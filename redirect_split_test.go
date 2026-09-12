@@ -43,16 +43,20 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 		t.Skip("opening the datastore:", err)
 	}
 	defer f.Close()
-	if err := mtgmatcher.LoadDatastore(f); err != nil {
+	b, err := mtgmatcher.Open("fleshandblood", f)
+	if err != nil {
 		t.Skip("loading the datastore:", err)
 	}
+	mtgmatcher.SetGlobalDatastore(b)
 	t.Cleanup(func() {
 		restore, err := os.Open(Config.DatastorePath)
 		if err != nil {
 			return
 		}
 		defer restore.Close()
-		mtgmatcher.LoadDatastore(restore)
+		if b, err := mtgmatcher.Open(datastoreGame(), restore); err == nil {
+			mtgmatcher.SetGlobalDatastore(b)
+		}
 	})
 
 	var split int

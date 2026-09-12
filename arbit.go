@@ -935,8 +935,13 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		// The same option drops the derived buy prices the market contradicts.
 		// "only Legit" cannot reach them: it filters through CustomPriceFilter,
-		// which only ever sees the seller's side of the trade
-		if pageVars.ReverseMode && arbitFilters["noindex"] && suspectPrice != nil {
+		// which only ever sees the seller's side of the trade. Nor can it reach
+		// a Global comparison's reference price since go-mtgban v0.8.3, where
+		// Mismatch hands the filter the probe's entry rather than the
+		// reference's: the TCGDirect price it vetted is the reference there,
+		// and a Direct listing above twice the market passed. Both are dropped
+		// here, on the price suspectPriceFor names for the mode.
+		if suspectPrice != nil && ((pageVars.ReverseMode && arbitFilters["noindex"]) || (pageVars.GlobalMode && arbitFilters["nosus"])) {
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
 				return invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
