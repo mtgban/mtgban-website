@@ -1313,9 +1313,9 @@
                             <th>Card</th>
                             <th>Set</th>
                             <th data-sort-method="none">INFO</th>
-                            <th class="c">Offer</th>
-                            <th class="c">Loaded</th>
-                            <th>Spread</th>
+                            <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>
+                            <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Loaded</th>
+                            <th data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Spread</th>
                             <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
@@ -1444,7 +1444,12 @@
     <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
     <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
     <script>
-        document.querySelectorAll('.opt-table').forEach(function(t) { new Tablesort(t); });
+        document.querySelectorAll('.opt-table').forEach(function(t) {
+            var sorter = new Tablesort(t);
+            t.addEventListener('beforeSort', function() {
+                sorter.options.descending = sorter.current.getAttribute('data-sort-descending') === 'true';
+            });
+        });
 
         function toggleOptRow(checkbox) {
             var row = checkbox.closest('tr');
