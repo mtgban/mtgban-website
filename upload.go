@@ -28,6 +28,7 @@ import (
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/moxfield"
 )
 
@@ -399,6 +400,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
 
+	// Publishing the list as a store changes what every page serves until
+	// the store is removed or the server restarts, so it needs its own
+	// grant - UploadPublish - rather than riding along with any other one
+	canPublishStore, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadPublish"))
+	canPublishStore = canPublishStore || (DevMode && !SigCheck)
+	publishStore := canPublishStore && r.FormValue("publishstore") == "true"
+
 	// Enable optimizer customization
 	var skipLowValue, skipLowValueAbs, skipHighValue, skipHighValueAbs bool
 	var skipConds, skipPrices bool
@@ -472,6 +480,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.MagicOnlyExports = magicOnlyExports
 	pageVars.CanChangeStores = canChangeStores
 	pageVars.CanUploadCustom = canUploadCustom
+	pageVars.CanPublishStore = canPublishStore
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
@@ -733,7 +742,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if increaseMaxRows {
 		maxRows = MaxUploadProEntries
 	}
-	// Allow a larger upload limit if set, if dev, or if it's an external call
+	// Allow a larger upload limit if set, if dev, or if it's an external call.
+	// UploadPublish carries no row-count privilege of its own - a store
+	// published site-wide is capped the same as any other upload unless the
+	// publisher separately holds UploadOptimizer/UploadNoLimit too.
 	noLimitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
 	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
 	if uploadNoLimit {
@@ -798,6 +810,39 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
+
+	// Whoever holds UploadPublish may serve the list as a store instead of
+	// pricing it. The rows are the ones on the page, printings picked and
+	// rows removed included, since the page posts them back the way the
+	// exports do; the mode says which side of the book they go on. A
+	// publisher need not also hold the Admin grant that reaching /admin
+	// itself takes, so the confirmation is shown right here rather than by
+	// redirecting there - the results below are computed the same as any
+	// other upload, just with the message added on top.
+	if publishStore {
+		kind := sessionstore.Retail
+		if blMode {
+			kind = sessionstore.Buylist
+		}
+		info := sessionstore.InfoFromForm(r)
+
+		report, err := Sessions.Publish(kind, info, uploadedData)
+		if err != nil {
+			pageVars.WarningMessage = "store not published: " + err.Error()
+			render(w, "upload.html", pageVars)
+			return
+		}
+
+		user := GetParamFromSig(sig, "UserEmail")
+		msg := fmt.Sprintf("Published %s (%s) as a %s store: %s", info.Name, info.Shorthand, kind, report)
+		LogPages["Upload"].Printf("%s by %q", msg, user)
+		UserNotify("upload", user+" "+msg)
+		// The confirmation says only what happened, not what happens next -
+		// the request falls through into the normal pricing/optimizer run
+		// below, the same as it would have without publishstore, so the
+		// list gets priced against the stores same as always.
+		pageVars.InfoMessage = msg + " The list is priced below as usual."
+	}
 
 	// Every export below is a list of cards to buy, sell or price, and an
 	// opened product is none of those - it is where some of the cards came

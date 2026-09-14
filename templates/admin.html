@@ -87,9 +87,7 @@
                 <tbody>
                 {{range $row := index .Tables 0}}
                     <tr data-tag="{{index $row 2}}">
-                        <td><a href="?refresh={{index $row 2}}" onclick="return confirm('Are you sure you want to refresh {{index $row 0}}?')">{{index $row 0}}</a></td>
-                        <td class="admin-mono">{{index $row 1}}</td>
-                        <td class="admin-mono"><a href="?logs={{index $row 2}}">{{index $row 2}}</a></td>
+                        {{template "admin-scraper-cells" $row}}
                         <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
@@ -118,9 +116,7 @@
                 <tbody>
                 {{range $row := index .Tables 1}}
                     <tr data-tag="{{index $row 2}}">
-                        <td><a href="?refresh={{index $row 2}}" onclick="return confirm('Are you sure you want to refresh {{index $row 0}}?')">{{index $row 0}}</a></td>
-                        <td class="admin-mono">{{index $row 1}}</td>
-                        <td class="admin-mono"><a href="?logs={{index $row 2}}">{{index $row 2}}</a></td>
+                        {{template "admin-scraper-cells" $row}}
                         <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
@@ -514,6 +510,28 @@
         </div>
     </div>
 </div>
+{{end}}
+
+{{/* The leading cells of a scraper row: name, id and tag. A scraper from the
+     bucket refreshes through its workflow and links its logs; a store an
+     admin published from an upload (the last column names its side) has
+     neither, and is removed from here instead. */}}
+{{define "admin-scraper-cells"}}
+    {{if index . 7}}
+        <td>{{index . 0}}</td>
+        <td class="admin-mono">{{index . 1}}</td>
+        <td class="admin-mono">{{index . 2}} &middot;
+            <form class="admin-inline-form" method="POST" action="admin" onsubmit="return confirm('Remove the session store {{index . 0}}?')">
+                <input type="hidden" name="removestore" value="{{index . 1}}">
+                <input type="hidden" name="kind" value="{{index . 7}}">
+                <button type="submit" class="admin-remove-link">remove</button>
+            </form>
+        </td>
+    {{else}}
+        <td><a href="?refresh={{index . 2}}" onclick="return confirm('Are you sure you want to refresh {{index . 0}}?')">{{index . 0}}</a></td>
+        <td class="admin-mono">{{index . 1}}</td>
+        <td class="admin-mono"><a href="?logs={{index . 2}}">{{index . 2}}</a></td>
+    {{end}}
 {{end}}
 
 {{define "extra-scripts"}}

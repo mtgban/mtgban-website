@@ -1024,6 +1024,10 @@
             {{end}}
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
             {{end}}
+            {{if .CanPublishStore}}
+            <div class="res-btn-sep"></div>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="openStorePrompt()">Publish as store</button>
+            {{end}}
         </div>
 
     </div>
@@ -1551,9 +1555,89 @@
         </div>
     </div>
 
+    {{if .CanPublishStore}}
+    {{/* The store about to be published: what ScraperInfo carries, less
+         what the server fills in - the timestamps, stamped at install, and
+         the game, which is the site's own. The list itself is read off the
+         page when Publish is pressed, the way the exports read it, so a
+         printing picked or a row removed above is what gets served. */}}
+    <div id="store-overlay" class="printing-overlay" onclick="if(event.target===this)closeStorePrompt()">
+        <div class="printing-picker store-prompt">
+            <div class="printing-picker-header">
+                <span class="printing-picker-title">Publish as a {{if .IsBuylist}}buylist{{else}}retail{{end}} store</span>
+                <button type="button" class="printing-picker-close" onclick="closeStorePrompt()">&times;</button>
+            </div>
+            <p class="store-prompt-note">Served to everyone, in memory only, until it is removed from the admin page or the server restarts. Rows without a price are left out.</p>
+            <label class="store-prompt-field">Name <input type="text" name="store_name" placeholder="Card Kingdom"></label>
+            <label class="store-prompt-field">Shorthand <input type="text" name="store_shorthand" placeholder="CK"></label>
+            <label class="store-prompt-field">Credit multiplier <input type="text" name="store_credit" placeholder="1.3" inputmode="decimal"></label>
+            <label class="store-prompt-field">Event <input type="text" name="store_family" placeholder="GP Vegas 2026"></label>
+            <label class="store-prompt-check"><input type="checkbox" name="store_sealed" value="true" {{if and .SealedEntries (not .SinglesEntries)}}checked{{end}}> Sealed mode</label>
+            <label class="store-prompt-check"><input type="checkbox" name="store_metadata" value="true"> Metadata only</label>
+            <label class="store-prompt-check"><input type="checkbox" name="store_noqty" value="true"> No quantity inventory</label>
+            <label class="store-prompt-check"><input type="checkbox" name="store_qtyprio" value="true"> Quantity priority</label>
+            <div class="store-prompt-actions">
+                <button type="button" class="upload-btn upload-btn-secondary" onclick="closeStorePrompt()">Cancel</button>
+                <button type="button" class="upload-btn upload-btn-primary" onclick="runPublishStore()">Publish</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    function openStorePrompt() {
+        document.getElementById("store-overlay").classList.add("open");
+        document.querySelector('#store-overlay [name="store_name"]').focus();
+    }
+    function closeStorePrompt() {
+        document.getElementById("store-overlay").classList.remove("open");
+    }
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") closeStorePrompt();
+    });
+
+    // Posts the rows on the page with the store's properties: the form the
+    // page posts itself back with is hidden, so the prompt lives beside it
+    // and its fields are copied over.
+    function runPublishStore() {
+        var overlay = document.getElementById("store-overlay");
+        var required = ["store_name", "store_shorthand"];
+        for (var i = 0; i < required.length; i++) {
+            var field = overlay.querySelector('[name="' + required[i] + '"]');
+            if (!field.value.trim()) {
+                field.focus();
+                return;
+            }
+        }
+
+        ensureHashesLoaded('all');
+        var form = document.getElementById("upload_form");
+        form.querySelectorAll('input[name^="store_"]').forEach(function(el) { el.remove(); });
+        overlay.querySelectorAll('input[name^="store_"]').forEach(function(field) {
+            if (field.type === "checkbox" && !field.checked) return;
+            var input = document.createElement("input");
+            input.type = "hidden";
+            input.name = field.name;
+            input.value = field.value;
+            form.appendChild(input);
+        });
+
+        resExportFields.forEach(function(id) {
+            document.getElementById(id).value = "";
+        });
+        var scope = document.getElementById("res_csvscope");
+        if (scope) {
+            scope.value = "";
+        }
+        document.getElementById("res_publishstore").value = "true";
+        form.target = '';
+        form.submit();
+    }
+    </script>
+    {{end}}
+
     <!-- Hidden form for pick-printing re-submission and exports -->
     <form id="upload_form" action="/upload" method="post" style="display:none">
         <input type="hidden" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
+        {{if .CanPublishStore}}<input type="hidden" id="res_publishstore" name="publishstore" value="">{{end}}
         <input type="hidden" id="res_download" name="download" value="">
         <input type="hidden" id="res_estimate" name="estimate" value="">
         <input type="hidden" id="res_deckbox" name="deckbox" value="">

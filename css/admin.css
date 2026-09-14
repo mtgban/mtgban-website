@@ -221,6 +221,22 @@
     font-weight: 500;
 }
 .admin-table a:hover { text-decoration: underline; }
+/* The session-store remove action posts rather than following a link - see
+   admin-scraper-cells - so it needs a submit button reading as the same
+   inline text link the rest of this table uses. */
+.admin-inline-form { display: inline; }
+.admin-remove-link {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+    color: var(--ainfo);
+    font-weight: 500;
+    font-size: inherit;
+    font-family: inherit;
+    cursor: pointer;
+}
+.admin-remove-link:hover { text-decoration: underline; }
 .admin-mono {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
