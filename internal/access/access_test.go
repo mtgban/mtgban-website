@@ -3,42 +3,21 @@ package access
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// inlineSink captures what the inline fallbacks would persist to the config.
-type inlineSink struct {
-	table  Table
-	grants []Grant
-}
-
 // fileHooks reach plain files, standing in for the bucket openers the site
 // injects.
-func fileHooks(sink *inlineSink) Hooks {
+func fileHooks() Hooks {
 	return Hooks{
 		Open: func(_ context.Context, path string) (io.ReadCloser, error) {
 			return os.Open(path)
 		},
 		OpenWrite: func(_ context.Context, path string) (io.WriteCloser, error) {
 			return os.Create(path)
-		},
-		SaveTableInline: func(_ context.Context, table Table) error {
-			if sink == nil {
-				return errors.New("no inline sink")
-			}
-			sink.table = table
-			return nil
-		},
-		SaveGrantsInline: func(_ context.Context, grants []Grant) error {
-			if sink == nil {
-				return errors.New("no inline sink")
-			}
-			sink.grants = grants
-			return nil
 		},
 	}
 }
@@ -54,28 +33,24 @@ func writeJSON(t *testing.T, path string, v any) {
 	}
 }
 
-// With no paths set nothing moves: a deployment whose config still carries
-// its acl and grants inline keeps working, which is what lets this ship
-// before any config is split.
-func TestLoadFallsBackToTheConfig(t *testing.T) {
-	c := New(fileHooks(nil))
-	err := c.Load(context.Background(), Sources{
-		FallbackTable:  Table{"Root": {"Search": {}}},
-		FallbackGrants: []Grant{{Email: "a@example.com", Tier: "Root"}},
-	})
-	if err != nil {
-		t.Fatal(err)
+// With no path configured, Load, SaveTable and SaveGrants all refuse rather
+// than reaching for a path that names no file: an empty path would
+// otherwise resolve to a confusing filesystem error instead of naming the
+// real problem.
+func TestNoPathConfiguredIsRefused(t *testing.T) {
+	c := New(fileHooks())
+	if err := c.Load(context.Background(), Sources{}); err == nil {
+		t.Error("Load with no paths did not error")
 	}
-	if _, ok := c.Table()["Root"]; !ok {
-		t.Errorf("table did not come from the fallback: %v", c.Table())
+	if err := c.SaveTable(context.Background(), Table{}); err == nil {
+		t.Error("SaveTable with no table path did not error")
 	}
-	if len(c.Grants()) != 1 {
-		t.Errorf("got %d grants from the fallback, want 1", len(c.Grants()))
+	if err := c.SaveGrants(context.Background(), nil); err == nil {
+		t.Error("SaveGrants with no grants path did not error")
 	}
 }
 
-// A path wins over the inline fields, and reaches a plain file through the
-// same call a bucket url would.
+// A Load reaches a plain file through the same call a bucket url would.
 func TestLoadReadsThePaths(t *testing.T) {
 	dir := t.TempDir()
 	tablePath := filepath.Join(dir, "acl.json")
@@ -86,17 +61,15 @@ func TestLoadReadsThePaths(t *testing.T) {
 		{Email: "b@example.com", Tier: "Mods"},
 	})
 
-	c := New(fileHooks(nil))
+	c := New(fileHooks())
 	err := c.Load(context.Background(), Sources{
-		TablePath:      tablePath,
-		GrantsPath:     grantsPath,
-		FallbackTable:  Table{"Inline": {}},
-		FallbackGrants: []Grant{{Email: "inline@example.com"}},
+		TablePath:  tablePath,
+		GrantsPath: grantsPath,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := c.Table()["Inline"]; ok || len(c.Table()) != 2 {
+	if len(c.Table()) != 2 {
 		t.Errorf("table did not come from the path: %v", c.Table())
 	}
 	if len(c.Grants()) != 2 || c.Grants()[0].Email != "a@example.com" {
@@ -107,10 +80,9 @@ func TestLoadReadsThePaths(t *testing.T) {
 // A configured path that cannot be read is an error, not a silent fallback:
 // enforcing an empty table would lock everyone out without saying why.
 func TestLoadReportsAMissingFile(t *testing.T) {
-	c := New(fileHooks(nil))
+	c := New(fileHooks())
 	err := c.Load(context.Background(), Sources{
-		TablePath:     filepath.Join(t.TempDir(), "nope.json"),
-		FallbackTable: Table{"Inline": {}},
+		TablePath: filepath.Join(t.TempDir(), "nope.json"),
 	})
 	if err == nil {
 		t.Fatal("missing table path did not error")
@@ -127,7 +99,7 @@ func TestReloadRefreshesOneValueOnly(t *testing.T) {
 	grantsPath := filepath.Join(dir, "grants.json")
 	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
 
-	c := New(fileHooks(nil))
+	c := New(fileHooks())
 	err := c.Load(context.Background(), Sources{
 		TablePath:  tablePath,
 		GrantsPath: grantsPath,
@@ -164,9 +136,11 @@ func TestReloadKeepsTheValueOnError(t *testing.T) {
 	dir := t.TempDir()
 	tablePath := filepath.Join(dir, "acl.json")
 	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+	grantsPath := filepath.Join(dir, "grants.json")
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
 
-	c := New(fileHooks(nil))
-	err := c.Load(context.Background(), Sources{TablePath: tablePath})
+	c := New(fileHooks())
+	err := c.Load(context.Background(), Sources{TablePath: tablePath, GrantsPath: grantsPath})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,14 +156,16 @@ func TestReloadKeepsTheValueOnError(t *testing.T) {
 	}
 }
 
-// With a grants path set, a save writes the file and publishes the new list.
+// A save writes the grants file and publishes the new list.
 func TestSaveGrantsWritesThePath(t *testing.T) {
 	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
 	grantsPath := filepath.Join(dir, "grants.json")
 	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
 
-	c := New(fileHooks(nil))
-	err := c.Load(context.Background(), Sources{GrantsPath: grantsPath})
+	c := New(fileHooks())
+	err := c.Load(context.Background(), Sources{TablePath: tablePath, GrantsPath: grantsPath})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,37 +190,16 @@ func TestSaveGrantsWritesThePath(t *testing.T) {
 	}
 }
 
-// Without a grants path the save goes through the inline hook — the config
-// write-back — and still publishes on success.
-func TestSaveGrantsFallsBackInline(t *testing.T) {
-	var sink inlineSink
-	c := New(fileHooks(&sink))
-	err := c.Load(context.Background(), Sources{
-		FallbackGrants: []Grant{{Email: "a@example.com"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	next := []Grant{{Email: "a@example.com"}, {Email: "b@example.com"}}
-	if err := c.SaveGrants(context.Background(), next); err != nil {
-		t.Fatal(err)
-	}
-	if len(sink.grants) != 2 {
-		t.Errorf("inline sink got %d grants, want 2", len(sink.grants))
-	}
-	if len(c.Grants()) != 2 {
-		t.Errorf("published %d grants, want 2", len(c.Grants()))
-	}
-}
-
-// With a table path set, a save writes the file and publishes the new table.
+// A save writes the table file and publishes the new table.
 func TestSaveTableWritesThePath(t *testing.T) {
 	dir := t.TempDir()
 	tablePath := filepath.Join(dir, "acl.json")
 	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+	grantsPath := filepath.Join(dir, "grants.json")
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
 
-	c := New(fileHooks(nil))
-	err := c.Load(context.Background(), Sources{TablePath: tablePath})
+	c := New(fileHooks())
+	err := c.Load(context.Background(), Sources{TablePath: tablePath, GrantsPath: grantsPath})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -265,28 +220,5 @@ func TestSaveTableWritesThePath(t *testing.T) {
 	}
 	if _, ok := onDisk["Mods"]; !ok || len(onDisk) != 2 {
 		t.Errorf("file holds %v, want the saved pair", onDisk)
-	}
-}
-
-// Without a table path the save goes through the inline hook — the config
-// write-back — and still publishes on success.
-func TestSaveTableFallsBackInline(t *testing.T) {
-	var sink inlineSink
-	c := New(fileHooks(&sink))
-	err := c.Load(context.Background(), Sources{
-		FallbackTable: Table{"Root": {"Search": {}}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	next := Table{"Root": {"Search": {}}, "Mods": {"Search": {}}}
-	if err := c.SaveTable(context.Background(), next); err != nil {
-		t.Fatal(err)
-	}
-	if len(sink.table) != 2 {
-		t.Errorf("inline sink got %d tiers, want 2", len(sink.table))
-	}
-	if len(c.Table()) != 2 {
-		t.Errorf("published %d tiers, want 2", len(c.Table()))
 	}
 }

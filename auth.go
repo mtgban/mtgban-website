@@ -41,7 +41,6 @@ type PatreonConfig struct {
 	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
 	Secret map[string]string `json:"secret"`
-	Grants []PatreonGrant    `json:"grants"`
 }
 
 type PatreonUserData struct {

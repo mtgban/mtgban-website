@@ -53,9 +53,8 @@ func skipAccessNotification(n *pq.Notification, instanceName string) bool {
 
 // startAccessReloadListener subscribes to the reload channel of every value
 // this deployment reads from its own file and keeps that value in sync with
-// the peers' saves. It needs the shared database to listen on, and there is
-// nothing to subscribe to for a value still carried inline: a peer cannot
-// write this deployment's config.
+// the peers' saves. It needs the shared database to listen on, and skips any
+// value with no path configured: there is nothing to reload.
 func startAccessReloadListener() {
 	if Config.SQLConfig == nil {
 		return

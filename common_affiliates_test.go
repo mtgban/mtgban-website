@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// withAffiliateConfig points the config's affiliate fields at the given
-// values for one test, restoring the config and the published value after.
-func withAffiliateConfig(t *testing.T, codes map[string]string, list []string, path string) {
+// withAffiliateConfig points the config's affiliates path at the given
+// value for one test, restoring the config and the published value after.
+func withAffiliateConfig(t *testing.T, path string) {
 	t.Helper()
 	saved := Config
 	savedValue := affiliatesPtr.Load()
@@ -18,29 +18,22 @@ func withAffiliateConfig(t *testing.T, codes map[string]string, list []string, p
 		Config = saved
 		affiliatesPtr.Store(savedValue)
 	})
-	Config.Affiliate = codes
-	Config.AffiliatesList = list
-	Config.AffiliatesBuylistList = nil
 	Config.AffiliatesPath = path
 }
 
-// With no path set the inline config fields keep working, which is what lets
-// this ship before any config is split.
-func TestLoadAffiliatesFallsBackToTheConfig(t *testing.T) {
-	withAffiliateConfig(t, map[string]string{"TCG": "12345"}, []string{"CK"}, "")
-	if err := loadAffiliates(context.Background()); err != nil {
-		t.Fatal(err)
+// With no path configured, both Load and Save refuse rather than reaching
+// for a path that names no file.
+func TestNoAffiliatesPathIsRefused(t *testing.T) {
+	withAffiliateConfig(t, "")
+	if err := loadAffiliates(context.Background()); err == nil {
+		t.Error("load with no affiliates path did not error")
 	}
-	if Affiliates().Codes["TCG"] != "12345" {
-		t.Errorf("codes did not come from the fallback: %v", Affiliates().Codes)
-	}
-	if len(Affiliates().List) != 1 {
-		t.Errorf("got %d list entries from the fallback, want 1", len(Affiliates().List))
+	if err := saveAffiliates(context.Background(), AffiliatesConfig{}); err == nil {
+		t.Error("save with no affiliates path did not error")
 	}
 }
 
-// A path wins over the inline fields, wholly: values the file does not carry
-// are not patched in from the config.
+// A Load reads the affiliate data from its shared file.
 func TestLoadAffiliatesReadsThePath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "affiliates.json")
 	data := []byte(`{"affiliate": {"TCG": "67890"}, "affiliates_list": ["CK", "SCG"]}`)
@@ -48,7 +41,7 @@ func TestLoadAffiliatesReadsThePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	withAffiliateConfig(t, map[string]string{"TCG": "12345"}, []string{"CK"}, path)
+	withAffiliateConfig(t, path)
 	if err := loadAffiliates(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -63,11 +56,11 @@ func TestLoadAffiliatesReadsThePath(t *testing.T) {
 	}
 }
 
-// With a path set, a save writes the shared file and publishes the value.
-// (The peer notification is a no-op here: tests run without a price DB.)
+// A save writes the shared file and publishes the value. (The peer
+// notification is a no-op here: tests run without a price DB.)
 func TestSaveAffiliatesWritesThePath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "affiliates.json")
-	withAffiliateConfig(t, map[string]string{"TCG": "12345"}, nil, path)
+	withAffiliateConfig(t, path)
 
 	next := AffiliatesConfig{Codes: map[string]string{"TCG": "67890"}, List: []string{"CK"}}
 	if err := saveAffiliates(context.Background(), next); err != nil {
@@ -93,7 +86,13 @@ func TestSaveAffiliatesWritesThePath(t *testing.T) {
 // A configured path that cannot be read is an error, not a silent fallback,
 // and the previously published value survives the failed reload.
 func TestLoadAffiliatesKeepsTheValueOnError(t *testing.T) {
-	withAffiliateConfig(t, map[string]string{"TCG": "12345"}, nil, "")
+	path := filepath.Join(t.TempDir(), "affiliates.json")
+	data := []byte(`{"affiliate": {"TCG": "12345"}}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	withAffiliateConfig(t, path)
 	if err := loadAffiliates(context.Background()); err != nil {
 		t.Fatal(err)
 	}

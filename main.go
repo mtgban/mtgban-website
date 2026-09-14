@@ -567,18 +567,13 @@ type ConfigType struct {
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
 	// from the ban list document or the set registry.
-	FormatEvents        []FormatEvent    `json:"format_events,omitempty"`
-	ScraperConfig       ScraperConfig    `json:"scraper_config"`
-	TimeseriesConfig    TimeseriesConfig `json:"timeseries_config"`
-	DiscordHook         string           `json:"discord_hook"`
-	DiscordNotifHook    string           `json:"discord_notif_hook"`
-	DiscordAPINotifHook string           `json:"discord_api_notif_hook"`
-	DiscordInviteLink   string           `json:"discord_invite_link"`
-	// The affiliate fields are fallbacks read only when AffiliatesPath is
-	// not set; use Affiliates() (common.go) instead of these.
-	Affiliate              map[string]string  `json:"affiliate"`
-	AffiliatesList         []string           `json:"affiliates_list"`
-	AffiliatesBuylistList  []string           `json:"affiliates_buylist_list"`
+	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
+	ScraperConfig          ScraperConfig      `json:"scraper_config"`
+	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
+	DiscordHook            string             `json:"discord_hook"`
+	DiscordNotifHook       string             `json:"discord_notif_hook"`
+	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
+	DiscordInviteLink      string             `json:"discord_invite_link"`
 	API                    map[string]string  `json:"api"`
 	APIDemoStores          []string           `json:"api_demo_stores"`
 	DiscordToken           string             `json:"discord_token"`
@@ -597,22 +592,15 @@ type ConfigType struct {
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
-	// ACL and the Patreon grants are read from their own files when a path is
-	// given, and from the fields below when it is not. See common.go: the
-	// fields are the migration's other half and go once every deployment has
-	// moved. A path may be shared between deployments or belong to one; that
-	// is a choice about the data, not about the code.
+	// ACL and the Patreon grants each live in their own file; a path may be
+	// shared between deployments or belong to one, which is a choice about
+	// the data, not the code. AffiliatesPath does the same for the
+	// affiliate data, which every game shares: a store a game doesn't
+	// carry never matches its list entries. These locate the files; see
+	// common.go for the readers and writers.
 	ACLPath           string `json:"acl_path"`
 	PatreonGrantsPath string `json:"patreon_grants_path"`
-
-	// AffiliatesPath does the same for the affiliate data - the codes and
-	// the two store lists above - which every game shares: the codes are
-	// the partner accounts, and a store a game doesn't carry never matches
-	// its list entries. The file holds the three sections under their
-	// config key names.
-	AffiliatesPath string `json:"affiliates_path"`
-
-	ACL map[string]map[string]map[string]string `json:"acl"`
+	AffiliatesPath    string `json:"affiliates_path"`
 
 	Uploader map[string]string `json:"uploader"`
 
