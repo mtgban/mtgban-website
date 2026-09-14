@@ -1,9 +1,9 @@
 # AGENTS.md
 
 Guidance for AI coding agents working in this repository. Humans may also find
-it a useful quickstart. A fuller architecture doc, `SPECIFICATION.md`, exists
-locally but is not committed as of this writing — this file doesn't assume
-you have it.
+it a useful quickstart. A fuller architecture doc, `SPECIFICATION.md`, is
+committed alongside this file, in the same doc-refresh pass — read it for
+detail this file only summarizes.
 
 ## What this is
 
