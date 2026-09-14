@@ -1091,23 +1091,6 @@ const (
 
 var apiUsersMutex sync.RWMutex
 
-// writeConfigTo writes the config to a path in a bucket, closing the writer
-// itself: for a bucket that is what finalises the upload, so its error is the
-// write's error and a caller that discarded it would call a failed save a
-// success.
-func writeConfigTo(ctx context.Context, bucket simplecloud.ReadWriter, path string, config ConfigType) error {
-	writer, err := simplecloud.InitWriter(ctx, bucket, path)
-	if err != nil {
-		return err
-	}
-	err = writeConfigFile(config, writer)
-	cerr := writer.Close()
-	if err != nil {
-		return err
-	}
-	return cerr
-}
-
 func writeConfigFile(config ConfigType, writer io.Writer) error {
 	e := json.NewEncoder(writer)
 	// Avoids & -> \u0026 and similar
