@@ -4,24 +4,16 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // registeredGames is every game mtgmatcher activates through its games
-// package, which is what a deployment can be configured as. Keep it in step
-// with go-mtgban/mtgmatcher/games/games.go.
-var registeredGames = []string{
-	"fleshandblood",
-	"gundam",
-	"lorcana",
-	"magic",
-	"onepiece",
-	"palworld",
-	"pokemon",
-	"riftbound",
-	"yugioh",
-}
+// package, which is what a deployment can be configured as. Read from
+// mtgmatcher.RegisteredGames() rather than a hand-kept list, so a game whose
+// blank import lands here doesn't first need a matching edit in this file.
+var registeredGames = mtgmatcher.RegisteredGames()
 
 // A game absent from gameMap panics the newspaper cache at startup
 // (news.go's "missing game in newspaper map"), so the entry has to exist
