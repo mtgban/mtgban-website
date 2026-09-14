@@ -18,15 +18,16 @@ MTGBAN is a multi-game trading-card-game price-aggregation website written in
 Go (`go 1.25`, module `github.com/mtgban/mtgban-website`). One codebase
 deploys as a separate site per game, selected by `Config.Game` (`main.go`,
 `DefaultGame = "magic"`): magic is the default, and lorcana, onepiece,
-yugioh, riftbound, fleshandblood, and pokemon each have their own
-`.github/workflows/<game>-deploy.yml`. gundam and palworld are wired into
-the site's rarity/color/card-back handling (`utils.go`) and registered in
-go-mtgban's `mtgmatcher/games`, but aren't deployed yet — go.mod pins
-`go-mtgban v0.8.3`, which predates the commit adding their packages, and
-neither has a deploy workflow. It is a single server binary (~25k lines in
-the root package, excluding tests) plus small support packages,
-server-rendered Go HTML templates, and vanilla JS/CSS with no frontend
-build step.
+yugioh, riftbound, fleshandblood, pokemon, gundam, and palworld each have
+their own `.github/workflows/<game>-deploy.yml`. gundam and palworld are the
+newest and both already registered in go-mtgban's pinned version (games.go's
+blank imports covered them before either had a deploy workflow) — but
+neither has an actual DigitalOcean App Platform app or its secret
+provisioned yet, which is infrastructure, not code; see AGENTS.md's
+"Deploying a new game". It is a
+single server binary (~25k lines in the root package, excluding tests) plus
+small support packages, server-rendered Go HTML templates, and vanilla
+JS/CSS with no frontend build step.
 
 Core capabilities:
 
@@ -521,9 +522,10 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
 
 - **Config variants**: one config file per deployment, selected via `Config.Game`
   (magic is the default; lorcana, onepiece, yugioh, riftbound, fleshandblood,
-  and pokemon are also live, each with its own `.github/workflows/<game>-deploy.yml`;
-  gundam and palworld have matcher/badge/card-back support but no deploy
-  workflow yet — see AGENTS.md). All `*.json` files, including every
+  and pokemon are already live; gundam and palworld have the code and the
+  deploy workflow but no DigitalOcean app or secret provisioned yet — see
+  AGENTS.md's "Deploying a new game"), each with its own
+  `.github/workflows/<game>-deploy.yml`. All `*.json` files, including every
   `config*.json`, are gitignored — the copies in a local checkout are stripped
   dev config, not production; real per-deployment config is pulled from the
   config bucket, so don't infer live behavior from a local file.
