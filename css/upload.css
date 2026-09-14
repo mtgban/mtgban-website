@@ -1575,3 +1575,57 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .page-header h1 .upload-source-link:hover {
     text-decoration-color: currentColor;
 }
+
+/* -- Publish-as-store prompt (gated by the UploadPublish grant) -- */
+.store-prompt {
+    width: 420px;
+}
+.store-prompt-note {
+    margin: 0 0 16px;
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    line-height: 1.4;
+}
+.store-prompt-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+}
+.store-prompt-field input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-family: inherit;
+    font-size: var(--text-md);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    outline: none;
+}
+.store-prompt-field input:focus { border-color: var(--ainfo); }
+.store-prompt-field input::placeholder { color: var(--text-dim); }
+.store-prompt-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: var(--text-md);
+    color: var(--normal);
+    cursor: pointer;
+}
+.store-prompt-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}

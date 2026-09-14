@@ -281,6 +281,7 @@ type PageVars struct {
 	MagicOnlyExports     bool
 	CanChangeStores      bool
 	CanUploadCustom      bool
+	CanPublishStore      bool
 	RemoteLinkURL        string
 	TotalQuantity        int
 	Optimized            map[string][]OptimizedUploadEntry
@@ -388,6 +389,7 @@ var OptionalFields = []string{
 	"UploadOptimizer",
 	"UploadNoLimit",
 	"UploadCustom",
+	"UploadPublish",
 	"AnyEnabled",
 	"AnyExperimentsEnabled",
 	"AnySpread",

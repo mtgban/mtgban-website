@@ -12,8 +12,8 @@ func TestAdminScraperTablesSort(t *testing.T) {
 	pv := PageVars{
 		BetaNav: &NavElem{Short: "b"},
 		Tables: [][][]string{
-			{{"Card Kingdom", "CK", "CK", "2026-09-06T10:00:00Z", "12345", "👍", "ok"}},
-			{{"Card Kingdom", "CK", "CK", "2026-09-06T10:00:00Z", "6789", "👍", "ok"}},
+			{{"Card Kingdom", "CK", "CK", "2026-09-06T10:00:00Z", "12345", "👍", "ok", ""}},
+			{{"Card Kingdom", "CK", "CK", "2026-09-06T10:00:00Z", "6789", "👍", "ok", ""}},
 		},
 	}
 	out := renderPage(t, "admin.html", false, pv)

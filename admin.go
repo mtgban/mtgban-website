@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/simplecloud"
 
@@ -103,6 +104,19 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		err := loadScraper(DataBucket, Config.ScraperConfig.BucketPath, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"), Config.ScraperConfig.BucketFileFormat)
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
+		}
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return
+	}
+
+	removeStore := r.FormValue("removestore")
+	if removeStore != "" {
+		v := url.Values{}
+		v.Set("msg", removeStore+" removed")
+		err := Sessions.Remove(r.FormValue("kind"), removeStore)
+		if err != nil {
+			v.Set("msg", "remove of "+removeStore+" error: "+err.Error())
 		}
 		r.URL.RawQuery = v.Encode()
 		http.Redirect(w, r, r.URL.String(), http.StatusFound)
@@ -550,6 +564,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			ref = "👍"
 		}
 
+		// A store published from an upload has no workflow to refresh it
+		// or log it, and can be removed from here instead. One the config
+		// has since claimed is a real store, whatever the registry says.
+		session := ""
+		if key == "UNKNOWN" && Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
+			key = "session"
+			session = sessionstore.Retail
+		}
+
 		row := []string{
 			name,
 			seller.Info().Shorthand,
@@ -558,11 +581,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprint(len(inv)),
 			ref,
 			status,
+			session,
 		}
 		sellerTable = append(sellerTable, row)
 	}
 	pageVars.Headers = append(pageVars.Headers, []string{
-		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
+		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status", "Session",
 	})
 	pageVars.Tables = append(pageVars.Tables, sellerTable)
 
@@ -603,6 +627,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			ref = "👍"
 		}
 
+		session := ""
+		if key == "UNKNOWN" && Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
+			key = "session"
+			session = sessionstore.Buylist
+		}
+
 		row := []string{
 			name,
 			vendor.Info().Shorthand,
@@ -611,11 +641,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprint(len(bl)),
 			ref,
 			status,
+			session,
 		}
 		vendorTable = append(vendorTable, row)
 	}
 	pageVars.Headers = append(pageVars.Headers, []string{
-		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
+		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status", "Session",
 	})
 	pageVars.Tables = append(pageVars.Tables, vendorTable)
 

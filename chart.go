@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -535,8 +536,12 @@ func stashInTimeseries() {
 	// Accumulate all prices into a single row per (date, uuid, foil, etched).
 	accumulated := map[string]*timeseries.PriceRow{}
 
-	// Collect retail prices from sellers
+	// Collect retail prices from sellers. A store published from an upload
+	// lives in memory only, whatever dataset its shorthand happens to name.
 	for _, seller := range GetSellers() {
+		if Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
+			continue
+		}
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Retail, seller.Info().Shorthand) {
 				continue
@@ -572,6 +577,9 @@ func stashInTimeseries() {
 
 	// Collect buylist prices from vendors
 	for _, vendor := range GetVendors() {
+		if Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
+			continue
+		}
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Buylist, vendor.Info().Shorthand) {
 				continue
