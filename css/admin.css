@@ -142,6 +142,7 @@
     outline: none;
     font-family: inherit;
 }
+.admin-grant-form input.admin-grant-overrides { flex: 2; }
 .admin-grant-form select { cursor: pointer; }
 .admin-grant-form input:focus,
 .admin-grant-form select:focus { border-color: var(--ainfo); }
