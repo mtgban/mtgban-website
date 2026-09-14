@@ -50,7 +50,8 @@ type PriceAPIOutput struct {
 // apiEnabledStores expands the sig's API store option into the concrete
 // store list. ALL_ACCESS generates it from the search blocklists at runtime
 // (so scrapers added after the sig was issued are picked up), DEV_ACCESS
-// sees everything, and an explicit list is taken as-is: a sig's own store
+// sees everything, and an explicit list is taken as-is, BASE_ACCESS filters
+// anything that isn't sealed and isn't from the main region; a sig's own store
 // list bypasses the blocklists by design.
 func apiEnabledStores(storesOpt string) []string {
 	var enabledStores []string
@@ -70,6 +71,24 @@ func apiEnabledStores(storesOpt string) []string {
 		for _, vendor := range GetVendors() {
 			shorthand := vendor.Info().Shorthand
 			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) {
+				enabledStores = append(enabledStores, shorthand)
+			}
+		}
+	case "BASE_ACCESS":
+		blocklistRetail := Config.SearchRetailBlockList
+		blocklistBuylist := Config.SearchBuylistBlockList
+
+		for _, seller := range GetSellers() {
+			info := seller.Info()
+			shorthand := info.Shorthand
+			if storeEligible(shorthand, nil, blocklistRetail) && !slices.Contains(enabledStores, shorthand) && !info.SealedMode && info.CountryFlag == "" {
+				enabledStores = append(enabledStores, shorthand)
+			}
+		}
+		for _, vendor := range GetVendors() {
+			info := vendor.Info()
+			shorthand := info.Shorthand
+			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) && !info.SealedMode && info.CountryFlag == "" {
 				enabledStores = append(enabledStores, shorthand)
 			}
 		}
