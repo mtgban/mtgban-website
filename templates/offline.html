@@ -190,10 +190,10 @@
             }
         });
 
-        // Failed offline images fall back to the neutral placeholder.
-        document.getElementById('cardImage').addEventListener('error', function () {
-            if (this.src !== PLACEHOLDER) this.src = PLACEHOLDER;
-        });
+        // A URL that passed safeImageURL still points at a local cache entry
+        // that can be missing or corrupted; card-art-fallback.js (loaded by
+        // base.html) catches that failure site-wide and swaps in the game's
+        // card back, the same as it does for a live vendor image 404ing.
 
         document.querySelectorAll('.search-sort-pill').forEach(function (b) {
             b.addEventListener('click', function () {

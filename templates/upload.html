@@ -809,7 +809,7 @@
                 <td>
                     <div class="ures-card-cell">
                         <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
-                            <img src="{{$card.ImageURL}}" loading="lazy">
+                            <img class="card-art" src="{{$card.ImageURL}}" loading="lazy">
                         </div>
                         <div class="ures-card-info">
                             <span class="ures-card-name">

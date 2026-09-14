@@ -15,6 +15,7 @@ var SHELL_URLS = [
     '/css/command-palette.css?hash=' + BUILD,
     '/css/settings-modal.css?hash=' + BUILD,
     '/css/editions-picker.css?hash=' + BUILD,
+    '/js/card-art-fallback.js?hash=' + BUILD,
     '/js/utils.js?hash=' + BUILD,
     '/js/fetchnames.js?hash=' + BUILD,
     '/js/autocomplete.js?hash=' + BUILD,

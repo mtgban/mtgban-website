@@ -17,7 +17,7 @@ function thumbHtml(src, foil, cw) {
     if (cw) cls += ' content-warning';
     return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
            (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
-           '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
+           '><img class="card-art" src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
 }
 
 /* A URL from the page - an attribute, a select's value, an href - resolved
