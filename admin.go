@@ -328,10 +328,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 					Config = config
 					Config.sourcePath = configSourcePath
 					pageVars.InfoMessage = "Config updated"
-					// The access table and grants are served from their own
-					// holder now; republish so an edit to the inline acl or
-					// grants takes effect immediately, as it did when readers
-					// hit the config directly.
+					// The access table, grants and affiliate data are served
+					// from their own files, not this config; reload them here
+					// in case the edit changed the paths that name them.
 					err = loadCommonConfig(r.Context())
 					if err != nil {
 						pageVars.WarningMessage = err.Error()
@@ -408,7 +407,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.ACLSource = Config.ACLPath
 	if pageVars.ACLSource == "" {
-		pageVars.ACLSource = "inline config"
+		pageVars.ACLSource = "not configured"
 	}
 
 	// -- Affiliates: handle POST if submitted --
@@ -441,7 +440,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.AffiliatesSource = Config.AffiliatesPath
 	if pageVars.AffiliatesSource == "" {
-		pageVars.AffiliatesSource = "inline config"
+		pageVars.AffiliatesSource = "not configured"
 	}
 
 	// -- Key overrides: handle POST if submitted --

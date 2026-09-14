@@ -6,21 +6,21 @@
 // any two deployments choose to point at is a decision about the data.
 //
 // The package touches no backend or config of its own — the caller hands it
-// hooks for opening paths and for the inline-config fallback, both of which
-// stay coupled to the deployment that owns them.
+// hooks for opening paths, which stay coupled to the deployment that owns
+// them.
 package access
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
 )
 
-// Grant is one entry of the Patreon grant list. The json tags match the
-// inline config field it migrates out of.
+// Grant is one entry of the Patreon grant list.
 type Grant struct {
 	Category string `json:"category"`
 	Email    string `json:"email"`
@@ -31,27 +31,17 @@ type Grant struct {
 // Table is the tier -> feature -> option access table.
 type Table map[string]map[string]map[string]string
 
-// Hooks are the deployment-owned halves: how a path reaches its backend
-// (credentials live with the caller) and how each value persists into the
-// inline config while one still carries it. The inline hooks go away with
-// the migration, once no config holds an inline table or grant list.
+// Hooks is the deployment-owned half: how a path reaches its backend.
+// Credentials live with the caller.
 type Hooks struct {
-	Open             func(ctx context.Context, path string) (io.ReadCloser, error)
-	OpenWrite        func(ctx context.Context, path string) (io.WriteCloser, error)
-	SaveTableInline  func(ctx context.Context, table Table) error
-	SaveGrantsInline func(ctx context.Context, grants []Grant) error
+	Open      func(ctx context.Context, path string) (io.ReadCloser, error)
+	OpenWrite func(ctx context.Context, path string) (io.WriteCloser, error)
 }
 
-// Sources says where a Load reads from: a path where one is configured, the
-// fallback values the deployment config carries inline where none is. The
-// fallback is what makes the move a migration rather than a flag day: this
-// ships before any config is split, and each deployment moves when its own
-// path is set.
+// Sources says where a Load reads from.
 type Sources struct {
-	TablePath      string
-	GrantsPath     string
-	FallbackTable  Table
-	FallbackGrants []Grant
+	TablePath  string
+	GrantsPath string
 }
 
 // Client holds the loaded table and grants. Both are read on request paths
@@ -158,7 +148,7 @@ func (c *Client) ReloadGrants(ctx context.Context) error {
 
 func (c *Client) loadTable(ctx context.Context, sources Sources) (Table, error) {
 	if sources.TablePath == "" {
-		return sources.FallbackTable, nil
+		return nil, errors.New("acl: no path configured")
 	}
 	var table Table
 	err := c.readJSONPath(ctx, sources.TablePath, &table)
@@ -170,7 +160,7 @@ func (c *Client) loadTable(ctx context.Context, sources Sources) (Table, error) 
 
 func (c *Client) loadGrants(ctx context.Context, sources Sources) ([]Grant, error) {
 	if sources.GrantsPath == "" {
-		return sources.FallbackGrants, nil
+		return nil, errors.New("grants: no path configured")
 	}
 	var grants []Grant
 	err := c.readJSONPath(ctx, sources.GrantsPath, &grants)
@@ -181,22 +171,16 @@ func (c *Client) loadGrants(ctx context.Context, sources Sources) ([]Grant, erro
 }
 
 // SaveGrants persists a new grant list to wherever the list was read from,
-// and publishes it on success. With no path configured that is still the
-// inline config, which is where the admin page has always written it.
+// and publishes it on success.
 func (c *Client) SaveGrants(ctx context.Context, grants []Grant) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.sources.GrantsPath == "" {
-		if err := c.hooks.SaveGrantsInline(ctx, grants); err != nil {
-			return err
-		}
-		c.setGrants(grants)
-		return nil
+		return errors.New("grants: no path configured")
 	}
-
 	if err := c.writeJSONPath(ctx, c.sources.GrantsPath, grants); err != nil {
-		return err
+		return fmt.Errorf("grants %s: %w", c.sources.GrantsPath, err)
 	}
 	c.setGrants(grants)
 	return nil
@@ -209,15 +193,10 @@ func (c *Client) SaveTable(ctx context.Context, table Table) error {
 	defer c.mu.Unlock()
 
 	if c.sources.TablePath == "" {
-		if err := c.hooks.SaveTableInline(ctx, table); err != nil {
-			return err
-		}
-		c.setTable(table)
-		return nil
+		return errors.New("acl: no path configured")
 	}
-
 	if err := c.writeJSONPath(ctx, c.sources.TablePath, table); err != nil {
-		return err
+		return fmt.Errorf("acl %s: %w", c.sources.TablePath, err)
 	}
 	c.setTable(table)
 	return nil
