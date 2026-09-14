@@ -382,7 +382,8 @@ func TestStoreEligible(t *testing.T) {
 
 // TestApiEnabledStores pins how the API turns the sig store option into the
 // store list: ALL_ACCESS applies the search blocklists at runtime,
-// DEV_ACCESS applies nothing, and an explicit list bypasses them entirely.
+// DEV_ACCESS applies nothing, an explicit list bypasses them entirely, and
+// BASE_ACCESS additionally drops sealed and non-main-region stores.
 func TestApiEnabledStores(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
@@ -414,6 +415,34 @@ func TestApiEnabledStores(t *testing.T) {
 	got = apiEnabledStores("PARITYIDX,PARITYV")
 	if !slices.Equal(got, []string{"PARITYIDX", "PARITYV"}) {
 		t.Errorf("explicit list should bypass blocklists, got %v", got)
+	}
+
+	// BASE_ACCESS starts from the same blocklisted set as ALL_ACCESS, then
+	// additionally drops sealed sellers and non-main-region vendors.
+	sealedSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
+		Name: "Parity Sealed", Shorthand: "PARITYSEALED", SealedMode: true,
+	})
+	sellers := append(*sellersPtr.Load(), sealedSeller)
+	sellersPtr.Store(&sellers)
+
+	euVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
+		Name: "Parity EU", Shorthand: "PARITYEU", CountryFlag: "EU",
+	})
+	vendors := append(*vendorsPtr.Load(), euVendor)
+	vendorsPtr.Store(&vendors)
+
+	got = apiEnabledStores("BASE_ACCESS")
+	if !slices.Contains(got, "PARITYA") {
+		t.Errorf("BASE_ACCESS should keep PARITYA, got %v", got)
+	}
+	if slices.Contains(got, "PARITYIDX") || slices.Contains(got, "PARITYV") {
+		t.Errorf("BASE_ACCESS should apply both blocklists, got %v", got)
+	}
+	if slices.Contains(got, "PARITYSEALED") {
+		t.Errorf("BASE_ACCESS should drop sealed sellers, got %v", got)
+	}
+	if slices.Contains(got, "PARITYEU") {
+		t.Errorf("BASE_ACCESS should drop non-main-region vendors, got %v", got)
 	}
 }
 
