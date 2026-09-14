@@ -26,6 +26,12 @@ type Grant struct {
 	Email    string `json:"email"`
 	Name     string `json:"name"`
 	Tier     string `json:"tier"`
+
+	// Overrides holds this grant's own feature -> option -> value table,
+	// the same shape as one tier's slice of Table. Applied after the
+	// grant's tier so it wins, and only for this one user - it does not
+	// touch the tier itself or anyone else granted it.
+	Overrides map[string]map[string]string `json:"overrides,omitempty"`
 }
 
 // Table is the tier -> feature -> option access table.

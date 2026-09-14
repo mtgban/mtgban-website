@@ -294,7 +294,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		doReboot = true
 
 		tier := r.FormValue("tier")
-		msg := ServerURL + "/?sig=" + sign(tier, nil)
+		msg := ServerURL + "/?sig=" + sign(tier, nil, nil)
 
 		v.Set("msg", msg)
 		v.Set("html", "textfield")

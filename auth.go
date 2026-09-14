@@ -193,10 +193,12 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tierTitle := ""
+	var overrides map[string]map[string]string
 	// If user is in the allowed list, load the tier from here
 	for _, grant := range PatreonGrants() {
 		if strings.ToLower(grant.Email) == userData.Email {
 			tierTitle = grant.Tier
+			overrides = grant.Overrides
 			LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
 			break
 		}
@@ -231,7 +233,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	LogPages["Admin"].Println(tierTitle)
 
 	// Sign our base URL with our tier and other data
-	sig := sign(tierTitle, userData)
+	sig := sign(tierTitle, userData, overrides)
 
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, sig)
@@ -680,14 +682,13 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 	}
 }
 
-func getValuesForTier(tierTitle string) url.Values {
-	v := url.Values{}
-	tier, found := ACL()[tierTitle]
-	if !found {
-		return v
-	}
+// applyACL sets each enabled page and its option values from table into v,
+// overwriting whatever v already holds for them. Calling it a second time
+// with a different table layers those values on top of the first call's -
+// which is how a grant's own Overrides sit on top of its tier's table.
+func applyACL(v url.Values, table map[string]map[string]string) {
 	for _, page := range OrderNav {
-		options, found := tier[page]
+		options, found := table[page]
 		if !found {
 			continue
 		}
@@ -701,6 +702,15 @@ func getValuesForTier(tierTitle string) url.Values {
 			v.Set(key, val)
 		}
 	}
+}
+
+func getValuesForTier(tierTitle string) url.Values {
+	v := url.Values{}
+	tier, found := ACL()[tierTitle]
+	if !found {
+		return v
+	}
+	applyACL(v, tier)
 	return v
 }
 
@@ -709,8 +719,12 @@ func getValuesForTier(tierTitle string) url.Values {
 // signing and verification paths walk is computed once instead of per request.
 var SignedFields = slices.Concat(OrderNav, OptionalFields)
 
-func sign(tierTitle string, userData *PatreonUserData) string {
+// sign encodes tierTitle's ACL values into a signature, with overrides -
+// a grant's own values for this one user - layered on top afterward so
+// they win over anything the tier itself set.
+func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[string]string) string {
 	v := getValuesForTier(tierTitle)
+	applyACL(v, overrides)
 	if userData != nil {
 		v.Set("UserName", userData.FullName)
 		v.Set("UserEmail", userData.Email)
