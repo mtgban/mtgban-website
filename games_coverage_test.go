@@ -18,6 +18,7 @@ var registeredGames = []string{
 	"magic",
 	"onepiece",
 	"palworld",
+	"pokemon",
 	"riftbound",
 	"yugioh",
 }
