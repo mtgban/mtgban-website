@@ -117,11 +117,37 @@ Magic's keyrune glyph) are a separate system with its own recipe and its own
 per-game history: `img/setsymbol/README.md`. Read it before touching
 `colorRarityMap` or adding a ninth game.
 
-`gundam` and `palworld` are registered in go-mtgban's `mtgmatcher/games` and
-have their badges and card backs set up here, but this repo's `go.mod` still
-pins a go-mtgban version older than the commit that added their
-`mtgmatcher` packages, and neither has a `.github/workflows/*-deploy.yml`
-yet — check both before assuming either is actually deployable.
+`gundam` and `palworld` have their badges, card backs, and deploy workflow
+all set up as of 2026-09-15 — see below — but neither has a DigitalOcean App
+Platform app or its `DO_<GAME>_APP_ID`/`DO_API_TOKEN` secret provisioned
+yet, which is not something committing code can do. Pushing a
+`gundam-*`/`palworld-*` tag before that exists just fails the workflow's
+`doctl apps create-deployment` step with an unknown-app error. (An earlier
+version of this file also claimed `go.mod`'s go-mtgban pin predated the
+commit that added their `mtgmatcher` packages — checked directly and that
+was wrong: both were already registered at the pinned `v0.8.3`, games.go
+blank-imports included, so no dependency bump was ever needed for this.)
+
+### Deploying a new game
+
+Two deploy patterns exist, chosen by how big the card pool is:
+
+- **DigitalOcean App Platform** (`lorcana`, `onepiece`, `fleshandblood`,
+  `riftbound`, `gundam`, `palworld`, plus `beta`) — a `.github/workflows/
+  <game>-deploy.yml` that does nothing but `doctl apps create-deployment
+  ${{ secrets.DO_<GAME>_APP_ID }} --wait` on a `v*`/`<game>-*` tag push (or
+  `workflow_dispatch`). All the actual build/deploy config lives in that
+  DigitalOcean App's own spec, not in this repo. This is the one to copy for
+  a small non-Magic game's card pool.
+- **Droplet over SSH** (`magic`, `pokemon`, `yugioh`) — the workflow SSHes
+  into a shared droplet and runs `deploy/deploy.sh <ref>`, which does its own
+  checkout and build. Reserved for the largest card pools; a new non-Magic
+  game almost certainly wants the App Platform pattern instead.
+
+Either way, code alone doesn't finish the job: the App Platform app (or the
+droplet slot) and its secret(s) have to be provisioned by someone with
+DigitalOcean/infra access before the workflow's first real run — a step no
+commit to this repo can complete on its own.
 
 ## Critical invariants — do not break these
 
