@@ -44,13 +44,33 @@
      it draws those instead. A deployment with no drawings loaded is a keyrune
      one, so it keeps the font's fallback glyph for a set the font does not
      know. Deciding here is the point: no page has to know which kind of game
-     it is serving. */}}
+     it is serving.
+
+     A published symbol is an address on someone else's server, not an asset
+     this site controls, and that address moving is not hypothetical: every
+     Pokemon symbol 404ed for nine days once, when tcgdex changed where the
+     file lived out from under a URL this site had already been handed. The
+     onerror hands the slot to the same drawing a set with no symbol at all
+     would get, hidden until then, so a vendor moving the file again reads as
+     a code in a badge rather than a hole where an icon should be. */}}
 {{define "set-symbol"}}
-    {{$badge := rarity_badge .Rarity .Code}}
     {{$symbol := set_symbol .Code}}
     {{if $symbol}}
-        <img class="set-symbol-art {{.Class}}" src="{{$symbol}}" alt="{{.Code}}" title="{{.Code}}" width="{{.Size}}" height="{{.Size}}" loading="lazy">
-    {{else if or .Keyrune (not $badge.Path)}}
+        <img class="set-symbol-art {{.Class}}" src="{{$symbol}}" alt="{{.Code}}" title="{{.Code}}" width="{{.Size}}" height="{{.Size}}" loading="lazy"
+             onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+        <span hidden>{{template "set-symbol-drawn" .}}</span>
+    {{else}}
+        {{template "set-symbol-drawn" .}}
+    {{end}}
+{{end}}
+
+{{/* The keyrune glyph or drawn rarity badge: what a set with no published
+     symbol shows, and what a published one falls back to if it fails to
+     load. Split out so both callers of set-symbol above render exactly the
+     same fallback rather than two hand-kept copies of it. */}}
+{{define "set-symbol-drawn"}}
+    {{$badge := rarity_badge .Rarity .Code}}
+    {{if or .Keyrune (not $badge.Path)}}
         <i class="ss {{.Keyrune}} {{if gt .Size 20}}ss-2x{{else}}ss-1x{{end}} ss-fw {{.Class}}"></i>
     {{else if .Color}}
         <svg class="{{.Class}}" width="{{.Size}}" height="{{.Size}}" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">

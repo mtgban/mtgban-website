@@ -94,6 +94,14 @@ func TestSetSymbolImages(t *testing.T) {
 		{"symbol precedes glyph", "SVI", "ss-svi", `class="set-symbol-art`},
 		{"no symbol still badges", "OP01", "", `>OP01</text>`},
 		{"no symbol keeps glyph", "LEA", "ss-lea", `<i class="ss ss-lea`},
+		// A published symbol's address is the vendor's to move, and it did:
+		// every Pokemon symbol 404ed for nine days once. onerror falls the
+		// image back to a hidden copy of the same glyph a set with none at
+		// all would show, rather than an empty box.
+		{"symbol has a fallback for a failed load", "SVI", "", `onerror="this.style.display='none';this.nextElementSibling.hidden=false;"`},
+		{"symbol's fallback is hidden", "SVI", "", `<span hidden>`},
+		{"symbol's fallback is the same glyph a bare set would draw", "SVI", "ss-svi", `<span hidden> <i class="ss ss-svi`},
+		{"symbol's fallback badges too, where a bare set would", "SVI", "", `<span hidden> <svg`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			arg := map[string]any{"Keyrune": tc.keyrune, "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Size": 20, "Class": "x"}
