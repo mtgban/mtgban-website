@@ -276,7 +276,8 @@ var colorRarityMap = map[string]map[string]string{
 	//
 	// So this climbs the placed ladder too, in the order palworldRarityMap
 	// already ranks them: the trial-deck rarities run beside their booster
-	// counterparts rather than under them, and are coloured to match.
+	// counterparts rather than under them, so each lands its own adjacent
+	// step rather than sharing its counterpart's colour.
 	"palworld": {
 		"Trial Deck":                 "var(--normal)",
 		"Common":                     "#707883",
