@@ -157,7 +157,12 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   worker for offline browsing: it loads persisted state at boot
   (`LoadPersisted()`), refreshes after scraper loads (`RefreshManifest()`),
   and recomputes on a debounced background goroutine
-  (`RequestRefresh()`/`StartRefresher()`).
+  (`RequestRefresh()`/`StartRefresher()`). Gated on `Config.Offline.ManifestPath`
+  / `.ImagesPath` (`ManifestPathConfigured()`/`ImagesPathConfigured()`) — as of
+  this writing none of the committed `config*.json` set either key, so on
+  every environment those files describe, offline mode's manifest load and
+  image bucket-auth are unconfigured no-ops until a deployment supplies the
+  bucket paths out-of-band.
 - **Checkpoints** (`checkpoints.go`): curated chart annotations (bans,
   releases, reprints) loaded from B2/file into `checkpointsStore`, editable
   as JSON in the admin panel, rendered as markers on price charts.
