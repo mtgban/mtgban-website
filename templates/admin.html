@@ -184,11 +184,12 @@
                             <option value="{{.}}">{{.}}</option>
                         {{end}}
                     </select>
+                    <input type="text" name="grantOverrides" placeholder='overrides, e.g. {"Search":{"SearchOfflineMode":"true"}}' class="admin-grant-overrides">
                     <input type="submit" value="Add Grant">
                 </form>
                 <div class="admin-table-wrap">
                 <table class="table-data admin-table">
-                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th></th></tr></thead>
+                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th>Overrides</th><th></th></tr></thead>
                     <tbody>
                     {{range $row := index .Tables 3}}
                         <tr>
@@ -197,6 +198,7 @@
                             <td class="admin-mono">{{index $row 2}}</td>
                             <td>{{index $row 3}}</td>
                             <td>{{index $row 4}}</td>
+                            <td class="admin-mono">{{index $row 5}}</td>
                             <td class="admin-grant-remove-cell">
                                 <form method="POST" action="admin?page=people" onsubmit="return confirm('Remove the {{index $row 4}} grant for {{index $row 2}}?')">
                                     <input type="hidden" name="revokeEmail" value="{{index $row 2}}">

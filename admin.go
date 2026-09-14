@@ -651,6 +651,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			Tier:     grantTier,
 		}
 
+		var overridesErr error
+		if raw := strings.TrimSpace(r.FormValue("grantOverrides")); raw != "" {
+			overridesErr = json.Unmarshal([]byte(raw), &newGrant.Overrides)
+		}
+
 		duplicate := false
 		for _, person := range PatreonGrants() {
 			if strings.EqualFold(person.Email, grantEmail) {
@@ -667,6 +672,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			pageVars.WarningMessage = grantEmail + " already has a grant"
 		case !tierExists:
 			pageVars.WarningMessage = "unknown tier: " + grantTier
+		case overridesErr != nil:
+			pageVars.WarningMessage = "invalid overrides JSON: " + overridesErr.Error()
 		default:
 			err := saveGrants(r.Context(), append(slices.Clone(PatreonGrants()), newGrant))
 			if err != nil {
@@ -707,12 +714,19 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	// -- People: Patreon Grants --
 	var userTable [][]string
 	for i, person := range PatreonGrants() {
+		overrides := ""
+		if len(person.Overrides) > 0 {
+			if raw, err := json.Marshal(person.Overrides); err == nil {
+				overrides = string(raw)
+			}
+		}
 		row := []string{
 			fmt.Sprintf("%d", i+1),
 			person.Category,
 			person.Email,
 			person.Name,
 			person.Tier,
+			overrides,
 		}
 		userTable = append(userTable, row)
 	}
