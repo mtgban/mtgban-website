@@ -244,6 +244,55 @@ var colorRarityMap = map[string]map[string]string{
 
 		"Promo": "#652978",
 	},
+	// Gundam prints its rarity as a two-or-three-letter code in a banner
+	// beside the card number, and the banner itself carries a signal: a
+	// plain rarity's banner is black, its "+" parallel run's is silver, and
+	// its "++" run's is gold. But that same black, that same silver and that
+	// same gold sit under Common and under Legend Rare alike, so there is
+	// nothing there to sample that would tell the eleven rarities apart -
+	// only that some are the same treatment as others.
+	//
+	// So this climbs the placed ladder the other games use, in the order
+	// gundamRarityMap already ranks them.
+	"gundam": {
+		"Common":      "var(--normal)",
+		"C+":          "#919495",
+		"C++":         "#A88A3C",
+		"Uncommon":    "#187870",
+		"U+":          "#1FA7C9",
+		"Rare":        "#156FA6",
+		"R+":          "#6F75AA",
+		"Legend Rare": "#CDB55E",
+		"LR+":         "#B66204",
+		"LR++":        "#E0B84A",
+		"Promo":       "#652978",
+	},
+	// Palworld prints its rarity the same way: a code in angle brackets
+	// beside the number ("<C>", "<SR>"), plain text with no colour of its
+	// own. The one mark on the card that does carry colour, a hexagonal holo
+	// stamp, is the same green-to-gold sparkle on every parallel print
+	// regardless of which of the fourteen rarities it is - a foil watermark,
+	// not a rarity signal.
+	//
+	// So this climbs the placed ladder too, in the order palworldRarityMap
+	// already ranks them: the trial-deck rarities run beside their booster
+	// counterparts rather than under them, and are coloured to match.
+	"palworld": {
+		"Trial Deck":                 "var(--normal)",
+		"Common":                     "#707883",
+		"Uncommon":                   "#919495",
+		"Trial Deck Rare":            "#187870",
+		"Rare":                       "#1FA7C9",
+		"Double Rare":                "#156FA6",
+		"Super Rare":                 "#6F75AA",
+		"Trial Deck Super Deck Rare": "#B45A96",
+		"Over Super Rare":            "#BF287F",
+		"Super Parallel":             "#B06435",
+		"Trial Deck Super Parallel":  "#B66204",
+		"Super Special Parallel":     "#CDB55E",
+		"Super Special Soul":         "#E0B84A",
+		"Promo":                      "#652978",
+	},
 }
 
 // badgeFont is the size the shapes are cut at, and the ceiling a set code is

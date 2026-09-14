@@ -386,6 +386,8 @@ var gameMap = map[string]string{
 	"riftbound":     "Riftbound: League of Legends Trading Card Game",
 	"fleshandblood": "Flesh and Blood TCG",
 	"pokemon":       "Pokemon",
+	"gundam":        "Gundam Card Game",
+	"palworld":      "Palworld Official Card Game",
 }
 
 // gameBadgeMap is the short form the brand wears under the wordmark on a
@@ -399,6 +401,8 @@ var gameBadgeMap = map[string]string{
 	"riftbound":     "Riftbound",
 	"fleshandblood": "Flesh and Blood",
 	"pokemon":       "Pokemon",
+	"gundam":        "Gundam",
+	"palworld":      "Palworld",
 }
 
 // Cache of card UUIDs that appear in the newspaper spike score pages.
