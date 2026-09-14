@@ -13,9 +13,11 @@ import (
 // with go-mtgban/mtgmatcher/games/games.go.
 var registeredGames = []string{
 	"fleshandblood",
+	"gundam",
 	"lorcana",
 	"magic",
 	"onepiece",
+	"palworld",
 	"riftbound",
 	"yugioh",
 }
