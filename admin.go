@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +23,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
@@ -1180,27 +1180,19 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 		}
 	}
 
-	v := url.Values{}
-	v.Set("API", "ALL_ACCESS")
-	v.Set("APImode", "all")
-	v.Set("UserEmail", user)
-
-	var exp string
+	claims := apisig.Claims{
+		API:    "ALL_ACCESS",
+		Fields: url.Values{"APImode": {"all"}, "UserEmail": {user}},
+	}
 	if duration != 0 {
-		expires := time.Now().Add(duration)
-		exp = fmt.Sprintf("%d", expires.Unix())
-		v.Set("Expires", exp)
+		claims.Expires = time.Now().Add(duration).Unix()
 	}
 
-	link := DefaultServerURL
+	link := apisig.DefaultLink
 	if !strings.HasSuffix(ServerURL, "mtgban.com") {
 		link = "http://localhost:" + fmt.Sprint(Config.Port)
 	}
-	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
-	sig := signHMACSHA1Base64([]byte(key), []byte(data))
-
-	v.Set("Signature", sig)
-	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil
+	return apisig.Mint([]byte(key), link, claims), nil
 }
 
 // randomString returns l printable ASCII characters (33 through 125) read
