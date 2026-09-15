@@ -827,6 +827,24 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'sealed-contents',
+            category: 'Search Syntax',
+            title: 'A Product\'s Contents',
+            icon: 'package-open',
+            summary: 'Read a sealed product three ways: everything it can hold, only what it guarantees, or only what it draws at random.',
+            snippets: ['contents:"Bundle"', 'decklist:"Bundle"', 'variable:"Bundle"'],
+            keywords: ['contents', 'decklist', 'variable', 'sealed', 'guaranteed', 'random', 'drop rate', 'avg copies', 'expected', 'pull rate', 'odds', 'probability'],
+            content: {
+                description: '<p>A sealed product\'s name resolves the same way for three filters, each reading its contents differently: <code>contents:"NAME"</code> lists everything the product can hold, guaranteed cards and random draws together; <code>decklist:"NAME"</code> lists only what it always holds (empty for a product that is pure boosters); <code>variable:"NAME"</code> lists only what it draws at random - the guaranteed cards taken back out. A product with both a fixed part and a random part shows a three-pill switch on the results page to jump between all three; naming more than one product in a query pools their contents but drops the switch, since it no longer names one product to read.</p><p>Under <code>variable:</code> alone, each card also carries an <strong>Avg Copies (est.)</strong> row: how many copies of that card you would get, on average, opening the product once. It is a count, not a chance - a card only one slot in the product can hold reads as a share below 1 (0.4 is roughly two packs in five), but a common card drawn from more than one slot in the same product adds up across those slots and can read well above 1 (a common land can average several copies in a full booster case). A fourth sort button next to the switch, shaped like a copy icon, orders results by this count, longest shot first by default. The row itself does not depend on that button showing: a product with nothing guaranteed at all has no three-way switch to offer (there is only one reading of it), but its cards still carry Avg Copies under a plain <code>variable:</code> search.</p>',
+                examples: [
+                    { query: 'contents:"Welcome Deck 2024 Black Deck"', desc: 'Everything the deck can hold' },
+                    { query: 'decklist:"Welcome Deck 2024 Black Deck"', desc: 'Only its 30 guaranteed spells' },
+                    { query: 'variable:"Welcome Deck 2024 Black Deck"', desc: 'Only its random inserts, with Avg Copies shown' }
+                ]
+            }
+        },
+
+        {
             id: 'sorting',
             category: 'Search Syntax',
             title: 'Sorting',
@@ -835,7 +853,7 @@ window.__BAN_GUIDE = {
             snippets: ['sort:chrono', 'sort:retail', 'sort:buylist', 'sort:alpha', 'sort:number', 'sort:hybrid'],
             keywords: ['sort', 'order', 'chrono', 'hybrid', 'alpha', 'alphabetical', 'number', 'retail', 'buylist', 'price', 'date', 'print', 'collector'],
             content: {
-                description: 'Change the sort order of results with <code>sort:VALUE</code>. Note: when a sort is set via query, the sort UI dropdown is disabled.',
+                description: 'Change the sort order of results with <code>sort:VALUE</code>. Note: when a sort is set via query, the sort UI dropdown is disabled. A seventh order, by a card\'s Avg Copies count, exists only under a <code>variable:</code> search - see "A Product\'s Contents" - and is reached by clicking its own button on the results page rather than typing <code>sort:</code>.',
                 table: [
                     { value: 'chrono', short: 'By print date (default)' },
                     { value: 'hybrid', short: 'Alphabetical with sets grouped' },
