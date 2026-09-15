@@ -223,11 +223,10 @@ func TestPriceParityBuylist(t *testing.T) {
 }
 
 // A vendor like SYP flags QuantityPriority because its rows are a count of
-// copies wanted, not an offer; the template reads that flag straight off
-// SearchEntry to decide whether to show the quantity or the price where the
-// price would normally go. searchSellersNG already copied the flag from
-// Info() - searchVendorsNG silently didn't, so every buylist result read as
-// a price no matter what the vendor declared.
+// copies wanted, not an offer; quantityUnit reads that flag into the
+// PriceUnit the template keys its display off. searchSellersNG already
+// copied the flag from Info() - searchVendorsNG silently didn't, so every
+// buylist result read as a price no matter what the vendor declared.
 func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	regular, _, _ := parityCards(t)
 
@@ -250,11 +249,53 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	var got bool
 	for _, res := range found[regular]["INDEX"] {
 		if res.Shorthand == "PARITYSYP" {
-			got = res.QuantityPriority
+			got = res.PriceUnit == PriceUnitCount
 		}
 	}
 	if !got {
-		t.Error("QuantityPriority did not carry through searchVendorsNG")
+		t.Error("QuantityPriority did not carry through searchVendorsNG as PriceUnitCount")
+	}
+}
+
+// A metadata-only vendor's row is read as a want-count only when its own
+// unit says so - PriceUnitCount - not whenever it merely isn't a dollar
+// offer. A synthetic row like an average count of copies is a non-offer
+// too, and carries no want at all to sum; banPricesFromRows must tell the
+// two apart rather than treat every non-offer alike.
+func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+
+	prevVendors := vendorsPtr.Load()
+	t.Cleanup(func() { vendorsPtr.Store(prevVendors) })
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
+			Name: "Fake Index Vendor", Shorthand: "FAKEIDX", MetadataOnly: true,
+		}),
+	}
+	vendorsPtr.Store(&vendors)
+
+	found := map[string]map[string][]SearchEntry{
+		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
+		foil:    {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitExpectedCount}}},
+	}
+	out := banPricesFromRows([]string{regular, foil}, found, "name", "shorthands", true, false, true)
+
+	coRegular, err := mtgmatcher.GetUUID(regular)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idRegular := getIDFromMode("name", coRegular)
+	if got := out[idRegular]["FAKEIDX"].Qty; got != 12 {
+		t.Errorf("a want-count row summed to %v, want 12", got)
+	}
+
+	coFoil, err := mtgmatcher.GetUUID(foil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idFoil := getIDFromMode("name", coFoil)
+	if got := out[idFoil]["FAKEIDX"].QtyFoil; got != 0 {
+		t.Errorf("an average-count row summed to %v, want 0 - it is not a want", got)
 	}
 }
 

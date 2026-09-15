@@ -577,7 +577,11 @@ func banPricesFromRows(cardIDs []string, found map[string]map[string][]SearchEnt
 
 				shouldQty := qty && !row.NoQuantity
 				if vendorSide {
-					shouldQty = qty && (!indexStores[row.Shorthand] || row.QuantityPriority)
+					// A row is read as a want-count only when its unit says
+					// so - !IsOffer() would also let a synthetic row like
+					// an average count through, which carries no want at
+					// all to sum.
+					shouldQty = qty && (!indexStores[row.Shorthand] || row.PriceUnit == PriceUnitCount)
 				}
 				if shouldQty {
 					if co.Sealed {

@@ -23,6 +23,12 @@ func searchEntries2embed(results []SearchEntry) []embed.Entry {
 	}
 	out := make([]embed.Entry, 0, len(results))
 	for _, entry := range results {
+		// A row whose unit isn't a dollar offer - a store's want-count, or a
+		// synthetic row like a drop rate - has nothing an embed's price
+		// columns can show.
+		if !entry.IsOffer() {
+			continue
+		}
 		out = append(out, embed.Entry{
 			ScraperName: entry.ScraperName,
 			Shorthand:   entry.Shorthand,

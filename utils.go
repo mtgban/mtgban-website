@@ -1595,3 +1595,11 @@ func keyruneClass(code string) string {
 	}
 	return "ss-" + strings.ToLower(code)
 }
+
+// formatExpectedCount spells an average count of copies with the decimals it
+// needs and no more: a card one slot in five carries is 0.2, one two slots
+// each carry is 2. Never a percentage - the same card counted from more than
+// one slot can pass 1, past what a chance could mean.
+func formatExpectedCount(count float64) string {
+	return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", count), "0"), ".")
+}

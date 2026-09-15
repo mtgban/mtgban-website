@@ -138,6 +138,13 @@
             <a class="search-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
             <a class="search-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
             <a class="search-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
+            {{/* Over the cards it might hold, how likely each is: a sort of
+                 its own, set off to the right of the three readings. */}}
+            {{if eq .Contents.Mode "variable"}}
+            <span class="search-sort-actions">
+                <a class="search-sort-pill{{if eq .SearchSort "odds"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=odds{{if and (eq .SearchSort "odds") (not .ReverseMode)}}&reverse=true{{end}}" title="Expected copies"><i data-lucide="copy"></i>{{if eq .SearchSort "odds"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            </span>
+            {{end}}
         </div>
     {{end}}
     {{if .TotalUnique}}
@@ -1168,8 +1175,8 @@
                                                     {{if and (eq $conditions "INDEX") $card.Sealed}}
                                                         <span class="price-right index-cols">
                                                         <span class="price">
-                                                            {{if .Price}}
-                                                                <span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
+                                                            {{if or .PriceUnit .Price}}
+                                                                {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                             {{else if .BundleIcon}}
                                                             {{else}}
                                                                 n/a
@@ -1234,8 +1241,8 @@
                                                         <span class="price-right">
                                                         {{end}}
                                                         <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
-                                                            {{if .Price}}
-                                                                <span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
+                                                            {{if or .PriceUnit .Price}}
+                                                                {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                             {{else if .BundleIcon}}
                                                             {{else}}
                                                                 n/a
@@ -1292,7 +1299,7 @@
                                                     {{else}}
                                                         <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
                                                     {{end}}
-                                                    {{if $.CanFixSearch}}
+                                                    {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
                                                         <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
                                                     {{end}}
                                                     </span>
@@ -1303,12 +1310,10 @@
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
                                                 {{$aboveP90 := false}}
-                                                {{if and (not .QuantityPriority) (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
+                                                {{if and .IsOffer (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
                                                 <span class="price-right has-buylist-extra">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $aboveP90}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if gt $card.GoodBuylist 0.0}}title="Card Kingdom P90 $ {{printf "%.2f" $card.GoodBuylist}}{{if gt $card.HighestBuylist 0.0}}; 90-day high $ {{printf "%.2f" $card.HighestBuylist}}{{end}}"{{end}}>
-                                                    {{if not .QuantityPriority}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
-                                                    {{else}}<span class="cur">#</span><span class="amt">{{.Quantity}}</span>
-                                                    {{end}}
+                                                    {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                 </span>
                                                 <span class="buylist-extra"
                                                     data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'

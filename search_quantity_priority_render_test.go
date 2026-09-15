@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// A QuantityPriority vendor's row - the shape searchVendorsNG now builds -
-// must render the quantity where the price would otherwise go, on both the
+// A PriceUnitCount vendor's row - the shape searchVendorsNG now builds - must
+// render the quantity where the price would otherwise go, on both the
 // desktop and mobile search pages. This is a render-level check rather than
 // a unit test on searchVendorsNG's output, because the two templates decide
 // what to show independently, and it is exactly that decision that read the
@@ -25,7 +25,7 @@ func quantityPriorityPage(mobile bool) PageVars {
 		},
 		FoundVendors: map[string]map[string][]SearchEntry{
 			id: {"INDEX": {
-				{ScraperName: "SYP", Shorthand: "SYP", Price: 5.00, Quantity: 12, QuantityPriority: true},
+				{ScraperName: "SYP", Shorthand: "SYP", Price: 5.00, Quantity: 12, PriceUnit: PriceUnitCount},
 			}},
 		},
 	}
@@ -39,7 +39,7 @@ func TestQuantityPriorityRendersAsCountNotPrice(t *testing.T) {
 			t.Errorf("mobile=%v: the quantity (12) is missing from the row", mobile)
 		}
 		if strings.Contains(out, "5.00") {
-			t.Errorf("mobile=%v: the price (5.00) rendered even though the vendor is QuantityPriority", mobile)
+			t.Errorf("mobile=%v: the price (5.00) rendered even though the vendor's unit is a count", mobile)
 		}
 	}
 }
