@@ -1182,7 +1182,7 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 
 	claims := apisig.Claims{
 		API:    "ALL_ACCESS",
-		Fields: url.Values{"APImode": {"all"}, "UserEmail": {user}},
+		Fields: url.Values{apisig.APIFields[0]: {"all"}, apisig.APIFields[1]: {user}},
 	}
 	if duration != 0 {
 		claims.Expires = time.Now().Add(duration).Unix()

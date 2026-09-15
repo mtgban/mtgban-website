@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,6 +74,16 @@ func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
 // TestEnforceAPISigningAcceptsGoldenBlob runs the real middleware over the
 // golden blob: accepted when valid, refused when tampered, and refused when
 // Expires is unparseable even though the signature over it is good.
+// Every field an API key signs must be one the middleware verifies, or a
+// minted key fails closed on this site.
+func TestOptionalFieldsCoverAPIFields(t *testing.T) {
+	for _, name := range apisig.APIFields {
+		if !slices.Contains(OptionalFields, name) {
+			t.Errorf("OptionalFields lacks %q", name)
+		}
+	}
+}
+
 func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
 	// handler never reads them, so one nil element each is enough.

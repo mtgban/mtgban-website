@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/url"
+	"slices"
 	"testing"
 	"time"
 )
@@ -90,11 +91,24 @@ func TestDecode(t *testing.T) {
 }
 
 func TestDecodeRejectsGarbage(t *testing.T) {
-	if _, err := Decode("not base64!"); err == nil {
+	v, err := Decode("not base64!")
+	if err == nil {
 		t.Error("expected error for bad base64")
+	}
+	if v == nil || v.Get("API") != "" {
+		t.Errorf("bad base64 should yield an empty non-nil map, got %v", v)
 	}
 	if _, err := Decode(base64.StdEncoding.EncodeToString([]byte("a=%zz"))); err == nil {
 		t.Error("expected error for bad query")
+	}
+}
+
+func TestAPIFieldsAreVerified(t *testing.T) {
+	// A field minted but not listed by the verifier fails closed; pin the list.
+	for _, name := range APIFields {
+		if !slices.Contains(testOptionalFields, name) {
+			t.Errorf("APIFields entry %q missing from the verifier's field list", name)
+		}
 	}
 }
 
