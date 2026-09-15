@@ -239,7 +239,7 @@
                  data-image-url="{{$card.ImageURL}}"
                  data-finish-tag="{{$card.FinishTag}}"
                  data-finish-class="{{$card.FinishClass}}"
-                 data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
+                 data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{promo_label $t}}{{end}}"
                  data-has-warning="{{$card.HasContentWarning}}"
                  data-crop-url="{{$card.CropURL}}"
                  data-setcode="{{$card.SetCode}}"
@@ -250,12 +250,12 @@
                 <div class="m-card-info">
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
                     {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
-                    {{if ne $card.VariantShort ""}}<span class="m-card-variant">{{$card.VariantShort}}</span>{{end}}
+                    {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}{{promo_label $p}}{{end}}</span>{{end}}
                     <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
                 </div>
                 <div class="m-card-badges">
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                    {{range $card.Treatments}}<span class="m-badge treatment">{{.}}</span>{{end}}
+                    {{range $card.Treatments}}<span class="m-badge treatment">{{promo_label .}}</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
