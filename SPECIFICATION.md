@@ -283,19 +283,30 @@ override; phone UA detection via `mileusna/useragent`).
 - **Execution**: parse → `searchAndFilter()` (search.go:1655) resolves
   UUIDs through `mtgmatcher.Search*` (exact/any/prefix/regexp/sealed/
   hashing modes, plus `scryfall` and a sealed+card `mixed` mode) →
-  `searchParallelNG()` (search.go:1895) runs seller and vendor scans in
+  `searchParallelNG()` (search.go:2058) runs seller and vendor scans in
   parallel goroutines, applying store/price/entry filter chains → optional
   custom-buylist injection → post-filters → sort (chrono/hybrid/alpha/
-  number/retail/buylist) → `Paginate()` (utils.go:1440) against the named
-  constants `MaxSearchResults` (100/page) and `MaxSearchTotalResults`
-  (10k max, search.go:32,39).
+  number/retail/buylist, plus `odds` — a `variable:` search only, by each
+  card's `dropOdds()` expected count, ascending) → `Paginate()`
+  (utils.go:1440) against the named constants `MaxSearchResults` (100/page)
+  and `MaxSearchTotalResults` (10k max, search.go:32,39).
 - **Results**: `map[cardUUID]map[condition][]SearchEntry`; INDEX
   pseudo-conditions merge TCG Low/Market and MKM Low/Trend pairs into
   single rows with a `Secondary` price. Without a signature, non-affiliate
   entries are `Locked` (link disabled) against `Affiliates().List` /
   `Affiliates().BuylistList` (common.go:70) — there is no longer a
   `Config.AffiliatesList` field; affiliates now live behind that accessor
-  as a split retail/buylist list.
+  as a split retail/buylist list. `SearchEntry.PriceUnit` (search.go:64)
+  says what a row's number means: an offer (the default, ranked and shown
+  as currency), a store's own want-count, or — under a `variable:` search
+  only — a synthetic "Avg Copies (est.)" row per card, `dropOdds()`'
+  (search.go:1727) expected count of copies opening the named product once
+  yields, summed across every slot that can draw it. Deliberately not a
+  percentage: summed across more than one slot the same card can average
+  past 1 (a common land can exceed 1 per booster box, several times that
+  per case), which is exactly what a chance cannot mean. `IsOffer()` is
+  what ranking, "best price" highlighting and the embed's price columns
+  ask instead of assuming every row is a dollar amount.
 - **Suggest** (`api_suggest.go`): no longer a live prefix scan of
   `mtgmatcher.AllNames()` per request. A `suggestIndex` is built once when
   the datastore (re)loads (`rebuildSuggestIndex()`), folding every name

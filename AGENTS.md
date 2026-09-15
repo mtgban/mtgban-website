@@ -194,7 +194,7 @@ checked against the current tree rather than copied wholesale:
   - `PartitionScrapersByMode` helper (4-way partition loop duplicated in upload.go, arbit.go, sleep.go)
   - Named constants for conditions & finish order (inline map repeated in upload.go + search.go)
   - Standardize JSON error responses (api*.go mix hand-built strings + json.NewEncoder)
-  - Table-driven sort dispatch (57 inline `sort.Slice` blocks across the root package as of this check, not just arbit.go/search.go)
+  - Table-driven sort dispatch (58 inline `sort.Slice` blocks across the root package as of this check, not just arbit.go/search.go)
 - **Phase 2** (decompose god-functions): split `Upload()`/`Search()`, consolidate CSV exporters, centralize external-ID resolution
 - **Phase 3** (frontend consolidation): extract shared JS helpers, consolidate settings system, delete dead `js/nav.js`
 - **Phase 4** (testing): add tests for auth logic, search parser, price aggregation, arbitrage math
