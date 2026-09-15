@@ -1420,16 +1420,17 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 				icon := Config.ScraperConfig.Icons[info.Shorthand]
 
 				res := SearchEntry{
-					ScraperName:  name,
-					Shorthand:    info.Shorthand,
-					Price:        entry.BuyPrice,
-					Credit:       entry.BuyPrice * info.CreditMultiplier,
-					MarketCredit: entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
-					Ratio:        entry.PriceRatio,
-					Quantity:     entry.Quantity,
-					URL:          entry.URL,
-					BundleIcon:   icon,
-					Country:      Country2flag[info.CountryFlag],
+					ScraperName:      name,
+					Shorthand:        info.Shorthand,
+					Price:            entry.BuyPrice,
+					Credit:           entry.BuyPrice * info.CreditMultiplier,
+					MarketCredit:     entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
+					Ratio:            entry.PriceRatio,
+					Quantity:         entry.Quantity,
+					URL:              entry.URL,
+					BundleIcon:       icon,
+					QuantityPriority: info.QuantityPriority,
+					Country:          Country2flag[info.CountryFlag],
 				}
 
 				foundVendors[cardID][conditions] = append(foundVendors[cardID][conditions], res)
