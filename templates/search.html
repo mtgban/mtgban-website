@@ -1044,7 +1044,7 @@
                                         <div class="result-badges">
                                             {{$qty := index $.CardQuantities $cardId}}{{if gt $qty 1}}<span class="result-badge qty" title="{{$qty}} copies in this list">{{$qty}}x copies</span>{{end}}
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                                            {{range $card.Treatments}}<span class="result-badge treatment">{{promo_label .}}</span>{{end}}
+                                            {{range $card.Treatments}}<a class="result-badge treatment" href="?q=is:{{.}}" title="Search every {{promo_label .}} printing">{{promo_label .}}</a>{{end}}
                                             {{if $card.Reserved}}<span class="result-badge rl">RL</span>{{end}}
                                             {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
                                             {{if $card.Newspaper}}<span class="result-badge news">News</span>{{end}}
@@ -1115,7 +1115,7 @@
                             {{if or $card.FlavorName $card.PromoTypes $card.Flag}}
                             <div class="result-card-extra">
                                 {{if or $card.FlavorName $card.PromoTypes}}
-                                    <span class="result-variant">{{if $card.FlavorName}}"{{$card.FlavorName}}"{{if $card.PromoTypes}} - {{end}}{{end}}{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}{{promo_label $p}}{{end}}</span>
+                                    <span class="result-variant">{{if $card.FlavorName}}"{{$card.FlavorName}}"{{if $card.PromoTypes}} - {{end}}{{end}}{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" title="Search every {{promo_label $p}} printing">{{promo_label $p}}</a>{{end}}</span>
                                 {{end}}
                                 {{if $card.Flag}}
                                     <span class="result-variant result-flag">{{$card.Flag}}</span>

@@ -679,6 +679,17 @@
     font-style: italic;
     line-height: 1;
 }
+/* A promo type inside the variant text links to the search that finds every
+   other printing carrying it - styled as the surrounding text rather than a
+   normal link, with underline the only cue, so a "Prerelease Boosterfun"
+   line doesn't read as three blue words. */
+.result-variant a {
+    color: inherit;
+    text-decoration: none;
+}
+.result-variant a:hover {
+    text-decoration: underline;
+}
 .result-flag {
     font-style: normal;
 }
@@ -730,9 +741,15 @@
     color: var(--search-text-dim);
     border: 1px solid rgba(255, 255, 255, 0.15);
 }
+.result-badge.treatment:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
 .light-theme .result-badge.treatment {
     background: rgba(0, 0, 0, 0.06);
     border-color: rgba(0, 0, 0, 0.15);
+}
+.light-theme .result-badge.treatment:hover {
+    background: rgba(0, 0, 0, 0.12);
 }
 
 .result-quick-icons {
