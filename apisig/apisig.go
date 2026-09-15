@@ -30,8 +30,7 @@ func Sign(secret, data []byte) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-// values returns the query values that are signed: API, every non-empty
-// field, and Expires when set. Encode sorts keys, which fixes the order.
+// values returns the signed query values: API, non-empty fields, and Expires when set.
 func (c Claims) values() url.Values {
 	v := url.Values{}
 	v.Set("API", c.API)
@@ -57,4 +56,20 @@ func (c Claims) expiresString() string {
 // Payload is the exact byte string that gets signed.
 func Payload(method, link string, c Claims) string {
 	return method + c.expiresString() + link + c.values().Encode()
+}
+
+// Mint signs c for a GET against link and returns the base64 blob for ?sig=.
+func Mint(secret []byte, link string, c Claims) string {
+	v := c.values()
+	v.Set("Signature", Sign(secret, []byte(Payload("GET", link, c))))
+	return base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+}
+
+// Decode parses a blob into its raw values. It verifies nothing.
+func Decode(blob string) (url.Values, error) {
+	raw, err := base64.StdEncoding.DecodeString(blob)
+	if err != nil {
+		return nil, err
+	}
+	return url.ParseQuery(string(raw))
 }
