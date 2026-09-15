@@ -56,11 +56,12 @@ type SearchEntry struct {
 	NoQuantity   bool
 	BundleIcon   string
 
-	// QuantityPriority marks a store whose rows are read as a count of
-	// copies wanted rather than as an offer, so the quantity is shown
-	// where the price would be and the price is not ranked against the
-	// others. The scraper declares it; nothing here names the store.
-	QuantityPriority bool
+	// PriceUnit says what the number in this row's price slot is worth: an
+	// offer to rank and show as currency (the zero value), a store's count
+	// of copies wanted (the scraper declares it), or a synthetic row's
+	// expected count of copies (built here). PriceSymbol/PriceAmount spell
+	// it; IsOffer says whether it belongs in the ranking at all.
+	PriceUnit PriceUnit
 
 	Country string
 
@@ -74,6 +75,83 @@ type SearchEntry struct {
 	ExtraValues map[string]float64
 
 	Locked bool
+}
+
+// PriceUnit is what SearchEntry.PriceUnit names: what a row's price slot
+// measures, since not every row's number is a dollar amount to rank.
+type PriceUnit int
+
+const (
+	PriceUnitDollar        PriceUnit = iota // an offer: ranked, shown as currency
+	PriceUnitCount                          // a store's want-count, shown as # N
+	PriceUnitExpectedCount                  // an average count of copies, shown as a bare number
+)
+
+// quantityUnit reads a scraper's own QuantityPriority flag into the unit its
+// rows carry - the only place that boundary is crossed, so a name change on
+// either side of it stays a one-line fix.
+func quantityUnit(quantityPriority bool) PriceUnit {
+	if quantityPriority {
+		return PriceUnitCount
+	}
+	return PriceUnitDollar
+}
+
+// IsOffer reports whether a row's price is a real offer: ranked against the
+// others' and worth comparing to a reference like a 90-day high.
+func (e SearchEntry) IsOffer() bool {
+	return e.PriceUnit == PriceUnitDollar
+}
+
+// PriceSymbol is the mark before a row's price-slot amount: a dollar sign
+// for an offer, a hash before a want-count, or nothing before an expected
+// count, which is not a currency and not a count of anything on a shelf.
+func (e SearchEntry) PriceSymbol() string {
+	switch e.PriceUnit {
+	case PriceUnitCount:
+		return "#"
+	case PriceUnitExpectedCount:
+		return ""
+	default:
+		if e.Price == 0 {
+			return ""
+		}
+		return "$"
+	}
+}
+
+// PriceAmount is the number itself, spelled the way its unit is: two
+// decimals for an offer, a bare count for a want-count, or an expected count
+// trimmed to as many decimals as it needs - never a percentage, since
+// summing the same card across more than one slot can carry it past what a
+// probability could mean.
+func (e SearchEntry) PriceAmount() string {
+	switch e.PriceUnit {
+	case PriceUnitCount:
+		return strconv.Itoa(e.Quantity)
+	case PriceUnitExpectedCount:
+		return formatExpectedCount(e.Price)
+	default:
+		if e.Price == 0 {
+			return ""
+		}
+		return fmt.Sprintf("%.2f", e.Price)
+	}
+}
+
+// PriceLabel is PriceSymbol and PriceAmount joined as one string, for a
+// price cell that isn't styled as two spans: a space between them where the
+// unit leads with a symbol, none where it doesn't - an expected count
+// carries no mark of its own, so there is nothing to space it from.
+func (e SearchEntry) PriceLabel() string {
+	symbol, amount := e.PriceSymbol(), e.PriceAmount()
+	if amount == "" {
+		return ""
+	}
+	if symbol == "" {
+		return amount
+	}
+	return symbol + " " + amount
 }
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
@@ -664,7 +742,31 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort sets as requested, default to chronological
+	odds := dropOdds(config)
 	switch pageVars.SearchSort {
+	case "odds":
+		// Ascending by default, unlike every other field here: what a
+		// variable search is for is finding the card expected in the fewest
+		// copies, and that card sorts to the top only this way round.
+		//
+		// A card never covered is not a card expected at zero - a missing
+		// entry and a real zero read the same off the map, and an ascending
+		// sort would otherwise put every uncovered card ahead of the ones
+		// an expected count is actually known for. Missing sorts last
+		// regardless of direction, ranked among itself by the fallback the
+		// other fields use.
+		sortData := resolveSortingData(allKeys)
+		sort.Slice(allKeys, func(i, j int) bool {
+			oddsI, hasI := odds[allKeys[i]]
+			oddsJ, hasJ := odds[allKeys[j]]
+			if hasI != hasJ {
+				return hasI
+			}
+			if !hasI || oddsI == oddsJ {
+				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
+			}
+			return oddsI < oddsJ
+		})
 	case "alpha":
 		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -880,6 +982,33 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// Pass through everything the collapsers didn't consume.
 		consumed := append([]string{"TCGLow", "TCGMarket", "MKMLow", "MKMTrend"}, evShorts...)
 		tmp = append(tmp, passthroughIndex(indexArray, consumed)...)
+
+		// A card is bought back, never sold, at the count it might come out
+		// of a pack at, so the row sits with what someone would buy it back
+		// for rather than with the offers to sell it. It is a count, not a
+		// chance: the same card drawn from more than one slot is added in,
+		// same as an EV row sums every slot's contribution to a price, so a
+		// common enough card averages more than one copy per product and
+		// reads as such rather than as a percentage past what one can mean.
+		// "(est.)" says the number is read off that count, not off a shelf,
+		// the same qualifier an estimated buylist quote already wears.
+		if count, found := odds[cardID]; found {
+			if foundVendors[cardID] == nil {
+				foundVendors[cardID] = map[string][]SearchEntry{}
+			}
+			foundVendors[cardID]["INDEX"] = append(foundVendors[cardID]["INDEX"], SearchEntry{
+				ScraperName: "Avg Copies (est.)",
+				// A real shorthand, so it reads as its own scraper rather
+				// than an empty one: buylist_badge compares Shorthand
+				// against a card's hotlist store, and both default to "",
+				// which put Card Kingdom's 3-month star on every row for a
+				// card that isn't hotlisted.
+				Shorthand:  "AvgCopies",
+				Price:      count,
+				PriceUnit:  PriceUnitExpectedCount,
+				NoQuantity: true,
+			})
+		}
 
 		if hasEV && getTCGSimulationIQR(cardID) > IQRThreshold {
 			pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
@@ -1347,16 +1476,16 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName:      name,
-					Shorthand:        info.Shorthand,
-					Price:            entry.Price,
-					Quantity:         entry.Quantity,
-					URL:              entry.URL,
-					NoQuantity:       info.NoQuantityInventory || info.MetadataOnly,
-					BundleIcon:       icon,
-					QuantityPriority: info.QuantityPriority,
-					Country:          Country2flag[info.CountryFlag],
-					ExtraValues:      entry.ExtraValues,
+					ScraperName: name,
+					Shorthand:   info.Shorthand,
+					Price:       entry.Price,
+					Quantity:    entry.Quantity,
+					URL:         entry.URL,
+					NoQuantity:  info.NoQuantityInventory || info.MetadataOnly,
+					BundleIcon:  icon,
+					PriceUnit:   quantityUnit(info.QuantityPriority),
+					Country:     Country2flag[info.CountryFlag],
+					ExtraValues: entry.ExtraValues,
 				}
 				if info.CreditMultiplier > 0 {
 					res.Credit = entry.Price / info.CreditMultiplier
@@ -1420,17 +1549,17 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 				icon := Config.ScraperConfig.Icons[info.Shorthand]
 
 				res := SearchEntry{
-					ScraperName:      name,
-					Shorthand:        info.Shorthand,
-					Price:            entry.BuyPrice,
-					Credit:           entry.BuyPrice * info.CreditMultiplier,
-					MarketCredit:     entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
-					Ratio:            entry.PriceRatio,
-					Quantity:         entry.Quantity,
-					URL:              entry.URL,
-					BundleIcon:       icon,
-					QuantityPriority: info.QuantityPriority,
-					Country:          Country2flag[info.CountryFlag],
+					ScraperName:  name,
+					Shorthand:    info.Shorthand,
+					Price:        entry.BuyPrice,
+					Credit:       entry.BuyPrice * info.CreditMultiplier,
+					MarketCredit: entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
+					Ratio:        entry.PriceRatio,
+					Quantity:     entry.Quantity,
+					URL:          entry.URL,
+					BundleIcon:   icon,
+					PriceUnit:    quantityUnit(info.QuantityPriority),
+					Country:      Country2flag[info.CountryFlag],
 				}
 
 				foundVendors[cardID][conditions] = append(foundVendors[cardID][conditions], res)
@@ -1584,6 +1713,39 @@ type ContentsViews struct {
 // come with them. Only where all three readings mean something: a product with
 // nothing guaranteed has no fixed list, one with no bonus cards has no
 // variable list, and neither has anything to switch between.
+// dropOdds is the expected number of copies of each card opening the
+// product a variable search asked about yields, on average, summed where a
+// card can come out more than one way - which is why it is a count and not
+// a chance: a common enough card, drawn from more than one slot, averages
+// more than one copy per product, past what any single chance could read
+// as. Nil for every other search.
+//
+// Asked of the matcher on each request rather than kept from load: over
+// every product in the datastore it answers in half a second, the slowest
+// single product in 4ms and the slowest with a variable part in 1.4ms,
+// against a search that then prices every card found.
+func dropOdds(config SearchConfig) map[string]float64 {
+	if config.ContentsMode != ContentsVariable || config.ContentsProduct == "" {
+		return nil
+	}
+	co, err := mtgmatcher.GetUUID(config.ContentsProduct)
+	if err != nil {
+		LogPages["Search"].Println("dropOdds:", config.ContentsProduct, err)
+		return nil
+	}
+	probs, err := mtgmatcher.GetProbabilitiesForSealed(co.SetCode, co.UUID)
+	if err != nil {
+		LogPages["Search"].Println("dropOdds:", co.Name, err)
+		return nil
+	}
+
+	counts := make(map[string]float64, len(probs))
+	for _, prob := range probs {
+		counts[prob.UUID] += prob.Probability
+	}
+	return counts
+}
+
 func contentsViews(query string, config SearchConfig) *ContentsViews {
 	if config.ContentsProduct == "" || config.ContentsMode == "" {
 		return nil

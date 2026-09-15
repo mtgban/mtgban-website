@@ -169,6 +169,12 @@
 .m-result-meta-contents .m-sort-pill.active {
     padding-right: 0.5em;
 }
+.m-result-meta-contents .m-sort-pill-odds {
+    margin-left: 0.5em;
+}
+.m-result-meta-contents .m-sort-pill-odds.active {
+    padding-right: 0.2em;
+}
 
 .m-sort-pill .m-sort-dir,
 .m-sort-pill .m-sort-dir svg {
