@@ -1031,7 +1031,7 @@
                                  data-image-url="{{$card.ImageURL}}"
                                  data-finish-tag="{{$card.FinishTag}}"
                                  data-finish-class="{{$card.FinishClass}}"
-                                 data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
+                                 data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{promo_label $t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
                                  onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
@@ -1044,7 +1044,7 @@
                                         <div class="result-badges">
                                             {{$qty := index $.CardQuantities $cardId}}{{if gt $qty 1}}<span class="result-badge qty" title="{{$qty}} copies in this list">{{$qty}}x copies</span>{{end}}
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                                            {{range $card.Treatments}}<span class="result-badge treatment">{{.}}</span>{{end}}
+                                            {{range $card.Treatments}}<span class="result-badge treatment">{{promo_label .}}</span>{{end}}
                                             {{if $card.Reserved}}<span class="result-badge rl">RL</span>{{end}}
                                             {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
                                             {{if $card.Newspaper}}<span class="result-badge news">News</span>{{end}}
@@ -1112,10 +1112,10 @@
                                     </div>
                                 </div>
                             </div>
-                            {{if or (ne $card.Variant "") $card.Flag}}
+                            {{if or $card.FlavorName $card.PromoTypes $card.Flag}}
                             <div class="result-card-extra">
-                                {{if ne $card.Variant ""}}
-                                    <span class="result-variant">{{$card.Variant}}</span>
+                                {{if or $card.FlavorName $card.PromoTypes}}
+                                    <span class="result-variant">{{if $card.FlavorName}}"{{$card.FlavorName}}"{{if $card.PromoTypes}} - {{end}}{{end}}{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}{{promo_label $p}}{{end}}</span>
                                 {{end}}
                                 {{if $card.Flag}}
                                     <span class="result-variant result-flag">{{$card.Flag}}</span>

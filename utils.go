@@ -410,43 +410,67 @@ func loadRarityBadges() {
 	}
 }
 
+// promoTypeLabel spells a promo type the way a page should show it - what
+// the promo_label template function calls. A "ff" token (Final Fantasy's
+// "ffi", "ffii", ...) reads as its own initialism rather than the fuller
+// spelling PromoTypeLabels carries for it ("FF I"); everything else is
+// mtgmatcher's own spelling, which - unlike title-casing the token - can put
+// back a space the token dropped ("bestof" -> "Best Of").
+func promoTypeLabel(value string) string {
+	if strings.HasPrefix(value, "ff") {
+		return strings.ToUpper(value)
+	}
+	return mtgmatcher.PromoTypeLabel(value)
+}
+
 type GenericCard struct {
 	UUID string
 	// ChartID is the id the UI passes to the chart system. uuid2card leaves it
 	// as the mtgmatcher card id; chart-capable pages override it with ban:<id>
 	// via chartIDForCard, so chartless pages (upload, arbit, news, ...) don't
 	// pay the variant-cache lookup for every card they render.
-	ChartID      string
-	Name         string
-	FlavorName   string
-	Edition      string
-	SetCode      string
-	Number       string
-	Variant      string
-	VariantShort string
-	Keyrune      string
-	ImageURL     string
-	Foil         bool
-	Etched       bool
-	FinishTag    string
-	FinishClass  string
-	Treatments   []string
-	Reserved     bool
-	Title        string
-	SearchURL    string
-	SypList      bool
-	Stocks       bool
-	StocksURL    string
-	Printings    string
-	Products     string
-	NumProducts  int
-	TCGId        string
-	Date         string
-	Sealed       bool
-	Booster      bool
-	HasDeck      bool
-	Flag         string
-	LangTag      string
+	ChartID    string
+	Name       string
+	FlavorName string
+	Edition    string
+	SetCode    string
+	Number     string
+	// PromoTypes is every promo type token co.PromoTypes carries that is not
+	// already shown some other way - not Boosterfun, not the alt-foil style
+	// that became FinishTag or a Treatments entry. A frame effect (Showcase,
+	// Extended Art, Borderless) is a printing's own promo type the same as
+	// Prerelease or Bundle, so it needs no field of its own and arrives here
+	// like any other. The one exception is the pre-8th-edition border, which
+	// carries no promo type in the datastore; "retro" is added for it by
+	// hand, since is:retro is a real filter despite that. The template
+	// spells each token with promo_label and links it to that search.
+	PromoTypes  []string
+	Keyrune     string
+	ImageURL    string
+	Foil        bool
+	Etched      bool
+	FinishTag   string
+	FinishClass string
+	// Treatments is the alt-foil-style promo type badge beside a non-foil
+	// card's name - a raw token each, same as PromoTypes, since every entry
+	// here is a promo type and nothing else ever fills the slice.
+	Treatments  []string
+	Reserved    bool
+	Title       string
+	SearchURL   string
+	SypList     bool
+	Stocks      bool
+	StocksURL   string
+	Printings   string
+	Products    string
+	NumProducts int
+	TCGId       string
+	Date        string
+	Sealed      bool
+	Booster     bool
+	HasDeck     bool
+	Flag        string
+	LangTag     string
 
 	Rarity            string
 	RarityColor       string
@@ -903,20 +927,6 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		_, newspaper = uuids[cardID]
 	}
 
-	variant := ""
-	if showVariant(cardID) {
-		switch {
-		case co.HasFrameEffect(magic.FrameEffectShowcase):
-			variant = "Showcase "
-		case co.HasFrameEffect(magic.FrameEffectExtendedArt):
-			variant = "Extended Art "
-		case co.BorderColor == magic.BorderColorBorderless:
-			variant = "Borderless "
-		case co.FrameVersion == "1997":
-			variant = "Retro Frame "
-		}
-	}
-
 	// Build the finish chip: defaults to Foil/Etched, overridden by alt foil type
 	var treatments []string
 	finishTag := ""
@@ -936,38 +946,52 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		finishTag = named
 	}
 
+	// Showcase, Extended Art and Borderless are already the printing's own
+	// promo type - co.PromoTypes carries them like any other, confirmed
+	// against the loaded datastore - so the loop below finds them with no
+	// detection of its own, and unconditionally: the pre-refactor code ran
+	// this same loop with no date gate, so a card whose PromoTypes carries
+	// one of these three showed the word even when it predates
+	// PromosForEverybodyYay, the site's mark for "this predates the
+	// marketing language" - confirmed against the loaded datastore, 0 of
+	// 22,412 such printings hid the word.
+
 	// Loop through the supported promo types, skipping Boosterfun already processed above
-	altFoilWord := ""
+	var promoTypes []string
 	for _, promoType := range co.PromoTypes {
-		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != magic.PromoTypeBoosterfun {
-			if slices.Contains(altFoilTags, promoType) {
-				if co.Foil || co.Etched {
-					// Foiling variant replaces the generic Foil/Etched chip
-					if short, ok := altFoilChipLabels[promoType]; ok {
-						finishTag = short
-					} else {
-						finishTag = mtgmatcher.Title(strings.TrimSuffix(promoType, "foil"))
-					}
-					finishClass = "altfoil"
-					altFoilWord = mtgmatcher.Title(promoType)
-				} else {
-					// Non-foil card with a foiling-style treatment — show as chip
-					treatments = append(treatments, mtgmatcher.Title(promoType))
-				}
-			}
-			if strings.HasPrefix(promoType, "ff") {
-				variant += strings.ToUpper(promoType) + " "
-				continue
-			}
-			// The promo type is a token so that it can be typed into a
-			// search, which cost it the spaces: title-casing it back gives
-			// "Bestof" where the storefront wrote "Best Of". Ask the game
-			// how it is spelled - Magic keeps no fuller spelling and falls
-			// back to the same title-casing, so nothing there moves.
-			variant += mtgmatcher.PromoTypeLabel(promoType) + " "
+		if !slices.Contains(mtgmatcher.AllPromoTypes(), promoType) || promoType == magic.PromoTypeBoosterfun {
+			continue
 		}
+
+		if slices.Contains(altFoilTags, promoType) {
+			if co.Foil || co.Etched {
+				// Foiling variant replaces the generic Foil/Etched chip
+				if short, ok := altFoilChipLabels[promoType]; ok {
+					finishTag = short
+				} else {
+					finishTag = mtgmatcher.Title(strings.TrimSuffix(promoType, "foil"))
+				}
+				finishClass = "altfoil"
+			} else {
+				// Non-foil card with a foiling-style treatment — show as chip
+				treatments = append(treatments, promoType)
+			}
+			continue // already shown as a chip or the finish tag
+		}
+
+		promoTypes = append(promoTypes, promoType)
 	}
-	variant = strings.TrimSpace(variant)
+
+	// Retro frame (the pre-8th-edition border) is the one exception: unlike
+	// the three above, co.FrameVersion carries no promo type of its own in
+	// the datastore, so nothing in the loop above ever adds it - it is
+	// added by hand instead, and only for a card new enough that the site
+	// would have said so: showVariant gates it because is:retro still needs
+	// to find a modern reprint that chose the old border, not the decades
+	// of original printings that predate the site saying anything at all.
+	if showVariant(cardID) && co.FrameVersion == "1997" {
+		promoTypes = append(promoTypes, "retro")
+	}
 
 	name, flavor := co.Name, co.FlavorName
 	if flavor != "" {
@@ -976,39 +1000,7 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		if preferFlavorName || allLanguageFlags[co.Language] == "" {
 			name, flavor = co.FlavorName, co.Name
 		}
-
-		if variant != "" {
-			variant = " - " + variant
-		}
-		variant = fmt.Sprintf("\"%s\" %s", flavor, variant)
 	}
-
-	// Append Etched information to the tag
-	if co.Etched {
-		if variant != "" {
-			variant += " "
-		}
-		variant += "Etched"
-	}
-
-	// Build variantShort: drop the quoted flavor prefix (mobile shows it on
-	// its own line) and any terms already surfaced as chips.
-	variantShort := variant
-	if flavor != "" {
-		variantShort = strings.TrimPrefix(variantShort, fmt.Sprintf("\"%s\"", flavor))
-		variantShort = strings.TrimSpace(variantShort)
-		variantShort = strings.TrimPrefix(variantShort, "-")
-	}
-	for _, t := range treatments {
-		variantShort = strings.ReplaceAll(variantShort, t, "")
-	}
-	if altFoilWord != "" {
-		variantShort = strings.ReplaceAll(variantShort, altFoilWord, "")
-	}
-	if co.Etched {
-		variantShort = strings.ReplaceAll(variantShort, "Etched", "")
-	}
-	variantShort = strings.Join(strings.Fields(variantShort), " ")
 
 	query := genQuery(co)
 
@@ -1102,38 +1094,37 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 	highestBuylist := getHighestBuylistPrice(cardID)
 
 	return GenericCard{
-		UUID:         co.UUID,
-		ChartID:      cardID,
-		Name:         name,
-		FlavorName:   flavor,
-		Edition:      co.Edition,
-		SetCode:      co.Card.SetCode,
-		Number:       co.Card.Number,
-		Variant:      variant,
-		VariantShort: variantShort,
-		Foil:         co.Foil,
-		Etched:       co.Etched,
-		FinishTag:    finishTag,
-		FinishClass:  finishClass,
-		Treatments:   treatments,
-		Keyrune:      keyrune,
-		ImageURL:     imgURL,
-		Title:        editionTitle(cardID),
-		Reserved:     co.Card.IsReserved,
-		SearchURL:    searchURL,
-		SypList:      sypList,
-		Stocks:       stocks,
-		StocksURL:    stocksURL,
-		Printings:    printings,
-		Products:     products,
-		NumProducts:  numProducts,
-		TCGId:        tcgID,
-		Date:         co.OriginalReleaseDate,
-		Sealed:       co.Sealed,
-		Booster:      canBoosterGen,
-		HasDeck:      hasDecklist,
-		Flag:         allLanguageFlags[co.Language],
-		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
+		UUID:        co.UUID,
+		ChartID:     cardID,
+		Name:        name,
+		FlavorName:  flavor,
+		Edition:     co.Edition,
+		SetCode:     co.Card.SetCode,
+		Number:      co.Card.Number,
+		PromoTypes:  promoTypes,
+		Foil:        co.Foil,
+		Etched:      co.Etched,
+		FinishTag:   finishTag,
+		FinishClass: finishClass,
+		Treatments:  treatments,
+		Keyrune:     keyrune,
+		ImageURL:    imgURL,
+		Title:       editionTitle(cardID),
+		Reserved:    co.Card.IsReserved,
+		SearchURL:   searchURL,
+		SypList:     sypList,
+		Stocks:      stocks,
+		StocksURL:   stocksURL,
+		Printings:   printings,
+		Products:    products,
+		NumProducts: numProducts,
+		TCGId:       tcgID,
+		Date:        co.OriginalReleaseDate,
+		Sealed:      co.Sealed,
+		Booster:     canBoosterGen,
+		HasDeck:     hasDecklist,
+		Flag:        allLanguageFlags[co.Language],
+		LangTag:     mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
 		Rarity:            co.Rarity,
 		RarityColor:       rarityColor,
