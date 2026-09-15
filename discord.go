@@ -253,6 +253,50 @@ type AffiliateConfig struct {
 	URLFunc func(*url.URL) *url.URL
 }
 
+// printingTitle names a printing the way the bot announces a link: the card,
+// the set it is in, the number it is filed under, and a mark for a finish
+// that is not the plain one.
+func printingTitle(co *mtgmatcher.CardObject) string {
+	title := fmt.Sprintf("%s [%s]", co.Name, co.SetCode)
+	if co.Number != "" {
+		title += " #" + co.Number
+	}
+	if co.Sealed {
+		title += " 📦"
+	} else if co.Etched {
+		title += " 💫"
+	} else if co.Foil {
+		title += " ✨"
+	}
+	return title
+}
+
+// manapoolCardTitle names the printing a Mana Pool card link points at.
+//
+// The path is /card/<set>/<number>/<tail>, and the tail is the card's name
+// only in the links the price feed publishes - all 546k of its records spell
+// it that way, which is why reading the last segment ever looked right. The
+// site's own links put an internal id there instead, and
+// /card/ltr/744z/3ca3376d-5850-4614-88ce-3081d4cbddcf - Sauron, the Dark Lord
+// - came out as "3Ca3376D 5850 4614 88Ce 3081D4Cbddcf". The set and the
+// number are in both shapes and name the printing between them, so the title
+// is built from those and the tail is not read at all.
+func manapoolCardTitle(u *url.URL) string {
+	fields := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(fields) < 3 {
+		return "Your search"
+	}
+
+	for _, card := range printingsAt(fields[1], fields[2]) {
+		co, err := mtgmatcher.GetUUID(card.UUID)
+		if err != nil {
+			continue
+		}
+		return printingTitle(co)
+	}
+	return "Your search"
+}
+
 var AffiliateStores = []AffiliateConfig{
 	{
 		Trigger:       "cardkingdom.com/mtg",
@@ -330,18 +374,7 @@ var AffiliateStores = []AffiliateConfig{
 				return "Your search"
 			}
 
-			title := fmt.Sprintf("%s [%s]", co.Name, co.SetCode)
-			if co.Number != "" {
-				title += " #" + co.Number
-			}
-			if co.Sealed {
-				title += " 📦"
-			} else if co.Etched {
-				title += " 💫"
-			} else if co.Foil {
-				title += " ✨"
-			}
-			return title
+			return printingTitle(co)
 		},
 	},
 	{
@@ -370,6 +403,7 @@ var AffiliateStores = []AffiliateConfig{
 		Name:          "Manapool",
 		Handle:        "MP",
 		DefaultFields: []string{"ref"},
+		TitleFunc:     manapoolCardTitle,
 	},
 	{
 		Trigger:       "manapool.com/sealed",
