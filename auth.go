@@ -396,6 +396,15 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
+		// Kept ungated to match the previous middleware exactly.
+		if exp := v.Get("Expires"); exp != "" {
+			if _, err := strconv.ParseInt(exp, 10, 64); err != nil {
+				log.Println("API error", err.Error())
+				w.Write([]byte(`{"error": "invalid or expired signature"}`))
+				return
+			}
+		}
+
 		secret := os.Getenv("BAN_SECRET")
 		apiUsersMutex.RLock()
 		userSecret, found := Config.APIUserSecrets[v.Get("UserEmail")]
