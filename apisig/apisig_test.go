@@ -2,8 +2,10 @@ package apisig
 
 import (
 	"encoding/base64"
+	"errors"
 	"net/url"
 	"testing"
+	"time"
 )
 
 const goldenSecret = "golden-secret"
@@ -93,5 +95,83 @@ func TestDecodeRejectsGarbage(t *testing.T) {
 	}
 	if _, err := Decode(base64.StdEncoding.EncodeToString([]byte("a=%zz"))); err == nil {
 		t.Error("expected error for bad query")
+	}
+}
+
+var testOptionalFields = []string{"UserName", "UserEmail", "APImode", "SearchDownloadCSV"}
+
+func mustDecode(t *testing.T, blob string) url.Values {
+	t.Helper()
+	v, err := Decode(blob)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestVerifyRoundTrip(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if err != nil {
+		t.Errorf("valid blob rejected: %v", err)
+	}
+}
+
+func TestVerifyNoExpiryNeverExpires(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsNoExpiry())
+	v := mustDecode(t, blob)
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(4000000000, 0))
+	if err != nil {
+		t.Errorf("no-expiry blob rejected: %v", err)
+	}
+}
+
+func TestVerifyExpired(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1800000001, 0))
+	if !errors.Is(err, ErrExpired) {
+		t.Errorf("got %v want ErrExpired", err)
+	}
+}
+
+func TestVerifyTampered(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	v.Set("API", "DEV_ACCESS")
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("got %v want ErrInvalid", err)
+	}
+}
+
+func TestVerifyWrongSecret(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	err := Verify([]byte("other"), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("got %v want ErrInvalid", err)
+	}
+}
+
+func TestVerifyIgnoresUnlistedFields(t *testing.T) {
+	// A field not in optionalFields is not part of the payload, so adding
+	// one after minting must not break verification. This mirrors how the
+	// website skips unknown keys today.
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	v.Set("Unrelated", "x")
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if err != nil {
+		t.Errorf("unlisted field broke verification: %v", err)
+	}
+}
+
+func TestVerifyBadExpires(t *testing.T) {
+	v := url.Values{"API": {"ALL_ACCESS"}, "Expires": {"soon"}, "Signature": {"x"}}
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("got %v want ErrInvalid", err)
 	}
 }

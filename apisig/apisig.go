@@ -6,8 +6,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 // DefaultLink is the constant host baked into every production payload.
@@ -72,4 +74,38 @@ func Decode(blob string) (url.Values, error) {
 		return nil, err
 	}
 	return url.ParseQuery(string(raw))
+}
+
+var (
+	// ErrInvalid means the signature does not match or is malformed.
+	ErrInvalid = errors.New("invalid signature")
+	// ErrExpired means the signature verified but its Expires is in the past.
+	ErrExpired = errors.New("expired signature")
+)
+
+// Verify checks the Signature in v for method and link under secret.
+// optionalFields names the fields that are signed when present and non-empty.
+func Verify(secret []byte, method, link string, v url.Values, optionalFields []string, now time.Time) error {
+	c := Claims{API: v.Get("API"), Fields: url.Values{}}
+	for _, name := range optionalFields {
+		if val := v.Get(name); val != "" {
+			c.Fields.Set(name, val)
+		}
+	}
+	exp := v.Get("Expires")
+	if exp != "" {
+		n, err := strconv.ParseInt(exp, 10, 64)
+		if err != nil {
+			return ErrInvalid
+		}
+		c.Expires = n
+	}
+	want := Sign(secret, []byte(Payload(method, link, c)))
+	if !hmac.Equal([]byte(want), []byte(v.Get("Signature"))) {
+		return ErrInvalid
+	}
+	if c.Expires != 0 && c.Expires < now.Unix() {
+		return ErrExpired
+	}
+	return nil
 }
