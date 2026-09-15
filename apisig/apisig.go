@@ -15,6 +15,10 @@ import (
 // DefaultLink is the constant host baked into every production payload.
 const DefaultLink = "http://www.mtgban.com"
 
+// APIFields are the optional fields an API key carries, signed when present.
+// The website's verifier must list every one of them.
+var APIFields = []string{"APImode", "UserEmail"}
+
 var (
 	// ErrInvalid means the signature does not match or is malformed.
 	ErrInvalid = errors.New("invalid signature")
@@ -83,7 +87,7 @@ func Mint(secret []byte, link string, c Claims) string {
 func Decode(blob string) (url.Values, error) {
 	raw, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
-		return nil, err
+		return url.Values{}, err
 	}
 	return url.ParseQuery(string(raw))
 }
