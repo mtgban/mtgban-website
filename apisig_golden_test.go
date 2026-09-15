@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -59,5 +63,44 @@ func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
 	want := "QVBJPUFMTF9BQ0NFU1MmQVBJbW9kZT1hbGwmU2lnbmF0dXJlPU1tY0ZWZjBOMlBySzNvOHprOU81WWREcXo0ZyUzRCZVc2VyRW1haWw9Z29sZGVuJTQwZXhhbXBsZS5jb20="
 	if got != want {
 		t.Errorf("generateAPIKey:\n got %q\nwant %q", got, want)
+	}
+}
+func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
+	if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+		t.Skip("needs a loaded datastore; enforceAPISigning refuses with 503 otherwise")
+	}
+	oldCheck, oldURL := SigCheck, ServerURL
+	SigCheck, ServerURL = true, "https://www.mtgban.com"
+	t.Cleanup(func() { SigCheck, ServerURL = oldCheck, oldURL })
+
+	apiUsersMutex.Lock()
+	if Config.APIUserSecrets == nil {
+		Config.APIUserSecrets = map[string]string{}
+	}
+	Config.APIUserSecrets["golden@example.com"] = goldenSecret
+	apiUsersMutex.Unlock()
+	t.Cleanup(func() {
+		apiUsersMutex.Lock()
+		delete(Config.APIUserSecrets, "golden@example.com")
+		apiUsersMutex.Unlock()
+	})
+
+	blob := "QVBJPUFMTF9BQ0NFU1MmQVBJbW9kZT1hbGwmU2lnbmF0dXJlPU1tY0ZWZjBOMlBySzNvOHprOU81WWREcXo0ZyUzRCZVc2VyRW1haWw9Z29sZGVuJTQwZXhhbXBsZS5jb20="
+	called := false
+	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true }))
+
+	req := httptest.NewRequest("GET", "/api/mtgban/stores.json?sig="+url.QueryEscape(blob), nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if !called {
+		t.Fatalf("valid blob rejected: %s", rec.Body.String())
+	}
+
+	called = false
+	req = httptest.NewRequest("GET", "/api/mtgban/stores.json?sig="+url.QueryEscape(blob[:len(blob)-8]+"AAAAAAA="), nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if called || !strings.Contains(rec.Body.String(), "invalid or expired signature") {
+		t.Errorf("tampered blob accepted, body %q", rec.Body.String())
 	}
 }

@@ -389,32 +389,12 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
-		raw, err := base64.StdEncoding.DecodeString(sig)
+		v, err := apisig.Decode(sig)
 		if SigCheck && err != nil {
-			log.Println("API error, no sig", err)
+			log.Println("API error, bad sig", err)
 			w.Write([]byte(`{"error": "invalid signature"}`))
 			return
 		}
-
-		v, err := url.ParseQuery(string(raw))
-		if SigCheck && err != nil {
-			log.Println("API error, no b64", err)
-			w.Write([]byte(`{"error": "invalid b64 signature"}`))
-			return
-		}
-
-		q := url.Values{}
-		q.Set("API", v.Get("API"))
-
-		for _, optional := range OptionalFields {
-			val := v.Get(optional)
-			if val != "" {
-				q.Set(optional, val)
-			}
-		}
-
-		sig = v.Get("Signature")
-		exp := v.Get("Expires")
 
 		secret := os.Getenv("BAN_SECRET")
 		apiUsersMutex.RLock()
@@ -424,26 +404,13 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			secret = userSecret
 		}
 
-		var expires int64
-		if exp != "" {
-			expires, err = strconv.ParseInt(exp, 10, 64)
-			if err != nil {
-				log.Println("API error", err.Error())
-				w.Write([]byte(`{"error": "invalid or expired signature"}`))
-				return
-			}
-			q.Set("Expires", exp)
-		}
-
-		link := DefaultServerURL
+		link := apisig.DefaultLink
 		if !strings.HasSuffix(ServerURL, "mtgban.com") {
 			link = "http://localhost:" + fmt.Sprint(Config.Port)
 		}
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, link, q.Encode())
-		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
-
-		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
-			log.Println("API error, invalid", data)
+		err = apisig.Verify([]byte(secret), r.Method, link, v, OptionalFields, time.Now())
+		if SigCheck && err != nil {
+			log.Println("API error, invalid", err)
 			w.Write([]byte(`{"error": "invalid or expired signature"}`))
 			return
 		}
