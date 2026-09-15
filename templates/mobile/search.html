@@ -250,12 +250,12 @@
                 <div class="m-card-info">
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
                     {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
-                    {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}{{promo_label $p}}{{end}}</span>{{end}}
+                    {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" onclick="event.stopPropagation()">{{promo_label $p}}</a>{{end}}</span>{{end}}
                     <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
                 </div>
                 <div class="m-card-badges">
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                    {{range $card.Treatments}}<span class="m-badge treatment">{{promo_label .}}</span>{{end}}
+                    {{range $card.Treatments}}<a class="m-badge treatment" href="?q=is:{{.}}" onclick="event.stopPropagation()">{{promo_label .}}</a>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}

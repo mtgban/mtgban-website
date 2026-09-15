@@ -255,6 +255,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* A promo type inside the variant text links to the search that finds every
+   other printing carrying it - styled as the surrounding text, underlined
+   at rest since touch has no hover to reveal it on. */
+.m-card-variant a {
+    color: inherit;
+    text-decoration: underline;
+}
 
 .m-card-set {
     font-size: 0.75rem;
