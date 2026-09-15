@@ -26,6 +26,7 @@ import (
 	"database/sql"
 
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
 	"github.com/mtgban/mtgban-website/internal/palette"
@@ -905,7 +906,7 @@ const (
 	DefaultConfigPath    = "config.json"
 	DefaultSecret        = "NotVerySecret!"
 	DefaultGame          = "magic"
-	DefaultServerURL     = "http://www.mtgban.com"
+	DefaultServerURL     = apisig.DefaultLink
 	DefaultDatastorePath = "AllPrintings.json.xz"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
