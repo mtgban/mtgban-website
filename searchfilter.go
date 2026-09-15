@@ -1019,17 +1019,28 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			if len(uuids) < 1 {
 				continue
 			}
-			co, err := mtgmatcher.GetUUID(uuids[0])
-			if err != nil {
-				continue
+			// The switch between readings names one product; more than one
+			// leaves it unset, the same rule contents: follows just above.
+			if len(uuids) == 1 && !negate {
+				if co, err := mtgmatcher.GetUUID(uuids[0]); err == nil {
+					config.ContentsProduct = co.UUID
+					config.ContentsMode = ContentsVariable
+				}
 			}
-			if !negate {
-				config.ContentsProduct = co.UUID
-				config.ContentsMode = ContentsVariable
-			}
-			picks, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
-			if err != nil {
-				continue
+			// Every named product's own guaranteed cards come back out, not
+			// only the first's - a second product named alongside it still
+			// means what it does not guarantee, not everything it holds.
+			var picks []string
+			for _, uuid := range uuids {
+				co, err := mtgmatcher.GetUUID(uuid)
+				if err != nil {
+					continue
+				}
+				deck, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+				if err != nil {
+					continue
+				}
+				picks = append(picks, deck...)
 			}
 			filters = append(filters, FilterElem{
 				Name:   "idlookup",

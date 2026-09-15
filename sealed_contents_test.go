@@ -302,3 +302,76 @@ func TestTheSettingPicksWhatALinkOpens(t *testing.T) {
 		}
 	}
 }
+
+// twoProductsWithBothKinds finds two distinct products that each hold a
+// fixed list and cards they might come with, so a query naming both has two
+// guaranteed lists to take back out rather than one.
+func twoProductsWithBothKinds(t *testing.T) (a, b *mtgmatcher.CardObject) {
+	t.Helper()
+	for _, code := range mtgmatcher.GetAllSets() {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil {
+			continue
+		}
+		for _, product := range set.SealedProduct {
+			if !mtgmatcher.SealedHasDecklist(code, product.UUID) ||
+				!mtgmatcher.SealedIsRandom(code, product.UUID) {
+				continue
+			}
+			co, err := mtgmatcher.GetUUID(product.UUID)
+			if err != nil {
+				continue
+			}
+			if a == nil {
+				a = co
+			} else if co.UUID != a.UUID {
+				b = co
+				return
+			}
+		}
+	}
+	return
+}
+
+// Naming several products in one variable: query takes each one's own
+// guaranteed cards back out, not only the first's - a second product named
+// alongside the first still means what it does not guarantee, not
+// everything it holds. And with more than one product named, no single
+// switch between readings applies, so neither is offered.
+func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	a, b := twoProductsWithBothKinds(t)
+	if a == nil || b == nil {
+		t.Skip("this datastore has fewer than two products with both a fixed and a variable part")
+	}
+
+	query := `variable:"` + a.Name + `","` + b.Name + `"`
+	config := parseSearchOptionsNG(query, nil, nil, nil)
+	if config.ContentsProduct != "" || config.ContentsMode != "" {
+		t.Errorf("naming two products still offers a switch over %q", config.ContentsProduct)
+	}
+
+	found, err := searchAndFilter(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundSet := map[string]bool{}
+	for _, id := range found {
+		foundSet[id] = true
+	}
+
+	for _, co := range []*mtgmatcher.CardObject{a, b} {
+		deck, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, uuid := range deck {
+			if foundSet[uuid] {
+				card, _ := mtgmatcher.GetUUID(uuid)
+				t.Errorf("%s is guaranteed by %s but survives the variable reading of both", card, co.Name)
+			}
+		}
+	}
+}
