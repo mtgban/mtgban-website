@@ -222,6 +222,42 @@ func TestPriceParityBuylist(t *testing.T) {
 	}
 }
 
+// A vendor like SYP flags QuantityPriority because its rows are a count of
+// copies wanted, not an offer; the template reads that flag straight off
+// SearchEntry to decide whether to show the quantity or the price where the
+// price would normally go. searchSellersNG already copied the flag from
+// Info() - searchVendorsNG silently didn't, so every buylist result read as
+// a price no matter what the vendor declared.
+func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
+	regular, _, _ := parityCards(t)
+
+	prevVendors := vendorsPtr.Load()
+	t.Cleanup(func() { vendorsPtr.Store(prevVendors) })
+
+	bl := mtgban.BuylistRecord{}
+	bl.Add(regular, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 12, URL: "u"})
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{
+			Name: "Parity SYP", Shorthand: "PARITYSYP",
+			MetadataOnly: true, QuantityPriority: true,
+		}),
+	}
+	vendorsPtr.Store(&vendors)
+
+	config := parseSearchOptionsNG(regular, nil, nil, nil)
+	found := searchVendorsNG([]string{regular}, config)
+
+	var got bool
+	for _, res := range found[regular]["INDEX"] {
+		if res.Shorthand == "PARITYSYP" {
+			got = res.QuantityPriority
+		}
+	}
+	if !got {
+		t.Error("QuantityPriority did not carry through searchVendorsNG")
+	}
+}
+
 // TestFinishPredicateParity flips divergence #1 from the plan: checkFinish is
 // gone, and one finish predicate (the search's cardFilterFinish) applies
 // everywhere - filtered API requests inherit it through the funnel, full
