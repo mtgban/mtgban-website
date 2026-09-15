@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha1"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -17,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
@@ -251,9 +250,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 }
 
 func signHMACSHA1Base64(key []byte, data []byte) string {
-	h := hmac.New(sha1.New, key)
-	h.Write(data)
-	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+	return apisig.Sign(key, data)
 }
 
 func getSignatureFromCookies(r *http.Request) string {
