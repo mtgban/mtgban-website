@@ -62,7 +62,7 @@ func (c Claims) expiresString() string {
 	return strconv.FormatInt(c.Expires, 10)
 }
 
-// payloadRaw is the exact byte string that gets signed, given the raw Expires spelling.
+// payloadRaw signs the Expires spelling as given rather than re-rendering it.
 func payloadRaw(method, exp, link string, q url.Values) string {
 	return method + exp + link + q.Encode()
 }

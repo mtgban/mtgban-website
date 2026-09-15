@@ -100,7 +100,7 @@ output, not a claim written here.
 | `utils.go`, `redirect.go`, `mobile.go`, `palette.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle, palette metadata APIs |
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
-| `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); imported by the API gateway repo, so its payload bytes are frozen by golden tests |
+| `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); to be imported by the API gateway repo, so its payload bytes are frozen by golden tests |
 | `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
 
 ## Non-Magic games

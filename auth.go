@@ -419,7 +419,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		}
 		err = apisig.Verify([]byte(secret), r.Method, link, v, OptionalFields, time.Now())
 		if SigCheck && err != nil {
-			log.Println("API error, invalid", err)
+			log.Println("API error, invalid", v.Get("UserEmail"), err)
 			w.Write([]byte(`{"error": "invalid or expired signature"}`))
 			return
 		}

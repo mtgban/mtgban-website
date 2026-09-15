@@ -171,7 +171,17 @@ func TestVerifyIgnoresUnlistedFields(t *testing.T) {
 func TestVerifyBadExpires(t *testing.T) {
 	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
 	v := mustDecode(t, blob)
+	// Re-sign so only the ParseInt guard can reject this blob.
+	q := url.Values{}
+	q.Set("API", v.Get("API"))
+	for _, name := range testOptionalFields {
+		if val := v.Get(name); val != "" {
+			q.Set(name, val)
+		}
+	}
+	q.Set("Expires", "soon")
 	v.Set("Expires", "soon")
+	v.Set("Signature", Sign([]byte(goldenSecret), []byte(payloadRaw("GET", "soon", DefaultLink, q))))
 	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
 	if !errors.Is(err, ErrInvalid) {
 		t.Errorf("got %v want ErrInvalid", err)
