@@ -212,7 +212,7 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 |---|---|---|
 | `noSigning` | Home, Guide, Privacy, Offline page, suggest/chart/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie; lazily initializes `ServerURL` on the first trusted-host request |
 | `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email; POST only when `NavElem.CanPOST` |
-| `enforceAPISigning` | `/api/mtgban/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET` |
+| `enforceAPISigning` | `/api/mtgban/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET` |
 
 Static assets (`/css/`, `/js/`, `/img/`) go through none of these three —
 they're registered directly on `ServeFile` with no wrapper.
