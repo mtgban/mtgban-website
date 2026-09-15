@@ -1037,6 +1037,15 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: picks,
 			})
 		case "container":
+			// Without this, a standalone container: query left CleanQuery
+			// empty and SearchMode unset, so searchAndFilter fell to its
+			// default card-name search - which never seeds a sealed
+			// product as a candidate at all, regardless of what the
+			// idlookup filter below asks for. mixed is what contents: and
+			// variable: already use for the same reason: it unions cards
+			// and sealed products into the candidate pool the filter then
+			// narrows down.
+			config.SearchMode = "mixed"
 			filters = append(filters, FilterElem{
 				Name:   "idlookup",
 				Negate: negate,
