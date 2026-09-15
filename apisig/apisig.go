@@ -15,6 +15,13 @@ import (
 // DefaultLink is the constant host baked into every production payload.
 const DefaultLink = "http://www.mtgban.com"
 
+var (
+	// ErrInvalid means the signature does not match or is malformed.
+	ErrInvalid = errors.New("invalid signature")
+	// ErrExpired means the signature verified but its Expires is in the past.
+	ErrExpired = errors.New("expired signature")
+)
+
 // Claims are the values packed into a signature.
 type Claims struct {
 	// API is the store scope: a preset such as ALL_ACCESS or a store list.
@@ -55,9 +62,14 @@ func (c Claims) expiresString() string {
 	return strconv.FormatInt(c.Expires, 10)
 }
 
+// payloadRaw is the exact byte string that gets signed, given the raw Expires spelling.
+func payloadRaw(method, exp, link string, q url.Values) string {
+	return method + exp + link + q.Encode()
+}
+
 // Payload is the exact byte string that gets signed.
 func Payload(method, link string, c Claims) string {
-	return method + c.expiresString() + link + c.values().Encode()
+	return payloadRaw(method, c.expiresString(), link, c.values())
 }
 
 // Mint signs c for a GET against link and returns the base64 blob for ?sig=.
@@ -76,35 +88,31 @@ func Decode(blob string) (url.Values, error) {
 	return url.ParseQuery(string(raw))
 }
 
-var (
-	// ErrInvalid means the signature does not match or is malformed.
-	ErrInvalid = errors.New("invalid signature")
-	// ErrExpired means the signature verified but its Expires is in the past.
-	ErrExpired = errors.New("expired signature")
-)
-
 // Verify checks the Signature in v for method and link under secret.
 // optionalFields names the fields that are signed when present and non-empty.
 func Verify(secret []byte, method, link string, v url.Values, optionalFields []string, now time.Time) error {
-	c := Claims{API: v.Get("API"), Fields: url.Values{}}
+	q := url.Values{}
+	q.Set("API", v.Get("API"))
 	for _, name := range optionalFields {
 		if val := v.Get(name); val != "" {
-			c.Fields.Set(name, val)
+			q.Set(name, val)
 		}
 	}
 	exp := v.Get("Expires")
+	var expVal int64
 	if exp != "" {
 		n, err := strconv.ParseInt(exp, 10, 64)
 		if err != nil {
 			return ErrInvalid
 		}
-		c.Expires = n
+		expVal = n
+		q.Set("Expires", exp)
 	}
-	want := Sign(secret, []byte(Payload(method, link, c)))
+	want := Sign(secret, []byte(payloadRaw(method, exp, link, q)))
 	if !hmac.Equal([]byte(want), []byte(v.Get("Signature"))) {
 		return ErrInvalid
 	}
-	if c.Expires != 0 && c.Expires < now.Unix() {
+	if exp != "" && expVal < now.Unix() {
 		return ErrExpired
 	}
 	return nil

@@ -169,7 +169,51 @@ func TestVerifyIgnoresUnlistedFields(t *testing.T) {
 }
 
 func TestVerifyBadExpires(t *testing.T) {
-	v := url.Values{"API": {"ALL_ACCESS"}, "Expires": {"soon"}, "Signature": {"x"}}
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	v.Set("Expires", "soon")
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("got %v want ErrInvalid", err)
+	}
+	if errors.Is(err, ErrExpired) {
+		t.Error("got ErrExpired, want ErrInvalid only")
+	}
+}
+
+func TestVerifyTamperedListedField(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	v.Set("UserEmail", "attacker@example.com")
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if !errors.Is(err, ErrInvalid) {
+		t.Errorf("got %v want ErrInvalid", err)
+	}
+}
+
+func TestVerifyExpiresZeroRejects(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsNoExpiry())
+	v := mustDecode(t, blob)
+	q := url.Values{}
+	q.Set("API", v.Get("API"))
+	for _, name := range testOptionalFields {
+		if val := v.Get(name); val != "" {
+			q.Set(name, val)
+		}
+	}
+	q.Set("Expires", "0")
+	v.Set("Expires", "0")
+	v.Set("Signature", Sign([]byte(goldenSecret), []byte(payloadRaw("GET", "0", DefaultLink, q))))
+	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
+	if !errors.Is(err, ErrExpired) {
+		t.Errorf("got %v want ErrExpired", err)
+	}
+}
+
+func TestVerifyNonCanonicalExpiresRejects(t *testing.T) {
+	blob := Mint([]byte(goldenSecret), DefaultLink, goldenClaimsWithExpiry())
+	v := mustDecode(t, blob)
+	v.Set("Expires", "+1800000000")
 	err := Verify([]byte(goldenSecret), "GET", DefaultLink, v, testOptionalFields, time.Unix(1700000000, 0))
 	if !errors.Is(err, ErrInvalid) {
 		t.Errorf("got %v want ErrInvalid", err)
