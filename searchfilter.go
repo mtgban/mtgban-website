@@ -436,19 +436,48 @@ func fixupPicks(code string) []string {
 	return picks
 }
 
+// fixupContents resolves a contents:/variable: value to the sealed products
+// it names. A comma-separated list of quoted names (mirroring
+// fixupEditionNG) names more than one product, and every one of them is
+// resolved and merged into the result.
 func fixupContents(code string) []string {
-	co, err := mtgmatcher.GetUUID(code)
-	if err != nil {
-		co, err = mtgmatcher.GetUUID(sealedname2uuid(code))
-		if err != nil {
-			return []string{}
+	var uuids []string
+	seen := map[string]bool{}
+	for _, field := range strings.Split(code, ",") {
+		field = strings.Trim(strings.TrimSpace(field), "\"")
+		if field == "" {
+			continue
+		}
+		for _, uuid := range resolveSealedProducts(field) {
+			if seen[uuid] {
+				continue
+			}
+			seen[uuid] = true
+			uuids = append(uuids, uuid)
 		}
 	}
-	if !co.Sealed {
-		return []string{}
+	return uuids
+}
+
+// resolveSealedProducts resolves one contents:/variable: term to sealed
+// product uuids: the single product it names exactly, by id or by name, or -
+// failing that - every product whose name contains it. That fallback is what
+// lets a product-type word like "Scene Box" reach every product of that type
+// across every set, rather than only the one exact listing.
+func resolveSealedProducts(name string) []string {
+	co, err := mtgmatcher.GetUUID(name)
+	if err != nil {
+		co, err = mtgmatcher.GetUUID(sealedname2uuid(name))
+	}
+	if err == nil && co.Sealed {
+		return []string{co.UUID}
 	}
 
-	return []string{co.UUID}
+	uuids, err := mtgmatcher.SearchSealedContains(name)
+	if err != nil {
+		return nil
+	}
+	return uuids
 }
 
 func fixupContainer(code string) []string {
@@ -566,7 +595,12 @@ func init() {
 		return len(opts[i]) < len(opts[j])
 	})
 
-	regexpOptions = fmt.Sprintf(`-?(%s|%s)[:<>](("([^"]+)"|\S+))+`, strings.Join(opts, "|"), strings.ToUpper(strings.Join(opts, "|")))
+	// The value is either a run of non-space characters, or one quoted
+	// string followed by zero or more comma-joined quoted strings - so a
+	// multi-word value can be comma-listed ("A B","C D") without the space
+	// inside each one closing the match early. No space around the comma
+	// itself, matching every other multi-value key already parsed this way.
+	regexpOptions = fmt.Sprintf(`-?(%s|%s)[:<>]("([^"]+)"(,"([^"]+)")*|\S+)`, strings.Join(opts, "|"), strings.ToUpper(strings.Join(opts, "|")))
 
 	re = regexp.MustCompile(regexpOptions)
 }
@@ -1919,18 +1953,21 @@ func cardFilterIdlookup(filters []string, co *mtgmatcher.CardObject) bool {
 
 func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 	// A name that names no product leaves nothing to be the contents of: the
-	// loop below has nothing to fail on, and an answer of "everything" is
+	// loop below has nothing to match on, and an answer of "everything" is
 	// the whole datastore handed back for a typo.
 	if len(filters) == 0 {
 		return true
 	}
+	// filters can name more than one product - an explicit list, or every
+	// product a product-type term like "Scene Box" matched - and a card
+	// that came out of any one of them belongs in the results.
 	values := cardobject2sources(co)
 	for _, filter := range filters {
-		if !slices.Contains(values, filter) {
-			return true
+		if slices.Contains(values, filter) {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
