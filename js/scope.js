@@ -16,12 +16,18 @@
     var field = document.getElementById('nav-scopefield');
     if (!btn || !row || !box) return;
 
+    var chips = row.querySelectorAll('.nav2-scope-chip');
+
     // The visible bar is not part of the search form - two text fields and
     // no submit button would cost the main bar its Enter - so what is typed
     // here is mirrored into the hidden field that is.
-    if (field) {
-        box.addEventListener('input', function() { field.value = box.value.trim(); });
+    function write(value) {
+        box.value = value;
+        if (field) field.value = value.trim();
     }
+
+    box.addEventListener('input', function() { write(box.value); });
+    write(box.value);
 
     function isOpen() { return document.body.classList.contains('has-scope'); }
 
@@ -66,9 +72,19 @@
     // form actually submits is cleared by hand here.
     if (clear) {
         clear.addEventListener('click', function() {
-            box.value = '';
-            if (field) field.value = '';
+            write('');
             box.focus();
+        });
+    }
+
+    // A shortcut writes itself into the bar, and that is all it does: the x
+    // is what empties it, and Enter is what runs the search, so a click
+    // meant as the first half of typing something else costs nothing.
+    for (var i = 0; i < chips.length; i++) {
+        chips[i].addEventListener('click', function() {
+            write(this.getAttribute('data-scope'));
+            box.focus();
+            box.setSelectionRange(box.value.length, box.value.length);
         });
     }
 

@@ -678,11 +678,12 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     color: var(--subtle, #8b8b8b);
 }
 .nav2-scope-box {
-    /* Capped like the search field above it, so the two bars read as one
-       column rather than a narrow box over a bar the width of the page. */
-    flex: 1 1 auto;
+    /* Sized to leave the rest of the row for the examples. box-sizing
+       matches the search field above so the number means the rendered
+       width, padding and border included. */
+    box-sizing: border-box;
+    flex: 0 1 400px;
     min-width: 0;
-    max-width: 480px;
     height: 24px;
     padding: 0 8px;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
@@ -699,7 +700,6 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
 }
 .nav2-scope-clear {
     flex-shrink: 0;
-    margin-right: auto;
     display: flex; align-items: center; justify-content: center;
     width: 22px; height: 22px;
     border: none; border-radius: var(--radius-sm, 6px);
@@ -709,3 +709,42 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     transition: background 0.12s, color 0.12s;
 }
 .nav2-scope-clear:hover { background: var(--surface-3, rgba(255,255,255,0.06)); color: var(--normal); }
+
+/* The examples fill the slack the box no longer takes, and double as the
+   only place the bar's syntax is written down. */
+.nav2-scope-examples {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* Set well clear of the x, so the list reads as its own group rather
+       than as more buttons attached to the box. */
+    margin-left: 16px;
+    margin-right: auto;
+    min-width: 0;
+    overflow: hidden;
+}
+.nav2-scope-chip {
+    flex-shrink: 0;
+    height: 20px;
+    padding: 0 8px;
+    border: 1px dashed var(--border-subtle, rgba(255,255,255,0.12));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--subtle, #8b8b8b);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs, 11px);
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.nav2-scope-chip:hover {
+    border-style: solid;
+    color: var(--normal);
+    background: var(--surface-3, rgba(255,255,255,0.06));
+}
+/* Below the band the box and the chips cannot both fit; the box is the
+   control and the examples are the hint, so the hint goes. */
+@media (max-width: 860px) {
+    .nav2-scope-examples { display: none; }
+    .nav2-scope-box { flex: 1 1 auto; }
+}

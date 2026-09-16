@@ -118,6 +118,15 @@
         <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
+        {{/* The row runs the width of the page whatever is in it, so the slack
+             to the right of the box earns its place by showing the syntax the
+             box takes. Clicking one writes it in; the x is what takes it out. */}}
+        <span class="nav2-scope-examples" id="nav-scope-examples">
+            <span class="nav2-scope-label">Common</span>
+            <button class="nav2-scope-chip" type="button" data-scope="f:nonfoil" title="Pin non-foil printings">f:nonfoil</button>
+            <button class="nav2-scope-chip" type="button" data-scope="f:foil" title="Pin foil printings">f:foil</button>
+            <button class="nav2-scope-chip" type="button" data-scope="is:altfoil" title="Pin the alternative foiling treatments">is:altfoil</button>
+        </span>
     </div>
   </div>
   {{end}}
