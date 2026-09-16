@@ -624,6 +624,13 @@ func fixupFormatNG(code string) []string {
 	return out
 }
 
+// isNotDigit reports whether a rune is anything but an ASCII digit. It is
+// what tells a collector number that names one printing - 17a, 107†, 074a,
+// C16-177 - from one that names the family a set files under it.
+func isNotDigit(r rune) bool {
+	return r < '0' || r > '9'
+}
+
 // namesASetCode reports whether a token is a set code. It is what tells
 // "neo 10e", two set codes and so a name search, from "neo 234", which
 // names a printing.
@@ -1295,7 +1302,8 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 	}
 
 	// Rewrite bare "<set code> <number>" queries, eg "neo 234" or
-	// "plst c16-177", to the equivalent s:CODE cn:NUMBER filters.
+	// "plst c16-177", to the equivalent s:CODE cn:NUMBER filters - cns:
+	// where the number is spelled with more than digits.
 	// ExtractNumberAny doubles as validator and normalizer: it strips
 	// leading # and zeroes, keeps dashed and starred numbers whole, and
 	// rejects ordinals and months. It rejected set-code-shaped tokens
@@ -1311,7 +1319,26 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			if number != "" && !namesASetCode(tokens[1]) {
 				set, err := mtgmatcher.GetSet(tokens[0])
 				if err == nil {
-					extraConfig := parseSearchOptionsNG("s:"+set.Code+" cn:"+number, nil, nil, nil)
+					// Someone writing cn: has chosen its reading, which
+					// answers with every printing filed under the plain
+					// number. Someone typing two words has chosen nothing,
+					// and means the printing they spelled - so a number
+					// saying more than a plain one is asked for exactly as
+					// typed, against the number the catalog writes. A
+					// spelling no card carries reaches nothing, which is
+					// what it should say.
+					//
+					// What is left after ExtractNumberAny decides which of
+					// the two it is, and the token as typed is what gets
+					// asked for. So "#234" is the plain number it means,
+					// the extraction having taken the # off, while "#17a"
+					// is asked for whole and is no card's number - as
+					// against 17a, which is one's.
+					op, value := "cn:", number
+					if strings.ContainsFunc(number, isNotDigit) {
+						op, value = "cns:", tokens[1]
+					}
+					extraConfig := parseSearchOptionsNG("s:"+set.Code+" "+op+value, nil, nil, nil)
 					filters = append(filters, extraConfig.CardFilters...)
 					query = ""
 				}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -204,10 +205,12 @@ func TestSetNumberShorthand(t *testing.T) {
 		}
 	})
 
+	// The number survives whole either way; what the set code in front of
+	// it decides is that the query is asked as written.
 	t.Run("PLST prefixed numbers stay in one piece", func(t *testing.T) {
 		config := parseSearchOptionsNG("plst c16-177", nil, nil, nil)
 		checkValues(t, findFilter(config, "edition"), "edition", "PLST")
-		checkValues(t, findFilter(config, "number"), "number", "c16-177")
+		checkValues(t, findFilter(config, "number_strict"), "number_strict", "c16-177")
 	})
 
 	t.Run("set reading wins over prefix reading", func(t *testing.T) {
@@ -275,6 +278,146 @@ func TestSetNumberShorthand(t *testing.T) {
 		}
 		if config.CleanQuery != "neo 234" {
 			t.Errorf("CleanQuery = %q, want %q", config.CleanQuery, "neo 234")
+		}
+	})
+
+	// A number saying more than the plain one behind it is asked for as
+	// written. cn: reads a number down to that plain one and answers with
+	// every printing filed under it, which is the right reading for whoever
+	// writes cn: and the wrong one for whoever typed two words: SPG files
+	// eight Mana Crypts under 17, and "spg 17a" names exactly one of them.
+	t.Run("a suffix asks for the printing wearing it", func(t *testing.T) {
+		config := parseSearchOptionsNG("spg 17a", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "SPG")
+		checkValues(t, findFilter(config, "number_strict"), "number_strict", "17a")
+		if findFilter(config, "number") != nil {
+			t.Error("unexpected loose number filter")
+		}
+
+		keys, err := searchAndFilter(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var numbers []string
+		seen := map[string]bool{}
+		for _, key := range keys {
+			co, err := mtgmatcher.GetUUID(key)
+			if err != nil || seen[co.Number] {
+				continue
+			}
+			seen[co.Number] = true
+			numbers = append(numbers, co.Number)
+		}
+		if len(numbers) != 1 || numbers[0] != "17a" {
+			t.Errorf("spg 17a reached %v, want only [17a]", numbers)
+		}
+	})
+
+	// A mark is a suffix like any other: 4ED files Thoughtlace at 107 and
+	// Drudge Skeletons at 107†, and cn: answers both.
+	t.Run("a mark asks for the marked printing", func(t *testing.T) {
+		config := parseSearchOptionsNG("4ed 107†", nil, nil, nil)
+		checkValues(t, findFilter(config, "number_strict"), "number_strict", "107†")
+
+		keys, err := searchAndFilter(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range keys {
+			co, err := mtgmatcher.GetUUID(key)
+			if err != nil {
+				continue
+			}
+			if co.Number != "107†" {
+				t.Errorf("4ed 107† reached #%s", co.Number)
+			}
+		}
+		if len(keys) == 0 {
+			t.Error("4ed 107† reached no printing")
+		}
+	})
+
+	t.Run("a plain number still answers the family", func(t *testing.T) {
+		config := parseSearchOptionsNG("spg 17", nil, nil, nil)
+		checkValues(t, findFilter(config, "number"), "number", "17")
+
+		keys, err := searchAndFilter(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		numbers := map[string]bool{}
+		for _, key := range keys {
+			co, err := mtgmatcher.GetUUID(key)
+			if err != nil {
+				continue
+			}
+			numbers[co.Number] = true
+		}
+		if len(numbers) < 2 {
+			t.Errorf("spg 17 reached %d distinct numbers, want the family", len(numbers))
+		}
+	})
+
+	// A prefixed number is asked as written like any other, and reaches the
+	// one printing it names.
+	t.Run("a prefixed number reaches its printing", func(t *testing.T) {
+		config := parseSearchOptionsNG("plst c16-177", nil, nil, nil)
+		keys, err := searchAndFilter(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range keys {
+			co, err := mtgmatcher.GetUUID(key)
+			if err != nil {
+				continue
+			}
+			if !strings.EqualFold(co.Number, "C16-177") {
+				t.Errorf("plst c16-177 reached #%s", co.Number)
+			}
+		}
+		if len(keys) == 0 {
+			t.Error("plst c16-177 reached no printing")
+		}
+	})
+
+	// Only the shorthand moves. Whoever writes the operator out has picked
+	// its reading and keeps it, decorations and all.
+	t.Run("writing cn: keeps its own looser reading", func(t *testing.T) {
+		config := parseSearchOptionsNG("s:spg cn:17a", nil, nil, nil)
+		checkValues(t, findFilter(config, "number"), "number", "17")
+	})
+
+	// ExtractNumberAny drops a # along with the parens and padding it
+	// cleans off a vendor's listing, so "#234" arrives as the plain number
+	// it means and reads loosely. It is what is left after that which
+	// picks the reading, while the token as typed is what gets asked for -
+	// so "#17a" is asked for whole, and no card is numbered that.
+	t.Run("a hash on a suffixed number is no number at all", func(t *testing.T) {
+		config := parseSearchOptionsNG("spg #17a", nil, nil, nil)
+		checkValues(t, findFilter(config, "number_strict"), "number_strict", "#17a")
+
+		keys, err := searchAndFilter(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(keys) != 0 {
+			t.Errorf("spg #17a reached %d printings, want none", len(keys))
+		}
+	})
+
+	// NEO carries no 30a. The shorthand used to drop the letter and hand
+	// back #30; answering nothing says what is true, and the plain number
+	// is still one keystroke away.
+	t.Run("a suffix the set does not carry reaches nothing", func(t *testing.T) {
+		config := parseSearchOptionsNG("neo 30a", nil, nil, nil)
+		checkValues(t, findFilter(config, "number_strict"), "number_strict", "30a")
+
+		keys, err := searchAndFilter(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(keys) != 0 {
+			t.Errorf("neo 30a reached %d printings, want none", len(keys))
 		}
 	})
 }
