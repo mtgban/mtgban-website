@@ -367,3 +367,53 @@ func TestCardPathComesBackWithItsName(t *testing.T) {
 		}
 	}
 }
+
+// The name a query opens with is a label, and it only goes in where the number
+// it labels named one card. This is the rule itself, with no datastore behind
+// it: the games that break it are not the game CI loads, so the cases live
+// here as cards rather than as a datastore to find them in.
+func TestOpeningNameLabelsWithoutNarrowing(t *testing.T) {
+	cards := func(names ...string) []mtgmatcher.Card {
+		out := make([]mtgmatcher.Card, len(names))
+		for i, name := range names {
+			out[i] = mtgmatcher.Card{Name: name, Number: "1", SetCode: "TST"}
+		}
+		return out
+	}
+
+	for _, tc := range []struct {
+		why   string
+		cards []mtgmatcher.Card
+		want  string
+	}{{
+		why:   "the one card at a number is named",
+		cards: cards("Black Lotus"),
+		want:  "Black Lotus",
+	}, {
+		why:   "every printing of the one name still names it",
+		cards: cards("Forest", "Forest", "Forest"),
+		want:  "Forest",
+	}, {
+		why:   "one name spelled two ways is still one name",
+		cards: cards("Elemental HERO Rampart Blaster", "Elemental Hero Rampart Blaster"),
+		want:  "Elemental HERO Rampart Blaster",
+	}, {
+		why:   "two names under one number name neither: HS SEA083//SEA247",
+		cards: cards("Marlynn // Treasure Island", "Marlynn // Arrows Back"),
+		want:  "",
+	}, {
+		why:   "and the order they come in does not pick one",
+		cards: cards("Marlynn // Arrows Back", "Marlynn // Treasure Island"),
+		want:  "",
+	}, {
+		why:   "a number no card sits at is not named",
+		cards: nil,
+		want:  "",
+	}} {
+		t.Run(tc.why, func(t *testing.T) {
+			if got := openingName(tc.cards); got != tc.want {
+				t.Errorf("openingName(%v) = %q, want %q", tc.cards, got, tc.want)
+			}
+		})
+	}
+}

@@ -84,6 +84,30 @@ func printingsAt(set, number string) []mtgmatcher.Card {
 	return cards
 }
 
+// openingName returns the name a query for a number should open with, or ""
+// where the number should stand alone.
+//
+// The name is a label for the reader, but the search reads it as a filter too,
+// so it goes in only where the number already named one card. High Seas files
+// both "Marlynn // Treasure Island" and "Marlynn // Arrows Back" under
+// SEA083//SEA247, and either name in front drops the other. Magic files one
+// name per number throughout; 1,337 numbers over six other games do not.
+func openingName(cards []mtgmatcher.Card) string {
+	if len(cards) == 0 {
+		return ""
+	}
+	// Folded, the way printingsAt already reads the numbers: a set that
+	// files one card under two spellings of its name - Yu-Gi-Oh has six,
+	// Elemental HERO beside Elemental Hero - has still named one card, and
+	// either spelling finds both rows.
+	for _, card := range cards[1:] {
+		if !strings.EqualFold(card.Name, cards[0].Name) {
+			return ""
+		}
+	}
+	return cards[0].Name
+}
+
 // namesFinish reports whether a word names a finish of one of the cards. It is
 // how the third part of a card path is told from the card name scryfall puts
 // in the same position, and it asks with the filter the query would run, over
@@ -133,9 +157,10 @@ func namesFinish(cards []mtgmatcher.Card, word string) bool {
 // nonfoil separately. It also means a set code scryfall spells differently, or
 // a number this game writes another way, fails as a search that says so rather
 // than as a dead link. The name goes in front of the filters where the set
-// files a card under the number, since the query is what the search box
+// files one card under the number, since the query is what the search box
 // shows, and a person reads a name there - the way a result's link always
-// read.
+// read. Where the name would narrow the results instead of labelling them,
+// the number stands alone - see openingName.
 //
 // The number is matched as printed, with cns: rather than cn:. Scryfall writes
 // it the way the card does, stars and daggers included, and those are exactly
@@ -176,8 +201,9 @@ func CardRedirect(w http.ResponseWriter, r *http.Request) {
 			query += " cns:" + number
 
 			cards := printingsAt(set, number)
-			if len(cards) > 0 {
-				query = cards[0].Name + " " + query
+			name := openingName(cards)
+			if name != "" {
+				query = name + " " + query
 			}
 			if len(fields) > 2 && namesFinish(cards, fields[2]) {
 				query += " f:" + fields[2]
