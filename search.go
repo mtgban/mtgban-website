@@ -770,12 +770,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	case "alpha":
 		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]], preferFlavor)
+			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "hybrid":
 		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]], preferFlavor)
+			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "number":
 		sortData := resolveSortingData(allKeys)
@@ -2087,7 +2087,6 @@ type SortingData struct {
 	// Lowercased fields the comparators order by, so the N log N
 	// comparisons don't re-lower them every time.
 	nameLower    string
-	flavorLower  string
 	editionLower string
 }
 
@@ -2109,7 +2108,6 @@ func getSortingData(uuid string) (*SortingData, error) {
 		releaseDate:  releaseDate,
 		parentCode:   set.ParentCode,
 		nameLower:    strings.ToLower(co.Name),
-		flavorLower:  strings.ToLower(co.FlavorName),
 		editionLower: strings.ToLower(co.Edition),
 	}, nil
 }
@@ -2283,23 +2281,22 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 
 // cmpSetsAlphabetical sorts cards by their names, trying to keep cards
 // grouped by edition, following the same rules as sortSets.
-func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
+//
+// The English name is what orders the list, even for a card displayed
+// under its localized name. A Japanese printing keyed on its own name
+// lands wherever the first code point of the kanji happens to fall,
+// which is not an order anybody reading an A-to-Z list is following;
+// and a localized name, Latin script or not, files the card away from
+// the English printing it reprints - "Pocion de alabastro" would sit
+// under P, chapters away from "Alabaster Potion".
+func cmpSetsAlphabetical(sortingI, sortingJ *SortingData) bool {
 	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI, setDateI := sortingI.co, sortingI.releaseDate
 	cJ, setDateJ := sortingJ.co, sortingJ.releaseDate
 
-	cIname, cInameLower := cI.Name, sortingI.nameLower
-	cJname, cJnameLower := cJ.Name, sortingJ.nameLower
-	if preferFlavor && cI.FlavorName != "" && allLanguageFlags[cI.Language] != "" {
-		cIname, cInameLower = cI.FlavorName, sortingI.flavorLower
-	}
-	if preferFlavor && cJ.FlavorName != "" && allLanguageFlags[cJ.Language] != "" {
-		cJname, cJnameLower = cJ.FlavorName, sortingJ.flavorLower
-	}
-
-	if cIname == cJname {
+	if cI.Name == cJ.Name {
 		if setDateI.Equal(setDateJ) {
 			// We need not to strip to keep set ordered wrt Promos etc
 			return cmpNumberAndFinish(sortingI, sortingJ, false)
@@ -2308,12 +2305,12 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) boo
 		return setDateI.After(setDateJ)
 	}
 
-	return cInameLower < cJnameLower
+	return sortingI.nameLower < sortingJ.nameLower
 }
 
 // cmpSetsAlphabeticalSet sorts cards by their names, keeping cards grouped
 // by edition alphabetically.
-func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
+func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData) bool {
 	if sortingI == nil || sortingJ == nil {
 		return false
 	}
@@ -2321,7 +2318,7 @@ func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) 
 	cJ := sortingJ.co
 
 	if cI.SetCode == cJ.SetCode {
-		return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
+		return cmpSetsAlphabetical(sortingI, sortingJ)
 	}
 
 	return sortingI.editionLower < sortingJ.editionLower

@@ -309,7 +309,7 @@ func arbitCardIDs(entries []mtgban.ArbitEntry) []string {
 // arbitLess returns the comparator for sorting entries in the given
 // mode, or nil for unknown modes (caller leaves the slice unsorted,
 // matching the prior switch's absence of a default case).
-func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavor bool) func(a, b *mtgban.ArbitEntry) bool {
+func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode bool) func(a, b *mtgban.ArbitEntry) bool {
 	switch mode {
 	case "available":
 		return func(a, b *mtgban.ArbitEntry) bool {
@@ -359,7 +359,7 @@ func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavo
 			if a.CardID == b.CardID {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return cmpSetsAlphabetical(sortData[a.CardID], sortData[b.CardID], preferFlavor)
+			return cmpSetsAlphabetical(sortData[a.CardID], sortData[b.CardID])
 		}
 	}
 	return nil
@@ -978,7 +978,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if sorting == "" {
 			sorting = DefaultSortingOption
 		}
-		less := arbitLess(arbit, sorting, pageVars.GlobalMode, preferFlavor)
+		less := arbitLess(arbit, sorting, pageVars.GlobalMode)
 		if less != nil {
 			sort.Slice(arbit, func(i, j int) bool { return less(&arbit[i], &arbit[j]) })
 		}
