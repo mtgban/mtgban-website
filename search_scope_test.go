@@ -166,6 +166,30 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 		BetaNav: &NavElem{Short: "TEST"},
 	}
 
+	// The claim the page makes about the bar has to match what the bar is
+	// doing: a bar the search ignores did not empty the page, and offering
+	// to undo it sends the reader after the one thing that is blameless.
+	for _, key := range []string{"search.html", "mobile/search.html"} {
+		t.Run(key+" ignored", func(t *testing.T) {
+			tmpl, found := cache[key]
+			if !found {
+				t.Fatalf("%s is not in the template cache", key)
+			}
+
+			vars := pageVars
+			vars.IsMobile = strings.HasPrefix(key, "mobile/")
+			vars.ScopeIgnored = true
+
+			var buf bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&buf, tmpl.Name(), vars); err != nil {
+				t.Fatalf("rendering failed: %v", err)
+			}
+			if strings.Contains(buf.String(), "narrowing this search") {
+				t.Error("the page says the bar is narrowing a search it is being left out of")
+			}
+		})
+	}
+
 	for _, key := range []string{"search.html", "mobile/search.html"} {
 		t.Run(key, func(t *testing.T) {
 			tmpl, found := cache[key]
@@ -185,6 +209,9 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 			if !strings.Contains(page, "</html>") {
 				t.Errorf("the page stops early, so execution halted partway: %d bytes ending %q",
 					len(page), page[max(0, len(page)-60):])
+			}
+			if !strings.Contains(page, "narrowing this search") {
+				t.Error("a bar that is narrowing the search went unmentioned on the page it emptied")
 			}
 			// The suggestions have to carry the pinned bar forward, or
 			// following one silently drops it.
