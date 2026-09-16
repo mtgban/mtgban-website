@@ -81,6 +81,42 @@ ensure_go() {
 
 "$SCRIPT_DIR/host-packages.sh"
 ensure_go
+
+# needrestart defaults to auto-restarting any service it thinks is using
+# now-stale libraries after an apt upgrade. Left at that default, an
+# unattended-upgrades window can silently bounce a live mtgban instance out
+# from under real traffic with no warning - deploy.sh's own blue-green
+# cycle should be the only thing that ever restarts this host's instances.
+# List-only leaves packages upgrading on their normal schedule; it only
+# stops needrestart from acting on its own afterward.
+#
+# A conf.d drop-in, not an in-place sed: needrestart.conf's shipped default
+# line varies by package version, so a sed matching one exact spelling can
+# silently no-op on a host whose file never matched it - looking idempotent
+# while never actually applying. A drop-in is written fresh every run
+# regardless of what the base file says, and needrestart's own conf.d
+# loader (confirmed live: it sorts and evals every conf.d/*.conf after the
+# main file) guarantees it's the value actually in effect, not just the
+# value this file happens to contain.
+echo "==> needrestart    : list-only (never auto-restart)"
+sudo tee /etc/needrestart/conf.d/mtgban-list-only.conf >/dev/null <<'EOF'
+# Installed by mtgban-website's bootstrap.sh - see there for why.
+$nrconf{restart} = 'l';
+EOF
+
+# Verified against needrestart's own config chain, not just this file's own
+# content - a typo or a conf.d file sorting after this one and overriding
+# it back would otherwise pass silently. This evals needrestart.conf
+# itself rather than asking the needrestart binary directly, so it relies
+# on that file's own conf.d-loading loop (confirmed live, package
+# 3.6-7ubuntu4.5) - a future package version that moved conf.d loading
+# into the binary instead would need this re-checked against it.
+EFFECTIVE=$(perl -e 'our %nrconf; do q(/etc/needrestart/needrestart.conf); print $nrconf{restart} // ""')
+if [ "$EFFECTIVE" != "l" ]; then
+    echo "!! needrestart's effective restart mode is '${EFFECTIVE:-<unset>}', not 'l' - refusing to continue" >&2
+    exit 1
+fi
+
 command -v go        >/dev/null || { echo "!! go still not found in PATH ($PATH)" >&2; exit 1; }
 SYSTEMCTL=$(command -v systemctl)
 NGINX=$(command -v nginx || echo /usr/sbin/nginx)
@@ -153,6 +189,45 @@ else
     echo "upstream ${UPSTREAM_NAME} { server 127.0.0.1:${BOOT_PORT}; }" | sudo tee "$UPSTREAM_CONF" >/dev/null
     sudo chown "$DEPLOY_USER:$DEPLOY_USER" "$UPSTREAM_CONF"
 fi
+
+# 5a. Hourly timer: cycle through deploy.sh, at the current ref, whenever
+#     needrestart flags this host's instance as running stale libraries -
+#     see self-cycle.sh for why a blue-green cycle is safe to run
+#     unattended where a raw restart would not be. Named off UNIT, not
+#     hardcoded to "mtgban", so it stays correct on a host bootstrapped
+#     with an overridden unit template.
+SELF_CYCLE_UNIT="${UNIT}-self-cycle"
+echo "==> installing ${SELF_CYCLE_UNIT}.timer"
+chmod +x "$REPO_DIR/deploy/self-cycle.sh"
+sudo tee "/etc/systemd/system/${SELF_CYCLE_UNIT}.service" >/dev/null <<EOF
+[Unit]
+Description=Cycle ${UNIT}@ through blue-green if needrestart flags it
+
+[Service]
+# Runs as root, deliberately - needrestart -b needs root to see every
+# unit's process, not just ones the deploy user owns (confirmed live: as
+# the deploy user it prints only the version line and nothing else, so
+# the check would silently never fire). self-cycle.sh itself drops to
+# DEPLOY_USER only for the two parts that must run as them.
+Type=oneshot
+Environment=DEPLOY_USER=${DEPLOY_USER}
+Environment=UNIT=${UNIT}
+WorkingDirectory=${REPO_DIR}
+ExecStart=${REPO_DIR}/deploy/self-cycle.sh
+EOF
+sudo tee "/etc/systemd/system/${SELF_CYCLE_UNIT}.timer" >/dev/null <<EOF
+[Unit]
+Description=Periodic check for ${SELF_CYCLE_UNIT}.service
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+sudo "$SYSTEMCTL" daemon-reload
+sudo "$SYSTEMCTL" enable --now "${SELF_CYCLE_UNIT}.timer"
 
 # 6. Build both checkouts.
 for port in "${PORTS[@]}"; do
