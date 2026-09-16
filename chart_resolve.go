@@ -250,7 +250,7 @@ func resolveBanIDForCard(ctx context.Context, co *mtgmatcher.CardObject) int64 {
 // tcgBanIDForCard is the ban_id of the variant carrying a card's own finish, or
 // 0 when the product has no listing for it.
 func tcgBanIDForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) int64 {
-	subType := tcgSubTypeForCard(co, subTypes)
+	subType := tcgSubTypeForCard(co, subTypes, mtgmatcher.GetUUID)
 	if subType == "" {
 		return 0
 	}
@@ -291,22 +291,31 @@ func foilSubTypes(subTypes map[string]int64) []string {
 	return foils
 }
 
+// printingLookup answers for one printing by uuid. The callers hand over
+// mtgmatcher.GetUUID; it is a parameter so the pairing above can be exercised
+// over a product's finishes without a datastore holding them.
+type printingLookup func(string) (*mtgmatcher.CardObject, error)
+
 // extraFoilFinishes returns the keys of a card's foil finishes past the primary
 // one (Lorcana's RainbowPillars and friends), ordered to match foilSubTypes.
 // Sorted, so with more than one extra the pairing would also depend on the
 // finish keys sorting into the same order as the sub-type names; today no
 // product carries a second extra, so the ordering above is the live constraint.
-func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
-	nonfoil := co.FoilUUIDs[mtgmatcher.FinishNonfoil]
+func extraFoilFinishes(co *mtgmatcher.CardObject, printing printingLookup) []string {
 	extras := make([]string, 0, len(co.FoilUUIDs))
 	for finish, id := range co.FoilUUIDs {
 		if finish == mtgmatcher.FinishNonfoil || finish == mtgmatcher.FinishFoil {
 			continue
 		}
-		// A game that also keys each printing by its own treatment name spells
-		// the plain one "normal", which is not a second name for a foil finish
-		// and must not take a place in the pairing below.
-		if id != "" && id == nonfoil {
+		// Whether a finish is a foil is the printing's own answer. Reading it
+		// off the name cannot work: a game that keys each printing by its
+		// treatment spells the plain ones "normal", "1steditionnormal",
+		// "unlimitededitionnormal", and comparing their uuid to the nonfoil
+		// key's only catches the one the key happens to point at - it left
+		// 4737 of Flesh and Blood's 17547 printings filing a plain 1st
+		// Edition among the foils, shifting the pairing below by a place.
+		sib, err := printing(id)
+		if err != nil || (!sib.Foil && !sib.Etched) {
 			continue
 		}
 		extras = append(extras, finish)
@@ -319,7 +328,7 @@ func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
 // Returns "" when the product carries no sub-type for that finish (a foil with
 // no foil listing yet), so the caller charts nothing rather than the wrong
 // finish's prices.
-func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) string {
+func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64, printing printingLookup) string {
 	// Ask the names first, before foilness is consulted at all. A game that
 	// keys a printing by the very thing TCGplayer prices it under - Flesh and
 	// Blood's "rainbowfoil" against "Rainbow Foil", Yu-Gi-Oh's "1stedition"
@@ -356,7 +365,7 @@ func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) str
 		return ""
 	}
 
-	for i, finish := range extraFoilFinishes(co) {
+	for i, finish := range extraFoilFinishes(co, printing) {
 		if co.FoilUUIDs[finish] != co.UUID {
 			continue
 		}
@@ -374,7 +383,7 @@ func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) str
 // the finish the sub-type names, or "" when the card carries no finish for it.
 // A sub-type the product doesn't list resolves to the primary foil, since
 // "Normal" is the only nonfoil name.
-func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64, subType string) string {
+func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64, subType string, printing printingLookup) string {
 	if subType == "" || subType == "Normal" {
 		if id, ok := co.FoilUUIDs[mtgmatcher.FinishNonfoil]; ok {
 			return id
@@ -382,7 +391,7 @@ func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64,
 		return co.UUID
 	}
 	if idx := slices.Index(foilSubTypes(subTypes), subType); idx > 0 {
-		extras := extraFoilFinishes(co)
+		extras := extraFoilFinishes(co, printing)
 		if idx-1 >= len(extras) {
 			// The mirror of tcgSubTypeForCard's refusal to map an extra
 			// sub-type onto the primary foil: a product priced under one more
@@ -428,7 +437,7 @@ func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string,
 			return "", false
 		}
 	}
-	id := tcgFinishIDForSubType(co, subTypes, vi.TCGSubType)
+	id := tcgFinishIDForSubType(co, subTypes, vi.TCGSubType, mtgmatcher.GetUUID)
 	if id == "" {
 		return "", false
 	}

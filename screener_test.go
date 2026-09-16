@@ -409,7 +409,7 @@ func TestMoverCardIdSeparatesFoilSubTypes(t *testing.T) {
 
 	seen := map[string]string{}
 	for _, subType := range []string{"Normal", "Cold Foil", "Holofoil"} {
-		id := tcgFinishIDForSubType(co, subTypes, subType)
+		id := tcgFinishIDForSubType(co, subTypes, subType, testPrintings(co.FoilUUIDs))
 		if prev, dup := seen[id]; dup && id != "" {
 			t.Errorf("sub-types %q and %q both resolve to %q", prev, subType, id)
 		}

@@ -336,7 +336,7 @@ var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (stri
 		return "", false, false
 	}
 
-	uuid := tcgFinishIDForSubType(co, subTypes, row.TCGSubType)
+	uuid := tcgFinishIDForSubType(co, subTypes, row.TCGSubType, mtgmatcher.GetUUID)
 	if uuid == "" {
 		return "", false, false
 	}
