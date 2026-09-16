@@ -1229,7 +1229,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return cmpSetsAlphabetical(sortData[arbit[i].CardID], sortData[arbit[j].CardID], preferFlavor)
+				return cmpSetsAlphabetical(sortData[arbit[i].CardID], sortData[arbit[j].CardID])
 			})
 		case "available":
 			sort.Slice(arbit, func(i, j int) bool {

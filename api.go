@@ -745,7 +745,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	switch sortOpt {
 	case "alpha":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]], false)
+			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "number":
 		sort.Slice(allKeys, func(i, j int) bool {
