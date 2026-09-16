@@ -731,6 +731,9 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	// The export links carry the sticky bar as its own parameter rather
+	// than spliced into the path, so the csv holds the rows the page did.
+	applySearchScope(&config, strings.TrimSpace(r.FormValue("scope")), blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if isSealed {
 		config.SearchMode = "sealed"
 		idOpt = "mtgjson"

@@ -158,6 +158,88 @@ var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
 // searchSuggestions adapts a parsed search that found nothing into the
 // suggest package's inputs.
+// searchScope reads the sticky filter bar - the secondary field holding
+// what does not change from one search to the next, a set or a finish -
+// so retyping the main bar never disturbs it.
+//
+// The url wins whenever it names the field at all, empty included. That
+// is what tells clearing apart from arriving with no field whatsoever:
+// every link and form the search pages draw names scope, so a request
+// without it came from somewhere else, and the cookie opens the bar the
+// way the reader last left it.
+func searchScope(w http.ResponseWriter, r *http.Request) string {
+	// r.Form is only filled once the request has been parsed, and reading
+	// the field by name is the whole point here - FormValue cannot tell an
+	// empty scope from an absent one.
+	r.ParseForm()
+
+	values, named := r.Form["scope"]
+	if !named {
+		return strings.TrimSpace(readCookie(r, "SearchScope"))
+	}
+
+	var scope string
+	if len(values) > 0 {
+		scope = strings.TrimSpace(values[0])
+	}
+	setForeverCookie(w, "SearchScope", scope)
+	return scope
+}
+
+// scopeRowOpen reports whether the pinned row is drawn. A pinned filter
+// opens it, since a filter nobody can see is one nobody can undo, but
+// closing it by hand outlives the page: without that the next search
+// draws it again and the button that closed it reads as broken.
+//
+// The chip stays lit either way, and names what is pinned, so a closed
+// row is a row put away rather than a filter gone quiet.
+func scopeRowOpen(r *http.Request, scope string) bool {
+	switch readCookie(r, "SearchScopeOpen") {
+	case "1":
+		return true
+	case "0":
+		return false
+	}
+	return scope != ""
+}
+
+// applySearchScope folds the sticky bar's filters into the search the
+// main bar asked for.
+//
+// The two bars are parsed apart and merged as filters, never as text.
+// The finish shorthand reads the literal last byte of a query - the
+// backtick of "abrade`" is what makes it foil and altfoil - and the bot
+// syntax splits on position, so gluing the two strings together would
+// quietly change what the main bar said.
+//
+// A filter the main bar already names wins outright. Filters are ANDed,
+// so a pinned "s:sos" under a typed "s:mh3" would otherwise answer
+// nothing at all, for a reason sitting in a bar nobody is looking at.
+//
+// Only filters cross over: a card name typed into the sticky bar is
+// dropped, because pinning a name is what the main bar is for.
+func applySearchScope(config *SearchConfig, scope string, blocklistRetail, blocklistBuylist, miscSearchOpts []string) {
+	if scope == "" {
+		return
+	}
+	// A query that names its own cards, or that we hand to another
+	// syntax whole, is not ours to narrow.
+	if config.SearchMode == "hashing" || config.SearchMode == "scryfall" {
+		return
+	}
+
+	pinned := parseSearchOptionsNG(scope, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	for _, filter := range pinned.CardFilters {
+		named := slices.ContainsFunc(config.CardFilters, func(elem FilterElem) bool {
+			return elem.Name == filter.Name
+		})
+		if named {
+			continue
+		}
+		config.CardFilters = append(config.CardFilters, filter)
+	}
+}
+
 func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
 	return suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
@@ -353,6 +435,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
 	query := strings.TrimSpace(r.FormValue("q"))
+	scope := searchScope(w, r)
+	pageVars.SearchScope = scope
+	pageVars.CanScope = true
+	pageVars.ScopeOpen = scopeRowOpen(r, scope)
 
 	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
 	if oembed {
@@ -626,6 +712,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, scope, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)

@@ -520,3 +520,44 @@ body.mobile:has(.m-home) .m-nav-home {
         margin-top: auto;
     }
 }
+/* ── Pinned filters ────────────────────────────────────────
+   The desktop bar's counterpart, in page flow rather than fixed chrome.
+   Hidden until something is pinned or the reader opens it, so the search
+   page keeps its one-bar look on a phone. */
+.m-pin-btn {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px;
+    border: none; border-radius: var(--radius-sm, 8px);
+    background: var(--surface-2, rgba(255,255,255,0.05));
+    color: var(--subtle, #8b8b8b);
+}
+.m-pin-btn.is-active { color: var(--accent, #e08a3c); }
+
+.m-scope-row { display: none; }
+body.has-scope .m-scope-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 16px 0;
+}
+.m-scope-box {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    border-radius: var(--radius-sm, 8px);
+    background: var(--background);
+    color: var(--normal);
+    font-family: inherit;
+    font-size: var(--text-sm, 13px);
+}
+.m-scope-clear {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px;
+    border: none; border-radius: var(--radius-sm, 8px);
+    background: transparent;
+    color: var(--subtle, #8b8b8b);
+}
