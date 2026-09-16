@@ -16,7 +16,18 @@
         </span>
         <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else}}/search{{end}}" autocomplete="off" spellcheck="false">
             <input id="nav-searchbox" type="text" name="q" placeholder="Search cards, sets, products…" value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autocapitalize="none" autofocus onFocus="this.setSelectionRange(0, this.value.length)">
+            {{/* The pinned bar rides along as a hidden field rather than as a
+                 second text input of its own. A form carrying two fields that
+                 block implicit submission, and no submit button, does not
+                 submit on Enter at all - binding the visible bar to the form
+                 took Enter away from the bar above it. */}}
+            {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}">{{end}}
         </form>
+        {{if .CanScope}}
+        <button class="nav2-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}" aria-controls="nav-scope" aria-expanded="{{if .SearchScope}}true{{else}}false{{end}}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        </button>
+        {{end}}
     </div>
 
     <div class="nav2-sections">
@@ -90,6 +101,26 @@
     </div>
 
   </div>
+
+  {{/* The sticky filter bar. It sits under the navbar rather than in the
+       results sidebar because the page that needs it most - a search the
+       pinned filters emptied - draws no sidebar at all, and a filter the
+       reader cannot see is one they cannot undo. */}}
+  {{if .CanScope}}
+  <div class="nav2-scope" id="nav-scope">
+    <div class="nav2-scope-inner">
+        <span class="nav2-scope-label">Pinned</span>
+        {{/* Bound to the search form by id rather than by nesting, so that
+             submitting from either bar sends both fields. */}}
+        <input class="nav2-scope-box" id="nav-scopebox" type="text"
+               value="{{.SearchScope}}" placeholder="Filters that stay put across searches — s:sos, is:foil, r:mythic"
+               maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+        <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+    </div>
+  </div>
+  {{end}}
 </nav>
 
 <div class="ban-nav-mobile-overlay" id="mobile-overlay" onclick="this.classList.remove('open'); document.getElementById('mobile-menu').classList.remove('open');"></div>

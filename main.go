@@ -121,6 +121,17 @@ type PageVars struct {
 	CanShowAll       bool
 	CleanSearchQuery string
 
+	// The sticky filter bar: what the searcher pinned once and does not
+	// retype, kept apart from SearchQuery so either bar can change without
+	// disturbing the other. CanScope is what draws it at all, since the
+	// navbar is shared with pages that run no search.
+	SearchScope string
+	CanScope    bool
+	// Whether the row is drawn. A pinned filter opens it, and closing it
+	// by hand is remembered - otherwise the next search reopens it and the
+	// button reads as broken.
+	ScopeOpen bool
+
 	// The switch between the three readings of a sealed product's contents,
 	// nil unless the search is one of them over a product that has all three
 	Contents *ContentsViews

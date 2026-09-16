@@ -20,6 +20,7 @@ var SHELL_URLS = [
     '/js/fetchnames.js?hash=' + BUILD,
     '/js/autocomplete.js?hash=' + BUILD,
     '/js/navbar.js?hash=' + BUILD,
+    '/js/scope.js?hash=' + BUILD,
     '/js/nightmode.js?hash=' + BUILD,
     '/js/palette-chips.js?hash=' + BUILD,
     '/js/palette-providers.js?hash=' + BUILD,

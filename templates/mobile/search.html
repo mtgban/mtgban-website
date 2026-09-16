@@ -75,9 +75,25 @@
     <div class="m-search-wrap">
         <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
             <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a card or product..." value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false">
+            {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}">{{end}}
         </form>
         <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+        {{if .CanScope}}
+        <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
+        {{end}}
     </div>
+    {{/* Same bar as the desktop navbar's, on the page rather than in fixed
+         chrome: a pinned filter has to stay visible here too, or a search
+         it empties looks broken with nothing to undo. */}}
+    {{if .CanScope}}
+    <div class="m-scope-row" id="nav-scope">
+        <input class="m-scope-box" id="nav-scopebox" type="text"
+               value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
+               maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+        <button class="m-scope-clear" id="nav-scope-clear" type="button" aria-label="Clear pinned filters"><i data-lucide="x"></i></button>
+    </div>
+    <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
+    {{end}}
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
     </script>
@@ -201,11 +217,11 @@
         <div class="m-sort-pills">
             {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
             {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
-            <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
-            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&scope={{.SearchScope}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&scope={{.SearchScope}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&scope={{.SearchScope}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&scope={{.SearchScope}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&scope={{.SearchScope}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
         </div>
         {{end}}
     </div>
@@ -218,13 +234,13 @@
     <div class="m-result-meta m-result-meta-contents">
         <span>Contents</span>
         <div class="m-sort-pills">
-            <a class="m-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
-            <a class="m-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
-            <a class="m-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}&scope={{.SearchScope}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}&scope={{.SearchScope}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}&scope={{.SearchScope}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
             {{/* Over the cards it might hold, how likely each is: a sort of
                  its own, to the right of the three readings. */}}
             {{if eq .Contents.Mode "variable"}}
-            <a class="m-sort-pill m-sort-pill-odds{{if eq .SearchSort "odds"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=odds{{if and (eq .SearchSort "odds") (not .ReverseMode)}}&reverse=true{{end}}" title="Expected copies"><i data-lucide="copy"></i>{{if eq .SearchSort "odds"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill m-sort-pill-odds{{if eq .SearchSort "odds"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&scope={{.SearchScope}}&sort=odds{{if and (eq .SearchSort "odds") (not .ReverseMode)}}&reverse=true{{end}}" title="Expected copies"><i data-lucide="copy"></i>{{if eq .SearchSort "odds"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
             {{end}}
         </div>
     </div>
@@ -583,15 +599,21 @@
         <div class="m-no-results">
             <i data-lucide="search-x" class="m-no-results-icon"></i>
             <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
+            {{if .SearchScope}}
+                <p class="m-no-results-hint">Pinned filters are narrowing this search:</p>
+                <ul class="m-no-results-suggestions">
+                    <li><a href="?q={{.SearchQuery}}&scope=">Search again without <code>{{.SearchScope}}</code></a></li>
+                </ul>
+            {{end}}
             {{if or .DidYouMean .AltSearches}}
                 {{if .DidYouMean}}
-                    <p class="m-no-results-hint">Did you mean <a href="?q={{.DidYouMean}}">{{.DidYouMean}}</a>?</p>
+                    <p class="m-no-results-hint">Did you mean <a href="?q={{.DidYouMean}}&scope={{.SearchScope}}">{{.DidYouMean}}</a>?</p>
                 {{end}}
                 {{if .AltSearches}}
                     <p class="m-no-results-hint">Try one of these:</p>
                     <ul class="m-no-results-suggestions">
                         {{range .AltSearches}}
-                            <li><a href="?q={{.Query}}">{{.Label}}</a></li>
+                            <li><a href="?q={{.Query}}&scope={{$.SearchScope}}">{{.Label}}</a></li>
                         {{end}}
                     </ul>
                 {{end}}
@@ -605,14 +627,14 @@
     {{if .CurrentIndex}}
     <div class="m-pagination">
         {{if ne .CurrentIndex 1}}
-            <a href="?q={{.SearchQuery}}&p=1&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
-            <a href="?q={{.SearchQuery}}&p={{.PrevIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
+            <a href="?q={{.SearchQuery}}&scope={{.SearchScope}}&p=1&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
+            <a href="?q={{.SearchQuery}}&scope={{.SearchScope}}&p={{.PrevIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
         {{end}}
         <span class="m-pg-cur">{{.CurrentIndex}}</span>
         <span class="m-pg-info">/ {{.TotalIndex}}</span>
         {{if ne .CurrentIndex .TotalIndex}}
-            <a href="?q={{.SearchQuery}}&p={{.NextIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
-            <a href="?q={{.SearchQuery}}&p={{.TotalIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
+            <a href="?q={{.SearchQuery}}&scope={{.SearchScope}}&p={{.NextIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
+            <a href="?q={{.SearchQuery}}&scope={{.SearchScope}}&p={{.TotalIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
         {{end}}
     </div>
     {{end}}
