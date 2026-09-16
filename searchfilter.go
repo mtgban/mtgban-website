@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -164,6 +165,53 @@ func fixupEditionNG(code string) []string {
 		out = append(out, field)
 	}
 	return out
+}
+
+// namesASet reports whether a word names an edition this datastore has, by
+// code or by name. A run with nothing loaded answers yes to everything: no
+// code names a set there, which is not the same as a code naming no set, and
+// a query is not reinterpreted over an empty shelf.
+func namesASet(value string) bool {
+	_, err := mtgmatcher.GetSetByName(strings.Trim(strings.TrimSpace(value), `"`))
+	return err == nil || errors.Is(err, mtgmatcher.ErrDatastoreEmpty)
+}
+
+// setFilterNamesNothing reports whether a field reads as a set filter - s:,
+// e:, set:, edition: - that no edition answers to, and so is words rather than
+// a filter.
+//
+// A card name can be filter syntax. Yu-Gi-Oh names a card S:P Little Knight,
+// and reading its opening as s:P asked for an edition no printing is in, so
+// every search carrying that name came to nothing at all - not a wider answer,
+// no answer. That is a person typing the name, and it is also every link the
+// site writes for the card, since genQuery gives each result its own name and
+// filters, so the card could not be reached from anywhere.
+//
+// Only a filter that can match nothing is given up, and only where the
+// datastore can be asked: set codes are the one filter vocabulary it holds, so
+// this is the only key that can tell a name from a filter rather than guess.
+// A negated one is left alone - -s:P excludes an edition nothing is in, which
+// is every card, and that is an answer rather than a dead end.
+func setFilterNamesNothing(field string) bool {
+	index := strings.IndexAny(field, ":<>")
+	if index == -1 {
+		return false
+	}
+	key := field[:index]
+	if strings.HasPrefix(key, "-") {
+		return false
+	}
+	switch strings.ToLower(key) {
+	case "s", "e", "set", "edition":
+	default:
+		return false
+	}
+	for _, value := range strings.Split(field[index+1:], ",") {
+		if namesASet(value) {
+			return false
+		}
+	}
+	return true
 }
 
 // Return a list of shorthands representing the selected stores
@@ -719,8 +767,10 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		query = strings.TrimRight(query, "&*~`")
 	}
 
-	// Iterate over the various possible filters
-	fields := re.FindAllString(query, -1)
+	// Iterate over the various possible filters. A set filter no edition
+	// answers to is dropped first, so the words it is made of stay in the
+	// query and are read as part of the name - see setFilterNamesNothing.
+	fields := slices.DeleteFunc(re.FindAllString(query, -1), setFilterNamesNothing)
 	config.AppliedFilters = fields
 	for _, field := range fields {
 		query = strings.Replace(query, field, "", 1)
