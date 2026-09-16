@@ -1044,7 +1044,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					// name-only fallback has to carry it too.
 					link = cm.SearchURL(pageVars.Metadata[cardID].Name, game, Affiliates().Codes["MKM"])
 				} else {
-					link = cm.BuildURL(id, game, Affiliates().Codes["MKM"], co.Foil || co.Etched)
+					link = cm.BuildURL(id, game, Affiliates().Codes["MKM"], cm.Finish{Foil: co.Foil || co.Etched})
 				}
 				tmp = append(tmp, SearchEntry{
 					ScraperName: "CardMarket",
