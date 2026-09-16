@@ -297,42 +297,72 @@
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }
 .sidebar-printings a:hover { text-decoration: underline; }
 .sidebar-printings i[class*="ss-"] { color: var(--normal); margin: 0 1px; }
-/* The keyrune glyphs and the filter input already centre on the same line,
-   but a generated set badge is a replaced element and rides the baseline,
-   leaving the filter hanging below it on games with no keyrune symbols. */
+/* The keyrune glyphs and the overflow trigger already centre on the same
+   line, but a generated set badge is a replaced element and rides the
+   baseline, leaving the trigger hanging below it on games with no keyrune
+   symbols. */
 .sidebar-printings a.pagination svg { vertical-align: middle; }
 
-/* Printings overflow filter input */
-.sidebar-printings-filter {
+/* Printings overflow trigger. It reads as the count it is and keeps that
+   size whether the panel is open or shut, so the symbols sharing its row
+   never shift under the pointer that is aiming at it. */
+.sidebar-printings-more {
     display: inline-block;
     box-sizing: border-box;
-    width: 5em;
     padding: 0 7px;
     height: 2em;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    background: none;
+    color: var(--search-text-dim);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    line-height: calc(2em - 2px);
+    vertical-align: middle;
+    margin: 1px;
+    cursor: pointer;
+    outline: none;
+    transition: color 0.1s, border-color 0.1s;
+}
+.sidebar-printings-more:hover,
+.sidebar-printings-more:focus-visible {
+    border-color: var(--accent-border, rgba(91,141,239,0.25));
+    color: var(--search-link);
+}
+.sidebar-printings-more[aria-expanded="true"] {
+    border-color: var(--accent-border, rgba(91,141,239,0.35));
+    color: var(--search-link);
+}
+
+/* The panel's own search bar, pinned above the symbols it filters */
+.sidebar-printings-filter {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    flex-shrink: 0;
+    padding: 0 7px;
+    height: 2em;
+    margin-bottom: 8px;
     border-radius: 4px;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     background: none;
     color: var(--normal);
     font: inherit;
     font-size: var(--text-sm);
-    font-weight: 600;
-    vertical-align: middle;
-    margin: 1px;
+    text-align: left;
     outline: none;
-    transition: color 0.1s, border-color 0.1s, width 0.15s;
+    transition: border-color 0.1s;
 }
 .sidebar-printings-filter::placeholder {
     color: var(--search-text-dim);
-    font-weight: 600;
     opacity: 1;
 }
 .sidebar-printings-filter:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
 }
 .sidebar-printings-filter:focus {
-    width: 9em;
     border-color: var(--accent-border, rgba(91,141,239,0.35));
-    color: var(--search-link);
 }
 
 .sidebar-printings a.sidebar-printings-hidden {
@@ -347,26 +377,37 @@
     left: 0;
     right: 0;
     z-index: 10;
-    min-height: 120px;
-    max-height: 240px;
-    overflow-y: auto;
+    max-height: 260px;
     background: var(--search-surface-1);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-sm, 6px);
     padding: 8px;
     text-align: center;
     line-height: 1.6;
-    scrollbar-width: thin;
-    scrollbar-color: var(--surface-4, #323840) transparent;
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
-.sidebar-printings-dropdown::-webkit-scrollbar { width: 4px; }
-.sidebar-printings-dropdown::-webkit-scrollbar-thumb {
+.sidebar-printings-dropdown.open {
+    display: flex;
+    flex-direction: column;
+}
+/* Only the symbols scroll: the search bar above them is the panel's own and
+   has to stay put, which it would not do inside one scroll box with them.
+   No floor, so filtering down to a hit or two closes the panel up behind
+   them instead of leaving an empty well; and no `flex: 1` either - the
+   panel is sized by its content rather than given a height, so a zero
+   flex-basis would have nothing to grow against. Shrinking is what the
+   cap needs, and that is the default `flex: 0 1 auto` with the automatic
+   minimum lifted. */
+.sidebar-printings-list {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4, #323840) transparent;
+}
+.sidebar-printings-list::-webkit-scrollbar { width: 4px; }
+.sidebar-printings-list::-webkit-scrollbar-thumb {
     background: var(--surface-4, #323840);
     border-radius: 2px;
-}
-.sidebar-printings-dropdown.open {
-    display: block;
 }
 
 

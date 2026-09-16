@@ -234,6 +234,57 @@
             <script type="text/javascript">
                 const PRINTINGS_THRESHOLD = 6;
 
+                // The two ways out of the overflow panel that are not the
+                // button itself. Both hooked up once: collapsePrintings runs
+                // on every hover - the sidebar rebuilds its printings per
+                // result the pointer crosses - so a listener registered
+                // inside it would stack one per hover, each closing over a
+                // dropdown that had already been removed.
+                document.addEventListener('click', function(e) {
+                    const container = document.getElementById('printings');
+                    if (!container || container.contains(e.target)) return;
+                    closePrintings(container);
+                });
+                // Escape belongs to the panel, not to the input: it has to
+                // answer with the caret on a symbol inside the panel, or on
+                // the button, and not only where it was left on opening.
+                // Whether it hands focus back is a separate question - the
+                // key still reaches here from the main search box, and a
+                // panel closing out of the corner of the eye is no reason to
+                // pull the caret out of what is being typed.
+                document.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Escape') return;
+                    const container = document.getElementById('printings');
+                    if (!container) return;
+                    closePrintings(container, container.contains(document.activeElement));
+                });
+
+                // Closing empties the filter with the panel, so every way out
+                // leaves the same thing behind: the next open starts on the
+                // whole list rather than dropping the caret into a stale query
+                // half the symbols are still hidden by.
+                function closePrintings(container, refocus) {
+                    const dropdown = container.querySelector('.sidebar-printings-dropdown.open');
+                    if (!dropdown) return;
+                    dropdown.classList.remove('open');
+                    const filter = dropdown.querySelector('.sidebar-printings-filter');
+                    if (filter) filter.value = '';
+                    dropdown.querySelectorAll('a.pagination').forEach(a => { a.style.display = ''; });
+                    const trigger = container.querySelector('.sidebar-printings-more');
+                    if (!trigger) return;
+                    setTriggerState(trigger, false);
+                    if (refocus) trigger.focus();
+                }
+
+                // The label says what pressing the button will do, so it has
+                // to turn over with the panel: left alone, an open panel goes
+                // on offering to show what is already on screen.
+                function setTriggerState(trigger, open) {
+                    trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    trigger.setAttribute('aria-label',
+                        (open ? 'Hide ' : 'Show ') + trigger.dataset.count + ' more editions');
+                }
+
                 function collapsePrintings() {
                     const container = document.getElementById('printings');
                     if (!container) return;
@@ -241,8 +292,8 @@
                     // Clean up previous collapse elements
                     const oldDropdown = container.querySelector('.sidebar-printings-dropdown');
                     if (oldDropdown) oldDropdown.remove();
-                    const oldFilter = container.querySelector('.sidebar-printings-filter');
-                    if (oldFilter) oldFilter.remove();
+                    const oldTrigger = container.querySelector('.sidebar-printings-more');
+                    if (oldTrigger) oldTrigger.remove();
                     // Unhide any previously hidden links (from prior hover)
                     container.querySelectorAll('a.sidebar-printings-hidden').forEach(a => a.classList.remove('sidebar-printings-hidden'));
 
@@ -252,59 +303,65 @@
                     const overflow = links.slice(PRINTINGS_THRESHOLD);
                     overflow.forEach(a => a.classList.add('sidebar-printings-hidden'));
 
-                    // Build dropdown with only the overflow icons
+                    // The panel: the filter on top, the overflow icons under it.
                     const dropdown = document.createElement('div');
                     dropdown.className = 'sidebar-printings-dropdown';
-                    overflow.forEach(a => {
-                        const clone = a.cloneNode(true);
-                        clone.classList.remove('sidebar-printings-hidden');
-                        dropdown.appendChild(clone);
-                    });
+                    // Only ever one panel on the page - the teardown above
+                    // drops the last one - so the id the button points at
+                    // stays unique.
+                    dropdown.id = 'printings-overflow';
 
                     const filter = document.createElement('input');
                     filter.type = 'text';
                     filter.className = 'sidebar-printings-filter';
-                    filter.placeholder = '+' + overflow.length;
+                    filter.placeholder = 'Filter editions';
                     filter.setAttribute('aria-label', 'Filter editions');
                     filter.autocomplete = 'off';
+                    dropdown.appendChild(filter);
 
-                    filter.addEventListener('focus', function() {
+                    const list = document.createElement('div');
+                    list.className = 'sidebar-printings-list';
+                    overflow.forEach(a => {
+                        const clone = a.cloneNode(true);
+                        clone.classList.remove('sidebar-printings-hidden');
+                        list.appendChild(clone);
+                    });
+                    dropdown.appendChild(list);
+
+                    // The count is a button that stays the size it reads, so
+                    // opening the panel does not shove the symbols beside it
+                    // along the row the way a growing input did.
+                    const trigger = document.createElement('button');
+                    trigger.type = 'button';
+                    trigger.className = 'sidebar-printings-more';
+                    trigger.textContent = '+' + overflow.length;
+                    trigger.dataset.count = overflow.length;
+                    trigger.setAttribute('aria-controls', dropdown.id);
+                    setTriggerState(trigger, false);
+                    trigger.addEventListener('click', function() {
+                        if (dropdown.classList.contains('open')) {
+                            closePrintings(container);
+                            return;
+                        }
                         dropdown.classList.add('open');
+                        setTriggerState(trigger, true);
+                        // The filter is the reason the panel opened: take the
+                        // caret there so a set can be typed without reaching
+                        // for it.
+                        filter.focus();
                     });
-                    // mousedown on dropdown links would steal focus; keep dropdown open
-                    // long enough for the click to register before blur closes it.
-                    filter.addEventListener('blur', function() {
-                        setTimeout(function() {
-                            if (!container.contains(document.activeElement)) {
-                                dropdown.classList.remove('open');
-                            }
-                        }, 150);
-                    });
+
                     filter.addEventListener('input', function() {
                         const q = this.value.trim().toLowerCase();
-                        dropdown.querySelectorAll('a.pagination').forEach(function(a) {
+                        list.querySelectorAll('a.pagination').forEach(function(a) {
                             const title = (a.getAttribute('title') || '').toLowerCase();
                             const href = (a.getAttribute('href') || '').toLowerCase();
                             const matches = !q || title.indexOf(q) !== -1 || href.indexOf(q) !== -1;
                             a.style.display = matches ? '' : 'none';
                         });
                     });
-                    filter.addEventListener('keydown', function(e) {
-                        if (e.key === 'Escape') {
-                            this.value = '';
-                            this.dispatchEvent(new Event('input'));
-                            this.blur();
-                        }
-                    });
 
-                    // Close on outside click
-                    document.addEventListener('click', function(e) {
-                        if (!container.contains(e.target)) {
-                            dropdown.classList.remove('open');
-                        }
-                    });
-
-                    container.appendChild(filter);
+                    container.appendChild(trigger);
                     container.appendChild(dropdown);
                 }
 
