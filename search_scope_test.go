@@ -35,7 +35,7 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 
 	for _, typed := range []string{"is:foil", "is:nonfoil"} {
 		config := parseForTest(t, typed)
-		applySearchScope(&config, "s:sos", nil, nil, nil)
+		applySearchScope(&config, scopeFilters("s:sos"))
 
 		names := filterNames(config.CardFilters)
 		if !slices.Contains(names, "edition") {
@@ -54,7 +54,7 @@ func TestSearchScopePrimaryWins(t *testing.T) {
 
 	config := parseForTest(t, "s:mh3")
 	before := len(config.CardFilters)
-	applySearchScope(&config, "s:sos", nil, nil, nil)
+	applySearchScope(&config, scopeFilters("s:sos"))
 
 	if len(config.CardFilters) != before {
 		t.Errorf("the pinned set was added on top of the typed one: %v", filterNames(config.CardFilters))
@@ -71,7 +71,7 @@ func TestSearchScopeIgnoresNames(t *testing.T) {
 
 	config := parseForTest(t, "is:foil")
 	before := len(config.CardFilters)
-	applySearchScope(&config, "abrade", nil, nil, nil)
+	applySearchScope(&config, scopeFilters("abrade"))
 
 	if len(config.CardFilters) != before {
 		t.Errorf("a name in the pinned bar changed the search: %v", filterNames(config.CardFilters))
@@ -92,7 +92,7 @@ func TestSearchScopeSkipsPassthroughModes(t *testing.T) {
 		config := parseForTest(t, "is:foil")
 		config.SearchMode = mode
 		before := len(config.CardFilters)
-		applySearchScope(&config, "s:sos", nil, nil, nil)
+		applySearchScope(&config, scopeFilters("s:sos"))
 
 		if len(config.CardFilters) != before {
 			t.Errorf("%s mode was narrowed by the pinned bar: %v", mode, filterNames(config.CardFilters))
@@ -227,6 +227,62 @@ func TestScopeRowOpen(t *testing.T) {
 			got := scopeRowOpen(r, tt.scope)
 			if got != tt.want {
 				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSearchScopeSurvivesReaderOptions is the shape that made the bar lie.
+// hidePromos and hidePrelPack put is: filters of their own into the main
+// query, and a merge that deduped on the filter name alone read those as
+// something the reader had typed - so a pinned finish was dropped, on the
+// settings of readers who never asked for any of this.
+func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("mtgmatcher datastore not loaded")
+	}
+
+	for _, opts := range [][]string{nil, {"hidePromos"}, {"hidePrelPack"}} {
+		config := parseSearchOptionsNG("s:soa", nil, nil, opts)
+		applySearchScope(&config, scopeFilters("is:foil"))
+
+		var applied bool
+		for _, filter := range config.CardFilters {
+			if filter.Name != "is" || filter.Negate {
+				continue
+			}
+			applied = applied || slices.Contains(filter.Values, "foil")
+		}
+		if !applied {
+			t.Errorf("opts %v: the pinned is:foil never reached the search: %v",
+				opts, filterNames(config.CardFilters))
+		}
+	}
+}
+
+// TestScopeIgnoredIsWhatTheBarSays keeps the red state honest: it means
+// the search passes over the bar whole, not merely that the bar is odd.
+func TestScopeIgnoredIsWhatTheBarSays(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("mtgmatcher datastore not loaded")
+	}
+
+	tests := []struct {
+		scope   string
+		ignored bool
+	}{
+		{"", false},
+		{"f:foil", false},
+		{"s:soa r:mythic", false},
+		{"abrade", true},
+		{"sdfsdfsdf", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.scope, func(t *testing.T) {
+			got := len(scopeFilters(tt.scope)) == 0 && tt.scope != ""
+			if got != tt.ignored {
+				t.Errorf("%q: ignored=%v, want %v", tt.scope, got, tt.ignored)
 			}
 		})
 	}

@@ -648,7 +648,9 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     transition: background 0.12s, color 0.12s;
 }
 .nav2-pin-btn:hover { background: var(--surface-3, rgba(255,255,255,0.06)); color: var(--normal); }
-.nav2-pin-btn.is-active { color: var(--accent, #e08a3c); }
+.nav2-pin-btn.is-active { color: var(--anormal); }
+/* Filled while the bar holds something, outline while it does not - the
+   state is readable with the row closed, which is when it has to be. */
 .nav2-pin-btn.is-active svg { fill: currentColor; }
 
 .nav2-scope {
@@ -694,9 +696,25 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     font-size: var(--text-sm, 13px);
 }
 .nav2-scope-box::placeholder { color: var(--subtle, #6d6d6d); }
+/* Something is pinned and none of it is a filter, so the search passes
+   over it. Said on the bar itself: the results are the same as an empty
+   bar's, so nothing else on the page can carry the news.
+   
+   Warning rather than danger, and dashed rather than solid: nothing has
+   gone wrong and nothing failed - the field is simply not in effect, which
+   is what the dashed border says on the examples beside it too. The verdict
+   also arrives a search late, and a colour that shouts would be shouting
+   about a bar that may already have been corrected. */
+.nav2-scope-box.is-ignored,
+.nav2-scope-box.is-ignored:focus {
+    border-style: dashed;
+    border-color: var(--awarning);
+    color: var(--awarning);
+}
 .nav2-scope-box:focus {
     outline: none;
-    border-color: var(--accent, #e08a3c);
+    /* The same focus ring the search field above it wears. */
+    border-color: var(--accent-border, rgba(91,141,239,0.45));
 }
 .nav2-scope-clear {
     flex-shrink: 0;
@@ -718,7 +736,7 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     gap: 6px;
     /* Set well clear of the x, so the list reads as its own group rather
        than as more buttons attached to the box. */
-    margin-left: 16px;
+    margin-left: 40px;
     margin-right: auto;
     min-width: 0;
     overflow: hidden;

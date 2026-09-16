@@ -203,8 +203,7 @@ func scopeRowOpen(r *http.Request, scope string) bool {
 	return scope != ""
 }
 
-// applySearchScope folds the sticky bar's filters into the search the
-// main bar asked for.
+// scopeFilters reads the pinned bar into the filters it contributes.
 //
 // The two bars are parsed apart and merged as filters, never as text.
 // The finish shorthand reads the literal last byte of a query - the
@@ -212,14 +211,35 @@ func scopeRowOpen(r *http.Request, scope string) bool {
 // syntax splits on position, so gluing the two strings together would
 // quietly change what the main bar said.
 //
+// Parsed without the reader's display options, unlike the main query:
+// hidePromos and hidePrelPack add filters of their own, and the main
+// query's parse has already added them. A second set here would only
+// collide with the first.
+//
+// Only filters come back: a card name typed into the pinned bar is
+// dropped, because pinning a name is what the main bar is for. A bar
+// that yields nothing at all is a bar the search will ignore, which is
+// the one thing the reader has to be told.
+func scopeFilters(scope string) []FilterElem {
+	if scope == "" {
+		return nil
+	}
+	return parseSearchOptionsNG(scope, nil, nil, nil).CardFilters
+}
+
+// applySearchScope folds the pinned bar's filters into the search the
+// main bar asked for.
+//
 // A filter the main bar already names wins outright. Filters are ANDed,
 // so a pinned "s:sos" under a typed "s:mh3" would otherwise answer
 // nothing at all, for a reason sitting in a bar nobody is looking at.
 //
-// Only filters cross over: a card name typed into the sticky bar is
-// dropped, because pinning a name is what the main bar is for.
-func applySearchScope(config *SearchConfig, scope string, blocklistRetail, blocklistBuylist, miscSearchOpts []string) {
-	if scope == "" {
+// Name and sense both have to match for that, not the name alone. An
+// exclusion and an inclusion never fight - "not promo" and "is foil"
+// narrow different things - and reading them as the same filter is how
+// a reader who hides promos came to pin a finish that never applied.
+func applySearchScope(config *SearchConfig, pinned []FilterElem) {
+	if len(pinned) == 0 {
 		return
 	}
 	// A query that names its own cards, or that we hand to another
@@ -228,10 +248,9 @@ func applySearchScope(config *SearchConfig, scope string, blocklistRetail, block
 		return
 	}
 
-	pinned := parseSearchOptionsNG(scope, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	for _, filter := range pinned.CardFilters {
+	for _, filter := range pinned {
 		named := slices.ContainsFunc(config.CardFilters, func(elem FilterElem) bool {
-			return elem.Name == filter.Name
+			return elem.Name == filter.Name && elem.Negate == filter.Negate
 		})
 		if named {
 			continue
@@ -436,9 +455,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	query := strings.TrimSpace(r.FormValue("q"))
 	scope := searchScope(w, r)
+	pinned := scopeFilters(scope)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	pageVars.ScopeOpen = scopeRowOpen(r, scope)
+	// Something is pinned, and none of it is a filter: the search will pass
+	// over it whole, and the bar has to say so rather than sit there looking
+	// like it is doing the work.
+	pageVars.ScopeIgnored = scope != "" && len(pinned) == 0
 
 	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
 	if oembed {
@@ -712,7 +736,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, scope, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
