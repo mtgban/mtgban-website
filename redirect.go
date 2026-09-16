@@ -84,6 +84,26 @@ func printingsAt(set, number string) []mtgmatcher.Card {
 	return cards
 }
 
+// nameReadsAsAName reports whether the search reads the whole of a card's name
+// as a name.
+//
+// The name a query opens with is there for the reader - the query is what the
+// search box shows, and a person reads a name there - but the search parses it
+// like any other words, and a name the filter syntax can read is read as a
+// filter wherever it sits. Yu-Gi-Oh names a card S:P Little Knight, and the
+// query its link built opened with what the parser takes for s:P, an edition
+// no printing is in, so the search came to nothing at all for all 16 of its
+// printings. Quoting does not save it: the filters are lifted out of the query
+// before the quotes are considered.
+//
+// The question is put to the search's own vocabulary rather than to a copy of
+// it kept here, so a filter added later takes with it the names it newly
+// claims. Two names in every datastore on hand answer no, both Yu-Gi-Oh, and
+// none in Magic.
+func nameReadsAsAName(name string) bool {
+	return !re.MatchString(name)
+}
+
 // namesFinish reports whether a word names a finish of one of the cards. It is
 // how the third part of a card path is told from the card name scryfall puts
 // in the same position, and it asks with the filter the query would run, over
@@ -177,7 +197,13 @@ func CardRedirect(w http.ResponseWriter, r *http.Request) {
 
 			cards := printingsAt(set, number)
 			if len(cards) > 0 {
-				query = cards[0].Name + " " + query
+				name := cards[0].Name
+				// A name the filter syntax can read is read as a filter
+				// wherever it sits, and the label then quietly becomes a
+				// condition - see nameReadsAsAName.
+				if nameReadsAsAName(name) {
+					query = name + " " + query
+				}
 			}
 			if len(fields) > 2 && namesFinish(cards, fields[2]) {
 				query += " f:" + fields[2]
