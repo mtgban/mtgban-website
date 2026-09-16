@@ -33,11 +33,16 @@ and `templates/offline.html` drives it from the url's `q` alone — see the
    through `base.html`, so the behaviour comes along for free.
 2. Read `scope` beside `q` in `templates/offline.html`, at all three places
    the query is read, and carry it through `buildUrl`.
-3. Merge the two parses. This is *easier* offline than online: the shape is
-   flat, so "the typed bar wins" is a field-by-field fallback rather than the
-   filter-name dedupe `applySearchScope` does —
+3. Merge the two parses. Online nothing arbitrates: every pinned filter
+   applies on top of the typed ones, and two that cannot both hold answer
+   nothing, which the empty page then explains. The flat offline shape
+   cannot express that - one `set` field cannot hold two sets - so the
+   honest equivalent is to let the pinned value fill a field the typed
+   query left empty, and to answer nothing where both are set and differ,
+   rather than quietly preferring one:
 
-       if (!primary.set && pinned.set) primary.set = pinned.set;
+       if (!primary.set) primary.set = pinned.set;
+       else if (pinned.set && pinned.set !== primary.set) return noResults;
 
    and the same for `number`, `finish`, `rarity`. Names never cross over,
    same as online.

@@ -44,20 +44,36 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 	}
 }
 
-// TestSearchScopePrimaryWins keeps the bar nobody is looking at from
-// emptying a search the main bar just asked for: filters are ANDed, so a
-// pinned set under a typed set would answer nothing at all.
-func TestSearchScopePrimaryWins(t *testing.T) {
+// TestSearchScopeKeepsBothSides is the contract in place of a merge that
+// picks a winner: both bars apply, always. Two editions do answer nothing,
+// and that is the point - the empty page names the pinned bar and offers to
+// drop it, where a bar quietly overruled reads as applied while it is not.
+func TestSearchScopeKeepsBothSides(t *testing.T) {
 	if len(mtgmatcher.GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
-	config := parseForTest(t, "s:mh3")
-	before := len(config.CardFilters)
-	applySearchScope(&config, scopeFilters("s:sos"))
+	tests := []struct {
+		typed  string
+		pinned string
+	}{
+		{"s:mh3", "s:sos"},      // same axis: answers nothing, by the reader's own hand
+		{"is:promo", "is:foil"}, // different axes under one filter name
+		{"s:sos", "r:mythic"},   // the ordinary case
+	}
 
-	if len(config.CardFilters) != before {
-		t.Errorf("the pinned set was added on top of the typed one: %v", filterNames(config.CardFilters))
+	for _, tt := range tests {
+		t.Run(tt.typed+" + "+tt.pinned, func(t *testing.T) {
+			config := parseForTest(t, tt.typed)
+			before := len(config.CardFilters)
+			pinned := scopeFilters(tt.pinned)
+			applySearchScope(&config, pinned)
+
+			if len(config.CardFilters) != before+len(pinned) {
+				t.Errorf("a pinned filter went missing: typed %v, pinned %v, merged %v",
+					tt.typed, filterNames(pinned), filterNames(config.CardFilters))
+			}
+		})
 	}
 }
 
@@ -259,11 +275,12 @@ func TestScopeRowOpen(t *testing.T) {
 	}
 }
 
-// TestSearchScopeSurvivesReaderOptions is the shape that made the bar lie.
-// hidePromos and hidePrelPack put is: filters of their own into the main
-// query, and a merge that deduped on the filter name alone read those as
-// something the reader had typed - so a pinned finish was dropped, on the
-// settings of readers who never asked for any of this.
+// TestSearchScopeSurvivesReaderOptions is the shape that made the bar lie
+// while the merge still picked winners. hidePromos and hidePrelPack put
+// is: filters of their own into the main query, those were read as
+// something the reader had typed, and a pinned finish was dropped on the
+// settings of readers who never asked for any of this. Nothing is dropped
+// now, and this stands to say so.
 func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
 	if len(mtgmatcher.GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")

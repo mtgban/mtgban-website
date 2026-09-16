@@ -228,16 +228,22 @@ func scopeFilters(scope string) []FilterElem {
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
-// main bar asked for.
+// main bar asked for. Every one of them, whatever the main bar says.
 //
-// A filter the main bar already names wins outright. Filters are ANDed,
-// so a pinned "s:sos" under a typed "s:mh3" would otherwise answer
-// nothing at all, for a reason sitting in a bar nobody is looking at.
+// Nothing here decides that one of two filters was not meant. Filters
+// are ANDed, so a pinned "s:sos" under a typed "s:mh3" does answer
+// nothing - but that is what the reader asked for twice, and the empty
+// page names the bar that narrowed it and offers to drop it, which is a
+// better answer than quietly searching for something else. Dropping one
+// side is the version with no way back: the results look ordinary and
+// the bar reads as applied while it is not.
 //
-// Name and sense both have to match for that, not the name alone. An
-// exclusion and an inclusion never fight - "not promo" and "is foil"
-// narrow different things - and reading them as the same filter is how
-// a reader who hides promos came to pin a finish that never applied.
+// It is also the only rule that stays true of filters we do not model.
+// Deciding which of two filters wins means knowing whether they share
+// an axis - two editions do, "is foil" and "is promo" do not, and the
+// site's own links write is: - and every guess at that was wrong for
+// somebody. A reader who hides promos lost every finish they pinned to
+// one such guess.
 func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 	if len(pinned) == 0 {
 		return
@@ -248,15 +254,7 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 		return
 	}
 
-	for _, filter := range pinned {
-		named := slices.ContainsFunc(config.CardFilters, func(elem FilterElem) bool {
-			return elem.Name == filter.Name && elem.Negate == filter.Negate
-		})
-		if named {
-			continue
-		}
-		config.CardFilters = append(config.CardFilters, filter)
-	}
+	config.CardFilters = append(config.CardFilters, pinned...)
 }
 
 func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
