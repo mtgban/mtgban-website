@@ -532,7 +532,10 @@ body.mobile:has(.m-home) .m-nav-home {
     background: var(--surface-2, rgba(255,255,255,0.05));
     color: var(--subtle, #8b8b8b);
 }
-.m-pin-btn.is-active { color: var(--accent, #e08a3c); }
+.m-pin-btn.is-active { color: var(--anormal); }
+/* Filled while the bar holds something, outline while it does not - the
+   state is readable with the row closed, which is when it has to be. */
+.m-pin-btn.is-active svg { fill: currentColor; }
 
 .m-scope-row { display: none; }
 body.has-scope .m-scope-row {
@@ -552,6 +555,11 @@ body.has-scope .m-scope-row {
     color: var(--normal);
     font-family: inherit;
     font-size: var(--text-sm, 13px);
+}
+.m-scope-box.is-ignored {
+    border-style: dashed;
+    border-color: var(--awarning);
+    color: var(--awarning);
 }
 .m-scope-clear {
     flex-shrink: 0;

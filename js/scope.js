@@ -21,9 +21,37 @@
     // The visible bar is not part of the search form - two text fields and
     // no submit button would cost the main bar its Enter - so what is typed
     // here is mirrored into the hidden field that is.
+    // The red state is the server's verdict on the scope that is actually
+    // applied, so it only ever spoke for the text that produced it. Once the
+    // box says something else the verdict is about a string that is no longer
+    // there, and the warning has to stand down - typing the ignored one back
+    // brings it round again, and the next search has the last word either way.
+    //
+    // Nothing here decides for itself whether a filter is real: the syntax is
+    // the search parser's, and a second opinion written in js would only be
+    // wrong somewhere the first one is right.
+    var ignoredValue = box.classList.contains('is-ignored') ? box.value.trim() : null;
+    var ignoredTitle = box.title;
+
+    function markState() {
+        // The icon fills while the bar holds something. This one needs no
+        // parser: whether the bar is empty is a question the box can answer
+        // for itself, so it answers per keystroke rather than per search.
+        btn.classList.toggle('is-active', box.value.trim() !== '');
+
+        var on = ignoredValue !== null && box.value.trim() === ignoredValue;
+        box.classList.toggle('is-ignored', on);
+        if (on) {
+            box.title = ignoredTitle;
+        } else {
+            box.removeAttribute('title');
+        }
+    }
+
     function write(value) {
         box.value = value;
         if (field) field.value = value.trim();
+        markState();
     }
 
     box.addEventListener('input', function() { write(box.value); });

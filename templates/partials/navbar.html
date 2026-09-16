@@ -112,7 +112,8 @@
         <span class="nav2-scope-label">Pinned</span>
         {{/* Bound to the search form by id rather than by nesting, so that
              submitting from either bar sends both fields. */}}
-        <input class="nav2-scope-box" id="nav-scopebox" type="text"
+        <input class="nav2-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+               {{if .ScopeIgnored}}title="Nothing here is a filter, so the search ignores it"{{end}}
                value="{{.SearchScope}}" placeholder="Filters that stay put across searches — s:sos, is:foil, r:mythic"
                maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
         <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters">

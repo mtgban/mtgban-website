@@ -131,6 +131,9 @@ type PageVars struct {
 	// by hand is remembered - otherwise the next search reopens it and the
 	// button reads as broken.
 	ScopeOpen bool
+	// The bar holds something that parses to no filter at all, so the
+	// search passes over it whole.
+	ScopeIgnored bool
 
 	// The switch between the three readings of a sealed product's contents,
 	// nil unless the search is one of them over a product that has all three

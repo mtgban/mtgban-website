@@ -87,7 +87,7 @@
          it empties looks broken with nothing to undo. */}}
     {{if .CanScope}}
     <div class="m-scope-row" id="nav-scope">
-        <input class="m-scope-box" id="nav-scopebox" type="text"
+        <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
                value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
                maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
         <button class="m-scope-clear" id="nav-scope-clear" type="button" aria-label="Clear pinned filters"><i data-lucide="x"></i></button>
