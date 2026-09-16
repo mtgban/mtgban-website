@@ -793,6 +793,18 @@
     }
 }
 
+/* -- Results page width --
+   page-standard's viewport-scaled cap (min(80vw, 1600px), no side padding)
+   leaves a wide dead margin once the store table needs its own scrollbar -
+   the table stays capped at the same width as the header text above it
+   instead of using the room a store-per-column table actually wants. This
+   still leaves a real, fixed gutter rather than running the table to the
+   window edge: only the cap grows, and by less than the gutter it frees. */
+.page-standard.upload-wide {
+    max-width: min(96vw, 2200px);
+    padding: 0 var(--page-gutter);
+}
+
 /* -- Results page header -- */
 .page-standard .page-header {
     align-items: baseline;

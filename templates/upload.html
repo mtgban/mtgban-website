@@ -55,7 +55,7 @@
     }
     </script>
     {{if or .UploadEntries .Optimized}}
-        <div class="page-standard">
+        <div class="page-standard upload-wide">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
             <div class="page-header">
                 <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{if .UploadSourceURL}}<a class="upload-source-link" href="{{.UploadSourceURL}}" target="_blank" rel="nofollow noopener">{{.UploadQuery}}</a>{{else}}{{.UploadQuery}}{{end}}{{end}}</h1>
