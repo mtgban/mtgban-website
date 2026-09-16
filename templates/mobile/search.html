@@ -599,7 +599,7 @@
         <div class="m-no-results">
             <i data-lucide="search-x" class="m-no-results-icon"></i>
             <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
-            {{if .SearchScope}}
+            {{if and .SearchScope (not .ScopeIgnored)}}
                 <p class="m-no-results-hint">Pinned filters are narrowing this search:</p>
                 <ul class="m-no-results-suggestions">
                     <li><a href="?q={{.SearchQuery}}&scope=">Search again without <code>{{.SearchScope}}</code></a></li>

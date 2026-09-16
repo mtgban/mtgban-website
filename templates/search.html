@@ -201,8 +201,12 @@
             <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
             {{/* Set apart from the "without s:sos" suggestions below: those
                  drop a term the searcher just typed and can see, this one
-                 drops the bar they pinned and may have stopped noticing. */}}
-            {{if .SearchScope}}
+                 drops the bar they pinned and may have stopped noticing.
+                 Only while the bar is narrowing anything: a bar the search
+                 ignores did not empty the page, and saying it did would
+                 send the reader to undo the one thing that is blameless.
+                 That bar says what it is on the bar itself. */}}
+            {{if and .SearchScope (not .ScopeIgnored)}}
                 <div class="search-suggestions">
                     <p class="search-suggestion-label">Pinned filters are narrowing this search:</p>
                     <ul class="search-suggestion-list">
