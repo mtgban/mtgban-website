@@ -624,6 +624,24 @@ func fixupFormatNG(code string) []string {
 	return out
 }
 
+// namesASetCode reports whether a token is a set code. It is what tells
+// "neo 10e", two set codes and so a name search, from "neo 234", which
+// names a printing.
+//
+// A code ending in "a" does not count: 30A is both a set code and the
+// shape a collector number with a letter suffix takes, and as the second
+// token of a two-token query it reads as the number. This is the rule
+// ExtractNumberAny applied on its own behalf until go-mtgban v0.8.4 made
+// it read its argument and nothing else; it moves here unchanged so the
+// queries that worked keep working.
+func namesASetCode(token string) bool {
+	if strings.HasSuffix(strings.ToLower(token), "a") {
+		return false
+	}
+	_, err := mtgmatcher.GetSet(token)
+	return err == nil
+}
+
 func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
 	rawQuery := query
 	var filters []FilterElem
@@ -1280,7 +1298,9 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 	// "plst c16-177", to the equivalent s:CODE cn:NUMBER filters.
 	// ExtractNumberAny doubles as validator and normalizer: it strips
 	// leading # and zeroes, keeps dashed and starred numbers whole, and
-	// rejects ordinals, months, and set-code-shaped tokens.
+	// rejects ordinals and months. It rejected set-code-shaped tokens
+	// too, until go-mtgban v0.8.4 made it pure - namesASetCode asks that
+	// question here now, of the datastore this process holds.
 	// The shorthand is meaningful only for singles: sealed products have
 	// no collector numbers, and the sealed handler assigns its SearchMode
 	// after this parse, so such queries cannot be told apart here
@@ -1288,7 +1308,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		tokens := strings.Fields(query)
 		if len(tokens) == 2 {
 			number := mtgmatcher.ExtractNumberAny(tokens[1])
-			if number != "" {
+			if number != "" && !namesASetCode(tokens[1]) {
 				set, err := mtgmatcher.GetSet(tokens[0])
 				if err == nil {
 					extraConfig := parseSearchOptionsNG("s:"+set.Code+" cn:"+number, nil, nil, nil)
