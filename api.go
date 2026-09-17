@@ -702,11 +702,11 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
 	// Expand blocklist as needed
-	skipSellersOpt := readSearchListCookie(r, "SearchSellersList", isSealed)
+	skipSellersOpt := readSearchListRequest(r, "sellers", "SearchSellersList", isSealed)
 	if skipSellersOpt != "" {
 		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
 	}
-	skipVendorsOpt := readSearchListCookie(r, "SearchVendorsList", isSealed)
+	skipVendorsOpt := readSearchListRequest(r, "vendors", "SearchVendorsList", isSealed)
 	if skipVendorsOpt != "" {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}

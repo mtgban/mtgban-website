@@ -531,10 +531,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	skipSellersOpt := readSearchListCookie(r, "SearchSellersList", pageVars.IsSealed)
+	pageVars.SearchHiddenSellers = skipSellersOpt
 	if skipSellersOpt != "" {
 		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
 	}
 	skipVendorsOpt := readSearchListCookie(r, "SearchVendorsList", pageVars.IsSealed)
+	pageVars.SearchHiddenVendors = skipVendorsOpt
 	if skipVendorsOpt != "" {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}

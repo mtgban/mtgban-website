@@ -1339,6 +1339,13 @@ func readSearchListCookie(r *http.Request, cookieName string, sealed bool) strin
 	return value
 }
 
+func readSearchListRequest(r *http.Request, queryName, cookieName string, sealed bool) string {
+	if _, present := r.URL.Query()[queryName]; present {
+		return r.FormValue(queryName)
+	}
+	return readSearchListCookie(r, cookieName, sealed)
+}
+
 // There is no forever in cookies, so pick a really large interval
 func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
@@ -1373,7 +1380,7 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 	cookie := http.Cookie{
 		Name:    cookieName,
 		Domain:  domain,
-		Path:    "/",
+		Path:    cookiePath(cookieName),
 		Expires: expires,
 		Value:   value,
 		// Only mark Secure when the site itself is served over HTTPS,
@@ -1386,6 +1393,16 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 		cookie.SameSite = http.SameSiteStrictMode
 	}
 	http.SetCookie(w, &cookie)
+	if cookie.Path != "/" {
+		// Remove the old Path=/ copy as well. Otherwise both values can be sent
+		// together until the browser-side migration runs, and cookie ordering
+		// is not a reliable way to choose between them.
+		legacy := cookie
+		legacy.Path = "/"
+		legacy.Expires = time.Unix(1, 0)
+		legacy.MaxAge = -1
+		http.SetCookie(w, &legacy)
+	}
 }
 
 // isSecureRequest reports whether the request reached us over HTTPS,

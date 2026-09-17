@@ -79,6 +79,14 @@ func TestSealedSearchListsPreserveExistingPreferences(t *testing.T) {
 	}
 }
 
+func TestSearchListRequestPrefersExplicitExportValue(t *testing.T) {
+	r := httptest.NewRequest("GET", "https://mtgban.com/api/search/retail/sealed/card.csv?sellers=exported", nil)
+	r.Header.Set("Cookie", "SearchSealedSellersList=sealed-cookie")
+	if got := readSearchListRequest(r, "sellers", "SearchSellersList", true); got != "exported" {
+		t.Fatalf("export list = %q, want exported", got)
+	}
+}
+
 // datastoreLoaded reports whether the mtgmatcher card datastore is available,
 // so data-dependent tests can skip when it isn't loaded locally or in CI.
 func datastoreLoaded() bool {

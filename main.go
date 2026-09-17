@@ -102,19 +102,28 @@ type PageVars struct {
 	AllKeys        []string
 	CardQuantities map[string]int
 	SearchQuery    string
-	SearchBest     bool
-	SearchSort     string
-	CondKeys       []string
-	FoundSellers   map[string]map[string][]SearchEntry
-	FoundVendors   map[string]map[string][]SearchEntry
-	Metadata       map[string]GenericCard
-	PromoTags      []string
-	SetKeyrunes    map[string]string
-	NoSort         bool
-	NoSettings     bool
-	HasSettings    bool
-	HasAvailable   bool
-	ShowUpsell     bool
+
+	SearchHiddenSellers string
+	SearchHiddenVendors string
+
+	SearchBest   bool
+	SearchSort   string
+	CondKeys     []string
+	FoundSellers map[string]map[string][]SearchEntry
+	FoundVendors map[string]map[string][]SearchEntry
+	Metadata     map[string]GenericCard
+	PromoTags    []string
+	SetKeyrunes  map[string]string
+	NoSort       bool
+	NoSettings   bool
+	HasSettings  bool
+
+	// CookiePathsJSON is generated from the registered NavElems and consumed
+	// by cookies.js. Keeping the route registry as the source avoids a second
+	// path map in the browser.
+	CookiePathsJSON template.JS
+	HasAvailable    bool
+	ShowUpsell      bool
 
 	PopularSearches []PopularSearch
 
@@ -373,6 +382,10 @@ type NavElem struct {
 	// script to pre-resolve the gear button's enabled state so it
 	// doesn't transition from is-disabled → enabled at load time.
 	HasSettings bool
+
+	// Cookies whose preferences belong only to this route. Cookies omitted
+	// here are shared and remain at Path=/.
+	CookieNames []string
 }
 
 var DefaultNav = []NavElem{
@@ -456,6 +469,10 @@ func init() {
 					Description: "Sealed product search",
 					Link:        "/sealed",
 					HasSettings: true,
+					CookieNames: []string{
+						"SearchSealedSellersList",
+						"SearchSealedVendorsList",
+					},
 					ShouldHide: func() bool {
 						return len(mtgmatcher.GetSealedUUIDs()) == 0
 					},
@@ -470,6 +487,7 @@ func init() {
 			Handle:      Newspaper,
 			Page:        "news.html",
 			HasSettings: true,
+			CookieNames: []string{"NewspaperList", "BanNewspaperPref"},
 			// Every page of it is built from the cached uuids, so with none
 			// the section is a stack of empty tables. A game with no
 			// newspaper data, or one whose database was never configured,
@@ -509,6 +527,11 @@ func init() {
 			Handle:      Sleepers,
 			Page:        "sleep.html",
 			HasSettings: true,
+			CookieNames: []string{
+				"SleepersSellersList",
+				"SleepersVendorsList",
+				"SleepersEditionList",
+			},
 		},
 		"Upload": {
 			Name:        "Upload",
@@ -528,6 +551,7 @@ func init() {
 			Handle:      Global,
 			Page:        "arbit.html",
 			HasSettings: true,
+			CookieNames: []string{"GlobalVendorsList", "GlobalEditionList"},
 		},
 		"Arbit": {
 			Name:        "Arbitrage",
@@ -537,6 +561,7 @@ func init() {
 			Handle:      Arbit,
 			Page:        "arbit.html",
 			HasSettings: true,
+			CookieNames: []string{"ArbitVendorsList"},
 		},
 		"Reverse": {
 			Name:        "Reverse",
@@ -546,6 +571,7 @@ func init() {
 			Handle:      Reverse,
 			Page:        "arbit.html",
 			HasSettings: true,
+			CookieNames: []string{"ReverseVendorsList"},
 		},
 		"Admin": {
 			Name:        "Admin",
@@ -559,6 +585,70 @@ func init() {
 			AlwaysOnForDev: true,
 		},
 	}
+}
+
+func forEachNavElem(fn func(NavElem)) {
+	for _, nav := range DefaultNav {
+		fn(nav)
+		for _, subPage := range nav.SubPages {
+			fn(subPage)
+		}
+	}
+	for _, nav := range ExtraNavs {
+		fn(*nav)
+		for _, subPage := range nav.SubPages {
+			fn(subPage)
+		}
+	}
+}
+
+func navLinkPath(link string) string {
+	parsed, err := url.Parse(link)
+	if err == nil && parsed.Path != "" {
+		return parsed.Path
+	}
+	return "/"
+}
+
+// cookiePath derives route-local paths from the same NavElems that register
+// the handlers. A cookie not claimed by a NavElem is intentionally shared
+// across the site and falls back to Path=/.
+func cookiePath(cookieName string) string {
+	path := "/"
+	forEachNavElem(func(nav NavElem) {
+		if path != "/" {
+			return
+		}
+		for _, name := range nav.CookieNames {
+			if name == cookieName {
+				path = navLinkPath(nav.Link)
+				return
+			}
+		}
+	})
+	return path
+}
+
+func cookiePathsJSON() template.JS {
+	var data strings.Builder
+	data.WriteByte('{')
+	first := true
+	forEachNavElem(func(nav NavElem) {
+		path := navLinkPath(nav.Link)
+		for _, name := range nav.CookieNames {
+			nameJSON, _ := json.Marshal(name)
+			pathJSON, _ := json.Marshal(path)
+			if !first {
+				data.WriteByte(',')
+			}
+			first = false
+			data.Write(nameJSON)
+			data.WriteByte(':')
+			data.Write(pathJSON)
+		}
+	})
+	data.WriteByte('}')
+	return template.JS(data.String())
 }
 
 var Config ConfigType
@@ -955,8 +1045,9 @@ func genPageNav(r *http.Request, activeTab, sig string) PageVars {
 		patreonURL = origin + "/auth"
 	}
 	pageVars := PageVars{
-		Title:        "BAN " + activeTab,
-		ErrorMessage: msg,
+		Title:           "BAN " + activeTab,
+		ErrorMessage:    msg,
+		CookiePathsJSON: cookiePathsJSON(),
 
 		PatreonIDs:   Config.Patreon.Client,
 		PatreonURL:   patreonURL,

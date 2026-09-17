@@ -1,4 +1,12 @@
-function setCookie(cname, cvalue, exdays) {
+// The server emits this from NavElem.Link. Cookies not claimed by a NavElem
+// are shared because their values are consumed by more than one route family.
+const COOKIE_PATHS = Object.freeze(window.__BAN_COOKIE_PATHS || {});
+
+function cookiePath(cname) {
+    return COOKIE_PATHS[cname] || '/';
+}
+
+function writeCookie(cname, cvalue, exdays, path) {
     const d = new Date();
     d.setTime(d.getTime() + (exdays*24*60*60*1000));
 
@@ -8,7 +16,19 @@ function setCookie(cname, cvalue, exdays) {
     }
     
     let expires = "expires="+ d.toUTCString();
-    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;SameSite=Strict";
+    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=" + path + ";SameSite=Strict";
+}
+
+function setCookie(cname, cvalue, exdays) {
+    const path = cookiePath(cname);
+    writeCookie(cname, cvalue, exdays, path);
+
+    // Move legacy root-scoped copies out of the broad path whenever a
+    // route-local preference is written. The startup migration below handles
+    // preferences that have not been touched since this change.
+    if (path !== '/') {
+        writeCookie(cname, '', 0, '/');
+    }
 }
 
 function getCookie(cname) {
@@ -26,6 +46,37 @@ function getCookie(cname) {
     }
     return "";
 }
+
+function migrateScopedCookies() {
+    Object.keys(COOKIE_PATHS).forEach(function (cname) {
+        const path = COOKIE_PATHS[cname];
+        const migrationKey = 'mtgban-cookie-scope-v1:' + cname;
+        let migrated = false;
+        try {
+            migrated = window.localStorage.getItem(migrationKey) === '1';
+        } catch (e) {}
+
+        // A Path=/ cookie is visible on every page, but the new scoped cookie
+        // is not. Migrate only when visiting its owner so an unrelated page
+        // cannot clear a legacy value before it has been copied.
+        const pathname = window.location.pathname;
+        if (migrated || (pathname !== path && !pathname.startsWith(path + '/'))) {
+            return;
+        }
+
+        const value = getCookie(cname);
+        if (value !== '') {
+            // Preserve the preference when moving it from the old root path.
+            writeCookie(cname, value, 3650, path);
+            writeCookie(cname, '', 0, '/');
+        }
+        try {
+            window.localStorage.setItem(migrationKey, '1');
+        } catch (e) {}
+    });
+}
+
+migrateScopedCookies();
 
 function clearForm(containerName) {
     const container = document.querySelector('#' + containerName);
