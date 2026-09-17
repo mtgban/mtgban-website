@@ -282,16 +282,31 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, r, sig)
 
-	// Redirect to the URL indicated in this query param, or go to homepage
-	redir := strings.Split(r.FormValue("state"), ";")[0]
-
-	// Go back home if empty or if coming back from a logout
-	if redir == "" || strings.Contains(redir, "errmsg=logout") {
-		redir = "/"
-	}
+	// Redirect to the URL indicated in this query param, or go to homepage.
+	// Drop a stale error from the page that started the login flow now that
+	// authentication succeeded.
+	redir := authRedirect(r.FormValue("state"))
 
 	// Redirect, we're done here
 	http.Redirect(w, r, redir, http.StatusFound)
+}
+
+func authRedirect(state string) string {
+	redir := strings.Split(state, ";")[0]
+
+	// Go back home if empty or if coming back from a logout.
+	if redir == "" || strings.Contains(redir, "errmsg=logout") {
+		return "/"
+	}
+
+	parsed, err := url.Parse(redir)
+	if err != nil {
+		return redir
+	}
+	query := parsed.Query()
+	query.Del("errmsg")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func signHMACSHA1Base64(key []byte, data []byte) string {
