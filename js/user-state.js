@@ -101,11 +101,12 @@
         return buildPreferences();
     }
 
-    // Card art on a recent search is owned by the device: captureFirstResultImage
-    // in recent-searches.js reads it off the results page on every visit. It never
-    // travels over the wire, so drop whatever a server copy carries (older clients
-    // did push it) and re-apply what this device already has - otherwise a hydrate
-    // blanks the thumbnails of any entry whose art had not been pushed yet.
+    // Card art on recent searches is owned by the device: recent-searches.js
+    // captures it on result pages and refreshes missing art from the landing page.
+    // It never travels over the wire, so drop whatever a server copy carries
+    // (older clients did push it) and re-apply what this device already has -
+    // otherwise a hydrate blanks the thumbnails of any entry whose art had not
+    // been pushed yet.
     var RECENT_ART_KEYS = ['img', 'crop', 'foil', 'cw'];
     function recentId(s) { return ('' + ((s && s.q) || '')).toLowerCase(); }
     function keepRecentArt(recents) {

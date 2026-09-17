@@ -4,6 +4,7 @@
     var PENDING_KEY = 'mtgban_pending_search'; // sessionStorage: query awaiting its answer
     var MAX_ENTRIES = 15;
     var ART_REFRESH_CONCURRENCY = 3;
+    var artRefreshInFlight = false;
     var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     var TOMB_CAP = 50;
     function isLive(s) { return !s.del; }
@@ -29,6 +30,10 @@
     function entryHref(s) {
         if (samePathOnThisSite(s.u)) return s.u;
         return '?q=' + encodeURIComponent(s.q);
+    }
+    function artRefreshHref(s) {
+        if (samePathOnThisSite(s.u)) return s.u;
+        return '/search?q=' + encodeURIComponent(s.q);
     }
     function mtime(s) { return s.m || s.t || 0; }
     function getLiveSearches() { return getRecentSearches().filter(isLive); }
@@ -320,9 +325,8 @@
         addSearch(q, answer.label, answer.url);
     }
 
-    function saveResultArt(query, img, crop, foil, cw) {
+    function updateResultArt(searches, query, img, crop, foil, cw) {
         if (!query || !img) return false;
-        var searches = getRecentSearches();
         var qLower = query.toLowerCase();
         var changed = false;
         for (var i = 0; i < searches.length; i++) {
@@ -343,6 +347,12 @@
                 break;
             }
         }
+        return changed;
+    }
+
+    function saveResultArt(query, img, crop, foil, cw) {
+        var searches = getRecentSearches();
+        var changed = updateResultArt(searches, query, img, crop, foil, cw);
         if (changed) saveRecentSearches(searches);
         return changed;
     }
@@ -371,19 +381,20 @@
     // page or sending the art back over the sync wire.
     function refreshMissingArt() {
         var params = new URLSearchParams(window.location.search);
-        if (params.get('q') || typeof fetch !== 'function' || typeof DOMParser === 'undefined') return;
+        if (artRefreshInFlight || params.get('q') || typeof fetch !== 'function' || typeof DOMParser === 'undefined') return;
 
         var searches = getLiveSearches().filter(function(s) {
             return !s.img && !s.crop;
         });
         if (!searches.length) return;
 
+        artRefreshInFlight = true;
         var next = 0;
-        var changed = false;
+        var updates = [];
         function refreshOne() {
             if (next >= searches.length) return Promise.resolve();
             var search = searches[next++];
-            return fetch(entryHref(search), { credentials: 'same-origin' })
+            return fetch(artRefreshHref(search), { credentials: 'same-origin' })
                 .then(function(response) { return response.ok ? response.text() : ''; })
                 .then(function(markup) {
                     if (!markup) return;
@@ -396,7 +407,7 @@
                     var finishClass = firstRow.getAttribute('data-finish-class') || '';
                     var foil = finishClass === 'foil' || finishClass === 'altfoil';
                     var cw = firstRow.getAttribute('data-has-warning') === 'true';
-                    changed = saveResultArt(search.q, img, crop, foil, cw) || changed;
+                    if (img) updates.push({ query: search.q, img: img, crop: crop, foil: foil, cw: cw });
                 })
                 .catch(function() {})
                 .then(refreshOne);
@@ -406,7 +417,18 @@
         var workerCount = Math.min(ART_REFRESH_CONCURRENCY, searches.length);
         for (var i = 0; i < workerCount; i++) workers.push(refreshOne());
         Promise.all(workers).then(function() {
-            if (changed) renderRecentSearches();
+            var current = getRecentSearches();
+            var changed = false;
+            updates.forEach(function(update) {
+                changed = updateResultArt(current, update.query, update.img, update.crop, update.foil, update.cw) || changed;
+            });
+            if (changed) {
+                saveRecentSearches(current);
+                renderRecentSearches();
+            }
+            artRefreshInFlight = false;
+        }, function() {
+            artRefreshInFlight = false;
         });
     }
 
