@@ -71,6 +71,12 @@ func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
 	}
 }
 
+func TestGenerateAPIKeyRejectsUnexpiredDemoKey(t *testing.T) {
+	if _, err := generateAPIKey(context.Background(), DefaultAPIDemoUser, 0); err == nil {
+		t.Fatal("generateAPIKey accepted a no-expiration demo key")
+	}
+}
+
 // TestEnforceAPISigningAcceptsGoldenBlob runs the real middleware over the
 // golden blob: accepted when valid, refused when tampered, and refused when
 // Expires is unparseable even though the signature over it is good.

@@ -1148,6 +1148,9 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 	if user == "" {
 		return "", errors.New("missing user")
 	}
+	if user == DefaultAPIDemoUser && duration == 0 {
+		return "", errors.New("demo user API keys must expire")
+	}
 
 	apiUsersMutex.RLock()
 	key, found := Config.APIUserSecrets[user]
