@@ -1889,7 +1889,7 @@
                 var row = activePicker.closest('tr');
                 var img = row.querySelector('.ures-card-cell img');
                 var setSpan = row.querySelector('.ures-card-set');
-                if (img) img.src = meta.image;
+                if (img) window.setCardArtSource(img, meta.image);
                 if (setSpan) setSpan.textContent = meta.edition + ' \u00B7 #' + meta.number;
                 closePrintingPicker();
             });
