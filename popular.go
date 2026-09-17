@@ -60,6 +60,7 @@ func getPopularSearches() []PopularSearch {
 	}
 
 	var out []PopularSearch
+	usedImages := make(map[string]struct{})
 	for _, q := range cfg {
 		config := parseSearchOptionsNG(q.Query, nil, nil, nil)
 		uuids, err := searchAndFilter(config)
@@ -79,15 +80,22 @@ func getPopularSearches() []PopularSearch {
 				return priceI > priceJ
 			})
 		}
-		imageID := uuids[0]
+		candidateIDs := uuids
 		// An explicit Card (name or query) overrides which card supplies the
-		// thumbnail; fall back to the query's top result when unresolved.
+		// thumbnail; fall back to the query's results when unresolved or when
+		// its images are already used by another tile.
 		if q.Card != "" {
 			if ids, err := searchAndFilter(parseSearchOptionsNG(q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
-				imageID = ids[0]
+				candidateIDs = append(append([]string{}, ids...), uuids...)
 			}
 		}
-		card := uuid2card(imageID, true, false, false)
+		card, ok := firstUnusedPopularCard(candidateIDs, usedImages, func(id string) GenericCard {
+			return uuid2card(id, true, false, false)
+		})
+		if !ok {
+			continue
+		}
+		usedImages[card.ImageURL] = struct{}{}
 		label := q.Label
 		if label == "" {
 			label = card.Edition
@@ -105,4 +113,22 @@ func getPopularSearches() []PopularSearch {
 		popularSearchesRetryAt = time.Now().Add(time.Minute)
 	}
 	return out
+}
+
+// firstUnusedPopularCard keeps the carousel's resolved images distinct while
+// allowing a duplicate top result to fall through to another result. The
+// resolver is injected so this selection rule remains testable without a
+// datastore-backed search.
+func firstUnusedPopularCard(ids []string, usedImages map[string]struct{}, resolve func(string) GenericCard) (GenericCard, bool) {
+	for _, id := range ids {
+		card := resolve(id)
+		if card.ImageURL == "" {
+			continue
+		}
+		if _, used := usedImages[card.ImageURL]; used {
+			continue
+		}
+		return card, true
+	}
+	return GenericCard{}, false
 }
