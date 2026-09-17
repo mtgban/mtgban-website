@@ -118,10 +118,10 @@ func getUserTier(ctx context.Context, client *patreon.Client, userID string) (st
 // OAuth target.
 func requestOrigin(r *http.Request) string {
 	if r == nil {
-		return DefaultServerURL
+		return ""
 	}
 
-	scheme := r.Header.Get("X-Forwarded-Proto")
+	scheme := firstForwardedValue(r.Header.Get("X-Forwarded-Proto"))
 	if scheme == "" {
 		scheme = "http"
 		if r.TLS != nil {
@@ -132,10 +132,7 @@ func requestOrigin(r *http.Request) string {
 		return ""
 	}
 
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
-	}
+	host := requestHost(r)
 	if !trustedHostname(host) {
 		return ""
 	}
@@ -143,14 +140,62 @@ func requestOrigin(r *http.Request) string {
 	return scheme + "://" + host
 }
 
+func firstForwardedValue(value string) string {
+	if comma := strings.IndexByte(value, ','); comma >= 0 {
+		value = value[:comma]
+	}
+	return strings.TrimSpace(value)
+}
+
+func requestHost(r *http.Request) string {
+	host := firstForwardedValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = r.Host
+	}
+	return host
+}
+
 // trustedHostname reports whether a host belongs to this site: localhost in
 // dev, or an mtgban.com host in production. Matched on the hostname exactly
 // (dropping any :port) and by suffix rather than substring, so a spoofed
 // "…mtgban.com.evil.tld" can't slip through.
 func trustedHostname(host string) bool {
-	name, _, _ := strings.Cut(host, ":")
-	name = strings.ToLower(name)
+	name, ok := validHostname(firstForwardedValue(host))
+	if !ok {
+		return false
+	}
 	return name == "localhost" || name == "mtgban.com" || strings.HasSuffix(name, ".mtgban.com")
+}
+
+func validHostname(host string) (string, bool) {
+	if strings.Count(host, ":") == 1 {
+		name, port, _ := strings.Cut(host, ":")
+		if port == "" {
+			return "", false
+		}
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+			return "", false
+		}
+		host = name
+	} else if strings.Contains(host, ":") {
+		return "", false
+	}
+
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if host == "" {
+		return "", false
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return "", false
+		}
+		for _, char := range label {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+				return "", false
+			}
+		}
+	}
+	return host, true
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
