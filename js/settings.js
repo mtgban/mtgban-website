@@ -24,9 +24,13 @@
             'settings-sleep-sellers': 'SleepersSellersList',
             'settings-sleep-vendors': 'SleepersVendorsList',
         },
-        // search — Singles + Sealed grids share one cookie list via
-        // a data-cookie attribute rather than a single element id.
-        cookieLists: ['SearchSellersList', 'SearchVendorsList'],
+        // search — each mode has its own list. The sealed names are scoped
+        // to /sealed by the NavElem registry; the singles names stay root
+        // scoped because offline mode consumes them too.
+        cookieLists: [
+            'SearchSellersList', 'SearchVendorsList',
+            'SearchSealedSellersList', 'SearchSealedVendorsList'
+        ],
         pills: {
             // search
             'settings-search-contents': 'SearchSealedContents',

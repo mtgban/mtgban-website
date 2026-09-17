@@ -440,6 +440,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(r, "Search", sig)
 	pageVars.IsMobile = isMobileRequest(r)
+	pageVars.IsSealed = r.URL.Path == "/sealed"
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
@@ -494,7 +495,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
 	if query == "" {
 		pageVars.PromoTags = mtgmatcher.AllPromoTypes()
@@ -530,11 +530,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	skipSellersOpt := readCookie(r, "SearchSellersList")
+	skipSellersOpt := readSearchListCookie(r, "SearchSellersList", pageVars.IsSealed)
 	if skipSellersOpt != "" {
 		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
 	}
-	skipVendorsOpt := readCookie(r, "SearchVendorsList")
+	skipVendorsOpt := readSearchListCookie(r, "SearchVendorsList", pageVars.IsSealed)
 	if skipVendorsOpt != "" {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}
