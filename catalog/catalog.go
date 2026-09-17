@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 //go:embed catalog.json
@@ -19,19 +20,27 @@ var embedded []byte
 // StoreScopeExplicit marks a package whose stores the customer picks.
 const StoreScopeExplicit = "explicit"
 
+// StoreScopeBase is the BASE_ACCESS preset.
+const StoreScopeBase = "BASE_ACCESS"
+
+// StoreScopeAll is the ALL_ACCESS preset.
+const StoreScopeAll = "ALL_ACCESS"
+
 var (
-	keyPattern     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	validScopes    = []string{StoreScopeExplicit, "BASE_ACCESS", "ALL_ACCESS"}
-	validModes     = []string{"retail", "buylist", "sealed"}
-	validIntervals = []string{"day", "week", "month", "year"}
+	keyPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	currencyPattern = regexp.MustCompile(`^[a-z]{3}$`)
+	validScopes     = []string{StoreScopeExplicit, StoreScopeBase, StoreScopeAll}
+	validModes      = []string{"retail", "buylist", "sealed"}
+	validIntervals  = []string{"month", "year"}
 )
 
 // Package is one price-data tier.
 type Package struct {
-	Key            string   `json:"key"`
-	Name           string   `json:"name"`
-	Monthly        int64    `json:"monthly"`
-	StoreScope     string   `json:"store_scope"`
+	Key        string `json:"key"`
+	Name       string `json:"name"`
+	Monthly    int64  `json:"monthly"`
+	StoreScope string `json:"store_scope"`
+	// IncludedStores is how many selectable stores the price includes beyond the implied TCG.
 	IncludedStores int      `json:"included_stores"`
 	Modes          []string `json:"modes"`
 }
@@ -54,12 +63,13 @@ type Interval struct {
 
 // Catalog is the whole price list.
 type Catalog struct {
-	Currency         string     `json:"currency"`
-	Packages         []Package  `json:"packages"`
-	Addons           []Addon    `json:"addons"`
-	Intervals        []Interval `json:"intervals"`
-	IncludedGames    []string   `json:"included_games"`
-	SelectableStores []string   `json:"selectable_stores"`
+	Currency      string     `json:"currency"`
+	Packages      []Package  `json:"packages"`
+	Addons        []Addon    `json:"addons"`
+	Intervals     []Interval `json:"intervals"`
+	IncludedGames []string   `json:"included_games"`
+	// SelectableStores never lists TCG: TCGplayer is implied on the starter package and the gateway adds it to the entitlement.
+	SelectableStores []string `json:"selectable_stores"`
 }
 
 // Load parses the embedded catalog.
@@ -71,7 +81,7 @@ func Load() (*Catalog, error) {
 func MustLoad() *Catalog {
 	c, err := Load()
 	if err != nil {
-		panic("catalog: " + err.Error())
+		panic(err.Error())
 	}
 	return c
 }
@@ -90,7 +100,7 @@ func Parse(data []byte) (*Catalog, error) {
 
 // Validate reports the first thing wrong with the catalog.
 func (c *Catalog) Validate() error {
-	if len(c.Currency) != 3 || strings.ToLower(c.Currency) != c.Currency {
+	if !currencyPattern.MatchString(c.Currency) {
 		return errors.New("currency must be a lowercase three-letter code")
 	}
 	if len(c.Packages) == 0 {
@@ -111,6 +121,9 @@ func (c *Catalog) Validate() error {
 		if err := claim(p.Key); err != nil {
 			return err
 		}
+		if p.Name == "" {
+			return fmt.Errorf("package %s: name is empty", p.Key)
+		}
 		if p.Monthly <= 0 {
 			return fmt.Errorf("package %s: monthly must be positive", p.Key)
 		}
@@ -130,6 +143,9 @@ func (c *Catalog) Validate() error {
 	for _, a := range c.Addons {
 		if err := claim(a.Key); err != nil {
 			return err
+		}
+		if a.Name == "" {
+			return fmt.Errorf("addon %s: name is empty", a.Key)
 		}
 		if a.Monthly <= 0 {
 			return fmt.Errorf("addon %s: monthly must be positive", a.Key)
@@ -165,15 +181,48 @@ func (c *Catalog) Validate() error {
 	if len(c.IncludedGames) == 0 {
 		return errors.New("included_games is empty")
 	}
+	for i, g := range c.IncludedGames {
+		if g == "" || strings.ToLower(g) != g {
+			return fmt.Errorf("included_games: %q must be a lowercase game name", g)
+		}
+		if slices.Contains(c.IncludedGames[:i], g) {
+			return fmt.Errorf("included_games: duplicate %q", g)
+		}
+	}
 	if len(c.SelectableStores) == 0 {
 		return errors.New("selectable_stores is empty")
 	}
 	for i, s := range c.SelectableStores {
-		if s == "" || strings.ToUpper(s) != s {
-			return fmt.Errorf("selectable_stores: %q must be an uppercase shorthand", s)
+		if s == "" || strings.ContainsRune(s, ',') || strings.IndexFunc(s, unicode.IsSpace) >= 0 {
+			return fmt.Errorf("selectable_stores: %q must be a store shorthand with no comma or whitespace", s)
 		}
 		if slices.Contains(c.SelectableStores[:i], s) {
 			return fmt.Errorf("selectable_stores: duplicate %q", s)
+		}
+	}
+	if err := c.checkLookupKeyCollisions(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkLookupKeyCollisions reports when two items and intervals produce the same Stripe lookup key.
+func (c *Catalog) checkLookupKeyCollisions() error {
+	seen := map[string]bool{}
+	items := make([]string, 0, len(c.Packages)+len(c.Addons))
+	for _, p := range c.Packages {
+		items = append(items, p.Key)
+	}
+	for _, a := range c.Addons {
+		items = append(items, a.Key)
+	}
+	for _, item := range items {
+		for _, iv := range c.Intervals {
+			key := LookupKey(item, iv.Key)
+			if seen[key] {
+				return fmt.Errorf("lookup key %q is produced by more than one item and interval", key)
+			}
+			seen[key] = true
 		}
 	}
 	return nil
@@ -241,7 +290,7 @@ func (a Addon) Applies(packageKey string) bool {
 }
 
 // Amount is the charge per billing period for a monthly amount.
-// Intervals shorter than a month return 0; the catalog never uses them.
+// Validate only admits month and year, so the fallthrough is unreachable.
 func (iv Interval) Amount(monthly int64) int64 {
 	switch iv.Interval {
 	case "month":
