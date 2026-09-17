@@ -72,8 +72,10 @@ func TestValidateRejects(t *testing.T) {
 		want string
 	}{
 		{"no currency", strings.Replace(minimal, `"usd"`, `""`, 1), "currency"},
+		{"numeric currency", strings.Replace(minimal, `"usd"`, `"123"`, 1), "currency"},
 		{"no packages", strings.Replace(minimal, `"packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"]}]`, `"packages": []`, 1), "at least one package"},
 		{"bad key", strings.Replace(minimal, `"key": "p"`, `"key": "P-1"`, 1), `key "P-1"`},
+		{"empty package name", strings.Replace(minimal, `"name": "P"`, `"name": ""`, 1), "name is empty"},
 		{"zero amount", strings.Replace(minimal, `"monthly": 100`, `"monthly": 0`, 1), "monthly"},
 		{"unknown scope", strings.Replace(minimal, `"ALL_ACCESS"`, `"DEV_ACCESS"`, 1), "store_scope"},
 		{"explicit without stores", strings.Replace(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": "explicit"`, 1), "included_stores"},
@@ -87,10 +89,14 @@ func TestValidateRejects(t *testing.T) {
 		{"no intervals", strings.Replace(minimal, `"intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}]`, `"intervals": []`, 1), "interval"},
 		{"no public interval", strings.Replace(minimal, `"public": true`, `"public": false`, 1), "public"},
 		{"bad interval unit", strings.Replace(minimal, `"interval": "month"`, `"interval": "fortnight"`, 1), "interval"},
+		{"week interval", strings.Replace(minimal, `"interval": "month"`, `"interval": "week"`, 1), "interval"},
 		{"zero count", strings.Replace(minimal, `"count": 1`, `"count": 0`, 1), "count"},
 		{"no included games", strings.Replace(minimal, `["magic"]`, `[]`, 1), "included_games"},
+		{"uppercase included game", strings.Replace(minimal, `["magic"]`, `["Magic"]`, 1), "included_games"},
+		{"duplicate included game", strings.Replace(minimal, `["magic"]`, `["magic", "magic"]`, 1), "included_games"},
 		{"no selectable stores", strings.Replace(minimal, `["CK"]`, `[]`, 1), "selectable_stores"},
-		{"lowercase store", strings.Replace(minimal, `["CK"]`, `["ck"]`, 1), "selectable_stores"},
+		{"store with comma", strings.Replace(minimal, `["CK"]`, `["CK,SCG"]`, 1), "selectable_stores"},
+		{"store with space", strings.Replace(minimal, `["CK"]`, `["C K"]`, 1), "selectable_stores"},
 		{"duplicate store", strings.Replace(minimal, `["CK"]`, `["CK", "CK"]`, 1), "selectable_stores"},
 	}
 	for _, c := range cases {
@@ -135,6 +141,26 @@ func TestLookups(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsLookupKeyCollision(t *testing.T) {
+	c := Catalog{
+		Currency: "usd",
+		Packages: []Package{
+			{Key: "a_b", Name: "AB", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}},
+			{Key: "a", Name: "A", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}},
+		},
+		Intervals: []Interval{
+			{Key: "monthly", Interval: "month", Count: 1, Public: true},
+			{Key: "b_monthly", Interval: "month", Count: 1},
+		},
+		IncludedGames:    []string{"magic"},
+		SelectableStores: []string{"CK"},
+	}
+	err := c.Validate()
+	if err == nil || !strings.Contains(err.Error(), "lookup key") {
+		t.Errorf("err %v, want containing %q", err, "lookup key")
+	}
+}
+
 func TestLookupKey(t *testing.T) {
 	if got := LookupKey("starter", "monthly"); got != "starter_monthly" {
 		t.Errorf("got %q", got)
@@ -153,8 +179,6 @@ func TestIntervalAmount(t *testing.T) {
 		{Interval{Interval: "month", Count: 1}, 20000, 20000},
 		{Interval{Interval: "month", Count: 3}, 20000, 60000},
 		{Interval{Interval: "year", Count: 1}, 20000, 240000},
-		{Interval{Interval: "week", Count: 1}, 20000, 0},
-		{Interval{Interval: "day", Count: 30}, 20000, 0},
 	}
 	for _, c := range cases {
 		if got := c.iv.Amount(c.monthly); got != c.want {
