@@ -105,6 +105,9 @@ func TestDecodeRejectsGarbage(t *testing.T) {
 
 func TestAPIFieldsAreVerified(t *testing.T) {
 	// A field minted but not listed by the verifier fails closed; pin the list.
+	// IMPORTANT: testOptionalFields below must include every field in APIFields.
+	// If you update APIFields, ensure testOptionalFields is updated too.
+	// In production, main.go's OptionalFields must also contain all APIFields.
 	for _, name := range APIFields {
 		if !slices.Contains(testOptionalFields, name) {
 			t.Errorf("APIFields entry %q missing from the verifier's field list", name)
@@ -112,6 +115,12 @@ func TestAPIFieldsAreVerified(t *testing.T) {
 	}
 }
 
+// testOptionalFields is the list used for apisig unit tests.
+// CRITICAL: This must include every field defined in APIFields above (line 20).
+// When updating APIFields, update this list too. In production, verify that
+// main.go's OptionalFields (used in auth.go enforceAPISigning) includes all
+// fields from APIFields, otherwise signature verification may incorrectly
+// accept or reject valid API requests.
 var testOptionalFields = []string{"UserName", "UserEmail", "APImode", "SearchDownloadCSV"}
 
 func mustDecode(t *testing.T, blob string) url.Values {
