@@ -13,7 +13,7 @@
       "key": "all_stores",
       "name": "All EU/US stores, no sealed",
       "monthly": 50000,
-      "store_scope": "BASE_ACCESS",
+      "store_scope": "ALL_ACCESS",
       "included_stores": 0,
       "modes": ["retail", "buylist"]
     },
@@ -45,5 +45,18 @@
     { "key": "quarterly", "interval": "month", "count": 3, "public": false }
   ],
   "included_games": ["magic"],
-  "selectable_stores": ["CK", "SCG", "CSI", "ABU", "MKM", "CT"]
+  "stores": [
+    {
+      "key": "TCG",
+      "name": "TCGplayer",
+      "implied": true,
+      "shorthands": ["TCGLow", "TCGMarket", "TCGDirect", "TCGDirectNet", "TCGPlayer"]
+    },
+    { "key": "CK", "name": "Card Kingdom", "shorthands": ["CK"] },
+    { "key": "SCG", "name": "Star City Games", "shorthands": ["SCG"] },
+    { "key": "CSI", "name": "Cool Stuff Inc", "shorthands": ["CSI"] },
+    { "key": "ABU", "name": "ABU Games", "shorthands": ["ABUGames", "ABU"] },
+    { "key": "MKM", "name": "Cardmarket", "shorthands": ["MKM", "MKMLow", "MKMTrend"] },
+    { "key": "CT", "name": "Card Trader", "shorthands": ["CT", "CT0"] }
+  ]
 }

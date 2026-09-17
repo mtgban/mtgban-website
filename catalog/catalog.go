@@ -20,17 +20,23 @@ var embedded []byte
 // StoreScopeExplicit marks a package whose stores the customer picks.
 const StoreScopeExplicit = "explicit"
 
-// StoreScopeBase is the BASE_ACCESS preset.
+// StoreScopeBase is the BASE_ACCESS preset: singles from the main region only.
 const StoreScopeBase = "BASE_ACCESS"
 
-// StoreScopeAll is the ALL_ACCESS preset.
+// StoreScopeAll is the ALL_ACCESS preset: every store; modes decide sealed.
 const StoreScopeAll = "ALL_ACCESS"
+
+// StoreScopes are the store_scope values a package may carry.
+var StoreScopes = []string{StoreScopeExplicit, StoreScopeBase, StoreScopeAll}
+
+// Modes are the API modes a package may grant, in canonical order.
+var Modes = []string{"retail", "buylist", "sealed"}
 
 var (
 	keyPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	currencyPattern = regexp.MustCompile(`^[a-z]{3}$`)
-	validScopes     = []string{StoreScopeExplicit, StoreScopeBase, StoreScopeAll}
-	validModes      = []string{"retail", "buylist", "sealed"}
+	gamePattern     = regexp.MustCompile(`^[a-z0-9]+$`)
+	storeKeyPattern = regexp.MustCompile(`^[A-Z0-9]+$`)
 	validIntervals  = []string{"month", "year"}
 )
 
@@ -40,7 +46,7 @@ type Package struct {
 	Name       string `json:"name"`
 	Monthly    int64  `json:"monthly"`
 	StoreScope string `json:"store_scope"`
-	// IncludedStores is how many selectable stores the price includes beyond the implied TCG.
+	// IncludedStores is how many selectable stores the price includes beyond the implied ones.
 	IncludedStores int      `json:"included_stores"`
 	Modes          []string `json:"modes"`
 }
@@ -61,6 +67,17 @@ type Interval struct {
 	Public   bool   `json:"public"`
 }
 
+// Store is one seller a customer can name, with every shorthand the price
+// API knows it by. Keys are uppercase because the gateway uppercases what a
+// customer typed before matching; shorthands keep the backend's spelling.
+type Store struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// Implied stores are part of every explicit-scope package and are not selectable.
+	Implied    bool     `json:"implied"`
+	Shorthands []string `json:"shorthands"`
+}
+
 // Catalog is the whole price list.
 type Catalog struct {
 	Currency      string     `json:"currency"`
@@ -68,8 +85,7 @@ type Catalog struct {
 	Addons        []Addon    `json:"addons"`
 	Intervals     []Interval `json:"intervals"`
 	IncludedGames []string   `json:"included_games"`
-	// SelectableStores never lists TCG: TCGplayer is implied on the starter package and the gateway adds it to the entitlement.
-	SelectableStores []string `json:"selectable_stores"`
+	Stores        []Store    `json:"stores"`
 }
 
 // Load parses the embedded catalog.
@@ -117,6 +133,7 @@ func (c *Catalog) Validate() error {
 		seen[key] = true
 		return nil
 	}
+	explicit := false
 	for _, p := range c.Packages {
 		if err := claim(p.Key); err != nil {
 			return err
@@ -127,8 +144,8 @@ func (c *Catalog) Validate() error {
 		if p.Monthly <= 0 {
 			return fmt.Errorf("package %s: monthly must be positive", p.Key)
 		}
-		if !slices.Contains(validScopes, p.StoreScope) {
-			return fmt.Errorf("package %s: store_scope must be one of %v", p.Key, validScopes)
+		if !slices.Contains(StoreScopes, p.StoreScope) {
+			return fmt.Errorf("package %s: store_scope must be one of %v", p.Key, StoreScopes)
 		}
 		if p.StoreScope == StoreScopeExplicit && p.IncludedStores < 1 {
 			return fmt.Errorf("package %s: included_stores must be at least 1 for an explicit scope", p.Key)
@@ -136,7 +153,8 @@ func (c *Catalog) Validate() error {
 		if p.StoreScope != StoreScopeExplicit && p.IncludedStores != 0 {
 			return fmt.Errorf("package %s: included_stores applies to an explicit scope only", p.Key)
 		}
-		if err := validateModes(p.Key, p.Modes); err != nil {
+		explicit = explicit || p.StoreScope == StoreScopeExplicit
+		if err := uniqueList("package "+p.Key+" modes", p.Modes, isMode, "one of "+fmt.Sprint(Modes)); err != nil {
 			return err
 		}
 	}
@@ -150,13 +168,8 @@ func (c *Catalog) Validate() error {
 		if a.Monthly <= 0 {
 			return fmt.Errorf("addon %s: monthly must be positive", a.Key)
 		}
-		if len(a.AppliesTo) == 0 {
-			return fmt.Errorf("addon %s: applies_to is empty", a.Key)
-		}
-		for _, key := range a.AppliesTo {
-			if _, ok := c.Package(key); !ok {
-				return fmt.Errorf("addon %s: applies_to names unknown package %q", a.Key, key)
-			}
+		if err := uniqueList("addon "+a.Key+" applies_to", a.AppliesTo, c.hasPackage, "a known package"); err != nil {
+			return err
 		}
 	}
 	if len(c.Intervals) == 0 {
@@ -178,30 +191,52 @@ func (c *Catalog) Validate() error {
 	if !public {
 		return errors.New("at least one interval must be public")
 	}
-	if len(c.IncludedGames) == 0 {
-		return errors.New("included_games is empty")
-	}
-	for i, g := range c.IncludedGames {
-		if g == "" || strings.ToLower(g) != g {
-			return fmt.Errorf("included_games: %q must be a lowercase game name", g)
-		}
-		if slices.Contains(c.IncludedGames[:i], g) {
-			return fmt.Errorf("included_games: duplicate %q", g)
-		}
-	}
-	if len(c.SelectableStores) == 0 {
-		return errors.New("selectable_stores is empty")
-	}
-	for i, s := range c.SelectableStores {
-		if s == "" || strings.ContainsRune(s, ',') || strings.IndexFunc(s, unicode.IsSpace) >= 0 {
-			return fmt.Errorf("selectable_stores: %q must be a store shorthand with no comma or whitespace", s)
-		}
-		if slices.Contains(c.SelectableStores[:i], s) {
-			return fmt.Errorf("selectable_stores: duplicate %q", s)
-		}
-	}
-	if err := c.checkLookupKeyCollisions(); err != nil {
+	if err := uniqueList("included_games", c.IncludedGames, gamePattern.MatchString, "a lowercase game name"); err != nil {
 		return err
+	}
+	if err := c.validateStores(explicit); err != nil {
+		return err
+	}
+	return c.checkLookupKeyCollisions()
+}
+
+// validateStores checks keys, names, shorthands, and that an explicit
+// package has something implied and something to pick.
+func (c *Catalog) validateStores(explicit bool) error {
+	if len(c.Stores) == 0 {
+		return errors.New("stores is empty")
+	}
+	shorthandOwner := map[string]string{}
+	implied, selectable := false, false
+	for i, s := range c.Stores {
+		if !storeKeyPattern.MatchString(s.Key) {
+			return fmt.Errorf("store %q: key must be uppercase letters and digits", s.Key)
+		}
+		for _, prev := range c.Stores[:i] {
+			if prev.Key == s.Key {
+				return fmt.Errorf("duplicate store %q", s.Key)
+			}
+		}
+		if s.Name == "" {
+			return fmt.Errorf("store %s: name is empty", s.Key)
+		}
+		if err := uniqueList("store "+s.Key+" shorthands", s.Shorthands, isToken, "a shorthand with no comma or whitespace"); err != nil {
+			return err
+		}
+		for _, sh := range s.Shorthands {
+			if owner, ok := shorthandOwner[sh]; ok {
+				return fmt.Errorf("shorthand %q belongs to both %s and %s", sh, owner, s.Key)
+			}
+			shorthandOwner[sh] = s.Key
+		}
+		implied = implied || s.Implied
+		selectable = selectable || !s.Implied
+	}
+	if explicit && !implied {
+		return errors.New("an explicit package needs an implied store")
+	}
+	if explicit && !selectable {
+		return errors.New("an explicit package needs a selectable store")
 	}
 	return nil
 }
@@ -228,19 +263,34 @@ func (c *Catalog) checkLookupKeyCollisions() error {
 	return nil
 }
 
-func validateModes(key string, modes []string) error {
-	if len(modes) == 0 {
-		return fmt.Errorf("package %s: at least one mode is required", key)
+// uniqueList checks a list is non-empty, every entry passes ok, and none repeats.
+func uniqueList(field string, items []string, ok func(string) bool, want string) error {
+	if len(items) == 0 {
+		return fmt.Errorf("%s is empty", field)
 	}
-	for i, m := range modes {
-		if !slices.Contains(validModes, m) {
-			return fmt.Errorf("package %s: unknown mode %q", key, m)
+	for i, s := range items {
+		if !ok(s) {
+			return fmt.Errorf("%s: %q must be %s", field, s, want)
 		}
-		if slices.Contains(modes[:i], m) {
-			return fmt.Errorf("package %s: duplicate mode %q", key, m)
+		if slices.Contains(items[:i], s) {
+			return fmt.Errorf("%s: duplicate %q", field, s)
 		}
 	}
 	return nil
+}
+
+func isMode(m string) bool {
+	return slices.Contains(Modes, m)
+}
+
+// isToken accepts a value that survives comma-joining into metadata and signatures.
+func isToken(s string) bool {
+	return s != "" && !strings.ContainsRune(s, ',') && strings.IndexFunc(s, unicode.IsSpace) < 0
+}
+
+func (c *Catalog) hasPackage(key string) bool {
+	_, ok := c.Package(key)
+	return ok
 }
 
 // Package returns the package with that key.
@@ -273,6 +323,16 @@ func (c *Catalog) Interval(key string) (Interval, bool) {
 	return Interval{}, false
 }
 
+// Store returns the store with that key.
+func (c *Catalog) Store(key string) (Store, bool) {
+	for _, s := range c.Stores {
+		if s.Key == key {
+			return s, true
+		}
+	}
+	return Store{}, false
+}
+
 // PublicIntervals returns the intervals a customer may pick without an invite.
 func (c *Catalog) PublicIntervals() []Interval {
 	var out []Interval
@@ -284,21 +344,42 @@ func (c *Catalog) PublicIntervals() []Interval {
 	return out
 }
 
+// ImpliedStores returns the stores every explicit-scope package includes.
+func (c *Catalog) ImpliedStores() []Store {
+	var out []Store
+	for _, s := range c.Stores {
+		if s.Implied {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// SelectableStores returns the stores a customer may pick on an explicit-scope package.
+func (c *Catalog) SelectableStores() []Store {
+	var out []Store
+	for _, s := range c.Stores {
+		if !s.Implied {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // Applies reports whether the add-on can be attached to the package.
 func (a Addon) Applies(packageKey string) bool {
 	return slices.Contains(a.AppliesTo, packageKey)
 }
 
 // Amount is the charge per billing period for a monthly amount.
-// Validate only admits month and year, so the fallthrough is unreachable.
-func (iv Interval) Amount(monthly int64) int64 {
+func (iv Interval) Amount(monthly int64) (int64, error) {
 	switch iv.Interval {
 	case "month":
-		return monthly * iv.Count
+		return monthly * iv.Count, nil
 	case "year":
-		return monthly * 12 * iv.Count
+		return monthly * 12 * iv.Count, nil
 	}
-	return 0
+	return 0, fmt.Errorf("catalog: interval %s: unsupported unit %q", iv.Key, iv.Interval)
 }
 
 // LookupKey is the Stripe lookup_key for an item billed at an interval.
