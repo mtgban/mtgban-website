@@ -25,6 +25,17 @@ func renderSearch(t *testing.T, template string, pageVars PageVars) string {
 	return b.String()
 }
 
+func TestSearchSidebarResetsArtFallbackOnHover(t *testing.T) {
+	out := renderSearch(t, "search.html", PageVars{
+		SearchQuery: "Lightning Bolt",
+		CardHashes:  []string{"some-uuid"},
+		AllKeys:     []string{"some-uuid"},
+	})
+	if !strings.Contains(out, "delete img.dataset.cardArtFallback;") {
+		t.Error("search sidebar does not reset the reused image's fallback marker")
+	}
+}
+
 // A search that found nothing says so, and the recent list drops it on that
 // word alone - the page is the only thing that knows.
 func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {

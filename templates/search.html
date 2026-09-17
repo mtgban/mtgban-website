@@ -437,6 +437,9 @@
 
                 function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName) {
                     var img = document.getElementById('cardImage');
+                    // The sidebar image is reused across hover targets; let a
+                    // newly assigned source trigger the fallback independently.
+                    delete img.dataset.cardArtFallback;
                     img.src = src;
                     // The image height feeds the space measurement but only
                     // settles on load; resizes move the 52vh cap too.
