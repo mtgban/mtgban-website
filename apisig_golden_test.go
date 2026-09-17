@@ -60,6 +60,11 @@ func TestRequestOrigin(t *testing.T) {
 	if got := requestOrigin(nil); got != "" {
 		t.Fatalf("requestOrigin(nil) = %q, want empty", got)
 	}
+
+	req := httptest.NewRequest("GET", "https://onepiece.mtgban.com/", nil)
+	if got := requestOrigin(req); got != "https://onepiece.mtgban.com" {
+		t.Fatalf("host-only HTTPS requestOrigin = %q, want https://onepiece.mtgban.com", got)
+	}
 }
 
 func TestIsSecureRequestRequiresTrustedHost(t *testing.T) {

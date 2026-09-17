@@ -165,6 +165,9 @@ func absoluteURL(r *http.Request, path string) string {
 	if origin := requestOrigin(r); origin != "" {
 		return origin + path
 	}
+	// Do not invent a default host for an untrusted ingress: it could point a
+	// client at a different game deployment. Callers that need an absolute URL
+	// must only use this with a trusted request origin.
 	return path
 }
 
