@@ -202,7 +202,11 @@
             html += '</div>';
             html += '<div class="landing-pane-body">';
             searches.forEach(function(s) {
-                var cropSrc = s.crop || '';
+                // Prefer the art crop, but keep older/crop-less entries from
+                // falling back to the oversized thumbnail row. The first
+                // result image is still useful background art for searches
+                // whose result has no crop URL (for example a product query).
+                var cropSrc = s.crop || s.img || '';
                 var token = parseSetToken(s.q);
                 html += '<a class="landing-item landing-item-recent' + (cropSrc ? ' has-crop' : '') + '"' + (cropSrc ? ' style="background-image:url(\'' + escapeAttr(cropSrc) + '\')"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
                 if (!cropSrc) {
