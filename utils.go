@@ -1277,7 +1277,7 @@ func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName 
 		flag, _ = strconv.ParseBool(readCookie(r, cookieName))
 		return flag
 	}
-	setForeverCookie(w, cookieName, val)
+	setForeverCookie(w, r, cookieName, val)
 	return flag
 }
 
@@ -1316,21 +1316,29 @@ func readCookie(r *http.Request, cookieName string) string {
 }
 
 // There is no forever in cookies, so pick a really large interval
-func setForeverCookie(w http.ResponseWriter, cookieName, value string) {
+func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
-	setCookie(w, cookieName, value, tenYears, false)
+	setCookie(w, r, cookieName, value, tenYears, false)
 }
 
 // Set a cookie in the response with no expiration at the default root
-func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Time, global bool) {
-	u, err := url.Parse(ServerURL)
-	if err != nil {
-		ServerNotify("cookie", "unable to parse ServerURL", true)
-		return
+func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
+	origin := requestOrigin(r)
+	u, err := url.Parse(origin)
+	if err != nil || u.Hostname() == "" {
+		// Untrusted hosts, including httptest's example.com and a platform's
+		// raw ingress hostname, may still use host-only cookies. Never widen
+		// those cookies to a parent domain derived from an untrusted Host.
+		u = &url.URL{Scheme: "http"}
+		if r != nil {
+			u.Host = r.Host
+		}
+		global = false
 	}
 
-	domain := u.Hostname()
+	domain := ""
 	if global {
+		domain = u.Hostname()
 		fields := strings.Split(domain, ".")
 		// Guard against hostname being "mtgban.com"
 		if fields[0] != "mtgban" {
@@ -1346,7 +1354,7 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 		Value:   value,
 		// Only mark Secure when the site itself is served over HTTPS,
 		// otherwise the cookie would be dropped during local HTTP dev.
-		Secure: u.Scheme == "https",
+		Secure: isSecureRequest(r),
 	}
 
 	if !global {

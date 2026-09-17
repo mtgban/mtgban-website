@@ -9,7 +9,7 @@ import (
 // in good standing with the affiliate programs we participate in.
 func Privacy(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
-	pageVars := genPageNav("Privacy", sig)
+	pageVars := genPageNav(r, "Privacy", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

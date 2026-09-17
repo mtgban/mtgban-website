@@ -19,13 +19,13 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		message = ErrMsg
 	case "logout":
 		// Invalidate the current cookie
-		setCookie(w, "MTGBAN", "", time.Now(), true)
+		setCookie(w, r, "MTGBAN", "", time.Now(), true)
 
-		http.Redirect(w, r, ServerURL, http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
-	pageVars := genPageNav("Home", sig)
+	pageVars := genPageNav(r, "Home", sig)
 	pageVars.ErrorMessage = message
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {

@@ -182,7 +182,7 @@ func searchScope(w http.ResponseWriter, r *http.Request) string {
 	if len(values) > 0 {
 		scope = strings.TrimSpace(values[0])
 	}
-	setForeverCookie(w, "SearchScope", scope)
+	setForeverCookie(w, r, "SearchScope", scope)
 	return scope
 }
 
@@ -438,7 +438,7 @@ func parseChartIDs(chartParam string) (ids []string, truncated bool) {
 func Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav("Search", sig)
+	pageVars := genPageNav(r, "Search", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
@@ -724,11 +724,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
-	pageVars.Embed.PageURL = ServerURL + r.URL.String()
+	pageVars.Embed.PageURL = absoluteURL(r, r.URL.String())
 	// Point the consumer at the very page it is unfurling: a fixed /search?q=
 	// names a different url than og:url on /sealed, or under any parameter
 	// the reader arrived with.
-	pageVars.Embed.OEmbedURL = ServerURL + "/search/oembed?format=json&url=" + url.QueryEscape(pageVars.Embed.PageURL)
+	pageVars.Embed.OEmbedURL = absoluteURL(r, "/search/oembed?format=json&url="+url.QueryEscape(pageVars.Embed.PageURL))
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
@@ -1009,7 +1009,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
-	preview := embed.Generate(externalURL(), allKeys, editionTitle, func(cardID string) []embed.Entry {
+	preview := embed.Generate(externalURL(r), allKeys, editionTitle, func(cardID string) []embed.Entry {
 		return EmbedSellerEntries(foundSellers, cardID, true)
 	})
 	if oembed {

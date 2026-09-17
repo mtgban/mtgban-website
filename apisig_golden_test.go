@@ -28,6 +28,21 @@ const (
 	goldenSigNoExpiry  = "MmcFVf0N2PrK3o8zk9O5YdDqz4g="
 )
 
+func TestRequestOrigin(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-Host", "onepiece.mtgban.com")
+	if got := requestOrigin(req); got != "https://onepiece.mtgban.com" {
+		t.Fatalf("requestOrigin = %q, want https://onepiece.mtgban.com", got)
+	}
+
+	req = httptest.NewRequest("GET", "/", nil)
+	req.Host = "attacker.example"
+	if got := requestOrigin(req); got != "" {
+		t.Fatalf("requestOrigin = %q for untrusted host, want empty", got)
+	}
+}
+
 func TestAPISignatureGolden(t *testing.T) {
 	cases := []struct {
 		name, data, want string
@@ -44,10 +59,6 @@ func TestAPISignatureGolden(t *testing.T) {
 }
 
 func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
-	oldURL := ServerURL
-	ServerURL = "https://www.mtgban.com"
-	t.Cleanup(func() { ServerURL = oldURL })
-
 	apiUsersMutex.Lock()
 	if Config.APIUserSecrets == nil {
 		Config.APIUserSecrets = map[string]string{}
@@ -90,7 +101,7 @@ func TestOptionalFieldsCoverAPIFields(t *testing.T) {
 	}
 }
 
-func TestEnforceAPISigningInitializesServerURL(t *testing.T) {
+func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
 	// handler never reads them, so one nil element each is enough.
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
@@ -103,9 +114,9 @@ func TestEnforceAPISigningInitializesServerURL(t *testing.T) {
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
-	oldCheck, oldURL := SigCheck, ServerURL
-	SigCheck, ServerURL = true, ""
-	t.Cleanup(func() { SigCheck, ServerURL = oldCheck, oldURL })
+	oldCheck, oldDev := SigCheck, DevMode
+	SigCheck, DevMode = true, false
+	t.Cleanup(func() { SigCheck, DevMode = oldCheck, oldDev })
 
 	apiUsersMutex.Lock()
 	if Config.APIUserSecrets == nil {
@@ -123,19 +134,14 @@ func TestEnforceAPISigningInitializesServerURL(t *testing.T) {
 	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 	}))
-	req := httptest.NewRequest("GET", "https://onepiece.mtgban.com/api/load/tcg_sealed?sig="+url.QueryEscape(
+	req := httptest.NewRequest("GET", "/api/load/tcg_sealed?sig="+url.QueryEscape(
 		"QVBJPUFMTF9BQ0NFU1MmQVBJbW9kZT1hbGwmU2lnbmF0dXJlPU1tY0ZWZjBOMlBySzNvOHprOU81WWREcXo0ZyUzRCZVc2VyRW1haWw9Z29sZGVuJTQwZXhhbXBsZS5jb20="), nil)
 	req.RemoteAddr = "198.51.100.1:1234"
-	req.Header.Set("X-Forwarded-Proto", "https")
-	req.Header.Set("X-Forwarded-Host", "onepiece.mtgban.com")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
 	if !called || rec.Code != http.StatusOK {
 		t.Fatalf("valid cold-start request rejected: code %d body %s", rec.Code, rec.Body.String())
-	}
-	if ServerURL != "https://onepiece.mtgban.com" {
-		t.Fatalf("ServerURL = %q, want trusted request host", ServerURL)
 	}
 }
 
@@ -152,9 +158,9 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
-	oldCheck, oldURL := SigCheck, ServerURL
-	SigCheck, ServerURL = true, "https://www.mtgban.com"
-	t.Cleanup(func() { SigCheck, ServerURL = oldCheck, oldURL })
+	oldCheck, oldDev := SigCheck, DevMode
+	SigCheck, DevMode = true, false
+	t.Cleanup(func() { SigCheck, DevMode = oldCheck, oldDev })
 
 	apiUsersMutex.Lock()
 	if Config.APIUserSecrets == nil {

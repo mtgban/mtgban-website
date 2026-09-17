@@ -8,7 +8,7 @@ import (
 
 func Guide(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
-	pageVars := genPageNav("Guide", sig)
+	pageVars := genPageNav(r, "Guide", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

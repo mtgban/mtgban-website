@@ -666,7 +666,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(foundSellers, false)
 		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(foundVendors)
 
-		ogFields = embed.FormatSearchResult(externalURL(), searchRes)
+		ogFields = embed.FormatSearchResult(externalURL(nil), searchRes)
 	} else if lastSold {
 		// Since grabLastSold is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message

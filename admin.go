@@ -66,7 +66,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	page := r.FormValue("page")
-	pageVars := genPageNav("Admin", sig)
+	pageVars := genPageNav(r, "Admin", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
@@ -308,7 +308,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		doReboot = true
 
 		tier := r.FormValue("tier")
-		msg := ServerURL + "/?sig=" + sign(tier, nil, nil)
+		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil))
 
 		v.Set("msg", msg)
 		v.Set("html", "textfield")
@@ -1191,10 +1191,7 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 		claims.Expires = time.Now().Add(duration).Unix()
 	}
 
-	link := apisig.DefaultLink
-	if !strings.HasSuffix(ServerURL, "mtgban.com") {
-		link = "http://localhost:" + fmt.Sprint(Config.Port)
-	}
+	link := signatureLink()
 	return apisig.Mint([]byte(key), link, claims), nil
 }
 

@@ -912,9 +912,6 @@ var paletteService = &palette.Service{
 	},
 }
 
-// External address from which server is reachable, loaded at the first request
-var ServerURL string
-
 const (
 	DefaultServerPort    = "8080"
 	DefaultConfigPath    = "config.json"
@@ -932,7 +929,7 @@ func ServeFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
-func genPageNav(activeTab, sig string) PageVars {
+func genPageNav(r *http.Request, activeTab, sig string) PageVars {
 	// Decode the sig once; this function reads it for expiry, every nav
 	// feature, and the user email, and each GetParamFromSig call would
 	// re-parse the whole thing.
@@ -940,23 +937,28 @@ func genPageNav(activeTab, sig string) PageVars {
 	expires, _ := strconv.ParseInt(sigParams.Get("Expires"), 10, 64)
 	msg := ""
 	showPatreonLogin := false
+	origin := requestOrigin(r)
 	if sig != "" {
 		if expires < time.Now().Unix() {
 			msg = ErrMsgExpired
 		}
-	} else {
+	} else if origin != "" {
 		showPatreonLogin = true
 	}
 
 	// These values need to be set for every rendered page
 	// In particular the Patreon variables are needed because the signature
 	// could expire in any page, and the button url needs these parameters
+	patreonURL := ""
+	if origin != "" {
+		patreonURL = origin + "/auth"
+	}
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
 
 		PatreonIDs:   Config.Patreon.Client,
-		PatreonURL:   ServerURL + "/auth",
+		PatreonURL:   patreonURL,
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
 

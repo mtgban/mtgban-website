@@ -230,7 +230,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		suggestions = append(suggestions, entry.name)
 		printings, _ := mtgmatcher.Printings4Card(entry.name)
 		results = append(results, embed.PrintingsLine(printings))
-		links = append(links, ServerURL+"/search?q="+url.QueryEscape(entry.name))
+		links = append(links, absoluteURL(r, "/search?q="+url.QueryEscape(entry.name)))
 	}
 	// This argument is mandatory
 	if suggestions == nil {

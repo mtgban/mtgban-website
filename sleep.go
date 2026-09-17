@@ -63,7 +63,7 @@ var sleepersLanguages = []string{
 func Sleepers(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav("Sleepers", sig)
+	pageVars := genPageNav(r, "Sleepers", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

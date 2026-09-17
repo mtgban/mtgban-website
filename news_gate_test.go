@@ -49,7 +49,7 @@ func TestNavHonoursShouldHideOnASection(t *testing.T) {
 
 	names := func() []string {
 		var out []string
-		for _, n := range genPageNav("Search", "").Nav {
+		for _, n := range genPageNav(nil, "Search", "").Nav {
 			out = append(out, n.Name)
 		}
 		return out
