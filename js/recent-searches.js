@@ -211,7 +211,7 @@
                 // Content-warning images stay in the gated thumbnail path
                 // unless a real crop is available, as with existing crops.
                 var backgroundSrc = cropSrc || (!s.cw ? imageSrc : '');
-                var backgroundClass = backgroundSrc ? ' has-background' + (cropSrc ? ' has-crop' : ' has-image') : '';
+                var backgroundClass = backgroundSrc ? ' has-background' + (cropSrc ? '' : ' has-image') : '';
                 var token = parseSetToken(s.q);
                 html += '<a class="landing-item landing-item-recent' + backgroundClass + '"' + (backgroundSrc ? ' style="background-image:url(&quot;' + escapeAttr(backgroundSrc) + '&quot;)"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
                 if (!backgroundSrc) {
