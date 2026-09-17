@@ -9,18 +9,38 @@ func TestAuthRedirect(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "removes error from absolute URL",
-			state: "https://mtgban.com/?errmsg=TierNotFound;baninc",
-			want:  "https://mtgban.com/",
+			name:  "removes error from relative path",
+			state: "/?errmsg=TierNotFound;baninc",
+			want:  "/",
 		},
 		{
 			name:  "preserves other query parameters",
-			state: "https://mtgban.com/search?q=sol&errmsg=UserNotFound;baninc",
-			want:  "https://mtgban.com/search?q=sol",
+			state: "/search?q=sol&errmsg=UserNotFound;baninc",
+			want:  "/search?q=sol",
+		},
+		{
+			name:  "preserves fragments",
+			state: "/search?q=sol&errmsg=UserNotFound#results;baninc",
+			want:  "/search?q=sol#results",
 		},
 		{
 			name:  "empty state goes home",
 			state: ";baninc",
+			want:  "/",
+		},
+		{
+			name:  "rejects absolute URL",
+			state: "https://evil.example/?errmsg=TierNotFound;baninc",
+			want:  "/",
+		},
+		{
+			name:  "rejects protocol relative URL",
+			state: "//evil.example/?errmsg=TierNotFound;baninc",
+			want:  "/",
+		},
+		{
+			name:  "rejects backslash host separator",
+			state: `/\\evil.example/?errmsg=TierNotFound;baninc`,
 			want:  "/",
 		},
 		{
