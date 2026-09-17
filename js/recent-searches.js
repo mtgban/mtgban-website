@@ -331,7 +331,13 @@
 
         var answer = window.BAN_SEARCH_RESULT || {};
         if (!answer.found) return;
-        addSearch(q, answer.label, answer.url);
+        var href = answer.url;
+        // A multi-result sealed search has no per-card canonical URL, but its
+        // route still matters when the landing page later refreshes its art.
+        if (!href && window.location.pathname === '/sealed') {
+            href = '/sealed?q=' + encodeURIComponent(q);
+        }
+        addSearch(q, answer.label, href);
     }
 
     function updateResultArt(searches, query, img, crop, foil, cw) {
