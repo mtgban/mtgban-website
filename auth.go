@@ -360,6 +360,8 @@ func enforceAPISigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
+		initServerURL(r)
+
 		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
 
 		ip, err := ratelimit.IPAddress(r)

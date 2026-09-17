@@ -84,6 +84,55 @@ func TestOptionalFieldsCoverAPIFields(t *testing.T) {
 	}
 }
 
+func TestEnforceAPISigningInitializesServerURL(t *testing.T) {
+	// enforceAPISigning only checks these are non-empty, and the stub next
+	// handler never reads them, so one nil element each is enough.
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	sellers := []mtgban.Seller{nil}
+	vendors := []mtgban.Vendor{nil}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	oldCheck, oldURL := SigCheck, ServerURL
+	SigCheck, ServerURL = true, ""
+	t.Cleanup(func() { SigCheck, ServerURL = oldCheck, oldURL })
+
+	apiUsersMutex.Lock()
+	if Config.APIUserSecrets == nil {
+		Config.APIUserSecrets = map[string]string{}
+	}
+	Config.APIUserSecrets["golden@example.com"] = goldenSecret
+	apiUsersMutex.Unlock()
+	t.Cleanup(func() {
+		apiUsersMutex.Lock()
+		delete(Config.APIUserSecrets, "golden@example.com")
+		apiUsersMutex.Unlock()
+	})
+
+	called := false
+	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	req := httptest.NewRequest("GET", "https://onepiece.mtgban.com/api/load/tcg_sealed?sig="+url.QueryEscape(
+		"QVBJPUFMTF9BQ0NFU1MmQVBJbW9kZT1hbGwmU2lnbmF0dXJlPU1tY0ZWZjBOMlBySzNvOHprOU81WWREcXo0ZyUzRCZVc2VyRW1haWw9Z29sZGVuJTQwZXhhbXBsZS5jb20="), nil)
+	req.RemoteAddr = "198.51.100.1:1234"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("X-Forwarded-Host", "onepiece.mtgban.com")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if !called || rec.Code != http.StatusOK {
+		t.Fatalf("valid cold-start request rejected: code %d body %s", rec.Code, rec.Body.String())
+	}
+	if ServerURL != "https://onepiece.mtgban.com" {
+		t.Fatalf("ServerURL = %q, want trusted request host", ServerURL)
+	}
+}
+
 func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	// enforceAPISigning only checks these are non-empty, and the stub next
 	// handler never reads them, so one nil element each is enough.
