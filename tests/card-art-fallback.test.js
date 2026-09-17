@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
 
 const source = readFileSync(new URL('../js/card-art-fallback.js', import.meta.url), 'utf8');
+const uploadTemplate = readFileSync(new URL('../templates/upload.html', import.meta.url), 'utf8');
 
 function loadFallback() {
     let onError;
@@ -11,8 +12,8 @@ function loadFallback() {
             this.src = '';
         }
 
-        matches() {
-            return true;
+        matches(selector) {
+            return selector.includes('.card-art');
         }
     }
     const window = {};
@@ -38,4 +39,20 @@ test('reused card art can fall back again after its source changes', () => {
     expect(image.dataset.cardArtFallback).toBeUndefined();
     onError({target: image});
     expect(image.src).toBe('/img/backs/pokemon.webp');
+});
+
+test('unrelated images do not receive the card-back fallback', () => {
+    const {FakeImage, onError} = loadFallback();
+    const image = new FakeImage();
+    image.matches = () => false;
+    image.src = 'broken.jpg';
+
+    onError({target: image});
+
+    expect(image.src).toBe('broken.jpg');
+    expect(image.dataset.cardArtFallback).toBeUndefined();
+});
+
+test('upload printing picker resets reused row art', () => {
+    expect(uploadTemplate).toContain('if (img) window.setCardArtSource(img, meta.image);');
 });
