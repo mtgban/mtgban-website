@@ -106,3 +106,59 @@ func TestParseRejectsMalformedJSON(t *testing.T) {
 		t.Error("expected error")
 	}
 }
+
+func TestLookups(t *testing.T) {
+	c := MustLoad()
+	if p, ok := c.Package("all_data"); !ok || p.Monthly != 80000 {
+		t.Errorf("package lookup %+v %v", p, ok)
+	}
+	if _, ok := c.Package("nope"); ok {
+		t.Error("unknown package found")
+	}
+	if a, ok := c.Addon("extra_game"); !ok || !a.Applies("all_stores") || a.Applies("nope") {
+		t.Errorf("addon lookup %+v %v", a, ok)
+	}
+	if a, _ := c.Addon("extra_store"); a.Applies("all_data") {
+		t.Error("extra_store applies to all_data")
+	}
+	if _, ok := c.Addon("nope"); ok {
+		t.Error("unknown addon found")
+	}
+	if iv, ok := c.Interval("quarterly"); !ok || iv.Count != 3 || iv.Public {
+		t.Errorf("interval lookup %+v %v", iv, ok)
+	}
+	if _, ok := c.Interval("nope"); ok {
+		t.Error("unknown interval found")
+	}
+	if pub := c.PublicIntervals(); len(pub) != 1 || pub[0].Key != "monthly" {
+		t.Errorf("public intervals %+v", pub)
+	}
+}
+
+func TestLookupKey(t *testing.T) {
+	if got := LookupKey("starter", "monthly"); got != "starter_monthly" {
+		t.Errorf("got %q", got)
+	}
+	if got := LookupKey("extra_game", "quarterly"); got != "extra_game_quarterly" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestIntervalAmount(t *testing.T) {
+	cases := []struct {
+		iv      Interval
+		monthly int64
+		want    int64
+	}{
+		{Interval{Interval: "month", Count: 1}, 20000, 20000},
+		{Interval{Interval: "month", Count: 3}, 20000, 60000},
+		{Interval{Interval: "year", Count: 1}, 20000, 240000},
+		{Interval{Interval: "week", Count: 1}, 20000, 0},
+		{Interval{Interval: "day", Count: 30}, 20000, 0},
+	}
+	for _, c := range cases {
+		if got := c.iv.Amount(c.monthly); got != c.want {
+			t.Errorf("%+v: got %d want %d", c.iv, got, c.want)
+		}
+	}
+}
