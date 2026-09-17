@@ -156,7 +156,9 @@ func externalURL(r *http.Request) string {
 	if origin := requestOrigin(r); origin != "" {
 		return origin
 	}
-	return DefaultServerURL
+	// Background jobs do not have a deployment request to identify a game
+	// host, so they use the site's single public identity.
+	return DefaultExternalURL
 }
 
 func absoluteURL(r *http.Request, path string) string {

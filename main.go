@@ -918,6 +918,7 @@ const (
 	DefaultSecret        = "NotVerySecret!"
 	DefaultGame          = "magic"
 	DefaultServerURL     = apisig.DefaultLink
+	DefaultExternalURL   = "https://mtgban.com"
 	DefaultDatastorePath = "AllPrintings.json.xz"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour

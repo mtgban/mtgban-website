@@ -1367,10 +1367,13 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 // isSecureRequest reports whether the request reached us over HTTPS,
 // accounting for a TLS-terminating proxy that sets X-Forwarded-Proto.
 func isSecureRequest(r *http.Request) bool {
+	if r == nil || !trustedHostname(requestHost(r)) {
+		return false
+	}
 	if r.TLS != nil {
 		return true
 	}
-	return r.Header.Get("X-Forwarded-Proto") == "https"
+	return firstForwardedValue(r.Header.Get("X-Forwarded-Proto")) == "https"
 }
 
 // dataReady reports whether the datastore and scrapers are loaded enough to

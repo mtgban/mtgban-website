@@ -29,17 +29,77 @@ const (
 )
 
 func TestRequestOrigin(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("X-Forwarded-Proto", "https")
-	req.Header.Set("X-Forwarded-Host", "onepiece.mtgban.com")
-	if got := requestOrigin(req); got != "https://onepiece.mtgban.com" {
-		t.Fatalf("requestOrigin = %q, want https://onepiece.mtgban.com", got)
+	tests := []struct {
+		name, host, proto, want string
+	}{
+		{"forwarded", "onepiece.mtgban.com", "https", "https://onepiece.mtgban.com"},
+		{"forwarded first hop", "onepiece.mtgban.com, attacker.example", "https, http", "https://onepiece.mtgban.com"},
+		{"port", "magic.mtgban.com:8080", "", "http://magic.mtgban.com:8080"},
+		{"untrusted", "attacker.example", "https", ""},
+		{"malformed trusted suffix", "junk onepiece.mtgban.com", "https", ""},
+		{"invalid port", "onepiece.mtgban.com:port", "https", ""},
+		{"invalid proto", "onepiece.mtgban.com", "ftp", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Host = tt.host
+			if tt.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.proto)
+			}
+			if strings.Contains(tt.host, ",") {
+				req.Header.Set("X-Forwarded-Host", tt.host)
+				req.Host = "internal:8080"
+			}
+			if got := requestOrigin(req); got != tt.want {
+				t.Fatalf("requestOrigin = %q, want %q", got, tt.want)
+			}
+		})
 	}
 
-	req = httptest.NewRequest("GET", "/", nil)
-	req.Host = "attacker.example"
-	if got := requestOrigin(req); got != "" {
-		t.Fatalf("requestOrigin = %q for untrusted host, want empty", got)
+	if got := requestOrigin(nil); got != "" {
+		t.Fatalf("requestOrigin(nil) = %q, want empty", got)
+	}
+}
+
+func TestIsSecureRequestRequiresTrustedHost(t *testing.T) {
+	for _, tt := range []struct {
+		name, host, proto string
+		want              bool
+	}{
+		{"trusted forwarded", "onepiece.mtgban.com", "https", true},
+		{"untrusted forwarded", "attacker.example", "https", false},
+		{"trusted direct TLS", "onepiece.mtgban.com", "", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			url := "http://" + tt.host + "/"
+			if tt.name == "trusted direct TLS" {
+				url = "https://" + tt.host + "/"
+			}
+			req := httptest.NewRequest("GET", url, nil)
+			if tt.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.proto)
+			}
+			if got := isSecureRequest(req); got != tt.want {
+				t.Fatalf("isSecureRequest = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPublicURLFallbacks(t *testing.T) {
+	if got := absoluteURL(nil, "/go/"); got != "/go/" {
+		t.Fatalf("absoluteURL(nil) = %q, want /go/", got)
+	}
+	if got := externalURL(nil); got != DefaultExternalURL {
+		t.Fatalf("externalURL(nil) = %q, want %q", got, DefaultExternalURL)
+	}
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Host = "onepiece.mtgban.com"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	if got := absoluteURL(req, "/go/"); got != "https://onepiece.mtgban.com/go/" {
+		t.Fatalf("absoluteURL = %q, want request origin", got)
 	}
 }
 
