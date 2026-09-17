@@ -203,3 +203,56 @@ func (c *Catalog) Package(key string) (Package, bool) {
 	}
 	return Package{}, false
 }
+
+// Addon returns the add-on with that key.
+func (c *Catalog) Addon(key string) (Addon, bool) {
+	for _, a := range c.Addons {
+		if a.Key == key {
+			return a, true
+		}
+	}
+	return Addon{}, false
+}
+
+// Interval returns the interval with that key.
+func (c *Catalog) Interval(key string) (Interval, bool) {
+	for _, iv := range c.Intervals {
+		if iv.Key == key {
+			return iv, true
+		}
+	}
+	return Interval{}, false
+}
+
+// PublicIntervals returns the intervals a customer may pick without an invite.
+func (c *Catalog) PublicIntervals() []Interval {
+	var out []Interval
+	for _, iv := range c.Intervals {
+		if iv.Public {
+			out = append(out, iv)
+		}
+	}
+	return out
+}
+
+// Applies reports whether the add-on can be attached to the package.
+func (a Addon) Applies(packageKey string) bool {
+	return slices.Contains(a.AppliesTo, packageKey)
+}
+
+// Amount is the charge per billing period for a monthly amount.
+// Intervals shorter than a month return 0; the catalog never uses them.
+func (iv Interval) Amount(monthly int64) int64 {
+	switch iv.Interval {
+	case "month":
+		return monthly * iv.Count
+	case "year":
+		return monthly * 12 * iv.Count
+	}
+	return 0
+}
+
+// LookupKey is the Stripe lookup_key for an item billed at an interval.
+func LookupKey(itemKey, intervalKey string) string {
+	return itemKey + "_" + intervalKey
+}
