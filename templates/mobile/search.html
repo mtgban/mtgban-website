@@ -1068,7 +1068,7 @@ function showCardDrawer(imgUrl, name, hasWarning) {
     var drawer = document.getElementById('m-drawer');
     var img = document.getElementById('m-drawer-img');
     var nameEl = document.getElementById('m-drawer-name');
-    img.src = imgUrl;
+    window.setCardArtSource(img, imgUrl);
     img.alt = name;
     // Blur content-warning art until tapped, matching desktop. Reset the
     // revealed state each open so a fresh card starts blurred again.

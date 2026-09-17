@@ -186,7 +186,7 @@
         </script>
         {{else}}
         <div class="news-table-wrap">
-            <table class="table-data news-table" id="screenerTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
+            <table class="table-data news-table" id="screenerTable" onmouseout="window.setCardArtSource(document.getElementById('hoverImage'),'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                 <thead>
                     <tr>
                         <th class="news-th-card">{{if eq .Screener.SelKind "sealed"}}Products{{else if eq .Screener.SelKind "both"}}Entries{{else}}Card{{end}}</th>
@@ -199,7 +199,7 @@
                 <tbody>
                     {{range $j, $row := .Screener.Rows}}
                         {{$card := (index $.Cards $j)}}
-                        <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                        <tr onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                             <td class="news-td-card">
                                 <div class="news-cc">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 20 "Class" "set-icon"}}

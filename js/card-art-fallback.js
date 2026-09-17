@@ -26,6 +26,16 @@
 // in by adding .card-art to it - nothing else has to change here.
 var CARD_ART_SELECTOR = '#cardImage, #cardImageModalImg, #m-drawer-img, .hoverImage, .m-card-img-landscape, .landing-popular-img, .card-art';
 
+// Reused card-art elements need a fresh fallback guard whenever their source
+// changes. Keeping this beside the error listener gives inline handlers one
+// shared way to make that transition safely.
+function setCardArtSource(img, src) {
+    if (!img) return;
+    delete img.dataset.cardArtFallback;
+    img.src = src;
+}
+window.setCardArtSource = setCardArtSource;
+
 document.addEventListener('error', function (e) {
     var img = e.target;
     if (!(img instanceof HTMLImageElement) || !img.matches(CARD_ART_SELECTOR)) {
