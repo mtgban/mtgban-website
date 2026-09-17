@@ -299,10 +299,15 @@ func authRedirect(state string) string {
 		return "/"
 	}
 
+	// The login templates put only the current path in state. Normalize
+	// backslashes because browsers can treat them as URL separators, then
+	// reject anything that could name another host or scheme.
+	redir = strings.ReplaceAll(redir, `\`, "/")
 	parsed, err := url.Parse(redir)
-	if err != nil {
-		return redir
+	if err != nil || parsed.Hostname() != "" || parsed.Scheme != "" || parsed.Opaque != "" || !strings.HasPrefix(parsed.Path, "/") || strings.HasPrefix(parsed.Path, "//") {
+		return "/"
 	}
+
 	query := parsed.Query()
 	query.Del("errmsg")
 	parsed.RawQuery = query.Encode()
