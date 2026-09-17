@@ -1924,6 +1924,79 @@ func numberSeedUUIDs(filters []FilterElem) ([]string, bool) {
 	return nil, false
 }
 
+// storeSeedUUIDs returns the uuids a plain store:/seller:/vendor: query
+// names, and whether one did. That filter ("vendor:TEST") is a PostFilter,
+// not a CardFilter - shouldSkipPostNG only runs once every store's pricing
+// for a candidate has already been fetched, well after this function
+// returns - so on its own it bounds nothing at this stage the way an edition
+// or number filter does. Without a seed here, the empty-query fallback below
+// degrades to the whole datastore, and every card in it gets a full pass
+// over every loaded scraper only to be thrown away later by the very filter
+// that could have picked its candidates directly to begin with.
+//
+// The first store-naming ("any") PostFilter present seeds. Other
+// PostFilters can ride alongside it - an automatic "hide empty" from qty>
+// or skip:empty, or a second store filter from seller:/vendor: combined -
+// and still run later via PostSearchFilter exactly as they would have
+// without this seed; this only needs a pool guaranteed to contain the final
+// answer, not the smallest one a second filter could in principle produce.
+// Disqualified the same way a number filter is when negated: -vendor:TEST
+// names what a card must not have among possibly many others it does, which
+// is not a set this can name by enumerating one store's keys - and a
+// negated store filter carries no Values to enumerate regardless.
+func storeSeedUUIDs(config SearchConfig) ([]string, bool) {
+	var f *FilterPostElem
+	for i := range config.PostFilters {
+		if config.PostFilters[i].Name == "any" && len(config.PostFilters[i].Values) > 0 {
+			f = &config.PostFilters[i]
+			break
+		}
+	}
+	if f == nil {
+		return nil, false
+	}
+
+	// Callers only reach this for card-scoped modes (see searchAndFilter),
+	// so a sealed listing - most stores carry only one or the other, but
+	// nothing here can assume that of an arbitrary shorthand - is dropped
+	// rather than handed to a mode that otherwise never returns one.
+	var uuids []string
+	addCard := func(cardID string) {
+		co, err := mtgmatcher.GetUUID(cardID)
+		if err != nil || co.Sealed {
+			return
+		}
+		uuids = append(uuids, cardID)
+	}
+	if !f.OnlyForVendor {
+		for _, seller := range GetSellers() {
+			if !slices.Contains(f.Values, strings.ToLower(seller.Info().Shorthand)) {
+				continue
+			}
+			for cardID := range seller.Inventory() {
+				addCard(cardID)
+			}
+		}
+	}
+	if !f.OnlyForSeller {
+		for _, vendor := range GetVendors() {
+			if !slices.Contains(f.Values, strings.ToLower(vendor.Info().Shorthand)) {
+				continue
+			}
+			for cardID := range vendor.Buylist() {
+				addCard(cardID)
+			}
+		}
+	}
+	// A store filter is applicable the moment it names a shorthand to seed
+	// from, whether or not that shorthand turns out to match a registered
+	// scraper or carry the requested card: same principle as the edition and
+	// number seeds above, seeded-but-empty answers "found nothing" directly
+	// rather than falling back to the whole pool to rediscover the same
+	// emptiness the slow way.
+	return dedupeKeys(uuids), true
+}
+
 func searchAndFilter(config SearchConfig) ([]string, error) {
 	query := config.CleanQuery
 	filters := config.CardFilters
@@ -1962,6 +2035,21 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			switch config.SearchMode {
 			case "", "prefix", "any":
 				uuids, seeded = numberSeedUUIDs(filters)
+			}
+		}
+		// A plain store:/seller:/vendor: query names its own exact result
+		// set the same way. Kept to the same modes as the number seed above:
+		// a store's inventory can hold sealed products and cards both (a
+		// store dealing in both normally registers as two scrapers, one per
+		// SealedMode, but nothing here can assume that of an arbitrary
+		// shorthand), and only these modes already mean "cards, not sealed
+		// product listings" on their own - seeding them here keeps that
+		// scoping rather than handing the sealed page a card row or a
+		// regular search a sealed one.
+		if !seeded {
+			switch config.SearchMode {
+			case "", "prefix", "any":
+				uuids, seeded = storeSeedUUIDs(config)
 			}
 		}
 	}
