@@ -112,9 +112,15 @@ func getUserTier(ctx context.Context, client *patreon.Client, userID string) (st
 	return tierTitle, nil
 }
 
-// Retrieve the main url, mostly for Patron auth -- we can't use the one provided
-// by the url since it can be relative and thus empty
-func getServerURL(r *http.Request) string {
+// requestOrigin returns the public origin for this request. The proxy must
+// overwrite the forwarded headers before they reach the application; the
+// hostname check prevents an arbitrary Host value from becoming a redirect or
+// OAuth target.
+func requestOrigin(r *http.Request) string {
+	if r == nil {
+		return DefaultServerURL
+	}
+
 	scheme := r.Header.Get("X-Forwarded-Proto")
 	if scheme == "" {
 		scheme = "http"
@@ -122,10 +128,16 @@ func getServerURL(r *http.Request) string {
 			scheme = "https"
 		}
 	}
+	if scheme != "http" && scheme != "https" {
+		return ""
+	}
 
 	host := r.Header.Get("X-Forwarded-Host")
 	if host == "" {
 		host = r.Host
+	}
+	if !trustedHostname(host) {
+		return ""
 	}
 
 	return scheme + "://" + host
@@ -141,31 +153,16 @@ func trustedHostname(host string) bool {
 	return name == "localhost" || name == "mtgban.com" || strings.HasSuffix(name, ".mtgban.com")
 }
 
-// initServerURL latches the external ServerURL from the first request on a host
-// we trust — localhost in dev, any *.mtgban.com in production. Requests on any
-// other host are ignored, notably the raw *.ondigitalocean.app app URL that a
-// platform health check hits before any custom-domain traffic: latching that
-// would pin ServerURL to a hostname that isn't a registered Patreon redirect
-// target and then leak into every redirect, embed, and OAuth link.
-func initServerURL(r *http.Request) {
-	if ServerURL != "" {
-		return
-	}
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
-	}
-	if !trustedHostname(host) {
-		return
-	}
-	ServerURL = getServerURL(r)
-	log.Println("Setting server URL as", ServerURL)
-}
-
 func Auth(w http.ResponseWriter, r *http.Request) {
+	origin := requestOrigin(r)
+	if origin == "" {
+		http.Error(w, "invalid host", http.StatusBadRequest)
+		return
+	}
+
 	code := r.FormValue("code")
 	if code == "" {
-		http.Redirect(w, r, ServerURL, http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
@@ -173,10 +170,10 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	source := Config.Patreon.Source
 	clientID := Config.Patreon.Client[source]
 	secret := Config.Patreon.Secret[source]
-	tokens, err := patreon.GetAuthToken(r.Context(), clientID, secret, ServerURL, code)
+	tokens, err := patreon.GetAuthToken(r.Context(), clientID, secret, origin, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
-		http.Redirect(w, r, ServerURL+"?errmsg=TokenNotFound", http.StatusFound)
+		http.Redirect(w, r, "/?errmsg=TokenNotFound", http.StatusFound)
 		return
 	}
 
@@ -187,7 +184,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	userData, err := getUserIDs(r.Context(), client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
-		http.Redirect(w, r, ServerURL+"?errmsg=UserNotFound", http.StatusFound)
+		http.Redirect(w, r, "/?errmsg=UserNotFound", http.StatusFound)
 		return
 	}
 
@@ -224,7 +221,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	// Handle error
 	if tierTitle == "" {
 		LogPages["Admin"].Println("getUserTier returned an empty tier")
-		http.Redirect(w, r, ServerURL+"?errmsg=TierNotFound", http.StatusFound)
+		http.Redirect(w, r, "/?errmsg=TierNotFound", http.StatusFound)
 		return
 	}
 
@@ -235,14 +232,14 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	sig := sign(tierTitle, userData, overrides)
 
 	// Keep it secret. Keep it safe.
-	putSignatureInCookies(w, sig)
+	putSignatureInCookies(w, r, sig)
 
 	// Redirect to the URL indicated in this query param, or go to homepage
 	redir := strings.Split(r.FormValue("state"), ";")[0]
 
 	// Go back home if empty or if coming back from a logout
 	if redir == "" || strings.Contains(redir, "errmsg=logout") {
-		redir = ServerURL
+		redir = "/"
 	}
 
 	// Redirect, we're done here
@@ -303,10 +300,7 @@ func signedUserEmail(r *http.Request) string {
 		}
 	}
 
-	link := DefaultServerURL
-	if !strings.HasSuffix(ServerURL, "mtgban.com") {
-		link = "http://localhost:" + fmt.Sprint(Config.Port)
-	}
+	link := signatureLink()
 	exp := v.Get("Expires")
 	data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
 	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
@@ -318,9 +312,9 @@ func signedUserEmail(r *http.Request) string {
 }
 
 // Put signature in cookies for one month, all domains can access this
-func putSignatureInCookies(w http.ResponseWriter, sig string) {
+func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
-	setCookie(w, "MTGBAN", sig, oneMonth, true)
+	setCookie(w, r, "MTGBAN", sig, oneMonth, true)
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
@@ -345,11 +339,9 @@ func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		initServerURL(r)
-
 		querySig := r.FormValue("sig")
 		if querySig != "" {
-			putSignatureInCookies(w, querySig)
+			putSignatureInCookies(w, r, querySig)
 		}
 
 		next.ServeHTTP(w, r)
@@ -359,8 +351,6 @@ func noSigning(next http.Handler) http.Handler {
 func enforceAPISigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
-
-		initServerURL(r)
 
 		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
 
@@ -415,11 +405,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			secret = userSecret
 		}
 
-		link := apisig.DefaultLink
-		if !strings.HasSuffix(ServerURL, "mtgban.com") {
-			link = "http://localhost:" + fmt.Sprint(Config.Port)
-		}
-		err = apisig.Verify([]byte(secret), r.Method, link, v, OptionalFields, time.Now())
+		err = apisig.Verify([]byte(secret), r.Method, signatureLink(), v, OptionalFields, time.Now())
 		if SigCheck && err != nil {
 			log.Println("API error, invalid", v.Get("UserEmail"), err)
 			w.Write([]byte(`{"error": "invalid or expired signature"}`))
@@ -454,8 +440,6 @@ func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		initServerURL(r)
-
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := ACL()["Any"]
 		if checkNoAuth {
@@ -478,7 +462,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		querySig := r.FormValue("sig")
 		if querySig != "" {
 			sig = querySig
-			putSignatureInCookies(w, querySig)
+			putSignatureInCookies(w, r, querySig)
 		}
 
 		switch r.Method {
@@ -503,7 +487,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		// happy path — nearly every request — it would be thrown away, and
 		// the handler builds its own right after.
 		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
-			pageVars := genPageNav("Error", sig)
+			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
 
@@ -513,7 +497,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
-			pageVars := genPageNav("Error", sig)
+			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -526,7 +510,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		v, err := url.ParseQuery(string(raw))
 		if SigCheck && err != nil {
-			pageVars := genPageNav("Error", sig)
+			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -548,10 +532,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		expectedSig := v.Get("Signature")
 		exp := v.Get("Expires")
 
-		link := DefaultServerURL
-		if !strings.HasSuffix(ServerURL, "mtgban.com") {
-			link = "http://localhost:" + fmt.Sprint(Config.Port)
-		}
+		link := signatureLink()
 		data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
 		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 		expires, err := strconv.ParseInt(exp, 10, 64)
@@ -560,7 +541,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
 			}
-			pageVars := genPageNav("Error", sig)
+			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if valid == expectedSig && expires < time.Now().Unix() {
@@ -592,7 +573,7 @@ func enforceSigning(next http.Handler) http.Handler {
 					canDo = true
 				}
 				if SigCheck && !canDo {
-					pageVars := genPageNav(nav.Name, sig)
+					pageVars := genPageNav(r, nav.Name, sig)
 					pageVars.Title = "This feature is BANned"
 					pageVars.ErrorMessage = ErrMsgPlus
 
@@ -603,7 +584,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				// A section hidden from the nav is not reachable by typing its
 				// url either, the same as its subpages below.
 				if nav.ShouldHide != nil && nav.ShouldHide() {
-					pageVars := genPageNav("Error", sig)
+					pageVars := genPageNav(r, "Error", sig)
 					pageVars.Title = "Unauthorized"
 					render(w, "home.html", pageVars)
 					return
@@ -613,7 +594,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				for _, subPage := range nav.SubPages {
 					if targetsSubPage(r, subPage.Link) &&
 						subPage.ShouldHide != nil && subPage.ShouldHide() {
-						pageVars := genPageNav("Error", sig)
+						pageVars := genPageNav(r, "Error", sig)
 						pageVars.Title = "Unauthorized"
 						render(w, "home.html", pageVars)
 						return
@@ -694,6 +675,16 @@ func getValuesForTier(tierTitle string) url.Values {
 // signing and verification paths walk is computed once instead of per request.
 var SignedFields = slices.Concat(OrderNav, OptionalFields)
 
+// signatureLink is the identity covered by a signed link. It is deliberately
+// independent of the request origin: production callers sign for the public
+// API identity, while local development keeps the historical localhost link.
+func signatureLink() string {
+	if DevMode {
+		return "http://localhost:" + fmt.Sprint(Config.Port)
+	}
+	return DefaultServerURL
+}
+
 // sign encodes tierTitle's ACL values into a signature, with overrides -
 // a grant's own values for this one user - layered on top afterward so
 // they win over anything the tier itself set.
@@ -706,11 +697,7 @@ func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[
 		v.Set("UserTier", tierTitle)
 	}
 
-	// This is constant or localhost for legacy reason
-	link := DefaultServerURL
-	if !strings.HasSuffix(ServerURL, "mtgban.com") {
-		link = "http://localhost:" + fmt.Sprint(Config.Port)
-	}
+	link := signatureLink()
 	expires := time.Now().Add(DefaultSignatureDuration)
 	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
 	key := os.Getenv("BAN_SECRET")

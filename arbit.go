@@ -407,7 +407,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	if reverse {
 		pageName = "Reverse"
 	}
-	pageVars := genPageNav(pageName, sig)
+	pageVars := genPageNav(r, pageName, sig)
 	pageVars.ReverseMode = reverse
 
 	var anyOptionEnabled bool
@@ -480,7 +480,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 func Global(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav("Global", sig)
+	pageVars := genPageNav(r, "Global", sig)
 	pageVars.GlobalMode = true
 
 	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")

@@ -317,7 +317,7 @@ func keepInOrder(all, enabled []string) []string {
 func Upload(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav("Upload", sig)
+	pageVars := genPageNav(r, "Upload", sig)
 
 	// Maximum form size. ParseForm is run first and on its own so that its
 	// error survives: ParseMultipartForm returns "not multipart" for a form
@@ -566,8 +566,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if r.Form.Has("index_pref") {
 		enabledIndexes = r.Form["index_stores"]
 		enabledSealedIndexes = r.Form["sealed_index_stores"]
-		setForeverCookie(w, "enabledIndexes", strings.Join(enabledIndexes, "|"))
-		setForeverCookie(w, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
+		setForeverCookie(w, r, "enabledIndexes", strings.Join(enabledIndexes, "|"))
+		setForeverCookie(w, r, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
 	} else {
 		if raw := readCookie(r, "enabledIndexes"); raw != "" {
 			enabledIndexes = strings.Split(raw, "|")
@@ -708,19 +708,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Reset the cookie for this preference
 	if len(hashes) == 0 && cachedGdocURL != gdocURL {
-		setForeverCookie(w, "gdocURL", gdocURL)
+		setForeverCookie(w, r, "gdocURL", gdocURL)
 		pageVars.RemoteLinkURL = gdocURL
 	}
 
 	// Save user preferred stores in cookies and make sure the page is updated with those
 	if blMode {
-		setForeverCookie(w, "enabledVendors", strings.Join(enabledStores, "|"))
-		setForeverCookie(w, "enabledSealedVendors", strings.Join(enabledSealedStores, "|"))
+		setForeverCookie(w, r, "enabledVendors", strings.Join(enabledStores, "|"))
+		setForeverCookie(w, r, "enabledSealedVendors", strings.Join(enabledSealedStores, "|"))
 		pageVars.EnabledVendors = enabledStores
 		pageVars.EnabledSealedVendors = enabledSealedStores
 	} else {
-		setForeverCookie(w, "enabledSellers", strings.Join(enabledStores, "|"))
-		setForeverCookie(w, "enabledSealedSellers", strings.Join(enabledSealedStores, "|"))
+		setForeverCookie(w, r, "enabledSellers", strings.Join(enabledStores, "|"))
+		setForeverCookie(w, r, "enabledSealedSellers", strings.Join(enabledSealedStores, "|"))
 		pageVars.EnabledSellers = enabledStores
 		pageVars.EnabledSealedSellers = enabledSealedStores
 	}

@@ -520,7 +520,7 @@ func atoiDefault(s string, def int) int {
 func Screener(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav("Screener", sig)
+	pageVars := genPageNav(r, "Screener", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

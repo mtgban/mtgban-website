@@ -1093,7 +1093,7 @@ var BucketNames = []string{
 func Newspaper(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav("Newspaper", sig)
+	pageVars := genPageNav(r, "Newspaper", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

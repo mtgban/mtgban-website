@@ -149,15 +149,21 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 }
 
 // externalURL is the origin this site is reachable at: what an oEmbed
-// consumer records as the provider, and what an embed's price links point
-// at. ServerURL is latched from the first request on a host we trust, so it
-// can still be empty behind one we do not - and a bot message can go out
-// before any request has come in at all.
-func externalURL() string {
-	if ServerURL != "" {
-		return ServerURL
+// consumer records as the provider, and what an embed's price links point at.
+// Background work has no request from which to derive an origin, so it uses
+// the public default; HTTP handlers pass their request through here.
+func externalURL(r *http.Request) string {
+	if origin := requestOrigin(r); origin != "" {
+		return origin
 	}
-	return "https://mtgban.com"
+	return DefaultServerURL
+}
+
+func absoluteURL(r *http.Request, path string) string {
+	if origin := requestOrigin(r); origin != "" {
+		return origin + path
+	}
+	return path
 }
 
 // oembedError answers an oEmbed request with a status and nothing else. The
