@@ -61,8 +61,7 @@ output, not a claim written here.
 
 - Config files (`config.json`, `config-beta.json`, `config-lite.json`,
   `config-lorcana.json`) and all `*.json` are **gitignored** except the
-  exemptions listed in `.gitignore` (the offline fixtures and
-  `catalog/catalog.json`) — do not commit them, and do not commit
+  exemptions listed in `.gitignore` — do not commit them, and do not commit
   `client_secret.json` / `google_client_secret.json`. Verify with
   `git status` before any commit.
 - `BAN_SECRET` (env var) keys the HMAC signing; `BAN_CONFIG_PATH` sets the
