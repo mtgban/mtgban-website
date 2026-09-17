@@ -141,6 +141,9 @@ func requestOrigin(r *http.Request) string {
 }
 
 func firstForwardedValue(value string) string {
+	// The edge must strip/overwrite client-supplied values, or prepend its own
+	// value. An edge that appends instead leaves the client in control of the
+	// first hop, so that proxy contract must be enforced outside the app.
 	if comma := strings.IndexByte(value, ','); comma >= 0 {
 		value = value[:comma]
 	}
