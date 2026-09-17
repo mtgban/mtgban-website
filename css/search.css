@@ -1925,8 +1925,8 @@ body.modal-embed .cp-overlay {
     box-sizing: border-box;
     min-height: 3em;
 }
-/* Crop art background */
-.landing-pane-recent .landing-item.has-crop {
+/* Art background */
+.landing-pane-recent .landing-item.has-background {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -1934,34 +1934,37 @@ body.modal-embed .cp-overlay {
     overflow: hidden;
     border-bottom: none;
 }
-.landing-pane-recent .landing-item.has-crop::before {
+.landing-pane-recent .landing-item.has-image {
+    background-position: top center;
+}
+.landing-pane-recent .landing-item.has-background::before {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 0;
     pointer-events: none;
 }
-.dark-theme .landing-pane-recent .landing-item.has-crop::before {
+.dark-theme .landing-pane-recent .landing-item.has-background::before {
     background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 80%, transparent 100%);
 }
-.light-theme .landing-pane-recent .landing-item.has-crop::before {
+.light-theme .landing-pane-recent .landing-item.has-background::before {
     background: linear-gradient(to right, rgba(255,255,255,0.93) 0%, rgba(255,255,255,0.75) 60%, rgba(255,255,255,0.4) 85%, transparent 100%);
 }
-.landing-pane-recent .landing-item.has-crop > .landing-item-info,
-.landing-pane-recent .landing-item.has-crop > .landing-item-thumb {
+.landing-pane-recent .landing-item.has-background > .landing-item-info,
+.landing-pane-recent .landing-item.has-background > .landing-item-thumb {
     position: relative;
     z-index: 1;
 }
-.dark-theme .landing-pane-recent .landing-item.has-crop .landing-item-info {
+.dark-theme .landing-pane-recent .landing-item.has-background .landing-item-info {
     text-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
-.dark-theme .landing-pane-recent .landing-item.has-crop .landing-item-query {
+.dark-theme .landing-pane-recent .landing-item.has-background .landing-item-query {
     color: #fff;
 }
-.light-theme .landing-pane-recent .landing-item.has-crop .landing-item-info {
+.light-theme .landing-pane-recent .landing-item.has-background .landing-item-info {
     text-shadow: 0 1px 3px rgba(255,255,255,0.4);
 }
-.light-theme .landing-pane-recent .landing-item.has-crop .landing-item-query {
+.light-theme .landing-pane-recent .landing-item.has-background .landing-item-query {
     color: #111;
 }
 /* Pin/delete buttons */
@@ -2001,14 +2004,14 @@ body.modal-embed .cp-overlay {
 .landing-pane-recent .landing-item-thumb i.ss {
     font-size: 1.5em;
 }
-/* Alternating/hover/pinned for non-crop entries */
-.landing-pane-recent .landing-item:nth-child(even):not(.has-crop) {
+/* Alternating/hover/pinned for entries without art */
+.landing-pane-recent .landing-item:nth-child(even):not(.has-background) {
     background-color: var(--row-odd);
 }
-.landing-pane-recent .landing-item:not(.has-crop):hover {
+.landing-pane-recent .landing-item:not(.has-background):hover {
     background-color: var(--row-hover);
 }
-.landing-pane-recent .landing-item:has(.landing-item-pin.pinned):not(.has-crop) {
+.landing-pane-recent .landing-item:has(.landing-item-pin.pinned):not(.has-background) {
     background-color: var(--surface-3);
 }
 

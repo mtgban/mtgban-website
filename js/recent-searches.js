@@ -206,15 +206,20 @@
                 // falling back to the oversized thumbnail row. The first
                 // result image is still useful background art for searches
                 // whose result has no crop URL (for example a product query).
-                var cropSrc = s.crop || s.img || '';
+                var cropSrc = httpURL(s.crop || '');
+                var imageSrc = httpURL(s.img || '');
+                // Content-warning images stay in the gated thumbnail path
+                // unless a real crop is available, as with existing crops.
+                var backgroundSrc = cropSrc || (!s.cw ? imageSrc : '');
+                var backgroundClass = backgroundSrc ? ' has-background' + (cropSrc ? ' has-crop' : ' has-image') : '';
                 var token = parseSetToken(s.q);
-                html += '<a class="landing-item landing-item-recent' + (cropSrc ? ' has-crop' : '') + '"' + (cropSrc ? ' style="background-image:url(\'' + escapeAttr(cropSrc) + '\')"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
-                if (!cropSrc) {
+                html += '<a class="landing-item landing-item-recent' + backgroundClass + '"' + (backgroundSrc ? ' style="background-image:url(&quot;' + escapeAttr(backgroundSrc) + '&quot;)"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
+                if (!backgroundSrc) {
                     html += '<div class="landing-item-thumb">';
                     if (token.keyrune) {
                         html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
-                    } else if (s.img) {
-                        html += thumbHtml(s.img, s.foil, s.cw);
+                    } else if (imageSrc) {
+                        html += thumbHtml(imageSrc, s.foil, s.cw);
                     } else {
                         html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
                     }
