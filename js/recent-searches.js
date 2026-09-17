@@ -3,6 +3,7 @@
     var STORAGE_KEY = 'mtgban_recent_searches';
     var PENDING_KEY = 'mtgban_pending_search'; // sessionStorage: query awaiting its answer
     var MAX_ENTRIES = 15;
+    var ART_REFRESH_CONCURRENCY = 3;
     var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     var TOMB_CAP = 50;
     function isLive(s) { return !s.del; }
@@ -319,24 +320,10 @@
         addSearch(q, answer.label, answer.url);
     }
 
-    function captureFirstResultImage() {
-        var params = new URLSearchParams(window.location.search);
-        var q = (params.get('q') || '').trim();
-        if (!q) return;
-
-        var firstRow = document.querySelector('.result-header[data-image-url], .m-card-header[data-image-url]');
-        if (!firstRow) return;
-
-        var img = firstRow.getAttribute('data-image-url');
-        if (!img) return;
-
-        var finishClass = firstRow.getAttribute('data-finish-class') || '';
-        var foil = finishClass === 'foil' || finishClass === 'altfoil';
-        var cw = firstRow.getAttribute('data-has-warning') === 'true';
-        var crop = firstRow.getAttribute('data-crop-url') || '';
-
+    function saveResultArt(query, img, crop, foil, cw) {
+        if (!query || !img) return false;
         var searches = getRecentSearches();
-        var qLower = q.toLowerCase();
+        var qLower = query.toLowerCase();
         var changed = false;
         for (var i = 0; i < searches.length; i++) {
             if (searches[i].q.toLowerCase() === qLower && !searches[i].del) {
@@ -357,6 +344,70 @@
             }
         }
         if (changed) saveRecentSearches(searches);
+        return changed;
+    }
+
+    function captureFirstResultImage() {
+        var params = new URLSearchParams(window.location.search);
+        var q = (params.get('q') || '').trim();
+        if (!q) return;
+
+        var firstRow = document.querySelector('.result-header[data-image-url], .m-card-header[data-image-url]');
+        if (!firstRow) return;
+
+        var img = firstRow.getAttribute('data-image-url');
+        if (!img) return;
+
+        var finishClass = firstRow.getAttribute('data-finish-class') || '';
+        var foil = finishClass === 'foil' || finishClass === 'altfoil';
+        var cw = firstRow.getAttribute('data-has-warning') === 'true';
+        var crop = firstRow.getAttribute('data-crop-url') || '';
+        saveResultArt(q, img, crop, foil, cw);
+    }
+
+    // A new browser can receive the recent-search list through user-state sync
+    // before it has visited any of the result pages that provide card art. Fill
+    // those local-only gaps in the background, without delaying the landing
+    // page or sending the art back over the sync wire.
+    function refreshMissingArt() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('q') || typeof fetch !== 'function' || typeof DOMParser === 'undefined') return;
+
+        var searches = getLiveSearches().filter(function(s) {
+            return !s.img && !s.crop;
+        });
+        if (!searches.length) return;
+
+        var next = 0;
+        var changed = false;
+        function refreshOne() {
+            if (next >= searches.length) return Promise.resolve();
+            var search = searches[next++];
+            return fetch(entryHref(search), { credentials: 'same-origin' })
+                .then(function(response) { return response.ok ? response.text() : ''; })
+                .then(function(markup) {
+                    if (!markup) return;
+                    var doc = new DOMParser().parseFromString(markup, 'text/html');
+                    var firstRow = doc.querySelector('.result-header[data-image-url], .m-card-header[data-image-url]');
+                    if (!firstRow) return;
+
+                    var img = firstRow.getAttribute('data-image-url') || '';
+                    var crop = firstRow.getAttribute('data-crop-url') || '';
+                    var finishClass = firstRow.getAttribute('data-finish-class') || '';
+                    var foil = finishClass === 'foil' || finishClass === 'altfoil';
+                    var cw = firstRow.getAttribute('data-has-warning') === 'true';
+                    changed = saveResultArt(search.q, img, crop, foil, cw) || changed;
+                })
+                .catch(function() {})
+                .then(refreshOne);
+        }
+
+        var workers = [];
+        var workerCount = Math.min(ART_REFRESH_CONCURRENCY, searches.length);
+        for (var i = 0; i < workerCount; i++) workers.push(refreshOne());
+        Promise.all(workers).then(function() {
+            if (changed) renderRecentSearches();
+        });
     }
 
     // Expose clear function globally for onclick handler
@@ -368,6 +419,7 @@
         recordPendingSearch();
         captureFirstResultImage();
         renderRecentSearches();
+        refreshMissingArt();
     }
 
     if (document.readyState === 'loading') {
@@ -380,6 +432,7 @@
     window.addEventListener('pageshow', function(e) {
         if (e.persisted) {
             renderRecentSearches();
+            refreshMissingArt();
         }
     });
 })();
