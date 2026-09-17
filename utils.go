@@ -1315,13 +1315,37 @@ func readCookie(r *http.Request, cookieName string) string {
 	return cookie.Value
 }
 
+func searchListCookieName(cookieName string, sealed bool) string {
+	if !sealed {
+		return cookieName
+	}
+	switch cookieName {
+	case "SearchSellersList":
+		return "SearchSealedSellersList"
+	case "SearchVendorsList":
+		return "SearchSealedVendorsList"
+	default:
+		return cookieName
+	}
+}
+
+func readSearchListCookie(r *http.Request, cookieName string, sealed bool) string {
+	value := readCookie(r, searchListCookieName(cookieName, sealed))
+	if value == "" && sealed {
+		// The old root-scoped list remains a useful default for sealed results
+		// until the user saves an independent sealed preference.
+		value = readCookie(r, cookieName)
+	}
+	return value
+}
+
 // There is no forever in cookies, so pick a really large interval
 func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
 	setCookie(w, r, cookieName, value, tenYears, false)
 }
 
-// Set a cookie in the response with no expiration at the default root
+// Set a cookie in the response with no expiration at its configured path.
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
 	origin := requestOrigin(r)
 	u, err := url.Parse(origin)
@@ -1416,14 +1440,14 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 
 // getSearchBlocklists combines the signature/config policy with the
 // per-browser store preferences used by search and its price surfaces.
-func getSearchBlocklists(r *http.Request, sig string) ([]string, []string, bool) {
+func getSearchBlocklists(r *http.Request, sig string, sealed bool) ([]string, []string, bool) {
 	retail, buylist := getDefaultBlocklists(sig)
 	personalized := sig != ""
-	if stores := readCookie(r, "SearchSellersList"); stores != "" {
+	if stores := readSearchListCookie(r, "SearchSellersList", sealed); stores != "" {
 		retail = appendNonEmptyCSV(retail, stores)
 		personalized = true
 	}
-	if stores := readCookie(r, "SearchVendorsList"); stores != "" {
+	if stores := readSearchListCookie(r, "SearchVendorsList", sealed); stores != "" {
 		buylist = appendNonEmptyCSV(buylist, stores)
 		personalized = true
 	}

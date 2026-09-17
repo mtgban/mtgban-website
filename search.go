@@ -441,6 +441,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(r, "Search", sig)
 	pageVars.IsMobile = isMobileRequest(r)
+	pageVars.IsSealed = r.URL.Path == "/sealed"
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
@@ -450,7 +451,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
 	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
 
-	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
+	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig, pageVars.IsSealed)
 
 	query := strings.TrimSpace(r.FormValue("q"))
 	scope := searchScope(w, r)
@@ -495,7 +496,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
 	if query == "" {
 		pageVars.PromoTags = backend().AllPromoTypes

@@ -695,21 +695,21 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
-
-	// Expand blocklist as needed
-	skipSellersOpt := readCookie(r, "SearchSellersList")
-	if skipSellersOpt != "" {
-		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
-	}
-	skipVendorsOpt := readCookie(r, "SearchVendorsList")
-	if skipVendorsOpt != "" {
-		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
-	}
-
 	isRetail := strings.Contains(r.URL.Path, "/retail/")
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
+
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+
+	// Expand blocklist as needed
+	skipSellersOpt := readSearchListCookie(r, "SearchSellersList", isSealed)
+	if skipSellersOpt != "" {
+		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
+	}
+	skipVendorsOpt := readSearchListCookie(r, "SearchVendorsList", isSealed)
+	if skipVendorsOpt != "" {
+		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
+	}
 
 	query := path.Base(r.URL.Path)
 	query = strings.TrimSuffix(query, ".json")

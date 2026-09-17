@@ -11,7 +11,7 @@ func TestGetSearchBlocklists(t *testing.T) {
 	r.Header.Set("Cookie", "SearchSellersList=TCGMarket,SCG,; SearchVendorsList=CK,")
 
 	sig := base64.StdEncoding.EncodeToString([]byte("SearchDisabled=CONFIG_SELLER&SearchBuylistDisabled=CONFIG_VENDOR"))
-	retail, buylist, personalized := getSearchBlocklists(r, sig)
+	retail, buylist, personalized := getSearchBlocklists(r, sig, false)
 
 	if got, want := retail, []string{"CONFIG_SELLER", "TCGMarket", "SCG"}; !equalStrings(got, want) {
 		t.Errorf("retail blocklist = %#v, want %#v", got, want)

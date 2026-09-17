@@ -25,7 +25,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sig := getSignatureFromCookies(r)
-	blocklistRetail, blocklistBuylist, personalized := getSearchBlocklists(r, sig)
+	blocklistRetail, blocklistBuylist, personalized := getSearchBlocklists(r, sig, false)
 
 	idsParam := r.FormValue("ids")
 	if idsParam == "" {
