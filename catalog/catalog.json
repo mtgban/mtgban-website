@@ -1,0 +1,49 @@
+{
+  "currency": "usd",
+  "packages": [
+    {
+      "key": "starter",
+      "name": "TCGplayer plus one store",
+      "monthly": 20000,
+      "store_scope": "explicit",
+      "included_stores": 1,
+      "modes": ["retail", "buylist"]
+    },
+    {
+      "key": "all_stores",
+      "name": "All EU/US stores, no sealed",
+      "monthly": 50000,
+      "store_scope": "BASE_ACCESS",
+      "included_stores": 0,
+      "modes": ["retail", "buylist"]
+    },
+    {
+      "key": "all_data",
+      "name": "All data",
+      "monthly": 80000,
+      "store_scope": "ALL_ACCESS",
+      "included_stores": 0,
+      "modes": ["retail", "buylist", "sealed"]
+    }
+  ],
+  "addons": [
+    {
+      "key": "extra_store",
+      "name": "Additional store",
+      "monthly": 15000,
+      "applies_to": ["starter"]
+    },
+    {
+      "key": "extra_game",
+      "name": "Additional game",
+      "monthly": 15000,
+      "applies_to": ["starter", "all_stores", "all_data"]
+    }
+  ],
+  "intervals": [
+    { "key": "monthly", "interval": "month", "count": 1, "public": true },
+    { "key": "quarterly", "interval": "month", "count": 3, "public": false }
+  ],
+  "included_games": ["magic"],
+  "selectable_stores": ["CK", "SCG", "CSI", "ABU", "MKM", "CT"]
+}
