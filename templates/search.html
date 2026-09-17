@@ -439,8 +439,7 @@
                     var img = document.getElementById('cardImage');
                     // The sidebar image is reused across hover targets; let a
                     // newly assigned source trigger the fallback independently.
-                    delete img.dataset.cardArtFallback;
-                    img.src = src;
+                    window.setCardArtSource(img, src);
                     // The image height feeds the space measurement but only
                     // settles on load; resizes move the 52vh cap too.
                     if (!img.__setValueHooked) {
@@ -1680,7 +1679,7 @@
         // origin it cannot have.
         var url = httpURL(header.getAttribute('data-image-url'));
         if (!url) return;
-        document.getElementById('cardImageModalImg').src = url;
+        window.setCardArtSource(document.getElementById('cardImageModalImg'), url);
         document.getElementById('cardImageModal').classList.add('open');
     }
     function hideCardImage() {

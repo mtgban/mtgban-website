@@ -436,7 +436,7 @@
             </div>
 
             <div class="arb-table-wrap">
-            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
+            <table class="table-data arb-table filterable" onmouseout="window.setCardArtSource(document.getElementById('hoverImage'),'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
@@ -489,7 +489,7 @@
                 {{$arbitContainer := .}}
                 {{range .Arbit}}
                     {{$card := (index $.Metadata .CardID)}}
-                    <tr data-arb-id="{{.CardID}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardID}}" data-arb-tcgid="{{uuid2tcgid .CardID}}" onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                    <tr data-arb-id="{{.CardID}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardID}}" data-arb-tcgid="{{uuid2tcgid .CardID}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'{{$card.ImageURL}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 24 "Class" "set-icon"}}
