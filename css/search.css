@@ -1922,13 +1922,15 @@ body.modal-embed .cp-overlay {
     gap: 0.6em;
     padding: 0.7em 0.7em;
     position: relative;
+    box-sizing: border-box;
+    min-height: 3em;
 }
 /* Crop art background */
 .landing-pane-recent .landing-item.has-crop {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    padding: 1em 0.7em;
+    padding: 0.7em 0.7em;
     overflow: hidden;
     border-bottom: none;
 }
@@ -1993,11 +1995,11 @@ body.modal-embed .cp-overlay {
 /* Fallback thumbnail (no crop) */
 .landing-pane-recent .landing-item-thumb {
     width: 4em;
-    height: 2.8em;
+    height: 1.5em;
     border-radius: 3px;
 }
 .landing-pane-recent .landing-item-thumb i.ss {
-    font-size: 1.8em;
+    font-size: 1.5em;
 }
 /* Alternating/hover/pinned for non-crop entries */
 .landing-pane-recent .landing-item:nth-child(even):not(.has-crop) {
