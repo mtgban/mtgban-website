@@ -90,7 +90,7 @@
         <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
                value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
                maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
-        <button class="m-scope-clear" id="nav-scope-clear" type="button" aria-label="Clear pinned filters"><i data-lucide="x"></i></button>
+        <button class="m-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters and close the bar" aria-label="Clear pinned filters and close the bar">CLEAR</button>
     </div>
     <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
     {{end}}
@@ -184,11 +184,24 @@
         <div class="m-search-wrap">
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                 <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="{{if not .IsMultiChart}}{{.SearchQuery}}{{end}}" maxlength="1000" autocapitalize="none" autocorrect="off" spellcheck="false">
+                {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}">{{end}}
             </form>
             <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+            {{if .CanScope}}
+            <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
+            {{end}}
             <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
             <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
         </div>
+        {{if .CanScope}}
+        <div class="m-scope-row" id="nav-scope">
+            <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+                   value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
+                   maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+            <button class="m-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters and close the bar" aria-label="Clear pinned filters and close the bar">CLEAR</button>
+        </div>
+        <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
+        {{end}}
     </div>
 
     {{/* Toast notification */}}

@@ -564,8 +564,15 @@ body.has-scope .m-scope-row {
 .m-scope-clear {
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    width: 30px; height: 30px;
-    border: none; border-radius: var(--radius-sm, 8px);
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    border-radius: var(--radius-sm, 8px);
     background: transparent;
     color: var(--subtle, #8b8b8b);
+    font-family: inherit;
+    font-size: var(--text-2xs, 10px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
 }

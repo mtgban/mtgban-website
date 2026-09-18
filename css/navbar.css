@@ -18,6 +18,18 @@ body.has-scope {
     --nav-height: calc(var(--nav2-height) + var(--nav2-scope-height));
 }
 
+/* Search content used to keep the old 83px top padding while the fixed
+   chrome grew by 38px. Move the document start with the chrome so the first
+   result and its sticky headers cannot begin underneath the pinned row. */
+@media (min-width: 769px) {
+    body.has-scope {
+        --content-padding-top: calc(83px + var(--nav2-scope-height));
+    }
+    body.has-scope .page-content {
+        padding-top: var(--content-padding-top);
+    }
+}
+
 .navbar-v2 {
     position: fixed; top: 0; left: 0; right: 0; z-index: 200;
     /* The whole of the fixed chrome, which is the bar plus the pinned
@@ -719,10 +731,16 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
 .nav2-scope-clear {
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px;
-    border: none; border-radius: var(--radius-sm, 6px);
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    border-radius: var(--radius-sm, 6px);
     background: transparent;
     color: var(--subtle, #8b8b8b);
+    font-family: inherit;
+    font-size: var(--text-2xs, 10px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
     cursor: pointer;
     transition: background 0.12s, color 0.12s;
 }

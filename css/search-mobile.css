@@ -25,6 +25,12 @@
     padding-top: 52px;
 }
 
+/* The pinned-filter row adds 36px to the fixed search bar (its 30px field
+   plus the 6px gap). Keep the first result below the expanded bar. */
+body.has-scope .m-page:has(.m-search-bar-sticky) {
+    padding-top: 88px;
+}
+
 .light-theme .m-search-bar-sticky {
     border-bottom-color: rgba(0, 0, 0, 0.06);
 }
