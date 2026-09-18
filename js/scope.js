@@ -103,7 +103,7 @@
         });
     }
 
-    // A shortcut writes itself into the bar, and that is all it does: the x
+    // A shortcut writes itself into the bar, and that is all it does: CLEAR
     // is what empties it, and Enter is what runs the search, so a click
     // meant as the first half of typing something else costs nothing.
     for (var i = 0; i < chips.length; i++) {
@@ -120,7 +120,7 @@
             apply(box.value.trim());
         } else if (e.key === 'Escape') {
             // Dismiss, in the usual sense: put the row away and leave what
-            // is in it alone. Emptying it is what the x is for.
+            // is in it alone. Emptying it is what CLEAR is for.
             e.preventDefault();
             setOpen(false);
             btn.focus();
