@@ -229,6 +229,9 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 			if !strings.Contains(page, "narrowing this search") {
 				t.Error("a bar that is narrowing the search went unmentioned on the page it emptied")
 			}
+			if !strings.Contains(page, "scope-clear") || !strings.Contains(page, "CLEAR") {
+				t.Error("the pinned bar has no explicit clear button")
+			}
 			// The suggestions have to carry the pinned bar forward, or
 			// following one silently drops it.
 			for _, alt := range pageVars.AltSearches {

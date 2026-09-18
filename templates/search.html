@@ -1480,7 +1480,14 @@
 
         var searchbox = document.getElementById('searchbox') || document.getElementById('nav-searchbox');
 
-        var STICKY_OFFSET = 77; // nav-height(56) + cover(21)
+        function stickyOffset() {
+            var navbar = document.querySelector('.navbar-v2');
+            var navHeight = navbar ? navbar.getBoundingClientRect().height :
+                parseFloat(getComputedStyle(document.body).getPropertyValue('--nav-height'));
+            var cover = document.querySelector('.result-header-cover');
+            var coverHeight = cover ? cover.getBoundingClientRect().height : 21;
+            return (Number.isFinite(navHeight) ? navHeight : 56) + coverHeight;
+        }
         var currentIdx = 0;
 
         document.addEventListener('keydown', function(e) {
@@ -1523,7 +1530,7 @@
                     currentIdx++;
                 }
                 // Scroll so the target header lands exactly at its sticky position
-                var delta = headers[currentIdx].getBoundingClientRect().top - STICKY_OFFSET;
+                var delta = headers[currentIdx].getBoundingClientRect().top - stickyOffset();
                 window.scrollBy(0, delta);
             } else if (e.key === 'PageUp') {
                 e.preventDefault();
@@ -1537,7 +1544,7 @@
                 // briefly scroll to top to measure the natural position
                 var saved = window.scrollY;
                 window.scrollTo(0, 0);
-                var target = headers[currentIdx].getBoundingClientRect().top - STICKY_OFFSET;
+                var target = headers[currentIdx].getBoundingClientRect().top - stickyOffset();
                 window.scrollTo(0, target);
             }
 
@@ -1583,7 +1590,7 @@
                 // Find the last header that is stuck (rect.top ≈ sticky position)
                 var stuckIdx = -1;
                 for (var i = headers.length - 1; i >= 0; i--) {
-                    if (headers[i].getBoundingClientRect().top <= STICKY_OFFSET + 2) {
+                    if (headers[i].getBoundingClientRect().top <= stickyOffset() + 2) {
                         stuckIdx = i;
                         break;
                     }

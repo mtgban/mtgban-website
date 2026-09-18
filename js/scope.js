@@ -91,17 +91,15 @@
         }
     });
 
-    // The x empties the bar and leaves it open, cursor waiting. Emptying it
-    // is an edit like any other and takes effect on the next search, so it
-    // neither reloads the page nor puts the row away - a clear meant as the
-    // first half of typing something else should not cost a round trip.
-    //
-    // Setting .value in script fires no input event, so the hidden field the
-    // form actually submits is cleared by hand here.
+    // CLEAR empties the bar, closes it, and reloads so the active search is
+    // immediately rerun without the pinned filters. Keeping the reload here
+    // also makes the visible state, hidden form field, and server-side result
+    // agree in one action.
     if (clear) {
         clear.addEventListener('click', function() {
             write('');
-            box.focus();
+            setOpen(false);
+            apply('');
         });
     }
 
