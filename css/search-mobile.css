@@ -504,6 +504,11 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     padding-top: calc(52px + 2.2em);
 }
 
+/* Keep the offline controls below the expanded pinned-filter row too. */
+body.has-scope .m-page:has(.m-offline-mode-pills) {
+    padding-top: calc(88px + 2.2em);
+}
+
 /* Condition groups (show/hide by active pill) */
 .m-cond-group {
     display: none;
@@ -2086,6 +2091,13 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
     /* Reclaim the space: page no longer needs extra top padding for search bar */
     .m-page:has(.m-search-bar-sticky) {
+        padding-top: 0;
+    }
+
+    /* Landscape hides the sticky search bar, so reclaim its space even when
+       the remembered pinned-filter state is still enabled. */
+    body.has-scope .m-page:has(.m-search-bar-sticky),
+    body.has-scope .m-page:has(.m-offline-mode-pills) {
         padding-top: 0;
     }
 
