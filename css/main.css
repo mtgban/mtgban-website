@@ -587,7 +587,7 @@ a.selected:hover{
 }
 /* ═══ Base template layout ═══ */
 .page-content {
-    padding-top: 83px;
+    padding-top: var(--content-padding-top);
     min-height: 100vh;
 }
 
