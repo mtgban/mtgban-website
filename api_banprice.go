@@ -51,8 +51,8 @@ type PriceAPIOutput struct {
 // store list. ALL_ACCESS generates it from the search blocklists at runtime
 // (so scrapers added after the sig was issued are picked up), DEV_ACCESS
 // sees everything, and an explicit list is taken as-is, BASE_ACCESS filters
-// anything that isn't sealed and isn't from the main region; a sig's own store
-// list bypasses the blocklists by design.
+// anything sealed or outside the main region unless it is metadata-only; a
+// sig's own store list bypasses the blocklists by design.
 func apiEnabledStores(storesOpt string) []string {
 	var enabledStores []string
 	switch storesOpt {
@@ -81,14 +81,14 @@ func apiEnabledStores(storesOpt string) []string {
 		for _, seller := range GetSellers() {
 			info := seller.Info()
 			shorthand := info.Shorthand
-			if storeEligible(shorthand, nil, blocklistRetail) && !slices.Contains(enabledStores, shorthand) && !info.SealedMode && info.CountryFlag == "" {
+			if storeEligible(shorthand, nil, blocklistRetail) && !slices.Contains(enabledStores, shorthand) && baseAccessStoreEligible(info) {
 				enabledStores = append(enabledStores, shorthand)
 			}
 		}
 		for _, vendor := range GetVendors() {
 			info := vendor.Info()
 			shorthand := info.Shorthand
-			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) && !info.SealedMode && info.CountryFlag == "" {
+			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) && baseAccessStoreEligible(info) {
 				enabledStores = append(enabledStores, shorthand)
 			}
 		}
@@ -96,6 +96,13 @@ func apiEnabledStores(storesOpt string) []string {
 		enabledStores = strings.Split(storesOpt, ",")
 	}
 	return enabledStores
+}
+
+// baseAccessStoreEligible keeps BASE_ACCESS focused on singles in the main
+// region, while allowing metadata-only indexes such as Cardmarket Trends to
+// contribute even when their source is outside that region.
+func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
+	return !info.SealedMode && (info.CountryFlag == "" || info.MetadataOnly)
 }
 
 func PriceAPI(w http.ResponseWriter, r *http.Request) {

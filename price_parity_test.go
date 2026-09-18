@@ -460,7 +460,8 @@ func TestStoreEligible(t *testing.T) {
 // TestApiEnabledStores pins how the API turns the sig store option into the
 // store list: ALL_ACCESS applies the search blocklists at runtime,
 // DEV_ACCESS applies nothing, an explicit list bypasses them entirely, and
-// BASE_ACCESS additionally drops sealed and non-main-region stores.
+// BASE_ACCESS additionally drops sealed and non-main-region stores, except
+// for metadata-only indexes.
 func TestApiEnabledStores(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
@@ -495,7 +496,7 @@ func TestApiEnabledStores(t *testing.T) {
 	}
 
 	// BASE_ACCESS starts from the same blocklisted set as ALL_ACCESS, then
-	// additionally drops sealed sellers and non-main-region vendors.
+	// additionally drops sealed and non-main-region stores.
 	sealedSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 		Name: "Parity Sealed", Shorthand: "PARITYSEALED", SealedMode: true,
 	})
@@ -506,6 +507,18 @@ func TestApiEnabledStores(t *testing.T) {
 		Name: "Parity EU", Shorthand: "PARITYEU", CountryFlag: "EU",
 	})
 	vendors := append(*vendorsPtr.Load(), euVendor)
+	vendorsPtr.Store(&vendors)
+
+	euIndexSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
+		Name: "Parity EU Index", Shorthand: "PARITYEUIDX", CountryFlag: "EU", MetadataOnly: true,
+	})
+	sellers = append(*sellersPtr.Load(), euIndexSeller)
+	sellersPtr.Store(&sellers)
+
+	euIndexVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
+		Name: "Parity EU Vendor Index", Shorthand: "PARITYEUVIDX", CountryFlag: "EU", MetadataOnly: true,
+	})
+	vendors = append(*vendorsPtr.Load(), euIndexVendor)
 	vendorsPtr.Store(&vendors)
 
 	got = apiEnabledStores("BASE_ACCESS")
@@ -520,6 +533,30 @@ func TestApiEnabledStores(t *testing.T) {
 	}
 	if slices.Contains(got, "PARITYEU") {
 		t.Errorf("BASE_ACCESS should drop non-main-region vendors, got %v", got)
+	}
+	for _, store := range []string{"PARITYEUIDX", "PARITYEUVIDX"} {
+		if !slices.Contains(got, store) {
+			t.Errorf("BASE_ACCESS should keep metadata-only store %s, got %v", store, got)
+		}
+	}
+}
+
+func TestBaseAccessStoreEligible(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		info mtgban.ScraperInfo
+		want bool
+	}{
+		{name: "main-region singles", info: mtgban.ScraperInfo{}, want: true},
+		{name: "foreign singles", info: mtgban.ScraperInfo{CountryFlag: "EU"}, want: false},
+		{name: "foreign metadata-only index", info: mtgban.ScraperInfo{CountryFlag: "EU", MetadataOnly: true}, want: true},
+		{name: "sealed metadata-only index", info: mtgban.ScraperInfo{MetadataOnly: true, SealedMode: true}, want: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := baseAccessStoreEligible(tt.info); got != tt.want {
+				t.Errorf("baseAccessStoreEligible(%+v) = %v, want %v", tt.info, got, tt.want)
+			}
+		})
 	}
 }
 
