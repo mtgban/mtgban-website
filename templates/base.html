@@ -31,6 +31,8 @@
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
 
+    <script>window.__BAN_COOKIE_PATHS = {{.CookiePathsJSON}};</script>
+
     {{block "extra-meta" .}}{{end}}
 
     <title>{{block "title" .}}{{.Title}}{{end}}</title>

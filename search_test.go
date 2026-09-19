@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -59,6 +60,31 @@ func TestMain(m *testing.M) {
 
 func parseSearchOptionsWrapper(input string) SearchConfig {
 	return parseSearchOptionsNG(input, nil, nil, nil)
+}
+
+func TestSealedSearchListsPreserveExistingPreferences(t *testing.T) {
+	legacy := httptest.NewRequest("GET", "https://mtgban.com/sealed", nil)
+	legacy.Header.Set("Cookie", "SearchSellersList=old-sellers; SearchVendorsList=old-vendors")
+	if got := readSearchListCookie(legacy, "SearchSellersList", true); got != "old-sellers" {
+		t.Fatalf("sealed sellers fallback = %q, want old-sellers", got)
+	}
+	if got := readSearchListCookie(legacy, "SearchVendorsList", true); got != "old-vendors" {
+		t.Fatalf("sealed vendors fallback = %q, want old-vendors", got)
+	}
+
+	newPreference := httptest.NewRequest("GET", "https://mtgban.com/sealed", nil)
+	newPreference.Header.Set("Cookie", "SearchSellersList=old-sellers; SearchSealedSellersList=new-sellers")
+	if got := readSearchListCookie(newPreference, "SearchSellersList", true); got != "new-sellers" {
+		t.Fatalf("sealed sellers preference = %q, want new-sellers", got)
+	}
+}
+
+func TestSearchListRequestPrefersExplicitExportValue(t *testing.T) {
+	r := httptest.NewRequest("GET", "https://mtgban.com/api/search/retail/sealed/card.csv?sellers=exported", nil)
+	r.Header.Set("Cookie", "SearchSealedSellersList=sealed-cookie")
+	if got := readSearchListRequest(r, "sellers", "SearchSellersList", true); got != "exported" {
+		t.Fatalf("export list = %q, want exported", got)
+	}
 }
 
 // datastoreLoaded reports whether the mtgmatcher card datastore is available,

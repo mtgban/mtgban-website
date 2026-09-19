@@ -834,7 +834,7 @@
                     {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
                     {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
-                    {{if $hasSingles}}
+                    {{if and (not .IsSealed) $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
@@ -842,7 +842,7 @@
                         {{end}}{{end}}
                     </div>
                     {{end}}
-                    {{if $hasSealed}}
+                    {{if and .IsSealed $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
@@ -869,7 +869,7 @@
                     {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
                     {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
-                    {{if $hasSingles}}
+                    {{if and (not .IsSealed) $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
@@ -877,7 +877,7 @@
                         {{end}}{{end}}
                     </div>
                     {{end}}
-                    {{if $hasSealed}}
+                    {{if and .IsSealed $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
                         {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
@@ -1216,6 +1216,9 @@ function mSettingsBulk(containerId, selectAll) {
 
 // Load current cookie values into the settings UI
 function loadSettings() {
+    var sellersCookie = {{if .IsSealed}}'SearchSealedSellersList'{{else}}'SearchSellersList'{{end}};
+    var vendorsCookie = {{if .IsSealed}}'SearchSealedVendorsList'{{else}}'SearchVendorsList'{{end}};
+
     // Layout
     var layout = getCookie('MobileSearchLayout') || 'expanded';
     var layoutGroup = document.getElementById('m-set-layout');
@@ -1280,14 +1283,14 @@ function loadSettings() {
     });
 
     // Exclude Sellers
-    var sellers = getCookie('SearchSellersList');
+    var sellers = getCookie(sellersCookie);
     var sellerList = sellers ? sellers.split(',') : [];
     document.querySelectorAll('#m-set-sellers input[type="checkbox"]').forEach(function(cb) {
         cb.checked = sellerList.indexOf(cb.name) !== -1;
     });
 
     // Exclude Vendors
-    var vendors = getCookie('SearchVendorsList');
+    var vendors = getCookie(vendorsCookie);
     var vendorList = vendors ? vendors.split(',') : [];
     document.querySelectorAll('#m-set-vendors input[type="checkbox"]').forEach(function(cb) {
         cb.checked = vendorList.indexOf(cb.name) !== -1;
@@ -1296,6 +1299,9 @@ function loadSettings() {
 
 // Save all settings to cookies and show toast
 function saveSettings() {
+    var sellersCookie = {{if .IsSealed}}'SearchSealedSellersList'{{else}}'SearchSellersList'{{end}};
+    var vendorsCookie = {{if .IsSealed}}'SearchSealedVendorsList'{{else}}'SearchVendorsList'{{end}};
+
     // Layout
     var layoutPill = document.querySelector('#m-set-layout .m-settings-pill.active');
     var layoutVal = layoutPill ? layoutPill.getAttribute('data-val') : 'expanded';
@@ -1334,14 +1340,14 @@ function saveSettings() {
     document.querySelectorAll('#m-set-sellers input[type="checkbox"]:checked').forEach(function(cb) {
         sellersList += cb.name + ',';
     });
-    setCookie('SearchSellersList', sellersList, 1000);
+    setCookie(sellersCookie, sellersList, 1000);
 
     // Exclude Vendors
     var vendorsList = '';
     document.querySelectorAll('#m-set-vendors input[type="checkbox"]:checked').forEach(function(cb) {
         vendorsList += cb.name + ',';
     });
-    setCookie('SearchVendorsList', vendorsList, 1000);
+    setCookie(vendorsCookie, vendorsList, 1000);
 
     // Close drawer
     closeSettings();

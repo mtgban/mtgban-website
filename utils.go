@@ -1315,13 +1315,44 @@ func readCookie(r *http.Request, cookieName string) string {
 	return cookie.Value
 }
 
+func searchListCookieName(cookieName string, sealed bool) string {
+	if !sealed {
+		return cookieName
+	}
+	switch cookieName {
+	case "SearchSellersList":
+		return "SearchSealedSellersList"
+	case "SearchVendorsList":
+		return "SearchSealedVendorsList"
+	default:
+		return cookieName
+	}
+}
+
+func readSearchListCookie(r *http.Request, cookieName string, sealed bool) string {
+	value := readCookie(r, searchListCookieName(cookieName, sealed))
+	if value == "" && sealed {
+		// The old root-scoped list remains a useful default for sealed results
+		// until the user saves an independent sealed preference.
+		value = readCookie(r, cookieName)
+	}
+	return value
+}
+
+func readSearchListRequest(r *http.Request, queryName, cookieName string, sealed bool) string {
+	if _, present := r.URL.Query()[queryName]; present {
+		return r.FormValue(queryName)
+	}
+	return readSearchListCookie(r, cookieName, sealed)
+}
+
 // There is no forever in cookies, so pick a really large interval
 func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
 	setCookie(w, r, cookieName, value, tenYears, false)
 }
 
-// Set a cookie in the response with no expiration at the default root
+// Set a cookie in the response with no expiration at its configured path.
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
 	origin := requestOrigin(r)
 	u, err := url.Parse(origin)
@@ -1349,7 +1380,7 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 	cookie := http.Cookie{
 		Name:    cookieName,
 		Domain:  domain,
-		Path:    "/",
+		Path:    cookiePath(cookieName),
 		Expires: expires,
 		Value:   value,
 		// Only mark Secure when the site itself is served over HTTPS,
@@ -1362,6 +1393,16 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 		cookie.SameSite = http.SameSiteStrictMode
 	}
 	http.SetCookie(w, &cookie)
+	if cookie.Path != "/" {
+		// Remove the old Path=/ copy as well. Otherwise both values can be sent
+		// together until the browser-side migration runs, and cookie ordering
+		// is not a reliable way to choose between them.
+		legacy := cookie
+		legacy.Path = "/"
+		legacy.Expires = time.Unix(1, 0)
+		legacy.MaxAge = -1
+		http.SetCookie(w, &legacy)
+	}
 }
 
 // isSecureRequest reports whether the request reached us over HTTPS,
