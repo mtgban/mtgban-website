@@ -392,19 +392,6 @@ func findArrayEnd(body string, start int) int {
 	return -1
 }
 
-// LoadReader parses product data from a pre-fetched page body.
-func LoadReader(r io.Reader, game mtgmatcher.Game, maxRows int) ([]Item, error) {
-	catName, ok := CategoryFilter[game]
-	if !ok {
-		return nil, fmt.Errorf("unsupported game: %s", game)
-	}
-	buf, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	return parseProducts(string(buf), catName, maxRows)
-}
-
 // mapCondition reads a showcase grade, and an empty or unknown one as NM.
 func mapCondition(cond string) mtgban.Condition {
 	grade, err := mtgban.ParseCondition(cond)
