@@ -40,8 +40,8 @@ var gameDatastores = map[string]string{
 // the predicate, because a check written against the predicate passed while
 // the search was broken.
 func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
-	saved := mtgmatcher.GlobalDatastore()
-	t.Cleanup(func() { mtgmatcher.SetGlobalDatastore(saved) })
+	saved := backend()
+	t.Cleanup(func() { matcherBackend.Store(saved) })
 
 	var ran int
 	for game, envVar := range gameDatastores {
@@ -54,18 +54,18 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		backend, err := mtgmatcher.Open(game, f)
+		datastore, err := mtgmatcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
 			continue
 		}
-		mtgmatcher.SetGlobalDatastore(backend)
+		matcherBackend.Store(datastore)
 		ran++
 
 		var tightened int
-		for _, uuid := range mtgmatcher.GetUUIDs() {
-			co, err := mtgmatcher.GetUUID(uuid)
+		for _, uuid := range backend().GetUUIDs() {
+			co, err := backend().GetUUID(uuid)
 			if err != nil || co.Sealed || co.SetCode == "" || co.Number == "" {
 				continue
 			}
@@ -73,7 +73,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 				!strings.ContainsFunc(co.Number, isNotDigit) {
 				continue
 			}
-			if _, err := mtgmatcher.GetSet(co.SetCode); err != nil {
+			if _, err := backend().GetSet(co.SetCode); err != nil {
 				continue
 			}
 			tightened++

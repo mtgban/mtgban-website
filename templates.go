@@ -4,14 +4,14 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"html/template"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/dsreload"
+
 	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
@@ -167,7 +167,7 @@ var funcMap = template.FuncMap{
 	// of its sets; everywhere else this is empty and the block draws what
 	// it drew before.
 	"set_symbol": func(code string) string {
-		set, err := mtgmatcher.GetSet(code)
+		set, err := backend().GetSet(code)
 		if err != nil {
 			return ""
 		}

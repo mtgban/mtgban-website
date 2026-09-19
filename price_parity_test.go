@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // Characterization suite for the search vs price-API unification (see
@@ -20,12 +19,12 @@ import (
 // product from the datastore, skipping when unavailable.
 func parityCards(t *testing.T) (regular, foil, sealed string) {
 	t.Helper()
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher data not loaded")
 	}
 	for _, u := range uuids {
-		co, err := mtgmatcher.GetUUID(u)
+		co, err := backend().GetUUID(u)
 		if err != nil || co.Sealed || co.Etched {
 			continue
 		}
@@ -38,7 +37,7 @@ func parityCards(t *testing.T) (regular, foil, sealed string) {
 			break
 		}
 	}
-	sealedIDs := mtgmatcher.GetSealedUUIDs()
+	sealedIDs := backend().GetSealedUUIDs()
 	if len(sealedIDs) > 0 {
 		sealed = sealedIDs[0]
 	}
@@ -280,7 +279,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 	}
 	out := banPricesFromRows([]string{regular, foil}, found, "name", "shorthands", true, false, true)
 
-	coRegular, err := mtgmatcher.GetUUID(regular)
+	coRegular, err := backend().GetUUID(regular)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +288,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 		t.Errorf("a want-count row summed to %v, want 12", got)
 	}
 
-	coFoil, err := mtgmatcher.GetUUID(foil)
+	coFoil, err := backend().GetUUID(foil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +333,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	// Sealed products count as nonfoil under the shared predicate (neither
 	// Foil nor Etched is set) and are dropped by foil/etched filters - the
 	// old checkFinish kept them under every finish value
-	coSealed, err := mtgmatcher.GetUUID(sealed)
+	coSealed, err := backend().GetUUID(sealed)
 	if err != nil {
 		t.Fatal(err)
 	}

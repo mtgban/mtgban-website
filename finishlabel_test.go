@@ -51,14 +51,14 @@ func TestFinishLabel(t *testing.T) {
 // foil types are promo types, not finishes — so nothing it stores should reach
 // the naming rule and change a title that reads correctly today.
 func TestFinishLabelLeavesMagicAlone(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	named := map[string]string{}
 	for _, uuid := range uuids {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil {
 			continue
 		}

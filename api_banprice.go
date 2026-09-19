@@ -122,12 +122,12 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Endpoint for retrieving the set codes
 	if strings.HasPrefix(urlPath, "sets") {
-		sets := mtgmatcher.GetAllSets()
+		sets := backend().GetAllSets()
 		filter := r.FormValue("filter")
 		if filter == "singles" {
 			var filtered []string
 			for _, code := range sets {
-				set, err := mtgmatcher.GetSet(code)
+				set, err := backend().GetSet(code)
 				if err != nil {
 					continue
 				}
@@ -139,7 +139,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		} else if filter == "sealed" {
 			var filtered []string
 			for _, code := range sets {
-				set, err := mtgmatcher.GetSet(code)
+				set, err := backend().GetSet(code)
 				if err != nil {
 					continue
 				}
@@ -270,7 +270,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Check if the path element is a set name or a hash
-		set, err := mtgmatcher.GetSet(base)
+		set, err := backend().GetSet(base)
 		if err == nil {
 			filterByEdition = set.Code
 		} else {
@@ -278,7 +278,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 				// Check for nonfoil, foil, etched
 				{false, false}, {true, false}, {false, true},
 			} {
-				uuid, err := mtgmatcher.MatchID(base, opts...)
+				uuid, err := backend().MatchID(base, opts...)
 				if err != nil {
 					continue
 				}
@@ -290,7 +290,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 			}
 			// Speed up search by keeping only the needed edition
 			if len(filterByHash) > 0 {
-				co, err := mtgmatcher.GetUUID(filterByHash[0])
+				co, err := backend().GetUUID(filterByHash[0])
 				if err == nil {
 					filterByEdition = co.SetCode
 				}
@@ -432,9 +432,9 @@ func resolveEditionFilter(filterByEdition string, filterByHash []string, sealed 
 		return filterByHash
 	}
 	if sealed {
-		return mtgmatcher.GetSealedUUIDsInSet(filterByEdition)
+		return backend().GetSealedUUIDsInSet(filterByEdition)
 	}
-	return mtgmatcher.GetUUIDsInSet(filterByEdition)
+	return backend().GetUUIDsInSet(filterByEdition)
 }
 
 // apiSearchConfig builds the narrow search config a filtered API request
@@ -449,7 +449,7 @@ func apiSearchConfig(uuids, enabledStores []string, filterByFinish string, seale
 	// The set index buckets are read-only, so partition into a fresh slice
 	kept := make([]string, 0, len(uuids))
 	for _, uuid := range uuids {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err == nil && co.Sealed == sealed {
 			kept = append(kept, uuid)
 		}
@@ -511,7 +511,7 @@ func banPricesFromRows(cardIDs []string, found map[string]map[string][]SearchEnt
 		if len(buckets) == 0 {
 			continue
 		}
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -713,7 +713,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if base == -1 {
 		return
 	}
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		return
 	}
@@ -1030,11 +1030,11 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 }
 
 func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor, withSKU bool) ([]string, error) {
-	co, err := mtgmatcher.GetUUID(id)
+	co, err := backend().GetUUID(id)
 	if err != nil {
 		uuid := externalUUID(id)
 		if uuid != "" {
-			co, err = mtgmatcher.GetUUID(uuid)
+			co, err = backend().GetUUID(uuid)
 		}
 		if err != nil {
 			return nil, err

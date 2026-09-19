@@ -10,16 +10,15 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // The index section links a marketplace it has no price from, which is worth
 // offering only where the site carries that marketplace at all.
 func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	uuid := mtgmatcher.GetUUIDs()[0]
+	uuid := backend().GetUUIDs()[0]
 
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
 	DevMode, SigCheck = true, false

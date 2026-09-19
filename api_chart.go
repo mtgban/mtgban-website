@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 type ChartAPIResponse struct {
@@ -44,7 +42,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	co, err := mtgmatcher.GetUUID(uuid)
+	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, "card not found")
 		return

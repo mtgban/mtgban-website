@@ -184,12 +184,12 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 	if err != nil {
 		// Not found again, let's provide a meaningful error
 		if editionSearched != "" {
-			set, err := mtgmatcher.GetSet(editionSearched)
+			set, err := backend().GetSet(editionSearched)
 			if err != nil {
 				return nil, fmt.Sprintf("No edition found for \"%s\"", editionSearched)
 			}
 			msg := fmt.Sprintf("No card found named \"%s\" in %s", query, set.Name)
-			printings, err := mtgmatcher.Printings4Card(query)
+			printings, err := backend().Printings4Card(query)
 			if err == nil {
 				msg = fmt.Sprintf("%s\n\"%s\" is printed in %s.", msg, query, embed.PrintingsLine(printings))
 			}
@@ -288,7 +288,7 @@ func manapoolCardTitle(u *url.URL) string {
 	}
 
 	for _, card := range printingsAt(fields[1], fields[2]) {
-		co, err := mtgmatcher.GetUUID(card.UUID)
+		co, err := backend().GetUUID(card.UUID)
 		if err != nil {
 			continue
 		}
@@ -365,11 +365,11 @@ var AffiliateStores = []AffiliateConfig{
 					break
 				}
 			}
-			cardID, err := mtgmatcher.MatchID(id, v.Get("Printing") == "Foil")
+			cardID, err := backend().MatchID(id, v.Get("Printing") == "Foil")
 			if err != nil {
 				return "Your search"
 			}
-			co, err := mtgmatcher.GetUUID(cardID)
+			co, err := backend().GetUUID(cardID)
 			if err != nil {
 				return "Your search"
 			}
@@ -572,9 +572,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					continue
 				}
 				mid := u.Query().Get("multiverseid")
-				uuids := mtgmatcher.GetUUIDs()
+				uuids := backend().GetUUIDs()
 				for _, uuid := range uuids {
-					co, _ := mtgmatcher.GetUUID(uuid)
+					co, _ := backend().GetUUID(uuid)
 					if co.Identifiers["multiverseId"] == mid {
 						m.Content = fmt.Sprintf("!%s|%s|%s", co.Name, co.SetCode, co.Number)
 						messageCreate(s, m)
@@ -626,7 +626,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	co, err := mtgmatcher.GetUUID(searchRes.CardID)
+	co, err := backend().GetUUID(searchRes.CardID)
 	if err != nil {
 		return
 	}
@@ -757,13 +757,13 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 
 	// Prepare card data
 	card := uuid2card(searchRes.CardID, true, false, false)
-	co, _ := mtgmatcher.GetUUID(searchRes.CardID)
+	co, _ := backend().GetUUID(searchRes.CardID)
 
 	printings := embed.PrintingsLine(co.Printings)
 	if searchRes.EditionSearched != "" && len(co.Variations) > 0 {
 		cn := []string{co.Number}
 		for _, varid := range co.Variations {
-			co, err := mtgmatcher.GetUUID(varid)
+			co, err := backend().GetUUID(varid)
 			if err != nil {
 				continue
 			}

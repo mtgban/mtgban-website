@@ -26,7 +26,7 @@ var isCaseNames = []string{
 // answers have to be one answer on every printing - or the order of the
 // case and the fallback would decide what "is:extendedart" matches.
 func TestIsFilterCasesAgreeWithMagicPromoTypes(t *testing.T) {
-	all := mtgmatcher.AllPromoTypes()
+	all := backend().AllPromoTypes
 	if len(all) == 0 {
 		t.Skip("no datastore loaded")
 	}
@@ -37,8 +37,8 @@ func TestIsFilterCasesAgreeWithMagicPromoTypes(t *testing.T) {
 			both = append(both, name)
 		}
 	}
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
@@ -55,7 +55,7 @@ func TestIsFilterCasesAgreeWithMagicPromoTypes(t *testing.T) {
 // The promo-type check moved out from under default:, so a value with no case
 // of its own has to keep reaching it.
 func TestIsFilterStillMatchesAPromoType(t *testing.T) {
-	all := mtgmatcher.AllPromoTypes()
+	all := backend().AllPromoTypes
 	if len(all) == 0 {
 		t.Skip("no datastore loaded")
 	}

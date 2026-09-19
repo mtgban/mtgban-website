@@ -83,7 +83,7 @@ func validateKeyOverrides(overrides KeyOverrides) []string {
 				if correct == "" {
 					continue // "" means drop the listing, always valid
 				}
-				if _, err := mtgmatcher.GetUUID(correct); err != nil {
+				if _, err := backend().GetUUID(correct); err != nil {
 					bad = append(bad, fmt.Sprintf("%s/%s: %s → %s (unknown card)", shorthand, kind, wrong, correct))
 				}
 			}
@@ -136,7 +136,7 @@ func uuidCardLabel(co *mtgmatcher.CardObject) string {
 
 // newOverrideCard builds the display data for a card uuid, or nil if unknown.
 func newOverrideCard(uuid string) *OverrideCard {
-	co, err := mtgmatcher.GetUUID(uuid)
+	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		return nil
 	}
@@ -152,13 +152,13 @@ func newOverrideCard(uuid string) *OverrideCard {
 // match. Everything comes from the in-memory card database at render time;
 // there is no lookup endpoint. Returns nil when the uuid is unknown.
 func overrideFixCandidates(wrongUUID string) (wrong *OverrideCard, candidates []OverrideCard) {
-	co, err := mtgmatcher.GetUUID(wrongUUID)
+	co, err := backend().GetUUID(wrongUUID)
 	if err != nil {
 		return nil, nil
 	}
 	wrong = newOverrideCard(wrongUUID)
 
-	uuids, err := mtgmatcher.SearchEquals(co.Name)
+	uuids, err := backend().SearchEquals(co.Name)
 	if err != nil {
 		return wrong, nil
 	}

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // reversePageVars is one reverse-mode table whose second entry the page has
@@ -124,7 +123,7 @@ func renderReverse(t *testing.T, query string) string {
 // market has no supply, and dividing a real buy price by that put every such
 // row above every real listing on the page.
 func TestReverseDropsIndexSellers(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher data not loaded")
 	}

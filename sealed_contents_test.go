@@ -13,17 +13,17 @@ import (
 // for a product having been reprinted.
 func productWithBothKinds(t *testing.T) *mtgmatcher.CardObject {
 	t.Helper()
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !mtgmatcher.SealedHasDecklist(code, product.UUID) ||
-				!mtgmatcher.SealedIsRandom(code, product.UUID) {
+			if !backend().SealedHasDecklist(code, product.UUID) ||
+				!backend().SealedIsRandom(code, product.UUID) {
 				continue
 			}
-			co, err := mtgmatcher.GetUUID(product.UUID)
+			co, err := backend().GetUUID(product.UUID)
 			if err == nil {
 				return co
 			}
@@ -35,7 +35,7 @@ func productWithBothKinds(t *testing.T) *mtgmatcher.CardObject {
 // What the reading is for: such a product lists a great deal more than it
 // always holds, so what it might hold is worth asking for on its own.
 func TestAProductHoldsMoreThanItGuarantees(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	co := productWithBothKinds(t)
@@ -43,11 +43,11 @@ func TestAProductHoldsMoreThanItGuarantees(t *testing.T) {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
 	}
 
-	deck, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+	deck, err := backend().GetDecklist(co.SetCode, co.UUID)
 	if err != nil {
 		t.Fatalf("%s has no fixed list after all: %v", co.Name, err)
 	}
-	picks, err := mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID)
+	picks, err := backend().GetPicksForSealed(co.SetCode, co.UUID)
 	if err != nil {
 		t.Fatalf("%s opens into nothing: %v", co.Name, err)
 	}
@@ -60,14 +60,14 @@ func TestAProductHoldsMoreThanItGuarantees(t *testing.T) {
 // The variable reading is the contents with the fixed list taken back out, so
 // it is two filters composed rather than a list built.
 func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
 	}
-	deck, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+	deck, err := backend().GetDecklist(co.SetCode, co.UUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
 	// And the cards it keeps are the ones the product does not guarantee.
 	for _, uuid := range deck {
 		if !shouldSkipCardNG(uuid, config.CardFilters) {
-			card, _ := mtgmatcher.GetUUID(uuid)
+			card, _ := backend().GetUUID(uuid)
 			t.Errorf("%s is guaranteed but survives the variable reading", card)
 			break
 		}
@@ -104,7 +104,7 @@ func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
 // Each of the three queries says which product it asked about and which
 // reading it wanted, so the page can offer the other two.
 func TestEachReadingNamesItselfAndItsProduct(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	co := productWithBothKinds(t)
@@ -133,13 +133,13 @@ func TestEachReadingNamesItselfAndItsProduct(t *testing.T) {
 // with those products. They are rows on the page, so the search is not empty,
 // but there is no card in it to read another way.
 func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	var wrapper string
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -147,8 +147,8 @@ func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
 			if len(product.Contents) != 1 || len(product.Contents["sealed"]) == 0 {
 				continue
 			}
-			if !mtgmatcher.SealedHasDecklist(code, product.UUID) ||
-				!mtgmatcher.SealedIsRandom(code, product.UUID) {
+			if !backend().SealedHasDecklist(code, product.UUID) ||
+				!backend().SealedIsRandom(code, product.UUID) {
 				continue
 			}
 			wrapper = product.Name
@@ -177,14 +177,14 @@ func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
 
 // Only a card counts as something to read another way.
 func TestContainsSingles(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
 	}
-	deck, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+	deck, err := backend().GetDecklist(co.SetCode, co.UUID)
 	if err != nil || len(deck) == 0 {
 		t.Skip("the product opens into nothing")
 	}
@@ -205,7 +205,7 @@ func TestContainsSingles(t *testing.T) {
 
 // The switch is offered only where all three readings mean something.
 func TestContentsSwitchOnlyWhereAllThreeMeanSomething(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	co := productWithBothKinds(t)
@@ -308,17 +308,17 @@ func TestTheSettingPicksWhatALinkOpens(t *testing.T) {
 // guaranteed lists to take back out rather than one.
 func twoProductsWithBothKinds(t *testing.T) (a, b *mtgmatcher.CardObject) {
 	t.Helper()
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !mtgmatcher.SealedHasDecklist(code, product.UUID) ||
-				!mtgmatcher.SealedIsRandom(code, product.UUID) {
+			if !backend().SealedHasDecklist(code, product.UUID) ||
+				!backend().SealedIsRandom(code, product.UUID) {
 				continue
 			}
-			co, err := mtgmatcher.GetUUID(product.UUID)
+			co, err := backend().GetUUID(product.UUID)
 			if err != nil {
 				continue
 			}
@@ -339,7 +339,7 @@ func twoProductsWithBothKinds(t *testing.T) (a, b *mtgmatcher.CardObject) {
 // everything it holds. And with more than one product named, no single
 // switch between readings applies, so neither is offered.
 func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	a, b := twoProductsWithBothKinds(t)
@@ -363,13 +363,13 @@ func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.
 	}
 
 	for _, co := range []*mtgmatcher.CardObject{a, b} {
-		deck, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+		deck, err := backend().GetDecklist(co.SetCode, co.UUID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, uuid := range deck {
 			if foundSet[uuid] {
-				card, _ := mtgmatcher.GetUUID(uuid)
+				card, _ := backend().GetUUID(uuid)
 				t.Errorf("%s is guaranteed by %s but survives the variable reading of both", card, co.Name)
 			}
 		}

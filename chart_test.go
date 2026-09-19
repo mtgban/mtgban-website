@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -17,7 +16,7 @@ import (
 // file is data-independent.
 func nRealUUIDs(t *testing.T, n int) []string {
 	t.Helper()
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) < n {
 		t.Skipf("mtgmatcher data not loaded (need %d UUIDs); skipping", n)
 	}

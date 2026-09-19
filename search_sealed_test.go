@@ -2,8 +2,6 @@ package main
 
 import (
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // sealedSearch runs a query the way the sealed tab does, fallback and all.
@@ -24,18 +22,18 @@ func sealedSearch(t *testing.T, query string) []string {
 // the card matcher when no product carried the name, so /sealed?q=the+last+ronin
 // showed the Magic card called The Last Ronin.
 func TestSealedTabNeverAnswersWithACard(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	// A card whose name no product carries, so the search has to fall back.
 	var orphan string
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
-		if _, err := mtgmatcher.SearchSealedContains(co.Name); err == nil {
+		if _, err := backend().SearchSealedContains(co.Name); err == nil {
 			continue
 		}
 		orphan = co.Name
@@ -46,7 +44,7 @@ func TestSealedTabNeverAnswersWithACard(t *testing.T) {
 	}
 
 	for _, key := range sealedSearch(t, orphan) {
-		co, err := mtgmatcher.GetUUID(key)
+		co, err := backend().GetUUID(key)
 		if err != nil {
 			t.Fatal(err)
 		}

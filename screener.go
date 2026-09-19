@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"golang.org/x/sync/singleflight"
 )
@@ -327,11 +326,11 @@ var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (stri
 	// Holofoil, and both would land on the same card. tcgFinishIDForSubType
 	// pairs them off the sub-types the product is actually priced under, the
 	// same way the chart read path does.
-	base, err := mtgmatcher.MatchID(strconv.Itoa(row.TCGProductID))
+	base, err := backend().MatchID(strconv.Itoa(row.TCGProductID))
 	if err != nil {
 		return "", false, false
 	}
-	co, err := mtgmatcher.GetUUID(base)
+	co, err := backend().GetUUID(base)
 	if err != nil {
 		return "", false, false
 	}
@@ -344,7 +343,7 @@ var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (stri
 	// The finish belongs to the printing that was resolved, not to the name of
 	// the sub-type that led there.
 	isFoil := false
-	if finished, ferr := mtgmatcher.GetUUID(uuid); ferr == nil {
+	if finished, ferr := backend().GetUUID(uuid); ferr == nil {
 		isFoil = finished.Foil || finished.Etched
 	}
 	return uuid, isFoil, true
@@ -358,7 +357,7 @@ type screenerMeta struct {
 
 // Classification is static, so resolve once at cache build, not per request; overridable in tests.
 var screenerClassify = func(uuid string) (screenerMeta, bool) {
-	co, err := mtgmatcher.GetUUID(uuid)
+	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		return screenerMeta{}, false
 	}
@@ -649,7 +648,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 
 	for _, res := range paged {
 		// DB uuid is finish-agnostic; resolve the priced foil/etched variant.
-		cardID, err := mtgmatcher.MatchID(res.UUID, res.IsFoil, res.IsEtched)
+		cardID, err := backend().MatchID(res.UUID, res.IsFoil, res.IsEtched)
 		if err != nil {
 			cardID = res.UUID
 		}

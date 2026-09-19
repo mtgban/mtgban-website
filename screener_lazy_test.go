@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -15,10 +14,10 @@ import (
 // thousands of them. A cold page now paints without them and asks for them
 // itself; a warm one still answers in one go.
 func TestScreenerDefersTheColdBuild(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	uuid := mtgmatcher.GetUUIDs()[0]
+	uuid := backend().GetUUIDs()[0]
 
 	prevFetch := screenerFetch
 	prevClassify := screenerClassify

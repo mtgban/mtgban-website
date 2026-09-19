@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"unicode"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"golang.org/x/text/unicode/norm"
 )
@@ -87,8 +86,8 @@ var suggestIndexPtr atomic.Pointer[suggestIndex]
 // data. Called from loadDatastore, the one place the card data swaps.
 func rebuildSuggestIndex() {
 	suggestIndexPtr.Store(newSuggestIndex(
-		mtgmatcher.AllNames("canonical", false),
-		mtgmatcher.AllNames("canonical", true),
+		backend().Names("canonical", false),
+		backend().Names("canonical", true),
 	))
 }
 
@@ -185,7 +184,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	sealed, _ := strconv.ParseBool(r.FormValue("sealed"))
 
 	if r.FormValue("all") == "true" {
-		AllNames := mtgmatcher.AllNames("canonical", sealed)
+		AllNames := backend().Names("canonical", sealed)
 		// An empty pool means the datastore isn't (fully) loaded; make sure
 		// no cache holds on to the degraded answer
 		if len(AllNames) == 0 {
@@ -228,7 +227,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	var links []string
 	for _, entry := range idx.prefixMatches(prefix, squashSuggestName(prefix), sealed) {
 		suggestions = append(suggestions, entry.name)
-		printings, _ := mtgmatcher.Printings4Card(entry.name)
+		printings, _ := backend().Printings4Card(entry.name)
 		results = append(results, embed.PrintingsLine(printings))
 		links = append(links, absoluteURL(r, "/search?q="+url.QueryEscape(entry.name)))
 	}

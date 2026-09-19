@@ -124,19 +124,20 @@ type catalogFragments struct {
 // buildCatalogFragments marshals the cards and sets of the current
 // datastore. Returns nil when the datastore holds no cards.
 func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, error) {
+	backend := s.backend()
 	cards := map[string]catalogCard{}
 	magic := s.magicImageKeys()
 	addCard := func(uuid string) {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend.GetUUID(uuid)
 		if err != nil {
 			return
 		}
 		cards[uuid] = newCatalogCard(co, s.deps.CardObjectSources(co), magic)
 	}
-	for _, uuid := range mtgmatcher.GetUUIDs() {
+	for _, uuid := range backend.GetUUIDs() {
 		addCard(uuid)
 	}
-	for _, uuid := range mtgmatcher.GetSealedUUIDs() {
+	for _, uuid := range backend.GetSealedUUIDs() {
 		addCard(uuid)
 	}
 
@@ -149,8 +150,8 @@ func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, er
 	}
 
 	sets := map[string]catalogSet{}
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend.GetAllSets() {
+		set, err := backend.GetSet(code)
 		if err != nil {
 			continue
 		}

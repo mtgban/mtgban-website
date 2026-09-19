@@ -92,7 +92,14 @@ func InfoFromForm(r *http.Request) mtgban.ScraperInfo {
 // a sealed store holds products where a singles store holds cards, the way
 // the scrapers that come in pairs are split. An unmatched row has nothing to
 // key on, and an opened product is not being traded as itself.
-func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry) (mtgban.Scraper, Report, error) {
+func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry, backends ...*mtgmatcher.Backend) (mtgban.Scraper, Report, error) {
+	var backend *mtgmatcher.Backend
+	if len(backends) > 0 {
+		backend = backends[0]
+	}
+	if backend == nil {
+		backend = &mtgmatcher.Backend{}
+	}
 	var report Report
 	if kind != Retail && kind != Buylist {
 		return nil, report, fmt.Errorf("unknown store kind %q", kind)
@@ -105,7 +112,7 @@ func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry)
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(entry.CardID)
+		co, err := backend.GetUUID(entry.CardID)
 		isSealed := err == nil && co.Sealed
 		if isSealed != info.SealedMode {
 			report.OtherSide++
@@ -162,6 +169,8 @@ func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry)
 // host's own (a snapshot-write mutex, say) must never be held by code that
 // then calls into the Registry, or the two lock orders can deadlock.
 type Hooks struct {
+	// Backend returns the current card datastore used to classify uploaded rows.
+	Backend func() *mtgmatcher.Backend
 	// Sellers and Vendors return the currently served scrapers, of every
 	// kind - session stores included, since Registry itself is what tells
 	// the two apart.
@@ -237,7 +246,11 @@ func (reg *Registry) Publish(kind string, info mtgban.ScraperInfo, entries []doc
 		return report, fmt.Errorf("shorthand %q may only hold letters, digits, - and _", info.Shorthand)
 	}
 
-	scraper, report, err := FromEntries(kind, info, entries)
+	var backend *mtgmatcher.Backend
+	if reg.hooks.Backend != nil {
+		backend = reg.hooks.Backend()
+	}
+	scraper, report, err := FromEntries(kind, info, entries, backend)
 	if err != nil {
 		return report, err
 	}

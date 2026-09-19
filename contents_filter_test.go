@@ -13,7 +13,7 @@ import (
 // variable: on a product with nothing guaranteed left no filter at all - both
 // answered a typo with the whole datastore.
 func TestContentsOfNothingIsNothing(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -30,13 +30,13 @@ func TestContentsOfNothingIsNothing(t *testing.T) {
 	// A product with contents but no decklist: everything it holds is
 	// variable, so the two readings agree.
 	var box string
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if mtgmatcher.SealedIsRandom(code, product.UUID) && !mtgmatcher.SealedHasDecklist(code, product.UUID) {
+			if backend().SealedIsRandom(code, product.UUID) && !backend().SealedHasDecklist(code, product.UUID) {
 				box = product.Name
 				break
 			}
@@ -128,20 +128,20 @@ func twoDisjointSealedProducts(t *testing.T) (a, b *mtgmatcher.CardObject) {
 		deck []string
 	}
 	var candidates []candidate
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !mtgmatcher.SealedHasDecklist(code, product.UUID) {
+			if !backend().SealedHasDecklist(code, product.UUID) {
 				continue
 			}
-			deck, err := mtgmatcher.GetDecklist(code, product.UUID)
+			deck, err := backend().GetDecklist(code, product.UUID)
 			if err != nil || len(deck) == 0 {
 				continue
 			}
-			co, err := mtgmatcher.GetUUID(product.UUID)
+			co, err := backend().GetUUID(product.UUID)
 			if err != nil {
 				continue
 			}
@@ -198,7 +198,7 @@ func twoDisjointSealedProducts(t *testing.T) (a, b *mtgmatcher.CardObject) {
 // sizes, and a single exact product is checked to still return only its own
 // cards.
 func TestContentsMultipleExactProductsUnion(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -207,8 +207,8 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 		t.Skip("this datastore has no two products with disjoint decklists")
 	}
 
-	deckA, errA := mtgmatcher.GetDecklist(a.SetCode, a.UUID)
-	deckB, errB := mtgmatcher.GetDecklist(b.SetCode, b.UUID)
+	deckA, errA := backend().GetDecklist(a.SetCode, a.UUID)
+	deckB, errB := backend().GetDecklist(b.SetCode, b.UUID)
 	if errA != nil || errB != nil || len(deckA) == 0 || len(deckB) == 0 {
 		t.Skip("decklists unavailable")
 	}
@@ -245,19 +245,19 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 // name of a real product rather than a pinned word like "Scene Box", so the
 // test doesn't depend on that product line still existing.
 func TestContentsSubstringFallsBackToProductType(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	var co *mtgmatcher.CardObject
 	var term string
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !mtgmatcher.SealedHasDecklist(code, product.UUID) {
+			if !backend().SealedHasDecklist(code, product.UUID) {
 				continue
 			}
 			words := strings.Fields(product.Name)
@@ -270,7 +270,7 @@ func TestContentsSubstringFallsBackToProductType(t *testing.T) {
 			if uuid := sealedname2uuid(candidate); uuid != "" {
 				continue
 			}
-			c, err := mtgmatcher.GetUUID(product.UUID)
+			c, err := backend().GetUUID(product.UUID)
 			if err != nil {
 				continue
 			}

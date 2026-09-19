@@ -83,10 +83,10 @@ func TestCardRedirectWidensAShortPath(t *testing.T) {
 
 // And a set alone reaches the set.
 func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	set, err := mtgmatcher.GetSet("LEA")
+	set, err := backend().GetSet("LEA")
 	if err != nil {
 		t.Skip("this datastore has no LEA")
 	}
@@ -105,7 +105,7 @@ func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
 		t.Errorf("the set came to %d results, want at least its %d cards", len(keys), len(set.Cards))
 	}
 	for _, key := range keys {
-		co, err := mtgmatcher.GetUUID(key)
+		co, err := backend().GetUUID(key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,10 +119,10 @@ func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
 // And the query it hands over is one the search resolves to that printing -
 // every finish of it, which is the reason it is a search and not a lookup.
 func TestCardRedirectLandsOnThePrinting(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	set, err := mtgmatcher.GetSet("LEA")
+	set, err := backend().GetSet("LEA")
 	if err != nil || len(set.Cards) == 0 {
 		t.Skip("this datastore has no LEA")
 	}
@@ -143,7 +143,7 @@ func TestCardRedirectLandsOnThePrinting(t *testing.T) {
 		t.Fatalf("%q found nothing, want %s", loc.Query().Get("q"), card.Name)
 	}
 	for _, key := range keys {
-		co, err := mtgmatcher.GetUUID(key)
+		co, err := backend().GetUUID(key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,10 +156,10 @@ func TestCardRedirectLandsOnThePrinting(t *testing.T) {
 // The third part is a finish, and scryfall fills the same position with the
 // card's name, so it counts only when it names one.
 func TestCardRedirectTakesAFinishOrTheName(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	if _, err := mtgmatcher.GetSet("OTJ"); err != nil {
+	if _, err := backend().GetSet("OTJ"); err != nil {
 		t.Skip("this datastore has no OTJ")
 	}
 
@@ -186,10 +186,10 @@ func TestCardRedirectTakesAFinishOrTheName(t *testing.T) {
 // And the finish narrows the search to that one printing rather than to
 // nothing, which is the only reason to pass it on.
 func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	if _, err := mtgmatcher.GetSet("OTJ"); err != nil {
+	if _, err := backend().GetSet("OTJ"); err != nil {
 		t.Skip("this datastore has no OTJ")
 	}
 
@@ -215,7 +215,7 @@ func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
 	if len(foil) != 1 {
 		t.Fatalf("asking for the foil came to %d results, want 1", len(foil))
 	}
-	co, err := mtgmatcher.GetUUID(foil[0])
+	co, err := backend().GetUUID(foil[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,10 +227,10 @@ func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
 // The number is matched as printed: a star or a dagger is what tells two
 // printings of one number apart, and cn: answered both.
 func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	if _, err := mtgmatcher.GetSet("4ED"); err != nil {
+	if _, err := backend().GetSet("4ED"); err != nil {
 		t.Skip("this datastore has no 4ED")
 	}
 
@@ -248,7 +248,7 @@ func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
 		t.Fatal("the daggered number found nothing")
 	}
 	for _, key := range keys {
-		co, err := mtgmatcher.GetUUID(key)
+		co, err := backend().GetUUID(key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -263,18 +263,18 @@ func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
 // of it: the position means one thing wherever it is read, and the card entire
 // is the same link without the word.
 func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	ids, err := mtgmatcher.SearchEquals("Foil")
+	ids, err := backend().SearchEquals("Foil")
 	if err != nil || len(ids) == 0 {
 		t.Skip("this datastore has no card named Foil")
 	}
-	co, err := mtgmatcher.GetUUID(ids[0])
+	co, err := backend().GetUUID(ids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !mtgmatcher.HasFoilPrinting(co.Name, co.SetCode) {
+	if !backend().HasFoilPrinting(co.Name, co.SetCode) {
 		t.Skip("the card named Foil has no foil printing here, so nothing collides")
 	}
 
@@ -302,7 +302,7 @@ func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
 	if len(keys) != 1 {
 		t.Fatalf("%q came to %d results, want the one foil printing", query, len(keys))
 	}
-	card, err := mtgmatcher.GetUUID(keys[0])
+	card, err := backend().GetUUID(keys[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,16 +333,16 @@ func cardPath(co *mtgmatcher.CardObject, finish string) string {
 // A path that names a finish comes back with the name in front: the filters
 // find the printing, the name is what the search box shows for it.
 func TestCardPathComesBackWithItsName(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	set, err := mtgmatcher.GetSet("LEA")
+	set, err := backend().GetSet("LEA")
 	if err != nil || len(set.Cards) == 0 {
 		t.Skip("this datastore has no LEA")
 	}
 
-	for _, id := range mtgmatcher.FinishSiblings(set.Cards[0].UUID) {
-		co, err := mtgmatcher.GetUUID(id)
+	for _, id := range backend().FinishSiblings(set.Cards[0].UUID) {
+		co, err := backend().GetUUID(id)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 const (
@@ -330,12 +329,12 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 
 		// Override a few fields for better integration with the site
 		if db == NewNewspaperDB {
-			uuid, err := mtgmatcher.MatchID(raw[1], raw[6] != "Normal")
+			uuid, err := backend().MatchID(raw[1], raw[6] != "Normal")
 			if err != nil {
 				LogPages["Newspaper"].Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
 				continue
 			}
-			co, _ := mtgmatcher.GetUUID(uuid)
+			co, _ := backend().GetUUID(uuid)
 			raw[0] = co.Rarity
 			raw[1] = uuid
 			raw[3] = co.Name
@@ -1186,7 +1185,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		if r.FormValue("format") == "csv" {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", `attachment; filename="syp-buylist.csv"`)
-			if err := mtgban.WriteBuylistToCSV(syp, 1, w); err != nil {
+			if err := mtgban.WriteBuylistToCSV(backend(), syp, 1, w); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			return
@@ -1338,7 +1337,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		for _, result := range results {
 			if skipEditionsOpt != "" {
 				filters := strings.Split(skipEditionsOpt, ",")
-				set, err := mtgmatcher.GetSetByName(result.Edition)
+				set, err := backend().GetSetByName(result.Edition)
 				if err == nil && slices.Contains(filters, set.Code) {
 					continue
 				}

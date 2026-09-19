@@ -170,16 +170,16 @@ func TestMagicFinishSearchID(t *testing.T) {
 
 	// Any printing that carries both finishes will do.
 	var uuid, foilID string
-	for _, id := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(id)
+	for _, id := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(id)
 		if err != nil || co.Sealed || co.Foil || co.Etched {
 			continue
 		}
-		alt, err := mtgmatcher.MatchID(id, true)
+		alt, err := backend().MatchID(id, true)
 		if err != nil || alt == id {
 			continue
 		}
-		if altCo, err := mtgmatcher.GetUUID(alt); err == nil && altCo.Foil {
+		if altCo, err := backend().GetUUID(alt); err == nil && altCo.Foil {
 			uuid, foilID = id, alt
 			break
 		}

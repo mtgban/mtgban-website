@@ -2,8 +2,6 @@ package main
 
 import (
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // The row under a chart and the chart itself have to mean the same printing,
@@ -21,7 +19,7 @@ func TestChartSearchID(t *testing.T) {
 	// No archive to resolve against - a deployment without one, or an id that
 	// resolved to nothing - still maps a plain matcher id.
 	t.Run("a matcher id resolves without a target", func(t *testing.T) {
-		uuids := mtgmatcher.GetUUIDs()
+		uuids := backend().GetUUIDs()
 		if len(uuids) == 0 {
 			t.Skip("datastore not loaded")
 		}
@@ -47,7 +45,7 @@ func TestChartSearchID(t *testing.T) {
 // verdict nor the ban: marker may be second-guessed by asking the matcher's
 // external map about the raw digits.
 func TestChartSearchIDDoesNotGuessBanIDs(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("datastore not loaded")
 	}
@@ -56,7 +54,7 @@ func TestChartSearchIDDoesNotGuessBanIDs(t *testing.T) {
 	// guard rather than on the number failing to match anything.
 	var tcgID, card string
 	for _, u := range uuids {
-		co, err := mtgmatcher.GetUUID(u)
+		co, err := backend().GetUUID(u)
 		if err != nil {
 			continue
 		}
@@ -64,7 +62,7 @@ func TestChartSearchIDDoesNotGuessBanIDs(t *testing.T) {
 		if id == "" {
 			continue
 		}
-		if _, merr := mtgmatcher.MatchID(id); merr == nil {
+		if _, merr := backend().MatchID(id); merr == nil {
 			tcgID, card = id, co.Name
 			break
 		}

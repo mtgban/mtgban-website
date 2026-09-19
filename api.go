@@ -31,7 +31,7 @@ import (
 var ErrMissingTCGId = errors.New("tcg id not found")
 
 func getLastSold(ctx context.Context, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +69,12 @@ func getDirectQty(ctx context.Context, cardID string) ([]tcgplayer.ListingData, 
 }
 
 func getDecklist(uuid string) ([]string, error) {
-	co, err := mtgmatcher.GetUUID(uuid)
+	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
 
-	return mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+	return backend().GetDecklist(co.SetCode, co.UUID)
 }
 
 func TCGHandler(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +112,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if useCSV {
-		co, _ := mtgmatcher.GetUUID(cardID)
+		co, _ := backend().GetUUID(cardID)
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
@@ -209,7 +209,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 func SCGRetailRedirect(ctx context.Context, ids, qtys, conds []string) (string, error) {
 	var data strings.Builder
 	for i, hash := range ids {
-		co, err := mtgmatcher.GetUUID(hash)
+		co, err := backend().GetUUID(hash)
 		if err != nil {
 			continue
 		}
@@ -347,7 +347,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		id, cond := row.id, row.cond
 		var prices [3]float64
 
-		co, err := mtgmatcher.GetUUID(id)
+		co, err := backend().GetUUID(id)
 		if err != nil {
 			continue
 		}
@@ -431,7 +431,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if useCSV {
-		co, _ := mtgmatcher.GetUUID(cardID)
+		co, _ := backend().GetUUID(cardID)
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
@@ -526,7 +526,7 @@ func UUID2MKMCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			cond = conds[i]
 		}
 
-		co, err := mtgmatcher.GetUUID(id)
+		co, err := backend().GetUUID(id)
 		if err != nil {
 			continue
 		}

@@ -78,6 +78,9 @@ type Entry struct {
 // Parser matches uploaded rows against the card database. The zero value is
 // usable; the optional fields hook it up to the host's services.
 type Parser struct {
+	// Backend supplies the live card datastore. The host may replace it when
+	// reloading card data; parsing takes a snapshot for each operation.
+	Backend func() *mtgmatcher.Backend
 	// Logf receives diagnostic lines about header detection. Optional.
 	Logf func(format string, v ...any)
 
@@ -95,6 +98,15 @@ type Parser struct {
 	// printings; the first in the resulting order wins. Optional; without it
 	// candidates keep the match order.
 	PreferredPrinting func(uuidA, uuidB string) bool
+}
+
+func (p *Parser) backend() *mtgmatcher.Backend {
+	if p.Backend != nil {
+		if backend := p.Backend(); backend != nil {
+			return backend
+		}
+	}
+	return &mtgmatcher.Backend{}
 }
 
 func (p *Parser) logf(format string, v ...any) {
@@ -382,7 +394,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		if len(vars) > 1 {
 			maybeEdition := vars[1]
 			// Only assign edition if it's a known set code
-			set, err := mtgmatcher.GetSetByName(maybeEdition)
+			set, err := p.backend().GetSetByName(maybeEdition)
 			if err == nil {
 				// Remove the parsed part, leaving any other detail available downstream
 				line = strings.Replace(line, "("+maybeEdition+")", "", 1)
@@ -524,11 +536,11 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	// sealed fallback below
 	ogName := res.Card.Name
 
-	cardID, err := mtgmatcher.Match(&res.Card)
+	cardID, err := p.backend().Match(&res.Card)
 
 	// When the lookup fails, retry against the sealed pool for a 1:1 match
 	if err != nil {
-		hits, _ := mtgmatcher.SearchSealedEquals(ogName)
+		hits, _ := p.backend().SearchSealedEquals(ogName)
 		if len(hits) > 0 {
 			cardID = hits[0]
 			err = nil

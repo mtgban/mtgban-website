@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
@@ -26,9 +25,10 @@ type manifestFile struct {
 
 // computeFingerprints hashes every in-memory price tuple, per set.
 func (s *Service) computeFingerprints() map[string]string {
+	backend := s.backend()
 	fps := map[string]*offline.Fingerprint{}
 	add := func(store, uuid, tag string, price float64, qty int) {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend.GetUUID(uuid)
 		if err != nil {
 			return
 		}

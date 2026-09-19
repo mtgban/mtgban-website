@@ -3,8 +3,6 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-
 	"github.com/mtgban/mtgban-website/moxfield"
 )
 
@@ -14,7 +12,7 @@ import (
 // Relies on the datastore loaded in TestMain, which is why it lives here
 // rather than in internal/docparse.
 func TestUploadSealedCSV(t *testing.T) {
-	if len(mtgmatcher.GetSealedUUIDs()) == 0 {
+	if len(backend().GetSealedUUIDs()) == 0 {
 		t.Skip("mtgmatcher data not loaded; skipping")
 	}
 
@@ -35,7 +33,7 @@ func TestUploadSealedCSV(t *testing.T) {
 
 	// Path 1: resolve via the Key uuid
 	for _, row := range rows {
-		if _, err := mtgmatcher.GetUUID(row[0]); err != nil {
+		if _, err := backend().GetUUID(row[0]); err != nil {
 			t.Logf("uuid %s not in local datastore, skipping id check", row[0])
 			continue
 		}
@@ -67,7 +65,7 @@ func TestUploadSealedCSV(t *testing.T) {
 			t.Errorf("name path %q: empty CardId", row[1])
 			continue
 		}
-		co, err := mtgmatcher.GetUUID(res.CardID)
+		co, err := backend().GetUUID(res.CardID)
 		if err != nil || !co.Sealed {
 			t.Errorf("name path %q: resolved to non-sealed %q", row[1], res.CardID)
 		}
@@ -79,7 +77,7 @@ func TestUploadSealedCSV(t *testing.T) {
 // they must resolve to the exact printing with the finish applied, so
 // mixed-printing decks don't collapse into one variation.
 func TestResolveMoxItemPrinting(t *testing.T) {
-	if _, err := mtgmatcher.GetSet("UNF"); err != nil {
+	if _, err := backend().GetSet("UNF"); err != nil {
 		t.Skip("datastore not loaded")
 	}
 
@@ -89,7 +87,7 @@ func TestResolveMoxItemPrinting(t *testing.T) {
 		if err != nil {
 			t.Fatalf("resolve %+v: %s", item, err)
 		}
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil {
 			t.Fatal(err)
 		}

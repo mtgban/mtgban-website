@@ -47,7 +47,7 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 	if err != nil {
 		t.Skip("loading the datastore:", err)
 	}
-	mtgmatcher.SetGlobalDatastore(b)
+	matcherBackend.Store(b)
 	t.Cleanup(func() {
 		restore, err := os.Open(Config.DatastorePath)
 		if err != nil {
@@ -55,13 +55,13 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 		}
 		defer restore.Close()
 		if b, err := mtgmatcher.Open(datastoreGame(), restore); err == nil {
-			mtgmatcher.SetGlobalDatastore(b)
+			matcherBackend.Store(b)
 		}
 	})
 
 	var split int
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed || !strings.Contains(co.Number, "/") {
 			continue
 		}

@@ -3,8 +3,6 @@ package main
 import (
 	"strings"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // Every value in PromoTypes or Treatments is a value "is:" can filter on
@@ -23,7 +21,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 
 	var checked int
 	for _, uuid := range []string{plain, chipped} {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -42,8 +40,8 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 
 	// is:retro is real even though "retro" never appears in AllPromoTypes.
 	var retroUUID string
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed || co.FrameVersion != "1997" {
 			continue
 		}
@@ -60,7 +58,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 	if retroUUID == "" {
 		t.Skip("this datastore has no retro-framed printing recent enough to show it")
 	}
-	co, _ := mtgmatcher.GetUUID(retroUUID)
+	co, _ := backend().GetUUID(retroUUID)
 	if cardFilterIs([]string{"retro"}, co) {
 		t.Errorf("%s (%s): is:retro does not match a card whose own PromoTypes names it", co.Name, co.SetCode)
 	}

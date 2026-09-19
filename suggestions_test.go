@@ -14,16 +14,16 @@ func TestClosestCardName(t *testing.T) {
 	if !datastoreLoaded() {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
-	if got := suggest.Closest("lightnig bolt", false); got != "Lightning Bolt" {
+	if got := suggest.Closest("lightnig bolt", false, backend()); got != "Lightning Bolt" {
 		t.Errorf("typo: Closest = %q, want Lightning Bolt", got)
 	}
-	if got := suggest.Closest("Lightning Bolt", false); got != "" {
+	if got := suggest.Closest("Lightning Bolt", false, backend()); got != "" {
 		t.Errorf("valid name should not suggest, got %q", got)
 	}
-	if got := suggest.Closest("zzqwxvkjmpft", false); got != "" {
+	if got := suggest.Closest("zzqwxvkjmpft", false, backend()); got != "" {
 		t.Errorf("gibberish should not suggest, got %q", got)
 	}
-	if got := suggest.Closest("ab", false); got != "" {
+	if got := suggest.Closest("ab", false, backend()); got != "" {
 		t.Errorf("short query should not suggest, got %q", got)
 	}
 }

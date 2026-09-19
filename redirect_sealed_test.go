@@ -39,18 +39,18 @@ func sealedPath(co *mtgmatcher.CardObject) string {
 // slug, and the slug is enough to find it again: every product in the
 // datastore, spelled as a path, comes back as itself.
 func TestSealedPathRoundTrips(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	var products int
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			co, err := mtgmatcher.GetUUID(product.UUID)
+			co, err := backend().GetUUID(product.UUID)
 			if err != nil {
 				continue
 			}
@@ -69,7 +69,7 @@ func TestSealedPathRoundTrips(t *testing.T) {
 // Each part narrows the one before it, and a path that stops early stops
 // narrowing rather than failing.
 func TestSealedPathNamesLessAsksForMore(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	for _, tt := range []struct{ path, want string }{
@@ -87,7 +87,7 @@ func TestSealedPathNamesLessAsksForMore(t *testing.T) {
 // The path is only as good as the search it lands on: followed through the
 // redirect into the sealed tab, a product's path shows that product.
 func TestSealedPathLandsOnTheProduct(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
@@ -100,12 +100,12 @@ func TestSealedPathLandsOnTheProduct(t *testing.T) {
 		defer delete(LogPages, "Search")
 	}
 
-	set, err := mtgmatcher.GetSet("SLD")
+	set, err := backend().GetSet("SLD")
 	if err != nil || len(set.SealedProduct) == 0 {
 		t.Skip("no SLD products")
 	}
 	product := set.SealedProduct[0]
-	co, _ := mtgmatcher.GetUUID(product.UUID)
+	co, _ := backend().GetUUID(product.UUID)
 
 	rec := httptest.NewRecorder()
 	SealedRedirect(rec, httptest.NewRequest(http.MethodGet, sealedPath(co), nil))

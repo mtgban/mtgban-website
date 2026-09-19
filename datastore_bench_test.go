@@ -9,7 +9,7 @@ import (
 // benchCards returns a fixed prefix of the uuid index. Load sorts that
 // index, so every run measures the same cards in the same order.
 func benchCards(b *testing.B, n int) []string {
-	all := mtgmatcher.GetUUIDs()
+	all := backend().GetUUIDs()
 	if len(all) == 0 {
 		b.Skip("datastore not loaded")
 	}
@@ -25,7 +25,7 @@ func BenchmarkGetUUID(b *testing.B) {
 	uuids := benchCards(b, 10000)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		co, err := mtgmatcher.GetUUID(uuids[i%len(uuids)])
+		co, err := backend().GetUUID(uuids[i%len(uuids)])
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -46,7 +46,7 @@ func BenchmarkGetUUIDEscaping(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		kept := make([]*mtgmatcher.CardObject, 0, pageSize)
 		for j := 0; j < pageSize; j++ {
-			co, err := mtgmatcher.GetUUID(uuids[(i*pageSize+j)%len(uuids)])
+			co, err := backend().GetUUID(uuids[(i*pageSize+j)%len(uuids)])
 			if err != nil {
 				continue
 			}
@@ -74,7 +74,7 @@ func BenchmarkUUID2Card(b *testing.B) {
 // no index behind it, an edition filter served from the set index, and a
 // numeric comparison over the whole pool.
 func BenchmarkSearchAndFilter(b *testing.B) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		b.Skip("datastore not loaded")
 	}
 	for _, query := range []string{"r:mythic", "s:MH2", "cn>300"} {

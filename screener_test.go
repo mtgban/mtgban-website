@@ -342,7 +342,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	}
 
 	// TCG-keyed rows resolve through the id map (needs the datastore)
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("datastore not loaded")
 	}
@@ -351,7 +351,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	var pid int
 	var want, wantFoil string
 	for _, u := range uuids {
-		co, err := mtgmatcher.GetUUID(u)
+		co, err := backend().GetUUID(u)
 		if err != nil || co.Foil || co.Etched || co.Sealed {
 			continue
 		}
@@ -398,7 +398,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 // finish as "anything but Normal" collapsed them onto a single card, so a
 // Lorcana screener showed one row where the archive holds two.
 func TestMoverCardIdSeparatesFoilSubTypes(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("datastore not loaded")
 	}
 
