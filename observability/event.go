@@ -3,6 +3,7 @@ package observability
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"net/url"
 	"strings"
 	"time"
 
@@ -70,4 +71,26 @@ func IsBot(userAgent string) bool {
 		return false
 	}
 	return useragent.Parse(userAgent).Bot
+}
+
+// PathURL turns a NormalizePath key into a same-host absolute path for links.
+// newspaper/index maps to /newspaper; newspaper/syp to /newspaper?page=syp.
+// Keys are produced by NormalizePath, so the result is safe for an href.
+func PathURL(key string) string {
+	key = strings.Trim(key, "/")
+	if key == "" || key == "home" {
+		return "/"
+	}
+	base, sub, cut := strings.Cut(key, "/")
+	if !cut {
+		return "/" + key
+	}
+	if _, ok := pageSubviews[base]; !ok {
+		// Unexpected slash on a non-subview route: link the first segment only.
+		return "/" + base
+	}
+	if sub == "index" {
+		return "/" + base
+	}
+	return "/" + base + "?page=" + url.QueryEscape(sub)
 }
