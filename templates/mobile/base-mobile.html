@@ -19,6 +19,8 @@
     <title>{{block "title" .}}{{.Title}}{{end}}</title>
 
     {{block "extra-head" .}}{{end}}
+    <!-- Before content: setCardArtSource must exist for mid-page art seeding. -->
+    <script type="text/javascript" src="/js/card-art-fallback.js?hash={{.Hash}}"></script>
 </head>
 
 <body class="light-theme mobile{{if .ScopeOpen}} has-scope{{end}}" data-game="{{game}}">
@@ -41,7 +43,6 @@
 </div>
 
 {{block "extra-scripts" .}}{{end}}
-<script type="text/javascript" src="/js/card-art-fallback.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}"></script>

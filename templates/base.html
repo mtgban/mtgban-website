@@ -36,6 +36,8 @@
     <title>{{block "title" .}}{{.Title}}{{end}}</title>
 
     {{block "extra-head" .}}{{end}}
+    <!-- Before content: search seeds #cardImage mid-page via setCardArtSource. -->
+    <script type="text/javascript" src="/js/card-art-fallback.js?hash={{.Hash}}"></script>
 </head>
 
 <body class="light-theme{{if .ModalMode}} modal-embed{{end}}{{if .ScopeOpen}} has-scope{{end}}" data-game="{{game}}">
@@ -77,7 +79,6 @@ window.__BAN_PALETTE_TARGETS = {
 };
 </script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-<script type="text/javascript" src="/js/card-art-fallback.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
