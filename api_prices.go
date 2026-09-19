@@ -25,7 +25,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sig := getSignatureFromCookies(r)
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	blocklistRetail, blocklistBuylist, personalized := getSearchBlocklists(r, sig)
 
 	idsParam := r.FormValue("ids")
 	if idsParam == "" {
@@ -149,7 +149,16 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if hasData {
-		w.Header().Set("Cache-Control", "public, max-age=300")
+		// The URL contains only card IDs, but the answer also depends on the
+		// user's signature and store-preference cookies. Keep personalized
+		// responses out of shared caches, or one user's filtered best price
+		// could be served to another user. Private caching still helps that
+		// user's own browser reuse the response for five minutes.
+		if personalized {
+			w.Header().Set("Cache-Control", "private, max-age=300")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=300")
+		}
 	} else {
 		w.Header().Set("Cache-Control", "no-store")
 	}
