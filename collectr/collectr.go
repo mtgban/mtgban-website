@@ -389,19 +389,6 @@ func findArrayEnd(body string, start int) int {
 	return -1
 }
 
-// LoadReader parses product data from a pre-fetched page body.
-func LoadReader(r io.Reader, game string, maxRows int) ([]Item, error) {
-	catName, ok := CategoryFilter[game]
-	if !ok {
-		return nil, fmt.Errorf("unsupported game: %s", game)
-	}
-	buf, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	return parseProducts(string(buf), catName, maxRows)
-}
-
 func mapCondition(cond string) string {
 	switch strings.ToUpper(strings.TrimSpace(cond)) {
 	case "NM", "NEAR MINT":
