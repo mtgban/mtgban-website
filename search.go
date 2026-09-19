@@ -450,7 +450,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
 	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
 
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
 	query := strings.TrimSpace(r.FormValue("q"))
 	scope := searchScope(w, r)
@@ -531,14 +531,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	skipSellersOpt := readCookie(r, "SearchSellersList")
-	if skipSellersOpt != "" {
-		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
-	}
-	skipVendorsOpt := readCookie(r, "SearchVendorsList")
-	if skipVendorsOpt != "" {
-		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
-	}
 	// For open mode (Any), disable history charts
 	if sig == "" && SigCheck {
 		pageVars.DisableChart = true
