@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestEmbeddedCatalogMatchesSpec(t *testing.T) {
+func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	c, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -23,8 +23,8 @@ func TestEmbeddedCatalogMatchesSpec(t *testing.T) {
 	if c.Packages[0].StoreScope != StoreScopeExplicit || c.Packages[0].IncludedStores != 1 {
 		t.Errorf("starter %+v", c.Packages[0])
 	}
-	// Sealed is gated by mode, so both upper tiers see every store.
-	if c.Packages[1].StoreScope != StoreScopeAll || c.Packages[2].StoreScope != StoreScopeAll {
+	// The 500 tier is BASE_ACCESS per issue 230; the 800 tier adds sealed and every region.
+	if c.Packages[1].StoreScope != StoreScopeBase || c.Packages[2].StoreScope != StoreScopeAll {
 		t.Errorf("scopes %+v", c.Packages)
 	}
 	if !reflect.DeepEqual(c.Packages[1].Modes, []string{"retail", "buylist"}) || !reflect.DeepEqual(c.Packages[2].Modes, Modes) {
@@ -68,7 +68,7 @@ func containsAll(have []string, want ...string) bool {
 
 func TestMustLoadDoesNotPanic(t *testing.T) {
 	if MustLoad() == nil {
-		t.Fatal("nil catalog")
+		t.Fatal("nil list")
 	}
 }
 
@@ -115,18 +115,21 @@ func TestValidateRejects(t *testing.T) {
 		json string
 		want string
 	}{
-		{"no currency", rep(minimal, `"usd"`, `""`), "currency must be a lowercase three-letter code"},
-		{"numeric currency", rep(minimal, `"usd"`, `"123"`), "currency must be a lowercase three-letter code"},
+		{"no currency", rep(minimal, `"usd"`, `""`), "currency must be one of [usd]"},
+		{"unsupported currency", rep(minimal, `"usd"`, `"eur"`), "currency must be one of [usd]"},
 		{"no packages", rep(minimal, pkg, `"packages": []`), "at least one package is required"},
 		{"bad key", rep(minimal, `"key": "p"`, `"key": "P-1"`), `key "P-1" must match`},
+		{"package key taken by an interval", rep(minimal, `"key": "p"`, `"key": "monthly"`), `duplicate key "monthly"`},
 		{"empty package name", rep(minimal, `"name": "P"`, `"name": ""`), "package p: name is empty"},
 		{"zero amount", rep(minimal, `"monthly": 100`, `"monthly": 0`), "package p: monthly must be positive"},
 		{"negative amount", rep(minimal, `"monthly": 100`, `"monthly": -5`), "package p: monthly must be positive"},
 		{"unknown scope", rep(minimal, `"ALL_ACCESS"`, `"DEV_ACCESS"`), "package p: store_scope must be one of"},
 		{"explicit without stores", rep(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": "explicit"`), "included_stores must be at least 1"},
 		{"preset with stores", rep(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": "ALL_ACCESS", "included_stores": 1`), "included_stores applies to an explicit scope only"},
+		{"more included stores than selectable", rep(explicit, `"included_stores": 1`, `"included_stores": 2`), "package p: included_stores 2 exceeds the 1 selectable stores"},
 		{"bad mode", rep(minimal, `["retail"]`, `["all"]`), `package p modes: "all" must be one of`},
 		{"duplicate mode", rep(minimal, `["retail"]`, `["retail", "retail"]`), `package p modes: duplicate "retail"`},
+		{"modes out of order", rep(minimal, `["retail"]`, `["buylist", "retail"]`), "package p modes: must be listed in the order"},
 		{"no modes", rep(minimal, `["retail"]`, `[]`), "package p modes is empty"},
 		{"addon empty name", rep(minimal, `"addons": []`, `"addons": [{"key": "x", "name": "", "monthly": 1, "applies_to": ["p"]}]`), "addon x: name is empty"},
 		{"addon zero amount", rep(minimal, `"addons": []`, `"addons": [{"key": "x", "name": "X", "monthly": 0, "applies_to": ["p"]}]`), "addon x: monthly must be positive"},
@@ -136,8 +139,9 @@ func TestValidateRejects(t *testing.T) {
 		{"duplicate key across kinds", rep(minimal, `"addons": []`, `"addons": [{"key": "p", "name": "X", "monthly": 1, "applies_to": ["p"]}]`), `duplicate key "p"`},
 		{"no intervals", rep(minimal, ivs, `"intervals": []`), "at least one interval is required"},
 		{"no public interval", rep(minimal, `"public": true`, `"public": false`), "at least one interval must be public"},
-		{"bad interval unit", rep(minimal, `"interval": "month"`, `"interval": "fortnight"`), "interval monthly: interval must be one of"},
-		{"week interval", rep(minimal, `"interval": "month"`, `"interval": "week"`), "interval monthly: interval must be one of"},
+		{"bad interval unit", rep(minimal, `"interval": "month"`, `"interval": "fortnight"`), "interval monthly: interval must be one of [month]"},
+		{"week interval", rep(minimal, `"interval": "month"`, `"interval": "week"`), "interval monthly: interval must be one of [month]"},
+		{"year interval", rep(minimal, `"interval": "month"`, `"interval": "year"`), "interval monthly: interval must be one of [month]"},
 		{"zero count", rep(minimal, `"count": 1`, `"count": 0`), "interval monthly: count must be at least 1"},
 		{"no included games", rep(minimal, `["magic"]`, `[]`), "included_games is empty"},
 		{"uppercase included game", rep(minimal, `["magic"]`, `["Magic"]`), `included_games: "Magic" must be a lowercase game name`},
@@ -248,7 +252,6 @@ func TestIntervalAmount(t *testing.T) {
 	}{
 		{Interval{Interval: "month", Count: 1}, 20000, 20000},
 		{Interval{Interval: "month", Count: 3}, 20000, 60000},
-		{Interval{Interval: "year", Count: 1}, 20000, 240000},
 	}
 	for _, c := range cases {
 		got, err := c.iv.Amount(c.monthly)
@@ -256,7 +259,9 @@ func TestIntervalAmount(t *testing.T) {
 			t.Errorf("%+v: got %d %v want %d", c.iv, got, err, c.want)
 		}
 	}
-	if got, err := (Interval{Key: "weekly", Interval: "week", Count: 1}).Amount(20000); err == nil || got != 0 {
-		t.Errorf("week: got %d %v, want an error", got, err)
+	for _, unit := range []string{"year", "week", ""} {
+		if got, err := (Interval{Key: "x", Interval: unit, Count: 1}).Amount(20000); err == nil || got != 0 {
+			t.Errorf("%q: got %d %v, want an error", unit, got, err)
+		}
 	}
 }

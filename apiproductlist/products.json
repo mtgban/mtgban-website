@@ -13,7 +13,7 @@
       "key": "all_stores",
       "name": "All EU/US stores, no sealed",
       "monthly": 50000,
-      "store_scope": "ALL_ACCESS",
+      "store_scope": "BASE_ACCESS",
       "included_stores": 0,
       "modes": ["retail", "buylist"]
     },
