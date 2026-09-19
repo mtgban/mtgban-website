@@ -134,38 +134,15 @@ func namesFinish(cards []mtgmatcher.Card, word string) bool {
 	return false
 }
 
-// CardRedirect answers the URL shape scryfall.com uses for a printing,
-// /card/<set>/<number>, so a link copied from there reaches the same card
-// here: swap the host, keep the path.
+// CardRedirect maps scryfall's /card/<set>/<number>[/<finish>] URLs onto a
+// search for the same printing. Path parts are optional from the right.
 //
-// Every part is optional from the right. /card/<set> is the set, and /card is
-// the search - a path that names less asks for more, rather than for nothing.
-//
-// The third part is a finish, and scryfall fills it with the card's name, so
-// it is taken as a finish only when it names one - see namesFinish. Anything
-// past it is scryfall's too, a language or a tracking parameter, and names no
-// printing either.
-//
-// A finish wins that position whatever else the word is, so scryfall's link
-// for the card named Foil, /card/uma/55/foil, lands on the foil printing of
-// it. The position means one thing wherever it is read, and the card entire is
-// the same link without the word.
-//
-// The printing is handed to the search rather than resolved here, which is
-// what makes the whole finish family land on one page when no finish is asked
-// for: a number names one printing, and this site prices its foil and its
-// nonfoil separately. It also means a set code scryfall spells differently, or
-// a number this game writes another way, fails as a search that says so rather
-// than as a dead link. The name goes in front of the filters where the set
-// files one card under the number, since the query is what the search box
-// shows, and a person reads a name there - the way a result's link always
-// read. Where the name would narrow the results instead of labelling them,
-// the number stands alone - see openingName.
-//
-// The number is matched as printed, with cns: rather than cn:. Scryfall writes
-// it the way the card does, stars and daggers included, and those are exactly
-// what tells two printings of one number apart: 4ED 107 is Thoughtlace and
-// 107† is Drudge Skeletons, and cn: answers both.
+// Invariants the code alone does not show:
+//   - the third segment is a finish only when namesFinish says so (so a card
+//     literally named Foil still works via /card/uma/55/foil)
+//   - hand off to search rather than resolve here, so missing finishes land
+//     on the whole family and bad set/number spellings fail as a search
+//   - match numbers with cns: (as-printed) so stars/daggers distinguish twins
 func CardRedirect(w http.ResponseWriter, r *http.Request) {
 	// Split the path as it was written rather than as it decodes, so a slash
 	// inside a part stays inside it: Flesh and Blood numbers a double-faced
