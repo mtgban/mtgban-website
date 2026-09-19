@@ -27,10 +27,6 @@ func productToRow(categoryID int, p tcgcsv.Product) timeseries.TCGProduct {
 	}
 }
 
-// IsStashingProducts reports whether a product sync is currently running in
-// this process.
-func (s *Service) IsStashingProducts() bool { return s.productsStashing.Load() }
-
 // StashProducts runs SyncProducts under the single-flight guard and the shared
 // crawl lock. It is the cron/CLI entry point, and takes the same kind of
 // context StashPrices does.
