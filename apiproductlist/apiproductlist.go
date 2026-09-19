@@ -1,7 +1,7 @@
-// Package catalog is the API price list: what is sold, at what amount, and
+// Package apiproductlist is the API price list: what is sold, at what amount, and
 // under which entitlement. The website renders the pricing page from it and
 // the gateway seeds Stripe from it, so both read this one embedded file.
-package catalog
+package apiproductlist
 
 import (
 	_ "embed"
@@ -14,7 +14,7 @@ import (
 	"unicode"
 )
 
-//go:embed catalog.json
+//go:embed products.json
 var embedded []byte
 
 // StoreScopeExplicit marks a package whose stores the customer picks.
@@ -78,8 +78,8 @@ type Store struct {
 	Shorthands []string `json:"shorthands"`
 }
 
-// Catalog is the whole price list.
-type Catalog struct {
+// ProductList is the whole price list.
+type ProductList struct {
 	Currency      string     `json:"currency"`
 	Packages      []Package  `json:"packages"`
 	Addons        []Addon    `json:"addons"`
@@ -89,12 +89,12 @@ type Catalog struct {
 }
 
 // Load parses the embedded catalog.
-func Load() (*Catalog, error) {
+func Load() (*ProductList, error) {
 	return Parse(embedded)
 }
 
 // MustLoad is Load for package initializers; the embedded file is under test.
-func MustLoad() *Catalog {
+func MustLoad() *ProductList {
 	c, err := Load()
 	if err != nil {
 		panic(err.Error())
@@ -103,8 +103,8 @@ func MustLoad() *Catalog {
 }
 
 // Parse decodes and validates a catalog document.
-func Parse(data []byte) (*Catalog, error) {
-	var c Catalog
+func Parse(data []byte) (*ProductList, error) {
+	var c ProductList
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("catalog: %w", err)
 	}
@@ -115,7 +115,7 @@ func Parse(data []byte) (*Catalog, error) {
 }
 
 // Validate reports the first thing wrong with the catalog.
-func (c *Catalog) Validate() error {
+func (c *ProductList) Validate() error {
 	if !currencyPattern.MatchString(c.Currency) {
 		return errors.New("currency must be a lowercase three-letter code")
 	}
@@ -202,7 +202,7 @@ func (c *Catalog) Validate() error {
 
 // validateStores checks keys, names, shorthands, and that an explicit
 // package has something implied and something to pick.
-func (c *Catalog) validateStores(explicit bool) error {
+func (c *ProductList) validateStores(explicit bool) error {
 	if len(c.Stores) == 0 {
 		return errors.New("stores is empty")
 	}
@@ -242,7 +242,7 @@ func (c *Catalog) validateStores(explicit bool) error {
 }
 
 // checkLookupKeyCollisions reports when two items and intervals produce the same Stripe lookup key.
-func (c *Catalog) checkLookupKeyCollisions() error {
+func (c *ProductList) checkLookupKeyCollisions() error {
 	seen := map[string]bool{}
 	items := make([]string, 0, len(c.Packages)+len(c.Addons))
 	for _, p := range c.Packages {
@@ -288,13 +288,13 @@ func isToken(s string) bool {
 	return s != "" && !strings.ContainsRune(s, ',') && strings.IndexFunc(s, unicode.IsSpace) < 0
 }
 
-func (c *Catalog) hasPackage(key string) bool {
+func (c *ProductList) hasPackage(key string) bool {
 	_, ok := c.Package(key)
 	return ok
 }
 
 // Package returns the package with that key.
-func (c *Catalog) Package(key string) (Package, bool) {
+func (c *ProductList) Package(key string) (Package, bool) {
 	for _, p := range c.Packages {
 		if p.Key == key {
 			return p, true
@@ -304,7 +304,7 @@ func (c *Catalog) Package(key string) (Package, bool) {
 }
 
 // Addon returns the add-on with that key.
-func (c *Catalog) Addon(key string) (Addon, bool) {
+func (c *ProductList) Addon(key string) (Addon, bool) {
 	for _, a := range c.Addons {
 		if a.Key == key {
 			return a, true
@@ -314,7 +314,7 @@ func (c *Catalog) Addon(key string) (Addon, bool) {
 }
 
 // Interval returns the interval with that key.
-func (c *Catalog) Interval(key string) (Interval, bool) {
+func (c *ProductList) Interval(key string) (Interval, bool) {
 	for _, iv := range c.Intervals {
 		if iv.Key == key {
 			return iv, true
@@ -324,7 +324,7 @@ func (c *Catalog) Interval(key string) (Interval, bool) {
 }
 
 // Store returns the store with that key.
-func (c *Catalog) Store(key string) (Store, bool) {
+func (c *ProductList) Store(key string) (Store, bool) {
 	for _, s := range c.Stores {
 		if s.Key == key {
 			return s, true
@@ -334,7 +334,7 @@ func (c *Catalog) Store(key string) (Store, bool) {
 }
 
 // PublicIntervals returns the intervals a customer may pick without an invite.
-func (c *Catalog) PublicIntervals() []Interval {
+func (c *ProductList) PublicIntervals() []Interval {
 	var out []Interval
 	for _, iv := range c.Intervals {
 		if iv.Public {
@@ -345,7 +345,7 @@ func (c *Catalog) PublicIntervals() []Interval {
 }
 
 // ImpliedStores returns the stores every explicit-scope package includes.
-func (c *Catalog) ImpliedStores() []Store {
+func (c *ProductList) ImpliedStores() []Store {
 	var out []Store
 	for _, s := range c.Stores {
 		if s.Implied {
@@ -356,7 +356,7 @@ func (c *Catalog) ImpliedStores() []Store {
 }
 
 // SelectableStores returns the stores a customer may pick on an explicit-scope package.
-func (c *Catalog) SelectableStores() []Store {
+func (c *ProductList) SelectableStores() []Store {
 	var out []Store
 	for _, s := range c.Stores {
 		if !s.Implied {
