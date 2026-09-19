@@ -36,7 +36,7 @@
 
     <div class="m-home-tools">
         {{range .Nav}}
-            {{if and (ne .Name "Home") (ne .Class "beta")}}
+            {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Class "beta")}}
                 <a class="m-home-tool" href="{{.Link}}">
                     <span class="m-home-tool-icon">{{.Short}}</span> {{.Name}}
                 </a>
@@ -55,6 +55,8 @@
             <a href="https://mtgban.com">Magic: the Gathering</a>
             <span>|</span>
             <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+            <span>|</span>
+            <a href="/changelog">Changelog</a>
         </div>
 
         <div class="m-home-login-row">

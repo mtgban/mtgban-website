@@ -1,0 +1,130 @@
+.changelog-page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 30px var(--page-gutter) 72px;
+}
+
+.changelog-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 42px;
+}
+
+.changelog-header h1 {
+    margin: 0;
+    color: var(--headingtext);
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: clamp(2.5rem, 7vw, 4.2rem);
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+}
+
+.changelog-header p {
+    margin: 12px 0 0;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+}
+
+.changelog-header .page-action {
+    margin-top: 5px;
+}
+
+.changelog-list {
+    border-top: 1px solid var(--border-moderate);
+}
+
+.changelog-entry {
+    padding: 25px 0 28px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.changelog-date {
+    display: block;
+    margin-bottom: 12px;
+    color: var(--ainfo);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.changelog-copy,
+.changelog-entry h2 {
+    max-width: 680px;
+    margin: 0;
+    color: var(--normaltext);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.changelog-entry h2 {
+    margin-bottom: 6px;
+    color: var(--headingtext);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: normal;
+}
+
+.changelog-source,
+.changelog-attachment {
+    display: inline-block;
+    margin-top: 15px;
+    margin-right: 14px;
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.changelog-source:hover,
+.changelog-attachment:hover {
+    color: var(--ainfo);
+}
+
+.changelog-message {
+    margin: 0;
+    padding: 25px 0;
+    border-top: 1px solid var(--border-moderate);
+    color: var(--text-dim);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+}
+
+.changelog-message-error {
+    color: var(--adanger);
+}
+
+@media (max-width: 640px) {
+    .changelog-page {
+        padding: 24px 20px 48px;
+    }
+
+    .changelog-header {
+        align-items: flex-end;
+        margin-bottom: 30px;
+    }
+
+    .changelog-header p {
+        max-width: 220px;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .changelog-header .page-action {
+        padding: 7px 12px;
+        font-size: 12px;
+    }
+
+    .changelog-copy {
+        font-size: 15px;
+    }
+}

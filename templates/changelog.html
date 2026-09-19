@@ -1,0 +1,48 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/changelog.css?hash={{.Hash}}">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+<main class="changelog-page">
+    <header class="changelog-header">
+        <div>
+            <h1>Changelog</h1>
+            <p>A running record of what changed at MTGBAN.</p>
+        </div>
+        <a class="page-action" href="/discord">Discord</a>
+    </header>
+
+    {{if .ChangelogError}}
+    <p class="changelog-message changelog-message-error">{{.ChangelogError}}</p>
+    {{else if not .Changelog}}
+    <p class="changelog-message">No announcements yet.</p>
+    {{else}}
+    <div class="changelog-list">
+        {{range .Changelog}}
+        <article class="changelog-entry">
+            <time class="changelog-date">{{.Published}}</time>
+
+            {{if .Content}}
+            <p class="changelog-copy">{{.Content}}</p>
+            {{end}}
+
+            {{range .Embeds}}
+                {{if .Title}}<h2>{{.Title}}</h2>{{end}}
+                {{if .Description}}<p class="changelog-copy">{{.Description}}</p>{{end}}
+                {{if .URL}}<a class="changelog-source" href="{{.URL}}" target="_blank" rel="noopener">Open link</a>{{end}}
+            {{end}}
+
+            {{range .Attachments}}
+            <a class="changelog-attachment" href="{{.URL}}" target="_blank" rel="noopener">{{.Name}}</a>
+            {{end}}
+
+            {{if .SourceURL}}<a class="changelog-source" href="{{.SourceURL}}" target="_blank" rel="noopener">View in Discord</a>{{end}}
+        </article>
+        {{end}}
+    </div>
+    {{end}}
+</main>
+{{end}}

@@ -117,6 +117,8 @@ type PageVars struct {
 	ShowUpsell     bool
 
 	PopularSearches []PopularSearch
+	Changelog       []changelogEntry
+	ChangelogError  string
 
 	CanShowAll       bool
 	CleanSearchQuery string
@@ -382,6 +384,13 @@ var DefaultNav = []NavElem{
 		Link:  "/",
 		Page:  "home.html",
 	},
+	{
+		Name:        "Changelog",
+		Short:       "📝",
+		Description: "See what changed recently",
+		Link:        "/changelog",
+		Page:        "changelog.html",
+	},
 }
 
 // List of keys that may be present or not, and when present they are
@@ -584,28 +593,29 @@ type ConfigType struct {
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
 	// from the ban list document or the set registry.
-	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
-	ScraperConfig          ScraperConfig      `json:"scraper_config"`
-	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	DiscordHook            string             `json:"discord_hook"`
-	DiscordNotifHook       string             `json:"discord_notif_hook"`
-	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
-	DiscordInviteLink      string             `json:"discord_invite_link"`
-	API                    map[string]string  `json:"api"`
-	APIDemoStores          []string           `json:"api_demo_stores"`
-	DiscordToken           string             `json:"discord_token"`
-	ArbitDefaultSellers    []string           `json:"arbit_default_sellers"`
-	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
-	SearchRetailBlockList  []string           `json:"search_block_list"`
-	SearchBuylistBlockList []string           `json:"search_buylist_block_list"`
-	SleepersBlockList      []string           `json:"sleepers_block_list"`
-	UploadSealedBlockList  []string           `json:"upload_sealed_block_list"`
-	GlobalAllowList        []string           `json:"global_allow_list"`
-	GlobalProbeList        []string           `json:"global_probe_list"`
-	Patreon                PatreonConfig      `json:"patreon"`
-	APIUserSecrets         map[string]string  `json:"api_user_secrets"`
-	GoogleCredentials      string             `json:"google_credentials"`
-	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
+	FormatEvents              []FormatEvent      `json:"format_events,omitempty"`
+	ScraperConfig             ScraperConfig      `json:"scraper_config"`
+	TimeseriesConfig          TimeseriesConfig   `json:"timeseries_config"`
+	DiscordHook               string             `json:"discord_hook"`
+	DiscordNotifHook          string             `json:"discord_notif_hook"`
+	DiscordAPINotifHook       string             `json:"discord_api_notif_hook"`
+	DiscordInviteLink         string             `json:"discord_invite_link"`
+	DiscordChangelogChannelID string             `json:"discord_changelog_channel_id"`
+	API                       map[string]string  `json:"api"`
+	APIDemoStores             []string           `json:"api_demo_stores"`
+	DiscordToken              string             `json:"discord_token"`
+	ArbitDefaultSellers       []string           `json:"arbit_default_sellers"`
+	ArbitBlockVendors         []string           `json:"arbit_block_vendors"`
+	SearchRetailBlockList     []string           `json:"search_block_list"`
+	SearchBuylistBlockList    []string           `json:"search_buylist_block_list"`
+	SleepersBlockList         []string           `json:"sleepers_block_list"`
+	UploadSealedBlockList     []string           `json:"upload_sealed_block_list"`
+	GlobalAllowList           []string           `json:"global_allow_list"`
+	GlobalProbeList           []string           `json:"global_probe_list"`
+	Patreon                   PatreonConfig      `json:"patreon"`
+	APIUserSecrets            map[string]string  `json:"api_user_secrets"`
+	GoogleCredentials         string             `json:"google_credentials"`
+	BuylistMarketCredit       map[string]float64 `json:"buylist_market_credit"`
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
@@ -1572,6 +1582,9 @@ func main() {
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
 	})
+
+	// Public changelog sourced from the Discord announcement channel.
+	http.Handle("/changelog", noSigning(http.HandlerFunc(Changelog)))
 
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
