@@ -117,7 +117,7 @@ type PageVars struct {
 	ShowUpsell     bool
 
 	PopularSearches []PopularSearch
-	Changelog       []ChangelogEntry
+	Changelog       []changelogEntry
 	ChangelogError  string
 
 	CanShowAll       bool
