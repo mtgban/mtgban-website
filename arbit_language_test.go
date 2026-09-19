@@ -3,8 +3,6 @@ package main
 import (
 	"slices"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestSleepersLanguagesAreEnglishMarket checks the list says what it means:
@@ -24,14 +22,14 @@ func TestSleepersLanguagesAreEnglishMarket(t *testing.T) {
 // by hand: one the datastore gains later would be dropped silently, being
 // neither English nor on the list. This is where that shows up.
 func TestSleepersLanguagesCoverFlavourPrintings(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher data not loaded")
 	}
 
 	missing := map[string]int{}
 	for _, u := range uuids {
-		co, err := mtgmatcher.GetUUID(u)
+		co, err := backend().GetUUID(u)
 		if err != nil || co.Language == "" {
 			continue
 		}
@@ -52,7 +50,7 @@ func TestSleepersLanguagesCoverFlavourPrintings(t *testing.T) {
 // TestSleepersDropForeignPrintings exercises the two modes that go through
 // ArbitOpts, which is what issue #319 asks for.
 func TestSleepersDropForeignPrintings(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher data not loaded")
 	}
 	// Without scrapers there is nothing to compare and both come back empty,
@@ -66,7 +64,7 @@ func TestSleepersDropForeignPrintings(t *testing.T) {
 	}
 	for name, tiers := range results {
 		for cardID := range tiers {
-			co, err := mtgmatcher.GetUUID(cardID)
+			co, err := backend().GetUUID(cardID)
 			if err != nil {
 				continue
 			}

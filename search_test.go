@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 	}
 
 	uuid := randomUUID(false)
-	co, err := mtgmatcher.GetUUID(uuid)
+	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -64,7 +64,7 @@ func parseSearchOptionsWrapper(input string) SearchConfig {
 // datastoreLoaded reports whether the mtgmatcher card datastore is available,
 // so data-dependent tests can skip when it isn't loaded locally or in CI.
 func datastoreLoaded() bool {
-	_, err := mtgmatcher.Match(&mtgmatcher.InputCard{Name: "Forest"})
+	_, err := backend().Match(&mtgmatcher.InputCard{Name: "Forest"})
 	var alias *mtgmatcher.AliasingError
 	return err == nil || errors.As(err, &alias)
 }
@@ -86,7 +86,7 @@ func TestAttemptMatchVariantIncludesFoil(t *testing.T) {
 
 	var haveNonfoil, haveFoil bool
 	for _, id := range uuids {
-		co, err := mtgmatcher.GetUUID(id)
+		co, err := backend().GetUUID(id)
 		if err != nil || co.Etched {
 			continue
 		}
@@ -204,10 +204,10 @@ func BenchmarkSearchOnlyBuylist(b *testing.B) {
 // nothing. When filters reject every exact match the search widens to the
 // prefix pool; a bare exact query keeps its exact-match priority.
 func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
-	if _, err := mtgmatcher.GetSet("LEB"); err != nil {
+	if _, err := backend().GetSet("LEB"); err != nil {
 		t.Skip("datastore not loaded")
 	}
-	if uuids, err := mtgmatcher.SearchEquals("serra"); err != nil || len(uuids) == 0 {
+	if uuids, err := backend().SearchEquals("serra"); err != nil || len(uuids) == 0 {
 		t.Skip("no exact card named Serra in this datastore")
 	}
 
@@ -220,7 +220,7 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 		t.Fatal("s:leb serra should widen to the prefix pool")
 	}
 	for _, uuid := range results {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,7 +239,7 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 		t.Fatal("bare serra should find the exact card")
 	}
 	for _, uuid := range results {
-		co, _ := mtgmatcher.GetUUID(uuid)
+		co, _ := backend().GetUUID(uuid)
 		if co.Name != "Serra" {
 			t.Errorf("bare exact query widened unexpectedly to %s", co.Name)
 		}

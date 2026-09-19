@@ -156,7 +156,7 @@ func TestCollectorNumberPLST(t *testing.T) {
 }
 
 func TestSetNumberShorthand(t *testing.T) {
-	if _, err := mtgmatcher.GetSet("PLST"); err != nil {
+	if _, err := backend().GetSet("PLST"); err != nil {
 		t.Skip("datastore not loaded")
 	}
 
@@ -301,7 +301,7 @@ func TestSetNumberShorthand(t *testing.T) {
 		var numbers []string
 		seen := map[string]bool{}
 		for _, key := range keys {
-			co, err := mtgmatcher.GetUUID(key)
+			co, err := backend().GetUUID(key)
 			if err != nil || seen[co.Number] {
 				continue
 			}
@@ -324,7 +324,7 @@ func TestSetNumberShorthand(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, key := range keys {
-			co, err := mtgmatcher.GetUUID(key)
+			co, err := backend().GetUUID(key)
 			if err != nil {
 				continue
 			}
@@ -347,7 +347,7 @@ func TestSetNumberShorthand(t *testing.T) {
 		}
 		numbers := map[string]bool{}
 		for _, key := range keys {
-			co, err := mtgmatcher.GetUUID(key)
+			co, err := backend().GetUUID(key)
 			if err != nil {
 				continue
 			}
@@ -367,7 +367,7 @@ func TestSetNumberShorthand(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, key := range keys {
-			co, err := mtgmatcher.GetUUID(key)
+			co, err := backend().GetUUID(key)
 			if err != nil {
 				continue
 			}

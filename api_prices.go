@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 type PriceResult struct {
@@ -128,7 +126,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Prefer thumbnail for inline favorites/recents render; fall back to full.
-		if co, err := mtgmatcher.GetUUID(cardID); err == nil {
+		if co, err := backend().GetUUID(cardID); err == nil {
 			if img, ok := co.Images["thumbnail"]; ok && img != "" {
 				result.ImageURL = img
 			} else if img, ok := co.Images["full"]; ok {

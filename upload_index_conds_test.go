@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // firstPlainCard returns a nonfoil single to hang the price entries on.
 func firstPlainCard(t *testing.T) string {
 	t.Helper()
-	for _, id := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(id)
+	for _, id := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(id)
 		if err == nil && !co.Sealed && !co.Foil && !co.Etched {
 			return id
 		}

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // Benchmarks comparing the two price pipelines on the same logical query:
@@ -33,8 +32,8 @@ var (
 // realistic scale: every card of the chosen set plus a sample of the wider
 // pool, so the edition filter has plenty of non-matching entries to reject.
 func buildBenchData() {
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -47,7 +46,7 @@ func buildBenchData() {
 		return
 	}
 
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	// Sample the pool down to ~50k cards per store.
 	step := len(uuids) / 50000
 	if step < 1 {
@@ -60,7 +59,7 @@ func buildBenchData() {
 	}
 	benchPoolUUIDs = pool
 	for _, u := range uuids {
-		co, err := mtgmatcher.GetUUID(u)
+		co, err := backend().GetUUID(u)
 		if err == nil && co.SetCode == benchSetCode && !co.Sealed {
 			benchSetUUIDs = append(benchSetUUIDs, u)
 		}
@@ -97,7 +96,7 @@ func buildBenchData() {
 
 func seedBenchScrapers(b *testing.B) (stores []string) {
 	b.Helper()
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		b.Skip("mtgmatcher data not loaded")
 	}
 	benchSeedOnce.Do(buildBenchData)

@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -146,7 +145,7 @@ func getDatasets(ctx context.Context, cardID string, sealed bool, keys []string,
 		return nil
 	}
 
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -430,7 +429,7 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 func getDatasetsForMulti(ctx context.Context, cardIDs []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
 	cards := make([]multiCardInput, 0, len(cardIDs))
 	for _, cardID := range cardIDs {
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -563,7 +562,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				card, err := mtgmatcher.GetUUID(id)
+				card, err := backend().GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
 					continue
@@ -594,7 +593,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				card, err := mtgmatcher.GetUUID(id)
+				card, err := backend().GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
 					continue

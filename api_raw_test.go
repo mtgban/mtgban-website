@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // withSigMode runs one test under the given auth flags, restoring them after.
@@ -33,7 +31,7 @@ func TestRawCardAPIDumpsEveryField(t *testing.T) {
 	}
 	withSigMode(t, true, false)
 
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Fatal("datastore loaded but no uuids")
 	}

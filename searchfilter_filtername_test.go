@@ -11,10 +11,10 @@ import (
 // Which words are a set filter and which are a card's name, decided against
 // the datastore the suite already has loaded.
 func TestSetFilterNamesNothing(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	if _, err := mtgmatcher.GetSet("LEA"); err != nil {
+	if _, err := backend().GetSet("LEA"); err != nil {
 		t.Skip("this datastore has no LEA")
 	}
 
@@ -57,8 +57,8 @@ func TestSetFilterNamesNothing(t *testing.T) {
 //
 //	YUGIOH_PATH=... go test -run NameThatIsFilterSyntaxIsStillFound
 func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
-	saved := mtgmatcher.GlobalDatastore()
-	t.Cleanup(func() { mtgmatcher.SetGlobalDatastore(saved) })
+	saved := backend()
+	t.Cleanup(func() { matcherBackend.Store(saved) })
 
 	var games []string
 	for game := range gameDatastores {
@@ -77,16 +77,16 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		backend, err := mtgmatcher.Open(game, f)
+		datastore, err := mtgmatcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
 			continue
 		}
-		mtgmatcher.SetGlobalDatastore(backend)
+		matcherBackend.Store(datastore)
 
-		for _, uuid := range mtgmatcher.GetUUIDs() {
-			co, err := mtgmatcher.GetUUID(uuid)
+		for _, uuid := range backend().GetUUIDs() {
+			co, err := backend().GetUUID(uuid)
 			if err != nil || co.Sealed || !re.MatchString(co.Name) {
 				continue
 			}

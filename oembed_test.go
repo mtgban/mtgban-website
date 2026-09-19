@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/embed"
 )
 
@@ -17,7 +16,7 @@ import (
 // gives has to be one - the search handler's own error paths render a whole
 // html page, which a consumer asking for json cannot read.
 func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
@@ -65,13 +64,13 @@ func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 // all one price list quotes the first card's numbers under every other card's
 // name - a Tempest common priced as a 30th Anniversary one.
 func TestPreviewQuotesEachCardWithItsOwnPrices(t *testing.T) {
-	ids, _ := mtgmatcher.SearchEquals("Counterspell")
+	ids, _ := backend().SearchEquals("Counterspell")
 	if len(ids) < 2 {
 		t.Skip("no datastore loaded")
 	}
 
 	prices := map[string]float64{ids[0]: 1.11, ids[1]: 22.22}
-	out := embed.Generate(externalURL(nil), ids[:2], editionTitle, func(cardID string) []embed.Entry {
+	out := embed.Generate(backend(), externalURL(nil), ids[:2], editionTitle, func(cardID string) []embed.Entry {
 		return []embed.Entry{{ScraperName: "TCG Low", Shorthand: "TCGLow", Price: prices[cardID]}}
 	})
 

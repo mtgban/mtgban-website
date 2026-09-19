@@ -19,17 +19,17 @@ import (
 // and whose cards are not all equally likely, so that an order means something.
 func productWithVariableCards(t *testing.T) *mtgmatcher.CardObject {
 	t.Helper()
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !mtgmatcher.SealedHasDecklist(code, product.UUID) ||
-				!mtgmatcher.SealedIsRandom(code, product.UUID) {
+			if !backend().SealedHasDecklist(code, product.UUID) ||
+				!backend().SealedIsRandom(code, product.UUID) {
 				continue
 			}
-			co, err := mtgmatcher.GetUUID(product.UUID)
+			co, err := backend().GetUUID(product.UUID)
 			if err != nil {
 				continue
 			}
@@ -56,7 +56,7 @@ func productWithVariableCards(t *testing.T) *mtgmatcher.CardObject {
 // Only the variable reading asks how likely each card is: the fixed list is
 // certain, and everything a product can hold mixes the two.
 func TestDropOddsAnswerTheVariableReadingOnly(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	co := productWithVariableCards(t)
@@ -129,7 +129,7 @@ func TestFormatExpectedCount(t *testing.T) {
 // copies, not the commons already obvious from their sheer number under
 // every other sort.
 func TestVariableReadingShowsAndSortsByDropRate(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
@@ -252,7 +252,7 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 // already in hand - so the row belongs with what someone would buy it back
 // for, not with those.
 func TestDropRateShowsOnlyOnTheBuyersSide(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
@@ -314,7 +314,7 @@ func TestDropRateShowsOnlyOnTheBuyersSide(t *testing.T) {
 // not Card Kingdom's - the buyers side alone calls buylist_badge at all, so
 // it is the only side that could show it.
 func TestDropRateDoesNotBorrowACKBadgeOrAFixLink(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
@@ -378,7 +378,7 @@ func TestDropRateDoesNotBorrowACKBadgeOrAFixLink(t *testing.T) {
 // The row's visibility is not tied to the sort: every sort mode shows the
 // same number of Avg Copies rows, and the pill only reorders them.
 func TestDropRateVisibilityDoesNotDependOnSort(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)

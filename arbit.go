@@ -255,7 +255,7 @@ var FilterOptConfig = map[string]FilterOpt{
 			oldFunc := opts.CustomPriceFilter
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
-				co, err := mtgmatcher.GetUUID(cardId)
+				co, err := backend().GetUUID(cardId)
 				if err == nil && co.Sealed {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
 						return 0, true
@@ -906,13 +906,13 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		var arbit []mtgban.ArbitEntry
 		if pageVars.GlobalMode && source.Info().SealedMode {
-			arbit = mtgban.Mismatch(opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
+			arbit = mtgban.Mismatch(backend(), opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
 		} else if pageVars.GlobalMode {
-			arbit = mtgban.Mismatch(opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
+			arbit = mtgban.Mismatch(backend(), opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
 		} else if pageVars.ReverseMode {
-			arbit = mtgban.Arbit(opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
+			arbit = mtgban.Arbit(backend(), opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
 		} else {
-			arbit = mtgban.Arbit(opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
+			arbit = mtgban.Arbit(backend(), opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
 		}
 		if len(arbit) == 0 {
 			continue

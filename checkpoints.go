@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
 
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
@@ -142,7 +141,7 @@ func relevantCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint 
 	}
 
 	printingSet := map[string]bool{}
-	if codes, err := mtgmatcher.Printings4Card(cardName); err == nil {
+	if codes, err := backend().Printings4Card(cardName); err == nil {
 		for _, c := range codes {
 			printingSet[strings.ToUpper(c)] = true
 		}
@@ -360,7 +359,7 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 // a half-step down (Conspiracy/Battlebond/MH-style), and the rest (commander,
 // promo, masters, starter, etc.) are typically companion products.
 func releasePriority(code string) int {
-	set, err := mtgmatcher.GetSet(code)
+	set, err := backend().GetSet(code)
 	if err != nil {
 		return 0
 	}
@@ -382,7 +381,7 @@ func releasePriority(code string) int {
 // card was printed in the given set. Falls back to the set's release date for
 // printings that don't carry a per-card date in MTGJSON.
 func perCardSetCheckpoints(cardName string, e EditionEntry, earliest, now time.Time) []ChartCheckpoint {
-	cards := mtgmatcher.MatchInSet(cardName, e.Code)
+	cards := backend().MatchInSet(cardName, e.Code)
 	if len(cards) == 0 {
 		return nil
 	}

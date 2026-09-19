@@ -32,7 +32,7 @@ func externalUUID(id string) string {
 		mtgmatcher.IDSpaceScryfall,
 		mtgmatcher.IDSpaceTCGplayer,
 	} {
-		uuid := mtgmatcher.ConvertID(space, id)
+		uuid := backend().ConvertID(space, id)
 		if uuid != "" {
 			return uuid
 		}
@@ -420,7 +420,7 @@ func promoTypeLabel(value string) string {
 	if strings.HasPrefix(value, "ff") {
 		return strings.ToUpper(value)
 	}
-	return mtgmatcher.PromoTypeLabel(value)
+	return backend().PromoTypeLabel(value)
 }
 
 type GenericCard struct {
@@ -512,16 +512,16 @@ func fileExists(filename string) bool {
 }
 
 func keyruneForCardSet(cardID string) string {
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		return ""
 	}
 
-	set, err := mtgmatcher.GetSet(co.Card.SetCode)
+	set, err := backend().GetSet(co.Card.SetCode)
 	if err != nil {
 		// Try again if token is under a related set
 		if co.Card.Rarity == "token" {
-			set, err = mtgmatcher.GetSet(strings.TrimPrefix(co.Card.SetCode, "T"))
+			set, err = backend().GetSet(strings.TrimPrefix(co.Card.SetCode, "T"))
 		}
 		if err != nil {
 			return ""
@@ -559,10 +559,10 @@ func keyruneForCardSet(cardID string) string {
 // getSetKeyrunes returns a map of set code -> bare "ss-CODE" keyrune class.
 // Used by the search landing page to render set-search recent-search items.
 func getSetKeyrunes() map[string]string {
-	codes := mtgmatcher.GetAllSets()
+	codes := backend().GetAllSets()
 	out := make(map[string]string, len(codes))
 	for _, code := range codes {
-		set, err := mtgmatcher.GetSet(code)
+		set, err := backend().GetSet(code)
 		if err != nil || set.KeyruneCode == "" {
 			continue
 		}
@@ -619,7 +619,7 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 // Step-and-Compleat are not "something foil" and keep their own shape.
 func finishListLabel(finish string) string {
 	if slices.Contains(altFoilTags, finish) {
-		label := mtgmatcher.PromoTypeLabel(finish)
+		label := backend().PromoTypeLabel(finish)
 		if label != mtgmatcher.Title(finish) {
 			if strings.HasSuffix(label, " foil") {
 				label = strings.TrimSuffix(label, " foil") + " Foil"
@@ -647,7 +647,7 @@ func spellFinish(finish string) string {
 }
 
 func editionTitle(cardID string) string {
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		return ""
 	}
@@ -797,7 +797,7 @@ func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, er
 
 // Look for a TCGproductId in all available places
 func findTCGproductID(cardID string) string {
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		return ""
 	}
@@ -895,7 +895,7 @@ var allLanguageFlags = map[string]string{
 }
 
 func showVariant(cardID string) bool {
-	setDate, err := mtgmatcher.CardReleaseDate(cardID)
+	setDate, err := backend().CardReleaseDate(cardID)
 	if err != nil {
 		return false
 	}
@@ -903,7 +903,7 @@ func showVariant(cardID string) bool {
 }
 
 func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
 	}
@@ -959,7 +959,7 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 	// Loop through the supported promo types, skipping Boosterfun already processed above
 	var promoTypes []string
 	for _, promoType := range co.PromoTypes {
-		if !slices.Contains(mtgmatcher.AllPromoTypes(), promoType) || promoType == magic.PromoTypeBoosterfun {
+		if !slices.Contains(backend().AllPromoTypes, promoType) || promoType == magic.PromoTypeBoosterfun {
 			continue
 		}
 
@@ -1024,8 +1024,8 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 	path := "search"
 	if co.Sealed {
 		path = "sealed"
-		canBoosterGen = mtgmatcher.SealedIsRandom(co.SetCode, co.UUID)
-		hasDecklist = mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID)
+		canBoosterGen = backend().SealedIsRandom(co.SetCode, co.UUID)
+		hasDecklist = backend().SealedHasDecklist(co.SetCode, co.UUID)
 	}
 
 	searchURL := fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query))
@@ -1039,7 +1039,7 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		for _, sealed := range sourceSealed {
 			// The sealed uuids while known might have changed and we need to
 			// make sure they don't crash the system here
-			sealedCo, err := mtgmatcher.GetUUID(sealed)
+			sealedCo, err := backend().GetUUID(sealed)
 			if err != nil {
 				continue
 			}
@@ -1161,7 +1161,7 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 	var b strings.Builder
 	// Hack to generate HTML in the template
 	for i, setCode := range co.Printings {
-		set, err := mtgmatcher.GetSet(setCode)
+		set, err := backend().GetSet(setCode)
 		if err != nil {
 			continue
 		}
@@ -1381,7 +1381,7 @@ func isSecureRequest(r *http.Request) bool {
 // must not let degraded warmup responses into caches: an empty payload with
 // a public max-age poisons every client behind the CDN for its lifetime.
 func dataReady() bool {
-	return len(mtgmatcher.GetUUIDs()) != 0 && len(GetSellers()) != 0 && len(GetVendors()) != 0
+	return len(backend().GetUUIDs()) != 0 && len(GetSellers()) != 0 && len(GetVendors()) != 0
 }
 
 // storeEligible reports whether a store may appear in a price surface under
@@ -1416,9 +1416,9 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 
 // Return a random uuid from the pool of singles or sealed uuids
 func randomUUID(sealed bool) string {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if sealed {
-		uuids = mtgmatcher.GetSealedUUIDs()
+		uuids = backend().GetSealedUUIDs()
 	}
 	if len(uuids) == 0 {
 		return ""

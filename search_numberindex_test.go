@@ -12,12 +12,12 @@ import (
 // search simply finds nothing and reads as "no such card", so the agreement
 // is worth asserting rather than assuming.
 func TestNumberIndexMatchesScan(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore loaded to run this test")
 	}
 	previous := numberIdx.Load()
 	t.Cleanup(func() { numberIdx.Store(previous) })
-	numberIdx.Store(buildNumberIndex(mtgmatcher.GlobalDatastore()))
+	numberIdx.Store(buildNumberIndex(backend()))
 
 	for _, tt := range []struct {
 		query, filter string
@@ -38,7 +38,7 @@ func TestNumberIndexMatchesScan(t *testing.T) {
 				t.Fatalf("%s did not seed", tt.query)
 			}
 			// The scan the seed replaces: every uuid, same filters.
-			scanned := filterUUIDs(mtgmatcher.GetUUIDs(), config.CardFilters)
+			scanned := filterUUIDs(backend().GetUUIDs(), config.CardFilters)
 			got := filterUUIDs(seeded, config.CardFilters)
 
 			slices.Sort(got)
@@ -53,12 +53,12 @@ func TestNumberIndexMatchesScan(t *testing.T) {
 // TestNumberSeedDeclines pins the shapes that do not bound the result set, and
 // so must keep scanning rather than seed a wrong answer.
 func TestNumberSeedDeclines(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore loaded to run this test")
 	}
 	previous := numberIdx.Load()
 	t.Cleanup(func() { numberIdx.Store(previous) })
-	numberIdx.Store(buildNumberIndex(mtgmatcher.GlobalDatastore()))
+	numberIdx.Store(buildNumberIndex(backend()))
 
 	for _, query := range []string{
 		"-cn:635",    // names what to leave out
@@ -90,12 +90,12 @@ func TestNumberIndexKeepsStoredForms(t *testing.T) {
 }
 
 func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore")
 	}
 	previous := numberIdx.Load()
 	t.Cleanup(func() { numberIdx.Store(previous) })
-	idx := buildNumberIndex(mtgmatcher.GlobalDatastore())
+	idx := buildNumberIndex(backend())
 	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
 			config := parseSearchOptionsNG(query, nil, nil, nil)
@@ -115,12 +115,12 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 // BenchmarkNumberIndexSearch measures the same request path with the index
 // disabled and enabled, after first checking that the result sets agree.
 func BenchmarkNumberIndexSearch(b *testing.B) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		b.Skip("Need a datastore")
 	}
 	previous := numberIdx.Load()
 	b.Cleanup(func() { numberIdx.Store(previous) })
-	idx := buildNumberIndex(mtgmatcher.GlobalDatastore())
+	idx := buildNumberIndex(backend())
 	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
 		config := parseSearchOptionsNG(query, nil, nil, nil)
 		numberIdx.Store(nil)
@@ -157,7 +157,7 @@ func BenchmarkNumberIndexSearch(b *testing.B) {
 }
 
 func BenchmarkNumberIndexBuild(b *testing.B) {
-	backend := mtgmatcher.GlobalDatastore()
+	backend := backend()
 	if len(backend.GetUUIDs()) == 0 {
 		b.Skip("Need a datastore")
 	}

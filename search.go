@@ -264,6 +264,7 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 		SearchMode:     config.SearchMode,
 		AppliedFilters: config.AppliedFilters,
 		Sealed:         sealed,
+		Backend:        backend(),
 	})
 }
 
@@ -320,7 +321,7 @@ func searchFallback(config SearchConfig) []string {
 // mtgmatcher id or a ban:/tcg:/scryfall:/mtgjson: prefixed id (bare numbers are
 // TCGplayer ids). Full resolution happens at render time.
 func isValidChartID(part string) bool {
-	if _, err := mtgmatcher.GetUUID(part); err == nil {
+	if _, err := backend().GetUUID(part); err == nil {
 		return true
 	}
 	switch prefix, _ := splitIDPrefix(part); prefix {
@@ -337,7 +338,7 @@ func isValidChartID(part string) bool {
 // back to the search always lands on the nonfoil printing. Falls back to the
 // uuid when the finish has no id of its own.
 func magicFinishSearchID(uuid string, foil, etched bool) string {
-	if matched, err := mtgmatcher.MatchID(uuid, foil, etched); err == nil {
+	if matched, err := backend().MatchID(uuid, foil, etched); err == nil {
 		return matched
 	}
 	return uuid
@@ -383,7 +384,7 @@ func chartSearchID(id string, target *chartTarget) (string, bool) {
 
 	// Nothing resolved, so there is no archive to have resolved against -
 	// a deployment without one, where the matcher still places a plain id.
-	if _, err := mtgmatcher.GetUUID(id); err == nil {
+	if _, err := backend().GetUUID(id); err == nil {
 		return id, true // already a matcher id (bare uuid / variant string)
 	}
 	prefix, val := splitIDPrefix(id)
@@ -395,7 +396,7 @@ func chartSearchID(id string, target *chartTarget) (string, bool) {
 
 	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
 	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
-	if matched, merr := mtgmatcher.MatchID(val); merr == nil {
+	if matched, merr := backend().MatchID(val); merr == nil {
 		return matched, true
 	}
 	return id, false
@@ -497,13 +498,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
 	if query == "" {
-		pageVars.PromoTags = mtgmatcher.AllPromoTypes()
+		pageVars.PromoTags = backend().AllPromoTypes
 		if !pageVars.IsSealed && !isSetsPage {
 			pageVars.SetKeyrunes = getSetKeyrunes()
 		}
 	}
 
-	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
+	pageVars.HasAvailable = len(backend().GetSealedUUIDs()) > 0
 
 	// Image corpus picker: only populate for entitled users.
 	if _, ok := offlineModeAllowed(r); ok {
@@ -1009,7 +1010,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
-	preview := embed.Generate(externalURL(r), allKeys, editionTitle, func(cardID string) []embed.Entry {
+	preview := embed.Generate(backend(), externalURL(r), allKeys, editionTitle, func(cardID string) []embed.Entry {
 		return EmbedSellerEntries(foundSellers, cardID, true)
 	})
 	if oembed {
@@ -1027,7 +1028,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
 		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
 
-		co, err := mtgmatcher.GetUUID(allKeys[0])
+		co, err := backend().GetUUID(allKeys[0])
 		if err == nil {
 			// A sealed product has no printings line, so it says what it is
 			// instead. Either way this is prose: the preview panel reads as
@@ -1142,7 +1143,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		// Same for CM
 		if !hasMKM && hasMKMScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
-			co, err := mtgmatcher.GetUUID(cardID)
+			co, err := backend().GetUUID(cardID)
 			if err == nil {
 				var link string
 
@@ -1286,7 +1287,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if !isMultiChart {
-			co, err := mtgmatcher.GetUUID(chartID)
+			co, err := backend().GetUUID(chartID)
 			if err != nil {
 				fmt.Println("Search: Failed to GetUUID: %w", err)
 				return
@@ -1311,7 +1312,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			var earliest time.Time
 			var chartNames []string
 			for _, id := range chartIDs {
-				co, gerr := mtgmatcher.GetUUID(id)
+				co, gerr := backend().GetUUID(id)
 				if gerr != nil {
 					continue
 				}
@@ -1347,9 +1348,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// the matcher.
 		if !isMultiChart {
 			searchID := chartSearchIDs[chartID]
-			co, gerr := mtgmatcher.GetUUID(searchID)
+			co, gerr := backend().GetUUID(searchID)
 			if gerr == nil && !co.Sealed {
-				altID, err := mtgmatcher.Match(&mtgmatcher.InputCard{
+				altID, err := backend().Match(&mtgmatcher.InputCard{
 					ID:   searchID,
 					Foil: !co.Foil,
 				})
@@ -1357,7 +1358,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					pageVars.Alternative = altID
 				}
 
-				altID, err = mtgmatcher.Match(&mtgmatcher.InputCard{
+				altID, err = backend().Match(&mtgmatcher.InputCard{
 					ID:        searchID,
 					Variation: "Etched",
 				})
@@ -1705,7 +1706,7 @@ func searchCustomBuylist(r *http.Request, cardIDs []string, foundVendors map[str
 	// Decklist/hashing searches repeat a key once per copy; foundVendors is
 	// keyed by the unique card, so dedupe to avoid appending an entry per copy.
 	for _, cardID := range dedupeKeys(cardIDs) {
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -1790,7 +1791,7 @@ const (
 // holding only the products that cards come in.
 func containsSingles(cardIDs []string) bool {
 	for _, cardID := range cardIDs {
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err == nil && !co.Sealed {
 			return true
 		}
@@ -1837,12 +1838,12 @@ func dropOdds(config SearchConfig) map[string]float64 {
 	if config.ContentsMode != ContentsVariable || config.ContentsProduct == "" {
 		return nil
 	}
-	co, err := mtgmatcher.GetUUID(config.ContentsProduct)
+	co, err := backend().GetUUID(config.ContentsProduct)
 	if err != nil {
 		LogPages["Search"].Println("dropOdds:", config.ContentsProduct, err)
 		return nil
 	}
-	probs, err := mtgmatcher.GetProbabilitiesForSealed(co.SetCode, co.UUID)
+	probs, err := backend().GetProbabilitiesForSealed(co.SetCode, co.UUID)
 	if err != nil {
 		LogPages["Search"].Println("dropOdds:", co.Name, err)
 		return nil
@@ -1860,14 +1861,14 @@ func contentsViews(query string, config SearchConfig) *ContentsViews {
 		return nil
 	}
 
-	co, err := mtgmatcher.GetUUID(config.ContentsProduct)
+	co, err := backend().GetUUID(config.ContentsProduct)
 	if err != nil {
 		return nil
 	}
-	if !mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+	if !backend().SealedHasDecklist(co.SetCode, co.UUID) {
 		return nil
 	}
-	if !mtgmatcher.SealedIsRandom(co.SetCode, co.UUID) {
+	if !backend().SealedIsRandom(co.SetCode, co.UUID) {
 		return nil
 	}
 
@@ -1962,7 +1963,7 @@ func storeSeedUUIDs(config SearchConfig) ([]string, bool) {
 	// rather than handed to a mode that otherwise never returns one.
 	var uuids []string
 	addCard := func(cardID string) {
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil || co.Sealed {
 			return
 		}
@@ -2020,10 +2021,10 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			for _, code := range codes {
 				switch config.SearchMode {
 				case "", "prefix", "any":
-					uuids = append(uuids, mtgmatcher.GetUUIDsInSet(code)...)
+					uuids = append(uuids, backend().GetUUIDsInSet(code)...)
 					seeded = true
 				case "sealed":
-					uuids = append(uuids, mtgmatcher.GetSealedUUIDsInSet(code)...)
+					uuids = append(uuids, backend().GetSealedUUIDsInSet(code)...)
 					seeded = true
 				}
 			}
@@ -2057,31 +2058,31 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 	if !seeded {
 		switch config.SearchMode {
 		case "exact":
-			uuids, err = mtgmatcher.SearchEquals(query)
+			uuids, err = backend().SearchEquals(query)
 		case "any":
-			uuids, err = mtgmatcher.SearchContains(query)
+			uuids, err = backend().SearchContains(query)
 		case "prefix":
-			uuids, err = mtgmatcher.SearchHasPrefix(query)
+			uuids, err = backend().SearchHasPrefix(query)
 		case "hashing":
 			uuids = config.UUIDs
 		case "regexp":
-			uuids, err = mtgmatcher.SearchRegexp(query)
+			uuids, err = backend().SearchRegexp(query)
 		case "sealed":
-			uuids, err = mtgmatcher.SearchSealedEquals(query)
+			uuids, err = backend().SearchSealedEquals(query)
 			if err != nil {
-				uuids, err = mtgmatcher.SearchSealedContains(query)
+				uuids, err = backend().SearchSealedContains(query)
 			}
 		case "scryfall":
 			uuids, err = searchScryfall(query)
 		case "mixed":
-			uuids, err = mtgmatcher.SearchSealedEquals(query)
+			uuids, err = backend().SearchSealedEquals(query)
 			if err != nil {
-				uuids, err = mtgmatcher.SearchSealedContains(query)
+				uuids, err = backend().SearchSealedContains(query)
 			}
-			moreUUIDs, _ := mtgmatcher.SearchEquals(query)
+			moreUUIDs, _ := backend().SearchEquals(query)
 			uuids = append(uuids, moreUUIDs...)
 		default:
-			uuids, err = mtgmatcher.SearchEquals(query)
+			uuids, err = backend().SearchEquals(query)
 			// An exact name match can be a red herring: "serra" names a
 			// Vanguard card, so "s:leb serra" would stop at it and then
 			// filter it out, finding nothing. When the filters reject every
@@ -2094,15 +2095,15 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 				if len(selected) != 0 {
 					return selected, nil
 				}
-				moreUUIDs, moreErr := mtgmatcher.SearchHasPrefix(query)
+				moreUUIDs, moreErr := backend().SearchHasPrefix(query)
 				if moreErr == nil {
 					uuids = moreUUIDs
 				}
 			}
 			if err != nil {
-				uuids, err = mtgmatcher.SearchHasPrefix(query)
+				uuids, err = backend().SearchHasPrefix(query)
 				if err != nil {
-					uuids, err = mtgmatcher.SearchRegexp(query)
+					uuids, err = backend().SearchRegexp(query)
 				}
 			}
 		}
@@ -2136,12 +2137,12 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 	codes := map[string]bool{}
 	seenNames := map[string]bool{}
 	for _, cardID := range allKeys {
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil || seenNames[co.Name] {
 			continue
 		}
 		seenNames[co.Name] = true
-		printings, err := mtgmatcher.Printings4Card(co.Name)
+		printings, err := backend().Printings4Card(co.Name)
 		if err != nil {
 			continue
 		}
@@ -2169,8 +2170,8 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 // addFinishVariants appends id's foil and etched finishes to uuids, skipping
 // any that don't exist, equal id, or are already present.
 func addFinishVariants(uuids []string, id string) []string {
-	foilID, _ := mtgmatcher.MatchID(id, true)
-	etchedID, _ := mtgmatcher.MatchID(id, false, true)
+	foilID, _ := backend().MatchID(id, true)
+	etchedID, _ := backend().MatchID(id, false, true)
 	for _, otherFinishID := range []string{foilID, etchedID} {
 		if otherFinishID != "" && otherFinishID != id && !slices.Contains(uuids, otherFinishID) {
 			uuids = append(uuids, otherFinishID)
@@ -2204,7 +2205,7 @@ func searchScryfall(query string) ([]string, error) {
 
 		// Sort through the results, add the possible foil and etched variants
 		for _, card := range result.Cards {
-			id := mtgmatcher.ConvertID(mtgmatcher.IDSpaceScryfall, card.ID)
+			id := backend().ConvertID(mtgmatcher.IDSpaceScryfall, card.ID)
 			if id == "" {
 				continue
 			}
@@ -2228,7 +2229,7 @@ func searchScryfall(query string) ([]string, error) {
 // Try searching for cards usign the Match algorithm
 func attemptMatch(query string) ([]string, error) {
 	var uuids []string
-	uuid, err := mtgmatcher.Match(&mtgmatcher.InputCard{
+	uuid, err := backend().Match(&mtgmatcher.InputCard{
 		Name: query,
 	})
 	if err != nil {
@@ -2288,15 +2289,15 @@ type SortingData struct {
 }
 
 func getSortingData(uuid string) (*SortingData, error) {
-	co, err := mtgmatcher.GetUUID(uuid)
+	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
-	set, err := mtgmatcher.GetSet(co.SetCode)
+	set, err := backend().GetSet(co.SetCode)
 	if err != nil {
 		return nil, err
 	}
-	releaseDate, err := mtgmatcher.CardReleaseDate(uuid)
+	releaseDate, err := backend().CardReleaseDate(uuid)
 	if err != nil {
 		return nil, err
 	}

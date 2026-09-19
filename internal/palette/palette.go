@@ -33,6 +33,8 @@ type ArbitFilter struct {
 // Service exposes the palette endpoints, wired to the host's live scraper
 // and page registries via callbacks so it always reflects current state.
 type Service struct {
+	// Backend returns the current card datastore.
+	Backend func() *mtgmatcher.Backend
 	// Sellers and Vendors return the live scraper lists for the stores
 	// endpoint.
 	Sellers func() []mtgban.Seller
@@ -68,6 +70,15 @@ type Service struct {
 	finishesCacheMu sync.RWMutex
 }
 
+func (s *Service) backend() *mtgmatcher.Backend {
+	if s.Backend != nil {
+		if backend := s.Backend(); backend != nil {
+			return backend
+		}
+	}
+	return &mtgmatcher.Backend{}
+}
+
 // Set is one edition as the frontend palette lists it.
 type Set struct {
 	Code     string   `json:"code"`
@@ -81,9 +92,10 @@ type Set struct {
 // BuildSetsCache rebuilds the JSON-serialized sets cache from mtgmatcher.
 // Called on datastore load.
 func (s *Service) BuildSetsCache() {
+	backend := s.backend()
 	sets := []Set{}
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend.GetAllSets() {
+		set, err := backend.GetSet(code)
 		if err != nil || set == nil {
 			continue
 		}
@@ -142,11 +154,12 @@ type Promo struct {
 // serving, which is the point - the guide and the palette can offer what the
 // datastore actually holds instead of a table written for one game.
 func (s *Service) BuildPromosCache() {
+	backend := s.backend()
 	// One pass over the printings, rather than a scan per type: with a few
 	// hundred types and a few thousand printings the difference is real.
 	counts := map[string]int{}
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend.GetUUIDs() {
+		co, err := backend.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -161,10 +174,10 @@ func (s *Service) BuildPromosCache() {
 	}
 
 	promos := []Promo{}
-	for _, promoType := range mtgmatcher.AllPromoTypes() {
+	for _, promoType := range backend.AllPromoTypes {
 		entry := Promo{
 			Value: promoType,
-			Label: mtgmatcher.PromoTypeLabel(promoType),
+			Label: backend.PromoTypeLabel(promoType),
 			Count: counts[promoType],
 		}
 		for shorthand, target := range aliases {
@@ -230,6 +243,7 @@ type Finish struct {
 // The foil treatments come from the caller, since Magic keeps them as promo
 // types and nothing in the data says which promo types are foilings.
 func (s *Service) BuildFinishesCache() {
+	backend := s.backend()
 	treatments := map[string]bool{}
 	if s.FoilTreatments != nil {
 		for _, treatment := range s.FoilTreatments() {
@@ -240,8 +254,8 @@ func (s *Service) BuildFinishesCache() {
 	// One pass over the printings, as the promos cache does, counting how many
 	// wear each name so the commonest can lead.
 	counts := map[string]int{}
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend.GetUUIDs() {
+		co, err := backend.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -336,7 +350,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 
 	resp := CardMetaResponse{Name: name}
 
-	printings, err := mtgmatcher.Printings4Card(name)
+	printings, err := s.backend().Printings4Card(name)
 	if err != nil || len(printings) == 0 {
 		json.NewEncoder(w).Encode(resp)
 		return
@@ -347,9 +361,9 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 	rarityMap := map[string]bool{}
 	colorMap := map[string]bool{}
 	typeMap := map[string]bool{}
-	uuids, _ := mtgmatcher.SearchEquals(name)
+	uuids, _ := s.backend().SearchEquals(name)
 	for _, uuid := range uuids {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := s.backend().GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -618,9 +632,9 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	resp := SealedMetaResponse{Name: name}
 
 	// Direct UUID lookup first; fall back to name resolution via the sealed-name index.
-	co, err := mtgmatcher.GetUUID(name)
+	co, err := s.backend().GetUUID(name)
 	if err != nil || co == nil {
-		co, err = mtgmatcher.GetUUID(sealedname2uuid(name))
+		co, err = s.backend().GetUUID(s.sealedname2uuid(name))
 		if err != nil || co == nil {
 			json.NewEncoder(w).Encode(resp)
 			return
@@ -638,10 +652,10 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	// hasContents and hasPicks both check actual data availability via mtgmatcher;
 	// a "found+sealed" product can still legitimately have neither (e.g., a Case that
 	// contains other sealed products but no decklist of its own).
-	if _, contentsErr := mtgmatcher.GetDecklist(co.SetCode, co.UUID); contentsErr == nil {
+	if _, contentsErr := s.backend().GetDecklist(co.SetCode, co.UUID); contentsErr == nil {
 		resp.HasContents = true
 	}
-	if _, picksErr := mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
+	if _, picksErr := s.backend().GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
 		resp.HasPicks = true
 	}
 
@@ -649,9 +663,9 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 }
 
 // sealedname2uuid resolves a sealed product name to its uuid, or "".
-func sealedname2uuid(name string) string {
+func (s *Service) sealedname2uuid(name string) string {
 	name = strings.TrimSpace(strings.Trim(name, "\""))
-	res, err := mtgmatcher.SearchSealedEquals(name)
+	res, err := s.backend().SearchSealedEquals(name)
 	if err != nil {
 		return ""
 	}

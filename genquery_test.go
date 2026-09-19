@@ -14,7 +14,7 @@ func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	var checked, missed int
 	for i, uuid := range uuids {
 		// A spread sample: the whole datastore would run the search engine
@@ -22,7 +22,7 @@ func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
 		if i%211 != 0 {
 			continue
 		}
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
@@ -69,8 +69,8 @@ func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
 	}
 
 	var tagged *mtgmatcher.CardObject
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed || co.Number == co.PlainNumber {
 			continue
 		}
@@ -87,7 +87,7 @@ func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
 		t.Fatalf("%q found nothing: %s", query, err)
 	}
 	for _, uuid := range found {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil {
 			continue
 		}

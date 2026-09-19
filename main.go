@@ -457,7 +457,7 @@ func init() {
 					Link:        "/sealed",
 					HasSettings: true,
 					ShouldHide: func() bool {
-						return len(mtgmatcher.GetSealedUUIDs()) == 0
+						return len(backend().GetSealedUUIDs()) == 0
 					},
 				},
 			},
@@ -643,10 +643,22 @@ var LogDir string
 // atomic.Pointer so concurrent reads can't observe a torn time.Time
 // (it's a 24-byte struct, not a single word).
 var (
+	matcherBackend         atomic.Pointer[mtgmatcher.Backend]
 	lastDatastoreUpdatePtr atomic.Pointer[time.Time]
 	lastStashUpdatePtr     atomic.Pointer[time.Time]
 	lastNewspaperUpdatePtr atomic.Pointer[time.Time]
 )
+
+// backend is the website's live datastore. The backend itself is
+// immutable after Open; only the pointer changes when a datastore reloads.
+var emptyMatcherBackend = &mtgmatcher.Backend{}
+
+func backend() *mtgmatcher.Backend {
+	if backend := matcherBackend.Load(); backend != nil {
+		return backend
+	}
+	return emptyMatcherBackend
+}
 
 // SetLastDatastoreUpdate / SetLastStashUpdate / SetLastNewspaperUpdate
 // publish a new timestamp atomically.
@@ -773,10 +785,11 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 
 // offlineService wires the offline API endpoints to the live scraper state.
 var offlineService = offlineapi.NewService(offlineapi.Deps{
-	Allow: offlineModeAllowed,
+	Backend: backend,
+	Allow:   offlineModeAllowed,
 
 	CanonicalSetCode: func(setCode string) (string, error) {
-		set, err := mtgmatcher.GetSet(setCode)
+		set, err := backend().GetSet(setCode)
 		if err != nil {
 			return "", err
 		}
@@ -784,7 +797,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	},
 
 	BuildSetPayload: func(setCode string, stores []string) (*offline.SetPayload, error) {
-		set, err := mtgmatcher.GetSet(setCode)
+		set, err := backend().GetSet(setCode)
 		if err != nil {
 			return nil, err
 		}
@@ -882,6 +895,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 // paletteService wires the command-palette endpoints to the live scraper lists,
 // the newspaper page registry, and the arbit filter options.
 var paletteService = &palette.Service{
+	Backend: backend,
 	PromoAliases: func() map[string]string {
 		return isKnownPromo
 	},
@@ -1267,7 +1281,7 @@ func loadDatastore(ds string) error {
 	// during the swap; queries without an index use the existing scan path.
 	idx := buildNumberIndex(backend)
 	numberIdx.Store(nil)
-	mtgmatcher.SetGlobalDatastore(backend)
+	matcherBackend.Store(backend)
 	numberIdx.Store(idx)
 
 	ServerNotify("init", "Datastore installed")
@@ -1627,7 +1641,7 @@ func main() {
 
 	// /healthz: returns 200 only if dependencies are OK.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		uuids := len(mtgmatcher.GetUUIDs())
+		uuids := len(backend().GetUUIDs())
 		sellers, vendors := len(GetSellers()), len(GetVendors())
 		if uuids == 0 || sellers == 0 || vendors == 0 {
 			log.Printf("healthz: not ready (uuids=%d, sellers=%d, vendors=%d)", uuids, sellers, vendors)

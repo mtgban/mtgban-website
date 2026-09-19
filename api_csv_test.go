@@ -7,21 +7,20 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestSimplePrice2CSVTCGSKU checks that an upload export carries the SKU of
 // the condition each row was loaded with, and that the price API export (no
 // upload data, so no condition either) keeps its original columns.
 func TestSimplePrice2CSVTCGSKU(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher data not loaded")
 	}
 
 	var id string
 	for _, u := range uuids {
-		if co, err := mtgmatcher.GetUUID(u); err == nil && !co.Sealed {
+		if co, err := backend().GetUUID(u); err == nil && !co.Sealed {
 			id = u
 			break
 		}
@@ -86,7 +85,7 @@ func runPrice2CSV(t *testing.T, pm map[string]map[string]*BanPrice, uploaded []U
 // conditions produces one row per (id, condition) with the right condition and
 // quantity — the case the old deduped-index code got wrong.
 func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher data not loaded")
 	}
@@ -106,7 +105,7 @@ func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
 	// labels (no " Foil" suffix) and Rarity is present.
 	var a, b string
 	for _, u := range uuids {
-		co, err := mtgmatcher.GetUUID(u)
+		co, err := backend().GetUUID(u)
 		if err != nil || co.Sealed || co.Foil || co.Etched || co.Rarity == "" {
 			continue
 		}

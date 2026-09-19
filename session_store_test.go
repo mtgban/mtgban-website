@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 )
@@ -52,10 +51,10 @@ func sessionInfo(shorthand string) mtgban.ScraperInfo {
 // package's tests load - the one thing internal/sessionstore's own,
 // datastore-free tests cannot exercise on their own.
 func TestFromEntriesSplitsSealedFromSinglesWithRealCards(t *testing.T) {
-	if len(mtgmatcher.GetSealedUUIDs()) == 0 {
+	if len(backend().GetSealedUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	sealed := mtgmatcher.GetSealedUUIDs()[0]
+	sealed := backend().GetSealedUUIDs()[0]
 	single := randomUUID(false)
 	entries := []UploadEntry{
 		{CardID: sealed, OriginalPrice: 100},
@@ -65,7 +64,7 @@ func TestFromEntriesSplitsSealedFromSinglesWithRealCards(t *testing.T) {
 	for _, sealedMode := range []bool{false, true} {
 		info := sessionInfo("ZZS")
 		info.SealedMode = sealedMode
-		scraper, report, err := sessionstore.FromEntries(sessionstore.Retail, info, entries)
+		scraper, report, err := sessionstore.FromEntries(sessionstore.Retail, info, entries, backend())
 		if err != nil {
 			t.Fatalf("sealed=%v: %s", sealedMode, err)
 		}

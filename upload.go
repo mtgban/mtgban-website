@@ -84,6 +84,7 @@ type UploadEntry = docparse.Entry
 // uploadParser matches uploaded rows, wired to the site's logger, the
 // TCGplayer SKU index, and the set-recency ordering for alias candidates.
 var uploadParser = &docparse.Parser{
+	Backend: backend,
 	Logf: func(format string, v ...any) {
 		if logger := LogPages["Upload"]; logger != nil {
 			logger.Printf(format, v...)
@@ -860,7 +861,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].CardID == "" {
 				continue
 			}
-			co, err := mtgmatcher.GetUUID(uploadedData[i].CardID)
+			co, err := backend().GetUUID(uploadedData[i].CardID)
 			if err != nil {
 				continue
 			}
@@ -961,7 +962,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(uploadedData[i].CardID)
+		co, err := backend().GetUUID(uploadedData[i].CardID)
 		if err == nil && co.Sealed {
 			sealedProductIDs = append(sealedProductIDs, uploadedData[i].CardID)
 		} else {
@@ -1272,7 +1273,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// Pick the right store list for this entry. The sealed id list was
 		// built from this same lookup, so ask the datastore directly instead
 		// of scanning the list per row.
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		isSealed := err == nil && co.Sealed
 		entryStores := enabledStores
 		if isSealed {
@@ -1742,11 +1743,11 @@ func unpackableSealed(entries []UploadEntry) int {
 		if entry.CardID == "" || entry.Unpacked {
 			continue
 		}
-		co, err := mtgmatcher.GetUUID(entry.CardID)
+		co, err := backend().GetUUID(entry.CardID)
 		if err != nil || !co.Sealed {
 			continue
 		}
-		if mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+		if backend().SealedHasDecklist(co.SetCode, co.UUID) {
 			n++
 		}
 	}
@@ -1778,13 +1779,13 @@ func unpackSealed(entries []UploadEntry) []UploadEntry {
 	var out []UploadEntry
 
 	for _, entry := range entries {
-		co, err := mtgmatcher.GetUUID(entry.CardID)
+		co, err := backend().GetUUID(entry.CardID)
 		if entry.CardID == "" || entry.Unpacked || err != nil || !co.Sealed ||
-			!mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+			!backend().SealedHasDecklist(co.SetCode, co.UUID) {
 			continue
 		}
 
-		picks, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+		picks, err := backend().GetDecklist(co.SetCode, co.UUID)
 		if err != nil || len(picks) == 0 {
 			continue
 		}
@@ -2038,19 +2039,19 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 		var matchErr error
 
 		// Try matching via TCGplayer product ID first
-		uuid := mtgmatcher.ConvertID(mtgmatcher.IDSpaceTCGplayer, item.ProductID)
+		uuid := backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, item.ProductID)
 		if uuid != "" {
-			cardID, matchErr = mtgmatcher.MatchID(uuid, item.IsFoil)
+			cardID, matchErr = backend().MatchID(uuid, item.IsFoil)
 		}
 
 		// Fall back to name-based matching
 		if cardID == "" {
 			if item.IsSealed {
 				// Search sealed products by name
-				results, err := mtgmatcher.SearchSealedEquals(item.Name)
+				results, err := backend().SearchSealedEquals(item.Name)
 				if err != nil {
 					// Try a looser search
-					results, err = mtgmatcher.SearchSealedContains(item.Name)
+					results, err = backend().SearchSealedContains(item.Name)
 				}
 				if err != nil {
 					matchErr = err
@@ -2064,7 +2065,7 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 					Variation: item.Number,
 					Foil:      item.IsFoil,
 				}
-				cardID, matchErr = mtgmatcher.Match(&card)
+				cardID, matchErr = backend().Match(&card)
 			}
 		}
 
@@ -2095,14 +2096,14 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 // on top.
 func resolveMoxItem(item moxfield.Item) (string, error) {
 	if item.ScryfallID != "" {
-		return mtgmatcher.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		return backend().MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
 	}
 
-	printings := mtgmatcher.MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
+	printings := backend().MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
 	if len(printings) == 0 {
 		return "", fmt.Errorf("unknown printing %s (%s) %s", item.Name, item.SetCode, item.Number)
 	}
-	return mtgmatcher.MatchID(printings[0].UUID, item.IsFoil, item.IsEtched)
+	return backend().MatchID(printings[0].UUID, item.IsFoil, item.IsEtched)
 }
 
 func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
@@ -2172,7 +2173,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		}
 
 		// Override header map and save relevant fields
-		if mtgmatcher.ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
+		if backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
 			record[5] = tcgID
 
 			record[2] = "Normal"

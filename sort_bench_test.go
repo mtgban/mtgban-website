@@ -6,13 +6,12 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // benchSortUUIDs picks n uuids spread across the datastore pool,
 // deterministically so every run sorts the same input.
 func benchSortUUIDs(b *testing.B, n int) []string {
-	all := mtgmatcher.GetUUIDs()
+	all := backend().GetUUIDs()
 	if len(all) == 0 {
 		b.Skip("mtgmatcher datastore not loaded")
 	}
@@ -174,7 +173,7 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 // one order. Also serves as a fixture to eyeball order stability across
 // implementations of the comparators.
 func TestSortSetsDeterministic(t *testing.T) {
-	all := mtgmatcher.GetUUIDs()
+	all := backend().GetUUIDs()
 	if len(all) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}

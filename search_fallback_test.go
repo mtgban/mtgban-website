@@ -3,12 +3,10 @@ package main
 import (
 	"slices"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 func TestPromoTypeMatches(t *testing.T) {
-	if len(mtgmatcher.AllPromoTypes()) == 0 {
+	if len(backend().AllPromoTypes) == 0 {
 		t.Skip("no datastore")
 	}
 
@@ -40,7 +38,7 @@ func TestPromoTypeMatches(t *testing.T) {
 }
 
 func TestSetCodeMatches(t *testing.T) {
-	if len(mtgmatcher.GetAllSets()) == 0 {
+	if len(backend().GetAllSets()) == 0 {
 		t.Skip("no datastore")
 	}
 
@@ -66,7 +64,7 @@ func TestSetCodeMatches(t *testing.T) {
 // likely to have meant it, and declines the cases where the query already said
 // what it wanted.
 func TestSearchFallback(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore")
 	}
 
@@ -80,7 +78,7 @@ func TestSearchFallback(t *testing.T) {
 			t.Fatal("want the cards printed as confettifoil")
 		}
 		for _, key := range keys {
-			co, err := mtgmatcher.GetUUID(key)
+			co, err := backend().GetUUID(key)
 			if err != nil {
 				continue
 			}
@@ -101,7 +99,7 @@ func TestSearchFallback(t *testing.T) {
 		}
 		wanted := setCodeMatches("kamigawa")
 		for _, key := range keys {
-			co, err := mtgmatcher.GetUUID(key)
+			co, err := backend().GetUUID(key)
 			if err != nil {
 				continue
 			}

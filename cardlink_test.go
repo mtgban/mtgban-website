@@ -3,8 +3,6 @@ package main
 import (
 	"net/url"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // linkQuery is the query an internal card link asks.
@@ -21,10 +19,10 @@ func linkQuery(t *testing.T, link string) string {
 // carrying a language or variant suffix - 59ita, 349alt, 1110jpn - once went
 // out as cn:, which reads the number without it, and the link came back empty.
 func TestCardLinkResolvesToItsPrinting(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	step := len(uuids) / 300
 	if step < 1 {
 		step = 1
@@ -32,7 +30,7 @@ func TestCardLinkResolvesToItsPrinting(t *testing.T) {
 
 	var checked, missed int
 	for i := 0; i < len(uuids); i += step {
-		co, err := mtgmatcher.GetUUID(uuids[i])
+		co, err := backend().GetUUID(uuids[i])
 		if err != nil || co.Sealed {
 			continue
 		}
@@ -74,13 +72,13 @@ func TestCardLinkResolvesToItsPrinting(t *testing.T) {
 // on the search, a product on the sealed page. No hop in between, so what the
 // address bar shows after the click is what the link said.
 func TestCardLinkIsThePrintingsQuery(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	var card, sealed string
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -100,7 +98,7 @@ func TestCardLinkIsThePrintingsQuery(t *testing.T) {
 		if tt.id == "" {
 			continue
 		}
-		co, _ := mtgmatcher.GetUUID(tt.id)
+		co, _ := backend().GetUUID(tt.id)
 		want := tt.page + url.QueryEscape(genQuery(co))
 		if got := uuid2card(tt.id, true, false, false).SearchURL; got != want {
 			t.Errorf("%s links to %q, want %q", co.Name, got, want)

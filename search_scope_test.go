@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/suggest"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 func filterNames(filters []FilterElem) []string {
@@ -29,7 +27,7 @@ func parseForTest(t *testing.T, query string) SearchConfig {
 // TestSearchScopeAddsFilters is the case the bar exists for: a set pinned
 // once, then a finish typed and retyped in the main bar.
 func TestSearchScopeAddsFilters(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
@@ -49,7 +47,7 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 // and that is the point - the empty page names the pinned bar and offers to
 // drop it, where a bar quietly overruled reads as applied while it is not.
 func TestSearchScopeKeepsBothSides(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
@@ -81,7 +79,7 @@ func TestSearchScopeKeepsBothSides(t *testing.T) {
 // sticky bar carries filters, and pinning a card name is what the main
 // bar is for.
 func TestSearchScopeIgnoresNames(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
@@ -100,7 +98,7 @@ func TestSearchScopeIgnoresNames(t *testing.T) {
 // TestSearchScopeSkipsPassthroughModes leaves alone the queries that name
 // their own cards or that another syntax reads whole.
 func TestSearchScopeSkipsPassthroughModes(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
@@ -285,7 +283,7 @@ func TestScopeRowOpen(t *testing.T) {
 // settings of readers who never asked for any of this. Nothing is dropped
 // now, and this stands to say so.
 func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
@@ -310,7 +308,7 @@ func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
 // TestScopeIgnoredIsWhatTheBarSays keeps the red state honest: it means
 // the search passes over the bar whole, not merely that the bar is odd.
 func TestScopeIgnoredIsWhatTheBarSays(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 

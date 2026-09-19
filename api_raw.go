@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // RawCardAPI serves the record behind one card id exactly as the backend
@@ -24,7 +22,7 @@ func RawCardAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cardID := strings.TrimPrefix(r.URL.Path, "/api/mtgmatcher/raw/")
-	co, err := mtgmatcher.GetUUID(cardID)
+	co, err := backend().GetUUID(cardID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

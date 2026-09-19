@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // registerTestVendor and registerTestSeller file a throwaway scraper under
@@ -57,8 +56,8 @@ func registerTestSeller(t *testing.T, shorthand string, uuids []string) {
 func somePlainCardUUIDs(t *testing.T, n int) []string {
 	t.Helper()
 	var uuids []string
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
@@ -82,7 +81,7 @@ func somePlainCardUUIDs(t *testing.T, n int) []string {
 // inventory/buylist keys instead, the same way an edition or collector
 // number filter already seeds an empty query.
 func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -108,7 +107,7 @@ func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
 // seller:/store: seeds from a seller's inventory the same way vendor: does
 // from a buylist.
 func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -136,7 +135,7 @@ func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
 // filter it down to zero later. Same "a seed that finds nothing has still
 // answered" principle the edition and number seeds already document.
 func TestUnknownStoreQuerySeedsEmptyRatherThanEverything(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -157,7 +156,7 @@ func TestUnknownStoreQuerySeedsEmptyRatherThanEverything(t *testing.T) {
 // fallback would satisfy that weaker check too, without actually locking
 // down that negation is left unseeded.
 func TestNegatedStoreQueryDoesNotSeed(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -187,7 +186,7 @@ func TestNegatedStoreQueryDoesNotSeed(t *testing.T) {
 // appends a PostFilter of its own and would have made storeSeedUUIDs bail
 // straight back to the full-datastore fallback.
 func TestStoreQuerySeedsAlongsideACompanionPostFilter(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -223,7 +222,7 @@ func TestStoreQuerySeedsAlongsideACompanionPostFilter(t *testing.T) {
 // other still narrows the final results later via PostSearchFilter in the
 // real request handler, which this test does not exercise.
 func TestStoreQuerySeedsWithASecondStoreFilterPresent(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -254,11 +253,11 @@ func TestStoreQuerySeedsWithASecondStoreFilterPresent(t *testing.T) {
 // exercise - only that seeding here is the whole named edition, not merely
 // what one store happens to carry.
 func TestStoreQueryDefersToAnEditionFilterAlreadySeeding(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
-	leaUUIDs := mtgmatcher.GetUUIDsInSet("LEA")
+	leaUUIDs := backend().GetUUIDsInSet("LEA")
 	if len(leaUUIDs) == 0 {
 		t.Skip("LEA not present in this datastore")
 	}
@@ -285,7 +284,7 @@ func TestStoreQueryDefersToAnEditionFilterAlreadySeeding(t *testing.T) {
 // narrows the final results later via PostSearchFilter, not exercised
 // here).
 func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
-	if len(mtgmatcher.GetUUIDs()) == 0 {
+	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
@@ -295,7 +294,7 @@ func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
 	}
 	registerTestVendor(t, "TEST", uuids)
 
-	co, err := mtgmatcher.GetUUID(uuids[0])
+	co, err := backend().GetUUID(uuids[0])
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -318,14 +317,14 @@ func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
 // ...) against every value, not just the first, so two disjoint vendors
 // both contribute their own cards to the seed.
 func TestStoreQueryUnionsACommaJoinedList(t *testing.T) {
-	all := mtgmatcher.GetUUIDs()
+	all := backend().GetUUIDs()
 	if len(all) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
 	var uuidsA, uuidsB []string
 	for _, uuid := range all {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}

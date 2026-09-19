@@ -20,6 +20,8 @@ import (
 
 // Deps holds all main-package knowledge the service needs.
 type Deps struct {
+	// Backend returns the current card datastore.
+	Backend func() *mtgmatcher.Backend
 	// Allow authenticates a request and returns the caller's email.
 	Allow func(r *http.Request) (email string, ok bool)
 
@@ -71,6 +73,15 @@ type Deps struct {
 	// the catalog can reuse the half derived from it. Nil rebuilds every
 	// time, which is what a caller that does not track this would want.
 	LastDatastoreUpdate func() time.Time
+}
+
+func (s *Service) backend() *mtgmatcher.Backend {
+	if s.deps.Backend != nil {
+		if backend := s.deps.Backend(); backend != nil {
+			return backend
+		}
+	}
+	return &mtgmatcher.Backend{}
 }
 
 // Service exposes the offline API endpoints and background refresh logic.

@@ -216,8 +216,8 @@ func getBulks(skipEditions []string) map[string]int {
 
 	tiers := map[string]int{}
 
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil || slices.Contains(skipEditions, set.Code) {
 			continue
 		}
@@ -240,8 +240,8 @@ func getBulks(skipEditions []string) map[string]int {
 		cardPrices := map[string]float64{}
 		var totalPrices float64
 		for _, card := range set.Cards {
-			uuid := mtgmatcher.ConvertID(mtgmatcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
-			co, err := mtgmatcher.GetUUID(uuid)
+			uuid := backend().ConvertID(mtgmatcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
+			co, err := backend().GetUUID(uuid)
 			if err != nil {
 				continue
 			}
@@ -308,7 +308,7 @@ func getHotlist(skipEditions []string) map[string]int {
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil || slices.Contains(skipEditions, co.SetCode) {
 			continue
 		}
@@ -429,7 +429,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 				continue
 			}
 
-			arbit := mtgban.Arbit(opts, vendor, seller)
+			arbit := mtgban.Arbit(backend(), opts, vendor, seller)
 
 			// Load the tiers
 			for i := range arbit {
@@ -438,7 +438,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 		}
 
 		if tcgSeller != nil {
-			mismatch := mtgban.Mismatch(opts, tcgSeller, seller)
+			mismatch := mtgban.Mismatch(backend(), opts, tcgSeller, seller)
 
 			// Load the tiers
 			for i := range mismatch {
@@ -487,7 +487,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		OnlyLanguages: sleepersLanguages,
 	}
 
-	mismatch := mtgban.Mismatch(opts, referenceSeller, targetSeller)
+	mismatch := mtgban.Mismatch(backend(), opts, referenceSeller, targetSeller)
 
 	marketCheck, _ := findSellerInventory("TCGMarket")
 
@@ -495,7 +495,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 	for i := range mismatch {
 		cardID := mismatch[i].CardID
 
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -576,7 +576,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 		level := int(math.Floor(r*exp) + maxrange)
 
 		if DevMode {
-			cc, _ := mtgmatcher.GetUUID(res.CardID)
+			cc, _ := backend().GetUUID(res.CardID)
 			log.Println(level, res.Level, cc)
 		}
 

@@ -3,8 +3,6 @@ package main
 import (
 	"sort"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestAlphabeticalSortUsesEnglishNames is the SOA case from the site: a
@@ -12,14 +10,14 @@ import (
 // has to read A-to-Z off the English names, not off whatever order the
 // kanji of the printed names happen to fall in.
 func TestAlphabeticalSortUsesEnglishNames(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
 	var keys []string
 	for _, uuid := range uuids {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.SetCode != "SOA" || co.Language != "Japanese" {
 			continue
 		}
@@ -51,14 +49,14 @@ func TestAlphabeticalSortUsesEnglishNames(t *testing.T) {
 // keying on the English name: a localized printing lands next to the
 // English one it reprints, instead of filing itself under its own name.
 func TestAlphabeticalSortGroupsLocalizedReprints(t *testing.T) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
 
 	var keys []string
 	for _, uuid := range uuids {
-		co, err := mtgmatcher.GetUUID(uuid)
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Name != "Akroma's Will" {
 			continue
 		}

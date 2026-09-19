@@ -3,8 +3,6 @@ package main
 import (
 	"strings"
 	"testing"
-
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // promoTypeCards finds one real card whose PromoTypes carries a token (the
@@ -14,8 +12,8 @@ import (
 // places a promo type reaches GenericCard.
 func promoTypeCards(t *testing.T) (plain, chipped string) {
 	t.Helper()
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
@@ -69,8 +67,8 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 	var found bool
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
@@ -111,8 +109,8 @@ func TestRetroFrameStaysDateGated(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 	var found bool
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed || co.FrameVersion != "1997" {
 			continue
 		}
@@ -153,11 +151,11 @@ func TestPromoTypeLabel(t *testing.T) {
 	if !datastoreLoaded() {
 		t.Skip("no datastore loaded for the mtgmatcher.PromoTypeLabel comparison")
 	}
-	for _, value := range mtgmatcher.AllPromoTypes() {
+	for _, value := range backend().AllPromoTypes {
 		if strings.HasPrefix(value, "ff") {
 			continue
 		}
-		if got, want := promoTypeLabel(value), mtgmatcher.PromoTypeLabel(value); got != want {
+		if got, want := promoTypeLabel(value), backend().PromoTypeLabel(value); got != want {
 			t.Errorf("promoTypeLabel(%q) = %q, want mtgmatcher's own %q", value, got, want)
 		}
 	}

@@ -275,12 +275,12 @@ func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
 }
 
 func getAllEditions() ([]string, map[string]EditionEntry) {
-	sets := mtgmatcher.GetAllSets()
+	sets := backend().GetAllSets()
 
 	sortedEditions := make([]string, 0, len(sets))
 	listEditions := map[string]EditionEntry{}
 	for _, code := range sets {
-		set, err := mtgmatcher.GetSet(code)
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -298,13 +298,13 @@ func getAllEditions() ([]string, map[string]EditionEntry) {
 }
 
 func getTreeEditions() ([]string, map[string][]EditionEntry) {
-	sets := mtgmatcher.GetAllSets()
+	sets := backend().GetAllSets()
 
 	var sortedEditions []string
 	listEditions := map[string][]EditionEntry{}
 	for _, code := range sets {
 		// Skip empty sets
-		set, err := mtgmatcher.GetSet(code)
+		set, err := backend().GetSet(code)
 		if err != nil || len(set.Cards) == 0 {
 			continue
 		}
@@ -324,7 +324,7 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 			// Find the very fist parent
 			topParentCode := set.ParentCode
 			for {
-				topset, err := mtgmatcher.GetSet(topParentCode)
+				topset, err := backend().GetSet(topParentCode)
 				if err != nil || topset.ParentCode == "" {
 					break
 				}
@@ -335,7 +335,7 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 			_, found := listEditions[topParentCode]
 			if !found {
 				// If not, create it
-				set, err := mtgmatcher.GetSet(topParentCode)
+				set, err := backend().GetSet(topParentCode)
 				if err != nil {
 					continue
 				}
@@ -427,13 +427,13 @@ func flattenEditions(keys []string, tree map[string][]EditionEntry) []FlatEditio
 func getSealedEditions() ([]string, map[string][]EditionEntry) {
 	sortedEditions := []string{}
 	listEditions := map[string][]EditionEntry{}
-	for _, code := range mtgmatcher.GetAllSets() {
+	for _, code := range backend().GetAllSets() {
 		switch code {
 		case "DRKITA", "LEGITA", "4EDALT":
 			continue
 		}
 
-		set, err := mtgmatcher.GetSet(code)
+		set, err := backend().GetSet(code)
 		if err != nil || len(set.SealedProduct) == 0 {
 			continue
 		}
@@ -478,8 +478,8 @@ func getAllEditionsByCategory() ([]string, map[string][]EditionEntry) {
 	sortedCategories := []string{}
 	listEditions := map[string][]EditionEntry{}
 
-	for _, code := range mtgmatcher.GetAllSets() {
-		set, err := mtgmatcher.GetSet(code)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -530,16 +530,16 @@ const (
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
 func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[string][]ReprintEntry) {
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 
 	var names []string
 	listReprints := map[string][]ReprintEntry{}
 
 	dupes := map[string]struct{}{}
 	for _, uuid := range uuids {
-		co, _ := mtgmatcher.GetUUID(uuid)
+		co, _ := backend().GetUUID(uuid)
 
-		set, err := mtgmatcher.GetSet(co.SetCode)
+		set, err := backend().GetSet(co.SetCode)
 		if err != nil {
 			continue
 		}
@@ -553,7 +553,7 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		}
 
 		// Skip strange stuff
-		if co.IsReserved || mtgmatcher.IsToken(co.Name) ||
+		if co.IsReserved || backend().NameIsToken(co.Name) ||
 			co.BorderColor == "gold" || co.BorderColor == "silver" ||
 			co.Rarity == "oversize" ||
 			co.HasPromoType(magic.PromoTypePromoPack) ||
@@ -575,7 +575,7 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		dupes[scryfallID] = struct{}{}
 
 		// Load the date for the card
-		printDate, err := mtgmatcher.CardReleaseDate(co.UUID)
+		printDate, err := backend().CardReleaseDate(co.UUID)
 		if err != nil {
 			continue
 		}
@@ -660,7 +660,7 @@ const (
 
 // Check if it makes sense to keep two keep foil and nonfoil separate
 func combineFinish(setCode string) bool {
-	set, err := mtgmatcher.GetSet(setCode)
+	set, err := backend().GetSet(setCode)
 	if err != nil {
 		return false
 	}
@@ -906,12 +906,12 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 
 	for cardID, entries := range bl {
 		// Skip cards too recent to have a meaningful 90-day window
-		cardDate, err := mtgmatcher.CardReleaseDate(cardID)
+		cardDate, err := backend().CardReleaseDate(cardID)
 		if err != nil || cardDate.After(threeMonthsAgo) {
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(cardID)
+		co, err := backend().GetUUID(cardID)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -955,10 +955,10 @@ func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDi
 	blDirectNet := map[string]float64{}
 	blDirectNetFoil := map[string]float64{}
 
-	uuids := mtgmatcher.GetUUIDs()
+	uuids := backend().GetUUIDs()
 
 	for _, uuid := range uuids {
-		co, _ := mtgmatcher.GetUUID(uuid)
+		co, _ := backend().GetUUID(uuid)
 
 		// Skip sets that are not well tracked upstream
 		if co.SetCode == "PMEI" || co.BorderColor == "gold" {
@@ -1054,7 +1054,7 @@ func updateStaticData() {
 
 	var filteredEditions []string
 	for _, code := range snap.AllEditionsKeys {
-		set, err := mtgmatcher.GetSet(code)
+		set, err := backend().GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -1069,7 +1069,7 @@ func updateStaticData() {
 	snap.AllEditionsKeysNoFoilOrPromos = filteredEditions
 
 	snap.TotalSets = len(snap.AllEditionsKeys)
-	snap.TotalUnique = len(mtgmatcher.GetUUIDs())
+	snap.TotalUnique = len(backend().GetUUIDs())
 	var totalCards int
 	for _, key := range snap.AllEditionsKeys {
 		totalCards += snap.AllEditionsMap[key].Size

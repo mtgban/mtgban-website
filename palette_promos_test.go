@@ -16,7 +16,7 @@ import (
 // answers with depends on which datastore is up - only that it answers at
 // all, spells every type, and puts the commonest first, is fixed.
 func TestPromosEndpoint(t *testing.T) {
-	if len(mtgmatcher.AllPromoTypes()) == 0 {
+	if len(backend().AllPromoTypes) == 0 {
 		t.Skip("no datastore loaded; skipping promo endpoint test")
 	}
 
@@ -35,8 +35,8 @@ func TestPromosEndpoint(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &promos); err != nil {
 		t.Fatal(err)
 	}
-	if len(promos) != len(mtgmatcher.AllPromoTypes()) {
-		t.Errorf("served %d types, the game declares %d", len(promos), len(mtgmatcher.AllPromoTypes()))
+	if len(promos) != len(backend().AllPromoTypes) {
+		t.Errorf("served %d types, the game declares %d", len(promos), len(backend().AllPromoTypes))
 	}
 
 	for _, promo := range promos {

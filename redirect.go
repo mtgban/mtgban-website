@@ -24,9 +24,9 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-		co, err := mtgmatcher.GetUUID(hash)
+		co, err := backend().GetUUID(hash)
 		if err != nil {
-			co, err = mtgmatcher.GetUUID(externalUUID(hash))
+			co, err = backend().GetUUID(externalUUID(hash))
 			if err != nil {
 				http.NotFound(w, r)
 				return
@@ -71,7 +71,7 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 
 // printingsAt returns the cards a set files under a number, as printed.
 func printingsAt(set, number string) []mtgmatcher.Card {
-	edition, err := mtgmatcher.GetSet(set)
+	edition, err := backend().GetSet(set)
 	if err != nil {
 		return nil
 	}
@@ -120,8 +120,8 @@ func namesFinish(cards []mtgmatcher.Card, word string) bool {
 	for _, card := range cards {
 		// A set carries one card object per printing, in its plain finish;
 		// f:foil is answered by a sibling of that one rather than by it.
-		for _, id := range mtgmatcher.FinishSiblings(card.UUID) {
-			co, err := mtgmatcher.GetUUID(id)
+		for _, id := range backend().FinishSiblings(card.UUID) {
+			co, err := backend().GetUUID(id)
 			if err != nil {
 				continue
 			}
@@ -236,7 +236,7 @@ func sealedSlug(name string) string {
 
 // sealedProductBySlug finds the product in a set that a slug names, or nil.
 func sealedProductBySlug(setCode, slug string) *mtgmatcher.SealedProduct {
-	set, err := mtgmatcher.GetSet(strings.ToUpper(setCode))
+	set, err := backend().GetSet(strings.ToUpper(setCode))
 	if err != nil || slug == "" {
 		return nil
 	}
