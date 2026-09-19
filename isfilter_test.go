@@ -17,6 +17,31 @@ var isCaseNames = []string{
 	"phyrexian", "ph", "commander", "productless", "ampersand", "p9", "altfoil",
 }
 
+func TestWCDAndGoldFiltersDiverge(t *testing.T) {
+	tests := []struct {
+		name      string
+		setCode   string
+		border    string
+		filter    string
+		wantMatch bool
+	}{
+		{name: "world championship deck", setCode: "WC97", filter: "wcd", wantMatch: true},
+		{name: "ptc", setCode: "PTC", filter: "wcd", wantMatch: true},
+		{name: "gold border outside deck sets", setCode: "ABC", border: "gold", filter: "gold", wantMatch: true},
+		{name: "gold border is not wcd", setCode: "ABC", border: "gold", filter: "wcd", wantMatch: false},
+		{name: "deck set is not gold", setCode: "WC97", filter: "gold", wantMatch: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			card := &mtgmatcher.CardObject{Card: mtgmatcher.Card{SetCode: tt.setCode, BorderColor: tt.border}}
+			got := !cardFilterIs([]string{tt.filter}, card)
+			if got != tt.wantMatch {
+				t.Fatalf("is:%s match = %v, want %v", tt.filter, got, tt.wantMatch)
+			}
+		})
+	}
+}
+
 // Letting every value fall through to the promo types can only widen what
 // matches, and on Magic it widens nothing as long as a name answered by a
 // case of its own agrees with the promo type of the same name wherever a

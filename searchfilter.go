@@ -2226,6 +2226,9 @@ func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
 	return true
 }
 
+// PTC is intentionally included with the World Championship Deck family.
+var wcSets = []string{"PTC", "WC97", "WC98", "WC99", "WC00", "WC01", "WC02", "WC03", "WC04"}
+
 func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 	for _, value := range filters {
 		switch value {
@@ -2253,7 +2256,11 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 			if co.IsFunny {
 				return false
 			}
-		case "wcd", "gold":
+		case "wcd":
+			if slices.Contains(wcSets, co.SetCode) {
+				return false
+			}
+		case "gold":
 			if co.BorderColor == "gold" {
 				return false
 			}
