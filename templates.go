@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mtgban/mtgban-website/internal/dsreload"
 
@@ -59,9 +58,6 @@ var funcMap = template.FuncMap{
 	"sealed_contents_filter": sealedContentsFilter,
 	"dec": func(i, j int) int {
 		return i - j
-	},
-	"mul": func(i float64, j int) float64 {
-		return i * float64(j)
 	},
 	"mulf": func(i, j float64) float64 {
 		return i * j
@@ -132,12 +128,6 @@ var funcMap = template.FuncMap{
 			}
 		}
 		return false
-	},
-	"triple_column_start": func(i int, length int) bool {
-		return i == 0 || i == length/3 || i == length*2/3
-	},
-	"triple_column_end": func(i int, length int) bool {
-		return i == length/3-1 || i == length*2/3-1 || i == length-1
 	},
 	"load_partner": func(s string) string {
 		return Affiliates().Codes[s]
@@ -214,7 +204,6 @@ var funcMap = template.FuncMap{
 		}
 		return color
 	},
-	"credit_factor": findCredit,
 	"tcg_market_price": func(s string) float64 {
 		return getTCGMarketPrice(s)
 	},
@@ -261,13 +250,6 @@ var funcMap = template.FuncMap{
 	},
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
-	},
-	"sixMonthsAgo": func(t time.Time) bool {
-		sixMonthsAgo := time.Now().AddDate(0, -6, 0)
-		return sixMonthsAgo.After(t)
-	},
-	"uuid2edition": func(s string) string {
-		return editionTitle(s)
 	},
 	"is_best_price": func(prices map[string]float64, store string, storeKeys []string, isBuylist bool) bool {
 		target := prices[store]
