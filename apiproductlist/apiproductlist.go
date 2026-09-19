@@ -1,6 +1,15 @@
-// Package apiproductlist is the API price list: what is sold, at what amount, and
-// under which entitlement. The website renders the pricing page from it and
-// the gateway seeds Stripe from it, so both read this one embedded file.
+// Package apiproductlist is the API price list: what is sold, at what
+// amount, and under which entitlement. The website renders the pricing page
+// from it and the gateway seeds Stripe from it, so both read this one
+// embedded file.
+//
+// The list carries structure (package keys, scopes, modes, store families,
+// intervals) and the amounts Stripe is seeded with. Stripe holds the live
+// Prices, keyed by LookupKey; the gateway looks them up by key and never
+// parses a key. The gateway pins this module by commit, so an edit here
+// reaches customers when the gateway bumps its dependency. The Patreon bundle
+// is not listed: it is sold through Patreon and granted as a manual
+// entitlement.
 package apiproductlist
 
 import (
@@ -20,7 +29,7 @@ var embedded []byte
 // StoreScopeExplicit marks a package whose stores the customer picks.
 const StoreScopeExplicit = "explicit"
 
-// StoreScopeBase is the BASE_ACCESS preset: singles from the main region only.
+// StoreScopeBase is the BASE_ACCESS preset: singles from the main region plus metadata-only indexes.
 const StoreScopeBase = "BASE_ACCESS"
 
 // StoreScopeAll is the ALL_ACCESS preset: every store; modes decide sealed.
@@ -29,21 +38,24 @@ const StoreScopeAll = "ALL_ACCESS"
 // StoreScopes are the store_scope values a package may carry.
 var StoreScopes = []string{StoreScopeExplicit, StoreScopeBase, StoreScopeAll}
 
-// Modes are the API modes a package may grant, in canonical order.
+// Modes are the API modes a package may grant, and the order a package must list them in.
 var Modes = []string{"retail", "buylist", "sealed"}
+
+// Currencies are the currencies Stripe is seeded in.
+var Currencies = []string{"usd"}
 
 var (
 	keyPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	currencyPattern = regexp.MustCompile(`^[a-z]{3}$`)
 	gamePattern     = regexp.MustCompile(`^[a-z0-9]+$`)
 	storeKeyPattern = regexp.MustCompile(`^[A-Z0-9]+$`)
-	validIntervals  = []string{"month", "year"}
+	validIntervals  = []string{"month"}
 )
 
 // Package is one price-data tier.
 type Package struct {
-	Key        string `json:"key"`
-	Name       string `json:"name"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// Monthly is the price per month in the smallest unit of the currency (cents for usd).
 	Monthly    int64  `json:"monthly"`
 	StoreScope string `json:"store_scope"`
 	// IncludedStores is how many selectable stores the price includes beyond the implied ones.
@@ -53,8 +65,9 @@ type Package struct {
 
 // Addon is a per-unit extra a package can carry.
 type Addon struct {
-	Key       string   `json:"key"`
-	Name      string   `json:"name"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// Monthly is the price per unit per month in the smallest unit of the currency (cents for usd).
 	Monthly   int64    `json:"monthly"`
 	AppliesTo []string `json:"applies_to"`
 }
@@ -85,10 +98,13 @@ type ProductList struct {
 	Addons        []Addon    `json:"addons"`
 	Intervals     []Interval `json:"intervals"`
 	IncludedGames []string   `json:"included_games"`
-	Stores        []Store    `json:"stores"`
+	// Stores is the starter picker and the pricing page's store names. A
+	// preset scope is expanded by the backend from its live scrapers and
+	// never reads this list.
+	Stores []Store `json:"stores"`
 }
 
-// Load parses the embedded catalog.
+// Load parses the embedded list.
 func Load() (*ProductList, error) {
 	return Parse(embedded)
 }
@@ -97,31 +113,32 @@ func Load() (*ProductList, error) {
 func MustLoad() *ProductList {
 	c, err := Load()
 	if err != nil {
-		panic(err.Error())
+		panic(err)
 	}
 	return c
 }
 
-// Parse decodes and validates a catalog document.
+// Parse decodes and validates a product list document.
 func Parse(data []byte) (*ProductList, error) {
 	var c ProductList
 	if err := json.Unmarshal(data, &c); err != nil {
-		return nil, fmt.Errorf("catalog: %w", err)
+		return nil, fmt.Errorf("apiproductlist: %w", err)
 	}
 	if err := c.Validate(); err != nil {
-		return nil, fmt.Errorf("catalog: %w", err)
+		return nil, fmt.Errorf("apiproductlist: %w", err)
 	}
 	return &c, nil
 }
 
-// Validate reports the first thing wrong with the catalog.
+// Validate reports the first thing wrong with the list.
 func (c *ProductList) Validate() error {
-	if !currencyPattern.MatchString(c.Currency) {
-		return errors.New("currency must be a lowercase three-letter code")
+	if !slices.Contains(Currencies, c.Currency) {
+		return fmt.Errorf("currency must be one of %v", Currencies)
 	}
 	if len(c.Packages) == 0 {
 		return errors.New("at least one package is required")
 	}
+	// Packages, add-ons, and intervals share one key space: all of them become Stripe lookup keys.
 	seen := map[string]bool{}
 	claim := func(key string) error {
 		if !keyPattern.MatchString(key) {
@@ -154,7 +171,7 @@ func (c *ProductList) Validate() error {
 			return fmt.Errorf("package %s: included_stores applies to an explicit scope only", p.Key)
 		}
 		explicit = explicit || p.StoreScope == StoreScopeExplicit
-		if err := uniqueList("package "+p.Key+" modes", p.Modes, isMode, "one of "+fmt.Sprint(Modes)); err != nil {
+		if err := validateModes(p.Key, p.Modes); err != nil {
 			return err
 		}
 	}
@@ -196,6 +213,12 @@ func (c *ProductList) Validate() error {
 	}
 	if err := c.validateStores(explicit); err != nil {
 		return err
+	}
+	selectable := len(c.SelectableStores())
+	for _, p := range c.Packages {
+		if p.StoreScope == StoreScopeExplicit && p.IncludedStores > selectable {
+			return fmt.Errorf("package %s: included_stores %d exceeds the %d selectable stores", p.Key, p.IncludedStores, selectable)
+		}
 	}
 	return c.checkLookupKeyCollisions()
 }
@@ -259,6 +282,23 @@ func (c *ProductList) checkLookupKeyCollisions() error {
 			}
 			seen[key] = true
 		}
+	}
+	return nil
+}
+
+// validateModes checks a package lists known modes once each, in canonical order.
+func validateModes(key string, modes []string) error {
+	field := "package " + key + " modes"
+	if err := uniqueList(field, modes, isMode, "one of "+fmt.Sprint(Modes)); err != nil {
+		return err
+	}
+	last := -1
+	for _, m := range modes {
+		i := slices.Index(Modes, m)
+		if i < last {
+			return fmt.Errorf("%s: must be listed in the order %v", field, Modes)
+		}
+		last = i
 	}
 	return nil
 }
@@ -373,16 +413,15 @@ func (a Addon) Applies(packageKey string) bool {
 
 // Amount is the charge per billing period for a monthly amount.
 func (iv Interval) Amount(monthly int64) (int64, error) {
-	switch iv.Interval {
-	case "month":
+	if iv.Interval == "month" {
 		return monthly * iv.Count, nil
-	case "year":
-		return monthly * 12 * iv.Count, nil
 	}
-	return 0, fmt.Errorf("catalog: interval %s: unsupported unit %q", iv.Key, iv.Interval)
+	return 0, fmt.Errorf("apiproductlist: interval %s: unsupported unit %q", iv.Key, iv.Interval)
 }
 
 // LookupKey is the Stripe lookup_key for an item billed at an interval.
+// Consumers look prices up by the whole key and never split it; Validate
+// rejects any two item and interval pairs that would produce the same key.
 func LookupKey(itemKey, intervalKey string) string {
 	return itemKey + "_" + intervalKey
 }
