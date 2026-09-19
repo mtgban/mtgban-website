@@ -14,10 +14,21 @@ import (
 
 const (
 	defaultChangelogChannelName = "ban-nouncement"
+	changelogDisplayTimezone    = "Europe/Rome"
 	changelogMessageLimit       = 100
 	changelogCacheTTL           = 5 * time.Minute
 	changelogRetryBackoff       = 30 * time.Second
 )
+
+var changelogDisplayLocation = loadChangelogDisplayLocation()
+
+func loadChangelogDisplayLocation() *time.Location {
+	location, err := time.LoadLocation(changelogDisplayTimezone)
+	if err != nil {
+		return time.Local
+	}
+	return location
+}
 
 type changelogAttachment struct {
 	Name string
@@ -193,7 +204,7 @@ func changelogEntryFromMessage(message *discordgo.Message, channelID string) (ch
 	}
 	entry := changelogEntry{
 		Content:   message.Content,
-		Published: message.Timestamp.Local().Format("Jan 2, 2006"),
+		Published: message.Timestamp.In(changelogDisplayLocation).Format("Jan 2, 2006"),
 		SourceURL: fmt.Sprintf("https://discord.com/channels/%s/%s/%s", guildID, channelID, message.ID),
 	}
 
