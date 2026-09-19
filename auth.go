@@ -30,11 +30,13 @@ const (
 
 	APIRequestsPerSec  = 10
 	UserRequestsPerSec = 3
+	// A screener refresh uses two requests; leave room for a quick follow-up.
+	UserRequestBurst = 4
 )
 
 var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
-var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
+var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
 
 type PatreonConfig struct {
 	Source string            `json:"source"`
