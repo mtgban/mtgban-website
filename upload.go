@@ -29,6 +29,7 @@ import (
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/manabox"
 	"github.com/mtgban/mtgban-website/moxfield"
 )
 
@@ -780,6 +781,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				uploadedData, uploadName, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
 				uploadedData, uploadName, err = loadMoxfield(r.Context(), u.Path, maxRows)
+			case "manabox.app", "www.manabox.app":
+				uploadedData, uploadName, err = loadManabox(r.Context(), gdocURL, maxRows)
 			case "app.getcollectr.com":
 				uploadedData, uploadName, err = loadCollectr(r.Context(), gdocURL, maxRows)
 			case "docs.google.com":
@@ -2012,6 +2015,31 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 			MismatchError:     err,
 			OriginalPrice:     item.Price,
 			OriginalCondition: item.Condition,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	return uploadEntries, deckName, nil
+}
+
+func loadManabox(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+	items, deckName, err := manabox.Load(ctx, link, maxRows)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch ManaBox deck: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		cardID, err := backend().MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		entry := UploadEntry{
+			Card: mtgmatcher.InputCard{
+				Name: item.Name,
+				Foil: item.IsFoil,
+			},
+			HasQuantity:   true,
+			Quantity:      item.Quantity,
+			CardID:        cardID,
+			MismatchError: err,
 		}
 		uploadEntries = append(uploadEntries, entry)
 	}
