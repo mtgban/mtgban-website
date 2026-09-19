@@ -1414,6 +1414,31 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 	return blocklistRetail, blocklistBuylist
 }
 
+// getSearchBlocklists combines the signature/config policy with the
+// per-browser store preferences used by search and its price surfaces.
+func getSearchBlocklists(r *http.Request, sig string) ([]string, []string, bool) {
+	retail, buylist := getDefaultBlocklists(sig)
+	personalized := sig != ""
+	if stores := readCookie(r, "SearchSellersList"); stores != "" {
+		retail = appendNonEmptyCSV(retail, stores)
+		personalized = true
+	}
+	if stores := readCookie(r, "SearchVendorsList"); stores != "" {
+		buylist = appendNonEmptyCSV(buylist, stores)
+		personalized = true
+	}
+	return retail, buylist, personalized
+}
+
+func appendNonEmptyCSV(dst []string, value string) []string {
+	for _, item := range strings.Split(value, ",") {
+		if item != "" {
+			dst = append(dst, item)
+		}
+	}
+	return dst
+}
+
 // Return a random uuid from the pool of singles or sealed uuids
 func randomUUID(sealed bool) string {
 	uuids := backend().GetUUIDs()
