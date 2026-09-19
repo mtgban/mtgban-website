@@ -172,6 +172,7 @@
             var u = new URL(s);
             if (u.host === 'store.tcgplayer.com')                            return { label: 'TCGplayer collection' };
             if (u.host === 'moxfield.com' || u.host === 'www.moxfield.com')  return { label: 'Moxfield deck' };
+            if (u.host === 'manabox.app' || u.host === 'www.manabox.app')    return { label: 'ManaBox deck' };
             if (u.host === 'docs.google.com')                                 return { label: 'Google Sheets' };
             return null;
         } catch (e) {
