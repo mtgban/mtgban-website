@@ -102,7 +102,7 @@ output, not a claim written here.
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
 | `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); to be imported by the API gateway repo, so its payload bytes are frozen by golden tests |
-| `catalog/` | The API price list (`catalog.json`, embedded): packages, add-ons, intervals, selectable stores. Imported by the API gateway repo to seed Stripe; the pricing page renders from it |
+| `apiproductlist/` | The API price list (`products.json`, embedded; amounts in cents): packages, add-ons, intervals, store families. The API gateway repo pins this module by commit and seeds Stripe from it, so a price edit needs a gateway dependency bump; the pricing page renders from it |
 | `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
 
 ## Non-Magic games

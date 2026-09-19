@@ -1,4 +1,4 @@
-package catalog
+package apiproductlist
 
 import (
 	"reflect"
@@ -167,7 +167,7 @@ func TestValidateRejects(t *testing.T) {
 }
 
 func TestValidateRejectsLookupKeyCollision(t *testing.T) {
-	c := Catalog{
+	c := ProductList{
 		Currency: "usd",
 		Packages: []Package{
 			{Key: "a_b", Name: "A B", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}},
