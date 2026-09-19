@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -120,5 +121,23 @@ func TestTheReadableQueryCannotBreakOutOfItsString(t *testing.T) {
 	})
 	if !strings.Contains(out, `label: "Hero's Downfall\" ; alert(1); \"",`) {
 		t.Error("a quote in the query did not survive as an escaped quote")
+	}
+}
+
+func TestCardArtFallbackLoadsBeforeContent(t *testing.T) {
+	for _, path := range []string{"templates/base.html", "templates/mobile/base-mobile.html"} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(raw)
+		fallback := strings.Index(s, "card-art-fallback.js")
+		content := strings.Index(s, `block "content"`)
+		if fallback < 0 || content < 0 {
+			t.Fatalf("%s: missing card-art-fallback.js or content block", path)
+		}
+		if fallback > content {
+			t.Fatalf("%s: card-art-fallback.js must load before content (search seeds sidebar mid-page)", path)
+		}
 	}
 }
