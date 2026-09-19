@@ -24,9 +24,9 @@ func navWithHiddenSubPage(t *testing.T, parentLink, subLink, marker string) http
 		UserRateLimiter = savedLimiter
 	})
 
-	// Unsigned requests all share the one empty-email bucket, so without a
-	// limiter of its own a test gets the rate limit notice instead of the page
-	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
+	// These unsigned test requests use the shared empty-email key. Give each
+	// helper invocation a fresh limiter so tests cannot affect one another.
+	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
 	DevMode, SigCheck = true, false
 	ExtraNavs = map[string]*NavElem{
 		"Testing": {
