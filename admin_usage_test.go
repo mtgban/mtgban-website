@@ -80,7 +80,7 @@ func TestAdminUsagePanelOnlyOnItsOwnPage(t *testing.T) {
 	}
 
 	onUsage := renderAdminPage(t, PageVars{Page: "usage", UsageStats: dash})
-	for _, want := range []string{"sleepers/gap", "Top pages", "sleepers sub-views"} {
+	for _, want := range []string{"sleepers/gap", "Top pages", "sleepers sub-views", `href="/sleepers?page=gap"`} {
 		if !strings.Contains(onUsage, want) {
 			t.Errorf("the usage tab does not contain %q", want)
 		}
@@ -116,4 +116,32 @@ func renderAdminPage(t *testing.T, vars PageVars) string {
 		t.Fatalf("rendering admin.html: %v", err)
 	}
 	return buf.String()
+}
+
+// Path links reverse NormalizePath for top pages, device split, and sub-views.
+func TestAdminUsagePathLinks(t *testing.T) {
+	dash := &UsageDashboard{
+		Instance: "magic",
+		TopPages: []observability.PathAgg{{Path: "newspaper/syp", Hits: 21, Uniques: 11}},
+		ByDevice: []observability.DeviceAgg{{Path: "search", Device: "desktop", Hits: 10, Uniques: 2}},
+		SubViews: []observability.PathAgg{{Path: "newspaper/syp", Hits: 21, Uniques: 11}},
+	}
+	html := renderAdminPage(t, PageVars{Page: "usage", UsageStats: dash})
+	for _, want := range []string{
+		`href="/newspaper?page=syp"`,
+		`href="/search"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("usage panel missing %q", want)
+		}
+	}
+
+	home := &UsageDashboard{
+		Instance: "magic",
+		TopPages: []observability.PathAgg{{Path: "home", Hits: 5, Uniques: 1}},
+	}
+	html = renderAdminPage(t, PageVars{Page: "usage", UsageStats: home})
+	if !strings.Contains(html, `href="/"`) {
+		t.Error("home path should link to /")
+	}
 }

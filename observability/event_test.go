@@ -46,3 +46,22 @@ func TestIsBot(t *testing.T) {
 		t.Fatal("a normal phone UA is not a bot")
 	}
 }
+
+func TestPathURL(t *testing.T) {
+	cases := []struct{ key, want string }{
+		{"", "/"},
+		{"home", "/"},
+		{"search", "/search"},
+		{"admin", "/admin"},
+		{"newspaper/index", "/newspaper"},
+		{"newspaper/syp", "/newspaper?page=syp"},
+		{"sleepers/gap", "/sleepers?page=gap"},
+		{"sleepers/other", "/sleepers?page=other"},
+		{"newspaper/combined_spike_score", "/newspaper?page=combined_spike_score"},
+	}
+	for _, c := range cases {
+		if got := PathURL(c.key); got != c.want {
+			t.Errorf("PathURL(%q)=%q want %q", c.key, got, c.want)
+		}
+	}
+}

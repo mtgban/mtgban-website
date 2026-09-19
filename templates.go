@@ -12,6 +12,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/dsreload"
 
 	"github.com/mtgban/mtgban-website/internal/palette"
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 // csvWithout returns csv with `drop` and any empty entries removed. Used by
@@ -276,6 +277,7 @@ var funcMap = template.FuncMap{
 	"palette_reverse_targets":   func() template.JS { return paletteService.ArbitTargetsJSON("reverse") },
 	"palette_global_targets":    func() template.JS { return paletteService.ArbitTargetsJSON("global") },
 	"guide_stores":              guideStoresJSON,
+	"usage_path_url":            observability.PathURL,
 	"dict": func(values ...any) (map[string]any, error) {
 		if len(values)%2 != 0 {
 			return nil, errors.New("dict requires even number of args")
