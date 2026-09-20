@@ -98,6 +98,7 @@ output, not a claim written here.
 | `product.go`, `chart.go`, `checkpoints.go` | Sealed EV, price charts, chart annotations |
 | `api*.go` | Price API, batch prices, chart/suggest APIs, CSV exports, API-mode loading |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
+| `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go`, `palette.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle, palette metadata APIs |
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |

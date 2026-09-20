@@ -1,0 +1,76 @@
+/* API plans page. Layout on the site's tokens; see main.css for the values. */
+.api-plans {
+    padding-top: var(--content-padding-top);
+    padding-bottom: 8vh;
+}
+.api-section { margin-bottom: 3em; }
+.api-section h2 {
+    font-size: var(--text-6xl);
+    margin: 0 0 0.6em;
+    color: var(--normal);
+}
+.api-section p { line-height: 1.6; color: var(--activetext); }
+.api-section code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    padding: 0.1em 0.4em;
+    border-radius: var(--radius-sm);
+}
+.api-note { font-size: var(--text-md); color: var(--text-dim); }
+.api-addon { display: inline-block; margin-right: 0.5em; }
+
+.api-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+    gap: 1.2em;
+}
+.api-card { padding: 1.2em 1.4em; }
+.api-card h3 { margin: 0 0 0.4em; font-size: var(--text-2xl); color: var(--normal); }
+.api-amount {
+    font-size: var(--text-9xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.6em;
+    color: var(--normal);
+}
+.api-amount span { font-size: var(--text-md); font-weight: 400; color: var(--text-dim); margin-left: 0.2em; }
+.api-card ul { margin: 0; padding-left: 1.2em; color: var(--activetext); font-size: var(--text-md); line-height: 1.6; }
+.api-cards-muted .api-card { opacity: 0.75; }
+
+.api-btn {
+    display: inline-block;
+    padding: 0.6em 1.2em;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-muted);
+    color: var(--ainfo);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+.api-btn:hover { filter: brightness(1.1); }
+.api-btn-secondary { background: var(--surface-1); border-color: var(--border-moderate); color: var(--normal); }
+
+.api-configurator form { display: grid; gap: 1.2em; }
+.api-fieldset {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    padding: 1em 1.2em;
+}
+.api-fieldset[hidden] { display: none; }
+.api-fieldset legend { padding: 0 0.4em; font-weight: 600; color: var(--normal); }
+.api-choice { display: block; padding: 0.3em 0; color: var(--activetext); cursor: pointer; }
+.api-choice-amount { color: var(--text-dim); font-size: var(--text-sm); margin-left: 0.4em; }
+.api-total-row { display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; }
+.api-total { font-size: var(--text-4xl); margin: 0; color: var(--normal); }
+.api-total strong { font-size: var(--text-9xl); }
+
+@media (max-width: 768px) {
+    .api-cards { grid-template-columns: 1fr; }
+    .page-header { flex-direction: column; }
+    .api-total-row { flex-direction: column; align-items: stretch; }
+    .api-btn { text-align: center; }
+}
