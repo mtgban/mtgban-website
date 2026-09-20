@@ -12,7 +12,7 @@
             <h1>Price data API</h1>
             <p class="page-subtitle">Every store, every game, one key.</p>
         </div>
-        <div class="page-action">
+        <div>
             <a class="api-btn api-btn-secondary" href="{{.GatewayURL}}/account">Manage your API access</a>
         </div>
     </div>
@@ -26,12 +26,12 @@
         <h2>Price data</h2>
         <div class="api-cards">
             {{range .Products.Packages}}
-            <div class="card api-card" data-package="{{.Key}}">
+            <div class="card api-card">
                 <h3>{{.Name}}</h3>
                 <p class="api-amount">{{usd .Monthly}}<span>/month</span></p>
                 <ul>
                     {{if eq .StoreScope "explicit"}}
-                    <li>TCGplayer plus {{.IncludedStores}} store of your choice</li>
+                    <li>One store of your choice, TCGplayer always included</li>
                     <li>Add more stores as you need them</li>
                     {{else if eq .StoreScope "BASE_ACCESS"}}
                     <li>Every EU and US store we track</li>
@@ -46,7 +46,7 @@
             {{end}}
         </div>
         <p class="api-note">
-            {{range .Products.Addons}}<span class="api-addon"><strong>{{.Name}}</strong> {{usd .Monthly}}/month{{if eq .Key "extra_store"}}, on the starter package{{else}}, on any package{{end}}.</span> {{end}}
+            {{range .Products.Addons}}<span class="api-addon"><strong>{{.Name}}</strong> {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}.</span> {{end}}
             Magic is included in every package.
         </p>
     </section>
@@ -81,9 +81,9 @@
         {{end}}
     </section>
 
-    <section class="api-section api-configurator" id="configurator">
+    <section class="api-section api-configurator">
         <h2>{{if .Change}}Change your plan{{else}}Configure your plan{{end}}</h2>
-        <form method="GET" action="{{.GatewayURL}}/checkout" id="api-config-form"{{if .Change}} data-change="1"{{end}}>
+        <form method="GET" action="{{.GatewayURL}}/checkout" id="api-config-form">
             <input type="hidden" name="return_to" value="{{.ReturnTo}}">
             {{if .Invite}}<input type="hidden" name="invite" value="{{.Invite}}">{{end}}
             {{if .Change}}<input type="hidden" name="change" value="1">{{end}}
@@ -106,7 +106,7 @@
             <fieldset class="api-fieldset">
                 <legend>Games</legend>
                 {{range .Games}}
-                <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}{{if .Included}} disabled data-included="1"{{end}}> {{.Name}}{{if .Included}} <span class="api-choice-amount">included</span>{{end}}</label>
+                <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}{{if .Included}} disabled{{end}}> {{.Name}}{{if .Included}} <span class="api-choice-amount">included</span>{{end}}</label>
                 {{end}}
             </fieldset>
 

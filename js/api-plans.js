@@ -58,12 +58,20 @@
 
     function update() {
         var pkg = selectedPackage();
+        var explicit = !!(pkg && pkg.explicit);
         var stores = document.getElementById('api-stores');
-        if (stores) stores.hidden = !(pkg && pkg.explicit);
+        if (stores) {
+            stores.hidden = !explicit;
+            // hidden alone does not stop submission, so disable too
+            var storeBoxes = stores.querySelectorAll('input[name="stores"]');
+            for (var k = 0; k < storeBoxes.length; k++) {
+                storeBoxes[k].disabled = !explicit;
+            }
+        }
         var total = computeTotal(data, {
             package: pkg ? pkg.key : '',
             interval: checkedValues('interval')[0] || 'monthly',
-            stores: pkg && pkg.explicit ? checkedValues('stores').length : 0,
+            stores: explicit ? checkedValues('stores').length : 0,
             games: form.querySelectorAll('input[name="games"]:checked').length
         });
         if (!total) return;
