@@ -508,6 +508,15 @@ func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
+		// A public page is served the way an ACL "Any" entry is
+		for _, nav := range ExtraNavs {
+			if nav.Public && nav.Link == r.URL.Path {
+				recordPageHit(r)
+				noSigning(next).ServeHTTP(w, r)
+				return
+			}
+		}
+
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := ACL()["Any"]
 		if checkNoAuth {

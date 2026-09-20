@@ -373,6 +373,9 @@ type NavElem struct {
 	// script to pre-resolve the gear button's enabled state so it
 	// doesn't transition from is-disabled → enabled at load time.
 	HasSettings bool
+
+	// Public pages need no signature and appear in the navbar for everyone
+	Public bool
 }
 
 var DefaultNav = []NavElem{
@@ -1001,6 +1004,7 @@ func genPageNav(r *http.Request, activeTab, sig string) PageVars {
 	// Enable buttons according to the enabled features
 	for _, feat := range OrderNav {
 		_, noAuth := ACL()["Any"][feat]
+		noAuth = noAuth || ExtraNavs[feat].Public
 		validSig := expires > time.Now().Unix()
 		devMode := DevMode && !SigCheck
 		alwaysOnDev := DevMode && ExtraNavs[feat].AlwaysOnForDev
@@ -1053,7 +1057,7 @@ func genPageNav(r *http.Request, activeTab, sig string) PageVars {
 			user = "Anonymous"
 		}
 		_, noAuth := ACL()["Any"][pageVars.Nav[mainNavIndex].Name]
-		if noAuth {
+		if noAuth || pageVars.Nav[mainNavIndex].Public {
 			user = ""
 		}
 	}
