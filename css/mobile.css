@@ -540,12 +540,18 @@ body.mobile:has(.m-home) .m-nav-home {
 .m-scope-row { display: none; }
 body.has-scope .m-scope-row {
     display: flex;
+    position: relative;
     align-items: center;
     gap: 6px;
     margin: 6px 16px 0;
 }
-.m-scope-box {
+.m-scope-autocomplete {
+    position: relative;
     flex: 1 1 auto;
+    min-width: 0;
+}
+.m-scope-box {
+    width: 100%;
     min-width: 0;
     height: 30px;
     padding: 0 10px;

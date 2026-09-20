@@ -664,12 +664,18 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
 
 .nav2-scope-inner {
     box-sizing: border-box;
+    position: relative;
     width: 100%;
     /* Same band as .nav2-inner, so the row lines up under the search box
        instead of under the whole viewport. */
     max-width: min(1000px, calc(100% - 32px));
     display: flex; align-items: center;
     gap: 8px;
+}
+.nav2-scope-autocomplete {
+    position: relative;
+    flex: 0 1 400px;
+    min-width: 0;
 }
 .nav2-scope-label {
     flex-shrink: 0;
@@ -684,7 +690,7 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
        matches the search field above so the number means the rendered
        width, padding and border included. */
     box-sizing: border-box;
-    flex: 0 1 400px;
+    width: 100%;
     min-width: 0;
     height: 24px;
     padding: 0 8px;
