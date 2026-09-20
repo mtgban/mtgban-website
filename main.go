@@ -329,6 +329,9 @@ type PageVars struct {
 
 	// Price-movers screener payload (nil on non-screener pages).
 	Screener *ScreenerVars
+
+	// API plans page payload (nil elsewhere)
+	API *APIPlansVars
 }
 
 type NavElem struct {
@@ -566,6 +569,14 @@ func init() {
 
 var Config ConfigType
 
+// APIGatewayConfig locates the API gateway the pricing page hands off to.
+type APIGatewayConfig struct {
+	// URL is the gateway's public origin, no trailing slash
+	URL string `json:"url"`
+	// Games are the gateway's configured games, what the configurator offers
+	Games []string `json:"games"`
+}
+
 type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
@@ -629,7 +640,8 @@ type ConfigType struct {
 	ObservabilityConfig   *timeseries.SQLConfig `json:"observability_config"`
 	NewNewspaperSQLConfig *timeseries.SQLConfig `json:"new_newspaper_sql_config"`
 
-	TCGCSVConfig *tcgcsv.Config `json:"tcgcsv_config"`
+	TCGCSVConfig *tcgcsv.Config   `json:"tcgcsv_config"`
+	APIGateway   APIGatewayConfig `json:"api_gateway"`
 
 	// The location of the configuation file (always last)
 	sourcePath string
@@ -936,6 +948,7 @@ const (
 	DefaultGame          = "magic"
 	DefaultServerURL     = apisig.DefaultLink
 	DefaultExternalURL   = "https://mtgban.com"
+	DefaultAPIGatewayURL = "https://api.mtgban.com"
 	DefaultDatastorePath = "AllPrintings.json.xz"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
@@ -1156,6 +1169,8 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 		Config.DatastorePath = DefaultDatastorePath
 	}
 
+	applyAPIGatewayDefaults(&Config.APIGateway)
+
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
 	if v == "" {
@@ -1163,7 +1178,22 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 		os.Setenv("BAN_SECRET", DefaultSecret)
 	}
 
+	if os.Getenv("TRIAL_SECRET") == "" {
+		log.Println("TRIAL_SECRET not set, API trial and sign-in handoff disabled")
+	}
+
 	return nil
+}
+
+// applyAPIGatewayDefaults fills api_gateway so the pricing page always has a target.
+func applyAPIGatewayDefaults(c *APIGatewayConfig) {
+	if c.URL == "" {
+		c.URL = DefaultAPIGatewayURL
+	}
+	c.URL = strings.TrimRight(c.URL, "/")
+	if len(c.Games) == 0 {
+		c.Games = []string{DefaultGame}
+	}
 }
 
 func openDBs() (err error) {
