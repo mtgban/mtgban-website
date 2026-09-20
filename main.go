@@ -430,6 +430,7 @@ var OrderNav = []string{
 	"Global",
 	"Arbit",
 	"Reverse",
+	"API",
 	"Admin",
 }
 
@@ -552,6 +553,15 @@ func init() {
 			Handle:      Reverse,
 			Page:        "arbit.html",
 			HasSettings: true,
+		},
+		"API": {
+			Name:        "API",
+			Short:       "🔑",
+			Description: "Price data API plans and access",
+			Link:        "/api-plans",
+			Handle:      APIPlans,
+			Page:        "api-plans.html",
+			Public:      true,
 		},
 		"Admin": {
 			Name:        "Admin",

@@ -1,0 +1,136 @@
+{{define "title"}}API plans &mdash; MTGBAN{{end}}
+
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/api-plans.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+{{with .API}}
+<div class="page-compact api-plans">
+    <div class="page-header">
+        <div>
+            <h1>Price data API</h1>
+            <p class="page-subtitle">Every store, every game, one key.</p>
+        </div>
+        <div class="page-action">
+            <a class="api-btn api-btn-secondary" href="{{.GatewayURL}}/account">Manage your API access</a>
+        </div>
+    </div>
+
+    <section class="api-section">
+        <h2>How access works</h2>
+        <p>One key covers every game on your plan. Requests go to <code>{{.GatewayURL}}/v1/{game}/mtgban/&hellip;</code> with the key as a bearer token, and return the same retail, buylist, and sealed feeds the site is built on. Paths, fields, and store shorthands are documented in the <a href="/guide">guide</a>.</p>
+    </section>
+
+    <section class="api-section">
+        <h2>Price data</h2>
+        <div class="api-cards">
+            {{range .Products.Packages}}
+            <div class="card api-card" data-package="{{.Key}}">
+                <h3>{{.Name}}</h3>
+                <p class="api-amount">{{usd .Monthly}}<span>/month</span></p>
+                <ul>
+                    {{if eq .StoreScope "explicit"}}
+                    <li>TCGplayer plus {{.IncludedStores}} store of your choice</li>
+                    <li>Add more stores as you need them</li>
+                    {{else if eq .StoreScope "BASE_ACCESS"}}
+                    <li>Every EU and US store we track</li>
+                    <li>Singles only, no sealed product</li>
+                    {{else}}
+                    <li>Every store, every mode</li>
+                    <li>Sealed product included</li>
+                    {{end}}
+                    <li>Modes: {{range $i, $m := .Modes}}{{if $i}}, {{end}}{{$m}}{{end}}</li>
+                </ul>
+            </div>
+            {{end}}
+        </div>
+        <p class="api-note">
+            {{range .Products.Addons}}<span class="api-addon"><strong>{{.Name}}</strong> {{usd .Monthly}}/month{{if eq .Key "extra_store"}}, on the starter package{{else}}, on any package{{end}}.</span> {{end}}
+            Magic is included in every package.
+        </p>
+    </section>
+
+    <section class="api-section">
+        <h2>Coming soon</h2>
+        <div class="api-cards api-cards-muted">
+            <div class="card api-card">
+                <h3>Velocity data</h3>
+                <p class="api-amount">{{usd .Velocity}}<span>/month</span></p>
+                <ul><li>How fast cards sell, by store and condition</li></ul>
+            </div>
+            <div class="card api-card">
+                <h3>Price data plus velocity</h3>
+                <p class="api-amount">{{usd .VelocityBundle}}<span>/month</span></p>
+                <ul><li>All data and velocity together</li></ul>
+            </div>
+        </div>
+        <p class="api-note">Not for sale yet. Ask on <a href="/discord">Discord</a> if you want in early.</p>
+    </section>
+
+    <section class="api-section">
+        <h2>Patreon</h2>
+        <p>The <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> bundle is {{usd .PatreonBundle}}/month for all games and all price data, arranged directly with us.</p>
+        {{if .CanTrial}}
+        <a class="api-btn" href="/api-trial">Try the API free for 15 days</a>
+        <p class="api-note">Fifteen days of all data across every game, no card required. One trial per Patreon account every six months.</p>
+        {{else if .Email}}
+        <p class="api-note">Supporters with an active pledge can try the API free for 15 days from this page.</p>
+        {{else}}
+        <p class="api-note">Signed-in supporters can try the API free for 15 days from this page.</p>
+        {{end}}
+    </section>
+
+    <section class="api-section api-configurator" id="configurator">
+        <h2>{{if .Change}}Change your plan{{else}}Configure your plan{{end}}</h2>
+        <form method="GET" action="{{.GatewayURL}}/checkout" id="api-config-form"{{if .Change}} data-change="1"{{end}}>
+            <input type="hidden" name="return_to" value="{{.ReturnTo}}">
+            {{if .Invite}}<input type="hidden" name="invite" value="{{.Invite}}">{{end}}
+            {{if .Change}}<input type="hidden" name="change" value="1">{{end}}
+
+            <fieldset class="api-fieldset">
+                <legend>Package</legend>
+                {{range $i, $p := .Products.Packages}}
+                <label class="api-choice"><input type="radio" name="package" value="{{$p.Key}}"{{if eq $i 0}} checked{{end}}> {{$p.Name}} <span class="api-choice-amount">{{usd $p.Monthly}}/month</span></label>
+                {{end}}
+            </fieldset>
+
+            <fieldset class="api-fieldset" id="api-stores">
+                <legend>Stores</legend>
+                <p class="api-note">{{range $i, $s := .Products.ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included. Pick the rest:</p>
+                {{range .Products.SelectableStores}}
+                <label class="api-choice"><input type="checkbox" name="stores" value="{{.Key}}"> {{.Name}}</label>
+                {{end}}
+            </fieldset>
+
+            <fieldset class="api-fieldset">
+                <legend>Games</legend>
+                {{range .Games}}
+                <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}{{if .Included}} disabled data-included="1"{{end}}> {{.Name}}{{if .Included}} <span class="api-choice-amount">included</span>{{end}}</label>
+                {{end}}
+            </fieldset>
+
+            <fieldset class="api-fieldset"{{if not .Invite}} hidden{{end}}>
+                <legend>Billing</legend>
+                {{range .Products.Intervals}}
+                {{if or .Public $.API.Invite}}
+                <label class="api-choice"><input type="radio" name="interval" value="{{.Key}}"{{if .Public}} checked{{end}}> {{if eq .Count 1}}Monthly{{else}}Every {{.Count}} months{{end}}</label>
+                {{end}}
+                {{end}}
+            </fieldset>
+
+            <div class="api-total-row">
+                <p class="api-total">Total <strong id="api-total">{{usd (index .Products.Packages 0).Monthly}}</strong> <span id="api-total-period">/month</span></p>
+                <button type="submit" class="api-btn">{{if .Change}}Review the change{{else}}Continue to checkout{{end}}</button>
+            </div>
+            <p class="api-note">The total is confirmed on the next page before anything is charged. Promotion codes are entered at checkout.</p>
+        </form>
+    </section>
+</div>
+{{end}}
+{{end}}
+
+{{define "extra-scripts"}}
+<script>window.__BAN_API_PLANS = {{api_plans_json .API}};</script>
+<script type="text/javascript" src="/js/api-plans.js?hash={{.Hash}}"></script>
+{{end}}
