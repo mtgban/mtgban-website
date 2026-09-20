@@ -41,7 +41,7 @@ func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if claims.Email != "ann@example.com" || claims.Name != "Ann Example" || claims.Purpose != apihandoff.PurposeTrial {
+	if claims.Email != "ann@example.com" || claims.Name != "Ann Example" || claims.Purpose != apihandoff.PurposeTrial || claims.Nonce == "" {
 		t.Errorf("claims %+v", claims)
 	}
 	if loc.Query().Get("return_to") != "https://pokemon.mtgban.com/api-plans" {
