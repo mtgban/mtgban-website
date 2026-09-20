@@ -77,8 +77,9 @@ func toggleMobileView(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
-// Pages that have mobile templates - only these show in mobile nav.
+// Pages with mobile-compatible templates - only these show in mobile nav.
 // Subpages (Sets, Sealed, Archive, etc.) that use the same handler/template are included.
+// Pages with responsive shared templates are included as well.
 var mobileEnabledPages = []string{
 	"Home",
 	"Search",
@@ -86,6 +87,7 @@ var mobileEnabledPages = []string{
 	"Sealed",
 	"Newspaper",
 	"Sleepers",
+	"Changelog",
 	"Admin",
 	"Guide",
 }

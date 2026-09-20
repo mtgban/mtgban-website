@@ -128,7 +128,7 @@ of the server's config is ignored, so the deployed file works unchanged:
   rather than reporting a clean run that wrote nothing)
 - `tcgcsv_config` — the chosen categories and the User-Agent
 - `timeseries_config.long_form_writes` — dual-write into the long `prices` table
-- `discord_notif_hook` — optional, for job-level success and failure notices
+- `discord.server_webhook_url` — optional, for job-level success and failure notices
 
 ## Running it as its own service
 

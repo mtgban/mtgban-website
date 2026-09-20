@@ -43,9 +43,12 @@ import (
 // config is the subset of the server's config.json this service reads. Unknown
 // keys are ignored, so it loads the deployment's existing file unchanged.
 type config struct {
-	SQLConfig        *timeseries.SQLConfig `json:"sql_config"`
-	TCGCSVConfig     *tcgcsv.Config        `json:"tcgcsv_config"`
-	DiscordNotifHook string                `json:"discord_notif_hook"`
+	SQLConfig    *timeseries.SQLConfig `json:"sql_config"`
+	TCGCSVConfig *tcgcsv.Config        `json:"tcgcsv_config"`
+	Discord      struct {
+		ServerWebhookURL string `json:"server_webhook_url"`
+	} `json:"discord"`
+	LegacyDiscordNotifHook string `json:"discord_notif_hook"`
 
 	TimeseriesConfig struct {
 		LongFormWrites bool `json:"long_form_writes"`
@@ -75,6 +78,9 @@ func loadConfig(ctx context.Context, path string) (*config, error) {
 	var cfg config
 	if err := json.NewDecoder(reader).Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if cfg.Discord.ServerWebhookURL == "" {
+		cfg.Discord.ServerWebhookURL = cfg.LegacyDiscordNotifHook
 	}
 	if cfg.SQLConfig == nil {
 		return nil, fmt.Errorf("%s: no sql_config section; there is no price database to write to", path)
@@ -125,11 +131,11 @@ func main() {
 	}
 
 	opts := []tcgcsvd.Option{tcgcsvd.WithLongFormWrites(cfg.TimeseriesConfig.LongFormWrites)}
-	if cfg.DiscordNotifHook != "" {
+	if cfg.Discord.ServerWebhookURL != "" {
 		// Synchronous on purpose: a one-shot process would exit before a
 		// backgrounded post ever left the machine.
 		opts = append(opts, tcgcsvd.WithNotifier(func(kind, message string) {
-			notify.Post(cfg.DiscordNotifHook, kind, message, false)
+			notify.Post(cfg.Discord.ServerWebhookURL, kind, message, false)
 		}))
 	}
 	svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db, opts...)

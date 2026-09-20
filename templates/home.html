@@ -83,7 +83,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         {{if not .ModalMode}}
         <div class="landing-tools">
             {{range .Nav}}
-                {{if and (ne .Name "Home") (ne .Class "beta")}}
+                {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Class "beta")}}
                     <a class="landing-tool" href="{{.Link}}">
                         <span class="t-icon">{{.Short}}</span> {{.Name}}
                     </a>
@@ -125,9 +125,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         {{end}}
 
         <div class="landing-game-links">
-            <a href="https://mtgban.com">Magic: the Gathering</a>
-            <span>|</span>
-            <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+            <a href="/changelog">Changelog</a>
         </div>
 
         <div class="landing-login-row">

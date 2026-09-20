@@ -1,0 +1,158 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/changelog.css?hash={{.Hash}}">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+<main class="changelog-page">
+    <header class="changelog-header">
+        <div>
+            <h1>Changelog</h1>
+            <p>A running record of what's happening in BAN.</p>
+        </div>
+        <a class="page-action" href="/discord">Discord</a>
+    </header>
+
+    {{if .ChangelogError}}
+    <p class="changelog-message changelog-message-error">{{.ChangelogError}}</p>
+    {{else if not .Changelog}}
+    <p class="changelog-message">No announcements yet.</p>
+    {{else}}
+    <div class="changelog-list">
+        {{range .Changelog}}
+        <section class="changelog-group">
+            <header class="changelog-group-header">
+                <time class="changelog-date">{{.Label}}</time>
+                <span class="changelog-group-count">{{len .Entries}} update{{if ne (len .Entries) 1}}s{{end}}</span>
+            </header>
+
+            <div class="changelog-group-messages">
+                {{range .Entries}}
+                <article class="changelog-entry">
+                    <div class="changelog-entry-meta">
+                        <time>{{.PublishedTime}}</time>
+                        {{if .SourceURL}}<a href="{{.SourceURL}}" target="_blank" rel="noopener">Discord</a>{{end}}
+                    </div>
+
+                    <div class="changelog-entry-main">
+                        {{if .ContentHTML}}
+                        <div class="changelog-rich-text">{{.ContentHTML}}</div>
+                        {{end}}
+
+                        {{range .Embeds}}
+                        <section class="changelog-embed">
+                            <div class="changelog-embed-layout{{if or .ImageURL .ThumbnailURL}} changelog-embed-layout-with-media{{end}}">
+                                <div class="changelog-embed-copy">
+                                    {{if .AuthorName}}
+                                    <div class="changelog-embed-author">
+                                        {{if .AuthorIconURL}}<img src="{{.AuthorIconURL}}" alt="" loading="lazy">{{end}}
+                                        {{if .AuthorURL}}<a href="{{.AuthorURL}}" target="_blank" rel="noopener">{{.AuthorNameHTML}}</a>{{else}}{{.AuthorNameHTML}}{{end}}
+                                    </div>
+                                    {{end}}
+                                    {{if .TitleHTML}}<h2>{{.TitleHTML}}</h2>{{end}}
+                                    {{if .DescriptionHTML}}<div class="changelog-rich-text">{{.DescriptionHTML}}</div>{{end}}
+                                    {{if .Fields}}
+                                    <dl class="changelog-embed-fields">
+                                        {{range .Fields}}
+                                        <div class="changelog-embed-field{{if .Inline}} changelog-embed-field-inline{{end}}">
+                                            <dt>{{.NameHTML}}</dt>
+                                            <dd>{{.ValueHTML}}</dd>
+                                        </div>
+                                        {{end}}
+                                    </dl>
+                                    {{end}}
+                                </div>
+                                {{if .ImageURL}}
+                                <div class="changelog-embed-media">
+                                    <figure class="changelog-image">
+                                        <a class="changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.ImageURL}}" data-lightbox-alt="{{if .Title}}{{.Title}}{{else}}Announcement image{{end}}" aria-label="Enlarge image"><img src="{{.ImageURL}}" alt="{{if .Title}}{{.Title}}{{else}}Announcement image{{end}}" loading="lazy"></a>
+                                    </figure>
+                                </div>
+                                {{else if .ThumbnailURL}}
+                                <div class="changelog-embed-media">
+                                    <a class="changelog-thumbnail changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.ThumbnailURL}}" data-lightbox-alt="Announcement thumbnail" aria-label="Enlarge image"><img src="{{.ThumbnailURL}}" alt="" loading="lazy"></a>
+                                </div>
+                                {{end}}
+                            </div>
+                            {{if .URL}}<a class="changelog-source" href="{{.URL}}" target="_blank" rel="noopener">Open link</a>{{end}}
+                            {{if .FooterText}}
+                            <div class="changelog-embed-footer">
+                                {{if .FooterIconURL}}<img src="{{.FooterIconURL}}" alt="" loading="lazy">{{end}}
+                                {{.FooterTextHTML}}
+                            </div>
+                            {{end}}
+                        </section>
+                        {{end}}
+
+                        {{range .Attachments}}
+                        {{if .IsImage}}
+                        <figure class="changelog-image">
+                            <a class="changelog-lightbox-trigger" href="#changelog-lightbox" data-lightbox-src="{{.URL}}" data-lightbox-alt="{{.Name}}" aria-label="Enlarge image"><img src="{{.URL}}" alt="{{.Name}}" loading="lazy"></a>
+                        </figure>
+                        {{else}}
+                        <a class="changelog-attachment" href="{{.URL}}" target="_blank" rel="noopener">{{.Name}}</a>
+                        {{end}}
+                        {{end}}
+                    </div>
+                </article>
+                {{end}}
+            </div>
+        </section>
+        {{end}}
+    </div>
+
+    {{if .CurrentIndex}}
+    <nav class="changelog-pagination" aria-label="Changelog pages">
+        {{if .PrevIndex}}<a href="/changelog?page={{.PrevIndex}}">Newer updates</a>{{end}}
+        <span>Page {{.CurrentIndex}} of {{.TotalIndex}}</span>
+        {{if .NextIndex}}<a href="/changelog?page={{.NextIndex}}">Older updates</a>{{end}}
+    </nav>
+    {{end}}
+    {{end}}
+    <div class="changelog-lightbox" id="changelog-lightbox" hidden role="dialog" aria-modal="true" aria-label="Image preview">
+        <button type="button" class="changelog-lightbox-close" aria-label="Close image preview">×</button>
+        <img class="changelog-lightbox-image" alt="">
+    </div>
+</main>
+{{end}}
+
+{{define "extra-scripts"}}
+<script>
+(() => {
+    const overlay = document.getElementById('changelog-lightbox');
+    if (!overlay) return;
+    const image = overlay.querySelector('.changelog-lightbox-image');
+    const closeButton = overlay.querySelector('.changelog-lightbox-close');
+    let previousFocus;
+
+    const close = () => {
+        overlay.hidden = true;
+        image.removeAttribute('src');
+        document.body.classList.remove('changelog-lightbox-open');
+        if (previousFocus) previousFocus.focus();
+    };
+
+    document.querySelectorAll('.changelog-lightbox-trigger').forEach(trigger => {
+        trigger.addEventListener('click', event => {
+            event.preventDefault();
+            previousFocus = document.activeElement;
+            image.src = trigger.dataset.lightboxSrc;
+            image.alt = trigger.dataset.lightboxAlt || '';
+            overlay.hidden = false;
+            document.body.classList.add('changelog-lightbox-open');
+            closeButton.focus();
+        });
+    });
+
+    closeButton.addEventListener('click', close);
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) close();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !overlay.hidden) close();
+    });
+})();
+</script>
+{{end}}

@@ -472,10 +472,11 @@ last-sold lookups (5 s fetch timeout, 30 s message-edit timeout);
 (dev/recap/chat); and Gatherer-link interception by multiverse id.
 Automatic affiliate-link rewriting (`checkForLinks`: Card Kingdom, Cool
 Stuff Inc, TCGplayer, Star City Games, Manapool, CardTrader, Amazon) is
-gated to the main Discord server *and* the default game, so a non-Magic
+gated to the configured Discord server *and* the default game, so a non-Magic
 deployment's bot never rewrites links. Webhooks — a separate channel from
-the bot session, via `internal/notify`, configured per `Config.DiscordHook`
-/ `DiscordNotifHook` / `DiscordAPINotifHook` — deliver server notifications:
+the bot session, via `internal/notify`, configured per
+`Config.Discord.UserWebhookURL` / `Config.Discord.ServerWebhookURL` /
+`Config.Discord.APIWebhookURL` — deliver server notifications:
 reload/refresh, panics (with stack trace), shutdown, checkpoint/datastore
 reload failures.
 
@@ -600,4 +601,3 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
    JS only enhances.
 6. **Declarative page registry** (`NavElem`) ties routing, auth, nav,
    logging, and templates together in one place.
-
