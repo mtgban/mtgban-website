@@ -47,7 +47,9 @@ var Country2flag = map[string]string{
 }
 
 func cookiePath(r *http.Request, cookieName string, global bool) string {
-	if global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") {
+	// MTGBAN is the authentication cookie and must remain available to every
+	// route, even when an untrusted host forces global domain scoping off.
+	if cookieName == "MTGBAN" || global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") {
 		return "/"
 	}
 	if r == nil || r.URL == nil {
