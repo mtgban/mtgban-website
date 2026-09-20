@@ -50,15 +50,17 @@ function fakeInput(name, value, checked) {
     return {name: name, value: value, checked: !!checked, disabled: false};
 }
 
-function buildFakeForm() {
+function buildFakeForm(storesChecked) {
+    storesChecked = storesChecked || [true, true];
     const packages = [
         fakeInput('package', 'starter', true),
         fakeInput('package', 'all_data', false),
     ];
-    const stores = [fakeInput('stores', 'CK', true), fakeInput('stores', 'SCG', true)];
+    const stores = [fakeInput('stores', 'CK', storesChecked[0]), fakeInput('stores', 'SCG', storesChecked[1])];
     const games = [fakeInput('games', 'magic', true)];
     const intervals = [fakeInput('interval', 'monthly', true)];
     const all = packages.concat(stores, games, intervals);
+    const submitButton = {disabled: false};
 
     let changeHandler = null;
     const form = {
@@ -68,7 +70,10 @@ function buildFakeForm() {
             if (m) return all.filter(function (i) { return i.name === m[1]; });
             return [];
         },
-        querySelector: function () { return null; },
+        querySelector: function (sel) {
+            if (sel === 'button[type="submit"]') return submitButton;
+            return null;
+        },
         addEventListener: function (evt, handler) { changeHandler = handler; },
     };
 
@@ -107,6 +112,7 @@ function buildFakeForm() {
         packages: packages,
         stores: stores,
         storesFieldset: storesFieldset,
+        submitButton: submitButton,
         triggerChange: function () { changeHandler(); },
     };
 }
@@ -123,4 +129,12 @@ test('switching off an explicit package disables the stale store checkboxes', ()
     expect(storesFieldset.hidden).toBe(true);
     expect(stores[0].disabled).toBe(true);
     expect(stores[1].disabled).toBe(true);
+});
+
+test('submit is disabled on an explicit package until enough stores are checked', () => {
+    const zeroChecked = buildFakeForm([false, false]);
+    expect(zeroChecked.submitButton.disabled).toBe(true);
+
+    const oneChecked = buildFakeForm([true, false]);
+    expect(oneChecked.submitButton.disabled).toBe(false);
 });

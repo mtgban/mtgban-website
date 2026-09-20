@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -67,12 +68,26 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	if origin == "" {
 		origin = DefaultExternalURL
 	}
+	invite := r.FormValue("invite")
+	change := r.FormValue("change") == "1"
+	// return_to carries invite and change so a checkout bounce back keeps the reader's context.
+	returnTo := origin + "/api-plans"
+	rv := url.Values{}
+	if invite != "" {
+		rv.Set("invite", invite)
+	}
+	if change {
+		rv.Set("change", "1")
+	}
+	if len(rv) > 0 {
+		returnTo += "?" + rv.Encode()
+	}
 	v := &APIPlansVars{
 		Products:       apiProducts,
 		GatewayURL:     Config.APIGateway.URL,
-		ReturnTo:       origin + "/api-plans",
-		Invite:         r.FormValue("invite"),
-		Change:         r.FormValue("change") == "1",
+		ReturnTo:       returnTo,
+		Invite:         invite,
+		Change:         change,
 		Email:          GetParamFromSig(sig, "UserEmail"),
 		PatreonBundle:  patreonBundleMonthly,
 		Velocity:       velocityMonthly,
@@ -122,7 +137,10 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 			out.IncludedGames++
 		}
 	}
-	data, _ := json.Marshal(out)
+	data, err := json.Marshal(out)
+	if err != nil {
+		return "null"
+	}
 	return template.JS(data)
 }
 

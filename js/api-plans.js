@@ -68,10 +68,16 @@
                 storeBoxes[k].disabled = !explicit;
             }
         }
+        var checkedStores = explicit ? checkedValues('stores').length : 0;
+        // An explicit package needs its included stores picked before checkout.
+        var submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.disabled = explicit && checkedStores < pkg.includedStores;
+        }
         var total = computeTotal(data, {
             package: pkg ? pkg.key : '',
             interval: checkedValues('interval')[0] || 'monthly',
-            stores: explicit ? checkedValues('stores').length : 0,
+            stores: checkedStores,
             games: form.querySelectorAll('input[name="games"]:checked').length
         });
         if (!total) return;

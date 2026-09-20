@@ -38,7 +38,7 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 		`action="https://api.example/checkout"`,
 		`name="package" value="starter"`,
 		`name="games" value="pokemon"`,
-		`name="stores" value="CK"`,
+		`name="stores" value="CK" checked`,
 		`name="return_to" value="https://mtgban.com/api-plans"`,
 		`href="https://api.example/account"`,
 		"/guide",
@@ -49,7 +49,7 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	if strings.Contains(body, `href="/api-trial"`) {
+	if strings.Contains(body, `href="/api-trial`) {
 		t.Error("anonymous reader sees the trial button")
 	}
 	if strings.Contains(body, `value="quarterly"`) {
@@ -64,15 +64,16 @@ func TestAPIPlansTrialButtonNeedsPledgeAndSecret(t *testing.T) {
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example"}
 
 	t.Setenv("TRIAL_SECRET", "")
-	if strings.Contains(apiPlansPage(t, sign("Legacy", user, nil)), `href="/api-trial"`) {
+	if strings.Contains(apiPlansPage(t, sign("Legacy", user, nil)), `href="/api-trial`) {
 		t.Error("trial offered without TRIAL_SECRET")
 	}
 
 	t.Setenv("TRIAL_SECRET", "s")
-	if strings.Contains(apiPlansPage(t, sign("", user, nil)), `href="/api-trial"`) {
+	if strings.Contains(apiPlansPage(t, sign("", user, nil)), `href="/api-trial`) {
 		t.Error("trial offered to a login with no pledge")
 	}
-	if !strings.Contains(apiPlansPage(t, sign("Legacy", user, nil)), `href="/api-trial"`) {
+	// html/template percent-encodes the query value, including the scheme's slashes.
+	if !strings.Contains(apiPlansPage(t, sign("Legacy", user, nil)), `href="/api-trial?return_to=https%3a%2f%2fmtgban.com%2fapi-plans"`) {
 		t.Error("trial missing for a pledged supporter")
 	}
 }
@@ -86,6 +87,9 @@ func TestAPIPlansInviteRevealsQuarterly(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, `value="quarterly"`) || !strings.Contains(body, `name="invite" value="abc"`) {
 		t.Error("invite did not reveal quarterly or was dropped")
+	}
+	if !strings.Contains(body, "invite=abc") {
+		t.Error("return_to dropped the invite")
 	}
 }
 
