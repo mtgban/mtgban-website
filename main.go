@@ -117,6 +117,8 @@ type PageVars struct {
 	ShowUpsell     bool
 
 	PopularSearches []PopularSearch
+	Changelog       []changelogGroup
+	ChangelogError  string
 
 	CanShowAll       bool
 	CleanSearchQuery string
@@ -382,6 +384,13 @@ var DefaultNav = []NavElem{
 		Link:  "/",
 		Page:  "home.html",
 	},
+	{
+		Name:        "Changelog",
+		Short:       "📝",
+		Description: "See what changed recently",
+		Link:        "/changelog",
+		Page:        "changelog.html",
+	},
 }
 
 // List of keys that may be present or not, and when present they are
@@ -563,6 +572,21 @@ func init() {
 
 var Config ConfigType
 
+// DiscordConfig contains the bot connection, community links, channel IDs,
+// and webhook destinations used by the website.
+type DiscordConfig struct {
+	BotToken             string `json:"bot_token"`
+	GuildID              string `json:"guild_id"`
+	InviteURL            string `json:"invite_url"`
+	ChangelogChannelID   string `json:"changelog_channel_id"`
+	DevelopmentChannelID string `json:"development_channel_id"`
+	RecapChannelID       string `json:"recap_channel_id"`
+	ChatChannelID        string `json:"chat_channel_id"`
+	UserWebhookURL       string `json:"user_webhook_url"`
+	ServerWebhookURL     string `json:"server_webhook_url"`
+	APIWebhookURL        string `json:"api_webhook_url"`
+}
+
 type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
@@ -587,13 +611,9 @@ type ConfigType struct {
 	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	DiscordHook            string             `json:"discord_hook"`
-	DiscordNotifHook       string             `json:"discord_notif_hook"`
-	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
-	DiscordInviteLink      string             `json:"discord_invite_link"`
+	Discord                DiscordConfig      `json:"discord"`
 	API                    map[string]string  `json:"api"`
 	APIDemoStores          []string           `json:"api_demo_stores"`
-	DiscordToken           string             `json:"discord_token"`
 	ArbitDefaultSellers    []string           `json:"arbit_default_sellers"`
 	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
 	SearchRetailBlockList  []string           `json:"search_block_list"`
@@ -630,6 +650,46 @@ type ConfigType struct {
 
 	// The location of the configuation file (always last)
 	sourcePath string
+}
+
+// UnmarshalJSON accepts the pre-discord-section keys during migration. New
+// configuration should use the nested discord object; legacy deployments can
+// roll forward without having to change their secrets in the same release.
+func (c *ConfigType) UnmarshalJSON(data []byte) error {
+	type configAlias ConfigType
+	legacy := struct {
+		*configAlias
+		DiscordHook               string `json:"discord_hook"`
+		DiscordNotifHook          string `json:"discord_notif_hook"`
+		DiscordAPINotifHook       string `json:"discord_api_notif_hook"`
+		DiscordInviteLink         string `json:"discord_invite_link"`
+		DiscordChangelogChannelID string `json:"discord_changelog_channel_id"`
+		DiscordToken              string `json:"discord_token"`
+	}{configAlias: (*configAlias)(c)}
+
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return err
+	}
+	if c.Discord.UserWebhookURL == "" {
+		c.Discord.UserWebhookURL = legacy.DiscordHook
+	}
+	if c.Discord.ServerWebhookURL == "" {
+		c.Discord.ServerWebhookURL = legacy.DiscordNotifHook
+	}
+	if c.Discord.APIWebhookURL == "" {
+		c.Discord.APIWebhookURL = legacy.DiscordAPINotifHook
+	}
+	if c.Discord.InviteURL == "" {
+		c.Discord.InviteURL = legacy.DiscordInviteLink
+	}
+	if c.Discord.ChangelogChannelID == "" {
+		c.Discord.ChangelogChannelID = legacy.DiscordChangelogChannelID
+	}
+	if c.Discord.BotToken == "" {
+		c.Discord.BotToken = legacy.DiscordToken
+	}
+	c.Discord.applyDefaults()
+	return nil
 }
 
 var DevMode bool
@@ -1570,8 +1630,11 @@ func main() {
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
+		http.Redirect(w, r, Config.Discord.InviteURL, http.StatusFound)
 	})
+
+	// Public changelog sourced from the Discord announcement channel.
+	http.Handle("/changelog", noSigning(http.HandlerFunc(Changelog)))
 
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))

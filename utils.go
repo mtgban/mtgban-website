@@ -1234,38 +1234,38 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 // Log and send the notification for a user action
 func ServerNotify(kind, message string, flags ...bool) {
 	log.Println(message)
-	if Config.DiscordNotifHook == "" {
+	if Config.Discord.ServerWebhookURL == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify.Post(Config.DiscordNotifHook, kind, message, DevMode)
+	go notify.Post(Config.Discord.ServerWebhookURL, kind, message, DevMode)
 }
 
 // Only send the notification for a user action
 func UserNotify(kind, message string, flags ...bool) {
-	if Config.DiscordHook == "" {
+	if Config.Discord.UserWebhookURL == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 		log.Println(kind, "-", message)
 	}
-	go notify.Post(Config.DiscordHook, kind, message, DevMode)
+	go notify.Post(Config.Discord.UserWebhookURL, kind, message, DevMode)
 }
 
 // Only send the notification for a user action
 func APINotify(message string, flags ...bool) {
 	kind := Config.Game
 	log.Println(kind, "-", message)
-	if Config.DiscordAPINotifHook == "" {
+	if Config.Discord.APIWebhookURL == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify.Post(Config.DiscordAPINotifHook, kind, message, DevMode)
+	go notify.Post(Config.Discord.APIWebhookURL, kind, message, DevMode)
 }
 
 // Read the query parameter, if present set a cookie that will be

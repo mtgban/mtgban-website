@@ -36,12 +36,10 @@ const (
 	// Timeout before giving up on a last sold price request
 	LastSoldTimeout = 30
 
-	// IDs of the channels on the main server
-	DevChannelID   = "769323295526748160"
-	RecapChannelID = "798588735259279453"
-	ChatChannelID  = "736007847560609794"
-
-	MainDiscordID = "637563728711385091"
+	defaultDiscordGuildID        = "637563728711385091"
+	defaultDiscordDevChannelID   = "769323295526748160"
+	defaultDiscordRecapChannelID = "798588735259279453"
+	defaultDiscordChatChannelID  = "736007847560609794"
 )
 
 var DiscordRetailBlocklist []string
@@ -49,15 +47,37 @@ var DiscordBuylistBlocklist []string
 
 var dg *discordgo.Session
 
+func (c *DiscordConfig) applyDefaults() {
+	if c.GuildID == "" {
+		c.GuildID = defaultDiscordGuildID
+	}
+	if c.DevelopmentChannelID == "" {
+		c.DevelopmentChannelID = defaultDiscordDevChannelID
+	}
+	if c.RecapChannelID == "" {
+		c.RecapChannelID = defaultDiscordRecapChannelID
+	}
+	if c.ChatChannelID == "" {
+		c.ChatChannelID = defaultDiscordChatChannelID
+	}
+}
+
+func discordGuildID() string {
+	if Config.Discord.GuildID != "" {
+		return Config.Discord.GuildID
+	}
+	return defaultDiscordGuildID
+}
+
 func setupDiscord() error {
 	var err error
 
-	if Config.DiscordToken == "" {
+	if Config.Discord.BotToken == "" {
 		return errors.New("no discord token")
 	}
 
 	// Create a new Discord session using the provided bot token.
-	dg, err = discordgo.New("Bot " + Config.DiscordToken)
+	dg, err = discordgo.New("Bot " + Config.Discord.BotToken)
 	if err != nil {
 		return err
 	}
@@ -68,8 +88,11 @@ func setupDiscord() error {
 	// Register the messageCreate func as a callback for MessageCreate events.
 	dg.AddHandler(messageCreate)
 
-	// In this example, we only care about receiving message events.
-	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMessages)
+	// The changelog reads message content, embeds, and attachments through the
+	// Discord API, so request the corresponding privileged intent as well.
+	dg.Identify.Intents = discordgo.MakeIntent(
+		discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent,
+	)
 
 	DiscordRetailBlocklist = append(Config.SearchRetailBlockList, "TCGDirectLow")
 	DiscordBuylistBlocklist = append(Config.SearchBuylistBlockList, "ABUCredit")
@@ -85,7 +108,7 @@ func setupDiscord() error {
 
 // Cleanly close down the Discord session.
 func cleanupDiscord() {
-	if Config.DiscordToken == "" {
+	if Config.Discord.BotToken == "" {
 		return
 	}
 	log.Println("Closing connection with Discord")
@@ -448,7 +471,7 @@ var AffiliateStores = []AffiliateConfig{
 // Check if a essage contains well-known links that can be tagged with BAN's links
 func checkForLinks(mGuildID, mContent string) (string, string) {
 	// Only for the main discord and only for the main game
-	if mGuildID != MainDiscordID || Config.Game != DefaultGame {
+	if mGuildID != discordGuildID() || Config.Game != DefaultGame {
 		return "", ""
 	}
 
@@ -537,7 +560,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Ingore messages not coming from the test channel when running in dev
-	if DevMode && m.ChannelID != DevChannelID {
+	if DevMode && m.ChannelID != Config.Discord.DevelopmentChannelID {
 		return
 	}
 
@@ -547,7 +570,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		!strings.HasPrefix(m.Content, "$$") {
 		switch {
 		// Check if selected channels can replace scryfall searches
-		case (m.ChannelID == DevChannelID || m.ChannelID == RecapChannelID || m.ChannelID == ChatChannelID) && strings.Contains(m.Content, "[["):
+		case (m.ChannelID == Config.Discord.DevelopmentChannelID || m.ChannelID == Config.Discord.RecapChannelID || m.ChannelID == Config.Discord.ChatChannelID) && strings.Contains(m.Content, "[["):
 			fields := squareBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
 				m.Content = "!" + strings.Trim(field, "[]")
@@ -853,7 +876,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 	}
 
 	// Show data source on non-ban servers
-	if guildID != MainDiscordID {
+	if guildID != discordGuildID() {
 		embed.Footer.IconURL = poweredByFooter.IconURL
 		embed.Footer.Text += poweredByFooter.Text
 	}
