@@ -95,7 +95,10 @@ html { font-size: 17px; }
     --nav-height: 56px;
     --page-gutter: 3vw;
     --page-max-width: min(80vw, 1600px);
-    --content-padding-top: calc(var(--nav-height) + 2vh);
+    /* Space between the fixed chrome and the page's first content. Keep this
+       separate from the chrome height so --nav2-scope-height can add the
+       pinned row without changing the normal desktop start. */
+    --content-padding-slack: 27px;
 
     /* ── Font Size Scale ── */
     --text-2xs:  0.625rem;  /* ~10px */
@@ -587,7 +590,9 @@ a.selected:hover{
 }
 /* ═══ Base template layout ═══ */
 .page-content {
-    padding-top: var(--content-padding-top);
+    /* Resolve --nav-height here, after body.has-scope has changed it. A
+       root-level --content-padding-top would retain the closed-nav value. */
+    padding-top: calc(var(--nav-height) + var(--content-padding-slack));
     min-height: 100vh;
 }
 
@@ -1293,7 +1298,6 @@ table.tiers td div {
     :root {
         --page-gutter: 16px;
         --page-max-width: 100%;
-        --content-padding-top: calc(var(--nav-height) + 8px);
     }
 
     .page-content { padding-top: 56px; }
