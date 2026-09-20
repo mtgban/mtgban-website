@@ -103,7 +103,7 @@
 {{$showInfo := or (not $.GlobalMode) $sealedSource}}
 <div class="page-standard arb-page arb-wide">
         <div id="hoverWrap" class="foil-wrap hoverWrap">
-            <img id="hoverImage" class="hoverImage" src=""/>
+            <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
         </div>
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
@@ -436,7 +436,7 @@
             </div>
 
             <div class="arb-table-wrap">
-            <table class="table-data arb-table filterable" onmouseout="window.setCardArtSource(document.getElementById('hoverImage'),'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
+            <table class="table-data arb-table filterable" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>

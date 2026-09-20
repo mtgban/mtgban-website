@@ -1021,6 +1021,10 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
     position: absolute;
     z-index: 200;
     pointer-events: none;
+    display: none;
+}
+.foil-wrap.hoverWrap.is-visible {
+    display: block;
 }
 .hoverWrap > img.hoverImage {
     position: static;

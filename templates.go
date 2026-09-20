@@ -42,7 +42,12 @@ func csvWithout(csv, drop string) string {
 	return strings.Join(out, ",")
 }
 
+const cardArtPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+
 var funcMap = template.FuncMap{
+	"card_art_placeholder": func() string {
+		return cardArtPlaceholder
+	},
 	// The datastore reload runs in the background, so the page that reports
 	// it asks at render time rather than being handed a copy that is stale
 	// by the time it is drawn.
