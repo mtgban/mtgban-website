@@ -10,7 +10,9 @@ test('an empty search list remains an explicit empty preference', () => {
         get: () => value,
         set: next => { value = next.split(';', 1)[0]; },
     });
-    const api = new Function('document', source + '\nreturn {getSearchListCookie, setSearchListCookie};')(document);
+    const api = new Function('document', 'window', source + '\nreturn {getSearchListCookie, setSearchListCookie};')(
+        document, {__BAN_COOKIE_PATHS: {}}
+    );
 
     api.setSearchListCookie('SearchSealedSellersList', '', 1000);
     expect(value).toBe('SearchSealedSellersList=__BAN_EMPTY_LIST__');
