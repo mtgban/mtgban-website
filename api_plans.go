@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apiproductlist"
@@ -101,24 +102,45 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		Count int64  `json:"count"`
 	}
 	out := struct {
-		Packages      []pkg               `json:"packages"`
-		Addons        map[string]int64    `json:"addons"`
-		AddonApplies  map[string][]string `json:"addonApplies"`
-		Intervals     []interval          `json:"intervals"`
-		IncludedGames int                 `json:"includedGames"`
-	}{Addons: map[string]int64{}, AddonApplies: map[string][]string{}, IncludedGames: len(v.Products.IncludedGames)}
+		Packages      []pkg            `json:"packages"`
+		Addons        map[string]int64 `json:"addons"`
+		Intervals     []interval       `json:"intervals"`
+		IncludedGames int              `json:"includedGames"`
+	}{Addons: map[string]int64{}}
 	for _, p := range v.Products.Packages {
 		out.Packages = append(out.Packages, pkg{p.Key, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores})
 	}
 	for _, a := range v.Products.Addons {
 		out.Addons[a.Key] = a.Monthly
-		out.AddonApplies[a.Key] = a.AppliesTo
 	}
 	for _, iv := range v.Products.Intervals {
 		out.Intervals = append(out.Intervals, interval{iv.Key, iv.Count})
 	}
+	// Counts only the included games actually offered by this deployment's gateway.
+	for _, g := range v.Games {
+		if g.Included {
+			out.IncludedGames++
+		}
+	}
 	data, _ := json.Marshal(out)
 	return template.JS(data)
+}
+
+// addonScope names, from the catalog, which packages an addon applies to.
+func addonScope(a apiproductlist.Addon, packages []apiproductlist.Package) string {
+	covers := true
+	var names []string
+	for _, p := range packages {
+		if slices.Contains(a.AppliesTo, p.Key) {
+			names = append(names, p.Name)
+		} else {
+			covers = false
+		}
+	}
+	if covers {
+		return "on any package"
+	}
+	return "on the " + strings.Join(names, ", ") + " package"
 }
 
 // formatUSD renders cents as $200, $1,500, or $12.50.

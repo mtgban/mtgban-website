@@ -70,7 +70,7 @@
 
 @media (max-width: 768px) {
     .api-cards { grid-template-columns: 1fr; }
-    .page-header { flex-direction: column; }
+    .api-plans .page-header { flex-direction: column; }
     .api-total-row { flex-direction: column; align-items: stretch; }
     .api-btn { text-align: center; }
 }

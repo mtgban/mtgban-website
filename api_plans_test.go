@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/mtgban-website/apiproductlist"
 )
 
 func apiPlansPage(t *testing.T, sig string) string {
@@ -40,6 +42,8 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 		`name="return_to" value="https://mtgban.com/api-plans"`,
 		`href="https://api.example/account"`,
 		"/guide",
+		`name="interval" value="monthly" checked`,
+		`<fieldset class="api-fieldset" hidden>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
@@ -82,6 +86,28 @@ func TestAPIPlansInviteRevealsQuarterly(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, `value="quarterly"`) || !strings.Contains(body, `name="invite" value="abc"`) {
 		t.Error("invite did not reveal quarterly or was dropped")
+	}
+}
+
+func TestAPIPlansJSONNil(t *testing.T) {
+	if apiPlansJSON(nil) != "null" {
+		t.Error("apiPlansJSON(nil) should be null")
+	}
+}
+
+func TestAddonScope(t *testing.T) {
+	packages := []apiproductlist.Package{
+		{Key: "starter", Name: "Starter"},
+		{Key: "all_stores", Name: "All Stores"},
+		{Key: "all_data", Name: "All Data"},
+	}
+	every := apiproductlist.Addon{Key: "extra_game", AppliesTo: []string{"starter", "all_stores", "all_data"}}
+	if got := addonScope(every, packages); got != "on any package" {
+		t.Errorf("addon applying to all packages: got %q", got)
+	}
+	one := apiproductlist.Addon{Key: "extra_store", AppliesTo: []string{"starter"}}
+	if got := addonScope(one, packages); got != "on the Starter package" {
+		t.Errorf("addon applying to one package: got %q", got)
 	}
 }
 
