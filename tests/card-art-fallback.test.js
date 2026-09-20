@@ -15,6 +15,10 @@ function loadFallback() {
         matches(selector) {
             return selector.includes('.card-art');
         }
+
+        closest() {
+            return null;
+        }
     }
     const window = {};
     const document = {
@@ -24,7 +28,7 @@ function loadFallback() {
         },
     };
     new Function('window', 'document', 'HTMLImageElement', source)(window, document, FakeImage);
-    return {FakeImage, onError, setCardArtSource: window.setCardArtSource};
+    return {FakeImage, onError, setCardArtSource: window.setCardArtSource, cardArtPlaceholder: window.cardArtPlaceholder};
 }
 
 test('reused card art can fall back again after its source changes', () => {
@@ -51,6 +55,21 @@ test('unrelated images do not receive the card-back fallback', () => {
 
     expect(image.src).toBe('broken.jpg');
     expect(image.dataset.cardArtFallback).toBeUndefined();
+});
+
+test('hover previews show only for real card art', () => {
+    const {FakeImage, setCardArtSource, cardArtPlaceholder} = loadFallback();
+    const image = new FakeImage();
+    const classes = new Set();
+    image.closest = selector => selector === '.hoverWrap' ? {
+        classList: {toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name)},
+    } : null;
+
+    setCardArtSource(image, 'card.jpg');
+    expect(classes.has('is-visible')).toBe(true);
+
+    setCardArtSource(image, cardArtPlaceholder);
+    expect(classes.has('is-visible')).toBe(false);
 });
 
 test('upload printing picker resets reused row art', () => {

@@ -16,7 +16,7 @@
 {{else}}
 <div class="news-wrap">
     <div id="hoverWrap" class="foil-wrap hoverWrap">
-        <img id="hoverImage" class="hoverImage" src=""/>
+        <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
     </div>
     <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
 
@@ -122,7 +122,7 @@
         </form>
         {{end}}
 
-        <div id="screenerLoading" class="screener-loading-overlay{{if .Screener.Deferred}} active{{end}}"><div class="screener-spinner"></div></div>
+        <div id="screenerLoading" class="screener-loading-overlay"><div class="screener-spinner"></div></div>
         <script>
         function screenerGo(form) {
             var o = document.getElementById('screenerLoading');
@@ -151,6 +151,10 @@
         </script>
 
         {{if .Screener.Deferred}}
+        <div class="screener-loading-state" role="status" aria-live="polite">
+            <div class="screener-spinner"></div>
+            <span>Loading results, please wait</span>
+        </div>
         {{/* The rows are a cold archive read, so the page is painted without
              them and asks for them itself. The reply is a whole page; the one
              region that needed the rows is taken out of it, which is also the
@@ -186,7 +190,7 @@
         </script>
         {{else}}
         <div class="news-table-wrap">
-            <table class="table-data news-table" id="screenerTable" onmouseout="window.setCardArtSource(document.getElementById('hoverImage'),'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
+            <table class="table-data news-table" id="screenerTable" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
                 <thead>
                     <tr>
                         <th class="news-th-card">{{if eq .Screener.SelKind "sealed"}}Products{{else if eq .Screener.SelKind "both"}}Entries{{else}}Card{{end}}</th>

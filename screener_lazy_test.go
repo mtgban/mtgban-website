@@ -58,12 +58,15 @@ func TestScreenerDefersTheColdBuild(t *testing.T) {
 		return rec.Body.String()
 	}
 
-	// Cold: the shell, with the spinner already up and nothing built.
+	// Cold: the shell, with an in-flow spinner and nothing built.
 	shell := get(t, "/screener")
 	if fetches != 0 {
 		t.Errorf("the cold page built %d times before painting", fetches)
 	}
-	if !strings.Contains(shell, "screener-loading-overlay active") {
+	if strings.Contains(shell, "screener-loading-overlay active") {
+		t.Error("the cold page blocks the in-flow loading message with the overlay")
+	}
+	if !strings.Contains(shell, "screener-loading-state") || !strings.Contains(shell, "Loading results, please wait") {
 		t.Error("the cold page paints without saying it is still working")
 	}
 	if strings.Contains(shell, `id="screenerTable"`) {
@@ -86,6 +89,9 @@ func TestScreenerDefersTheColdBuild(t *testing.T) {
 	}
 	if strings.Contains(rows, "screener-loading-overlay active") {
 		t.Error("the reply still says it is working")
+	}
+	if strings.Contains(rows, "screener-loading-state") || strings.Contains(rows, "Loading results, please wait") {
+		t.Error("the row response still carries the deferred loading cue")
 	}
 
 	// Warm: answered in one go, with no second round trip to wait for.
