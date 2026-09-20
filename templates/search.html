@@ -379,7 +379,10 @@
                     container.appendChild(dropdown);
                 }
 
-                // The sidebar follows the result under the pointer via mouseover.
+                // The sidebar follows the result under the pointer via mouse
+                // entry. The header, variant line, and price body are separate
+                // siblings, so moving between them can enter the same card
+                // more than once; updateSidebar deduplicates those entries.
                 // Pressing a modifier (Cmd/Ctrl) makes the browser re-hit-test
                 // under the still cursor and fire a phantom `mouseover` — and
                 // with the stacked sticky headers that resolves to the pinned
@@ -436,6 +439,9 @@
 
                 function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName) {
                     var img = document.getElementById('cardImage');
+                    var sidebarCardKey = [src || '', isFoil ? 'foil' : '', isEtched ? 'etched' : '', setCode || '', cardName || ''].join('\u001f');
+                    if (img && img.__sidebarCardKey === sidebarCardKey) return;
+                    if (img) img.__sidebarCardKey = sidebarCardKey;
                     // The sidebar image is reused across hover targets; let a
                     // newly assigned source trigger the fallback independently.
                     window.setCardArtSource(img, src);
@@ -528,8 +534,6 @@
                 }
             </script>
 
-            {{$emptyImg := "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}}
-
             <div class="search-layout">
 
                 <div class="search-sidebar">
@@ -593,6 +597,7 @@
                 </div>
 
                 <div class="search-results">
+                    {{$haveFirst := false}}
                     {{$firstImg := ""}}
                     {{$firstPrint := ""}}
                     {{$firstProduct := ""}}
@@ -823,7 +828,7 @@
                                     // Legend entries carry the chart id (ban:<id> when long-form reads
                                     // are on); match them to the row's data-chart-id, not data-card-id.
                                     var row = document.querySelector('.result-header[data-chart-id="' + cardId + '"]');
-                                    if (row && typeof row.onmouseover === 'function') row.onmouseover();
+                                    if (row && typeof row.onmouseenter === 'function') row.onmouseenter();
                                 });
                                 legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
                             })();
@@ -1088,7 +1093,8 @@
 
                     {{range $i, $cardId := .AllKeys}}
                         {{$card := (index $.Metadata $cardId)}}
-                        {{if eq $firstImg ""}}
+                        {{if not $haveFirst}}
+                            {{$haveFirst = true}}
                             {{$firstImg = $card.ImageURL}}
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
@@ -1114,7 +1120,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{promo_label $t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                                 onmouseenter="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 32 "Class" "result-set-icon"}}
                                 </a>
@@ -1202,7 +1208,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -1434,7 +1440,11 @@
                 </div>{{/* Close .search-results */}}
 
                 {{if eq $firstImg ""}}
-                    {{$firstImg = $emptyImg}}
+                    {{/* A missing first image still gets the game's card back;
+                         using the transparent pixel here makes the initial
+                         load look empty and bypasses the normal image error
+                         fallback entirely. */}}
+                    {{$firstImg = card_back}}
                 {{end}}
                 <script type="text/javascript">
                     updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}}, {{$firstProductCount}});
@@ -1547,8 +1557,8 @@
                 window.scrollTo(0, target);
             }
 
-            // Trigger the header's onmouseover to update the sidebar image
-            headers[currentIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+            // Trigger the header's hover handler to update the sidebar image.
+            headers[currentIdx].dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}));
         });
 
         // Rows sliding under a still cursor never produce a mouseover: browsers
@@ -1560,8 +1570,8 @@
         function hoverRowUnderPointer() {
             if (typeof __mx !== 'number' || typeof __my !== 'number') return false;
             var el = document.elementFromPoint(__mx, __my);
-            var row = el && el.closest ? el.closest('[onmouseover]') : null;
-            if (!row || typeof row.onmouseover !== 'function') {
+            var row = el && el.closest ? el.closest('[onmouseenter]') : null;
+            if (!row || typeof row.onmouseenter !== 'function') {
                 lastPointerTarget = null;
                 return false;
             }
@@ -1569,7 +1579,7 @@
                 lastPointerTarget = row;
                 __hoverTrusted = true;
                 try {
-                    row.onmouseover();
+                    row.onmouseenter();
                 } finally {
                     __hoverTrusted = false;
                 }

@@ -33,12 +33,38 @@ window.cardArtPlaceholder = CARD_ART_PLACEHOLDER;
 // shared way to make that transition safely.
 function setCardArtSource(img, src) {
     if (!img) return;
-    delete img.dataset.cardArtFallback;
-    img.src = src;
+    var game = document.body && document.body.getAttribute('data-game');
+    var target = src || (game ? '/img/backs/' + game + '.webp' : src);
     var hoverWrap = img.closest && img.closest('.hoverWrap');
-    if (hoverWrap) {
-        hoverWrap.classList.toggle('is-visible', src !== CARD_ART_PLACEHOLDER);
+    var showHover = function () {
+        if (hoverWrap) {
+            hoverWrap.classList.toggle('is-visible', target !== CARD_ART_PLACEHOLDER);
+        }
+    };
+    var apply = function () {
+        img.src = target;
+        showHover();
+    };
+
+    delete img.dataset.cardArtFallback;
+    // Keep the previous art visible while a different printing loads. This
+    // matters on the price-heavy search pages, where moving between adjacent
+    // results otherwise exposes the image's blank loading state in Firefox.
+    // The token prevents a slow response for an older hover from winning.
+    if (target !== CARD_ART_PLACEHOLDER && typeof Image !== 'undefined') {
+        var request = new Image();
+        var token = {};
+        img.__cardArtRequest = token;
+        request.onload = function () {
+            if (img.__cardArtRequest === token) apply();
+        };
+        request.onerror = function () {
+            if (img.__cardArtRequest === token) apply();
+        };
+        request.src = target;
+        return;
     }
+    apply();
 }
 window.setCardArtSource = setCardArtSource;
 
