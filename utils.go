@@ -1315,6 +1315,8 @@ func readCookie(r *http.Request, cookieName string) string {
 	return cookie.Value
 }
 
+const emptySearchListCookieValue = "__BAN_EMPTY_LIST__"
+
 func searchListCookieName(cookieName string, sealed bool) string {
 	if !sealed {
 		return cookieName
@@ -1336,7 +1338,15 @@ func readSearchListCookie(r *http.Request, cookieName string, sealed bool) strin
 		// until the user saves an independent sealed preference.
 		value = readCookie(r, cookieName)
 	}
+	if value == emptySearchListCookieValue {
+		return ""
+	}
 	return value
+}
+
+func hasSearchListCookie(r *http.Request, cookieName string, sealed bool) bool {
+	_, err := r.Cookie(searchListCookieName(cookieName, sealed))
+	return err == nil
 }
 
 // There is no forever in cookies, so pick a really large interval
@@ -1447,10 +1457,12 @@ func getSearchBlocklists(r *http.Request, sig string, sealed bool) ([]string, []
 		retail = appendNonEmptyCSV(retail, stores)
 		personalized = true
 	}
+	personalized = personalized || hasSearchListCookie(r, "SearchSellersList", sealed)
 	if stores := readSearchListCookie(r, "SearchVendorsList", sealed); stores != "" {
 		buylist = appendNonEmptyCSV(buylist, stores)
 		personalized = true
 	}
+	personalized = personalized || hasSearchListCookie(r, "SearchVendorsList", sealed)
 	return retail, buylist, personalized
 }
 

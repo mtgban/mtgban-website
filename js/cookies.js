@@ -1,3 +1,5 @@
+const EMPTY_SEARCH_LIST_COOKIE = '__BAN_EMPTY_LIST__';
+
 function setCookie(cname, cvalue, exdays) {
     const d = new Date();
     d.setTime(d.getTime() + (exdays*24*60*60*1000));
@@ -9,6 +11,15 @@ function setCookie(cname, cvalue, exdays) {
     
     let expires = "expires="+ d.toUTCString();
     document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;SameSite=Strict";
+}
+
+function getSearchListCookie(cname) {
+    const value = getCookie(cname);
+    return value === EMPTY_SEARCH_LIST_COOKIE ? '' : value;
+}
+
+function setSearchListCookie(cname, cvalue, exdays) {
+    setCookie(cname, cvalue || EMPTY_SEARCH_LIST_COOKIE, exdays);
 }
 
 function getCookie(cname) {

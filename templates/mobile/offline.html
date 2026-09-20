@@ -78,7 +78,7 @@
     }
 
     function hiddenList(name) {
-        return (getCookie(name) || '').split(',').filter(Boolean);
+        return (getSearchListCookie(name) || '').split(',').filter(Boolean);
     }
 
     // Compose a shell URL carrying the query and active mode.

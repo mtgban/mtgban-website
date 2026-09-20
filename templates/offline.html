@@ -80,7 +80,7 @@
     // Suggestions read the current mode off this shared deps object.
     var searchDeps = null;
     function hiddenList(name) {
-        return (getCookie(name) || '').split(',').filter(Boolean);
+        return (getSearchListCookie(name) || '').split(',').filter(Boolean);
     }
 
     // Compose a shell URL carrying the query and active mode.

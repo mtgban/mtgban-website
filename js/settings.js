@@ -24,9 +24,8 @@
             'settings-sleep-sellers': 'SleepersSellersList',
             'settings-sleep-vendors': 'SleepersVendorsList',
         },
-        // search — each mode has its own list. The sealed names are scoped
-        // to /sealed by the NavElem registry; the singles names stay root
-        // scoped because offline mode consumes them too.
+        // search — each mode has its own list. Singles remain a separate
+        // name because offline mode consumes them too.
         cookieLists: [
             'SearchSellersList', 'SearchVendorsList',
             'SearchSealedSellersList', 'SearchSealedVendorsList'
@@ -135,14 +134,14 @@
         if (!grids.length) return;
         addBinding({
             load: function () {
-                const items = (getCookie(cookieName) || '').split(',').filter(Boolean);
+                const items = (getSearchListCookie(cookieName) || '').split(',').filter(Boolean);
                 grids.forEach(function (grid) {
                     grid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
                         cb.checked = items.indexOf(cb.name) >= 0;
                     });
                 });
             },
-            save: function () { setCookie(cookieName, readListByCookie(cookieName), 1000); },
+            save: function () { setSearchListCookie(cookieName, readListByCookie(cookieName), 1000); },
             serialize: function () { return cookieName + '=' + readListByCookie(cookieName); },
         });
     }

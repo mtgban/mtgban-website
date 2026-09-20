@@ -24,6 +24,45 @@ func TestGetSearchBlocklists(t *testing.T) {
 	}
 }
 
+func TestGetSearchBlocklistsSealedPreferences(t *testing.T) {
+	sig := base64.StdEncoding.EncodeToString([]byte("SearchDisabled=NONE&SearchBuylistDisabled=NONE"))
+	tests := []struct {
+		name       string
+		cookie     string
+		wantRetail []string
+		wantBuy    []string
+	}{
+		{
+			name:       "sealed values win",
+			cookie:     "SearchSellersList=singles-seller; SearchVendorsList=singles-vendor; SearchSealedSellersList=sealed-seller; SearchSealedVendorsList=sealed-vendor",
+			wantRetail: []string{"sealed-seller"},
+			wantBuy:    []string{"sealed-vendor"},
+		},
+		{
+			name:       "explicitly cleared sealed values do not fall back",
+			cookie:     "SearchSellersList=singles-seller; SearchVendorsList=singles-vendor; SearchSealedSellersList=" + emptySearchListCookieValue + "; SearchSealedVendorsList=" + emptySearchListCookieValue,
+			wantRetail: nil,
+			wantBuy:    nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest("GET", "/sealed", nil)
+			r.Header.Set("Cookie", tt.cookie)
+			retail, buylist, personalized := getSearchBlocklists(r, sig, true)
+			if !equalStrings(retail, tt.wantRetail) {
+				t.Errorf("retail blocklist = %#v, want %#v", retail, tt.wantRetail)
+			}
+			if !equalStrings(buylist, tt.wantBuy) {
+				t.Errorf("buylist blocklist = %#v, want %#v", buylist, tt.wantBuy)
+			}
+			if !personalized {
+				t.Error("sealed preferences should mark the response personalized")
+			}
+		})
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

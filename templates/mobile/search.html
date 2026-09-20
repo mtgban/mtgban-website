@@ -1283,14 +1283,14 @@ function loadSettings() {
     });
 
     // Exclude Sellers
-    var sellers = getCookie(sellersCookie);
+    var sellers = getSearchListCookie(sellersCookie);
     var sellerList = sellers ? sellers.split(',') : [];
     document.querySelectorAll('#m-set-sellers input[type="checkbox"]').forEach(function(cb) {
         cb.checked = sellerList.indexOf(cb.name) !== -1;
     });
 
     // Exclude Vendors
-    var vendors = getCookie(vendorsCookie);
+    var vendors = getSearchListCookie(vendorsCookie);
     var vendorList = vendors ? vendors.split(',') : [];
     document.querySelectorAll('#m-set-vendors input[type="checkbox"]').forEach(function(cb) {
         cb.checked = vendorList.indexOf(cb.name) !== -1;
@@ -1340,14 +1340,14 @@ function saveSettings() {
     document.querySelectorAll('#m-set-sellers input[type="checkbox"]:checked').forEach(function(cb) {
         sellersList += cb.name + ',';
     });
-    setCookie(sellersCookie, sellersList, 1000);
+    setSearchListCookie(sellersCookie, sellersList, 1000);
 
     // Exclude Vendors
     var vendorsList = '';
     document.querySelectorAll('#m-set-vendors input[type="checkbox"]:checked').forEach(function(cb) {
         vendorsList += cb.name + ',';
     });
-    setCookie(vendorsCookie, vendorsList, 1000);
+    setSearchListCookie(vendorsCookie, vendorsList, 1000);
 
     // Close drawer
     closeSettings();
