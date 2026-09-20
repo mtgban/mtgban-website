@@ -46,6 +46,24 @@ var Country2flag = map[string]string{
 	"GB": "🇬🇧",
 }
 
+func cookiePath(r *http.Request, cookieName string, global bool) string {
+	if global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") {
+		return "/"
+	}
+	if r == nil || r.URL == nil {
+		return "/"
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	if i := strings.IndexByte(path, '/'); i >= 0 {
+		path = path[:i]
+	}
+	if path == "" {
+		return "/"
+	}
+	return "/" + path
+}
+
 // colorRarityMap paints the rarity badge. The Lorcana entries are sampled
 // from the rarity symbols the cards actually carry: a grey ink drop, a copper
 // triangle, a silver diamond, a gold pentagon.
@@ -1321,7 +1339,7 @@ func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value 
 	setCookie(w, r, cookieName, value, tenYears, false)
 }
 
-// Set a cookie in the response with no expiration at the default root
+// Set a cookie in the response with no expiration at its route path.
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
 	origin := requestOrigin(r)
 	u, err := url.Parse(origin)
@@ -1349,7 +1367,7 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 	cookie := http.Cookie{
 		Name:    cookieName,
 		Domain:  domain,
-		Path:    "/",
+		Path:    cookiePath(r, cookieName, global),
 		Expires: expires,
 		Value:   value,
 		// Only mark Secure when the site itself is served over HTTPS,
@@ -1362,6 +1380,15 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 		cookie.SameSite = http.SameSiteStrictMode
 	}
 	http.SetCookie(w, &cookie)
+	if cookie.Path != "/" {
+		// Remove the old Path=/ copy too. Otherwise both values can be sent
+		// together until the user saves the preference again.
+		legacy := cookie
+		legacy.Path = "/"
+		legacy.Expires = time.Unix(1, 0)
+		legacy.MaxAge = -1
+		http.SetCookie(w, &legacy)
+	}
 }
 
 // isSecureRequest reports whether the request reached us over HTTPS,
