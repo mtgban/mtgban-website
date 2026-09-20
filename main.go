@@ -563,6 +563,18 @@ func init() {
 			Page:        "api-plans.html",
 			Public:      true,
 		},
+		"APITrial": {
+			Name:   "APITrial",
+			Link:   "/api-trial",
+			Handle: APITrial,
+			Page:   "api-plans.html",
+		},
+		"APILogin": {
+			Name:   "APILogin",
+			Link:   "/api-login",
+			Handle: APILogin,
+			Page:   "api-plans.html",
+		},
 		"Admin": {
 			Name:        "Admin",
 			Short:       "❌",
