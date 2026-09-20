@@ -22,7 +22,6 @@ func TestCookiePath(t *testing.T) {
 		{"SleepersEditionList", "/sleepers/bulk", false, "/sleepers"},
 		{"ArbitVendorsList", "/arbit", false, "/arbit"},
 		{"ReverseVendorsList", "/reverse", false, "/reverse"},
-		{"GlobalEditionList", "/global", false, "/global"},
 		{"UploadOptimizerOpts", "/upload", false, "/upload"},
 		{"MTGBAN", "/auth", true, "/"},
 		{"MTGBAN", "/auth", false, "/"},

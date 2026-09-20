@@ -842,12 +842,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		opts.ProfitabilityConstant = ProfConstGlobal
 	}
 
-	// Override the edition list if set
-	skipEditionsOpt := readCookie(r, "GlobalEditionList")
-	if skipEditionsOpt != "" {
-		opts.Editions = strings.Split(skipEditionsOpt, ",")
-	}
-
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
