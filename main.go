@@ -1191,7 +1191,7 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 		Config.DatastorePath = DefaultDatastorePath
 	}
 
-	applyAPIGatewayDefaults(&Config.APIGateway)
+	applyAPIGatewayDefaults(&Config.APIGateway, Config.Game)
 
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
@@ -1207,14 +1207,22 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	return nil
 }
 
-// applyAPIGatewayDefaults fills api_gateway so the pricing page always has a target.
-func applyAPIGatewayDefaults(c *APIGatewayConfig) {
+// applyAPIGatewayDefaults fills api_gateway so the pricing page always has a
+// target; game is this deployment's own game, added to the default game list.
+func applyAPIGatewayDefaults(c *APIGatewayConfig, game string) {
 	if c.URL == "" {
 		c.URL = DefaultAPIGatewayURL
 	}
 	c.URL = strings.TrimRight(c.URL, "/")
+	if !strings.HasPrefix(c.URL, "http://") && !strings.HasPrefix(c.URL, "https://") {
+		log.Printf("api_gateway.url must be absolute, using %s", DefaultAPIGatewayURL)
+		c.URL = DefaultAPIGatewayURL
+	}
 	if len(c.Games) == 0 {
 		c.Games = []string{DefaultGame}
+		if game != "" && game != DefaultGame {
+			c.Games = append(c.Games, game)
+		}
 	}
 }
 
