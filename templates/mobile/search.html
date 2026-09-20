@@ -87,9 +87,11 @@
          it empties looks broken with nothing to undo. */}}
     {{if .CanScope}}
     <div class="m-scope-row" id="nav-scope">
-        <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
-               value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
-               maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+        <div class="m-scope-autocomplete autocomplete">
+            <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+                   value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
+                   maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+        </div>
         <button class="m-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters and close the bar" aria-label="Clear pinned filters and close the bar">CLEAR</button>
     </div>
     <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
@@ -195,9 +197,11 @@
         </div>
         {{if .CanScope}}
         <div class="m-scope-row" id="nav-scope">
-            <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
-                   value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
-                   maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+            <div class="m-scope-autocomplete autocomplete">
+                <input class="m-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+                       value="{{.SearchScope}}" placeholder="Filters that stay put — s:sos, is:foil"
+                       maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+            </div>
             <button class="m-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters and close the bar" aria-label="Clear pinned filters and close the bar">CLEAR</button>
         </div>
         <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>

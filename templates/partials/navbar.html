@@ -112,10 +112,12 @@
         <span class="nav2-scope-label">Pinned</span>
         {{/* Bound to the search form by id rather than by nesting, so that
              submitting from either bar sends both fields. */}}
-        <input class="nav2-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
-               {{if .ScopeIgnored}}title="Nothing here is a filter, so the search ignores it"{{end}}
-               value="{{.SearchScope}}" placeholder="Filters that stay put across searches — s:sos, is:foil, r:mythic"
-               maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+        <div class="nav2-scope-autocomplete autocomplete">
+            <input class="nav2-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
+                   {{if .ScopeIgnored}}title="Nothing here is a filter, so the search ignores it"{{end}}
+                   value="{{.SearchScope}}" placeholder="Filters that stay put across searches — s:sos, is:foil, r:mythic"
+                   maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
+        </div>
         <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters and close the bar" aria-label="Clear pinned filters and close the bar">CLEAR</button>
         {{/* The row runs the width of the page whatever is in it, so the slack
              to the right of the box earns its place by showing the syntax the

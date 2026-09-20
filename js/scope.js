@@ -57,6 +57,17 @@
     box.addEventListener('input', function() { write(box.value); });
     write(box.value);
 
+    /* The pinned field accepts the same filter vocabulary as the primary
+       search. Reuse the shared autocomplete so values like f: or s: get the
+       same provider candidates, while the form keeps both fields on submit. */
+    if (typeof autocomplete === 'function' && !box._scopeAutocompleteBound) {
+        var form = document.getElementById('nav-searchform') || document.getElementById('searchform');
+        if (form) {
+            box._scopeAutocompleteBound = true;
+            autocomplete(form, box, location.pathname.indexOf('/sealed') === 0 ? 'true' : 'false');
+        }
+    }
+
     function isOpen() { return document.body.classList.contains('has-scope'); }
 
     function setOpen(open) {
