@@ -3,12 +3,6 @@
     <link rel="stylesheet" type="text/css" href="/css/sleepers-mobile.css?hash={{.Hash}}">
 {{end}}
 
-{{define "extra-head"}}
-    {{if eq .Subtitle "Options"}}
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-    {{end}}
-{{end}}
-
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
 
 {{define "content"}}
