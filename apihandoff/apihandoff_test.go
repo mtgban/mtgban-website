@@ -9,9 +9,9 @@ import (
 
 var (
 	goldenSecret = []byte("handoff-test-secret")
-	goldenClaims = Claims{Email: "ann@example.com", Name: "Ann Example", Purpose: PurposeTrial, Expires: time.Unix(1789000000, 0).UTC()}
+	goldenClaims = Claims{Email: "ann@example.com", Name: "Ann Example", Purpose: PurposeTrial, Nonce: "golden-nonce", Expires: time.Unix(1789000000, 0).UTC()}
 	// Recorded once; the gateway verifies tokens this package minted, so the bytes are frozen.
-	goldenToken = "ZW1haWw9YW5uJTQwZXhhbXBsZS5jb20mZXhwPTE3ODkwMDAwMDAmbmFtZT1Bbm4rRXhhbXBsZSZwdXJwb3NlPXRyaWFs.uiPelFvmzxomT0F1wjVBp7RvN-Bg53Y5Zp_NPj6gvc8"
+	goldenToken = "ZW1haWw9YW5uJTQwZXhhbXBsZS5jb20mZXhwPTE3ODkwMDAwMDAmbmFtZT1Bbm4rRXhhbXBsZSZub25jZT1nb2xkZW4tbm9uY2UmcHVycG9zZT10cmlhbA.MUBVNhbExDlxD7ZjrQh_Hbjt4mTFmSEURT-9uO_gNhM"
 	before      = time.Unix(1788999999, 0)
 )
 
@@ -43,8 +43,9 @@ func TestVerifyRejects(t *testing.T) {
 		"expired":      {goldenSecret, goldenToken, goldenClaims.Expires},
 		"no dot":       {goldenSecret, strings.ReplaceAll(goldenToken, ".", ""), before},
 		"empty":        {goldenSecret, "", before},
-		"bad purpose":  {goldenSecret, Mint(goldenSecret, Claims{Email: "a@b.c", Purpose: "admin", Expires: goldenClaims.Expires}), before},
-		"no email":     {goldenSecret, Mint(goldenSecret, Claims{Purpose: PurposeLogin, Expires: goldenClaims.Expires}), before},
+		"bad purpose":  {goldenSecret, Mint(goldenSecret, Claims{Email: "a@b.c", Purpose: "admin", Nonce: "n", Expires: goldenClaims.Expires}), before},
+		"no email":     {goldenSecret, Mint(goldenSecret, Claims{Purpose: PurposeLogin, Nonce: "n", Expires: goldenClaims.Expires}), before},
+		"no nonce":     {goldenSecret, Mint(goldenSecret, Claims{Email: "a@b.c", Purpose: PurposeLogin, Nonce: "", Expires: goldenClaims.Expires}), before},
 	}
 	for name, tc := range cases {
 		if _, err := Verify(tc.secret, tc.token, tc.now); !errors.Is(err, ErrInvalid) {
@@ -55,7 +56,7 @@ func TestVerifyRejects(t *testing.T) {
 
 func TestRoundTripLogin(t *testing.T) {
 	now := time.Now()
-	c := Claims{Email: "Bob@Example.com", Name: "Bob", Purpose: PurposeLogin, Expires: now.Add(TTL).Truncate(time.Second).UTC()}
+	c := Claims{Email: "Bob@Example.com", Name: "Bob", Purpose: PurposeLogin, Nonce: "round-trip-nonce", Expires: now.Add(TTL).Truncate(time.Second).UTC()}
 	got, err := Verify([]byte("s"), Mint([]byte("s"), c), now)
 	if err != nil || got != c {
 		t.Fatalf("got %+v, %v; want %+v", got, err, c)

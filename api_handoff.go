@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -32,6 +33,7 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 	secret := os.Getenv("TRIAL_SECRET")
 
 	msg := ""
+	nonce := ""
 	switch {
 	case secret == "":
 		msg = ErrMsgAPIHandoffOff
@@ -39,10 +41,20 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 		msg = ErrMsg
 	case purpose == apihandoff.PurposeTrial && GetParamFromSig(sig, "UserTier") == "":
 		msg = ErrMsgAPITrialPledge
+	default:
+		var err error
+		nonce, err = apihandoff.NewNonce()
+		if err != nil {
+			log.Println("apihandoff: NewNonce:", err)
+			msg = ErrMsgAPIHandoffOff
+		}
 	}
 	if msg != "" {
 		pageVars := genPageNav(r, "API", sig)
-		pageVars.Title = "BAN API"
+		pageVars.IsMobile = isMobileRequest(r)
+		if pageVars.IsMobile {
+			pageVars.Nav = filterNavForMobile(pageVars.Nav)
+		}
 		pageVars.ErrorMessage = msg
 		render(w, "api-plans.html", pageVars)
 		return
@@ -52,6 +64,7 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 		Email:   email,
 		Name:    GetParamFromSig(sig, "UserName"),
 		Purpose: purpose,
+		Nonce:   nonce,
 		Expires: time.Now().Add(apihandoff.TTL),
 	})
 	q := url.Values{"t": {token}}

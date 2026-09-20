@@ -6,6 +6,7 @@ package apihandoff
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
@@ -32,6 +33,8 @@ type Claims struct {
 	Email   string
 	Name    string
 	Purpose string
+	// Nonce is unique per mint so the gateway can burn a used token.
+	Nonce   string
 	Expires time.Time
 }
 
@@ -40,10 +43,20 @@ func Mint(secret []byte, c Claims) string {
 	v := url.Values{}
 	v.Set("email", c.Email)
 	v.Set("name", c.Name)
+	v.Set("nonce", c.Nonce)
 	v.Set("purpose", c.Purpose)
 	v.Set("exp", strconv.FormatInt(c.Expires.Unix(), 10))
 	body := base64.RawURLEncoding.EncodeToString([]byte(v.Encode()))
 	return body + "." + sign(secret, body)
+}
+
+// NewNonce returns a random, URL-safe nonce for a minted token.
+func NewNonce() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // Verify checks the signature and expiry and returns the claims.
@@ -64,8 +77,8 @@ func Verify(secret []byte, token string, now time.Time) (Claims, error) {
 	if err != nil || !now.Before(time.Unix(exp, 0)) {
 		return Claims{}, ErrInvalid
 	}
-	c := Claims{Email: v.Get("email"), Name: v.Get("name"), Purpose: v.Get("purpose"), Expires: time.Unix(exp, 0).UTC()}
-	if c.Email == "" || (c.Purpose != PurposeTrial && c.Purpose != PurposeLogin) {
+	c := Claims{Email: v.Get("email"), Name: v.Get("name"), Purpose: v.Get("purpose"), Nonce: v.Get("nonce"), Expires: time.Unix(exp, 0).UTC()}
+	if c.Email == "" || c.Nonce == "" || (c.Purpose != PurposeTrial && c.Purpose != PurposeLogin) {
 		return Claims{}, ErrInvalid
 	}
 	return c, nil
