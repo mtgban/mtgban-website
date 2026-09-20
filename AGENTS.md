@@ -102,6 +102,7 @@ output, not a claim written here.
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
 | `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); to be imported by the API gateway repo, so its payload bytes are frozen by golden tests |
+| `apihandoff/` | The signed Patreon handoff token (`Mint`, `Verify`) the game sites hand to the API gateway for trials and sign-in; the gateway imports it, so the golden test freezes its bytes |
 | `apiproductlist/` | The API price list (`products.json`, embedded; amounts in cents): packages, add-ons, intervals, store families. The API gateway repo pins this module by commit and seeds Stripe from it, so a price edit needs a gateway dependency bump; the pricing page renders from it |
 | `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
 
