@@ -62,14 +62,12 @@
     max-width: var(--page-max-width);
     margin-left: auto;
     margin-right: auto;
-    padding-left: 16px;
-    padding-right: 16px;
+    --search-layout-padding: 16px;
+    padding-left: var(--search-layout-padding);
+    padding-right: var(--search-layout-padding);
 }
 
 @media (min-width: 901px) {
-    .search-layout {
-        grid-template-columns: 340px 1fr;
-    }
     .search-results { grid-column: 2; }
 }
 
@@ -273,7 +271,7 @@
            positioning layer that can re-anchor in Firefox. */
         --search-sidebar-top: calc(var(--nav-height, 48px) + var(--content-padding-slack, 27px));
         top: var(--search-sidebar-top);
-        left: calc((100vw - min(80vw, 1600px)) / 2);
+        left: calc(50% - min(40vw, 800px) + var(--search-layout-padding));
         width: 340px;
         box-sizing: border-box;
         height: calc(100dvh - var(--search-sidebar-top));
@@ -320,9 +318,10 @@
     }
 
     .sidebar-body {
-        /* Yield the lower sidebar to the pinned controls first. The large
-           shrink factor keeps SORT and the card visible; only once this
-           section has collapsed does the image begin to shrink. */
+        /* The lower products/actions area intentionally scrolls inside the
+           fixed sidebar. The large shrink factor keeps SORT and the card
+           visible; only once this section has collapsed does the image begin
+           to shrink. */
         flex: 100 1 auto;
         min-height: 0;
         overflow-y: auto;
@@ -337,6 +336,16 @@
         z-index: 20;
         background: var(--background);
     }
+}
+
+body.modal-embed .search-sidebar {
+    position: static;
+    top: auto;
+    left: auto;
+    width: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
 }
 
 .sidebar-printings {
