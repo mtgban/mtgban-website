@@ -29,6 +29,8 @@ type APIPlansVars struct {
 	Products   *apiproductlist.ProductList
 	GatewayURL string
 	Games      []APIPlanGame
+	// GameChoice is false when every configured game is included, so the games group hides.
+	GameChoice bool
 	ReturnTo   string
 	Invite     string
 	// Change is set when the account page sent the reader here to change a plan
@@ -101,6 +103,7 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	for _, g := range Config.APIGateway.Games {
 		included := slices.Contains(apiProducts.IncludedGames, g)
 		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(g), Included: included, Checked: included || g == Config.Game})
+		v.GameChoice = v.GameChoice || !included
 	}
 	return v
 }

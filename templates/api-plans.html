@@ -12,15 +12,10 @@
             <h1>Price data API</h1>
             <p class="page-subtitle">Every store, every game, one key.</p>
         </div>
-        <div>
-            <a class="api-btn api-btn-secondary" href="{{.GatewayURL}}/account">Manage your API access</a>
-        </div>
+        <a class="page-action" href="{{.GatewayURL}}/account">Manage your API access</a>
     </div>
 
-    <section class="api-section">
-        <h2>How access works</h2>
-        <p>One key covers every game on your plan. Requests go to <code>{{.GatewayURL}}/v1/{game}/mtgban/&hellip;</code> with the key as a bearer token, and return the same retail, buylist, and sealed feeds the site is built on. Paths, fields, and store shorthands are documented in the <a href="/guide">guide</a>.</p>
-    </section>
+    <p class="api-lead">One key covers every game on your plan. Send it as a bearer token and get the same retail, buylist, and sealed feeds the site is built on. Paths, fields, and store shorthands are in the <a href="/guide">guide</a>.</p>
 
     <section class="api-section">
         <h2>Price data</h2>
@@ -36,26 +31,15 @@
             </div>
             {{end}}
         </div>
-        <p class="api-note">
-            {{range .Products.Addons}}<span class="api-addon"><strong>{{.Name}}</strong> {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}.</span> {{end}}
-            Magic is included in every package.
-        </p>
+        <p class="api-note">Magic is included in every package. {{range .Products.Addons}}{{.Name}} is {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}. {{end}}</p>
     </section>
 
     <section class="api-section">
         <h2>Coming soon</h2>
-        <div class="api-cards api-cards-muted">
-            <div class="card api-card">
-                <h3>Velocity data</h3>
-                <p class="api-amount">{{usd .Velocity}}<span>/month</span></p>
-                <ul><li>How fast cards sell, by store and condition</li></ul>
-            </div>
-            <div class="card api-card">
-                <h3>Price data plus velocity</h3>
-                <p class="api-amount">{{usd .VelocityBundle}}<span>/month</span></p>
-                <ul><li>All data and velocity together</li></ul>
-            </div>
-        </div>
+        <ul class="api-soon">
+            <li><strong>Velocity data</strong> {{usd .Velocity}}/month, how fast cards sell by store and condition.</li>
+            <li><strong>Price data plus velocity</strong> {{usd .VelocityBundle}}/month, both together.</li>
+        </ul>
         <p class="api-note">Not for sale yet. Ask on <a href="/discord">Discord</a> if you want in early.</p>
     </section>
 
@@ -63,8 +47,10 @@
         <h2>Patreon</h2>
         <p>The <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> bundle is {{usd .PatreonBundle}}/month for all games and all price data, arranged directly with us.</p>
         {{if .CanTrial}}
-        <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for {{.TrialDays}} days</a>
-        <p class="api-note">{{.TrialDays}} days of all data across every game, no card required. One trial per Patreon account every six months.</p>
+        <div class="api-trial-row">
+            <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for {{.TrialDays}} days</a>
+            <p class="api-note">{{.TrialDays}} days of all data across every game, no card required. One trial per Patreon account every six months.</p>
+        </div>
         {{else if .Email}}
         <p class="api-note">Supporters with an active pledge can try the API free for {{.TrialDays}} days from this page.</p>
         {{else}}
@@ -81,40 +67,47 @@
 
             <fieldset class="api-fieldset">
                 <legend>Package</legend>
-                {{range $i, $p := .Products.Packages}}
-                <label class="api-choice"><input type="radio" name="package" value="{{$p.Key}}"{{if eq $i 0}} checked{{end}}> {{$p.Name}} <span class="api-choice-amount">{{usd $p.Monthly}}/month</span></label>
-                {{end}}
+                <div class="api-choices">
+                    {{range $i, $p := .Products.Packages}}
+                    <label class="api-choice"><input type="radio" name="package" value="{{$p.Key}}"{{if eq $i 0}} checked{{end}}> {{$p.Name}} <span class="api-choice-amount">{{usd $p.Monthly}}/month</span></label>
+                    {{end}}
+                </div>
             </fieldset>
 
             <fieldset class="api-fieldset" id="api-stores">
-                <legend>Stores</legend>
-                <p class="api-note">{{range $i, $s := .Products.ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included. Pick the rest:</p>
-                {{range $i, $s := .Products.SelectableStores}}
-                <label class="api-choice"><input type="checkbox" name="stores" value="{{$s.Key}}"{{if eq $i 0}} checked{{end}}> {{$s.Name}}</label>
-                {{end}}
+                <legend>Stores <span class="api-legend-note">{{range $i, $s := .Products.ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included</span></legend>
+                <div class="api-choices">
+                    {{range $i, $s := .Products.SelectableStores}}
+                    <label class="api-choice"><input type="checkbox" name="stores" value="{{$s.Key}}"{{if eq $i 0}} checked{{end}}> {{$s.Name}}</label>
+                    {{end}}
+                </div>
             </fieldset>
 
-            <fieldset class="api-fieldset">
+            <fieldset class="api-fieldset"{{if not .GameChoice}} hidden{{end}}>
                 <legend>Games</legend>
-                {{range .Games}}
-                <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}{{if .Included}} disabled{{end}}> {{.Name}}{{if .Included}} <span class="api-choice-amount">included</span>{{end}}</label>
-                {{end}}
+                <div class="api-choices">
+                    {{range .Games}}
+                    <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}{{if .Included}} disabled{{end}}> {{.Name}}{{if .Included}} <span class="api-choice-amount">included</span>{{end}}</label>
+                    {{end}}
+                </div>
             </fieldset>
 
             <fieldset class="api-fieldset"{{if not .Invite}} hidden{{end}}>
                 <legend>Billing</legend>
-                {{range .Products.Intervals}}
-                {{if or .Public $.API.Invite}}
-                <label class="api-choice"><input type="radio" name="interval" value="{{.Key}}"{{if .Public}} checked{{end}}> {{if eq .Count 1}}Monthly{{else}}Every {{.Count}} months{{end}}</label>
-                {{end}}
-                {{end}}
+                <div class="api-choices">
+                    {{range .Products.Intervals}}
+                    {{if or .Public $.API.Invite}}
+                    <label class="api-choice"><input type="radio" name="interval" value="{{.Key}}"{{if .Public}} checked{{end}}> {{if eq .Count 1}}Monthly{{else}}Every {{.Count}} months{{end}}</label>
+                    {{end}}
+                    {{end}}
+                </div>
             </fieldset>
 
             <div class="api-total-row">
-                <p class="api-total">Total <strong id="api-total">{{usd (index .Products.Packages 0).Monthly}}</strong> <span id="api-total-period">/month</span></p>
+                <p class="api-total">Total <strong id="api-total">{{usd (index .Products.Packages 0).Monthly}}</strong><span id="api-total-period">/month</span></p>
                 <button type="submit" class="api-btn">{{if .Change}}Review the change{{else}}Continue to checkout{{end}}</button>
+                <p class="api-note">Confirmed at checkout before anything is charged. Promotion codes are entered there.</p>
             </div>
-            <p class="api-note">The total is confirmed on the next page before anything is charged. Promotion codes are entered at checkout.</p>
         </form>
     </section>
 </div>
