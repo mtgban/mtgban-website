@@ -212,6 +212,9 @@ func TestValidMetricAndWindow(t *testing.T) {
 	if !validWindow(30) {
 		t.Error("window 30 should be valid")
 	}
+	if !validWindow(60) {
+		t.Error("window 60 should be valid")
+	}
 	if validWindow(31) {
 		t.Error("window 31 is not a preset, should be invalid")
 	}
