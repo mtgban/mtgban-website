@@ -27,7 +27,8 @@
     grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
     gap: 1em;
 }
-.api-podium { align-items: end; }
+/* Side cards share a height; the podium card rises above the row. */
+.api-podium { align-items: stretch; }
 .api-card {
     position: relative;
     padding: 1em 1.2em;
@@ -61,7 +62,7 @@
 .api-amount span { font-size: var(--text-md); font-weight: 400; color: var(--text-dim); margin-left: 0.15em; }
 .api-card ul { margin: 0; padding-left: 1.1em; color: var(--activetext); font-size: var(--text-md); line-height: 1.55; }
 /* The podium step: the fullest package stands taller than its neighbours. */
-.api-card-top { padding-top: 1.6em; padding-bottom: 1.6em; }
+.api-card-top { margin-top: -0.75em; padding-top: 1.6em; }
 .api-card-top .api-amount { font-size: var(--text-9xl); }
 
 .api-btn {
@@ -121,6 +122,6 @@
 
 @media (max-width: 768px) {
     .api-cards { grid-template-columns: 1fr; }
-    .api-card-top { padding-top: 1em; padding-bottom: 1em; }
+    .api-card-top { margin-top: 0; padding-top: 1em; }
     .api-plans .page-header { flex-direction: column; }
 }

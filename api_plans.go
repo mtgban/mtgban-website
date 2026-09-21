@@ -155,16 +155,16 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 
 // scopeBullets are the two price-card bullets for a package's store scope.
 func scopeBullets(p apiproductlist.Package, cat *apiproductlist.ProductList) []string {
-	var names []string
+	var keys []string
 	for _, s := range cat.ImpliedStores() {
-		names = append(names, s.Name)
+		keys = append(keys, s.Key)
 	}
-	implied := strings.Join(names, ", ")
+	implied := strings.Join(keys, ", ")
 	switch p.StoreScope {
 	case apiproductlist.StoreScopeExplicit:
-		first := "One store of your choice, " + implied + " always included"
+		first := "One store of choice, " + implied + " included"
 		if p.IncludedStores != 1 {
-			first = strconv.Itoa(p.IncludedStores) + " stores of your choice, " + implied + " always included"
+			first = strconv.Itoa(p.IncludedStores) + " stores of choice, " + implied + " included"
 		}
 		return []string{first, "Add more stores as you need them"}
 	case apiproductlist.StoreScopeBase:

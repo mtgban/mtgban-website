@@ -140,16 +140,16 @@ func TestScopeBullets(t *testing.T) {
 
 	one := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeExplicit, IncludedStores: 1}
 	got := scopeBullets(one, cat)
-	if !strings.Contains(got[0], "of your choice") {
+	if !strings.Contains(got[0], "of choice") {
 		t.Errorf("explicit one store: %v", got)
 	}
-	if got[0] != "One store of your choice, TCGplayer always included" {
+	if got[0] != "One store of choice, TCG included" {
 		t.Errorf("explicit one store wording: %v", got)
 	}
 
 	two := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeExplicit, IncludedStores: 2}
 	got = scopeBullets(two, cat)
-	if got[0] != "2 stores of your choice, TCGplayer always included" {
+	if got[0] != "2 stores of choice, TCG included" {
 		t.Errorf("explicit two stores wording: %v", got)
 	}
 	if got[1] != "Add more stores as you need them" {
@@ -175,7 +175,7 @@ func TestScopeBullets(t *testing.T) {
 		},
 	}
 	got = scopeBullets(one, multi)
-	if got[0] != "One store of your choice, TCGplayer, Card Kingdom always included" {
+	if got[0] != "One store of choice, TCG, CK included" {
 		t.Errorf("explicit wording with two implied stores: %v", got)
 	}
 }
