@@ -19,9 +19,7 @@ var apiProducts = apiproductlist.MustLoad()
 
 // Amounts quoted on the page that Stripe does not sell, in cents, from issue #230.
 const (
-	patreonBundleMonthly  = 100000
-	velocityMonthly       = 100000
-	velocityBundleMonthly = 150000
+	patreonBundleMonthly = 100000
 )
 
 // APIPlansVars is what api-plans.html renders beyond the shared PageVars.
@@ -39,9 +37,7 @@ type APIPlansVars struct {
 	Email    string
 	CanTrial bool
 
-	PatreonBundle  int64
-	Velocity       int64
-	VelocityBundle int64
+	PatreonBundle int64
 
 	// TrialDays must match the gateway's trial_days config.
 	TrialDays int
@@ -88,16 +84,14 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		returnTo += "?" + rv.Encode()
 	}
 	v := &APIPlansVars{
-		Products:       apiProducts,
-		GatewayURL:     Config.APIGateway.URL,
-		ReturnTo:       returnTo,
-		Invite:         invite,
-		Change:         change,
-		Email:          GetParamFromSig(sig, "UserEmail"),
-		PatreonBundle:  patreonBundleMonthly,
-		Velocity:       velocityMonthly,
-		VelocityBundle: velocityBundleMonthly,
-		TrialDays:      15,
+		Products:      apiProducts,
+		GatewayURL:    Config.APIGateway.URL,
+		ReturnTo:      returnTo,
+		Invite:        invite,
+		Change:        change,
+		Email:         GetParamFromSig(sig, "UserEmail"),
+		PatreonBundle: patreonBundleMonthly,
+		TrialDays:     15,
 	}
 	v.CanTrial = v.Email != "" && GetParamFromSig(sig, "UserTier") != "" && os.Getenv("TRIAL_SECRET") != ""
 	for _, g := range Config.APIGateway.Games {

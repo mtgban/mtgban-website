@@ -34,7 +34,7 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	body := apiPlansPage(t, "")
 	for _, want := range []string{
 		"TCGplayer plus one store", "$200", "All EU/US stores, no sealed", "$500", "All data", "$800",
-		"$150", "$1,000", "$1,500",
+		"$150", "$1,000",
 		`action="https://api.example/checkout"`,
 		`name="package" value="starter"`,
 		`name="games" value="pokemon"`,
