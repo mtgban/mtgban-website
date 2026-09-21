@@ -118,6 +118,31 @@
         }
     }
 
+    // Plain-text export of one category, for pasting into an AI agent.
+    function categoryText(catName) {
+        var NL = String.fromCharCode(10);
+        var out = ['# MTGBAN ' + catName + ' guide', 'Source: ' + window.location.origin + '/guide#' + (TAB_BY_CATEGORY[catName] || DEFAULT_TAB), ''];
+        var secs = document.querySelectorAll('.guide-section[data-category="' + catName + '"]');
+        for (var i = 0; i < secs.length; i++) {
+            var s = secs[i];
+            out.push('## ' + s.getAttribute('data-title'), '');
+            var desc = s.querySelector('.guide-section-desc');
+            if (desc) out.push(desc.innerText.trim(), '');
+            var rows = s.querySelectorAll('.guide-table tbody tr');
+            for (var r = 0; r < rows.length; r++) {
+                var cells = rows[r].querySelectorAll('td');
+                out.push('- ' + '`' + cells[0].textContent + '`' + ': ' + cells[1].textContent);
+            }
+            if (rows.length) out.push('');
+            var exs = s.querySelectorAll('.guide-example');
+            if (exs.length) out.push('Examples:');
+            for (var e = 0; e < exs.length; e++) {
+                out.push('- ' + '`' + exs[e].querySelector('.guide-example-query').textContent + '`' + ': ' + exs[e].querySelector('.guide-example-desc').textContent);
+            }
+            if (exs.length) out.push('');
+        }
+        return out.join(NL);
+    }
     // ── Build main content ──
     for (var c = 0; c < categories.length; c++) {
         var catName = categories[c];
@@ -130,6 +155,15 @@
         var h2 = document.createElement('h2');
         h2.textContent = catName;
         divider.appendChild(h2);
+        if (catName === 'API') {
+            var copyTab = document.createElement('button');
+            copyTab.type = 'button';
+            copyTab.className = 'guide-copy-tab';
+            copyTab.title = 'Copy this tab as plain text';
+            copyTab.innerHTML = '<i data-lucide="copy"></i> Copy as text';
+            copyTab.onclick = function () { copySnippet(copyTab, categoryText(catName)); };
+            divider.appendChild(copyTab);
+        }
         sectionsContainer.appendChild(divider);
 
         var catSections = categoryMap[catName];
@@ -199,6 +233,23 @@
             }
 
             section.innerHTML = html;
+            // Copy button on every code block.
+            var pres = section.querySelectorAll('pre');
+            for (var pi = 0; pi < pres.length; pi++) {
+                (function (pre) {
+                    var wrap = document.createElement('div');
+                    wrap.className = 'guide-pre';
+                    pre.parentNode.insertBefore(wrap, pre);
+                    wrap.appendChild(pre);
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'guide-example-copy guide-pre-copy';
+                    btn.title = 'Copy to clipboard';
+                    btn.innerHTML = '<i data-lucide="copy"></i>';
+                    btn.onclick = function () { copySnippet(btn, pre.textContent); };
+                    wrap.appendChild(btn);
+                })(pres[pi]);
+            }
             sectionsContainer.appendChild(section);
         }
     }
