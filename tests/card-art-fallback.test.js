@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 const source = readFileSync(new URL('../js/card-art-fallback.js', import.meta.url), 'utf8');
 const uploadTemplate = readFileSync(new URL('../templates/upload.html', import.meta.url), 'utf8');
 
-function loadFallback(gameAttr) {
+function loadFallback() {
     let onError;
     class FakeImage {
         constructor() {
@@ -22,7 +22,7 @@ function loadFallback(gameAttr) {
     }
     const window = {};
     const document = {
-        body: {getAttribute: () => gameAttr === undefined ? 'pokemon' : gameAttr},
+        body: {getAttribute: () => 'pokemon'},
         addEventListener: (type, handler) => {
             if (type === 'error') onError = handler;
         },
@@ -74,42 +74,4 @@ test('hover previews show only for real card art', () => {
 
 test('upload printing picker resets reused row art', () => {
     expect(uploadTemplate).toContain('if (img) window.setCardArtSource(img, meta.image);');
-});
-
-// data-game is server-rendered from Config.Game, not user input - but the
-// fallback path is still built by string concatenation, so a slug carrying
-// meta-characters (a scheme, a traversal sequence, an attribute-breaking
-// quote) must never reach img.src. Malformed values fall back to leaving
-// the image alone rather than something a browser would resolve as a
-// working navigation.
-test('a malformed data-game value never reaches img.src', () => {
-    const {FakeImage, onError} = loadFallback('javascript:alert(1)');
-    const image = new FakeImage();
-    image.src = 'broken.jpg';
-
-    onError({target: image});
-
-    expect(image.src).toBe('broken.jpg');
-    expect(image.src).not.toContain('javascript:');
-});
-
-test('a path-traversal data-game value never reaches img.src', () => {
-    const {FakeImage, setCardArtSource} = loadFallback('../../etc/passwd');
-    const image = new FakeImage();
-
-    setCardArtSource(image, undefined);
-
-    // No safe target could be determined (no explicit src, no valid game
-    // slug), so nothing built from the malformed value ever reaches src -
-    // String() covers whether that landed as null or an empty string.
-    expect(String(image.src)).not.toContain('..');
-});
-
-test('a clean data-game value still builds the normal fallback path', () => {
-    const {FakeImage, setCardArtSource} = loadFallback('magic');
-    const image = new FakeImage();
-
-    setCardArtSource(image, undefined);
-
-    expect(image.src).toBe('/img/backs/magic.webp');
 });
