@@ -50,6 +50,20 @@ func TestPublicPageNeedsNoSignature(t *testing.T) {
 	}
 }
 
+func TestPublicPageRejectsNonGET(t *testing.T) {
+	const marker = "PUBLIC-BODY"
+	handler := publicNav(t, marker)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/open", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status %d, want 405", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), marker) {
+		t.Error("405 response reached the handler")
+	}
+}
+
 func TestPublicPageIsInNavForEveryone(t *testing.T) {
 	publicNav(t, "")
 	pageVars := genPageNav(httptest.NewRequest("GET", "/open", nil), "Open", "")

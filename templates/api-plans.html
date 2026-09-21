@@ -30,17 +30,7 @@
                 <h3>{{.Name}}</h3>
                 <p class="api-amount">{{usd .Monthly}}<span>/month</span></p>
                 <ul>
-                    {{/* StoreScope is apiproductlist.StoreScopeExplicit or StoreScopeBase; anything else is ALL_ACCESS */}}
-                    {{if eq .StoreScope "explicit"}}
-                    <li>One store of your choice, TCGplayer always included</li>
-                    <li>Add more stores as you need them</li>
-                    {{else if eq .StoreScope "BASE_ACCESS"}}
-                    <li>Every EU and US store we track</li>
-                    <li>Singles only, no sealed product</li>
-                    {{else}}
-                    <li>Every store, every mode</li>
-                    <li>Sealed product included</li>
-                    {{end}}
+                    {{range scope_bullets . $.API.Products}}<li>{{.}}</li>{{end}}
                     <li>Modes: {{range $i, $m := .Modes}}{{if $i}}, {{end}}{{$m}}{{end}}</li>
                 </ul>
             </div>
@@ -73,12 +63,12 @@
         <h2>Patreon</h2>
         <p>The <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> bundle is {{usd .PatreonBundle}}/month for all games and all price data, arranged directly with us.</p>
         {{if .CanTrial}}
-        <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for 15 days</a>
-        <p class="api-note">Fifteen days of all data across every game, no card required. One trial per Patreon account every six months.</p>
+        <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for {{.TrialDays}} days</a>
+        <p class="api-note">{{.TrialDays}} days of all data across every game, no card required. One trial per Patreon account every six months.</p>
         {{else if .Email}}
-        <p class="api-note">Supporters with an active pledge can try the API free for 15 days from this page.</p>
+        <p class="api-note">Supporters with an active pledge can try the API free for {{.TrialDays}} days from this page.</p>
         {{else}}
-        <p class="api-note">Signed-in supporters can try the API free for 15 days from this page.</p>
+        <p class="api-note">Signed-in supporters can try the API free for {{.TrialDays}} days from this page.</p>
         {{end}}
     </section>
 

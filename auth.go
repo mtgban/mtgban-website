@@ -511,6 +511,10 @@ func enforceSigning(next http.Handler) http.Handler {
 		// A public page is served the way an ACL "Any" entry is
 		for _, nav := range ExtraNavs {
 			if nav.Public && nav.Link == r.URL.Path {
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+					return
+				}
 				recordPageHit(r)
 				noSigning(next).ServeHTTP(w, r)
 				return
