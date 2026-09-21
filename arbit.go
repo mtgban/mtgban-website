@@ -280,6 +280,25 @@ var FilterOptConfig = map[string]FilterOpt{
 var BadConditions = []string{"MP", "HP", "PO"}
 var UCRarity = []string{"uncommon", "common"}
 
+// isCardmarketMarket reports whether shorthand names one of
+// cardmarket.Market's own two buckets - "MKM" (its main storefront) or
+// "MKMPS" (its Powerseller-only one) - as opposed to Cardmarket's other,
+// unrelated scrapers ("MKMIndex", "MKMSealed", "MKMTrend").
+func isCardmarketMarket(shorthand string) bool {
+	return shorthand == "MKM" || shorthand == "MKMPS"
+}
+
+// noPLSTFoil skips The List's foil and etched printings from Arbit and
+// Mismatch whenever Cardmarket Market is one side of the comparison:
+// sellers there commonly list them under the wrong finish, and the
+// resulting spread is noise rather than a real one.
+func noPLSTFoil(co *mtgmatcher.CardObject) (float64, bool) {
+	if co.SetCode == "PLST" && (co.Foil || co.Etched) {
+		return 0, true
+	}
+	return 1, false
+}
+
 var ABU4H = []string{
 	"Limited Edition Alpha",
 	"Limited Edition Beta",
@@ -849,6 +868,11 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	// the search results do, so they follow the same setting.
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 
+	// Whatever the user-toggled options above already composed onto
+	// CustomCardFilter, before the per-scraper loop starts layering its
+	// own conditions on top of it fresh each iteration.
+	baseCardFilter := opts.CustomCardFilter
+
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
@@ -896,6 +920,23 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		// Set custom scraper options
 		if pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect" {
 			opts.Conditions = BadConditions
+		}
+
+		// Reset to the base each iteration - one scraper's own condition
+		// below must not leak onto the next scraper's comparison, the way
+		// TCGDirect's line above already does not reset itself.
+		opts.CustomCardFilter = baseCardFilter
+		if isCardmarketMarket(source.Info().Shorthand) || isCardmarketMarket(scraper.Info().Shorthand) {
+			oldFunc := opts.CustomCardFilter
+			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
+				if factor, skip := noPLSTFoil(co); skip {
+					return factor, skip
+				}
+				if oldFunc != nil {
+					return oldFunc(co)
+				}
+				return 1, false
+			}
 		}
 
 		var arbit []mtgban.ArbitEntry
