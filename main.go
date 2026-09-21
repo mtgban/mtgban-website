@@ -80,6 +80,11 @@ type PageVars struct {
 
 	IsMobile bool
 
+	// HandoffOrigins are the sites the upload handoff page will take a card
+	// list from. It reads them rather than naming one itself, so the list
+	// lives in Go where it can be tested.
+	HandoffOrigins []string
+
 	Embed struct {
 		OEmbedURL    string
 		PageURL      string
@@ -1675,6 +1680,10 @@ func main() {
 			http.Handle(subPage.Link, handler)
 		}
 	}
+
+	// The upload handoff sits under /upload but is its own page: the nav
+	// entry registers an exact path, so it needs naming here.
+	http.Handle("/upload/handoff", enforceSigning(http.HandlerFunc(UploadHandoff)))
 
 	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
 	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(SearchAPI)))

@@ -1,0 +1,25 @@
+{{define "title"}}Receiving a card list &mdash; MTGBAN{{end}}
+
+{{define "content"}}
+<div class="legal" id="handoff" data-handoff-origins="{{jsonArray .HandoffOrigins}}">
+    <h1>Receiving a card list</h1>
+
+    <p id="handoff-status">Waiting for the card list&hellip;</p>
+
+    <p id="handoff-hint" hidden>
+        This page is opened by a browser extension, which hands it the cards
+        it read from a storefront. Nothing was handed over, so there is
+        nothing to price &mdash; <a href="/upload">upload a list yourself</a>
+        instead.
+    </p>
+
+    <!-- Submitted from here rather than from whoever sent the rows. This
+         page is the site's own, so the upload is same-origin and carries the
+         session; a request made from the extension's page would not. -->
+    <form id="handoff-form" method="post" action="/upload" hidden>
+        <textarea id="handoff-rows" name="textArea"></textarea>
+    </form>
+</div>
+
+<script type="text/javascript" src="/js/upload-handoff.js?hash={{.Hash}}"></script>
+{{end}}
