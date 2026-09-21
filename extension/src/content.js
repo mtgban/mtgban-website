@@ -76,6 +76,10 @@
     );
   }
 
+  // shown is the row count the button last named, so a change in the page can
+  // be told from the page merely being touched.
+  var shown = -1;
+
   function label(button) {
     var count = MKM.countRows(document);
     var text = button.querySelector(".ban-label");
@@ -83,6 +87,8 @@
       text.textContent = "Export " + count + " to BAN";
     }
     button.hidden = count === 0;
+    shown = count;
+    return count;
   }
 
   function install() {
@@ -103,6 +109,11 @@
 
     // The page fills its table after load and refills it on every filter, so
     // the count follows the table rather than the moment this ran.
+    //
+    // Only a changed count counts as a change. Exporting appends an anchor to
+    // the document and takes it away again, which is a mutation like any
+    // other: reacting to every one of those cleared the line saying what the
+    // export had just done, about a third of a second after it said it.
     var pending = null;
     var observer = new MutationObserver(function () {
       if (pending !== null) {
@@ -110,6 +121,11 @@
       }
       pending = setTimeout(function () {
         pending = null;
+        if (MKM.countRows(document) === shown) {
+          return;
+        }
+        // The table itself moved, so what the last export said of it no
+        // longer holds.
         say(button, "");
         label(button);
       }, 300);

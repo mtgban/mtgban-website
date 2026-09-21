@@ -8,6 +8,10 @@
       body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 40rem; }
       .row { border-bottom: 1px solid #ddd; padding: .5rem 0; }
       code { background: #f2f2f2; padding: 0 .25rem; }
+      /* The hrefs are the relative ones Cardmarket writes, because that is
+         what the parser has to read. They lead nowhere from here, so they are
+         not dressed up as links. */
+      .row a { color: inherit; text-decoration: none; cursor: default; font-weight: 600; }
     </style>
   </head>
   <body>
@@ -17,6 +21,11 @@
       level and driven by the real content script — so the button below is the
       one the extension injects on Cardmarket. Click it to download the CSV.
       Nothing here needs the extension installed.
+    </p>
+    <p>
+      The card names carry the relative hrefs Cardmarket writes, since that is
+      where the parser reads them from. They point nowhere on this page and do
+      nothing when clicked.
     </p>
 
     <!-- Stand-ins for the offers a Cardmarket page lists. -->
@@ -47,6 +56,16 @@
       <span data-bs-original-title="Played">PL</span>
       <em>— no product id, so the upload falls back to name + edition</em>
     </div>
+
+    <script>
+      // Left alone, those hrefs ask this test server for a Cardmarket page.
+      document.addEventListener("click", function (event) {
+        var target = event.target;
+        if (target && target.closest && target.closest(".row a")) {
+          event.preventDefault();
+        }
+      });
+    </script>
 
     <script src="../src/parse.js"></script>
     <script src="../src/csv.js"></script>
