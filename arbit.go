@@ -280,6 +280,16 @@ var FilterOptConfig = map[string]FilterOpt{
 var BadConditions = []string{"MP", "HP", "PO"}
 var UCRarity = []string{"uncommon", "common"}
 
+// noPLSTFoil skips The List's foil and etched printings from Arbit and
+// Mismatch: sellers commonly list them under the wrong finish, and the
+// resulting spread is noise rather than a real one.
+func noPLSTFoil(co *mtgmatcher.CardObject) (float64, bool) {
+	if co.SetCode == "PLST" && (co.Foil || co.Etched) {
+		return 0, true
+	}
+	return 1, false
+}
+
 var ABU4H = []string{
 	"Limited Edition Alpha",
 	"Limited Edition Beta",
@@ -782,6 +792,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	opts := &mtgban.ArbitOpts{
 		MinSpread:             MinSpread,
 		ProfitabilityConstant: ProfConst,
+		CustomCardFilter:      noPLSTFoil,
 	}
 
 	// Set options (if they apply to the right page mode)
