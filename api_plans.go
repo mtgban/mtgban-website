@@ -17,27 +17,25 @@ import (
 // apiProducts is the embedded price list, validated by its own package tests.
 var apiProducts = apiproductlist.MustLoad()
 
-// Amounts quoted on the page that Stripe does not sell, in cents, from issue #230.
-const (
-	patreonBundleMonthly = 100000
-)
-
 // APIPlansVars is what api-plans.html renders beyond the shared PageVars.
 type APIPlansVars struct {
 	Products   *apiproductlist.ProductList
 	GatewayURL string
-	Games      []APIPlanGame
-	// GameChoice is false when every configured game is included, so the games group hides.
-	GameChoice bool
-	ReturnTo   string
-	Invite     string
+	// Cards is the packages in podium order; TopCard is the one on the podium step.
+	Cards   []apiproductlist.Package
+	TopCard string
+	// DefaultPackage is the card checked on arrival.
+	DefaultPackage string
+	// ExtraGameMonthly is the add-on price for a game past the included count, in cents.
+	ExtraGameMonthly int64
+	Games            []APIPlanGame
+	ReturnTo         string
+	Invite           string
 	// Change is set when the account page sent the reader here to change a plan
 	Change bool
 	// Email is the signed-in reader, empty for anonymous
 	Email    string
 	CanTrial bool
-
-	PatreonBundle int64
 
 	// TrialDays must match the gateway's trial_days config.
 	TrialDays int
@@ -45,10 +43,9 @@ type APIPlansVars struct {
 
 // APIPlanGame is one game checkbox in the configurator.
 type APIPlanGame struct {
-	Key      string
-	Name     string
-	Included bool
-	Checked  bool
+	Key     string
+	Name    string
+	Checked bool
 }
 
 // APIPlans renders the public pricing page and configurator.
@@ -84,22 +81,39 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		returnTo += "?" + rv.Encode()
 	}
 	v := &APIPlansVars{
-		Products:      apiProducts,
-		GatewayURL:    Config.APIGateway.URL,
-		ReturnTo:      returnTo,
-		Invite:        invite,
-		Change:        change,
-		Email:         GetParamFromSig(sig, "UserEmail"),
-		PatreonBundle: patreonBundleMonthly,
-		TrialDays:     15,
+		Products:   apiProducts,
+		GatewayURL: Config.APIGateway.URL,
+		ReturnTo:   returnTo,
+		Invite:     invite,
+		Change:     change,
+		Email:      GetParamFromSig(sig, "UserEmail"),
+		TrialDays:  15,
+	}
+	v.Cards, v.TopCard = podiumOrder(apiProducts.Packages)
+	v.DefaultPackage = apiProducts.Packages[0].Key
+	if a, ok := apiProducts.Addon("extra_game"); ok {
+		v.ExtraGameMonthly = a.Monthly
 	}
 	v.CanTrial = v.Email != "" && GetParamFromSig(sig, "UserTier") != "" && os.Getenv("TRIAL_SECRET") != ""
+	// The site's own game is preselected; the base price covers one game of the buyer's choice.
 	for _, g := range Config.APIGateway.Games {
-		included := slices.Contains(apiProducts.IncludedGames, g)
-		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(g), Included: included, Checked: included || g == Config.Game})
-		v.GameChoice = v.GameChoice || !included
+		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(g), Checked: g == Config.Game})
 	}
 	return v
+}
+
+// podiumOrder puts the priciest package in the middle with the runner-up on
+// its left: 500, 800, 200 for the three-package list. Fewer or more packages
+// stay in ascending order. The second result is the key of the middle card.
+func podiumOrder(packages []apiproductlist.Package) ([]apiproductlist.Package, string) {
+	sorted := slices.Clone(packages)
+	slices.SortStableFunc(sorted, func(a, b apiproductlist.Package) int {
+		return int(a.Monthly - b.Monthly)
+	})
+	if len(sorted) != 3 {
+		return sorted, ""
+	}
+	return []apiproductlist.Package{sorted[1], sorted[2], sorted[0]}, sorted[2].Key
 }
 
 // apiPlansJSON is the configurator's data: every amount the client total needs.
@@ -122,7 +136,7 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		Addons        map[string]int64 `json:"addons"`
 		Intervals     []interval       `json:"intervals"`
 		IncludedGames int              `json:"includedGames"`
-	}{Addons: map[string]int64{}}
+	}{Addons: map[string]int64{}, IncludedGames: v.Products.IncludedGames}
 	for _, p := range v.Products.Packages {
 		out.Packages = append(out.Packages, pkg{p.Key, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores})
 	}
@@ -131,12 +145,6 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 	}
 	for _, iv := range v.Products.Intervals {
 		out.Intervals = append(out.Intervals, interval{iv.Key, iv.Count})
-	}
-	// Counts only the included games actually offered by this deployment's gateway.
-	for _, g := range v.Games {
-		if g.Included {
-			out.IncludedGames++
-		}
 	}
 	data, err := json.Marshal(out)
 	if err != nil {
@@ -160,7 +168,7 @@ func scopeBullets(p apiproductlist.Package, cat *apiproductlist.ProductList) []s
 		}
 		return []string{first, "Add more stores as you need them"}
 	case apiproductlist.StoreScopeBase:
-		return []string{"Every EU and US store we track", "Singles only, no sealed product"}
+		return []string{"Every EU and US store we track", "No sealed product or EV calcs"}
 	default:
 		return []string{"Every store, every mode", "Sealed product included"}
 	}

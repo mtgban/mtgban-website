@@ -2,7 +2,7 @@
 (function () {
     // computeTotal mirrors billing.Plan.LineItems: package, extra stores past
     // the included count on an explicit package, extra games past the
-    // catalog's included games, all times the interval count.
+    // included count, all times the interval count.
     function computeTotal(data, choice) {
         var pkg = null;
         for (var i = 0; i < data.packages.length; i++) {
@@ -69,16 +69,17 @@
             }
         }
         var checkedStores = explicit ? checkedValues('stores').length : 0;
-        // An explicit package needs its included stores picked before checkout.
+        var checkedGames = form.querySelectorAll('input[name="games"]:checked').length;
+        // Checkout needs the included stores picked on an explicit package, and at least the included games.
         var submitButton = form.querySelector('button[type="submit"]');
         if (submitButton) {
-            submitButton.disabled = explicit && checkedStores < pkg.includedStores;
+            submitButton.disabled = (explicit && checkedStores < pkg.includedStores) || checkedGames < data.includedGames;
         }
         var total = computeTotal(data, {
             package: pkg ? pkg.key : '',
             interval: checkedValues('interval')[0] || 'monthly',
             stores: checkedStores,
-            games: form.querySelectorAll('input[name="games"]:checked').length
+            games: checkedGames
         });
         if (!total) return;
         document.getElementById('api-total').textContent = formatUSD(total.cents);
@@ -99,6 +100,18 @@
             for (var i = 0; i < boxes.length; i++) {
                 if (boxes[i].disabled) continue;
                 boxes[i].checked = wanted.indexOf(boxes[i].value) !== -1;
+            }
+        });
+    }
+
+    // A click anywhere on a package card picks it; the radio inside is hidden.
+    var cards = form.querySelectorAll('.api-card');
+    for (var c = 0; c < cards.length; c++) {
+        cards[c].addEventListener('click', function () {
+            var radio = this.querySelector('input[name="package"]');
+            if (radio && !radio.checked) {
+                radio.checked = true;
+                update();
             }
         });
     }

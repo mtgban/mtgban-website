@@ -50,14 +50,15 @@ function fakeInput(name, value, checked) {
     return {name: name, value: value, checked: !!checked, disabled: false};
 }
 
-function buildFakeForm(storesChecked) {
+function buildFakeForm(storesChecked, gameChecked) {
     storesChecked = storesChecked || [true, true];
+    if (gameChecked === undefined) gameChecked = true;
     const packages = [
         fakeInput('package', 'starter', true),
         fakeInput('package', 'all_data', false),
     ];
     const stores = [fakeInput('stores', 'CK', storesChecked[0]), fakeInput('stores', 'SCG', storesChecked[1])];
-    const games = [fakeInput('games', 'magic', true)];
+    const games = [fakeInput('games', 'magic', gameChecked)];
     const intervals = [fakeInput('interval', 'monthly', true)];
     const all = packages.concat(stores, games, intervals);
     const submitButton = {disabled: false};
@@ -137,4 +138,12 @@ test('submit is disabled on an explicit package until enough stores are checked'
 
     const oneChecked = buildFakeForm([true, false]);
     expect(oneChecked.submitButton.disabled).toBe(false);
+});
+
+test('submit is disabled until at least the included games are checked', () => {
+    const none = buildFakeForm([true, true], false);
+    expect(none.submitButton.disabled).toBe(true);
+
+    const one = buildFakeForm([true, true], true);
+    expect(one.submitButton.disabled).toBe(false);
 });

@@ -11,7 +11,6 @@
     color: var(--activetext);
 }
 .api-plans .page-header { margin-bottom: 1em; }
-.api-lead { max-width: 60em; margin-bottom: 2.5em; }
 
 .api-section { margin-bottom: 2.5em; }
 .api-section h2 {
@@ -22,13 +21,36 @@
 .api-note { font-size: var(--text-md); color: var(--text-dim); }
 .api-section > .api-note { margin: 0.75em 0 0; }
 
+/* Package cards double as the package selector; the radio inside is hidden. */
 .api-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
     gap: 1em;
 }
-.api-card { padding: 1em 1.2em; }
+.api-podium { align-items: end; }
+.api-card {
+    position: relative;
+    padding: 1em 1.2em;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.api-card input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    pointer-events: none;
+}
+.api-card:hover { border-color: var(--border-moderate); }
+.api-card:has(input:checked) {
+    border-color: var(--ainfo);
+    background: var(--accent-muted);
+    box-shadow: 0 0 0 1px var(--ainfo);
+}
+.api-card:focus-within { outline: 2px solid var(--ainfo); outline-offset: 2px; }
 .api-card h3 { margin: 0 0 0.3em; font-size: var(--text-xl); color: var(--normal); }
+.api-card h3 label { cursor: pointer; }
 .api-amount {
     font-size: var(--text-6xl);
     font-weight: 700;
@@ -38,19 +60,9 @@
 }
 .api-amount span { font-size: var(--text-md); font-weight: 400; color: var(--text-dim); margin-left: 0.15em; }
 .api-card ul { margin: 0; padding-left: 1.1em; color: var(--activetext); font-size: var(--text-md); line-height: 1.55; }
-
-.api-soon {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4em 2em;
-    color: var(--activetext);
-    font-size: var(--text-md);
-    line-height: 1.6;
-}
-.api-soon strong { color: var(--normal); font-weight: 600; }
+/* The podium step: the fullest package stands taller than its neighbours. */
+.api-card-top { padding-top: 1.6em; padding-bottom: 1.6em; }
+.api-card-top .api-amount { font-size: var(--text-9xl); }
 
 .api-btn {
     display: inline-block;
@@ -72,7 +84,7 @@
 .api-trial-row .api-note { margin: 0; }
 
 /* Configurator: one labelled row per choice group, options as chips. */
-.api-configurator form { display: grid; gap: 1.1em; }
+.api-configurator { display: grid; gap: 1.1em; }
 .api-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .api-fieldset[hidden] { display: none; }
 .api-fieldset legend { padding: 0; margin-bottom: 0.5em; font-weight: 600; color: var(--normal); }
@@ -109,5 +121,6 @@
 
 @media (max-width: 768px) {
     .api-cards { grid-template-columns: 1fr; }
+    .api-card-top { padding-top: 1em; padding-bottom: 1em; }
     .api-plans .page-header { flex-direction: column; }
 }

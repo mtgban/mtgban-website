@@ -14,54 +14,30 @@
         <a class="page-action" href="{{.GatewayURL}}/account">Manage your API access</a>
     </div>
 
-    <section class="api-section">
-        <h2>Price data</h2>
-        <div class="api-cards">
-            {{range .Products.Packages}}
-            <div class="card api-card">
-                <h3>{{.Name}}</h3>
-                <p class="api-amount">{{usd .Monthly}}<span>/month</span></p>
-                <ul>
-                    {{range scope_bullets . $.API.Products}}<li>{{.}}</li>{{end}}
-                    <li>Modes: {{range $i, $m := .Modes}}{{if $i}}, {{end}}{{$m}}{{end}}</li>
-                </ul>
-            </div>
-            {{end}}
-        </div>
-        <p class="api-note">Magic is included in every package. {{range .Products.Addons}}{{.Name}} is {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}. {{end}}</p>
-    </section>
+    <form method="GET" action="{{.GatewayURL}}/checkout" id="api-config-form">
+        <input type="hidden" name="return_to" value="{{.ReturnTo}}">
+        {{if .Invite}}<input type="hidden" name="invite" value="{{.Invite}}">{{end}}
+        {{if .Change}}<input type="hidden" name="change" value="1">{{end}}
 
-    <section class="api-section">
-        <h2>Patreon</h2>
-        <p>The <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> bundle is {{usd .PatreonBundle}}/month for all games and all price data, arranged directly with us.</p>
-        {{if .CanTrial}}
-        <div class="api-trial-row">
-            <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for {{.TrialDays}} days</a>
-            <p class="api-note">{{.TrialDays}} days of all data across every game, no card required. One trial per Patreon account every six months.</p>
-        </div>
-        {{else if .Email}}
-        <p class="api-note">Supporters with an active pledge can try the API free for {{.TrialDays}} days from this page.</p>
-        {{else}}
-        <p class="api-note">Signed-in supporters can try the API free for {{.TrialDays}} days from this page.</p>
-        {{end}}
-    </section>
-
-    <section class="api-section api-configurator">
-        <h2>{{if .Change}}Change your plan{{else}}Configure your plan{{end}}</h2>
-        <form method="GET" action="{{.GatewayURL}}/checkout" id="api-config-form">
-            <input type="hidden" name="return_to" value="{{.ReturnTo}}">
-            {{if .Invite}}<input type="hidden" name="invite" value="{{.Invite}}">{{end}}
-            {{if .Change}}<input type="hidden" name="change" value="1">{{end}}
-
-            <fieldset class="api-fieldset">
-                <legend>Package</legend>
-                <div class="api-choices">
-                    {{range $i, $p := .Products.Packages}}
-                    <label class="api-choice"><input type="radio" name="package" value="{{$p.Key}}"{{if eq $i 0}} checked{{end}}> {{$p.Name}} <span class="api-choice-amount">{{usd $p.Monthly}}/month</span></label>
-                    {{end}}
+        <section class="api-section">
+            <h2>{{if .Change}}Change your plan{{else}}Pick a package{{end}}</h2>
+            <div class="api-cards api-podium">
+                {{range .Cards}}
+                <div class="card api-card{{if eq .Key $.API.TopCard}} api-card-top{{end}}">
+                    <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
+                    <h3><label for="api-package-{{.Key}}">{{.Name}}</label></h3>
+                    <p class="api-amount">{{usd .Monthly}}<span>/month</span></p>
+                    <ul>
+                        {{range scope_bullets . $.API.Products}}<li>{{.}}</li>{{end}}
+                        <li>Modes: {{range $i, $m := .Modes}}{{if $i}}, {{end}}{{$m}}{{end}}</li>
+                    </ul>
                 </div>
-            </fieldset>
+                {{end}}
+            </div>
+            <p class="api-note">{{range .Products.Addons}}{{.Name}} is {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}. {{end}}</p>
+        </section>
 
+        <section class="api-section api-configurator">
             <fieldset class="api-fieldset" id="api-stores">
                 <legend>Stores <span class="api-legend-note">{{range $i, $s := .Products.ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included</span></legend>
                 <div class="api-choices">
@@ -71,11 +47,11 @@
                 </div>
             </fieldset>
 
-            <fieldset class="api-fieldset"{{if not .GameChoice}} hidden{{end}}>
-                <legend>Games</legend>
+            <fieldset class="api-fieldset"{{if le (len .Games) 1}} hidden{{end}}>
+                <legend>Games <span class="api-legend-note">{{if eq .Products.IncludedGames 1}}one included{{else}}{{.Products.IncludedGames}} included{{end}}, {{usd .ExtraGameMonthly}}/month for each additional</span></legend>
                 <div class="api-choices">
                     {{range .Games}}
-                    <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}{{if .Included}} disabled{{end}}> {{.Name}}{{if .Included}} <span class="api-choice-amount">included</span>{{end}}</label>
+                    <label class="api-choice"><input type="checkbox" name="games" value="{{.Key}}"{{if .Checked}} checked{{end}}> {{.Name}}</label>
                     {{end}}
                 </div>
             </fieldset>
@@ -96,7 +72,21 @@
                 <button type="submit" class="api-btn">{{if .Change}}Review the change{{else}}Continue to checkout{{end}}</button>
                 <p class="api-note">Confirmed at checkout before anything is charged. Promotion codes are entered there.</p>
             </div>
-        </form>
+        </section>
+    </form>
+
+    <section class="api-section">
+        <h2>Patreon supporters</h2>
+        {{if .CanTrial}}
+        <div class="api-trial-row">
+            <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for {{.TrialDays}} days</a>
+            <p class="api-note">{{.TrialDays}} days of all data across every game, no card required. One trial per Patreon account every six months.</p>
+        </div>
+        {{else if .Email}}
+        <p class="api-note">Supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> pledge can try the API free for {{.TrialDays}} days from this page.</p>
+        {{else}}
+        <p class="api-note">Signed-in <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> supporters can try the API free for {{.TrialDays}} days from this page.</p>
+        {{end}}
     </section>
 </div>
 {{end}}

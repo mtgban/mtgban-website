@@ -46,7 +46,6 @@ var Currencies = []string{"usd"}
 
 var (
 	keyPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	gamePattern     = regexp.MustCompile(`^[a-z0-9]+$`)
 	storeKeyPattern = regexp.MustCompile(`^[A-Z0-9]+$`)
 	validIntervals  = []string{"month"}
 )
@@ -93,11 +92,12 @@ type Store struct {
 
 // ProductList is the whole price list.
 type ProductList struct {
-	Currency      string     `json:"currency"`
-	Packages      []Package  `json:"packages"`
-	Addons        []Addon    `json:"addons"`
-	Intervals     []Interval `json:"intervals"`
-	IncludedGames []string   `json:"included_games"`
+	Currency  string     `json:"currency"`
+	Packages  []Package  `json:"packages"`
+	Addons    []Addon    `json:"addons"`
+	Intervals []Interval `json:"intervals"`
+	// IncludedGames is how many games the base price covers; the buyer picks which.
+	IncludedGames int `json:"included_games"`
 	// Stores is the starter picker and the pricing page's store names. A
 	// preset scope is expanded by the backend from its live scrapers and
 	// never reads this list.
@@ -208,8 +208,8 @@ func (c *ProductList) Validate() error {
 	if !public {
 		return errors.New("at least one interval must be public")
 	}
-	if err := uniqueList("included_games", c.IncludedGames, gamePattern.MatchString, "a lowercase game name"); err != nil {
-		return err
+	if c.IncludedGames < 1 {
+		return errors.New("included_games must be at least 1")
 	}
 	if err := c.validateStores(explicit); err != nil {
 		return err

@@ -33,10 +33,10 @@ func apiPlansPage(t *testing.T, sig string) string {
 func TestAPIPlansRendersCatalog(t *testing.T) {
 	body := apiPlansPage(t, "")
 	for _, want := range []string{
-		"TCGplayer plus one store", "$200", "All EU/US stores, no sealed", "$500", "All data", "$800",
-		"$150", "$1,000",
+		"À la carte", "$200", "Base Access", "$500", "All Access", "$800", "$150",
+		"No sealed product or EV calcs", "one included, $150/month for each additional",
 		`action="https://api.example/checkout"`,
-		`name="package" value="starter"`,
+		`name="package" id="api-package-starter" value="starter" checked`,
 		`name="games" value="pokemon"`,
 		`name="stores" value="CK" checked`,
 		`name="return_to" value="https://mtgban.com/api-plans"`,
@@ -57,6 +57,17 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	}
 	if strings.Contains(body, `name="stores" value="TCG"`) {
 		t.Error("implied store offered as a checkbox")
+	}
+	if strings.Contains(body, "Patreon bundle") || strings.Contains(body, "Magic is included") {
+		t.Error("page still mentions the Patreon bundle or an included game")
+	}
+	// Podium order: 500, 800, 200.
+	base, all, carte := strings.Index(body, "Base Access"), strings.Index(body, "All Access"), strings.Index(body, "À la carte")
+	if !(base < all && all < carte) {
+		t.Errorf("cards out of podium order: base %d all %d carte %d", base, all, carte)
+	}
+	if !strings.Contains(body, `class="card api-card api-card-top"`) || !strings.Contains(body, `id="api-package-all_data"`) {
+		t.Error("the priciest package is not the podium card")
 	}
 }
 
@@ -174,5 +185,21 @@ func TestFormatUSD(t *testing.T) {
 		if got := formatUSD(cents); got != want {
 			t.Errorf("%d: %s want %s", cents, got, want)
 		}
+	}
+}
+
+func TestPodiumOrder(t *testing.T) {
+	three := []apiproductlist.Package{{Key: "a", Monthly: 200}, {Key: "b", Monthly: 500}, {Key: "c", Monthly: 800}}
+	cards, top := podiumOrder(three)
+	if top != "c" || cards[0].Key != "b" || cards[1].Key != "c" || cards[2].Key != "a" {
+		t.Errorf("three packages: %+v top %q", cards, top)
+	}
+	two := []apiproductlist.Package{{Key: "x", Monthly: 900}, {Key: "y", Monthly: 100}}
+	cards, top = podiumOrder(two)
+	if top != "" || cards[0].Key != "y" || cards[1].Key != "x" {
+		t.Errorf("two packages: %+v top %q", cards, top)
+	}
+	if three[0].Key != "a" {
+		t.Error("input was reordered in place")
 	}
 }

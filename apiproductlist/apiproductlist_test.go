@@ -36,7 +36,7 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if len(c.Intervals) != 2 || !c.Intervals[0].Public || c.Intervals[1].Public || c.Intervals[1].Count != 3 {
 		t.Errorf("intervals %+v", c.Intervals)
 	}
-	if !reflect.DeepEqual(c.IncludedGames, []string{"magic"}) {
+	if c.IncludedGames != 1 {
 		t.Errorf("included games %v", c.IncludedGames)
 	}
 	if implied := c.ImpliedStores(); len(implied) != 1 || implied[0].Key != "TCG" || !containsAll(implied[0].Shorthands, "TCGLow", "TCGDirectNet", "TCGPlayer") {
@@ -77,7 +77,7 @@ const minimal = `{
   "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"]}],
   "addons": [],
   "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
-  "included_games": ["magic"],
+  "included_games": 1,
   "stores": [{"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}]
 }`
 
@@ -87,7 +87,7 @@ const explicit = `{
   "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "explicit", "included_stores": 1, "modes": ["retail"]}],
   "addons": [],
   "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
-  "included_games": ["magic"],
+  "included_games": 1,
   "stores": [
     {"key": "TCG", "name": "TCGplayer", "implied": true, "shorthands": ["TCGLow"]},
     {"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}
@@ -143,11 +143,7 @@ func TestValidateRejects(t *testing.T) {
 		{"week interval", rep(minimal, `"interval": "month"`, `"interval": "week"`), "interval monthly: interval must be one of [month]"},
 		{"year interval", rep(minimal, `"interval": "month"`, `"interval": "year"`), "interval monthly: interval must be one of [month]"},
 		{"zero count", rep(minimal, `"count": 1`, `"count": 0`), "interval monthly: count must be at least 1"},
-		{"no included games", rep(minimal, `["magic"]`, `[]`), "included_games is empty"},
-		{"uppercase included game", rep(minimal, `["magic"]`, `["Magic"]`), `included_games: "Magic" must be a lowercase game name`},
-		{"game with space", rep(minimal, `["magic"]`, `["one piece"]`), `included_games: "one piece" must be a lowercase game name`},
-		{"game with comma", rep(minimal, `["magic"]`, `["magic,lorcana"]`), `included_games: "magic,lorcana" must be a lowercase game name`},
-		{"duplicate included game", rep(minimal, `["magic"]`, `["magic", "magic"]`), `included_games: duplicate "magic"`},
+		{"zero included games", rep(minimal, `"included_games": 1`, `"included_games": 0`), "included_games must be at least 1"},
 		{"no stores", rep(minimal, `"stores": [{"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}]`, `"stores": []`), "stores is empty"},
 		{"lowercase store key", rep(minimal, `"key": "CK"`, `"key": "ck"`), `store "ck": key must be uppercase letters and digits`},
 		{"store key with space", rep(minimal, `"key": "CK"`, `"key": "C K"`), `store "C K": key must be uppercase letters and digits`},
@@ -181,7 +177,7 @@ func TestValidateRejectsLookupKeyCollision(t *testing.T) {
 			{Key: "monthly", Interval: "month", Count: 1, Public: true},
 			{Key: "b_monthly", Interval: "month", Count: 1},
 		},
-		IncludedGames: []string{"magic"},
+		IncludedGames: 1,
 		Stores:        []Store{{Key: "CK", Name: "Card Kingdom", Shorthands: []string{"CK"}}},
 	}
 	err := c.Validate()
