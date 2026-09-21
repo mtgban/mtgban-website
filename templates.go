@@ -279,6 +279,7 @@ var funcMap = template.FuncMap{
 	"usd":                       formatUSD,
 	"api_plans_json":            apiPlansJSON,
 	"addon_scope":               addonScope,
+	"scope_bullets":             scopeBullets,
 	"dict": func(values ...any) (map[string]any, error) {
 		if len(values)%2 != 0 {
 			return nil, errors.New("dict requires even number of args")

@@ -40,6 +40,9 @@ type APIPlansVars struct {
 	PatreonBundle  int64
 	Velocity       int64
 	VelocityBundle int64
+
+	// TrialDays must match the gateway's trial_days config.
+	TrialDays int
 }
 
 // APIPlanGame is one game checkbox in the configurator.
@@ -92,6 +95,7 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		PatreonBundle:  patreonBundleMonthly,
 		Velocity:       velocityMonthly,
 		VelocityBundle: velocityBundleMonthly,
+		TrialDays:      15,
 	}
 	v.CanTrial = v.Email != "" && GetParamFromSig(sig, "UserTier") != "" && os.Getenv("TRIAL_SECRET") != ""
 	for _, g := range Config.APIGateway.Games {
@@ -142,6 +146,27 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		return "null"
 	}
 	return template.JS(data)
+}
+
+// scopeBullets are the two price-card bullets for a package's store scope.
+func scopeBullets(p apiproductlist.Package, cat *apiproductlist.ProductList) []string {
+	var names []string
+	for _, s := range cat.ImpliedStores() {
+		names = append(names, s.Name)
+	}
+	implied := strings.Join(names, ", ")
+	switch p.StoreScope {
+	case apiproductlist.StoreScopeExplicit:
+		first := "One store of your choice, " + implied + " always included"
+		if p.IncludedStores != 1 {
+			first = strconv.Itoa(p.IncludedStores) + " stores of your choice, " + implied + " always included"
+		}
+		return []string{first, "Add more stores as you need them"}
+	case apiproductlist.StoreScopeBase:
+		return []string{"Every EU and US store we track", "Singles only, no sealed product"}
+	default:
+		return []string{"Every store, every mode", "Sealed product included"}
+	}
 }
 
 // addonScope names, from the catalog, which packages an addon applies to.

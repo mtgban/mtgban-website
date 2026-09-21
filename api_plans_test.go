@@ -73,8 +73,15 @@ func TestAPIPlansTrialButtonNeedsPledgeAndSecret(t *testing.T) {
 		t.Error("trial offered to a login with no pledge")
 	}
 	// html/template percent-encodes the query value, including the scheme's slashes.
-	if !strings.Contains(apiPlansPage(t, sign("Legacy", user, nil)), `href="/api-trial?return_to=https%3a%2f%2fmtgban.com%2fapi-plans"`) {
+	page := apiPlansPage(t, sign("Legacy", user, nil))
+	if !strings.Contains(page, `href="/api-trial?return_to=https%3a%2f%2fmtgban.com%2fapi-plans"`) {
 		t.Error("trial missing for a pledged supporter")
+	}
+	if !strings.Contains(page, "15 days") {
+		t.Error("trial length missing from the page")
+	}
+	if !strings.Contains(page, "15 days of all data") {
+		t.Error("trial note length missing from the page")
 	}
 }
 
@@ -112,6 +119,53 @@ func TestAddonScope(t *testing.T) {
 	one := apiproductlist.Addon{Key: "extra_store", AppliesTo: []string{"starter"}}
 	if got := addonScope(one, packages); got != "on the Starter package" {
 		t.Errorf("addon applying to one package: got %q", got)
+	}
+}
+
+func TestScopeBullets(t *testing.T) {
+	cat := &apiproductlist.ProductList{
+		Stores: []apiproductlist.Store{{Key: "TCG", Name: "TCGplayer", Implied: true}},
+	}
+
+	one := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeExplicit, IncludedStores: 1}
+	got := scopeBullets(one, cat)
+	if !strings.Contains(got[0], "of your choice") {
+		t.Errorf("explicit one store: %v", got)
+	}
+	if got[0] != "One store of your choice, TCGplayer always included" {
+		t.Errorf("explicit one store wording: %v", got)
+	}
+
+	two := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeExplicit, IncludedStores: 2}
+	got = scopeBullets(two, cat)
+	if got[0] != "2 stores of your choice, TCGplayer always included" {
+		t.Errorf("explicit two stores wording: %v", got)
+	}
+	if got[1] != "Add more stores as you need them" {
+		t.Errorf("explicit second bullet: %v", got)
+	}
+
+	base := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeBase}
+	got = scopeBullets(base, cat)
+	if !strings.Contains(strings.Join(got, " "), "EU and US") {
+		t.Errorf("base bullets: %v", got)
+	}
+
+	all := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeAll}
+	got = scopeBullets(all, cat)
+	if !strings.Contains(strings.Join(got, " "), "Sealed product included") {
+		t.Errorf("all bullets: %v", got)
+	}
+
+	multi := &apiproductlist.ProductList{
+		Stores: []apiproductlist.Store{
+			{Key: "TCG", Name: "TCGplayer", Implied: true},
+			{Key: "CK", Name: "Card Kingdom", Implied: true},
+		},
+	}
+	got = scopeBullets(one, multi)
+	if got[0] != "One store of your choice, TCGplayer, Card Kingdom always included" {
+		t.Errorf("explicit wording with two implied stores: %v", got)
 	}
 }
 
