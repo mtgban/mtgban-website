@@ -460,3 +460,24 @@
         padding: 1em;
     }
 }
+
+/* Code blocks in API sections. */
+.guide-section-desc pre {
+    margin: 0.6em 0;
+    padding: 0.7em 0.9em;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    background: color-mix(in srgb, var(--ainfo, #559eff) 6%, var(--background, #f8f8f8));
+    border: 1px solid color-mix(in srgb, var(--ainfo, #559eff) 20%, transparent);
+    border-radius: 6px;
+}
+.guide-section-desc pre code {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: inherit;
+    color: inherit;
+}

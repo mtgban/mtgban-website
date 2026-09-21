@@ -32,6 +32,7 @@
             <button type="button" class="guide-tab" data-tab="overview" role="tab">Overview</button>
             <button type="button" class="guide-tab" data-tab="palette" role="tab">Command Palette</button>
             <button type="button" class="guide-tab" data-tab="syntax" role="tab">Syntax</button>
+            <button type="button" class="guide-tab" data-tab="api" role="tab">API</button>
             <button type="button" class="guide-tab" data-tab="faq" role="tab">F.A.Q.</button>
         </div>
         <div id="guide-sections" data-tab-pane="structured">
@@ -56,11 +57,12 @@
         'Overview':        'overview',
         'Command Palette': 'palette',
         'Search Syntax':   'syntax',
+        'API':             'api',
         'Tools':           'overview',
         'Tips & Tricks':   'overview'
     };
     var DEFAULT_TAB = 'overview';
-    var VALID_TABS = ['overview', 'palette', 'syntax', 'faq'];
+    var VALID_TABS = ['overview', 'palette', 'syntax', 'api', 'faq'];
 
     // Build nav permission lookup from palette data
     var navNames = {};
