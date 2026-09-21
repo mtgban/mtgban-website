@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -47,6 +48,20 @@ const cardArtPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BA
 var funcMap = template.FuncMap{
 	"card_art_placeholder": func() string {
 		return cardArtPlaceholder
+	},
+	// jsonArray writes a list of strings for a script to read out of an
+	// attribute. A list that cannot be written comes out as an empty one:
+	// for the handoff page, whose attribute names who may hand it a card
+	// list, that is a page listening to nobody rather than to everybody.
+	"jsonArray": func(values []string) string {
+		if values == nil {
+			values = []string{}
+		}
+		encoded, err := json.Marshal(values)
+		if err != nil {
+			return "[]"
+		}
+		return string(encoded)
 	},
 	// The datastore reload runs in the background, so the page that reports
 	// it asks at render time rather than being handed a copy that is stale
