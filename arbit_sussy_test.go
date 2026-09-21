@@ -1,12 +1,30 @@
 package main
 
 import (
+	"bytes"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
+
+// renderArbit runs the arbit page the way the server does, so a test
+// exercises the real template rather than a parsed-but-unrendered one.
+func renderArbit(t *testing.T, pageVars PageVars) string {
+	t.Helper()
+	baseName, files := renderTemplateFiles("arbit.html", false)
+	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
+	if err != nil {
+		t.Fatalf("parsing arbit.html: %v", err)
+	}
+	var b bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&b, baseName, pageVars); err != nil {
+		t.Fatalf("rendering arbit.html: %v", err)
+	}
+	return b.String()
+}
 
 // reversePageVars is one reverse-mode table whose second entry the page has
 // been told not to trust, so the badge has one row to land on and one to
