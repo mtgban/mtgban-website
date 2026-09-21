@@ -94,6 +94,11 @@ type Parser struct {
 	// condition for SKU uploads that carry no explicit condition column.
 	TCGSkuToCondition func(sku string) string
 
+	// MKMIDToUUID resolves a Cardmarket product id to a card uuid, returning
+	// "" for unknown ids. Optional; without it Cardmarket id columns are
+	// ignored.
+	MKMIDToUUID func(mkmID string) string
+
 	// PreferredPrinting orders alias candidates when a name matches several
 	// printings; the first in the resulting order wins. Optional; without it
 	// candidates keep the match order.
@@ -113,6 +118,25 @@ func (p *Parser) logf(format string, v ...any) {
 	if p.Logf != nil {
 		p.Logf(format, v...)
 	}
+}
+
+// wholeNumber drops the decimal a spreadsheet leaves on a whole number.
+// A Cardmarket id is an integer, but a CSV that has been through Excel comes
+// back with "265854.0" where it went in as "265854", and an id compared as
+// written would match nothing and fall silently to name matching. Only a
+// trailing ".0" on digits is dropped; anything else is passed on as it came,
+// since a value this does not recognise is not one to guess at.
+func wholeNumber(field string) string {
+	trimmed := strings.TrimSuffix(field, ".0")
+	if trimmed == field || trimmed == "" {
+		return field
+	}
+	for _, r := range trimmed {
+		if r < '0' || r > '9' {
+			return field
+		}
+	}
+	return trimmed
 }
 
 // GetQuantity parses a quantity field, accepting a trailing "x" ("4x").
@@ -222,6 +246,15 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 			if !found {
 				indexMap["tcgSku"] = i
 			}
+		// A Cardmarket id needs both halves named: "original id" and
+		// "instance id" are the mtgban export's own columns and carry the
+		// one half that is not the marketplace.
+		case (strings.Contains(field, "mcm") || strings.Contains(field, "mkm") ||
+			strings.Contains(field, "cardmarket")) && strings.Contains(field, "id"):
+			_, found := indexMap["mkmID"]
+			if !found {
+				indexMap["mkmID"] = i
+			}
 		case (strings.Contains(field, "name") && !strings.Contains(field, "edition") && !strings.Contains(field, "set") && !strings.Contains(field, "expansion") && !strings.Contains(field, "folder")) || field == "card":
 			_, found := indexMap["cardName"]
 			if !found {
@@ -313,10 +346,11 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 	// If this field is present we don't need safe defaults
 	_, foundID := indexMap["id"]
 	_, foundTcgID := indexMap["tcgSku"]
+	_, foundMkmID := indexMap["mkmID"]
 
 	// Set some default values for the mandatory fields
 	_, foundName := indexMap["cardName"]
-	if !foundName && !foundID && !foundTcgID {
+	if !foundName && !foundID && !foundTcgID && !foundMkmID {
 		indexMap["cardName"] = 0
 		// Used by some formats that do not set a card name
 		i, found := indexMap["title"]
@@ -455,6 +489,14 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	if found && idx < len(record) && p.TCGSkuToUUID != nil {
 		tcgSkuID = record[idx]
 		res.Card.ID = p.TCGSkuToUUID(tcgSkuID)
+	}
+
+	// A Cardmarket id resolves the same way, but only fills an id nothing
+	// else has answered with: a column naming the uuid outright is the
+	// better answer, and an id nothing answers to is not an answer at all.
+	idx, found = indexMap["mkmID"]
+	if found && idx < len(record) && p.MKMIDToUUID != nil && res.Card.ID == "" {
+		res.Card.ID = p.MKMIDToUUID(wholeNumber(record[idx]))
 	}
 
 	res.Card.Name = record[indexMap["cardName"]]

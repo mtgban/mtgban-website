@@ -158,3 +158,114 @@ func TestParseRowInfersConditionFromSKU(t *testing.T) {
 		})
 	}
 }
+
+// TestParseHeaderCardmarketID pins which columns name a Cardmarket product
+// and, as much, which ones do not: the mtgban export's own "Original Id" and
+// "Instance Id" carry the word without naming the marketplace, and a column
+// naming the marketplace without an id is a price.
+func TestParseHeaderCardmarketID(t *testing.T) {
+	for _, tt := range []struct {
+		desc   string
+		header []string
+		want   int
+		found  bool
+	}{
+		{"the column mkmhtml2csv writes", []string{"uuid", "card_name", "mcm_id"}, 2, true},
+		// The site spells the marketplace MKM everywhere else - MKMTrend,
+		// MKMLow - so a hand-written list is as likely to say that as mcm.
+		{"spelled the way the site spells it", []string{"Name", "MKM Id"}, 1, true},
+		{"no separator, mkm", []string{"Name", "mkmId"}, 1, true},
+		{"spelled out", []string{"Name", "Edition", "Cardmarket Id"}, 2, true},
+		{"no separator", []string{"Name", "mcmId"}, 1, true},
+		{"the mtgban export's own id columns", []string{"Key", "Name", "Original Id", "Instance Id"}, 0, false},
+		{"a price is not an id", []string{"Name", "Edition", "Cardmarket Price"}, 0, false},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			p := &Parser{}
+			indexMap, err := p.ParseHeader(tt.header)
+			if err != nil {
+				t.Fatalf("ParseHeader: %v", err)
+			}
+			got, found := indexMap["mkmID"]
+			if found != tt.found {
+				t.Fatalf("mkmID found = %v, want %v (map %v)", found, tt.found, indexMap)
+			}
+			if found && got != tt.want {
+				t.Errorf("mkmID = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseRowResolvesCardmarketID pins that the hook fills an id nothing
+// else answered with, and only then.
+func TestParseRowResolvesCardmarketID(t *testing.T) {
+	resolving := &Parser{
+		MKMIDToUUID: func(mkmID string) string {
+			if mkmID == "265854" {
+				return "uuid-from-mkm"
+			}
+			return ""
+		},
+	}
+
+	for _, tt := range []struct {
+		desc     string
+		parser   *Parser
+		indexMap map[string]int
+		record   []string
+		want     string
+	}{
+		{
+			"a known product id resolves",
+			resolving,
+			map[string]int{"cardName": 0, "mkmID": 1},
+			[]string{"Some Card", "265854"},
+			"uuid-from-mkm",
+		},
+		{
+			"an unknown product id resolves to nothing",
+			resolving,
+			map[string]int{"cardName": 0, "mkmID": 1},
+			[]string{"Some Card", "999999"},
+			"",
+		},
+		{
+			"a uuid column wins over the product id",
+			resolving,
+			map[string]int{"cardName": 0, "mkmID": 1, "id": 2},
+			[]string{"Some Card", "265854", "uuid-explicit"},
+			"uuid-explicit",
+		},
+		{
+			"a spreadsheet's decimal is not part of the id",
+			resolving,
+			map[string]int{"cardName": 0, "mkmID": 1},
+			[]string{"Some Card", "265854.0"},
+			"uuid-from-mkm",
+		},
+		{
+			"anything else is passed on as it came",
+			resolving,
+			map[string]int{"cardName": 0, "mkmID": 1},
+			[]string{"Some Card", "265854.5"},
+			"",
+		},
+		{
+			"without the hook the column is ignored",
+			&Parser{},
+			map[string]int{"cardName": 0, "mkmID": 1},
+			[]string{"Some Card", "265854"},
+			"",
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			// Matching needs the datastore (not loaded here); the id is
+			// resolved before Match, so its failure is irrelevant.
+			res, _ := tt.parser.ParseRow(tt.indexMap, tt.record)
+			if res.Card.ID != tt.want {
+				t.Errorf("Card.ID = %q, want %q", res.Card.ID, tt.want)
+			}
+		})
+	}
+}
