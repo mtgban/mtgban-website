@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "MTGBAN Cardmarket Export",
+  "version": "0.1.0",
+  "description": "Export the offers on a Cardmarket page as a CSV for upload to MTGBAN.",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "cardmarket-export@mtgban.com",
+      "strict_min_version": "115.0"
+    }
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.cardmarket.com/*/Magic/*",
+        "https://www.cardmarket.com/*/Pokemon/*",
+        "https://www.cardmarket.com/*/YuGiOh/*",
+        "https://www.cardmarket.com/*/Lorcana/*",
+        "https://www.cardmarket.com/*/OnePiece/*",
+        "https://www.cardmarket.com/*/FleshAndBlood/*",
+        "https://www.cardmarket.com/*/Riftbound/*"
+      ],
+      "js": ["src/parse.js", "src/csv.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

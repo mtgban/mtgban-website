@@ -27,6 +27,9 @@ cache_*
 # Offline-mode wire-format fixtures (exempt from the *.json ignore above)
 !tests/offline/fixtures/*.json
 
+# The browser extension's manifest is source, not configuration (same exemption)
+!extension/**/*.json
+
 # Logs directory
 logs/
 

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MKM export parser checks</title>
+  </head>
+  <body>
+    <h1>MKM export parser checks</h1>
+    <pre id="out">running…</pre>
+
+    <!-- A stand-in for the rows a Cardmarket offers page lists. Each one is
+         here for something the parser has to get right; see the checks. -->
+    <div id="fixture" hidden>
+      <!-- Plain offer. The product id is in a lazy-loading data attribute,
+           not in src, which is why the parser reads outerHTML. -->
+      <div id="stockRow111111">
+        <a href="/en/Magic/Products/Singles/Time-Spiral/Mirri-s-Guile?language=1">Mirri's Guile</a>
+        <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-echo="//static.cardmarket.com/items/9/265854/mirris-guile.jpg" />
+        <span data-bs-original-title="Near Mint"></span>
+        <span class="item-count small">3</span>
+        <span>0,45 €</span>
+      </div>
+
+      <!-- The other image host, a foil, and a tooltip that has not been
+           initialised yet so the fact is still in title. -->
+      <div id="stockRow222222">
+        <a href="/en/Magic/Products/Singles/Zendikar/Sorcerous-Spyglass-V2?language=1">Sorcerous Spyglass</a>
+        <img src="https://product-images.s3.cardmarket.com/51/ZEN/300001/sorcerous-spyglass.jpg" />
+        <span title="Excellent"></span>
+        <span title="Foil"></span>
+        <span class="item-count small">1</span>
+      </div>
+
+      <!-- Signed: not the printing the catalog knows, so it is dropped. -->
+      <div id="stockRow333333">
+        <a href="/en/Magic/Products/Singles/Revised/Black-Lotus?language=1">Black Lotus</a>
+        <span data-bs-original-title="Near Mint"></span>
+        <span data-bs-original-title="Signed"></span>
+        <span class="item-count small">1</span>
+      </div>
+
+      <!-- The same offer drawn twice: counted once. -->
+      <div id="stockRow111111">
+        <a href="/en/Magic/Products/Singles/Time-Spiral/Mirri-s-Guile?language=1">Mirri's Guile</a>
+        <span data-bs-original-title="Near Mint"></span>
+        <span class="item-count small">3</span>
+      </div>
+
+      <!-- No product link: nothing to name, so nothing is claimed. -->
+      <div id="stockRow444444">
+        <span data-bs-original-title="Near Mint"></span>
+      </div>
+
+      <!-- No quantity shown, and no image: quantity falls back to 1 and the
+           row still carries its name, with an empty id. -->
+      <div id="stockRow555555">
+        <a href="/en/Pokemon/Products/Singles/Base-Set/Charizard">Charizard</a>
+        <span data-bs-original-title="Played"></span>
+      </div>
+    </div>
+
+    <script src="../src/parse.js"></script>
+    <script src="../src/csv.js"></script>
+    <script>
+      (function () {
+        var lines = [];
+        var failures = 0;
+
+        function check(name, got, want) {
+          var ok = String(got) === String(want);
+          if (!ok) {
+            failures++;
+          }
+          lines.push(
+            (ok ? "PASS  " : "FAIL  ") +
+              name +
+              (ok ? "" : "\n        got  " + JSON.stringify(got) +
+                          "\n        want " + JSON.stringify(want))
+          );
+        }
+
+        var fixture = document.getElementById("fixture");
+        var offers = MKM.parseOffers(fixture, "");
+        var byID = {};
+        offers.forEach(function (o) {
+          byID[o.articleID] = o;
+        });
+
+        check("rows counted", MKM.countRows(fixture), 6);
+        // 6 rows, less the signed one, the repeat and the one naming no product.
+        check("offers kept", offers.length, 3);
+
+        check("signed row dropped", byID["333333"] === undefined, true);
+        check("linkless row dropped", byID["444444"] === undefined, true);
+
+        var a = byID["111111"];
+        check("apostrophe restored", a.cardName, "Mirri's Guile");
+        check("edition dashes", a.edition, "Time Spiral");
+        check("condition mapped", a.condition, "NM");
+        check("not foil", a.foil, "");
+        check("quantity read", a.quantity, "3");
+        check("id from lazy attribute", a.mcmID, "265854");
+
+        var b = byID["222222"];
+        check("version suffix stripped", b.cardName, "Sorcerous Spyglass");
+        check("condition from title", b.condition, "SP");
+        check("foil from title", b.foil, "foil");
+        check("id from s3 host", b.mcmID, "300001");
+
+        var c = byID["555555"];
+        check("quantity defaults", c.quantity, "1");
+        check("missing id is empty", c.mcmID, "");
+        check("condition mapped", c.condition, "HP");
+
+        // The language filter keeps only the language asked for, and a row
+        // naming none is left alone rather than guessed at.
+        check("language filter", MKM.parseOffers(fixture, "7").length, 1);
+
+        // CSV shape and quoting, checked directly so it does not depend on
+        // what the fixture happens to contain.
+        var header = MKM.csvColumns().join(",");
+        check(
+          "header",
+          header,
+          "mcm_id,card_name,edition,condition,foil,quantity,article_id"
+        );
+        var csv = MKM.toCSV([
+          {
+            mcmID: "1",
+            cardName: 'Bob, the "Builder"',
+            edition: "Set\nTwo",
+            condition: "NM",
+            foil: "",
+            quantity: "2",
+            articleID: "9",
+          },
+        ]);
+        check(
+          "quoting",
+          csv.split("\r\n")[1],
+          '1,"Bob, the ""Builder""","Set\nTwo",NM,,2,9'
+        );
+        check("trailing newline", csv.slice(-2), "\r\n");
+
+        lines.push("");
+        lines.push(failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
+        document.getElementById("out").textContent = lines.join("\n");
+      })();
+    </script>
+  </body>
+</html>
