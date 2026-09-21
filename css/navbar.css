@@ -10,12 +10,14 @@
        so the two are no longer the same number. */
     --nav2-height: 56px;
     --nav2-scope-height: 38px;
+    --nav2-border-height: 1px;
+    --nav-height: calc(var(--nav2-height) + var(--nav2-border-height));
 }
 
 /* One variable moves the sidebar, the result headers and the cover band
    together, the same lever body.modal-embed pulls the other way. */
 body.has-scope {
-    --nav-height: calc(var(--nav2-height) + var(--nav2-scope-height));
+    --nav-height: calc(var(--nav2-height) + var(--nav2-scope-height) + var(--nav2-border-height));
 }
 
 .navbar-v2 {
@@ -23,6 +25,7 @@ body.has-scope {
     /* The whole of the fixed chrome, which is the bar plus the pinned
        filter row when that is open - hence --nav-height rather than the
        bar's own --nav2-height. */
+    box-sizing: border-box;
     height: var(--nav-height);
     background: var(--navbackground);
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
@@ -655,6 +658,7 @@ body.light-theme .navbar-v2[data-tier="modern"] {
 
 .nav2-scope {
     display: none;
+    box-sizing: border-box;
     width: 100%;
     height: var(--nav2-scope-height);
     border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
