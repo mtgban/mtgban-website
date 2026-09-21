@@ -146,6 +146,14 @@ func PartitionEntries(entries []Entry, sealedIDs []string) (singles, sealed, not
 
 // MergeIdenticalEntries collapses rows with the same card and condition into
 // one entry, accumulating quantities.
+//
+// The variant is part of what makes two rows the same row. A uuid is not
+// always fine enough to tell two listings apart - Cardmarket sells "Kevin -
+// Flightless Bird (V.1)" and "(V.2)" as separate products, and both match
+// the one printing - so rows naming different variants are kept apart even
+// where they resolve alike. Collapsing them would throw away the only thing
+// the person wrote that said they were not the same card, and take one of
+// the two prices with it.
 func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 	var uploadedDataClean []Entry
 	duplicatedHashes := map[string]bool{}
@@ -160,7 +168,8 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 		// Use id + condition to mimic a "sku", and the product it came out of
 		// where there is one: two precons holding the same staple hold one
 		// each, and a view that reads a box at a time has to say so in both.
-		sku := uploadedData[i].CardID + uploadedData[i].OriginalCondition + uploadedData[i].UnpackedFrom
+		sku := uploadedData[i].CardID + uploadedData[i].OriginalCondition +
+			uploadedData[i].UnpackedFrom + uploadedData[i].Card.Variation
 
 		if duplicatedHashes[sku] {
 			qty := 1
@@ -172,7 +181,8 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 			for j := range uploadedDataClean {
 				if uploadedData[i].CardID == uploadedDataClean[j].CardID &&
 					uploadedData[i].OriginalCondition == uploadedDataClean[j].OriginalCondition &&
-					uploadedData[i].UnpackedFrom == uploadedDataClean[j].UnpackedFrom {
+					uploadedData[i].UnpackedFrom == uploadedDataClean[j].UnpackedFrom &&
+					uploadedData[i].Card.Variation == uploadedDataClean[j].Card.Variation {
 					if uploadedDataClean[j].Quantity == 0 {
 						uploadedDataClean[j].Quantity++
 					}

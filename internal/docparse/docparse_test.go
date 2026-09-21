@@ -158,3 +158,63 @@ func TestParseRowInfersConditionFromSKU(t *testing.T) {
 		})
 	}
 }
+
+// TestMergeKeepsVariantsApart pins that two rows naming different variants
+// stay two rows. Cardmarket sells a card's alternate printings as separate
+// products and tells them apart with a "(V.n)" index; the matcher resolves
+// both to the one printing it knows, so the uuid alone cannot say they are
+// different listings. The variant can, and it is the only thing the person
+// wrote that does.
+func TestMergeKeepsVariantsApart(t *testing.T) {
+	entry := func(id, variation, cond string, qty int) Entry {
+		e := Entry{CardID: id, OriginalCondition: cond, Quantity: qty, HasQuantity: true}
+		e.Card.Name = "Kevin - Flightless Bird"
+		e.Card.Variation = variation
+		return e
+	}
+
+	for _, tt := range []struct {
+		desc  string
+		in    []Entry
+		want  int
+		wantQ []int
+	}{
+		{
+			"two versions of one printing stay apart",
+			[]Entry{entry("3059", "V.1", "NM", 1), entry("3059", "V.2", "NM", 1)},
+			2, []int{1, 1},
+		},
+		{
+			"the same version still merges",
+			[]Entry{entry("3059", "V.1", "NM", 1), entry("3059", "V.1", "NM", 2)},
+			1, []int{3},
+		},
+		{
+			"a variant against none is still two rows",
+			[]Entry{entry("3059", "", "NM", 1), entry("3059", "V.2", "NM", 1)},
+			2, []int{1, 1},
+		},
+		{
+			"condition still separates as it did",
+			[]Entry{entry("3059", "V.1", "NM", 1), entry("3059", "V.1", "SP", 1)},
+			2, []int{1, 1},
+		},
+		{
+			"rows with no card are all preserved",
+			[]Entry{entry("", "", "NM", 1), entry("", "", "NM", 1)},
+			2, []int{1, 1},
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := MergeIdenticalEntries(tt.in)
+			if len(got) != tt.want {
+				t.Fatalf("got %d entries, want %d: %+v", len(got), tt.want, got)
+			}
+			for i, q := range tt.wantQ {
+				if got[i].Quantity != q {
+					t.Errorf("entry %d quantity = %d, want %d", i, got[i].Quantity, q)
+				}
+			}
+		})
+	}
+}
