@@ -49,17 +49,28 @@
 
 
 /* ═══ Layout: sidebar + main ═══ */
+.page-content:has(.search-layout) {
+    min-height: 0;
+}
+
 .search-layout {
     display: grid;
     grid-template-columns: 340px 1fr;
     gap: 0;
-    min-height: calc(100vh - var(--nav-height, 40px));
-    margin-top: -40px;
+    min-height: 0;
+    margin-top: calc(-1 * var(--content-padding-slack));
     max-width: var(--page-max-width);
     margin-left: auto;
     margin-right: auto;
     padding-left: 16px;
     padding-right: 16px;
+}
+
+@media (min-width: 901px) {
+    .search-layout {
+        grid-template-columns: 340px 1fr;
+    }
+    .search-results { grid-column: 2; }
 }
 
 
@@ -219,8 +230,9 @@
     border-radius: 2px;
 }
 
-.sidebar-img-wrap {
+.search-sidebar .sidebar-img-wrap {
     position: relative;
+    display: block;
     /* A fixed flex child of the sidebar column now, above the scrolling body.
        Shrink-wrapped so the foil ::after overlay hugs the image exactly even
        when the height cap makes it narrower than the column. */
@@ -249,6 +261,84 @@
     display: block;
     background: var(--search-surface-2);
 }
+
+@media (min-width: 901px) {
+    /* Keep the sidebar independent from the result list. Its lower section
+       scrolls inside this column, so Available in and export/upload remain
+       part of the sidebar without affecting the document footer. */
+    .search-sidebar {
+        position: fixed;
+        /* Keep the sidebar in a bounded viewport rectangle. The shared
+           navbar token accounts for the pinned row without a second sticky
+           positioning layer that can re-anchor in Firefox. */
+        --search-sidebar-top: calc(var(--nav-height, 48px) + var(--content-padding-slack, 27px));
+        top: var(--search-sidebar-top);
+        left: calc((100vw - min(80vw, 1600px)) / 2);
+        width: 340px;
+        box-sizing: border-box;
+        height: calc(100dvh - var(--search-sidebar-top));
+        min-height: 0;
+        max-height: none;
+        z-index: 10;
+        overflow: hidden;
+    }
+
+    .sidebar-pinned {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        position: static;
+        background: var(--background);
+        overflow: hidden;
+    }
+
+    .sidebar-pinned .sidebar-search,
+    .sidebar-pinned .sidebar-printings {
+        flex: 0 0 auto;
+    }
+
+    /* The whole sidebar is fixed. A second sticky layer here makes Firefox
+       re-anchor SORT against the fixed container when the document reaches
+       its end, which can pull the controls under the navbar. */
+    .sidebar-pinned .sidebar-search {
+        position: static;
+        top: auto;
+    }
+
+    .sidebar-pinned .sidebar-img-wrap {
+        display: flex;
+        flex: 1 1 auto;
+        align-items: center;
+        justify-content: center;
+        min-height: 120px;
+        width: auto;
+    }
+
+    .sidebar-pinned .sidebar-card-img {
+        max-height: 100%;
+    }
+
+    .sidebar-body {
+        /* Yield the lower sidebar to the pinned controls first. The large
+           shrink factor keeps SORT and the card visible; only once this
+           section has collapsed does the image begin to shrink. */
+        flex: 100 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* The fixed sidebar reaches the viewport bottom while the document
+       footer is in normal flow. Paint the footer above the sidebar at the
+       end of the page so its disclosure remains readable. */
+    body:has(.search-layout) .site-footer {
+        position: relative;
+        z-index: 20;
+        background: var(--background);
+    }
+}
+
 .sidebar-printings {
     font-size: var(--text-base);
     color: var(--activetext);
@@ -718,7 +808,7 @@
     font-size: var(--text-md);
     color: var(--search-text-dim);
     font-style: italic;
-    line-height: 1;
+    line-height: normal;
 }
 /* A promo type inside the variant text links to the search that finds every
    other printing carrying it - styled as the surrounding text rather than a
@@ -1598,7 +1688,9 @@ body.modal-embed .cp-overlay {
         z-index: 150;
         background: var(--background);
     }
-    .search-sidebar > *:not(.sidebar-search) { display: none; }
+    .search-results { grid-column: auto; }
+    .search-sidebar > *:not(.sidebar-pinned):not(.sidebar-search) { display: none; }
+    .sidebar-pinned > *:not(.sidebar-search) { display: none; }
     /* Sidebar preview is gone here, so surface a per-card image button. */
     .qi-view-image { display: inline-flex; }
     .result-body { grid-template-columns: 1fr; }
