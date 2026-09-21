@@ -1,7 +1,7 @@
 /* The button sits above the page and styles itself completely, since it
    inherits whatever Cardmarket's own CSS leaves lying around otherwise. */
 
-#mtgban-mkm-export {
+#ban-mkm-export {
   position: fixed;
   right: 16px;
   bottom: 16px;
@@ -28,34 +28,34 @@
   cursor: pointer;
 }
 
-#mtgban-mkm-export:hover {
+#ban-mkm-export:hover {
   background: #26406a;
 }
 
-#mtgban-mkm-export:focus-visible {
+#ban-mkm-export:focus-visible {
   outline: 2px solid #8ab4f8;
   outline-offset: 2px;
 }
 
-#mtgban-mkm-export[hidden] {
+#ban-mkm-export[hidden] {
   display: none;
 }
 
-#mtgban-mkm-export .mtgban-label {
+#ban-mkm-export .ban-label {
   font-weight: 600;
 }
 
-#mtgban-mkm-export .mtgban-note:empty {
+#ban-mkm-export .ban-note:empty {
   display: none;
 }
 
-#mtgban-mkm-export .mtgban-note {
+#ban-mkm-export .ban-note {
   opacity: 0.8;
   font-size: 12px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  #mtgban-mkm-export {
+  #ban-mkm-export {
     transition: background 120ms ease;
   }
 }

@@ -1,4 +1,4 @@
-# MTGBAN Cardmarket Export
+# BAN Cardmarket Export
 
 A browser extension that reads the offers listed on a Cardmarket page and
 writes them out as a CSV the site's `/upload` page can read.
@@ -33,7 +33,7 @@ back to matching on `card_name` and `edition`, so the row still lands.
 there so a row can be traced back to the listing it came from.
 
 **There is no price column, deliberately.** The upload compares a price it is
-given against mtgban's own, which are dollars, and every price on Cardmarket is
+given against BAN's own, which are dollars, and every price on Cardmarket is
 euros. A price column here would be read as the currency it is not, and a
 valuation wrong by an exchange rate is worse than one the site works out for
 itself.
@@ -91,6 +91,11 @@ python3 -m http.server 8731 --directory extension
 
 then open `http://localhost:8731/test/run.html`. It prints a line per check and
 `ALL CHECKS PASSED` at the end.
+
+`test/demo.html`, served the same way, lays the same rows out at document level
+and loads the real content script, so the button on it is the one the extension
+injects. It is the quickest way to see the button and the file it produces
+without installing anything.
 
 The other half of the contract — that the CSV above is read the way it is meant
 to be — is pinned on the Go side, in `internal/docparse`.

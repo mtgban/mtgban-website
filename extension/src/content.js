@@ -8,7 +8,7 @@
 (function (MKM) {
   "use strict";
 
-  var BUTTON_ID = "mtgban-mkm-export";
+  var BUTTON_ID = "ban-mkm-export";
 
   // The page path names the game: /<language>/<Game>/... for every game
   // Cardmarket sells.
@@ -40,7 +40,7 @@
   }
 
   function say(button, message) {
-    var note = button.querySelector(".mtgban-note");
+    var note = button.querySelector(".ban-note");
     if (note) {
       note.textContent = message;
     }
@@ -78,9 +78,9 @@
 
   function label(button) {
     var count = MKM.countRows(document);
-    var text = button.querySelector(".mtgban-label");
+    var text = button.querySelector(".ban-label");
     if (text) {
-      text.textContent = "Export " + count + " to MTGBAN";
+      text.textContent = "Export " + count + " to BAN";
     }
     button.hidden = count === 0;
   }
@@ -94,7 +94,7 @@
     button.id = BUTTON_ID;
     button.type = "button";
     button.innerHTML =
-      '<span class="mtgban-label"></span><span class="mtgban-note"></span>';
+      '<span class="ban-label"></span><span class="ban-note"></span>';
     button.addEventListener("click", function () {
       exportOffers(button);
     });

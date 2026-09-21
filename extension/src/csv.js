@@ -8,7 +8,7 @@
 // from, and the matcher ignores it.
 //
 // There is no price column. The upload compares a price it is given against
-// mtgban's own, which are dollars, and every price on Cardmarket is euros: a
+// BAN's own, which are dollars, and every price on Cardmarket is euros: a
 // column here would be read as the currency it is not, and a valuation that
 // is wrong by an exchange rate is worse than one the site works out itself.
 

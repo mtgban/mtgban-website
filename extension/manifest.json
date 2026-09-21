@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "MTGBAN Cardmarket Export",
+  "name": "BAN Cardmarket Export",
   "version": "0.1.0",
-  "description": "Export the offers on a Cardmarket page as a CSV for upload to MTGBAN.",
+  "description": "Export the offers on a Cardmarket page as a CSV for upload to BAN.",
 
   "browser_specific_settings": {
     "gecko": {

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>BAN export button demo</title>
+    <link rel="stylesheet" href="../src/content.css" />
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 40rem; }
+      .row { border-bottom: 1px solid #ddd; padding: .5rem 0; }
+      code { background: #f2f2f2; padding: 0 .25rem; }
+    </style>
+  </head>
+  <body>
+    <h1>BAN export button demo</h1>
+    <p>
+      The same rows <code>test/run.html</code> checks, but laid out at document
+      level and driven by the real content script — so the button below is the
+      one the extension injects on Cardmarket. Click it to download the CSV.
+      Nothing here needs the extension installed.
+    </p>
+
+    <!-- Stand-ins for the offers a Cardmarket page lists. -->
+    <div class="row" id="stockRow111111">
+      <a href="/en/Magic/Products/Singles/Time-Spiral/Mirri-s-Guile?language=1">Mirri's Guile</a>
+      <img alt="" width="1" height="1" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-echo="//static.cardmarket.com/items/9/265854/mirris-guile.jpg" />
+      <span data-bs-original-title="Near Mint">NM</span>
+      <span class="item-count small">3</span>
+    </div>
+
+    <div class="row" id="stockRow222222">
+      <a href="/en/Magic/Products/Singles/Zendikar/Sorcerous-Spyglass-V2?language=1">Sorcerous Spyglass</a>
+      <img alt="" width="1" height="1" src="https://product-images.s3.cardmarket.com/51/ZEN/300001/sorcerous-spyglass.jpg" />
+      <span title="Excellent">EX</span>
+      <span title="Foil">Foil</span>
+      <span class="item-count small">1</span>
+    </div>
+
+    <div class="row" id="stockRow333333">
+      <a href="/en/Magic/Products/Singles/Revised/Black-Lotus?language=1">Black Lotus</a>
+      <span data-bs-original-title="Near Mint">NM</span>
+      <span data-bs-original-title="Signed">Signed — skipped</span>
+      <span class="item-count small">1</span>
+    </div>
+
+    <div class="row" id="stockRow555555">
+      <a href="/en/Pokemon/Products/Singles/Base-Set/Charizard">Charizard</a>
+      <span data-bs-original-title="Played">PL</span>
+      <em>— no product id, so the upload falls back to name + edition</em>
+    </div>
+
+    <script src="../src/parse.js"></script>
+    <script src="../src/csv.js"></script>
+    <script src="../src/content.js"></script>
+  </body>
+</html>
