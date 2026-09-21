@@ -39,6 +39,7 @@ var screenerWindows = []ScreenerWindow{
 	{7, "7 days"},
 	{14, "14 days"},
 	{30, "30 days"},
+	{60, "60 days"},
 	{90, "90 days"},
 	{180, "6 months"},
 	{365, "1 year"},
