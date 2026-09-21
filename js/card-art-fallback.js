@@ -28,13 +28,23 @@ var CARD_ART_SELECTOR = '#cardImage, #cardImageModalImg, #m-drawer-img, .hoverIm
 var CARD_ART_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 window.cardArtPlaceholder = CARD_ART_PLACEHOLDER;
 
+// data-game is server-rendered - see the "game" template function, which
+// hands back Config.Game verbatim - never user input. Validated against the
+// slug shape every registered game actually uses anyway, so building a path
+// from it can never carry a scheme, host, or traversal sequence, whatever
+// reads the attribute next.
+var GAME_SLUG_RE = /^[a-z0-9]+$/;
+function cardBackForGame() {
+    var game = document.body && document.body.getAttribute('data-game');
+    return game && GAME_SLUG_RE.test(game) ? '/img/backs/' + game + '.webp' : null;
+}
+
 // Reused card-art elements need a fresh fallback guard whenever their source
 // changes. Keeping this beside the error listener gives inline handlers one
 // shared way to make that transition safely.
 function setCardArtSource(img, src) {
     if (!img) return;
-    var game = document.body && document.body.getAttribute('data-game');
-    var target = src || (game ? '/img/backs/' + game + '.webp' : src);
+    var target = src || cardBackForGame();
     var hoverWrap = img.closest && img.closest('.hoverWrap');
     var showHover = function () {
         if (hoverWrap) {
@@ -85,9 +95,9 @@ document.addEventListener('error', function (e) {
     // base-mobile.html both set it); mirrors what the card_back template
     // function computes server-side, so a page needs neither to call it nor
     // to thread the value through to script-generated images.
-    var game = document.body.getAttribute('data-game');
-    if (!game) {
+    var back = cardBackForGame();
+    if (!back) {
         return;
     }
-    img.src = '/img/backs/' + game + '.webp';
+    img.src = back;
 }, true);
