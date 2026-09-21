@@ -12,7 +12,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['welcome', 'intro', 'overview', 'start', 'getting started', 'about', 'mtgban', 'ban'],
             content: {
-                description: '<p>MTG<span class="ban">BAN</span> aggregates retail and buylist prices for Magic: The Gathering singles and sealed products across dozens of vendors. Everything on the site is built around two things: a flexible search syntax, and a keyboard-driven command palette that composes that syntax for you.</p><p>The three things you can reach from anywhere:</p><ul><li><strong>Search</strong> - find prices for a card or sealed product, filter by set, rarity, finish, condition, store, region, or price thresholds. Results split into retail and buylist, with condition breakdowns and index references from aggregators like TCGplayer.</li><li><strong>The Command Palette</strong> - <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> from any page (or <kbd>/</kbd> when no input is focused) opens a single surface for searching cards, composing filter queries with guided chips, jumping to pages, recalling saved commands, browsing sealed products, and uploading collections.</li><li><strong>Tools</strong> - Newspaper for daily market movement, Sleepers for undervalued cards, Arbitrage for retail/buylist gaps, and Upload &amp; Optimize for splitting a collection across buylists.</li></ul><p>The rest of this guide is organized by tab:</p><ul><li><strong>Overview</strong> (you are here) - the palette at a glance, then a tour of the tools available on your account, then power-user tips.</li><li><strong>Command Palette</strong> - chips, modes, multi-stage navigation, saved commands, walkthroughs, and the full keyboard cheatsheet.</li><li><strong>Syntax</strong> - reference for every search prefix.</li><li><strong>F.A.Q.</strong> - common questions.</li></ul>',
+                description: '<p>MTG<span class="ban">BAN</span> aggregates retail and buylist prices for Magic: The Gathering singles and sealed products across dozens of vendors. Everything on the site is built around two things: a flexible search syntax, and a keyboard-driven command palette that composes that syntax for you.</p><p>The three things you can reach from anywhere:</p><ul><li><strong>Search</strong> - find prices for a card or sealed product, filter by set, rarity, finish, condition, store, region, or price thresholds. Results split into retail and buylist, with condition breakdowns and index references from aggregators like TCGplayer.</li><li><strong>The Command Palette</strong> - <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> from any page (or <kbd>/</kbd> when no input is focused) opens a single surface for searching cards, composing filter queries with guided chips, jumping to pages, recalling saved commands, browsing sealed products, and uploading collections.</li><li><strong>Tools</strong> - Newspaper for daily market movement, Sleepers for undervalued cards, Arbitrage for retail/buylist gaps, and Upload &amp; Optimize for splitting a collection across buylists.</li></ul><p>The rest of this guide is organized by tab:</p><ul><li><strong>Overview</strong> (you are here) - the palette at a glance, then a tour of the tools available on your account, then power-user tips.</li><li><strong>Command Palette</strong> - chips, modes, multi-stage navigation, saved commands, walkthroughs, and the full keyboard cheatsheet.</li><li><strong>Syntax</strong> - reference for every search prefix.</li><li><strong>API</strong> - keys, endpoints, query options, and the response format of the price data API.</li><li><strong>F.A.Q.</strong> - common questions.</li></ul>',
                 table: [],
                 examples: []
             }
@@ -1187,6 +1187,120 @@ window.__BAN_GUIDE = {
                 examples: [
                     { query: 'is:reserved price>50', desc: 'Expensive reserved list cards' }
                 ]
+            }
+        },
+
+        // API
+        {
+            id: 'api-getting-started',
+            category: 'API',
+            title: 'Getting a Key',
+            icon: 'key-round',
+            summary: 'Where keys come from, the gateway URL, and how to authenticate',
+            snippets: ['Authorization: Bearer mtgban_live_...', 'https://api.mtgban.com/v1/{game}/mtgban/'],
+            keywords: ['api', 'key', 'token', 'bearer', 'gateway', 'authentication', 'auth', 'plans', 'account', 'price api', 'json', 'curl'],
+            content: {
+                description: '<p>The price API returns the same retail and buylist data the site is built on, as JSON or CSV. Access is sold per package on the <a href="/api-plans">plans page</a>. Keys are created on the <a href="https://api.mtgban.com/account">account page</a> and shown once; create another if you lose one.</p><p>Every request goes through the gateway at <code>https://api.mtgban.com/v1/{game}/mtgban/&hellip;</code>, where <code>{game}</code> is one of the games on your plan, such as <code>magic</code> or <code>pokemon</code>. <code>https://api.mtgban.com/v1/games.json</code> lists the games the gateway serves. One key covers every game on the plan.</p><p>Send the key as a bearer token. A <code>key</code> query parameter is also accepted for spreadsheet tools that cannot set headers, but it ends up in logs and browser history, so prefer the header.</p><pre><code>curl -H "Authorization: Bearer mtgban_live_..." \\\n  https://api.mtgban.com/v1/magic/mtgban/retail/ZEN.json</code></pre><p>Responses are gzip-compressed JSON over HTTPS only. Links issued before the gateway with a <code>sig</code> parameter keep working directly on the game sites.</p>',
+                table: [],
+                examples: []
+            }
+        },
+
+        {
+            id: 'api-endpoints',
+            category: 'API',
+            title: 'Endpoints',
+            icon: 'route',
+            summary: 'Sets, stores, edition snapshots, sealed, single cards, and search',
+            snippets: ['retail/ZEN.json', 'buylist/10E.csv', 'sealed/ROE.json', 'sets.json', 'stores.json'],
+            keywords: ['api', 'endpoint', 'retail', 'buylist', 'sealed', 'sets', 'stores', 'edition', 'snapshot', 'single card', 'csv', 'search'],
+            content: {
+                description: '<p>Paths are relative to <code>https://api.mtgban.com/v1/{game}/mtgban/</code>. Only <code>GET</code> is accepted. Every endpoint returns JSON; replace <code>.json</code> with <code>.csv</code> for a human-readable CSV that leaves out the fields a flat file cannot hold. Editions use <a href="https://scryfall.com/sets" target="_blank" rel="noopener">Scryfall set codes</a>.</p>',
+                table: [
+                    { value: 'sets.json', short: 'Set codes with data. filter=sealed or filter=singles narrows the list.' },
+                    { value: 'stores.json', short: 'Store tags used as keys in price objects, in a stable order. filter=sealed or filter=singles narrows it; tag=names returns full store names instead.' },
+                    { value: 'retail/{SET}.json', short: 'Retail prices for one edition. buylist/{SET}.json for buylist, all/{SET}.json for both.' },
+                    { value: 'sealed/{SET}.json', short: 'Sealed product prices, retail and buylist in one call.' },
+                    { value: 'retail/{id}.json', short: 'One card, regular and foil prices. The id can be an MTGBAN id, MTGJSON UUID, Scryfall id, or TCGplayer product id. buylist/{id}.json for buylist.' },
+                    { value: 'search/retail/{query}.json', short: 'Prices for every card matching a search, using the same syntax as the site (see the Syntax tab). Also search/buylist and search/sealed.' },
+                    { value: 'retail.json', short: 'Full snapshot, JSON only, deprecated. Query editions instead.' }
+                ],
+                examples: [
+                    { query: 'retail/ZEN.json', desc: 'Zendikar retail prices', palette: true },
+                    { query: 'buylist/10E.csv', desc: 'Tenth Edition buylist as CSV', palette: true },
+                    { query: 'sets.json?filter=sealed', desc: 'Sets that have sealed data', palette: true },
+                    { query: 'stores.json?tag=names', desc: 'Full store names in tag order', palette: true },
+                    { query: 'retail/7da23b15-dfb8-4267-9b33-d7a4c035c434.json', desc: 'One card by MTGBAN id', palette: true },
+                    { query: 'search/retail/Sol Ring s:CMR.json', desc: 'Every Commander Legends Sol Ring', palette: true }
+                ]
+            }
+        },
+
+        {
+            id: 'api-options',
+            category: 'API',
+            title: 'Query Options',
+            icon: 'sliders-horizontal',
+            summary: 'Output ids, quantities, conditions, single vendors, finish, and store names',
+            snippets: ['id=tcg', 'qty=true', 'conds=true', 'vendor=CK', 'finish=foil', 'tag=names'],
+            keywords: ['api', 'query', 'parameter', 'option', 'id', 'tcg', 'scryfall', 'mtgjson', 'quantity', 'qty', 'conditions', 'conds', 'vendor', 'finish', 'tag', 'filter', 'scope'],
+            content: {
+                description: '<p>Options are query parameters and can be combined. Quantities and per-condition prices are only exported by some stores; buylists usually report the NM price only.</p>',
+                table: [
+                    { value: 'id=tcg', short: 'Key card objects by another id system: tcg (TCGplayer product id), scryfall, mtgjson, mkm (Cardmarket), ck (Card Kingdom), or mtgban (the default). ck and mtgban list foil and regular under separate ids.' },
+                    { value: 'qty=true', short: 'Add qty, qty_foil, and qty_etched to price objects. Retail: stock across all conditions. Buylist: the amount the store wants.' },
+                    { value: 'conds=true', short: 'Add a conditions dictionary with a price per condition (NM, SP, MP, HP, PO, with _foil and _etched variants). With qty=true a quantities dictionary is added too.' },
+                    { value: 'vendor=CK,SCG', short: 'Limit the response to the listed store tags. Condition prices are always included.' },
+                    { value: 'finish=foil', short: 'Keep one finish only: foil, nonfoil, or etched.' },
+                    { value: 'tag=names', short: 'Use full store names as keys instead of tags. stores.json?tag=names gives the mapping.' },
+                    { value: 'filter=sealed', short: 'On sets.json and stores.json, keep only entries with sealed data; filter=singles keeps singles.' },
+                    { value: 'scope=', short: 'On search endpoints, the same scope filters as the search page.' }
+                ],
+                examples: [
+                    { query: 'retail/ZEN.json?id=tcg&qty=true', desc: 'Zendikar retail keyed by TCGplayer id, with stock', palette: true },
+                    { query: 'buylist/7da23b15-dfb8-4267-9b33-d7a4c035c434.json?conds=true', desc: 'One card with a buylist price per condition', palette: true },
+                    { query: 'retail/MH3.json?vendor=CK&finish=foil', desc: 'Card Kingdom foils from Modern Horizons 3', palette: true }
+                ]
+            }
+        },
+
+        {
+            id: 'api-response',
+            category: 'API',
+            title: 'Response Format',
+            icon: 'braces',
+            summary: 'The JSON shape, price objects, and the store redirect',
+            snippets: ['meta.base_url', 'retail.{id}.{store}.regular', 'conditions.NM'],
+            keywords: ['api', 'response', 'json', 'format', 'schema', 'meta', 'regular', 'foil', 'etched', 'cond', 'conditions', 'quantities', 'redirect', 'base_url', 'openapi'],
+            content: {
+                description: '<p>A response has an <code>error</code> string, a <code>meta</code> object with the request <code>date</code>, the API <code>version</code>, and a <code>base_url</code>, then <code>retail</code> and <code>buylist</code> dictionaries. Each is keyed by card id, then by store tag, and holds a price object. Prices are USD floats and are the best available price at that store; <code>cond</code> is the condition of that price. Missing stores, cards, and prices are simply absent. Always check <code>error</code>, since a request can succeed with a message in it.</p><pre><code>{\n  "error": "",\n  "meta": { "date": "...", "version": "...", "base_url": "https://www.mtgban.com/go/" },\n  "retail": {\n    "&lt;card id&gt;": {\n      "CK":  { "regular": 12.99, "foil": 39.99, "cond": "NM" },\n      "SCG": { "regular": 11.50, "qty": 4,\n               "conditions": { "NM": 11.50, "SP": 9.75 },\n               "quantities": { "NM": 3, "SP": 1 } }\n    }\n  },\n  "buylist": {}\n}</code></pre><p>Price objects carry <code>regular</code>, <code>foil</code>, and <code>etched</code> as the card and the id system allow, plus the optional <code>qty</code>, <code>conditions</code>, and <code>quantities</code> fields described under Query Options.</p><p><strong>Store redirect:</strong> <code>base_url</code> + store tag + card id opens that store&rsquo;s page for the card, for example <code>https://www.mtgban.com/go/CK/7da23b15-dfb8-4267-9b33-d7a4c035c434</code>. Any of the supported id systems works. The redirect is free to use.</p><p>An OpenAPI description of the response lives on the <a href="https://github.com/mtgban/mtgban-website/wiki/Open-API-Specification" target="_blank" rel="noopener">project wiki</a>.</p>',
+                table: [],
+                examples: []
+            }
+        },
+
+        {
+            id: 'api-errors',
+            category: 'API',
+            title: 'Errors and Limits',
+            icon: 'shield-alert',
+            summary: 'Status codes, the JSON error field, and rate limits',
+            snippets: ['401', '403', '429', 'RateLimit-Limit'],
+            keywords: ['api', 'error', 'status', 'code', '401', '403', '429', '502', 'rate limit', 'throttle', 'retry', 'unauthorized', 'forbidden'],
+            content: {
+                description: '<p>Errors are JSON with an <code>error</code> message and, where it applies, the <code>game</code>: <code>{"error": "plan does not include game", "game": "pokemon"}</code>.</p><p>Each key may make 10 requests per second with a short burst allowance. The <code>RateLimit-Limit</code> header carries the limit; a 429 carries <code>Retry-After</code>. Successful responses include <code>X-MTGBAN-Game</code> and <code>X-MTGBAN-Account</code> headers.</p>',
+                table: [
+                    { value: '200', short: 'Success. Still check the error field in the JSON.' },
+                    { value: '401', short: 'Missing, malformed, revoked, or unknown key, or a suspended account.' },
+                    { value: '403', short: 'Key is valid but the plan lacks the game or the mode (retail, buylist, sealed). The body names which.' },
+                    { value: '404', short: 'Unknown game or path.' },
+                    { value: '405', short: 'A method other than GET.' },
+                    { value: '429', short: 'Rate limit exceeded. Wait for Retry-After seconds and make fewer concurrent requests.' },
+                    { value: '502', short: 'The game site is unreachable or answered with an error. Try again shortly.' },
+                    { value: '503', short: 'The gateway database is unavailable. Try again shortly.' },
+                    { value: '504', short: 'The game site took too long. Narrow the request or try again.' }
+                ],
+                examples: []
             }
         }
 
