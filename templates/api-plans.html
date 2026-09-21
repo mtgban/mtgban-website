@@ -10,12 +10,9 @@
     <div class="page-header">
         <div>
             <h1>Price data API</h1>
-            <p class="page-subtitle">Every store, every game, one key.</p>
         </div>
         <a class="page-action" href="{{.GatewayURL}}/account">Manage your API access</a>
     </div>
-
-    <p class="api-lead">One key covers every game on your plan. Send it as a bearer token and get the same retail, buylist, and sealed feeds the site is built on. Paths, fields, and store shorthands are in the <a href="/guide">guide</a>.</p>
 
     <section class="api-section">
         <h2>Price data</h2>
@@ -32,15 +29,6 @@
             {{end}}
         </div>
         <p class="api-note">Magic is included in every package. {{range .Products.Addons}}{{.Name}} is {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}. {{end}}</p>
-    </section>
-
-    <section class="api-section">
-        <h2>Coming soon</h2>
-        <ul class="api-soon">
-            <li><strong>Velocity data</strong> {{usd .Velocity}}/month, how fast cards sell by store and condition.</li>
-            <li><strong>Price data plus velocity</strong> {{usd .VelocityBundle}}/month, both together.</li>
-        </ul>
-        <p class="api-note">Not for sale yet. Ask on <a href="/discord">Discord</a> if you want in early.</p>
     </section>
 
     <section class="api-section">
