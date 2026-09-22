@@ -77,6 +77,99 @@
         guide.hidden = true;
     }
 
+    // The columns a handed-over card is written into, and the header they
+    // are written under. Fixed rather than built from whichever keys turn
+    // up, so the header the upload parses is the same one every time and
+    // can be pinned on the Go side - internal/docparse decides what each
+    // of these names means, and a column nobody filled is an empty cell
+    // rather than a different layout.
+    var COLUMNS = [
+        ["id", "uuid"],
+        ["name", "card_name"],
+        ["edition", "edition"],
+        ["number", "number"],
+        ["foil", "foil"],
+        ["condition", "condition"],
+        ["quantity", "quantity"],
+        ["price", "price"],
+        ["notes", "notes"],
+    ];
+
+    // A value written the way a CSV reader expects to find it. Card names
+    // carry commas and quotation marks often enough that this is not a
+    // nicety: "Tarmogoyf" with a comma in it splits into two columns and
+    // moves every field after it one to the left.
+    function field(value) {
+        if (value === undefined || value === null) {
+            return "";
+        }
+        if (value === true) {
+            return "yes";
+        }
+        if (value === false) {
+            return "no";
+        }
+        var written = String(value);
+        if (/[",\r\n]/.test(written)) {
+            return '"' + written.replace(/"/g, '""') + '"';
+        }
+        return written;
+    }
+
+    // asCSV turns the structured hand-over into the text one. A card is
+    // kept when it names something to look up - an id or a name - and
+    // dropped otherwise, because a row that identifies nothing is not a
+    // card the upload can refuse informatively, it is a blank line.
+    function asCSV(cards) {
+        var lines = [];
+        for (var i = 0; i < cards.length; i++) {
+            var card = cards[i];
+            if (!card || typeof card !== "object") {
+                continue;
+            }
+            if (field(card.id) === "" && field(card.name) === "") {
+                continue;
+            }
+            var row = [];
+            for (var c = 0; c < COLUMNS.length; c++) {
+                row.push(field(card[COLUMNS[c][0]]));
+            }
+            lines.push(row.join(","));
+        }
+        if (lines.length === 0) {
+            return null;
+        }
+        var header = [];
+        for (var h = 0; h < COLUMNS.length; h++) {
+            header.push(COLUMNS[h][1]);
+        }
+        return { text: header.join(",") + "\n" + lines.join("\n") + "\n", rows: lines.length };
+    }
+
+    // listFrom reads whichever of the two shapes a hand-over came in.
+    //
+    // Text is the older one and what the Cardmarket extension sends: a CSV
+    // or a decklist, parsed at the far end exactly as a paste would be. It
+    // arrives as "csv" or as "text"; the first name is the one already in
+    // the wild and is not going anywhere.
+    //
+    // Cards is the other: a list of objects naming a uuid, a quantity, a
+    // condition and whatever else is known, for a sender that has resolved
+    // its cards already and should not have to write a CSV by hand to say
+    // so. It is turned into the text shape here, because the upload takes
+    // text and this page is the one place that has to know both.
+    function listFrom(data) {
+        var text = typeof data.text === "string" ? data.text : data.csv;
+        if (typeof text === "string" && text.trim() !== "") {
+            var counted = typeof data.rows === "number" && data.rows > 0 ? data.rows : 0;
+            return { text: text, rows: counted };
+        }
+        if (Object.prototype.toString.call(data.cards) === "[object Array]") {
+            return asCSV(data.cards);
+        }
+        return null;
+    }
+
     // Taken once. A second message is not a second upload.
     var taken = false;
 
@@ -86,15 +179,17 @@
             allowed.indexOf(event.origin) === -1 ||
             event.source !== opener ||
             !event.data ||
-            event.data.type !== ROWS ||
-            typeof event.data.csv !== "string" ||
-            event.data.csv.trim() === ""
+            event.data.type !== ROWS
         ) {
+            return;
+        }
+        var list = listFrom(event.data);
+        if (!list) {
             return;
         }
         taken = true;
 
-        rows.value = event.data.csv;
+        rows.value = list.text;
 
         // Where the rows were read, for the results heading. Taken only
         // when it belongs to the origin that handed them over: the page it
@@ -110,11 +205,13 @@
             }
         }
 
-        // The sender knows how many cards it read; this page only sees text,
-        // and text does not say whether its first line is a header or a card.
-        // A count is shown when it is given and not counted for otherwise.
-        var count = event.data.rows;
-        if (typeof count === "number" && count > 0) {
+        // The sender knows how many cards it read; text does not say
+        // whether its first line is a header or a card, so a count is
+        // shown when it is given and not counted for otherwise. A
+        // structured hand-over counts itself: the rows are objects there,
+        // and the ones that named nothing have already been dropped.
+        var count = list.rows;
+        if (count > 0) {
             say("Pricing " + count + " row" + (count === 1 ? "" : "s") + "…");
         } else {
             say("Pricing your list…");
