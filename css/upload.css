@@ -431,6 +431,10 @@
     background: var(--accent-muted);
     color: var(--normal);
 }
+.upload-source-area.drag-rejected {
+    border-color: var(--adanger);
+    color: var(--adanger);
+}
 
 .upload-source-area label {
     cursor: pointer;
