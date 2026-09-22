@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
+	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
 )
 
@@ -880,6 +881,14 @@ func tcgSKU2UUID(sku string) string {
 	return entries[0].OriginalID
 }
 
+// mkmIDs resolves a Cardmarket product id to the card it names.
+//
+// The snapshot is handed over rather than reached for: that package holds
+// the resolving, this one holds the sellers.
+var mkmIDs = &mkmidparser.Parser{
+	Sellers: func() *[]mtgban.Seller { return sellersPtr.Load() },
+}
+
 // tcgSKU2Condition resolves a TCGplayer SKU (instance id) to the condition it
 // encodes (NM/SP/MP/HP/PO) via the same "tcgskuid" index as tcgSKU2UUID, where
 // each entry's Conditions is preserved. Returns "" if the SKU is unknown.
@@ -889,71 +898,6 @@ func tcgSKU2Condition(sku string) string {
 		return ""
 	}
 	return entries[0].Conditions
-}
-
-// mkmID2UUID resolves a Cardmarket product id to a card uuid by walking the
-// inventories the Cardmarket scrapers publish, where each entry carries the
-// product it priced in OriginalID. Returns "" if the id is unknown.
-//
-// The walk is the lookup. findOriginalID goes the other way for free because
-// an inventory is keyed by uuid; this direction has no such key, so the scan
-// is the whole of it and it runs per uploaded row rather than off an index
-// built at load time. That suits a column almost no upload carries.
-//
-// The sealed shelves are walked too. A seller's offers are not all singles,
-// and a sealed product's id is published by the sealed scraper rather than
-// the two singles indexes, so leaving it out would resolve every card on a
-// mixed page and none of the boxes.
-//
-// One product is routinely several uuids, and which ones decides whether the
-// id names a card. Cardmarket sells a printing's finishes as one product, so
-// the foil and the plain entry answer to the same id and differ only by the
-// suffix the datastore files a finish under: half of the 103,611 ids on the
-// Magic shelves are shared that way, and the upload's own foil column says
-// which finish is meant. Those agree, and the base uuid is the answer - the
-// finish is re-resolved from the flag, not from which index was read first.
-// Only a disagreement about the card itself - 1,525 ids, where the base uuids
-// differ - names nothing, and returns "" so the row falls back to its name
-// and edition.
-func mkmID2UUID(mkmID string) string {
-	if mkmID == "" {
-		return ""
-	}
-	var found string
-	for _, shorthand := range []string{"MKMTrend", "MKMLow", "MKMSealed"} {
-		inv, err := findSellerInventory(shorthand)
-		if err != nil {
-			continue
-		}
-		for uuid, entries := range inv {
-			base := baseUUID(uuid)
-			if base == found {
-				continue
-			}
-			for _, entry := range entries {
-				if entry.OriginalID != mkmID {
-					continue
-				}
-				if found != "" {
-					return ""
-				}
-				found = base
-				break
-			}
-		}
-	}
-	return found
-}
-
-// baseUUID drops the suffix the datastore files a non-default finish under,
-// so two finishes of one printing are recognised as the one card they are.
-func baseUUID(uuid string) string {
-	for _, suffix := range []string{"_f", "_e"} {
-		if strings.HasSuffix(uuid, suffix) {
-			return strings.TrimSuffix(uuid, suffix)
-		}
-	}
-	return uuid
 }
 
 // Look for the original id (product id) of a card in a given inventory

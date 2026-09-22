@@ -93,7 +93,7 @@ var uploadParser = &docparse.Parser{
 	},
 	TCGSkuToUUID:      tcgSKU2UUID,
 	TCGSkuToCondition: tcgSKU2Condition,
-	MKMIDToUUID:       mkmID2UUID,
+	MKMIDToUUID:       mkmIDs.Resolve,
 	PreferredPrinting: sortSets,
 }
 
