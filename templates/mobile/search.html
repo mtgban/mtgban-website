@@ -1172,8 +1172,11 @@ document.querySelectorAll('.m-card').forEach(function(card) {
 function openSettings() {
     loadSettings();
     document.getElementById('m-settings-overlay').classList.add('open');
-    document.getElementById('m-settings-sheet').classList.add('open');
-    lucide.createIcons({nameAttr: 'data-lucide', attrs: {}});
+    var sheet = document.getElementById('m-settings-sheet');
+    sheet.classList.add('open');
+    // Only the sheet's own icons: the default root is the whole document, and
+    // a results page carries hundreds.
+    lucide.createIcons({root: sheet});
 }
 
 function closeSettings() {

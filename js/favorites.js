@@ -403,7 +403,7 @@
         }
         container.innerHTML = html;
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
-            lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
+            lucide.createIcons({ root: container });
         }
         if (mode === 'desktop') initDragDrop(container);
     }
