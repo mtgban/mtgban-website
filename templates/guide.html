@@ -5,7 +5,6 @@
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>
     <script>window.__BAN_STORES = {{guide_stores}};</script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
 {{define "content"}}
@@ -425,11 +424,6 @@
                 target.scrollIntoView({ behavior: 'smooth' });
             }, 100);
         }
-    }
-
-    // ── Lucide init ──
-    if (window.lucide) {
-        lucide.createIcons();
     }
 
     // ── Helpers ──

@@ -66,7 +66,6 @@
     </script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     {{if .PatreonLogin}}
     <script>
         // Build the Patreon OAuth URL at click time so the current page rides
@@ -1623,7 +1622,6 @@
 {{define "extra-scripts"}}
 <script type="text/javascript" src="/js/offline/offline-images.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}"></script>
-<script>lucide.createIcons();</script>
 <script>
 (function () {
     // Card-action icons collapse into a kebab dropdown in the single-column
