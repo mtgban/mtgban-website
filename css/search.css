@@ -319,10 +319,10 @@
            giving up the least-needed information first: Available In, then
            Export/Upload - both live inside .sidebar-body, the scrollable
            lower part of this column, not as direct children of it (see
-           templates/search.html). .sidebar-pinned's own shrink weight
-           (its rule, below) is deliberately tiny next to .sidebar-body's, so
-           in practice the image doesn't give up any of its own size until
-           .sidebar-body has already given up both. */
+           templates/search.html). The image itself is sized from the window
+           alone (.sidebar-img-wrap, below) and takes no part in dividing up
+           this column, so hiding a section never changes it - what a section
+           gives up goes to what is left of .sidebar-body, not to the card. */
         container: search-sidebar-height / size;
     }
 
@@ -332,7 +332,7 @@
 
     /* Available In first - useful, but the reader came here for prices, and
        every product it names is one click from the same search anyway. */
-    @container search-sidebar-height (max-height: 600px) {
+    @container search-sidebar-height (max-height: 655px) {
         .sidebar-products-card {
             display: none;
         }
@@ -341,9 +341,9 @@
     /* Export/Upload second, once Available In giving up its room isn't
        enough on its own - these are the actions a reader is most likely
        mid-click on, so they're the last thing .sidebar-body gives up before
-       .sidebar-pinned's own shrink weight (see its rule below) starts
-       mattering. */
-    @container search-sidebar-height (max-height: 500px) {
+       the column gives up. The image does not grow when this fires - its
+       size is fixed by the window, not by the room this frees. */
+    @container search-sidebar-height (max-height: 580px) {
         .sidebar-footer {
             display: none;
         }
@@ -351,20 +351,11 @@
 
     .sidebar-pinned {
         display: flex;
-        /* No grow - this holds its own natural size rather than reclaiming
-           room .sidebar-body frees up by hiding a section. Shrink is nonzero
-           but 200x lighter than .sidebar-body's own (that rule, below): CSS
-           distributes a height deficit between flex siblings in proportion
-           to shrink-factor x size, so as long as .sidebar-body has any
-           natural size of its own left to give - Available In, then
-           Export/Upload, then whatever it always shows below those, like
-           "Show all versions" - it absorbs effectively all of any squeeze
-           first. Only once .sidebar-body is already at its own min-height:0
-           floor does the remaining deficit fall to this, and from here to
-           .sidebar-img-wrap's own shrink-then-floor below - a real, gradual
-           last resort, not a single breakpoint that could leave nothing left
-           to give if .sidebar-body's true minimum still doesn't fit. */
-        flex: 0 1 auto;
+        /* Holds its own size: neither grow nor shrink. The card image
+           inside is sized from the window (its rule, below), so there is
+           nothing here for the column's height to negotiate over -
+           .sidebar-body is the only part that gives. */
+        flex: 0 0 auto;
         flex-direction: column;
         min-height: 0;
         position: static;
@@ -387,26 +378,33 @@
 
     .sidebar-pinned .sidebar-img-wrap {
         display: flex;
-        flex: 1 1 auto;
+        /* What the card image is allowed to be, as a pure function of this
+           column - never of what .sidebar-body happens to contain. 36vh is
+           the card's size wherever the column has room for it; the cqh term
+           takes over on a shorter
+           window, where 100cqh is .search-sidebar's own height and the
+           subtraction is what sits alongside the image (the sort box, the
+           printings row, their margins) plus the one action .sidebar-body
+           always keeps. Declared here rather than on .search-sidebar
+           itself: a container query unit inside the container's own rule
+           resolves against an ancestor container, not the element that
+           declared it, so 100cqh there silently read the wrong box.
+
+           Because both terms read only the window, the image holds one size
+           for a given window on every card, and moves only when the window
+           does. */
+        --sidebar-card-img-cap: min(36vh, calc(100cqh - 180px));
+        /* Neither grow nor shrink: this box takes no part in dividing up
+           the column's height. That is the whole point - the cap above has
+           already decided the image's size from the window alone, and any
+           give here would put it back at the mercy of what .sidebar-body
+           contains, shrinking when a card has a lot to show and springing
+           back the moment a section was hidden. */
+        flex: 0 0 auto;
         align-items: center;
         justify-content: center;
-        /* An explicit height, not just a cap: flex-basis:auto reads this
-           when it's set, rather than falling back to content-based sizing.
-           Content-based sizing here means the image's own natural width
-           (this column is only 340px wide) drives its height via aspect
-           ratio, which at most viewport heights is a tighter constraint than
-           52vh - so without an explicit height, .sidebar-pinned's own
-           near-zero shrink weight (its rule, above) would hold this at a
-           near-constant, width-bound size regardless of viewport height,
-           instead of continuing to track 52vh on its own - overstating how
-           much room .sidebar-pinned actually needs, and starving
-           .sidebar-body of room it should have gotten first. */
-        height: var(--sidebar-card-img-cap, 52vh);
-        /* 60% of that same cap, kept as one token with .sidebar-card-img's
-           max-height so the two can't drift apart - a flat 120px here let a
-           short viewport (or a sidebar squeezed by a tall .sidebar-body)
-           shrink the card past the point it still reads clearly. */
-        min-height: calc(0.6 * var(--sidebar-card-img-cap, 52vh));
+        max-height: var(--sidebar-card-img-cap);
+        min-height: 0;
         width: auto;
     }
 
@@ -415,14 +413,14 @@
     }
 
     .sidebar-body {
-        /* The only item in this column with any grow: whatever's left after
-           .sidebar-pinned's own footprint is this section's. Shrink is 200x
-           .sidebar-pinned's own (that rule, above) - the number itself
-           doesn't matter, only that it's overwhelmingly larger, so this
-           absorbs a height deficit first and scrolls internally rather than
-           clip, all the way down to its own min-height:0, before
-           .sidebar-pinned gives up any of its natural size. */
-        flex: 1 200 auto;
+        /* The only part of this column that gives at all. The @container
+           rules above are sized so that what they leave visible fits beside
+           a full-size image, so normally this shows all of its content and
+           this shrink never engages; it is the residual safety for the
+           cases a height-only breakpoint can't know about, like a card
+           whose printings row wraps to a second line. Better that this
+           scrolls than that the column overflows its own bottom edge. */
+        flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
