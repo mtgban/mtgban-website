@@ -2069,9 +2069,26 @@
     //  Open / close
     // ════════════════════════════════════════════════════════════════
 
+    // A page with no icons of its own does not load lucide (see the "icons"
+    // block in the base templates), but every palette row is an icon. Fetch it
+    // on first open, the way card names are fetched below. The URL matches the
+    // one the base templates and sw.js use, so the cached copy is reused.
+    function ensureLucide() {
+        if (S.lucideRequested || typeof lucide !== 'undefined') return;
+        S.lucideRequested = true;
+        var tag = document.createElement('script');
+        tag.src = 'https://unpkg.com/lucide@latest/dist/umd/lucide.js';
+        tag.onload = function () {
+            if (typeof lucide === 'undefined' || !lucide.createIcons) return;
+            lucide.createIcons({ root: DOM.overlay });
+        };
+        document.head.appendChild(tag);
+    }
+
     function openPalette() {
         if (S.open) return;
         S.open = true;
+        ensureLucide();
         S.previousFocus = document.activeElement;
         DOM.overlay.classList.add('open');
         document.body.style.overflow = 'hidden';
