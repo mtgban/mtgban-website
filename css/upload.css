@@ -827,6 +827,12 @@
     text-decoration: underline;
 }
 
+.upload-share-link svg {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+}
+
 /* -- Results header: two-row stack -- */
 .res-header {
     display: flex;
@@ -852,6 +858,50 @@
 .res-export-btn {
     padding: 8px 18px;
     font-size: var(--text-md);
+}
+
+/* Flips the list between Retail and Buylist without re-uploading it */
+.res-mode-btn {
+    padding: 8px 18px;
+    font-size: var(--text-md);
+}
+
+.res-mode-btn svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+/* What stands in the switch's place for a reader who cannot take it */
+.res-mode-upsell {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-md);
+    color: var(--text-dim);
+}
+
+.res-mode-upsell svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+.res-mode-upsell-btn {
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(63, 185, 80, 0.25);
+    background: rgba(63, 185, 80, 0.1);
+    color: var(--asuccess);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+
+.res-mode-upsell-btn:hover {
+    background: rgba(63, 185, 80, 0.2);
+    text-decoration: none;
 }
 
 .res-summary {
