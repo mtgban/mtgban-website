@@ -98,6 +98,69 @@
             same ones that page takes.
         </p>
 
+        <h2>Handing a list over</h2>
+        <p>
+            This page announces itself to the window that opened it, then
+            waits for as long as it takes. It takes one list and no more,
+            it listens only to the window that opened it, and only to a
+            message from an allowed origin above.
+        </p>
+<pre class="handoff-example">// this page, once it is listening
+{ type: "mtgban-handoff-ready" }
+
+// the opener, in reply &mdash; either a list as text&hellip;
+{ type: "mtgban-handoff-rows",
+  text: "4 Rift Bolt\n1 Lightning Bolt (2ED) *F*\n",
+  rows: 2,
+  source: "https://www.cardmarket.com/en/Magic/Users/&hellip;" }
+
+// &hellip;or the same cards, already resolved
+{ type: "mtgban-handoff-rows",
+  cards: [
+    { id: "6f4b4e4a-&hellip;", quantity: 2, condition: "NM", foil: false },
+    { name: "Rift Bolt", edition: "TSP", number: "148", quantity: 1 }
+  ],
+  source: "https://www.cardmarket.com/en/Magic/Users/&hellip;" }</pre>
+        <p>
+            <code>text</code> is anything described below &mdash; a CSV, a
+            spreadsheet's worth of tab separated columns, a decklist. It is
+            also accepted as <code>csv</code>, which is the name the
+            Cardmarket extension has always sent and which is not going
+            anywhere.
+        </p>
+        <p>
+            <code>cards</code> is for a sender that has resolved its cards
+            already and should not have to write a CSV by hand to say so.
+            Each entry names any of the fields below; the page writes them
+            into the columns described further down, so the two shapes are
+            read by exactly the same parser at the far end.
+        </p>
+
+        <table class="handoff-fields">
+            <thead><tr><th>Field</th><th>What it says</th></tr></thead>
+            <tbody>
+                <tr><td><code>id</code></td><td>the printing's uuid, which settles it outright</td></tr>
+                <tr><td><code>name</code></td><td>the card's name, where there is no id</td></tr>
+                <tr><td><code>edition</code></td><td>the set it is in</td></tr>
+                <tr><td><code>number</code></td><td>its collector number, or another variant</td></tr>
+                <tr><td><code>foil</code></td><td><code>true</code> or <code>false</code></td></tr>
+                <tr><td><code>condition</code></td><td>a grade, in either spelling</td></tr>
+                <tr><td><code>quantity</code></td><td>how many, as a number</td></tr>
+                <tr><td><code>price</code></td><td>what they were paid for, shown beside the results</td></tr>
+                <tr><td><code>notes</code></td><td>anything to carry through; a URL here becomes a link</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            An entry naming neither an <code>id</code> nor a
+            <code>name</code> is dropped rather than sent as a blank line.
+            <code>rows</code> is how many cards are on the way, shown while
+            the upload runs; a <code>cards</code> list counts itself and
+            does not need it. <code>source</code> is the page the list was
+            read from, kept only when it belongs to the origin that sent
+            the message, and used to name the results.
+        </p>
+
         <h2>What a list looks like</h2>
         <p>
             Comma or tab separated text, with a header row naming the

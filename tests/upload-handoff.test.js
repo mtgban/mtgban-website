@@ -249,3 +249,131 @@ describe('where the rows were read', () => {
         expect(submitted).toEqual([true]);
     });
 });
+
+describe('the structured hand-over', () => {
+    // The other way to hand a list over: objects rather than text, for a
+    // sender that has resolved its cards already. The page turns them into
+    // the text shape, because that is what the upload takes.
+    const cards = (list, over = {}) => ({
+        origin: SENDER,
+        data: Object.assign({type: ROWS, cards: list}, over),
+    });
+
+    test('it writes the header the upload parses, and one line a card', () => {
+        const opener = {closed: false};
+        const {elements, submitted, deliver} = loadHandoff({opener});
+
+        deliver(Object.assign(cards([
+            {id: 'abc-123', quantity: 2, condition: 'NM', foil: false},
+            {name: 'Rift Bolt', edition: 'TSP', number: '148', quantity: 1},
+        ]), {source: opener}));
+
+        expect(elements['handoff-rows'].value).toBe(
+            'uuid,card_name,edition,number,foil,condition,quantity,price,notes\n' +
+            'abc-123,,,,no,NM,2,,\n' +
+            ',Rift Bolt,TSP,148,,,1,,\n'
+        );
+        expect(submitted).toEqual([true]);
+    });
+
+    test('it counts the cards itself', () => {
+        // Text cannot say whether its first line is a header or a card, so
+        // that shape has to be told. This one knows.
+        const opener = {closed: false};
+        const {elements, deliver} = loadHandoff({opener});
+
+        deliver(Object.assign(cards([{id: 'a'}, {id: 'b'}, {id: 'c'}]), {source: opener}));
+        expect(elements['handoff-status-text'].textContent).toBe('Pricing 3 rows…');
+    });
+
+    test('a card naming nothing to look up is dropped', () => {
+        // Neither an id nor a name is not a card the upload can refuse
+        // informatively; it is a blank line.
+        const opener = {closed: false};
+        const {elements, deliver} = loadHandoff({opener});
+
+        deliver(Object.assign(cards([
+            {quantity: 4, condition: 'NM'},
+            {name: 'Rift Bolt'},
+        ]), {source: opener}));
+
+        expect(elements['handoff-rows'].value).toBe(
+            'uuid,card_name,edition,number,foil,condition,quantity,price,notes\n' +
+            ',Rift Bolt,,,,,,,\n'
+        );
+        expect(elements['handoff-status-text'].textContent).toBe('Pricing 1 row…');
+    });
+
+    test('and a list of nothing else is not taken at all', () => {
+        const opener = {closed: false};
+        const {submitted, deliver} = loadHandoff({opener});
+
+        deliver(Object.assign(cards([{quantity: 4}, null, 'nonsense']), {source: opener}));
+        expect(submitted).toEqual([]);
+    });
+
+    test('a name with a comma in it stays one column', () => {
+        // The failure this prevents is silent: the row splits, every field
+        // after it moves one to the left, and a quantity is read as a price.
+        const opener = {closed: false};
+        const {elements, deliver} = loadHandoff({opener});
+
+        deliver(Object.assign(cards([
+            {name: 'Adéwalé, Breaker of Chains', quantity: 1},
+            {name: 'Say "Hello"', quantity: 2},
+        ]), {source: opener}));
+
+        expect(elements['handoff-rows'].value.split('\n')[1]).toBe(
+            ',"Adéwalé, Breaker of Chains",,,,,1,,'
+        );
+        expect(elements['handoff-rows'].value.split('\n')[2]).toBe(
+            ',"Say ""Hello""",,,,,2,,'
+        );
+    });
+
+    test('foil is written the way the parser reads it', () => {
+        const opener = {closed: false};
+        const {elements, deliver} = loadHandoff({opener});
+
+        deliver(Object.assign(cards([
+            {id: 'a', foil: true},
+            {id: 'b', foil: false},
+        ]), {source: opener}));
+
+        const lines = elements['handoff-rows'].value.split('\n');
+        expect(lines[1]).toBe('a,,,,yes,,,,');
+        expect(lines[2]).toBe('b,,,,no,,,,');
+    });
+});
+
+describe('the text hand-over', () => {
+    test('it answers to "text" as well as to "csv"', () => {
+        // csv is the name already in the wild and is not going anywhere;
+        // text is what the shape has always actually been, since a
+        // decklist is not a CSV and has always been accepted.
+        const opener = {closed: false};
+        const {elements, submitted, deliver} = loadHandoff({opener});
+
+        deliver({
+            origin: SENDER,
+            source: opener,
+            data: {type: ROWS, text: '4 Rift Bolt\n1 Lightning Bolt\n'},
+        });
+
+        expect(elements['handoff-rows'].value).toBe('4 Rift Bolt\n1 Lightning Bolt\n');
+        expect(submitted).toEqual([true]);
+    });
+
+    test('and text is what is taken when a message carries both', () => {
+        const opener = {closed: false};
+        const {elements, deliver} = loadHandoff({opener});
+
+        deliver({
+            origin: SENDER,
+            source: opener,
+            data: {type: ROWS, text: 'written', csv: 'ignored', cards: [{id: 'a'}]},
+        });
+
+        expect(elements['handoff-rows'].value).toBe('written');
+    });
+});

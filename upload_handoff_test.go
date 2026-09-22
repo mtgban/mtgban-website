@@ -510,6 +510,128 @@ func TestHandoffGuideNamesColumnsTheParserReads(t *testing.T) {
 	}
 }
 
+// The structured hand-over is turned into a CSV by js/upload-handoff.js and
+// parsed by internal/docparse, which is two languages and one contract. The
+// header is read out of the script rather than written here, so the pin
+// fails when the script's columns move rather than when somebody remembers
+// to update a list.
+func TestStructuredHandoffHeaderReachesItsFields(t *testing.T) {
+	script, err := os.ReadFile("js/upload-handoff.js")
+	if err != nil {
+		t.Fatalf("reading the handoff script: %v", err)
+	}
+
+	block := regexp.MustCompile(`(?s)var COLUMNS = \[(.*?)\];`).FindStringSubmatch(string(script))
+	if block == nil {
+		t.Fatal("the script declares no COLUMNS table")
+	}
+	pairs := regexp.MustCompile(`\["([^"]+)", "([^"]+)"\]`).FindAllStringSubmatch(block[1], -1)
+	if len(pairs) == 0 {
+		t.Fatal("the COLUMNS table holds no columns")
+	}
+
+	// What the sender writes, and what it is called in the CSV.
+	var header []string
+	written := map[string]string{}
+	for _, pair := range pairs {
+		// FindAllStringSubmatch hands back the whole match first, so the
+		// sender's key is 1 and the column it is written under is 2.
+		written[pair[2]] = pair[1]
+		header = append(header, pair[2])
+	}
+
+	var parser docparse.Parser
+	indexMap, err := parser.ParseHeader(header)
+	if err != nil {
+		t.Fatalf("ParseHeader(%v): %v", header, err)
+	}
+
+	// Every column the sender may fill has to arrive somewhere. A cell
+	// nothing reads is a field quietly dropped between the two languages.
+	for _, column := range header {
+		var reached string
+		for field, at := range indexMap {
+			if at < len(header) && header[at] == column {
+				reached = field
+				break
+			}
+		}
+		if reached == "" {
+			t.Errorf("%q (written as %q) reaches no field", column, written[column])
+		}
+	}
+
+	// And the ones whose meaning is not obvious from the name land where
+	// the format says they do.
+	for field, want := range map[string]string{
+		"id":         "uuid",
+		"cardName":   "card_name",
+		"edition":    "edition",
+		"variant":    "number",
+		"printing":   "foil",
+		"conditions": "condition",
+		"quantity":   "quantity",
+		"price":      "price",
+		"notes":      "notes",
+	} {
+		at, ok := indexMap[field]
+		if !ok {
+			t.Errorf("%s reaches nothing", field)
+			continue
+		}
+		if at >= len(header) || header[at] != want {
+			t.Errorf("%s reads column %d, want %q", field, at, want)
+		}
+	}
+}
+
+// And the fields the guide says a structured hand-over may name are the
+// ones the script actually reads. Documenting a tenth field, or dropping
+// one the script still writes, is the failure this catches - both halves
+// are prose to the compiler.
+func TestGuideNamesTheFieldsTheScriptReads(t *testing.T) {
+	script, err := os.ReadFile("js/upload-handoff.js")
+	if err != nil {
+		t.Fatalf("reading the handoff script: %v", err)
+	}
+	block := regexp.MustCompile(`(?s)var COLUMNS = \[(.*?)\];`).FindStringSubmatch(string(script))
+	if block == nil {
+		t.Fatal("the script declares no COLUMNS table")
+	}
+	reads := map[string]bool{}
+	for _, pair := range regexp.MustCompile(`\["([^"]+)", "([^"]+)"\]`).FindAllStringSubmatch(block[1], -1) {
+		reads[pair[1]] = true
+	}
+
+	page := renderPage(t, "upload_handoff.html", false, PageVars{
+		BetaNav:        &NavElem{Short: "b"},
+		HandoffOrigins: HandoffOrigins,
+	})
+	table := regexp.MustCompile(`(?s)<table class="handoff-fields">(.*?)</table>`).FindStringSubmatch(page)
+	if table == nil {
+		t.Fatal("the guide prints no message-field table")
+	}
+
+	documented := map[string]bool{}
+	for _, row := range regexp.MustCompile(`<tr><td><code>([^<]+)</code></td>`).FindAllStringSubmatch(table[1], -1) {
+		documented[row[1]] = true
+	}
+	if len(documented) == 0 {
+		t.Fatal("the message-field table names no fields")
+	}
+
+	for field := range documented {
+		if !reads[field] {
+			t.Errorf("the guide documents %q, which the script does not read", field)
+		}
+	}
+	for field := range reads {
+		if !documented[field] {
+			t.Errorf("the script reads %q, which the guide does not document", field)
+		}
+	}
+}
+
 // The progress line starts hidden and is revealed by the script, which
 // works only while nothing in our own stylesheet has given it a display.
 //

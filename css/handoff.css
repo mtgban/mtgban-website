@@ -69,7 +69,8 @@
     white-space: nowrap;
 }
 
-.handoff-cols {
+.handoff-cols,
+.handoff-fields {
     width: 100%;
     margin: 12px 0 20px;
     border-collapse: collapse;
@@ -77,14 +78,17 @@
 }
 
 .handoff-cols th,
-.handoff-cols td {
+.handoff-cols td,
+.handoff-fields th,
+.handoff-fields td {
     padding: 8px 10px;
     text-align: left;
     vertical-align: top;
     border-bottom: 1px solid var(--border-subtle);
 }
 
-.handoff-cols th {
+.handoff-cols th,
+.handoff-fields th {
     color: var(--normal);
     font-weight: 600;
     border-bottom-color: var(--border-moderate);
@@ -92,7 +96,8 @@
 
 /* The field name is the column being looked up, so it stays on one line
    and the spellings beside it take the wrapping. */
-.handoff-cols td:first-child {
+.handoff-cols td:first-child,
+.handoff-fields td:first-child {
     width: 34%;
     color: var(--normal);
     white-space: nowrap;
@@ -117,7 +122,8 @@
 }
 
 @media (max-width: 600px) {
-    .handoff-cols td:first-child {
+    .handoff-cols td:first-child,
+    .handoff-fields td:first-child {
         width: auto;
         white-space: normal;
     }
