@@ -340,27 +340,32 @@ func getSignatureFromCookies(r *http.Request) string {
 	return sig
 }
 
-// signedUserEmail returns the UserEmail from a validly-signed, unexpired cookie/sig, else "". Mirrors enforceSigning's HMAC check but allows any method.
-func signedUserEmail(r *http.Request) string {
-	sig := getSignatureFromCookies(r)
-	if querySig := r.FormValue("sig"); querySig != "" {
-		sig = querySig
-	}
+// signatureIsValid says whether sig is one this host wrote and has not yet
+// expired, and hands back what it carries either way.
+//
+// It is enforceSigning's check without the branches deciding what to say
+// about a failure, for the callers that only need to know whether a
+// signature may be trusted: a handler reached without the middleware in
+// front of it, or one looking at a request the middleware would refuse on
+// method alone. Those callers used to carry their own copy of the HMAC,
+// which is a copy of a security decision - the sort that goes on agreeing
+// with the original right up until the day the scheme changes.
+//
+// The values come back even when the answer is no, so a caller can read a
+// name off an untrusted signature to say who is being turned away. What it
+// must not do is act on a grant it finds there.
+func signatureIsValid(sig string) (url.Values, bool) {
 	if sig == "" {
-		return ""
+		return nil, false
 	}
-
-	raw, err := base64.StdEncoding.DecodeString(sig)
-	if err != nil {
-		return ""
+	v := parseSig(sig)
+	if v == nil {
+		return nil, false
 	}
-	v, err := url.ParseQuery(string(raw))
-	if err != nil {
-		return ""
-	}
-
+	// Development without a secret to sign with: anything that decodes is
+	// taken at its word, which is what every other check here does too.
 	if !SigCheck {
-		return v.Get("UserEmail")
+		return v, true
 	}
 
 	q := url.Values{}
@@ -370,12 +375,27 @@ func signedUserEmail(r *http.Request) string {
 		}
 	}
 
-	link := signatureLink()
 	exp := v.Get("Expires")
-	data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
+	data := fmt.Sprintf("GET%s%s%s", exp, signatureLink(), q.Encode())
 	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 	expires, err := strconv.ParseInt(exp, 10, 64)
 	if err != nil || valid != v.Get("Signature") || expires < time.Now().Unix() {
+		return v, false
+	}
+	return v, true
+}
+
+// signedUserEmail returns the UserEmail from a validly-signed, unexpired
+// cookie/sig, else "". Deciding whether to believe it is signatureIsValid's
+// job; what this adds is which signature to ask about, and that it will
+// answer for a request of any method.
+func signedUserEmail(r *http.Request) string {
+	sig := getSignatureFromCookies(r)
+	if querySig := r.FormValue("sig"); querySig != "" {
+		sig = querySig
+	}
+	v, ok := signatureIsValid(sig)
+	if !ok {
 		return ""
 	}
 	return v.Get("UserEmail")
