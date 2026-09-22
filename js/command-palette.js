@@ -879,6 +879,28 @@
         return out;
     }
 
+    // The server's nav carries Short, an emoji the navbar prints as text. It
+    // arrives here as `icon`, which the row hands to lucide as an icon name -
+    // and there is no lucide icon named by an emoji, so every nav row drew an
+    // empty <i>. Name the icon per entry instead, and keep compass as the
+    // fallback for whatever the nav grows later.
+    var NAV_ICONS = {
+        'Home': 'house',
+        'Changelog': 'scroll-text',
+        'Search': 'search',
+        'Sets': 'library',
+        'Sealed': 'box',
+        'Newspaper': 'newspaper',
+        'TCG Syp List': 'clipboard-list',
+        'Screener (Beta)': 'binoculars',
+        'Sleepers': 'moon-star',
+        'Upload': 'upload',
+        'Global': 'globe',
+        'Arbitrage': 'trending-up',
+        'Reverse': 'trending-down',
+        'Admin': 'shield'
+    };
+
     function getNavResults(query) {
         var nav = palette.nav || [];
         var out = [];
@@ -887,7 +909,7 @@
             if (!query || scoreMatch(query, n.name, null) > 0) {
                 out.push({
                     type: 'nav', title: n.name, subtitle: 'Navigate to ' + n.name,
-                    icon: n.icon || 'compass',
+                    icon: NAV_ICONS[n.name] || 'compass',
                     navName: n.name, navLink: n.link,
                     action: (function (link) { return function () { window.location.href = link; }; })(n.link),
                     score: query ? scoreMatch(query, n.name, null) : 0
