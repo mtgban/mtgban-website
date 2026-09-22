@@ -12,6 +12,7 @@
 package mkmidparser
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -57,7 +58,51 @@ type built struct {
 	// this describes can have changed.
 	builtFrom *[]mtgban.Seller
 
+	// The Cardmarket shelves it was actually built from. Every other
+	// seller's refresh republishes the snapshot with these copied across
+	// untouched, and rebuilding for one of those is a walk spent arriving
+	// at the same map.
+	shelves []mtgban.Seller
+
 	ids map[string]string
+}
+
+// shelvesOf picks the Cardmarket shelves out of a sellers snapshot.
+func shelvesOf(sellers []mtgban.Seller) []mtgban.Seller {
+	var shelves []mtgban.Seller
+	for _, seller := range sellers {
+		if slices.ContainsFunc(shelfNames, func(shelf string) bool {
+			return strings.EqualFold(seller.Info().Shorthand, shelf)
+		}) {
+			shelves = append(shelves, seller)
+		}
+	}
+	return shelves
+}
+
+// sameShelves reports whether two lists hold the same sellers.
+//
+// By identity, and by reflection rather than ==, because a seller is an
+// interface: comparing two of them panics if what is inside is a struct
+// holding a map, and an inventory is a map. Every scraper here is a
+// pointer, so this is the same answer == would give - without the upload
+// path being where we find out about one that is not. Anything that is
+// not a pointer is reported as changed, which costs a rebuild and never
+// a wrong answer.
+func sameShelves(was, now []mtgban.Seller) bool {
+	if len(was) != len(now) || len(was) == 0 {
+		return false
+	}
+	for i := range was {
+		a, b := reflect.ValueOf(was[i]), reflect.ValueOf(now[i])
+		if a.Kind() != reflect.Pointer || b.Kind() != reflect.Pointer {
+			return false
+		}
+		if a.Pointer() != b.Pointer() {
+			return false
+		}
+	}
+	return true
 }
 
 // publish installs an index, unless the inventories it describes have
@@ -83,7 +128,14 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
 	if p.Sellers() != snapshot {
 		return
 	}
-	p.cached.Store(&built{builtFrom: snapshot, ids: ids})
+	// The shelves are read off the snapshot rather than handed in beside
+	// it. They are a fact about it, and a second argument is a second
+	// chance to pass one that describes something else.
+	p.cached.Store(&built{
+		builtFrom: snapshot,
+		shelves:   shelvesOf(*snapshot),
+		ids:       ids,
+	})
 }
 
 // ids answers with the index for the sellers currently published,
@@ -112,10 +164,22 @@ func (p *Parser) ids() map[string]string {
 		return cached.ids
 	}
 
-	// Built from the snapshot that was loaded, not from whatever GetSellers
-	// answers by the time the walk reaches it: the key has to name what
-	// the index actually describes.
-	ids := build(*snapshot)
+	// The snapshot moved. Whether that matters is a different question:
+	// sellers are republished whole, so a refresh of any one of them - a
+	// buylist, a storefront nothing here reads - hands out a new slice
+	// with the Cardmarket shelves unchanged inside it.
+	shelves := shelvesOf(*snapshot)
+	if cached != nil && sameShelves(cached.shelves, shelves) {
+		// Re-keyed to the snapshot in hand so the rows after this one ask
+		// the cheap question again instead of this one.
+		p.publish(snapshot, cached.ids)
+		return cached.ids
+	}
+
+	// Built from the shelves that were loaded, not from whatever the
+	// source answers by the time the walk reaches them: the key has to
+	// name what the index actually describes.
+	ids := build(shelves)
 	p.publish(snapshot, ids)
 
 	// Answered from what was asked about, whether or not it was published.
@@ -137,15 +201,10 @@ func (p *Parser) ids() map[string]string {
 // uuid is the answer - the finish is re-resolved from the flag, not from
 // which shelf was read first. Only a disagreement about the card itself -
 // 1,525 ids, where the base uuids differ - names nothing.
-func build(sellers []mtgban.Seller) map[string]string {
+func build(shelves []mtgban.Seller) map[string]string {
 	ids := map[string]string{}
 
-	for _, seller := range sellers {
-		if !slices.ContainsFunc(shelfNames, func(shelf string) bool {
-			return strings.EqualFold(seller.Info().Shorthand, shelf)
-		}) {
-			continue
-		}
+	for _, seller := range shelves {
 
 		for uuid, entries := range seller.Inventory() {
 			base := baseUUID(uuid)

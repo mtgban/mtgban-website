@@ -105,7 +105,7 @@ func TestResolveWithNothingPublished(t *testing.T) {
 	}
 }
 
-func TestParserFollowsTheShelves(t *testing.T) {
+func TestIndexFollowsTheShelves(t *testing.T) {
 	// The inventories are replaced without the datastore moving, so an
 	// index keyed on a datastore stamp would go on answering from the
 	// previous shelves - and would do it silently.
@@ -122,7 +122,7 @@ func TestParserFollowsTheShelves(t *testing.T) {
 	}
 }
 
-func TestParserIsPublishedWithoutALock(t *testing.T) {
+func TestIndexIsPublishedWithoutALock(t *testing.T) {
 	// Readers resolving while the inventories are replaced under them.
 	// Every answer has to be one of the two snapshots' answers: a reader
 	// may see either, having asked while the ground was moving, but never
@@ -243,7 +243,7 @@ func TestASupersededBuildIsNotPublished(t *testing.T) {
 	}
 }
 
-func TestASupersededParserIsNeverServed(t *testing.T) {
+func TestASupersededIndexIsNeverServed(t *testing.T) {
 	// The read is what makes the above safe rather than merely tidy: an
 	// index keyed to shelves no longer live is never served, however it
 	// came to be there.
@@ -254,10 +254,60 @@ func TestASupersededParserIsNeverServed(t *testing.T) {
 
 	p.cached.Store(&built{
 		builtFrom: &older,
+		shelves:   shelvesOf(older),
 		ids:       map[string]string{"900001": "uuid-before"},
 	})
 
 	if got := p.Resolve("900001"); got != "uuid-after" {
 		t.Errorf("served a superseded index: %q, want uuid-after", got)
+	}
+}
+
+// elsewhere is a seller this package does not read, for the test about
+// what a refresh of one costs.
+func elsewhere(shorthand string) mtgban.Seller {
+	inv := mtgban.InventoryRecord{}
+	inv.Add("uuid-other", &mtgban.InventoryEntry{Price: 1})
+	return mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{
+		Name: shorthand, Shorthand: shorthand,
+	})
+}
+
+func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
+	// Sellers are republished whole, so the snapshot moves whenever
+	// anything moves - a buylist, a storefront this package does not read.
+	// Only the Cardmarket shelves decide what the index says.
+	p, live := newParser()
+
+	mkm := shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"})
+	live.publish(mkm, elsewhere("CK"))
+	if got := p.Resolve("900001"); got != "uuid-mkm" {
+		t.Fatalf("first resolve = %q, want uuid-mkm", got)
+	}
+
+	// A mark a rebuild would wipe, so "did it rebuild" is answerable
+	// without timing anything.
+	p.cached.Load().ids["sentinel"] = "kept"
+
+	// Cardkingdom refreshes: a new snapshot, the Cardmarket shelf copied
+	// across untouched.
+	after := live.publish(mkm, elsewhere("CK"))
+	if got := p.Resolve("900001"); got != "uuid-mkm" {
+		t.Errorf("after an unrelated refresh = %q, want uuid-mkm", got)
+	}
+	if p.cached.Load().ids["sentinel"] != "kept" {
+		t.Error("an unrelated seller's refresh rebuilt the index")
+	}
+	if p.cached.Load().builtFrom != after {
+		t.Error("the index was not re-keyed to the snapshot in hand")
+	}
+
+	// A Cardmarket shelf moving is the case that must rebuild.
+	live.publish(shelf("MKMTrend", map[string]string{"uuid-moved": "900001"}), elsewhere("CK"))
+	if got := p.Resolve("900001"); got != "uuid-moved" {
+		t.Errorf("after the shelf moved = %q, want uuid-moved", got)
+	}
+	if p.cached.Load().ids["sentinel"] == "kept" {
+		t.Error("a Cardmarket shelf moved and the index was not rebuilt")
 	}
 }
