@@ -160,6 +160,11 @@
 
 /* ═══ Sidebar ═══ */
 .search-sidebar {
+    /* 20px top/bottom (40px total) - the @container thresholds further down,
+       in the desktop layout below, are written against this column's content
+       box, so they're each 40px short of the border-box number they're
+       tuned for (600px/500px content-box = 640px/540px border-box). Retune
+       both together if this changes. */
     padding: 20px;
     position: sticky;
     top: var(--nav-height, 48px);
@@ -308,11 +313,58 @@
         max-height: none;
         z-index: 10;
         overflow: hidden;
+        /* A short viewport (or the pinned-filters bar eating into it) used to
+           just clip whatever didn't fit - usually Export/Upload, the very
+           thing a reader most needs a click on. Degrade on purpose instead,
+           giving up the least-needed information first: Available In, then
+           Export/Upload - both live inside .sidebar-body, the scrollable
+           lower part of this column, not as direct children of it (see
+           templates/search.html). .sidebar-pinned's own shrink weight
+           (its rule, below) is deliberately tiny next to .sidebar-body's, so
+           in practice the image doesn't give up any of its own size until
+           .sidebar-body has already given up both. */
+        container: search-sidebar-height / size;
+    }
+
+    /* A size container query compares against the content box, not
+       .search-sidebar's own border-box height - see the 20px padding this
+       carries back in, above. */
+
+    /* Available In first - useful, but the reader came here for prices, and
+       every product it names is one click from the same search anyway. */
+    @container search-sidebar-height (max-height: 600px) {
+        .sidebar-products-card {
+            display: none;
+        }
+    }
+
+    /* Export/Upload second, once Available In giving up its room isn't
+       enough on its own - these are the actions a reader is most likely
+       mid-click on, so they're the last thing .sidebar-body gives up before
+       .sidebar-pinned's own shrink weight (see its rule below) starts
+       mattering. */
+    @container search-sidebar-height (max-height: 500px) {
+        .sidebar-footer {
+            display: none;
+        }
     }
 
     .sidebar-pinned {
         display: flex;
-        flex: 1 1 auto;
+        /* No grow - this holds its own natural size rather than reclaiming
+           room .sidebar-body frees up by hiding a section. Shrink is nonzero
+           but 200x lighter than .sidebar-body's own (that rule, below): CSS
+           distributes a height deficit between flex siblings in proportion
+           to shrink-factor x size, so as long as .sidebar-body has any
+           natural size of its own left to give - Available In, then
+           Export/Upload, then whatever it always shows below those, like
+           "Show all versions" - it absorbs effectively all of any squeeze
+           first. Only once .sidebar-body is already at its own min-height:0
+           floor does the remaining deficit fall to this, and from here to
+           .sidebar-img-wrap's own shrink-then-floor below - a real, gradual
+           last resort, not a single breakpoint that could leave nothing left
+           to give if .sidebar-body's true minimum still doesn't fit. */
+        flex: 0 1 auto;
         flex-direction: column;
         min-height: 0;
         position: static;
@@ -338,11 +390,22 @@
         flex: 1 1 auto;
         align-items: center;
         justify-content: center;
-        /* 60% of the card's own normal cap, kept as one token with
-           .sidebar-card-img's max-height so the two can't drift apart - a
-           flat 120px here let a short viewport (or a sidebar squeezed by a
-           tall .sidebar-body) shrink the card past the point it still reads
-           clearly. */
+        /* An explicit height, not just a cap: flex-basis:auto reads this
+           when it's set, rather than falling back to content-based sizing.
+           Content-based sizing here means the image's own natural width
+           (this column is only 340px wide) drives its height via aspect
+           ratio, which at most viewport heights is a tighter constraint than
+           52vh - so without an explicit height, .sidebar-pinned's own
+           near-zero shrink weight (its rule, above) would hold this at a
+           near-constant, width-bound size regardless of viewport height,
+           instead of continuing to track 52vh on its own - overstating how
+           much room .sidebar-pinned actually needs, and starving
+           .sidebar-body of room it should have gotten first. */
+        height: var(--sidebar-card-img-cap, 52vh);
+        /* 60% of that same cap, kept as one token with .sidebar-card-img's
+           max-height so the two can't drift apart - a flat 120px here let a
+           short viewport (or a sidebar squeezed by a tall .sidebar-body)
+           shrink the card past the point it still reads clearly. */
         min-height: calc(0.6 * var(--sidebar-card-img-cap, 52vh));
         width: auto;
     }
@@ -352,11 +415,14 @@
     }
 
     .sidebar-body {
-        /* The lower products/actions area intentionally scrolls inside the
-           fixed sidebar. The large shrink factor keeps SORT and the card
-           visible; only once this section has collapsed does the image begin
-           to shrink. */
-        flex: 100 1 auto;
+        /* The only item in this column with any grow: whatever's left after
+           .sidebar-pinned's own footprint is this section's. Shrink is 200x
+           .sidebar-pinned's own (that rule, above) - the number itself
+           doesn't matter, only that it's overwhelmingly larger, so this
+           absorbs a height deficit first and scrolls internally rather than
+           clip, all the way down to its own min-height:0, before
+           .sidebar-pinned gives up any of its natural size. */
+        flex: 1 200 auto;
         min-height: 0;
         overflow-y: auto;
         overflow-x: hidden;
