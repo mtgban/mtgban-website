@@ -13,7 +13,6 @@
     <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
 {{define "content"}}
@@ -92,7 +91,6 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         </div>
         {{end}}
     </div>
-    <script>lucide.createIcons();</script>
 
     {{if ne .ErrorMessage ""}}
         <div class="landing-error">{{.ErrorMessage}}</div>

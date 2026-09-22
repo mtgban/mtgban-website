@@ -45,6 +45,15 @@
 </div>
 
 {{block "extra-scripts" .}}{{end}}
+{{block "icons" .}}
+<!-- Load lucide and paint the server-rendered <i data-lucide> placeholders.
+     Pages carry icons whether or not any of their own scripts calls
+     createIcons(). A page with none of its own overrides this block to skip
+     the bundle; the override has to emit something, because an empty
+     definition loses to this default rather than replacing it. -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script>if (window.lucide) lucide.createIcons();</script>
+{{end}}
 <script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}"></script>

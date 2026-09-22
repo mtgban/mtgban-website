@@ -269,6 +269,11 @@
         if (favs.length === 0) {
             if (mode === 'desktop') {
                 container.innerHTML = renderFavEmptyState();
+                // The early return skips the createIcons() below, and the
+                // empty state carries the CSV import icon.
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons({ root: container });
+                }
             } else {
                 container.innerHTML = '';
             }
