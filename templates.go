@@ -86,7 +86,19 @@ var funcMap = template.FuncMap{
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
 			return ""
 		}
-		return parsed.String()
+		// Rebuilt rather than echoed, the same way the handoff link is:
+		// Host excludes userinfo, so https://user:pass@host/... would get
+		// this far and keep the credentials in the href, which a browser
+		// may then send as Basic auth.
+		clean := url.URL{
+			Scheme:   parsed.Scheme,
+			Host:     parsed.Host,
+			Path:     parsed.Path,
+			RawPath:  parsed.RawPath,
+			RawQuery: parsed.RawQuery,
+			Fragment: parsed.Fragment,
+		}
+		return clean.String()
 	},
 	"inc": func(i, j int) int {
 		return i + j
