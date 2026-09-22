@@ -210,7 +210,7 @@
         S.items = [];
         S.activeIndex = -1;
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
-            lucide.createIcons({ nodes: resultsEl.querySelectorAll('[data-lucide]') });
+            lucide.createIcons({ root: resultsEl });
         }
     }
 
@@ -1717,7 +1717,7 @@
         updateFooterHints();
 
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
-            lucide.createIcons({ nodes: resultsEl.querySelectorAll('[data-lucide]') });
+            lucide.createIcons({ root: resultsEl });
         }
 
         // Bind click handlers (and the inline saved-row delete button).

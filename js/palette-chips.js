@@ -28,7 +28,7 @@
                 containerEl.insertBefore(renderChip(chips[c], c), inputEl);
             }
             if (typeof lucide !== 'undefined' && lucide.createIcons) {
-                lucide.createIcons({ nodes: containerEl.querySelectorAll('[data-lucide]') });
+                lucide.createIcons({ root: containerEl });
             }
         }
 

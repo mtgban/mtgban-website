@@ -244,7 +244,7 @@
         var newBody = container.querySelector('.landing-pane-body');
         if (newBody && savedScroll) newBody.scrollTop = savedScroll;
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
-            lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
+            lucide.createIcons({ root: container });
         }
     }
 

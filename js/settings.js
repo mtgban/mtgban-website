@@ -318,7 +318,7 @@
             body.focus({ preventScroll: true });
         }
         if (window.lucide && lucide.createIcons) {
-            lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
+            lucide.createIcons({ root: modalEl });
         }
     }
 
