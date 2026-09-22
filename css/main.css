@@ -589,6 +589,19 @@ a.selected:hover{
     background-color: var(--background);
 }
 /* ═══ Base template layout ═══ */
+/* A bare <svg>, default display:inline, sitting between the fixed navbar
+   and .page-content in every base.html page - all width/height:0, holding
+   nothing but <defs> nobody ever sees directly. An empty inline box still
+   takes a line box's worth of height from its own line-height, which reads
+   as unexplained slack between the navbar and the page's first content on
+   every page; display:block removes it from that inline flow entirely
+   without display:none, which some browsers stop resolving a paint-server
+   reference (set-symbol-drawn's fill="url(#gradient-foil)") against once
+   the ancestor holding the <defs> is unrendered. */
+.set-symbol-defs {
+    display: block;
+}
+
 .page-content {
     /* Resolve --nav-height here, after body.has-scope has changed it. A
        root-level --content-padding-top would retain the closed-nav value. */
