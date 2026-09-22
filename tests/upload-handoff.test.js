@@ -23,6 +23,7 @@ function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot 
         'handoff-hint': {hidden: true},
         'handoff-form': {submit: () => submitted.push(true)},
         'handoff-rows': {value: ''},
+        'handoff-source': {value: ''},
     };
 
     let onMessage;
@@ -154,5 +155,57 @@ describe('on any other page', () => {
         const opener = {closed: false};
         const {sent} = loadHandoff({opener, missingRoot: true});
         expect(sent).toEqual([]);
+    });
+});
+
+describe('where the rows were read', () => {
+    // Carried so the results can say "Cardmarket" rather than "pasted
+    // text". What it is called is decided on the server; what crosses here
+    // is a URL, and only one belonging to the origin that sent it.
+    const opener = () => ({closed: false});
+
+    test('a page on the sending origin is carried', () => {
+        const op = opener();
+        const {deliver, elements} = loadHandoff({opener: op});
+        const url = SENDER + '/en/Magic/Users/Seller/Offers/Singles';
+
+        deliver(rowsMessage(op, {data: {type: ROWS, csv: 'a\n1\n', source: url}}));
+
+        expect(elements['handoff-source'].value).toBe(url);
+    });
+
+    test('a page somewhere else is not', () => {
+        // The origin check on the message says who is talking; this says
+        // the page they name is one of their own.
+        const op = opener();
+        const {deliver, elements, submitted} = loadHandoff({opener: op});
+
+        deliver(rowsMessage(op, {
+            data: {type: ROWS, csv: 'a\n1\n', source: 'https://example.test/somewhere'},
+        }));
+
+        expect(elements['handoff-source'].value).toBe('');
+        // The rows are still good; only the label was refused.
+        expect(submitted).toEqual([true]);
+    });
+
+    test('something that is not a URL is not', () => {
+        const op = opener();
+        const {deliver, elements, submitted} = loadHandoff({opener: op});
+
+        deliver(rowsMessage(op, {data: {type: ROWS, csv: 'a\n1\n', source: 'not a url'}}));
+
+        expect(elements['handoff-source'].value).toBe('');
+        expect(submitted).toEqual([true]);
+    });
+
+    test('rows sent without one are taken as they always were', () => {
+        const op = opener();
+        const {deliver, elements, submitted} = loadHandoff({opener: op});
+
+        deliver(rowsMessage(op));
+
+        expect(elements['handoff-source'].value).toBe('');
+        expect(submitted).toEqual([true]);
     });
 });

@@ -18,6 +18,10 @@
          session; a request made from the extension's page would not. -->
     <form id="handoff-form" method="post" action="/upload" hidden>
         <textarea id="handoff-rows" name="textArea"></textarea>
+        <!-- Where the rows were read, so the results can say so instead of
+             calling them pasted text. Carried as a URL and named on the
+             server, which is the only side that decides what it is called. -->
+        <input type="hidden" id="handoff-source" name="uploadSource">
     </form>
 </div>
 

@@ -1186,21 +1186,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Orders implies priority of argument search
 	pageVars.Metadata = map[string]GenericCard{}
-	if len(hashes) != 0 {
-		pageVars.UploadQuery = "hashes"
-	} else if textArea != "" {
-		pageVars.UploadQuery = "pasted text"
-	} else if gdocURL != "" {
-		// Show the source's own name when the loader could retrieve one,
-		// and let the results header link back to it
-		pageVars.UploadQuery = "remote URL"
-		if uploadName != "" {
-			pageVars.UploadQuery = uploadName
-		}
-		pageVars.UploadSourceURL = gdocURL
-	} else {
-		pageVars.UploadQuery = handler.Filename
+	// Read here rather than passed dereferenced: a paste reaches this line
+	// with no file behind it at all.
+	var uploadFilename string
+	if handler != nil {
+		uploadFilename = handler.Filename
 	}
+	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
+		hashes, textArea, r.FormValue("uploadSource"), gdocURL, uploadName, uploadFilename,
+	)
 	pageVars.TotalEntries = map[string]float64{}
 
 	pageVars.UploadEntries = uploadedData
