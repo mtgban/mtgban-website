@@ -282,7 +282,7 @@
                     dropdown.classList.remove('open');
                     const filter = dropdown.querySelector('.sidebar-printings-filter');
                     if (filter) filter.value = '';
-                    dropdown.querySelectorAll('a.pagination').forEach(a => { a.style.display = ''; });
+                    dropdown.querySelectorAll('a.printing-symbol').forEach(a => { a.style.display = ''; });
                     const trigger = container.querySelector('.sidebar-printings-more');
                     if (!trigger) return;
                     setTriggerState(trigger, false);
@@ -310,7 +310,7 @@
                     // Unhide any previously hidden links (from prior hover)
                     container.querySelectorAll('a.sidebar-printings-hidden').forEach(a => a.classList.remove('sidebar-printings-hidden'));
 
-                    const links = Array.from(container.querySelectorAll('a.pagination'));
+                    const links = Array.from(container.querySelectorAll('a.printing-symbol'));
                     if (links.length <= PRINTINGS_THRESHOLD) return;
 
                     const overflow = links.slice(PRINTINGS_THRESHOLD);
@@ -366,7 +366,7 @@
 
                     filter.addEventListener('input', function() {
                         const q = this.value.trim().toLowerCase();
-                        list.querySelectorAll('a.pagination').forEach(function(a) {
+                        list.querySelectorAll('a.printing-symbol').forEach(function(a) {
                             const title = (a.getAttribute('title') || '').toLowerCase();
                             const href = (a.getAttribute('href') || '').toLowerCase();
                             const matches = !q || title.indexOf(q) !== -1 || href.indexOf(q) !== -1;

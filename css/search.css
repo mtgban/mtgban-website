@@ -505,7 +505,7 @@ body.modal-embed .search-sidebar {
    line, but a generated set badge is a replaced element and rides the
    baseline, leaving the trigger hanging below it on games with no keyrune
    symbols. */
-.sidebar-printings a.pagination svg { vertical-align: middle; }
+.sidebar-printings a.printing-symbol svg { vertical-align: middle; }
 
 /* Printings overflow trigger. It reads as the count it is and keeps that
    size whether the panel is open or shut, so the symbols sharing its row
