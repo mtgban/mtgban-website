@@ -131,3 +131,45 @@
     font-weight: 600;
     color: var(--normal);
 }
+
+/* ═══ The line shown while a list is on its way ═══ */
+
+.handoff-status {
+    display: flex;
+    align-items: center;
+    margin: 24px 0 8px;
+    font-size: 18px;
+    color: var(--normal);
+}
+
+/* Giving it a display of its own takes [hidden] away: the attribute works
+   by a display:none in the browser's own stylesheet, and any author rule
+   beats that. Without this the line and its spinner sit above the guide on
+   every page nobody handed anything to. */
+.handoff-status[hidden] {
+    display: none;
+}
+
+/* Beside the words rather than over the page: the wait is a network hop
+   and then an upload, and there is nothing underneath worth covering.
+   It keeps turning through the submit, which navigates to the results -
+   the old page stays on screen while that loads, and stopping the
+   spinner first would look like the list had been dropped. */
+.handoff-spinner {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-right: 10px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: handoff-spin 0.8s linear infinite;
+}
+
+@keyframes handoff-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .handoff-spinner { animation: none; }
+}

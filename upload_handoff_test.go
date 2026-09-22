@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -58,6 +59,32 @@ func TestHandoffPostsToTheUpload(t *testing.T) {
 		if !strings.Contains(page, want) {
 			t.Errorf("the form is missing %s", want)
 		}
+	}
+}
+
+// The list is fetched a page at a time on the far side and then uploaded
+// here, so there are seconds where a still page is the only thing anybody
+// can see. The spinner is what says the page is still working, and it is
+// markup rather than something the script builds, so it is on screen from
+// the moment the line is shown.
+func TestHandoffSpinsWhileItWaits(t *testing.T) {
+	page := renderPage(t, "upload_handoff.html", false, PageVars{
+		BetaNav:        &NavElem{Short: "b"},
+		HandoffOrigins: HandoffOrigins,
+	})
+
+	if !strings.Contains(page, `class="handoff-spinner"`) {
+		t.Error("the progress line carries no spinner")
+	}
+	// Hidden to begin with: a page opened by hand shows the guide, and a
+	// spinner over it would be turning for something that is not coming.
+	if !strings.Contains(page, `id="handoff-status" class="handoff-status" hidden`) {
+		t.Error("the progress line does not start hidden")
+	}
+	// The words live in their own element because the spinner shares the
+	// line: writing to the line itself would take the spinner with it.
+	if !strings.Contains(page, `id="handoff-status-text"`) {
+		t.Error("the progress line has nowhere to write the words")
 	}
 }
 
@@ -480,5 +507,32 @@ func TestHandoffGuideNamesColumnsTheParserReads(t *testing.T) {
 
 	if checked < 20 {
 		t.Errorf("only %d spellings were checked; the tables are probably not being read", checked)
+	}
+}
+
+// The progress line starts hidden and is revealed by the script, which
+// works only while nothing in our own stylesheet has given it a display.
+//
+// [hidden] is a display:none in the browser's stylesheet, and any author
+// rule beats that - so `.handoff-status { display: flex }` alone puts the
+// line and its spinner above the guide on every page nobody handed
+// anything to. Neither suite can see it: the Go side reads the attribute
+// out of the markup and the bun stubs set `hidden` as a property, so this
+// asks the stylesheet instead.
+func TestHiddenStillHidesTheProgressLine(t *testing.T) {
+	sheet, err := os.ReadFile("css/handoff.css")
+	if err != nil {
+		t.Fatalf("reading the stylesheet: %v", err)
+	}
+
+	block := regexp.MustCompile(`(?s)\.handoff-status \{(.*?)\}`).FindStringSubmatch(string(sheet))
+	if block == nil {
+		t.Skip("the progress line has no rule of its own")
+	}
+	if !strings.Contains(block[1], "display:") {
+		return
+	}
+	if !strings.Contains(string(sheet), ".handoff-status[hidden]") {
+		t.Error(".handoff-status sets a display and nothing puts [hidden] back")
 	}
 }
