@@ -26,6 +26,7 @@
     var hint = document.getElementById("handoff-hint");
     var form = document.getElementById("handoff-form");
     var rows = document.getElementById("handoff-rows");
+    var source = document.getElementById("handoff-source");
 
     // The sites allowed to hand a list over, as the server named them. An
     // attribute that is missing or unreadable leaves the list empty, which is
@@ -67,6 +68,20 @@
         taken = true;
 
         rows.value = event.data.csv;
+
+        // Where the rows were read, for the results heading. Taken only
+        // when it belongs to the origin that handed them over: the page it
+        // names has to be a page on the site that sent it, or it is not
+        // carried at all. What it is called is the server's to decide.
+        if (source && typeof event.data.source === "string") {
+            try {
+                if (new URL(event.data.source).origin === event.origin) {
+                    source.value = event.data.source;
+                }
+            } catch (err) {
+                // Not a URL. The heading manages without one.
+            }
+        }
 
         // The sender knows how many cards it read; this page only sees text,
         // and text does not say whether its first line is a header or a card.
