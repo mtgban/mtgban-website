@@ -32,25 +32,10 @@
     <h1>Receiving a card list</h1>
 
     {{if $receiving}}
-    <p id="handoff-status">Waiting for the card list&hellip;</p>
-
-    <p id="handoff-hint" hidden>
-        This page is opened by a browser extension, which hands it the cards
-        it read from a storefront. Nothing was handed over, so there is
-        nothing to price &mdash; <a href="/upload">upload a list yourself</a>
-        instead.
-    </p>
-
-    <!-- Submitted from here rather than from whoever sent the rows. This
-         page is the site's own, so the upload is same-origin and carries the
-         session; a request made from the extension's page would not. -->
-    <form id="handoff-form" method="post" action="/upload" hidden>
-        <textarea id="handoff-rows" name="textArea"></textarea>
-        <!-- Where the rows were read, so the results can say so instead of
-             calling them pasted text. Carried as a URL and named on the
-             server, which is the only side that decides what it is called. -->
-        <input type="hidden" id="handoff-source" name="uploadSource">
-    </form>
+    <!-- Hidden until the script finds somebody to receive a list from, so
+         that a page opened by hand shows the guide rather than a line
+         waiting for something that is never coming. -->
+    <p id="handoff-status" hidden><span id="handoff-status-text">Waiting for the card list&hellip;</span></p>
     {{else}}
     <!-- No signature, or one whose tier does not carry Upload. The list is
          not taken: it would be walked, handed over, posted, and refused at
@@ -73,7 +58,145 @@
         </div>
     </div>
     {{end}}
-</div>
+
+    {{if $receiving}}
+    <!-- Submitted from here rather than from whoever sent the rows. This
+         page is the site's own, so the upload is same-origin and carries the
+         session; a request made from the extension's page would not. -->
+    <form id="handoff-form" method="post" action="/upload" hidden>
+        <textarea id="handoff-rows" name="textArea"></textarea>
+        <!-- Where the rows were read, so the results can say so instead of
+             calling them pasted text. Carried as a URL and named on the
+             server, which is the only side that decides what it is called. -->
+        <input type="hidden" id="handoff-source" name="uploadSource">
+    </form>
+    {{end}}
+
+    <!-- What the page says when nothing was handed to it, which is what
+         anybody who opens the URL themselves sees. It is the only
+         documentation of this endpoint there is, so it says what reaches
+         it and in what shape rather than only what it is for. -->
+    <div id="handoff-guide">
+        {{if $receiving}}<p class="handoff-idle">Nothing was handed to this page.</p>{{end}}
+
+        <h2>What this page is for</h2>
+        <p>
+            This page does not hold a card list of its own. A browser
+            extension reads the offers on a storefront, opens this page, and
+            hands the rows over window to window; the page posts them to the
+            <a href="/upload">uploader</a>, which prices them against every
+            store MTGBAN follows. It carries the session that way, which a
+            request made from the extension's own origin could not.
+        </p>
+        <p>
+            {{if .HandoffOrigins}}A list can be handed over from {{range $i, $origin := .HandoffOrigins}}{{if $i}}, {{end}}<code>{{$origin}}</code>{{end}}, and from nowhere else.{{else}}No site is currently allowed to hand a list over.{{end}}
+            To price a list yourself, paste or upload it at
+            <a href="/upload">/upload</a> &mdash; the formats below are the
+            same ones that page takes.
+        </p>
+
+        <h2>What a list looks like</h2>
+        <p>
+            Comma or tab separated text, with a header row naming the
+            columns. Their order does not matter, and columns nothing
+            recognises are ignored rather than refused. Matching is on
+            substrings and case is ignored, so <code>Card Name</code>,
+            <code>name</code> and <code>Product Name</code> all reach the
+            same field.
+        </p>
+
+        <table class="handoff-cols">
+            <thead><tr><th>Field</th><th>Headers that reach it</th></tr></thead>
+            <tbody>
+                <tr><td>Card name</td><td>anything with <code>name</code> in it, or <code>card</code></td></tr>
+                <tr><td>Edition</td><td><code>edition</code>, <code>set</code>, <code>expansion</code></td></tr>
+                <tr><td>Number or variant</td><td><code>number</code>, <code>variant</code>, <code>variation</code>, <code>version</code>, <code>comment</code></td></tr>
+                <tr><td>Finish</td><td><code>foil</code>, <code>printing</code>, <code>finish</code>, <code>f/nf</code></td></tr>
+                <tr><td>Condition</td><td>anything with <code>condition</code> in it</td></tr>
+                <tr><td>Quantity</td><td><code>quantity</code>, <code>qty</code>, <code>stock</code>, <code>count</code>, <code>have</code></td></tr>
+                <tr><td>Price</td><td><code>price</code>, <code>low</code></td></tr>
+                <tr><td>Notes</td><td><code>notes</code>, <code>data</code> &mdash; kept and shown, trimmed at 1024 characters</td></tr>
+            </tbody>
+        </table>
+
+        <h2>Naming the printing outright</h2>
+        <p>
+            A name and an edition identify most cards, but not all of them:
+            a card printed twice in one set is told apart by its collector
+            number, and some are not told apart by wording at all. An
+            identifier settles it, and is tried before any of the columns
+            above.
+        </p>
+        <table class="handoff-cols">
+            <thead><tr><th>Identifier</th><th>Headers that reach it</th></tr></thead>
+            <tbody>
+                <tr><td>MTGJSON / Scryfall uuid</td><td><code>uuid</code>, <code>id</code>, <code>key</code>, <code>scryfall id</code>, <code>mtgjson id</code></td></tr>
+                <tr><td>TCGplayer product</td><td><code>tcgplayer product id</code></td></tr>
+                <tr><td>TCGplayer SKU</td><td><code>tcgplayer id</code> &mdash; carries the condition and finish too</td></tr>
+                <tr><td>Cardmarket product</td><td><code>cardmarket id</code>, <code>mcm id</code>, <code>mkm id</code></td></tr>
+            </tbody>
+        </table>
+        <p>
+            A Cardmarket id names a product rather than a printing, so it is
+            used only where nothing better answered, and only where one
+            printing answers to it.
+        </p>
+
+        <h2>What the values may say</h2>
+        <ul>
+            <li>
+                <strong>Condition</strong> is one of five grades &mdash; NM,
+                SP, MP, HP, PO &mdash; written either way: <code>NM</code>
+                and <code>Near Mint</code> both land on NM, as do
+                <code>Lightly Played</code> and <code>Excellent</code> on
+                SP, <code>Moderately Played</code> and <code>Very Good</code>
+                on MP, <code>Heavily Played</code> and <code>Good</code> on
+                HP, and <code>Poor</code> and <code>Damaged</code> on PO.
+                A row with no condition is priced as NM.
+            </li>
+            <li>
+                <strong>Finish</strong> takes <code>yes</code>/<code>no</code>,
+                <code>true</code>/<code>false</code>, <code>1</code>,
+                <code>x</code>, or a word containing <em>foil</em>. Anything
+                naming <em>non-foil</em> is not one. An etched printing is
+                named in the variant column instead.
+            </li>
+            <li>
+                <strong>Quantity</strong> is a whole number, with or without
+                a trailing <code>x</code>. A row at zero is skipped, and rows
+                for the same printing in the same condition are added
+                together.
+            </li>
+        </ul>
+
+        <h2>A list with no header at all</h2>
+        <p>
+            One column and no header is read as a decklist, the way it would
+            be written out by hand:
+        </p>
+<pre class="handoff-example">4 Rift Bolt
+4x Rift Bolt (TSP)
+1 Lightning Bolt (2ED) *F*
+10 Swamp &lt;462&gt; [CLB]</pre>
+        <p>
+            The set goes in brackets, the collector number in angle brackets,
+            and <code>*F*</code> or <code>*E*</code> on the end asks for the
+            foil or etched printing. Without an edition the most recent
+            printing is used.
+        </p>
+
+        <h2>And what an extension sends</h2>
+        <p>
+            The same thing, with the columns filled in. This is a Cardmarket
+            seller's offers as the extension writes them:
+        </p>
+<pre class="handoff-example">mcm_id,card_name,edition,condition,foil,quantity,price_usd,article_id,mkm_notes
+265854,Thornwind Faeries,Urza's Legacy,NM,,3,0.06,1234567,https://www.cardmarket.com/...</pre>
+        <p>
+            Up to {{uploadLimit}} rows at a time &mdash; {{uploadProLimit}}
+            with the Optimizer &mdash; and {{uploadMaxMB}}&nbsp;MB of file.
+        </p>
+    </div>
 
 <script type="text/javascript" src="/js/upload-handoff.js?hash={{.Hash}}"></script>
 {{end}}

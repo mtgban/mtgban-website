@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mtgban/mtgban-website/internal/docparse"
 )
 
 // TestHandoffNamesItsOrigins pins that the page carries the origins the server
@@ -379,4 +383,102 @@ func TestHandoffHandlerAsksBeforeItReceives(t *testing.T) {
 			t.Error("a rewritten signature was given the form")
 		}
 	})
+}
+
+// TestHandoffDocumentsItself pins that the page says what reaches it and in
+// what shape, for both readers who see it: somebody who opened the URL
+// themselves, and somebody being turned away.
+//
+// This page is the only documentation of the handoff there is. The column
+// vocabulary it prints is internal/docparse's, so the risk is the two
+// drifting - a spelling documented here that the parser stopped reading
+// is worse than none at all.
+func TestHandoffDocumentsItself(t *testing.T) {
+	// Both readers: the one who was handed nothing, and the one being
+	// turned away. The message is what tells them apart.
+	for _, told := range []string{"", ErrMsg} {
+		page := renderPage(t, "upload_handoff.html", false, PageVars{
+			BetaNav:        &NavElem{Short: "b"},
+			HandoffOrigins: HandoffOrigins,
+			InfoMessage:    told,
+		})
+
+		if !strings.Contains(page, `id="handoff-guide"`) {
+			t.Fatalf("InfoMessage=%q: the page carries no guide", told)
+		}
+		// Where a list may come from is a fact about this deployment, so it
+		// is printed rather than described.
+		for _, origin := range HandoffOrigins {
+			if !strings.Contains(page, origin) {
+				t.Errorf("InfoMessage=%q: the guide does not name %s", told, origin)
+			}
+		}
+		// One spelling per field docparse's ParseHeader actually matches.
+		for _, column := range []string{
+			"card", "edition", "variant", "foil", "condition", "quantity",
+			"price", "notes", "uuid", "tcgplayer id", "cardmarket",
+		} {
+			if !strings.Contains(page, column) {
+				t.Errorf("InfoMessage=%q: the guide does not mention %q", told, column)
+			}
+		}
+		// And the limits, read off the handler's own constants.
+		if !strings.Contains(page, fmt.Sprint(MaxUploadEntries)) {
+			t.Errorf("InfoMessage=%q: the guide does not say how many rows fit", told)
+		}
+	}
+}
+
+// Every header spelling the guide prints is one docparse still reads.
+//
+// The spellings are taken off the rendered page rather than listed here,
+// because a list here would be a third copy: the parser has its own, the
+// guide prints its own, and only the page is what somebody follows. Each
+// one is then handed to the parser, which answers for itself - it is a
+// switch of substring tests, and reading it by eye is how a documented
+// column comes to be one nothing matches.
+func TestHandoffGuideNamesColumnsTheParserReads(t *testing.T) {
+	page := renderPage(t, "upload_handoff.html", false, PageVars{
+		BetaNav:        &NavElem{Short: "b"},
+		HandoffOrigins: HandoffOrigins,
+	})
+
+	tables := regexp.MustCompile(`(?s)<table class="handoff-cols">(.*?)</table>`).FindAllStringSubmatch(page, -1)
+	if len(tables) == 0 {
+		t.Fatal("the guide prints no column table")
+	}
+
+	spelt := regexp.MustCompile(`<code>([^<]+)</code>`)
+	var parser docparse.Parser
+	var checked int
+
+	for _, table := range tables {
+		for _, found := range spelt.FindAllStringSubmatch(table[1], -1) {
+			spelling := found[1]
+			checked++
+
+			// Paired with a card name, since a lone column is read as a
+			// decklist and a header anchored on nothing is handed back to
+			// be re-read as data.
+			indexMap, err := parser.ParseHeader([]string{spelling, "card name"})
+			if err != nil {
+				t.Errorf("%q: ParseHeader refused it: %v", spelling, err)
+				continue
+			}
+			var reached bool
+			for _, at := range indexMap {
+				if at == 0 {
+					reached = true
+					break
+				}
+			}
+			if !reached {
+				t.Errorf("%q is printed on the handoff page and reaches no field", spelling)
+			}
+		}
+	}
+
+	if checked < 20 {
+		t.Errorf("only %d spellings were checked; the tables are probably not being read", checked)
+	}
 }

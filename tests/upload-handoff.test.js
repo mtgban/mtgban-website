@@ -22,8 +22,9 @@ function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot 
             getAttribute: (name) =>
                 name === 'data-can-upload' ? String(canUpload) : JSON.stringify(origins),
         },
-        'handoff-status': {textContent: ''},
-        'handoff-hint': {hidden: true},
+        'handoff-status': {hidden: true},
+        'handoff-status-text': {textContent: ''},
+        'handoff-guide': {hidden: false},
         'handoff-form': {submit: () => submitted.push(true)},
         'handoff-rows': {value: ''},
         'handoff-source': {value: ''},
@@ -35,7 +36,7 @@ function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot 
     // before it announces itself.
     if (!canUpload) {
         delete elements['handoff-status'];
-        delete elements['handoff-hint'];
+        delete elements['handoff-status-text'];
         delete elements['handoff-form'];
         delete elements['handoff-rows'];
         delete elements['handoff-source'];
@@ -79,17 +80,28 @@ describe('asking for the rows', () => {
         expect(loadHandoff({opener, origins: []}).sent).toEqual([]);
     });
 
-    test('opened by hand it explains itself instead of waiting', () => {
+    test('opened by hand it leaves the guide up instead of waiting', () => {
+        // The guide is what the page renders; nothing here has to put it
+        // there. What matters is that the progress line, and the spinner
+        // on it, stay down - there is nothing coming to spin for.
         const {elements, sent} = loadHandoff({opener: null});
 
-        expect(elements['handoff-status'].textContent).toBe('Nothing was handed to this page.');
-        expect(elements['handoff-hint'].hidden).toBe(false);
+        expect(elements['handoff-guide'].hidden).toBe(false);
+        expect(elements['handoff-status'].hidden).toBe(true);
         expect(sent).toEqual([]);
     });
 
     test('an opener that has since gone is the same as none', () => {
         const {elements} = loadHandoff({opener: {closed: true}});
-        expect(elements['handoff-status'].textContent).toBe('Nothing was handed to this page.');
+        expect(elements['handoff-guide'].hidden).toBe(false);
+        expect(elements['handoff-status'].hidden).toBe(true);
+    });
+
+    test('an opener to hear from swaps the guide for the progress line', () => {
+        const {elements} = loadHandoff({opener: {closed: false}});
+
+        expect(elements['handoff-status'].hidden).toBe(false);
+        expect(elements['handoff-guide'].hidden).toBe(true);
     });
 
     test('it says nothing at all when the page cannot upload', () => {
@@ -124,7 +136,7 @@ describe('taking the rows', () => {
         const {deliver, elements} = loadHandoff({opener});
 
         deliver(rowsMessage(opener, {data: {type: ROWS, csv: 'a\n1\n', rows: 12}}));
-        expect(elements['handoff-status'].textContent).toBe('Pricing 12 rows…');
+        expect(elements['handoff-status-text'].textContent).toBe('Pricing 12 rows…');
     });
 
     test('one row is not one rows', () => {
@@ -132,7 +144,7 @@ describe('taking the rows', () => {
         const {deliver, elements} = loadHandoff({opener});
 
         deliver(rowsMessage(opener, {data: {type: ROWS, csv: 'a\n1\n', rows: 1}}));
-        expect(elements['handoff-status'].textContent).toBe('Pricing 1 row…');
+        expect(elements['handoff-status-text'].textContent).toBe('Pricing 1 row…');
     });
 
     test('no count given is no count claimed', () => {
@@ -140,7 +152,7 @@ describe('taking the rows', () => {
         const {deliver, elements} = loadHandoff({opener});
 
         deliver(rowsMessage(opener));
-        expect(elements['handoff-status'].textContent).toBe('Pricing your list…');
+        expect(elements['handoff-status-text'].textContent).toBe('Pricing your list…');
     });
 
     test('a second message is not a second upload', () => {

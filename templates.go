@@ -54,6 +54,11 @@ var funcMap = template.FuncMap{
 	// attribute. A list that cannot be written comes out as an empty one:
 	// for the handoff page, whose attribute names who may hand it a card
 	// list, that is a page listening to nobody rather than to everybody.
+	// What a page documenting the upload may say about its size, read off
+	// the handler's own constants rather than written out beside them.
+	"uploadLimit":    func() int { return MaxUploadEntries },
+	"uploadProLimit": func() int { return MaxUploadProEntries },
+	"uploadMaxMB":    func() int { return MaxUploadFileSize >> 20 },
 	"jsonArray": func(values []string) string {
 		if values == nil {
 			values = []string{}
