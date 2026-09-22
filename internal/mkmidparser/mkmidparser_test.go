@@ -214,3 +214,50 @@ func TestTheWalkHappensOnce(t *testing.T) {
 			"being reused", perRow, walk)
 	}
 }
+
+func TestASupersededBuildIsNotPublished(t *testing.T) {
+	// A build takes milliseconds, which is long enough for a refresh to
+	// land in the middle of one. The build that started earlier must not
+	// install itself over the newer index already published.
+	p, live := newParser()
+
+	older := live.publish(shelf("MKMTrend", map[string]string{"uuid-before": "900001"}))
+	if got := p.Resolve("900001"); got != "uuid-before" {
+		t.Fatalf("before the refresh = %q, want uuid-before", got)
+	}
+
+	newer := live.publish(shelf("MKMTrend", map[string]string{"uuid-after": "900001"}))
+	if got := p.Resolve("900001"); got != "uuid-after" {
+		t.Fatalf("after the refresh = %q, want uuid-after", got)
+	}
+
+	// The first upload finishes its walk and tries to install what it
+	// built, which describes inventories no longer live.
+	p.publish(older, map[string]string{"900001": "uuid-before"})
+
+	if p.cached.Load().builtFrom != newer {
+		t.Error("a superseded build installed itself over the newer index")
+	}
+	if got := p.Resolve("900001"); got != "uuid-after" {
+		t.Errorf("resolved to %q after a late publish, want uuid-after", got)
+	}
+}
+
+func TestASupersededParserIsNeverServed(t *testing.T) {
+	// The read is what makes the above safe rather than merely tidy: an
+	// index keyed to shelves no longer live is never served, however it
+	// came to be there.
+	p, live := newParser()
+
+	older := []mtgban.Seller{shelf("MKMTrend", map[string]string{"uuid-before": "900001"})}
+	live.publish(shelf("MKMTrend", map[string]string{"uuid-after": "900001"}))
+
+	p.cached.Store(&built{
+		builtFrom: &older,
+		ids:       map[string]string{"900001": "uuid-before"},
+	})
+
+	if got := p.Resolve("900001"); got != "uuid-after" {
+		t.Errorf("served a superseded index: %q, want uuid-after", got)
+	}
+}

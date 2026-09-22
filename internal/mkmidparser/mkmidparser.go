@@ -60,8 +60,29 @@ type built struct {
 	ids map[string]string
 }
 
-// publish installs an index for a snapshot.
+// publish installs an index, unless the inventories it describes have
+// already been replaced.
+//
+// A walk takes milliseconds, which is long enough for a scrapers refresh
+// to land in the middle of one. Without this check a build that started
+// on the older snapshot would install itself on top of a newer one
+// already published, and the cache would be keyed to inventories that are
+// no longer live.
+//
+// Nothing would be resolved wrongly from it - ids compares the key
+// against the current snapshot on every read, so a superseded index is
+// never served - but the next reader would pay for a rebuild that need
+// not have happened, and a cache describing replaced inventories is close
+// enough to the thing this whole package exists to avoid that it is worth
+// not leaving lying around.
+//
+// The check narrows the window rather than closing it: the snapshot can
+// still move between the load here and the store below. What makes that
+// harmless is the same key check on the read, not this.
 func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
+	if p.Sellers() != snapshot {
+		return
+	}
 	p.cached.Store(&built{builtFrom: snapshot, ids: ids})
 }
 
@@ -97,6 +118,10 @@ func (p *Parser) ids() map[string]string {
 	ids := build(*snapshot)
 	p.publish(snapshot, ids)
 
+	// Answered from what was asked about, whether or not it was published.
+	// A caller that started under an older snapshot finishes under it,
+	// which is steadier than changing its mind about the inventories half
+	// way down a list.
 	return ids
 }
 
