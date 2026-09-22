@@ -35,7 +35,10 @@
     <!-- Hidden until the script finds somebody to receive a list from, so
          that a page opened by hand shows the guide rather than a line
          waiting for something that is never coming. -->
-    <p id="handoff-status" hidden><span id="handoff-status-text">Waiting for the card list&hellip;</span></p>
+    <p id="handoff-status" class="handoff-status" hidden>
+        <span class="handoff-spinner" aria-hidden="true"></span>
+        <span id="handoff-status-text">Waiting for the card list&hellip;</span>
+    </p>
     {{else}}
     <!-- No signature, or one whose tier does not carry Upload. The list is
          not taken: it would be walked, handed over, posted, and refused at
