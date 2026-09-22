@@ -55,7 +55,7 @@ func expiresIn(t *testing.T, v url.Values) time.Duration {
 
 // The point of the dropdown: the link is good for as long as it was cut for.
 func TestInviteLinkExpiresWhenAsked(t *testing.T) {
-	for _, days := range []int{1, 7, 15, 31, 60} {
+	for _, days := range []int{1, 7, 15, 30, 60} {
 		got := expiresIn(t, inviteSig(t, "tier=Pioneer&duration="+strconv.Itoa(days)))
 		want := time.Duration(days) * 24 * time.Hour
 
