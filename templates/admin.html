@@ -1,3 +1,8 @@
+{{/* No icons of its own, and nothing it loads injects any. The command
+     palette, which every desktop page ships, fetches lucide itself the
+     first time it opens. */}}
+{{define "icons"}}<!-- no lucide: this page has no icons -->{{end}}
+
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/admin.css?hash={{.Hash}}">
 {{end}}
