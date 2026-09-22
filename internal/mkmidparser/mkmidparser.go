@@ -1,100 +1,162 @@
-// Package mkmidparser resolves a Cardmarket product id to the card it
-// names, for the upload's mcm_id column.
+// Package mkmidparser resolves a Cardmarket product id to the card it names.
 //
-// It is the one direction the Cardmarket scrapers do not publish. Their
-// inventories are keyed by uuid, with the product each entry priced
-// carried alongside it, so uuid-to-product is a map lookup and
-// product-to-uuid is not.
+// The Cardmarket scrapers publish inventories keyed by uuid, with the
+// product each entry priced carried alongside it. Nothing had ever needed
+// the other direction, so the upload used to walk all three shelves per
+// row looking for one id - which suited a column almost no upload carried,
+// and stopped suiting it when the cm-banner extension began writing that
+// column on every row.
+//
+// This is that walk, done once and kept, for as long as the shelves it was
+// built from are the ones still published.
 package mkmidparser
 
 import (
+	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// Parser answers the id-to-card question for a sellers snapshot.
+// Parser answers the id-to-card question, holding the index it answers
+// from.
 //
-// Sellers is how it reaches the current one. A function rather than a
-// value, because the answer has to be about what is published now; passed
-// in rather than reached for, because the snapshot belongs to whoever
-// loaded it - the same reason docparse takes Resolve as a hook instead of
-// importing what holds it.
+// Sellers is how it reaches the current snapshot. It is a function rather
+// than a value because the answer has to be about what is published now,
+// and rather than a global because the snapshot belongs to whoever loaded
+// it - the same reason docparse takes this package's Resolve as a hook
+// instead of importing it.
 type Parser struct {
 	Sellers func() *[]mtgban.Seller
+
+	cached atomic.Pointer[built]
 }
 
 // shelfNames are the Cardmarket scrapers that publish the product they
 // priced, which is what makes this direction possible at all.
-var shelfNames = []string{"MKMTrend", "MKMLow", "MKMSealed"}
-
-// inventoryOf finds one of those shelves in a snapshot.
-func inventoryOf(sellers []mtgban.Seller, shorthand string) mtgban.InventoryRecord {
-	for _, seller := range sellers {
-		if strings.EqualFold(seller.Info().Shorthand, shorthand) {
-			return seller.Inventory()
-		}
-	}
-	return nil
-}
-
-// Resolve answers with the card a Cardmarket product id names, by walking the
-// inventories the Cardmarket scrapers publish, where each entry carries the
-// product it priced in OriginalID. Returns "" if the id is unknown.
 //
-// The walk is the lookup. findOriginalID goes the other way for free because
-// an inventory is keyed by uuid; this direction has no such key, so the scan
-// is the whole of it and it runs per uploaded row rather than off an index
-// built at load time. That suits a column almost no upload carries.
-//
-// The sealed shelves are walked too. A seller's offers are not all singles,
+// The sealed shelf is one of them. A seller's offers are not all singles,
 // and a sealed product's id is published by the sealed scraper rather than
 // the two singles indexes, so leaving it out would resolve every card on a
 // mixed page and none of the boxes.
+var shelfNames = []string{"MKMTrend", "MKMLow", "MKMSealed"}
+
+// built is the reverse of what those shelves publish - their entries
+// carry the product they priced, and this is that read the other way round.
 //
-// One product is routinely several uuids, and which ones decides whether the
-// id names a card. Cardmarket sells a printing's finishes as one product, so
-// the foil and the plain entry answer to the same id and differ only by the
-// suffix the datastore files a finish under: half of the 103,611 ids on the
-// Magic shelves are shared that way, and the upload's own foil column says
-// which finish is meant. Those agree, and the base uuid is the answer - the
-// finish is re-resolved from the flag, not from which index was read first.
-// Only a disagreement about the card itself - 1,525 ids, where the base uuids
-// differ - names nothing, and returns "" so the row falls back to its name
-// and edition.
-func (p *Parser) Resolve(mkmID string) string {
-	if mkmID == "" || p.Sellers == nil {
-		return ""
+// It carries the sellers snapshot it was built from, because that is what
+// says whether it is still true. The inventories are replaced by
+// updateSellers, which does not touch the datastore stamp, so an index
+// keyed on that would go on describing the previous snapshot after a
+// scrapers-only refresh - and would say so silently, by resolving ids to
+// cards that had moved.
+type built struct {
+	// The snapshot this was last matched against, which is the cheap
+	// question: if the sellers have not been republished at all, nothing
+	// this describes can have changed.
+	builtFrom *[]mtgban.Seller
+
+	ids map[string]string
+}
+
+// publish installs an index for a snapshot.
+func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
+	p.cached.Store(&built{builtFrom: snapshot, ids: ids})
+}
+
+// ids answers with the index for the sellers currently published,
+// building it if what is cached was built from an older snapshot.
+//
+// Nothing here is ordered against anything else, and it does not need to
+// be: what makes an answer correct is that its key matches the snapshot
+// being asked about, and that is checked on every read. Two uploads
+// arriving together on the same snapshot may both build one, and either
+// may be the one that lands - they were built from the same inventories,
+// so the duplicate work is all it costs.
+//
+// The alternative was a lock held across the build, which buys a walk
+// saved and every other upload waiting behind it.
+func (p *Parser) ids() map[string]string {
+	if p.Sellers == nil {
+		return nil
 	}
 	snapshot := p.Sellers()
 	if snapshot == nil {
-		return ""
+		return nil
 	}
 
-	var found string
-	for _, shorthand := range shelfNames {
-		inv := inventoryOf(*snapshot, shorthand)
-		if inv == nil {
+	cached := p.cached.Load()
+	if cached != nil && cached.builtFrom == snapshot {
+		return cached.ids
+	}
+
+	// Built from the snapshot that was loaded, not from whatever GetSellers
+	// answers by the time the walk reaches it: the key has to name what
+	// the index actually describes.
+	ids := build(*snapshot)
+	p.publish(snapshot, ids)
+
+	return ids
+}
+
+// build walks the Cardmarket shelves once and records, for each
+// product id they price, the card it names.
+//
+// One product is routinely several uuids, and which ones decides whether
+// the id names a card at all. Cardmarket sells a printing's finishes as one
+// product, so the foil and the plain entry answer to the same id and differ
+// only by the suffix the datastore files a finish under: half of the
+// 103,611 ids on the Magic shelves are shared that way, and the upload's
+// own foil column says which finish is meant. Those agree, and the base
+// uuid is the answer - the finish is re-resolved from the flag, not from
+// which shelf was read first. Only a disagreement about the card itself -
+// 1,525 ids, where the base uuids differ - names nothing.
+func build(sellers []mtgban.Seller) map[string]string {
+	ids := map[string]string{}
+
+	for _, seller := range sellers {
+		if !slices.ContainsFunc(shelfNames, func(shelf string) bool {
+			return strings.EqualFold(seller.Info().Shorthand, shelf)
+		}) {
 			continue
 		}
-		for uuid, entries := range inv {
+
+		for uuid, entries := range seller.Inventory() {
 			base := baseUUID(uuid)
-			if base == found {
-				continue
-			}
 			for _, entry := range entries {
-				if entry.OriginalID != mkmID {
+				if entry.OriginalID == "" {
 					continue
 				}
-				if found != "" {
-					return ""
+				found, seen := ids[entry.OriginalID]
+				if !seen {
+					ids[entry.OriginalID] = base
+					continue
 				}
-				found = base
-				break
+				if found != base {
+					// Names nothing, and stays that way: "" is not a base
+					// uuid, so a later shelf agreeing with either of them
+					// cannot talk it back round.
+					ids[entry.OriginalID] = ""
+				}
 			}
 		}
 	}
-	return found
+
+	return ids
+}
+
+// Resolve answers with the card a Cardmarket product id names, or "" if
+// the id is unknown, and "" as well if it names more than one card.
+//
+// An id the shelves do not price is unknown, and one they disagree about
+// names more than one card, which is the same answer: the row falls back
+// to its name and edition.
+func (p *Parser) Resolve(mkmID string) string {
+	if mkmID == "" {
+		return ""
+	}
+	return p.ids()[mkmID]
 }
 
 // baseUUID drops the suffix the datastore files a non-default finish under,

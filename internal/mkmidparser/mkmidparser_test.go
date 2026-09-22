@@ -1,8 +1,11 @@
 package mkmidparser
 
 import (
+	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -99,5 +102,115 @@ func TestResolveWithNothingPublished(t *testing.T) {
 	}
 	if got := (&Parser{}).Resolve("265854"); got != "" {
 		t.Errorf("with no source = %q, want empty string", got)
+	}
+}
+
+func TestParserFollowsTheShelves(t *testing.T) {
+	// The inventories are replaced without the datastore moving, so an
+	// index keyed on a datastore stamp would go on answering from the
+	// previous shelves - and would do it silently.
+	p, live := newParser()
+
+	live.publish(shelf("MKMTrend", map[string]string{"uuid-before": "700001"}))
+	if got := p.Resolve("700001"); got != "uuid-before" {
+		t.Fatalf("before the refresh = %q, want uuid-before", got)
+	}
+
+	live.publish(shelf("MKMTrend", map[string]string{"uuid-after": "700001"}))
+	if got := p.Resolve("700001"); got != "uuid-after" {
+		t.Errorf("after the refresh = %q, want uuid-after", got)
+	}
+}
+
+func TestParserIsPublishedWithoutALock(t *testing.T) {
+	// Readers resolving while the inventories are replaced under them.
+	// Every answer has to be one of the two snapshots' answers: a reader
+	// may see either, having asked while the ground was moving, but never
+	// a torn index. Run with -race, which is the point of it.
+	p, live := newParser()
+
+	before := shelf("MKMTrend", map[string]string{"uuid-before": "900001"})
+	after := shelf("MKMTrend", map[string]string{"uuid-after": "900001"})
+	live.publish(before)
+
+	stop := make(chan struct{})
+	var refresher sync.WaitGroup
+	refresher.Add(1)
+	go func() {
+		defer refresher.Done()
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if i%2 == 0 {
+				live.publish(after)
+			} else {
+				live.publish(before)
+			}
+		}
+	}()
+
+	var readers sync.WaitGroup
+	for reader := 0; reader < 8; reader++ {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			for i := 0; i < 2000; i++ {
+				switch got := p.Resolve("900001"); got {
+				case "uuid-before", "uuid-after":
+				default:
+					t.Errorf("resolved to %q, which is neither snapshot", got)
+					return
+				}
+			}
+		}()
+	}
+
+	readers.Wait()
+	close(stop)
+	refresher.Wait()
+}
+
+func TestTheWalkHappensOnce(t *testing.T) {
+	// What the index changed. The walk it replaced ran per uploaded row,
+	// so a list of N rows read the shelves N times; this reads them once
+	// and then answers from a map. Logged rather than asserted on a
+	// threshold, which would fail on a slow machine and not on a
+	// regression - the ratio is the claim.
+	const cards = 8000
+	const rows = 200
+
+	byUUID := make(map[string]string, cards)
+	for i := 0; i < cards; i++ {
+		byUUID[fmt.Sprintf("uuid-%06d", i)] = fmt.Sprintf("%d", 800000+i)
+	}
+
+	p, live := newParser()
+	live.publish(shelf("MKMTrend", byUUID))
+
+	first := time.Now()
+	if got := p.Resolve("800000"); got != "uuid-000000" {
+		t.Fatalf("first lookup = %q, want uuid-000000", got)
+	}
+	walk := time.Since(first)
+
+	rest := time.Now()
+	for i := 0; i < rows; i++ {
+		id := fmt.Sprintf("%d", 800000+i)
+		if got := p.Resolve(id); got != fmt.Sprintf("uuid-%06d", i) {
+			t.Fatalf("lookup %s = %q", id, got)
+		}
+	}
+	perRow := time.Since(rest) / rows
+
+	t.Logf("%d cards: one walk %v, then %v a row - the walk it replaced ran "+
+		"once a row, so %d rows cost about %v", cards, walk, perRow, rows,
+		time.Duration(rows)*walk)
+
+	if perRow > walk/10 {
+		t.Errorf("a row still costs %v against a %v walk: the index is not "+
+			"being reused", perRow, walk)
 	}
 }
