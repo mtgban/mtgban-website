@@ -32,7 +32,8 @@
     }
 
     var status = document.getElementById("handoff-status");
-    var hint = document.getElementById("handoff-hint");
+    var statusText = document.getElementById("handoff-status-text");
+    var guide = document.getElementById("handoff-guide");
     var form = document.getElementById("handoff-form");
     var rows = document.getElementById("handoff-rows");
     var source = document.getElementById("handoff-source");
@@ -50,13 +51,30 @@
         allowed = [];
     }
 
-    // Opened by hand rather than by an extension: there is nobody to ask, so
-    // say what this page is for and stop.
+    // say writes the line about what is happening to the list. The spinner
+    // beside it is the stylesheet's, and is shown and hidden with the line
+    // it sits on rather than being driven from here.
+    function say(message) {
+        if (statusText) {
+            statusText.textContent = message;
+        }
+    }
+
+    // Opened by hand rather than by an extension: there is nobody to ask,
+    // and the page is already showing the guide that says what it is for.
     var opener = window.opener;
     if (!opener || opener.closed) {
-        status.textContent = "Nothing was handed to this page.";
-        hint.hidden = false;
         return;
+    }
+
+    // Somebody to hear from. The page stops being documentation and starts
+    // being a progress line - which is the whole of what it has to say
+    // from here until it submits.
+    if (status) {
+        status.hidden = false;
+    }
+    if (guide) {
+        guide.hidden = true;
     }
 
     // Taken once. A second message is not a second upload.
@@ -97,10 +115,9 @@
         // A count is shown when it is given and not counted for otherwise.
         var count = event.data.rows;
         if (typeof count === "number" && count > 0) {
-            status.textContent =
-                "Pricing " + count + " row" + (count === 1 ? "" : "s") + "…";
+            say("Pricing " + count + " row" + (count === 1 ? "" : "s") + "…");
         } else {
-            status.textContent = "Pricing your list…";
+            say("Pricing your list…");
         }
 
         form.submit();

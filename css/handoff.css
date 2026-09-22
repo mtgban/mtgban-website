@@ -28,18 +28,22 @@
     margin-top: 18px;
 }
 
+/* Patreon's own colours, worn the way the landing page's login button
+   wears them. Light text on an accent fill needs a background token to
+   read against, and the one this page would use flips with the theme. */
 .handoff-btn {
-    padding: 8px 16px;
-    border: 1px solid var(--ainfo);
+    padding: 8px 20px;
+    border: 1px solid rgba(255, 66, 77, 0.25);
     border-radius: var(--radius-sm);
-    background: var(--ainfo);
-    color: var(--background);
+    background: rgba(255, 66, 77, 0.1);
+    color: #ff424d;
     font-weight: 600;
     text-decoration: none;
 }
 
 .handoff-btn:hover {
-    filter: brightness(1.1);
+    background: rgba(255, 66, 77, 0.2);
+    text-decoration: none;
 }
 
 .handoff-btn-secondary {
@@ -49,6 +53,81 @@
 }
 
 .handoff-btn-secondary:hover {
+    background: var(--bg-hover);
     color: var(--normal);
-    filter: none;
+}
+
+/* ═══ The guide, which is what the page shows until a list arrives ═══ */
+
+#handoff-guide code {
+    padding: 1px 5px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.handoff-cols {
+    width: 100%;
+    margin: 12px 0 20px;
+    border-collapse: collapse;
+    font-size: 15px;
+}
+
+.handoff-cols th,
+.handoff-cols td {
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.handoff-cols th {
+    color: var(--normal);
+    font-weight: 600;
+    border-bottom-color: var(--border-moderate);
+}
+
+/* The field name is the column being looked up, so it stays on one line
+   and the spellings beside it take the wrapping. */
+.handoff-cols td:first-child {
+    width: 34%;
+    color: var(--normal);
+    white-space: nowrap;
+}
+
+.handoff-example {
+    /* main.css lays every pre out inline-block, which shrinks this one to
+       its longest line and leaves the panel ragged. */
+    display: block;
+    margin: 12px 0 20px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    /* A header row of column names is long and means nothing broken in
+       half, so it scrolls rather than wraps. */
+    overflow-x: auto;
+    white-space: pre;
+}
+
+@media (max-width: 600px) {
+    .handoff-cols td:first-child {
+        width: auto;
+        white-space: normal;
+    }
+}
+
+/* The line saying nothing arrived, above the guide that explains what
+   would have. Only a reader who could have received one sees it. */
+.handoff-idle {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--normal);
 }
