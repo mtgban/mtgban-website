@@ -1194,7 +1194,7 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&b, `<a class="pagination" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
+		fmt.Fprintf(&b, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
 
 		keyruneCode := strings.ToLower(set.KeyruneCode)
 		if keyruneCode == "" {
