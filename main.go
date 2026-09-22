@@ -1683,7 +1683,15 @@ func main() {
 
 	// The upload handoff sits under /upload but is its own page: the nav
 	// entry registers an exact path, so it needs naming here.
-	http.Handle("/upload/handoff", enforceSigning(http.HandlerFunc(UploadHandoff)))
+	//
+	// Served without the signing middleware, which would answer a reader
+	// who has no signature with the home page. This one is worth reaching
+	// signed out: somebody sent here by an extension arrives knowing
+	// nothing about the site, and the page can say what it is and what it
+	// would take to use it. It grants nothing by being read - the rows it
+	// receives are posted to /upload, which is enforced as it always was -
+	// and it checks the signature itself before it agrees to receive any.
+	http.Handle("/upload/handoff", noSigning(http.HandlerFunc(UploadHandoff)))
 
 	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
 	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(SearchAPI)))

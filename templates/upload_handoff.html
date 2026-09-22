@@ -5,10 +5,33 @@
 
 {{define "title"}}Receiving a card list &mdash; MTGBAN{{end}}
 
+{{define "extra-css"}}<link rel="stylesheet" type="text/css" href="/css/handoff.css?hash={{.Hash}}">{{end}}
+
+{{define "extra-head"}}
+{{if .PatreonLogin}}
+<script type="text/javascript">
+    // The same construction the landing and search pages use: built at
+    // click time so this page rides along in the state param and the
+    // reader is returned here rather than to the home page - they came
+    // with a card list in hand, and it is still waiting in the tab that
+    // opened this one.
+    function getPatreonURL(patreonId, client) {
+        return "https://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash + ";" + client);
+    }
+</script>
+{{end}}
+{{end}}
+
 {{define "content"}}
-<div class="legal" id="handoff" data-handoff-origins="{{jsonArray .HandoffOrigins}}">
+{{/* One condition wearing two faces: the page either takes a list or says
+     why it will not, and the line saying why is how it knows. */}}
+{{$receiving := not .InfoMessage}}
+<div class="legal" id="handoff"
+     data-handoff-origins="{{jsonArray .HandoffOrigins}}"
+     data-can-upload="{{if $receiving}}true{{else}}false{{end}}">
     <h1>Receiving a card list</h1>
 
+    {{if $receiving}}
     <p id="handoff-status">Waiting for the card list&hellip;</p>
 
     <p id="handoff-hint" hidden>
@@ -28,6 +51,28 @@
              server, which is the only side that decides what it is called. -->
         <input type="hidden" id="handoff-source" name="uploadSource">
     </form>
+    {{else}}
+    <!-- No signature, or one whose tier does not carry Upload. The list is
+         not taken: it would be walked, handed over, posted, and refused at
+         the far end. Better to say so while it is still on the shelf. -->
+    <div class="handoff-locked">
+        <p class="handoff-locked-msg">{{.InfoMessage}}</p>
+        <p>
+            This page receives a card list from a browser extension and
+            prices it against every store MTGBAN follows &mdash; what each
+            one sells your cards for, what each one pays for them, and where
+            the gap between the two is worth acting on.
+        </p>
+        <div class="handoff-locked-actions">
+            {{if .PatreonLogin}}
+                {{range $ref, $id := .PatreonIDs}}
+                <a class="handoff-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
+                {{end}}
+            {{end}}
+            <a class="handoff-btn handoff-btn-secondary" href="/">See what BAN does</a>
+        </div>
+    </div>
+    {{end}}
 </div>
 
 <script type="text/javascript" src="/js/upload-handoff.js?hash={{.Hash}}"></script>

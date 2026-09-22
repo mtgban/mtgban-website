@@ -22,6 +22,15 @@
         return;
     }
 
+    // A reader with no signature, or whose tier does not carry the Upload
+    // grant. The page has already said so; what matters here is that it
+    // stays silent. An extension that heard this one announce itself would
+    // hand over a list nothing can price - and on the storefronts this is
+    // built for, gathering that list is minutes of somebody's afternoon.
+    if (root.getAttribute("data-can-upload") !== "true") {
+        return;
+    }
+
     var status = document.getElementById("handoff-status");
     var hint = document.getElementById("handoff-hint");
     var form = document.getElementById("handoff-form");
