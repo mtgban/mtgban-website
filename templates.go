@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -68,6 +69,24 @@ var funcMap = template.FuncMap{
 	// by the time it is drawn.
 	"datastore_reload": func() dsreload.State {
 		return datastoreReloads.Status()
+	},
+	// sourceLink answers with a URL a results row can be made clickable
+	// with, or "" for a note that is not one.
+	//
+	// The notes column is whatever the uploaded file put in it, so only an
+	// absolute http or https URL becomes a link and every other note stays
+	// the text it is. html/template would refuse a javascript: href on its
+	// own, but a note is not a link merely for being a string, and a row
+	// whose note is a sentence should not look like one.
+	"sourceLink": func(note string) string {
+		parsed, err := url.Parse(strings.TrimSpace(note))
+		if err != nil || parsed.Host == "" {
+			return ""
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return ""
+		}
+		return parsed.String()
 	},
 	"inc": func(i, j int) int {
 		return i + j
