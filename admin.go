@@ -80,9 +80,16 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	if msg != "" {
 		pageVars.InfoMessage = msg
 	}
-	html := r.FormValue("html")
-	if html == "textfield" {
+	// What the result is, said in a word the page can print beside it. The
+	// token is matched rather than shown, so the label is this code's to
+	// write and not something a query string can put on the page.
+	switch r.FormValue("html") {
+	case "textfield":
 		pageVars.SelectableField = true
+		pageVars.SelectableLabel = "New key"
+	case "invite":
+		pageVars.SelectableField = true
+		pageVars.SelectableLabel = "Invite link"
 	}
 
 	refresh := r.FormValue("refresh")
@@ -303,15 +310,25 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", msg)
 		v.Set("html", "textfield")
 
-	case "spoof":
+	case "invite":
 		v = url.Values{}
 		doReboot = true
 
 		tier := r.FormValue("tier")
-		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil))
+
+		// How long the link is good for, in days. A request that names no
+		// duration - an old bookmark, a hand-written URL - gets the length a
+		// login gets, which is what this tool handed out before it could be
+		// asked for anything else.
+		duration := DefaultSignatureDuration
+		days, err := strconv.Atoi(r.FormValue("duration"))
+		if err == nil && days > 0 {
+			duration = time.Duration(days) * 24 * time.Hour
+		}
+		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil, duration))
 
 		v.Set("msg", msg)
-		v.Set("html", "textfield")
+		v.Set("html", "invite")
 	}
 	if doReboot {
 		r.URL.RawQuery = v.Encode()

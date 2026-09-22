@@ -279,7 +279,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	LogPages["Admin"].Println(tierTitle)
 
 	// Sign our base URL with our tier and other data
-	sig := sign(tierTitle, userData, overrides)
+	sig := sign(tierTitle, userData, overrides, DefaultSignatureDuration)
 
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, r, sig)
@@ -778,7 +778,12 @@ func signatureLink() string {
 // sign encodes tierTitle's ACL values into a signature, with overrides -
 // a grant's own values for this one user - layered on top afterward so
 // they win over anything the tier itself set.
-func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[string]string) string {
+//
+// The duration is the caller's: a login asks for DefaultSignatureDuration, an
+// invite link for however long it was cut for. There is no unexpiring answer -
+// signatureIsValid refuses a sig whose Expires will not parse as readily as
+// one whose Expires has passed.
+func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[string]string, duration time.Duration) string {
 	v := getValuesForTier(tierTitle)
 	applyACL(v, overrides)
 	if userData != nil {
@@ -788,7 +793,7 @@ func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[
 	}
 
 	link := signatureLink()
-	expires := time.Now().Add(DefaultSignatureDuration)
+	expires := time.Now().Add(duration)
 	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
 	key := os.Getenv("BAN_SECRET")
 	sig := signHMACSHA1Base64([]byte(key), []byte(data))

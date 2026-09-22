@@ -231,6 +231,7 @@ type PageVars struct {
 	Finishes     []string
 
 	SelectableField bool
+	SelectableLabel string
 	DisableLinks    bool
 
 	DisableChart    bool
