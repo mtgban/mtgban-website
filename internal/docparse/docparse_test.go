@@ -269,3 +269,59 @@ func TestParseRowResolvesCardmarketID(t *testing.T) {
 		})
 	}
 }
+
+// The cm-banner extension writes a Cardmarket offers page into its last
+// column, and the upload results turn that into the link on the loaded
+// price. The column is named to land in "notes" because that is the field
+// the results already carry through a round trip - nothing in the matcher
+// was widened for it, since a case matching "url" would also swallow the
+// image-url columns other exports carry.
+//
+// This is the join between two repositories, so it is pinned here: the
+// header is cm-banner's, and a change that stops it reaching notes breaks
+// a feature whose other half is not in this tree.
+func TestBannerHeaderReachesNotes(t *testing.T) {
+	header := []string{
+		"mcm_id", "card_name", "edition", "condition",
+		"foil", "quantity", "price_usd", "article_id", "mkm_notes",
+	}
+
+	p := &Parser{}
+	indexMap, err := p.ParseHeader(header)
+	if err != nil {
+		t.Fatalf("ParseHeader: %v", err)
+	}
+
+	idx, found := indexMap["notes"]
+	if !found {
+		t.Fatal("mkm_notes does not reach the notes column")
+	}
+	if header[idx] != "mkm_notes" {
+		t.Errorf("notes is column %d (%q), want mkm_notes", idx, header[idx])
+	}
+
+	// And the columns beside it still land where they did.
+	for key, want := range map[string]string{
+		"mkmID":      "mcm_id",
+		"cardName":   "card_name",
+		"edition":    "edition",
+		"conditions": "condition",
+		"printing":   "foil",
+		"quantity":   "quantity",
+		"price":      "price_usd",
+	} {
+		at, ok := indexMap[key]
+		if !ok {
+			t.Errorf("%s reaches nothing", key)
+			continue
+		}
+		if header[at] != want {
+			t.Errorf("%s is column %q, want %q", key, header[at], want)
+		}
+	}
+
+	// article_id is carried for tracing and is meant to reach nothing.
+	if at, ok := indexMap["id"]; ok && header[at] == "article_id" {
+		t.Error("article_id was read as an identifier")
+	}
+}
