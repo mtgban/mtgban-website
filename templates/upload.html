@@ -544,13 +544,115 @@
                 try { localStorage.setItem('uploadTab', tab); } catch(e) {}
             };
 
+            // A file dropped anywhere on the page is picked up, not just over
+            // the file drop zone - the reader may still be on the URL or Text
+            // tab, and pressed() already switches source to 'file' as part of
+            // handling a selection, so routing every drop through the input
+            // and that same handler covers the mode switch for free.
             (function() {
-                var dropArea = document.getElementById('source-file');
-                if (!dropArea) return;
                 var counter = 0;
-                dropArea.addEventListener('dragenter', function(e) { e.preventDefault(); counter++; dropArea.classList.add('drag-over'); });
-                dropArea.addEventListener('dragleave', function() { counter--; if (counter <= 0) { counter = 0; dropArea.classList.remove('drag-over'); } });
-                dropArea.addEventListener('drop', function() { counter = 0; dropArea.classList.remove('drag-over'); });
+                var previousSource = null;
+                var defaultFileLabel = document.getElementById('fileLabel') ? document.getElementById('fileLabel').innerHTML : '';
+                function hasFiles(e) {
+                    return !!(e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') !== -1);
+                }
+                function activeSourceArea() {
+                    var ids = ['source-file', 'source-url', 'source-text'];
+                    for (var i = 0; i < ids.length; i++) {
+                        var el = document.getElementById(ids[i]);
+                        if (el && !el.classList.contains('upload-source-hidden')) return el;
+                    }
+                    return null;
+                }
+                function activeSourceType() {
+                    var btn = document.querySelector('.upload-source-btn.active');
+                    return btn ? btn.id.replace('src-btn-', '') : null;
+                }
+                // Browsing via the dialog is already constrained to this list
+                // by the input's own accept attribute; a drop bypasses that
+                // natively, so it's re-applied here by hand. Server-side
+                // rejection remains the real backstop either way.
+                function acceptedFile(fileInput, file) {
+                    var accept = (fileInput.getAttribute('accept') || '').split(',')
+                        .map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+                    if (!accept.length) return true;
+                    var name = (file.name || '').toLowerCase();
+                    var type = (file.type || '').toLowerCase();
+                    for (var i = 0; i < accept.length; i++) {
+                        var a = accept[i];
+                        if (a.charAt(0) === '.' ? name.slice(-a.length) === a : type === a) return true;
+                    }
+                    return false;
+                }
+                function rejectFile(file) {
+                    var label = document.getElementById('fileLabel');
+                    var area = document.getElementById('source-file');
+                    if (!label) return;
+                    var message = '"' + file.name + '" is not a CSV, XLS or XLSX file';
+                    label.textContent = message;
+                    if (area) area.classList.add('drag-rejected');
+                    setTimeout(function() {
+                        if (label.textContent === message) label.innerHTML = defaultFileLabel;
+                        if (area) area.classList.remove('drag-rejected');
+                    }, 2500);
+                }
+                document.addEventListener('dragenter', function(e) {
+                    if (!hasFiles(e)) return;
+                    e.preventDefault();
+                    // Preview the eventual outcome as soon as a file crosses
+                    // into the page, rather than highlighting whichever of
+                    // URL/Text happens to be open right up until the drop
+                    // itself switches it. Remembered so dragging back out
+                    // without dropping can put the reader back where they
+                    // were instead of leaving them stranded on File.
+                    if (counter === 0) {
+                        var current = activeSourceType();
+                        previousSource = current === 'file' ? null : current;
+                        selectSource('file');
+                    }
+                    counter++;
+                    var area = activeSourceArea();
+                    if (area) area.classList.add('drag-over');
+                });
+                document.addEventListener('dragover', function(e) {
+                    if (hasFiles(e)) e.preventDefault();
+                });
+                document.addEventListener('dragleave', function(e) {
+                    if (!hasFiles(e)) return;
+                    counter--;
+                    if (counter <= 0) {
+                        counter = 0;
+                        var area = activeSourceArea();
+                        if (area) area.classList.remove('drag-over');
+                        // The drag left without a drop - back to whichever
+                        // tab was open before the preview switched it.
+                        if (previousSource) selectSource(previousSource);
+                        previousSource = null;
+                    }
+                });
+                document.addEventListener('drop', function(e) {
+                    if (!hasFiles(e)) return;
+                    e.preventDefault();
+                    counter = 0;
+                    previousSource = null;
+                    var area = activeSourceArea();
+                    if (area) area.classList.remove('drag-over');
+
+                    var fileInput = document.getElementById('file');
+                    var dropped = e.dataTransfer.files;
+                    if (!fileInput || !dropped || !dropped.length) return;
+
+                    var file = dropped[0];
+                    if (!acceptedFile(fileInput, file)) {
+                        rejectFile(file);
+                        return;
+                    }
+
+                    var transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    fileInput.files = transfer.files;
+                    pressed();
+                });
             })();
 
             window.autoGrowTextArea = function(el) {
