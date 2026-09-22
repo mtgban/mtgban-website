@@ -261,6 +261,16 @@
 }
 
 @media (min-width: 901px) {
+    /* The sidebar reaches the viewport bottom via position: fixed, which
+       contributes no height to this grid - a short result list would
+       otherwise let the document (and the footer after it) end well above
+       that fixed edge, stranding the sidebar's own lower content below the
+       footer instead of above it. Floor the layout at the same height the
+       sidebar occupies so the document always reaches at least that far. */
+    .search-layout {
+        min-height: calc(100dvh - var(--nav-height, 48px) - var(--content-padding-slack, 27px));
+    }
+
     /* Keep the sidebar independent from the result list. Its lower section
        scrolls inside this column, so Available in and export/upload remain
        part of the sidebar without affecting the document footer. */
