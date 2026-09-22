@@ -10,6 +10,24 @@
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
+{{/* The icons this page draws as it loads, as the markup lucide would have
+     produced, minus the data-lucide attribute that would have it redraw them.
+
+     An <i data-lucide> is an empty element until lucide has been fetched from
+     a cdn and run: the button paints without its icon, then widens around one.
+     Drawn here they arrive with the page and never move. An icon that appears
+     on a click - copyShareLink's tick - can still be a placeholder, since by
+     then lucide is long loaded and nothing is waiting on it.
+
+     Sized by the caller: .res-mode-btn svg, .res-mode-upsell svg and
+     .upload-share-link svg in upload.css. */}}
+{{define "upload-icon"}}<svg class="lucide lucide-{{.}}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    {{- if eq . "arrow-left-right"}}<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>
+    {{- else if eq . "lock"}}<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    {{- else if eq . "share-2"}}<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>
+    {{- else if eq . "package-open"}}<path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/>
+    {{- end}}</svg>{{end}}
+
 {{define "content"}}
     <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
     <script type="text/javascript">
@@ -70,7 +88,7 @@
                     {{if .UploadEntries}}{{len .UploadEntries}} row{{if ne (len .UploadEntries) 1}}s{{end}} &middot; {{end}}{{if .UnpackedFrom}}contents of {{.UnpackedFrom}} sealed product{{if ne .UnpackedFrom 1}}s{{end}} &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
                     {{if .RemoteLinkURL}}
                         &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="copyShareLink(this)" title="Copy shareable link">
-                            <i data-lucide="share-2" style="width:14px;height:14px;vertical-align:-2px"></i> Share
+                            {{template "upload-icon" "share-2"}} Share
                         </a>
                         <input type="hidden" id="remoteLinkURL" value="{{.RemoteLinkURL}}">
                     {{end}}
@@ -80,7 +98,7 @@
                              same helper the exports use, so nothing is resolved or
                              carried for a reader who never asks. */}}
                         &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="runUnpack()" title="Price the cards inside the sealed products instead">
-                            <i data-lucide="package-open" style="width:14px;height:14px;vertical-align:-2px"></i> Unpack {{.UnpackSealed}} sealed
+                            {{template "upload-icon" "package-open"}} Unpack {{.UnpackSealed}} sealed
                         </a>
                     {{end}}
                 </p>
@@ -1124,6 +1142,26 @@
                 <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
                 {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
             </div>
+            <div class="res-btn-sep"></div>
+            {{if .CanBuylist}}
+                {{/* The same list, priced the other way round. The rows are read
+                     off the page and posted back the way the exports are, so
+                     the other side costs a click rather than a second upload -
+                     and the stores, index prices and optimizer settings keep
+                     coming from the cookies they always came from. */}}
+                <button class="upload-btn upload-btn-secondary res-mode-btn" onclick="switchUploadMode()"
+                        title="Price this same list against store {{if .IsBuylist}}retail prices{{else}}buylists{{end}}">
+                    {{template "upload-icon" "arrow-left-right"}}Switch to {{if .IsBuylist}}Retail{{else}}Buylist{{end}}
+                </button>
+            {{else}}
+                {{/* Buylist is a tier away, so the button's place says what it
+                     would do rather than going quiet about it. */}}
+                <span class="res-mode-upsell">
+                    {{template "upload-icon" "lock"}}
+                    See what stores would pay for this list with the Legacy tier
+                    <a class="res-mode-upsell-btn" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">Join BAN</a>
+                </span>
+            {{end}}
             {{if .CanBuylist}}
             <div class="res-btn-sep"></div>
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('download', false)">Get CSV</button>
@@ -1745,7 +1783,7 @@
 
     <!-- Hidden form for pick-printing re-submission and exports -->
     <form id="upload_form" action="/upload" method="post" style="display:none">
-        <input type="hidden" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
+        <input type="hidden" id="res_mode" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
         {{if .CanPublishStore}}<input type="hidden" id="res_publishstore" name="publishstore" value="">{{end}}
         <input type="hidden" id="res_download" name="download" value="">
         <input type="hidden" id="res_estimate" name="estimate" value="">
@@ -1842,6 +1880,26 @@
             scope.value = "";
         }
         document.getElementById("res_unpack").value = "true";
+        var form = document.getElementById("upload_form");
+        form.target = '';
+        form.submit();
+    }
+
+    // Prices the list the other way round. Only the mode field changes: the
+    // rows come off the page like every other action here, so nothing has to
+    // be uploaded again, and the handler still refuses buylist to anyone
+    // without the grant however this field arrives.
+    function switchUploadMode() {
+        ensureHashesLoaded('all');
+        resExportFields.forEach(function(id) {
+            document.getElementById(id).value = "";
+        });
+        var scope = document.getElementById("res_csvscope");
+        if (scope) {
+            scope.value = "";
+        }
+        var mode = document.getElementById("res_mode");
+        mode.value = mode.value === "true" ? "false" : "true";
         var form = document.getElementById("upload_form");
         form.target = '';
         form.submit();
