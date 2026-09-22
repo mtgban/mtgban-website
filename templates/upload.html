@@ -1,3 +1,10 @@
+{{/* The loaded price, linked back to where the row was read when the file
+     said: the extension writes the offer's own page into the notes column,
+     so the price you were charged links to the offer charging it. Defined
+     once because both tables draw it - the rows that matched and the ones
+     that found nothing, which are the ones most worth going back to. */}}
+{{define "loaded-price"}}<td class="ures-price">{{$source := sourceLink .Notes}}{{if $source}}<a href="{{$source}}" target="_blank" rel="nofollow noopener" title="Open this offer where it was read from">$ {{printf "%.2f" .OriginalPrice}}</a>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}</td>{{end}}
+
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
@@ -929,11 +936,7 @@
                         {{if $canRemove}}<button type="button" class="ures-remove-btn" onclick="toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>{{end}}
                     </div>
                 </td>
-                {{/* The loaded price is where the row came from, when the
-                     file said: the extension writes the offer's own page
-                     into the notes column, so the price you were charged
-                     links back to the offer charging it. */}}
-                <td class="ures-price">{{$source := sourceLink .Notes}}{{if $source}}<a href="{{$source}}" target="_blank" rel="nofollow noopener" title="Open this offer where it was read from">$ {{printf "%.2f" .OriginalPrice}}</a>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}</td>
+                {{template "loaded-price" .}}
                 <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
                 <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
                 {{range $storeKeys}}
@@ -1094,7 +1097,7 @@
     </thead>
     <tbody>
         {{range .Entries}}
-        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
+        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}">
             <td>
                 <div class="ures-card-cell">
                     <img src="{{card_back}}" loading="lazy">
@@ -1104,7 +1107,7 @@
                     </div>
                 </div>
             </td>
-            <td class="ures-price">{{$source := sourceLink .Notes}}{{if $source}}<a href="{{$source}}" target="_blank" rel="nofollow noopener" title="Open this offer where it was read from">$ {{printf "%.2f" .OriginalPrice}}</a>{{else}}$ {{printf "%.2f" .OriginalPrice}}{{end}}</td>
+            {{template "loaded-price" .}}
             <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
             <td style="text-align:center">{{.Quantity}}</td>
         </tr>
