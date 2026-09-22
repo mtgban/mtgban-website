@@ -238,6 +238,10 @@
     width: fit-content;
     max-width: 100%;
     margin: 0 auto 14px;
+    /* .sidebar-card-img's own max-height, and the fixed-sidebar min-height
+       floor below that keeps it from shrinking past 60% of this, both read
+       the same token so the two can't drift apart from each other. */
+    --sidebar-card-img-cap: 52vh;
 }
 .sidebar-img-wrap.foil-wrap[data-foil="true"]::after,
 .sidebar-img-wrap.foil-wrap[data-etched="true"]::after {
@@ -251,7 +255,7 @@
        centered. width auto keeps the aspect ratio under the cap. */
     width: auto;
     max-width: 100%;
-    max-height: 52vh;
+    max-height: var(--sidebar-card-img-cap, 52vh);
     /* The image and its foil overlay share this, so a scan cut rounder only
        has to set --card-radius (see main.css); the fallback is the default. */
     border-radius: var(--card-radius, var(--radius-lg));
@@ -265,10 +269,19 @@
        contributes no height to this grid - a short result list would
        otherwise let the document (and the footer after it) end well above
        that fixed edge, stranding the sidebar's own lower content below the
-       footer instead of above it. Floor the layout at the same height the
-       sidebar occupies so the document always reaches at least that far. */
+       footer instead of above it. Floor the layout so the document always
+       reaches the top of the reserved footer strip below - the same edge
+       the sidebar itself stops at - rather than the true viewport bottom,
+       which only ever bought a scroll that revealed blank space. */
     .search-layout {
-        min-height: calc(100dvh - var(--nav-height, 48px) - var(--content-padding-slack, 27px));
+        /* The disclosure footer needs about one line of 12px text plus its
+           own 20px/28px top/bottom padding to show without wrapping on any
+           desktop width this layout applies at (901px+) - 90px covers that
+           with room for a second line. Reserved as its own strip rather
+           than left to chance: the sidebar's own bottom edge (below) keys
+           off the same variable, so neither one crowds the footer's spot. */
+        --search-footer-reserve: 90px;
+        min-height: calc(100dvh - var(--nav-height, 48px) - var(--content-padding-slack, 27px) - var(--search-footer-reserve));
     }
 
     /* Keep the sidebar independent from the result list. Its lower section
@@ -284,7 +297,13 @@
         left: calc(50% - min(40vw, 800px) + var(--search-layout-padding));
         width: 340px;
         box-sizing: border-box;
-        height: calc(100dvh - var(--search-sidebar-top));
+        /* Stops short of the true viewport bottom by the reserved footer
+           strip, so Export/Upload - the sidebar's own last, clickable row -
+           never sits underneath where the footer paints once the page
+           reaches it, on a page short or long. Falls back in case a future
+           markup change ever pulls this out from under .search-layout,
+           where --search-footer-reserve is actually declared. */
+        height: calc(100dvh - var(--search-sidebar-top) - var(--search-footer-reserve, 90px));
         min-height: 0;
         max-height: none;
         z-index: 10;
@@ -319,7 +338,12 @@
         flex: 1 1 auto;
         align-items: center;
         justify-content: center;
-        min-height: 120px;
+        /* 60% of the card's own normal cap, kept as one token with
+           .sidebar-card-img's max-height so the two can't drift apart - a
+           flat 120px here let a short viewport (or a sidebar squeezed by a
+           tall .sidebar-body) shrink the card past the point it still reads
+           clearly. */
+        min-height: calc(0.6 * var(--sidebar-card-img-cap, 52vh));
         width: auto;
     }
 
@@ -345,6 +369,11 @@
         position: relative;
         z-index: 20;
         background: var(--background);
+        /* The fixed sidebar already reads as a complete, self-contained
+           column - the 48px of breathing room .site-footer normally keeps
+           above itself just adds scroll a short results page has no content
+           to fill, past a sidebar that already looks done with itself. */
+        margin-top: 0;
     }
 }
 
