@@ -19,7 +19,7 @@
     {{if ne .InfoMessage ""}}
         {{if .SelectableField}}
             <div class="admin-msg">
-                New key: <input value="{{.InfoMessage}}" onFocus="this.setSelectionRange(0, this.value.length)" style="width:70%; padding:4px 8px; background:var(--surface-2); border:1px solid var(--border-moderate); border-radius:4px; color:var(--normal); font-family:var(--font-mono); font-size:var(--text-sm); outline:none;">
+                {{.SelectableLabel}}: <input value="{{.InfoMessage}}" onFocus="this.setSelectionRange(0, this.value.length)" style="width:70%; padding:4px 8px; background:var(--surface-2); border:1px solid var(--border-moderate); border-radius:4px; color:var(--normal); font-family:var(--font-mono); font-size:var(--text-sm); outline:none;">
             </div>
         {{else}}
             <div class="admin-msg">{{.InfoMessage}}</div>
@@ -473,16 +473,30 @@
             <div class="card tools-card">
                 <h3>Admin Tools</h3>
 
+                {{/* An invite link carries a tier's grants and an expiry, so
+                     it takes both before there is anything to mint: either
+                     select submits once the other has been answered, so the
+                     two can be picked in whichever order. */}}
                 <div class="admin-tool">
-                    <label>Spoof User Tier</label>
+                    <label>Create Invite Link</label>
                     <form action="admin" method="GET">
-                        <input type="hidden" name="reboot" value="spoof"/>
-                        <select name="tier" onchange="this.form.submit()">
+                        <input type="hidden" name="reboot" value="invite"/>
+                        <select name="tier" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
                             <option disabled selected value="">~ choose tier ~</option>
                             {{range .Tiers}}
                                 <option value="{{.}}">{{.}}</option>
                             {{end}}
                         </select>
+                        <div class="tool-row">
+                            <select name="duration" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
+                                <option disabled selected value="">~ expires in ~</option>
+                                <option value="1">One day</option>
+                                <option value="7">One week</option>
+                                <option value="15">Two weeks</option>
+                                <option value="31">One month</option>
+                                <option value="60">Two months</option>
+                            </select>
+                        </div>
                     </form>
                 </div>
 
@@ -497,6 +511,7 @@
                                 <option value="0">No expiration</option>
                                 <option value="15">Two weeks</option>
                                 <option value="31">One month</option>
+                                <option value="60">Two months</option>
                                 <option value="183">Half year</option>
                                 <option value="365">One year</option>
                             </select>

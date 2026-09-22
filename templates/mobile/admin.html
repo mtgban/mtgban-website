@@ -95,15 +95,25 @@
     <div class="m-admin-section">
         <h2>Admin Tools</h2>
 
+        {{/* Both halves before there is anything to mint - see the desktop
+             template for why either select submits once the other is set. */}}
         <div class="m-admin-tool">
-            <label>Spoof User Tier</label>
+            <label>Create Invite Link</label>
             <form action="admin" method="GET">
-                <input type="hidden" name="reboot" value="spoof"/>
-                <select name="tier" onchange="this.form.submit()">
+                <input type="hidden" name="reboot" value="invite"/>
+                <select name="tier" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
                     <option disabled selected value="">Choose tier...</option>
                     {{range .Tiers}}
                         <option value="{{.}}">{{.}}</option>
                     {{end}}
+                </select>
+                <select name="duration" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
+                    <option disabled selected value="">Expires in...</option>
+                    <option value="1">One day</option>
+                    <option value="7">One week</option>
+                    <option value="15">Two weeks</option>
+                    <option value="31">One month</option>
+                    <option value="60">Two months</option>
                 </select>
             </form>
         </div>
@@ -118,6 +128,7 @@
                     <option value="0">No expiration</option>
                     <option value="15">Two weeks</option>
                     <option value="31">One month</option>
+                    <option value="60">Two months</option>
                     <option value="183">Half year</option>
                     <option value="365">One year</option>
                 </select>
