@@ -24,13 +24,15 @@ func signedAs(t *testing.T, fields url.Values, expires time.Time) string {
 	return base64.StdEncoding.EncodeToString([]byte(fields.Encode()))
 }
 
-// signingEnabled puts the globals where production keeps them, since both
-// the link being signed for and whether anything is checked at all are read
-// off them.
-func signingEnabled(t *testing.T) {
+// signingEnabled turns the check on, since whether anything is verified at
+// all is a global. dev keeps DevMode where the caller needs it: the link
+// being signed for is read off it too, so minting and checking agree
+// either way - but render() only reparses templates from disk while it is
+// set, which is the only template cache a test binary has.
+func signingEnabled(t *testing.T, dev bool) {
 	t.Helper()
 	savedDev, savedCheck := DevMode, SigCheck
-	DevMode, SigCheck = false, true
+	DevMode, SigCheck = dev, true
 	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedCheck })
 	// The runtime puts this one back itself, including unsetting it again
 	// where it was never set to begin with.
@@ -42,7 +44,7 @@ func signingEnabled(t *testing.T) {
 // to believe travels in a cookie the reader holds, so a page asking "may
 // this person upload" has to ask whether the answer was written here.
 func TestSignatureIsValid(t *testing.T) {
-	signingEnabled(t)
+	signingEnabled(t, false)
 
 	granted := func() url.Values {
 		return url.Values{"Upload": {"true"}, "UserTier": {"Pro"}}
@@ -107,7 +109,7 @@ func emailFromCookie(t *testing.T, sig string) string {
 // signedUserEmail is the other caller, and carried its own copy of the
 // check until now. It answers only for a signature that passes.
 func TestSignedUserEmailNeedsAValidSignature(t *testing.T) {
-	signingEnabled(t)
+	signingEnabled(t, false)
 
 	sig := signedAs(t, url.Values{"UserEmail": {"someone@example.test"}}, time.Now().Add(time.Hour))
 	if got := emailFromCookie(t, sig); got != "someone@example.test" {

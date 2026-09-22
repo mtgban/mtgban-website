@@ -10,7 +10,7 @@ const ROWS = 'mtgban-handoff-rows';
 // loadHandoff runs the script against a stand-in for the page it ships with,
 // and hands back what the test needs to drive it: the opener it talks to, the
 // listener it attached, and the elements it writes to.
-function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot = false} = {}) {
+function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot = false, canUpload = true} = {}) {
     const sent = [];
     if (opener) {
         opener.postMessage = (message, target) => sent.push({message, target});
@@ -18,13 +18,28 @@ function loadHandoff({origins = [SENDER], opener = {closed: false}, missingRoot 
 
     const submitted = [];
     const elements = {
-        handoff: {getAttribute: () => JSON.stringify(origins)},
+        handoff: {
+            getAttribute: (name) =>
+                name === 'data-can-upload' ? String(canUpload) : JSON.stringify(origins),
+        },
         'handoff-status': {textContent: ''},
         'handoff-hint': {hidden: true},
         'handoff-form': {submit: () => submitted.push(true)},
         'handoff-rows': {value: ''},
         'handoff-source': {value: ''},
     };
+
+    // A page that cannot upload does not render the status line or the
+    // form, so neither is here to be written to. The script has to notice
+    // before it reaches for them, which is the same thing as noticing
+    // before it announces itself.
+    if (!canUpload) {
+        delete elements['handoff-status'];
+        delete elements['handoff-hint'];
+        delete elements['handoff-form'];
+        delete elements['handoff-rows'];
+        delete elements['handoff-source'];
+    }
 
     let onMessage;
     const window = {
@@ -75,6 +90,19 @@ describe('asking for the rows', () => {
     test('an opener that has since gone is the same as none', () => {
         const {elements} = loadHandoff({opener: {closed: true}});
         expect(elements['handoff-status'].textContent).toBe('Nothing was handed to this page.');
+    });
+
+    test('it says nothing at all when the page cannot upload', () => {
+        // The page has already said why. What matters here is the silence:
+        // an extension that heard this one announce itself would hand over
+        // a list nothing can price, and gathering that list is minutes of
+        // somebody's afternoon.
+        const opener = {closed: false};
+        const {sent, submitted, deliver} = loadHandoff({opener, canUpload: false});
+
+        expect(sent).toEqual([]);
+        deliver(rowsMessage(opener));
+        expect(submitted).toEqual([]);
     });
 });
 

@@ -1,0 +1,54 @@
+/* The page an extension hands a card list to. It is a plain .legal page
+   with two things of its own: the line saying how the handoff is going,
+   and what it says instead to a reader who cannot upload at all. */
+
+.handoff-locked {
+    margin: 24px 0 8px;
+    padding: 20px 22px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-md);
+}
+
+.handoff-locked-msg {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--normal);
+}
+
+.handoff-locked p:last-of-type {
+    margin-bottom: 0;
+}
+
+.handoff-locked-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.handoff-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--ainfo);
+    border-radius: var(--radius-sm);
+    background: var(--ainfo);
+    color: var(--background);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.handoff-btn:hover {
+    filter: brightness(1.1);
+}
+
+.handoff-btn-secondary {
+    background: transparent;
+    border-color: var(--border-moderate);
+    color: var(--text-dim);
+}
+
+.handoff-btn-secondary:hover {
+    color: var(--normal);
+    filter: none;
+}

@@ -1,8 +1,13 @@
 package main
 
 import (
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestHandoffNamesItsOrigins pins that the page carries the origins the server
@@ -81,6 +86,71 @@ func TestHandoffOriginsAreHTTPS(t *testing.T) {
 		if strings.Count(origin, "/") != 2 {
 			t.Errorf("origin %q is not a bare scheme and host", origin)
 		}
+	}
+}
+
+// TestHandoffTakesNothingItCannotPrice pins what a reader without the
+// Upload grant is shown, and what is not on the page for them.
+//
+// The form is the part that matters. Gathering a list is minutes of
+// somebody's afternoon on the storefronts this is built for, and a page
+// that took one only to have /upload refuse it at the far end would spend
+// all of that before saying no.
+func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
+	page := renderPage(t, "upload_handoff.html", false, PageVars{
+		BetaNav:        &NavElem{Short: "b"},
+		HandoffOrigins: HandoffOrigins,
+		InfoMessage:    ErrMsg,
+	})
+
+	for _, gone := range []string{`name="textArea"`, `action="/upload"`, `id="handoff-status"`} {
+		if strings.Contains(page, gone) {
+			t.Errorf("a reader who cannot upload was still given %s", gone)
+		}
+	}
+	if !strings.Contains(page, ErrMsg) {
+		t.Error("the page does not say why it is not taking the list")
+	}
+	// The script reads this to decide whether to announce itself at all,
+	// which is what keeps an extension from handing rows to a page that
+	// cannot do anything with them.
+	if !strings.Contains(page, `data-can-upload="false"`) {
+		t.Error("the page does not tell its own script to stay quiet")
+	}
+}
+
+// The invitation is the point of serving this page signed out at all: it is
+// where somebody arrives who has only ever seen the extension.
+func TestHandoffInvitesAReaderWithNoSignature(t *testing.T) {
+	page := renderPage(t, "upload_handoff.html", false, PageVars{
+		BetaNav:      &NavElem{Short: "b"},
+		InfoMessage:  ErrMsg,
+		PatreonLogin: true,
+		PatreonIDs:   map[string]string{"patreon": "12345"},
+		PatreonURL:   "https://mtgban.com/auth",
+	})
+
+	for _, want := range []string{"getPatreonURL", "12345", "Log in"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the invitation is missing %s", want)
+		}
+	}
+}
+
+// A reader who is signed in and whose tier simply does not reach this far
+// is not asked to log in again.
+func TestHandoffDoesNotAskASignedInReaderToLogIn(t *testing.T) {
+	page := renderPage(t, "upload_handoff.html", false, PageVars{
+		BetaNav:      &NavElem{Short: "b"},
+		InfoMessage:  ErrMsgPlus,
+		PatreonLogin: false,
+	})
+
+	if strings.Contains(page, "Log in") {
+		t.Error("a signed-in reader was offered a login button")
+	}
+	if !strings.Contains(page, ErrMsgPlus) {
+		t.Error("the page does not say the tier is what is missing")
 	}
 }
 
@@ -238,4 +308,75 @@ func TestUploadQuery(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The page is served without the signing middleware in front of it, so
+// these are the checks. A grant travels in a cookie the reader holds, and
+// the only thing separating "my tier includes this" from "I typed it into
+// my own cookie" is whether this host signed it.
+func TestHandoffHandlerAsksBeforeItReceives(t *testing.T) {
+	signingEnabled(t, true)
+
+	page := func(t *testing.T, sig string) string {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/upload/handoff", nil)
+		if sig != "" {
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		}
+		rec := httptest.NewRecorder()
+		UploadHandoff(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		return rec.Body.String()
+	}
+
+	granted := signedAs(t, url.Values{"Upload": {"true"}, "UserTier": {"Pro"}}, time.Now().Add(time.Hour))
+
+	t.Run("a tier that carries Upload", func(t *testing.T) {
+		body := page(t, granted)
+		if !strings.Contains(body, `data-can-upload="true"`) {
+			t.Error("a granted reader was not allowed to receive a list")
+		}
+		if !strings.Contains(body, `name="textArea"`) {
+			t.Error("the form the rows are posted with is missing")
+		}
+	})
+
+	t.Run("a tier that does not", func(t *testing.T) {
+		body := page(t, signedAs(t, url.Values{"UserTier": {"Free"}}, time.Now().Add(time.Hour)))
+		if strings.Contains(body, `name="textArea"`) {
+			t.Error("a reader without the grant was given the form anyway")
+		}
+		if !strings.Contains(body, ErrMsgPlus) {
+			t.Error("a signed-in reader was not told it is the tier that is missing")
+		}
+	})
+
+	t.Run("nobody at all", func(t *testing.T) {
+		body := page(t, "")
+		if strings.Contains(body, `name="textArea"`) {
+			t.Error("a reader with no signature was given the form")
+		}
+		if !strings.Contains(body, ErrMsg) {
+			t.Error("a reader with no signature was not invited in")
+		}
+	})
+
+	t.Run("the grant written in by hand", func(t *testing.T) {
+		// The whole reason the HMAC is checked here rather than the grant
+		// being read straight off the cookie.
+		raw, _ := base64.StdEncoding.DecodeString(granted)
+		v, _ := url.ParseQuery(string(raw))
+		v.Set("UserTier", "Free")
+		forged := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+
+		body := page(t, forged)
+		if strings.Contains(body, `data-can-upload="true"`) {
+			t.Error("a rewritten signature was believed")
+		}
+		if strings.Contains(body, `name="textArea"`) {
+			t.Error("a rewritten signature was given the form")
+		}
+	})
 }

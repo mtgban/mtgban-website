@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -27,8 +28,14 @@ import (
 // origin decides what gets valued, not what it is worth.
 //
 // Nothing beyond that. The page does not read the session, does not answer
-// with what it holds, changes nothing that outlasts the request, and cannot be
-// reached at all by someone signed out.
+// with what it holds, and changes nothing that outlasts the request.
+//
+// It is readable signed out, which is how somebody who has only ever seen
+// the extension gets told what this site is. Being read is all that grants:
+// a reader whose signature does not carry the Upload grant is not received
+// at all - the page says why and stays silent - so an origin here cannot
+// hand a list to somebody who has no way to price one.
+//
 // The bare cardmarket.com is deliberately not here. It redirects to the
 // www host before a page loads, so a content script never runs on it and
 // no message ever arrives from it - and this list is what an origin is
@@ -137,12 +144,51 @@ func uploadQuery(hashes []string, textArea, handedFrom, gdocURL, gdocName, filen
 // It carries no list of its own. The rows arrive after it loads, from the
 // window that opened it, and the form is submitted from here - same origin,
 // same session, an ordinary upload by the time it reaches the handler.
+//
+// This one is served without the signing middleware, so it is also the
+// page somebody lands on knowing nothing about the site, and it does its
+// own asking: a signature this host wrote, carrying the Upload grant, or
+// the page says so and declines to receive anything. Refusing here rather
+// than at the far end is the difference between reading somebody's whole
+// shelf and then being told no, and being told no before the walk starts.
 func UploadHandoff(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Upload", sig)
 	pageVars.Title = "Receiving a card list"
 	pageVars.HandoffOrigins = HandoffOrigins
+
+	// The grant is only worth reading off a signature this host wrote,
+	// since the whole of it travels in a cookie the reader holds.
+	params, signed := signatureIsValid(sig)
+	canUpload, _ := strconv.ParseBool(params.Get("Upload"))
+	canUpload = canUpload && signed
+	if DevMode && !SigCheck {
+		canUpload = true
+	}
+
+	// Two ways to arrive without it, and they want different sentences:
+	// somebody with no signature at all has not joined, and somebody whose
+	// tier does not carry Upload has, and needs to hear which way is up.
+	//
+	// This line is also the whole of what the page needs to know, so it is
+	// all that is passed: a reader who is being told why is a reader whose
+	// list is not being taken, and the two cannot disagree if there is
+	// only one of them.
+	//
+	// It is the info line rather than the error one. An ErrorMessage is
+	// the whole page in base.html - it renders in place of the content
+	// block, not alongside it - and what this page has to say is the part
+	// underneath: what it would have done, and the button that gets there.
+	if !canUpload {
+		pageVars.InfoMessage = ErrMsg
+		if signed {
+			pageVars.InfoMessage = ErrMsgPlus
+		}
+	}
+
+	// The middleware used to count this page; it no longer sees it.
+	recordPageHit(r)
 
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
