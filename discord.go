@@ -346,8 +346,13 @@ func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 // matcher already indexes, so the printing it names is looked up rather than
 // guessed from the slug beside it.
 //
-// The Printing parameter picks the foil sibling where the page is showing
-// one.
+// The finish comes from which of the printing's two product ids this one is,
+// not from the URL: TCGplayer sells an etched card as a product of its own
+// but still labels its Printing "Foil", so asking for the foil sibling of an
+// etched id lands on the plain foil wherever one exists. Measured over this
+// datastore's 1,219 etched ids: 333 answer a non-etched printing when the
+// finish is read off the URL, and 1 when it is read off the id - that one
+// being a printing the datastore holds no etched sibling for at all.
 func tcgplayerCard(u *url.URL) *mtgmatcher.CardObject {
 	var id string
 	for _, id = range strings.Split(u.Path, "/") {
@@ -357,7 +362,12 @@ func tcgplayerCard(u *url.URL) *mtgmatcher.CardObject {
 		}
 	}
 
-	cardID, err := backend().MatchID(id, u.Query().Get("Printing") == "Foil")
+	// A printing files its plain and its etched product under one id space,
+	// so the id is etched exactly when it is the one filed as etched.
+	base, err := backend().GetUUID(backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, id))
+	etched := err == nil && base.Identifiers["tcgplayerEtchedProductId"] == id
+
+	cardID, err := backend().MatchID(id, u.Query().Get("Printing") == "Foil", etched)
 	if err != nil {
 		return nil
 	}

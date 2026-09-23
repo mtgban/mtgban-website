@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -93,6 +94,55 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 
 	if checkedTCG == 0 || checkedMP == 0 {
 		t.Fatalf("nothing was checked: %d tcgplayer, %d mana pool", checkedTCG, checkedMP)
+	}
+}
+
+// An etched product is one TCGplayer sells under an id of its own while its
+// page still says Printing=Foil, so reading the finish off the URL lands on
+// the plain foil wherever the printing has one. Reading it off the id does
+// not, and this is the whole population rather than a sample: the one card
+// that still misses is a printing this datastore holds no etched sibling for,
+// which no finish flag can conjure.
+func TestTCGplayerEtchedIDNamesTheEtchedPrinting(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	var checked, missed int
+	for id, uuid := range backend().ExternalIdentifiers[mtgmatcher.IDSpaceTCGplayer] {
+		base, err := backend().GetUUID(uuid)
+		if err != nil || base.Identifiers["tcgplayerEtchedProductId"] != id {
+			continue
+		}
+		checked++
+
+		// The finish the page would carry, which is the misleading half.
+		link, err := url.Parse("https://www.tcgplayer.com/product/" + id + "/magic-product?Printing=Foil")
+		if err != nil {
+			t.Fatalf("parsing the link for %s: %v", id, err)
+		}
+		co := tcgplayerCard(link)
+		if co == nil {
+			t.Errorf("etched product %s named no printing", id)
+			continue
+		}
+		if !co.Etched {
+			missed++
+			if missed < 4 {
+				t.Logf("etched product %s names %s %s #%s, which is not etched (it has no etched sibling here: %v)",
+					id, co.Name, co.SetCode, co.Number, backend().FinishUUID(&co.Card, "etched") == "")
+			}
+		}
+	}
+
+	if checked == 0 {
+		t.Skip("this datastore files no etched products")
+	}
+	// One card over 1,219 ids as measured on the September datastore. A
+	// regression here is a resolver reading the URL again, which moves this
+	// into the hundreds, not a datastore gaining one more odd printing.
+	if missed > checked/100 {
+		t.Errorf("%d of %d etched products name a printing that is not etched", missed, checked)
 	}
 }
 
