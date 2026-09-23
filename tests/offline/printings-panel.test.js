@@ -94,3 +94,37 @@ test('it never returns a negative height', () => {
         ).toBeGreaterThanOrEqual(0);
     }
 });
+
+test('Set Value stashes on how much room is left, monotonically', () => {
+    // The old signal asked whether .sidebar-body was OVERFLOWING. That worked
+    // when the body was content-sized and scrolled, but it now answers a
+    // squeeze by collapsing the boxes inside it - Available In first, then
+    // Export - so it stops overflowing as it gets smaller. Measured on a real
+    // sealed page at a fixed card size, sweeping the window down: the body
+    // overflowed at 125px of room, did NOT at 75px (Export had just been
+    // collapsed away, taking the overflow with it), and did again at 25px.
+    // The tables came out from behind the hover trigger and went back as the
+    // window moved.
+    //
+    // Room is monotonic in the squeeze, so this asserts that: once it stashes,
+    // it stays stashed all the way down.
+    let seenStash = false;
+    for (let room = 600; room >= 0; room -= 5) {
+        const stash = panel.shouldStashSetValue(room);
+        if (stash) seenStash = true;
+        expect(
+            !(seenStash && !stash),
+            `un-stashed at ${room}px of room after stashing higher up - the trigger flickers as the window moves`,
+        ).toBe(true);
+    }
+    expect(seenStash, 'expected it to stash at some point on the way down').toBe(true);
+});
+
+test('Set Value sits inline while the column still has room for it', () => {
+    // Above the threshold the tables belong in the flow, where they are
+    // readable without hovering anything.
+    expect(panel.shouldStashSetValue(panel.MIN_BODY_FOR_SET_VALUE)).toBe(false);
+    expect(panel.shouldStashSetValue(panel.MIN_BODY_FOR_SET_VALUE - 1)).toBe(true);
+    expect(panel.shouldStashSetValue(400)).toBe(false);
+    expect(panel.shouldStashSetValue(0)).toBe(true);
+});

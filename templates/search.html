@@ -539,7 +539,7 @@
                 // useful height are they stashed behind the hover trigger.
                 // Measured by un-stashing and reading the body's flex
                 // leftover, so it tracks the actual image and table heights.
-                const SETVALUE_MIN_BODY = 160;
+                // The threshold and the rule live in js/printings-panel.js.
                 function updateSetValueMode() {
                     var printings = document.getElementById('printings');
                     if (!printings) return;
@@ -547,12 +547,7 @@
                     if (!printings.querySelector('.sidebar-setvalue')) return;
                     var sidebar = printings.closest('.search-sidebar');
                     var body = sidebar ? sidebar.querySelector('.sidebar-body') : null;
-                    // The sidebar is content-sized under a viewport cap, so a
-                    // small body can also mean a short products list that fits
-                    // entirely; only a body that is both below a useful height
-                    // and actually hiding content is squeezed.
-                    if (body && body.clientHeight < SETVALUE_MIN_BODY
-                            && body.scrollHeight > body.clientHeight + 1) {
+                    if (body && self.PrintingsPanel.shouldStashSetValue(body.clientHeight)) {
                         printings.classList.add('setvalue-stashed');
                     }
                 }
