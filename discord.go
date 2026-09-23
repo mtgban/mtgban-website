@@ -290,6 +290,18 @@ func unknownTitle(*url.URL) string {
 	return "Your search"
 }
 
+// banSearchLink is this site's address for a printing, as the bot hands it to
+// a reader: the page that answers for its kind, the printing's own uuid as
+// the query, and the tags that attribute the visit to the bot and to the
+// server the message was posted in.
+func banSearchLink(co *mtgmatcher.CardObject, guildID string) string {
+	searchEndpoint := "search"
+	if co.Sealed {
+		searchEndpoint = "sealed"
+	}
+	return "https://www.mtgban.com/" + searchEndpoint + "?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildID
+}
+
 // printingTitle names a printing the way the bot announces a link: the card,
 // the set it is in, the number it is filed under, and a mark for a finish
 // that is not the plain one.
@@ -676,16 +688,28 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
-			title, link, _ := checkForLinks(m.GuildID, m.Content)
+			title, link, co := checkForLinks(m.GuildID, m.Content)
 			if title == "" || link == "" {
 				break
+			}
+
+			description := "Support **MTGBAN** by using this link"
+			// Only where the store's link named a printing: every other
+			// address on this site would be a search for whatever the URL
+			// happened to spell, which is not what the reader clicked.
+			if co != nil {
+				subject := "card"
+				if co.Sealed {
+					subject = "product"
+				}
+				description += fmt.Sprintf("\n[Check the %s on our website too](%s)", subject, banSearchLink(co, m.GuildID))
 			}
 
 			// Spam time!
 			_, err := s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 				Title:       title,
 				URL:         link,
-				Description: "Support **MTGBAN** by using this link",
+				Description: description,
 			})
 			if err != nil {
 				log.Println(err)
@@ -874,11 +898,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 		printings = fmt.Sprintf("%s. Variants in %s are %s", printings, searchRes.EditionSearched, strings.Join(cn, ", "))
 	}
 
-	searchEndpoint := "search"
-	if co.Sealed {
-		searchEndpoint = "sealed"
-	}
-	link := "https://www.mtgban.com/" + searchEndpoint + "?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildID
+	link := banSearchLink(co, guildID)
 
 	// Set title of the main message
 	name := card.Name

@@ -243,3 +243,108 @@ func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
 		t.Errorf("another game was answered: %q %q %v", title, link, co)
 	}
 }
+
+// The website link is the one the bot has always built for a card lookup, so
+// it goes to the page that answers for the product's kind and keeps the tags
+// that attribute the visit back to the bot.
+func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	single, err := backend().GetUUID(randomUUID(false))
+	if err != nil {
+		t.Fatalf("a single: %v", err)
+	}
+	sealed, err := backend().GetUUID(randomUUID(true))
+	if err != nil {
+		t.Fatalf("a sealed product: %v", err)
+	}
+
+	for _, tt := range []struct {
+		co   *mtgmatcher.CardObject
+		page string
+	}{
+		{single, "https://www.mtgban.com/search"},
+		{sealed, "https://www.mtgban.com/sealed"},
+	} {
+		link := banSearchLink(tt.co, "1234")
+		if !strings.HasPrefix(link, tt.page+"?") {
+			t.Errorf("%s links to %q, want the %s page", tt.co.Name, link, tt.page)
+			continue
+		}
+
+		parsed, err := url.Parse(link)
+		if err != nil {
+			t.Errorf("parsing %q: %v", link, err)
+			continue
+		}
+		v := parsed.Query()
+		if got := v.Get("q"); got != tt.co.UUID {
+			t.Errorf("%s asks %q, want %q", tt.co.Name, got, tt.co.UUID)
+		}
+		if got := v.Get("utm_source"); got != "banbot" {
+			t.Errorf("%s is attributed to %q, want %q", tt.co.Name, got, "banbot")
+		}
+		if got := v.Get("utm_affiliate"); got != "1234" {
+			t.Errorf("%s names guild %q, want %q", tt.co.Name, got, "1234")
+		}
+	}
+}
+
+// The link has to find the printing it was made for, the way the site's own
+// links are held to it. A uuid query is answered by searchAndFilter directly,
+// so this asks the search the same question the reader's click does.
+func TestBanSearchLinkFindsItsPrinting(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	uuids := backend().GetUUIDs()
+	step := len(uuids) / 100
+	if step < 1 {
+		step = 1
+	}
+
+	var checked, missed int
+	for i := 0; i < len(uuids); i += step {
+		co, err := backend().GetUUID(uuids[i])
+		if err != nil {
+			continue
+		}
+		checked++
+
+		parsed, err := url.Parse(banSearchLink(co, "1234"))
+		if err != nil {
+			t.Fatalf("parsing the link for %s: %v", co.Name, err)
+		}
+		query := parsed.Query().Get("q")
+		keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+		if err != nil {
+			t.Errorf("%s %s #%s: %v", co.Name, co.SetCode, co.Number, err)
+			continue
+		}
+
+		var found bool
+		for _, key := range keys {
+			if key == co.UUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			missed++
+			if missed < 6 {
+				t.Errorf("the bot's link for %s %s #%s asks %q and does not find it (%d results)",
+					co.Name, co.SetCode, co.Number, query, len(keys))
+			}
+		}
+	}
+
+	if checked == 0 {
+		t.Fatal("no cards were checked")
+	}
+	if missed != 0 {
+		t.Errorf("%d of %d links miss the printing they point at", missed, checked)
+	}
+}
