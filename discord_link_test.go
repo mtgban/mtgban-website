@@ -1,0 +1,153 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
+)
+
+// tcgplayerLinkFor spells the address TCGplayer files a printing under, the
+// way a reader pastes it: the product id, and the Printing parameter the page
+// carries for a foil. The slug is deliberately not the card's name - a name
+// holding one of the store's Skip words ("Helpful ...") would have the bot
+// ignore the message, which is a property of the skip list and not of the
+// mapping these tests are about.
+func tcgplayerLinkFor(co *mtgmatcher.CardObject) string {
+	id := co.Identifiers["tcgplayerProductId"]
+	if co.Etched {
+		id = co.Identifiers["tcgplayerEtchedProductId"]
+	}
+	if id == "" {
+		return ""
+	}
+	link := "https://www.tcgplayer.com/product/" + id + "/magic-product"
+	if co.Foil {
+		link += "?Printing=Foil"
+	}
+	return link
+}
+
+// A store link the bot answers has to name the printing it points at, or name
+// nothing: the website link built from it is the reader's next click, and one
+// that lands on a different card is worse than one that is not offered.
+//
+// The fixtures are built from the datastore rather than written down, so the
+// test asks the question for whatever cards this datastore holds instead of
+// going stale against a set it no longer carries.
+func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	uuids := backend().GetUUIDs()
+	step := len(uuids) / 400
+	if step < 1 {
+		step = 1
+	}
+
+	var checkedTCG, checkedMP int
+	for i := 0; i < len(uuids); i += step {
+		co, err := backend().GetUUID(uuids[i])
+		if err != nil || co.Sealed {
+			continue
+		}
+
+		if link := tcgplayerLinkFor(co); link != "" {
+			checkedTCG++
+			_, _, got := checkForLinks(discordGuildID(), "look at "+link)
+			if got == nil {
+				t.Errorf("%s %s #%s: %s named no printing", co.Name, co.SetCode, co.Number, link)
+			} else if got.UUID != co.UUID {
+				t.Errorf("%s named %s %s #%s (%s), want %s %s #%s (%s)",
+					link, got.Name, got.SetCode, got.Number, got.UUID,
+					co.Name, co.SetCode, co.Number, co.UUID)
+			}
+		}
+
+		// Mana Pool files a card under its set and its number as printed,
+		// and says nothing about the finish, so its links name the printing
+		// a set files under the number - the one printingsAt answers with.
+		if co.Number != "" && !co.Foil && !co.Etched {
+			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card",
+				strings.ToLower(co.SetCode), strings.ToLower(co.Number))
+			checkedMP++
+			_, _, got := checkForLinks(discordGuildID(), link)
+			if got == nil {
+				// A number two cards answer to names neither of them. Magic
+				// files one name per number, so this does not fire here; it
+				// keeps the test honest against a datastore for a game that
+				// does - see openingName in redirect.go.
+				if openingName(printingsAt(co.SetCode, co.Number)) == "" {
+					continue
+				}
+				t.Errorf("%s %s #%s: %s named no printing", co.Name, co.SetCode, co.Number, link)
+			} else if got.UUID != co.UUID {
+				t.Errorf("%s named %s %s #%s (%s), want %s %s #%s (%s)",
+					link, got.Name, got.SetCode, got.Number, got.UUID,
+					co.Name, co.SetCode, co.Number, co.UUID)
+			}
+		}
+	}
+
+	if checkedTCG == 0 || checkedMP == 0 {
+		t.Fatalf("nothing was checked: %d tcgplayer, %d mana pool", checkedTCG, checkedMP)
+	}
+}
+
+// A store whose links carry no identifier of ours is answered with the
+// affiliate link alone. The website link is the part that needs one, and
+// guessing it is the mistake this pins shut.
+//
+// Cool Stuff Inc is the fixture that matters: its addresses are /p/<id> with
+// an id of its own (coolstuffinc.go:653), so a resolver that reads "the first
+// whole number in the path" the way the TCGplayer one does would answer with
+// whatever card TCGplayer happens to file under that number. The number here
+// is a real TCGplayer product id, so that mistake cannot pass quietly.
+func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	for _, tt := range []struct{ name, message string }{
+		{"card kingdom", "https://www.cardkingdom.com/mtg/revised-edition/goblin-king"},
+		{"card kingdom buylist", "https://www.cardkingdom.com/purchasing/mtg_singles?filter[name]=Goblin+King"},
+		{"cool stuff inc", "https://www.coolstuffinc.com/p/1435"},
+		{"star city games", "https://starcitygames.com/goblin-king-sgl-mtg-3ed-en/"},
+		{"cardtrader", "https://www.cardtrader.com/cards/goblin-king"},
+		{"amazon", "https://www.amazon.com/dp/B0123456"},
+		{"a tcgplayer product this datastore does not hold", "https://www.tcgplayer.com/product/999999999/magic-product"},
+		{"a mana pool set this datastore does not hold", "https://manapool.com/card/zzz/1/a-card"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			title, link, co := checkForLinks(discordGuildID(), tt.message)
+			if title == "" || link == "" {
+				t.Fatalf("the affiliate link itself went missing: title=%q link=%q", title, link)
+			}
+			if co != nil {
+				t.Errorf("named %s %s #%s, want nothing", co.Name, co.SetCode, co.Number)
+			}
+		})
+	}
+}
+
+// The bot speaks for one guild and one game. Everything below rides on
+// checkForLinks, so these are the gates that keep it off every other server.
+func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
+	message := "https://www.tcgplayer.com/product/1435/magic-product"
+
+	title, link, co := checkForLinks("some-other-guild", message)
+	if title != "" || link != "" || co != nil {
+		t.Errorf("another guild was answered: %q %q %v", title, link, co)
+	}
+
+	previous := Config.Game
+	Config.Game = "lorcana"
+	defer func() { Config.Game = previous }()
+
+	title, link, co = checkForLinks(discordGuildID(), message)
+	if title != "" || link != "" || co != nil {
+		t.Errorf("another game was answered: %q %q %v", title, link, co)
+	}
+}
