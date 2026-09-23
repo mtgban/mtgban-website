@@ -333,6 +333,10 @@ var funcMap = template.FuncMap{
 	"palette_reverse_targets":   func() template.JS { return paletteService.ArbitTargetsJSON("reverse") },
 	"palette_global_targets":    func() template.JS { return paletteService.ArbitTargetsJSON("global") },
 	"guide_stores":              guideStoresJSON,
+	"usd":                       formatUSD,
+	"api_plans_json":            apiPlansJSON,
+	"addon_scope":               addonScope,
+	"scope_bullets":             scopeBullets,
 	"usage_path_url":            observability.PathURL,
 	"dict": func(values ...any) (map[string]any, error) {
 		if len(values)%2 != 0 {

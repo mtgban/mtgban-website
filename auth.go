@@ -401,6 +401,17 @@ func signedUserEmail(r *http.Request) string {
 	return v.Get("UserEmail")
 }
 
+// verifiedSignature is the cookie signature when signatureIsValid accepts
+// it, else "". Handlers reached through an ACL "Any" entry skip
+// enforceSigning, so they call this before trusting who the reader is.
+func verifiedSignature(r *http.Request) string {
+	sig := getSignatureFromCookies(r)
+	if _, ok := signatureIsValid(sig); !ok {
+		return ""
+	}
+	return sig
+}
+
 // Put signature in cookies for one month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
