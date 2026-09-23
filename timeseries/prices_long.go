@@ -295,7 +295,9 @@ func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory in
 			args = append(args, *cursor)
 		}
 		var date sql.NullTime
-		err := c.db.QueryRowContext(ctx, providerLatestDateQuery(cursor != nil, step > 0), args...).Scan(&date)
+		bounded, strict := cursor != nil, step > 0
+		err := c.queryRow(ctx, c.providerLatestDateStmt(bounded, strict),
+			providerLatestDateQuery(bounded, strict), args...).Scan(&date)
 		if err != nil && err != sql.ErrNoRows {
 			return sql.NullTime{}, err
 		}
