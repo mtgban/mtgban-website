@@ -517,17 +517,18 @@
                 {{if $.CurrentIndex}}
                     <tr style="background-color: var(--headerbackground);">
                         <td colspan="13" style="text-align: center; vertical-align: middle;">
-                            <p style="display: inline;">
+                            <div class="pagination">
                                 {{if ne $.CurrentIndex 1}}
-                                    <a class="pagination" href="?page=syp&p=1">&lt;</a>
-                                    <a class="pagination" href="?page=syp&p={{$.PrevIndex}}"><i class="arrow left"></i></a>
+                                    <a href="?page=syp&p=1">&lt;</a>
+                                    <a href="?page=syp&p={{$.PrevIndex}}"><i class="arrow left"></i></a>
                                 {{end}}
-                                {{$.CurrentIndex}} / {{$.TotalIndex}}
+                                <span class="cur">{{$.CurrentIndex}}</span>
+                                <span class="pg-info">/ {{$.TotalIndex}}</span>
                                 {{if ne $.CurrentIndex $.TotalIndex}}
-                                    <a class="pagination" href="?page=syp&p={{$.NextIndex}}"><i class="arrow right"></i></a>
-                                    <a class="pagination" href="?page=syp&p={{$.TotalIndex}}">&gt;</a>
+                                    <a href="?page=syp&p={{$.NextIndex}}"><i class="arrow right"></i></a>
+                                    <a href="?page=syp&p={{$.TotalIndex}}">&gt;</a>
                                 {{end}}
-                            </p>
+                            </div>
                         </td>
                     </tr>
                 {{end}}
