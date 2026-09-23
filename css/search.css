@@ -113,9 +113,18 @@ body:has(.search-layout) {
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     transition: all 0.12s;
 }
-.search-sort-pill svg {
+/* The <i> the server renders and lucide later swaps for an <svg>, sized
+   like the icon that replaces it. Without this the placeholder is an empty
+   0x0 box, so every pill is 32px narrower and this row 16px shorter than
+   its final size - and SORT drops 8px the moment the bundle lands, one
+   frame in. Reserving the box means the first frame is already laid out
+   where the last one will be; what arrives later is the drawing, not the
+   room for it. Paired with the svg rule so the two cannot drift. */
+.search-sort-pill svg,
+.search-sort-pill i[data-lucide] {
     width: 16px;
     height: 16px;
+    flex: 0 0 auto;
 }
 .search-sort-pill:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
@@ -234,9 +243,11 @@ body:has(.search-layout) {
 .search-sort-settings:hover {
     color: var(--normal);
 }
-.search-sort-settings svg {
+.search-sort-settings svg,
+.search-sort-settings i[data-lucide] {
     width: 16px;
     height: 16px;
+    flex: 0 0 auto;
 }
 .search-sidebar::-webkit-scrollbar { width: 4px; }
 .search-sidebar::-webkit-scrollbar-thumb {
@@ -2135,7 +2146,16 @@ body.modal-embed .cp-overlay {
     .qi-actions > span:hover,
     .qi-actions > button:hover { background: var(--search-row-hover); color: var(--normal); }
     .qi-actions img { width: 20px; }
-    .qi-actions svg { width: 20px; height: 20px; }
+    /* Declared on the container, not on the icons: the star's own rule is
+       more specific than anything written here could reasonably be, so a
+       competing width would simply lose to it. An inherited custom property
+       reaches it regardless, and there is still one number per layout. */
+    .qi-actions { --qi-icon-size: 20px; }
+    .qi-actions svg,
+    .qi-actions i[data-lucide] {
+        width: var(--qi-icon-size);
+        height: var(--qi-icon-size);
+    }
     .qi-actions .emoji { font-size: var(--text-xl); }
 
     /* The favorite button matches the others (its base rule is more specific
@@ -3019,6 +3039,18 @@ body.modal-embed .cp-overlay {
     justify-content: center;
 }
 
+/* The star and the <i> lucide swaps for it, given one box between them.
+   Nothing used to size either - the star just arrived at lucide's own 24,
+   which is the fallback here - so the button was 4px of its own padding
+   until the bundle landed, and this row, right-aligned in the header, slid
+   24px sideways the moment it did. The narrow layout takes both down to 20
+   by setting --qi-icon-size on .qi-actions, above. */
+.result-quick-icons .fav-btn svg,
+.result-quick-icons .fav-btn i[data-lucide] {
+    display: block;
+    width: var(--qi-icon-size, 24px);
+    height: var(--qi-icon-size, 24px);
+}
 
 .result-quick-icons .fav-btn:hover {
     color: var(--normal);
@@ -3087,7 +3119,8 @@ body.modal-embed .cp-overlay {
     border-color: var(--accent-border, rgba(91,141,239,0.35));
 }
 .fav-sort-pill i,
-.fav-sort-pill svg { width: 16px; height: 16px; }
+.fav-sort-pill svg,
+.fav-sort-pill i[data-lucide] { width: 16px; height: 16px; flex: 0 0 auto; }
 .fav-sort-pill .fav-sort-dir.asc,
 .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
 
