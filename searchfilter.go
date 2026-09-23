@@ -759,12 +759,18 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		}
 	}
 
-	// Clean any special characters from the main query, handle it later
+	// Clean any special characters from the main query, handle it later.
+	// An empty query has no last character and nothing below to parse out of
+	// it, but it still carries the blocklists gathered above: the search page
+	// reaches here with one whenever the pinned bar is doing the searching,
+	// and so does an export url with no name in it (/api/search/retail/.csv).
 	var lastChar string
-	switch query[len(query)-1] {
-	case '&', '*', '~', '`':
-		lastChar = query[len(query)-1:]
-		query = strings.TrimRight(query, "&*~`")
+	if query != "" {
+		switch query[len(query)-1] {
+		case '&', '*', '~', '`':
+			lastChar = query[len(query)-1:]
+			query = strings.TrimRight(query, "&*~`")
+		}
 	}
 
 	// Iterate over the various possible filters. A set filter no edition

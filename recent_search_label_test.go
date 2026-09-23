@@ -29,6 +29,7 @@ func renderSearch(t *testing.T, template string, pageVars PageVars) string {
 func TestSearchSidebarResetsArtFallbackOnHover(t *testing.T) {
 	out := renderSearch(t, "search.html", PageVars{
 		SearchQuery: "Lightning Bolt",
+		SearchRan:   true,
 		CardHashes:  []string{"some-uuid"},
 		AllKeys:     []string{"some-uuid"},
 	})
@@ -43,6 +44,7 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		found := renderSearch(t, template, PageVars{
 			SearchQuery: "Lightning Bolt",
+			SearchRan:   true,
 			CardHashes:  []string{"some-uuid"},
 		})
 		if !strings.Contains(found, "found: true") {
@@ -51,6 +53,7 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 
 		empty := renderSearch(t, template, PageVars{
 			SearchQuery: "Lightning Bolt",
+			SearchRan:   true,
 			InfoMessage: NoResultsMessage,
 		})
 		if !strings.Contains(empty, "found: false") {
@@ -66,6 +69,7 @@ func TestTheSearchPageHandsOverTheReadableQuery(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		out := renderSearch(t, template, PageVars{
 			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
+			SearchRan:   true,
 			CardHashes:  []string{"some-uuid"},
 		})
 		if !strings.Contains(out, `label: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil"`) {
@@ -94,6 +98,7 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		one := renderSearch(t, template, PageVars{
 			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
+			SearchRan:   true,
 			CardHashes:  uuids,
 			Metadata:    map[string]GenericCard{uuids[0]: card},
 		})
@@ -103,6 +108,7 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 
 		many := renderSearch(t, template, PageVars{
 			SearchQuery: "Plaguecrafter",
+			SearchRan:   true,
 			CardHashes:  []string{"a", "b"},
 			Metadata:    map[string]GenericCard{"a": card},
 		})
@@ -117,6 +123,7 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 func TestTheReadableQueryCannotBreakOutOfItsString(t *testing.T) {
 	out := renderSearch(t, "search.html", PageVars{
 		SearchQuery: `Hero's Downfall" ; alert(1); "`,
+		SearchRan:   true,
 		CardHashes:  []string{"some-uuid"},
 	})
 	if !strings.Contains(out, `label: "Hero's Downfall\" ; alert(1); \"",`) {

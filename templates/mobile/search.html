@@ -60,10 +60,12 @@
     {{else if and (eq .SearchQuery "") .EditionSort}}
         {{template "m-sealed-landing" .}}
     {{else}}
-        {{if eq .SearchQuery ""}}
-            {{template "m-search-bar" .}}
-        {{else}}
+        {{/* See the desktop template: a pinned filter is a search of its own,
+             so the results draw on that rather than on a query. */}}
+        {{if .SearchRan}}
             {{template "m-search-results" .}}
+        {{else}}
+            {{template "m-search-bar" .}}
         {{end}}
     {{end}}
 {{end}}
@@ -609,7 +611,14 @@
     {{else}}
         <div class="m-no-results">
             <i data-lucide="search-x" class="m-no-results-icon"></i>
-            <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
+            {{/* A scope-only search has no query to quote, and quoting the
+                 empty one reads as a bug ("No results for """). The pinned
+                 bar it did search on is named right below. */}}
+            {{if .SearchQuery}}
+                <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
+            {{else}}
+                <p class="m-no-results-msg">{{.InfoMessage}}</p>
+            {{end}}
             {{if and .SearchScope (not .ScopeIgnored)}}
                 <p class="m-no-results-hint">Pinned filters are narrowing this search:</p>
                 <ul class="m-no-results-suggestions">

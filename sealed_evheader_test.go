@@ -12,6 +12,7 @@ func sealedPage(entries []SearchEntry) PageVars {
 		BetaNav: &NavElem{Short: "b"},
 		// Non-empty, or the page renders its landing instead of results.
 		SearchQuery:  "a sealed thing",
+		SearchRan:    true,
 		AllKeys:      []string{id},
 		CondKeys:     []string{"INDEX"},
 		Metadata:     map[string]GenericCard{id: {Name: "A Sealed Thing", Sealed: true, SetCode: "TST"}},

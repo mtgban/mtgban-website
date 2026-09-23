@@ -167,6 +167,7 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 		Title:       "BAN Search",
 		InfoMessage: NoCardsMessage,
 		SearchQuery: "s:M19 cns:235 Fountain sdfsdfsdf Renewal",
+		SearchRan:   true,
 		SearchScope: "f:foil",
 		CanScope:    true,
 		DidYouMean:  "Fountain of Renewal",

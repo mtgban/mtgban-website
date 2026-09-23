@@ -497,7 +497,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
-	if query == "" {
+
+	// A pinned filter names a set of cards the same way a query does, so a
+	// bar with something in it is a search even when the box above it is
+	// empty: searchAndFilter already seeds from an edition, a number or a
+	// store when there is no text to search. A bar the parser made no filter
+	// of is not one - it would seed nothing and find nothing, which the
+	// landing page says better than an empty result does.
+	//
+	// The editions tree on /sets is a page rather than a placeholder waiting
+	// for a query, so it keeps its own empty state either way.
+	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
+
+	if query == "" && !scopeOnly {
 		if !pageVars.IsSealed && !isSetsPage {
 			pageVars.SetKeyrunes = getSetKeyrunes()
 		}
@@ -654,8 +666,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		chartIDs = nil
 	}
 
-	// If query is empty there is nothing to do
-	if query == "" {
+	// If neither bar holds anything there is nothing to do
+	if query == "" && !scopeOnly {
 		editions := GetEditions()
 		// Hijack sealed list
 		if pageVars.IsSealed {
@@ -704,6 +716,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		render(w, "search.html", pageVars)
 		return
 	}
+
+	// Past here the request is a search, whichever bar asked for it. The page
+	// draws results rather than the landing panes on the strength of this
+	// rather than of a query being present, since a scope-only search has
+	// none - including when it finds nothing, which is a result too.
+	pageVars.SearchRan = true
 
 	start := time.Now()
 
