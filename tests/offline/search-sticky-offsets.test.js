@@ -273,3 +273,52 @@ test('the collapsed icon row sizes both through one inherited token', () => {
     const star = css.slice(css.indexOf('.result-quick-icons .fav-btn svg'));
     expect(star.slice(0, star.indexOf('}'))).toContain('--qi-icon-size');
 });
+
+// The editions panel spans three languages: a Go emitter, an inline script in
+// the template, and the stylesheet. The couplings between them are invisible
+// from any one of the three, so they are asserted here from the sources.
+const templateSrc = fs.readFileSync(path.join(__dirname, '../../templates/search.html'), 'utf8');
+const utilsSrc = fs.readFileSync(path.join(__dirname, '../../utils.go'), 'utf8');
+
+test('there is always an overflow panel for the truncation note to move into', () => {
+    // genCardPrintings emits the note only when it has stopped early, and by
+    // then it has written one link per index 0..MaxRuneSymbols - so
+    // MaxRuneSymbols + 1 of them. collapsePrintings builds the panel only
+    // when it finds MORE than PRINTINGS_THRESHOLD links. The note is
+    // therefore orphaned - rendered under the symbol row with no panel to
+    // receive it - exactly when MaxRuneSymbols < PRINTINGS_THRESHOLD.
+    //
+    // It degrades gently: the note is styled to stand on its own line either
+    // way, so what a reader sees is the pre-panel appearance rather than a
+    // broken one. This guards the two numbers against being retuned into
+    // that state silently, since nothing else connects them.
+    const cap = utilsSrc.match(/MaxRuneSymbols\s*=\s*(\d+)/);
+    const threshold = templateSrc.match(/PRINTINGS_THRESHOLD\s*=\s*(\d+)/);
+    expect(cap, 'expected MaxRuneSymbols in utils.go').toBeTruthy();
+    expect(threshold, 'expected PRINTINGS_THRESHOLD in templates/search.html').toBeTruthy();
+    expect(
+        Number(cap[1]),
+        `MaxRuneSymbols (${cap[1]}) emits ${Number(cap[1]) + 1} symbols before the note, `
+        + `which is not more than PRINTINGS_THRESHOLD (${threshold[1]}), so no panel is built for it`,
+    ).toBeGreaterThanOrEqual(Number(threshold[1]));
+});
+
+test('the editions panel is placed by the script, since the stylesheet stopped placing it', () => {
+    // position: fixed (asserted above) leaves the panel with no offsets of
+    // its own - it is off at 0,0 until the script gives it geometry. The two
+    // halves live in different files and neither reads as incomplete alone,
+    // so this pins that the placement call survives beside the open.
+    expect(templateSrc).toContain('function positionPrintings(');
+    const open = templateSrc.indexOf("dropdown.classList.add('open')");
+    expect(open, 'expected the panel to be opened by class').toBeGreaterThan(0);
+    const before = templateSrc.slice(Math.max(0, open - 400), open);
+    expect(
+        before,
+        'expected positionPrintings() to run before the panel is shown, or it opens at 0,0',
+    ).toContain('positionPrintings(container, dropdown)');
+
+    // And the focus that follows must not scroll: a fixed panel still sits
+    // inside a scrollable column, and "revealing" it drags the card off the
+    // top - the bug this rule exists to prevent.
+    expect(templateSrc).toContain('filter.focus({ preventScroll: true })');
+});
