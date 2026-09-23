@@ -209,3 +209,28 @@ test('running short collapses Available In to its title, it does not delete it',
     const hidesFooter = rules('.search-sidebar .sidebar-products-card[data-expanded="true"] ~ .sidebar-footer');
     expect(hidesFooter.join(' ')).toContain('none');
 });
+
+test('the editions panel is placed against the viewport, not a box that can clip it', () => {
+    // It hangs below the symbol row, over the boxes underneath. Absolutely
+    // positioned, it belonged to the first scrollable ancestor: the pinned
+    // block counted it as overflow, so focusing the panel's filter scrolled
+    // that block to "reveal" it and carried the card off the top of the
+    // column, with no scrollbar to undo it. Fixed, it has no such ancestor -
+    // the script gives it its geometry.
+    const pos = declaration('.sidebar-printings-dropdown', 'position');
+    expect(pos, 'expected .sidebar-printings-dropdown to be positioned').toBe('fixed');
+    // Its width comes from the row it hangs off, so its own padding and
+    // border have to come out of that rather than be added to it.
+    expect(declaration('.sidebar-printings-dropdown', 'box-sizing')).toBe('border-box');
+});
+
+test('the pinned block is not a scroll container', () => {
+    // Nothing in it needs clipping - the card holds its natural size rather
+    // than being squeezed - and `hidden` here silently makes it a scroll box
+    // that anything positioned against it can be scrolled inside.
+    const overflow = declarations('.sidebar-pinned', 'overflow');
+    expect(
+        overflow.every(v => v === 'visible'),
+        `expected .sidebar-pinned not to clip, saw overflow: ${overflow.join(' | ')}`,
+    ).toBe(true);
+});
