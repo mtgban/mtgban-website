@@ -234,3 +234,42 @@ test('the pinned block is not a scroll container', () => {
         `expected .sidebar-pinned not to clip, saw overflow: ${overflow.join(' | ')}`,
     ).toBe(true);
 });
+
+test('every icon placeholder is sized with the icon that replaces it', () => {
+    // The server renders <i data-lucide="…"> and the bundle later swaps it
+    // for an <svg>. An unsized placeholder is a 0x0 box, so the row lays out
+    // at the wrong size until the bundle lands and then jumps: the SORT row
+    // was 16px shorter and its label 8px higher, and the result star, whose
+    // row is right-aligned, slid the whole strip 24px sideways.
+    //
+    // Each rule that sizes one of these icons has to size its placeholder in
+    // the same breath - that is the only way the two cannot disagree - so
+    // this asserts the pairing rather than any particular number.
+    for (const base of ['.search-sort-pill', '.search-sort-settings', '.fav-sort-pill',
+                        '.result-quick-icons .fav-btn', '.qi-actions']) {
+        const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // the selector list of whichever rule sizes this icon
+        const re = new RegExp(`([^{}]*${esc}\\s+svg[^{}]*)\\{([^{}]*)\\}`, 'g');
+        let found = false, m;
+        while ((m = re.exec(css)) !== null) {
+            if (!/width/.test(m[2])) continue;   // skip rules that only paint
+            found = true;
+            expect(
+                m[1],
+                `"${base} svg" is sized without its placeholder; the row will jump when lucide paints`,
+            ).toContain('i[data-lucide]');
+        }
+        expect(found, `expected a rule sizing "${base} svg"`).toBe(true);
+    }
+});
+
+test('the collapsed icon row sizes both through one inherited token', () => {
+    // The star's own rule out-specifies anything the narrow layout could
+    // reasonably write, so a competing width there simply loses to it - which
+    // is how the placeholder ended up reserving 24px against a 20px icon, a
+    // 4px jump in the other direction. An inherited custom property reaches
+    // it regardless of specificity.
+    expect(rules('.qi-actions').join(' ')).toContain('--qi-icon-size');
+    const star = css.slice(css.indexOf('.result-quick-icons .fav-btn svg'));
+    expect(star.slice(0, star.indexOf('}'))).toContain('--qi-icon-size');
+});
