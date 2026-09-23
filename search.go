@@ -1154,10 +1154,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 						foil = cm.Only
 					}
 					link = cm.BuildURL(game, id, cm.URLOption{
-						Foil:      foil,
-						Signed:    cm.None,
-						Altered:   cm.None,
-						Language:  cm.LanguageEnglish,
+						Foil:    foil,
+						Signed:  cm.None,
+						Altered: cm.None,
+						// Note that Chinese languages are spelled
+						// differently, they will be skipped
+						Language:  cm.LanguageFromName(co.Language),
 						Affiliate: Affiliates().Codes["MKM"],
 					})
 				}
