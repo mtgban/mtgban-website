@@ -274,6 +274,20 @@ type AffiliateConfig struct {
 
 	// Function to build the complete URL
 	URLFunc func(*url.URL) *url.URL
+
+	// Function to name the printing the link points at, for the stores whose
+	// URLs carry an identifier that names one. It is what lets the bot offer
+	// the card on this site beside the store's own link, so it answers with
+	// nothing rather than with a guess: a link to the wrong card is worse
+	// than no link at all.
+	CardFunc func(*url.URL) *mtgmatcher.CardObject
+}
+
+// unknownTitle is the title a store's link carries where the printing behind
+// it cannot be named. It is the whole title for a store whose URLs say
+// nothing (Amazon), and the fallback for one whose URLs usually do.
+func unknownTitle(*url.URL) string {
+	return "Your search"
 }
 
 // printingTitle names a printing the way the bot announces a link: the card,
@@ -294,7 +308,7 @@ func printingTitle(co *mtgmatcher.CardObject) string {
 	return title
 }
 
-// manapoolCardTitle names the printing a Mana Pool card link points at.
+// manapoolCard names the printing a Mana Pool card link points at.
 //
 // The path is /card/<set>/<number>/<tail>, and the tail is the card's name
 // only in the links the price feed publishes - all 546k of its records spell
@@ -302,12 +316,18 @@ func printingTitle(co *mtgmatcher.CardObject) string {
 // site's own links put an internal id there instead, and
 // /card/ltr/744z/3ca3376d-5850-4614-88ce-3081d4cbddcf - Sauron, the Dark Lord
 // - came out as "3Ca3376D 5850 4614 88Ce 3081D4Cbddcf". The set and the
-// number are in both shapes and name the printing between them, so the title
-// is built from those and the tail is not read at all.
-func manapoolCardTitle(u *url.URL) string {
+// number are in both shapes and name the printing between them, so the card
+// is found from those and the tail is not read at all.
+//
+// Taking the first printing a set files under the number is safe because the
+// two name one card: of the 106,229 pairs this datastore files, none is
+// answered by two. Other games do file a number under two names - see
+// openingName in redirect.go - but the bot reads links for Magic only, which
+// checkForLinks gates on.
+func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 	fields := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(fields) < 3 {
-		return "Your search"
+		return nil
 	}
 
 	for _, card := range printingsAt(fields[1], fields[2]) {
@@ -315,9 +335,37 @@ func manapoolCardTitle(u *url.URL) string {
 		if err != nil {
 			continue
 		}
-		return printingTitle(co)
+		return co
 	}
-	return "Your search"
+	return nil
+}
+
+// tcgplayerCard names the printing a TCGplayer product link points at.
+//
+// The product id is the first whole number in the path, and it is an id the
+// matcher already indexes, so the printing it names is looked up rather than
+// guessed from the slug beside it.
+//
+// The Printing parameter picks the foil sibling where the page is showing
+// one.
+func tcgplayerCard(u *url.URL) *mtgmatcher.CardObject {
+	var id string
+	for _, id = range strings.Split(u.Path, "/") {
+		_, err := strconv.Atoi(id)
+		if err == nil {
+			break
+		}
+	}
+
+	cardID, err := backend().MatchID(id, u.Query().Get("Printing") == "Foil")
+	if err != nil {
+		return nil
+	}
+	co, err := backend().GetUUID(cardID)
+	if err != nil {
+		return nil
+	}
+	return co
 }
 
 var AffiliateStores = []AffiliateConfig{
@@ -379,26 +427,8 @@ var AffiliateStores = []AffiliateConfig{
 			u.RawQuery = v.Encode()
 			return u
 		},
-		TitleFunc: func(u *url.URL) string {
-			v := u.Query()
-			var id string
-			for _, id = range strings.Split(u.Path, "/") {
-				_, err := strconv.Atoi(id)
-				if err == nil {
-					break
-				}
-			}
-			cardID, err := backend().MatchID(id, v.Get("Printing") == "Foil")
-			if err != nil {
-				return "Your search"
-			}
-			co, err := backend().GetUUID(cardID)
-			if err != nil {
-				return "Your search"
-			}
-
-			return printingTitle(co)
-		},
+		TitleFunc: unknownTitle,
+		CardFunc:  tcgplayerCard,
 	},
 	{
 		Trigger: "starcitygames.com/",
@@ -426,7 +456,8 @@ var AffiliateStores = []AffiliateConfig{
 		Name:          "Manapool",
 		Handle:        "MP",
 		DefaultFields: []string{"ref"},
-		TitleFunc:     manapoolCardTitle,
+		TitleFunc:     unknownTitle,
+		CardFunc:      manapoolCard,
 	},
 	{
 		Trigger:       "manapool.com/sealed",
@@ -453,26 +484,25 @@ var AffiliateStores = []AffiliateConfig{
 		Name:          "Amazon",
 		Handle:        "AMZN",
 		DefaultFields: []string{"tag"},
-		TitleFunc: func(u *url.URL) string {
-			return "Your search"
-		},
+		TitleFunc:     unknownTitle,
 	},
 	{
 		Trigger:       "/a.co/",
 		Name:          "Amazon",
 		Handle:        "AMZN",
 		DefaultFields: []string{"tag"},
-		TitleFunc: func(u *url.URL) string {
-			return "Your search"
-		},
+		TitleFunc:     unknownTitle,
 	},
 }
 
-// Check if a essage contains well-known links that can be tagged with BAN's links
-func checkForLinks(mGuildID, mContent string) (string, string) {
+// Check if a essage contains well-known links that can be tagged with BAN's
+// links. The printing comes back too where the store's URL named one, and is
+// nil otherwise - a store whose links carry no identifier, or one whose link
+// this time named nothing the datastore holds.
+func checkForLinks(mGuildID, mContent string) (string, string, *mtgmatcher.CardObject) {
 	// Only for the main discord and only for the main game
 	if mGuildID != discordGuildID() || Config.Game != DefaultGame {
-		return "", ""
+		return "", "", nil
 	}
 
 	for _, store := range AffiliateStores {
@@ -508,9 +538,20 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 				continue
 			}
 
+			// Name the printing the link points at, where the store's URL
+			// carries enough to. This reads the posted URL, so it has to
+			// happen before URLFunc folds it into a partner redirect.
+			var co *mtgmatcher.CardObject
+			if store.CardFunc != nil {
+				co = store.CardFunc(u)
+			}
+
 			// Extract a sensible link title
 			title := mtgmatcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
-			if store.TitleFunc != nil {
+			switch {
+			case co != nil:
+				title = printingTitle(co)
+			case store.TitleFunc != nil:
 				title = store.TitleFunc(u)
 			}
 			title += " at " + store.Name
@@ -535,10 +576,10 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 			}
 			u.RawQuery = v.Encode()
 
-			return title, u.String()
+			return title, u.String(), co
 		}
 	}
-	return "", ""
+	return "", "", nil
 }
 
 // This function will be called (due to AddHandler above) every time a new
@@ -607,7 +648,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
-			title, link := checkForLinks(m.GuildID, m.Content)
+			title, link, _ := checkForLinks(m.GuildID, m.Content)
 			if title == "" || link == "" {
 				break
 			}
