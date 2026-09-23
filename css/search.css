@@ -373,7 +373,16 @@ body:has(.search-layout) {
         min-height: 0;
         position: static;
         background: var(--background);
-        overflow: hidden;
+        /* Nothing in here needs clipping - the image holds its natural size
+           rather than being squeezed - and `hidden` was not free: it made
+           this a scroll container, which is how the editions panel came to
+           push the card off the top of the column. The panel hung below this
+           row, absolutely positioned, so it counted as this box's scrollable
+           overflow; focusing its filter then scrolled this box to reveal it,
+           with no scrollbar to undo that. The panel is placed against the
+           viewport now and no longer belongs to any scroll box, but leaving
+           this one behind for the next thing to trip on would be a trap. */
+        overflow: visible;
     }
 
     .sidebar-pinned .sidebar-search,
@@ -744,13 +753,23 @@ body.modal-embed .search-sidebar {
     display: none !important;
 }
 
-/* Printings overflow dropdown - flows down over content below */
+/* Printings overflow dropdown - hangs below the symbol row, over the boxes
+   underneath it.
+
+   Fixed, and placed by the script that opens it. Every box between this and
+   the viewport either is a scroll box or can become one - the pinned block
+   it hangs from, the column below a short window - and an absolutely
+   positioned panel is clipped by the first of them, which is exactly what
+   used to cut this one off. Against the viewport there is nothing left to
+   clip it, and the script can give it the room that is actually there
+   rather than a number guessed from the card's height. The left/width/top/
+   max-height below are the fallback for the moment before it is placed. */
 .sidebar-printings-dropdown {
     display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
+    position: fixed;
+    /* The script hands it the row's own width, so the padding and border
+       have to come out of that rather than be added to it. */
+    box-sizing: border-box;
     z-index: 10;
     max-height: 260px;
     background: var(--search-surface-1);
@@ -783,6 +802,22 @@ body.modal-embed .search-sidebar {
 .sidebar-printings-list::-webkit-scrollbar-thumb {
     background: var(--surface-4, #323840);
     border-radius: 2px;
+}
+
+/* The note about printings too numerous to draw at all. Its own line either
+   way: on the symbol row when no overflow panel was built (it replaced a
+   <br> that used to force the break), and at the foot of the panel when
+   there is one, which is where the JS moves it. */
+.sidebar-printings-note {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--search-text-dim);
+}
+.sidebar-printings-dropdown .sidebar-printings-note {
+    flex-shrink: 0;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
 
 

@@ -361,6 +361,53 @@
                     if (card && card.hasAttribute('data-expanded')) setProductsExpanded(null);
                 });
 
+                // What the panel is comfortable at, and the least it can be
+                // and still read as a list rather than a sliver.
+                const PRINTINGS_PANEL_MAX = 260;
+                const PRINTINGS_PANEL_MIN = 120;
+
+                // The panel is fixed, so it is placed against the viewport
+                // instead of inheriting a chain of boxes any one of which can
+                // clip it. Measured at open time and again on resize: the row
+                // it hangs from moves with every hovered result, and the room
+                // under it moves with the window.
+                function positionPrintings(container, dropdown) {
+                    const row = container.getBoundingClientRect();
+                    const below = window.innerHeight - row.bottom - 18;
+                    const above = row.top - 18;
+                    dropdown.style.left = row.left + 'px';
+                    dropdown.style.width = row.width + 'px';
+                    // Below the row by default - that is where the boxes this
+                    // is meant to cover are. It only goes above when there is
+                    // not enough room under the row to read it and there is
+                    // more over the card, which on this column means a window
+                    // too short to be showing those boxes anyway.
+                    if (below < PRINTINGS_PANEL_MIN && above > below) {
+                        const room = Math.min(PRINTINGS_PANEL_MAX, above);
+                        dropdown.style.top = (row.top - 6 - room) + 'px';
+                        dropdown.style.maxHeight = room + 'px';
+                        return;
+                    }
+                    dropdown.style.top = (row.bottom + 6) + 'px';
+                    // Whatever is actually left under the row, capped at the
+                    // size the panel is comfortable at. The symbol list inside
+                    // takes the difference as a scroll, so a short window
+                    // costs a scroll rather than a cut.
+                    dropdown.style.maxHeight = Math.min(PRINTINGS_PANEL_MAX, below) + 'px';
+                }
+
+                // Deferred: a resize moves the card too (its cap is in vh), so
+                // the row this hangs from is still where it was when the event
+                // fires. Reading it a task later reads where it ended up.
+                window.addEventListener('resize', function() {
+                    setTimeout(function() {
+                        const container = document.getElementById('printings');
+                        if (!container) return;
+                        const dropdown = container.querySelector('.sidebar-printings-dropdown.open');
+                        if (dropdown) positionPrintings(container, dropdown);
+                    }, 0);
+                });
+
                 // The label says what pressing the button will do, so it has
                 // to turn over with the panel: left alone, an open panel goes
                 // on offering to show what is already on screen.
@@ -373,6 +420,15 @@
                 function collapsePrintings() {
                     const container = document.getElementById('printings');
                     if (!container) return;
+
+                    // A rebuild starts from the markup as it was served, so
+                    // the note goes back on the row before we decide again
+                    // whether there is a panel for it to move into. Taken out
+                    // first: on a rebuild with the panel still open it is a
+                    // child of that panel, and would go in the bin with it.
+                    const oldNote = container.querySelector('.sidebar-printings-note');
+                    if (oldNote) container.appendChild(oldNote);
+
 
                     // Clean up previous collapse elements
                     const oldDropdown = container.querySelector('.sidebar-printings-dropdown');
@@ -413,6 +469,15 @@
                     });
                     dropdown.appendChild(list);
 
+                    // The truncation note reads as a footnote to the list it
+                    // is about, so it travels with it into the panel rather
+                    // than sitting under the six symbols on the row outside.
+                    // Moved, not cloned: leaving a copy behind would say
+                    // there is more to see next to the very row that is not
+                    // showing it.
+                    const note = container.querySelector('.sidebar-printings-note');
+                    if (note) dropdown.appendChild(note);
+
                     // The count is a button that stays the size it reads, so
                     // opening the panel does not shove the symbols beside it
                     // along the row the way a growing input did.
@@ -428,12 +493,16 @@
                             closePrintings(container);
                             return;
                         }
+                        positionPrintings(container, dropdown);
                         dropdown.classList.add('open');
                         setTriggerState(trigger, true);
                         // The filter is the reason the panel opened: take the
                         // caret there so a set can be typed without reaching
-                        // for it.
-                        filter.focus();
+                        // for it. preventScroll because the panel hangs below
+                        // this row over the boxes underneath: any scrollable
+                        // ancestor would otherwise "reveal" it by scrolling
+                        // the column, dragging the card off the top.
+                        filter.focus({ preventScroll: true });
                     });
 
                     filter.addEventListener('input', function() {

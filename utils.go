@@ -1217,7 +1217,11 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 		b.WriteString(`</a>`)
 
 		if i == MaxRuneSymbols && len(co.Printings) > MaxRuneSymbols {
-			b.WriteString("<br>and many more (too many to list)...")
+			// An element rather than a bare text node: the overflow panel
+			// moves this line into itself, where it belongs - it is a note
+			// about what the panel is not showing, not about the row of
+			// symbols beside it.
+			b.WriteString(`<span class="sidebar-printings-note">and many more (too many to list)...</span>`)
 			break
 		}
 	}
