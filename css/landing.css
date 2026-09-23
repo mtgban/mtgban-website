@@ -119,8 +119,15 @@
     transition: all 0.15s;
     display: flex; align-items: center; justify-content: center;
 }
-.landing-action-btn svg {
+/* The <i> the server writes and lucide later swaps for an <svg>, sized in the
+   same breath as the icon so the two cannot disagree. Unsized it was a 0x0
+   box: each button 20px square short of its final size, the pair of them
+   38px tall instead of 18, and - the strip being right-aligned - both
+   sliding 40px left and 10px up the frame the bundle landed. */
+.landing-action-btn svg,
+.landing-action-btn i[data-lucide] {
     width: 20px; height: 20px;
+    flex: 0 0 auto;
 }
 .landing-action-btn + .landing-action-btn {
     border-left: 1px solid var(--border-subtle);

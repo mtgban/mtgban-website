@@ -179,7 +179,14 @@
     margin-top: 0;
 }
 
-.cp-category-header svg {
+/* Every row, header and chip in the palette is an <i data-lucide> that lucide
+   swaps for an <svg>. The palette fetches the bundle itself on first open
+   (ensureLucide, js/command-palette.js), so on a page that carries no other
+   icons the overlay is drawn before any of them exist: measured, a result
+   icon was a 0x0 box that became 20x20. Each rule sizes the placeholder in
+   the same selector list as the icon that replaces it. */
+.cp-category-header svg,
+.cp-category-header i[data-lucide] {
     width: 12px;
     height: 12px;
     opacity: 0.8;
@@ -216,6 +223,7 @@
 }
 
 .cp-result-icon svg,
+.cp-result-icon i[data-lucide],
 .cp-result-icon img {
     width: 20px;
     height: 20px;
@@ -297,7 +305,8 @@ body.dark-theme .cp-result-icon img[src*="cardconduit"] {
     flex-shrink: 0;
 }
 
-.cp-result-delete svg {
+.cp-result-delete svg,
+.cp-result-delete i[data-lucide] {
     width: 14px;
     height: 14px;
 }
@@ -579,7 +588,8 @@ body.dark-theme .cp-result-icon img[src*="cardconduit"] {
     display: inline-flex;
     align-items: center;
 }
-.cp-chip-icon svg {
+.cp-chip-icon svg,
+.cp-chip-icon i[data-lucide] {
     width: 13px;
     height: 13px;
 }
@@ -620,7 +630,8 @@ body.dark-theme .cp-result-icon img[src*="cardconduit"] {
 .cp-chip.active .cp-chip-delete:hover {
     background: rgba(245, 158, 11, 0.25);
 }
-.cp-chip-delete svg {
+.cp-chip-delete svg,
+.cp-chip-delete i[data-lucide] {
     width: 11px;
     height: 11px;
 }

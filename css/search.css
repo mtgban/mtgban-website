@@ -1293,6 +1293,19 @@ body.modal-embed .search-sidebar {
     cursor: pointer;
 }
 .result-quick-icons .qi-view-image:hover { color: var(--normal); }
+/* "Shares the favorite star's styling" has to include the star's box, or the
+   sharing stops exactly where it matters: nothing sized this icon, so it
+   arrived at lucide's own 24 against a 0x0 placeholder, and the strip -
+   right-aligned in the header - slid 24px sideways the moment the bundle
+   landed. Measured at 860px: the card-name row lost 24px of width and its
+   set titles rewrapped, moving the page 198px. Same token as the star, so
+   the collapsed menu takes both down to 20 in one place. */
+.result-quick-icons .qi-view-image svg,
+.result-quick-icons .qi-view-image i[data-lucide] {
+    display: block;
+    width: var(--qi-icon-size, 24px);
+    height: var(--qi-icon-size, 24px);
+}
 
 /* Lightbox that shows the card art when the sidebar preview isn't available. */
 .card-image-modal {

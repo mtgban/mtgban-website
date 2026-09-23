@@ -86,7 +86,15 @@
     opacity: 1;
     font-weight: 500;
 }
-.guide-nav-link svg {
+/* The sidebar links, the section headings and the copy buttons all carry an
+   <i data-lucide> that lucide swaps for an <svg> a frame later. Sized only on
+   the svg, the placeholder was a 0x0 box and the whole page laid out around
+   icons that were not there yet: labels 14px left of where they end up,
+   headings 22px left, and the document 49.5px shorter - 648 elements moving
+   the moment the bundle landed, some of them by 47px. Each rule sizes its
+   placeholder in the same selector list, so the two cannot drift apart. */
+.guide-nav-link svg,
+.guide-nav-link i[data-lucide] {
     width: 14px;
     height: 14px;
     flex-shrink: 0;
@@ -218,7 +226,8 @@
     padding-bottom: 0.5em;
     border-bottom: 1px solid var(--border-subtle, rgba(0,0,0,0.06));
 }
-.guide-section-header svg {
+.guide-section-header svg,
+.guide-section-header i[data-lucide] {
     width: 22px;
     height: 22px;
     color: #FFBF00;
@@ -367,7 +376,8 @@
     color: #FFBF00;
     background: var(--surface-2, rgba(0,0,0,0.06));
 }
-.guide-example-copy svg {
+.guide-example-copy svg,
+.guide-example-copy i[data-lucide] {
     width: 14px;
     height: 14px;
 }

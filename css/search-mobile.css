@@ -94,6 +94,17 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     justify-content: center;
 }
 
+/* Nothing sized this icon, so it arrived at lucide's own 24 against a 0x0
+   placeholder and popped into a button that was already 44px square.
+   Reserving the box it ends up in keeps the look and drops the pop; the
+   same three buttons are .m-filter-btn and .m-settings-btn. */
+.m-search-btn svg,
+.m-search-btn i[data-lucide] {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+}
+
 .light-theme .m-search-btn {
     border-color: rgba(0, 0, 0, 0.2);
     background: rgba(0, 0, 0, 0.04);
@@ -2373,8 +2384,8 @@ body.m-setpicker-lock {
     cursor: pointer;
 }
 
-.m-setpicker-close i,
-.m-setpicker-close svg { width: 1.4em; height: 1.4em; }
+.m-setpicker-close svg,
+.m-setpicker-close i[data-lucide] { width: 1.4em; height: 1.4em; }
 
 .m-setpicker-title {
     font-size: 1rem;
@@ -2517,8 +2528,8 @@ body.m-setpicker-lock {
 .m-fav-sort .fav-sort-pill.active {
     color: var(--dodgerblue);
 }
-.m-fav-sort .fav-sort-pill i,
-.m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
+.m-fav-sort .fav-sort-pill svg,
+.m-fav-sort .fav-sort-pill i[data-lucide] { width: 16px; height: 16px; }
 .m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
 .m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
 
