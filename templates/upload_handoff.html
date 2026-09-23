@@ -3,7 +3,7 @@
      first time it opens. */}}
 {{define "icons"}}<!-- no lucide: this page has no icons -->{{end}}
 
-{{define "title"}}Receiving a card list &mdash; MTGBAN{{end}}
+{{define "title"}}Receiving a card list - MTGBAN{{end}}
 
 {{define "extra-css"}}<link rel="stylesheet" type="text/css" href="/css/handoff.css?hash={{.Hash}}">{{end}}
 
@@ -45,11 +45,22 @@
          the far end. Better to say so while it is still on the shelf. -->
     <div class="handoff-locked">
         <p class="handoff-locked-msg">{{.InfoMessage}}</p>
+        <p class="handoff-pitch">
+            {{if .PatreonLogin}}Pricing a card list is for logged-in
+            members. If you have an account, you may simply be logged out
+            here: log back in and you will land right where you were, list
+            and all.{{else}}Pricing a card list needs a tier that includes
+            the Uploader. Consider upgrading to unlock it, along with
+            <a href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">everything
+            BAN has to offer</a>!{{end}}
+        </p>
         <p>
-            This page receives a card list from a browser extension and
-            prices it against every store MTGBAN follows &mdash; what each
-            one sells your cards for, what each one pays for them, and where
-            the gap between the two is worth acting on.
+            MTGBAN prices a whole list against every store it follows:
+            what each one charges for your cards, and what each one pays
+            for them. That is one page of it. There is also arbitrage
+            between stores, the same cards priced across regions, sealed
+            valued by what is actually in the box, and buylist spreads
+            that move through the day.
         </p>
         <div class="handoff-locked-actions">
             {{if .PatreonLogin}}
@@ -87,14 +98,14 @@
             This page does not hold a card list of its own. A browser
             extension reads the offers on a storefront, opens this page, and
             hands the rows over window to window; the page posts them to the
-            <a href="/upload">uploader</a>, which prices them against every
+            <a href="/upload">Uploader</a>, which prices them against every
             store MTGBAN follows. It carries the session that way, which a
             request made from the extension's own origin could not.
         </p>
         <p>
             {{if .HandoffOrigins}}A list can be handed over from {{range $i, $origin := .HandoffOrigins}}{{if $i}}, {{end}}<code>{{$origin}}</code>{{end}}, and from nowhere else.{{else}}No site is currently allowed to hand a list over.{{end}}
             To price a list yourself, paste or upload it at
-            <a href="/upload">/upload</a> &mdash; the formats below are the
+            <a href="/upload">/upload</a> - the formats below are the
             same ones that page takes.
         </p>
 
@@ -108,7 +119,7 @@
 <pre class="handoff-example">// this page, once it is listening
 { type: "mtgban-handoff-ready" }
 
-// the opener, in reply &mdash; either a list as text&hellip;
+// the opener, in reply - either a list as text&hellip;
 { type: "mtgban-handoff-rows",
   text: "4 Rift Bolt\n1 Lightning Bolt (2ED) *F*\n",
   rows: 2,
@@ -122,7 +133,7 @@
   ],
   source: "https://www.cardmarket.com/en/Magic/Users/&hellip;" }</pre>
         <p>
-            <code>text</code> is anything described below &mdash; a CSV, a
+            <code>text</code> is anything described below - a CSV, a
             spreadsheet's worth of tab separated columns, a decklist. It is
             also accepted as <code>csv</code>, which is the name the
             Cardmarket extension has always sent and which is not going
@@ -181,7 +192,7 @@
                 <tr><td>Condition</td><td>anything with <code>condition</code> in it</td></tr>
                 <tr><td>Quantity</td><td><code>quantity</code>, <code>qty</code>, <code>stock</code>, <code>count</code>, <code>have</code></td></tr>
                 <tr><td>Price</td><td><code>price</code>, <code>low</code></td></tr>
-                <tr><td>Notes</td><td><code>notes</code>, <code>data</code> &mdash; kept and shown, trimmed at 1024 characters</td></tr>
+                <tr><td>Notes</td><td><code>notes</code>, <code>data</code> - kept and shown, trimmed at 1024 characters</td></tr>
             </tbody>
         </table>
 
@@ -198,7 +209,7 @@
             <tbody>
                 <tr><td>MTGJSON / Scryfall uuid</td><td><code>uuid</code>, <code>id</code>, <code>key</code>, <code>scryfall id</code>, <code>mtgjson id</code></td></tr>
                 <tr><td>TCGplayer product</td><td><code>tcgplayer product id</code></td></tr>
-                <tr><td>TCGplayer SKU</td><td><code>tcgplayer id</code> &mdash; carries the condition and finish too</td></tr>
+                <tr><td>TCGplayer SKU</td><td><code>tcgplayer id</code> - carries the condition and finish too</td></tr>
                 <tr><td>Cardmarket product</td><td><code>cardmarket id</code>, <code>mcm id</code>, <code>mkm id</code></td></tr>
             </tbody>
         </table>
@@ -211,8 +222,8 @@
         <h2>What the values may say</h2>
         <ul>
             <li>
-                <strong>Condition</strong> is one of five grades &mdash; NM,
-                SP, MP, HP, PO &mdash; written either way: <code>NM</code>
+                <strong>Condition</strong> is one of five grades - NM,
+                SP, MP, HP, PO - written either way: <code>NM</code>
                 and <code>Near Mint</code> both land on NM, as do
                 <code>Lightly Played</code> and <code>Excellent</code> on
                 SP, <code>Moderately Played</code> and <code>Very Good</code>
@@ -259,8 +270,8 @@
 <pre class="handoff-example">mcm_id,card_name,edition,condition,foil,quantity,price_usd,article_id,mkm_notes
 265854,Thornwind Faeries,Urza's Legacy,NM,,3,0.06,1234567,https://www.cardmarket.com/...</pre>
         <p>
-            Up to {{uploadLimit}} rows at a time &mdash; {{uploadProLimit}}
-            with the Optimizer &mdash; and {{uploadMaxMB}}&nbsp;MB of file.
+            Up to {{uploadLimit}} rows at a time - {{uploadProLimit}}
+            with the Optimizer - and {{uploadMaxMB}}&nbsp;MB of file.
         </p>
     </div>
 </div>

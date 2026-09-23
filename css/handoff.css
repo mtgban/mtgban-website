@@ -21,6 +21,28 @@
     margin-bottom: 0;
 }
 
+/* The line that has to land. It is the first thing read after the
+   heading, so it is set a step up from the paragraph that follows it. */
+.handoff-pitch {
+    font-size: 17px;
+    color: var(--normal);
+}
+
+/* The one link in the invitation, and the one thing it is asking for.
+   It sits inside a sentence rather than on a button, so it needs both
+   halves to read as a link at all: this page's anchors come out
+   near-white against near-white text and carry no underline. Patreon's
+   own red, the same one the log-in button wears. */
+.handoff-pitch a {
+    color: #ff424d;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.handoff-pitch a:hover {
+    filter: brightness(1.15);
+}
+
 .handoff-locked-actions {
     display: flex;
     flex-wrap: wrap;
