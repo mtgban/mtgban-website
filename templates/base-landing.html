@@ -63,8 +63,15 @@ window.__BAN_PALETTE_TARGETS = {
      Pages carry icons whether or not any of their own scripts calls
      createIcons(). A page with none of its own overrides this block to skip
      the bundle; the override has to emit something, because an empty
-     definition loses to this default rather than replacing it. -->
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+     definition loses to this default rather than replacing it.
+
+     Pinned rather than @latest: this runs on nearly every page, so an
+     unpinned tag hands whatever lucide publishes next straight to
+     production on the first cold load after it lands, reviewed by nobody.
+     It also costs a 302 through unpkg's version resolver on every cold
+     load. Bump deliberately; the icon names in `data-lucide` attributes
+     are the compatibility surface to check when you do. -->
+<script src="https://unpkg.com/lucide@1.47.0/dist/umd/lucide.js"></script>
 <script>if (window.lucide) lucide.createIcons();</script>
 {{end}}
 <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
