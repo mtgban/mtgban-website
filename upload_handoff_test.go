@@ -658,3 +658,43 @@ func TestHiddenStillHidesTheProgressLine(t *testing.T) {
 		t.Error(".handoff-status sets a display and nothing puts [hidden] back")
 	}
 }
+
+// TestHandoffClosesWhatItOpens pins that the page's own container closes.
+//
+// It did not: the guide arrived and took the closing tag of the div the
+// whole page sits in with it. Nothing failed. The Go templates still
+// parsed, every string this file looks for was still on the page, and the
+// browser did what browsers do with an unclosed div - it put the footer,
+// and every script after it, inside a box styled `max-width: 760px;
+// margin: 0 auto`, which puts the site footer in the middle of the page.
+//
+// Balance is checked between the page container and the footer, which is
+// the span an unclosed tag in this template swallows.
+func TestHandoffClosesWhatItOpens(t *testing.T) {
+	for _, told := range []string{"", ErrMsg} {
+		page := renderPage(t, "upload_handoff.html", false, PageVars{
+			BetaNav:        &NavElem{Short: "b"},
+			HandoffOrigins: HandoffOrigins,
+			InfoMessage:    told,
+		})
+
+		start := strings.Index(page, `<div class="page-content">`)
+		footer := strings.Index(page, "<footer")
+		if start < 0 || footer < 0 {
+			t.Fatalf("InfoMessage=%q: the page has no content container or no footer", told)
+		}
+
+		region := page[start:footer]
+		depth := 0
+		for _, tag := range regexp.MustCompile(`<div\b[^>]*>|</div>`).FindAllString(region, -1) {
+			if tag == "</div>" {
+				depth--
+			} else {
+				depth++
+			}
+		}
+		if depth != 0 {
+			t.Errorf("InfoMessage=%q: %d div(s) left open before the footer, which lands inside them", told, depth)
+		}
+	}
+}
