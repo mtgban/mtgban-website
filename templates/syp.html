@@ -1,0 +1,108 @@
+{{define "extra-css"}}
+    {{/* The table, card cell and button styling are the arbitrage table's own,
+         and this page is the same table with fewer columns. Sharing the
+         stylesheet keeps the two looking alike; it is only the template that
+         needed separating. */}}
+    <link rel="stylesheet" type="text/css" href="/css/arbit.css?hash={{.Hash}}">
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+{{end}}
+
+{{define "content"}}
+<div class="page-standard arb-page arb-wide">
+    <a name="top"></a>
+
+    {{/* The art preview follows the pointer down the rows. setCardArtSource
+         comes from card-art-fallback.js, which the base page already loads. */}}
+    <div id="hoverWrap" class="foil-wrap hoverWrap">
+        <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
+    </div>
+    <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
+
+    <div class="page-header">
+        <div>
+            <h1>{{.Title}}</h1>
+            <p class="page-subtitle">Cards TCGplayer is buying for its Store Your Products program.</p>
+        </div>
+        {{if .Arb}}
+            <div class="arb-load-btns">
+                <a class="arb-load-btn csv" href="?page=syp&format=csv">Download CSV</a>
+            </div>
+        {{end}}
+    </div>
+
+    {{if ne .InfoMessage ""}}
+        <h2><p>{{.InfoMessage}}</p></h2>
+    {{end}}
+
+    {{/* One entry, always: the handler builds a single list. Ranging rather
+         than indexing keeps the empty case (no SYP vendor loaded) off the
+         table entirely. */}}
+    {{range .Arb}}
+        <div class="arb-table-wrap">
+            <table class="table-data arb-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
+                <thead>
+                    <tr>
+                        <th><a href="?page=syp&sort=alpha">Card</a> / <a href="?page=syp&sort=edition">Edition</a></th>
+                        <th class="c">Cond</th>
+                        <th class="c"><a href="?page=syp&sort=available">Qty</a></th>
+                        <th class="c"><a href="?page=syp&sort=sell_price">Sell Price</a></th>
+                        <th class="c">Links</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Arbit}}
+                        {{$card := (index $.Metadata .CardID)}}
+                        <tr onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'{{$card.ImageURL}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <td>
+                                <div class="arb-card-cell">
+                                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 24 "Class" "set-icon"}}
+                                    <span class="card-name-line">
+                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
+                                        {{buylist_badge $.ScraperShort $card.HotlistStore}}
+                                    </span>
+                                    <span class="card-edition">{{$card.Edition}} &middot; #{{$card.Number}}{{if $card.HasDeck}} &middot; Decklist{{else if $card.Etched}} &middot; Etched{{else if $card.Foil}} &middot; Foil{{end}}</span>
+                                </div>
+                            </td>
+                            <td>{{.InventoryEntry.Conditions}}</td>
+                            <td>{{.InventoryEntry.Quantity}}</td>
+                            <td class="m">$ {{printf "%.2f" .InventoryEntry.Price}}</td>
+                            <td>
+                                <div class="arb-quick-links">
+                                    {{if ne .InventoryEntry.URL ""}}
+                                        <a class="arb-qlink buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                    {{end}}
+                                </div>
+                            </td>
+                        </tr>
+                    {{end}}
+
+                    {{if $.CurrentIndex}}
+                        <tr style="background-color: var(--headerbackground);">
+                            <td colspan="5">
+                                <div class="pagination">
+                                    {{if ne $.CurrentIndex 1}}
+                                        <a href="?page=syp&p=1">&lt;</a>
+                                        <a href="?page=syp&p={{$.PrevIndex}}"><i class="arrow left"></i></a>
+                                    {{end}}
+                                    <span class="cur">{{$.CurrentIndex}}</span>
+                                    <span class="pg-info">/ {{$.TotalIndex}}</span>
+                                    {{if ne $.CurrentIndex $.TotalIndex}}
+                                        <a href="?page=syp&p={{$.NextIndex}}"><i class="arrow right"></i></a>
+                                        <a href="?page=syp&p={{$.TotalIndex}}">&gt;</a>
+                                    {{end}}
+                                </div>
+                            </td>
+                        </tr>
+                    {{end}}
+
+                    <tr style="background-color: var(--background);">
+                        <td colspan="5">
+                            <a class="arb-back-top" href="#top"><i class="arrow up"></i> back to top</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {{end}}
+</div>
+{{end}}

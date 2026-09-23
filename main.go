@@ -116,7 +116,6 @@ type PageVars struct {
 	PromoTags      []string
 	SetKeyrunes    map[string]string
 	NoSort         bool
-	NoSettings     bool
 	HasSettings    bool
 	HasAvailable   bool
 	ShowUpsell     bool
@@ -189,7 +188,6 @@ type PageVars struct {
 	IsOneDay           bool
 	CanSwitchDay       bool
 	SortDir            string
-	LargeTable         bool
 	OffsetCards        int
 	FilterSet          string
 	Editions           []string
