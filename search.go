@@ -498,7 +498,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
 	if query == "" {
-		pageVars.PromoTags = backend().AllPromoTypes
 		if !pageVars.IsSealed && !isSetsPage {
 			pageVars.SetKeyrunes = getSetKeyrunes()
 		}

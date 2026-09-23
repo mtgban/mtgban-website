@@ -113,7 +113,6 @@ type PageVars struct {
 	FoundSellers   map[string]map[string][]SearchEntry
 	FoundVendors   map[string]map[string][]SearchEntry
 	Metadata       map[string]GenericCard
-	PromoTags      []string
 	SetKeyrunes    map[string]string
 	NoSort         bool
 	HasSettings    bool
@@ -171,7 +170,6 @@ type PageVars struct {
 	ArbitOptKeys       []string
 	ArbitOptConfig     map[string]FilterOpt
 	ArbitFilters       map[string]bool
-	ArbitOptTests      map[string]bool
 	SortOption         string
 	GlobalMode         bool
 	ReverseMode        bool
@@ -215,12 +213,10 @@ type PageVars struct {
 	SleepersKeys   []string
 	SleepersColors []string
 
-	Headers      [][]string
 	Tables       [][][]string
 	LastUpdate   time.Time
 	LastNews     time.Time
 	LastStash    time.Time
-	CurrentTime  time.Time
 	Uptime       string
 	DiskStatus   string
 	MemoryStatus string
@@ -230,7 +226,6 @@ type PageVars struct {
 
 	SelectableField bool
 	SelectableLabel string
-	DisableLinks    bool
 
 	DisableChart    bool
 	MaxLookbackDays int

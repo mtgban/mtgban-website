@@ -602,9 +602,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		sellerTable = append(sellerTable, row)
 	}
-	pageVars.Headers = append(pageVars.Headers, []string{
-		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status", "Session",
-	})
 	pageVars.Tables = append(pageVars.Tables, sellerTable)
 
 	// -- Dashboard: Buylist Scrapers --
@@ -662,9 +659,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		vendorTable = append(vendorTable, row)
 	}
-	pageVars.Headers = append(pageVars.Headers, []string{
-		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status", "Session",
-	})
 	pageVars.Tables = append(pageVars.Tables, vendorTable)
 
 	// -- Dashboard: Registered Pages --
@@ -680,9 +674,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		pageTable = append(pageTable, row)
 	}
-	pageVars.Headers = append(pageVars.Headers, []string{
-		"", "Icon", "Logs", "Link", "Template",
-	})
 	pageVars.Tables = append(pageVars.Tables, pageTable)
 
 	// -- People: quick-add a Patreon grant --
@@ -813,7 +804,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.DiskStatus = disk()
 	pageVars.MemoryStatus = mem()
 	pageVars.LatestHash = BuildCommit
-	pageVars.CurrentTime = time.Now()
 
 	pageVars.DisableChart = IsStashingInProgress()
 
