@@ -257,6 +257,12 @@ type OptimizedUploadEntry struct {
 	// Price used to display a visual indicator
 	VisualPrice float64
 
+	// Whatever the source row carried in its notes column, for the link
+	// back to the offer the price was read from. Only the loaded price is
+	// that offer's: with IgnorePrices the number shown is an index's, and
+	// linking it to a seller would name the wrong source for it.
+	Notes string
+
 	// Profitability index
 	Profitability float64
 }
@@ -1495,6 +1501,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				Spread:        factor,
 				BestPrice:     price,
 				Quantity:      qty,
+				Notes:         uploadedData[i].Notes,
 				VisualPrice:   comparePrice * visualPerc / 100.0,
 				Profitability: profitability,
 			})

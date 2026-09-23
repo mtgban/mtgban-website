@@ -78,3 +78,33 @@ func TestALinkedPriceLooksLikeOne(t *testing.T) {
 		t.Error("a linked price is given no affordance, so it reads as plain text")
 	}
 }
+
+// The optimizer shows the same number and had no link on it at all. It
+// belongs only in the branch where that number is the uploaded price: with
+// IgnorePrices the figure comes from an index, and pointing it at a seller
+// would name the wrong source for it.
+func TestTheOptimizerLinksTheLoadedPriceToo(t *testing.T) {
+	page, err := os.ReadFile("templates/upload.html")
+	if err != nil {
+		t.Fatalf("reading upload.html: %v", err)
+	}
+
+	cell := regexp.MustCompile(`(?s)<td class="opt-loaded">.*?</td>`).FindString(string(page))
+	if cell == "" {
+		t.Fatal("the optimizer has no loaded-price cell")
+	}
+	if !strings.Contains(cell, "sourceLink .Notes") {
+		t.Fatal("the optimizer's loaded price carries no link back to the offer")
+	}
+
+	// It has to sit inside the IgnorePrices else-branch, which is where
+	// the number shown is the one the upload carried.
+	split := strings.Index(cell, "{{else}}")
+	source := strings.Index(cell, "sourceLink .Notes")
+	if split < 0 {
+		t.Fatal("the cell no longer branches on IgnorePrices")
+	}
+	if source < split {
+		t.Error("the offer link is on the price the optimizer took from an index")
+	}
+}
