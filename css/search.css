@@ -1021,7 +1021,10 @@ body.modal-embed .search-sidebar {
        difference, permanently. Starting the column's first header on the
        line it pins to makes that difference zero. */
     --result-cover-height: 21px;
-    padding: var(--result-cover-height) 18px 80px;
+    /* The last thing in this column is the pagination row, which carries
+       20px under itself already. 80px on top of that was most of a result
+       card's worth of nothing. */
+    padding: var(--result-cover-height) 18px 32px;
     /* Query container so the Sellers/Buyers body can collapse to a single
        column based on the real width available to the results (which depends
        on whether the sidebar is showing), not on the raw viewport width. */
@@ -1031,11 +1034,22 @@ body.modal-embed .search-sidebar {
 /* Affiliate/value-prop note shown to logged-out visitors above the results. */
 .search-results-blurb {
     max-width: 720px;
+    /* The 2em top is for the other page that uses this class
+       (templates/offline.html), where nothing sits above it. */
     margin: 2em auto 0.5em;
     font-size: var(--text-sm);
     line-height: 1.5;
     color: var(--search-text-dim);
     text-align: center;
+}
+
+/* In the results column that 2em is a second gap stacked on the column's
+   own padding-top: the navbar ends, then 21px of padding, then 23px of
+   margin, and only then the first line of text. The padding is already the
+   breathing room here, and it is not free to trade away - it is the line
+   the first result header pins to (see .search-results). */
+.search-results > .search-results-blurb {
+    margin-top: 0;
 }
 
 
