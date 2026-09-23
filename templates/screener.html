@@ -220,7 +220,7 @@
                 </tbody>
             </table>
 
-            <div class="news-pagination">
+            <div class="pagination framed">
                 {{if ne .CurrentIndex 1}}
                     <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
                 {{end}}

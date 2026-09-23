@@ -1611,42 +1611,11 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 }
 
 
-/* ═══ Pagination ═══ */
-.search-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 20px 0;
-}
-.search-pagination a,
-.search-pagination span {
-    padding: 6px 12px;
-    border-radius: 5px;
-    font-size: var(--text-md);
-    font-weight: 500;
-    text-decoration: none;
-    transition: all 0.12s;
-}
-.search-pagination a {
-    background: var(--search-surface-2);
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    color: var(--activetext);
-}
-.search-pagination a:hover {
-    border-color: var(--accent-border, rgba(91,141,239,0.25));
-    color: var(--normal);
-}
-.search-pagination .cur {
-    background: var(--accent-muted, rgba(91,141,239,0.12));
-    border: 1px solid var(--accent-border, rgba(91,141,239,0.25));
-    color: var(--search-link);
-    font-weight: 600;
-}
-.search-pagination .pg-info {
-    font-size: var(--text-md);
-    color: var(--search-text-dim);
-}
+/* The search page carries its own palette (--search-*), so the shared
+   .pagination keeps its shape here and only the colours are restated. */
+.search-pagination a { background: var(--search-surface-2); }
+.search-pagination .cur { color: var(--search-link); }
+.search-pagination .pg-info { color: var(--search-text-dim); }
 
 
 /* ═══ Chart container ═══ */
@@ -2199,9 +2168,6 @@ body.modal-embed .cp-overlay {
     .search-sort-pill { padding: 8px 14px; font-size: var(--text-md); }
     .search-sort-label { padding: 8px 0; }
 
-    /* Pagination: bigger touch targets */
-    .search-pagination a,
-    .search-pagination span { padding: 10px 16px; font-size: var(--text-lg); }
 
     /* Chart canvas responsive */
     .chart-container canvas { width: 100% !important; height: auto !important; }

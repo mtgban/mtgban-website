@@ -726,35 +726,54 @@ a.selected:hover{
 }
 .back-link:hover { text-decoration: underline; }
 
-/* ═══ Pagination ═══ */
+/* ═══ Pagination ═══
+   One control, used by every paged table: `< ‹ 2 /3 › >`, with the anchors
+   bare and the index in .cur / .pg-info. Pages that need a frame around it
+   add .framed. A page with its own palette overrides the two or three
+   colours rather than restating the component. */
 .pagination {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 1em 0;
+    padding: 20px 0;
 }
-.pagination a {
-    padding: 5px 10px;
+/* Sits at the foot of a bordered table rather than free on the page. */
+.pagination.framed {
+    padding: 14px;
+    border-top: 1px solid var(--border-subtle);
+}
+.pagination a,
+.pagination span {
+    padding: 6px 12px;
     border-radius: 5px;
-    background: var(--surface-2);
-    color: var(--activetext);
+    font-size: var(--text-md);
+    font-weight: 500;
     text-decoration: none;
-    font-size: var(--text-base);
-    font-weight: 600;
     transition: all 0.12s;
 }
+.pagination a {
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    color: var(--activetext);
+}
 .pagination a:hover {
-    background: var(--surface-3);
+    border-color: var(--accent-border);
     color: var(--normal);
 }
 .pagination .cur {
-    font-weight: 700;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
     color: var(--ainfo);
+    font-weight: 600;
 }
 .pagination .pg-info {
+    font-size: var(--text-md);
     color: var(--text-dim);
-    font-size: var(--text-sm);
+}
+@media (max-width: 768px) {
+    .pagination a,
+    .pagination span { padding: 10px 16px; font-size: var(--text-lg); }
 }
 
 .indent{
