@@ -68,11 +68,16 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 		}
 
 		// Mana Pool files a card under its set and its number as printed,
-		// and says nothing about the finish, so its links name the printing
-		// a set files under the number - the one printingsAt answers with.
-		if co.Number != "" && !co.Foil && !co.Etched {
-			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card",
-				strings.ToLower(co.SetCode), strings.ToLower(co.Number))
+		// and names the finish in the query rather than in the path.
+		if co.Number != "" {
+			finish := "nonfoil"
+			if co.Etched {
+				finish = "etched"
+			} else if co.Foil {
+				finish = "foil"
+			}
+			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
+				strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
 			checkedMP++
 			_, _, got := checkForLinks(discordGuildID(), link)
 			if got == nil {
@@ -94,6 +99,43 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 
 	if checkedTCG == 0 || checkedMP == 0 {
 		t.Fatalf("nothing was checked: %d tcgplayer, %d mana pool", checkedTCG, checkedMP)
+	}
+}
+
+// A finish the printing was never sold in is answered with nothing, not with
+// the finish the set happens to file first. Mana Pool priced one row; the
+// other is a different card at a different price, and offering it would be
+// the wrong-card mistake wearing the right name.
+func TestManaPoolFinishItDoesNotSellNamesNothing(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	var checked int
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
+		if err != nil || co.Sealed || co.Number == "" || co.Etched {
+			continue
+		}
+		if backend().FinishUUID(&co.Card, "etched") != "" {
+			continue
+		}
+
+		link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?finish=etched",
+			strings.ToLower(co.SetCode), strings.ToLower(co.Number))
+		if _, _, got := checkForLinks(discordGuildID(), link); got != nil {
+			t.Errorf("%s %s #%s is not sold etched, yet %s named %s (etched=%v)",
+				co.Name, co.SetCode, co.Number, link, got.UUID, got.Etched)
+		}
+
+		checked++
+		if checked >= 50 {
+			break
+		}
+	}
+
+	if checked == 0 {
+		t.Skip("every printing in this datastore is sold etched")
 	}
 }
 
