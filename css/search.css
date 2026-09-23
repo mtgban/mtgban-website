@@ -55,16 +55,26 @@
 
 .search-layout {
     display: grid;
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: var(--search-sidebar-width, 340px) 1fr;
     gap: 0;
     min-height: 0;
     margin-top: calc(-1 * var(--content-padding-slack));
     max-width: var(--page-max-width);
     margin-left: auto;
     margin-right: auto;
-    --search-layout-padding: 16px;
     padding-left: var(--search-layout-padding);
     padding-right: var(--search-layout-padding);
+}
+
+/* Where this page's two columns sit, declared once on the element both the
+   layout and the site footer inherit from. .search-sidebar is fixed, so it
+   cannot take its left edge from the grid, and the footer is not inside the
+   grid at all - before this, each carried its own copy of the same centring
+   arithmetic and they could drift apart silently. */
+body:has(.search-layout) {
+    --search-layout-padding: 16px;
+    --search-sidebar-width: 340px;
+    --search-sidebar-left: calc(50% - min(40vw, 800px) + var(--search-layout-padding));
 }
 
 @media (min-width: 901px) {
@@ -273,19 +283,23 @@
     /* The sidebar reaches the viewport bottom via position: fixed, which
        contributes no height to this grid - a short result list would
        otherwise let the document (and the footer after it) end well above
-       that fixed edge, stranding the sidebar's own lower content below the
-       footer instead of above it. Floor the layout so the document always
-       reaches the top of the reserved footer strip below - the same edge
-       the sidebar itself stops at - rather than the true viewport bottom,
-       which only ever bought a scroll that revealed blank space. */
+       that fixed edge, so the footer would sit mid-viewport with the
+       sidebar still running past it. Floor the layout at the same edge the
+       sidebar itself stops at. */
     .search-layout {
-        /* The disclosure footer needs about one line of 12px text plus its
-           own 20px/28px top/bottom padding to show without wrapping on any
-           desktop width this layout applies at (901px+) - 90px covers that
-           with room for a second line. Reserved as its own strip rather
-           than left to chance: the sidebar's own bottom edge (below) keys
-           off the same variable, so neither one crowds the footer's spot. */
-        --search-footer-reserve: 90px;
+        /* Two lines of 12px text plus the trimmed padding this page gives
+           the footer (see its rule at the end of this block), which is what
+           it takes at the narrow end of this layout - 38 + 10 + 12 + 1 is
+           61, and this is the next round number up. It has to cover the
+           worst case rather than the common one: under-reserve and the page
+           scrolls again, over-reserve and it only ends a few px early.
+           The floor is what this grid must reach, and the footer comes after
+           it: floor the grid at the whole viewport and the footer is pushed
+           past the bottom of it by its own height, every time, on a page
+           with room to spare. That is not the sidebar's old reserve, which
+           was this column keeping clear of a footer that crossed it - this
+           one is about where the document ends. */
+        --search-footer-reserve: 64px;
         /* Subtract only what is actually above this: the margin-top above
            starts it on the nav line, not one --content-padding-slack below
            it, so subtracting the slack here too ended the document a slack
@@ -314,16 +328,17 @@
            that much scroll to travel through first. */
         --search-sidebar-top: var(--nav-height, 48px);
         top: var(--search-sidebar-top);
-        left: calc(50% - min(40vw, 800px) + var(--search-layout-padding));
-        width: 340px;
+        left: var(--search-sidebar-left);
+        width: var(--search-sidebar-width);
         box-sizing: border-box;
-        /* Stops short of the true viewport bottom by the reserved footer
-           strip, so Export/Upload - the sidebar's own last, clickable row -
-           never sits underneath where the footer paints once the page
-           reaches it, on a page short or long. Falls back in case a future
-           markup change ever pulls this out from under .search-layout,
-           where --search-footer-reserve is actually declared. */
-        height: calc(100dvh - var(--search-sidebar-top) - var(--search-footer-reserve, 90px));
+        /* The full column, all the way down. This used to stop a reserved
+           90px short of the viewport bottom so the site footer could never
+           paint over Export/Upload once the page reached it - 90px given up
+           at every scroll position to protect one. The footer now starts
+           where the results column does (see its rule at the end of this
+           block) and no longer passes over this column at all, so the whole
+           height is this column's to use. */
+        height: calc(100dvh - var(--search-sidebar-top));
         min-height: 0;
         max-height: none;
         z-index: 10;
@@ -446,10 +461,24 @@
     /* The fixed sidebar reaches the viewport bottom while the document
        footer is in normal flow. Paint the footer above the sidebar at the
        end of the page so its disclosure remains readable. */
+    /* Under the search results and nothing else. The sidebar is fixed and
+       reaches the viewport bottom, so a full-bleed footer crosses it at the
+       end of every page - which used to be answered by painting the footer
+       on top (a reserved strip the sidebar had to stop short of, and a
+       z-index to win where they still met). Indenting it past the sidebar
+       column means the two never meet at all, so neither is needed, and the
+       footer reads as belonging to the results it follows. */
     body:has(.search-layout) .site-footer {
-        position: relative;
-        z-index: 20;
-        background: var(--background);
+        margin-left: calc(var(--search-sidebar-left) + var(--search-sidebar-width));
+        margin-right: var(--search-sidebar-left);
+        /* Tighter than the site default's 20/28. This one line of small
+           print sits at the bottom of a column that is competing for height
+           with a card image, an editions row and three boxes, and 48px of
+           padding around it is room those are scrolling for. Kept here
+           rather than in main.css because --search-footer-reserve above has
+           to track it, and two numbers that must agree belong together. */
+        padding-top: 10px;
+        padding-bottom: 12px;
         /* The fixed sidebar already reads as a complete, self-contained
            column - the 48px of breathing room .site-footer normally keeps
            above itself just adds scroll a short results page has no content
