@@ -213,6 +213,11 @@ rather than trusting this list indefinitely.
   cache-busting; bumping assets relies on a rebuild changing the hash.
 - Mobile has separate templates under `templates/mobile/` and `*-mobile.css`;
   a UI change often needs both desktop and mobile variants.
+- The search page's two columns (fixed sidebar + sticky result headers) have
+  a set of offsets and degradation rules that read as arbitrary and are not:
+  `docs/search-column-layout.md` has the reasoning, and
+  `tests/offline/search-sticky-offsets.test.js` pins the parts a browserless
+  test can reach.
 - `embed.go` is Discord **embed** formatting, not Go `//go:embed` asset
   embedding — don't be misled by the name.
 - **Template FuncMap risks:** `templates.go` adds 30+ template helpers via
