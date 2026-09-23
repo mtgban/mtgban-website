@@ -17,6 +17,7 @@ func quantityPriorityPage(mobile bool) PageVars {
 		BetaNav:     &NavElem{Short: "b"},
 		IsMobile:    mobile,
 		SearchQuery: "a card",
+		SearchRan:   true,
 		AllKeys:     []string{id},
 		CondKeys:    []string{"INDEX", "NM"},
 		Metadata:    map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},

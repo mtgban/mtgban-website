@@ -139,6 +139,10 @@ type PageVars struct {
 	// The bar holds something that parses to no filter at all, so the
 	// search passes over it whole.
 	ScopeIgnored bool
+	// A search ran for this request. Not the same as SearchQuery being set:
+	// a pinned filter searches on its own, and the page has results to draw
+	// (or an empty-handed answer to give) with the box above it empty.
+	SearchRan bool
 
 	// The switch between the three readings of a sealed product's contents,
 	// nil unless the search is one of them over a product that has all three

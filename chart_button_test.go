@@ -14,6 +14,7 @@ func TestChartButtonFollowsTheChart(t *testing.T) {
 		BetaNav:      &NavElem{Short: "b"},
 		AllKeys:      []string{"a", "b"},
 		SearchQuery:  "query",
+		SearchRan:    true,
 		PatreonLogin: true,
 	}
 

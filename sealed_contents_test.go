@@ -249,6 +249,7 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 			BetaNav:     &NavElem{},
 			IsMobile:    mobile,
 			SearchQuery: views.Fixed,
+			SearchRan:   true,
 			TotalUnique: 4,
 			AllKeys:     []string{"a"},
 			Contents:    views,
@@ -270,6 +271,7 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 	out := renderPage(t, "search.html", false, PageVars{
 		BetaNav:     &NavElem{},
 		SearchQuery: "lightning bolt",
+		SearchRan:   true,
 		TotalUnique: 3,
 		AllKeys:     []string{"a"},
 	})

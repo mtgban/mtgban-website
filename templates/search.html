@@ -94,13 +94,15 @@
 {{end}}
 
 {{define "content"}}
+    {{/* Results whenever a search ran, which is not the same as a query
+         being present: a pinned filter searches on its own. */}}
     {{if and (eq .SearchQuery "") .EditionSort}}
         {{template "search-sealed" .}}
     {{else}}
-        {{if eq .SearchQuery ""}}
-            {{template "search-landing-panes" .}}
-        {{else}}
+        {{if .SearchRan}}
             {{template "search-results" .}}
+        {{else}}
+            {{template "search-landing-panes" .}}
         {{end}}
     {{end}}
 {{end}}
