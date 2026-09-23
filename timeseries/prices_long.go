@@ -264,8 +264,31 @@ func providerLatestDateQuery(bounded, strict bool) string {
 // gameHasRowsOnQuery asks whether one game wrote anything on one exact date.
 // The equality on date is what makes it cheap: the planner nested-loops from
 // the day's index entries into variants by primary key and stops at the first
-// row that belongs to this game - 3ms against the live archive, where asking
-// the same question as "the newest date of this game" costs seconds.
+// row that belongs to this game.
+//
+// It drives from prices, and that is deliberate. Driving from prices means the
+// hit costs however many of the day's entries sit in front of this game's
+// first one - a day of TCGplayer prices carries every game, written game by
+// game, so for Magic under provider 3 that is 51,817 entries and 345ms on the
+// live archive. Tempting, then, to drive from variants instead and make each
+// ban_id a primary-key probe into prices: the hit drops to under a
+// millisecond, because a game with rows that day has them for most of its
+// variants and the first probe lands.
+//
+// The miss is what kills it. moverAnchor loops on misses - that is the whole
+// point of the walk - and a miss satisfies no LIMIT, so the probe side runs to
+// the end. Driving from variants that is one scattered primary-key descent per
+// variant into a 42GB index: measured at 40.8 seconds for a 61,619-variant
+// game against a provider holding 147,280 rows that day, where driving from
+// prices scans the day once and answers in 1.3. Forcing a hash join between
+// both sides instead is stable on the miss (0.2s) but pays for the whole day
+// slice on every hit (3.2s), and hits are the common case.
+//
+// So all three shapes trade hit against miss, and this one takes the trade that
+// matches the traffic. The way out is not another rewrite of this query: it is
+// to stop asking the archive which dates a game covers, and keep a
+// (provider, category, date) coverage table that answers both anchors with a
+// primary-key lookup.
 func gameHasRowsOnQuery(tcgCategory int) string {
 	scope, _ := moverScope(tcgCategory, 3)
 	return `SELECT 1 FROM prices p

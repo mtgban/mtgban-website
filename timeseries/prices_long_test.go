@@ -161,6 +161,18 @@ func TestMoverAnchorFastPathQueries(t *testing.T) {
 			t.Errorf("magic probe is missing %q:\n%s", want, probe)
 		}
 	}
+
+	// And it must drive from prices, not from variants. Driving from variants
+	// makes the hit almost free and the miss catastrophic - one scattered
+	// primary-key descent per variant, 40.8s measured against 1.3s for this
+	// shape - and moverAnchor loops on misses.
+	if strings.Contains(probe, "MATERIALIZED") {
+		t.Errorf("probe pins a join order that inverts its miss cost:\n%s", probe)
+	}
+	pricesAt, variantsAt := strings.Index(probe, "FROM prices"), strings.Index(probe, "JOIN variants")
+	if pricesAt < 0 || variantsAt < 0 || pricesAt > variantsAt {
+		t.Errorf("probe does not drive from prices:\n%s", probe)
+	}
 	if probe := gameHasRowsOnQuery(71); !strings.Contains(probe, "v.tcgp_category_id = $3") {
 		t.Errorf("non-magic probe does not carry its category at $3:\n%s", probe)
 	}
