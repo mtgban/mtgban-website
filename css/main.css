@@ -377,13 +377,6 @@ a {
     text-decoration: none;
 }
 
-a.pagination {
-    color: var(--normal);
-    text-decoration: none;
-    display: inline;
-}
-
-
 /*********** TOP NAVBAR ***********/
 
 /* Theme toggle */
