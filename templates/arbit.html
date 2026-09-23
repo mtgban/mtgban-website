@@ -120,8 +120,6 @@
 
         <a name="top"></a>
 
-        <!-- Selector bar (hidden for SYP) -->
-        {{if ne .ScraperShort "SYP"}}
         <div class="arb-selector-bar">
             <div class="arb-current-store">
                 <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
@@ -153,7 +151,7 @@
                     {{end}}
                 </select>
             </div>
-            {{if and (not .LargeTable) .Arb}}
+            {{if .Arb}}
             <div class="arb-current-store">
                 <span class="store-type">{{if .ReverseMode}}Buying from{{else}}Selling to{{end}}</span>
                 <select class="arb-store-select" onchange="if(this.value) location.hash = this.value">
@@ -165,33 +163,28 @@
             </div>
             {{end}}
         </div>
-        {{end}}
 
         <!-- Filter chips -->
-        {{if not .LargeTable}}
-            <div class="arb-filter-bar">
-                <span class="arb-filter-label">Show</span>
-                {{range $.ArbitOptKeys}}
-                    {{$key := .}}
-                    {{$skipIfTesting := and (index $.ArbitOptConfig .).BetaFlag (not $.CanShowAll)}}
-                    {{$skipIfGlobal := and (index $.ArbitOptConfig .).ArbitOnly $.GlobalMode}}
-                    {{$skipIfArbit := and (index $.ArbitOptConfig .).GlobalOnly (not $.GlobalMode)}}
-                    {{$skipIfNotReverse := and (index $.ArbitOptConfig .).ReverseOnly (not $.ReverseMode)}}
-                    {{$skipIfSealed := and (index $.ArbitOptConfig .).NoSealed $sealedSource}}
-                    {{$skipIfNotSealed := and (index $.ArbitOptConfig .).SealedOnly (not $sealedSource)}}
-                    {{if and (and (not $skipIfTesting) (not $skipIfGlobal)) (and (and (not $skipIfNotSealed) (not $skipIfSealed)) (and (not $skipIfArbit) (not $skipIfNotReverse)))}}
-                        {{$cfg := index $.ArbitOptConfig .}}
-                        {{if $cfg}}
-                            {{$name := $cfg.Title}}
-                            <a class="arb-filter-chip {{if index $.ArbitFilters .}}on{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
-                        {{end}}
+        <div class="arb-filter-bar">
+            <span class="arb-filter-label">Show</span>
+            {{range $.ArbitOptKeys}}
+                {{$key := .}}
+                {{$skipIfTesting := and (index $.ArbitOptConfig .).BetaFlag (not $.CanShowAll)}}
+                {{$skipIfGlobal := and (index $.ArbitOptConfig .).ArbitOnly $.GlobalMode}}
+                {{$skipIfArbit := and (index $.ArbitOptConfig .).GlobalOnly (not $.GlobalMode)}}
+                {{$skipIfNotReverse := and (index $.ArbitOptConfig .).ReverseOnly (not $.ReverseMode)}}
+                {{$skipIfSealed := and (index $.ArbitOptConfig .).NoSealed $sealedSource}}
+                {{$skipIfNotSealed := and (index $.ArbitOptConfig .).SealedOnly (not $sealedSource)}}
+                {{if and (and (not $skipIfTesting) (not $skipIfGlobal)) (and (and (not $skipIfNotSealed) (not $skipIfSealed)) (and (not $skipIfArbit) (not $skipIfNotReverse)))}}
+                    {{$cfg := index $.ArbitOptConfig .}}
+                    {{if $cfg}}
+                        {{$name := $cfg.Title}}
+                        <a class="arb-filter-chip {{if index $.ArbitFilters .}}on{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
                     {{end}}
                 {{end}}
-                <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Filter edition...">
-            </div>
-        {{else}}
-            <br>
-        {{end}}
+            {{end}}
+            <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Filter edition...">
+        </div>
 
         {{if ne .InfoMessage ""}}
             <h2><p>{{.InfoMessage}}</p></h2>
@@ -199,10 +192,6 @@
 
         <script type='text/javascript'>
             function sortBy(sort, name) {
-                {{if eq $.ScraperShort "SYP"}}
-                    window.location.href = "?page=syp&sort=" + sort + "#" + name;
-                    return;
-                {{end}}
                 window.location.href = "?&source={{$.ScraperShort}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{$val}}&{{end}}sort=" + sort + "#" + name;
             }
 
@@ -369,11 +358,6 @@
                     {{end}}
                     -->
                 </div>
-                {{if and (eq $i 0) (eq $.ScraperShort "SYP")}}
-                    <div class="arb-load-btns">
-                        <a class="arb-load-btn csv" href="?page=syp&format=csv">Download CSV</a>
-                    </div>
-                {{end}}
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
@@ -514,24 +498,6 @@
                     </tr>
                 {{end}}
 
-                {{if $.CurrentIndex}}
-                    <tr style="background-color: var(--headerbackground);">
-                        <td colspan="13" style="text-align: center; vertical-align: middle;">
-                            <p style="display: inline;">
-                                {{if ne $.CurrentIndex 1}}
-                                    <a class="pagination" href="?page=syp&p=1">&lt;</a>
-                                    <a class="pagination" href="?page=syp&p={{$.PrevIndex}}"><i class="arrow left"></i></a>
-                                {{end}}
-                                {{$.CurrentIndex}} / {{$.TotalIndex}}
-                                {{if ne $.CurrentIndex $.TotalIndex}}
-                                    <a class="pagination" href="?page=syp&p={{$.NextIndex}}"><i class="arrow right"></i></a>
-                                    <a class="pagination" href="?page=syp&p={{$.TotalIndex}}">&gt;</a>
-                                {{end}}
-                            </p>
-                        </td>
-                    </tr>
-                {{end}}
-
                 <tr style="background-color: var(--background);">
                     <td colspan=13>
                         <a class="arb-back-top" href="#top"><i class="arrow up"></i> back to top</a>
@@ -650,7 +616,6 @@ document.addEventListener('click', function(e) {
 {{end}}
 
 {{define "settings-content"}}
-{{if not .NoSettings}}
 {{$cookieName := "ArbitVendorsList"}}
 {{if .ReverseMode}}{{$cookieName = "ReverseVendorsList"}}{{end}}
 {{if .GlobalMode}}{{$cookieName = "GlobalVendorsList"}}{{end}}
@@ -664,5 +629,4 @@ document.addEventListener('click', function(e) {
         {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-arbit-vendors" "CookieName" $cookieName)}}
     </div>
 </section>
-{{end}}
 {{end}}

@@ -203,8 +203,6 @@ type NewspaperPage struct {
 	Sort string
 	// The name of the columns and their properties
 	Head []Heading
-	// Whether this table has lots of fields that need wider display
-	Large bool
 	// How many elements are present before the card triplet
 	Offset int
 	// Which field to use for price comparison
@@ -1170,14 +1168,17 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	case "syp":
 		pageVars.Title = "TCGplayer Store-Your-Products List"
 		pageVars.ScraperShort = "SYP"
-		pageVars.LargeTable = true
 		pageVars.Metadata = map[string]GenericCard{}
-		pageVars.NoSettings = true
+		// The gear reads the section's flag, and Newspaper has settings even
+		// though this page of it does not. Left alone it renders live and
+		// answers a click with nothing, since the panel it opens is never
+		// built here.
+		pageVars.HasSettings = false
 
 		syp, err := findVendorBuylist("SYP")
 		if err != nil {
 			pageVars.InfoMessage = "SYP not configured yet"
-			render(w, "arbit.html", pageVars)
+			render(w, "syp.html", pageVars)
 			return
 		}
 
@@ -1258,18 +1259,14 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			pageVars.Metadata[entry.CardID] = uuid2card(entry.CardID, true, false, preferFlavor)
 		}
 
-		entry := Arbitrage{
-			Name:        "SYP",
-			Key:         "SYP",
-			Arbit:       arbit,
-			HasNoCredit: true,
-			HasNoPrice:  true,
-			HasNoArbit:  true,
-		}
+		// The HasNo* flags and the name were how this list asked arbit.html
+		// to stop being an arbitrage table. syp.html has fixed columns, so
+		// the entries are all that is left to carry.
+		entry := Arbitrage{Arbit: arbit}
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 
-		render(w, "arbit.html", pageVars)
+		render(w, "syp.html", pageVars)
 
 		return
 	}
@@ -1297,7 +1294,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Subtitle = newspage.Title
 		pageVars.InfoMessage = newspage.Desc
 		pageVars.Headings = newspage.Head
-		pageVars.LargeTable = newspage.Large
 		pageVars.OffsetCards = newspage.Offset
 
 		if newspage.Priced != "" {
