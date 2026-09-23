@@ -1164,8 +1164,27 @@
     font-size: var(--text-md);
     white-space: nowrap;
 }
-.ures-price a { color: var(--normal); }
-.ures-price a:hover { color: var(--ainfo); }
+/* A price carrying a link back to the offer it was read from. It keeps the
+   column's own colour - a row of blue numbers would read as a different
+   kind of figure - so the underline is the whole of what says it can be
+   clicked. Without it the link is invisible: site anchors carry no
+   underline, and somebody who cannot see a link does not hover one, so the
+   feature reads as never having worked.
+
+   The underline takes the colour of the number rather than a border grey.
+   Tried at --border-moderate first, which is 12% white on a dark page: it
+   is there in the DOM, correct in the computed style, and cannot be seen
+   at the size a price is set in. */
+.ures-price a,
+.opt-loaded .loaded > a:not(.opt-altlink) {
+    color: var(--normal);
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}
+.ures-price a:hover,
+.opt-loaded .loaded > a:not(.opt-altlink):hover {
+    color: var(--ainfo);
+}
 .ures-price.no-data { color: var(--text-dim); }
 .ures-price.best,
 .ures-price.best a { color: var(--asuccess); font-weight: 600; }
