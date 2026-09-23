@@ -1189,7 +1189,16 @@ func genQuery(co *mtgmatcher.CardObject) string {
 func genCardPrintings(co *mtgmatcher.CardObject) string {
 	var b strings.Builder
 	// Hack to generate HTML in the template
-	for i, setCode := range co.Printings {
+	//
+	// drawn, not the loop index: a printing whose set the backend cannot
+	// resolve is skipped without drawing anything, and counting the index
+	// counted those too - so the cap was "stop after looking at 57" rather
+	// than the "stop after drawing 57" its name claims, and the row came out
+	// short by however many were skipped. It also decided how many symbols
+	// the overflow panel would be built from, which is the number the script
+	// compares against PRINTINGS_THRESHOLD.
+	var drawn int
+	for _, setCode := range co.Printings {
 		set, err := backend().GetSet(setCode)
 		if err != nil {
 			continue
@@ -1216,7 +1225,9 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 		}
 		b.WriteString(`</a>`)
 
-		if i == MaxRuneSymbols && len(co.Printings) > MaxRuneSymbols {
+		drawn++
+
+		if drawn == MaxRuneSymbols && len(co.Printings) > drawn {
 			// An element rather than a bare text node: the overflow panel
 			// moves this line into itself, where it belongs - it is a note
 			// about what the panel is not showing, not about the row of

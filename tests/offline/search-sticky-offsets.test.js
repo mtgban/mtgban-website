@@ -282,11 +282,10 @@ const utilsSrc = fs.readFileSync(path.join(__dirname, '../../utils.go'), 'utf8')
 
 test('there is always an overflow panel for the truncation note to move into', () => {
     // genCardPrintings emits the note only when it has stopped early, and by
-    // then it has written one link per index 0..MaxRuneSymbols - so
-    // MaxRuneSymbols + 1 of them. collapsePrintings builds the panel only
-    // when it finds MORE than PRINTINGS_THRESHOLD links. The note is
-    // therefore orphaned - rendered under the symbol row with no panel to
-    // receive it - exactly when MaxRuneSymbols < PRINTINGS_THRESHOLD.
+    // then it has drawn exactly MaxRuneSymbols symbols. collapsePrintings
+    // builds the panel only when it finds MORE than PRINTINGS_THRESHOLD of
+    // them. The note is therefore orphaned - rendered under the symbol row
+    // with no panel to receive it - as soon as the two are equal.
     //
     // It degrades gently: the note is styled to stand on its own line either
     // way, so what a reader sees is the pre-panel appearance rather than a
@@ -298,9 +297,9 @@ test('there is always an overflow panel for the truncation note to move into', (
     expect(threshold, 'expected PRINTINGS_THRESHOLD in templates/search.html').toBeTruthy();
     expect(
         Number(cap[1]),
-        `MaxRuneSymbols (${cap[1]}) emits ${Number(cap[1]) + 1} symbols before the note, `
+        `MaxRuneSymbols (${cap[1]}) draws ${cap[1]} symbols before the note, `
         + `which is not more than PRINTINGS_THRESHOLD (${threshold[1]}), so no panel is built for it`,
-    ).toBeGreaterThanOrEqual(Number(threshold[1]));
+    ).toBeGreaterThan(Number(threshold[1]));
 });
 
 test('the editions panel is placed by the script, since the stylesheet stopped placing it', () => {
