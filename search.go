@@ -1144,6 +1144,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					// Cardmarket names the game in every product path, so the
 					// name-only fallback has to carry it too.
 					link = cm.SearchURL(game, pageVars.Metadata[cardID].Name, cm.URLOption{
+						Signed:    cm.None,
+						Altered:   cm.None,
 						Affiliate: Affiliates().Codes["MKM"],
 					})
 				} else {
@@ -1153,6 +1155,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					}
 					link = cm.BuildURL(game, id, cm.URLOption{
 						Foil:      foil,
+						Signed:    cm.None,
+						Altered:   cm.None,
 						Language:  cm.LanguageEnglish,
 						Affiliate: Affiliates().Codes["MKM"],
 					})
