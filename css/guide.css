@@ -470,3 +470,49 @@
         padding: 1em;
     }
 }
+
+/* Code blocks in API sections. */
+.guide-main { min-width: 0; }
+.guide-section-desc pre {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0.6em 0;
+    padding: 0.7em 0.9em;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    background: color-mix(in srgb, var(--ainfo, #559eff) 6%, var(--background, #f8f8f8));
+    border: 1px solid color-mix(in srgb, var(--ainfo, #559eff) 20%, transparent);
+    border-radius: 6px;
+}
+.guide-section-desc pre code {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: inherit;
+    color: inherit;
+}
+
+/* Copy buttons on code blocks and on the API tab. */
+.guide-pre { position: relative; }
+.guide-pre .guide-pre-copy { position: absolute; top: 6px; right: 6px; margin: 0; opacity: 0.6; }
+.guide-pre:hover .guide-pre-copy, .guide-pre-copy:hover { opacity: 1; }
+.guide-category-divider { display: flex; align-items: flex-end; justify-content: space-between; gap: 1em; }
+.guide-copy-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0.5em;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, #FFBF00 40%, transparent);
+    background: none;
+    color: #FFBF00;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+.guide-copy-tab:hover { background: color-mix(in srgb, #FFBF00 12%, transparent); }
+.guide-copy-tab svg { width: 14px; height: 14px; }
