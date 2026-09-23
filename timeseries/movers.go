@@ -21,6 +21,36 @@ type MoverRow struct {
 	Prior   float64
 }
 
+// buildWideMoverRowsQuery pairs each card's price on the two anchor dates, in
+// the legacy wide table.
+//
+// Both arms are MATERIALIZED, and that is the whole performance of this query.
+// Referenced once each they would otherwise be inlined, leaving the planner a
+// plain self-join on product_prices - where it badly underestimates how many of
+// one day's cards are still priced on the other (1,578 against 25,259 measured
+// on the live archive) and so picks a nested loop: one idx_uuid_date descent
+// per card of the current day, 25,891 descents into a 167M-row table, 152,571
+// buffers and 14.6 seconds. Materialized, each day is one idx_date range scan
+// and the two meet in a hash join - 6,003 buffers and 0.33s for the same 25,259
+// rows.
+//
+// column is hard-coded via columnForDataset, safe to interpolate.
+func buildWideMoverRowsQuery(column string) string {
+	return fmt.Sprintf(`
+		WITH cur AS MATERIALIZED (
+			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
+			  FROM product_prices
+			 WHERE date = $1::date AND language = '' AND %[1]s > 0 AND %[1]s >= $3
+		),
+		old AS MATERIALIZED (
+			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
+			  FROM product_prices
+			 WHERE date = $2::date AND language = '' AND %[1]s > 0 AND %[1]s >= $4
+		)
+		SELECT cur.mtgjson_uuid, cur.is_foil, cur.is_etched, cur.p, old.p
+		  FROM cur JOIN old USING (mtgjson_uuid, is_foil, is_etched, is_alt)`, column)
+}
+
 // GetMovers returns the cards that moved the most over a window, filtered
 // by the floor prices given.
 func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice, minPriorPrice float64) ([]MoverRow, error) {
@@ -54,22 +84,7 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 	}
 	priorStr := prior.Time.Format("2006-01-02")
 
-	// column is hard-coded via columnForDataset, safe to interpolate.
-	q := fmt.Sprintf(`
-		WITH cur AS (
-			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
-			  FROM product_prices
-			 WHERE date = $1::date AND language = '' AND %[1]s > 0 AND %[1]s >= $3
-		),
-		old AS (
-			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
-			  FROM product_prices
-			 WHERE date = $2::date AND language = '' AND %[1]s > 0 AND %[1]s >= $4
-		)
-		SELECT cur.mtgjson_uuid, cur.is_foil, cur.is_etched, cur.p, old.p
-		  FROM cur JOIN old USING (mtgjson_uuid, is_foil, is_etched, is_alt)`, column)
-
-	rows, err := c.db.QueryContext(ctx, q, latestStr, priorStr, minPrice, minPriorPrice)
+	rows, err := c.db.QueryContext(ctx, buildWideMoverRowsQuery(column), latestStr, priorStr, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
 	}

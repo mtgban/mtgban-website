@@ -30,3 +30,18 @@ create index idx_uuid_date on
     public.product_prices
     using btree (mtgjson_uuid,
     date);
+-- Two more indexes exist on the live table and are load-bearing for the mover
+-- reads, so they belong here too: idx_date is what a materialized per-day arm
+-- of buildWideMoverRowsQuery scans, and idx_uuid_foil_etched_alt_date serves
+-- the per-card history reads.
+create index idx_date on
+    public.product_prices
+    using btree (date);
+
+create index idx_uuid_foil_etched_alt_date on
+    public.product_prices
+    using btree (mtgjson_uuid,
+    is_foil,
+    is_etched,
+    is_alt,
+    date);

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -54,5 +55,20 @@ func TestGetMoversAnchorsToColumnLatest(t *testing.T) {
 		if len(rows) == 0 {
 			t.Errorf("GetMovers(%d) returned 0 movers; a metric with data must return some", idx)
 		}
+	}
+}
+
+// Both arms of the wide mover query have to be materialized. Inlined, the
+// planner's estimate of how many of one day's cards are still priced on the
+// other is off by more than an order of magnitude, and the nested loop it picks
+// on the strength of that estimate costs 14.6 seconds against the live archive
+// where the hash join costs 0.33.
+func TestWideMoverRowsQueryMaterializes(t *testing.T) {
+	q := buildWideMoverRowsQuery("tcgplayer_low_price")
+	if n := strings.Count(q, "AS MATERIALIZED ("); n != 2 {
+		t.Errorf("query materializes %d of its two arms:\n%s", n, q)
+	}
+	if strings.Count(q, "tcgplayer_low_price") != 6 {
+		t.Errorf("column is not carried into every clause:\n%s", q)
 	}
 }
