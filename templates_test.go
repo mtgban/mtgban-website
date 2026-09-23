@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"html/template"
+	"strings"
 	"testing"
 	"text/template/parse"
 )
@@ -105,5 +107,48 @@ func collectTemplateRefs(node parse.Node, out *[]string) {
 	case *parse.WithNode:
 		collectTemplateRefs(n.List, out)
 		collectTemplateRefs(n.ElseList, out)
+	}
+}
+
+// TestCardArtPlaceholderSurvivesEscaping pins that the placeholder reaches the
+// page as the inert 1x1 gif it is meant to be.
+//
+// It is a data: URI, and the contextual autoescaper rejects those in a URL
+// context unless they are typed template.URL - it writes #ZgotmplZ instead.
+// That is not inert: it resolves against the current page, so the browser
+// fetches the whole HTML document back as an image (6.3MB on a full arbit
+// table), fails to decode it, and the card-art fallback then pulls down the
+// game's card back - all before anyone has hovered a row.
+//
+// Both contexts are checked because they escape differently and only one of
+// them was ever broken: the same value goes into an onmouseout handler as a JS
+// string, where data: is allowed through and always worked.
+func TestCardArtPlaceholderSurvivesEscaping(t *testing.T) {
+	for _, tc := range []struct {
+		name, tmpl string
+	}{
+		{"src attribute", `<img class="hoverImage" src="{{card_art_placeholder}}"/>`},
+		{"js string argument", `<div onmouseout="setCardArtSource(img,'{{card_art_placeholder}}')"></div>`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl, err := template.New(tc.name).Funcs(funcMap).Parse(tc.tmpl)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			var out bytes.Buffer
+			if err := tmpl.Execute(&out, nil); err != nil {
+				t.Fatalf("execute: %v", err)
+			}
+			got := out.String()
+			if strings.Contains(got, "ZgotmplZ") {
+				t.Errorf("placeholder was sanitized away, leaving a src that fetches the page itself: %s", got)
+			}
+			// The JS context escapes the slashes (data:image\/gif), which is
+			// the same string once the engine reads it, so compare on the part
+			// that cannot be escaped either way.
+			if !strings.Contains(got, "base64,R0lGOD") {
+				t.Errorf("placeholder did not reach the output: %s", got)
+			}
+		})
 	}
 }

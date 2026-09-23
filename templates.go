@@ -47,8 +47,18 @@ func csvWithout(csv, drop string) string {
 const cardArtPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
 var funcMap = template.FuncMap{
-	"card_art_placeholder": func() string {
-		return cardArtPlaceholder
+	// template.URL, not string: this is a data: URI, and the contextual
+	// autoescaper rejects those in a src= attribute, writing #ZgotmplZ in
+	// its place. That is not an inert placeholder - it resolves against the
+	// current page, so the browser fetches the whole HTML document back as
+	// an image (6.3MB on a full arbit table), fails to decode it, and the
+	// card-art fallback then pulls down the game's card back. Three wasted
+	// round trips before anyone has hovered anything.
+	//
+	// Safe to mark: the value is this file's own constant, never anything a
+	// request carries.
+	"card_art_placeholder": func() template.URL {
+		return template.URL(cardArtPlaceholder)
 	},
 	// jsonArray writes a list of strings for a script to read out of an
 	// attribute. A list that cannot be written comes out as an empty one:
