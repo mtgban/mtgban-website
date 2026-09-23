@@ -40,6 +40,7 @@
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/printings-panel.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     {{if .ChartID}}
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
@@ -363,37 +364,19 @@
 
                 // What the panel is comfortable at, and the least it can be
                 // and still read as a list rather than a sliver.
-                const PRINTINGS_PANEL_MAX = 260;
-                const PRINTINGS_PANEL_MIN = 120;
-
-                // The panel is fixed, so it is placed against the viewport
-                // instead of inheriting a chain of boxes any one of which can
-                // clip it. Measured at open time and again on resize: the row
-                // it hangs from moves with every hovered result, and the room
-                // under it moves with the window.
+                // Placed against the viewport, because position: fixed leaves
+                // the panel with no offsets of its own. Where it goes is
+                // arithmetic and lives in js/printings-panel.js, where it can
+                // be tested; this is the DOM half. Measured at open time and
+                // again on resize: the row it hangs from moves with every
+                // hovered result, and the room under it moves with the window.
                 function positionPrintings(container, dropdown) {
-                    const row = container.getBoundingClientRect();
-                    const below = window.innerHeight - row.bottom - 18;
-                    const above = row.top - 18;
-                    dropdown.style.left = row.left + 'px';
-                    dropdown.style.width = row.width + 'px';
-                    // Below the row by default - that is where the boxes this
-                    // is meant to cover are. It only goes above when there is
-                    // not enough room under the row to read it and there is
-                    // more over the card, which on this column means a window
-                    // too short to be showing those boxes anyway.
-                    if (below < PRINTINGS_PANEL_MIN && above > below) {
-                        const room = Math.min(PRINTINGS_PANEL_MAX, above);
-                        dropdown.style.top = (row.top - 6 - room) + 'px';
-                        dropdown.style.maxHeight = room + 'px';
-                        return;
-                    }
-                    dropdown.style.top = (row.bottom + 6) + 'px';
-                    // Whatever is actually left under the row, capped at the
-                    // size the panel is comfortable at. The symbol list inside
-                    // takes the difference as a scroll, so a short window
-                    // costs a scroll rather than a cut.
-                    dropdown.style.maxHeight = Math.min(PRINTINGS_PANEL_MAX, below) + 'px';
+                    const at = self.PrintingsPanel.placement(
+                        container.getBoundingClientRect(), window.innerHeight);
+                    dropdown.style.left = at.left + 'px';
+                    dropdown.style.width = at.width + 'px';
+                    dropdown.style.top = at.top + 'px';
+                    dropdown.style.maxHeight = at.maxHeight + 'px';
                 }
 
                 // Deferred: a resize moves the card too (its cap is in vh), so
