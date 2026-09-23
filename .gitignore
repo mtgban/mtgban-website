@@ -27,6 +27,9 @@ cache_*
 # Offline-mode wire-format fixtures (exempt from the *.json ignore above)
 !tests/offline/fixtures/*.json
 
+# API product list (exempt from the *.json ignore above)
+!apiproductlist/products.json
+
 # Logs directory
 logs/
 
