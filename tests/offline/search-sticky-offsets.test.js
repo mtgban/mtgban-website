@@ -116,7 +116,52 @@ test('the layout floors its height at that same line', () => {
     const min = declarations('.search-layout', 'min-height').find(v => v.includes('100dvh'));
     expect(min, 'expected .search-layout to floor its height against the viewport').toBeTruthy();
     expect(min).toContain('--nav-height');
+    // ...and the footer comes after this grid, so flooring it at the whole
+    // viewport pushes the footer past the bottom of it by the footer's own
+    // height - every time, on a page with room to spare, which is a page
+    // that then scrolls for nothing. This is not the sidebar's old reserve
+    // (that was this column keeping clear of a footer crossing it, and the
+    // test below pins that it is gone); this one is where the document ends.
+    expect(min).toContain('--search-footer-reserve');
     // Subtracting the slack as well ends the document a slack short, which
     // pulls the site footer up past where the sidebar's bottom edge sits.
     expect(min).not.toContain('--content-padding-slack');
 });
+
+test('the footer starts where the results column does, not under the sidebar', () => {
+    // The sidebar is fixed and reaches the viewport bottom, so a full-bleed
+    // footer crosses it at the end of every page. That used to be paid for
+    // with a reserved strip the sidebar had to stop short of - 90px given up
+    // at every scroll position to protect one. Indenting the footer past the
+    // sidebar column instead is what lets the sidebar own its full height,
+    // so these two go together: if the footer ever goes full-bleed again,
+    // the height below has to give the strip back.
+    const left = declaration('body:has(.search-layout) .site-footer', 'margin-left');
+    expect(left, 'expected the search page footer to clear the sidebar column').toBeTruthy();
+    expect(left).toContain('--search-sidebar-left');
+    expect(left).toContain('--search-sidebar-width');
+
+    const height = declaration('.search-sidebar', 'height');
+    expect(height).toContain('100dvh');
+    expect(height).toContain('--search-sidebar-top');
+    expect(height).not.toContain('reserve');
+});
+
+test('the sidebar column and the footer read one definition of where it sits', () => {
+    // Three places used to carry the same centring arithmetic: the grid's
+    // track, the fixed sidebar's left edge, and now the footer's indent.
+    // They can only drift apart if one of them spells it out again.
+    const bodyRule = rules('body:has(.search-layout)')[0];
+    expect(bodyRule).toContain('--search-sidebar-left');
+    expect(bodyRule).toContain('--search-sidebar-width');
+    expect(declaration('.search-sidebar', 'left')).toBe('var(--search-sidebar-left)');
+    expect(declaration('.search-sidebar', 'width')).toBe('var(--search-sidebar-width)');
+    // Narrow viewports drop to a single column, so it is the two-column
+    // track that has to read the token, not whichever rule comes last.
+    const tracks = declarations('.search-layout', 'grid-template-columns');
+    expect(
+        tracks.some(t => t.includes('--search-sidebar-width')),
+        `expected the two-column track to read the sidebar width, saw: ${tracks.join(' | ')}`,
+    ).toBe(true);
+});
+
