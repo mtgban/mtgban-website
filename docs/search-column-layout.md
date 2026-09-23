@@ -156,6 +156,27 @@ could reasonably write, so the size travels as an inherited custom property
 (`--qi-icon-size`) instead. A first attempt without that traded a 24px jump
 for a 4px one in the other direction.
 
+The image button beside it (`.qi-view-image`, visible only below 900px) reads
+the same token, for the same reason and one more: `.qi-actions` has already
+taken the token to 20 by the width the button appears at, so a rule of its own
+would have to repeat that number to avoid standing 24px tall next to a 20px
+star.
+
+The rest of the site is paired the same way — `css/landing.css`,
+`css/guide.css`, `css/screener.css`, `css/command-palette.css`,
+`css/mobile.css`, `css/search-mobile.css` — and guarded by
+`tests/offline/icon-placeholders.test.js`.
+
+Raising a placeholder's specificity is not free, though. Spelling a pairing
+`i[data-lucide]` rather than `i` adds an attribute to the selector, and
+`.m-sort-pill i[data-lucide]` (0,2,1) then beats `.m-sort-pill .m-sort-dir`
+(0,2,0), which is what sizes the sort arrow to 20px. The placeholder took the
+pill's generic 18px instead, against a 20px icon: measured, a 2px jump that
+moved 1240 elements. **Where a placeholder is already reached by a class of
+its own, leave the pairing spelled `i`** — or size it through that class,
+the way `.settings-section-chevron` and `.group-chevron` do, which needs no
+pairing at all because one selector covers both states.
+
 This reserves the room; it does not make the icons arrive sooner. The slots
 are empty until the bundle lands, they just no longer shove anything.
 

@@ -533,6 +533,15 @@ body.mobile:has(.m-home) .m-nav-home {
     color: var(--subtle, #8b8b8b);
 }
 .m-pin-btn.is-active { color: var(--anormal); }
+/* Sized here rather than left to lucide's own 24 against a 0x0 placeholder,
+   which is what the icon used to pop in from. The button is 38px square
+   either way; this is the box inside it. */
+.m-pin-btn svg,
+.m-pin-btn i[data-lucide] {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+}
 /* Filled while the bar holds something, outline while it does not - the
    state is readable with the row closed, which is when it has to be. */
 .m-pin-btn.is-active svg { fill: currentColor; }

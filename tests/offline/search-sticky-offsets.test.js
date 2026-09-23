@@ -246,7 +246,8 @@ test('every icon placeholder is sized with the icon that replaces it', () => {
     // the same breath - that is the only way the two cannot disagree - so
     // this asserts the pairing rather than any particular number.
     for (const base of ['.search-sort-pill', '.search-sort-settings', '.fav-sort-pill',
-                        '.result-quick-icons .fav-btn', '.qi-actions']) {
+                        '.result-quick-icons .fav-btn', '.result-quick-icons .qi-view-image',
+                        '.qi-actions']) {
         const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         // the selector list of whichever rule sizes this icon
         const re = new RegExp(`([^{}]*${esc}\\s+svg[^{}]*)\\{([^{}]*)\\}`, 'g');
@@ -261,6 +262,17 @@ test('every icon placeholder is sized with the icon that replaces it', () => {
         }
         expect(found, `expected a rule sizing "${base} svg"`).toBe(true);
     }
+});
+
+test('the image button is sized through the same token as the star', () => {
+    // It is styled to share the star's look, and for a while that stopped at
+    // the colours: nothing sized this icon, so it arrived at lucide's own 24
+    // against a 0x0 placeholder and slid the right-aligned strip 24px. It is
+    // only visible below 900px, where .qi-actions has already taken the token
+    // to 20 - reading the same token is what keeps the two buttons the same
+    // size there instead of 24 against 20.
+    const img = css.slice(css.indexOf('.result-quick-icons .qi-view-image svg'));
+    expect(img.slice(0, img.indexOf('}'))).toContain('--qi-icon-size');
 });
 
 test('the collapsed icon row sizes both through one inherited token', () => {

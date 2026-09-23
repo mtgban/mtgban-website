@@ -55,8 +55,11 @@
     color: var(--text-dim);
 }
 .screener-reset:hover { color: var(--normal); }
-.screener-reset i { width: 1.1em; height: 1.1em; }
-.screener-reset svg { width: 1.1em; height: 1.1em; display: block; }
+/* One rule for the icon and for the <i> lucide swaps for it: two rules with
+   the same numbers reserve the same box only for as long as nobody edits one
+   of them. Measured 15.42px square either way today. */
+.screener-reset svg,
+.screener-reset i[data-lucide] { width: 1.1em; height: 1.1em; display: block; }
 
 .screener-editions {
     position: relative;
