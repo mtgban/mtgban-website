@@ -170,11 +170,6 @@ body:has(.search-layout) {
 
 /* ═══ Sidebar ═══ */
 .search-sidebar {
-    /* 20px top/bottom (40px total) - the @container thresholds further down,
-       in the desktop layout below, are written against this column's content
-       box, so they're each 40px short of the border-box number they're
-       tuned for (600px/500px content-box = 640px/540px border-box). Retune
-       both together if this changes. */
     padding: 20px;
     position: sticky;
     top: var(--nav-height, 48px);
@@ -201,13 +196,19 @@ body:has(.search-layout) {
 .sidebar-body::-webkit-scrollbar { width: 0; height: 0; }
 
 .sidebar-footer {
+    /* No padding of its own: the gap between the boxes in this stack is set
+       once on .sidebar-body, so this is not a second, different one. */
     flex-shrink: 0;
-    padding: 12px 0 0;
 }
 
 /* ── Sidebar search bar ── */
 .sidebar-search {
-    margin: -20px -20px 8px;
+    /* No bottom margin: this is a sticky bar with its own background, and
+       its padding-bottom is what keeps the divider off that background's
+       edge as the column scrolls under it. A margin under the bar as well
+       was a second 8px gap on top of that one - 8px of the card's height,
+       at the top of a column that runs out of it. The padding stays. */
+    margin: -20px -20px 0;
     padding: 20px 20px 8px;
     position: sticky;
     top: -20px;
@@ -342,59 +343,32 @@ body:has(.search-layout) {
         min-height: 0;
         max-height: none;
         z-index: 10;
-        overflow: hidden;
-        /* A short viewport (or the pinned-filters bar eating into it) used to
-           just clip whatever didn't fit - usually Export/Upload, the very
-           thing a reader most needs a click on. Degrade on purpose instead,
-           giving up the least-needed information first: Available In, then
-           Export/Upload - both live inside .sidebar-body, the scrollable
-           lower part of this column, not as direct children of it (see
-           templates/search.html). .sidebar-pinned's own shrink weight
-           (its rule, below) is deliberately tiny next to .sidebar-body's, so
-           in practice the image doesn't give up any of its own size until
-           .sidebar-body has already given up both. */
-        container: search-sidebar-height / size;
-    }
-
-    /* A size container query compares against the content box, not
-       .search-sidebar's own border-box height - see the 20px padding this
-       carries back in, above. */
-
-    /* Available In first - useful, but the reader came here for prices, and
-       every product it names is one click from the same search anyway. */
-    @container search-sidebar-height (max-height: 600px) {
-        .sidebar-products-card {
-            display: none;
-        }
-    }
-
-    /* Export/Upload second, once Available In giving up its room isn't
-       enough on its own - these are the actions a reader is most likely
-       mid-click on, so they're the last thing .sidebar-body gives up before
-       .sidebar-pinned's own shrink weight (see its rule below) starts
-       mattering. */
-    @container search-sidebar-height (max-height: 500px) {
-        .sidebar-footer {
-            display: none;
-        }
+        /* Level with the gap the stack inside is spaced by, not the 20px
+           the sides carry. This edge is the bottom of the window, so what
+           sits above it is the last row of buttons and what sits below it
+           is nothing - room spent here is room the Available In list is
+           scrolling for. The sides keep their 20px: those separate two
+           columns of content, which is a different job. */
+        padding-bottom: 8px;
+        /* Below roughly a 550px-tall window even the image block alone is
+           taller than this column, and there is nothing left to give that
+           would not mean shrinking the card. Scroll rather than cut: the
+           search box at the top is the part that leaves first, and it has a
+           twin in the navbar. At every ordinary height the contents fit and
+           no scrollbar appears. */
+        overflow-x: hidden;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--surface-4, #323840) transparent;
     }
 
     .sidebar-pinned {
         display: flex;
-        /* No grow - this holds its own natural size rather than reclaiming
-           room .sidebar-body frees up by hiding a section. Shrink is nonzero
-           but 200x lighter than .sidebar-body's own (that rule, below): CSS
-           distributes a height deficit between flex siblings in proportion
-           to shrink-factor x size, so as long as .sidebar-body has any
-           natural size of its own left to give - Available In, then
-           Export/Upload, then whatever it always shows below those, like
-           "Show all versions" - it absorbs effectively all of any squeeze
-           first. Only once .sidebar-body is already at its own min-height:0
-           floor does the remaining deficit fall to this, and from here to
-           .sidebar-img-wrap's own shrink-then-floor below - a real, gradual
-           last resort, not a single breakpoint that could leave nothing left
-           to give if .sidebar-body's true minimum still doesn't fit. */
-        flex: 0 1 auto;
+        /* Neither grows nor shrinks: the search bar, the card and its
+           edition icons are one block that always gets the room it asks
+           for. Everything that gives when this column runs short is in
+           .sidebar-body, below. */
+        flex: 0 0 auto;
         flex-direction: column;
         min-height: 0;
         position: static;
@@ -415,52 +389,205 @@ body:has(.search-layout) {
         top: auto;
     }
 
+    .sidebar-pinned .sidebar-img-wrap,
+    .sidebar-pinned .sidebar-printings {
+        /* The same 8px the boxes below are stacked with. These carried 14px
+           from when this column was a list of loose parts; against a stack
+           that is spaced once, on .sidebar-body, they are two more special
+           margins - and 12px of a column whose lower box is the first thing
+           to start scrolling. */
+        margin-bottom: 8px;
+    }
+
     .sidebar-pinned .sidebar-img-wrap {
-        display: flex;
-        flex: 1 1 auto;
-        align-items: center;
-        justify-content: center;
-        /* An explicit height, not just a cap: flex-basis:auto reads this
-           when it's set, rather than falling back to content-based sizing.
-           Content-based sizing here means the image's own natural width
-           (this column is only 340px wide) drives its height via aspect
-           ratio, which at most viewport heights is a tighter constraint than
-           52vh - so without an explicit height, .sidebar-pinned's own
-           near-zero shrink weight (its rule, above) would hold this at a
-           near-constant, width-bound size regardless of viewport height,
-           instead of continuing to track 52vh on its own - overstating how
-           much room .sidebar-pinned actually needs, and starving
-           .sidebar-body of room it should have gotten first. */
-        height: var(--sidebar-card-img-cap, 52vh);
-        /* 60% of that same cap, kept as one token with .sidebar-card-img's
-           max-height so the two can't drift apart - a flat 120px here let a
-           short viewport (or a sidebar squeezed by a tall .sidebar-body)
-           shrink the card past the point it still reads clearly. */
-        min-height: calc(0.6 * var(--sidebar-card-img-cap, 52vh));
-        width: auto;
+        /* Never shrinks. The card is the one thing in this column that
+           cannot be made smaller without making it worse, so it is not part
+           of what gives when the column runs short - Available In is, and
+           then Export. The shared rule above shrink-wraps this box to the
+           image so the foil ::after overlay lands on the card rather than
+           across the column. */
+        flex: 0 0 auto;
     }
 
     .sidebar-pinned .sidebar-card-img {
-        max-height: 100%;
+        /* The card's own ceiling, not a share of anything. It is bounded so
+           a very short window cannot let it run past the column, but within
+           that it just sits at its natural size for this column's width. */
+        max-height: var(--sidebar-card-img-cap, 52vh);
     }
 
-    .sidebar-body {
-        /* The only item in this column with any grow: whatever's left after
-           .sidebar-pinned's own footprint is this section's. Shrink is 200x
-           .sidebar-pinned's own (that rule, above) - the number itself
-           doesn't matter, only that it's overwhelmingly larger, so this
-           absorbs a height deficit first and scrolls internally rather than
-           clip, all the way down to its own min-height:0, before
-           .sidebar-pinned gives up any of its natural size. */
-        flex: 1 200 auto;
+    .search-sidebar .sidebar-body {
+        /* Exactly the room left under the image, and a size container so the
+           boxes inside can be told how much that is. grow:1 with a basis
+           that size containment fixes at 0 means this is never anything but
+           the leftover - it does not ask for room of its own, and hiding
+           something inside it cannot change its height, so there is no loop
+           between the queries at the end of this block and what they hide.
+
+           Every rule in this stack is written from .search-sidebar rather
+           than on the class alone: the shared rules these override - the
+           Available In card's own 8em list cap among them - sit further
+           down this file, so matching their specificity would lose to them
+           on source order.
+
+           A column of boxes stacked straight onto each other rather than one
+           scroller holding all three: that way each can be told separately
+           whether it gives. The one box in here that can scroll does. */
+        container: search-sidebar-space / size;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1 1 auto;
         min-height: 0;
+        /* The last resort, below both rules at the end of this block: with
+           Available In and Export both gone and only the always-there links
+           left, a column this short still has to keep them reachable, and a
+           scrollbar is the one way left that is not clipping them. Visible
+           rather than the chromeless one this used to have - a hidden
+           scrollbar on a cut-off list is exactly what reads as a bug. */
         overflow-y: auto;
         overflow-x: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: var(--surface-4, #323840) transparent;
+    }
+    .search-sidebar .sidebar-body::-webkit-scrollbar { width: 4px; height: 0; }
+    .search-sidebar .sidebar-body::-webkit-scrollbar-thumb {
+        background: var(--surface-4, #323840);
+        border-radius: 2px;
     }
 
-    /* The fixed sidebar reaches the viewport bottom while the document
-       footer is in normal flow. Paint the footer above the sidebar at the
-       end of the page so its disclosure remains readable. */
+    /* Everything here holds its natural size... */
+    .search-sidebar .sidebar-body > * {
+        flex: 0 0 auto;
+    }
+
+    /* ...except Available In, which is the one box that gives. It is also
+       the only one whose content has no natural bound - a card in two
+       products costs a line, one in twenty costs twenty - so it is both the
+       tallest thing here when there is room and the obvious place for a
+       squeeze to land. It is already built to scroll inside itself, so
+       shrinking it costs a reader nothing but a scroll. */
+    .search-sidebar .sidebar-products-card {
+        display: flex;
+        flex-direction: column;
+        flex: 0 1 auto;
+        /* The one floor in this box, and the only literal in it: its title
+           bar plus about two rows of list. It cannot be derived - `auto`
+           and `min-content` both floor a flex item at its WHOLE content,
+           which here is every product the card knows, and `auto` is
+           collapsed to zero anyway by this box's own overflow: hidden.
+           Zero was what used to let this shrink past its content to a 2px
+           sliver of border - the very "clipped sliver" the rule below
+           exists to prevent, reached by the other road. It shrinks smoothly
+           to this and then the column scrolls, which is reachable. */
+        min-height: 78px;
+    }
+
+    .search-sidebar .sidebar-products-list {
+        /* Fills its card rather than stopping at a fixed 8em, and keeps its
+           own scrollbar - this is what absorbs the squeeze. No floor of its
+           own: the card above carries the one for both, so there are not
+           two numbers here that have to be kept agreeing. */
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        /* Centred in whatever room the card has, because the card's floor
+           means a short list is sitting in a box taller than itself - one
+           product left a line of text at the top of it with the slack all
+           underneath. `safe` is the whole reason this is a flex box rather
+           than a text-align: it degrades to top-aligned the moment the list
+           is taller than the room, where true centring would push the first
+           products out of the top of a scroll box with no way to reach
+           them. A browser that does not know the keyword drops the
+           declaration and lands on the same top alignment. */
+        display: flex;
+        flex-direction: column;
+        justify-content: safe center;
+    }
+
+    /* Both thresholds below are that box's OWN requirement - what it needs
+       to be worth drawing, plus the gap above it - and deliberately not the
+       whole stack's. What else is in this column varies with the card: one
+       result has a single "Show all versions" link above these, another has
+       three, and a threshold set for the busy case hides a box that would
+       have fitted comfortably in the quiet one. Erring the other way costs
+       at worst a short scroll in this column, which is reachable; erring
+       high costs a box the reader cannot get to at all.
+
+       Available In goes first, and its number is the one place the rule
+       above does not hold, deliberately. Its floor (78) plus the gap and
+       the Export box below it (8 + 92) plus one action link above (43) is
+       221, so a threshold at its own requirement would show the box at the
+       exact heights where it lands on that floor and the column has to
+       scroll to hold it. Set above that band instead: shown only where it
+       has room to be a list rather than its own minimum. Under it the box
+       is chrome, and the reader came here for prices - every product it
+       names is one click from this same search anyway. */
+    @container search-sidebar-space (max-height: 260px) {
+        /* The box stays; its list is what goes. A title bar reading
+           "Available In 7" is two lines' worth of the answer on its own -
+           that there are seven, and a place to press for which - where
+           removing the box outright left the reader with nothing to say
+           the products even existed. */
+        .search-sidebar .sidebar-products-list {
+            display: none;
+        }
+        .search-sidebar .sidebar-products-card {
+            /* Nothing to fill any more: it is its own title bar. */
+            flex: 0 0 auto;
+            min-height: 0;
+        }
+        .search-sidebar .sidebar-products-title {
+            cursor: pointer;
+        }
+        .search-sidebar .sidebar-products-caret {
+            display: inline;
+        }
+        .search-sidebar .sidebar-products-title:hover,
+        .search-sidebar .sidebar-products-title:focus-visible {
+            color: var(--normal);
+        }
+    }
+
+    /* Pressed open. It takes the whole column under its own title and the
+       Export box gives way for as long as it is open - which is the point:
+       at these heights there is no room to show both, and the reader has
+       just said which one they want. Clicking away or Escape puts Export
+       back. Not an overlay laid over the column: an overlay would have to
+       be positioned against the viewport to escape this column's scroll
+       box, and taking the room instead lands in exactly the same pixels
+       with none of that. The attribute is set only by a press, so it
+       overrides the container rules above in both directions - including
+       collapsing the list at a height roomy enough to have shown it. */
+    .search-sidebar .sidebar-products-card[data-expanded="true"] {
+        flex: 1 1 auto;
+        min-height: 78px;
+    }
+    .search-sidebar .sidebar-products-card[data-expanded="true"] .sidebar-products-list {
+        display: block;
+    }
+    /* Points the way the press will go, like every other disclosure. */
+    .search-sidebar .sidebar-products-card[data-expanded="true"] .sidebar-products-caret {
+        transform: rotate(180deg);
+    }
+    .search-sidebar .sidebar-products-card[data-expanded="true"] ~ .sidebar-footer {
+        display: none;
+    }
+    .search-sidebar .sidebar-products-card[data-expanded="false"] .sidebar-products-list {
+        display: none;
+    }
+
+    /* Export/Upload goes last and only once losing Available In was not
+       enough on its own - these are the actions a reader is most likely
+       mid-click on. Its own two rows of buttons plus the gap above them
+       come to a hair over 110px; below that they cannot both be drawn, and
+       half a button bar is worse than none. */
+    @container search-sidebar-space (max-height: 112px) {
+        .search-sidebar .sidebar-footer {
+            display: none;
+        }
+    }
+
     /* Under the search results and nothing else. The sidebar is fixed and
        reaches the viewport bottom, so a full-bleed footer crosses it at the
        end of every page - which used to be answered by painting the footer
@@ -661,13 +788,20 @@ body.modal-embed .search-sidebar {
 
 /* Available In card */
 .sidebar-products-card {
-    margin-top: 8px;
     background: var(--search-surface-1);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-sm, 6px);
     overflow: hidden;
 }
 .sidebar-products-title {
+    /* A button, so it is reachable by keyboard wherever it does something.
+       Everything below the first four lines is undoing what a button brings
+       and restoring the bar it has always looked like. */
+    display: block;
+    width: 100%;
+    background: none;
+    border: 0;
+    font-family: inherit;
     font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
@@ -676,6 +810,18 @@ body.modal-embed .search-sidebar {
     padding: 6px 12px;
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     text-align: center;
+    /* Default is not a control: with room for the list there is nothing for
+       a press to do, and a pointer over it would be promising otherwise.
+       The collapsed rules further down turn it into one. */
+    cursor: default;
+}
+
+/* Only shown where the title is doing something - see the collapsed block
+   at the end of the desktop layout. */
+.sidebar-products-caret {
+    display: none;
+    margin-left: 6px;
+    font-size: var(--text-xs);
 }
 /* Product count, appended to the title. Empty when there is nothing to
    count, so the margin has to come from the span itself. */
@@ -741,9 +887,6 @@ body.modal-embed .search-sidebar {
 }
 .sidebar-action:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
-}
-.sidebar-action + .sidebar-products-card {
-    margin-top: 8px;
 }
 .sidebar-action.primary {
     background: var(--accent-muted, rgba(91,141,239,0.12));
@@ -2826,6 +2969,7 @@ body.modal-embed .cp-overlay {
     align-items: center;
     justify-content: center;
 }
+
 
 .result-quick-icons .fav-btn:hover {
     color: var(--normal);

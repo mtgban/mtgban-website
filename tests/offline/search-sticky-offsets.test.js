@@ -165,3 +165,47 @@ test('the sidebar column and the footer read one definition of where it sits', (
     ).toBe(true);
 });
 
+test('Available In has a floor wherever it is showing a list', () => {
+    // It is the box that gives when the column runs short, but only down to
+    // a point: with min-height:0 it kept shrinking past its own content to
+    // the 2px of border left over, which is the "clipped sliver" the
+    // collapse exists to prevent, reached by the other road. Neither `auto`
+    // nor `min-content` can express the floor - both floor a flex item at
+    // its WHOLE content, every product the card knows - and `auto` is
+    // collapsed to zero anyway by this box's own overflow: hidden.
+    //
+    // A floor of 0 is correct in exactly one place: the collapsed state,
+    // where the box IS its title bar and has no list to keep room for. So
+    // this asserts a real floor exists rather than that every rule carries
+    // one.
+    const floors = declarations('.search-sidebar .sidebar-products-card', 'min-height');
+    expect(floors.length, 'expected the desktop Available In card to declare a floor').toBeGreaterThan(0);
+    const real = floors.filter(v => /^[1-9]\d*px$/.test(v));
+    expect(
+        real.length,
+        `expected a non-zero px floor among: ${floors.join(' | ')}`,
+    ).toBeGreaterThan(0);
+    // ...and the pressed-open state has to keep one, because that is the
+    // state whose whole job is holding a list.
+    const expanded = declarations('.search-sidebar .sidebar-products-card[data-expanded="true"]', 'min-height');
+    expect(expanded.some(v => /^[1-9]\d*px$/.test(v)),
+        `expected the expanded card to keep a floor, saw: ${expanded.join(' | ')}`).toBe(true);
+});
+
+test('running short collapses Available In to its title, it does not delete it', () => {
+    // Removing the box outright left no trace that the products existed.
+    // The title bar is two lines' worth of the answer by itself - that
+    // there are seven, and somewhere to press for which - so what the
+    // container rule takes is the list.
+    const tight = css.slice(css.indexOf('@container search-sidebar-space (max-height: 260px)'));
+    const block = tight.slice(0, tight.indexOf('\n    }\n'));
+    expect(block).toContain('.sidebar-products-list');
+    expect(
+        /\.sidebar-products-card\s*\{[^{}]*display:\s*none/.test(block),
+        'expected the short-column rule to hide the list, not the whole card',
+    ).toBe(false);
+
+    // Pressing it open takes the room from Export for as long as it is open.
+    const hidesFooter = rules('.search-sidebar .sidebar-products-card[data-expanded="true"] ~ .sidebar-footer');
+    expect(hidesFooter.join(' ')).toContain('none');
+});

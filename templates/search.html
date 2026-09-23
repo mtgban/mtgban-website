@@ -289,6 +289,78 @@
                     if (refocus) trigger.focus();
                 }
 
+                // Available In collapses to its title bar when the column runs
+                // short, and presses open over the Export box. The attribute
+                // is what a press leaves behind: absent means "whatever the
+                // column's height calls for", which is what a fresh card and
+                // a click-away both go back to.
+                // Whether the title is a control at all is the stylesheet's
+                // call, not this script's: it becomes one only where the
+                // column is too short to show the list outright, and the
+                // caret is the rule that says so. Reading it back keeps the
+                // two from disagreeing - and stops a stray press collapsing
+                // a list on a tall window, where there would be no caret
+                // left to press to bring it back.
+                function productsIsCollapsible() {
+                    const caret = document.querySelector('.sidebar-products-caret');
+                    return !!caret && getComputedStyle(caret).display !== 'none';
+                }
+
+                function productsListOpen() {
+                    const list = document.getElementById('products');
+                    return !!list && getComputedStyle(list).display !== 'none';
+                }
+
+                // What a reader can see, not what was last pressed: with no
+                // attribute the stylesheet decides, so the list's own display
+                // is the only honest answer either way.
+                function syncProductsToggle() {
+                    const toggle = document.getElementById('productsToggle');
+                    if (!toggle) return;
+                    toggle.setAttribute('aria-expanded', productsListOpen() ? 'true' : 'false');
+                }
+
+                function setProductsExpanded(state) {
+                    const card = document.getElementById('productsCard');
+                    if (!card) return;
+                    if (state === null) {
+                        card.removeAttribute('data-expanded');
+                    } else {
+                        card.setAttribute('data-expanded', state ? 'true' : 'false');
+                    }
+                    syncProductsToggle();
+                }
+
+                // A resize moves the column's height across the threshold
+                // without anyone pressing anything, so the label has to be
+                // re-read rather than remembered.
+                window.addEventListener('resize', function() {
+                    setTimeout(syncProductsToggle, 0);
+                });
+                window.addEventListener('load', syncProductsToggle);
+
+                document.addEventListener('click', function(e) {
+                    const card = document.getElementById('productsCard');
+                    if (!card) return;
+                    const toggle = document.getElementById('productsToggle');
+                    if (toggle && toggle.contains(e.target)) {
+                        if (productsIsCollapsible()) setProductsExpanded(!productsListOpen());
+                        return;
+                    }
+                    // Clicked away. Only worth acting on while it is holding
+                    // a state of its own - otherwise every click on the page
+                    // would be writing the same attribute back.
+                    if (card.hasAttribute('data-expanded') && !card.contains(e.target)) {
+                        setProductsExpanded(null);
+                    }
+                });
+
+                document.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Escape') return;
+                    const card = document.getElementById('productsCard');
+                    if (card && card.hasAttribute('data-expanded')) setProductsExpanded(null);
+                });
+
                 // The label says what pressing the button will do, so it has
                 // to turn over with the panel: left alone, an open panel goes
                 // on offering to show what is already on screen.
@@ -467,6 +539,10 @@
                     collapsePrintings();
                     updateSetValueMode();
 
+                    // A different card, so whatever the last one was pressed
+                    // into does not carry over to a list it was not about.
+                    setProductsExpanded(null);
+
                     let productDiv = document.getElementById('products');
                     if (productDiv) {
                         if (products === "") {
@@ -547,8 +623,8 @@
                             <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}&scope={{.SearchScope}}">Show all versions</a>
                         {{end}}
                         {{if .HasAvailable}}
-                            <div class="sidebar-products-card">
-                                <div class="sidebar-products-title">Available In<span class="sidebar-products-count" id="productsCount"></span></div>
+                            <div class="sidebar-products-card" id="productsCard">
+                                <button type="button" class="sidebar-products-title" id="productsToggle" aria-expanded="true" aria-controls="products">Available In<span class="sidebar-products-count" id="productsCount"></span><span class="sidebar-products-caret" aria-hidden="true">&#9662;</span></button>
                                 <div class="sidebar-products-list" id="products"></div>
                             </div>
                         {{end}}
