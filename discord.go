@@ -324,6 +324,11 @@ func printingTitle(co *mtgmatcher.CardObject) string {
 // answered by two. Other games do file a number under two names - see
 // openingName in redirect.go - but the bot reads links for Magic only, which
 // checkForLinks gates on.
+//
+// The finish is not in the path at all; Mana Pool spells it in the query, as
+// finish=nonfoil, foil or etched. A link that names one is answered with that
+// sibling or with nothing, never with the finish the set files first: the
+// reader was looking at a price for one of them.
 func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 	fields := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(fields) < 3 {
@@ -334,6 +339,19 @@ func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 		co, err := backend().GetUUID(card.UUID)
 		if err != nil {
 			continue
+		}
+
+		finish := u.Query().Get("finish")
+		if finish == "" {
+			return co
+		}
+		sibling, err := backend().MatchIDFinish(co.UUID, finish)
+		if err != nil {
+			return nil
+		}
+		co, err = backend().GetUUID(sibling)
+		if err != nil {
+			return nil
 		}
 		return co
 	}
