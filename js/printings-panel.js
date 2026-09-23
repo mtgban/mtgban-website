@@ -1,4 +1,5 @@
-/* Where the editions overflow panel goes.
+/* How the sidebar's two panels decide to show themselves: where the editions
+ * overflow panel goes, and whether Set Value collapses behind its trigger.
  *
  * The panel is position: fixed, which is the only way it escapes being
  * clipped: every box between it and the viewport either is a scroll box or
@@ -18,6 +19,10 @@
     // Clear of the row it hangs from, and of the window's own edge.
     var ROW_GAP = 6;
     var EDGE_GAP = 18;
+
+    // The least room the lower half of the column can have before Set Value
+    // stops sitting inline and collapses behind its one-line trigger.
+    var MIN_BODY_FOR_SET_VALUE = 160;
 
     /* Given the symbol row's rectangle and the window's height, where the
      * panel goes. Returns viewport coordinates, ready for style.top et al.
@@ -54,8 +59,27 @@
         return common;
     }
 
+    /* Whether Set Value collapses behind its hover trigger. `room` is
+     * .sidebar-body's height, which is exactly the leftover under the card -
+     * so it falls as the Set Value tables above it grow, and this is
+     * monotonic in the squeeze.
+     *
+     * It deliberately does not ask whether the body is OVERFLOWING, which is
+     * what it used to ask. The body answers a squeeze by collapsing the boxes
+     * inside it - Available In first, then Export - so it stops overflowing
+     * as it gets smaller, and the answer flips back and forth. Measured on a
+     * real sealed page: the body overflowed at 125px of room, did not at
+     * 75px (the Export box had just been collapsed away, taking the overflow
+     * with it), and did again at 25px. The tables came out from behind the
+     * trigger and went back as the window moved. */
+    function shouldStashSetValue(room) {
+        return room < MIN_BODY_FOR_SET_VALUE;
+    }
+
     self.PrintingsPanel = {
         placement: placement,
+        shouldStashSetValue: shouldStashSetValue,
+        MIN_BODY_FOR_SET_VALUE: MIN_BODY_FOR_SET_VALUE,
         MAX_HEIGHT: MAX_HEIGHT,
         MIN_HEIGHT: MIN_HEIGHT,
         ROW_GAP: ROW_GAP,
