@@ -53,6 +53,35 @@ type Client struct {
 	// on a client built without one, and the read falls back to Query.
 	stmtHGetAllLong    *sql.Stmt
 	stmtHGetAllByBanID *sql.Stmt
+
+	// The screener's anchor walk asks for a provider's newest date up to
+	// sixteen times a build, and the unbounded form spans every partition, so
+	// its plan is the expensive part: 23ms of planning and 7,982 buffers
+	// against 4ms of execution on the live archive. Kept prepared it plans in
+	// 0.1ms. Indexed by the two shape flags the query takes - see
+	// providerLatestDateStmt.
+	stmtProviderLatestDate [3]*sql.Stmt
+}
+
+// providerLatestDateShape numbers the three forms of providerLatestDateQuery
+// that moverAnchor actually asks for, so each can hold its own prepared
+// statement. The fourth combination (unbounded and strict) is not a shape: with
+// no bound there is nothing to be strict about.
+func providerLatestDateShape(bounded, strict bool) int {
+	switch {
+	case !bounded:
+		return 0
+	case !strict:
+		return 1
+	default:
+		return 2
+	}
+}
+
+// providerLatestDateStmt returns the prepared statement for one shape of the
+// newest-date query, or nil when preparing it failed.
+func (c *Client) providerLatestDateStmt(bounded, strict bool) *sql.Stmt {
+	return c.stmtProviderLatestDate[providerLatestDateShape(bounded, strict)]
 }
 
 // query runs a read through stmt when the client managed to prepare it, and as
@@ -73,6 +102,14 @@ func (c *Client) query(ctx context.Context, stmt *sql.Stmt, text string, args ..
 		return stmt.QueryContext(ctx, args...)
 	}
 	return c.db.QueryContext(ctx, text, args...)
+}
+
+// queryRow is query's single-row twin, with the same fallback.
+func (c *Client) queryRow(ctx context.Context, stmt *sql.Stmt, text string, args ...any) *sql.Row {
+	if stmt != nil {
+		return stmt.QueryRowContext(ctx, args...)
+	}
+	return c.db.QueryRowContext(ctx, text, args...)
 }
 
 // OpenDB opens a raw Postgres pool for the database described by the config,
@@ -128,6 +165,10 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	// pays for its plan every time.
 	c.stmtHGetAllLong, _ = db.Prepare(hgetAllLongQuery)
 	c.stmtHGetAllByBanID, _ = db.Prepare(hgetAllByBanIDQuery)
+	for _, shape := range []struct{ bounded, strict bool }{{false, false}, {true, false}, {true, true}} {
+		stmt, _ := db.Prepare(providerLatestDateQuery(shape.bounded, shape.strict))
+		c.stmtProviderLatestDate[providerLatestDateShape(shape.bounded, shape.strict)] = stmt
+	}
 	return c, nil
 }
 
@@ -169,7 +210,9 @@ func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool,
 
 // Close shuts down the connection pool.
 func (c *Client) Close() error {
-	for _, stmt := range []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID} {
+	stmts := []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID}
+	stmts = append(stmts, c.stmtProviderLatestDate[:]...)
+	for _, stmt := range stmts {
 		if stmt != nil {
 			stmt.Close()
 		}
