@@ -1143,9 +1143,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
 					// name-only fallback has to carry it too.
-					link = cm.SearchURL(pageVars.Metadata[cardID].Name, game, Affiliates().Codes["MKM"])
+					link = cm.SearchURL(game, pageVars.Metadata[cardID].Name, cm.URLOption{
+						Affiliate: Affiliates().Codes["MKM"],
+					})
 				} else {
-					link = cm.BuildURL(id, game, Affiliates().Codes["MKM"], cm.Finish{Foil: co.Foil || co.Etched})
+					foil := cm.Any
+					if co.Foil || co.Etched {
+						foil = cm.Only
+					}
+					link = cm.BuildURL(game, id, cm.URLOption{
+						Foil:      foil,
+						Language:  cm.LanguageEnglish,
+						Affiliate: Affiliates().Codes["MKM"],
+					})
 				}
 				tmp = append(tmp, SearchEntry{
 					ScraperName: "CardMarket",
