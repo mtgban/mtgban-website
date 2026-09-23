@@ -286,7 +286,12 @@
            than left to chance: the sidebar's own bottom edge (below) keys
            off the same variable, so neither one crowds the footer's spot. */
         --search-footer-reserve: 90px;
-        min-height: calc(100dvh - var(--nav-height, 48px) - var(--content-padding-slack, 27px) - var(--search-footer-reserve));
+        /* Subtract only what is actually above this: the margin-top above
+           starts it on the nav line, not one --content-padding-slack below
+           it, so subtracting the slack here too ended the document a slack
+           short of that edge and pulled the footer up by 27px on a page
+           with few results. */
+        min-height: calc(100dvh - var(--nav-height, 48px) - var(--search-footer-reserve));
     }
 
     /* Keep the sidebar independent from the result list. Its lower section
@@ -296,8 +301,18 @@
         position: fixed;
         /* Keep the sidebar in a bounded viewport rectangle. The shared
            navbar token accounts for the pinned row without a second sticky
-           positioning layer that can re-anchor in Firefox. */
-        --search-sidebar-top: calc(var(--nav-height, 48px) + var(--content-padding-slack, 27px));
+           positioning layer that can re-anchor in Firefox.
+
+           --nav-height alone, without --content-padding-slack: that is the
+           line the result headers' own sticky pins to, and .search-layout's
+           negative margin-top deliberately starts the results column on it
+           too, so a header is already at its sticky position and never
+           visibly travels before catching. Adding the slack here put this
+           column one slack below that line, which is the whole misalignment
+           - the fix is to bring this up to the line, not to push the
+           results column down to meet it, which would give every header
+           that much scroll to travel through first. */
+        --search-sidebar-top: var(--nav-height, 48px);
         top: var(--search-sidebar-top);
         left: calc(50% - min(40vw, 800px) + var(--search-layout-padding));
         width: 340px;
@@ -790,7 +805,16 @@ body.modal-embed .search-sidebar {
 
 /* ═══ Results main area ═══ */
 .search-results {
-    padding: 10px 18px 80px;
+    /* The strip .result-header-cover paints to mask the band between the
+       navbar and a pinned header. It is the one number that ties this
+       column's top padding to where a header pins: a sticky offset never
+       moves anything else, so a header whose static position sits above its
+       own sticky top is painted lower than the space it left behind, and
+       covers whatever follows it - the variant row - by exactly that
+       difference, permanently. Starting the column's first header on the
+       line it pins to makes that difference zero. */
+    --result-cover-height: 21px;
+    padding: var(--result-cover-height) 18px 80px;
     /* Query container so the Sellers/Buyers body can collapse to a single
        column based on the real width available to the results (which depends
        on whether the sidebar is showing), not on the raw viewport width. */
@@ -836,7 +860,7 @@ body.modal-embed .search-sidebar {
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: 0;
     position: sticky;
-    top: calc(var(--nav-height, 48px) + 21px);
+    top: calc(var(--nav-height, 48px) + var(--result-cover-height, 21px));
     z-index: 2;
 }
 .result-header.result-first {
@@ -850,8 +874,8 @@ body.modal-embed .search-sidebar {
     position: sticky;
     top: var(--nav-height, 48px);
     z-index: 2;
-    height: 21px;
-    margin-bottom: -21px;
+    height: var(--result-cover-height, 21px);
+    margin-bottom: calc(-1 * var(--result-cover-height, 21px));
     background: var(--background);
     margin-left: -18px;
     margin-right: -18px;
