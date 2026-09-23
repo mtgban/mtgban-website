@@ -60,9 +60,10 @@ output, not a claim written here.
 ## Configuration & secrets
 
 - Config files (`config.json`, `config-beta.json`, `config-lite.json`,
-  `config-lorcana.json`) and all `*.json` are **gitignored** — do not commit
-  them, and do not commit `client_secret.json` / `google_client_secret.json`.
-  Verify with `git status` before any commit.
+  `config-lorcana.json`) and all `*.json` are **gitignored** except the
+  exemptions listed in `.gitignore` — do not commit them, and do not commit
+  `client_secret.json` / `google_client_secret.json`. Verify with
+  `git status` before any commit.
 - `BAN_SECRET` (env var) keys the HMAC signing; `BAN_CONFIG_PATH` sets the
   default config path.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
@@ -97,10 +98,13 @@ output, not a claim written here.
 | `product.go`, `chart.go`, `checkpoints.go` | Sealed EV, price charts, chart annotations |
 | `api*.go` | Price API, batch prices, chart/suggest APIs, CSV exports, API-mode loading |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
+| `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go`, `palette.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle, palette metadata APIs |
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
 | `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); to be imported by the API gateway repo, so its payload bytes are frozen by golden tests |
+| `apihandoff/` | The signed Patreon handoff token (`Mint`, `Verify`) the game sites hand to the API gateway for trials and sign-in; the gateway imports it, so the golden test freezes its bytes |
+| `apiproductlist/` | The API price list (`products.json`, embedded; amounts in cents): packages, add-ons, intervals, store families. The API gateway repo pins this module by commit and seeds Stripe from it, so a price edit needs a gateway dependency bump; the pricing page renders from it |
 | `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
 
 ## Non-Magic games

@@ -1,0 +1,127 @@
+/* API plans page. Layout on the site's tokens; see main.css for the values. */
+.api-plans {
+    padding-top: 1.5em;
+    padding-bottom: 8vh;
+}
+/* main.css indents every paragraph; this page keeps text flush with its headings. */
+.api-plans p {
+    margin-left: 0;
+    margin-bottom: 0.75em;
+    line-height: 1.6;
+    color: var(--activetext);
+}
+.api-plans .page-header { margin-bottom: 1em; }
+
+.api-section { margin-bottom: 2.5em; }
+.api-section h2 {
+    font-size: var(--text-4xl);
+    margin: 0 0 0.6em;
+    color: var(--normal);
+}
+.api-note { font-size: var(--text-md); color: var(--text-dim); }
+.api-section > .api-note { margin: 0.75em 0 0; }
+
+/* Package cards double as the package selector; the radio inside is hidden. */
+.api-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+    gap: 1em;
+}
+/* Side cards share a height; the podium card rises above the row. */
+.api-podium { align-items: stretch; }
+.api-card {
+    position: relative;
+    padding: 1em 1.2em;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.api-card input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    pointer-events: none;
+}
+.api-card:hover { border-color: var(--border-moderate); }
+.api-card:has(input:checked) {
+    border-color: var(--ainfo);
+    background: var(--accent-muted);
+    box-shadow: 0 0 0 1px var(--ainfo);
+}
+.api-card:focus-within { outline: 2px solid var(--ainfo); outline-offset: 2px; }
+.api-card h3 { margin: 0 0 0.3em; font-size: var(--text-xl); color: var(--normal); }
+.api-card h3 label { cursor: pointer; }
+.api-amount {
+    font-size: var(--text-6xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.5em;
+    color: var(--normal);
+}
+.api-amount span { font-size: var(--text-md); font-weight: 400; color: var(--text-dim); margin-left: 0.15em; }
+.api-card ul { margin: 0; padding-left: 1.1em; color: var(--activetext); font-size: var(--text-md); line-height: 1.55; }
+/* The podium step: the fullest package stands taller than its neighbours. */
+.api-card-top { margin-top: -0.75em; padding-top: 1.6em; }
+.api-card-top .api-amount { font-size: var(--text-9xl); }
+
+.api-btn {
+    display: inline-block;
+    padding: 0.45em 1em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-muted);
+    color: var(--ainfo);
+    font-size: var(--text-md);
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.api-btn:hover { filter: brightness(1.1); }
+.api-btn:disabled { opacity: 0.6; cursor: default; }
+.api-trial-row { display: flex; align-items: center; gap: 1em; flex-wrap: wrap; }
+.api-trial-row .api-note { margin: 0; }
+
+/* Configurator: one labelled row per choice group, options as chips. */
+.api-configurator { display: grid; gap: 1.1em; }
+.api-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.api-fieldset[hidden] { display: none; }
+.api-fieldset legend { padding: 0; margin-bottom: 0.5em; font-weight: 600; color: var(--normal); }
+.api-legend-note { margin-left: 0.5em; font-weight: 400; font-size: var(--text-md); color: var(--text-dim); }
+.api-choices { display: flex; flex-wrap: wrap; gap: 0.5em; }
+.api-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.4em 0.8em;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    color: var(--activetext);
+    font-size: var(--text-md);
+    cursor: pointer;
+}
+.api-choice:has(input:checked) { border-color: var(--accent-border); background: var(--accent-muted); color: var(--normal); }
+.api-choice:has(input:disabled) { cursor: default; opacity: 0.7; }
+.api-choice input { margin: 0; accent-color: var(--ainfo); }
+.api-choice-amount { color: var(--text-dim); font-size: var(--text-sm); }
+
+.api-total-row {
+    display: flex;
+    align-items: center;
+    gap: 1.25em;
+    flex-wrap: wrap;
+    padding-top: 0.75em;
+    border-top: 1px solid var(--border-subtle);
+}
+.api-total { margin: 0; font-size: var(--text-lg); color: var(--text-dim); }
+.api-total strong { font-size: var(--text-6xl); color: var(--normal); margin: 0 0.1em 0 0.35em; }
+.api-total-row .api-note { margin: 0; flex-basis: 100%; }
+
+@media (max-width: 768px) {
+    .api-cards { grid-template-columns: 1fr; }
+    .api-card-top { margin-top: 0; padding-top: 1em; }
+    .api-plans .page-header { flex-direction: column; }
+}
