@@ -139,6 +139,31 @@ func uploadQuery(hashes []string, textArea, handedFrom, gdocURL, gdocName, filen
 	return filename, ""
 }
 
+// uploadAllowed says whether this reader's list can be priced, by the two
+// routes the rest of the site reads it by.
+//
+// A deployment can open a feature to everybody by listing it under the
+// "Any" tier, and both enforceSigning and the nav honour that before they
+// look at a signature at all. Asking only the signature - which is what
+// this page did at first - refuses readers the rest of the site lets
+// straight in, and the refusal is silent from where they are standing:
+// the page declines to announce itself, so the extension that opened it
+// waits for a reply that is never coming.
+//
+// Otherwise the grant has to come from a signature this host wrote. A
+// grant read off an unverified cookie is a grant the reader typed.
+func uploadAllowed(anyone bool, params url.Values, signed bool) bool {
+	if anyone {
+		return true
+	}
+	// Local development with nothing to check signatures against.
+	if DevMode && !SigCheck {
+		return true
+	}
+	granted, _ := strconv.ParseBool(params.Get("Upload"))
+	return signed && granted
+}
+
 // UploadHandoff renders the page an extension hands a card list to.
 //
 // It carries no list of its own. The rows arrive after it loads, from the
@@ -161,11 +186,8 @@ func UploadHandoff(w http.ResponseWriter, r *http.Request) {
 	// The grant is only worth reading off a signature this host wrote,
 	// since the whole of it travels in a cookie the reader holds.
 	params, signed := signatureIsValid(sig)
-	canUpload, _ := strconv.ParseBool(params.Get("Upload"))
-	canUpload = canUpload && signed
-	if DevMode && !SigCheck {
-		canUpload = true
-	}
+	_, anyone := ACL()["Any"]["Upload"]
+	canUpload := uploadAllowed(anyone, params, signed)
 
 	// Two ways to arrive without it, and they want different sentences:
 	// somebody with no signature at all has not joined, and somebody whose

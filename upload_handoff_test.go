@@ -698,3 +698,43 @@ func TestHandoffClosesWhatItOpens(t *testing.T) {
 		}
 	}
 }
+
+// The page refuses to receive a list it cannot get priced, and refuses
+// silently: it does not announce itself, so an extension that opened it
+// waits for a reply that never comes and sits on READY for ever. That
+// makes every way of getting this answer wrong expensive, and there were
+// two ways of reading it before this - the site's and this page's.
+func TestUploadAllowed(t *testing.T) {
+	saved := DevMode
+	DevMode = false
+	t.Cleanup(func() { DevMode = saved })
+
+	granted := url.Values{"Upload": {"true"}}
+	plain := url.Values{"UserTier": {"Free"}}
+
+	for _, tc := range []struct {
+		name   string
+		anyone bool
+		params url.Values
+		signed bool
+		want   bool
+	}{
+		// The case that was refused: a deployment that opens the upload to
+		// everybody, which the middleware and the nav both honour before
+		// they look at a signature at all.
+		{"the deployment opens it to everybody", true, nil, false, true},
+		{"and still does for somebody signed in", true, granted, true, true},
+
+		{"a signature this host wrote, carrying the grant", false, granted, true, true},
+		{"the same grant on a signature it did not write", false, granted, false, false},
+		{"a signature without the grant", false, plain, true, false},
+		{"nobody at all", false, nil, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := uploadAllowed(tc.anyone, tc.params, tc.signed); got != tc.want {
+				t.Errorf("uploadAllowed(anyone=%v, signed=%v) = %v, want %v",
+					tc.anyone, tc.signed, got, tc.want)
+			}
+		})
+	}
+}
