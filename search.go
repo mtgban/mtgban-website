@@ -1453,11 +1453,11 @@ func collapseIndex(entries []SearchEntry, lowShort, marketShort, lowSolo, market
 }
 
 // collapseSealedEV folds the sealed expected-value rows from a card's INDEX
-// entries into one row per product: a base entry and its " Sim" sibling, paired
-// by the product id in the scraper name (its second word), become base price
-// primary and simulated price secondary. evShorts is the set of sealed-EV
-// scraper shorthands. Returns the collapsed rows and whether any EV entry was
-// present (so the caller can flag a high-IQR caution).
+// entries into one row per price source: an EV entry and its Sim sibling,
+// paired by the shorthand they share but for that suffix (MKMEV and MKMSim),
+// become EV price primary and simulated price secondary. evShorts is the set
+// of sealed-EV scraper shorthands. Returns the collapsed rows and whether any
+// EV entry was present (so the caller can flag a high-IQR caution).
 func collapseSealedEV(entries []SearchEntry, evShorts []string) (rows []SearchEntry, seen bool) {
 	pos := map[string]int{}
 	for i := range entries {
@@ -1466,22 +1466,18 @@ func collapseSealedEV(entries []SearchEntry, evShorts []string) (rows []SearchEn
 		}
 		seen = true
 
-		// The product id is the second word of the scraper name.
-		fields := strings.Fields(entries[i].ScraperName)
-		if len(fields) < 2 {
-			continue
-		}
-		id := fields[1]
+		source, isSim := strings.CutSuffix(entries[i].Shorthand, "Sim")
+		source = strings.TrimSuffix(source, "EV")
 
-		idx, found := pos[id]
+		idx, found := pos[source]
 		if !found {
 			rows = append(rows, entries[i])
 			idx = len(rows) - 1
-			pos[id] = idx
+			pos[source] = idx
 			rows[idx].IsEV = true
 		}
 
-		if strings.Contains(entries[i].ScraperName, " Sim") {
+		if isSim {
 			rows[idx].Secondary = entries[i].Price
 			rows[idx].ExtraValues = entries[i].ExtraValues
 		} else {
