@@ -2,6 +2,7 @@ package main
 
 import (
 	"html/template"
+	"strings"
 	"testing"
 	"text/template/parse"
 )
@@ -16,6 +17,21 @@ func TestTemplatesParse(t *testing.T) {
 
 	if _, err := buildTemplateCache(); err != nil {
 		t.Fatalf("templates failed to parse: %v", err)
+	}
+}
+
+// The placeholder is written into src attributes. As a plain string,
+// html/template judges a data: URL unsafe there and writes #ZgotmplZ, which
+// the browser requests as the page's own address on every view.
+func TestCardArtPlaceholderSurvivesSrc(t *testing.T) {
+	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(`<img src="{{card_art_placeholder}}">`))
+	var b strings.Builder
+	err := tmpl.Execute(&b, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.String(), cardArtPlaceholder) {
+		t.Errorf("rendered %s, want the placeholder in src", b.String())
 	}
 }
 

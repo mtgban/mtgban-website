@@ -47,8 +47,10 @@ func csvWithout(csv, drop string) string {
 const cardArtPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
 var funcMap = template.FuncMap{
-	"card_art_placeholder": func() string {
-		return cardArtPlaceholder
+	// A URL, or html/template rewrites the data: scheme in src to
+	// #ZgotmplZ, which the browser fetches as the page's own address.
+	"card_art_placeholder": func() template.URL {
+		return template.URL(cardArtPlaceholder)
 	},
 	// jsonArray writes a list of strings for a script to read out of an
 	// attribute. A list that cannot be written comes out as an empty one:
