@@ -6,9 +6,11 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -505,6 +507,13 @@ func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil boo
 	return row
 }
 
+// isAltVariant is the is_alt half of a printing's row key. An Alternate Fourth
+// Edition copy shares its original's mtgjson uuid, language and IsAlternative
+// flag, so only the "_alt" tag on its own uuid keeps the two rows apart.
+func isAltVariant(co *mtgmatcher.CardObject) bool {
+	return co.IsAlternative || strings.Contains(co.UUID, "_alt")
+}
+
 // stashingInProgress gates concurrent invocations of stashInTimeseries
 // (cron + admin button). Use IsStashingInProgress to read.
 var stashingInProgress atomic.Bool
@@ -568,7 +577,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, isAltVariant(card), card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
@@ -599,7 +608,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, isAltVariant(card), card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -353,5 +354,44 @@ func TestBuildProviderRegistryDeduplicates(t *testing.T) {
 	want := []providerDisplay{{timeseries.ProviderTCGLow, "TCGplayer Low", "red"}}
 	if !slices.Equal(providerRegistry, want) {
 		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
+	}
+}
+
+// TestAltCopyKeepsItsOwnRow pins that an Alternate Fourth Edition copy and the
+// Fourth Edition printing it copies stash into two rows: they share an mtgjson
+// uuid, a language, and mtgjson's IsAlternative flag.
+func TestAltCopyKeepsItsOwnRow(t *testing.T) {
+	original, err := backend().GetUUID("1b3a28ad-41ca-587a-9feb-5f40154976da")
+	if err != nil {
+		t.Skip("mtgmatcher data not loaded; skipping")
+	}
+	copied, err := backend().GetUUID(original.UUID + "_alt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accumulated := map[string]*timeseries.PriceRow{}
+	for _, card := range []struct {
+		co    *mtgmatcher.CardObject
+		price float64
+	}{
+		{original, 0.94},
+		{copied, 195.40},
+	} {
+		row := getRow(accumulated, card.co.UUID, card.co.Foil, card.co.Etched, isAltVariant(card.co), card.co.Language, "2026-09-24")
+		row.SetPriceForDataset(4, card.price)
+	}
+
+	if len(accumulated) != 2 {
+		t.Fatalf("got %d rows for %s and its copy, want 2", len(accumulated), original.UUID)
+	}
+	for _, row := range accumulated {
+		want := 0.94
+		if row.IsAlt {
+			want = 195.40
+		}
+		if got := row.PriceForDataset(4); got == nil || *got != want {
+			t.Errorf("is_alt=%v row priced %v, want %v", row.IsAlt, got, want)
+		}
 	}
 }
