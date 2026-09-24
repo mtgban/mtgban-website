@@ -256,7 +256,7 @@ func TestASupersededIndexIsNeverServed(t *testing.T) {
 
 	p.cached.Store(&built{
 		builtFrom: weak.Make(&older),
-		shelves:   shelvesOf(older),
+		shelves:   weakShelves(shelvesOf(older)),
 		ids:       map[string]string{"900001": "uuid-before"},
 	})
 
@@ -314,6 +314,24 @@ func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
 	}
 }
 
+// freed reports whether seller is collected once replace has run. The
+// caller drops its own reference inside replace.
+func freed(seller mtgban.Seller, replace func()) bool {
+	released := make(chan struct{})
+	runtime.AddCleanup(seller.(*mtgban.BaseSeller), func(done chan struct{}) { close(done) }, released)
+	replace()
+
+	for range 20 {
+		runtime.GC()
+		select {
+		case <-released:
+			return true
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	return false
+}
+
 // A refresh of any seller republishes the whole snapshot. What the index
 // keeps to recognise the old one must not keep it alive, or every seller
 // replaced since the last upload stays in memory until the next one.
@@ -329,20 +347,34 @@ func TestAReplacedSellerIsNotKeptAlive(t *testing.T) {
 		t.Fatalf("resolve = %q, want uuid-mkm", got)
 	}
 
-	released := make(chan struct{})
-	runtime.AddCleanup(store.(*mtgban.BaseSeller), func(done chan struct{}) { close(done) }, released)
-	store = nil
-
 	// Card Kingdom refreshes, and nothing resolves an id afterwards.
-	live.publish(mkm, elsewhere("CK"))
-
-	for range 20 {
-		runtime.GC()
-		select {
-		case <-released:
-			return
-		case <-time.After(10 * time.Millisecond):
-		}
+	if !freed(store, func() {
+		store = nil
+		live.publish(mkm, elsewhere("CK"))
+	}) {
+		t.Error("the replaced seller is still alive: the index is holding the snapshot it was in")
 	}
-	t.Error("the replaced seller is still alive: the index is holding the snapshot it was in")
+}
+
+// The same holds for the Cardmarket shelves themselves, which the index
+// keeps to tell its own refresh from everybody else's.
+func TestAReplacedShelfIsNotKeptAlive(t *testing.T) {
+	p, live := newParser()
+	defer runtime.KeepAlive(p)
+
+	mkm := shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"})
+	store := elsewhere("CK")
+	live.publish(mkm, store)
+	got := p.Resolve("900001")
+	if got != "uuid-mkm" {
+		t.Fatalf("resolve = %q, want uuid-mkm", got)
+	}
+
+	// Cardmarket refreshes, and nothing resolves an id afterwards.
+	if !freed(mkm, func() {
+		mkm = nil
+		live.publish(shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"}), store)
+	}) {
+		t.Error("the replaced shelf is still alive: the index is holding it")
+	}
 }
