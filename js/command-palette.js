@@ -1301,7 +1301,7 @@
 
         rows.push({
             type: 'upload-file', title: 'Browse for file...',
-            subtitle: 'CSV, XLS, or XLSX', icon: 'file-up'
+            subtitle: 'CSV, TXT, XLS, or XLSX', icon: 'file-up'
         });
 
         var hashCount = countDataHashRows();
