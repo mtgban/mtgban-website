@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   wake:
-    if: github.event.pull_request.draft == false
+    # Fork PRs do not receive repo/org secrets; skip wake rather than fail red.
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
