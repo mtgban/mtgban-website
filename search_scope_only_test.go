@@ -120,17 +120,26 @@ func TestScopeAloneRunsTheSealedSearch(t *testing.T) {
 	}
 }
 
-// The navbar's Search and Sealed links name no scope. A filter pinned by the
-// cookie still fills the bar there, but it is not a search nobody asked for:
-// those pages keep their own landing, with the favorites and recent searches
-// that only live on it.
-func TestScopeFromTheCookieKeepsTheLanding(t *testing.T) {
+// The bar lives in the url alone, but browsers still carry the SearchScope
+// and SearchScopeOpen cookies older builds wrote, good for ten years. A page
+// opened with nothing in its url comes up with nothing pinned regardless:
+// an empty bar, and the row put away.
+func TestScopeIgnoresLeftoverCookies(t *testing.T) {
 	uuid, _, scope := scopedCard(t)
+	leftovers := []*http.Cookie{
+		{Name: "SearchScope", Value: scope},
+		{Name: "SearchScopeOpen", Value: "1"},
+	}
 
-	for page, marker := range map[string]string{"/search": landingMarker, "/sealed": sealedMarker} {
-		out := searchWithStock(t, uuid, page, &http.Cookie{Name: "SearchScope", Value: scope})
-		if !strings.Contains(out, marker) {
-			t.Errorf("%s with %q pinned by cookie ran a search instead of its landing page", page, scope)
+	for _, page := range []string{"/search", "/sealed"} {
+		out := searchWithStock(t, uuid, page, leftovers...)
+		// Looked for rather than ruled out, so a page that failed to render
+		// cannot pass for one with nothing pinned.
+		if !strings.Contains(out, `name="scope" value=""`) {
+			t.Errorf("%s did not come up with an empty pinned bar", page)
+		}
+		if strings.Contains(out, " has-scope") {
+			t.Errorf("%s opened the pinned row from a cookie", page)
 		}
 	}
 }

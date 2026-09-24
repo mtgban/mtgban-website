@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"net/http"
-	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -114,35 +112,6 @@ func TestSearchScopeSkipsPassthroughModes(t *testing.T) {
 	}
 }
 
-// TestSearchScopeURLWins covers the rule that lets clearing tell itself
-// apart from arriving with no field at all.
-func TestSearchScopeURLWins(t *testing.T) {
-	tests := []struct {
-		name   string
-		target string
-		cookie string
-		want   string
-	}{
-		{"url names it", "/search?q=x&scope=s%3Asos", "is:foil", "s:sos"},
-		{"url clears it", "/search?q=x&scope=", "is:foil", ""},
-		{"url is silent", "/search?q=x", "is:foil", "is:foil"},
-		{"nothing anywhere", "/search?q=x", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", tt.target, nil)
-			if tt.cookie != "" {
-				r.AddCookie(&http.Cookie{Name: "SearchScope", Value: tt.cookie})
-			}
-			got := searchScope(httptest.NewRecorder(), r)
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 // TestSearchScopeRendersInSuggestions renders the page that sits at the far
 // end of a pinned filter: nothing found, the bar still narrowing, and the
 // "without s:xxx" suggestions listed under it.
@@ -240,38 +209,6 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 			}
 			if strings.Count(page, "scope=f%3afoil")+strings.Count(page, "scope=f%3Afoil") < len(pageVars.AltSearches) {
 				t.Error("the suggestions dropped the pinned bar from their links")
-			}
-		})
-	}
-}
-
-// TestScopeRowOpen pins what the chip has to do: close, and stay closed.
-// A pinned filter opens the row the first time, but once it has been put
-// away by hand the next search must not draw it again - that is what made
-// the chip look like it had stopped answering.
-func TestScopeRowOpen(t *testing.T) {
-	tests := []struct {
-		name   string
-		scope  string
-		cookie string
-		want   bool
-	}{
-		{"a pinned filter opens the row", "f:foil", "", true},
-		{"nothing pinned, nothing drawn", "", "", false},
-		{"closed by hand stays closed", "f:foil", "0", false},
-		{"opened by hand stays open", "", "1", true},
-		{"reopened over a filter", "f:foil", "1", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", "/search?q=x", nil)
-			if tt.cookie != "" {
-				r.AddCookie(&http.Cookie{Name: "SearchScopeOpen", Value: tt.cookie})
-			}
-			got := scopeRowOpen(r, tt.scope)
-			if got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}

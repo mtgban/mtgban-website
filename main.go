@@ -132,10 +132,6 @@ type PageVars struct {
 	// navbar is shared with pages that run no search.
 	SearchScope string
 	CanScope    bool
-	// Whether the row is drawn. A pinned filter opens it, and closing it
-	// by hand is remembered - otherwise the next search reopens it and the
-	// button reads as broken.
-	ScopeOpen bool
 	// The bar holds something that parses to no filter at all, so the
 	// search passes over it whole.
 	ScopeIgnored bool
