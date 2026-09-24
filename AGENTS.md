@@ -82,6 +82,9 @@ output, not a claim written here.
   root package — most features live in one top-level file each.
 - Don't commit binaries, datastores (`*.json.xz`, `allprintings5.json`),
   `dump.rdb`, `.orig`/`.rej` artifacts, or `logs/`.
+- **No `reflect`**, tests included; CI's revive rejects the import. Compare
+  with `slices`/`maps`, or a comparison written for the type:
+  `docs/adr/0002-no-reflect.md` has why and how.
 
 ## Where things live (root package)
 

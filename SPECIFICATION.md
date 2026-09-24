@@ -558,7 +558,8 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
   for the offline/service-worker mode. All Go tests need the local
   `allprintings5.json` datastore (AGENTS.md). CI (`.github/workflows/ci.yml`)
   runs on every PR and push to master: a `style` job (`gofmt -s -l .`,
-  `go vet ./...`, `revive` pinned to v1.13.0, `staticcheck` pinned to
+  `go vet ./...`, `revive` pinned to v1.13.0 (its config also rejects any
+  import of `reflect`, per `docs/adr/0002-no-reflect.md`), `staticcheck` pinned to
   2025.1.1) and a `build-and-test` job (`bun test tests/`, `go build ./...`,
   `go test ./...` against a downloaded `allprintings5.json`).
 - **Deployment**: single binary behind a reverse proxy; admin `?reboot=update`
