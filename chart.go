@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"slices"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -61,7 +63,7 @@ func earliestChartDate(ctx context.Context, uuid string, isFoil, isEtched bool, 
 
 type Dataset struct {
 	Name   string
-	Data   []string
+	Data   []ChartPoint
 	Color  string
 	AxisID string
 	Sealed bool
@@ -103,6 +105,53 @@ func getDateAxisValues(earliest time.Time) []string {
 		dates = append(dates, d.Format("2006-01-02"))
 	}
 	return dates
+}
+
+// defaultChartRange is the history a chart draws when it first paints, in days,
+// matching the option the date-range select starts on. The page renders this
+// much and no more: a viewer entitled to ten years was being sent ten years of
+// series in order to look at six months of it, and the rest costs nothing until
+// it is asked for.
+const defaultChartRange = 180
+
+// chartWindow is the window a request should read: the tier's ceiling from the
+// signature, and the range wanted, clamped to it. A non-positive want means the
+// ceiling. Reading only what will be drawn prunes partitions - see
+// docs/chart-page-loading.md.
+func chartWindow(sig string, wantDays int) (window timeseries.Lookback, maxDays int) {
+	ceiling := chartLookback(sig)
+	maxDays = ceiling.Days()
+	if wantDays <= 0 || wantDays > maxDays {
+		return ceiling, maxDays
+	}
+	return timeseries.Lookback(wantDays), maxDays
+}
+
+// chartInitialRange is what a chart page renders inline: the range the viewer
+// last chose, which the front-end mirrors into a cookie because the server
+// cannot read localStorage, else where the select starts. Rendering the wrong
+// one draws the chart twice. Zero is "All".
+func chartInitialRange(r *http.Request, multi bool) int {
+	name, fallback := "SearchChartRange", defaultChartRange
+	if multi {
+		name, fallback = "SearchChartMultiRange", 0
+	}
+	days, err := strconv.Atoi(readCookie(r, name))
+	if err != nil || days < 0 {
+		return fallback
+	}
+	return days
+}
+
+// chartRangeParam reads the requested window off a request, in days. Zero means
+// the caller named no range, or named one that isn't a positive number, and
+// wants whatever its tier allows.
+func chartRangeParam(r *http.Request) int {
+	days, err := strconv.Atoi(r.FormValue("range"))
+	if err != nil || days <= 0 {
+		return 0
+	}
+	return days
 }
 
 // chartLookback returns the chart history window, in days, as encoded in
@@ -262,6 +311,47 @@ func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lo
 	return results
 }
 
+// chartRosterConcurrency caps how many of a roster's cards are read at once.
+// The archive pool is small (eight connections in the Magic deployment), and a
+// roster is one request among many, so it takes a share rather than the lot:
+// ten cards over four still lands in three waves instead of ten.
+const chartRosterConcurrency = 4
+
+// chartSeries is one roster card's fetched history, kept beside the identity
+// the chart and the legend name it by.
+type chartSeries struct {
+	CardID string
+	Name   string
+	Prices map[string]timeseries.ProviderPrices
+
+	// target is what the archive is asked about. Set by the caller when it
+	// resolves the roster; nil entries are dropped before the fetch.
+	target *chartTarget
+}
+
+// fetchRosterPrices reads a roster's cards concurrently, in roster order. Read
+// one at a time, ten cards cost 848ms against 301ms together. Targets are
+// resolved by the caller, whose per-request map has no locking of its own.
+func fetchRosterPrices(ctx context.Context, targets []chartSeries, lb timeseries.Lookback) []chartSeries {
+	if len(targets) == 0 {
+		return nil
+	}
+	out := make([]chartSeries, len(targets))
+	copy(out, targets)
+
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, chartRosterConcurrency)
+	for i := range out {
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			out[i].Prices = fetchChartPrices(ctx, out[i].target, lb)
+		})
+	}
+	wg.Wait()
+	return out
+}
+
 // earliestChartedDate is the oldest date a fetched series holds, which is where
 // the axis starts. Empty series fall back to the lookback boundary, the same
 // answer the archive gave when it was asked directly.
@@ -307,39 +397,81 @@ func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []st
 	return datasets
 }
 
+// ChartPoint is one plotted value, or a gap. Gaps outnumber prices on a long
+// chart, so the encoding is over half the payload: null is four bytes and is
+// Chart.js's own gap value, where the old "Number.NaN" string cost thirteen.
+type ChartPoint struct {
+	Price float64
+	Known bool
+}
+
+// MarshalJSON writes a price as a bare number and a gap as null, which is how
+// the value reaches both the template (a JS literal) and the chart API (JSON).
+func (p ChartPoint) MarshalJSON() ([]byte, error) {
+	if !p.Known {
+		return []byte("null"), nil
+	}
+	return strconv.AppendFloat(nil, p.Price, 'g', -1, 64), nil
+}
+
+// UnmarshalJSON reads back what MarshalJSON wrote, so a chart response
+// round-trips through Go - which is what lets anything consume the API as a
+// typed response rather than as a bag of floats.
+//
+// The quoted form is also accepted, because that is what the API sent before
+// gaps became null and responses carry an hour of cache.
+func (p *ChartPoint) UnmarshalJSON(b []byte) error {
+	text := string(b)
+	if text == "null" {
+		*p = ChartPoint{}
+		return nil
+	}
+	if unquoted, err := strconv.Unquote(text); err == nil {
+		text = unquoted
+	}
+	price, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		// "Number.NaN", or anything else that isn't a price, is a gap.
+		*p = ChartPoint{}
+		return nil
+	}
+	*p = ChartPoint{Price: price, Known: true}
+	return nil
+}
+
+// priceAt is the price a pivoted result holds for one provider on one day, and
+// whether it holds one at all.
+func priceAt(results map[string]timeseries.ProviderPrices, label string, provider int16) ChartPoint {
+	pp, ok := results[label]
+	if !ok {
+		return ChartPoint{}
+	}
+	price, ok := pp[provider]
+	if !ok {
+		return ChartPoint{}
+	}
+	return ChartPoint{Price: price, Known: true}
+}
+
 // buildProviderDataset projects one provider's series across the label dates.
-// Missing dates and missing prices both render as Number.NaN so the chart gaps.
+// Days the provider did not quote come out as gaps.
 func buildProviderDataset(results map[string]timeseries.ProviderPrices, labels []string, pd providerDisplay) Dataset {
-	data := make([]string, len(labels))
+	data := make([]ChartPoint, len(labels))
 	for i, label := range labels {
-		if pp, ok := results[label]; ok {
-			if price, ok := pp[pd.Provider]; ok {
-				data[i] = fmt.Sprintf("%g", price)
-				continue
-			}
-		}
-		data[i] = "Number.NaN"
+		data[i] = priceAt(results, label, pd.Provider)
 	}
 	return Dataset{Name: pd.Name, Data: data, Color: pd.Color, Reference: pd.Name}
 }
 
 // buildDatasetLong is buildDataset for the long-form read: it projects one
 // provider out of the pivoted date -> (provider -> price) result. Missing dates
-// and missing providers both render as Number.NaN so the chart leaves a gap.
+// and missing providers both come out as gaps.
 func buildDatasetLong(results map[string]timeseries.ProviderPrices, labels []string, config DatasetConfig) Dataset {
-	var data []string
+	var data []ChartPoint
 	if len(results) > 0 {
-		data = make([]string, len(labels))
+		data = make([]ChartPoint, len(labels))
 		for i, label := range labels {
-			if pp, ok := results[label]; ok {
-				if price, ok := pp[config.Provider]; ok {
-					data[i] = fmt.Sprintf("%g", price)
-				} else {
-					data[i] = "Number.NaN"
-				}
-			} else {
-				data[i] = "Number.NaN"
-			}
+			data[i] = priceAt(results, label, config.Provider)
 		}
 	}
 	return Dataset{
@@ -351,22 +483,17 @@ func buildDatasetLong(results map[string]timeseries.ProviderPrices, labels []str
 }
 
 // buildDataset projects a single column out of the shared HGetAll result
-// map. Missing dates and null prices both render as Number.NaN so the
-// front-end chart leaves a gap rather than drawing a zero.
+// map. Missing dates and null prices both come out as gaps, so the front-end
+// chart leaves a hole rather than drawing a zero.
 func buildDataset(results map[string]timeseries.PriceRow, labels []string, config DatasetConfig) Dataset {
-	var data []string
+	var data []ChartPoint
 	if len(results) > 0 {
-		data = make([]string, len(labels))
+		data = make([]ChartPoint, len(labels))
 		for i, label := range labels {
 			if row, ok := results[label]; ok {
-				price := row.PriceForDataset(config.Index)
-				if price != nil {
-					data[i] = fmt.Sprintf("%g", *price)
-				} else {
-					data[i] = "Number.NaN"
+				if price := row.PriceForDataset(config.Index); price != nil {
+					data[i] = ChartPoint{Price: *price, Known: true}
 				}
-			} else {
-				data[i] = "Number.NaN"
 			}
 		}
 	}

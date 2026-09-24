@@ -149,7 +149,7 @@ func TestMultiCardPaletteUniqueAndNonEmpty(t *testing.T) {
 // dummyData returns a non-empty slice so a Dataset is considered to have data
 // by mergeMultiCardDatasets. The actual values don't matter — the merge logic
 // only checks len(ds.Data).
-func dummyData() []string { return []string{"1"} }
+func dummyData() []ChartPoint { return []ChartPoint{{Price: 1, Known: true}} }
 
 func TestMergeMultiCardDatasetsEmpty(t *testing.T) {
 	datasets, refs := mergeMultiCardDatasets(nil)
@@ -195,7 +195,7 @@ func TestMergeMultiCardDatasetsFiltersEmptyData(t *testing.T) {
 			Datasets: []Dataset{
 				{Reference: "TCG Low", Data: dummyData()},
 				{Reference: "CK Buy", Data: nil},
-				{Reference: "TCG Market", Data: []string{}},
+				{Reference: "TCG Market", Data: []ChartPoint{}},
 			},
 		},
 	}
