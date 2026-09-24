@@ -591,7 +591,16 @@ func enforceSigning(next http.Handler) http.Handler {
 		// The error nav is built lazily inside each failing branch: on the
 		// happy path — nearly every request — it would be thrown away, and
 		// the handler builds its own right after.
-		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+		// An invite link names nobody, so it is limited by its own signature
+		// once checked, not in the bucket requests with no signature share.
+		limitKey := GetParamFromSig(sig, "UserEmail")
+		if limitKey == "" {
+			v, ok := signatureIsValid(sig)
+			if ok {
+				limitKey = v.Get("Signature")
+			}
+		}
+		if !UserRateLimiter.Allow(limitKey) && r.URL.Path != "/admin" {
 			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
