@@ -662,9 +662,11 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	// The API middleware checks a ?sig= and lets a request without one
+	// through unchecked, so a cookie counts only once it is checked here.
+	sig := r.FormValue("sig")
 	if sig == "" {
-		sig = r.FormValue("sig")
+		sig = verifiedSignature(r)
 	}
 
 	out := PriceAPIOutput{}
@@ -785,6 +787,16 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			OnlyForSeller: forSeller,
 			OnlyForVendor: !forSeller,
 		}}
+	}
+
+	// A key sees only the stores it was sold, as on the price API. Its scope
+	// is one more store filter, so the query's own still narrow within it.
+	storesOpt := GetParamFromSig(sig, "API")
+	if storesOpt != "" && strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
+		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
+			Name:   "store",
+			Values: fixupStoreCodeNG(strings.Join(apiEnabledStores(storesOpt), ",")),
+		})
 	}
 
 	// Retrieve prices through the same gathering the search page uses, so
