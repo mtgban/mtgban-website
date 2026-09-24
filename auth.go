@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -325,8 +326,10 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 func getSignatureFromCookies(r *http.Request) string {
 	sig := readCookie(r, "MTGBAN")
 
+	// enforceSigning checks a ?sig= whenever there is one, so that is the
+	// signature to act on; a cookie beside it has not been checked.
 	querySig := r.FormValue("sig")
-	if sig == "" && querySig != "" {
+	if querySig != "" {
 		sig = querySig
 	}
 
@@ -381,7 +384,7 @@ func signatureIsValid(sig string) (url.Values, bool) {
 	data := fmt.Sprintf("GET%s%s%s", exp, signatureLink(), q.Encode())
 	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || valid != v.Get("Signature") || expires < time.Now().Unix() {
+	if err != nil || !hmac.Equal([]byte(valid), []byte(v.Get("Signature"))) || expires < time.Now().Unix() {
 		return v, false
 	}
 	return v, true
@@ -414,10 +417,16 @@ func verifiedSignature(r *http.Request) string {
 	return sig
 }
 
-// Put signature in cookies for one month, all domains can access this
+// Put signature in cookies for one month, or as long as a checked signature
+// lasts if that is longer, as an invite can; all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
-	setCookie(w, r, "MTGBAN", sig, oneMonth, true)
+	expires := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
+	v, ok := signatureIsValid(sig)
+	signed, err := strconv.ParseInt(v.Get("Expires"), 10, 64)
+	if ok && err == nil && time.Unix(signed, 0).After(expires) {
+		expires = time.Unix(signed, 0)
+	}
+	setCookie(w, r, "MTGBAN", sig, expires, true)
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
@@ -589,7 +598,16 @@ func enforceSigning(next http.Handler) http.Handler {
 		// The error nav is built lazily inside each failing branch: on the
 		// happy path — nearly every request — it would be thrown away, and
 		// the handler builds its own right after.
-		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+		// An invite link names nobody, so it is limited by its own signature
+		// once checked, not in the bucket requests with no signature share.
+		limitKey := GetParamFromSig(sig, "UserEmail")
+		if limitKey == "" {
+			v, ok := signatureIsValid(sig)
+			if ok {
+				limitKey = v.Get("Signature")
+			}
+		}
+		if !UserRateLimiter.Allow(limitKey) && r.URL.Path != "/admin" {
 			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
@@ -638,8 +656,9 @@ func enforceSigning(next http.Handler) http.Handler {
 		link := signatureLink()
 		data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
 		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		signed := hmac.Equal([]byte(valid), []byte(expectedSig))
 		expires, err := strconv.ParseInt(exp, 10, 64)
-		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
+		if SigCheck && (err != nil || !signed || expires < time.Now().Unix()) {
 			if r.Method != "GET" {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
@@ -647,7 +666,7 @@ func enforceSigning(next http.Handler) http.Handler {
 			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
-			if valid == expectedSig && expires < time.Now().Unix() {
+			if signed && expires < time.Now().Unix() {
 				pageVars.ErrorMessage = ErrMsgExpired
 				pageVars.PatreonLogin = true
 				if DevMode {

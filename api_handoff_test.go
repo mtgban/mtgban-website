@@ -251,3 +251,25 @@ func TestAPIHandoffDropsUntrustedReturnTo(t *testing.T) {
 		t.Errorf("untrusted return_to forwarded: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 }
+
+// A ?sig= on the link is whoever made the link, not the reader who
+// followed it, so it must never be the one signed in.
+func TestAPIHandoffIgnoresASigOnTheLink(t *testing.T) {
+	setGatewaySecret(t, "trial-secret")
+	signingEnabled(t, true)
+	other := sign("Legacy", &PatreonUserData{Email: "mallory@example.com", FullName: "Mallory", EmailVerified: true}, nil, DefaultSignatureDuration)
+	path := "/api-login?sig=" + url.QueryEscape(other)
+
+	ann := &PatreonUserData{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
+	rec := handoffRequest(t, APILogin, path, "Legacy", ann)
+	loc, _ := url.Parse(rec.Header().Get("Location"))
+	claims, err := apihandoff.Verify([]byte("trial-secret"), loc.Query().Get("t"), time.Now())
+	if err != nil || claims.Email != "ann@example.com" {
+		t.Errorf("signed-in reader handed over as %q (err %v)", claims.Email, err)
+	}
+
+	rec = handoffRequest(t, APILogin, path, "", nil)
+	if rec.Header().Get("Location") != "" {
+		t.Errorf("reader with no login handed over: %q", rec.Header().Get("Location"))
+	}
+}

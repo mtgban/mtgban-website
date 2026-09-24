@@ -40,7 +40,12 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 
 // apiHandoff mints the token for the signed-in reader and redirects to path on the gateway.
 func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
-	sig := verifiedSignature(r)
+	// The reader's own login only: a ?sig= on the link names whoever made it.
+	sig := readCookie(r, "MTGBAN")
+	_, signed := signatureIsValid(sig)
+	if !signed {
+		sig = ""
+	}
 	email := GetParamFromSig(sig, "UserEmail")
 	secret := apiGatewaySecret()
 

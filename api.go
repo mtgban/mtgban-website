@@ -662,9 +662,11 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	// The API middleware checks a ?sig= and lets a request without one
+	// through unchecked, so a cookie counts only once it is checked here.
+	sig := r.FormValue("sig")
 	if sig == "" {
-		sig = r.FormValue("sig")
+		sig = verifiedSignature(r)
 	}
 
 	out := PriceAPIOutput{}
