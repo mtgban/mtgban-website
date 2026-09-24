@@ -189,8 +189,10 @@ default), and an HMAC-SHA1 `Signature` over
 signature checks (`enforceAPISigning`) look up a per-user secret in
 `Config.APIUserSecrets` first, falling back to `BAN_SECRET` — page
 signatures always use `BAN_SECRET` only. It is stored in the `MTGBAN`
-cookie (31 days, shared across `*.mtgban.com`, **not** HttpOnly) and/or
-passed as `?sig=`. `GetParamFromSig()` extracts individual grants.
+cookie (31 days, or as long as a checked signature lasts if longer, as
+an invite can; shared across `*.mtgban.com`, **not** HttpOnly) and/or
+passed as `?sig=`, which wins over the cookie wherever both are sent.
+`GetParamFromSig()` extracts individual grants.
 
 ### 3.3 ACL / tiers
 
@@ -211,7 +213,7 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 | Wrapper | Used for | Behavior |
 |---|---|---|
 | `noSigning` | Home, Guide, Privacy, Offline page, suggest/chart/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie; lazily initializes `ServerURL` on the first trusted-host request |
-| `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email; POST only when `NavElem.CanPOST` |
+| `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email, or per invite signature; POST only when `NavElem.CanPOST` |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET` |
 
 Static assets (`/css/`, `/js/`, `/img/`) go through none of these three —
@@ -494,7 +496,8 @@ no restart), `config` (reload config plus the ACL/grants/affiliates that
 ride beside it), `checkpoints` (chart checkpoints), `snapshot` (stash into
 timeseries), `tcgcsv` (TCGCSV price ingestion), `server` (process exit
 only), `newKey`/`demokey` (API-key generation, `&user=&duration=`), and
-`spoof` (signed tier-spoof URL for testing). Five JSON editors — config,
+`invite` (a signed link carrying a tier, `&tier=&duration=`, for up to two
+months). Five JSON editors — config,
 checkpoints, ACL/access table, affiliates, key overrides — the last backed
 by a per-store UUID-remap builder reached from a "Fix" link on search
 results (`search.go`/`search.html`). A People tab adds/removes Patreon
@@ -548,7 +551,7 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
   root package as of this writing (`ls *_test.go`), organized by subsystem
   rather than one-per-source-file: search/searchfilter (query parser, sort
   orders, sealed/number-index edge cases), upload (parsers, unpack, magic
-  export/CSV), arbit (best-of, language handling, suspicious-spread
+  export/CSV), arbit (language handling, suspicious-spread
   heuristics), charts (axis, buttons, resolve/search-by-id), admin (ajax,
   datastore, table-sort, usage), games-coverage/game-badge/game-body (every
   game the matcher registers needs a badge and a template — checked in one
