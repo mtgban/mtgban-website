@@ -45,6 +45,10 @@ type Entry struct {
 	// Condition as found in the source data
 	OriginalCondition string
 
+	// The condition a buylist run was told to ignore, which blanks
+	// OriginalCondition; kept so the page can post the row back as sent.
+	IgnoredCondition string
+
 	// Whether source data had Quantity information
 	HasQuantity bool
 
