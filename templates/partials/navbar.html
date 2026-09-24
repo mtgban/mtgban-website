@@ -115,7 +115,7 @@
         <div class="nav2-scope-autocomplete autocomplete">
             <input class="nav2-scope-box{{if .ScopeIgnored}} is-ignored{{end}}" id="nav-scopebox" type="text"
                    {{if .ScopeIgnored}}title="Nothing here is a filter, so the search ignores it"{{end}}
-                   value="{{.SearchScope}}" placeholder="Filters that stay put across searches — s:sos, is:foil, r:mythic"
+                   value="{{.SearchScope}}" placeholder="Extra filters for this session, like s:sos, is:foil or r:mythic"
                    maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
         </div>
         {{/* The Enter the bar has always taken, as something to click: the
