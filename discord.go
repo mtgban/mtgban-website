@@ -290,6 +290,24 @@ func unknownTitle(*url.URL) string {
 	return "Your search"
 }
 
+// storeLinkDescription is the body of the bot's reply to a store link: the
+// line it has always carried, and - only where the store's URL named a
+// printing - a second one offering that printing here. Every other address
+// on this site would be a search for whatever the URL happened to spell,
+// which is not what the reader clicked.
+func storeLinkDescription(co *mtgmatcher.CardObject, guildID string) string {
+	description := "Support **MTGBAN** by using this link"
+	if co == nil {
+		return description
+	}
+
+	subject := "card"
+	if co.Sealed {
+		subject = "product"
+	}
+	return description + fmt.Sprintf("\n[Check the %s on our website too](%s)", subject, banSearchLink(co, guildID))
+}
+
 // banSearchLink is this site's address for a printing, as the bot hands it to
 // a reader: the page that answers for its kind, the printing's own uuid as
 // the query, and the tags that attribute the visit to the bot and to the
@@ -693,23 +711,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				break
 			}
 
-			description := "Support **MTGBAN** by using this link"
-			// Only where the store's link named a printing: every other
-			// address on this site would be a search for whatever the URL
-			// happened to spell, which is not what the reader clicked.
-			if co != nil {
-				subject := "card"
-				if co.Sealed {
-					subject = "product"
-				}
-				description += fmt.Sprintf("\n[Check the %s on our website too](%s)", subject, banSearchLink(co, m.GuildID))
-			}
-
 			// Spam time!
 			_, err := s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 				Title:       title,
 				URL:         link,
-				Description: description,
+				Description: storeLinkDescription(co, m.GuildID),
 			})
 			if err != nil {
 				log.Println(err)

@@ -292,6 +292,48 @@ func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
 	}
 }
 
+// The reply's wording is what the reader actually sees, and it is the one
+// part of this that a live Discord session would otherwise be the first to
+// render. A store link that named no printing has to read exactly as it did
+// before any of this existed.
+func TestStoreLinkDescriptionOffersOnlyWhatItResolved(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	const affiliateLine = "Support **MTGBAN** by using this link"
+
+	if got := storeLinkDescription(nil, "1234"); got != affiliateLine {
+		t.Errorf("a link that named nothing reads %q, want %q", got, affiliateLine)
+	}
+
+	single, err := backend().GetUUID(randomUUID(false))
+	if err != nil {
+		t.Fatalf("a single: %v", err)
+	}
+	sealed, err := backend().GetUUID(randomUUID(true))
+	if err != nil {
+		t.Fatalf("a sealed product: %v", err)
+	}
+
+	for _, tt := range []struct {
+		name string
+		co   *mtgmatcher.CardObject
+		want string
+	}{
+		{"a card", single, "[Check the card on our website too](" + banSearchLink(single, "1234") + ")"},
+		{"a sealed product", sealed, "[Check the product on our website too](" + banSearchLink(sealed, "1234") + ")"},
+	} {
+		got := storeLinkDescription(tt.co, "1234")
+		if !strings.HasPrefix(got, affiliateLine+"\n") {
+			t.Errorf("%s dropped the affiliate line: %q", tt.name, got)
+		}
+		if !strings.HasSuffix(got, tt.want) {
+			t.Errorf("%s offers %q, want it to end with %q", tt.name, got, tt.want)
+		}
+	}
+}
+
 // The link has to find the printing it was made for, the way the site's own
 // links are held to it. A uuid query is answered by searchAndFilter directly,
 // so this asks the search the same question the reader's click does.
