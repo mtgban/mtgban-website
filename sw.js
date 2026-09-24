@@ -57,10 +57,10 @@ var SHELL_URLS = [
 var KEYRUNE_PREFIX = 'https://cdn.jsdelivr.net/npm/keyrune@';
 var KEYRUNE_CSS = KEYRUNE_PREFIX + 'latest/css/keyrune.css';
 
-// Lucide draws the navbar and picker icons, and stays on @latest for the same
-// reason keyrune does.
+// Lucide draws the navbar and picker icons. The same pinned URL the templates
+// load, since the offline fallback only answers the exact request it cached.
 var LUCIDE_PREFIX = 'https://unpkg.com/lucide@';
-var LUCIDE_JS = LUCIDE_PREFIX + 'latest/dist/umd/lucide.js';
+var LUCIDE_JS = 'https://unpkg.com/lucide@1.47.0/dist/umd/lucide.js';
 
 function isKeyrune(url) {
     return url.href.indexOf(KEYRUNE_PREFIX) === 0;
