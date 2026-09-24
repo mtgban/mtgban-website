@@ -101,6 +101,90 @@ func TestGetChangelogEntriesUsesStaleCacheAndBacksOff(t *testing.T) {
 	}
 }
 
+// While one visitor waits on Discord, the rest are answered with the copy
+// already held rather than queued behind it.
+func TestGetChangelogEntriesServesStaleWhileRefreshing(t *testing.T) {
+	resetChangelogCache()
+	defer resetChangelogCache()
+
+	oldFetch := fetchChangelogEntriesFunc
+	defer func() { fetchChangelogEntriesFunc = oldFetch }()
+
+	release := make(chan struct{})
+	fetchChangelogEntriesFunc = func() ([]changelogEntry, error) {
+		return []changelogEntry{{Content: "held"}}, nil
+	}
+	_, err := getChangelogEntries()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changelogCacheMu.Lock()
+	cachedChangelog.refreshed = time.Now().Add(-changelogCacheTTL - time.Second)
+	changelogCacheMu.Unlock()
+
+	started := make(chan struct{})
+	fetchChangelogEntriesFunc = func() ([]changelogEntry, error) {
+		close(started)
+		<-release
+		return []changelogEntry{{Content: "fresh"}}, nil
+	}
+	refreshed := make(chan struct{})
+	go func() {
+		_, _ = getChangelogEntries()
+		close(refreshed)
+	}()
+	<-started
+	// The refresh has to land before the cache is reset for the next test.
+	defer func() {
+		close(release)
+		<-refreshed
+	}()
+
+	answered := make(chan []changelogEntry)
+	go func() {
+		entries, _ := getChangelogEntries()
+		answered <- entries
+	}()
+	select {
+	case entries := <-answered:
+		if len(entries) != 1 || entries[0].Content != "held" {
+			t.Errorf("answered %#v while refreshing, want the held copy", entries)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a visitor waited on the refresh with a copy to answer from")
+	}
+}
+
+// A fetch that panics must not leave the cache marked as refreshing, or every
+// later visitor waits on it forever.
+func TestGetChangelogEntriesSurvivesAPanickingFetch(t *testing.T) {
+	resetChangelogCache()
+	defer resetChangelogCache()
+
+	oldFetch := fetchChangelogEntriesFunc
+	defer func() { fetchChangelogEntriesFunc = oldFetch }()
+
+	fetchChangelogEntriesFunc = func() ([]changelogEntry, error) {
+		panic("discordgo")
+	}
+	_, err := getChangelogEntries()
+	if err == nil {
+		t.Error("a panicking fetch reported no error")
+	}
+
+	answered := make(chan struct{})
+	go func() {
+		_, _ = getChangelogEntries()
+		close(answered)
+	}()
+	select {
+	case <-answered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the visitor after a panicking fetch is still waiting")
+	}
+}
+
 func TestGetChangelogEntriesBacksOffColdFailures(t *testing.T) {
 	resetChangelogCache()
 	defer resetChangelogCache()
