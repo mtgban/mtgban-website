@@ -32,6 +32,15 @@ END $$;
 CREATE INDEX IF NOT EXISTS prices_provider_date ON public.prices (provider, date)
     INCLUDE (ban_id, price);
 
+-- The screener's game probe joins a day of prices to variants and asks which
+-- game each row belongs to. Without this, that join reads variants as a
+-- 3,387-buffer seq scan; with it the probe stays index-only at 1,469. Partial
+-- and INCLUDE-only, so it costs ~11 MB. The live database got this built
+-- CONCURRENTLY; here it builds with the rest, since nothing reads the table yet.
+CREATE INDEX IF NOT EXISTS variants_magic_cover ON public.variants (ban_id)
+    INCLUDE (mtgjson_uuid, is_foil, is_etched, tcgp_product_id, tcgp_sub_type)
+    WHERE mtgjson_uuid IS NOT NULL AND language = '';
+
 -- Provider FK: referenced table is 13 rows, validation is trivial — add validated.
 DO $$
 BEGIN
