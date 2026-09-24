@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -537,6 +540,39 @@ func TestApiEnabledStores(t *testing.T) {
 		if !slices.Contains(got, store) {
 			t.Errorf("BASE_ACCESS should keep metadata-only store %s, got %v", store, got)
 		}
+	}
+}
+
+// stores.json narrows to the singles or the sealed stores the way sets.json
+// narrows its sets, as the guide documents.
+func TestStoresFilterNarrowsBothWays(t *testing.T) {
+	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
+	DevMode, SigCheck = true, false
+	prev := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prev) })
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Singles", Shorthand: "SINGLES1"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Sealed", Shorthand: "SEALED1", SealedMode: true}),
+	}
+	sellersPtr.Store(&sellers)
+
+	for filter, want := range map[string]string{"sealed": `["SEALED1"]`, "singles": `["SINGLES1"]`} {
+		rec := httptest.NewRecorder()
+		PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter="+filter, nil))
+		got := strings.TrimSpace(rec.Body.String())
+		if got != want {
+			t.Errorf("stores.json?filter=%s = %s, want %s", filter, got, want)
+		}
+	}
+
+	// A key whose scope holds no sealed store gets an empty list, not null.
+	singles := sellers[:1]
+	sellersPtr.Store(&singles)
+	rec := httptest.NewRecorder()
+	PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter=sealed", nil))
+	got := strings.TrimSpace(rec.Body.String())
+	if got != "[]" {
+		t.Errorf("stores.json?filter=sealed with no sealed store = %s, want []", got)
 	}
 }
 
