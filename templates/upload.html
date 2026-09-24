@@ -246,7 +246,7 @@
                             <label>
                                 <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
                                 <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
-                                <span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span></span>
+                                <span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span></span>
                                 <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();clearFile();">clear selection</span>
                             </label>
                         </div>
@@ -725,7 +725,7 @@
             window.clearFile = function() {
                 var input = document.getElementById('file');
                 input.value = '';
-                document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span>';
                 document.getElementById('clearFileBtn').style.display = 'none';
                 enabledButtons();
             };
@@ -761,7 +761,7 @@
                         if (!this.value.trim()) return;
                         var fileInput = document.getElementById('file');
                         if (fileInput) fileInput.value = "";
-                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span>';
                         document.getElementById('clearFileBtn').style.display = 'none';
                         var ta = document.getElementById('textArea');
                         if (ta) ta.value = "";
@@ -790,7 +790,7 @@
                         if (urlInput) urlInput.value = "";
                         var fileInput = document.getElementById('file');
                         if (fileInput) fileInput.value = "";
-                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span>';
                         document.getElementById('clearFileBtn').style.display = 'none';
                         const form = document.getElementById("upload_form");
                         form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
