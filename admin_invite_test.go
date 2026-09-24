@@ -55,7 +55,7 @@ func expiresIn(t *testing.T, v url.Values) time.Duration {
 
 // The point of the dropdown: the link is good for as long as it was cut for.
 func TestInviteLinkExpiresWhenAsked(t *testing.T) {
-	for _, days := range []int{1, 7, 15, 30, 60} {
+	for _, days := range []int{1, 7, 15, 30} {
 		got := expiresIn(t, inviteSig(t, "tier=Pioneer&duration="+strconv.Itoa(days)))
 		want := time.Duration(days) * 24 * time.Hour
 
@@ -82,11 +82,28 @@ func TestInviteLinkWithoutADurationKeepsTheLoginLength(t *testing.T) {
 // zero, a negative or a word falls back to the default rather than handing
 // over something that cannot be used.
 func TestInviteLinkIsNeverBornExpired(t *testing.T) {
-	for _, duration := range []string{"0", "-3", "later", ""} {
+	for _, duration := range []string{"0", "-3", "later", "", "106752"} {
 		got := expiresIn(t, inviteSig(t, "tier=Pioneer&duration="+url.QueryEscape(duration)))
 		if got <= 0 {
 			t.Errorf("duration=%q minted a link that expired %v ago", duration, -got)
 		}
+	}
+}
+
+// A link lasts no longer than the cookie that holds it, however long a
+// hand-written URL asks for, or the browser drops it while still valid.
+func TestInviteLinkLastsNoLongerThanItsCookie(t *testing.T) {
+	cookie := signatureCookieDays * 24 * time.Hour
+	for _, duration := range []string{"60", "36500"} {
+		got := expiresIn(t, inviteSig(t, "tier=Pioneer&duration="+duration))
+		if got > cookie {
+			t.Errorf("duration=%s: the link has %v left, past its %v cookie", duration, got, cookie)
+		}
+	}
+	rec := httptest.NewRecorder()
+	putSignatureInCookies(rec, httptest.NewRequest(http.MethodGet, "/", nil), "sig")
+	if left := time.Until(rec.Result().Cookies()[0].Expires); left < cookie-time.Minute {
+		t.Errorf("the cookie lasts %v, less than the %v an invite may", left, cookie)
 	}
 }
 
@@ -135,9 +152,10 @@ func TestAdminOffersAnInviteLinkWithAnExpiry(t *testing.T) {
 			t.Errorf("mobile=%v: the tool is still named after what it used to be", mobile)
 		}
 
-		// Two months on both this tool's dropdown and the API key's.
-		if got := strings.Count(out, `<option value="60">Two months</option>`); got != 2 {
-			t.Errorf("mobile=%v: Two months appears in %d dropdowns, want both", mobile, got)
+		// The invite stops at a month, as its cookie does; an API key's
+		// dropdown still offers more.
+		if got := strings.Count(out, `<option value="60">Two months</option>`); got != 1 {
+			t.Errorf("mobile=%v: Two months appears in %d dropdowns, want the API key's alone", mobile, got)
 		}
 	}
 }

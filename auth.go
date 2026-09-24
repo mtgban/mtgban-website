@@ -454,10 +454,15 @@ func verifiedRequestSignature(r *http.Request) string {
 	return sig
 }
 
-// Put signature in cookies for one month, all domains can access this
+// signatureCookieDays is how long the MTGBAN cookie keeps a signature, and so
+// the longest an invite link may last: one that outlived its cookie would be
+// dropped by the browser while still valid.
+const signatureCookieDays = 31
+
+// Put signature in cookies for a month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
-	setCookie(w, r, "MTGBAN", sig, oneMonth, true)
+	expires := time.Now().Add(signatureCookieDays * 24 * time.Hour)
+	setCookie(w, r, "MTGBAN", sig, expires, true)
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
