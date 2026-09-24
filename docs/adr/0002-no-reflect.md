@@ -38,10 +38,9 @@ usually reached for.
    `slices.EqualFunc` or `maps.EqualFunc` with a comparison written for the
    type. A comparison that names every field of a type gets an unkeyed
    literal of that type beside it, which stops compiling when the type gains
-   a field (`internal/offline/format_test.go`). Where every field of a type
-   is exported and encoded, comparing the JSON encodings is the same check.
-   A question about a type's shape rather than its values goes to
-   `go/types`, which reads it the way a linter does.
+   a field (`internal/offline/format_test.go`). A question about a type's
+   shape rather than its values goes to `go/types`, which reads it the way a
+   linter does.
 4. **A library whose job is reflection is the same thing one import away.**
    That covers deep copy, deep equality and struct mapping. If one is
    proposed, add it to the blocklist rather than importing it.
