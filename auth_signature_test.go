@@ -3,13 +3,17 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
@@ -152,5 +156,60 @@ func TestHandlersActOnTheSignatureTheMiddlewareChecked(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 	if reached {
 		t.Error("a forged cookie beside a valid ?sig= reached an admin-only handler")
+	}
+}
+
+// The API middleware lets a request with no ?sig= through as the demo, and
+// checks nothing else about it. A cookie sent with it is unchecked too, and
+// may lift it out of the demo stores only once its signature holds.
+func TestSearchAPITakesNoUncheckedCookie(t *testing.T) {
+	var uuid, name string
+	for _, id := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(id)
+		if err != nil || co.Sealed || strings.ContainsAny(co.Name, ":,/'\"") {
+			continue
+		}
+		uuid, name = id, co.Name
+		break
+	}
+	if uuid == "" {
+		t.Skip("no datastore loaded")
+	}
+
+	signingEnabled(t, false)
+	prevDemo := Config.APIDemoStores
+	t.Cleanup(func() { Config.APIDemoStores = prevDemo })
+	Config.APIDemoStores = []string{"DEMO"}
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers); vendorsPtr.Store(prevVendors) })
+	stock := mtgban.InventoryRecord{}
+	stock.Add(uuid, &mtgban.InventoryEntry{Conditions: "NM", Price: 12.34, Quantity: 1})
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(stock, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"})}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "V", Shorthand: "V"})}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	search := func(cookie string) string {
+		req := httptest.NewRequest(http.MethodGet, "/api/mtgban/search/retail/"+url.PathEscape(name)+".json", nil)
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		rec := httptest.NewRecorder()
+		enforceAPISigning(http.HandlerFunc(SearchAPI)).ServeHTTP(rec, req)
+		return rec.Body.String()
+	}
+
+	valid := sign("Pioneer", &PatreonUserData{Email: "sub@example.com", FullName: "Sub", EmailVerified: true}, nil, time.Hour)
+	if !strings.Contains(search(valid), "12.34") {
+		t.Fatal("a checked cookie did not reach the stores it grants")
+	}
+	forged := base64.StdEncoding.EncodeToString([]byte("Expires=99999999999"))
+	if strings.Contains(search(forged), "12.34") {
+		t.Error("a hand-written cookie lifted a sig-less API search out of the demo stores")
 	}
 }
