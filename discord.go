@@ -559,6 +559,22 @@ var AffiliateStores = []AffiliateConfig{
 	},
 }
 
+// onStore reports whether u is a link on the store trigger names: the store's
+// own host, and the trigger's path. The trigger turning up anywhere else - in a
+// query, in another site's path - does not make a link the store's.
+func onStore(u *url.URL, trigger string) bool {
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return false
+	}
+	domain, prefix, _ := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(trigger, "https://"), "/"), "/")
+	domain = strings.TrimPrefix(domain, "www.")
+	host := strings.ToLower(u.Hostname())
+	if host != domain && !strings.HasSuffix(host, "."+domain) {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimPrefix(u.Path, "/"), prefix)
+}
+
 // checkForLinks answers a message carrying a well-known store's link with the
 // reply the bot posts for it, and with nil where the message carries none.
 // Nil is the whole of "nothing to say": a message naming no store, a store
@@ -600,7 +616,7 @@ func checkForLinks(mGuildID, mContent string) *discordgo.MessageEmbed {
 				continue
 			}
 			u, err := url.Parse(field)
-			if err != nil {
+			if err != nil || !onStore(u, store.Trigger) {
 				continue
 			}
 

@@ -309,6 +309,23 @@ func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
 	}
 }
 
+// A store's name can sit anywhere in a link, and the reply would carry that
+// link under the store's name, with the printing it seems to name offered on
+// this site beside it. Only the store's own host is a store link.
+func TestCheckForLinksAnswersOnlyTheStoresOwnHost(t *testing.T) {
+	for _, message := range []string{
+		"https://evil.example/card/lea/232/x?manapool.com/card",
+		"https://evil.example/x/tcgplayer.com/product/1435/magic-product",
+		"https://tcgplayer.com.evil.example/product/1435/magic-product",
+		"https://evil.example/cardkingdom.com/mtg/revised-edition/goblin-king",
+	} {
+		reply := checkForLinks(discordGuildID(), message)
+		if reply != nil {
+			t.Errorf("%s was answered as %q", message, reply.Title)
+		}
+	}
+}
+
 // The bot speaks for one guild and one game. Everything below rides on
 // checkForLinks, so these are the gates that keep it off every other server.
 func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
