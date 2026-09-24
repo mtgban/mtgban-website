@@ -58,11 +58,17 @@
     box.addEventListener('input', function() { write(box.value); });
     write(box.value);
 
+    // A suggestion picked from the list writes the box without an input
+    // event, so the field is read again from it when the form goes.
+    var form = document.getElementById('nav-searchform') || document.getElementById('searchform');
+    if (form && field) {
+        form.addEventListener('submit', function() { field.value = box.value.trim(); });
+    }
+
     /* The pinned field accepts the same filter vocabulary as the primary
        search. Reuse the shared autocomplete so values like f: or s: get the
        same provider candidates, while the form keeps both fields on submit. */
     if (typeof autocomplete === 'function' && !box._scopeAutocompleteBound) {
-        var form = document.getElementById('nav-searchform') || document.getElementById('searchform');
         if (form) {
             box._scopeAutocompleteBound = true;
             autocomplete(form, box, location.pathname.indexOf('/sealed') === 0 ? 'true' : 'false');
@@ -139,6 +145,10 @@
     box.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
+            // A highlighted suggestion is the autocomplete's to take: this
+            // Enter picks it, and the next one runs the search.
+            var list = document.getElementById(box.id + 'autocomplete-list');
+            if (list && list.querySelector('.autocomplete-active')) return;
             apply(box.value.trim());
         } else if (e.key === 'Escape') {
             // Dismiss, in the usual sense: put the row away and leave what
