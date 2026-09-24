@@ -3,11 +3,38 @@ package main
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/bwmarrin/discordgo"
+
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
+
+// offeredPrinting is the printing a reply offers on this site: the uuid its
+// second line asks for, or "" where it offered none. Reading it back out of
+// the rendered description rather than off an intermediate is the point - it
+// is the address the reader's click actually goes to.
+func offeredPrinting(t *testing.T, reply *discordgo.MessageEmbed) string {
+	t.Helper()
+	if reply == nil {
+		return ""
+	}
+
+	offer := offeredLinkRE.FindStringSubmatch(reply.Description)
+	if offer == nil {
+		return ""
+	}
+	parsed, err := url.Parse(offer[1])
+	if err != nil {
+		t.Fatalf("the offer in %q is not a URL: %v", reply.Description, err)
+	}
+	return parsed.Query().Get("q")
+}
+
+// offeredLinkRE picks the markdown link out of a reply's second line.
+var offeredLinkRE = regexp.MustCompile(`\]\((https://[^)]+)\)`)
 
 // tcgplayerProductIDOf is the id TCGplayer files a printing under: the etched
 // product where the printing is etched, the plain one otherwise. The two are
@@ -101,13 +128,12 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 				sharedTCG++
 			} else {
 				checkedTCG++
-				_, _, got := checkForLinks(discordGuildID(), "look at "+link)
-				if got == nil {
-					t.Errorf("%s %s #%s: %s named no printing", co.Name, co.SetCode, co.Number, link)
-				} else if got.UUID != co.UUID {
-					t.Errorf("%s named %s %s #%s (%s), want %s %s #%s (%s)",
-						link, got.Name, got.SetCode, got.Number, got.UUID,
-						co.Name, co.SetCode, co.Number, co.UUID)
+				got := offeredPrinting(t, checkForLinks(discordGuildID(), "look at "+link))
+				if got == "" {
+					t.Errorf("%s %s #%s: %s offered no printing", co.Name, co.SetCode, co.Number, link)
+				} else if got != co.UUID {
+					t.Errorf("%s offers %s, want %s %s #%s (%s)",
+						link, got, co.Name, co.SetCode, co.Number, co.UUID)
 				}
 			}
 		}
@@ -124,8 +150,8 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
 				strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
 			checkedMP++
-			_, _, got := checkForLinks(discordGuildID(), link)
-			if got == nil {
+			got := offeredPrinting(t, checkForLinks(discordGuildID(), link))
+			if got == "" {
 				// A number two cards answer to names neither of them. Magic
 				// files one name per number, so this does not fire here; it
 				// keeps the test honest against a datastore for a game that
@@ -133,11 +159,10 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 				if openingName(printingsAt(co.SetCode, co.Number)) == "" {
 					continue
 				}
-				t.Errorf("%s %s #%s: %s named no printing", co.Name, co.SetCode, co.Number, link)
-			} else if got.UUID != co.UUID {
-				t.Errorf("%s named %s %s #%s (%s), want %s %s #%s (%s)",
-					link, got.Name, got.SetCode, got.Number, got.UUID,
-					co.Name, co.SetCode, co.Number, co.UUID)
+				t.Errorf("%s %s #%s: %s offered no printing", co.Name, co.SetCode, co.Number, link)
+			} else if got != co.UUID {
+				t.Errorf("%s offers %s, want %s %s #%s (%s)",
+					link, got, co.Name, co.SetCode, co.Number, co.UUID)
 			}
 		}
 	}
@@ -179,9 +204,9 @@ func TestManaPoolFinishItDoesNotSellNamesNothing(t *testing.T) {
 
 		link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?finish=etched",
 			strings.ToLower(co.SetCode), strings.ToLower(co.Number))
-		if _, _, got := checkForLinks(discordGuildID(), link); got != nil {
-			t.Errorf("%s %s #%s is not sold etched, yet %s named %s (etched=%v)",
-				co.Name, co.SetCode, co.Number, link, got.UUID, got.Etched)
+		if got := offeredPrinting(t, checkForLinks(discordGuildID(), link)); got != "" {
+			t.Errorf("%s %s #%s is not sold etched, yet %s offers %s",
+				co.Name, co.SetCode, co.Number, link, got)
 		}
 
 		checked++
@@ -270,12 +295,15 @@ func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
 		{"a mana pool card across every set", "https://manapool.com/card/caravan-vigil"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			title, link, co := checkForLinks(discordGuildID(), tt.message)
-			if title == "" || link == "" {
-				t.Fatalf("the affiliate link itself went missing: title=%q link=%q", title, link)
+			reply := checkForLinks(discordGuildID(), tt.message)
+			if reply == nil {
+				t.Fatal("the store's own link went unanswered")
 			}
-			if co != nil {
-				t.Errorf("named %s %s #%s, want nothing", co.Name, co.SetCode, co.Number)
+			if reply.Title == "" || reply.URL == "" {
+				t.Fatalf("the affiliate link itself went missing: title=%q url=%q", reply.Title, reply.URL)
+			}
+			if got := offeredPrinting(t, reply); got != "" {
+				t.Errorf("offered %s, want nothing", got)
 			}
 		})
 	}
@@ -286,18 +314,16 @@ func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
 func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
 	message := "https://www.tcgplayer.com/product/1435/magic-product"
 
-	title, link, co := checkForLinks("some-other-guild", message)
-	if title != "" || link != "" || co != nil {
-		t.Errorf("another guild was answered: %q %q %v", title, link, co)
+	if reply := checkForLinks("some-other-guild", message); reply != nil {
+		t.Errorf("another guild was answered: %q", reply.Title)
 	}
 
 	previous := Config.Game
 	Config.Game = "lorcana"
 	defer func() { Config.Game = previous }()
 
-	title, link, co = checkForLinks(discordGuildID(), message)
-	if title != "" || link != "" || co != nil {
-		t.Errorf("another game was answered: %q %q %v", title, link, co)
+	if reply := checkForLinks(discordGuildID(), message); reply != nil {
+		t.Errorf("another game was answered: %q", reply.Title)
 	}
 }
 

@@ -559,14 +559,16 @@ var AffiliateStores = []AffiliateConfig{
 	},
 }
 
-// Check if a essage contains well-known links that can be tagged with BAN's
-// links. The printing comes back too where the store's URL named one, and is
-// nil otherwise - a store whose links carry no identifier, or one whose link
-// this time named nothing the datastore holds.
-func checkForLinks(mGuildID, mContent string) (string, string, *mtgmatcher.CardObject) {
+// checkForLinks answers a message carrying a well-known store's link with the
+// reply the bot posts for it, and with nil where the message carries none.
+// Nil is the whole of "nothing to say": a message naming no store, a store
+// this guild or this game does not answer for, and a link that parsed into
+// nothing all end the same way, and there is nothing a caller could do
+// differently about any of them.
+func checkForLinks(mGuildID, mContent string) *discordgo.MessageEmbed {
 	// Only for the main discord and only for the main game
 	if mGuildID != discordGuildID() || Config.Game != DefaultGame {
-		return "", "", nil
+		return nil
 	}
 
 	for _, store := range AffiliateStores {
@@ -640,10 +642,14 @@ func checkForLinks(mGuildID, mContent string) (string, string, *mtgmatcher.CardO
 			}
 			u.RawQuery = v.Encode()
 
-			return title, u.String(), co
+			return &discordgo.MessageEmbed{
+				Title:       title,
+				URL:         u.String(),
+				Description: storeLinkDescription(co, mGuildID),
+			}
 		}
 	}
-	return "", "", nil
+	return nil
 }
 
 // This function will be called (due to AddHandler above) every time a new
@@ -712,17 +718,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
-			title, link, co := checkForLinks(m.GuildID, m.Content)
-			if title == "" || link == "" {
+			reply := checkForLinks(m.GuildID, m.Content)
+			if reply == nil {
 				break
 			}
 
 			// Spam time!
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-				Title:       title,
-				URL:         link,
-				Description: storeLinkDescription(co, m.GuildID),
-			})
+			_, err := s.ChannelMessageSendEmbed(m.ChannelID, reply)
 			if err != nil {
 				log.Println(err)
 			}
