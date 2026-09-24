@@ -982,6 +982,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// Check if conditions should be retrieved
 		if uploadedData[i].OriginalCondition != "" {
 			if skipConds {
+				uploadedData[i].IgnoredCondition = uploadedData[i].OriginalCondition
 				uploadedData[i].OriginalCondition = ""
 			} else {
 				shouldCheckForConditions = true

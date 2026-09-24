@@ -139,6 +139,42 @@ func TestModeSwitchPricesTheSameRowsTheOtherWay(t *testing.T) {
 	}
 }
 
+// A buylist run told to ignore conditions still posts each row back with the
+// condition it came with: retail prices them, and copies of one card that
+// differ only by condition must not come back merged into one row.
+func TestModeSwitchKeepsIgnoredConditions(t *testing.T) {
+	cards := twoCards(t)
+	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
+	DevMode, SigCheck = true, false
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Upload"] == nil {
+		LogPages["Upload"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Upload")
+	}
+
+	form := url.Values{}
+	form.Set("mode", "true")
+	form.Set("nocond", "on")
+	form.Set("rows", cards[0]+"\t1\tNM\t2\t\n"+cards[0]+"\t2\tMP\t1\t\n")
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	Upload(rec, req)
+
+	out := rec.Body.String()
+	if !strings.Contains(out, "Buylist mode") {
+		t.Fatal("the request did not come back as a page of buylist results")
+	}
+	for _, cond := range []string{"NM", "MP"} {
+		if !strings.Contains(out, `data-cond="`+cond+`"`) {
+			t.Errorf("the %s row lost its condition, so the switch would post it back blank", cond)
+		}
+	}
+}
+
 // A list that was opened stays opened across the switch. The rows the page
 // posts back are the cards, each naming the box it came out of, so the other
 // side is priced against the same sections rather than a flat list - and
