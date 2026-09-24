@@ -2,10 +2,12 @@ package mkmidparser
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -235,7 +237,7 @@ func TestASupersededBuildIsNotPublished(t *testing.T) {
 	// built, which describes inventories no longer live.
 	p.publish(older, map[string]string{"900001": "uuid-before"})
 
-	if p.cached.Load().builtFrom != newer {
+	if p.cached.Load().builtFrom.Value() != newer {
 		t.Error("a superseded build installed itself over the newer index")
 	}
 	if got := p.Resolve("900001"); got != "uuid-after" {
@@ -253,7 +255,7 @@ func TestASupersededIndexIsNeverServed(t *testing.T) {
 	live.publish(shelf("MKMTrend", map[string]string{"uuid-after": "900001"}))
 
 	p.cached.Store(&built{
-		builtFrom: &older,
+		builtFrom: weak.Make(&older),
 		shelves:   shelvesOf(older),
 		ids:       map[string]string{"900001": "uuid-before"},
 	})
@@ -298,7 +300,7 @@ func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
 	if p.cached.Load().ids["sentinel"] != "kept" {
 		t.Error("an unrelated seller's refresh rebuilt the index")
 	}
-	if p.cached.Load().builtFrom != after {
+	if p.cached.Load().builtFrom.Value() != after {
 		t.Error("the index was not re-keyed to the snapshot in hand")
 	}
 
@@ -310,4 +312,37 @@ func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
 	if p.cached.Load().ids["sentinel"] == "kept" {
 		t.Error("a Cardmarket shelf moved and the index was not rebuilt")
 	}
+}
+
+// A refresh of any seller republishes the whole snapshot. What the index
+// keeps to recognise the old one must not keep it alive, or every seller
+// replaced since the last upload stays in memory until the next one.
+func TestAReplacedSellerIsNotKeptAlive(t *testing.T) {
+	p, live := newParser()
+	defer runtime.KeepAlive(p)
+
+	mkm := shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"})
+	store := elsewhere("CK")
+	live.publish(mkm, store)
+	got := p.Resolve("900001")
+	if got != "uuid-mkm" {
+		t.Fatalf("resolve = %q, want uuid-mkm", got)
+	}
+
+	released := make(chan struct{})
+	runtime.AddCleanup(store.(*mtgban.BaseSeller), func(done chan struct{}) { close(done) }, released)
+	store = nil
+
+	// Card Kingdom refreshes, and nothing resolves an id afterwards.
+	live.publish(mkm, elsewhere("CK"))
+
+	for range 20 {
+		runtime.GC()
+		select {
+		case <-released:
+			return
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	t.Error("the replaced seller is still alive: the index is holding the snapshot it was in")
 }
