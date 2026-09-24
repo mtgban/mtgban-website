@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -104,7 +103,7 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	if a, ok := apiProducts.Addon("extra_game"); ok {
 		v.ExtraGameMonthly = a.Monthly
 	}
-	v.CanTrial = v.Email != "" && GetParamFromSig(sig, "UserTier") != "" && os.Getenv("TRIAL_SECRET") != ""
+	v.CanTrial = v.Email != "" && GetParamFromSig(sig, "UserTier") != "" && apiGatewaySecret() != ""
 	// The site's own game is preselected; the base price covers one game of the buyer's choice.
 	for _, g := range Config.APIGateway.Games {
 		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(g), Checked: g == Config.Game})

@@ -74,12 +74,12 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 func TestAPIPlansTrialButtonNeedsPledgeAndSecret(t *testing.T) {
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example"}
 
-	t.Setenv("TRIAL_SECRET", "")
+	setGatewaySecret(t, "")
 	if strings.Contains(apiPlansPage(t, sign("Legacy", user, nil, DefaultSignatureDuration)), `href="/api-trial`) {
-		t.Error("trial offered without TRIAL_SECRET")
+		t.Error("trial offered without a gateway secret")
 	}
 
-	t.Setenv("TRIAL_SECRET", "s")
+	setGatewaySecret(t, "s")
 	if strings.Contains(apiPlansPage(t, sign("", user, nil, DefaultSignatureDuration)), `href="/api-trial`) {
 		t.Error("trial offered to a login with no pledge")
 	}

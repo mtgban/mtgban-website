@@ -1247,8 +1247,8 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 		os.Setenv("BAN_SECRET", DefaultSecret)
 	}
 
-	if os.Getenv("TRIAL_SECRET") == "" {
-		log.Println("TRIAL_SECRET not set, API trial and sign-in handoff disabled")
+	if apiGatewaySecret() == "" {
+		log.Println("api_user_secrets has no " + apiGatewayUser + " entry, API trial and sign-in handoff disabled")
 	}
 
 	return nil

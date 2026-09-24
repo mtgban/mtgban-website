@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/mtgban/mtgban-website/apihandoff"
@@ -15,6 +14,18 @@ const (
 	ErrMsgAPITrialPledge = "The API trial is for supporters with an active pledge"
 	ErrMsgAPIHandoffOff  = "API sign-in from this site is not available right now"
 )
+
+// apiGatewayUser is the api_user_secrets entry the gateway calls this site
+// with. The same secret signs the handoff tokens the gateway verifies, so a
+// deployment that lets the gateway in already has everything the handoff
+// needs.
+const apiGatewayUser = "gateway@mtgban.com"
+
+// apiGatewaySecret is the shared secret for this site, empty when the
+// gateway is not configured, which turns the handoffs off.
+func apiGatewaySecret() string {
+	return Config.APIUserSecrets[apiGatewayUser]
+}
 
 // APITrial hands a pledged supporter to the gateway to start a trial.
 func APITrial(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +41,7 @@ func APILogin(w http.ResponseWriter, r *http.Request) {
 func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 	sig := verifiedSignature(r)
 	email := GetParamFromSig(sig, "UserEmail")
-	secret := os.Getenv("TRIAL_SECRET")
+	secret := apiGatewaySecret()
 
 	msg := ""
 	nonce := ""
@@ -64,6 +75,7 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 		Email:   email,
 		Name:    GetParamFromSig(sig, "UserName"),
 		Purpose: purpose,
+		Game:    Config.Game,
 		Nonce:   nonce,
 		Expires: time.Now().Add(apihandoff.TTL),
 	})

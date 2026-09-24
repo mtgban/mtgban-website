@@ -33,6 +33,9 @@ type Claims struct {
 	Email   string
 	Name    string
 	Purpose string
+	// Game is the site that minted the token; the gateway verifies with that
+	// game's shared secret, the one it already uses to call the site.
+	Game string
 	// Nonce is unique per mint so the gateway can burn a used token.
 	Nonce   string
 	Expires time.Time
@@ -42,6 +45,7 @@ type Claims struct {
 func Mint(secret []byte, c Claims) string {
 	v := url.Values{}
 	v.Set("email", c.Email)
+	v.Set("game", c.Game)
 	v.Set("name", c.Name)
 	v.Set("nonce", c.Nonce)
 	v.Set("purpose", c.Purpose)
@@ -77,11 +81,27 @@ func Verify(secret []byte, token string, now time.Time) (Claims, error) {
 	if err != nil || !now.Before(time.Unix(exp, 0)) {
 		return Claims{}, ErrInvalid
 	}
-	c := Claims{Email: v.Get("email"), Name: v.Get("name"), Purpose: v.Get("purpose"), Nonce: v.Get("nonce"), Expires: time.Unix(exp, 0).UTC()}
-	if c.Email == "" || c.Nonce == "" || (c.Purpose != PurposeTrial && c.Purpose != PurposeLogin) {
+	c := Claims{Email: v.Get("email"), Name: v.Get("name"), Purpose: v.Get("purpose"), Game: v.Get("game"), Nonce: v.Get("nonce"), Expires: time.Unix(exp, 0).UTC()}
+	if c.Email == "" || c.Game == "" || c.Nonce == "" || (c.Purpose != PurposeTrial && c.Purpose != PurposeLogin) {
 		return Claims{}, ErrInvalid
 	}
 	return c, nil
+}
+
+// Game reads the game claim without verifying anything, so the verifier can
+// pick that game's secret. Nothing else in the token is to be believed
+// until Verify accepts it with that secret.
+func Game(token string) string {
+	body, _, _ := strings.Cut(token, ".")
+	raw, err := base64.RawURLEncoding.DecodeString(body)
+	if err != nil {
+		return ""
+	}
+	v, err := url.ParseQuery(string(raw))
+	if err != nil {
+		return ""
+	}
+	return v.Get("game")
 }
 
 func sign(secret []byte, body string) string {
