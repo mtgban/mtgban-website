@@ -40,7 +40,14 @@ func (s *site) APILogin(w http.ResponseWriter, r *http.Request) {
 
 // apiHandoff mints the token for the signed-in reader and redirects to path on the gateway.
 func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
-	sig := verifiedSignature(r)
+	// The reader's own login only. A ?sig= on the link names whoever made
+	// it, and enforceSigning may have put it in the cookie's place, so a
+	// request carrying one hands over nobody; the site never links here
+	// with one.
+	sig := ""
+	if r.FormValue("sig") == "" {
+		sig = verifiedSignature(r)
+	}
 	email := GetParamFromSig(sig, "UserEmail")
 	secret := apiGatewaySecret()
 
