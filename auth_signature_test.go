@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
 // signedAs mints a signature the way sign() does, over the fields given.
@@ -125,5 +127,30 @@ func TestSignedUserEmailNeedsAValidSignature(t *testing.T) {
 
 	if got := emailFromCookie(t, forged); got != "" {
 		t.Errorf("email = %q for a rewritten signature, want empty", got)
+	}
+}
+
+// enforceSigning checks the ?sig= whenever a request carries one, so that is
+// the signature a handler has to read as well. A cookie sent beside it is
+// never checked, and grants it claims must not be what adminOnly believes.
+func TestHandlersActOnTheSignatureTheMiddlewareChecked(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
+
+	reached := false
+	handler := enforceSigning(adminOnly(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+	})))
+
+	valid := signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(time.Hour))
+	forged := base64.StdEncoding.EncodeToString([]byte("Admin=true&Expires=99999999999"))
+
+	req := httptest.NewRequest(http.MethodGet, "/debug/pprof/?sig="+url.QueryEscape(valid), nil)
+	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: forged})
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	if reached {
+		t.Error("a forged cookie beside a valid ?sig= reached an admin-only handler")
 	}
 }

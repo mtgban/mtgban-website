@@ -325,8 +325,10 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 func getSignatureFromCookies(r *http.Request) string {
 	sig := readCookie(r, "MTGBAN")
 
+	// enforceSigning checks a ?sig= whenever there is one, so that is the
+	// signature to act on; a cookie beside it has not been checked.
 	querySig := r.FormValue("sig")
-	if sig == "" && querySig != "" {
+	if querySig != "" {
 		sig = querySig
 	}
 
