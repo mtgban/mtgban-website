@@ -177,7 +177,7 @@ func scopeBullets(p apiproductlist.Package, cat *apiproductlist.ProductList) []s
 		}
 		return []string{first, "Add more stores as you need them"}
 	case apiproductlist.StoreScopeBase:
-		return []string{"Every EU and US store we track", "No sealed product or EV calcs"}
+		return []string{"Every US store we track, plus the price indexes", "No sealed product or EV calcs"}
 	default:
 		return []string{"Every store, every mode", "Sealed product included"}
 	}

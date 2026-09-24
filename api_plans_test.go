@@ -158,7 +158,7 @@ func TestScopeBullets(t *testing.T) {
 
 	base := apiproductlist.Package{StoreScope: apiproductlist.StoreScopeBase}
 	got = scopeBullets(base, cat)
-	if !strings.Contains(strings.Join(got, " "), "EU and US") {
+	if !strings.Contains(strings.Join(got, " "), "Every US store") {
 		t.Errorf("base bullets: %v", got)
 	}
 
