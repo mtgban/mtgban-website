@@ -353,17 +353,26 @@ func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory in
 }
 
 // buildMoverRowsQuery pairs each of this game's prices on the two anchor dates.
+//
+// Both arms are MATERIALIZED for the reason buildWideMoverRowsQuery is: left
+// inlined, the planner sees a self-join on prices, underestimates how many of
+// one day's cards are still priced on the other, and picks a nested loop that
+// descends into a 42GB index once per card. cur happens to materialize anyway
+// under the multiple-reference rule - it is named again by the variants join -
+// but old is referenced once, so PG12+ inlines it and that is all the nested
+// loop needs. Saying it on both arms means neither depends on how many times
+// the query below happens to name them.
 func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Time, minPrice, minPriorPrice float64) (string, []any) {
 	args := []any{provider, latest, prior, minPrice, minPriorPrice}
 	scope, scopeArgs := moverScope(tcgCategory, len(args)+1)
 	args = append(args, scopeArgs...)
 
 	return `
-		WITH cur AS (
+		WITH cur AS MATERIALIZED (
 			SELECT ban_id, price FROM prices
 			 WHERE provider=$1 AND date=$2 AND price >= $4
 		),
-		old AS (
+		old AS MATERIALIZED (
 			SELECT ban_id, price FROM prices
 			 WHERE provider=$1 AND date=$3 AND price >= $5
 		)

@@ -139,6 +139,17 @@ func TestBuildMoverRowsQueryArgs(t *testing.T) {
 	}
 }
 
+// And both arms have to be materialized, the same way the wide query's are.
+// old is referenced once, so without the keyword PG12+ inlines it and the
+// planner is back to a self-join on prices with an estimate an order of
+// magnitude low.
+func TestBuildMoverRowsQueryMaterializes(t *testing.T) {
+	query, _ := buildMoverRowsQuery(ProviderTCGLow, CategoryMagic, time.Now(), time.Now(), 0, 0)
+	if n := strings.Count(query, "AS MATERIALIZED ("); n != 2 {
+		t.Errorf("query materializes %d of its two arms:\n%s", n, query)
+	}
+}
+
 // The fast path asks two cheap questions per step: what is the provider's
 // newest date (an index read with no join in the way), and did this game write
 // anything on it (an equality on date, so the planner can nested-loop into
