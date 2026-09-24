@@ -73,6 +73,8 @@ function setCardArtSource(img, src) {
         return;
     }
 
+    // Newer than any preload still in flight, which must not land after it.
+    img.__cardArtRequest = null;
     apply();
 }
 window.setCardArtSource = setCardArtSource;
