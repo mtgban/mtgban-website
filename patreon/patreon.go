@@ -25,7 +25,7 @@ type AuthToken struct {
 // The Patreon OAuth endpoints, with the field selections the site reads.
 const (
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
-	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
+	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,is_email_verified,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
 	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
 	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
 )
@@ -89,8 +89,9 @@ type UserData struct {
 	} `json:"errors"`
 	Data struct {
 		Attributes struct {
-			Email    string `json:"email"`
-			FullName string `json:"full_name"`
+			Email           string `json:"email"`
+			IsEmailVerified bool   `json:"is_email_verified"`
+			FullName        string `json:"full_name"`
 		} `json:"attributes"`
 		Relationships struct {
 			Memberships struct {

@@ -12,8 +12,9 @@ import (
 
 // Messages the handoff pages show instead of redirecting.
 const (
-	ErrMsgAPITrialPledge = "The API trial is for supporters with an active pledge"
-	ErrMsgAPIHandoffOff  = "API sign-in from this site is not available right now"
+	ErrMsgAPITrialPledge      = "The API trial is for supporters with an active pledge"
+	ErrMsgAPIHandoffOff       = "API sign-in from this site is not available right now"
+	ErrMsgAPIEmailUnconfirmed = "Confirm your email with Patreon, then log in again to continue"
 )
 
 // APITrial hands a pledged supporter to the gateway to start a trial.
@@ -33,6 +34,7 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 	secret := os.Getenv("TRIAL_SECRET")
 
 	msg := ""
+	login := false
 	nonce := ""
 	switch {
 	// Unchecked signatures would let anybody name any email to the gateway.
@@ -40,6 +42,12 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 		msg = ErrMsgAPIHandoffOff
 	case email == "":
 		msg = ErrMsg
+		login = true
+	// The gateway signs in whoever the email names, so Patreon must have
+	// confirmed it.
+	case GetParamFromSig(sig, "UserEmailUnverified") == "true":
+		msg = ErrMsgAPIEmailUnconfirmed
+		login = true
 	case purpose == apihandoff.PurposeTrial && GetParamFromSig(sig, "UserTier") == "":
 		msg = ErrMsgAPITrialPledge
 	default:
@@ -57,6 +65,12 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 			pageVars.Nav = filterNavForMobile(pageVars.Nav)
 		}
 		pageVars.ErrorMessage = msg
+		if login {
+			// The home page carries the Patreon button, which comes back here.
+			pageVars.PatreonLogin = pageVars.PatreonURL != ""
+			render(w, "home.html", pageVars)
+			return
+		}
 		render(w, "api-plans.html", pageVars)
 		return
 	}

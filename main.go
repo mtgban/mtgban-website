@@ -404,6 +404,7 @@ var DefaultNav = []NavElem{
 var OptionalFields = []string{
 	"UserName",
 	"UserEmail",
+	"UserEmailUnverified",
 	"UserTier",
 	"SearchDisabled",
 	"SearchBuylistDisabled",

@@ -33,7 +33,7 @@ func handoffRequest(t *testing.T, handler http.HandlerFunc, path, tier string, u
 
 func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
-	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example"}
+	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
 	rec := handoffRequest(t, APITrial, "/api-trial?return_to=https://pokemon.mtgban.com/api-plans", "Legacy", user)
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
@@ -56,7 +56,7 @@ func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 
 func TestAPILoginRedirectsWithVerifiableToken(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
-	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
+	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob", EmailVerified: true}
 	rec := handoffRequest(t, APILogin, "/api-login", "Legacy", user)
 	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/session?t=") {
 		t.Errorf("status %d location %q", rec.Code, rec.Header().Get("Location"))
@@ -65,6 +65,57 @@ func TestAPILoginRedirectsWithVerifiableToken(t *testing.T) {
 	claims, err := apihandoff.Verify([]byte("trial-secret"), loc.Query().Get("t"), time.Now())
 	if err != nil || claims.Purpose != apihandoff.PurposeLogin {
 		t.Errorf("claims %+v err %v", claims, err)
+	}
+}
+
+// The gateway signs in whoever the token's email names, so an email Patreon
+// has not confirmed is one anybody could have typed.
+func TestAPIHandoffNeedsAConfirmedEmail(t *testing.T) {
+	t.Setenv("TRIAL_SECRET", "trial-secret")
+	user := &PatreonUserData{Email: "victim@example.com", FullName: "Mallory"}
+	for _, handler := range []http.HandlerFunc{APILogin, APITrial} {
+		rec := handoffRequest(t, handler, "/api-login", "Legacy", user)
+		if rec.Header().Get("Location") != "" {
+			t.Fatal("minted a handoff token for an unconfirmed Patreon email")
+		}
+		if !strings.Contains(rec.Body.String(), ErrMsgAPIEmailUnconfirmed) {
+			t.Error("the refusal does not say to confirm the email")
+		}
+	}
+}
+
+// Readers with no email to hand over: signed out, or holding an invite link,
+// which carries a tier and nobody's identity.
+func TestAPIHandoffNeedsAPatreonLogin(t *testing.T) {
+	t.Setenv("TRIAL_SECRET", "trial-secret")
+	for name, tier := range map[string]string{"signed out": "", "invite link": "Legacy"} {
+		rec := handoffRequest(t, APILogin, "/api-login", tier, nil)
+		if rec.Header().Get("Location") != "" {
+			t.Errorf("%s: minted a handoff token with no email", name)
+		}
+		if !strings.Contains(rec.Body.String(), ErrMsg) {
+			t.Errorf("%s: the refusal does not say why", name)
+		}
+	}
+}
+
+// Whoever is refused for want of a login is offered one, and the Patreon round
+// trip comes back to the handoff: its state is the page the button is on.
+func TestAPIHandoffRefusalOffersALogin(t *testing.T) {
+	t.Setenv("TRIAL_SECRET", "trial-secret")
+	signingEnabled(t, true)
+	savedPatreon := Config.Patreon
+	t.Cleanup(func() { Config.Patreon = savedPatreon })
+	Config.Patreon = PatreonConfig{Client: map[string]string{"ban": "client-id"}}
+
+	rec := httptest.NewRecorder()
+	APILogin(rec, httptest.NewRequest(http.MethodGet, "https://www.mtgban.com/api-login", nil))
+	body := rec.Body.String()
+	if !strings.Contains(body, "patreon.com/oauth2/authorize") || !strings.Contains(body, "client-id") {
+		t.Error("the refusal offers no Patreon login")
+	}
+	if !strings.Contains(body, "window.location.pathname + window.location.search") {
+		t.Error("the login does not come back to the page it was offered on")
 	}
 }
 
@@ -92,7 +143,7 @@ func TestAPIHandoffOffWithoutSignatureChecks(t *testing.T) {
 
 func TestAPIHandoffDisabledWithoutSecret(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "")
-	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
+	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
 	rec := handoffRequest(t, APILogin, "/api-login", "Legacy", user)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPIHandoffOff) {
 		t.Errorf("status %d, body lacks the disabled message", rec.Code)
@@ -127,7 +178,7 @@ func TestAPIHandoffsAreHiddenSubPagesOfTheAPIPage(t *testing.T) {
 
 func TestAPIPlansDispatchesHandoffSubPages(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
-	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
+	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob", EmailVerified: true}
 	rec := handoffRequest(t, APIPlans, "/api-login", "Legacy", user)
 	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/session?t=") {
 		t.Errorf("login via the API page: status %d location %q", rec.Code, rec.Header().Get("Location"))
@@ -140,7 +191,7 @@ func TestAPIPlansDispatchesHandoffSubPages(t *testing.T) {
 
 func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
-	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
+	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
 	signingEnabled(t, true)
 	savedCfg := Config.APIGateway
 	t.Cleanup(func() { Config.APIGateway = savedCfg })
@@ -166,7 +217,7 @@ func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 
 func TestAPIHandoffDropsUntrustedReturnTo(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
-	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
+	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob", EmailVerified: true}
 	rec := handoffRequest(t, APILogin, "/api-login?return_to=https://evil.example/steal", "Legacy", user)
 	loc, _ := url.Parse(rec.Header().Get("Location"))
 	if rec.Code != http.StatusFound || loc.Query().Has("return_to") {

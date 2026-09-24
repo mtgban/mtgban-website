@@ -45,10 +45,11 @@ type PatreonConfig struct {
 }
 
 type PatreonUserData struct {
-	UserID       string
-	MembershipID string
-	FullName     string
-	Email        string
+	UserID        string
+	MembershipID  string
+	FullName      string
+	Email         string
+	EmailVerified bool
 }
 
 func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
@@ -72,10 +73,11 @@ func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 	}
 
 	return &PatreonUserData{
-		UserID:       userData.Data.IDV1,
-		MembershipID: membershipID,
-		FullName:     userData.Data.Attributes.FullName,
-		Email:        strings.ToLower(userData.Data.Attributes.Email),
+		UserID:        userData.Data.IDV1,
+		MembershipID:  membershipID,
+		FullName:      userData.Data.Attributes.FullName,
+		Email:         strings.ToLower(userData.Data.Attributes.Email),
+		EmailVerified: userData.Data.Attributes.IsEmailVerified,
 	}, nil
 }
 
@@ -801,6 +803,11 @@ func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[
 		v.Set("UserName", userData.FullName)
 		v.Set("UserEmail", userData.Email)
 		v.Set("UserTier", tierTitle)
+		// The API gateway signs in whoever the email names, so one Patreon
+		// has not confirmed says so; only those carry the extra field.
+		if !userData.EmailVerified {
+			v.Set("UserEmailUnverified", "true")
+		}
 	}
 
 	link := signatureLink()
