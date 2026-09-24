@@ -35,7 +35,8 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 	msg := ""
 	nonce := ""
 	switch {
-	case secret == "":
+	// Unchecked signatures would let anybody name any email to the gateway.
+	case secret == "" || !SigCheck:
 		msg = ErrMsgAPIHandoffOff
 	case email == "":
 		msg = ErrMsg

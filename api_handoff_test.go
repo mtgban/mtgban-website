@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,15 +12,19 @@ import (
 	"github.com/mtgban/mtgban-website/apihandoff"
 )
 
-func handoffRequest(t *testing.T, handler http.HandlerFunc, path, sig string) *httptest.ResponseRecorder {
+// handoffRequest runs handler with signatures checked, as production does,
+// for a reader signed in on tier as user. An invite link is a tier with no
+// user, and a reader with neither is signed out.
+func handoffRequest(t *testing.T, handler http.HandlerFunc, path, tier string, user *PatreonUserData) *httptest.ResponseRecorder {
 	t.Helper()
-	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
-	t.Cleanup(func() { DevMode, SigCheck, Config.APIGateway = savedDev, savedSig, savedCfg })
-	DevMode, SigCheck = true, false
+	signingEnabled(t, true)
+	savedCfg := Config.APIGateway
+	t.Cleanup(func() { Config.APIGateway = savedCfg })
 	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []string{"magic"}}
 	req := httptest.NewRequest(http.MethodGet, path, nil)
-	if sig != "" {
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+	if tier != "" || user != nil {
+		// Signed after the mode is set, so it carries the link the check expects.
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sign(tier, user, nil, DefaultSignatureDuration)})
 	}
 	rec := httptest.NewRecorder()
 	handler(rec, req)
@@ -29,7 +34,7 @@ func handoffRequest(t *testing.T, handler http.HandlerFunc, path, sig string) *h
 func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example"}
-	rec := handoffRequest(t, APITrial, "/api-trial?return_to=https://pokemon.mtgban.com/api-plans", sign("Legacy", user, nil, DefaultSignatureDuration))
+	rec := handoffRequest(t, APITrial, "/api-trial?return_to=https://pokemon.mtgban.com/api-plans", "Legacy", user)
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
@@ -49,22 +54,10 @@ func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 	}
 }
 
-func TestAPITrialNeedsAPledge(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
-	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
-	rec := handoffRequest(t, APITrial, "/api-trial", sign("", user, nil, DefaultSignatureDuration))
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPITrialPledge) {
-		t.Errorf("status %d, body lacks the pledge message", rec.Code)
-	}
-	if rec.Header().Get("Location") != "" {
-		t.Error("redirected without a pledge")
-	}
-}
-
-func TestAPILoginWorksWithoutAPledge(t *testing.T) {
+func TestAPILoginRedirectsWithVerifiableToken(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
 	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
-	rec := handoffRequest(t, APILogin, "/api-login", sign("", user, nil, DefaultSignatureDuration))
+	rec := handoffRequest(t, APILogin, "/api-login", "Legacy", user)
 	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/session?t=") {
 		t.Errorf("status %d location %q", rec.Code, rec.Header().Get("Location"))
 	}
@@ -75,10 +68,32 @@ func TestAPILoginWorksWithoutAPledge(t *testing.T) {
 	}
 }
 
+// Without signature checks any cookie is believed, so any email could be
+// handed to the gateway; a -dev run holding the real secret must mint nothing.
+func TestAPIHandoffOffWithoutSignatureChecks(t *testing.T) {
+	t.Setenv("TRIAL_SECRET", "trial-secret")
+	signingEnabled(t, true)
+	SigCheck = false
+	forged := base64.StdEncoding.EncodeToString([]byte(url.Values{
+		"UserEmail": {"victim@example.com"}, "UserTier": {"Legacy"},
+		"Expires": {"99999999999"},
+	}.Encode()))
+	req := httptest.NewRequest(http.MethodGet, "/api-login", nil)
+	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: forged})
+	rec := httptest.NewRecorder()
+	APILogin(rec, req)
+	if rec.Header().Get("Location") != "" {
+		t.Fatal("minted a handoff token off an unchecked signature")
+	}
+	if !strings.Contains(rec.Body.String(), ErrMsgAPIHandoffOff) {
+		t.Error("the refusal does not say the handoff is off")
+	}
+}
+
 func TestAPIHandoffDisabledWithoutSecret(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
-	rec := handoffRequest(t, APILogin, "/api-login", sign("Legacy", user, nil, DefaultSignatureDuration))
+	rec := handoffRequest(t, APILogin, "/api-login", "Legacy", user)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPIHandoffOff) {
 		t.Errorf("status %d, body lacks the disabled message", rec.Code)
 	}
@@ -113,23 +128,22 @@ func TestAPIHandoffsAreHiddenSubPagesOfTheAPIPage(t *testing.T) {
 func TestAPIPlansDispatchesHandoffSubPages(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
 	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
-	rec := handoffRequest(t, APIPlans, "/api-login", sign("", user, nil, DefaultSignatureDuration))
+	rec := handoffRequest(t, APIPlans, "/api-login", "Legacy", user)
 	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/session?t=") {
 		t.Errorf("login via the API page: status %d location %q", rec.Code, rec.Header().Get("Location"))
 	}
-	rec = handoffRequest(t, APIPlans, "/api-trial", sign("", user, nil, DefaultSignatureDuration))
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPITrialPledge) {
-		t.Errorf("trial via the API page: status %d", rec.Code)
+	rec = handoffRequest(t, APIPlans, "/api-trial", "Legacy", user)
+	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/trial?t=") {
+		t.Errorf("trial via the API page: status %d location %q", rec.Code, rec.Header().Get("Location"))
 	}
 }
 
 func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
-	// handoffRequest turns SigCheck off; a tampered cookie must still be refused with it on.
-	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
-	t.Cleanup(func() { DevMode, SigCheck, Config.APIGateway = savedDev, savedSig, savedCfg })
-	DevMode, SigCheck = true, true
+	signingEnabled(t, true)
+	savedCfg := Config.APIGateway
+	t.Cleanup(func() { Config.APIGateway = savedCfg })
 	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []string{"magic"}}
 	// Signed after DevMode is set, so the signature carries the same link the check expects.
 	sig := sign("Legacy", user, nil, DefaultSignatureDuration)
@@ -153,7 +167,7 @@ func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 func TestAPIHandoffDropsUntrustedReturnTo(t *testing.T) {
 	t.Setenv("TRIAL_SECRET", "trial-secret")
 	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
-	rec := handoffRequest(t, APILogin, "/api-login?return_to=https://evil.example/steal", sign("", user, nil, DefaultSignatureDuration))
+	rec := handoffRequest(t, APILogin, "/api-login?return_to=https://evil.example/steal", "Legacy", user)
 	loc, _ := url.Parse(rec.Header().Get("Location"))
 	if rec.Code != http.StatusFound || loc.Query().Has("return_to") {
 		t.Errorf("untrusted return_to forwarded: %d %q", rec.Code, rec.Header().Get("Location"))
