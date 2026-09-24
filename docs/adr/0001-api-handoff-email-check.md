@@ -47,7 +47,8 @@ Two more constraints:
   public, the shared ACL gives `"Any"` the `API` section. `enforceSigning`
   then passes `/api-plans` and its sub-pages `/api-login` and `/api-trial`
   straight to the handler without checking anything. That is why
-  `apiHandoff` reads the reader through `verifiedSignature` itself.
+  `apiHandoff` checks the reader's cookie itself. It never reads a `?sig=`,
+  which names whoever made the link rather than the reader.
 - **Grants must keep working without confirmation.** Grantees are invitees
   and testers, and are not to be sent off to confirm anything.
 
