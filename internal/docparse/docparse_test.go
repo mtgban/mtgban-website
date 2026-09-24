@@ -179,6 +179,11 @@ func TestParseHeaderCardmarketID(t *testing.T) {
 		{"no separator", []string{"Name", "mcmId"}, 1, true},
 		{"the mtgban export's own id columns", []string{"Key", "Name", "Original Id", "Instance Id"}, 0, false},
 		{"a price is not an id", []string{"Name", "Edition", "Cardmarket Price"}, 0, false},
+		// "mkm" and "id" inside a header naming something else: a price
+		// read as a product id prices the row as whatever card that is.
+		{"a price guide", []string{"Name", "MKM Price Guide"}, 0, false},
+		{"a price paid", []string{"Name", "Price Paid (Cardmarket)"}, 0, false},
+		{"another cardmarket id space", []string{"Name", "mcmMetaId", "MKM Expansion Id"}, 0, false},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			p := &Parser{}
