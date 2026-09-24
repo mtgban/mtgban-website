@@ -6,6 +6,18 @@
     margin-top: 0;
 }
 
+/* The online sidebar is fixed from the navbar down, which here is where the
+   banner is; keep it in its column, under the banner, as it used to be. */
+@media (min-width: 901px) {
+    .offline-shell .search-sidebar {
+        position: sticky;
+        left: auto;
+        width: auto;
+        height: auto;
+        max-height: calc(100dvh - var(--search-sidebar-top));
+    }
+}
+
 /* Sort pills show a direction arrow on the active pill: green asc, red desc (rotated). */
 .offline-shell .search-sort-dir {
     display: none;
