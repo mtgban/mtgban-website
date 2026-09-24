@@ -12,7 +12,6 @@
 package mkmidparser
 
 import (
-	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -63,8 +62,9 @@ type built struct {
 	// The Cardmarket shelves it was actually built from. Every other
 	// seller's refresh republishes the snapshot with these copied across
 	// untouched, and rebuilding for one of those is a walk spent arriving
-	// at the same map.
-	shelves []mtgban.Seller
+	// at the same map. Held weakly too, or a refresh of the shelves
+	// themselves would keep the replaced ones alive until the next upload.
+	shelves []weak.Pointer[mtgban.BaseSeller]
 
 	ids map[string]string
 }
@@ -82,25 +82,33 @@ func shelvesOf(sellers []mtgban.Seller) []mtgban.Seller {
 	return shelves
 }
 
-// sameShelves reports whether two lists hold the same sellers.
+// weakShelves points at shelves without keeping them alive.
 //
-// By identity, and by reflection rather than ==, because a seller is an
-// interface: comparing two of them panics if what is inside is a struct
-// holding a map, and an inventory is a map. Every scraper here is a
-// pointer, so this is the same answer == would give - without the upload
-// path being where we find out about one that is not. Anything that is
-// not a pointer is reported as changed, which costs a rebuild and never
-// a wrong answer.
-func sameShelves(was, now []mtgban.Seller) bool {
+// Every loaded scraper is a *mtgban.BaseSeller, as ReadSellerFromJSON
+// builds them. Anything else gets a pointer to nothing, which sameShelves
+// reports as changed: that costs a rebuild and never a wrong answer.
+func weakShelves(shelves []mtgban.Seller) []weak.Pointer[mtgban.BaseSeller] {
+	held := make([]weak.Pointer[mtgban.BaseSeller], len(shelves))
+	for i, shelf := range shelves {
+		base, ok := shelf.(*mtgban.BaseSeller)
+		if ok {
+			held[i] = weak.Make(base)
+		}
+	}
+	return held
+}
+
+// sameShelves reports whether now holds the very sellers was points at.
+//
+// By identity. A shelf that has been replaced and collected since reads
+// as nil, so it can never be mistaken for whatever took its place.
+func sameShelves(was []weak.Pointer[mtgban.BaseSeller], now []mtgban.Seller) bool {
 	if len(was) != len(now) || len(was) == 0 {
 		return false
 	}
 	for i := range was {
-		a, b := reflect.ValueOf(was[i]), reflect.ValueOf(now[i])
-		if a.Kind() != reflect.Pointer || b.Kind() != reflect.Pointer {
-			return false
-		}
-		if a.Pointer() != b.Pointer() {
+		shelf, ok := now[i].(*mtgban.BaseSeller)
+		if !ok || shelf == nil || was[i].Value() != shelf {
 			return false
 		}
 	}
@@ -135,7 +143,7 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
 	// chance to pass one that describes something else.
 	p.cached.Store(&built{
 		builtFrom: weak.Make(snapshot),
-		shelves:   shelvesOf(*snapshot),
+		shelves:   weakShelves(shelvesOf(*snapshot)),
 		ids:       ids,
 	})
 }
