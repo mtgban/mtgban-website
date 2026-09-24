@@ -409,7 +409,8 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 		duration := DefaultSignatureDuration
 		days, err := strconv.Atoi(r.FormValue("duration"))
 		if err == nil && days > 0 {
-			duration = time.Duration(days) * 24 * time.Hour
+			// No longer than the cookie that will hold it
+			duration = time.Duration(min(days, signatureCookieDays)) * 24 * time.Hour
 		}
 		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil, duration))
 

@@ -733,7 +733,7 @@ config plus the ACL/grants/affiliates that ride beside it), `checkpoints`
 (chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
 price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
 generation, `&user=&duration=`), and `invite` (a signed invite link for a
-tier, `&tier=&duration=`). Five JSON editors — config,
+tier, `&tier=&duration=`, for up to the 31 days its cookie lasts). Five JSON editors — config,
 checkpoints, ACL/access table, affiliates, key overrides — the last backed
 by a per-store UUID-remap builder reached from a "Fix" link on search
 results (`search.go`/`search.html`). A People tab adds/removes Patreon
