@@ -102,7 +102,7 @@ output, not a claim written here.
 | `utils.go`, `redirect.go`, `mobile.go`, `palette.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle, palette metadata APIs |
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
-| `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); to be imported by the API gateway repo, so its payload bytes are frozen by golden tests |
+| `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); the API gateway repo imports it, so its payload bytes are frozen by golden tests |
 | `apihandoff/` | The signed Patreon handoff token (`Mint`, `Verify`) the game sites hand to the API gateway for trials and sign-in; the gateway imports it, so the golden test freezes its bytes |
 | `apiproductlist/` | The API price list (`products.json`, embedded; amounts in cents): packages, add-ons, intervals, store families. The API gateway repo pins this module by commit and seeds Stripe from it, so a price edit needs a gateway dependency bump; the pricing page renders from it |
 | `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
@@ -222,6 +222,11 @@ rather than trusting this list indefinitely.
   `docs/search-column-layout.md` has the reasoning, and
   `tests/offline/search-sticky-offsets.test.js` pins the parts a browserless
   test can reach.
+- The API gateway (`mtgban/api-gatewahy`) imports six packages from this
+  module: `apisig`, `apihandoff`, `apiproductlist`, `observability`,
+  `ratelimit` and `timeseries`. A change to any of them is a change to the
+  gateway too; `docs/api-gateway-dependency.md` has why the dependency points
+  this way and which side deploys first.
 - `embed.go` is Discord **embed** formatting, not Go `//go:embed` asset
   embedding — don't be misled by the name.
 - **Template FuncMap risks:** `templates.go` adds 30+ template helpers via
