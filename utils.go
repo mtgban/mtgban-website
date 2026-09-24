@@ -1450,18 +1450,20 @@ func storeEligible(shorthand string, allowlist, blocklist []string) bool {
 	return !slices.Contains(blocklist, shorthand)
 }
 
-// Retrieve default blocklists according to the signature contents
+// Retrieve default blocklists according to the signature contents.
+// Callers append a reader's own stores, so the config lists are clipped:
+// an append into their spare capacity would be seen by every other request.
 func getDefaultBlocklists(sig string) ([]string, []string) {
 	var blocklistRetail, blocklistBuylist []string
 	blocklistRetailOpt := GetParamFromSig(sig, "SearchDisabled")
 	if blocklistRetailOpt == "" {
-		blocklistRetail = Config.SearchRetailBlockList
+		blocklistRetail = slices.Clip(Config.SearchRetailBlockList)
 	} else if blocklistRetailOpt != "NONE" {
 		blocklistRetail = strings.Split(blocklistRetailOpt, ",")
 	}
 	blocklistBuylistOpt := GetParamFromSig(sig, "SearchBuylistDisabled")
 	if blocklistBuylistOpt == "" {
-		blocklistBuylist = Config.SearchBuylistBlockList
+		blocklistBuylist = slices.Clip(Config.SearchBuylistBlockList)
 	} else if blocklistBuylistOpt != "NONE" {
 		blocklistBuylist = strings.Split(blocklistBuylistOpt, ",")
 	}
