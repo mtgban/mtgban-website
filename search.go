@@ -24,7 +24,6 @@ import (
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
-	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 const (
@@ -273,14 +272,23 @@ func searchFallback(config SearchConfig) []string {
 }
 
 // isValidChartID reports whether a chart= piece is a plausibly chartable id: a
-// mtgmatcher id or a ban:/tcg:/scryfall:/mtgjson: prefixed id (bare numbers are
-// TCGplayer ids). Full resolution happens at render time.
+// mtgmatcher id, a ban:/tcg:/scryfall:/mtgjson: prefixed id, a bare number (a
+// TCGplayer id), or something shaped like an mtgjson uuid. Full resolution
+// happens at render time.
+//
+// The uuid shape has to pass even when mtgmatcher does not carry it, because
+// resolution has a fallback for exactly that case: a printing the datastore
+// retired but the archive still holds prices for charts from our own history.
+// Refusing it here is what decides it never gets asked about.
 func isValidChartID(part string) bool {
 	if _, err := backend().GetUUID(part); err == nil {
 		return true
 	}
 	switch prefix, _ := splitIDPrefix(part); prefix {
 	case "ban", "tcg", "scryfall", "mtgjson":
+		return true
+	}
+	if maybeUUIDString(part) {
 		return true
 	}
 	_, err := strconv.Atoi(part)
@@ -1215,30 +1223,39 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
 		} else if Config.TimeseriesConfig.LongFormReads {
-			lb := chartLookback(sig)
-			pageVars.MaxLookbackDays = lb.Days()
+			// Render the window the chart draws, taken from the viewer's own
+			// last choice so it is not drawn once and redrawn at theirs. A
+			// roster's select starts on "All", so absent a choice it renders
+			// the lot. See docs/chart-page-loading.md.
+			lb, maxDays := chartWindow(sig, chartInitialRange(r, isMultiChart))
+			pageVars.MaxLookbackDays = maxDays
+			pageVars.ChartLoadedDays = lb.Days()
 
 			// Generic path: resolve every roster id to a target and chart it by
 			// whatever providers have data — one path for every game, keyed on the
 			// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
 			// UI's identity for favorites/roster/legend); the ban_id is internal.
-			var earliest time.Time
-			var ids, names []string
-			var series []map[string]timeseries.ProviderPrices
+			//
+			// Resolution stays here, on the request's own goroutine, because
+			// chartTargetFor owns an unlocked per-request map; only the archive
+			// reads that follow are issued together.
+			resolved := make([]chartSeries, 0, len(chartIDs))
 			for _, id := range chartIDs {
 				target := chartTargetFor(id)
 				if target == nil {
 					continue
 				}
-				// Read each card once and take the axis from what came back: a
-				// roster used to cost two archive round-trips per card, and
-				// against a hundred-partition prices table a round-trip is
-				// mostly planning.
-				results := fetchChartPrices(r.Context(), target, lb)
-				ids = append(ids, id)
-				names = append(names, target.Name)
-				series = append(series, results)
-				if e := earliestChartedDate(results, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+				resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, target: target})
+			}
+			series := fetchRosterPrices(r.Context(), resolved, lb)
+
+			// Read each card once and take the axis from what came back: a
+			// roster used to cost two archive round-trips per card, and
+			// against a hundred-partition prices table a round-trip is
+			// mostly planning.
+			var earliest time.Time
+			for _, s := range series {
+				if e := earliestChartedDate(s.Prices, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
 					earliest = e
 				}
 			}
@@ -1247,17 +1264,21 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
 				cards := make([]multiCardInput, len(series))
-				for i, results := range series {
+				for i, s := range series {
 					cards[i] = multiCardInput{
-						CardID:   ids[i],
-						Name:     names[i],
-						Datasets: chartDatasetsFrom(results, pageVars.AxisLabels),
+						CardID:   s.CardID,
+						Name:     s.Name,
+						Datasets: chartDatasetsFrom(s.Prices, pageVars.AxisLabels),
 					}
 				}
 				if isMultiChart {
 					datasets, refs := mergeMultiCardDatasets(cards)
 					pageVars.Datasets = datasets
 					pageVars.ChartReferences = refs
+					names := make([]string, len(cards))
+					for i, card := range cards {
+						names[i] = card.Name
+					}
 					pageVars.Checkpoints = multiCardCheckpoints(names, earliest)
 				} else {
 					pageVars.Datasets = cards[0].Datasets
@@ -1275,6 +1296,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
+			// The legacy read has no ranged endpoint behind it, so the page
+			// renders the whole window and the front-end never widens.
+			pageVars.ChartLoadedDays = pageVars.MaxLookbackDays
 
 			earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
@@ -1287,6 +1311,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		} else {
 			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
+			// The legacy read has no ranged endpoint behind it, so the page
+			// renders the whole window and the front-end never widens.
+			pageVars.ChartLoadedDays = pageVars.MaxLookbackDays
 
 			// Union of date ranges: pick the oldest earliest so every card's
 			// available history shows up, with NaN gaps for dates predating it.

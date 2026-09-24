@@ -414,6 +414,22 @@ func verifiedSignature(r *http.Request) string {
 	return sig
 }
 
+// verifiedRequestSignature is verifiedSignature for a handler that also has to
+// accept a signature named in the query, the way enforceSigning does: a link
+// someone was sent carries its grant in ?sig= before any cookie exists for it.
+// Whichever one it reads, it hands back only a signature signatureIsValid
+// accepts, so a caller behind noSigning can read a grant off it.
+func verifiedRequestSignature(r *http.Request) string {
+	sig := getSignatureFromCookies(r)
+	if querySig := r.FormValue("sig"); querySig != "" {
+		sig = querySig
+	}
+	if _, ok := signatureIsValid(sig); !ok {
+		return ""
+	}
+	return sig
+}
+
 // Put signature in cookies for one month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
