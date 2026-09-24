@@ -2,6 +2,7 @@ package manabox
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 )
@@ -20,8 +21,8 @@ func TestParseDeckURL(t *testing.T) {
 }
 
 func TestLoadLive(t *testing.T) {
-	if testing.Short() {
-		t.Skip("live network")
+	if os.Getenv("MANABOX_LIVE") == "" {
+		t.Skip("MANABOX_LIVE not set; skipping live ManaBox test")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
