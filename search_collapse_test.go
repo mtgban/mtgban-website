@@ -149,7 +149,7 @@ func TestCollapseIndex(t *testing.T) {
 }
 
 func TestCollapseSealedEV(t *testing.T) {
-	evShorts := []string{"EV"}
+	evShorts := []string{"TCGLowEV", "TCGLowSim", "TCGDirectNetEV", "TCGDirectNetSim", "TCGDirectSYPNetEV", "MKMEV", "MKMSim"}
 
 	tests := []struct {
 		name     string
@@ -159,10 +159,10 @@ func TestCollapseSealedEV(t *testing.T) {
 		check    func(t *testing.T, rows []SearchEntry)
 	}{
 		{
-			name: "base then sim folds into one row",
+			name: "EV then sim folds into one row",
 			entries: []SearchEntry{
-				{Shorthand: "EV", ScraperName: "EV alpha", Price: 10},
-				{Shorthand: "EV", ScraperName: "EV alpha Sim", Price: 11, ExtraValues: map[string]float64{"iqr": 1.5}},
+				{Shorthand: "TCGLowEV", ScraperName: "TCG Low EV", Price: 10},
+				{Shorthand: "TCGLowSim", ScraperName: "TCG Low Sim", Price: 11, ExtraValues: map[string]float64{"iqr": 1.5}},
 			},
 			wantLen:  1,
 			wantSeen: true,
@@ -176,10 +176,10 @@ func TestCollapseSealedEV(t *testing.T) {
 			},
 		},
 		{
-			name: "sim then base (order independent within a product)",
+			name: "sim then EV (order independent within a source)",
 			entries: []SearchEntry{
-				{Shorthand: "EV", ScraperName: "EV alpha Sim", Price: 11},
-				{Shorthand: "EV", ScraperName: "EV alpha", Price: 10},
+				{Shorthand: "TCGLowSim", ScraperName: "TCG Low Sim", Price: 11},
+				{Shorthand: "TCGLowEV", ScraperName: "TCG Low EV", Price: 10},
 			},
 			wantLen:  1,
 			wantSeen: true,
@@ -190,29 +190,36 @@ func TestCollapseSealedEV(t *testing.T) {
 			},
 		},
 		{
-			name: "distinct products stay separate",
+			name: "Cardmarket EV and Sim fold into one row",
 			entries: []SearchEntry{
-				{Shorthand: "EV", ScraperName: "EV alpha", Price: 10},
-				{Shorthand: "EV", ScraperName: "EV beta", Price: 20},
-				{Shorthand: "EV", ScraperName: "EV alpha Sim", Price: 11},
+				{Shorthand: "MKMEV", ScraperName: "Cardmarket EV", Price: 30},
+				{Shorthand: "MKMSim", ScraperName: "Cardmarket Sim", Price: 28},
+			},
+			wantLen:  1,
+			wantSeen: true,
+			check: func(t *testing.T, rows []SearchEntry) {
+				if rows[0].ScraperName != "Cardmarket EV" || rows[0].Price != 30 || rows[0].Secondary != 28 {
+					t.Errorf("row = %q %v/%v, want \"Cardmarket EV\" 30/28", rows[0].ScraperName, rows[0].Price, rows[0].Secondary)
+				}
+			},
+		},
+		{
+			name: "distinct sources stay separate",
+			entries: []SearchEntry{
+				{Shorthand: "TCGDirectNetEV", ScraperName: "TCG Direct (net) EV", Price: 10},
+				{Shorthand: "TCGDirectNetSim", ScraperName: "TCG Direct (net) Sim", Price: 11},
+				{Shorthand: "TCGDirectSYPNetEV", ScraperName: "TCG Direct SYP (net) EV", Price: 20},
 			},
 			wantLen:  2,
 			wantSeen: true,
 			check: func(t *testing.T, rows []SearchEntry) {
 				if rows[0].Price != 10 || rows[0].Secondary != 11 {
-					t.Errorf("alpha Price/Secondary = %v/%v, want 10/11", rows[0].Price, rows[0].Secondary)
+					t.Errorf("TCG Direct (net) Price/Secondary = %v/%v, want 10/11", rows[0].Price, rows[0].Secondary)
 				}
-				if rows[1].Price != 20 {
-					t.Errorf("beta Price = %v, want 20", rows[1].Price)
+				if rows[1].Price != 20 || rows[1].Secondary != 0 {
+					t.Errorf("TCG Direct SYP (net) Price/Secondary = %v/%v, want 20/0", rows[1].Price, rows[1].Secondary)
 				}
 			},
-		},
-		{
-			name:     "EV present but name without a product id is skipped",
-			entries:  []SearchEntry{{Shorthand: "EV", ScraperName: "EV", Price: 10}},
-			wantLen:  0,
-			wantSeen: true,
-			check:    func(t *testing.T, rows []SearchEntry) {},
 		},
 		{
 			name:     "non-EV shorthands are ignored",

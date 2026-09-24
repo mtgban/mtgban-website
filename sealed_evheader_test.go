@@ -53,10 +53,10 @@ func TestSealedEVHeaderFollowsItsRows(t *testing.T) {
 // The flag the header follows is set by the collapse, not by the caller.
 func TestCollapseSealedEVMarksItsRows(t *testing.T) {
 	rows, seen := collapseSealedEV([]SearchEntry{
-		// A base entry and its " Sim" sibling, paired on the product id in
-		// the second word, which is the shape the collapse documents.
-		{ScraperName: "EV 12345", Shorthand: "TCGLowEV", Price: 4.20},
-		{ScraperName: "EV 12345 Sim", Shorthand: "TCGLowSim", Price: 4.00},
+		// An EV entry and its Sim sibling, paired on the shorthand they
+		// share but for the suffix.
+		{ScraperName: "TCG Low EV", Shorthand: "TCGLowEV", Price: 4.20},
+		{ScraperName: "TCG Low Sim", Shorthand: "TCGLowSim", Price: 4.00},
 		{ScraperName: "TCGplayer", Shorthand: "TCGSealed", Price: 9.99},
 	}, []string{"TCGLowEV", "TCGLowSim"})
 
