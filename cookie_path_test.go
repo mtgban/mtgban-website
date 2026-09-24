@@ -23,6 +23,7 @@ func TestCookiePath(t *testing.T) {
 		{"ArbitVendorsList", "/arbit", false, "/arbit"},
 		{"ReverseVendorsList", "/reverse", false, "/reverse"},
 		{"UploadOptimizerOpts", "/upload", false, "/upload"},
+		{"UploadCustomRate", "/upload", false, "/"},
 		{"MTGBAN", "/auth", true, "/"},
 		{"MTGBAN", "/auth", false, "/"},
 		{"MobileSearchLayout", "/sealed", false, "/"},
