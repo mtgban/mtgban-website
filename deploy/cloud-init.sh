@@ -78,6 +78,10 @@ if [ ! -f /etc/mtgban.env ]; then
 BAN_SECRET=XXX
 BAN_CONFIG_KEY=XXX
 BAN_CONFIG_SECRET=XXX
+# Left unset on purpose: no value disables the API trial and sign-in handoff
+# cleanly, while a placeholder would mint tokens the gateway rejects. Fill it
+# in with the gateway's own secret when there is one.
+#TRIAL_SECRET=
 EOF
     chmod 600 /etc/mtgban.env
     chown root:root /etc/mtgban.env

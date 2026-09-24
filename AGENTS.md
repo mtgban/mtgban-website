@@ -66,6 +66,11 @@ output, not a claim written here.
   `git status` before any commit.
 - `BAN_SECRET` (env var) keys the HMAC signing; `BAN_CONFIG_PATH` sets the
   default config path.
+- `TRIAL_SECRET` (env var) keys the handoff token the API gateway verifies
+  (`apihandoff`), so it has to be the same string here and there, and the
+  same across every deployment handing off to one gateway. Unset disables
+  the API trial and sign-in handoff and is a supported state; see
+  `deploy/README.md` for where it lives on a droplet.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
   for the current line — it moves): scraper config, Patreon OAuth, ACL (tier →
   page → flags), affiliates, DB addresses, B2 bucket credentials.

@@ -109,15 +109,20 @@ sudo systemctl disable --now mtgban.service || true
 
 ### 2. Create the secrets env file (NOT in git)
 
-The unit reads `BAN_SECRET` and the B2 config credentials from
-`/etc/mtgban.env` via `EnvironmentFile=`. This file lives only on the droplet,
-owned by root and mode 600 — it is never committed. Fill in the real values:
+The unit reads `BAN_SECRET`, the B2 config credentials and `TRIAL_SECRET`
+from `/etc/mtgban.env` via `EnvironmentFile=`. This file lives only on the
+droplet, owned by root and mode 600 — it is never committed. Fill in the three
+real values (the fourth key is deliberately left commented out — see below):
 
 ```bash
 sudo tee /etc/mtgban.env >/dev/null <<'EOF'
 BAN_SECRET=XXX
 BAN_CONFIG_KEY=XXX
 BAN_CONFIG_SECRET=XXX
+# Left unset on purpose: no value disables the API trial and sign-in handoff
+# cleanly, while a placeholder would mint tokens the gateway rejects. Fill it
+# in with the gateway's own secret when there is one.
+#TRIAL_SECRET=
 EOF
 sudo chmod 600 /etc/mtgban.env
 sudo chown root:root /etc/mtgban.env
@@ -125,6 +130,34 @@ sudo chown root:root /etc/mtgban.env
 
 Format is plain `KEY=value` (no surrounding quotes — values are literal, not
 shell-expanded). Both instances read the same file.
+
+`TRIAL_SECRET` is commented out rather than given a placeholder, and that is
+the point of it. It keys the token this site hands the API gateway for an API
+trial or a sign-in (`apihandoff`), so the only value worth setting is the one
+the **gateway verifies with** — the same string on both sides, and the same
+across every game deployment handing off to the same gateway.
+
+No value is a supported state: the site logs `TRIAL_SECRET not set, API trial
+and sign-in handoff disabled` at startup and the pricing page stops offering
+the trial. A *wrong* value is the state to avoid, and it is the one an
+unreplaced `XXX` would leave behind — the site mints tokens that look fine
+here and fail verification at the far end, after the reader has already been
+redirected. The other three keys fail loudly and immediately when they are
+wrong; this one does not, so it starts empty.
+
+Setting it — on a fresh droplet or one already running — is the same manual
+edit, since neither `cloud-init.sh` nor `bootstrap.sh` will touch a secrets
+file that already exists:
+
+```bash
+echo 'TRIAL_SECRET=<the string the gateway verifies with>' | sudo tee -a /etc/mtgban.env
+```
+
+`EnvironmentFile` is read when an instance starts, so nothing picks the value
+up until one restarts. The next deploy does that on its own. To apply it
+sooner, restart the two one at a time rather than together — they are the
+blue/green pair nginx sits in front of, and restarting both at once is the
+one way to turn this into downtime.
 
 ### 3. Create the two per-port checkouts and start 8081
 

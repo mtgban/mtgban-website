@@ -162,6 +162,10 @@ else
 BAN_SECRET=XXX
 BAN_CONFIG_KEY=XXX
 BAN_CONFIG_SECRET=XXX
+# Left unset on purpose: no value disables the API trial and sign-in handoff
+# cleanly, while a placeholder would mint tokens the gateway rejects. Fill it
+# in with the gateway's own secret when there is one.
+#TRIAL_SECRET=
 EOF
     sudo chmod 600 "$ENV_FILE"
     sudo chown root:root "$ENV_FILE"
