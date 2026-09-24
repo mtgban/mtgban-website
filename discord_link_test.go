@@ -9,6 +9,16 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
+// tcgplayerProductIDOf is the id TCGplayer files a printing under: the etched
+// product where the printing is etched, the plain one otherwise. The two are
+// one id space, which is what lets a single lookup answer either.
+func tcgplayerProductIDOf(co *mtgmatcher.CardObject) string {
+	if co.Etched {
+		return co.Identifiers["tcgplayerEtchedProductId"]
+	}
+	return co.Identifiers["tcgplayerProductId"]
+}
+
 // tcgplayerLinkFor spells the address TCGplayer files a printing under, the
 // way a reader pastes it: the product id, and the Printing parameter the page
 // carries for a foil. The slug is deliberately not the card's name - a name
@@ -16,10 +26,7 @@ import (
 // ignore the message, which is a property of the skip list and not of the
 // mapping these tests are about.
 func tcgplayerLinkFor(co *mtgmatcher.CardObject) string {
-	id := co.Identifiers["tcgplayerProductId"]
-	if co.Etched {
-		id = co.Identifiers["tcgplayerEtchedProductId"]
-	}
+	id := tcgplayerProductIDOf(co)
 	if id == "" {
 		return ""
 	}
@@ -30,40 +37,78 @@ func tcgplayerLinkFor(co *mtgmatcher.CardObject) string {
 	return link
 }
 
+// tcgplayerSharedProductIDs are the ids more than one printing answers to, so
+// no lookup can tell which of them a link meant. TCGplayer sells a Secret
+// Lair's English and Japanese printings as one product - SLD #1112 and
+// #1112jpn both file under 450544 - and a handful of dagger variants the same
+// way. mtgmatcher keeps the first filer and drops the rest, deterministically,
+// so the answer is a real printing of the right card under the right name; it
+// just is not always the one a caller started from.
+func tcgplayerSharedProductIDs() map[string]bool {
+	printings := map[string]map[string]bool{}
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+		id := tcgplayerProductIDOf(co)
+		if id == "" {
+			continue
+		}
+		if printings[id] == nil {
+			printings[id] = map[string]bool{}
+		}
+		printings[id][co.SetCode+" "+co.Number] = true
+	}
+
+	shared := map[string]bool{}
+	for id, under := range printings {
+		if len(under) > 1 {
+			shared[id] = true
+		}
+	}
+	return shared
+}
+
 // A store link the bot answers has to name the printing it points at, or name
 // nothing: the website link built from it is the reader's next click, and one
 // that lands on a different card is worse than one that is not offered.
 //
 // The fixtures are built from the datastore rather than written down, so the
 // test asks the question for whatever cards this datastore holds instead of
-// going stale against a set it no longer carries.
+// going stale against a set it no longer carries. Every printing is asked,
+// not a sample: a wrong answer is one card, and a sample that misses it
+// reads exactly like a population that does not hold it. Some 300k lookups,
+// about three seconds beside the datastore's own load.
 func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
 
-	uuids := backend().GetUUIDs()
-	step := len(uuids) / 400
-	if step < 1 {
-		step = 1
-	}
+	shared := tcgplayerSharedProductIDs()
 
-	var checkedTCG, checkedMP int
-	for i := 0; i < len(uuids); i += step {
-		co, err := backend().GetUUID(uuids[i])
+	var checkedTCG, checkedMP, sharedTCG int
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
 		if err != nil || co.Sealed {
 			continue
 		}
 
 		if link := tcgplayerLinkFor(co); link != "" {
-			checkedTCG++
-			_, _, got := checkForLinks(discordGuildID(), "look at "+link)
-			if got == nil {
-				t.Errorf("%s %s #%s: %s named no printing", co.Name, co.SetCode, co.Number, link)
-			} else if got.UUID != co.UUID {
-				t.Errorf("%s named %s %s #%s (%s), want %s %s #%s (%s)",
-					link, got.Name, got.SetCode, got.Number, got.UUID,
-					co.Name, co.SetCode, co.Number, co.UUID)
+			// An id several printings answer to cannot name one of them, so
+			// asking it to would be testing the datastore's filing order.
+			if shared[tcgplayerProductIDOf(co)] {
+				sharedTCG++
+			} else {
+				checkedTCG++
+				_, _, got := checkForLinks(discordGuildID(), "look at "+link)
+				if got == nil {
+					t.Errorf("%s %s #%s: %s named no printing", co.Name, co.SetCode, co.Number, link)
+				} else if got.UUID != co.UUID {
+					t.Errorf("%s named %s %s #%s (%s), want %s %s #%s (%s)",
+						link, got.Name, got.SetCode, got.Number, got.UUID,
+						co.Name, co.SetCode, co.Number, co.UUID)
+				}
 			}
 		}
 
@@ -99,6 +144,17 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 
 	if checkedTCG == 0 || checkedMP == 0 {
 		t.Fatalf("nothing was checked: %d tcgplayer, %d mana pool", checkedTCG, checkedMP)
+	}
+	t.Logf("%d tcgplayer printings, %d mana pool; %d printings share a product id with another and were not asked",
+		checkedTCG, checkedMP, sharedTCG)
+
+	// The shared ids are a property of how TCGplayer sells Secret Lairs, not
+	// of this code, but a jump would mean the id space had stopped naming one
+	// printing - which is the assumption the link rests on. 2,543 of 150,619
+	// printings, 1.7%, on the September datastore; this fires at 3%.
+	if sharedTCG*100 > (checkedTCG+sharedTCG)*3 {
+		t.Errorf("%d of %d printings share a product id, well past the 1.7%% this datastore has carried",
+			sharedTCG, checkedTCG+sharedTCG)
 	}
 }
 
@@ -211,6 +267,7 @@ func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
 		{"amazon", "https://www.amazon.com/dp/B0123456"},
 		{"a tcgplayer product this datastore does not hold", "https://www.tcgplayer.com/product/999999999/magic-product"},
 		{"a mana pool set this datastore does not hold", "https://manapool.com/card/zzz/1/a-card"},
+		{"a mana pool card across every set", "https://manapool.com/card/caravan-vigil"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			title, link, co := checkForLinks(discordGuildID(), tt.message)
