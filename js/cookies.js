@@ -1,12 +1,16 @@
-// Search preferences are shared by /search and /sealed. Other browser
+// Search preferences are shared by /search and /sealed, and the custom
+// buylist is set up on /upload but priced into /search too. Other browser
 // preferences belong to the first path segment of the page that edits them.
-function cookiePath(cname) {
-    if (cname.startsWith('Search') || cname.startsWith('MobileSearch')) {
-        return '/';
-    }
-
+function routePath() {
     const match = window.location.pathname.match(/^\/[^/]+/);
     return match ? match[0] : '/';
+}
+
+function cookiePath(cname) {
+    if (cname.startsWith('Search') || cname.startsWith('MobileSearch') || cname.startsWith('UploadCustom')) {
+        return '/';
+    }
+    return routePath();
 }
 
 function writeCookie(cname, cvalue, exdays, path) {
@@ -26,10 +30,11 @@ function setCookie(cname, cvalue, exdays) {
     const path = cookiePath(cname);
     writeCookie(cname, cvalue, exdays, path);
 
-    // Remove a legacy root-scoped copy when a route-local preference is
-    // written. This prevents two values with the same name from being sent.
-    if (path !== '/') {
-        writeCookie(cname, '', 0, '/');
+    // Expire the copy at the other path, a legacy root one or a route one
+    // left by an older build, so two values with one name are never sent.
+    const other = path === '/' ? routePath() : '/';
+    if (other !== path) {
+        writeCookie(cname, '', 0, other);
     }
 }
 

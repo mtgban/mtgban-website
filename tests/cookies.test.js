@@ -21,8 +21,22 @@ test('shared search cookies remain root-scoped on sealed pages', () => {
 
     api.setCookie('SearchSellersList', 'value', 1000);
 
-    expect(writes).toHaveLength(1);
     expect(writes[0]).toContain('path=/;');
+    expect(writes.slice(1).every(w => w.startsWith('SearchSellersList=;'))).toBe(true);
+});
+
+// /search prices the custom buylist from these, so a copy scoped to /upload
+// is one it never receives.
+test('custom buylist cookies are root-scoped and expire the upload copy', () => {
+    const { api, writes } = loadCookies({ pathname: '/upload' });
+
+    api.setCookie('UploadCustomRate', '0.8', 1000);
+
+    expect(writes).toHaveLength(2);
+    expect(writes[0]).toContain('UploadCustomRate=0.8;');
+    expect(writes[0]).toContain('path=/;');
+    expect(writes[1]).toStartWith('UploadCustomRate=;');
+    expect(writes[1]).toContain('path=/upload;');
 });
 
 test('route-local cookies use the current route and expire the root copy', () => {
