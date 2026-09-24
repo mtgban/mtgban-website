@@ -300,6 +300,36 @@ func TestChangelogEntryFromMessageSkipsEmptyMessages(t *testing.T) {
 	}
 }
 
+// The channel carries more than announcements: Discord's own notices, whose
+// content is a thread's name or a pin, and this bot's replies to a store link
+// posted in one. Neither belongs on the public page.
+func TestChangelogEntryFromMessageSkipsWhatIsNotAnAnnouncement(t *testing.T) {
+	prev := dg
+	t.Cleanup(func() { dg = prev })
+	dg = &discordgo.Session{State: discordgo.NewState()}
+	dg.State.User = &discordgo.User{ID: "the-bot"}
+
+	for name, message := range map[string]*discordgo.Message{
+		"a thread's name":     {Type: discordgo.MessageTypeThreadCreated, Content: "FREE CARDS https://evil.example"},
+		"the bot's own reply": {Author: &discordgo.User{ID: "the-bot"}, Embeds: []*discordgo.MessageEmbed{{Title: "Black Lotus at Manapool"}}},
+	} {
+		_, ok := changelogEntryFromMessage(message, "channel")
+		if ok {
+			t.Errorf("%s became a changelog entry", name)
+		}
+	}
+
+	for name, message := range map[string]*discordgo.Message{
+		"an announcement":               {Author: &discordgo.User{ID: "an-admin"}, Content: "Release notes"},
+		"one posted by a slash command": {Type: discordgo.MessageTypeChatInputCommand, Author: &discordgo.User{ID: "another-bot"}, Content: "Release notes"},
+	} {
+		_, ok := changelogEntryFromMessage(message, "channel")
+		if !ok {
+			t.Errorf("%s was left out", name)
+		}
+	}
+}
+
 func TestGroupChangelogEntriesKeepsDiscordOrder(t *testing.T) {
 	base := time.Date(2026, time.September, 20, 16, 0, 0, 0, time.UTC)
 	entries := []changelogEntry{

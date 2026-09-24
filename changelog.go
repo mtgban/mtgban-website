@@ -270,12 +270,33 @@ func listChangelogChannels() ([]*discordgo.Channel, error) {
 	return dg.GuildChannels(discordGuildID())
 }
 
+// ownMessage reports whether this bot wrote message.
+func ownMessage(message *discordgo.Message) bool {
+	if dg == nil || dg.State == nil || message.Author == nil {
+		return false
+	}
+	dg.State.RLock()
+	defer dg.State.RUnlock()
+	return dg.State.User != nil && message.Author.ID == dg.State.User.ID
+}
+
 func changelogEntryFromMessage(message *discordgo.Message, channelID string) (changelogEntry, bool) {
 	return changelogEntryFromMessageWithLabels(message, channelID, changelogMentionLabels{})
 }
 
 func changelogEntryFromMessageWithLabels(message *discordgo.Message, channelID string, mentionLabels changelogMentionLabels) (changelogEntry, bool) {
 	if message == nil {
+		return changelogEntry{}, false
+	}
+	// Announcements only: not Discord's notices, such as a thread's name,
+	// and not this bot's replies to a store link posted in one.
+	switch message.Type {
+	case discordgo.MessageTypeDefault, discordgo.MessageTypeReply,
+		discordgo.MessageTypeChatInputCommand, discordgo.MessageTypeContextMenuCommand:
+	default:
+		return changelogEntry{}, false
+	}
+	if ownMessage(message) {
 		return changelogEntry{}, false
 	}
 	if strings.TrimSpace(message.Content) == "" && len(message.Embeds) == 0 && len(message.Attachments) == 0 {
