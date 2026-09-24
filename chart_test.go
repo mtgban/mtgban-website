@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -42,7 +41,7 @@ func TestParseChartIDsEmpty(t *testing.T) {
 func TestParseChartIDsSingle(t *testing.T) {
 	a, _ := twoRealUUIDs(t)
 	got, _ := parseChartIDs(a)
-	if !reflect.DeepEqual(got, []string{a}) {
+	if !slices.Equal(got, []string{a}) {
 		t.Fatalf("expected [%s], got %v", a, got)
 	}
 }
@@ -51,7 +50,7 @@ func TestParseChartIDsTrimsWhitespaceAndSkipsEmpty(t *testing.T) {
 	a, b := twoRealUUIDs(t)
 	got, _ := parseChartIDs("  " + a + " , ," + b + "  ")
 	want := []string{a, b}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
@@ -60,7 +59,7 @@ func TestParseChartIDsDedupesPreservingOrder(t *testing.T) {
 	a, b := twoRealUUIDs(t)
 	got, _ := parseChartIDs(a + "," + b + "," + a)
 	want := []string{a, b}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
 }
@@ -68,7 +67,7 @@ func TestParseChartIDsDedupesPreservingOrder(t *testing.T) {
 func TestParseChartIDsDropsInvalid(t *testing.T) {
 	a, _ := twoRealUUIDs(t)
 	got, _ := parseChartIDs("not-a-real-uuid," + a + ",also-bogus")
-	if !reflect.DeepEqual(got, []string{a}) {
+	if !slices.Equal(got, []string{a}) {
 		t.Fatalf("expected only [%s], got %v", a, got)
 	}
 }
@@ -86,7 +85,7 @@ func TestParseChartIDsCapsRoster(t *testing.T) {
 	// More distinct valid ids than the chart can render: keep the first
 	// maxCards in order and flag the drop.
 	got, truncated := parseChartIDs(strings.Join(ids, ","))
-	if !reflect.DeepEqual(got, ids[:maxCards]) {
+	if !slices.Equal(got, ids[:maxCards]) {
 		t.Fatalf("expected first %d ids in order, got %v", maxCards, got)
 	}
 	if !truncated {
@@ -184,7 +183,7 @@ func TestMergeMultiCardDatasetsOverridesNameAndColor(t *testing.T) {
 	if out[0].Reference != "TCG Low" {
 		t.Errorf("Reference should be preserved, got %q", out[0].Reference)
 	}
-	if !reflect.DeepEqual(refs, []string{"TCG Low"}) {
+	if !slices.Equal(refs, []string{"TCG Low"}) {
 		t.Errorf("refs = %v, want [TCG Low]", refs)
 	}
 }
@@ -207,7 +206,7 @@ func TestMergeMultiCardDatasetsFiltersEmptyData(t *testing.T) {
 	if out[0].Reference != "TCG Low" {
 		t.Errorf("kept the wrong dataset: %+v", out[0])
 	}
-	if !reflect.DeepEqual(refs, []string{"TCG Low"}) {
+	if !slices.Equal(refs, []string{"TCG Low"}) {
 		t.Errorf("empty datasets should not contribute to refs; got %v", refs)
 	}
 }
@@ -262,7 +261,7 @@ func TestMergeMultiCardDatasetsReferenceOrderFirstSeen(t *testing.T) {
 	}
 	_, refs := mergeMultiCardDatasets(cards)
 	want := []string{"TCG Low", "CK Buy", "TCG Market"}
-	if !reflect.DeepEqual(refs, want) {
+	if !slices.Equal(refs, want) {
 		t.Errorf("refs = %v, want %v", refs, want)
 	}
 }

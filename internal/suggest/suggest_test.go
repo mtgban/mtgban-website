@@ -1,7 +1,7 @@
 package suggest
 
 import (
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -49,7 +49,7 @@ func TestRelaxedSearches(t *testing.T) {
 	}
 	for _, tc := range cases {
 		got := relaxedSearches(tc.raw, tc.clean, tc.filters)
-		if !reflect.DeepEqual(got, tc.want) {
+		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: relaxedSearches = %#v, want %#v", tc.name, got, tc.want)
 		}
 	}
