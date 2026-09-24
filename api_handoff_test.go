@@ -11,6 +11,18 @@ import (
 	"github.com/mtgban/mtgban-website/apihandoff"
 )
 
+// setGatewaySecret installs the shared secret the handoff signs with; empty turns the handoff off.
+func setGatewaySecret(t *testing.T, secret string) {
+	t.Helper()
+	saved, savedGame := Config.APIUserSecrets, Config.Game
+	t.Cleanup(func() { Config.APIUserSecrets, Config.Game = saved, savedGame })
+	Config.Game = "magic"
+	Config.APIUserSecrets = map[string]string{}
+	if secret != "" {
+		Config.APIUserSecrets[apiGatewayUser] = secret
+	}
+}
+
 func handoffRequest(t *testing.T, handler http.HandlerFunc, path, sig string) *httptest.ResponseRecorder {
 	t.Helper()
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
@@ -27,7 +39,7 @@ func handoffRequest(t *testing.T, handler http.HandlerFunc, path, sig string) *h
 }
 
 func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
+	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example"}
 	rec := handoffRequest(t, APITrial, "/api-trial?return_to=https://pokemon.mtgban.com/api-plans", sign("Legacy", user, nil, DefaultSignatureDuration))
 	if rec.Code != http.StatusFound {
@@ -41,7 +53,7 @@ func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if claims.Email != "ann@example.com" || claims.Name != "Ann Example" || claims.Purpose != apihandoff.PurposeTrial || claims.Nonce == "" {
+	if claims.Email != "ann@example.com" || claims.Name != "Ann Example" || claims.Purpose != apihandoff.PurposeTrial || claims.Game != "magic" || claims.Nonce == "" {
 		t.Errorf("claims %+v", claims)
 	}
 	if loc.Query().Get("return_to") != "https://pokemon.mtgban.com/api-plans" {
@@ -50,7 +62,7 @@ func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 }
 
 func TestAPITrialNeedsAPledge(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
+	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
 	rec := handoffRequest(t, APITrial, "/api-trial", sign("", user, nil, DefaultSignatureDuration))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPITrialPledge) {
@@ -62,7 +74,7 @@ func TestAPITrialNeedsAPledge(t *testing.T) {
 }
 
 func TestAPILoginWorksWithoutAPledge(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
+	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
 	rec := handoffRequest(t, APILogin, "/api-login", sign("", user, nil, DefaultSignatureDuration))
 	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/session?t=") {
@@ -76,7 +88,7 @@ func TestAPILoginWorksWithoutAPledge(t *testing.T) {
 }
 
 func TestAPIHandoffDisabledWithoutSecret(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "")
+	setGatewaySecret(t, "")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
 	rec := handoffRequest(t, APILogin, "/api-login", sign("Legacy", user, nil, DefaultSignatureDuration))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPIHandoffOff) {
@@ -111,7 +123,7 @@ func TestAPIHandoffsAreHiddenSubPagesOfTheAPIPage(t *testing.T) {
 }
 
 func TestAPIPlansDispatchesHandoffSubPages(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
+	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
 	rec := handoffRequest(t, APIPlans, "/api-login", sign("", user, nil, DefaultSignatureDuration))
 	if rec.Code != http.StatusFound || !strings.HasPrefix(rec.Header().Get("Location"), "https://api.example/session?t=") {
@@ -124,7 +136,7 @@ func TestAPIPlansDispatchesHandoffSubPages(t *testing.T) {
 }
 
 func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
+	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
 	// handoffRequest turns SigCheck off; a tampered cookie must still be refused with it on.
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
@@ -151,7 +163,7 @@ func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 }
 
 func TestAPIHandoffDropsUntrustedReturnTo(t *testing.T) {
-	t.Setenv("TRIAL_SECRET", "trial-secret")
+	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "bob@example.com", FullName: "Bob"}
 	rec := handoffRequest(t, APILogin, "/api-login?return_to=https://evil.example/steal", sign("", user, nil, DefaultSignatureDuration))
 	loc, _ := url.Parse(rec.Header().Get("Location"))
