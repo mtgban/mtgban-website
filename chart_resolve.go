@@ -189,7 +189,7 @@ func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 	}
 	if banID, ok := PricesArchiveDB.CachedMagicBanID(timeseries.MagicVariant{
 		MtgjsonUUID: co.UUID, IsFoil: co.Foil, IsEtched: co.Etched,
-		IsAlt: co.IsAlternative, Language: co.Language,
+		IsAlt: isAltVariant(co), Language: co.Language,
 	}); ok {
 		return banID
 	}
