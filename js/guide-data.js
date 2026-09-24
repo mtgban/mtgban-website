@@ -1216,7 +1216,7 @@ window.__BAN_GUIDE = {
             snippets: ['retail/ZEN.json', 'buylist/10E.csv', 'sealed/ROE.json', 'sets.json', 'stores.json'],
             keywords: ['api', 'endpoint', 'retail', 'buylist', 'sealed', 'sets', 'stores', 'edition', 'snapshot', 'single card', 'csv', 'search'],
             content: {
-                description: '<p>Paths are relative to <code>https://api.mtgban.com/v1/{game}/mtgban/</code>. Only <code>GET</code> is accepted. Every endpoint returns JSON; replace <code>.json</code> with <code>.csv</code> for a human-readable CSV that leaves out the fields a flat file cannot hold. Editions use <a href="https://scryfall.com/sets" target="_blank" rel="noopener">Scryfall set codes</a>.</p>',
+                description: '<p>Paths are relative to <code>https://api.mtgban.com/v1/{game}/mtgban/</code>. Only <code>GET</code> is accepted. Every endpoint returns JSON; replace <code>.json</code> with <code>.csv</code> for a human-readable CSV that leaves out the fields a flat file cannot hold, except on <code>all/{SET}</code> and the unfiltered full snapshot. Editions use <a href="https://scryfall.com/sets" target="_blank" rel="noopener">Scryfall set codes</a>.</p>',
                 table: [
                     { value: 'sets.json', short: 'Set codes with data. filter=sealed or filter=singles narrows the list.' },
                     { value: 'stores.json', short: 'Store tags used as keys in price objects, in a stable order. filter=sealed or filter=singles narrows it; tag=names returns full store names instead.' },
@@ -1251,7 +1251,7 @@ window.__BAN_GUIDE = {
                     { value: 'id=tcg', short: 'Key card objects by another id system: tcg (TCGplayer product id), scryfall, mtgjson, mkm (Cardmarket), ck (Card Kingdom), or mtgban (the default). ck and mtgban list foil and regular under separate ids.' },
                     { value: 'qty=true', short: 'Add qty, qty_foil, and qty_etched to price objects. Retail: stock across all conditions. Buylist: the amount the store wants.' },
                     { value: 'conds=true', short: 'Add a conditions dictionary with a price per condition (NM, SP, MP, HP, PO, with _foil and _etched variants). With qty=true a quantities dictionary is added too.' },
-                    { value: 'vendor=CK,SCG', short: 'Limit the response to the listed store tags. Condition prices are always included.' },
+                    { value: 'vendor=CK,SCG', short: 'Limit the response to the listed store tags. With a single store, condition prices are always included.' },
                     { value: 'finish=foil', short: 'Keep one finish only: foil, nonfoil, or etched.' },
                     { value: 'tag=names', short: 'Use full store names as keys instead of tags. stores.json?tag=names gives the mapping.' },
                     { value: 'filter=sealed', short: 'On sets.json and stores.json, keep only entries with sealed data; filter=singles keeps singles.' },
