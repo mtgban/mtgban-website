@@ -95,8 +95,12 @@ func (c *Client) providerLatestDateStmt(bounded, strict bool) *sql.Stmt {
 // survives lets Postgres settle on a generic plan, which took the same read to
 // 0.06ms of planning.
 //
-// The fallback is not just for a failed prepare: a pooler that cannot hold
-// server-side statements (pgbouncer in transaction mode) needs this path too.
+// The fallback covers a prepare that failed at NewClient time, and a client
+// built without one. It does not cover a statement the server loses later - a
+// pooler in transaction mode hands the prepare to one backend and the read to
+// another, and the read comes back "prepared statement does not exist" with no
+// second chance here. Nothing in front of this database pools that way today;
+// if that changes, this is the path that has to learn to retry.
 func (c *Client) query(ctx context.Context, stmt *sql.Stmt, text string, args ...any) (*sql.Rows, error) {
 	if stmt != nil {
 		return stmt.QueryContext(ctx, args...)
