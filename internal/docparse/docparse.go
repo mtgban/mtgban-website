@@ -219,6 +219,22 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 	return uploadedDataClean
 }
 
+// isCardmarketIDHeader reports whether a lowercased header names a Cardmarket
+// product id, separators aside: mcm_id, "MKM Id", cardmarketId.
+func isCardmarketIDHeader(field string) bool {
+	compact := strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return r
+		}
+		return -1
+	}, field)
+	switch compact {
+	case "mcmid", "mkmid", "cardmarketid", "mcmproductid", "mkmproductid", "cardmarketproductid":
+		return true
+	}
+	return false
+}
+
 // ParseHeader maps recognized column names to their index in the header row.
 func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 	if len(first) < 1 {
@@ -250,11 +266,10 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 			if !found {
 				indexMap["tcgSku"] = i
 			}
-		// A Cardmarket id needs both halves named: "original id" and
-		// "instance id" are the mtgban export's own columns and carry the
-		// one half that is not the marketplace.
-		case (strings.Contains(field, "mcm") || strings.Contains(field, "mkm") ||
-			strings.Contains(field, "cardmarket")) && strings.Contains(field, "id"):
+		// A Cardmarket id is matched by its whole name: "original id" and
+		// "instance id" are the mtgban export's own, and "mkm" and "id" both
+		// turn up in headers that are something else, as "MKM Price Guide".
+		case isCardmarketIDHeader(field):
 			_, found := indexMap["mkmID"]
 			if !found {
 				indexMap["mkmID"] = i
