@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -383,7 +384,7 @@ func signatureIsValid(sig string) (url.Values, bool) {
 	data := fmt.Sprintf("GET%s%s%s", exp, signatureLink(), q.Encode())
 	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || valid != v.Get("Signature") || expires < time.Now().Unix() {
+	if err != nil || !hmac.Equal([]byte(valid), []byte(v.Get("Signature"))) || expires < time.Now().Unix() {
 		return v, false
 	}
 	return v, true
@@ -655,8 +656,9 @@ func enforceSigning(next http.Handler) http.Handler {
 		link := signatureLink()
 		data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
 		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		signed := hmac.Equal([]byte(valid), []byte(expectedSig))
 		expires, err := strconv.ParseInt(exp, 10, 64)
-		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
+		if SigCheck && (err != nil || !signed || expires < time.Now().Unix()) {
 			if r.Method != "GET" {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
@@ -664,7 +666,7 @@ func enforceSigning(next http.Handler) http.Handler {
 			pageVars := genPageNav(r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
-			if valid == expectedSig && expires < time.Now().Unix() {
+			if signed && expires < time.Now().Unix() {
 				pageVars.ErrorMessage = ErrMsgExpired
 				pageVars.PatreonLogin = true
 				if DevMode {

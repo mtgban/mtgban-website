@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -211,5 +212,30 @@ func TestSearchAPITakesNoUncheckedCookie(t *testing.T) {
 	forged := base64.StdEncoding.EncodeToString([]byte("Expires=99999999999"))
 	if strings.Contains(search(forged), "12.34") {
 		t.Error("a hand-written cookie lifted a sig-less API search out of the demo stores")
+	}
+}
+
+// A signature this host wrote that has run out is told it was logged out,
+// with the way back in; one it never wrote is not.
+func TestEnforceSigningTellsExpiredFromForged(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
+	handler := enforceSigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	expired := signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(-time.Hour))
+	v := parseSig(expired)
+	v.Set("Signature", "AAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	forged := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+
+	for name, sig := range map[string]string{"expired": expired, "forged": forged} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/search?sig="+url.QueryEscape(sig), nil))
+		// The page escapes the apostrophe in the message.
+		loggedOut := strings.Contains(rec.Body.String(), html.EscapeString(ErrMsgExpired))
+		if loggedOut != (name == "expired") {
+			t.Errorf("%s: told it was logged out: %v", name, loggedOut)
+		}
 	}
 }
