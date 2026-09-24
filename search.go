@@ -506,8 +506,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// landing page says better than an empty result does.
 	//
 	// The editions tree on /sets is a page rather than a placeholder waiting
-	// for a query, so it keeps its own empty state either way.
-	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
+	// for a query, so it keeps its own empty state either way. And only a
+	// request naming scope is the bar searching: the navbar's links name
+	// none, and a filter the cookie pinned must not replace their pages.
+	_, scopeNamed := r.Form["scope"]
+	scopeOnly := query == "" && scopeNamed && len(pinned) > 0 && !isSetsPage
 
 	if query == "" && !scopeOnly {
 		if !pageVars.IsSealed && !isSetsPage {
