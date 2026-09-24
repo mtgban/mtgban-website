@@ -184,8 +184,8 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(urlPath, "stores") {
 		output := enabledStores
 		filter := r.FormValue("filter")
-		if filter == "singles" {
-			var filtered []string
+		if filter == "singles" || filter == "sealed" {
+			filtered := []string{}
 			for _, seller := range GetSellers() {
 				if (seller.Info().SealedMode && filter == "singles") || (!seller.Info().SealedMode && filter == "sealed") {
 					continue
