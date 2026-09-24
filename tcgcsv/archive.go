@@ -2,6 +2,7 @@ package tcgcsv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,6 +16,23 @@ import (
 // ArchiveEpoch is the earliest date tcgcsv has a daily price archive for.
 // Backfill starts here by default.
 var ArchiveEpoch = time.Date(2024, 2, 8, 0, 0, 0, 0, time.UTC)
+
+// ErrArchiveForbidden reports that tcgcsv refused the archive endpoint with a
+// 403. As of 2026-09 it answers every archive date that way, back to the epoch:
+// the operator withdrew the archive over bandwidth cost and moderation load,
+// and asks callers to read categories, groups and prices instead.
+//
+// It is a sentinel because the refusal is about the endpoint, not the day. A
+// caller walking a date range has to stop on the first one rather than ask
+// again for every remaining day - nine hundred-odd requests that can only be
+// refused, aimed at a service that withdrew the file to save bandwidth.
+var ErrArchiveForbidden = errors.New("tcgcsv: the price archive is not available")
+
+// archiveNoticeLen is how much of the 403 body to relay. tcgcsv answers with a
+// ~730-byte note from its operator whose second half is the actionable part
+// (what to call instead, and how often), so the 200-character snippet other
+// errors carry would cut exactly what the reader needs.
+const archiveNoticeLen = 800
 
 // sevenZipBinaries are the 7z CLIs we accept, in order of preference. The
 // archives use solid PPMd compression, which pure-Go 7z readers do not reliably
@@ -43,12 +61,11 @@ func find7z() (string, error) {
 //
 // found is false when tcgcsv has no archive for date (HTTP 404), which the
 // caller should treat as "skip this day", not an error.
+//
+// A 403 is ErrArchiveForbidden and means the opposite: not this day, but the
+// endpoint. Every remaining day would be refused too, so a caller walking a
+// range stops there.
 func (c *Client) FetchPriceArchive(ctx context.Context, date time.Time, wantCategories map[int]bool) (byCategory map[int][]Price, found bool, err error) {
-	bin, err := find7z()
-	if err != nil {
-		return nil, false, err
-	}
-
 	dateStr := date.Format("2006-01-02")
 	url := fmt.Sprintf("%s/archive/tcgplayer/prices-%s.ppmd.7z", c.baseURL, dateStr)
 	body, status, err := c.do(ctx, url, archiveTimeout)
@@ -58,8 +75,23 @@ func (c *Client) FetchPriceArchive(ctx context.Context, date time.Time, wantCate
 	if status == http.StatusNotFound {
 		return nil, false, nil
 	}
+	if status == http.StatusForbidden {
+		// The body is the operator's own note; relay it rather than a bare 403,
+		// since it is the only place the reason and the alternative are written.
+		return nil, false, fmt.Errorf("%w: %s", ErrArchiveForbidden, snippetLen(body, archiveNoticeLen))
+	}
 	if status != http.StatusOK {
 		return nil, false, fmt.Errorf("tcgcsv: %s -> %d: %s", url, status, snippet(body))
+	}
+
+	// Only now is an extractor needed. Looking for one first would have made a
+	// missing p7zip the reported reason for a day that turned out to be a 404 or
+	// a withdrawn endpoint, neither of which an extractor would have helped
+	// with. Backfill still fails fast on the dependency: it calls
+	// CheckArchiveTooling once before its loop.
+	bin, err := find7z()
+	if err != nil {
+		return nil, false, err
 	}
 
 	tmpDir, err := os.MkdirTemp("", "tcgcsv-archive-")

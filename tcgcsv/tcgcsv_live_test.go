@@ -2,6 +2,7 @@ package tcgcsv
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -82,6 +83,14 @@ func TestFetchPriceArchiveLive(t *testing.T) {
 	// The epoch archive exists and contains Lorcana prices; the category filter
 	// must exclude every other game's prices.
 	byCat, found, err := c.FetchPriceArchive(ctx, ArchiveEpoch, map[int]bool{CategoryLorcana: true})
+	if errors.Is(err, ErrArchiveForbidden) {
+		// Since 2026-09 tcgcsv answers every archive date with a 403 (see
+		// ErrArchiveForbidden). Everything below describes an archive we can no
+		// longer fetch, so report the refusal and stop rather than fail a test
+		// about the service being as it is. Delete this branch when the archive
+		// comes back and the assertions below apply again.
+		t.Skipf("tcgcsv has withdrawn the price archive: %v", err)
+	}
 	if err != nil {
 		t.Fatalf("FetchPriceArchive(epoch): %v", err)
 	}
