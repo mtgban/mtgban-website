@@ -11,15 +11,15 @@ import (
 )
 
 func TestUserRateLimitAllowsDeferredPagePair(t *testing.T) {
-	limiter := ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
-	key := "ip:192.0.2.10"
+	// The limiter the server uses, on a key no request sends, fresh each run.
+	key := fmt.Sprintf("test:deferred-page-pair:%d", time.Now().UnixNano())
 
 	for request := 1; request <= UserRequestBurst; request++ {
-		if !limiter.Allow(key) {
+		if !UserRateLimiter.Allow(key) {
 			t.Fatalf("request %d was rate limited", request)
 		}
 	}
-	if limiter.Allow(key) {
+	if UserRateLimiter.Allow(key) {
 		t.Errorf("request %d was allowed, want burst limit %d", UserRequestBurst+1, UserRequestBurst)
 	}
 }
