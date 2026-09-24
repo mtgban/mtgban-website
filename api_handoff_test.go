@@ -252,3 +252,36 @@ func TestAPIHandoffDropsUntrustedReturnTo(t *testing.T) {
 		t.Errorf("untrusted return_to forwarded: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 }
+
+// A ?sig= on the link is whoever made the link, not the reader who followed
+// it, so a request carrying one hands over nobody: called directly, with the
+// reader's cookie beside it, and through enforceSigning, which puts the ?sig=
+// in the cookie's place.
+func TestAPIHandoffIgnoresASigOnTheLink(t *testing.T) {
+	setGatewaySecret(t, "trial-secret")
+	signingEnabled(t, true)
+	other := sign("Legacy", &PatreonUserData{Email: "mallory@example.com", FullName: "Mallory", EmailVerified: true}, nil, DefaultSignatureDuration)
+	path := "/api-login?sig=" + url.QueryEscape(other)
+	ann := &PatreonUserData{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
+
+	handedOver := func(rec *httptest.ResponseRecorder) string {
+		loc, _ := url.Parse(rec.Header().Get("Location"))
+		claims, err := apihandoff.Verify([]byte("trial-secret"), loc.Query().Get("t"), time.Now())
+		if err != nil {
+			return ""
+		}
+		return claims.Email
+	}
+	if got := handedOver(handoffRequest(t, testSite.APILogin, path, "Legacy", ann)); got != "" {
+		t.Errorf("signed-in reader with a ?sig= on the link handed over as %q", got)
+	}
+	if got := handedOver(handoffRequest(t, testSite.APILogin, path, "", nil)); got != "" {
+		t.Errorf("reader with no login handed over as %q", got)
+	}
+	if got := handedOver(handoffRequest(t, enforceSigning(testSite, http.HandlerFunc(testSite.APILogin)).ServeHTTP, path, "Legacy", ann)); got != "" {
+		t.Errorf("through the middleware, handed over as %q", got)
+	}
+	if got := handedOver(handoffRequest(t, testSite.APILogin, "/api-login", "Legacy", ann)); got != "ann@example.com" {
+		t.Errorf("the reader's own login handed over as %q, want ann@example.com", got)
+	}
+}

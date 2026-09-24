@@ -343,7 +343,9 @@ cookie (31 days, shared across `*.mtgban.com`, **not** HttpOnly) and/or
 passed as `?sig=`. `GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the
-cookie.
+cookie. The API handoff (`/api-login`, `/api-trial`) is the exception: there
+a signature is a person, and a request carrying a `?sig=` hands over nobody
+(ADR-0001).
 
 ### 3.3 ACL / tiers
 
