@@ -244,7 +244,7 @@
 
                         <div class="upload-source-area" id="source-file">
                             <label>
-                                <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
+                                <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
                                 <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
                                 <span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span></span>
                                 <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();clearFile();">clear selection</span>
@@ -613,7 +613,7 @@
                     var label = document.getElementById('fileLabel');
                     var area = document.getElementById('source-file');
                     if (!label) return;
-                    var message = '"' + file.name + '" is not a CSV, XLS or XLSX file';
+                    var message = '"' + file.name + '" is not a CSV, TXT, XLS or XLSX file';
                     label.textContent = message;
                     if (area) area.classList.add('drag-rejected');
                     setTimeout(function() {
