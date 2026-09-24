@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
+	"weak"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -55,8 +56,9 @@ var shelfNames = []string{"MKMTrend", "MKMLow", "MKMSealed"}
 type built struct {
 	// The snapshot this was last matched against, which is the cheap
 	// question: if the sellers have not been republished at all, nothing
-	// this describes can have changed.
-	builtFrom *[]mtgban.Seller
+	// this describes can have changed. Held weakly, or every seller in it
+	// would stay alive after a refresh replaced them.
+	builtFrom weak.Pointer[[]mtgban.Seller]
 
 	// The Cardmarket shelves it was actually built from. Every other
 	// seller's refresh republishes the snapshot with these copied across
@@ -132,7 +134,7 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
 	// it. They are a fact about it, and a second argument is a second
 	// chance to pass one that describes something else.
 	p.cached.Store(&built{
-		builtFrom: snapshot,
+		builtFrom: weak.Make(snapshot),
 		shelves:   shelvesOf(*snapshot),
 		ids:       ids,
 	})
@@ -160,7 +162,7 @@ func (p *Parser) ids() map[string]string {
 	}
 
 	cached := p.cached.Load()
-	if cached != nil && cached.builtFrom == snapshot {
+	if cached != nil && cached.builtFrom.Value() == snapshot {
 		return cached.ids
 	}
 
