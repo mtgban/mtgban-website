@@ -12,19 +12,20 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// The markup each of the three answers is recognised by: the landing panes,
-// the results (found or empty-handed), and the editions tree /sets draws
-// instead of either.
+// The markup each of the answers is recognised by: the landing panes, the
+// results (found or empty-handed), the editions tree /sets draws instead of
+// either, and the product browser that is /sealed's landing.
 const (
 	landingMarker = `class="search-landing"`
 	setsMarker    = `class="page-standard sets-page"`
+	sealedMarker  = `class="sealed-layout"`
 )
 
 // searchWithStock runs the search page over a request, with one card stocked
 // so a search that reaches the stores has something to show - without a
 // seller every result is filtered away for carrying no listing, and a page
 // that found cards reads exactly like one that found none.
-func searchWithStock(t *testing.T, stocked string, target string) string {
+func searchWithStock(t *testing.T, stocked string, target string, cookies ...*http.Cookie) string {
 	t.Helper()
 
 	// render() only reparses templates from disk while DevMode is set, which
@@ -51,8 +52,12 @@ func searchWithStock(t *testing.T, stocked string, target string) string {
 		mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})}
 	sellersPtr.Store(&sellers)
 
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
 	rec := httptest.NewRecorder()
-	Search(rec, httptest.NewRequest(http.MethodGet, target, nil))
+	Search(rec, req)
 	return rec.Body.String()
 }
 
@@ -107,11 +112,26 @@ func TestScopeAloneRunsTheSealedSearch(t *testing.T) {
 
 	out := searchWithStock(t, sealed, "/sealed?scope="+url.QueryEscape("s:"+co.SetCode))
 
-	if strings.Contains(out, landingMarker) {
-		t.Fatal("a pinned set with no query fell back to the landing page on /sealed")
+	if strings.Contains(out, sealedMarker) {
+		t.Fatal("a pinned set with no query fell back to the product browser on /sealed")
 	}
 	if !strings.Contains(out, co.Name) {
 		t.Errorf("the scoped sealed search did not turn up %q", co.Name)
+	}
+}
+
+// The navbar's Search and Sealed links name no scope. A filter pinned by the
+// cookie still fills the bar there, but it is not a search nobody asked for:
+// those pages keep their own landing, with the favorites and recent searches
+// that only live on it.
+func TestScopeFromTheCookieKeepsTheLanding(t *testing.T) {
+	uuid, _, scope := scopedCard(t)
+
+	for page, marker := range map[string]string{"/search": landingMarker, "/sealed": sealedMarker} {
+		out := searchWithStock(t, uuid, page, &http.Cookie{Name: "SearchScope", Value: scope})
+		if !strings.Contains(out, marker) {
+			t.Errorf("%s with %q pinned by cookie ran a search instead of its landing page", page, scope)
+		}
 	}
 }
 
