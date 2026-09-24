@@ -359,6 +359,12 @@ func printingTitle(co *mtgmatcher.CardObject) string {
 // finish=nonfoil, foil or etched. A link that names one is answered with that
 // sibling or with nothing, never with the finish the set files first: the
 // reader was looking at a price for one of them.
+//
+// A link that names none is still answered, because most of them do not: the
+// page's own canonical address is the bare /card/<set>/<number>/<tail>, and
+// the query form is what a deep link to one finish's listing carries. Mana
+// Pool also serves a /card/<slug> shape for a card across every set, which
+// names no printing at all and so is answered with nothing.
 func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 	fields := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(fields) < 3 {
