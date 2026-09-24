@@ -25,14 +25,15 @@ function element(extra = {}) {
 
 // Runs scope.js over a bar holding `pinned`, and hands back the pieces plus
 // wherever the page was sent.
-function loadBar(pinned) {
+function loadBar(pinned, extra = {}) {
     const nodes = {
         'nav-pin-btn': element(),
         'nav-scope': element(),
-        'nav-scopebox': element({ value: pinned }),
+        'nav-scopebox': element({ value: pinned, id: 'nav-scopebox' }),
         'nav-scope-clear': element(),
         'nav-scope-go': element(),
         'nav-scopefield': element(),
+        ...extra,
     };
     const navigated = [];
     const document = {
@@ -115,4 +116,29 @@ test('the mobile scope box stays inside its slot', () => {
     const rule = mobileCss.match(/\.m-scope-box\s*\{[^}]*\}/);
     expect(rule).not.toBeNull();
     expect(rule[0]).toContain('box-sizing: border-box');
+});
+
+// A highlighted suggestion is the autocomplete's to take: Enter picks it
+// instead of running the search on the half-typed filter under it.
+test('Enter leaves a highlighted suggestion to the autocomplete', () => {
+    const { nodes, navigated } = loadBar('r:myt', {
+        'nav-scopeboxautocomplete-list': element({
+            querySelector: selector => (selector === '.autocomplete-active' ? {} : null),
+        }),
+    });
+
+    nodes['nav-scopebox'].handlers.keydown({ key: 'Enter', preventDefault: () => {} });
+
+    expect(navigated).toHaveLength(0);
+});
+
+// A suggestion picked with the mouse writes the box without an input event,
+// and the search form still has to send what the box shows.
+test('the search form sends what the box shows', () => {
+    const { nodes } = loadBar('r:myt', { 'nav-searchform': element() });
+
+    nodes['nav-scopebox'].value = 'r:mythic';
+    nodes['nav-searchform'].handlers.submit();
+
+    expect(nodes['nav-scopefield'].value).toBe('r:mythic');
 });
