@@ -744,6 +744,28 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
 }
 .nav2-scope-clear:hover { background: var(--surface-3, rgba(255,255,255,0.06)); color: var(--normal); }
 
+/* GO runs the bar; CLEAR empties it. Same size and shape so they read as one
+   pair, with only GO carrying the accent - the one that acts on what was
+   typed, next to the one that throws it away. */
+.nav2-scope-go {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    height: 22px;
+    padding: 0 9px;
+    border: 1px solid var(--accent-border, rgba(91,141,239,0.35));
+    border-radius: var(--radius-sm, 6px);
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+    color: var(--ainfo, #5b8def);
+    font-family: inherit;
+    font-size: var(--text-2xs, 10px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+
+.nav2-scope-go:hover { background: rgba(91,141,239,0.22); color: var(--normal); }
+
 /* The examples fill the slack the box no longer takes, and double as the
    only place the bar's syntax is written down. */
 .nav2-scope-examples {

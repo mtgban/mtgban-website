@@ -118,12 +118,16 @@
                    value="{{.SearchScope}}" placeholder="Filters that stay put across searches — s:sos, is:foil, r:mythic"
                    maxlength="500" autocapitalize="none" autocomplete="off" spellcheck="false">
         </div>
+        {{/* The Enter the bar has always taken, as something to click: the
+             box is not in the search form (see above), so nothing about it
+             says a keypress is what runs it. */}}
+        <button class="nav2-scope-go" id="nav-scope-go" type="button" title="Search with these pinned filters" aria-label="Search with these pinned filters">GO</button>
         <button class="nav2-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters and close the bar" aria-label="Clear pinned filters and close the bar">CLEAR</button>
         {{/* The row runs the width of the page whatever is in it, so the slack
              to the right of the box earns its place by showing the syntax the
              box takes. Clicking one writes it in; CLEAR takes it out. */}}
         <span class="nav2-scope-examples" id="nav-scope-examples">
-            <span class="nav2-scope-label">Common</span>
+            <span class="nav2-scope-label">Fill</span>
             <button class="nav2-scope-chip" type="button" data-scope="f:nonfoil" title="Pin non-foil printings">f:nonfoil</button>
             <button class="nav2-scope-chip" type="button" data-scope="f:foil" title="Pin foil printings">f:foil</button>
             <button class="nav2-scope-chip" type="button" data-scope="is:altfoil" title="Pin the alternative foiling treatments">is:altfoil</button>
