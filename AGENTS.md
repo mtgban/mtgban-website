@@ -165,7 +165,10 @@ commit to this repo can complete on its own.
 2. **Stateless auth.** Permissions live entirely in the signed `MTGBAN`
    cookie / `?sig=` (an HMAC-signed query string). There is no session store
    or user DB. Read grants via `GetParamFromSig()`; don't introduce server-side
-   session state.
+   session state. The Patreon email is an identity outside the site only once
+   Patreon has confirmed it; where that is recorded, where it is enforced, and
+   why a new signed field must not ride on every login:
+   `docs/adr/0001-api-handoff-email-check.md`.
 
 3. **Card identity goes through `mtgmatcher`.** Resolve cards via
    `mtgmatcher.Match()`/`GetUUID()`/`MatchId()` — don't hand-roll UUID or
