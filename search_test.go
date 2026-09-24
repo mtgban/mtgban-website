@@ -27,6 +27,9 @@ func TestMain(m *testing.M) {
 		log.Println("loadDatastore skipped:", err)
 		os.Exit(m.Run())
 	}
+	// loadDatastore builds the editions in the background, so a test that
+	// runs first would read the empty snapshot.
+	updateStaticData()
 
 	Config.ScraperConfig.BucketAccessKey = os.Getenv("B2_KEY_ID")
 	Config.ScraperConfig.BucketSecretKey = os.Getenv("B2_APP_KEY")
