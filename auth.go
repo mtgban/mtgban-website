@@ -416,10 +416,16 @@ func verifiedSignature(r *http.Request) string {
 	return sig
 }
 
-// Put signature in cookies for one month, all domains can access this
+// Put signature in cookies for one month, or as long as a checked signature
+// lasts if that is longer, as an invite can; all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
-	setCookie(w, r, "MTGBAN", sig, oneMonth, true)
+	expires := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
+	v, ok := signatureIsValid(sig)
+	signed, err := strconv.ParseInt(v.Get("Expires"), 10, 64)
+	if ok && err == nil && time.Unix(signed, 0).After(expires) {
+		expires = time.Unix(signed, 0)
+	}
+	setCookie(w, r, "MTGBAN", sig, expires, true)
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
