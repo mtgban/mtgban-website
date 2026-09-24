@@ -31,7 +31,10 @@ func initTCGCSVService() error {
 		return errors.New("tcgcsv: no price database configured")
 	}
 	svc, err := tcgcsvd.New(*Config.TCGCSVConfig, PricesArchiveDB,
-		tcgcsvd.WithLongFormWrites(Config.TimeseriesConfig.LongFormWrites),
+		// Not the raw flag: a non-Magic deployment's charts read the long
+		// prices table and nothing else, so the ingest's TCGplayer series has
+		// to land there too, the same as the site's own snapshot does.
+		tcgcsvd.WithLongFormWrites(longFormWrites()),
 		tcgcsvd.WithNotifier(func(kind, message string) { ServerNotify(kind, message) }),
 		tcgcsvd.WithProductReport(logTCGProductMatchReport))
 	if err != nil {

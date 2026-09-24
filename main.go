@@ -1296,9 +1296,9 @@ func openDBs() (err error) {
 				log.Println("warning: could not ensure tcg_products schema:", serr)
 			}
 		}
-		// Long-form dual-write: make sure the current and next month's price
+		// Long-form writes: make sure the current and next month's price
 		// partitions exist ahead of any write. Writes-only (creates partitions).
-		if Config.TimeseriesConfig.LongFormWrites {
+		if longFormWrites() {
 			now := time.Now()
 			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
 				log.Println("warning: could not ensure current price partition:", serr)
