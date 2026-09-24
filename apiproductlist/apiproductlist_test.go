@@ -1,7 +1,7 @@
 package apiproductlist
 
 import (
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -27,7 +27,7 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if c.Packages[1].StoreScope != StoreScopeBase || c.Packages[2].StoreScope != StoreScopeAll {
 		t.Errorf("scopes %+v", c.Packages)
 	}
-	if !reflect.DeepEqual(c.Packages[1].Modes, []string{"retail", "buylist"}) || !reflect.DeepEqual(c.Packages[2].Modes, Modes) {
+	if !slices.Equal(c.Packages[1].Modes, []string{"retail", "buylist"}) || !slices.Equal(c.Packages[2].Modes, Modes) {
 		t.Errorf("modes %+v", c.Packages)
 	}
 	if len(c.Addons) != 2 || c.Addons[0].Key != "extra_store" || c.Addons[1].Key != "extra_game" {

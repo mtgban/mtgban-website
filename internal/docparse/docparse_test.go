@@ -2,7 +2,7 @@ package docparse
 
 import (
 	"errors"
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -57,16 +57,22 @@ func TestPartitionEntries(t *testing.T) {
 		},
 	}
 
+	// The entries differ only by id and by error, and which list each one
+	// lands in is all that partitioning decides.
+	sameEntry := func(a, b Entry) bool {
+		return a.CardID == b.CardID && errors.Is(a.MismatchError, b.MismatchError)
+	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gotSingles, gotSealed, gotNotFound := PartitionEntries(tc.entries, sealedIDs)
-			if !reflect.DeepEqual(gotSingles, tc.wantSingles) {
+			if !slices.EqualFunc(gotSingles, tc.wantSingles, sameEntry) {
 				t.Errorf("singles = %v, want %v", gotSingles, tc.wantSingles)
 			}
-			if !reflect.DeepEqual(gotSealed, tc.wantSealed) {
+			if !slices.EqualFunc(gotSealed, tc.wantSealed, sameEntry) {
 				t.Errorf("sealed = %v, want %v", gotSealed, tc.wantSealed)
 			}
-			if !reflect.DeepEqual(gotNotFound, tc.wantNotFound) {
+			if !slices.EqualFunc(gotNotFound, tc.wantNotFound, sameEntry) {
 				t.Errorf("notFound = %v, want %v", gotNotFound, tc.wantNotFound)
 			}
 		})

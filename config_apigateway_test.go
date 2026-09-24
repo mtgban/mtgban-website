@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -15,7 +15,8 @@ func TestAPIGatewayConfigDecodes(t *testing.T) {
 	if c.APIGateway.URL != "https://api.example" {
 		t.Errorf("url %q, want the trailing slash trimmed", c.APIGateway.URL)
 	}
-	if want := []string{"magic", "pokemon"}; !reflect.DeepEqual(c.APIGateway.Games, want) {
+	want := []string{"magic", "pokemon"}
+	if !slices.Equal(c.APIGateway.Games, want) {
 		t.Errorf("games %v want %v", c.APIGateway.Games, want)
 	}
 }
@@ -23,13 +24,13 @@ func TestAPIGatewayConfigDecodes(t *testing.T) {
 func TestAPIGatewayConfigDefaults(t *testing.T) {
 	var c APIGatewayConfig
 	applyAPIGatewayDefaults(&c, "pokemon")
-	if c.URL != DefaultAPIGatewayURL || !reflect.DeepEqual(c.Games, []string{"magic", "pokemon"}) {
+	if c.URL != DefaultAPIGatewayURL || !slices.Equal(c.Games, []string{"magic", "pokemon"}) {
 		t.Errorf("defaults %+v", c)
 	}
 
 	var empty APIGatewayConfig
 	applyAPIGatewayDefaults(&empty, "")
-	if !reflect.DeepEqual(empty.Games, []string{DefaultGame}) {
+	if !slices.Equal(empty.Games, []string{DefaultGame}) {
 		t.Errorf("empty game: %+v", empty)
 	}
 

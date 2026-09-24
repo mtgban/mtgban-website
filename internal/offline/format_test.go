@@ -2,7 +2,7 @@ package offline
 
 import (
 	"bytes"
-	"reflect"
+	"maps"
 	"testing"
 	"time"
 )
@@ -34,6 +34,32 @@ func samplePayload() *SetPayload {
 	}
 }
 
+// These stop compiling when either type gains a field, so samePayload
+// cannot fall behind one without anyone noticing.
+var (
+	_ = PriceEntry{0, 0, 0, 0, "", 0, 0, 0, 0, nil, nil}
+	_ = SetPayload{"", time.Time{}, nil, nil}
+)
+
+// samePayload compares two payloads field by field, down to every price.
+func samePayload(a, b *SetPayload) bool {
+	samePrice := func(x, y *PriceEntry) bool {
+		if x == nil || y == nil {
+			return x == y
+		}
+		return x.Regular == y.Regular && x.Foil == y.Foil && x.Etched == y.Etched && x.Sealed == y.Sealed &&
+			x.Cond == y.Cond &&
+			x.Qty == y.Qty && x.QtyFoil == y.QtyFoil && x.QtyEtched == y.QtyEtched && x.QtySealed == y.QtySealed &&
+			maps.Equal(x.Conditions, y.Conditions) && maps.Equal(x.Quantities, y.Quantities)
+	}
+	sameStores := func(x, y map[string]*PriceEntry) bool {
+		return maps.EqualFunc(x, y, samePrice)
+	}
+	return a.SetCode == b.SetCode && a.Snapshot.Equal(b.Snapshot) &&
+		maps.EqualFunc(a.Retail, b.Retail, sameStores) &&
+		maps.EqualFunc(a.Buylist, b.Buylist, sameStores)
+}
+
 func TestEncodeDecodeRoundtrip(t *testing.T) {
 	p := samplePayload()
 	data, err := Encode(p)
@@ -44,7 +70,7 @@ func TestEncodeDecodeRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(p, got) {
+	if !samePayload(p, got) {
 		t.Errorf("roundtrip mismatch:\nwant %+v\ngot  %+v", p, got)
 	}
 }
