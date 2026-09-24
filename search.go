@@ -156,53 +156,6 @@ func (e SearchEntry) PriceLabel() string {
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
-// searchSuggestions adapts a parsed search that found nothing into the
-// suggest package's inputs.
-// searchScope reads the sticky filter bar - the secondary field holding
-// what does not change from one search to the next, a set or a finish -
-// so retyping the main bar never disturbs it.
-//
-// The url wins whenever it names the field at all, empty included. That
-// is what tells clearing apart from arriving with no field whatsoever:
-// every link and form the search pages draw names scope, so a request
-// without it came from somewhere else, and the cookie opens the bar the
-// way the reader last left it.
-func searchScope(w http.ResponseWriter, r *http.Request) string {
-	// r.Form is only filled once the request has been parsed, and reading
-	// the field by name is the whole point here - FormValue cannot tell an
-	// empty scope from an absent one.
-	r.ParseForm()
-
-	values, named := r.Form["scope"]
-	if !named {
-		return strings.TrimSpace(readCookie(r, "SearchScope"))
-	}
-
-	var scope string
-	if len(values) > 0 {
-		scope = strings.TrimSpace(values[0])
-	}
-	setForeverCookie(w, r, "SearchScope", scope)
-	return scope
-}
-
-// scopeRowOpen reports whether the pinned row is drawn. A pinned filter
-// opens it, since a filter nobody can see is one nobody can undo, but
-// closing it by hand outlives the page: without that the next search
-// draws it again and the button that closed it reads as broken.
-//
-// The chip stays lit either way, and names what is pinned, so a closed
-// row is a row put away rather than a filter gone quiet.
-func scopeRowOpen(r *http.Request, scope string) bool {
-	switch readCookie(r, "SearchScopeOpen") {
-	case "1":
-		return true
-	case "0":
-		return false
-	}
-	return scope != ""
-}
-
 // scopeFilters reads the pinned bar into the filters it contributes.
 //
 // The two bars are parsed apart and merged as filters, never as text.
@@ -257,6 +210,8 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 	config.CardFilters = append(config.CardFilters, pinned...)
 }
 
+// searchSuggestions adapts a parsed search that found nothing into the
+// suggest package's inputs.
 func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
 	return suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
@@ -453,11 +408,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
 	query := strings.TrimSpace(r.FormValue("q"))
-	scope := searchScope(w, r)
+	// The pinned bar lives in the url alone, so a page opened without it
+	// starts with nothing pinned.
+	scope := strings.TrimSpace(r.FormValue("scope"))
 	pinned := scopeFilters(scope)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
-	pageVars.ScopeOpen = scopeRowOpen(r, scope)
 	// Something is pinned, and none of it is a filter: the search will pass
 	// over it whole, and the bar has to say so rather than sit there looking
 	// like it is doing the work.
@@ -506,11 +462,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// landing page says better than an empty result does.
 	//
 	// The editions tree on /sets is a page rather than a placeholder waiting
-	// for a query, so it keeps its own empty state either way. And only a
-	// request naming scope is the bar searching: the navbar's links name
-	// none, and a filter the cookie pinned must not replace their pages.
-	_, scopeNamed := r.Form["scope"]
-	scopeOnly := query == "" && scopeNamed && len(pinned) > 0 && !isSetsPage
+	// for a query, so it keeps its own empty state either way.
+	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
 
 	if query == "" && !scopeOnly {
 		if !pageVars.IsSealed && !isSetsPage {

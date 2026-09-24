@@ -40,6 +40,7 @@ function loadBar(pinned, extra = {}) {
         getElementById: id => nodes[id] || null,
         body: { classList: { contains: () => false, toggle: () => {}, add: () => {}, remove: () => {} } },
         addEventListener: () => {},
+        set cookie(value) { throw new Error('the bar stored a cookie: ' + value); },
     };
     const window = {
         location: {
@@ -47,11 +48,7 @@ function loadBar(pinned, extra = {}) {
             assign: url => navigated.push(url),
         },
     };
-    // setCookie comes from cookies.js on a real page; nothing on the paths
-    // under test reaches it, but the reference has to resolve.
-    new Function('window', 'document', 'setCookie', 'URL', source)(
-        window, document, () => {}, URL,
-    );
+    new Function('window', 'document', 'URL', source)(window, document, URL);
     return { nodes, navigated };
 }
 
@@ -87,6 +84,19 @@ test('GO takes what is in the box now, not what was pinned before', () => {
     expect(new URL(navigated[0]).searchParams.get('scope')).toBe('s:M19');
 });
 
+// The bar lives in the url alone. Putting the row away or clearing it leaves
+// nothing behind for the next page, or the next visit, to read back.
+test('closing and clearing the bar store nothing', () => {
+    const { nodes, navigated } = loadBar('f:nonfoil');
+
+    // With no setCookie in scope and document.cookie throwing, either way of
+    // storing something fails the test.
+    nodes['nav-pin-btn'].handlers.click();
+    nodes['nav-scope-clear'].handlers.click();
+
+    expect(new URL(navigated[0]).searchParams.get('scope')).toBe('');
+});
+
 test('a bar with no GO button still loads', () => {
     // The button is markup; scope.js also serves pages rendered before it.
     const nodes = {
@@ -96,14 +106,14 @@ test('a bar with no GO button still loads', () => {
         'nav-scope-clear': element(),
         'nav-scopefield': element(),
     };
-    const run = () => new Function('window', 'document', 'setCookie', 'URL', source)(
+    const run = () => new Function('window', 'document', 'URL', source)(
         { location: { href: 'https://example.test/search', assign: () => {} } },
         {
             getElementById: id => nodes[id] || null,
             body: { classList: { contains: () => false, toggle: () => {} } },
             addEventListener: () => {},
         },
-        () => {}, URL,
+        URL,
     );
     expect(run).not.toThrow();
 });

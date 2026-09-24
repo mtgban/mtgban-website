@@ -80,9 +80,6 @@
     function setOpen(open) {
         document.body.classList.toggle('has-scope', open);
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        // Remembered server-side, so the next page draws the row the way it
-        // was left instead of reopening it under the reader.
-        setCookie('SearchScopeOpen', open ? '1' : '0', 3650);
     }
 
     // Reload with a different scope rather than submitting the form: the
