@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 const source = readFileSync(new URL('../js/card-art-fallback.js', import.meta.url), 'utf8');
 const uploadTemplate = readFileSync(new URL('../templates/upload.html', import.meta.url), 'utf8');
 
-function loadFallback(gameAttr) {
+function loadFallback(gameAttr, Preload) {
     let onError;
     class FakeImage {
         constructor() {
@@ -27,7 +27,7 @@ function loadFallback(gameAttr) {
             if (type === 'error') onError = handler;
         },
     };
-    new Function('window', 'document', 'HTMLImageElement', source)(window, document, FakeImage);
+    new Function('window', 'document', 'HTMLImageElement', 'Image', source)(window, document, FakeImage, Preload);
     return {FakeImage, onError, setCardArtSource: window.setCardArtSource, cardArtPlaceholder: window.cardArtPlaceholder};
 }
 
@@ -69,6 +69,30 @@ test('hover previews show only for real card art', () => {
     expect(classes.has('is-visible')).toBe(true);
 
     setCardArtSource(image, cardArtPlaceholder);
+    expect(classes.has('is-visible')).toBe(false);
+});
+
+// Leaving the table is newer than a hover whose art is still loading, so that
+// art landing afterwards must not bring the preview back.
+test('leaving the table outranks a preload still in flight', () => {
+    const preloads = [];
+    class Preload {
+        constructor() {
+            preloads.push(this);
+        }
+    }
+    const {FakeImage, setCardArtSource, cardArtPlaceholder} = loadFallback(undefined, Preload);
+    const image = new FakeImage();
+    const classes = new Set();
+    image.closest = selector => selector === '.hoverWrap' ? {
+        classList: {toggle: (name, enabled) => enabled ? classes.add(name) : classes.delete(name)},
+    } : null;
+
+    setCardArtSource(image, 'card.jpg');
+    setCardArtSource(image, cardArtPlaceholder);
+    preloads[0].onload();
+
+    expect(image.src).toBe(cardArtPlaceholder);
     expect(classes.has('is-visible')).toBe(false);
 });
 
