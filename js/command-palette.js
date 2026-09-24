@@ -2099,7 +2099,7 @@
         if (S.lucideRequested || typeof lucide !== 'undefined') return;
         S.lucideRequested = true;
         var tag = document.createElement('script');
-        tag.src = 'https://unpkg.com/lucide@latest/dist/umd/lucide.js';
+        tag.src = 'https://unpkg.com/lucide@1.47.0/dist/umd/lucide.js';
         tag.onload = function () {
             if (typeof lucide === 'undefined' || !lucide.createIcons) return;
             lucide.createIcons({ root: DOM.overlay });

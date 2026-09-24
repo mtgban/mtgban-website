@@ -107,10 +107,10 @@
         libsLoading = true;
 
         var scripts = [
-            'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
-            'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js',
-            'https://cdn.jsdelivr.net/npm/hammerjs@2/hammer.min.js',
-            'https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2/dist/chartjs-plugin-zoom.min.js'
+            'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+            'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js',
+            'https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js',
+            'https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js'
         ];
 
         var loaded = 0;
