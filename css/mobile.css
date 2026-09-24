@@ -561,6 +561,10 @@ body.has-scope .m-scope-row {
 }
 .m-scope-box {
     width: 100%;
+    /* Without this the padding and border are added to the 100%, and the box
+       runs 22px past the slot it was given - over whatever sits to its right.
+       It always did; the button now there is what made it visible. */
+    box-sizing: border-box;
     min-width: 0;
     height: 30px;
     padding: 0 10px;
@@ -576,6 +580,23 @@ body.has-scope .m-scope-row {
     border-color: var(--awarning);
     color: var(--awarning);
 }
+/* The tap target for the bar, beside the one that empties it. */
+.m-scope-go {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--accent-border, rgba(91,141,239,0.35));
+    border-radius: var(--radius-sm, 8px);
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+    color: var(--ainfo, #5b8def);
+    font-family: inherit;
+    font-size: var(--text-2xs, 10px);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+}
+
 .m-scope-clear {
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;

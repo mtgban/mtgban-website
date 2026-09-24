@@ -5,14 +5,15 @@
  *
  * The row is bound to the search form by id rather than by nesting, so
  * typing in either bar and pressing Enter sends both fields; everything
- * here is only about opening, closing and clearing it without losing the
- * rest of the url.
+ * here is only about opening, closing, running and clearing it without
+ * losing the rest of the url.
  */
 (function() {
     var btn = document.getElementById('nav-pin-btn');
     var row = document.getElementById('nav-scope');
     var box = document.getElementById('nav-scopebox');
     var clear = document.getElementById('nav-scope-clear');
+    var go = document.getElementById('nav-scope-go');
     var field = document.getElementById('nav-scopefield');
     if (!btn || !row || !box) return;
 
@@ -114,9 +115,19 @@
         });
     }
 
+    // GO is the Enter below, as something to click. The box is bound to the
+    // search form by id rather than by nesting, so nothing on screen says a
+    // keypress is what runs it - and on a phone there is no Enter in view at
+    // all until the keyboard is up.
+    if (go) {
+        go.addEventListener('click', function() {
+            apply(box.value.trim());
+        });
+    }
+
     // A shortcut writes itself into the bar, and that is all it does: CLEAR
-    // is what empties it, and Enter is what runs the search, so a click
-    // meant as the first half of typing something else costs nothing.
+    // is what empties it, and GO or Enter is what runs the search, so a
+    // click meant as the first half of typing something else costs nothing.
     for (var i = 0; i < chips.length; i++) {
         chips[i].addEventListener('click', function() {
             write(this.getAttribute('data-scope'));
