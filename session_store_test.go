@@ -311,6 +311,7 @@ func TestAdminRemovesASessionStore(t *testing.T) {
 		form := url.Values{"removestore": {"ZZS"}, "kind": {"retail"}}
 		req := httptest.NewRequest(http.MethodPost, "/admin", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
 		rec := httptest.NewRecorder()
 		Admin(rec, req)
 		return rec

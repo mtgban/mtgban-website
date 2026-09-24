@@ -17,6 +17,7 @@ func inviteSig(t *testing.T, query string) url.Values {
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodGet, "/admin?reboot=invite&"+query, nil)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
 	rec := httptest.NewRecorder()
 	Admin(rec, req)
 
@@ -96,6 +97,7 @@ func TestInviteLinkIsOneTheSiteAccepts(t *testing.T) {
 	signingEnabled(t, false)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin?reboot=invite&tier=Pioneer&duration=7", nil)
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
 	rec := httptest.NewRecorder()
 	Admin(rec, req)
 
@@ -138,6 +140,43 @@ func TestAdminOffersAnInviteLinkWithAnExpiry(t *testing.T) {
 		// Two months on both this tool's dropdown and the API key's.
 		if got := strings.Count(out, `<option value="60">Two months</option>`); got != 2 {
 			t.Errorf("mobile=%v: Two months appears in %d dropdowns, want both", mobile, got)
+		}
+	}
+}
+
+// Every admin action runs off the query string, so a crafted link could cut
+// an invite, grant a tier or rewrite the ACL in an admin's session. Only a
+// request the admin page made runs anything; one from another site, from an
+// app such as Discord (none), or from a sibling mtgban.com site lands on the
+// bare page having done nothing.
+func TestAdminRunsNothingItDidNotAskFor(t *testing.T) {
+	for _, tc := range []struct {
+		method, fetchSite, referer string
+		runs                       bool
+	}{
+		{http.MethodGet, "cross-site", "", false},
+		{http.MethodPost, "cross-site", "", false},
+		{http.MethodGet, "none", "", false},
+		{http.MethodGet, "same-site", "https://beta.mtgban.com/", false},
+		{http.MethodGet, "", "", false},
+		{http.MethodGet, "", "https://evil.example/admin", false},
+		// A browser too old to say, on the admin page's own link.
+		{http.MethodGet, "", "http://example.com/admin", true},
+		{http.MethodGet, "same-origin", "", true},
+	} {
+		req := httptest.NewRequest(tc.method, "/admin?reboot=invite&tier=Pioneer", nil)
+		if tc.fetchSite != "" {
+			req.Header.Set("Sec-Fetch-Site", tc.fetchSite)
+		}
+		if tc.referer != "" {
+			req.Header.Set("Referer", tc.referer)
+		}
+		rec := httptest.NewRecorder()
+		Admin(rec, req)
+
+		ran := strings.Contains(rec.Header().Get("Location"), "html=invite")
+		if ran != tc.runs {
+			t.Errorf("%s from %q (referer %q): ran=%v, want %v", tc.method, tc.fetchSite, tc.referer, ran, tc.runs)
 		}
 	}
 }

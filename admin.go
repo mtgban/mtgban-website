@@ -54,7 +54,27 @@ var BuildCommit = func() string {
 	return ""
 }()
 
+// fromThisSite reports whether the browser says this site made the request:
+// by Sec-Fetch-Site, or by the Referer where a browser too old sends none.
+func fromThisSite(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin":
+		return true
+	case "":
+		referer, err := url.Parse(r.Referer())
+		return err == nil && referer.Host != "" && referer.Host == requestHost(r)
+	}
+	return false
+}
+
 func Admin(w http.ResponseWriter, r *http.Request) {
+	// Every action below runs off the query string, so only a request the
+	// admin page itself made may carry one; others land on the bare page.
+	if (r.URL.RawQuery != "" || r.Method != http.MethodGet) && !fromThisSite(r) {
+		http.Redirect(w, r, r.URL.Path, http.StatusSeeOther)
+		return
+	}
+
 	// The dashboard asks for the workflow status once it has rendered, so a
 	// round trip to GitHub never delays the page. Answered from here rather
 	// than a route of its own, to stay behind the same signing middleware.
