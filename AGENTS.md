@@ -77,6 +77,10 @@ output, not a claim written here.
   custom buylist to search results`, `api/banprice: simplify function
   signature`, `fix(mobile): switch to full-screen edition picker`. Keep commits
   small and focused.
+- **Keep the subject short, case by case, and the body to a few lines**,
+  wrapped at 72: the why and the number that proves it. Longer write-ups
+  go in `docs/`, committed with the change, and the body points at them.
+  Comments stay two or three lines the same way.
 - **Do NOT add a `Co-Authored-By` trailer** to commits.
 - Match the surrounding code's style; this is plain idiomatic Go with a flat
   root package — most features live in one top-level file each.
