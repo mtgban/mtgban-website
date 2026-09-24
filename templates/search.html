@@ -47,6 +47,7 @@
         <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0"></script>
         <script type="text/javascript" src="/js/chartopts.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/chart-range.js?hash={{.Hash}}"></script>
     {{end}}
     {{if .IsSealed}}
     <script type="text/javascript" src="/js/sealed.js?hash={{.Hash}}" defer></script>
@@ -762,8 +763,12 @@
                                     <span class="btn default chart-add-btn chart-add-full" title="Charts hold up to {{.MaxChartCards}} cards &mdash; remove one to add another">&#10133; Add card</span>
                                     {{end}}
                                 </p>
-                                {{if .Checkpoints}}
-                                <p class="chart-checkpoint-toggles">
+                                {{/* A chart that can widen may gain checkpoints it has
+                                     none of in the window rendered here, so the toggles
+                                     exist from the start and installCheckpoints shows
+                                     them once there is something to toggle. */}}
+                                {{if or .Checkpoints (lt .ChartLoadedDays .MaxLookbackDays)}}
+                                <p class="chart-checkpoint-toggles"{{if not .Checkpoints}} style="display: none;"{{end}}>
                                     <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
                                     <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
                                     <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
@@ -805,6 +810,16 @@
                             // timeline is visible at once; shorter-history cards just begin
                             // partway along the shared axis instead of clamping the whole chart.
                             var rangeKey = {{if .IsMultiChart}}'chartMultiDateRange'{{else}}'chartDateRange'{{end}};
+                            // The same choice, mirrored into a cookie. localStorage is the
+                            // front-end's own copy, but the server cannot read it, and a
+                            // server that does not know the range renders the one the select
+                            // starts on and then watches the viewer widen it - which draws
+                            // the chart twice on every load, for anyone who ever widened once.
+                            var rangeCookie = {{if .IsMultiChart}}'SearchChartMultiRange'{{else}}'SearchChartRange'{{end}};
+                            function rememberRange(rangeDays) {
+                                localStorage.setItem(rangeKey, rangeDays.toString());
+                                setCookie(rangeCookie, rangeDays.toString(), 365);
+                            }
                             var savedRange = localStorage.getItem(rangeKey);
                             {{if .IsMultiChart}}
                             if (savedRange === null) {
@@ -815,6 +830,9 @@
                                 document.getElementById('dateRange').value = savedRange;
                             }
                             var initialRange = parseInt(document.getElementById('dateRange').value);
+                            // Write it back even when nothing changed, so the cookie exists
+                            // from the first load rather than only once the select is touched.
+                            rememberRange(initialRange);
                             if (initialRange > 0 && initialRange < allLabels.length) {
                                 opts.scales.x.min = allLabels[initialRange - 1];
                             }
@@ -845,6 +863,55 @@
                             // Expose chart so checkpoint toggle handlers can reach it
                             window.cardChart = cardChart;
                             checkpointChartRef.chart = cardChart;
+
+                            // How much history the page actually rendered, and how much the
+                            // viewer is entitled to. They differ because the page inlines the
+                            // window the chart first draws and fetches the rest only if asked
+                            // for it; installChartPayload is what a fetched wider window
+                            // replaces the chart's contents with, and is assigned below by
+                            // whichever of the two chart shapes this page is.
+                            var chartLoadedDays = {{.ChartLoadedDays}};
+                            var chartMaxDays = {{.MaxLookbackDays}};
+                            var chartRosterIDs = {{.ChartIDsCSV}};
+                            var installChartPayload;
+
+                            // The axis a widened payload brings, installed everywhere it is
+                            // held. x-top is a transparent spacer scale, but it is a category
+                            // axis built from the labels the chart was constructed with, so
+                            // leaving it alone keeps the old window's labels on a chart that
+                            // no longer has them.
+                            function installLabels(labels) {
+                                cardChart.data.labels = labels;
+                                var top = cardChart.options.scales['x-top'];
+                                if (top) top.labels = labels;
+                            }
+
+                            // Checkpoint annotations are keyed to the axis, so a widened
+                            // chart needs the ones its new span crosses, not the ones the
+                            // rendered window did.
+                            function installCheckpoints(list) {
+                                chartCheckpoints = list || [];
+                                var toggles = document.querySelector('.chart-checkpoint-toggles');
+                                if (toggles) toggles.style.display = chartCheckpoints.length ? '' : 'none';
+                                if (!chartCheckpoints.length) {
+                                    if (cardChart.options.plugins.annotation) {
+                                        cardChart.options.plugins.annotation.annotations = {};
+                                    }
+                                    return;
+                                }
+                                restoreCheckpointTypes();
+                                // Built against the same options object the first pass used,
+                                // not against the chart's resolved copy of it.
+                                // buildCheckpointAnnotations reserves the top padding band
+                                // the badges are positioned into by mutating what it is
+                                // handed, so handing it a different object reserves the band
+                                // somewhere the layout never reads and the icons land off the
+                                // top of the canvas.
+                                var annotations = buildCheckpointAnnotations(chartCheckpoints, checkpointChartRef, opts);
+                                opts.plugins.annotation = { clip: false, annotations: annotations };
+                                cardChart.options.plugins.annotation = opts.plugins.annotation;
+                                cardChart.options.layout = opts.layout;
+                            }
 
                             {{if .IsMultiChart}}
                             // Multi-card mode: keep one persistent line per card and swap its
@@ -933,9 +1000,66 @@
                                 });
                                 localStorage.setItem('chartMultiRef', ref);
                             }
-                            document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
-                                btn.classList.toggle('active', btn.getAttribute('data-ref') === currentReference);
-                            });
+                            // Draws the picker from chartReferences, which the server renders
+                            // for the window the page drew and a widened payload can extend.
+                            // Listeners rather than inline onclick, since these buttons are
+                            // rebuilt rather than parsed from the template.
+                            function renderReferencePicker() {
+                                var host = document.querySelector('.chart-ref-picker');
+                                if (!host) return;
+                                host.textContent = '';
+                                chartReferences.forEach(function(ref) {
+                                    var btn = document.createElement('a');
+                                    btn.className = 'btn default ref-picker-btn' +
+                                        (ref === currentReference ? ' active' : '');
+                                    btn.setAttribute('data-ref', ref);
+                                    btn.href = 'javascript:void(0)';
+                                    btn.textContent = ref;
+                                    btn.addEventListener('click', function() { selectReference(ref); });
+                                    host.appendChild(btn);
+                                });
+                            }
+                            renderReferencePicker();
+
+                            // A widened roster arrives as the same (card × reference) list the
+                            // page rendered, so it rebuilds the same lookup and re-collapses to
+                            // one line per card on whichever reference is showing.
+                            installChartPayload = function(data) {
+                                installLabels(data.axisLabels);
+                                cardLines = {};
+                                cardOrder = [];
+                                data.datasets.forEach(function(ds) {
+                                    if (!cardLines[ds.cardId]) {
+                                        cardLines[ds.cardId] = { label: ds.name, color: ds.color, references: {} };
+                                        cardOrder.push(ds.cardId);
+                                    }
+                                    cardLines[ds.cardId].references[ds.reference || ds.name] = chartNumbers(ds.data);
+                                });
+                                if (data.references && data.references.length) {
+                                    chartReferences = data.references;
+                                    if (chartReferences.indexOf(currentReference) < 0) {
+                                        currentReference = chartReferences[0];
+                                    }
+                                    // The picker was rendered from the window the page drew,
+                                    // so a wider one can carry a price source that window had
+                                    // no button for. Re-render it rather than only re-marking
+                                    // what is already there, or that source is charted with
+                                    // no way to select it.
+                                    renderReferencePicker();
+                                }
+                                cardChart.data.datasets = cardOrder.map(function(id) {
+                                    var cl = cardLines[id];
+                                    return {
+                                        cardId: id,
+                                        label: cl.label,
+                                        data: cl.references[currentReference] || [],
+                                        borderColor: cl.color,
+                                        fill: 'origin',
+                                    };
+                                });
+                                installCheckpoints(data.checkpoints);
+                                renderChartLegend(cardChart, 'chartLegend');
+                            };
 
                             // Hovering a legend entry drives the sidebar preview to that
                             // card by replaying its result row's hover, so the image,
@@ -962,6 +1086,19 @@
                             {{else}}
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
+
+                            // A widened single-card chart is rebuilt rather than patched in
+                            // place: a longer window can hold a provider that has no data at
+                            // all in the rendered one, which would otherwise be left out.
+                            installChartPayload = function(data) {
+                                installLabels(data.axisLabels);
+                                cardChart.data.datasets = data.datasets.map(function(ds) {
+                                    return chartDatasetConfig(ds);
+                                });
+                                installCheckpoints(data.checkpoints);
+                                applySavedLegendState(cardChart, legendStorageKey);
+                                renderChartLegend(cardChart, 'chartLegend', legendStorageKey);
+                            };
                             {{end}}
 
                             // Build custom HTML legend (single-card clicks persist via
@@ -985,7 +1122,21 @@
                                 attributeFilter: ['class'],
                             });
 
-                            function changeRange(rangeDays) {
+                            // The loader owns everything about history the chart does not yet
+                            // hold. Narrowing, or picking a range inside the rendered window,
+                            // never reaches the network.
+                            var chartRange = new ChartRangeLoader({
+                                ids: chartRosterIDs,
+                                maxDays: chartMaxDays,
+                                loadedDays: chartLoadedDays,
+                                onData: function(data) { installChartPayload(data); },
+                                onBusy: function(busy) {
+                                    var sel = document.getElementById('dateRange');
+                                    if (sel) sel.disabled = busy;
+                                },
+                            });
+
+                            function applyRangeWindow(rangeDays) {
                                 var allLabels = cardChart.data.labels;
                                 if (rangeDays === 0 || rangeDays >= allLabels.length) {
                                     cardChart.options.scales.x.min = undefined;
@@ -995,7 +1146,22 @@
                                 }
                                 setReleasesSuppressedByRange(rangeDays);
                                 cardChart.update();
-                                localStorage.setItem(rangeKey, rangeDays.toString());
+                            }
+
+                            function changeRange(rangeDays) {
+                                rememberRange(rangeDays);
+                                chartRange.ensure(rangeDays, function() {
+                                    applyRangeWindow(rangeDays);
+                                });
+                            }
+
+                            // The select can start on a range wider than the page rendered -
+                            // a saved preference, or a roster, which defaults to the whole
+                            // span. Fill it in now so the chart matches what the control says.
+                            if (chartRange.want(initialRange) > chartLoadedDays) {
+                                chartRange.ensure(initialRange, function() {
+                                    applyRangeWindow(initialRange);
+                                });
                             }
                             function toggleGaps() {
                                 cardChart.options.spanGaps = !cardChart.options.spanGaps;
