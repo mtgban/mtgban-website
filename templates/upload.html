@@ -930,7 +930,7 @@
             {{/* The product a card came out of, and how many of it were
                  opened, travel with the row: they are what lets the sections
                  be rebuilt when the page posts itself back. */}}
-            <tr data-hash="{{.CardID}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}"
+            <tr data-hash="{{.CardID}}" data-qtys="{{.Quantity}}" data-cond="{{or .OriginalCondition .IgnoredCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}"
                 data-from="{{.UnpackedFrom}}" data-fromqty="{{.UnpackedQuantity}}"
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                 <td>
