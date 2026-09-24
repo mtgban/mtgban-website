@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -147,5 +148,32 @@ func TestAdminOffersAnInviteLinkWithAnExpiry(t *testing.T) {
 		if got := strings.Count(out, `<option value="60">Two months</option>`); got != 2 {
 			t.Errorf("mobile=%v: Two months appears in %d dropdowns, want both", mobile, got)
 		}
+	}
+}
+
+// The cookie a link is kept in has to last as long as the link: a two-month
+// invite put in a one-month cookie is gone a month early.
+func TestInviteLinkCookieLastsAsLongAsTheLink(t *testing.T) {
+	signingEnabled(t, false)
+	sig := sign("Pioneer", nil, nil, 60*24*time.Hour)
+
+	rec := httptest.NewRecorder()
+	putSignatureInCookies(rec, httptest.NewRequest(http.MethodGet, "https://www.mtgban.com/", nil), sig)
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("set %d cookies, want the signature's", len(cookies))
+	}
+	left := time.Until(cookies[0].Expires)
+	if left < 59*24*time.Hour {
+		t.Errorf("the cookie lasts %v, less than the invite it holds", left)
+	}
+
+	// Stored before it is checked, so a forged Expires buys nothing.
+	forged := base64.StdEncoding.EncodeToString([]byte("Expires=99999999999"))
+	rec = httptest.NewRecorder()
+	putSignatureInCookies(rec, httptest.NewRequest(http.MethodGet, "https://www.mtgban.com/", nil), forged)
+	left = time.Until(rec.Result().Cookies()[0].Expires)
+	if left > 32*24*time.Hour {
+		t.Errorf("a forged signature kept its cookie for %v", left)
 	}
 }
