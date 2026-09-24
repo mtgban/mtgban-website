@@ -323,7 +323,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		duration := DefaultSignatureDuration
 		days, err := strconv.Atoi(r.FormValue("duration"))
 		if err == nil && days > 0 {
-			duration = time.Duration(days) * 24 * time.Hour
+			// Two months at most, as the select offers.
+			duration = time.Duration(min(days, 60)) * 24 * time.Hour
 		}
 		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil, duration))
 

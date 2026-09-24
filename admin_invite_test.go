@@ -82,11 +82,19 @@ func TestInviteLinkWithoutADurationKeepsTheLoginLength(t *testing.T) {
 // zero, a negative or a word falls back to the default rather than handing
 // over something that cannot be used.
 func TestInviteLinkIsNeverBornExpired(t *testing.T) {
-	for _, duration := range []string{"0", "-3", "later", ""} {
+	for _, duration := range []string{"0", "-3", "later", "", "106752"} {
 		got := expiresIn(t, inviteSig(t, "tier=Pioneer&duration="+url.QueryEscape(duration)))
 		if got <= 0 {
 			t.Errorf("duration=%q minted a link that expired %v ago", duration, -got)
 		}
+	}
+}
+
+// The select stops at two months, and so does a hand-written URL.
+func TestInviteLinkLastsTwoMonthsAtMost(t *testing.T) {
+	got := expiresIn(t, inviteSig(t, "tier=Pioneer&duration=36500"))
+	if got > 60*24*time.Hour {
+		t.Errorf("a 100-year link has %v left, want two months at most", got)
 	}
 }
 
