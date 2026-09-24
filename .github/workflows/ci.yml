@@ -75,7 +75,7 @@ jobs:
       - name: Compute datastore cache key
         id: ds
         run: |
-          etag=$(curl -sI "$DATASTORE_URL" | grep -i etag | tr -d '\r"' | cut -f 2 -d " ")
+          etag=$(curl -sI --retry 3 --retry-all-errors "$DATASTORE_URL" | grep -i etag | tr -d '\r"' | cut -f 2 -d " ")
           base=$(basename "$DATASTORE_URL" | cut -d? -f1)
           echo "key=$base-$etag" >> "$GITHUB_OUTPUT"
           echo "filepath=datastore/$base" >> "$GITHUB_OUTPUT"
@@ -91,7 +91,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p datastore/
-          curl -L "$DATASTORE_URL" -o "${{ steps.ds.outputs.filepath }}"
+          curl -L --fail --retry 3 --retry-all-errors "$DATASTORE_URL" -o "${{ steps.ds.outputs.filepath }}"
 
       - name: Decompress datastore
         run: xz -dc "${{ steps.ds.outputs.filepath }}" > allprintings5.json
