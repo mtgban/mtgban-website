@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
+	"github.com/mtgban/mtgban-website/internal/csiidparser"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
 )
@@ -886,6 +887,13 @@ func tcgSKU2UUID(sku string) string {
 // The snapshot is handed over rather than reached for: that package holds
 // the resolving, this one holds the sellers.
 var mkmIDs = &mkmidparser.Parser{
+	Sellers: func() *[]mtgban.Seller { return sellersPtr.Load() },
+}
+
+// csiIDs resolves a Cool Stuff Inc product id to the card it names, the same
+// way and for the same reason - except that no id space indexes this one, so
+// the loaded inventory is the only thing that can answer at all.
+var csiIDs = &csiidparser.Parser{
 	Sellers: func() *[]mtgban.Seller { return sellersPtr.Load() },
 }
 

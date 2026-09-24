@@ -320,6 +320,27 @@ func manapoolCardTitle(u *url.URL) string {
 	return "Your search"
 }
 
+// coolstuffincTitle names the printing a Cool Stuff Inc product link points
+// at.
+//
+// The path is /p/<pid>, and the id is the storefront's own: no id space
+// indexes it, so it cannot be looked up the way a TCGplayer product id can,
+// and the path carries nothing else - no name, no set, no number. Reading it
+// as a name is what had the bot announce "1435 at Cool Stuff Inc".
+//
+// What does know the id is the inventory already loaded, where the scrapers
+// stamp the product each entry priced. A link to something this site does not
+// price - an accessory, a sealed case, a card that has since sold out - is
+// answered with nothing, the same as every other store whose link names more
+// than the datastore holds.
+func coolstuffincTitle(u *url.URL) string {
+	co, err := backend().GetUUID(csiIDs.Resolve(path.Base(u.Path)))
+	if err != nil {
+		return "Your search"
+	}
+	return printingTitle(co)
+}
+
 var AffiliateStores = []AffiliateConfig{
 	{
 		Trigger:       "cardkingdom.com/mtg",
@@ -353,10 +374,7 @@ var AffiliateStores = []AffiliateConfig{
 		Name:          "Cool Stuff Inc",
 		Handle:        "CSI",
 		DefaultFields: []string{"utm_referrer"},
-		TitleFunc: func(u *url.URL) string {
-			base, _ := url.QueryUnescape(path.Base(u.Path))
-			return mtgmatcher.Title(base)
-		},
+		TitleFunc:     coolstuffincTitle,
 	},
 	{
 		Trigger: "tcgplayer.com/product",
