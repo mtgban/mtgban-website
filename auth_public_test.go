@@ -86,3 +86,32 @@ func TestAnyTierPageIsInNavForEveryone(t *testing.T) {
 		t.Errorf("nav %s shows a hidden sub-page or a gated page to an anonymous reader", joined)
 	}
 }
+
+// A grant is matched on the Patreon email, which a Patreon account can set to
+// anybody's until Patreon has confirmed it; an unconfirmed one claims nothing.
+func TestGrantNeedsAConfirmedEmail(t *testing.T) {
+	savedAccess := Access
+	t.Cleanup(func() { Access = savedAccess })
+	files := map[string]string{
+		"acl":    `{}`,
+		"grants": `[{"email": "Granted@Example.com", "tier": "Vintage"}]`,
+	}
+	Access = access.New(access.Hooks{
+		Open: func(_ context.Context, path string) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader(files[path])), nil
+		},
+	})
+	err := Access.Load(context.Background(), access.Sources{TablePath: "acl", GrantsPath: "grants"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	grant, ok := grantFor(&PatreonUserData{Email: "granted@example.com", EmailVerified: true})
+	if !ok || grant.Tier != "Vintage" {
+		t.Errorf("the grantee was not granted: %+v %v", grant, ok)
+	}
+	_, ok = grantFor(&PatreonUserData{Email: "granted@example.com"})
+	if ok {
+		t.Error("an unconfirmed email claimed the grant made to its owner")
+	}
+}

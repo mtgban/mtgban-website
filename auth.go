@@ -81,6 +81,21 @@ func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 	}, nil
 }
 
+// grantFor is the grant made to this user's email, if there is one. Only an
+// email Patreon has confirmed names anybody: an unconfirmed one is whatever
+// the account typed, and would claim the tier granted to its real owner.
+func grantFor(userData *PatreonUserData) (PatreonGrant, bool) {
+	if !userData.EmailVerified {
+		return PatreonGrant{}, false
+	}
+	for _, grant := range PatreonGrants() {
+		if strings.ToLower(grant.Email) == userData.Email {
+			return grant, true
+		}
+	}
+	return PatreonGrant{}, false
+}
+
 func getUserTier(ctx context.Context, client *patreon.Client, userID string) (string, error) {
 	membershipData, err := client.GetMembershipData(ctx, userID)
 	if err != nil {
@@ -243,13 +258,11 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	tierTitle := ""
 	var overrides map[string]map[string]string
 	// If user is in the allowed list, load the tier from here
-	for _, grant := range PatreonGrants() {
-		if strings.ToLower(grant.Email) == userData.Email {
-			tierTitle = grant.Tier
-			overrides = grant.Overrides
-			LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
-			break
-		}
+	grant, granted := grantFor(userData)
+	if granted {
+		tierTitle = grant.Tier
+		overrides = grant.Overrides
+		LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
 	}
 
 	// Else, load the tier from the API
