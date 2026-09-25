@@ -32,7 +32,7 @@ const (
 	TooLongMessage    = "Your query planeswalked away, try a shorter one"
 	TooManyMessage    = "Too many results, try adjusting your filters"
 	NoResultsMessage  = "No products matching your search could be found"
-	NoPromosMessage   = "No products matching your search could be found — some promos may be hidden"
+	NoPromosMessage   = "No products matching your search could be found - some promos may be hidden"
 	NoCardsMessage    = "No products matching your search could be found"
 
 	MaxSearchTotalResults = 10000

@@ -30,7 +30,7 @@
         {{if .Running}}
             <div class="admin-msg admin-msg-progress">
                 <span class="admin-spinner"></span>
-                Datastore update in progress &mdash; started by {{.Source}} {{.Elapsed}} ago from <code>{{.Path}}</code>.
+                Datastore update in progress - started by {{.Source}} {{.Elapsed}} ago from <code>{{.Path}}</code>.
                 The site keeps serving the datastore it already has until this finishes.
                 <a href="?">Refresh</a>
             </div>
@@ -390,7 +390,7 @@
                     </div>
                 </div>
                 <div class="uuid-field">
-                    <label>Correct card — pick the right printing</label>
+                    <label>Correct card - pick the right printing</label>
                     {{if .OverrideCandidates}}
                     <ul class="uuid-candidates" id="ovrCandidates">
                         {{range .OverrideCandidates}}
@@ -401,7 +401,7 @@
                         {{end}}
                     </ul>
                     {{else}}
-                    <p class="admin-hint">No other printings share this card's name — edit the JSON below directly to set a cross-name target.</p>
+                    <p class="admin-hint">No other printings share this card's name - edit the JSON below directly to set a cross-name target.</p>
                     {{end}}
                 </div>
                 <button type="button" id="ovrAdd" class="cfg-btn cfg-primary uuid-add">Add to overrides</button>
