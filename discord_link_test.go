@@ -150,7 +150,9 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
 				strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
 			checkedMP++
-			got := offeredPrinting(t, checkForLinks(discordGuildID(), link))
+			reply := checkForLinks(discordGuildID(), link)
+			got := offeredPrinting(t, reply)
+			title := printingTitle(co) + " at Manapool"
 			if got == "" {
 				// A number two cards answer to names neither of them. Magic
 				// files one name per number, so this does not fire here; it
@@ -163,6 +165,10 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			} else if got != co.UUID {
 				t.Errorf("%s offers %s, want %s %s #%s (%s)",
 					link, got, co.Name, co.SetCode, co.Number, co.UUID)
+			} else if !strings.HasSuffix(reply.Title, title) {
+				// The tail is no name, so a title read off the URL says
+				// "A Card".
+				t.Errorf("%s is titled %q, want %q", link, reply.Title, title)
 			}
 		}
 	}
