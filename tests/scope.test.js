@@ -24,8 +24,8 @@ function element(extra = {}) {
 }
 
 // Runs scope.js over a bar holding `pinned`, and hands back the pieces plus
-// wherever the page was sent.
-function loadBar(pinned, extra = {}) {
+// wherever the page was sent. autocomplete stands in for the shared one.
+function loadBar(pinned, extra = {}, autocomplete = undefined) {
     const nodes = {
         'nav-pin-btn': element(),
         'nav-scope': element(),
@@ -45,10 +45,12 @@ function loadBar(pinned, extra = {}) {
     const window = {
         location: {
             href: 'https://example.test/search?q=bolt&sort=alpha',
+            pathname: '/search',
             assign: url => navigated.push(url),
         },
     };
-    new Function('window', 'document', 'URL', source)(window, document, URL);
+    new Function('window', 'document', 'URL', 'autocomplete', 'location', source)(
+        window, document, URL, autocomplete, window.location);
     return { nodes, navigated };
 }
 
@@ -151,4 +153,17 @@ test('the search form sends what the box shows', () => {
     nodes['nav-searchform'].handlers.submit();
 
     expect(nodes['nav-scopefield'].value).toBe('r:mythic');
+});
+
+// The pinned bar takes the same f:, s: and is: suggestions as the main one.
+// The call sits behind a typeof guard, so losing it fails nothing else.
+test('the bar is handed the shared autocomplete', () => {
+    const bound = [];
+    const { nodes } = loadBar('s:sos', { 'nav-searchform': element() },
+        (form, box, sealed) => bound.push({ form, box, sealed }));
+
+    expect(bound).toHaveLength(1);
+    expect(bound[0].form).toBe(nodes['nav-searchform']);
+    expect(bound[0].box).toBe(nodes['nav-scopebox']);
+    expect(bound[0].sealed).toBe('false');
 });
