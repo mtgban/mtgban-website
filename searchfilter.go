@@ -2130,45 +2130,42 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 			}
 		}
 
-		// The game's own name for what this printing carries. Where a game
-		// names no finishes of its own this is one of the three above and
-		// agrees with them, so it costs those games nothing. Where it does,
-		// it is the only thing telling two printings apart: Yu-Gi-Oh prices
-		// print runs, so f:1stedition and f:unlimited are the whole
-		// distinction and neither is a foilness a case can answer.
-		if co.Finish != "" && value == co.Finish {
+		if finishReaches(co, value) {
 			return false
 		}
 
-		// The finish with its print run taken off, so f:rainbowfoil reaches
-		// a product whose only rainbow is the Unlimited printing.
-		finish, found := mtgmatcher.FinishOf(co.Finish)
-		if found && finish.Treatment == value {
-			return false
-		}
-
-		// The print run with its treatment taken off, so f:unlimited reaches
-		// Unlimited Edition Rainbow Foil and Unlimited Holofoil alike.
-		if found && finish.Run != "" && mtgmatcher.PromoTypeSlug(finish.Run) == value {
-			return false
-		}
-
-		// Magic keeps its foil treatments as promo types rather than finishes
-		// - its only finishes are nonfoil, foil and etched - so a galaxy foil
-		// is a foil whose treatment is filed elsewhere. A treatment is what a person means by finish, and
-		// uuid2card already prints it in place of the foil chip, so f: should
-		// reach it: altFoilTags is exactly the promo types that name a
-		// foiling, which is why it gates this and any promo type does not.
-		treatment := value
+		// A short form reaches the Magic treatment it stands for: f:galaxy
+		// is f:galaxyfoil
 		expanded, known := isKnownPromo[value]
-		if known {
-			treatment = expanded
-		}
-		if slices.Contains(altFoilTags, treatment) && co.HasPromoType(treatment) {
+		if known && slices.Contains(altFoilTags, expanded) && co.HasPromoType(expanded) {
 			return false
 		}
 	}
 	return true
+}
+
+// finishReaches reports whether f: reaches the printing by a name, past its
+// Foil and Etched flags. The name is:
+//   - the finish its game names it by, which is all that tells Yu-Gi-Oh's
+//     print runs apart;
+//   - that finish with its print run taken off, so f:rainbowfoil reaches a
+//     product whose only rainbow is the Unlimited printing;
+//   - its print run with the treatment taken off, so f:unlimited reaches
+//     Unlimited Edition Rainbow Foil and Unlimited Holofoil alike;
+//   - a Magic foil treatment, which Magic files as a promo type. altFoilTags
+//     names the promo types that are foilings.
+func finishReaches(co *mtgmatcher.CardObject, name string) bool {
+	if co.Finish != "" && name == co.Finish {
+		return true
+	}
+	finish, found := mtgmatcher.FinishOf(co.Finish)
+	if found && finish.Treatment == name {
+		return true
+	}
+	if found && finish.Run != "" && mtgmatcher.PromoTypeSlug(finish.Run) == name {
+		return true
+	}
+	return slices.Contains(altFoilTags, name) && co.HasPromoType(name)
 }
 
 func cardFilterDate(filters []string, co *mtgmatcher.CardObject) bool {
