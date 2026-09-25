@@ -40,7 +40,6 @@ func TestFinishFilterKeepsTheSharedNames(t *testing.T) {
 		{"foil", nonfoil, false},
 		{"nonfoil", nonfoil, true},
 		{"nf", nonfoil, true},
-		{"r", nonfoil, true},
 		{"nonfoil", foil, false},
 		{"etched", etched, true},
 		{"e", etched, true},

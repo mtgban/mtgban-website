@@ -355,7 +355,7 @@ window.__BAN_GUIDE = {
                 description: '<p>Filter by finish with <code>f:VALUE</code> using the values below, or append a suffix character directly to any search term.</p>',
                 table: [
                     { value: 'foil / f', short: 'Foil' },
-                    { value: 'nonfoil / nf / r', short: 'Non-foil' },
+                    { value: 'nonfoil / nf', short: 'Non-foil' },
                     { value: 'etched / e', short: 'Etched foil' },
                     { value: 'is:altfoil', short: 'Any special foil variant (Galaxy, Surge, Ripple, etc.)' },
                     { value: '*', short: 'Foil only (query suffix)' },
