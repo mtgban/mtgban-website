@@ -197,12 +197,12 @@ func TestUploadSourceFrom(t *testing.T) {
 	}{{
 		name: "a seller's offers page names the seller",
 		raw:  "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles",
-		want: "Cardmarket — Lemhast",
+		want: "Cardmarket - Lemhast",
 		link: "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles",
 	}, {
 		name: "the seller survives the filters the walk carries",
 		raw:  "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles?idLanguages=1&site=4",
-		want: "Cardmarket — Lemhast",
+		want: "Cardmarket - Lemhast",
 		link: "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles?idLanguages=1&site=4",
 	}, {
 		// Host excludes userinfo, so this passes the origin check. Echoing
@@ -210,7 +210,7 @@ func TestUploadSourceFrom(t *testing.T) {
 		// results page.
 		name: "credentials do not ride along into the link",
 		raw:  "https://user:pass@www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles",
-		want: "Cardmarket — Lemhast",
+		want: "Cardmarket - Lemhast",
 		link: "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles",
 	}, {
 		// Somewhere else on the same site is still that site.
@@ -282,7 +282,7 @@ func TestUploadQuery(t *testing.T) {
 		name:      "a handed-over list names where it was read",
 		textArea:  "a,b\n1,2\n",
 		handed:    offers,
-		wantQuery: "Cardmarket \u2014 Lemhast",
+		wantQuery: "Cardmarket - Lemhast",
 		wantLink:  offers,
 	}, {
 		name:      "a list handed from somewhere unallowed is a paste",

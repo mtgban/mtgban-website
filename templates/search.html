@@ -760,7 +760,7 @@
                                     {{if lt (len .ChartIDs) .MaxChartCards}}
                                     <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
                                     {{else}}
-                                    <span class="btn default chart-add-btn chart-add-full" title="Charts hold up to {{.MaxChartCards}} cards &mdash; remove one to add another">&#10133; Add card</span>
+                                    <span class="btn default chart-add-btn chart-add-full" title="Charts hold up to {{.MaxChartCards}} cards - remove one to add another">&#10133; Add card</span>
                                     {{end}}
                                 </p>
                                 {{/* A chart that can widen may gain checkpoints it has
@@ -1443,7 +1443,7 @@
                                     <div class="qi-actions">
                                     {{if $.CanFixSearch}}
                                         <a class="raw-record" href="/api/mtgmatcher/raw/{{$cardId}}" target="_blank" rel="noopener" title="Raw mtgmatcher record for this card (admin)"><span class="emoji">&#128300;</span></a>
-                                        <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode — show a Fix link on each store (admin)" onclick="toggleAdminFixMode()">&#128295;</span>
+                                        <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode - show a Fix link on each store (admin)" onclick="toggleAdminFixMode()">&#128295;</span>
                                     {{end}}
                                     {{if $card.Sealed}}
                                         {{if $card.Booster}}
@@ -1614,7 +1614,7 @@
                                                         {{else}}
                                                         <span class="price-right">
                                                         {{end}}
-                                                        <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
+                                                        <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
                                                             {{if or .PriceUnit .Price}}
                                                                 {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                             {{else if .BundleIcon}}
@@ -1686,7 +1686,7 @@
                                                 {{$aboveP90 := false}}
                                                 {{if and .IsOffer (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
                                                 <span class="price-right has-buylist-extra">
-                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $aboveP90}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if gt $card.GoodBuylist 0.0}}title="Card Kingdom P90 $ {{printf "%.2f" $card.GoodBuylist}}{{if gt $card.HighestBuylist 0.0}}; 90-day high $ {{printf "%.2f" $card.HighestBuylist}}{{end}}"{{end}}>
+                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $aboveP90}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if gt $card.GoodBuylist 0.0}}title="Card Kingdom P90 $ {{printf "%.2f" $card.GoodBuylist}}{{if gt $card.HighestBuylist 0.0}}; 90-day high $ {{printf "%.2f" $card.HighestBuylist}}{{end}}"{{end}}>
                                                     {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                 </span>
                                                 <span class="buylist-extra"

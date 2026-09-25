@@ -446,7 +446,7 @@ func noteNewspaperStaleness(pageVars *PageVars) {
 		pageVars.InfoMessage = notice
 		return
 	}
-	pageVars.InfoMessage += " — " + notice
+	pageVars.InfoMessage += " - " + notice
 }
 
 // refreshNewspaperEdition runs one edition of a page's query. The second

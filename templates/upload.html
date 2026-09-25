@@ -246,7 +246,7 @@
                             <label>
                                 <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
                                 <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
-                                <span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span></span>
+                                <span class="upload-file-hint">CSV, TXT, XLS, XLSX - max 5MB</span></span>
                                 <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();clearFile();">clear selection</span>
                             </label>
                         </div>
@@ -355,7 +355,7 @@
                 <div class="upload-help-card">
                     <h3>Supported Formats</h3>
                     <p><strong>CSV</strong> or <strong>spreadsheet</strong> files (.csv/.xls/.xlsx), <strong>Google Sheets</strong>, <strong>TCG</strong> and other tracker URLs, or plaintext decklists.</p>
-                    <p>Popular exports like TCG, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card name lists also work &mdash; the most recent printing will be used.</p>
+                    <p>Popular exports like TCG, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card name lists also work - the most recent printing will be used.</p>
                     <div class="upload-help-note">Excel sheets should contain <code>mtgban</code> in the sheet name. Google Sheets must be publicly accessible. The saved URL will persist as a preference.</div>
                 </div>
 
@@ -378,7 +378,7 @@
                     <h3>Optimizer</h3>
                     <p>Groups results by <strong>store</strong> and <strong>edition</strong> with a theoretical maximum split per store. Similar offers within the margin threshold are all listed.</p>
                     <p>Each store section shows its offer next to loaded/TCG Low price. The percentage indicates offer strength. Use <strong>Load at</strong> buttons to push directly to partner storefronts.</p>
-                    <div class="upload-help-note">The qty multiplier applies only to optimizer operations &mdash; loaded data stays untouched. You can download per-store CSVs or remove cards from TCGplayer inventory.</div>
+                    <div class="upload-help-note">The qty multiplier applies only to optimizer operations - loaded data stays untouched. You can download per-store CSVs or remove cards from TCGplayer inventory.</div>
                 </div>
 
                 <hr class="upload-help-divider">
@@ -388,7 +388,7 @@
                     <div class="upload-legend-list">
                         <div class="upload-legend-row">
                             <span class="upload-legend-swatch" style="background:var(--aliasing);"></span>
-                            Tinted background &mdash; alias was guessed, verify printing via dropdown
+                            Tinted background - alias was guessed, verify printing via dropdown
                         </div>
                         <div class="upload-legend-row">
                             <span class="upload-legend-swatch" style="background:var(--asuccess);"></span>
@@ -725,7 +725,7 @@
             window.clearFile = function() {
                 var input = document.getElementById('file');
                 input.value = '';
-                document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span>';
+                document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX - max 5MB</span>';
                 document.getElementById('clearFileBtn').style.display = 'none';
                 enabledButtons();
             };
@@ -761,7 +761,7 @@
                         if (!this.value.trim()) return;
                         var fileInput = document.getElementById('file');
                         if (fileInput) fileInput.value = "";
-                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX - max 5MB</span>';
                         document.getElementById('clearFileBtn').style.display = 'none';
                         var ta = document.getElementById('textArea');
                         if (ta) ta.value = "";
@@ -790,7 +790,7 @@
                         if (urlInput) urlInput.value = "";
                         var fileInput = document.getElementById('file');
                         if (fileInput) fileInput.value = "";
-                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, TXT, XLS, XLSX - max 5MB</span>';
                         document.getElementById('clearFileBtn').style.display = 'none';
                         const form = document.getElementById("upload_form");
                         form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
@@ -963,7 +963,7 @@
                         {{if ne $price 0.0}}
                             <a href="https://mtgban.com/go/{{if $root.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
                         {{else}}
-                            &mdash;
+                            -
                         {{end}}
                     </td>
                 {{end}}

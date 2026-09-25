@@ -85,7 +85,7 @@ func uploadSourceFrom(raw string) (name string, link string) {
 	parts := strings.Split(parsed.Path, "/")
 	for i := 0; i+1 < len(parts); i++ {
 		if parts[i] == "Users" && parts[i+1] != "" {
-			name += " \u2014 " + parts[i+1]
+			name += " - " + parts[i+1]
 			break
 		}
 	}
