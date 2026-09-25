@@ -113,11 +113,20 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 		t.Errorf("a forged cookie widened a key scoped to CK: %s", body)
 	}
 
-	// A reader's own signature is not a key: with no API claim it keeps the
-	// site's store policy, once it verifies.
-	site := signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(time.Hour))
+	// A reader's own signature is not a key, even where its tier grants the
+	// API page, which signs as API=true: once it verifies, it keeps the
+	// site's store policy.
+	site := signedAs(t, url.Values{"UserEmail": {"sub@example.com"}, "API": {"true"}}, time.Now().Add(time.Hour))
 	if !strings.Contains(search("", site), "Star City Games") {
 		t.Error("a checked site signature lost a store it is shown on the site")
+	}
+
+	// A key's signature can sit in the cookie too, put there by a page it
+	// opened, and its scope holds there as well.
+	keyCookie := signedAs(t, url.Values{"UserEmail": {"key@example.com"}, "APImode": {"all"}, "API": {"CK"}}, time.Now().Add(time.Hour))
+	body = search("", keyCookie)
+	if !strings.Contains(body, "Card Kingdom") || strings.Contains(body, "Star City Games") {
+		t.Errorf("a key's scope was dropped when it came in the cookie: %s", body)
 	}
 
 	// The site's own export is not a key, and keeps every store it shows.
