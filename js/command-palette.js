@@ -214,27 +214,12 @@
         }
     }
 
-    // upload.go's cookie fallback for stores only fires when hashes is non-empty;
-    // URL/file submissions must include the saved store list explicitly.
-    function appendUserStores(form) {
-        if (typeof getCookie !== 'function') return;
-        var combined = (getCookie('enabledSellers') || '') + '|' + (getCookie('enabledVendors') || '');
-        var seen = {};
-        combined.split('|').forEach(function (s) {
-            s = s.trim();
-            if (!s || seen[s]) return;
-            seen[s] = true;
-            appendHidden(form, 'stores', s);
-        });
-    }
-
     function submitUploadURL(url) {
         var form = document.createElement('form');
         form.method = 'post';
         form.action = '/upload';
         form.style.display = 'none';
         appendHidden(form, 'gdocURL', url);
-        appendUserStores(form);
         document.body.appendChild(form);
         showUploadingState('Submitting URL to Uploader...');
         form.submit();
@@ -253,7 +238,6 @@
         picker.accept = '.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         picker.addEventListener('change', function () {
             if (!picker.files || !picker.files[0]) return;
-            appendUserStores(form);
             showUploadingState('Uploading ' + picker.files[0].name + '...');
             form.submit();
         });
