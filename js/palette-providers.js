@@ -101,17 +101,46 @@
     });
 
     // Finish
+    //
+    // Foil, non-foil and etched are read off a printing's flags, so they stand
+    // for every game. The loaded game's own finishes are fetched and appended
+    // the way the promo types join is:.
+    var finishOptions = [
+        { value: 'foil', label: 'Foil', iconColor: '#d4af37' },
+        { value: 'nonfoil', label: 'Non-foil', iconColor: '#888' },
+        { value: 'etched', label: 'Etched', iconColor: '#06b6d4' }
+    ];
+    var finishesMerged = false;
+    var finishesFetching = null;
+    function ensureFinishes() {
+        if (finishesMerged || finishesFetching) return finishesFetching;
+        finishesFetching = fetch('/api/palette/finishes.json')
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (data) { mergeFinishes(data); })
+            .catch(function () { mergeFinishes([]); });
+        return finishesFetching;
+    }
+    function mergeFinishes(finishes) {
+        finishesMerged = true;
+        finishesFetching = null;
+        var seen = {};
+        for (var i = 0; i < finishOptions.length; i++) seen[finishOptions[i].value] = true;
+        for (var j = 0; j < (finishes || []).length; j++) {
+            var finish = finishes[j];
+            if (!finish || !finish.value || seen[finish.value]) continue;
+            seen[finish.value] = true;
+            finishOptions.push({ value: finish.value, label: finish.label || finish.value });
+        }
+        fireOnDataReady();
+    }
+
     register({
         prefix: 'f:',
         name: 'Finish',
         icon: 'sparkles',
         getCandidates: function (query) {
-            var base = [
-                { value: 'foil', label: 'Foil', iconColor: '#d4af37' },
-                { value: 'nonfoil', label: 'Non-foil', iconColor: '#888' },
-                { value: 'etched', label: 'Etched', iconColor: '#06b6d4' }
-            ];
-            return filterEntries(base, query);
+            ensureFinishes();
+            return filterEntries(finishOptions, query);
         }
     });
 
