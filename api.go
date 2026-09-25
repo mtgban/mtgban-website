@@ -791,8 +791,9 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// A key sees only the stores it was sold, as on the price API. Its scope
 	// is one more store filter, so the query's own still narrow within it.
+	// A site login signs API=true for the API page, which names no store.
 	storesOpt := GetParamFromSig(sig, "API")
-	if storesOpt != "" && strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
+	if storesOpt != "" && storesOpt != "true" && strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
 			Name:   "store",
 			Values: fixupStoreCodeNG(strings.Join(apiEnabledStores(storesOpt), ",")),
