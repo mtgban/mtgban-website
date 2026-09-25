@@ -122,6 +122,45 @@ func TestFinishFilterMatchesTheTreatment(t *testing.T) {
 	}
 }
 
+// A print run reaches every printing sold in it, whichever treatment:
+// f:unlimited finds Flesh and Blood's Unlimited Edition and Pokemon's
+// Unlimited Holofoil, and never another run or a set printed once.
+func TestFinishFilterMatchesThePrintRun(t *testing.T) {
+	first := finishCard("wtr006_225017_1steditionnormal", "1steditionnormal", false)
+	firstRainbow := finishCard("wtr006_225017_1steditionrainbowfoil", "1steditionrainbowfoil", true)
+	unlimitedRainbow := finishCard("wtr006_225017_unlimitededitionrainbowfoil", "unlimitededitionrainbowfoil", true)
+	printedOnce := finishCard("omn015_682847_rainbowfoil", "rainbowfoil", true)
+	firstHolo := finishCard("01-62_44418_1steditionholofoil", "1steditionholofoil", true)
+	unlimitedHolo := finishCard("01-62_44418_unlimitedholofoil", "unlimitedholofoil", true)
+
+	tests := []struct {
+		query string
+		co    *mtgmatcher.CardObject
+		want  bool
+	}{
+		{"1stedition", first, true},
+		{"1stedition", firstRainbow, true},
+		{"1stedition", unlimitedRainbow, false},
+		{"unlimited", unlimitedRainbow, true},
+		{"unlimited", first, false},
+		{"unlimited", firstRainbow, false},
+		{"1stedition", firstHolo, true},
+		{"unlimited", firstHolo, false},
+		{"unlimited", unlimitedHolo, true},
+		{"1stedition", unlimitedHolo, false},
+		{"unlimited", printedOnce, false},
+		{"limited", unlimitedRainbow, false},
+		// The trailing comma leaves an empty value, which names no run
+		{"unlimited,", printedOnce, false},
+	}
+	for _, test := range tests {
+		got := matches(test.query, test.co)
+		if got != test.want {
+			t.Errorf("f:%s against %q = %t, want %t", test.query, test.co.UUID, got, test.want)
+		}
+	}
+}
+
 // Magic files its foil treatments as promo types, not finishes - its only
 // finishes are nonfoil, foil and etched - so the treatment has to be reached
 // there or a galaxy foil is only ever f:foil.

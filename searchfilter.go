@@ -2142,7 +2142,14 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 
 		// The finish with its print run taken off, so f:rainbowfoil reaches
 		// a product whose only rainbow is the Unlimited printing.
-		if finish, found := mtgmatcher.FinishOf(co.Finish); found && finish.Treatment == value {
+		finish, found := mtgmatcher.FinishOf(co.Finish)
+		if found && finish.Treatment == value {
+			return false
+		}
+
+		// The print run with its treatment taken off, so f:unlimited reaches
+		// Unlimited Edition Rainbow Foil and Unlimited Holofoil alike.
+		if found && finish.Run != "" && mtgmatcher.NormalizeFinish(finish.Run) == value {
 			return false
 		}
 
