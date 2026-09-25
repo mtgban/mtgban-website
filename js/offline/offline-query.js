@@ -29,7 +29,13 @@
         return tokens;
     }
 
-    function parse(str) {
+    // parse reads a query. finishes is the catalog's finish list: a game's own
+    // finish is taken where the catalog names it, spelled the way it is stored.
+    function parse(str, finishes) {
+        var known = {};
+        (finishes || []).forEach(function (finish) {
+            if (finish && finish.value) known[finish.value] = true;
+        });
         var out = {names: [], set: '', number: '', finish: '', rarity: '', unsupported: []};
         var tokens = tokenize(String(str || ''));
         for (var i = 0; i < tokens.length; i++) {
@@ -68,8 +74,11 @@
                 out.number = val;
                 break;
             case 'f':
+                var slug = val.toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (FINISH[val.toLowerCase()]) {
                     out.finish = FINISH[val.toLowerCase()];
+                } else if (known[slug]) {
+                    out.finish = slug;
                 } else {
                     out.unsupported.push(tok.text);
                 }
@@ -162,6 +171,7 @@
         if (parsed.finish === 'foil' && !(card.f && !card.e)) return false;
         if (parsed.finish === 'etched' && !card.e) return false;
         if (parsed.finish === 'nonfoil' && (card.f || card.e)) return false;
+        if (parsed.finish && !FINISH[parsed.finish] && (card.fin || []).indexOf(parsed.finish) === -1) return false;
         return true;
     }
 

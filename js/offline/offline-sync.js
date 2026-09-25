@@ -193,7 +193,7 @@ async function rebuildCatalog(catalog) {
     var names = {};
     Object.keys(catalog.cards || {}).forEach(function(uuid) {
         var c = catalog.cards[uuid];
-        cards.push({ uuid: uuid, n: c.n, num: c.num, r: c.r, set: c.set, f: c.f, e: c.e, s: c.s, p: c.p, i: c.i });
+        cards.push({ uuid: uuid, n: c.n, num: c.num, r: c.r, set: c.set, f: c.f, e: c.e, s: c.s, p: c.p, i: c.i, fin: c.fin });
         var k = self.OfflineUtil.normName(c.n || '');
         if (!k) return;
         if (!names[k]) names[k] = [];
@@ -213,4 +213,5 @@ async function rebuildCatalog(catalog) {
     // Display dictionaries for the offline shell (OfflineUtil.loadCatalogDicts reads these).
     await self.OfflineDB.setMeta('catalogSets', catalog.sets || {});
     await self.OfflineDB.setMeta('catalogStores', catalog.stores || {});
+    await self.OfflineDB.setMeta('catalogFinishes', catalog.finishes || []);
 }

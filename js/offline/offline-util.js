@@ -39,8 +39,9 @@
         return Promise.all([
             self.OfflineDB.getMeta('catalogSets'),
             self.OfflineDB.getMeta('catalogStores'),
+            self.OfflineDB.getMeta('catalogFinishes'),
         ]).then(function(res) {
-            return { sets: res[0] || {}, stores: res[1] || {} };
+            return { sets: res[0] || {}, stores: res[1] || {}, finishes: res[2] || [] };
         });
     }
 

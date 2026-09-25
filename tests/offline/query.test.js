@@ -57,6 +57,16 @@ test('finish aliases normalize', () => {
     expect(p('f:etched').finish).toBe('etched');
 });
 
+// A game's own finish is taken where the catalog names it, folded the way
+// the catalog spells it; anything else stays unsupported.
+test('a finish the catalog names is read', () => {
+    const finishes = [{value: 'rainbowfoil', label: 'Rainbow Foil'}];
+    expect(p('f:foil').finish).toBe('foil');
+    expect(Q.parse('f:Rainbow-Foil', finishes).finish).toBe('rainbowfoil');
+    expect(Q.parse('f:galaxy', finishes).unsupported).toEqual(['f:galaxy']);
+    expect(p('f:rainbowfoil').unsupported).toEqual(['f:rainbowfoil']);
+});
+
 test('rarity aliases normalize', () => {
     expect(p('r:c').rarity).toBe('common');
     expect(p('r:uncommon').rarity).toBe('uncommon');
@@ -156,6 +166,19 @@ test('exact name lookup plus substring scan', async () => {
     const uuids = out.results.map(r => r.uuid).sort();
     expect(uuids).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
     expect(out.missingSets).toEqual(['OLD']);
+});
+
+test('a game finish reaches only the printings that carry it', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const getCard = env.getCard;
+    env.getCard = async function (uuid) {
+        const card = await getCard(uuid);
+        return card && card.uuid === 'u-neo-1f' ? {...card, fin: ['rainbowfoil']} : card;
+    };
+    const finishes = [{value: 'rainbowfoil', label: 'Rainbow Foil'}];
+    const out = await Q.execute(Q.parse('boseiju f:rainbowfoil', finishes), env);
+    expect(out.results.map(r => r.uuid)).toEqual(['u-neo-1f']);
 });
 
 test('results carry payload slices', async () => {
