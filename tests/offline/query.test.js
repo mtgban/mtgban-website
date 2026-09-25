@@ -31,20 +31,19 @@ test('every spelling of the set operator is read', () => {
 });
 
 test('cn operator and bare digits both set number', () => {
-    expect(p('cn:123').number).toEqual(['123']);
-    expect(p('sol ring 4').number).toEqual(['4']);
+    expect(p('cn:123').number).toMatchObject([{values: ['123'], strict: false}]);
+    expect(p('sol ring 4').number).toMatchObject([{values: ['4'], strict: false}]);
     expect(p('sol ring 4').names).toEqual(['sol', 'ring']);
 });
 
 // Every link the site builds for one printing spells the number cns: - it is
-// the number the printing prints, marks and all - so offline has to read it.
-// The offline catalog already stores that number and compares it exactly, so
-// the two spellings mean the same thing here.
-test('cns is read the same way cn is', () => {
-    expect(p('cns:1116jpn').number).toEqual(['1116jpn']);
-    expect(p('cns:123').number).toEqual(['123']);
+// the number the printing prints, marks and all - so offline has to read it,
+// against the number the catalog stores as printed.
+test('cns is read as the printed number', () => {
+    expect(p('cns:1116jpn').number).toMatchObject([{values: ['1116jpn'], strict: true}]);
+    expect(p('cns:123').number).toMatchObject([{values: ['123'], strict: true}]);
     expect(p('plaguecrafter s:sld cns:1116jpn f:nonfoil')).toMatchObject({
-        set: ['SLD'], number: ['1116jpn'], finish: ['nonfoil'], names: ['plaguecrafter'],
+        set: ['SLD'], number: [{values: ['1116jpn'], strict: true}], finish: ['nonfoil'], names: ['plaguecrafter'],
     });
     // and it is not left sitting in the unsupported pile
     expect(p('cns:1116jpn').unsupported).toEqual([]);
@@ -52,7 +51,7 @@ test('cns is read the same way cn is', () => {
 
 test('collector numbers with letters need cn:', () => {
     const r = p('cn:234a');
-    expect(r.number).toEqual(['234a']);
+    expect(r.number).toMatchObject([{values: ['234a']}]);
     expect(p('234a').names).toEqual(['234a']);
 });
 
@@ -112,8 +111,21 @@ test('rarity lists and short forms read as online', () => {
 // cn:, cns: and number: take lists too, compared without case as online
 // compares them.
 test('number lists read as online', () => {
-    expect(p('cn:1,2A').number).toEqual(['1', '2a']);
-    expect(p('number:OP01-001').number).toEqual(['op01-001']);
+    expect(p('cn:1,2A').number).toMatchObject([{values: ['1', '2a']}]);
+    expect(p('number:OP01-001').number).toMatchObject([{values: ['op01-001']}]);
+});
+
+// A range and a set scope read as online reads them: two plain numbers
+// around a dash in ascending order, and a set list before a colon. A dashed
+// number that is no such range (2002-1, SET-123) stays a number.
+test('number ranges and set scopes read as online', () => {
+    expect(p('cn:1-50').number).toMatchObject([{range: [1, 50], sets: []}]);
+    expect(p('cn:MKM:42').number).toMatchObject([{values: ['42'], sets: ['MKM'], range: null}]);
+    expect(p('cns:mkm,otj:1-5').number).toMatchObject([{range: [1, 5], sets: ['MKM', 'OTJ']}]);
+    expect(p('cn:2002-1').number).toMatchObject([{values: ['2002-1'], range: null}]);
+    expect(p('cn:SET-123').number).toMatchObject([{values: ['set-123'], range: null}]);
+    // two number filters both hold, as online
+    expect(p('cn:1-50 cn:MKM:42').number).toHaveLength(2);
 });
 
 test('unknown operator values are unsupported', () => {
@@ -276,6 +288,35 @@ test('rarity and number lists keep a card any value reaches', async () => {
     };
     out = await Q.execute(Q.parse('boseiju cn:op01-001'), env);
     expect(out.results.map(r => r.uuid)).toEqual(['u-mh2-1']);
+});
+
+// A range reads the plain number the catalog carries where the printed one
+// reads differently (OP01-120 reads 120, not 1), and a number with none is in
+// no range. A set scope leaves every card outside its sets alone.
+test('number ranges and set scopes keep what online keeps', async () => {
+    const withNumber = (uuid, num, pn) => {
+        const env = fakeEnv();
+        const getCard = env.getCard;
+        env.getCard = async function (id) {
+            const card = await getCard(id);
+            return card && card.uuid === uuid ? {...card, num, pn} : card;
+        };
+        return env;
+    };
+    const uuids = async (query, env) => {
+        Q.resetCaches();
+        const out = await Q.execute(Q.parse(query), env || fakeEnv());
+        return out.results.map(r => r.uuid).sort();
+    };
+
+    expect(await uuids('boseiju cn:10-200')).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju cn:1-50')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju cn:100-130', withNumber('u-mh2-1', 'OP01-120', '120'))).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju cn:120', withNumber('u-mh2-1', 'OP01-120', '120'))).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju cns:120', withNumber('u-mh2-1', 'OP01-120', '120'))).toEqual([]);
+    expect(await uuids('boseiju cn:1-500', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju cn:NEO:1')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju cn:NEO:100-200')).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
 });
 
 test('results carry payload slices', async () => {
