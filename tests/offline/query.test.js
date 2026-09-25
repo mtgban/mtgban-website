@@ -18,7 +18,7 @@ test('quoted phrase is a single name token', () => {
 
 test('set operator uppercases', () => {
     const r = p('ragavan s:mh2');
-    expect(r.set).toBe('MH2');
+    expect(r.set).toEqual(['MH2']);
     expect(r.names).toEqual(['ragavan']);
 });
 
@@ -26,7 +26,7 @@ test('set operator uppercases', () => {
 // as are set: and edition:.
 test('every spelling of the set operator is read', () => {
     for (const key of ['e', 'set', 'edition']) {
-        expect(p(key + ':mh2')).toMatchObject({set: 'MH2', unsupported: []});
+        expect(p(key + ':mh2')).toMatchObject({set: ['MH2'], unsupported: []});
     }
 });
 
@@ -44,7 +44,7 @@ test('cns is read the same way cn is', () => {
     expect(p('cns:1116jpn').number).toBe('1116jpn');
     expect(p('cns:123').number).toBe('123');
     expect(p('plaguecrafter s:sld cns:1116jpn f:nonfoil')).toMatchObject({
-        set: 'SLD', number: '1116jpn', finish: 'nonfoil', names: ['plaguecrafter'],
+        set: ['SLD'], number: '1116jpn', finish: ['nonfoil'], names: ['plaguecrafter'],
     });
     // and it is not left sitting in the unsupported pile
     expect(p('cns:1116jpn').unsupported).toEqual([]);
@@ -57,20 +57,20 @@ test('collector numbers with letters need cn:', () => {
 });
 
 test('finish aliases normalize', () => {
-    expect(p('f:foil').finish).toBe('foil');
-    expect(p('f:f').finish).toBe('foil');
-    expect(p('f:nf').finish).toBe('nonfoil');
-    expect(p('f:nonfoil').finish).toBe('nonfoil');
-    expect(p('f:e').finish).toBe('etched');
-    expect(p('f:etched').finish).toBe('etched');
+    expect(p('f:foil').finish).toEqual(['foil']);
+    expect(p('f:f').finish).toEqual(['foil']);
+    expect(p('f:nf').finish).toEqual(['nonfoil']);
+    expect(p('f:nonfoil').finish).toEqual(['nonfoil']);
+    expect(p('f:e').finish).toEqual(['etched']);
+    expect(p('f:etched').finish).toEqual(['etched']);
 });
 
 // A game's own finish is taken where the catalog names it, folded the way
 // the catalog spells it; anything else stays unsupported.
 test('a finish the catalog names is read', () => {
     const finishes = [{value: 'rainbowfoil', label: 'Rainbow Foil'}];
-    expect(p('f:foil').finish).toBe('foil');
-    expect(Q.parse('f:Rainbow-Foil', finishes).finish).toBe('rainbowfoil');
+    expect(p('f:foil').finish).toEqual(['foil']);
+    expect(Q.parse('f:Rainbow-Foil', finishes).finish).toEqual(['rainbowfoil']);
     expect(Q.parse('f:galaxy', finishes).unsupported).toEqual(['f:galaxy']);
     expect(p('f:rainbowfoil').unsupported).toEqual(['f:rainbowfoil']);
 });
@@ -79,8 +79,18 @@ test('a finish the catalog names is read', () => {
 // reaches the cards that list it, as f:galaxy reaches galaxy foils online.
 test('a short form the catalog files is read', () => {
     const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
-    expect(Q.parse('f:galaxy', finishes)).toMatchObject({finish: 'galaxy', unsupported: []});
+    expect(Q.parse('f:galaxy', finishes)).toMatchObject({finish: ['galaxy'], unsupported: []});
     expect(Q.parse('f:surge', finishes).unsupported).toEqual(['f:surge']);
+});
+
+// A comma list names any of its values, as it does online. A finish list
+// offline cannot answer in full is left unsupported, as one value would be.
+test('comma lists name any of their values', () => {
+    const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
+    expect(Q.parse('s:mh2,MH3 f:foil,galaxy', finishes)).toMatchObject({
+        set: ['MH2', 'MH3'], finish: ['foil', 'galaxy'], unsupported: [],
+    });
+    expect(Q.parse('f:foil,surge', finishes)).toMatchObject({finish: [], unsupported: ['f:foil,surge']});
 });
 
 test('rarity aliases normalize', () => {
@@ -102,16 +112,16 @@ test('unknown keys are unsupported verbatim', () => {
 });
 
 test('quoted operator value', () => {
-    expect(p('s:"MH2"').set).toBe('MH2');
+    expect(p('s:"MH2"').set).toEqual(['MH2']);
 });
 
 test('empty and whitespace input', () => {
-    expect(p('')).toEqual({names: [], set: '', number: '', finish: '', rarity: '', unsupported: []});
+    expect(p('')).toEqual({names: [], set: [], number: '', finish: [], rarity: '', unsupported: []});
     expect(p('   ').names).toEqual([]);
 });
 
 test('last occurrence wins', () => {
-    expect(p('s:NEO s:MH2').set).toBe('MH2');
+    expect(p('s:NEO s:MH2').set).toEqual(['MH2']);
 });
 
 test('garbage inputs never throw', () => {
@@ -208,6 +218,28 @@ test('a short form reaches only the cards that list it', async () => {
     const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
     const out = await Q.execute(Q.parse('boseiju f:galaxy', finishes), env);
     expect(out.results.map(r => r.uuid)).toEqual(['u-neo-1f']);
+});
+
+test('a set list reads every set it names', async () => {
+    Q.resetCaches();
+    let out = await Q.execute(Q.parse('s:neo,mh2'), fakeEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+    expect(out.missingSets).toEqual([]);
+
+    Q.resetCaches();
+    out = await Q.execute(Q.parse('s:neo,old'), fakeEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
+    expect(out.missingSets).toEqual(['OLD']);
+});
+
+test('a finish list keeps a card any of its finishes reaches', async () => {
+    Q.resetCaches();
+    let out = await Q.execute(Q.parse('"boseiju reaches" f:foil,etched'), fakeEnv());
+    expect(out.results.map(r => r.uuid)).toEqual(['u-neo-1f']);
+
+    Q.resetCaches();
+    out = await Q.execute(Q.parse('"boseiju reaches" f:nonfoil,foil'), fakeEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
 });
 
 test('results carry payload slices', async () => {
