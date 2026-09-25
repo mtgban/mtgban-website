@@ -598,8 +598,8 @@ func getSetKeyrunes() map[string]string {
 //
 // A game with finishes of its own names them in CardObject.Finish, the name
 // TCGplayer prices the printing under with the spaces taken out, so it can be
-// typed into a search; mtgmatcher.FinishLabel spells it back as TCGplayer
-// does. Magic never reaches it: its foil types live in PromoTypes.
+// typed into a search; its row in mtgmatcher.Finishes spells it back as
+// TCGplayer does. Magic never reaches it: its foil types live in PromoTypes.
 func finishLabel(co *mtgmatcher.CardObject) string {
 	switch co.Finish {
 	case "", mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
@@ -642,8 +642,14 @@ func finishListLabel(finish string) string {
 // to name them along with the rest. A name the finish table has no row for -
 // Magic's etched foil - splits its trailing foil off and title-cases the rest.
 func spellFinish(finish string) string {
-	if label := mtgmatcher.FinishLabel(finish); label != "" {
-		return label
+	// The plain printing is asked for as f:nonfoil; TCGplayer's "Normal"
+	// would send a reader to a word the search does not take.
+	if finish == mtgmatcher.FinishNonfoil {
+		return "Non-foil"
+	}
+	row, found := mtgmatcher.FinishOf(finish)
+	if found {
+		return row.TCGplayer
 	}
 	base := strings.TrimSuffix(finish, "foil")
 	if base != finish && base != "" {

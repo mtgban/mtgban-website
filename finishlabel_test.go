@@ -43,6 +43,21 @@ func TestFinishLabel(t *testing.T) {
 	}
 }
 
+// Every name a finish is listed by is one f: reads back as that finish.
+func TestSpellFinishReadsBackThroughTheFilter(t *testing.T) {
+	slugs := []string{mtgmatcher.FinishEtched}
+	for _, finish := range mtgmatcher.Finishes {
+		slugs = append(slugs, finish.Slug)
+	}
+	for _, slug := range slugs {
+		label := spellFinish(slug)
+		got := fixupFinishNG(label)
+		if len(got) != 1 || got[0] != slug {
+			t.Errorf("spellFinish(%q) = %q, which f: reads as %q", slug, label, got)
+		}
+	}
+}
+
 // Magic's only finishes are nonfoil, foil and etched — its foil types are
 // promo types, not finishes — so nothing it stores should reach the naming
 // rule and change a title that reads correctly today.
