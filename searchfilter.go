@@ -2124,7 +2124,7 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 			if co.Foil {
 				return false
 			}
-		case "nonfoil", "nf", "r":
+		case "nonfoil", "nf":
 			if !co.Foil && !co.Etched {
 				return false
 			}
