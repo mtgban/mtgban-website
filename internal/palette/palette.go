@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -60,14 +60,11 @@ type Service struct {
 	// the caller - the same list the finish filter accepts.
 	FoilTreatments func() []string
 
-	setsCache   []byte
-	setsCacheMu sync.RWMutex
-
-	promosCache   []byte
-	promosCacheMu sync.RWMutex
-
-	finishesCache   []byte
-	finishesCacheMu sync.RWMutex
+	// The lists each endpoint serves, built on datastore load and read on
+	// every request.
+	setsCache     atomic.Pointer[[]byte]
+	promosCache   atomic.Pointer[[]byte]
+	finishesCache atomic.Pointer[[]byte]
 }
 
 func (s *Service) backend() *mtgmatcher.Backend {
@@ -131,9 +128,7 @@ func (s *Service) BuildSetsCache() {
 	if err != nil {
 		return
 	}
-	s.setsCacheMu.Lock()
-	s.setsCache = data
-	s.setsCacheMu.Unlock()
+	s.setsCache.Store(&data)
 }
 
 // Promo is a promo type as the palette and the guide offer it: the token an
@@ -201,25 +196,25 @@ func (s *Service) BuildPromosCache() {
 	if err != nil {
 		return
 	}
-	s.promosCacheMu.Lock()
-	s.promosCache = data
-	s.promosCacheMu.Unlock()
+	s.promosCache.Store(&data)
 }
 
-// Promos returns the loaded game's promo types.
-func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
+// serveCached writes a list built on datastore load. Until it is built the
+// answer is an empty list the browser must not keep for an hour.
+func serveCached(w http.ResponseWriter, data *[]byte) {
 	w.Header().Set("Content-Type", "application/json")
-	s.promosCacheMu.RLock()
-	data := s.promosCache
-	s.promosCacheMu.RUnlock()
-	// cache not warm - dont serve [] for an hour
-	if len(data) == 0 {
+	if data == nil || len(*data) == 0 {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write([]byte(`[]`))
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write(data)
+	w.Write(*data)
+}
+
+// Promos returns the loaded game's promo types.
+func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
+	serveCached(w, s.promosCache.Load())
 }
 
 // Finish is one finish the loaded game prints, as the palette lists it.
@@ -297,25 +292,12 @@ func (s *Service) BuildFinishesCache() {
 	if err != nil {
 		return
 	}
-	s.finishesCacheMu.Lock()
-	s.finishesCache = data
-	s.finishesCacheMu.Unlock()
+	s.finishesCache.Store(&data)
 }
 
 // Finishes returns the loaded game's finishes.
 func (s *Service) Finishes(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	s.finishesCacheMu.RLock()
-	data := s.finishesCache
-	s.finishesCacheMu.RUnlock()
-	// cache not warm - dont serve [] for an hour
-	if len(data) == 0 {
-		w.Header().Set("Cache-Control", "no-store")
-		w.Write([]byte(`[]`))
-		return
-	}
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write(data)
+	serveCached(w, s.finishesCache.Load())
 }
 
 // CardMetaResponse describes one card for the frontend.
@@ -395,18 +377,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 
 // Sets returns all known set codes with display metadata.
 func (s *Service) Sets(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	s.setsCacheMu.RLock()
-	data := s.setsCache
-	s.setsCacheMu.RUnlock()
-	// cache not warm - dont serve [] for an hour
-	if len(data) == 0 {
-		w.Header().Set("Cache-Control", "no-store")
-		w.Write([]byte(`[]`))
-		return
-	}
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write(data)
+	serveCached(w, s.setsCache.Load())
 }
 
 // Store is one scraper as the frontend lists it.
