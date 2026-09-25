@@ -2149,7 +2149,7 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 
 		// The print run with its treatment taken off, so f:unlimited reaches
 		// Unlimited Edition Rainbow Foil and Unlimited Holofoil alike.
-		if found && finish.Run != "" && mtgmatcher.NormalizeFinish(finish.Run) == value {
+		if found && finish.Run != "" && mtgmatcher.PromoTypeSlug(finish.Run) == value {
 			return false
 		}
 
