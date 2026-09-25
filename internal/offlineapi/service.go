@@ -46,7 +46,7 @@ type Deps struct {
 
 	// Game names the card game this deployment serves. It decides how image
 	// keys are derived, because Magic's mirror keys on the scryfall id while
-	// every other game keys on the card's own datastore uuid. Nil or empty
+	// every other game keys on the card's TCGplayer product. Nil or empty
 	// means Magic, which is what a deployment that never set it is.
 	Game func() string
 
@@ -115,7 +115,7 @@ func NewService(deps Deps) *Service {
 }
 
 // magicImageKeys reports whether this deployment's images are filed under
-// scryfall ids rather than datastore uuids.
+// scryfall ids rather than datastore products.
 func (s *Service) magicImageKeys() bool {
 	if s.deps.Game == nil {
 		return true

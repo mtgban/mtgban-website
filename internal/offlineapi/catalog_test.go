@@ -72,24 +72,17 @@ func TestImageKey(t *testing.T) {
 			magic: true,
 			want:  "",
 		},
-		// The datastore games key on the card's own uuid: their image urls are
-		// their CDN's filenames and name nothing anything else knows.
+		// The datastore games key on the product: their image urls are their
+		// CDN's filenames and name nothing anything else knows.
 		{
-			name: "datastore single keys on its uuid, not its url",
-			co:   cardFor("1854", "TFC", "https://cdn.example.invalid/cards/elsa-1854.jpg", "", false),
-			want: "1854",
+			name: "datastore single keys on its product, not its uuid or url",
+			co:   datastoreCard("dtd011_502592_rainbowfoil", "502592", "https://cdn.example.invalid/cards/502592.jpg"),
+			want: "502592",
 		},
 		{
-			name: "datastore finish resolves to the printing that holds the image",
-			co:   cardFor("1854_f", "TFC", "https://cdn.example.invalid/cards/elsa-1854.jpg", "", false),
-			want: "1854",
-		},
-		// Riftbound files no bare printing at all, only finishes, so this is
-		// the only shape its cards ever take.
-		{
-			name: "datastore dashed finish resolves the same way",
-			co:   cardFor("ogn-066-298_foil", "OGN", "https://cdn.example.invalid/a.png", "", false),
-			want: "ogn-066-298",
+			name: "datastore single naming no product and no finishes keys on its uuid",
+			co:   datastoreCard("unl-t01", "", "https://cdn.example.invalid/a.png"),
+			want: "unl-t01",
 		},
 		{
 			name: "datastore sealed keeps the p- prefix and its own uuid",
@@ -98,7 +91,7 @@ func TestImageKey(t *testing.T) {
 		},
 		{
 			name: "datastore card with no image has no key either",
-			co:   cardFor("1854_f", "TFC", "", "", false),
+			co:   datastoreCard("dtd011_502592_rainbowfoil", "502592", ""),
 			want: "",
 		},
 	}
@@ -113,13 +106,45 @@ func TestImageKey(t *testing.T) {
 	}
 }
 
-// A uuid with no finish suffix is a printing already, and one that opens with
-// an underscore is not a suffix to strip but a name that happens to start with
-// one; trimming either would ask the bundle for a key that is not in it.
-func TestBasePrintingIDLeavesNonSuffixesAlone(t *testing.T) {
-	for _, id := range []string{"1854", "ogn-066-298", "_leading", ""} {
-		if got := basePrintingID(id); got != id {
-			t.Errorf("basePrintingID(%q) = %q, want it unchanged", id, got)
+// datastoreCard builds a datastore game's single the way the loaders do: its
+// TCGplayer product id, where it names one, among its identifiers.
+func datastoreCard(uuid, product, imagesFull string) *mtgmatcher.CardObject {
+	co := cardFor(uuid, "DTD", imagesFull, "", false)
+	if product != "" {
+		co.Identifiers = map[string]string{"tcgplayerProductId": product}
+	}
+	return co
+}
+
+// Collector number DTD011 is two Flesh and Blood products, 502592 sold in
+// Normal and Rainbow Foil and 502740 in Cold Foil, and AGB008 is two products
+// of one finish each. Cutting the uuid at its last underscore gave 502592's
+// finishes "dtd011" and "dtd011_502592", and both AGB008 products "agb008".
+func TestDatastoreImageKeyFollowsTheProduct(t *testing.T) {
+	for _, tt := range []struct{ uuid, product string }{
+		{"dtd011_502592", "502592"},
+		{"dtd011_502592_rainbowfoil", "502592"},
+		{"dtd011_502740_coldfoil", "502740"},
+		{"agb008_633694", "633694"},
+		{"agb008_633695", "633695"},
+	} {
+		co := datastoreCard(tt.uuid, tt.product, "https://cdn.example.invalid/x.jpg")
+		if got := imageKey(co, false); got != tt.product {
+			t.Errorf("imageKey(%s) = %q, want its product %q", tt.uuid, got, tt.product)
+		}
+	}
+}
+
+// Riftbound's tokens name no product, and unl-t01 is sold in two finishes
+// sharing one image. Keyed on their uuids they would be filed twice, so they
+// share the key of the printing they are finishes of.
+func TestDatastoreImageKeyFoldsAPrintingThatNamesNoProduct(t *testing.T) {
+	foilUUIDs := map[string]string{"nonfoil": "unl-t01", "foil": "unl-t01_foil"}
+	for _, uuid := range []string{"unl-t01", "unl-t01_foil"} {
+		co := datastoreCard(uuid, "", "https://cdn.example.invalid/a.png")
+		co.FoilUUIDs = foilUUIDs
+		if got := imageKey(co, false); got != "unl-t01_foil" {
+			t.Errorf("imageKey(%s) = %q, want the printing's %q", uuid, got, "unl-t01_foil")
 		}
 	}
 }
