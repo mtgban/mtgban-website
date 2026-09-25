@@ -40,7 +40,7 @@
             known[finish.value] = true;
             (finish.aliases || []).forEach(function (alias) { known[alias] = true; });
         });
-        var out = {names: [], set: '', number: '', finish: '', rarity: '', unsupported: []};
+        var out = {names: [], set: [], number: '', finish: [], rarity: '', unsupported: []};
         var tokens = tokenize(String(str || ''));
         for (var i = 0; i < tokens.length; i++) {
             var tok = tokens[i];
@@ -71,7 +71,8 @@
             case 'e':
             case 'set':
             case 'edition':
-                out.set = val.toUpperCase();
+                // A comma list names any of its sets, as it does online
+                out.set = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
                 break;
             /* Both spellings, one behaviour: the offline catalog stores the
              * number a printing prints, so an exact compare is already what
@@ -81,11 +82,9 @@
                 out.number = val;
                 break;
             case 'f':
-                var slug = val.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (FINISH[val.toLowerCase()]) {
-                    out.finish = FINISH[val.toLowerCase()];
-                } else if (known[slug]) {
-                    out.finish = slug;
+                var slugs = readFinishes(val, known);
+                if (slugs) {
+                    out.finish = slugs;
                 } else {
                     out.unsupported.push(tok.text);
                 }
@@ -102,6 +101,37 @@
             }
         }
         return out;
+    }
+
+    // readFinishes reads f:'s comma list, each value spelled the way the
+    // catalog stores it, or null when offline cannot answer one of them.
+    function readFinishes(val, known) {
+        var values = val.split(',').filter(Boolean);
+        if (values.length === 0) return null;
+        var out = [];
+        for (var i = 0; i < values.length; i++) {
+            var lower = values[i].toLowerCase();
+            var slug = lower.replace(/[^a-z0-9]/g, '');
+            if (FINISH[lower]) {
+                out.push(FINISH[lower]);
+            } else if (known[slug]) {
+                out.push(slug);
+            } else {
+                return null;
+            }
+        }
+        return out;
+    }
+
+    // hasFinish answers the three names every game shares off the card's
+    // flags, and any other off the names the catalog lists on it.
+    function hasFinish(card, finish) {
+        switch (finish) {
+        case 'foil': return !!card.f && !card.e;
+        case 'etched': return !!card.e;
+        case 'nonfoil': return !card.f && !card.e;
+        }
+        return (card.fin || []).indexOf(finish) !== -1;
     }
 
     // Mirrors MaxSearchTotalResults (search.go:36).
@@ -172,13 +202,10 @@
 
     function matchesFilters(card, parsed) {
         if (parsed.sealed != null && !!card.s !== parsed.sealed) return false;
-        if (parsed.set && card.set !== parsed.set) return false;
+        if (parsed.set.length && parsed.set.indexOf(card.set) === -1) return false;
         if (parsed.number && card.num !== parsed.number) return false;
         if (parsed.rarity && card.r !== parsed.rarity) return false;
-        if (parsed.finish === 'foil' && !(card.f && !card.e)) return false;
-        if (parsed.finish === 'etched' && !card.e) return false;
-        if (parsed.finish === 'nonfoil' && (card.f || card.e)) return false;
-        if (parsed.finish && !FINISH[parsed.finish] && (card.fin || []).indexOf(parsed.finish) === -1) return false;
+        if (parsed.finish.length && !parsed.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
         return true;
     }
 
@@ -194,27 +221,30 @@
                     cards.push(card);
                 }
             }
-        } else if (parsed.set !== '') {
-            if (!(await env.hasSet(parsed.set))) {
-                out.missingSets.push(parsed.set);
-                return out;
-            }
-            var payload;
-            try {
-                payload = await cachedPayload(parsed.set, env);
-            } catch (err) {
-                out.missingSets.push(parsed.set);
-                return out;
-            }
+        } else if (parsed.set.length > 0) {
             var seen = {};
-            var sections = [payload.retail, payload.buylist];
-            for (var s = 0; s < sections.length; s++) {
-                for (var id in sections[s]) {
-                    if (seen[id]) continue;
-                    seen[id] = true;
-                    var c = await env.getCard(id);
-                    if (c && matchesFilters(c, parsed)) {
-                        cards.push(c);
+            for (var n = 0; n < parsed.set.length; n++) {
+                var setCode = parsed.set[n];
+                if (!(await env.hasSet(setCode))) {
+                    out.missingSets.push(setCode);
+                    continue;
+                }
+                var payload;
+                try {
+                    payload = await cachedPayload(setCode, env);
+                } catch (err) {
+                    out.missingSets.push(setCode);
+                    continue;
+                }
+                var sections = [payload.retail, payload.buylist];
+                for (var s = 0; s < sections.length; s++) {
+                    for (var id in sections[s]) {
+                        if (seen[id]) continue;
+                        seen[id] = true;
+                        var c = await env.getCard(id);
+                        if (c && matchesFilters(c, parsed)) {
+                            cards.push(c);
+                        }
                     }
                 }
             }
