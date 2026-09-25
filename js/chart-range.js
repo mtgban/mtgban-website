@@ -57,7 +57,9 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
             return r.json();
         })
         .then(function(data) {
-            if (!data || !data.datasets) throw new Error('chart range: empty payload');
+            // An archive error arrives as an empty chart, and a wider window
+            // holds the one drawn, so an empty answer is never a widening.
+            if (!data || !data.datasets || !data.datasets.length) throw new Error('chart range: empty payload');
             var got = data.loadedDays || ask;
             // A response narrower than what is already drawn is not a widening:
             // installing it would shrink the chart. Keep what the page has and
