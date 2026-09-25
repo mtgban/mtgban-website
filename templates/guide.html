@@ -160,7 +160,7 @@
             copyTab.className = 'guide-copy-tab';
             copyTab.title = 'Copy this tab as plain text';
             copyTab.innerHTML = '<i data-lucide="copy"></i> Copy as text';
-            copyTab.onclick = function () { copySnippet(copyTab, categoryText(catName)); };
+            copyTab.onclick = function () { copySnippet(copyTab, categoryText('API')); };
             divider.appendChild(copyTab);
         }
         sectionsContainer.appendChild(divider);
