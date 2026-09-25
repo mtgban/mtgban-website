@@ -199,7 +199,8 @@ func TestPodiumOrder(t *testing.T) {
 	if top != "" || cards[0].Key != "y" || cards[1].Key != "x" {
 		t.Errorf("two packages: %+v top %q", cards, top)
 	}
-	if three[0].Key != "a" {
+	// The only input here not already in price order.
+	if two[0].Key != "x" {
 		t.Error("input was reordered in place")
 	}
 }
