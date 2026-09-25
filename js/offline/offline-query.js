@@ -43,7 +43,7 @@
             known[finish.value] = true;
             (finish.aliases || []).forEach(function (alias) { known[alias] = true; });
         });
-        var out = {names: [], set: [], number: [], finish: [], rarity: [], unsupported: []};
+        var out = {names: [], set: [], number: [], finish: [], rarity: [], not: {set: [], finish: [], rarity: []}, unsupported: []};
         var tokens = tokenize(String(str || ''));
         for (var i = 0; i < tokens.length; i++) {
             var tok = tokens[i];
@@ -73,10 +73,13 @@
             }
             var key = tok.text.slice(0, at).toLowerCase();
             var val = tok.text.slice(at + 1).replace(/^"|"$/g, '');
+            // A leading - negates the filter, as it does online
+            var negate = key.charAt(0) === '-';
+            if (negate) key = key.slice(1);
             if (at !== colon) {
                 // Online compares cn: and number: this way (FilterOperations)
                 if (key === 'cn' || key === 'number') {
-                    out.number.push(readNumber(val, false, tok.text.charAt(at)));
+                    out.number.push(readNumber(val, false, tok.text.charAt(at), negate));
                 } else {
                     out.unsupported.push(tok.text);
                 }
@@ -88,25 +91,37 @@
             case 'set':
             case 'edition':
                 // A comma list names any of its sets, as it does online
-                out.set = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
+                var sets = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
+                if (negate) {
+                    out.not.set = out.not.set.concat(sets);
+                } else {
+                    out.set = sets;
+                }
                 break;
             case 'cn':
             case 'cns':
             case 'number':
-                out.number.push(readNumber(val, key === 'cns'));
+                out.number.push(readNumber(val, key === 'cns', ':', negate));
                 break;
             case 'f':
                 var slugs = readFinishes(val, known);
-                if (slugs) {
-                    out.finish = slugs;
-                } else {
+                if (!slugs) {
                     out.unsupported.push(tok.text);
+                } else if (negate) {
+                    out.not.finish = out.not.finish.concat(slugs);
+                } else {
+                    out.finish = slugs;
                 }
                 break;
             case 'r':
-                out.rarity = val.toLowerCase().split(',').map(function (value) {
+                var rarities = val.toLowerCase().split(',').map(function (value) {
                     return RARITY[value] || value;
                 });
+                if (negate) {
+                    out.not.rarity = out.not.rarity.concat(rarities);
+                } else {
+                    out.rarity = rarities;
+                }
                 break;
             default:
                 out.unsupported.push(tok.text);
@@ -139,8 +154,8 @@
     // before a colon scopes the number to those sets, two plain numbers
     // around a dash in ascending order are a range, a > or < compares against
     // the first number given, and anything else is a comma list of numbers.
-    function readNumber(val, strict, op) {
-        var filter = {sets: [], strict: strict, values: [], range: null, compare: null, bound: 0};
+    function readNumber(val, strict, op, negate) {
+        var filter = {sets: [], strict: strict, values: [], range: null, compare: null, bound: 0, negate: !!negate};
         var code = val;
         if (code.indexOf(':') !== -1) {
             var parts = code.split(':');
@@ -179,13 +194,23 @@
         var plain = typeof card.pn === 'string' ? card.pn.toLowerCase() : printed;
         if (filter.range) {
             var value = numberValue(plain);
+            // Online files a range's lower bound as a filter of its own that
+            // no negation reaches, so a negated range keeps only what lies
+            // past its upper bound
+            if (filter.negate) return value > filter.range[1];
             return filter.range[0] <= value && value <= filter.range[1];
         }
+        var matched;
         // Both ends count, as online's compareCollectorNumber skips only a
         // number past the bound
-        if (filter.compare === '>') return numberValue(plain) >= filter.bound;
-        if (filter.compare === '<') return numberValue(plain) <= filter.bound;
-        return filter.values.indexOf(printed) !== -1 || (!filter.strict && filter.values.indexOf(plain) !== -1);
+        if (filter.compare === '>') {
+            matched = numberValue(plain) >= filter.bound;
+        } else if (filter.compare === '<') {
+            matched = numberValue(plain) <= filter.bound;
+        } else {
+            matched = filter.values.indexOf(printed) !== -1 || (!filter.strict && filter.values.indexOf(plain) !== -1);
+        }
+        return filter.negate ? !matched : matched;
     }
 
     // hasFinish answers the three names every game shares off the card's
@@ -269,6 +294,9 @@
         if (parsed.sealed != null && !!card.s !== parsed.sealed) return false;
         if (parsed.set.length && parsed.set.indexOf(card.set) === -1) return false;
         if (!parsed.number.every(function (filter) { return numberMatches(card, filter); })) return false;
+        if (parsed.not.set.indexOf(card.set) !== -1) return false;
+        if (parsed.not.rarity.indexOf(card.r || '') !== -1) return false;
+        if (parsed.not.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
         if (parsed.rarity.length && parsed.rarity.indexOf(card.r || '') === -1) return false;
         if (parsed.finish.length && !parsed.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
         return true;
