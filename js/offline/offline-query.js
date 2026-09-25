@@ -7,6 +7,9 @@
         nonfoil: 'nonfoil', nf: 'nonfoil',
         etched: 'etched', e: 'etched'
     };
+    // INTEGER is what online's strconv.Atoi takes
+    var INTEGER = /^[+-]?\d+$/;
+
     // RARITY is online's short forms (fixupRarityNG). Any other word is a
     // rarity as the catalog writes it, as it is online.
     var RARITY = {
@@ -54,7 +57,7 @@
             var operatorish = colon > 0 || /[<>=]/.test(tok.text);
             if (!operatorish) {
                 if (/^\d+$/.test(tok.text)) {
-                    out.number = [tok.text];
+                    out.number.push(readNumber(tok.text, false));
                 } else {
                     out.names.push(tok.text);
                 }
@@ -74,14 +77,10 @@
                 // A comma list names any of its sets, as it does online
                 out.set = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
                 break;
-            /* Both spellings, one behaviour: the offline catalog stores the
-             * number a printing prints, so comparing it without case is what
-             * cns: means online, and cn: has always been read that way here.
-             * A comma list names any of its numbers. */
             case 'cn':
             case 'cns':
             case 'number':
-                out.number = val.toLowerCase().split(',');
+                out.number.push(readNumber(val, key === 'cns'));
                 break;
             case 'f':
                 var slugs = readFinishes(val, known);
@@ -121,6 +120,52 @@
             }
         }
         return out;
+    }
+
+    // readNumber reads cn:, cns: and number: as online does: a set list
+    // before a colon scopes the number to those sets, two plain numbers
+    // around a dash in ascending order are a range, and anything else is a
+    // comma list of numbers.
+    function readNumber(val, strict) {
+        var filter = {sets: [], strict: strict, values: [], range: null};
+        var code = val;
+        if (code.indexOf(':') !== -1) {
+            var parts = code.split(':');
+            filter.sets = parts[0].split(',').map(function (set) { return set.replace(/^"|"$/g, '').toUpperCase(); });
+            code = parts[1];
+        }
+        var ends = code.split('-');
+        if (ends.length > 1 && INTEGER.test(ends[0]) && INTEGER.test(ends[1]) && parseInt(ends[0], 10) < parseInt(ends[1], 10)) {
+            filter.range = [parseInt(ends[0], 10), parseInt(ends[1], 10)];
+        } else {
+            filter.values = code.toLowerCase().split(',');
+        }
+        return filter;
+    }
+
+    // numberValue reads a number as online's compareCollectorNumber does:
+    // whole, else its first run of digits, and one with no digits sorts past
+    // every range.
+    function numberValue(num) {
+        if (INTEGER.test(num)) return parseInt(num, 10);
+        var digits = (/\d+/.exec(num) || [''])[0].replace(/^0+/, '');
+        return digits === '' ? Infinity : parseInt(digits, 10);
+    }
+
+    // numberMatches answers one number filter as online does. A card outside
+    // its sets passes untouched, and a range reads the plain number the
+    // catalog carries. A strict number compares the printed one; a loose one
+    // takes either, since offline cannot reduce a typed number the way the
+    // game would.
+    function numberMatches(card, filter) {
+        if (filter.sets.length && filter.sets.indexOf(card.set) === -1) return true;
+        var printed = (card.num || '').toLowerCase();
+        var plain = typeof card.pn === 'string' ? card.pn.toLowerCase() : printed;
+        if (filter.range) {
+            var value = numberValue(plain);
+            return filter.range[0] <= value && value <= filter.range[1];
+        }
+        return filter.values.indexOf(printed) !== -1 || (!filter.strict && filter.values.indexOf(plain) !== -1);
     }
 
     // hasFinish answers the three names every game shares off the card's
@@ -203,7 +248,7 @@
     function matchesFilters(card, parsed) {
         if (parsed.sealed != null && !!card.s !== parsed.sealed) return false;
         if (parsed.set.length && parsed.set.indexOf(card.set) === -1) return false;
-        if (parsed.number.length && parsed.number.indexOf((card.num || '').toLowerCase()) === -1) return false;
+        if (!parsed.number.every(function (filter) { return numberMatches(card, filter); })) return false;
         if (parsed.rarity.length && parsed.rarity.indexOf(card.r || '') === -1) return false;
         if (parsed.finish.length && !parsed.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
         return true;
