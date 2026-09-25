@@ -677,6 +677,7 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     gap: 8px;
 }
 .nav2-scope-autocomplete {
+    /* Sized to leave the rest of the row for the examples. */
     position: relative;
     flex: 0 1 400px;
     min-width: 0;
@@ -690,9 +691,8 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
     color: var(--subtle, #8b8b8b);
 }
 .nav2-scope-box {
-    /* Sized to leave the rest of the row for the examples. box-sizing
-       matches the search field above so the number means the rendered
-       width, padding and border included. */
+    /* box-sizing matches the search field above, so the box fills its
+       wrapper with padding and border included. */
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
@@ -802,5 +802,5 @@ body.has-scope .nav2-scope { display: flex; justify-content: center; }
    control and the examples are the hint, so the hint goes. */
 @media (max-width: 860px) {
     .nav2-scope-examples { display: none; }
-    .nav2-scope-box { flex: 1 1 auto; }
+    .nav2-scope-autocomplete { flex: 1 1 auto; }
 }
