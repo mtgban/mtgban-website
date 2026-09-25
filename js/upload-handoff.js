@@ -22,6 +22,16 @@
         return;
     }
 
+    // Opened by an extension, so a list is on its way. The guide is for a
+    // page nobody handed anything to, and this reader - taken or turned
+    // away - already has the one line above it that is about them.
+    var opener = window.opener;
+    var handed = !!opener && !opener.closed;
+    var guide = document.getElementById("handoff-guide");
+    if (handed && guide) {
+        guide.hidden = true;
+    }
+
     // A reader with no signature, or whose tier does not carry the Upload
     // grant. The page has already said so; what matters here is that it
     // stays silent. An extension that heard this one announce itself would
@@ -33,7 +43,6 @@
 
     var status = document.getElementById("handoff-status");
     var statusText = document.getElementById("handoff-status-text");
-    var guide = document.getElementById("handoff-guide");
     var form = document.getElementById("handoff-form");
     var rows = document.getElementById("handoff-rows");
     var source = document.getElementById("handoff-source");
@@ -62,19 +71,14 @@
 
     // Opened by hand rather than by an extension: there is nobody to ask,
     // and the page is already showing the guide that says what it is for.
-    var opener = window.opener;
-    if (!opener || opener.closed) {
+    if (!handed) {
         return;
     }
 
-    // Somebody to hear from. The page stops being documentation and starts
-    // being a progress line - which is the whole of what it has to say
-    // from here until it submits.
+    // Somebody to hear from, so the progress line comes up - the whole of
+    // what the page has to say from here until it submits.
     if (status) {
         status.hidden = false;
-    }
-    if (guide) {
-        guide.hidden = true;
     }
 
     // The columns a handed-over card is written into, and the header they
