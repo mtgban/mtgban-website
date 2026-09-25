@@ -27,6 +27,9 @@ type catalogCard struct {
 	Products []string `json:"p,omitempty"`
 	Image    string   `json:"i,omitempty"`
 	Finishes []string `json:"fin,omitempty"`
+	// PlainNumber is the number cn: reads, where the printed one reads
+	// differently: "2" of "ST01-002", or an empty one, which reads as none.
+	PlainNumber *string `json:"pn,omitempty"`
 }
 
 // imageKey is the key the mirror filed this card's image under, and so what
@@ -74,7 +77,7 @@ func datastoreImageKey(co *mtgmatcher.CardObject) string {
 
 // newCatalogCard builds a catalog entry from a card object and its store list.
 func newCatalogCard(co *mtgmatcher.CardObject, products []string, magic bool) catalogCard {
-	return catalogCard{
+	card := catalogCard{
 		Name:     co.Name,
 		Number:   co.Number,
 		Rarity:   co.Rarity,
@@ -85,6 +88,11 @@ func newCatalogCard(co *mtgmatcher.CardObject, products []string, magic bool) ca
 		Products: products,
 		Image:    imageKey(co, magic),
 	}
+	if co.PlainNumber != co.Number {
+		plain := co.PlainNumber
+		card.PlainNumber = &plain
+	}
+	return card
 }
 
 type catalogSet struct {

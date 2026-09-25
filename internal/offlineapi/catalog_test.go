@@ -1,6 +1,8 @@
 package offlineapi
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -184,6 +186,26 @@ func TestNewCatalogCardSealed(t *testing.T) {
 	}
 	if card.Image != "p-MH3-541185" {
 		t.Errorf("Image = %q, want %q", card.Image, "p-MH3-541185")
+	}
+}
+
+// cn: reads a card's plain number, so the catalog carries it wherever the
+// printed number would read differently, an empty one included.
+func TestNewCatalogCardPlainNumber(t *testing.T) {
+	for _, tt := range []struct{ number, plain, want string }{
+		{"107", "107", ""},
+		{"ST01-002", "2", `"pn":"2"`},
+		{"P-001", "", `"pn":""`},
+	} {
+		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{Name: "Card", SetCode: "SET", Number: tt.number, PlainNumber: tt.plain}}
+		raw, err := json.Marshal(newCatalogCard(co, nil, false))
+		if err != nil {
+			t.Fatal(err)
+		}
+		carried := strings.Contains(string(raw), `"pn":`)
+		if carried != (tt.want != "") || tt.want != "" && !strings.Contains(string(raw), tt.want) {
+			t.Errorf("%s with plain %q marshals as %s, want %q", tt.number, tt.plain, raw, tt.want)
+		}
 	}
 }
 
