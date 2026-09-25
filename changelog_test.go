@@ -361,6 +361,7 @@ func TestRenderDiscordMarkdownNestsIndentedBullets(t *testing.T) {
 		{"one-space indent", "- a\n - a1\n- b", []string{"", "1", ""}},
 		{"tab indent", "- a\n\t* a1", []string{"", "1"}},
 		{"back up one level", "- a\n  - a1\n    - a2\n  - a3\n- b", []string{"", "1", "2", "1", ""}},
+		{"deeper than there are markers", "- a\n  - b\n    - c\n      - d", []string{"", "1", "2", "3"}},
 		{"wide indent is one level", "- a\n        - a1", []string{"", "1"}},
 		{"text ends the list", "  - a\ntext\n- b", []string{"", ""}},
 	} {
