@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -345,6 +347,33 @@ func TestRenderDiscordMarkdownEscapesAndDecorates(t *testing.T) {
 	}
 	if strings.Contains(rendered, "<script>") {
 		t.Fatal("rendered markdown contains unescaped HTML")
+	}
+}
+
+func TestRenderDiscordMarkdownNestsIndentedBullets(t *testing.T) {
+	itemPattern := regexp.MustCompile(`<p class="changelog-list-item"(?: style="--changelog-list-depth: (\d+)")?>`)
+	for _, tc := range []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"two-space sub-bullets", "**Small site update!**\n- a\n- b\n  - b1\n  - b2\n- c", []string{"", "", "1", "1", ""}},
+		{"one-space indent", "- a\n - a1\n- b", []string{"", "1", ""}},
+		{"tab indent", "- a\n\t* a1", []string{"", "1"}},
+		{"back up one level", "- a\n  - a1\n    - a2\n  - a3\n- b", []string{"", "1", "2", "1", ""}},
+		{"wide indent is one level", "- a\n        - a1", []string{"", "1"}},
+		{"text ends the list", "  - a\ntext\n- b", []string{"", ""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rendered := string(renderDiscordMarkdown(tc.input))
+			var got []string
+			for _, match := range itemPattern.FindAllStringSubmatch(rendered, -1) {
+				got = append(got, match[1])
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("depths = %q, want %q: %s", got, tc.want, rendered)
+			}
+		})
 	}
 }
 

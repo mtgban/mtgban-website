@@ -151,6 +151,7 @@
 .changelog-list-item {
     display: flex;
     gap: 8px;
+    padding-left: calc(var(--changelog-list-depth, 0) * 20px);
 }
 
 .changelog-list-item span {

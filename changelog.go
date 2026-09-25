@@ -10,6 +10,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -535,8 +536,13 @@ func renderDiscordMarkdownWithLabels(input string, mentionLabels changelogMentio
 	var output strings.Builder
 	lines := strings.Split(input, "\n")
 	inCodeBlock := false
+	var listIndents []int
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+		isListItem := !inCodeBlock && (strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* "))
+		if !isListItem {
+			listIndents = listIndents[:0]
+		}
 		if strings.HasPrefix(trimmed, "```") {
 			if inCodeBlock {
 				output.WriteString("</code></pre>")
@@ -569,8 +575,15 @@ func renderDiscordMarkdownWithLabels(input string, mentionLabels changelogMentio
 			output.WriteString(`<blockquote class="changelog-quote">`)
 			output.WriteString(renderDiscordInline(strings.TrimSpace(strings.TrimPrefix(trimmed, ">")), 0, mentionLabels))
 			output.WriteString("</blockquote>")
-		case strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* "):
-			output.WriteString(`<p class="changelog-list-item"><span class="changelog-list-marker" aria-hidden="true">•</span><span class="changelog-list-content">`)
+		case isListItem:
+			var depth int
+			listIndents, depth = changelogListDepth(listIndents, line)
+			if depth == 0 {
+				output.WriteString(`<p class="changelog-list-item">`)
+			} else {
+				output.WriteString(`<p class="changelog-list-item" style="--changelog-list-depth: ` + strconv.Itoa(depth) + `">`)
+			}
+			output.WriteString(`<span class="changelog-list-marker" aria-hidden="true">` + changelogListMarkers[min(depth, len(changelogListMarkers)-1)] + `</span><span class="changelog-list-content">`)
 			output.WriteString(renderDiscordInline(strings.TrimSpace(trimmed[2:]), 0, mentionLabels))
 			output.WriteString("</span></p>")
 		case trimmed == "":
@@ -585,6 +598,33 @@ func renderDiscordMarkdownWithLabels(input string, mentionLabels changelogMentio
 		output.WriteString("</code></pre>")
 	}
 	return template.HTML(output.String())
+}
+
+// changelogListMarkers are the bullets per nesting level, deepest repeating.
+var changelogListMarkers = []string{"•", "◦", "▪"}
+
+// changelogListDepth nests a bullet line under the nearest shallower bullet
+// above it, given the indents of the bullets still open. As in Discord, any
+// deeper indent is one level down however wide it is, and a tab counts as
+// four spaces.
+func changelogListDepth(indents []int, line string) ([]int, int) {
+	indent := 0
+	for _, r := range line {
+		if r == ' ' {
+			indent++
+		} else if r == '\t' {
+			indent += 4
+		} else {
+			break
+		}
+	}
+	for len(indents) > 0 && indents[len(indents)-1] > indent {
+		indents = indents[:len(indents)-1]
+	}
+	if len(indents) == 0 || indents[len(indents)-1] < indent {
+		indents = append(indents, indent)
+	}
+	return indents, len(indents) - 1
 }
 
 func renderDiscordInline(input string, depth int, mentionLabels changelogMentionLabels) string {
