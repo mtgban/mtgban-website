@@ -232,6 +232,11 @@ git push origin v1.2.3
 The workflow runs `deploy.sh v1.2.3` on the droplet. You can also trigger a
 manual run (any ref) from the Actions tab via `workflow_dispatch`.
 
+Deploys to one host run one at a time. A tag push is skipped when another tag
+the workflow deploys on points at newer code, so pushing `v1.2.3` and `v1.2.4`
+together deploys only `v1.2.4`, whichever run starts first
+(`.github/workflows/newest-tag.yml`). Manual runs are never skipped.
+
 ## Rollback
 
 **A failed deploy rolls itself back.** Whatever goes wrong — the build, a
@@ -248,6 +253,8 @@ moved until then either, so a reboot mid-failure comes back on the good
 release.
 
 **To roll back a deploy that succeeded** — one that passed its checks and only
-looked wrong later — re-deploy the previous tag: `git push origin v1.2.2` (or
-run the workflow manually with that ref). The script builds and flips to
-whatever ref it is given, so rolling back is the same path as rolling forward.
+looked wrong later — run the workflow manually with the previous tag as its
+ref. Pushing that tag again does not work: a tag already on GitHub triggers
+nothing, and a push of an older tag is skipped because a newer one exists. The
+script builds and flips to whatever ref it is given, so rolling back is the
+same path as rolling forward.

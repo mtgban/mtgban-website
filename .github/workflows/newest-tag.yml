@@ -1,0 +1,55 @@
+name: newest-tag
+
+# Called by every deploy workflow before it deploys. Tags pushed together
+# start one run each, all at once and in no set order, so a run for older
+# code can finish last and leave it live. A tag push goes on to deploy only
+# when no other tag the caller deploys on points at newer code: that tag's
+# own run deploys it instead. Manual runs always deploy what they are given.
+on:
+  workflow_call:
+    inputs:
+      tags:
+        description: "The caller's push tag patterns, space separated"
+        required: true
+        type: string
+    outputs:
+      deploy:
+        description: "'true' when the caller should deploy"
+        value: ${{ jobs.check.outputs.deploy }}
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v6
+        if: github.event_name == 'push'
+        with:
+          fetch-depth: 0     # every tag, and the history to compare them
+          filter: tree:0     # commits only: no file contents are needed
+
+      - id: check
+        env:
+          TAGS: ${{ inputs.tags }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != push ]; then
+              echo "deploy=true" >> "$GITHUB_OUTPUT"
+              exit 0
+          fi
+          read -ra patterns <<< "$TAGS"
+          commit=$(git rev-parse "$GITHUB_REF^{commit}")
+          # Tags on commits that contain this one, minus those on this commit.
+          newer=$(git tag -l "${patterns[@]}" --sort=-creatordate --contains "$commit" | while read -r tag; do
+              [ "$(git rev-parse "$tag^{commit}")" = "$commit" ] || echo "$tag"
+          done)
+          if [ -n "$newer" ]; then
+              echo "::notice::Not deploying $GITHUB_REF_NAME: newer code is tagged $(echo "$newer" | head -1)"
+              echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi

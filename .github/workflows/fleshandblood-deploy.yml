@@ -10,7 +10,19 @@ on:
 permissions: {}
 
 jobs:
+  newest:
+    uses: ./.github/workflows/newest-tag.yml
+    permissions:
+      contents: read
+    with:
+      tags: 'v* fleshandblood-*'
+
   deploy:
+    needs: newest
+    if: needs.newest.outputs.deploy == 'true'
+    # One deploy at a time: two at once race on the same host or app.
+    concurrency:
+      group: ${{ github.workflow }}
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl

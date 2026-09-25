@@ -148,9 +148,11 @@ Two deploy patterns exist, chosen by how big the card pool is:
   `riftbound`, `gundam`, `palworld`, plus `beta`) — a `.github/workflows/
   <game>-deploy.yml` that does nothing but `doctl apps create-deployment
   ${{ secrets.DO_<GAME>_APP_ID }} --wait` on a `v*`/`<game>-*` tag push (or
-  `workflow_dispatch`). All the actual build/deploy config lives in that
-  DigitalOcean App's own spec, not in this repo. This is the one to copy for
-  a small non-Magic game's card pool.
+  `workflow_dispatch`), behind the `newest` job and `concurrency` group every
+  deploy workflow shares (`.github/workflows/newest-tag.yml` has why; copy
+  both, passing the same tag patterns). All the actual build/deploy config
+  lives in that DigitalOcean App's own spec, not in this repo. This is the
+  one to copy for a small non-Magic game's card pool.
 - **Droplet over SSH** (`magic`, `pokemon`, `yugioh`) — the workflow SSHes
   into a shared droplet and runs `deploy/deploy.sh <ref>`, which does its own
   checkout and build. Reserved for the largest card pools; a new non-Magic
