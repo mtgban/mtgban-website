@@ -25,6 +25,8 @@ const apiGatewayUser = "gateway@mtgban.com"
 // apiGatewaySecret is the shared secret for this site, empty when the
 // gateway is not configured, which turns the handoffs off.
 func apiGatewaySecret() string {
+	apiUsersMutex.RLock()
+	defer apiUsersMutex.RUnlock()
 	return Config.APIUserSecrets[apiGatewayUser]
 }
 
