@@ -294,7 +294,7 @@ func TestParseRowResolvesCardmarketID(t *testing.T) {
 func TestBannerHeaderReachesNotes(t *testing.T) {
 	header := []string{
 		"mcm_id", "card_name", "edition", "condition",
-		"foil", "quantity", "price_usd", "article_id", "mkm_notes",
+		"foil", "quantity", "price_usd", "mkm_language", "article_id", "mkm_notes",
 	}
 
 	p := &Parser{}
@@ -331,8 +331,11 @@ func TestBannerHeaderReachesNotes(t *testing.T) {
 		}
 	}
 
-	// article_id is carried for tracing and is meant to reach nothing.
-	if at, ok := indexMap["id"]; ok && header[at] == "article_id" {
-		t.Error("article_id was read as an identifier")
+	// mkm_language is there for whoever reads the file, and article_id for
+	// tracing; both are meant to reach nothing.
+	for key, at := range indexMap {
+		if header[at] == "mkm_language" || header[at] == "article_id" {
+			t.Errorf("%s was read as %s", header[at], key)
+		}
 	}
 }
