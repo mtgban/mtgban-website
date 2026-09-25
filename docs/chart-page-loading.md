@@ -63,7 +63,8 @@ fetching the rest. Narrowing rosters belongs in their default range.
 
 A window with no prices in it renders the whole span instead. A retired
 printing, or a product no longer priced, has history only further back,
-and hiding its chart would also hide the select that widens it.
+and hiding its chart would also hide the select that widens it. The
+mobile drawer does the same, with a second request to `/api/chart`.
 
 ## Still open
 
