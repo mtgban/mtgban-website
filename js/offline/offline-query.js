@@ -7,11 +7,11 @@
         nonfoil: 'nonfoil', nf: 'nonfoil',
         etched: 'etched', e: 'etched'
     };
+    // RARITY is online's short forms (fixupRarityNG). Any other word is a
+    // rarity as the catalog writes it, as it is online.
     var RARITY = {
-        common: 'common', c: 'common',
-        uncommon: 'uncommon', u: 'uncommon',
-        rare: 'rare', r: 'rare',
-        mythic: 'mythic', m: 'mythic'
+        c: 'common', u: 'uncommon', r: 'rare', m: 'mythic',
+        s: 'special', t: 'token', o: 'oversize'
     };
 
     // tokenize splits on whitespace honoring double-quoted phrases.
@@ -40,7 +40,7 @@
             known[finish.value] = true;
             (finish.aliases || []).forEach(function (alias) { known[alias] = true; });
         });
-        var out = {names: [], set: [], number: '', finish: [], rarity: '', unsupported: []};
+        var out = {names: [], set: [], number: [], finish: [], rarity: [], unsupported: []};
         var tokens = tokenize(String(str || ''));
         for (var i = 0; i < tokens.length; i++) {
             var tok = tokens[i];
@@ -54,7 +54,7 @@
             var operatorish = colon > 0 || /[<>=]/.test(tok.text);
             if (!operatorish) {
                 if (/^\d+$/.test(tok.text)) {
-                    out.number = tok.text;
+                    out.number = [tok.text];
                 } else {
                     out.names.push(tok.text);
                 }
@@ -75,11 +75,13 @@
                 out.set = val.split(',').filter(Boolean).map(function (code) { return code.toUpperCase(); });
                 break;
             /* Both spellings, one behaviour: the offline catalog stores the
-             * number a printing prints, so an exact compare is already what
-             * cns: means online, and cn: has always been read that way here. */
+             * number a printing prints, so comparing it without case is what
+             * cns: means online, and cn: has always been read that way here.
+             * A comma list names any of its numbers. */
             case 'cn':
             case 'cns':
-                out.number = val;
+            case 'number':
+                out.number = val.toLowerCase().split(',');
                 break;
             case 'f':
                 var slugs = readFinishes(val, known);
@@ -90,11 +92,9 @@
                 }
                 break;
             case 'r':
-                if (RARITY[val.toLowerCase()]) {
-                    out.rarity = RARITY[val.toLowerCase()];
-                } else {
-                    out.unsupported.push(tok.text);
-                }
+                out.rarity = val.toLowerCase().split(',').map(function (value) {
+                    return RARITY[value] || value;
+                });
                 break;
             default:
                 out.unsupported.push(tok.text);
@@ -203,8 +203,8 @@
     function matchesFilters(card, parsed) {
         if (parsed.sealed != null && !!card.s !== parsed.sealed) return false;
         if (parsed.set.length && parsed.set.indexOf(card.set) === -1) return false;
-        if (parsed.number && card.num !== parsed.number) return false;
-        if (parsed.rarity && card.r !== parsed.rarity) return false;
+        if (parsed.number.length && parsed.number.indexOf((card.num || '').toLowerCase()) === -1) return false;
+        if (parsed.rarity.length && parsed.rarity.indexOf(card.r || '') === -1) return false;
         if (parsed.finish.length && !parsed.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
         return true;
     }
