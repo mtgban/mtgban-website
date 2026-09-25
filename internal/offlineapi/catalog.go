@@ -34,7 +34,7 @@ type catalogCard struct {
 // the url its artwork happens to live at. Which identifier differs: Magic is
 // mirrored from MTGJSON crossed with Scryfall's bulk data and keyed on the
 // scryfall id, while every other game is mirrored out of mtgban's own
-// datastore and keyed on the card's uuid there.
+// datastore and keyed on the product the card is a printing of.
 func imageKey(co *mtgmatcher.CardObject, magic bool) string {
 	if co.Images["full"] == "" {
 		return ""
@@ -43,7 +43,7 @@ func imageKey(co *mtgmatcher.CardObject, magic bool) string {
 		if co.Sealed {
 			return "p-" + co.UUID
 		}
-		return basePrintingID(co.UUID)
+		return datastoreImageKey(co)
 	}
 	if co.Sealed {
 		// TCGplayer names a product image for its own product id, so this
@@ -58,21 +58,16 @@ func imageKey(co *mtgmatcher.CardObject, magic bool) string {
 	return co.Identifiers["scryfallId"]
 }
 
-// basePrintingID strips the finish suffix off a datastore uuid.
+// datastoreImageKey names the one image all finishes of a product share: its
+// TCGplayer product id or, where the card names no product, the key its
+// finishes share (mtgmatcher.PrintingKey). img-downloader's datastore
+// provider files images under the same expression; change both together.
 //
-// A printing's finishes are uuids of their own — Lorcana files 1854 and
-// 1854_f, Riftbound ogn-066-298_nonfoil and ..._foil — and they all share one
-// image, which the mirror stores once under the printing's id. This is the
-// trim that finds it, and the mirror documents the same rule from its side.
-//
-// It is not a tidying detail. Riftbound's base id is not in the uuid map at
-// all, only its finishes are, so every one of its cards needs this; without it
-// the game resolves no images whatsoever.
-func basePrintingID(uuid string) string {
-	if i := strings.LastIndex(uuid, "_"); i > 0 {
-		return uuid[:i]
-	}
-	return uuid
+// It reads fields because a datastore id is opaque (go-mtgban's
+// mtgmatcher/datastore.go says why). Cutting the uuid at its last underscore
+// gave 14,780 products more than one key and 12,857 a key another had too.
+func datastoreImageKey(co *mtgmatcher.CardObject) string {
+	return mtgmatcher.ProductKeyOf(co.Identifiers, mtgmatcher.PrintingKey(co.Card))
 }
 
 // newCatalogCard builds a catalog entry from a card object and its store list.
