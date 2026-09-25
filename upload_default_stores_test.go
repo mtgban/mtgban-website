@@ -15,8 +15,9 @@ import (
 )
 
 // storesOfBothKinds serves one singles store, ZZS, and one sealed one, ZZT,
-// and returns a card and a product for them to price.
-func storesOfBothKinds(t *testing.T) (card, product string) {
+// as sellers or vendors by kind, and returns a card and a product for them to
+// price.
+func storesOfBothKinds(t *testing.T, kind string) (card, product string) {
 	t.Helper()
 	keepScrapers(t)
 	cards := twoCards(t)
@@ -43,19 +44,19 @@ func storesOfBothKinds(t *testing.T) (card, product string) {
 
 	sealed := sessionInfo("ZZT")
 	sealed.SealedMode = true
-	_, err := Sessions.Publish(sessionstore.Retail, sessionInfo("ZZS"), []UploadEntry{{CardID: card, OriginalPrice: 1}})
+	_, err := Sessions.Publish(kind, sessionInfo("ZZS"), []UploadEntry{{CardID: card, OriginalPrice: 1}})
 	if err != nil {
 		t.Fatalf("publishing the singles store: %v", err)
 	}
-	_, err = Sessions.Publish(sessionstore.Retail, sealed, []UploadEntry{{CardID: product, OriginalPrice: 1}})
+	_, err = Sessions.Publish(kind, sealed, []UploadEntry{{CardID: product, OriginalPrice: 1}})
 	if err != nil {
 		t.Fatalf("publishing the sealed store: %v", err)
 	}
 	return card, product
 }
 
-// uploadWithoutStores posts rows the way the handoff page does, with no store
-// list, and returns the labels on the results strips.
+// uploadWithoutStores posts rows the way the results page's own form does,
+// with no store list, and returns the labels on the results strips.
 func uploadWithoutStores(t *testing.T, id string, cookies ...*http.Cookie) []string {
 	t.Helper()
 	form := url.Values{}
@@ -80,7 +81,7 @@ func uploadWithoutStores(t *testing.T, id string, cookies ...*http.Cookie) []str
 // have ticked. Those come from the affiliate list, which every deployment
 // shares, so it also names sealed stores and stores this game does not carry.
 func TestUploadWithoutStoresKeepsOnlySinglesSellers(t *testing.T) {
-	card, _ := storesOfBothKinds(t)
+	card, _ := storesOfBothKinds(t, sessionstore.Retail)
 	affiliatesPtr.Store(&AffiliatesConfig{List: []string{"ZZS", "ZZT", "ZZX"}})
 
 	labels := uploadWithoutStores(t, card)
@@ -98,7 +99,7 @@ func TestUploadWithoutStoresKeepsOnlySinglesSellers(t *testing.T) {
 // The sealed defaults are a cookie once somebody has chosen them, and a store
 // named in it can have gone since.
 func TestUploadWithoutStoresDropsAGoneSealedStore(t *testing.T) {
-	_, product := storesOfBothKinds(t)
+	_, product := storesOfBothKinds(t, sessionstore.Retail)
 
 	labels := uploadWithoutStores(t, product, &http.Cookie{Name: "enabledSealedSellers", Value: "ZZT|ZZGone"})
 	if !slices.Contains(labels, "Session ZZT") {
@@ -106,5 +107,27 @@ func TestUploadWithoutStoresDropsAGoneSealedStore(t *testing.T) {
 	}
 	if slices.Contains(labels, "") {
 		t.Errorf("a store that has gone is a nameless column: %q", labels)
+	}
+}
+
+// Buylist mode falls back to the vendors' cookies, and a store they name can
+// have gone just the same. Without a cookie the defaults are already the
+// vendors served, so only a stale one tells the filtered fallback apart.
+func TestUploadWithoutStoresDropsAGoneVendor(t *testing.T) {
+	card, product := storesOfBothKinds(t, sessionstore.Buylist)
+	buylist := &http.Cookie{Name: "uploadMode", Value: "true"}
+
+	for _, tc := range []struct{ id, cookie, store string }{
+		{card, "enabledVendors", "ZZS"},
+		{product, "enabledSealedVendors", "ZZT"},
+	} {
+		stale := &http.Cookie{Name: tc.cookie, Value: tc.store + "|ZZGone"}
+		labels := uploadWithoutStores(t, tc.id, buylist, stale)
+		if !slices.Contains(labels, "Session "+tc.store) {
+			t.Fatalf("%s: the store is not priced: the strip shows %q", tc.cookie, labels)
+		}
+		if slices.Contains(labels, "") {
+			t.Errorf("%s: a store that has gone is a nameless column: %q", tc.cookie, labels)
+		}
 	}
 }
