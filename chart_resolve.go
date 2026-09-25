@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 
@@ -259,8 +258,8 @@ func tcgBanIDForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) int64
 // variants table keys a non-Magic printing on (product, sub-type) — so a
 // non-Magic card's finish lives in the sub-type, while mtgmatcher gives each
 // finish a uuid of its own. mtgmatcher names a finish the way TCGplayer names
-// the sub-type (mtgmatcher.FinishSlug), so tcgSubTypeForCard and
-// tcgFinishIDForSubType are lookups on that one name, in either direction.
+// the sub-type (mtgmatcher.FinishSlug), so tcgSubTypeForCard and tcgFinishID
+// are lookups on that one name, in either direction.
 
 // tcgSubTypeForCard names the sub-type a card's own finish is priced under.
 // Returns "" when the product carries no sub-type for that finish (a foil with
@@ -275,61 +274,33 @@ func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) str
 	return ""
 }
 
-// tcgFinishIDForSubType is the inverse: given a product's base card, the id of
-// the finish the sub-type names, or "" when the card carries no finish for it.
-// No sub-type at all is the plain printing, and the bare word Foil is the
-// printing the foil flag answers with.
-func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64, subType string) string {
-	if subType == "" || subType == "Normal" {
-		if id, ok := co.FoilUUIDs[mtgmatcher.FinishNonfoil]; ok {
-			return id
-		}
-		return co.UUID
+// tcgFinishID is the inverse: the id of the product's printing sold under the
+// sub-type, or "" when the product is not sold in it, since charting the wrong
+// finish is worse than charting nothing. No sub-type at all is the product's
+// own printing.
+func tcgFinishID(productID int, subType string) string {
+	pid := strconv.Itoa(productID)
+	var id string
+	var err error
+	if subType == "" {
+		id, err = backend().MatchID(pid)
+	} else {
+		id, err = backend().MatchIDFinish(pid, subType)
 	}
-	finish := mtgmatcher.FinishSlug(subType)
-	if id, ok := co.FoilUUIDs[finish]; ok {
-		return id
-	}
-	if finish != mtgmatcher.FinishFoil {
+	if err != nil {
 		return ""
 	}
-	if id, err := backend().MatchID(co.UUID, true); err == nil {
-		return id
-	}
-	return co.UUID
+	return id
 }
 
 // tcgVariantSearchID maps a non-Magic variant to the mtgmatcher id of the card
 // and finish it names, for the results table the chart lives inside. ok=false
 // when mtgmatcher doesn't know the product (a game it doesn't carry, or a
-// product with no card), or when the card has no finish for the variant's
-// sub-type — charting the wrong finish is worse than charting nothing.
-func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string, bool) {
-	matched, err := backend().MatchID(strconv.Itoa(vi.TCGProductID))
-	if err != nil {
-		return "", false
-	}
-	co, err := backend().GetUUID(matched)
-	if err != nil {
-		return matched, true
-	}
-	subTypes, ok := PricesArchiveDB.CachedTCGSubTypeBanIDs(vi.TCGProductID)
-	if !ok {
-		// Without the product's sub-types there is nothing to pair the
-		// variant's own against, and tcgFinishIDForSubType reads an unknown
-		// sub-type as the primary foil — which is the wrong finish rather
-		// than no finish. Say so instead.
-		subTypes, err = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, vi.TCGProductID)
-		if err != nil {
-			log.Printf("chart: sub-types for product %d: %v", vi.TCGProductID, err)
-			return "", false
-		}
-	}
-	id := tcgFinishIDForSubType(co, subTypes, vi.TCGSubType)
-	if id == "" {
-		return "", false
-	}
-	return id, true
+// product with no card), or when the card is not sold in the variant's
+// sub-type.
+func tcgVariantSearchID(vi timeseries.VariantInfo) (string, bool) {
+	id := tcgFinishID(vi.TCGProductID, vi.TCGSubType)
+	return id, id != ""
 }
 
 // tcgProductID extracts a card's TCGplayer product id from its identifiers.
@@ -404,7 +375,7 @@ func nonMagicTarget(ctx context.Context, vi timeseries.VariantInfo) *chartTarget
 	t := &chartTarget{BanID: vi.BanID}
 	// The product id maps back to the game's own card id, on the finish the
 	// variant's sub-type names.
-	if searchID, ok := tcgVariantSearchID(ctx, vi); ok {
+	if searchID, ok := tcgVariantSearchID(vi); ok {
 		t.SearchID = searchID
 	}
 	if p, ok, _ := PricesArchiveDB.GetTCGProduct(ctx, vi.TCGProductID); ok {

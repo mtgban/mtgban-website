@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -34,7 +35,6 @@ var tcgFinishCases = []struct {
 	subTypes  []string          // what the product is priced under
 	printings map[string]string // uuid -> the finish it carries
 	want      map[string]string // uuid -> sub-type ("" = no data for that finish)
-	unmapped  []string          // sub-types the card has no finish for
 }{
 	{
 		name:      "cold foil",
@@ -65,7 +65,6 @@ var tcgFinishCases = []struct {
 		subTypes:  []string{"Normal", "Cold Foil", "Holofoil"},
 		printings: map[string]string{"2810": "nonfoil", "2810_coldfoil": "coldfoil"},
 		want:      map[string]string{"2810": "Normal", "2810_coldfoil": "Cold Foil"},
-		unmapped:  []string{"Holofoil"},
 	},
 	{
 		name:      "foil-only card",
@@ -114,39 +113,49 @@ func TestTCGSubTypeForCard(t *testing.T) {
 	}
 }
 
+// productInBothFinishes is a product whose card is sold plain and foil, with
+// the uuid of each, so the two sub-types have two printings to land on.
+func productInBothFinishes(t *testing.T) (int, string, string) {
+	t.Helper()
+	for _, u := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(u)
+		if err != nil || co.Foil || co.Etched || co.Sealed {
+			continue
+		}
+		foil, hasFoil := co.FoilUUIDs[mtgmatcher.FinishFoil]
+		if !hasFoil || foil == co.UUID {
+			continue
+		}
+		pid, err := strconv.Atoi(co.Identifiers["tcgplayerProductId"])
+		if err != nil {
+			continue
+		}
+		return pid, co.UUID, foil
+	}
+	t.Skip("no card sold in both finishes with a tcgplayer product id")
+	return 0, "", ""
+}
+
 // And back: charting a variant has to land on the card row of the finish its
-// sub-type names, not on the product's base printing.
-func TestTCGFinishIDForSubType(t *testing.T) {
-	for _, tc := range tcgFinishCases {
-		subTypes := map[string]int64{}
-		for i, subType := range tc.subTypes {
-			subTypes[subType] = int64(i + 1)
-		}
-		finishes := foilUUIDs(tc.printings)
-		// The card mtgmatcher resolves a bare product id to, as the callers get it.
-		base := finishes["nonfoil"]
-		if base == "" {
-			for uuid := range tc.printings {
-				if base == "" || uuid < base {
-					base = uuid
-				}
-			}
-		}
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: base, FoilUUIDs: finishes}}
-		for uuid, subType := range tc.want {
-			if subType == "" {
-				continue // no variant to chart
-			}
-			if got := tcgFinishIDForSubType(co, subTypes, subType); got != uuid {
-				t.Errorf("%s: tcgFinishIDForSubType(%q) = %q, want %q", tc.name, subType, got, uuid)
-			}
-		}
-		// And the other half of the symmetry: a sub-type the card has no finish
-		// for maps to nothing, rather than landing on the primary foil.
-		for _, subType := range tc.unmapped {
-			if got := tcgFinishIDForSubType(co, subTypes, subType); got != "" {
-				t.Errorf("%s: tcgFinishIDForSubType(%q) = %q, want no id", tc.name, subType, got)
-			}
+// sub-type names, not on the product's base printing, and on no row at all
+// for a sub-type the product is not sold in.
+func TestTCGFinishID(t *testing.T) {
+	if !datastoreLoaded() {
+		t.Skip("mtgmatcher datastore not loaded")
+	}
+	pid, plain, foil := productInBothFinishes(t)
+	base, err := backend().MatchID(strconv.Itoa(pid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for subType, want := range map[string]string{
+		"":          base,
+		"Normal":    plain,
+		"Foil":      foil,
+		"Cold Foil": "",
+	} {
+		if got := tcgFinishID(pid, subType); got != want {
+			t.Errorf("tcgFinishID(%d, %q) = %q, want %q", pid, subType, got, want)
 		}
 	}
 }

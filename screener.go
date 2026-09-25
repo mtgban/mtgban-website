@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"slices"
 	"sort"
@@ -309,10 +308,9 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 
 // moverCardID resolves a mover row to this game's uuid: Magic rows carry the
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
-// through the external id map with the sub-type picking the finish. subTypes is
-// the row's product's sub-type map, gathered for the whole result set by
-// moverSubTypes; nil resolves on the card object alone. Overridable in tests.
-var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (string, bool, bool) {
+// through the external id map with the sub-type naming the finish. Overridable
+// in tests.
+var moverCardID = func(row timeseries.MoverRow) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
@@ -321,22 +319,8 @@ var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (stri
 	}
 
 	// One product covers every finish of a card, so the sub-type is where the
-	// finish lives - and which sub-type names which finish varies by game.
-	// Reading it as "anything but Normal is the foil" collapses a game with
-	// more than one onto a single printing: Lorcana prices Cold Foil and
-	// Holofoil, and both would land on the same card. tcgFinishIDForSubType
-	// pairs them off the sub-types the product is actually priced under, the
-	// same way the chart read path does.
-	base, err := backend().MatchID(strconv.Itoa(row.TCGProductID))
-	if err != nil {
-		return "", false, false
-	}
-	co, err := backend().GetUUID(base)
-	if err != nil {
-		return "", false, false
-	}
-
-	uuid := tcgFinishIDForSubType(co, subTypes, row.TCGSubType)
+	// finish lives: Lorcana prices Cold Foil and Holofoil as two printings.
+	uuid := tcgFinishID(row.TCGProductID, row.TCGSubType)
 	if uuid == "" {
 		return "", false, false
 	}
@@ -344,7 +328,8 @@ var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (stri
 	// The finish belongs to the printing that was resolved, not to the name of
 	// the sub-type that led there.
 	isFoil := false
-	if finished, ferr := backend().GetUUID(uuid); ferr == nil {
+	finished, err := backend().GetUUID(uuid)
+	if err == nil {
 		isFoil = finished.Foil || finished.Etched
 	}
 	return uuid, isFoil, true
@@ -363,46 +348,6 @@ var screenerClassify = func(uuid string) (screenerMeta, bool) {
 		return screenerMeta{}, false
 	}
 	return screenerMeta{Sealed: co.Sealed, SetCode: co.SetCode, Edition: co.Edition}, true
-}
-
-// moverSubTypes gathers the sub-type maps the TCG-keyed rows in raw need, warm
-// cache first and one batched query for the rest. Resolving row by row asked
-// the table per miss, which is a round-trip each across a result set that runs
-// to tens of thousands - fine for the single-card paths the lookup was written
-// for, not for a whole screener page rebuilt on a cold cache.
-func moverSubTypes(ctx context.Context, raw []timeseries.MoverRow) map[int]map[string]int64 {
-	if PricesArchiveDB == nil {
-		return nil
-	}
-	out := map[int]map[string]int64{}
-	var missing []int
-	for _, row := range raw {
-		if row.MtgjsonUUID != "" || row.TCGProductID == 0 {
-			continue
-		}
-		// A nil entry still counts as seen, so a product asked for once is not
-		// asked for again.
-		if _, seen := out[row.TCGProductID]; seen {
-			continue
-		}
-		m, cached := PricesArchiveDB.CachedTCGSubTypeBanIDs(row.TCGProductID)
-		out[row.TCGProductID] = m
-		if !cached {
-			missing = append(missing, row.TCGProductID)
-		}
-	}
-	if len(missing) == 0 {
-		return out
-	}
-	found, err := PricesArchiveDB.LookupTCGSubTypeBanIDsBatch(ctx, missing)
-	if err != nil {
-		log.Println("screener: batched sub-type lookup failed:", err)
-		return out
-	}
-	for productID, m := range found {
-		out[productID] = m
-	}
-	return out
 }
 
 // screenerFlight collapses concurrent builds of the same key. The window
@@ -453,12 +398,11 @@ func buildMovers(ctx context.Context, key string, metric, window int, minPrice, 
 	if err != nil {
 		return nil, err
 	}
-	subTypes := moverSubTypes(ctx, raw)
 	rows := make([]screenerRow, 0, len(raw))
 	for _, row := range raw {
 		// Resolve non-Magic rows to this game's uuid so the rest of the
 		// pipeline (classification, dedup keys, links) is id-uniform
-		uuid, isFoil, ok := moverCardID(row, subTypes[row.TCGProductID])
+		uuid, isFoil, ok := moverCardID(row)
 		if !ok {
 			continue
 		}
