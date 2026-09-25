@@ -12,27 +12,23 @@ func TestFinishLabel(t *testing.T) {
 		finish string
 		want   string
 	}{
-		// The three the Foil and Etched flags already describe, plus the two
-		// spellings a game uses for a plain printing.
+		// The three the Foil and Etched flags already describe.
 		{"unset", "", ""},
 		{"shared nonfoil", mtgmatcher.FinishNonfoil, ""},
 		{"shared foil", mtgmatcher.FinishFoil, ""},
 		{"shared etched", mtgmatcher.FinishEtched, ""},
-		{"a game's plain printing", "normal", ""},
-		{"lorcana's plain printing", "nofoil", ""},
 
-		// The foil family, whose one lowercase word splits on the suffix.
+		// Every other finish, spelled as TCGplayer names the printing.
 		{"flesh and blood rainbow", "rainbowfoil", "Rainbow Foil"},
-		{"flesh and blood cold", "coldfoil", "Cold Foil"},
-		{"lorcana holo", "holofoil", "Holo Foil"},
-
-		// The ones no rule gets right.
+		{"flesh and blood run", "1steditionrainbowfoil", "1st Edition Rainbow Foil"},
+		{"lorcana cold", "coldfoil", "Cold Foil"},
+		{"gundam holo", "holofoil", "Holofoil"},
+		{"pokemon reverse", "reverseholofoil", "Reverse Holofoil"},
 		{"yugioh print run", "1stedition", "1st Edition"},
-		{"lorcana pillars", "rainbowpillars", "Rainbow Pillars"},
-
-		// A name that is neither foil-suffixed nor irregular.
-		{"lorcana silver", "silver", "Silver"},
 		{"yugioh unlimited", "unlimited", "Unlimited"},
+
+		// A name the table has no row for keeps the rule.
+		{"a finish added since", "galaxyfoil", "Galaxy Foil"},
 	}
 
 	for _, test := range tests {
@@ -47,9 +43,9 @@ func TestFinishLabel(t *testing.T) {
 	}
 }
 
-// Magic's CanonicalFinish only ever answers with the three shared names — its
-// foil types are promo types, not finishes — so nothing it stores should reach
-// the naming rule and change a title that reads correctly today.
+// Magic's only finishes are nonfoil, foil and etched — its foil types are
+// promo types, not finishes — so nothing it stores should reach the naming
+// rule and change a title that reads correctly today.
 func TestFinishLabelLeavesMagicAlone(t *testing.T) {
 	uuids := backend().GetUUIDs()
 	if len(uuids) == 0 {

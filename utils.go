@@ -593,32 +593,16 @@ func getSetKeyrunes() map[string]string {
 	return out
 }
 
-// finishLabels spells the finishes finishLabel's rule below cannot: a name
-// that is not a foil at all, or one whose words do not split on the suffix.
-var finishLabels = map[string]string{
-	"1stedition":      "1st Edition",
-	"rainbowpillars":  "Rainbow Pillars",
-	"reverseholofoil": "Reverse Holo Foil",
-}
-
 // finishLabel spells the finish a card actually carries, or "" for one the
 // Foil and Etched flags already describe as well as anything could.
 //
-// A game with finishes of its own names them in CardObject.Finish, and the
-// matcher spells a finish the way it spells a promo type: one lowercase word,
-// so it can be typed into a search. That costs the spaces, so "coldfoil" comes
-// back where a person writes "Cold Foil". Split the trailing foil off and
-// title-case what is left, which is the same rule uuid2card already applies to
-// Magic's promo foils.
-//
-// Magic itself never reaches the rule: its CanonicalFinish answers only with
-// the three shared names, and its foil types live in PromoTypes. "normal" and
-// "nofoil" are here because a game spelling its plain printing that way means
-// the same nothing as the shared constant.
+// A game with finishes of its own names them in CardObject.Finish, the name
+// TCGplayer prices the printing under with the spaces taken out, so it can be
+// typed into a search; mtgmatcher.FinishLabel spells it back as TCGplayer
+// does. Magic never reaches it: its foil types live in PromoTypes.
 func finishLabel(co *mtgmatcher.CardObject) string {
 	switch co.Finish {
-	case "", "normal", "nofoil",
-		mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+	case "", mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
 		return ""
 	}
 	return spellFinish(co.Finish)
@@ -655,10 +639,10 @@ func finishListLabel(finish string) string {
 // spellFinish is the rule finishLabel applies, on a name rather than on a
 // card, for callers listing the finishes a game has rather than naming one
 // card's. It spells the shared names too, since a list of what f: accepts has
-// to name them along with the rest.
+// to name them along with the rest. A name the finish table has no row for -
+// Magic's etched foil - splits its trailing foil off and title-cases the rest.
 func spellFinish(finish string) string {
-	label, found := finishLabels[finish]
-	if found {
+	if label := mtgmatcher.FinishLabel(finish); label != "" {
 		return label
 	}
 	base := strings.TrimSuffix(finish, "foil")

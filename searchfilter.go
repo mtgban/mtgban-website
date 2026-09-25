@@ -2140,20 +2140,15 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 			return false
 		}
 
-		// A spelling this printing answers to. A game registers the bare
-		// treatment name beside the run-qualified one a product is actually
-		// sold under, so f:rainbowfoil reaches a product whose only rainbow
-		// is the Unlimited printing. An alias names a finish rather than a
-		// printing, so it counts only where it resolves to this one.
-		alias, aliased := co.FinishAliases[value]
-		if aliased && co.UUID != "" && co.FoilUUIDs[alias] == co.UUID {
+		// The finish with its print run taken off, so f:rainbowfoil reaches
+		// a product whose only rainbow is the Unlimited printing.
+		if finish, found := mtgmatcher.FinishOf(co.Finish); found && finish.Treatment == value {
 			return false
 		}
 
 		// Magic keeps its foil treatments as promo types rather than finishes
-		// - its CanonicalFinish answers with the three shared names and
-		// nothing else - so a galaxy foil is a foil whose treatment is filed
-		// elsewhere. A treatment is what a person means by finish, and
+		// - its only finishes are nonfoil, foil and etched - so a galaxy foil
+		// is a foil whose treatment is filed elsewhere. A treatment is what a person means by finish, and
 		// uuid2card already prints it in place of the foil chip, so f: should
 		// reach it: altFoilTags is exactly the promo types that name a
 		// foiling, which is why it gates this and any promo type does not.
