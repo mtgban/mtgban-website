@@ -5,6 +5,8 @@ import (
 	"hash/fnv"
 	"strconv"
 	"testing"
+
+	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
 // The catalog used to be marshalled as one map and is now assembled from
@@ -15,7 +17,9 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 		"uuid-b": {Name: "Beta", Number: "2", Rarity: "rare", SetCode: "AAA", Foil: true},
 		"uuid-a": {Name: "Alpha", Number: "1", SetCode: "ZZZ", Products: []string{"p1", "p2"}},
 		"uuid-c": {Name: "Gamma", Sealed: true, Image: "img"},
+		"uuid-d": {Name: "Delta", SetCode: "AAA", Foil: true, Finishes: []string{"rainbowfoil"}},
 	}
+	finishes := []palette.Finish{{Value: "rainbowfoil", Label: "Rainbow Foil", Count: 1}}
 	sets := map[string]catalogSet{
 		"ZZZ": {Name: "Zed", Keyrune: "zzz", Date: "2020-01-01"},
 		"AAA": {Name: "Ay"},
@@ -26,7 +30,7 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 	}
 
 	// what the old code produced
-	whole, err := json.Marshal(map[string]any{"sets": sets, "cards": cards, "stores": stores})
+	whole, err := json.Marshal(map[string]any{"sets": sets, "cards": cards, "finishes": finishes, "stores": stores})
 	if err != nil {
 		t.Fatalf("marshal whole: %v", err)
 	}
@@ -35,6 +39,10 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 	rawCards, err := json.Marshal(cards)
 	if err != nil {
 		t.Fatalf("marshal cards: %v", err)
+	}
+	rawFinishes, err := json.Marshal(finishes)
+	if err != nil {
+		t.Fatalf("marshal finishes: %v", err)
 	}
 	rawSets, err := json.Marshal(sets)
 	if err != nil {
@@ -47,6 +55,7 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 	var assembled []byte
 	for _, part := range [][]byte{
 		[]byte(`{"cards":`), rawCards,
+		[]byte(`,"finishes":`), rawFinishes,
 		[]byte(`,"sets":`), rawSets,
 		[]byte(`,"stores":`), rawStores,
 		[]byte(`}`),

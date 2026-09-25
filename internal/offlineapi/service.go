@@ -15,6 +15,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
 	"github.com/mtgban/mtgban-website/internal/offline"
+	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -43,6 +44,12 @@ type Deps struct {
 
 	ScraperName       func(shorthand string) string
 	CardObjectSources func(co *mtgmatcher.CardObject) []string
+
+	// FinishNames are the names f: reaches a card by, and Finishes the list
+	// the palette offers them in. The catalog carries both, so f: and its
+	// menu work offline too.
+	FinishNames func(co *mtgmatcher.CardObject) []string
+	Finishes    func() []palette.Finish
 
 	// Game names the card game this deployment serves. It decides how image
 	// keys are derived, because Magic's mirror keys on the scryfall id while

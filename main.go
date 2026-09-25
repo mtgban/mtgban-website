@@ -937,6 +937,8 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 
 	ScraperName:       scraperName,
 	CardObjectSources: cardobject2sources,
+	FinishNames:       finishNames,
+	Finishes:          paletteService.FinishList,
 
 	LastDatastoreUpdate: GetLastDatastoreUpdate,
 
