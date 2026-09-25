@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"maps"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -260,120 +258,27 @@ func tcgBanIDForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) int64
 // TCGplayer prices one product under several sub-types, one per finish, and the
 // variants table keys a non-Magic printing on (product, sub-type) — so a
 // non-Magic card's finish lives in the sub-type, while mtgmatcher gives each
-// finish a uuid of its own. tcgSubTypeForCard and tcgFinishIDForSubType are
-// inverses that bridge the two, and both read the finish off the sub-types the
-// product is actually priced under, since the names vary by game: "Normal" is
-// the nonfoil, the first foil sub-type is the primary foil ("Foil" for
-// Riftbound, "Cold Foil" for Lorcana), and the ones after it are Lorcana's
-// extra foil sub-types, which TCGplayer calls "Holofoil" (mtgmatcher/lorcana's
-// selectFinish reads the same naming from the other direction).
-
-// foilSubTypes returns a product's foil sub-types in the order they pair with a
-// card's foil finishes: alphabetical, which puts the primary foil ("Cold Foil",
-// "Foil") ahead of the "Holofoil" the extra sub-types are sold as.
-//
-// The pairing is positional over this list and the sorted one extraFoilFinishes
-// returns, so it rests on an invariant nothing in the data enforces: on a
-// product priced under more than one foil, the primary foil's name sorts before
-// the extras'. It holds for every name in use, but that is a naming coincidence
-// carrying structural weight — a new foil sub-type sorting ahead of "Cold Foil"
-// would re-pair every finish on its product. TestFoilSubTypeOrdering pins the
-// names we know, so a new one gets added there and the order gets checked
-// rather than assumed.
-func foilSubTypes(subTypes map[string]int64) []string {
-	foils := make([]string, 0, len(subTypes))
-	for subType := range subTypes {
-		if subType != "" && subType != "Normal" {
-			foils = append(foils, subType)
-		}
-	}
-	slices.Sort(foils)
-	return foils
-}
-
-// extraFoilFinishes returns the keys of a card's foil finishes past the primary
-// one (Lorcana's RainbowPillars and friends), ordered to match foilSubTypes.
-// Sorted, so with more than one extra the pairing would also depend on the
-// finish keys sorting into the same order as the sub-type names; today no
-// product carries a second extra, so the ordering above is the live constraint.
-func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
-	nonfoil := co.FoilUUIDs[mtgmatcher.FinishNonfoil]
-	extras := make([]string, 0, len(co.FoilUUIDs))
-	for finish, id := range co.FoilUUIDs {
-		if finish == mtgmatcher.FinishNonfoil || finish == mtgmatcher.FinishFoil {
-			continue
-		}
-		// A game that also keys each printing by its own treatment name spells
-		// the plain one "normal", which is not a second name for a foil finish
-		// and must not take a place in the pairing below.
-		if id != "" && id == nonfoil {
-			continue
-		}
-		extras = append(extras, finish)
-	}
-	slices.Sort(extras)
-	return extras
-}
+// finish a uuid of its own. mtgmatcher names a finish the way TCGplayer names
+// the sub-type (mtgmatcher.FinishSlug), so tcgSubTypeForCard and
+// tcgFinishIDForSubType are lookups on that one name, in either direction.
 
 // tcgSubTypeForCard names the sub-type a card's own finish is priced under.
 // Returns "" when the product carries no sub-type for that finish (a foil with
 // no foil listing yet), so the caller charts nothing rather than the wrong
 // finish's prices.
 func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) string {
-	// Ask the names first, before foilness is consulted at all. A game that
-	// keys a printing by the very thing TCGplayer prices it under - Flesh and
-	// Blood's "rainbowfoil" against "Rainbow Foil", Yu-Gi-Oh's "1stedition"
-	// against "1st Edition" - answers exactly, with none of the pairing below
-	// and none of its assumptions.
-	//
-	// It has to come before the foilness split because a sub-type need not be a
-	// finish at all: Yu-Gi-Oh prices print runs, so there is no "Normal" for the
-	// nonfoil branch to find and no foil sub-type for the pairing to walk.
-	//
-	// The generic names are left to that existing logic. They are aliases a game
-	// registers beside the specific one - Flesh and Blood's "foil" and
-	// "rainbowfoil" can name the same printing - so letting them match here
-	// would make the answer depend on which one was looked at first.
-	for _, subType := range slices.Sorted(maps.Keys(subTypes)) {
-		finish := mtgmatcher.NormalizeFinish(subType)
-		if finish == mtgmatcher.FinishNonfoil || finish == mtgmatcher.FinishFoil {
-			continue
-		}
-		id, ok := co.FoilUUIDs[finish]
-		if ok && id == co.UUID {
+	for subType := range subTypes {
+		if mtgmatcher.FinishSlug(subType) == co.Finish {
 			return subType
 		}
 	}
-
-	if !co.Foil {
-		if _, ok := subTypes["Normal"]; ok {
-			return "Normal"
-		}
-		return ""
-	}
-	foils := foilSubTypes(subTypes)
-	if len(foils) == 0 {
-		return ""
-	}
-
-	for i, finish := range extraFoilFinishes(co) {
-		if co.FoilUUIDs[finish] != co.UUID {
-			continue
-		}
-		// An extra sub-type the product isn't priced under is not the primary
-		// foil's data in disguise, so leave it unmapped.
-		if i+1 < len(foils) {
-			return foils[i+1]
-		}
-		return ""
-	}
-	return foils[0]
+	return ""
 }
 
 // tcgFinishIDForSubType is the inverse: given a product's base card, the id of
 // the finish the sub-type names, or "" when the card carries no finish for it.
-// A sub-type the product doesn't list resolves to the primary foil, since
-// "Normal" is the only nonfoil name.
+// No sub-type at all is the plain printing, and the bare word Foil is the
+// printing the foil flag answers with.
 func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64, subType string) string {
 	if subType == "" || subType == "Normal" {
 		if id, ok := co.FoilUUIDs[mtgmatcher.FinishNonfoil]; ok {
@@ -381,20 +286,12 @@ func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64,
 		}
 		return co.UUID
 	}
-	if idx := slices.Index(foilSubTypes(subTypes), subType); idx > 0 {
-		extras := extraFoilFinishes(co)
-		if idx-1 >= len(extras) {
-			// The mirror of tcgSubTypeForCard's refusal to map an extra
-			// sub-type onto the primary foil: a product priced under one more
-			// foil than the card has finishes would otherwise hand both
-			// sub-types the same id, and a roster holding both would render
-			// two rows for one printing.
-			return ""
-		}
-		return co.FoilUUIDs[extras[idx-1]]
-	}
-	if id, ok := co.FoilUUIDs[mtgmatcher.FinishFoil]; ok {
+	finish := mtgmatcher.FinishSlug(subType)
+	if id, ok := co.FoilUUIDs[finish]; ok {
 		return id
+	}
+	if finish != mtgmatcher.FinishFoil {
+		return ""
 	}
 	if id, err := backend().MatchID(co.UUID, true); err == nil {
 		return id
