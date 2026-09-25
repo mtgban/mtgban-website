@@ -101,9 +101,12 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         <div class="landing-divider"></div>
 
         {{if .PopularSearches}}
-        <div class="landing-popular">
-            <div class="landing-popular-title">Popular searches</div>
-            <div class="landing-popular-viewport">
+        <div class="landing-popular" id="landing-popular">
+            <div class="landing-popular-title">
+                Popular searches
+                <button class="landing-popular-toggle" type="button" aria-controls="landing-popular-viewport" aria-expanded="true" title="Hide popular searches"><i data-lucide="chevron-up"></i></button>
+            </div>
+            <div class="landing-popular-viewport" id="landing-popular-viewport">
                 <div class="landing-popular-track" style="animation-duration: calc({{len .PopularSearches}} * 4s)">
                     {{range .PopularSearches}}
                     <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}">
@@ -120,6 +123,26 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
                 </div>
             </div>
         </div>
+        <script>
+        // Runs before paint, so a minimized carousel never flashes open.
+        // '0' rather than removeItem: user-state.js only syncs setItem writes.
+        (function() {
+            var KEY = 'mtgban_popular_collapsed';
+            var box = document.getElementById('landing-popular');
+            var btn = box.querySelector('.landing-popular-toggle');
+            function apply(collapsed) {
+                box.classList.toggle('collapsed', collapsed);
+                btn.setAttribute('aria-expanded', String(!collapsed));
+                btn.title = collapsed ? 'Show popular searches' : 'Hide popular searches';
+            }
+            try { apply(localStorage.getItem(KEY) === '1'); } catch (e) {}
+            btn.addEventListener('click', function() {
+                var collapsed = !box.classList.contains('collapsed');
+                apply(collapsed);
+                try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
+            });
+        })();
+        </script>
         {{end}}
 
         <div class="landing-game-links">

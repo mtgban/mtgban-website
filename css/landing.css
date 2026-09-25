@@ -180,8 +180,40 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-dim);
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     margin-bottom: 12px;
+}
+.landing-popular-toggle {
+    padding: 2px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    transition: all 0.15s;
+}
+.landing-popular-toggle:hover {
+    background: var(--accent-muted);
+    color: var(--ainfo);
+}
+/* Sized before lucide swaps the <i> for an <svg>, so the title never shifts. */
+.landing-popular-toggle svg,
+.landing-popular-toggle i[data-lucide] {
+    width: 14px; height: 14px;
+    transition: transform 0.15s;
+}
+.landing-popular.collapsed .landing-popular-toggle svg {
+    transform: rotate(180deg);
+}
+.landing-popular.collapsed .landing-popular-title {
+    margin-bottom: 0;
+}
+.landing-popular.collapsed .landing-popular-viewport {
+    display: none;
 }
 /* Viewport clips the scrolling track and fades both edges. */
 .landing-popular-viewport {
