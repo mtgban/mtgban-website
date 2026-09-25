@@ -140,14 +140,27 @@ test('number comparisons read as online', () => {
     expect(p('r>rare').unsupported).toEqual(['r>rare']);
 });
 
+// A leading - negates a filter, as it does online. Negated values gather,
+// since none of one list and none of another is none of either.
+test('negated filters read as online', () => {
+    const finishes = [{value: 'galaxyfoil', aliases: ['galaxy']}];
+    expect(Q.parse('bolt -s:neo,mh2 -e:lea -f:foil,galaxy -r:c', finishes)).toMatchObject({
+        not: {set: ['NEO', 'MH2', 'LEA'], finish: ['foil', 'galaxy'], rarity: ['common']},
+        set: [], finish: [], rarity: [], unsupported: [],
+    });
+    expect(p('-cn:MKM:1-50').number).toMatchObject([{range: [1, 50], sets: ['MKM'], negate: true}]);
+    expect(p('-cn>100').number).toMatchObject([{compare: '>', bound: 100, negate: true}]);
+    expect(p('-f:gilded').unsupported).toEqual(['-f:gilded']);
+});
+
 test('unknown operator values are unsupported', () => {
     expect(p('f:gilded').unsupported).toEqual(['f:gilded']);
 });
 
 test('unknown keys are unsupported verbatim', () => {
-    const r = p('lotus date>2020 skip:index -s:NEO');
+    const r = p('lotus date>2020 skip:index -skip:retail');
     expect(r.names).toEqual(['lotus']);
-    expect(r.unsupported).toEqual(['date>2020', 'skip:index', '-s:NEO']);
+    expect(r.unsupported).toEqual(['date>2020', 'skip:index', '-skip:retail']);
 });
 
 test('quoted operator value', () => {
@@ -155,7 +168,7 @@ test('quoted operator value', () => {
 });
 
 test('empty and whitespace input', () => {
-    expect(p('')).toEqual({names: [], set: [], number: [], finish: [], rarity: [], unsupported: []});
+    expect(p('')).toEqual({names: [], set: [], number: [], finish: [], rarity: [], not: {set: [], finish: [], rarity: []}, unsupported: []});
     expect(p('   ').names).toEqual([]);
 });
 
@@ -338,6 +351,42 @@ test('number ranges, comparisons and set scopes keep what online keeps', async (
     expect(await uuids('boseiju cn>119', withNumber('u-mh2-1', 'OP01-120', '120'))).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
     expect(await uuids('boseiju cn>100', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
     expect(await uuids('boseiju cn<500', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-neo-1', 'u-neo-1f']);
+});
+
+test('negated filters drop what they name', async () => {
+    const uuids = async query => {
+        Q.resetCaches();
+        const out = await Q.execute(Q.parse(query), fakeEnv());
+        return out.results.map(r => r.uuid).sort();
+    };
+    expect(await uuids('boseiju -s:neo')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju -f:foil')).toEqual(['u-mh2-1', 'u-neo-1']);
+    expect(await uuids('boseiju -r:rare')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju s:neo -f:nonfoil')).toEqual(['u-neo-1f']);
+    // A scope still leaves every card outside it alone
+    expect(await uuids('boseiju -cn:NEO:177')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju -cn:12')).toEqual(['u-neo-1', 'u-neo-1f']);
+    // A negated comparison is strict the other way, and drops a number
+    // with no digits
+    expect(await uuids('boseiju -cn>100')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju -cn<12')).toEqual(['u-neo-1', 'u-neo-1f']);
+});
+
+// Online keeps a range's lower bound out of the negation's reach: -cn:10-50
+// keeps only what lies past 50, so a card numbered 5 is dropped too.
+test('a negated range keeps what lies past its upper bound', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const getCard = env.getCard;
+    env.getCard = async function (uuid) {
+        const card = await getCard(uuid);
+        return card && card.uuid === 'u-mh2-1' ? {...card, num: '5'} : card;
+    };
+    let out = await Q.execute(Q.parse('boseiju -cn:10-50'), env);
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
+    Q.resetCaches();
+    out = await Q.execute(Q.parse('boseiju -cn:10-200'), fakeEnv());
+    expect(out.results.map(r => r.uuid)).toEqual([]);
 });
 
 test('results carry payload slices', async () => {
