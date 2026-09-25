@@ -72,15 +72,21 @@ test('hover previews show only for real card art', () => {
     expect(classes.has('is-visible')).toBe(false);
 });
 
-// Leaving the table is newer than a hover whose art is still loading, so that
-// art landing afterwards must not bring the preview back.
-test('leaving the table outranks a preload still in flight', () => {
+// Records every Image the fallback preloads through, so a test can settle it.
+function recordPreloads() {
     const preloads = [];
     class Preload {
         constructor() {
             preloads.push(this);
         }
     }
+    return {preloads, Preload};
+}
+
+// Leaving the table is newer than a hover whose art is still loading, so that
+// art landing afterwards must not bring the preview back.
+test('leaving the table outranks a preload still in flight', () => {
+    const {preloads, Preload} = recordPreloads();
     const {FakeImage, setCardArtSource, cardArtPlaceholder} = loadFallback(undefined, Preload);
     const image = new FakeImage();
     const classes = new Set();
@@ -94,6 +100,51 @@ test('leaving the table outranks a preload still in flight', () => {
 
     expect(image.src).toBe(cardArtPlaceholder);
     expect(classes.has('is-visible')).toBe(false);
+});
+
+// Handing the element the address that failed to preload would fail it a
+// second time, with the previous card still showing, before the back came.
+test('a failed preload goes straight to the card back', () => {
+    const {preloads, Preload} = recordPreloads();
+    const {FakeImage, setCardArtSource} = loadFallback(undefined, Preload);
+    const image = new FakeImage();
+    const assigned = [];
+    Object.defineProperty(image, 'src', {get: () => assigned.at(-1), set: value => assigned.push(value)});
+
+    setCardArtSource(image, 'broken.jpg');
+    preloads[0].onerror();
+
+    expect(assigned).toEqual(['/img/backs/pokemon.webp']);
+    expect(image.dataset.cardArtFallback).toBe('1');
+});
+
+// A hover the pointer has moved on from must not spend the fallback of the
+// image it moved to.
+test('a stale preload failure leaves the current art alone', () => {
+    const {preloads, Preload} = recordPreloads();
+    const {FakeImage, setCardArtSource} = loadFallback(undefined, Preload);
+    const image = new FakeImage();
+
+    setCardArtSource(image, 'first.jpg');
+    setCardArtSource(image, 'second.jpg');
+    preloads[0].onerror();
+
+    expect(image.src).toBe('');
+    expect(image.dataset.cardArtFallback).toBeUndefined();
+});
+
+// Art decoded only after it is swapped in leaves the element blank for a
+// frame, so the element decodes it as it paints.
+test('swapped-in art is decoded as it is painted', () => {
+    const {preloads, Preload} = recordPreloads();
+    const {FakeImage, setCardArtSource} = loadFallback(undefined, Preload);
+    const image = new FakeImage();
+
+    setCardArtSource(image, 'card.jpg');
+    preloads[0].onload();
+
+    expect(image.src).toBe('card.jpg');
+    expect(image.decoding).toBe('sync');
 });
 
 test('upload printing picker resets reused row art', () => {

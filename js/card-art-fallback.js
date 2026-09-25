@@ -51,6 +51,9 @@ function setCardArtSource(img, src) {
         }
     };
     var apply = function () {
+        // Decoded as it is painted: art decoded afterwards leaves the element
+        // blank for a frame when it is swapped in.
+        img.decoding = 'sync';
         img.src = target;
         showHover();
     };
@@ -66,8 +69,16 @@ function setCardArtSource(img, src) {
         request.onload = function () {
             if (img.__cardArtRequest === token) apply();
         };
+        // Straight to the card back: handing the element the address that just
+        // failed would only make it fail a second time first.
         request.onerror = function () {
-            if (img.__cardArtRequest === token) apply();
+            if (img.__cardArtRequest !== token) return;
+            var back = cardBackForGame();
+            if (back) {
+                target = back;
+                img.dataset.cardArtFallback = '1';
+            }
+            apply();
         };
         request.src = target;
         return;
