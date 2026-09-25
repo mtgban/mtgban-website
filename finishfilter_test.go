@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -189,5 +190,35 @@ func TestFinishFilterIgnoresNonFoilPromoTypes(t *testing.T) {
 
 	if matches("prerelease", prerelease) {
 		t.Error("f:prerelease matched: f: reaches foilings, not every promo type")
+	}
+}
+
+// The finish list and the offline catalog offer the names finishNames gives,
+// so past the three flags f: has to take each of them and nothing else.
+func TestFinishNamesNameWhatTheFilterTakes(t *testing.T) {
+	galaxy := finishCard("m-2_f", mtgmatcher.FinishFoil, true)
+	galaxy.PromoTypes = []string{"galaxyfoil", "prerelease"}
+	cards := []*mtgmatcher.CardObject{galaxy}
+	names := append(slices.Clone(altFoilTags), "prerelease")
+	for short := range isKnownPromo {
+		names = append(names, short)
+	}
+	for _, row := range mtgmatcher.Finishes {
+		cards = append(cards, finishCard(row.Slug, row.Slug, row.Foil))
+		names = append(names, row.Slug, row.Treatment, mtgmatcher.PromoTypeSlug(row.Run))
+	}
+
+	for _, co := range cards {
+		listed := finishNames(co)
+		for _, name := range names {
+			switch name {
+			case "", mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+				continue
+			}
+			got := matches(name, co)
+			if got != slices.Contains(listed, name) {
+				t.Errorf("%s: f:%s = %t, but finishNames = %q", co.UUID, name, got, listed)
+			}
+		}
 	}
 }
