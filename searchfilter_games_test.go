@@ -28,11 +28,10 @@ var gameDatastores = map[string]string{
 //
 // The tightening hands the number to a filter comparing it against the number
 // as the catalog writes it, and a miss there is not a wider answer but no
-// answer at all. Two shapes make it miss, and namesOnePrinting refuses both:
-// a catalog that pads is asked for a number it does not write, since
-// ExtractNumberAny strips the padding on the way in (Pokemon files 074a); and
-// a game that reduces a number rather than trimming it has no suffix to speak
-// of (One Piece files ST01-001 under a plain number of 1).
+// answer at all. That is why the token is asked for as typed: ExtractNumberAny
+// strips a catalog's padding (Pokemon's 074a becomes 74a) and reduces a
+// number rather than trimming it (One Piece's ST01-001 becomes ST01-1), and
+// neither is a number the catalog writes.
 //
 // Only the printings this change tightens are checked, because they are the
 // only ones it answers for - Palworld's shorthand, for one, already reaches
