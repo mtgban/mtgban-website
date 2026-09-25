@@ -632,21 +632,24 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Make sure there are some enabled stores for direct access
+	// Make sure there are some enabled stores for direct access: what the
+	// form would have sent. The defaults are filtered like any submitted
+	// list, since the affiliate list is every deployment's and names sealed
+	// stores and ones this game does not carry.
 	if len(stores) == 0 && len(enabledStores) == 0 {
 		if blMode {
-			enabledStores = pageVars.EnabledVendors
+			enabledStores = keepInOrder(singlesVendors, pageVars.EnabledVendors)
 		} else {
-			enabledStores = pageVars.EnabledSellers
+			enabledStores = keepInOrder(singlesSellers, pageVars.EnabledSellers)
 		}
 	}
 	// Same as above, covering requests that carry no sealed_stores field
 	// at all (hash transfers from search, gdocURL links)
 	if len(sealedStores) == 0 && len(enabledSealedStores) == 0 {
 		if blMode {
-			enabledSealedStores = pageVars.EnabledSealedVendors
+			enabledSealedStores = keepInOrder(sealedVendors, pageVars.EnabledSealedVendors)
 		} else {
-			enabledSealedStores = pageVars.EnabledSealedSellers
+			enabledSealedStores = keepInOrder(sealedSellers, pageVars.EnabledSealedSellers)
 		}
 	}
 
