@@ -110,7 +110,8 @@
                 } else if (negate) {
                     out.not.finish = out.not.finish.concat(slugs);
                 } else {
-                    out.finish = slugs;
+                    // Each f: must hold, as online files one filter per token
+                    out.finish.push(slugs);
                 }
                 break;
             case 'r':
@@ -298,7 +299,9 @@
         if (parsed.not.rarity.indexOf(card.r || '') !== -1) return false;
         if (parsed.not.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
         if (parsed.rarity.length && parsed.rarity.indexOf(card.r || '') === -1) return false;
-        if (parsed.finish.length && !parsed.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
+        if (!parsed.finish.every(function (slugs) {
+            return slugs.some(function (finish) { return hasFinish(card, finish); });
+        })) return false;
         return true;
     }
 

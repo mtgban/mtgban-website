@@ -43,7 +43,7 @@ test('cns is read as the printed number', () => {
     expect(p('cns:1116jpn').number).toMatchObject([{values: ['1116jpn'], strict: true}]);
     expect(p('cns:123').number).toMatchObject([{values: ['123'], strict: true}]);
     expect(p('plaguecrafter s:sld cns:1116jpn f:nonfoil')).toMatchObject({
-        set: ['SLD'], number: [{values: ['1116jpn'], strict: true}], finish: ['nonfoil'], names: ['plaguecrafter'],
+        set: ['SLD'], number: [{values: ['1116jpn'], strict: true}], finish: [['nonfoil']], names: ['plaguecrafter'],
     });
     // and it is not left sitting in the unsupported pile
     expect(p('cns:1116jpn').unsupported).toEqual([]);
@@ -56,20 +56,20 @@ test('collector numbers with letters need cn:', () => {
 });
 
 test('finish aliases normalize', () => {
-    expect(p('f:foil').finish).toEqual(['foil']);
-    expect(p('f:f').finish).toEqual(['foil']);
-    expect(p('f:nf').finish).toEqual(['nonfoil']);
-    expect(p('f:nonfoil').finish).toEqual(['nonfoil']);
-    expect(p('f:e').finish).toEqual(['etched']);
-    expect(p('f:etched').finish).toEqual(['etched']);
+    expect(p('f:foil').finish).toEqual([['foil']]);
+    expect(p('f:f').finish).toEqual([['foil']]);
+    expect(p('f:nf').finish).toEqual([['nonfoil']]);
+    expect(p('f:nonfoil').finish).toEqual([['nonfoil']]);
+    expect(p('f:e').finish).toEqual([['etched']]);
+    expect(p('f:etched').finish).toEqual([['etched']]);
 });
 
 // A game's own finish is taken where the catalog names it, folded the way
 // the catalog spells it; anything else stays unsupported.
 test('a finish the catalog names is read', () => {
     const finishes = [{value: 'rainbowfoil', label: 'Rainbow Foil'}];
-    expect(p('f:foil').finish).toEqual(['foil']);
-    expect(Q.parse('f:Rainbow-Foil', finishes).finish).toEqual(['rainbowfoil']);
+    expect(p('f:foil').finish).toEqual([['foil']]);
+    expect(Q.parse('f:Rainbow-Foil', finishes).finish).toEqual([['rainbowfoil']]);
     expect(Q.parse('f:galaxy', finishes).unsupported).toEqual(['f:galaxy']);
     expect(p('f:rainbowfoil').unsupported).toEqual(['f:rainbowfoil']);
 });
@@ -78,7 +78,7 @@ test('a finish the catalog names is read', () => {
 // reaches the cards that list it, as f:galaxy reaches galaxy foils online.
 test('a short form the catalog files is read', () => {
     const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
-    expect(Q.parse('f:galaxy', finishes)).toMatchObject({finish: ['galaxy'], unsupported: []});
+    expect(Q.parse('f:galaxy', finishes)).toMatchObject({finish: [['galaxy']], unsupported: []});
     expect(Q.parse('f:surge', finishes).unsupported).toEqual(['f:surge']);
 });
 
@@ -87,7 +87,7 @@ test('a short form the catalog files is read', () => {
 test('comma lists name any of their values', () => {
     const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
     expect(Q.parse('s:mh2,MH3 f:foil,galaxy', finishes)).toMatchObject({
-        set: ['MH2', 'MH3'], finish: ['foil', 'galaxy'], unsupported: [],
+        set: ['MH2', 'MH3'], finish: [['foil', 'galaxy']], unsupported: [],
     });
     expect(Q.parse('f:foil,surge', finishes)).toMatchObject({finish: [], unsupported: ['f:foil,surge']});
 });
@@ -351,6 +351,29 @@ test('number ranges, comparisons and set scopes keep what online keeps', async (
     expect(await uuids('boseiju cn>119', withNumber('u-mh2-1', 'OP01-120', '120'))).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
     expect(await uuids('boseiju cn>100', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
     expect(await uuids('boseiju cn<500', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-neo-1', 'u-neo-1f']);
+});
+
+// Online files each f: token as a filter of its own and keeps a card every
+// one of them reaches, so f:foil f:galaxy is the galaxy foils. Within one
+// token any value is enough.
+test('every f: token holds', async () => {
+    const finishes = [{value: 'galaxyfoil', aliases: ['galaxy']}];
+    expect(Q.parse('f:foil f:galaxy', finishes).finish).toEqual([['foil'], ['galaxy']]);
+
+    const env = fakeEnv();
+    const getCard = env.getCard;
+    env.getCard = async function (uuid) {
+        const card = await getCard(uuid);
+        return card && card.uuid.indexOf('u-neo-1') === 0 ? {...card, fin: ['galaxyfoil', 'galaxy']} : card;
+    };
+    const uuids = async query => {
+        Q.resetCaches();
+        const out = await Q.execute(Q.parse(query, finishes), env);
+        return out.results.map(r => r.uuid).sort();
+    };
+    expect(await uuids('boseiju f:galaxy')).toEqual(['u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju f:foil f:galaxy')).toEqual(['u-neo-1f']);
+    expect(await uuids('boseiju f:foil,nonfoil f:galaxy')).toEqual(['u-neo-1', 'u-neo-1f']);
 });
 
 test('negated filters drop what they name', async () => {
