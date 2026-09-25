@@ -2137,7 +2137,7 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 		// A short form reaches the Magic treatment it stands for: f:galaxy
 		// is f:galaxyfoil
 		expanded, known := isKnownPromo[value]
-		if known && slices.Contains(altFoilTags, expanded) && co.HasPromoType(expanded) {
+		if known && co.HasPromoType(expanded) && slices.Contains(altFoilTags, expanded) {
 			return false
 		}
 	}
@@ -2165,7 +2165,8 @@ func finishReaches(co *mtgmatcher.CardObject, name string) bool {
 	if found && finish.Run != "" && mtgmatcher.PromoTypeSlug(finish.Run) == name {
 		return true
 	}
-	return slices.Contains(altFoilTags, name) && co.HasPromoType(name)
+	// The card first: most printings carry no promo type at all
+	return co.HasPromoType(name) && slices.Contains(altFoilTags, name)
 }
 
 // finishNames are the names finishReaches accepts for the printing, for the
