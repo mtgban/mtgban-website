@@ -75,6 +75,14 @@ test('a finish the catalog names is read', () => {
     expect(p('f:rainbowfoil').unsupported).toEqual(['f:rainbowfoil']);
 });
 
+// A short form is read where the catalog files it under a treatment, and
+// reaches the cards that list it, as f:galaxy reaches galaxy foils online.
+test('a short form the catalog files is read', () => {
+    const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
+    expect(Q.parse('f:galaxy', finishes)).toMatchObject({finish: 'galaxy', unsupported: []});
+    expect(Q.parse('f:surge', finishes).unsupported).toEqual(['f:surge']);
+});
+
 test('rarity aliases normalize', () => {
     expect(p('r:c').rarity).toBe('common');
     expect(p('r:uncommon').rarity).toBe('uncommon');
@@ -186,6 +194,19 @@ test('a game finish reaches only the printings that carry it', async () => {
     };
     const finishes = [{value: 'rainbowfoil', label: 'Rainbow Foil'}];
     const out = await Q.execute(Q.parse('boseiju f:rainbowfoil', finishes), env);
+    expect(out.results.map(r => r.uuid)).toEqual(['u-neo-1f']);
+});
+
+test('a short form reaches only the cards that list it', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const getCard = env.getCard;
+    env.getCard = async function (uuid) {
+        const card = await getCard(uuid);
+        return card && card.uuid === 'u-neo-1f' ? {...card, fin: ['galaxyfoil', 'galaxy']} : card;
+    };
+    const finishes = [{value: 'galaxyfoil', label: 'Galaxy Foil', aliases: ['galaxy']}];
+    const out = await Q.execute(Q.parse('boseiju f:galaxy', finishes), env);
     expect(out.results.map(r => r.uuid)).toEqual(['u-neo-1f']);
 });
 

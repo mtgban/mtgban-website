@@ -30,11 +30,15 @@
     }
 
     // parse reads a query. finishes is the catalog's finish list: a game's own
-    // finish is taken where the catalog names it, spelled the way it is stored.
+    // finish, or a short form of one, is taken where the catalog names it,
+    // spelled the way it is stored. A card lists the short forms that reach
+    // it, so one is matched as itself.
     function parse(str, finishes) {
         var known = {};
         (finishes || []).forEach(function (finish) {
-            if (finish && finish.value) known[finish.value] = true;
+            if (!finish || !finish.value) return;
+            known[finish.value] = true;
+            (finish.aliases || []).forEach(function (alias) { known[alias] = true; });
         });
         var out = {names: [], set: '', number: '', finish: '', rarity: '', unsupported: []};
         var tokens = tokenize(String(str || ''));
