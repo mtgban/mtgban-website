@@ -61,6 +61,10 @@ A roster still renders its whole span inline: its select starts on "All",
 so narrowing it would mean reading six months and then immediately
 fetching the rest. Narrowing rosters belongs in their default range.
 
+A window with no prices in it renders the whole span instead. A retired
+printing, or a product no longer priced, has history only further back,
+and hiding its chart would also hide the select that widens it.
+
 ## Still open
 
 - 28 empty future partitions are scanned by every query against `prices`.

@@ -1248,6 +1248,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, target: target})
 			}
 			series := fetchRosterPrices(r.Context(), resolved, lb)
+			// An empty window hides the chart and the select that could widen it,
+			// so a card whose prices all predate the window reads the ceiling.
+			if lb.Days() < maxDays && !slices.ContainsFunc(series, func(s chartSeries) bool { return len(s.Prices) > 0 }) {
+				lb, _ = chartWindow(sig, 0)
+				pageVars.ChartLoadedDays = lb.Days()
+				series = fetchRosterPrices(r.Context(), resolved, lb)
+			}
 
 			// Read each card once and take the axis from what came back: a
 			// roster used to cost two archive round-trips per card, and
