@@ -297,3 +297,34 @@ func TestContentsSubstringFallsBackToProductType(t *testing.T) {
 		t.Errorf("contents:%q (fallback) found %d cards, want at least the %d the exact product %q has", term, len(wide), len(exact), co.Name)
 	}
 }
+
+// container: answers with the products a card comes in, which a card-name
+// search never seeds as candidates. /sealed forces its own mode, so this asks
+// the way /search, the CSV export and the bot do.
+func TestContainerFindsTheProductsACardComesIn(t *testing.T) {
+	var card, product string
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
+		if err != nil || co.Sealed {
+			continue
+		}
+		for _, source := range cardobject2sources(co) {
+			_, err = backend().GetUUID(source)
+			if err == nil {
+				card, product = uuid, source
+				break
+			}
+		}
+		if card != "" {
+			break
+		}
+	}
+	if card == "" {
+		t.Skip("no datastore loaded, or no card in it comes in a product")
+	}
+
+	ids, err := searchAndFilter(parseSearchOptionsNG("container:"+card, nil, nil, nil))
+	if err != nil || !slices.Contains(ids, product) {
+		t.Errorf("container:%s did not find %s, a product it comes in: %d results, err %v", card, product, len(ids), err)
+	}
+}
