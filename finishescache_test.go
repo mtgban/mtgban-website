@@ -11,9 +11,10 @@ import (
 )
 
 type paletteFinish struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
-	Count int    `json:"count"`
+	Value   string   `json:"value"`
+	Label   string   `json:"label"`
+	Count   int      `json:"count"`
+	Aliases []string `json:"aliases"`
 }
 
 func fetchFinishes(t *testing.T) []paletteFinish {
@@ -100,6 +101,31 @@ func TestFinishesCacheUsesTheGamesSpelling(t *testing.T) {
 		return
 	}
 	t.Skip("this datastore has no doublerainbow printing")
+}
+
+// A short form is filed under the treatment it stands for, the way the promo
+// list carries its aliases, rather than listed a second time.
+func TestFinishesCacheFilesShortForms(t *testing.T) {
+	if len(backend().GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	paletteService.BuildFinishesCache()
+
+	found := false
+	for _, finish := range fetchFinishes(t) {
+		switch finish.Value {
+		case "galaxy":
+			t.Error("galaxy is listed on its own")
+		case "galaxyfoil":
+			found = true
+			if !slices.Contains(finish.Aliases, "galaxy") {
+				t.Errorf("galaxyfoil carries %v, want galaxy among them", finish.Aliases)
+			}
+		}
+	}
+	if !found {
+		t.Skip("this datastore has no galaxyfoil printing")
+	}
 }
 
 // Foil is capitalised throughout. The game's map spells fifteen treatments
