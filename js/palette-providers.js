@@ -117,14 +117,15 @@
         if (finishesMerged || finishesFetching) return finishesFetching;
         finishesFetching = fetch('/api/palette/finishes.json')
             .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-            .catch(offlineFinishes)
+            .catch(function () { return offlineMeta('catalogFinishes'); })
             .then(mergeFinishes, function () { mergeFinishes([]); });
         return finishesFetching;
     }
-    // Only a browser that turned offline mode on has a catalog to read
-    function offlineFinishes() {
-        if (!window.OfflineDB || !window.OfflineMode || !window.OfflineMode.enabled()) return [];
-        return window.OfflineDB.getMeta('catalogFinishes');
+    // offlineMeta is what the offline catalog stored under key. Only a
+    // browser that turned offline mode on has a catalog to read.
+    function offlineMeta(key) {
+        if (!window.OfflineDB || !window.OfflineMode || !window.OfflineMode.enabled()) return undefined;
+        return window.OfflineDB.getMeta(key);
     }
     function mergeFinishes(finishes) {
         finishesMerged = true;
@@ -482,7 +483,8 @@
         if (setsCache) return Promise.resolve(setsCache);
         if (setsCacheFetching) return setsCacheFetching;
         setsCacheFetching = fetch('/api/palette/sets.json')
-            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+            .catch(offlineSets)
             .then(function (data) {
                 setsCache = data || [];
                 setsCacheFetching = null;
@@ -496,6 +498,24 @@
                 return setsCache;
             });
         return setsCacheFetching;
+    }
+
+    // offlineSets is the offline catalog's set list, which it files by code,
+    // in the server's order: newest first, then by code.
+    function offlineSets() {
+        return Promise.resolve(offlineMeta('catalogSets')).then(function (catalog) {
+            var sets = Object.keys(catalog || {}).map(function (code) {
+                var set = catalog[code];
+                return { code: code, name: set.n, keyrune: set.k, released: set.d };
+            });
+            sets.sort(function (a, b) {
+                var da = a.released || '';
+                var db = b.released || '';
+                if (da !== db) return da < db ? 1 : -1;
+                return a.code < b.code ? -1 : 1;
+            });
+            return sets;
+        });
     }
 
     var setsProvider = {

@@ -64,6 +64,9 @@
             var val = tok.text.slice(colon + 1).replace(/^"|"$/g, '');
             switch (key) {
             case 's':
+            case 'e':
+            case 'set':
+            case 'edition':
                 out.set = val.toUpperCase();
                 break;
             /* Both spellings, one behaviour: the offline catalog stores the
