@@ -36,8 +36,14 @@ func TestQuantityPriorityRendersAsCountNotPrice(t *testing.T) {
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, quantityPriorityPage(mobile))
 
-		if !strings.Contains(out, "12") {
-			t.Errorf("mobile=%v: the quantity (12) is missing from the row", mobile)
+		// The slot itself: a bare "12" is on every page already, in the
+		// favicon link's sizes="120x120".
+		want := `<span class="cur">#</span><span class="amt">12</span>`
+		if mobile {
+			want = `<span class="m-vendor-price"># 12</span>`
+		}
+		if !strings.Contains(out, want) {
+			t.Errorf("mobile=%v: the price slot does not read %s", mobile, want)
 		}
 		if strings.Contains(out, "5.00") {
 			t.Errorf("mobile=%v: the price (5.00) rendered even though the vendor's unit is a count", mobile)
