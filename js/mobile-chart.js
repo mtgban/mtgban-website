@@ -71,9 +71,13 @@
         currentChart.update();
     }
 
+    function fetchChart(cardId, range) {
+        return fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + range)
+            .then(function(r) { return r.json(); });
+    }
+
     function prefetchFullRange(cardId, fullRange) {
-        prefetchPromise = fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + fullRange)
-            .then(function(r) { return r.json(); })
+        prefetchPromise = fetchChart(cardId, fullRange)
             .then(function(data) {
                 if (currentCardId !== cardId || !currentChart) return;
                 if (!data || !data.datasets) return;
@@ -353,8 +357,17 @@
         setRangePickerValue(initialRange);
 
         loadChartLibs(function() {
-            fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + initialRange)
-                .then(function(r) { return r.json(); })
+            var loaded = initialRange;
+            fetchChart(cardId, initialRange)
+                .then(function(data) {
+                    // An empty window may only mean the card's prices all predate
+                    // it, as a retired printing's do: ask for all the tier allows.
+                    if (currentCardId === cardId && data.datasets && !data.datasets.length && data.maxLookbackDays > initialRange) {
+                        loaded = data.maxLookbackDays;
+                        return fetchChart(cardId, loaded);
+                    }
+                    return data;
+                })
                 .then(function(data) {
                     if (currentCardId !== cardId) return;
                     loading.style.display = 'none';
@@ -379,9 +392,9 @@
                     }
 
                     renderChartLegend(data.datasets, currentChart);
-                    currentMaxLoaded = initialRange;
+                    currentMaxLoaded = loaded;
                     setRangePickerDisabled(false);
-                    if (data.maxLookbackDays && data.maxLookbackDays > initialRange) {
+                    if (data.maxLookbackDays && data.maxLookbackDays > loaded) {
                         prefetchFullRange(cardId, data.maxLookbackDays);
                     }
                 })
