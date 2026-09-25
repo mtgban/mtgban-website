@@ -116,6 +116,23 @@ describe('asking for the rows', () => {
         deliver(rowsMessage(opener));
         expect(submitted).toEqual([]);
     });
+
+    test('turned away with a list in hand, it shows only why', () => {
+        // The reader came from the extension to price a list, and what they
+        // need is the line saying how to get in - not a manual for the
+        // endpoint underneath it.
+        const {elements, sent} = loadHandoff({opener: {closed: false}, canUpload: false});
+
+        expect(elements['handoff-guide'].hidden).toBe(true);
+        expect(sent).toEqual([]);
+    });
+
+    test('turned away with nothing in hand, the guide stays up', () => {
+        // Opened by hand, which is somebody reading about the endpoint. The
+        // guide is public; that is who it is for.
+        const {elements} = loadHandoff({opener: null, canUpload: false});
+        expect(elements['handoff-guide'].hidden).toBe(false);
+    });
 });
 
 describe('taking the rows', () => {
