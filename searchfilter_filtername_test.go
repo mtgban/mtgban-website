@@ -41,6 +41,15 @@ func TestSetFilterNamesNothing(t *testing.T) {
 			}
 		})
 	}
+
+	// The parse asks it too: the words stay in the query rather than
+	// becoming an edition filter no printing is in.
+	config := parseSearchOptionsNG("S:P Little Knight", nil, nil, nil)
+	for _, filter := range config.CardFilters {
+		if filter.Name == "edition" {
+			t.Errorf("S:P was read as an edition filter %v", filter.Values)
+		}
+	}
 }
 
 // A card whose name is filter syntax is reached by every route that names it.
