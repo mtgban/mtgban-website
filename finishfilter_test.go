@@ -103,33 +103,28 @@ func TestFinishFilterNormalizesTheQuery(t *testing.T) {
 	}
 }
 
-// A bare treatment name is registered as a spelling reaching the qualified
-// finish a product is actually sold under, and has to resolve to this printing
-// rather than merely be known to the card.
-func TestFinishFilterFollowsAnAlias(t *testing.T) {
-	co := finishCard("evo056_517297_unlrainbow", "unlrainbowfoil", true)
-	co.FoilUUIDs = map[string]string{
-		"unlrainbowfoil": "evo056_517297_unlrainbow",
-		"1srainbowfoil":  "evo056_517297_1erainbow",
-	}
-	co.FinishAliases = map[string]string{"rainbowfoil": "unlrainbowfoil"}
+// A treatment reaches every printing sold in it, whichever print run: f:
+// rainbowfoil finds a product whose only rainbow is the Unlimited printing,
+// while the run's own name still picks out that run alone.
+func TestFinishFilterMatchesTheTreatment(t *testing.T) {
+	unlimited := finishCard("evo056_517297_unlimitededitionrainbowfoil", "unlimitededitionrainbowfoil", true)
+	first := finishCard("evo056_517297_1steditionrainbowfoil", "1steditionrainbowfoil", true)
+	plain := finishCard("evo056_517297_unlimitededitionnormal", "unlimitededitionnormal", false)
 
-	if !matches("rainbowfoil", co) {
-		t.Error("f:rainbowfoil did not follow the alias to this printing")
+	if !matches("rainbowfoil", unlimited) || !matches("rainbowfoil", first) {
+		t.Error("f:rainbowfoil did not reach both runs' rainbow")
 	}
-
-	// The sibling knows the same alias, but it names the other printing.
-	other := finishCard("evo056_517297_1erainbow", "1srainbowfoil", true)
-	other.FoilUUIDs = co.FoilUUIDs
-	other.FinishAliases = co.FinishAliases
-	if matches("rainbowfoil", other) {
-		t.Error("f:rainbowfoil matched a printing the alias does not name")
+	if matches("rainbowfoil", plain) {
+		t.Error("f:rainbowfoil matched a plain printing")
+	}
+	if !matches("1steditionrainbowfoil", first) || matches("1steditionrainbowfoil", unlimited) {
+		t.Error("f:1steditionrainbowfoil did not pick out the first edition alone")
 	}
 }
 
-// Magic files its foil treatments as promo types, not finishes - its
-// CanonicalFinish answers with the three shared names and nothing else - so
-// the treatment has to be reached there or a galaxy foil is only ever f:foil.
+// Magic files its foil treatments as promo types, not finishes - its only
+// finishes are nonfoil, foil and etched - so the treatment has to be reached
+// there or a galaxy foil is only ever f:foil.
 func TestFinishFilterReachesMagicTreatments(t *testing.T) {
 	galaxy := finishCard("m-2_f", mtgmatcher.FinishFoil, true)
 	galaxy.PromoTypes = []string{"galaxyfoil"}

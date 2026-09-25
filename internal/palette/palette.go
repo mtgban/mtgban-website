@@ -272,9 +272,6 @@ func (s *Service) BuildFinishesCache() {
 		for name := range co.FoilUUIDs {
 			seen[name] = true
 		}
-		for name := range co.FinishAliases {
-			seen[name] = true
-		}
 
 		for name := range seen {
 			counts[name]++
