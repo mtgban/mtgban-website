@@ -104,7 +104,8 @@
     //
     // Foil, non-foil and etched are read off a printing's flags, so they stand
     // for every game. The loaded game's own finishes are fetched and appended
-    // the way the promo types join is:.
+    // the way the promo types join is:, and offline they come from the catalog
+    // the offline search reads.
     var finishOptions = [
         { value: 'foil', label: 'Foil', iconColor: '#d4af37' },
         { value: 'nonfoil', label: 'Non-foil', iconColor: '#888' },
@@ -115,10 +116,15 @@
     function ensureFinishes() {
         if (finishesMerged || finishesFetching) return finishesFetching;
         finishesFetching = fetch('/api/palette/finishes.json')
-            .then(function (r) { return r.ok ? r.json() : []; })
-            .then(function (data) { mergeFinishes(data); })
-            .catch(function () { mergeFinishes([]); });
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+            .catch(offlineFinishes)
+            .then(mergeFinishes, function () { mergeFinishes([]); });
         return finishesFetching;
+    }
+    // Only a browser that turned offline mode on has a catalog to read
+    function offlineFinishes() {
+        if (!window.OfflineDB || !window.OfflineMode || !window.OfflineMode.enabled()) return [];
+        return window.OfflineDB.getMeta('catalogFinishes');
     }
     function mergeFinishes(finishes) {
         finishesMerged = true;

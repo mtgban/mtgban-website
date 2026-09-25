@@ -147,7 +147,7 @@
             paintCount();
             return;
         }
-        var parsed = OfflineQuery.parse(q);
+        var parsed = OfflineQuery.parse(q, dicts.finishes);
         parsed.sealed = sealedMode;
         exec = await OfflineQuery.execute(parsed, env);
         paint();
