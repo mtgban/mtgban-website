@@ -250,7 +250,7 @@
         var picker = document.createElement('input');
         picker.type   = 'file';
         picker.name   = 'cardListFile';
-        picker.accept = '.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        picker.accept = '.csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         picker.addEventListener('change', function () {
             if (!picker.files || !picker.files[0]) return;
             appendUserStores(form);
