@@ -659,6 +659,29 @@ func TestHiddenStillHidesTheProgressLine(t *testing.T) {
 	}
 }
 
+// The buttons are anchors inside .legal, and main.css's `.legal a` outranks a
+// lone class: a rule naming only .handoff-btn loses its text colour to it,
+// which in the dark theme is near-white.
+func TestHandoffButtonsOutrankTheLegalLinkColour(t *testing.T) {
+	sheet, err := os.ReadFile("css/handoff.css")
+	if err != nil {
+		t.Fatalf("reading the stylesheet: %v", err)
+	}
+
+	rules := regexp.MustCompile(`(?m)^([^{}\n]*\.handoff-btn[^{}\n]*)\{`).FindAllStringSubmatch(string(sheet), -1)
+	if len(rules) == 0 {
+		t.Fatal("the stylesheet styles no handoff buttons")
+	}
+	for _, rule := range rules {
+		for _, selector := range strings.Split(rule[1], ",") {
+			selector = strings.TrimSpace(selector)
+			if !strings.HasPrefix(selector, ".handoff-locked ") {
+				t.Errorf("%q is outranked by .legal a", selector)
+			}
+		}
+	}
+}
+
 // TestHandoffClosesWhatItOpens pins that the page's own container closes.
 //
 // It did not: the guide arrived and took the closing tag of the div the

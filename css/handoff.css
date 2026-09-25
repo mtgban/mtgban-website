@@ -31,10 +31,10 @@
 /* The one link in the invitation, and the one thing it is asking for.
    It sits inside a sentence rather than on a button, so it needs both
    halves to read as a link at all: this page's anchors come out
-   near-white against near-white text and carry no underline. Patreon's
-   own red, the same one the log-in button wears. */
+   near-white against near-white text and carry no underline. The same
+   blue the log-in button wears. */
 .handoff-pitch a {
-    color: #ff424d;
+    color: var(--dodgerblue);
     text-decoration: underline;
     text-underline-offset: 3px;
 }
@@ -50,33 +50,35 @@
     margin-top: 18px;
 }
 
-/* Patreon's own colours, worn the way the landing page's login button
-   wears them. Light text on an accent fill needs a background token to
-   read against, and the one this page would use flips with the theme. */
-.handoff-btn {
+/* An invitation, so the site's primary blue - the one .cfg-primary wears -
+   rather than an alarm red. Scoped to outrank `.legal a`, whose colour was
+   taking over both buttons' text. */
+.handoff-locked .handoff-btn {
     padding: 8px 20px;
-    border: 1px solid rgba(255, 66, 77, 0.25);
+    border: 1px solid transparent;
     border-radius: var(--radius-sm);
-    background: rgba(255, 66, 77, 0.1);
-    color: #ff424d;
+    background: var(--dodgerblue);
+    color: #fff;
     font-weight: 600;
     text-decoration: none;
 }
 
-.handoff-btn:hover {
-    background: rgba(255, 66, 77, 0.2);
+.handoff-locked .handoff-btn:hover {
+    filter: brightness(1.1);
     text-decoration: none;
 }
 
-.handoff-btn-secondary {
+/* Normal text rather than dim: it is often the only button, and dim on
+   the dark card reads as disabled. */
+.handoff-locked .handoff-btn-secondary {
     background: transparent;
     border-color: var(--border-moderate);
-    color: var(--text-dim);
+    color: var(--normal);
 }
 
-.handoff-btn-secondary:hover {
+.handoff-locked .handoff-btn-secondary:hover {
     background: var(--bg-hover);
-    color: var(--normal);
+    filter: none;
 }
 
 /* ═══ The guide, which is what the page shows until a list arrives ═══ */
