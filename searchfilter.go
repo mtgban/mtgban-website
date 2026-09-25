@@ -2133,13 +2133,6 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 		if finishReaches(co, value) {
 			return false
 		}
-
-		// A short form reaches the Magic treatment it stands for: f:galaxy
-		// is f:galaxyfoil
-		expanded, known := isKnownPromo[value]
-		if known && co.HasPromoType(expanded) && slices.Contains(altFoilTags, expanded) {
-			return false
-		}
 	}
 	return true
 }
@@ -2152,8 +2145,9 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 //     product whose only rainbow is the Unlimited printing;
 //   - its print run with the treatment taken off, so f:unlimited reaches
 //     Unlimited Edition Rainbow Foil and Unlimited Holofoil alike;
-//   - a Magic foil treatment, which Magic files as a promo type. altFoilTags
-//     names the promo types that are foilings.
+//   - a Magic foil treatment, which Magic files as a promo type, or its short
+//     form: f:galaxy is f:galaxyfoil. altFoilTags names the promo types that
+//     are foilings.
 func finishReaches(co *mtgmatcher.CardObject, name string) bool {
 	if co.Finish != "" && name == co.Finish {
 		return true
@@ -2165,16 +2159,25 @@ func finishReaches(co *mtgmatcher.CardObject, name string) bool {
 	if found && finish.Run != "" && mtgmatcher.PromoTypeSlug(finish.Run) == name {
 		return true
 	}
+	expanded, known := isKnownPromo[name]
+	if known {
+		name = expanded
+	}
 	// The card first: most printings carry no promo type at all
 	return co.HasPromoType(name) && slices.Contains(altFoilTags, name)
 }
 
 // finishNames are the names finishReaches accepts for the printing, for the
 // finish list and the offline catalog, which list them rather than ask about
-// one. Each is one of the printing's own words, so these are all of them.
+// one. Each is one of the printing's own words or a short form of one, so
+// these are all of them.
 func finishNames(co *mtgmatcher.CardObject) []string {
 	finish, _ := mtgmatcher.FinishOf(co.Finish)
-	candidates := append([]string{co.Finish, finish.Treatment, mtgmatcher.PromoTypeSlug(finish.Run)}, co.PromoTypes...)
+	candidates := []string{co.Finish, finish.Treatment, mtgmatcher.PromoTypeSlug(finish.Run)}
+	for _, promoType := range co.PromoTypes {
+		candidates = append(candidates, promoType)
+		candidates = append(candidates, promoShortForms[promoType]...)
+	}
 	var names []string
 	for _, name := range candidates {
 		if name != "" && !slices.Contains(names, name) && finishReaches(co, name) {
@@ -2183,6 +2186,19 @@ func finishNames(co *mtgmatcher.CardObject) []string {
 	}
 	return names
 }
+
+// promoShortForms is isKnownPromo turned around: the short forms each promo
+// type answers to.
+var promoShortForms = func() map[string][]string {
+	out := map[string][]string{}
+	for short, promoType := range isKnownPromo {
+		out[promoType] = append(out[promoType], short)
+	}
+	for _, shorts := range out {
+		slices.Sort(shorts)
+	}
+	return out
+}()
 
 func cardFilterDate(filters []string, co *mtgmatcher.CardObject) bool {
 	return compareReleaseDate(filters, co, func(a, b time.Time) bool {

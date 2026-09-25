@@ -34,6 +34,13 @@ test('the game names its finishes after the three every game has', async () => {
     expect(await values(providers, 'f:')).toEqual(['foil', 'nonfoil', 'etched', 'rainbowfoil']);
 });
 
+test('a finish shows its short forms beside it', async () => {
+    const served = { '/api/palette/finishes.json': [{ value: 'galaxyfoil', label: 'Galaxy Foil', count: 3, aliases: ['galaxy'] }] };
+    const { providers } = load(served, {}, false);
+    await values(providers, 'f:');
+    expect(providers.getProvider('f:').getCandidates('galaxy')[0]).toMatchObject({ value: 'galaxyfoil', sublabel: 'galaxy' });
+});
+
 test('offline, the finishes come from the catalog', async () => {
     const { providers, opened } = load(null, { catalogFinishes: rainbow }, true);
     expect(await values(providers, 'f:')).toEqual(['foil', 'nonfoil', 'etched', 'rainbowfoil']);

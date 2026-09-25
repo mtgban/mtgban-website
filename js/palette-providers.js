@@ -136,7 +136,7 @@
             var finish = finishes[j];
             if (!finish || !finish.value || seen[finish.value]) continue;
             seen[finish.value] = true;
-            finishOptions.push({ value: finish.value, label: finish.label || finish.value });
+            finishOptions.push({ value: finish.value, label: finish.label || finish.value, sublabel: (finish.aliases || []).join(' ') });
         }
         fireOnDataReady();
     }

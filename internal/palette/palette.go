@@ -217,9 +217,10 @@ func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
 
 // Finish is one finish the loaded game prints, as the palette lists it.
 type Finish struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
-	Count int    `json:"count"`
+	Value   string   `json:"value"`
+	Label   string   `json:"label"`
+	Count   int      `json:"count"`
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 // BuildFinishesCache rebuilds the finish list from the loaded game. Called on
@@ -256,12 +257,32 @@ func (s *Service) FinishList() []Finish {
 		}
 	}
 
+	// A short form rides with the treatment it stands for, as the promo
+	// types carry theirs, rather than being listed a second time
+	var aliases map[string]string
+	if s.PromoAliases != nil {
+		aliases = s.PromoAliases()
+	}
+	shortForms := map[string][]string{}
+	for value := range counts {
+		target := aliases[value]
+		if target != "" && counts[target] > 0 {
+			shortForms[target] = append(shortForms[target], value)
+		}
+	}
+	for _, shorts := range shortForms {
+		for _, short := range shorts {
+			delete(counts, short)
+		}
+		sort.Strings(shorts)
+	}
+
 	for value, count := range counts {
 		label := value
 		if s.FinishLabel != nil {
 			label = s.FinishLabel(value)
 		}
-		finishes = append(finishes, Finish{Value: value, Label: label, Count: count})
+		finishes = append(finishes, Finish{Value: value, Label: label, Count: count, Aliases: shortForms[value]})
 	}
 	sort.Slice(finishes, func(i, j int) bool {
 		if finishes[i].Count != finishes[j].Count {
