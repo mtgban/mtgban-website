@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -160,6 +161,13 @@ func getChangelogEntries() ([]changelogEntry, error) {
 			return nil, err
 		}
 		if cachedChangelog.refreshing {
+			// Somebody is already asking Discord: answer with what is held,
+			// and wait only when there is nothing to answer with.
+			if len(cachedChangelog.entries) > 0 {
+				entries := cloneChangelogEntries(cachedChangelog.entries)
+				changelogCacheMu.Unlock()
+				return entries, nil
+			}
 			done := cachedChangelog.refreshDone
 			changelogCacheMu.Unlock()
 			<-done
@@ -171,7 +179,7 @@ func getChangelogEntries() ([]changelogEntry, error) {
 		done := cachedChangelog.refreshDone
 		changelogCacheMu.Unlock()
 
-		entries, err := fetchChangelogEntriesFunc()
+		entries, err := fetchChangelogSafely()
 
 		changelogCacheMu.Lock()
 		if err == nil {
@@ -195,6 +203,21 @@ func getChangelogEntries() ([]changelogEntry, error) {
 		}
 		return result, resultErr
 	}
+}
+
+// fetchChangelogSafely turns a panic in the fetch into an error: left to
+// unwind, it would leave refreshing set and every later visitor waiting.
+// It is reported the way recoverPanic would have, stack and all.
+func fetchChangelogSafely() (entries []changelogEntry, err error) {
+	defer func() {
+		p := recover()
+		if p != nil {
+			err = fmt.Errorf("fetching the changelog panicked: %v", p)
+			ServerNotify("panic", err.Error(), true)
+			ServerNotify("panic", string(debug.Stack()))
+		}
+	}()
+	return fetchChangelogEntriesFunc()
 }
 
 func fetchChangelogEntries() ([]changelogEntry, error) {
@@ -248,12 +271,33 @@ func listChangelogChannels() ([]*discordgo.Channel, error) {
 	return dg.GuildChannels(discordGuildID())
 }
 
+// ownMessage reports whether this bot wrote message.
+func ownMessage(message *discordgo.Message) bool {
+	if dg == nil || dg.State == nil || message.Author == nil {
+		return false
+	}
+	dg.State.RLock()
+	defer dg.State.RUnlock()
+	return dg.State.User != nil && message.Author.ID == dg.State.User.ID
+}
+
 func changelogEntryFromMessage(message *discordgo.Message, channelID string) (changelogEntry, bool) {
 	return changelogEntryFromMessageWithLabels(message, channelID, changelogMentionLabels{})
 }
 
 func changelogEntryFromMessageWithLabels(message *discordgo.Message, channelID string, mentionLabels changelogMentionLabels) (changelogEntry, bool) {
 	if message == nil {
+		return changelogEntry{}, false
+	}
+	// Announcements only: not Discord's notices, such as a thread's name,
+	// and not this bot's replies to a store link posted in one.
+	switch message.Type {
+	case discordgo.MessageTypeDefault, discordgo.MessageTypeReply,
+		discordgo.MessageTypeChatInputCommand, discordgo.MessageTypeContextMenuCommand:
+	default:
+		return changelogEntry{}, false
+	}
+	if ownMessage(message) {
 		return changelogEntry{}, false
 	}
 	if strings.TrimSpace(message.Content) == "" && len(message.Embeds) == 0 && len(message.Attachments) == 0 {
