@@ -991,9 +991,8 @@ var paletteService = &palette.Service{
 		return isKnownPromo
 	},
 	FinishLabel: finishListLabel,
-	FoilTreatments: func() []string {
-		return altFoilTags
-	},
+	FinishNames: finishNames,
+
 	Sellers: GetSellers,
 	Vendors: GetVendors,
 	NewspaperPages: func() []palette.NewspaperPage {

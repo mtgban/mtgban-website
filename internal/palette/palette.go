@@ -54,11 +54,9 @@ type Service struct {
 	// matcher stores one as a single lowercase word.
 	FinishLabel func(string) string
 
-	// FoilTreatments names the promo types that are a foiling rather than an
-	// occasion. Magic files its treatments there rather than as finishes, and
-	// nothing in the data marks which ones they are, so the list is curated by
-	// the caller - the same list the finish filter accepts.
-	FoilTreatments func() []string
+	// FinishNames are the names the finish filter reaches a printing by, so
+	// the list offers what f: accepts and nothing else.
+	FinishNames func(*mtgmatcher.CardObject) []string
 
 	// The lists each endpoint serves, built on datastore load and read on
 	// every request.
@@ -226,54 +224,38 @@ type Finish struct {
 
 // BuildFinishesCache rebuilds the finish list from the loaded game. Called on
 // datastore load, beside the promos cache.
+func (s *Service) BuildFinishesCache() {
+	data, err := json.Marshal(s.FinishList())
+	if err != nil {
+		return
+	}
+	s.finishesCache.Store(&data)
+}
+
+// FinishList is every name the finish filter reaches the loaded game's
+// printings by, commonest first, each with how many printings it reaches.
 //
 // Read off the printings rather than from a table, because the vocabulary is
 // the game's: Lorcana prints cold foil and holofoil, Flesh and Blood rainbow
 // and cold, Yu-Gi-Oh prices print runs, and a game added tomorrow brings its
-// own. Every place a finish name can sit is collected - the name the printing
-// carries, the keys of the finishes it is sold in, and the spellings those
-// answer to - so the list is what the filter accepts rather than a second
-// answer to the same question.
-//
-// The foil treatments come from the caller, since Magic keeps them as promo
-// types and nothing in the data says which promo types are foilings.
-func (s *Service) BuildFinishesCache() {
-	backend := s.backend()
-	treatments := map[string]bool{}
-	if s.FoilTreatments != nil {
-		for _, treatment := range s.FoilTreatments() {
-			treatments[treatment] = true
-		}
+// own.
+func (s *Service) FinishList() []Finish {
+	finishes := []Finish{}
+	if s.FinishNames == nil {
+		return finishes
 	}
-
-	// One pass over the printings, as the promos cache does, counting how many
-	// wear each name so the commonest can lead.
+	backend := s.backend()
 	counts := map[string]int{}
 	for _, uuid := range backend.GetUUIDs() {
 		co, err := backend.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
-
-		seen := map[string]bool{}
-		for _, name := range co.PromoTypes {
-			if treatments[name] {
-				seen[name] = true
-			}
-		}
-		if co.Finish != "" {
-			seen[co.Finish] = true
-		}
-		for name := range co.FoilUUIDs {
-			seen[name] = true
-		}
-
-		for name := range seen {
+		for _, name := range s.FinishNames(co) {
 			counts[name]++
 		}
 	}
 
-	finishes := []Finish{}
 	for value, count := range counts {
 		label := value
 		if s.FinishLabel != nil {
@@ -287,12 +269,7 @@ func (s *Service) BuildFinishesCache() {
 		}
 		return finishes[i].Value < finishes[j].Value
 	})
-
-	data, err := json.Marshal(finishes)
-	if err != nil {
-		return
-	}
-	s.finishesCache.Store(&data)
+	return finishes
 }
 
 // Finishes returns the loaded game's finishes.
