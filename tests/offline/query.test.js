@@ -128,6 +128,18 @@ test('number ranges and set scopes read as online', () => {
     expect(p('cn:1-50 cn:MKM:42').number).toHaveLength(2);
 });
 
+// cn> and cn< compare as online does, against the first number given. cns
+// takes no comparison online, and a colon wins the split, so neither
+// cns>300 nor cn>MKM:300 is one.
+test('number comparisons read as online', () => {
+    expect(p('cn>300').number).toMatchObject([{compare: '>', bound: 300}]);
+    expect(p('number<10,20').number).toMatchObject([{compare: '<', bound: 10}]);
+    expect(p('cn<1-50').number).toMatchObject([{range: [1, 50], compare: null}]);
+    expect(p('cns>300').unsupported).toEqual(['cns>300']);
+    expect(p('cn>MKM:300').unsupported).toEqual(['cn>MKM:300']);
+    expect(p('r>rare').unsupported).toEqual(['r>rare']);
+});
+
 test('unknown operator values are unsupported', () => {
     expect(p('f:gilded').unsupported).toEqual(['f:gilded']);
 });
@@ -293,7 +305,7 @@ test('rarity and number lists keep a card any value reaches', async () => {
 // A range reads the plain number the catalog carries where the printed one
 // reads differently (OP01-120 reads 120, not 1), and a number with none is in
 // no range. A set scope leaves every card outside its sets alone.
-test('number ranges and set scopes keep what online keeps', async () => {
+test('number ranges, comparisons and set scopes keep what online keeps', async () => {
     const withNumber = (uuid, num, pn) => {
         const env = fakeEnv();
         const getCard = env.getCard;
@@ -317,6 +329,15 @@ test('number ranges and set scopes keep what online keeps', async () => {
     expect(await uuids('boseiju cn:1-500', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-neo-1', 'u-neo-1f']);
     expect(await uuids('boseiju cn:NEO:1')).toEqual(['u-mh2-1']);
     expect(await uuids('boseiju cn:NEO:100-200')).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+
+    // A comparison counts its bound, reads the plain number, and keeps a
+    // number with no digits above every bound, as online
+    expect(await uuids('boseiju cn>100')).toEqual(['u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju cn>177')).toEqual(['u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju cn<12')).toEqual(['u-mh2-1']);
+    expect(await uuids('boseiju cn>119', withNumber('u-mh2-1', 'OP01-120', '120'))).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju cn>100', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+    expect(await uuids('boseiju cn<500', withNumber('u-mh2-1', 'P-001', ''))).toEqual(['u-neo-1', 'u-neo-1f']);
 });
 
 test('results carry payload slices', async () => {

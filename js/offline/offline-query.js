@@ -63,12 +63,25 @@
                 }
                 continue;
             }
-            if (colon <= 0) {
+            // Split where online does: at the first colon, else the first <,
+            // else the first >
+            var at = colon !== -1 ? colon : tok.text.indexOf('<');
+            if (at === -1) at = tok.text.indexOf('>');
+            if (at <= 0) {
                 out.unsupported.push(tok.text);
                 continue;
             }
-            var key = tok.text.slice(0, colon).toLowerCase();
-            var val = tok.text.slice(colon + 1).replace(/^"|"$/g, '');
+            var key = tok.text.slice(0, at).toLowerCase();
+            var val = tok.text.slice(at + 1).replace(/^"|"$/g, '');
+            if (at !== colon) {
+                // Online compares cn: and number: this way (FilterOperations)
+                if (key === 'cn' || key === 'number') {
+                    out.number.push(readNumber(val, false, tok.text.charAt(at)));
+                } else {
+                    out.unsupported.push(tok.text);
+                }
+                continue;
+            }
             switch (key) {
             case 's':
             case 'e':
@@ -124,10 +137,10 @@
 
     // readNumber reads cn:, cns: and number: as online does: a set list
     // before a colon scopes the number to those sets, two plain numbers
-    // around a dash in ascending order are a range, and anything else is a
-    // comma list of numbers.
-    function readNumber(val, strict) {
-        var filter = {sets: [], strict: strict, values: [], range: null};
+    // around a dash in ascending order are a range, a > or < compares against
+    // the first number given, and anything else is a comma list of numbers.
+    function readNumber(val, strict, op) {
+        var filter = {sets: [], strict: strict, values: [], range: null, compare: null, bound: 0};
         var code = val;
         if (code.indexOf(':') !== -1) {
             var parts = code.split(':');
@@ -137,6 +150,9 @@
         var ends = code.split('-');
         if (ends.length > 1 && INTEGER.test(ends[0]) && INTEGER.test(ends[1]) && parseInt(ends[0], 10) < parseInt(ends[1], 10)) {
             filter.range = [parseInt(ends[0], 10), parseInt(ends[1], 10)];
+        } else if (op === '>' || op === '<') {
+            filter.compare = op;
+            filter.bound = numberValue(code.toLowerCase().split(',')[0]);
         } else {
             filter.values = code.toLowerCase().split(',');
         }
@@ -165,6 +181,10 @@
             var value = numberValue(plain);
             return filter.range[0] <= value && value <= filter.range[1];
         }
+        // Both ends count, as online's compareCollectorNumber skips only a
+        // number past the bound
+        if (filter.compare === '>') return numberValue(plain) >= filter.bound;
+        if (filter.compare === '<') return numberValue(plain) <= filter.bound;
         return filter.values.indexOf(printed) !== -1 || (!filter.strict && filter.values.indexOf(plain) !== -1);
     }
 
