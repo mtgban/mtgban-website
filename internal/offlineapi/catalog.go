@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
 type catalogCard struct {
@@ -25,6 +26,7 @@ type catalogCard struct {
 	Sealed   bool     `json:"s,omitempty"`
 	Products []string `json:"p,omitempty"`
 	Image    string   `json:"i,omitempty"`
+	Finishes []string `json:"fin,omitempty"`
 }
 
 // imageKey is the key the mirror filed this card's image under, and so what
@@ -109,11 +111,12 @@ type catalogCache struct {
 // when it is replaced, while the store list changes with every scraper
 // reload - and a reload is what asks for a refresh.
 type catalogFragments struct {
-	source time.Time
-	cards  []byte
-	sets   []byte
-	nCards int
-	nSets  int
+	source   time.Time
+	cards    []byte
+	finishes []byte
+	sets     []byte
+	nCards   int
+	nSets    int
 }
 
 // buildCatalogFragments marshals the cards and sets of the current
@@ -127,7 +130,18 @@ func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, er
 		if err != nil {
 			return
 		}
-		cards[uuid] = newCatalogCard(co, s.deps.CardObjectSources(co), magic)
+		card := newCatalogCard(co, s.deps.CardObjectSources(co), magic)
+		if s.deps.FinishNames != nil {
+			for _, name := range s.deps.FinishNames(co) {
+				// The Foil and Etched flags answer the names every game shares
+				switch name {
+				case mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+					continue
+				}
+				card.Finishes = append(card.Finishes, name)
+			}
+		}
+		cards[uuid] = card
 	}
 	for _, uuid := range backend.GetUUIDs() {
 		addCard(uuid)
@@ -157,7 +171,16 @@ func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, er
 		}
 	}
 
+	finishes := []palette.Finish{}
+	if s.deps.Finishes != nil {
+		finishes = s.deps.Finishes()
+	}
+
 	rawCards, err := json.Marshal(cards)
+	if err != nil {
+		return nil, err
+	}
+	rawFinishes, err := json.Marshal(finishes)
 	if err != nil {
 		return nil, err
 	}
@@ -167,11 +190,12 @@ func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, er
 	}
 
 	return &catalogFragments{
-		source: source,
-		cards:  rawCards,
-		sets:   rawSets,
-		nCards: len(cards),
-		nSets:  len(sets),
+		source:   source,
+		cards:    rawCards,
+		finishes: rawFinishes,
+		sets:     rawSets,
+		nCards:   len(cards),
+		nSets:    len(sets),
 	}, nil
 }
 
@@ -240,12 +264,13 @@ func (s *Service) refreshCatalog() {
 	}
 
 	// The document these pieces make is what used to be marshalled whole,
-	// key order included: encoding/json sorts a map's keys, so cards, sets
-	// and stores come out in the order written here. Hashing the pieces
+	// key order included: encoding/json sorts a map's keys, so cards,
+	// finishes, sets and stores come out in the order written here. Hashing the pieces
 	// rather than a joined copy keeps the version the same as before for
 	// the same content, without building the whole 37MB again.
 	parts := [][]byte{
 		[]byte(`{"cards":`), frags.cards,
+		[]byte(`,"finishes":`), frags.finishes,
 		[]byte(`,"sets":`), frags.sets,
 		[]byte(`,"stores":`), rawStores,
 		[]byte(`}`),
