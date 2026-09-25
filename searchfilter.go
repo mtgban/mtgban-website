@@ -308,7 +308,7 @@ func fixupFinishNG(code string) []string {
 		// separators. That is what makes "Rainbow Foil", "rainbow-foil" and
 		// "rainbowfoil" one query, and it leaves the shared names alone -
 		// foil, etched, nonfoil and the short forms are already one word.
-		filters[i] = mtgmatcher.NormalizeFinish(filters[i])
+		filters[i] = mtgmatcher.PromoTypeSlug(filters[i])
 	}
 	return filters
 }
