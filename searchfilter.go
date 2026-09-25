@@ -2168,6 +2168,21 @@ func finishReaches(co *mtgmatcher.CardObject, name string) bool {
 	return slices.Contains(altFoilTags, name) && co.HasPromoType(name)
 }
 
+// finishNames are the names finishReaches accepts for the printing, for the
+// finish list and the offline catalog, which list them rather than ask about
+// one. Each is one of the printing's own words, so these are all of them.
+func finishNames(co *mtgmatcher.CardObject) []string {
+	finish, _ := mtgmatcher.FinishOf(co.Finish)
+	candidates := append([]string{co.Finish, finish.Treatment, mtgmatcher.PromoTypeSlug(finish.Run)}, co.PromoTypes...)
+	var names []string
+	for _, name := range candidates {
+		if name != "" && !slices.Contains(names, name) && finishReaches(co, name) {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
 func cardFilterDate(filters []string, co *mtgmatcher.CardObject) bool {
 	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
 		return !a.Equal(b)
