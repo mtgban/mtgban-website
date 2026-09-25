@@ -22,6 +22,14 @@ test('set operator uppercases', () => {
     expect(r.names).toEqual(['ragavan']);
 });
 
+// The menu offers e: beside s:, and online both are the edition filter,
+// as are set: and edition:.
+test('every spelling of the set operator is read', () => {
+    for (const key of ['e', 'set', 'edition']) {
+        expect(p(key + ':mh2')).toMatchObject({set: 'MH2', unsupported: []});
+    }
+});
+
 test('cn operator and bare digits both set number', () => {
     expect(p('cn:123').number).toBe('123');
     expect(p('sol ring 4').number).toBe('4');
