@@ -31,8 +31,8 @@ test('every spelling of the set operator is read', () => {
 });
 
 test('cn operator and bare digits both set number', () => {
-    expect(p('cn:123').number).toBe('123');
-    expect(p('sol ring 4').number).toBe('4');
+    expect(p('cn:123').number).toEqual(['123']);
+    expect(p('sol ring 4').number).toEqual(['4']);
     expect(p('sol ring 4').names).toEqual(['sol', 'ring']);
 });
 
@@ -41,10 +41,10 @@ test('cn operator and bare digits both set number', () => {
 // The offline catalog already stores that number and compares it exactly, so
 // the two spellings mean the same thing here.
 test('cns is read the same way cn is', () => {
-    expect(p('cns:1116jpn').number).toBe('1116jpn');
-    expect(p('cns:123').number).toBe('123');
+    expect(p('cns:1116jpn').number).toEqual(['1116jpn']);
+    expect(p('cns:123').number).toEqual(['123']);
     expect(p('plaguecrafter s:sld cns:1116jpn f:nonfoil')).toMatchObject({
-        set: ['SLD'], number: '1116jpn', finish: ['nonfoil'], names: ['plaguecrafter'],
+        set: ['SLD'], number: ['1116jpn'], finish: ['nonfoil'], names: ['plaguecrafter'],
     });
     // and it is not left sitting in the unsupported pile
     expect(p('cns:1116jpn').unsupported).toEqual([]);
@@ -52,7 +52,7 @@ test('cns is read the same way cn is', () => {
 
 test('collector numbers with letters need cn:', () => {
     const r = p('cn:234a');
-    expect(r.number).toBe('234a');
+    expect(r.number).toEqual(['234a']);
     expect(p('234a').names).toEqual(['234a']);
 });
 
@@ -94,15 +94,30 @@ test('comma lists name any of their values', () => {
 });
 
 test('rarity aliases normalize', () => {
-    expect(p('r:c').rarity).toBe('common');
-    expect(p('r:uncommon').rarity).toBe('uncommon');
-    expect(p('r:r').rarity).toBe('rare');
-    expect(p('r:m').rarity).toBe('mythic');
+    expect(p('r:c').rarity).toEqual(['common']);
+    expect(p('r:uncommon').rarity).toEqual(['uncommon']);
+    expect(p('r:r').rarity).toEqual(['rare']);
+    expect(p('r:m').rarity).toEqual(['mythic']);
+});
+
+// r: reads as it does online: a comma list, each value one of its short
+// forms or a rarity as the catalog writes it.
+test('rarity lists and short forms read as online', () => {
+    expect(p('r:s,t,o').rarity).toEqual(['special', 'token', 'oversize']);
+    expect(p('r:rare,M').rarity).toEqual(['rare', 'mythic']);
+    expect(p('r:special')).toMatchObject({rarity: ['special'], unsupported: []});
+    expect(p('r:bonus')).toMatchObject({rarity: ['bonus'], unsupported: []});
+});
+
+// cn:, cns: and number: take lists too, compared without case as online
+// compares them.
+test('number lists read as online', () => {
+    expect(p('cn:1,2A').number).toEqual(['1', '2a']);
+    expect(p('number:OP01-001').number).toEqual(['op01-001']);
 });
 
 test('unknown operator values are unsupported', () => {
     expect(p('f:gilded').unsupported).toEqual(['f:gilded']);
-    expect(p('r:special').unsupported).toEqual(['r:special']);
 });
 
 test('unknown keys are unsupported verbatim', () => {
@@ -116,7 +131,7 @@ test('quoted operator value', () => {
 });
 
 test('empty and whitespace input', () => {
-    expect(p('')).toEqual({names: [], set: [], number: '', finish: [], rarity: '', unsupported: []});
+    expect(p('')).toEqual({names: [], set: [], number: [], finish: [], rarity: [], unsupported: []});
     expect(p('   ').names).toEqual([]);
 });
 
@@ -137,9 +152,9 @@ test('unterminated quote degrades to plain tokens', () => {
 });
 
 test('remaining rarity and finish aliases', () => {
-    expect(p('r:common').rarity).toBe('common');
-    expect(p('r:u').rarity).toBe('uncommon');
-    expect(p('r:rare').rarity).toBe('rare');
+    expect(p('r:common').rarity).toEqual(['common']);
+    expect(p('r:u').rarity).toEqual(['uncommon']);
+    expect(p('r:rare').rarity).toEqual(['rare']);
     expect(p('f:premium').unsupported).toEqual(['f:premium']);
 });
 
@@ -240,6 +255,27 @@ test('a finish list keeps a card any of its finishes reaches', async () => {
     Q.resetCaches();
     out = await Q.execute(Q.parse('"boseiju reaches" f:nonfoil,foil'), fakeEnv());
     expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
+});
+
+test('rarity and number lists keep a card any value reaches', async () => {
+    Q.resetCaches();
+    let out = await Q.execute(Q.parse('boseiju r:mythic,rare'), fakeEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+
+    Q.resetCaches();
+    out = await Q.execute(Q.parse('boseiju cn:12,177'), fakeEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+
+    // A number the catalog prints in capitals is found typed either way
+    Q.resetCaches();
+    const env = fakeEnv();
+    const getCard = env.getCard;
+    env.getCard = async function (uuid) {
+        const card = await getCard(uuid);
+        return card && card.uuid === 'u-mh2-1' ? {...card, num: 'OP01-001'} : card;
+    };
+    out = await Q.execute(Q.parse('boseiju cn:op01-001'), env);
+    expect(out.results.map(r => r.uuid)).toEqual(['u-mh2-1']);
 });
 
 test('results carry payload slices', async () => {
