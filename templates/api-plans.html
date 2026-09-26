@@ -54,12 +54,19 @@
         <section class="api-section api-configurator" id="api-configure">
             <h2>{{if .Change}}Change your plan{{else}}Your plan{{end}}</h2>
             <fieldset class="api-fieldset" id="api-stores"{{if not .DefaultExplicit}} hidden{{end}}>
-                <legend>Stores <span class="api-legend-note">{{range $i, $s := .Products.ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included, your first store is on us, each additional is {{usd .ExtraStoreMonthly}}/month</span></legend>
+                <legend>Stores <span class="api-legend-note">{{if .ImpliedStores}}{{range $i, $s := .ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included, {{end}}your first store is on us, each additional is {{usd .ExtraStoreMonthly}}/month</span></legend>
+                {{if or .Stores .PaidStores}}
                 <div class="api-choices">
                     {{range $i, $s := .Stores}}
-                    <label class="api-choice"><input type="checkbox" name="stores" value="{{$s.Key}}"{{if eq $i 0}} checked{{end}}{{if not $.API.DefaultExplicit}} disabled{{end}}> {{$s.Name}}</label>
+                    <label class="api-choice"><input type="checkbox" name="stores" value="{{$s.Key}}"{{if $.API.WantedStores}}{{if slice_has $.API.WantedStores $s.Key}} checked{{end}}{{else if eq $i 0}} checked{{end}}{{if not $.API.DefaultExplicit}} disabled{{end}}> {{$s.Name}}</label>
+                    {{end}}
+                    {{range .PaidStores}}
+                    <label class="api-choice"><input type="checkbox" name="stores" value="{{.}}" checked{{if not $.API.DefaultExplicit}} disabled{{end}}> {{.}}</label>
                     {{end}}
                 </div>
+                {{else}}
+                <p class="api-note">No stores are loaded on this site right now.</p>
+                {{end}}
             </fieldset>
 
             <fieldset class="api-fieldset"{{if le (len .Games) 1}} hidden{{end}}>

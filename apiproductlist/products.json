@@ -67,28 +67,5 @@
     { "key": "quarterly", "interval": "month", "count": 3, "public": false }
   ],
   "included_games": 1,
-  "stores": [
-    {
-      "key": "TCG",
-      "name": "TCGplayer",
-      "implied": true,
-      "shorthands": ["TCGLow", "TCGDirectLow", "TCGMarket", "TCGMid", "TCGDirect", "TCGDirectNet", "TCGPlayer", "SYP"]
-    },
-    { "key": "CK", "name": "Card Kingdom", "shorthands": ["CK", "CKGraded", "CKBLLast"] },
-    { "key": "SCG", "name": "Star City Games", "shorthands": ["SCG"] },
-    { "key": "CSI", "name": "Cool Stuff Inc", "shorthands": ["CSI", "CSIUnique"] },
-    { "key": "ABU", "name": "ABU Games", "shorthands": ["ABU", "ABUGames", "ABUCredit", "ABUScans"] },
-    { "key": "MKM", "name": "Cardmarket", "shorthands": ["MKM", "MKMLow", "MKMTrend", "MKMPS"] },
-    { "key": "CT", "name": "Card Trader", "shorthands": ["CT", "CT0", "CT1DR"] },
-    { "key": "GN", "name": "Game Nerdz", "shorthands": ["GN"] },
-    { "key": "HA", "name": "Hareruya", "shorthands": ["HA"] },
-    { "key": "MMC", "name": "MTG Mint Card", "shorthands": ["MMC"] },
-    { "key": "MS", "name": "MTGSeattle", "shorthands": ["MS"] },
-    { "key": "MC", "name": "Magic Corner", "shorthands": ["MC"] },
-    { "key": "MP", "name": "Mana Pool", "shorthands": ["MP"] },
-    { "key": "ML", "name": "Manaleak", "shorthands": ["ML"] },
-    { "key": "SZ", "name": "Strike Zone", "shorthands": ["SZ"] },
-    { "key": "VS", "name": "Vegas Singles", "shorthands": ["VS"] },
-    { "key": "AF", "name": "Arcana Frisia", "shorthands": ["AF"] }
-  ]
+  "implied": { "key": "tcg", "name": "TCGplayer" }
 }

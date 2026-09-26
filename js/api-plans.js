@@ -103,12 +103,14 @@
             }
         }
         ['games', 'stores'].forEach(function (name) {
-            var wanted = params.getAll(name).join(',').split(',').filter(Boolean);
+            // The server resolves legacy store shorthands to family keys.
+            var wanted = name === 'stores' && data.storeKeys ? data.storeKeys : params.getAll(name).join(',').split(',');
+            wanted = wanted.map(function (w) { return w.trim().toLowerCase(); }).filter(Boolean);
             if (!wanted.length) return;
             var boxes = form.querySelectorAll('input[name="' + name + '"]');
             for (var i = 0; i < boxes.length; i++) {
                 if (boxes[i].disabled) continue;
-                boxes[i].checked = wanted.indexOf(boxes[i].value) !== -1;
+                boxes[i].checked = wanted.indexOf(boxes[i].value.toLowerCase()) !== -1;
             }
         });
     }

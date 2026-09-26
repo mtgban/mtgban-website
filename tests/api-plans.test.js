@@ -86,13 +86,13 @@ function fakeCard(radio) {
     };
 }
 
-function buildFakeForm(storesChecked, gameChecked) {
+function buildFakeForm(storesChecked, gameChecked, search, storeKeys) {
     storesChecked = storesChecked || [true, true];
     if (gameChecked === undefined) gameChecked = true;
     const packages = fakeRadioGroup('package', ['starter', 'all_data']);
     const ctas = [fakeCta('starter', 'Choose Starter'), fakeCta('all_data', 'Choose All Access')];
     const cards = [fakeCard(packages[0]), fakeCard(packages[1])];
-    const stores = [fakeInput('stores', 'CK', storesChecked[0]), fakeInput('stores', 'SCG', storesChecked[1])];
+    const stores = [fakeInput('stores', 'cardkingdom', storesChecked[0]), fakeInput('stores', 'starcitygames', storesChecked[1])];
     const games = [fakeInput('games', 'magic', gameChecked)];
     const intervals = [fakeInput('interval', 'monthly', true)];
     const all = packages.concat(stores, games, intervals);
@@ -143,8 +143,9 @@ function buildFakeForm(storesChecked, gameChecked) {
             addons: {extra_store: 15000, extra_game: 15000},
             intervals: [{key: 'monthly', count: 1}],
             includedGames: 1,
+            storeKeys: storeKeys,
         },
-        location: {search: ''},
+        location: {search: search || ''},
     };
 
     // Running the source also fires the initial update() synchronously.
@@ -219,4 +220,26 @@ test('the total row names the selected package', () => {
     ctas[1].click();
 
     expect(totalPackage.textContent).toBe('All Access');
+});
+
+test('a change link prefills the store boxes from comma-joined family keys', () => {
+    const joined = buildFakeForm([false, false], true, '?change=1&package=starter&stores=cardkingdom,starcitygames');
+    expect(joined.stores[0].checked).toBe(true);
+    expect(joined.stores[1].checked).toBe(true);
+
+    const one = buildFakeForm([true, false], true, '?change=1&package=starter&stores=starcitygames');
+    expect(one.stores[0].checked).toBe(false);
+    expect(one.stores[1].checked).toBe(true);
+});
+
+test('store prefill matches family keys whatever their case', () => {
+    const {stores} = buildFakeForm([false, false], true, '?change=1&package=starter&stores=CardKingdom,STARCITYGAMES');
+    expect(stores[0].checked).toBe(true);
+    expect(stores[1].checked).toBe(true);
+});
+
+test('store prefill prefers the keys the server resolved from legacy shorthands', () => {
+    const {stores} = buildFakeForm([false, true], true, '?change=1&package=starter&stores=CK', ['cardkingdom']);
+    expect(stores[0].checked).toBe(true);
+    expect(stores[1].checked).toBe(false);
 });
