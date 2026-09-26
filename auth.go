@@ -750,7 +750,15 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 		}
 		ServerNotify("panic", msg, true)
 		ServerNotify("panic", string(buf))
-		ServerNotify("panic", "source request: "+r.URL.String())
+
+		// A sig in the query is a working credential, so mask it
+		u := *r.URL
+		query := u.Query()
+		if query.Has("sig") {
+			query.Set("sig", "REDACTED")
+		}
+		u.RawQuery = query.Encode()
+		ServerNotify("panic", "source request: "+u.String())
 
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
