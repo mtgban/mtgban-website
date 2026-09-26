@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -237,7 +238,7 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "box"},
 		}, nil
 	}
-	screenerClassify = func(uuid string) (screenerMeta, bool) {
+	screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) {
 		switch uuid {
 		case "bad":
 			return screenerMeta{}, false
@@ -248,7 +249,7 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 		}
 	}
 
-	rows, err := cachedMovers(context.Background(), 2, 30, 5, 0)
+	rows, err := cachedMovers(context.Background(), backend(), 2, 30, 5, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,17 +281,17 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCache = map[string]screenerCacheEntry{}
 	screenerCacheMu.Unlock()
 
-	screenerClassify = func(uuid string) (screenerMeta, bool) { return screenerMeta{}, true }
+	screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) { return screenerMeta{}, true }
 	screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
 		calls[screenerCacheKey(metric, window, minPrice, minPriorPrice)]++
 		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil
 	}
 
 	// First call fetches, second is served from cache.
-	if _, err := cachedMovers(context.Background(), 2, 30, 5, 0); err != nil {
+	if _, err := cachedMovers(context.Background(), backend(), 2, 30, 5, 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cachedMovers(context.Background(), 2, 30, 5, 0); err != nil {
+	if _, err := cachedMovers(context.Background(), backend(), 2, 30, 5, 0); err != nil {
 		t.Fatal(err)
 	}
 	if calls[screenerCacheKey(2, 30, 5, 0)] != 1 {
@@ -298,7 +299,7 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	}
 
 	// A different current floor is a distinct cache key.
-	if _, err := cachedMovers(context.Background(), 2, 30, 10, 0); err != nil {
+	if _, err := cachedMovers(context.Background(), backend(), 2, 30, 10, 0); err != nil {
 		t.Fatal(err)
 	}
 	if calls[screenerCacheKey(2, 30, 10, 0)] != 1 {
@@ -306,7 +307,7 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	}
 
 	// A different prior floor is also a distinct cache key.
-	if _, err := cachedMovers(context.Background(), 2, 30, 5, 100); err != nil {
+	if _, err := cachedMovers(context.Background(), backend(), 2, 30, 5, 100); err != nil {
 		t.Fatal(err)
 	}
 	if calls[screenerCacheKey(2, 30, 5, 100)] != 1 {
@@ -315,7 +316,7 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 
 	// Fill past the cap with distinct keys; the map must stay bounded.
 	for w := 0; w < screenerCacheMax+5; w++ {
-		if _, err := cachedMovers(context.Background(), 99, w, 5, 0); err != nil {
+		if _, err := cachedMovers(context.Background(), backend(), 99, w, 5, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -332,13 +333,13 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 // row is about.
 func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	// Magic rows pass through untouched
-	uuid, isFoil, ok := moverCardID(timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true})
+	uuid, isFoil, ok := moverCardID(backend(), timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true})
 	if !ok || uuid != "abc" || !isFoil {
 		t.Errorf("magic row = %q/%v/%v, want abc/true/true", uuid, isFoil, ok)
 	}
 
 	// A row with no identity at all resolves to nothing
-	if _, _, ok := moverCardID(timeseries.MoverRow{}); ok {
+	if _, _, ok := moverCardID(backend(), timeseries.MoverRow{}); ok {
 		t.Error("identity-less row should not resolve")
 	}
 
@@ -348,7 +349,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	}
 	pid, want, wantFoil := productInBothFinishes(t)
 
-	uuid, isFoil, ok = moverCardID(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"})
+	uuid, isFoil, ok = moverCardID(backend(), timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"})
 	if !ok || isFoil {
 		t.Fatalf("tcg row did not resolve: %q/%v/%v", uuid, isFoil, ok)
 	}
@@ -358,7 +359,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 
 	// A foil sub-type reaches a foil printing, and the finish comes from the
 	// printing that was resolved rather than from the sub-type's name.
-	foilUUID, isFoil, ok := moverCardID(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Foil"})
+	foilUUID, isFoil, ok := moverCardID(backend(), timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Foil"})
 	if !ok {
 		t.Fatal("foil sub-type did not resolve")
 	}
@@ -430,7 +431,7 @@ func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
 		<-release
 		return []timeseries.MoverRow{{MtgjsonUUID: "good", Current: 100, Prior: 50}}, nil
 	}
-	screenerClassify = func(uuid string) (screenerMeta, bool) {
+	screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) {
 		return screenerMeta{SetCode: "STX", Edition: "Strixhaven"}, true
 	}
 
@@ -440,7 +441,7 @@ func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
 	errs := make([]error, callers)
 	for i := range callers {
 		wg.Go(func() {
-			rows[i], errs[i] = cachedMovers(context.Background(), 2, 30, 5, 0)
+			rows[i], errs[i] = cachedMovers(context.Background(), backend(), 2, 30, 5, 0)
 		})
 	}
 

@@ -520,17 +520,17 @@ const (
 )
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
-func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[string][]ReprintEntry) {
-	uuids := backend().GetUUIDs()
+func getReprintsGlobal(b *mtgmatcher.Backend, tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[string][]ReprintEntry) {
+	uuids := b.GetUUIDs()
 
 	var names []string
 	listReprints := map[string][]ReprintEntry{}
 
 	dupes := map[string]struct{}{}
 	for _, uuid := range uuids {
-		co, _ := backend().GetUUID(uuid)
+		co, _ := b.GetUUID(uuid)
 
-		set, err := backend().GetSet(co.SetCode)
+		set, err := b.GetSet(co.SetCode)
 		if err != nil {
 			continue
 		}
@@ -544,7 +544,7 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		}
 
 		// Skip strange stuff
-		if co.IsReserved || backend().NameIsToken(co.Name) ||
+		if co.IsReserved || b.NameIsToken(co.Name) ||
 			co.BorderColor == "gold" || co.BorderColor == "silver" ||
 			co.Rarity == "oversize" ||
 			co.HasPromoType(magic.PromoTypePromoPack) ||
@@ -566,7 +566,7 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		dupes[scryfallID] = struct{}{}
 
 		// Load the date for the card
-		printDate, err := backend().CardReleaseDate(co.UUID)
+		printDate, err := b.CardReleaseDate(co.UUID)
 		if err != nil {
 			continue
 		}
@@ -650,8 +650,8 @@ const (
 )
 
 // Check if it makes sense to keep two keep foil and nonfoil separate
-func combineFinish(setCode string) bool {
-	set, err := backend().GetSet(setCode)
+func combineFinish(b *mtgmatcher.Backend, setCode string) bool {
+	set, err := b.GetSet(setCode)
 	if err != nil {
 		return false
 	}
@@ -732,6 +732,7 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 }
 
 func runSealedAnalysis() {
+	b := backend()
 	log.Println("Running set analysis")
 
 	tcgInventory, _ := findSellerInventory("TCGLow")
@@ -740,13 +741,13 @@ func runSealedAnalysis() {
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
-	reprintsKeys, reprintsMap := getReprintsGlobal(tcgInventory, tcgMarket)
+	reprintsKeys, reprintsMap := getReprintsGlobal(b, tcgInventory, tcgMarket)
 	reprintsPtr.Store(&reprintsSnapshot{Keys: reprintsKeys, Map: reprintsMap})
 
 	infos := map[string]mtgban.InventoryRecord{}
 
-	runRawSetValue(infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	for label, record := range buylistMetrics("CK", map[string]buylistReducer{
+	runRawSetValue(b, infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
+	for label, record := range buylistMetrics(b, "CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
 		"highest": highestBuylistPrice,
 		"goodP90": goodBuylistPrice,
@@ -831,7 +832,7 @@ func hotlistReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
 // one aggregate query covers the whole 90-day window, then every card runs
 // through every reducer. The result is keyed by the same labels passed in.
-func buylistMetrics(store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
+func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
 	bl, err := findVendorBuylist(store)
 	if err != nil {
 		return nil
@@ -897,12 +898,12 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 
 	for cardID, entries := range bl {
 		// Skip cards too recent to have a meaningful 90-day window
-		cardDate, err := backend().CardReleaseDate(cardID)
+		cardDate, err := b.CardReleaseDate(cardID)
 		if err != nil || cardDate.After(threeMonthsAgo) {
 			continue
 		}
 
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -934,7 +935,7 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 	return out
 }
 
-func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
+func runRawSetValue(b *mtgmatcher.Backend, infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
 	inv := map[string]float64{}
 	invFoil := map[string]float64{}
 	invDirect := map[string]float64{}
@@ -946,10 +947,10 @@ func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDi
 	blDirectNet := map[string]float64{}
 	blDirectNetFoil := map[string]float64{}
 
-	uuids := backend().GetUUIDs()
+	uuids := b.GetUUIDs()
 
 	for _, uuid := range uuids {
-		co, _ := backend().GetUUID(uuid)
+		co, _ := b.GetUUID(uuid)
 
 		// Skip sets that are not well tracked upstream
 		if co.SetCode == "PMEI" || co.BorderColor == "gold" {
@@ -957,7 +958,7 @@ func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDi
 		}
 
 		// Determine whether to keep prices separated or combine them
-		useFoil := co.Foil && !combineFinish(co.SetCode)
+		useFoil := co.Foil && !combineFinish(b, co.SetCode)
 
 		var blPrice float64
 		entriesBl, found := ckBuylist[uuid]

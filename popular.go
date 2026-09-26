@@ -42,7 +42,7 @@ var (
 // thumbnail, reusing the regular search pipeline. The result is cached and
 // rebuilt whenever the configured queries change (e.g. after a config
 // reload) or while the datastore is still loading.
-func getPopularSearches() []PopularSearch {
+func getPopularSearches(ds *datastore) []PopularSearch {
 	cfg := Config.PopularSearches
 
 	popularSearchesMu.Lock()
@@ -62,15 +62,15 @@ func getPopularSearches() []PopularSearch {
 	var out []PopularSearch
 	usedImages := make(map[string]struct{})
 	for _, q := range cfg {
-		config := parseSearchOptionsNG(q.Query, nil, nil, nil)
-		uuids, err := searchAndFilter(config)
+		config := parseSearchOptionsNG(ds.backend, q.Query, nil, nil, nil)
+		uuids, err := searchAndFilter(ds, config)
 		if err != nil || len(uuids) == 0 {
 			continue
 		}
 		// searchAndFilter doesn't apply sort:retail (that needs live
 		// prices), so sort here and take the top-retail card as the tile.
 		if config.SortMode == "retail" {
-			sortData := resolveSortingData(uuids)
+			sortData := resolveSortingData(ds.backend, uuids)
 			prices := resolveBestPrices(uuids, defaultSellerPriorityOpt, price4seller)
 			sort.Slice(uuids, func(i, j int) bool {
 				priceI, priceJ := prices[uuids[i]], prices[uuids[j]]
@@ -85,12 +85,12 @@ func getPopularSearches() []PopularSearch {
 		// thumbnail; fall back to the query's results when unresolved or when
 		// its images are already used by another tile.
 		if q.Card != "" {
-			if ids, err := searchAndFilter(parseSearchOptionsNG(q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
+			if ids, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
 				candidateIDs = append(append([]string{}, ids...), uuids...)
 			}
 		}
 		card, ok := firstUnusedPopularCard(candidateIDs, usedImages, func(id string) GenericCard {
-			return uuid2card(id, true, false, false)
+			return uuid2card(ds.backend, id, true, false, false)
 		})
 		if !ok {
 			continue

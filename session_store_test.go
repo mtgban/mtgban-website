@@ -55,7 +55,7 @@ func TestFromEntriesSplitsSealedFromSinglesWithRealCards(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 	sealed := backend().GetSealedUUIDs()[0]
-	single := randomUUID(false)
+	single := randomUUID(backend(), false)
 	entries := []UploadEntry{
 		{CardID: sealed, OriginalPrice: 100},
 		{CardID: single, OriginalPrice: 1},
@@ -100,7 +100,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 		return entries
 	}
 
-	report, err := Sessions.Publish(sessionstore.Retail, sessionInfo("ZZS"), rows(3))
+	report, err := Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), rows(3))
 	if err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
@@ -115,7 +115,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 		t.Error("ZZS is not registered as a session store")
 	}
 
-	_, err = Sessions.Publish(sessionstore.Retail, sessionInfo("ZZS"), rows(1))
+	_, err = Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), rows(1))
 	if err != nil {
 		t.Fatalf("publishing again: %s", err)
 	}
@@ -125,7 +125,7 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 	}
 
 	// The same shorthand on the other side is its own store
-	_, err = Sessions.Publish(sessionstore.Buylist, sessionInfo("ZZS"), rows(2))
+	_, err = Sessions.Publish(backend(), sessionstore.Buylist, sessionInfo("ZZS"), rows(2))
 	if err != nil {
 		t.Fatalf("publishing the buylist: %s", err)
 	}
@@ -187,7 +187,7 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 		{sessionstore.Buylist, "CK"},
 		{sessionstore.Retail, "ZZREAL"},
 	} {
-		_, err := Sessions.Publish(tt.kind, sessionInfo(tt.shorthand), rows)
+		_, err := Sessions.Publish(backend(), tt.kind, sessionInfo(tt.shorthand), rows)
 		if err == nil {
 			t.Errorf("%s/%s published over a real store", tt.kind, tt.shorthand)
 		}
@@ -202,7 +202,7 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 
 	// The buylist side of ZZREAL is free: nothing serves it and nothing
 	// configures it
-	_, err = Sessions.Publish(sessionstore.Buylist, sessionInfo("ZZREAL"), rows)
+	_, err = Sessions.Publish(backend(), sessionstore.Buylist, sessionInfo("ZZREAL"), rows)
 	if err != nil {
 		t.Errorf("the free side of a shorthand refused: %s", err)
 	}
@@ -224,7 +224,7 @@ func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 	Config.ScraperConfig.Config = map[string]map[string][]string{}
 	rows := []UploadEntry{{CardID: "uuid-a", OriginalPrice: 1}}
 
-	_, err := Sessions.Publish(sessionstore.Retail, sessionInfo("ZZS"), rows)
+	_, err := Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), rows)
 	if err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
@@ -236,7 +236,7 @@ func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 	if err == nil {
 		t.Error("removed a store the config now claims")
 	}
-	_, err = Sessions.Publish(sessionstore.Retail, sessionInfo("ZZS"), rows)
+	_, err = Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), rows)
 	if err == nil {
 		t.Error("published over a store the config now claims")
 	}
@@ -302,7 +302,7 @@ func TestAdminRemovesASessionStore(t *testing.T) {
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
 	DevMode, SigCheck = true, false
 
-	_, err := Sessions.Publish(sessionstore.Retail, sessionInfo("ZZS"), []UploadEntry{{CardID: "uuid-a", OriginalPrice: 1}})
+	_, err := Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), []UploadEntry{{CardID: "uuid-a", OriginalPrice: 1}})
 	if err != nil {
 		t.Fatalf("publishing: %s", err)
 	}

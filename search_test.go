@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 		os.Exit(m.Run())
 	}
 
-	uuid := randomUUID(false)
+	uuid := randomUUID(backend(), false)
 	co, err := backend().GetUUID(uuid)
 	if err != nil {
 		log.Fatalln(err)
@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 }
 
 func parseSearchOptionsWrapper(input string) SearchConfig {
-	return parseSearchOptionsNG(input, nil, nil, nil)
+	return parseSearchOptionsNG(backend(), input, nil, nil, nil)
 }
 
 // datastoreLoaded reports whether the mtgmatcher card datastore is available,
@@ -78,7 +78,7 @@ func TestAttemptMatchVariantIncludesFoil(t *testing.T) {
 	}
 
 	const query = "Meren of Clan Nel Toth (Borderless)"
-	uuids, err := attemptMatch(query)
+	uuids, err := attemptMatch(backend(), query)
 	if err != nil {
 		t.Fatalf("attemptMatch(%q): %v", query, err)
 	}
@@ -118,7 +118,7 @@ func BenchmarkSearchExact(b *testing.B) {
 	}
 
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -127,7 +127,7 @@ func BenchmarkSearchPrefix(b *testing.B) {
 	config := parseSearchOptionsWrapper(fmt.Sprintf("%s sm:prefix", NameToBeFound))
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -137,7 +137,7 @@ func BenchmarkSearchAllFromEdition(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -147,7 +147,7 @@ func BenchmarkSearchWithEdition(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -157,7 +157,7 @@ func BenchmarkSearchWithNumber(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -167,7 +167,7 @@ func BenchmarkSearchWithEditionPrefix(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -180,7 +180,7 @@ func BenchmarkSearchOnlyRetail(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -193,7 +193,7 @@ func BenchmarkSearchOnlyBuylist(b *testing.B) {
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
+		allKeys, _ := searchAndFilter(currentDatastore(), config)
 		searchParallelNG(allKeys, config)
 	}
 }
@@ -210,8 +210,8 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 		t.Skip("no exact card named Serra in this datastore")
 	}
 
-	config := parseSearchOptionsNG("s:leb serra", nil, nil, nil)
-	results, err := searchAndFilter(config)
+	config := parseSearchOptionsNG(backend(), "s:leb serra", nil, nil, nil)
+	results, err := searchAndFilter(currentDatastore(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,8 +229,8 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 	}
 
 	// Bare exact query: only the exact matches, no widening
-	config = parseSearchOptionsNG("serra", nil, nil, nil)
-	results, err = searchAndFilter(config)
+	config = parseSearchOptionsNG(backend(), "serra", nil, nil, nil)
+	results, err = searchAndFilter(currentDatastore(), config)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -31,7 +31,7 @@ func BenchmarkSortSets(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
-		sortData := resolveSortingData(keys)
+		sortData := resolveSortingData(backend(), keys)
 		sort.Slice(keys, func(i, j int) bool {
 			return cmpSets(sortData[keys[i]], sortData[keys[j]])
 		})
@@ -43,7 +43,7 @@ func BenchmarkSortSetsAlphabetical(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
-		sortData := resolveSortingData(keys)
+		sortData := resolveSortingData(backend(), keys)
 		sort.Slice(keys, func(i, j int) bool {
 			return cmpSetsAlphabetical(sortData[keys[i]], sortData[keys[j]])
 		})
@@ -55,7 +55,7 @@ func BenchmarkSortSetsAlphabeticalSet(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
-		sortData := resolveSortingData(keys)
+		sortData := resolveSortingData(backend(), keys)
 		sort.Slice(keys, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[keys[i]], sortData[keys[j]])
 		})
@@ -67,7 +67,7 @@ func BenchmarkSortByNumberAndFinish(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
-		sortData := resolveSortingData(keys)
+		sortData := resolveSortingData(backend(), keys)
 		sort.Slice(keys, func(i, j int) bool {
 			return cmpNumberAndFinish(sortData[keys[i]], sortData[keys[j]], false)
 		})
@@ -98,7 +98,7 @@ func BenchmarkSortSetsByRetail(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
-		sortData := resolveSortingData(keys)
+		sortData := resolveSortingData(backend(), keys)
 		prices := resolveBestPrices(keys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(keys, func(i, j int) bool {
 			priceI, priceJ := prices[keys[i]], prices[keys[j]]
@@ -152,7 +152,7 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
-		sortData := resolveSortingData(keys)
+		sortData := resolveSortingData(backend(), keys)
 		buyPrices := resolveBestPrices(keys, defaultVendorPriorityOpt, price4vendor)
 		retPrices := resolveBestPrices(keys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(keys, func(i, j int) bool {
@@ -184,11 +184,11 @@ func TestSortSetsDeterministic(t *testing.T) {
 	}
 
 	a := slices.Clone(uuids)
-	sort.SliceStable(a, func(i, j int) bool { return sortSets(a[i], a[j]) })
+	sort.SliceStable(a, func(i, j int) bool { return sortSets(backend(), a[i], a[j]) })
 
 	b := slices.Clone(uuids)
 	slices.Reverse(b)
-	sort.SliceStable(b, func(i, j int) bool { return sortSets(b[i], b[j]) })
+	sort.SliceStable(b, func(i, j int) bool { return sortSets(backend(), b[i], b[j]) })
 
 	// Compare as sets of positions: equal elements may tie, so require the
 	// comparator to consider adjacent out-of-order pairs equal rather than
@@ -197,7 +197,7 @@ func TestSortSetsDeterministic(t *testing.T) {
 		if a[i] == b[i] {
 			continue
 		}
-		if sortSets(a[i], b[i]) || sortSets(b[i], a[i]) {
+		if sortSets(backend(), a[i], b[i]) || sortSets(backend(), b[i], a[i]) {
 			t.Fatalf("order diverges at %d: %s vs %s", i, a[i], b[i])
 		}
 	}

@@ -10,6 +10,7 @@ import (
 )
 
 func Redirect(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	path := strings.TrimPrefix(r.URL.Path, "/go/")
 	fields := strings.Split(path, "/")
 
@@ -24,9 +25,9 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-		co, err := backend().GetUUID(hash)
+		co, err := b.GetUUID(hash)
 		if err != nil {
-			co, err = backend().GetUUID(externalUUID(hash))
+			co, err = b.GetUUID(externalUUID(b, hash))
 			if err != nil {
 				http.NotFound(w, r)
 				return
@@ -70,8 +71,8 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 }
 
 // printingsAt returns the cards a set files under a number, as printed.
-func printingsAt(set, number string) []mtgmatcher.Card {
-	edition, err := backend().GetSet(set)
+func printingsAt(b *mtgmatcher.Backend, set, number string) []mtgmatcher.Card {
+	edition, err := b.GetSet(set)
 	if err != nil {
 		return nil
 	}
@@ -115,13 +116,13 @@ func openingName(cards []mtgmatcher.Card) string {
 // word the search answers. A name answers to nothing: spelled the way finishes
 // are spelled, "another-round" is "anotherround", which no printing is sold
 // as.
-func namesFinish(cards []mtgmatcher.Card, word string) bool {
+func namesFinish(b *mtgmatcher.Backend, cards []mtgmatcher.Card, word string) bool {
 	values := fixupFinishNG(word)
 	for _, card := range cards {
 		// A set carries one card object per printing, in its plain finish;
 		// f:foil is answered by a sibling of that one rather than by it.
-		for _, id := range backend().FinishSiblings(card.UUID) {
-			co, err := backend().GetUUID(id)
+		for _, id := range b.FinishSiblings(card.UUID) {
+			co, err := b.GetUUID(id)
 			if err != nil {
 				continue
 			}
@@ -144,6 +145,7 @@ func namesFinish(cards []mtgmatcher.Card, word string) bool {
 //     on the whole family and bad set/number spellings fail as a search
 //   - match numbers with cns: (as-printed) so stars/daggers distinguish twins
 func CardRedirect(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	// Split the path as it was written rather than as it decodes, so a slash
 	// inside a part stays inside it: Flesh and Blood numbers a double-faced
 	// card WTR040//WTR039, which travels as %2F%2F and would otherwise arrive
@@ -177,12 +179,12 @@ func CardRedirect(w http.ResponseWriter, r *http.Request) {
 			number := fields[1]
 			query += " cns:" + number
 
-			cards := printingsAt(set, number)
+			cards := printingsAt(b, set, number)
 			name := openingName(cards)
 			if name != "" {
 				query = name + " " + query
 			}
-			if len(fields) > 2 && namesFinish(cards, fields[2]) {
+			if len(fields) > 2 && namesFinish(b, cards, fields[2]) {
 				query += " f:" + fields[2]
 			}
 		}
@@ -212,8 +214,8 @@ func sealedSlug(name string) string {
 }
 
 // sealedProductBySlug finds the product in a set that a slug names, or nil.
-func sealedProductBySlug(setCode, slug string) *mtgmatcher.SealedProduct {
-	set, err := backend().GetSet(strings.ToUpper(setCode))
+func sealedProductBySlug(b *mtgmatcher.Backend, setCode, slug string) *mtgmatcher.SealedProduct {
+	set, err := b.GetSet(strings.ToUpper(setCode))
 	if err != nil || slug == "" {
 		return nil
 	}
@@ -244,7 +246,7 @@ func SealedRedirect(w http.ResponseWriter, r *http.Request) {
 
 		if len(fields) > 1 && fields[1] != "" {
 			slug := fields[1]
-			product := sealedProductBySlug(set, slug)
+			product := sealedProductBySlug(backend(), set, slug)
 			if product != nil {
 				query = product.Name
 			} else {
@@ -264,7 +266,7 @@ func SealedRedirect(w http.ResponseWriter, r *http.Request) {
 }
 
 func RandomSearch(w http.ResponseWriter, r *http.Request) {
-	uuid := randomUUID(false)
+	uuid := randomUUID(backend(), false)
 
 	v := r.URL.Query()
 	v.Set("q", uuid)
@@ -275,7 +277,7 @@ func RandomSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
-	uuid := randomUUID(true)
+	uuid := randomUUID(backend(), true)
 
 	v := r.URL.Query()
 	v.Set("q", uuid)

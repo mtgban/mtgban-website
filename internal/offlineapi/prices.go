@@ -28,10 +28,13 @@ func (s *Service) enabledStores(r *http.Request) []string {
 	return out
 }
 
-// servePrices builds, watermarks, and streams one set's payload.
+// servePrices builds, watermarks, and streams one set's payload. Reads the
+// backend once, so the set code it resolves and the prices it builds from
+// come from the same load.
 func (s *Service) servePrices(w http.ResponseWriter, r *http.Request, email, rest string) {
+	b, _ := s.datastore()
 	setCode := strings.TrimSuffix(rest, ".bin")
-	canonCode, err := s.deps.CanonicalSetCode(setCode)
+	canonCode, err := s.deps.CanonicalSetCode(b, setCode)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -40,7 +43,7 @@ func (s *Service) servePrices(w http.ResponseWriter, r *http.Request, email, res
 
 	stores := s.enabledStores(r)
 
-	payload, err := s.deps.BuildSetPayload(setCode, stores)
+	payload, err := s.deps.BuildSetPayload(b, setCode, stores)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

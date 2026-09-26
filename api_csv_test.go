@@ -66,7 +66,7 @@ func runPrice2CSV(t *testing.T, pm map[string]map[string]*BanPrice, uploaded []U
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	if err := SimplePrice2CSV(w, pm, uploaded, nil, false); err != nil {
+	if err := SimplePrice2CSV(backend(), w, pm, uploaded, nil, false); err != nil {
 		t.Fatalf("SimplePrice2CSV: %v", err)
 	}
 	w.Flush()
@@ -127,7 +127,7 @@ func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	if err := UUID2TCGCSV(w, ids, qtys, conds); err != nil {
+	if err := UUID2TCGCSV(backend(), w, ids, qtys, conds); err != nil {
 		t.Fatalf("UUID2TCGCSV: %v", err)
 	}
 	w.Flush()

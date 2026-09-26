@@ -16,9 +16,10 @@ type PriceResult struct {
 }
 
 func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	// During warmup every answer would be empty; a 503 makes clients retry
 	// later instead of caching blank prices and images for their tiles
-	if !dataReady() {
+	if !dataReady(b) {
 		w.Header().Set("Cache-Control", "no-store")
 		errorResponse(w, http.StatusServiceUnavailable, "not ready")
 		return
@@ -126,7 +127,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Prefer thumbnail for inline favorites/recents render; fall back to full.
-		if co, err := backend().GetUUID(cardID); err == nil {
+		if co, err := b.GetUUID(cardID); err == nil {
 			if img, ok := co.Images["thumbnail"]; ok && img != "" {
 				result.ImageURL = img
 			} else if img, ok := co.Images["full"]; ok {

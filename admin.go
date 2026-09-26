@@ -63,6 +63,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ds := currentDatastore()
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	page := r.FormValue("page")
@@ -72,7 +74,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	pageVars.LastUpdate = GetLastDatastoreUpdate()
+	pageVars.LastUpdate = ds.loadedAt
 	pageVars.LastNews = GetLastNewspaperUpdate()
 	pageVars.LastStash = GetLastStashUpdate()
 
@@ -480,7 +482,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		var parsed KeyOverrides
 		if err := json.Unmarshal([]byte(newOverrides), &parsed); err != nil {
 			pageVars.WarningMessage = "Key overrides JSON invalid: " + err.Error()
-		} else if bad := validateKeyOverrides(parsed); len(bad) > 0 {
+		} else if bad := validateKeyOverrides(b, parsed); len(bad) > 0 {
 			pageVars.WarningMessage = "Key overrides have unknown target UUIDs: " + strings.Join(bad, "; ")
 		} else {
 			// Reload every shorthand touched by either the old or new set, so
@@ -536,7 +538,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	// card and its same-name printings are resolved here from the in-memory card
 	// database and rendered straight into the page (no lookup endpoint). --
 	if wrong := r.FormValue("fixwrong"); wrong != "" {
-		if card, candidates := overrideFixCandidates(wrong); card != nil {
+		if card, candidates := overrideFixCandidates(b, wrong); card != nil {
 			pageVars.OverrideFixStore = r.FormValue("fixstore")
 			pageVars.OverrideFixKind = r.FormValue("fixkind")
 			pageVars.OverrideWrongCard = card

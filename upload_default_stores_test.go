@@ -44,11 +44,11 @@ func storesOfBothKinds(t *testing.T, kind string) (card, product string) {
 
 	sealed := sessionInfo("ZZT")
 	sealed.SealedMode = true
-	_, err := Sessions.Publish(kind, sessionInfo("ZZS"), []UploadEntry{{CardID: card, OriginalPrice: 1}})
+	_, err := Sessions.Publish(backend(), kind, sessionInfo("ZZS"), []UploadEntry{{CardID: card, OriginalPrice: 1}})
 	if err != nil {
 		t.Fatalf("publishing the singles store: %v", err)
 	}
-	_, err = Sessions.Publish(kind, sealed, []UploadEntry{{CardID: product, OriginalPrice: 1}})
+	_, err = Sessions.Publish(backend(), kind, sealed, []UploadEntry{{CardID: product, OriginalPrice: 1}})
 	if err != nil {
 		t.Fatalf("publishing the sealed store: %v", err)
 	}

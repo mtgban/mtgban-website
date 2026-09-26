@@ -70,7 +70,7 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 			t.Fatal(err)
 		}
 		query := loc.Query().Get("q")
-		keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 		if err != nil {
 			t.Fatal(err)
 		}

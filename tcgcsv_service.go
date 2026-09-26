@@ -78,10 +78,11 @@ func stashTCGCSVProducts() {
 // is why it is wired in here rather than living in tcgcsvd — the standalone
 // service has no datastore to match against.
 func logTCGProductMatchReport(categoryID int, products []timeseries.TCGProduct) {
+	b := backend()
 	var matched int
 	var sampleUnmatched []string
 	for _, p := range products {
-		if backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, strconv.Itoa(p.ProductID)) != "" {
+		if b.ConvertID(mtgmatcher.IDSpaceTCGplayer, strconv.Itoa(p.ProductID)) != "" {
 			matched++
 		} else if len(sampleUnmatched) < 3 {
 			sampleUnmatched = append(sampleUnmatched, fmt.Sprintf("%d %q", p.ProductID, p.Name))

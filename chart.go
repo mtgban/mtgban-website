@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -174,7 +175,7 @@ func chartLookback(sig string) timeseries.Lookback {
 // language=nil, lookback) result set, so we fetch HGetAll exactly once and
 // fan the rows out to every per-dataset render rather than firing N
 // identical SQL queries (and discarding 15/16 of each result).
-func getDatasets(ctx context.Context, cardID string, sealed bool, keys []string, lb timeseries.Lookback) []Dataset {
+func getDatasets(ctx context.Context, b *mtgmatcher.Backend, cardID string, sealed bool, keys []string, lb timeseries.Lookback) []Dataset {
 	if PricesArchiveDB == nil {
 		return nil
 	}
@@ -195,7 +196,7 @@ func getDatasets(ctx context.Context, cardID string, sealed bool, keys []string,
 		return nil
 	}
 
-	co, err := backend().GetUUID(cardID)
+	co, err := b.GetUUID(cardID)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -577,10 +578,10 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 // multi-card chart, plus the list of distinct reference names that have at
 // least one non-empty dataset. UUIDs that fail to resolve are skipped so a
 // single bad input doesn't take the whole chart down.
-func getDatasetsForMulti(ctx context.Context, cardIDs []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
+func getDatasetsForMulti(ctx context.Context, b *mtgmatcher.Backend, cardIDs []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
 	cards := make([]multiCardInput, 0, len(cardIDs))
 	for _, cardID := range cardIDs {
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -605,7 +606,7 @@ func getDatasetsForMulti(ctx context.Context, cardIDs []string, labels []string,
 		cards = append(cards, multiCardInput{
 			CardID:   cardID,
 			Name:     cardName,
-			Datasets: getDatasets(ctx, cardID, co.Sealed, labels, lb),
+			Datasets: getDatasets(ctx, b, cardID, co.Sealed, labels, lb),
 		})
 	}
 
@@ -680,6 +681,7 @@ func stashInTimeseries() {
 		return
 	}
 
+	b := backend()
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
 
@@ -713,7 +715,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				card, err := backend().GetUUID(id)
+				card, err := b.GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
 					continue
@@ -744,7 +746,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				card, err := backend().GetUUID(id)
+				card, err := b.GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
 					continue

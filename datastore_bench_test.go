@@ -64,7 +64,7 @@ func BenchmarkUUID2Card(b *testing.B) {
 	uuids := benchCards(b, 10000)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		uuid2card(uuids[i%len(uuids)], false, false, false)
+		uuid2card(backend(), uuids[i%len(uuids)], false, false, false)
 	}
 }
 
@@ -79,10 +79,10 @@ func BenchmarkSearchAndFilter(b *testing.B) {
 	}
 	for _, query := range []string{"r:mythic", "s:MH2", "cn>300"} {
 		b.Run(query, func(b *testing.B) {
-			config := parseSearchOptionsNG(query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				out, err := searchAndFilter(config)
+				out, err := searchAndFilter(currentDatastore(), config)
 				if err != nil {
 					b.Fatal(err)
 				}

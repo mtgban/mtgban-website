@@ -21,20 +21,22 @@ import (
 
 // Deps holds all main-package knowledge the service needs.
 type Deps struct {
-	// Backend returns the current card datastore.
-	Backend func() *mtgmatcher.Backend
+	// Datastore returns the current card datastore and when it was loaded,
+	// together: a catalog refresh reads this once so the cards it marshals
+	// and the source time it keys them on describe the same load.
+	Datastore func() (*mtgmatcher.Backend, time.Time)
 	// Allow authenticates a request and returns the caller's email.
 	Allow func(r *http.Request) (email string, ok bool)
 
 	// CanonicalSetCode returns the canonical (uppercased) set code for the
-	// given input. Returns an error if the set is unknown. Main provides this
-	// by wrapping mtgmatcher.GetSet; tests inject a fake so the package does
-	// not need the live datastore.
-	CanonicalSetCode func(setCode string) (string, error)
+	// given input, matched against b. Returns an error if the set is
+	// unknown. Main provides this by wrapping mtgmatcher.GetSet; tests
+	// inject a fake so the package does not need the live datastore.
+	CanonicalSetCode func(b *mtgmatcher.Backend, setCode string) (string, error)
 
 	// BuildSetPayload gathers and converts one set's prices for the given
-	// store subset (main owns BanPrice and the getters).
-	BuildSetPayload func(setCode string, stores []string) (*offline.SetPayload, error)
+	// store subset, matched against b (main owns BanPrice and the getters).
+	BuildSetPayload func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error)
 
 	// EnabledStores returns all non-blocklisted seller+vendor shorthands.
 	EnabledStores func() []string
@@ -47,9 +49,10 @@ type Deps struct {
 
 	// FinishNames are the names f: reaches a card by, and Finishes the list
 	// the palette offers them in. The catalog carries both, so f: and its
-	// menu work offline too.
+	// menu work offline too. Finishes takes the same backend the catalog
+	// refresh already read, rather than reading its own.
 	FinishNames func(co *mtgmatcher.CardObject) []string
-	Finishes    func() []palette.Finish
+	Finishes    func(b *mtgmatcher.Backend) []palette.Finish
 
 	// Game names the card game this deployment serves. It decides how image
 	// keys are derived, because Magic's mirror keys on the scryfall id while
@@ -75,20 +78,20 @@ type Deps struct {
 
 	RetailBlockList  func() []string
 	BuylistBlockList func() []string
-
-	// LastDatastoreUpdate reports when the card data was last replaced, so
-	// the catalog can reuse the half derived from it. Nil rebuilds every
-	// time, which is what a caller that does not track this would want.
-	LastDatastoreUpdate func() time.Time
 }
 
-func (s *Service) backend() *mtgmatcher.Backend {
-	if s.deps.Backend != nil {
-		if backend := s.deps.Backend(); backend != nil {
-			return backend
-		}
+// datastore reads the live backend and its load time together. A nil hook
+// or nil backend reads as an empty datastore, which never equals a later
+// real load, so it just rebuilds every time.
+func (s *Service) datastore() (*mtgmatcher.Backend, time.Time) {
+	if s.deps.Datastore == nil {
+		return &mtgmatcher.Backend{}, time.Time{}
 	}
-	return &mtgmatcher.Backend{}
+	b, t := s.deps.Datastore()
+	if b == nil {
+		return &mtgmatcher.Backend{}, time.Time{}
+	}
+	return b, t
 }
 
 // Service exposes the offline API endpoints and background refresh logic.

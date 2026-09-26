@@ -110,10 +110,10 @@ func TestPriceParityRetail(t *testing.T) {
 	seedParityScrapers(t, regular, foil)
 
 	cardIDs := []string{regular, foil}
-	config := parseSearchOptionsNG(regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 	found := searchSellersNG(cardIDs, config)
 
-	api := getSellerPrices("", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
+	api := getSellerPrices(backend(), "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: the search row per condition and the API conditions map must
 	// carry the same numbers.
@@ -178,7 +178,7 @@ func TestWalkRepeatedIds(t *testing.T) {
 	seedParityScrapers(t, regular, foil)
 
 	cardIDs := []string{regular, regular, regular, regular}
-	config := parseSearchOptionsNG(regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 
 	found := searchSellersNG(cardIDs, config)
 	for _, cond := range []string{"NM", "SP", "PO"} {
@@ -200,10 +200,10 @@ func TestPriceParityBuylist(t *testing.T) {
 	seedParityScrapers(t, regular, foil)
 
 	cardIDs := []string{regular}
-	config := parseSearchOptionsNG(regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 	found := searchVendorsNG(cardIDs, config)
 
-	api := getVendorPrices("", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
+	api := getVendorPrices(backend(), "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: raw buylist prices must match; the credit multiplier is a
 	// search-side display value layered on the same base number.
@@ -245,7 +245,7 @@ func TestSearchVendorsCarriesQuantityPriority(t *testing.T) {
 	}
 	vendorsPtr.Store(&vendors)
 
-	config := parseSearchOptionsNG(regular, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 	found := searchVendorsNG([]string{regular}, config)
 
 	var got bool
@@ -280,13 +280,13 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
 		foil:    {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitExpectedCount}}},
 	}
-	out := banPricesFromRows([]string{regular, foil}, found, "name", "shorthands", true, false, true)
+	out := banPricesFromRows(backend(), []string{regular, foil}, found, "name", "shorthands", true, false, true)
 
 	coRegular, err := backend().GetUUID(regular)
 	if err != nil {
 		t.Fatal(err)
 	}
-	idRegular := getIDFromMode("name", coRegular)
+	idRegular := getIDFromMode(backend(), "name", coRegular)
 	if got := out[idRegular]["FAKEIDX"].Qty; got != 12 {
 		t.Errorf("a want-count row summed to %v, want 12", got)
 	}
@@ -295,7 +295,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	idFoil := getIDFromMode("name", coFoil)
+	idFoil := getIDFromMode(backend(), "name", coFoil)
 	if got := out[idFoil]["FAKEIDX"].QtyFoil; got != 0 {
 		t.Errorf("an average-count row summed to %v, want 0 - it is not a want", got)
 	}
@@ -316,7 +316,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	stores := []string{"PARITYA", "PARITYIDX"}
 
 	// Funnel path (hash filter): finish=foil keeps only the foil printing
-	api := getSellerPrices("", stores, "", cardIDs, "foil", false, false, false, "")
+	api := getSellerPrices(backend(), "", stores, "", cardIDs, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil")
 	}
@@ -325,7 +325,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	}
 
 	// Full dump path: the same predicate through EntryRule.Finish
-	api = getSellerPrices("", stores, "", nil, "foil", false, false, false, "")
+	api = getSellerPrices(backend(), "", stores, "", nil, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil in a full dump")
 	}
@@ -340,11 +340,11 @@ func TestFinishPredicateParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if applyCardFilter("finish", []string{"nonfoil"}, coSealed) {
+	if applyCardFilter(backend(), "finish", []string{"nonfoil"}, coSealed) {
 		t.Error("finish(sealed, nonfoil) drops; want kept")
 	}
 	for _, finish := range []string{"foil", "etched"} {
-		if !applyCardFilter("finish", []string{finish}, coSealed) {
+		if !applyCardFilter(backend(), "finish", []string{finish}, coSealed) {
 			t.Errorf("finish(sealed, %s) keeps; want dropped", finish)
 		}
 	}
@@ -366,7 +366,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config := SearchConfig{StoreFilters: []FilterStoreElem{{
 		Name: "seller", Values: []string{"paritya"}, OnlyForSeller: true,
 	}}}
-	api := banPricesFromRows(cardIDs, searchSellersNG(cardIDs, config), "", "", true, true, false)
+	api := banPricesFromRows(backend(), cardIDs, searchSellersNG(cardIDs, config), "", "", true, true, false)
 	if _, found := api[regular]["PARITYIDX"]; found {
 		t.Error("seller filter should exclude PARITYIDX from the output")
 	}
@@ -379,7 +379,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config = SearchConfig{EntryFilters: []FilterEntryElem{{
 		Name: "condition", Values: []string{"NM"}, OnlyForVendor: true,
 	}}}
-	bl := banPricesFromRows(cardIDs, searchVendorsNG(cardIDs, config), "", "", true, true, true)
+	bl := banPricesFromRows(backend(), cardIDs, searchVendorsNG(cardIDs, config), "", "", true, true, true)
 	if got := bl[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
 		t.Errorf("conditions[NM] = %v, want 5", got)
 	}
@@ -429,10 +429,10 @@ func TestZeroPricedListings(t *testing.T) {
 	}
 
 	t.Run("funnel path", func(t *testing.T) {
-		check(t, getSellerPrices("", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
+		check(t, getSellerPrices(backend(), "", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
 	})
 	t.Run("full dump path", func(t *testing.T) {
-		check(t, getSellerPrices("", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
+		check(t, getSellerPrices(backend(), "", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
 	})
 }
 

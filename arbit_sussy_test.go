@@ -132,7 +132,7 @@ func renderReverse(t *testing.T, query string) string {
 	r := httptest.NewRequest("GET", "/reverse?"+query, nil)
 	w := httptest.NewRecorder()
 	pageVars := PageVars{ReverseMode: true, BetaNav: &NavElem{Short: "beta"}}
-	scraperCompare(w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(backend(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
 

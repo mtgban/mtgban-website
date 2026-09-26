@@ -333,6 +333,7 @@ type CardMetaResponse struct {
 // CardMeta returns metadata (printings, rarities, colors, types) for a card
 // name, used by the chip-based filter builder.
 func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 
@@ -349,7 +350,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 
 	resp := CardMetaResponse{Name: name}
 
-	printings, err := s.backend().Printings4Card(name)
+	printings, err := b.Printings4Card(name)
 	if err != nil || len(printings) == 0 {
 		json.NewEncoder(w).Encode(resp)
 		return
@@ -360,9 +361,9 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 	rarityMap := map[string]bool{}
 	colorMap := map[string]bool{}
 	typeMap := map[string]bool{}
-	uuids, _ := s.backend().SearchEquals(name)
+	uuids, _ := b.SearchEquals(name)
 	for _, uuid := range uuids {
-		co, err := s.backend().GetUUID(uuid)
+		co, err := b.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -603,6 +604,7 @@ type SealedMetaResponse struct {
 // Sealed reports availability of contents-mode and pack-pull-mode searches
 // for a sealed product, used by the palette to gate action rows.
 func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 
@@ -620,9 +622,9 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	resp := SealedMetaResponse{Name: name}
 
 	// Direct UUID lookup first; fall back to name resolution via the sealed-name index.
-	co, err := s.backend().GetUUID(name)
+	co, err := b.GetUUID(name)
 	if err != nil || co == nil {
-		co, err = s.backend().GetUUID(s.sealedname2uuid(name))
+		co, err = b.GetUUID(s.sealedname2uuid(b, name))
 		if err != nil || co == nil {
 			json.NewEncoder(w).Encode(resp)
 			return
@@ -640,10 +642,10 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	// hasContents and hasPicks both check actual data availability via mtgmatcher;
 	// a "found+sealed" product can still legitimately have neither (e.g., a Case that
 	// contains other sealed products but no decklist of its own).
-	if _, contentsErr := s.backend().GetDecklist(co.SetCode, co.UUID); contentsErr == nil {
+	if _, contentsErr := b.GetDecklist(co.SetCode, co.UUID); contentsErr == nil {
 		resp.HasContents = true
 	}
-	if _, picksErr := s.backend().GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
+	if _, picksErr := b.GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
 		resp.HasPicks = true
 	}
 
@@ -651,9 +653,9 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 }
 
 // sealedname2uuid resolves a sealed product name to its uuid, or "".
-func (s *Service) sealedname2uuid(name string) string {
+func (s *Service) sealedname2uuid(b *mtgmatcher.Backend, name string) string {
 	name = strings.TrimSpace(strings.Trim(name, "\""))
-	res, err := s.backend().SearchSealedEquals(name)
+	res, err := b.SearchSealedEquals(name)
 	if err != nil {
 		return ""
 	}

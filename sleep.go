@@ -61,6 +61,8 @@ var sleepersLanguages = []string{
 }
 
 func Sleepers(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Sleepers", sig)
@@ -116,7 +118,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
-	editions := GetEditions()
+	editions := ds.editions
 	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
 	pageVars.EditionsByCategory = editions.AllEditionsByCategory
 	pageVars.PickerID = "sleep-editions-picker"
@@ -139,7 +141,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "bulk":
 		pageVars.Subtitle = "Bulk me up"
 
-		tiers = getBulks(skipEditions)
+		tiers = getBulks(b, skipEditions)
 
 	case "reprint":
 		pageVars.Subtitle = "Long time no reprint"
@@ -148,19 +150,19 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "mismatch":
 		pageVars.Subtitle = "Market Mismatch"
 
-		tiers = getTiers(blocklistRetail, blocklistBuylist, skipEditions)
+		tiers = getTiers(b, blocklistRetail, blocklistBuylist, skipEditions)
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
 		ref, target := r.FormValue("ref"), r.FormValue("target")
-		tiers = getGap(blocklistRetail, ref, target, skipEditions)
+		tiers = getGap(b, blocklistRetail, ref, target, skipEditions)
 	case "hotlist":
 		pageVars.Subtitle = "Highest buylist growth"
 
-		tiers = getHotlist(skipEditions)
+		tiers = getHotlist(b, skipEditions)
 	}
 
-	sleepers, err := sleepersLayout(tiers)
+	sleepers, err := sleepersLayout(b, tiers)
 	if err != nil {
 		ServerNotify("sleep", "unable to generate sleepers: "+err.Error())
 
@@ -180,7 +182,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		for _, cardID := range cardIDs {
 			_, found := pageVars.Metadata[cardID]
 			if !found {
-				pageVars.Metadata[cardID] = uuid2card(cardID, true, false, preferFlavor)
+				pageVars.Metadata[cardID] = uuid2card(b, cardID, true, false, preferFlavor)
 			}
 		}
 	}
@@ -204,7 +206,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getBulks(skipEditions []string) map[string]int {
+func getBulks(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
 	inv, err := findSellerInventory("TCGLow")
 	if err != nil {
 		return nil
@@ -216,8 +218,8 @@ func getBulks(skipEditions []string) map[string]int {
 
 	tiers := map[string]int{}
 
-	for _, code := range backend().GetAllSets() {
-		set, err := backend().GetSet(code)
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
 		if err != nil || slices.Contains(skipEditions, set.Code) {
 			continue
 		}
@@ -240,8 +242,8 @@ func getBulks(skipEditions []string) map[string]int {
 		cardPrices := map[string]float64{}
 		var totalPrices float64
 		for _, card := range set.Cards {
-			uuid := backend().ConvertID(mtgmatcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
-			co, err := backend().GetUUID(uuid)
+			uuid := b.ConvertID(mtgmatcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
+			co, err := b.GetUUID(uuid)
 			if err != nil {
 				continue
 			}
@@ -292,7 +294,7 @@ func getBulks(skipEditions []string) map[string]int {
 	return tiers
 }
 
-func getHotlist(skipEditions []string) map[string]int {
+func getHotlist(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	bl, _ := findVendorBuylist("CK")
@@ -308,7 +310,7 @@ func getHotlist(skipEditions []string) map[string]int {
 			continue
 		}
 
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err != nil || slices.Contains(skipEditions, co.SetCode) {
 			continue
 		}
@@ -372,7 +374,7 @@ func getReprints(skipEditions []string) map[string]int {
 	return tiers
 }
 
-func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
+func getTiers(b *mtgmatcher.Backend, blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	sellersSnapshot := GetSellers()
@@ -429,7 +431,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 				continue
 			}
 
-			arbit := mtgban.Arbit(backend(), opts, vendor, seller)
+			arbit := mtgban.Arbit(b, opts, vendor, seller)
 
 			// Load the tiers
 			for i := range arbit {
@@ -438,7 +440,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 		}
 
 		if tcgSeller != nil {
-			mismatch := mtgban.Mismatch(backend(), opts, tcgSeller, seller)
+			mismatch := mtgban.Mismatch(b, opts, tcgSeller, seller)
 
 			// Load the tiers
 			for i := range mismatch {
@@ -450,7 +452,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 	return tiers
 }
 
-func getGap(blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
+func getGap(b *mtgmatcher.Backend, blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	log.Println("Sleepers comparing", ref, "with", target)
@@ -487,7 +489,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		OnlyLanguages: sleepersLanguages,
 	}
 
-	mismatch := mtgban.Mismatch(backend(), opts, referenceSeller, targetSeller)
+	mismatch := mtgban.Mismatch(b, opts, referenceSeller, targetSeller)
 
 	marketCheck, _ := findSellerInventory("TCGMarket")
 
@@ -495,7 +497,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 	for i := range mismatch {
 		cardID := mismatch[i].CardID
 
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -532,7 +534,7 @@ func noOversize(co *mtgmatcher.CardObject) (float64, bool) {
 }
 
 // Return a map of letter : []cardId from a map of cardId : amount
-func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
+func sleepersLayout(b *mtgmatcher.Backend, tiers map[string]int) (map[string][]string, error) {
 	results := []Sleeper{}
 	for c := range tiers {
 		if tiers[c] > 1 {
@@ -576,7 +578,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 		level := int(math.Floor(r*exp) + maxrange)
 
 		if DevMode {
-			cc, _ := backend().GetUUID(res.CardID)
+			cc, _ := b.GetUUID(res.CardID)
 			log.Println(level, res.Level, cc)
 		}
 

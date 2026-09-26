@@ -43,9 +43,9 @@ func TestCollectorNumberPlainForm(t *testing.T) {
 			co.Number = tt.number
 			co.PlainNumber = tt.original
 
-			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number")
-			skip := applyCardFilter("number", elem.Values, co)
+			skip := applyCardFilter(backend(), "number", elem.Values, co)
 			if skip == tt.want {
 				t.Errorf("%s against %q: matched=%v, want %v",
 					tt.query, tt.number, !skip, tt.want)
@@ -73,9 +73,9 @@ func TestCollectorNumberStrictIsVerbatim(t *testing.T) {
 			co.Number = tt.number
 			co.PlainNumber = tt.number
 
-			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number_strict")
-			skip := applyCardFilter("number_strict", elem.Values, co)
+			skip := applyCardFilter(backend(), "number_strict", elem.Values, co)
 			if skip == tt.want {
 				t.Errorf("%s against %q: matched=%v, want %v",
 					tt.query, tt.number, !skip, tt.want)
