@@ -28,7 +28,7 @@ import (
 // it lives in, the way mtgmatcher.ExternalUUID used to: the spaces in their
 // historical order, first hit wins.
 func externalUUID(id string) string {
-	for _, space := range []string{
+	for _, space := range []mtgmatcher.IDSpace{
 		mtgmatcher.IDSpaceMTGJSON,
 		mtgmatcher.IDSpaceScryfall,
 		mtgmatcher.IDSpaceTCGplayer,

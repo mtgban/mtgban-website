@@ -696,7 +696,7 @@ func bulkBuylist(co *mtgmatcher.CardObject) float64 {
 	default:
 		if co.IsPromo {
 			price = 0.05
-		} else if mtgmatcher.IsBasicLand(co.Name) {
+		} else if magic.IsBasicLand(co.Name) {
 			price = 0.01
 			if co.Foil {
 				price = 0.10

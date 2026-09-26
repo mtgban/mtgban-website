@@ -415,9 +415,10 @@ func fixupIDs(code string) []string {
 		// A "space:id" value names the id space to convert through - "tcg"
 		// for short, anything else as the matcher spells it - which is what
 		// reaches a space the spaceless walk must skip, like multiverse
-		space, id, qualified := strings.Cut(field, ":")
+		prefix, id, qualified := strings.Cut(field, ":")
 		if qualified {
-			if space == "tcg" {
+			space := mtgmatcher.IDSpace(prefix)
+			if prefix == "tcg" {
 				space = mtgmatcher.IDSpaceTCGplayer
 			}
 			uuid := backend().ConvertID(space, id)

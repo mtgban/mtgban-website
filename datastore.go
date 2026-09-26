@@ -30,7 +30,7 @@ func newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastore {
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
-		names:    newNamesSnapshot(b.Names("canonical", false), b.Names("canonical", true)),
+		names:    newNamesSnapshot(b.Names(mtgmatcher.NameFormCanonical, false), b.Names(mtgmatcher.NameFormCanonical, true)),
 		editions: newEditionsSnapshot(b),
 		palette:  paletteService.NewSnapshot(b),
 		loadedAt: loadedAt,
