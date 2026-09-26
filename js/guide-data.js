@@ -1096,7 +1096,7 @@ window.__BAN_GUIDE = {
             icon: 'globe',
             summary: 'Cross-store arbitrage at the index level - pick a reference index and see where else is cheaper.',
             snippets: [],
-            keywords: ['global', 'arbitrage', 'index', 'reference', 'card kingdom', 'star city games', 'tcg market', 'CT zero', 'TCG direct', 'TCG low', 'EV', 'sealed', 'spread', 'profit', 'difference', 'yield', 'bucks', 'SYP', 'stocks', 'legit', 'cross-store'],
+            keywords: ['global', 'arbitrage', 'index', 'reference', 'card kingdom', 'star city games', 'tcg market', 'CT zero', 'TCG direct', 'TCG low', 'EV', 'sealed', 'spread', 'profit', 'difference', 'yield', 'bucks', 'SYP', 'stocks', 'legit', 'cross-store', 'stable', 'decklist'],
             content: {
                 description: '<p>Global is a cross-store arbitrage tool that picks one store as a reference (the <em>index</em>) and surfaces cards where other markets are charging more. Unlike per-card Search, Global operates at the index level: every result is a comparison between the chosen index and one or more target stores.</p><p><strong>Pick an index:</strong></p><ul><li><strong>Singles</strong> - Card Kingdom, Star City Games, TCG Market</li><li><strong>Sealed</strong> - CT Zero EV Sealed, TCG Direct (net) EV Sealed, TCG Low EV Sealed (EV = expected value of pack contents)</li></ul><p>The results page shows each card with the index price, the target store\'s price, the dollar profit, the dollar difference, and a spread percentage. Direct Buy links go to both the source (the cheap index) and the target.</p><p><strong>Filter presets</strong> - toggle one or more to narrow results. The palette\'s <code>&gt;global + Tab</code> menu exposes the same set:</p>',
                 table: [
@@ -1108,9 +1108,11 @@ window.__BAN_GUIDE = {
                     { value: 'only Yield+',        short: 'Minimum profit threshold' },
                     { value: 'only Difference+',   short: 'Minimum price difference' },
                     { value: 'only Difference++',  short: 'Higher minimum price difference' },
+                    { value: 'only Decklists+',    short: 'Sealed: only products with a fixed decklist' },
                     { value: 'only SYP',           short: 'On the TCGplayer Save Your Points list' },
                     { value: 'only Stocks',        short: 'Has stock at the target' },
-                    { value: 'only Legit',         short: 'Filter out questionable results' }
+                    { value: 'only Legit',         short: 'Filter out questionable results' },
+                    { value: 'only Stable',        short: 'Sealed: hide products with a high simulation IQR' }
                 ],
                 examples: [
                     { query: '>global + Tab + "Card Kingdom"', desc: 'Open Global with Card Kingdom as the index', palette: true },
