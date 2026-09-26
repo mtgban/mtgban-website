@@ -847,7 +847,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		info := sessionstore.InfoFromForm(r)
 
-		report, err := Sessions.Publish(kind, info, uploadedData)
+		report, err := Sessions.Publish(b, kind, info, uploadedData)
 		if err != nil {
 			pageVars.WarningMessage = "store not published: " + err.Error()
 			render(w, "upload.html", pageVars)
@@ -1019,7 +1019,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// way the sealed and index fetches below already do.
 		results = map[string]map[string]*BanPrice{}
 		if len(cardIDs) > 0 {
-			results = getVendorPrices(ds, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+			results = getVendorPrices(b, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Build the custom buylist if requested
@@ -1058,7 +1058,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Fetch sealed vendor prices and merge
 		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			sealedResults := getVendorPrices(ds, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
+			sealedResults := getVendorPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
 			for cardID, stores := range sealedResults {
 				if results[cardID] == nil {
 					results[cardID] = map[string]*BanPrice{}
@@ -1081,12 +1081,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// upload has no singles (see the comment above).
 		results = map[string]map[string]*BanPrice{}
 		if len(cardIDs) > 0 {
-			results = getSellerPrices(ds, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+			results = getSellerPrices(b, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Fetch sealed seller prices and merge
 		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			sealedResults := getSellerPrices(ds, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
+			sealedResults := getSellerPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
 			for cardID, stores := range sealedResults {
 				if results[cardID] == nil {
 					results[cardID] = map[string]*BanPrice{}
@@ -1118,7 +1118,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		indexResults := map[string]map[string]*BanPrice{}
 		if len(cardIDs) > 0 && len(csvIndexKeys) > 0 {
-			indexResults = getSellerPrices(ds, "", csvIndexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+			indexResults = getSellerPrices(b, "", csvIndexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Copy these index prices in the final results
@@ -1159,7 +1159,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if !slices.Contains(indexKeys, altPriceSource) {
 			indexKeys = append(indexKeys, altPriceSource)
 		}
-		indexResults = getSellerPrices(ds, "", indexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+		indexResults = getSellerPrices(b, "", indexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
 	// An index that is also a selected store (TCGSealed) already gets its
@@ -1174,7 +1174,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch sealed index prices
 	if len(sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		sealedIndexResults := getSellerPrices(ds, "", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref)
+		sealedIndexResults := getSellerPrices(b, "", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref)
 		for cardID, stores := range sealedIndexResults {
 			if indexResults[cardID] == nil {
 				indexResults[cardID] = map[string]*BanPrice{}

@@ -106,8 +106,7 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 }
 
 func PriceAPI(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
-	b := ds.backend
+	b := backend()
 	sig := r.FormValue("sig")
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()
@@ -336,11 +335,11 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
 		dumpType += "retail"
-		out.Retail = getSellerPrices(ds, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
-		out.Buylist = getVendorPrices(ds, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -627,7 +626,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 	return out
 }
 
-func getSellerPrices(ds *datastore, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getSellerPrices(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering: resolve
@@ -635,14 +634,17 @@ func getSellerPrices(ds *datastore, mode string, enabledStores []string, filterB
 	// and aggregate the rows. Full dumps keep the direct scan below - they
 	// have no filter to resolve, and aggregating in place costs orders of
 	// magnitude less than materializing rows for the whole pool.
+	//
+	// apiSearchConfig always builds SearchMode "hashing" with no CleanQuery,
+	// so searchAndFilter would only ever reach its "hashing" branch (uuids =
+	// config.UUIDs, no seed path applies, no error path sets err) and return
+	// filterUUIDs(b, config.UUIDs, config.CardFilters), nil - inlined here so
+	// this needs only the backend, not a full datastore snapshot.
 	if filterByEdition != "" || filterByHash != nil {
-		uuids := resolveEditionFilter(ds.backend, filterByEdition, filterByHash, sealed)
-		config := apiSearchConfig(ds.backend, uuids, enabledStores, filterByFinish, sealed)
-		cardIDs, err := searchAndFilter(ds, config)
-		if err != nil {
-			return out
-		}
-		return banPricesFromRows(ds.backend, cardIDs, searchSellersNG(cardIDs, config), mode, tagName, qty, conds, false)
+		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
+		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
+		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
+		return banPricesFromRows(b, cardIDs, searchSellersNG(cardIDs, config), mode, tagName, qty, conds, false)
 	}
 
 	var finishFilter []string
@@ -683,7 +685,7 @@ func getSellerPrices(ds *datastore, mode string, enabledStores []string, filterB
 			Finish: finishFilter,
 		}
 		for cardID := range inventory {
-			processEntry(ds.backend, out, inventory[cardID], mode, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
+			processEntry(b, out, inventory[cardID], mode, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 
@@ -848,19 +850,17 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 	}
 }
 
-func getVendorPrices(ds *datastore, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getVendorPrices(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering, exactly
-	// like getSellerPrices
+	// like getSellerPrices (see its comment for why filterUUIDs stands in
+	// for searchAndFilter here).
 	if filterByEdition != "" || filterByHash != nil {
-		uuids := resolveEditionFilter(ds.backend, filterByEdition, filterByHash, sealed)
-		config := apiSearchConfig(ds.backend, uuids, enabledStores, filterByFinish, sealed)
-		cardIDs, err := searchAndFilter(ds, config)
-		if err != nil {
-			return out
-		}
-		return banPricesFromRows(ds.backend, cardIDs, searchVendorsNG(cardIDs, config), mode, tagName, qty, conds, true)
+		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
+		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
+		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
+		return banPricesFromRows(b, cardIDs, searchVendorsNG(cardIDs, config), mode, tagName, qty, conds, true)
 	}
 
 	var finishFilter []string
@@ -899,7 +899,7 @@ func getVendorPrices(ds *datastore, mode string, enabledStores []string, filterB
 			Finish: finishFilter,
 		}
 		for cardID := range buylist {
-			processEntry(ds.backend, out, buylist[cardID], mode, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
+			processEntry(b, out, buylist[cardID], mode, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 

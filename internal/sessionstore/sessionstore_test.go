@@ -99,7 +99,7 @@ func TestFromEntriesKeepsWhatAStoreCanList(t *testing.T) {
 		{CardID: "uuid-f", OriginalPrice: 3, OriginalCondition: "MINT"},
 	}
 
-	scraper, report, err := FromEntries(Retail, mtgban.ScraperInfo{Shorthand: "ZZS"}, entries)
+	scraper, report, err := FromEntries(Retail, mtgban.ScraperInfo{Shorthand: "ZZS"}, entries, nil)
 	if err != nil {
 		t.Fatalf("building the store: %s", err)
 	}
@@ -124,7 +124,7 @@ func TestFromEntriesKeepsWhatAStoreCanList(t *testing.T) {
 		t.Error("the inventory carries no timestamp")
 	}
 
-	scraper, report, err = FromEntries(Buylist, mtgban.ScraperInfo{Shorthand: "ZZV"}, entries)
+	scraper, report, err = FromEntries(Buylist, mtgban.ScraperInfo{Shorthand: "ZZV"}, entries, nil)
 	if err != nil {
 		t.Fatalf("building the buylist: %s", err)
 	}
@@ -138,7 +138,7 @@ func TestFromEntriesKeepsWhatAStoreCanList(t *testing.T) {
 }
 
 func TestFromEntriesRejectsUnknownKind(t *testing.T) {
-	_, _, err := FromEntries("sealed", mtgban.ScraperInfo{Shorthand: "ZZS"}, nil)
+	_, _, err := FromEntries("sealed", mtgban.ScraperInfo{Shorthand: "ZZS"}, nil, nil)
 	if err == nil {
 		t.Error("an unknown kind was accepted")
 	}
@@ -149,7 +149,7 @@ func TestFromEntriesRejectsUnknownKind(t *testing.T) {
 func TestRegistryPublishInstallsAndTracks(t *testing.T) {
 	reg, host := newRegistry()
 
-	report, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session Store", Shorthand: "ZZS"},
+	report, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session Store", Shorthand: "ZZS"},
 		[]docparse.Entry{priced("uuid-a", 1), priced("uuid-b", 2)})
 	if err != nil {
 		t.Fatalf("publishing: %s", err)
@@ -186,7 +186,7 @@ func TestRegistryPublishValidates(t *testing.T) {
 		{"nothing to list", mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"}, []docparse.Entry{{CardID: "uuid-a"}}},
 	} {
 		reg, host := newRegistry()
-		_, err := reg.Publish(Retail, tt.info, tt.entries)
+		_, err := reg.Publish(nil, Retail, tt.info, tt.entries)
 		if err == nil {
 			t.Errorf("%s: published", tt.desc)
 		}
@@ -207,7 +207,7 @@ func TestRegistryPublishRefusesARealStore(t *testing.T) {
 	rows := []docparse.Entry{priced("uuid-a", 1)}
 
 	for _, shorthand := range []string{"CK", "ck", "ZZREAL", "zzreal"} {
-		_, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: shorthand}, rows)
+		_, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: shorthand}, rows)
 		if err == nil {
 			t.Errorf("%s published over a real store", shorthand)
 		}
@@ -228,10 +228,10 @@ func TestRegistryPublishReplacesItsOwnStore(t *testing.T) {
 	rows3 := []docparse.Entry{priced("uuid-a", 1), priced("uuid-b", 1), priced("uuid-c", 1)}
 	rows1 := []docparse.Entry{priced("uuid-a", 1)}
 
-	if _, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"}, rows3); err != nil {
+	if _, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"}, rows3); err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
-	if _, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "zzs"}, rows1); err != nil {
+	if _, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "zzs"}, rows1); err != nil {
 		t.Fatalf("publishing under another case: %s", err)
 	}
 	if len(host.sellers) != 1 || host.sellers[0].Info().Shorthand != "zzs" {
@@ -243,7 +243,7 @@ func TestRegistryPublishReplacesItsOwnStore(t *testing.T) {
 		t.Error("the registry does not recognize the store under either spelling")
 	}
 
-	if _, err := reg.Publish(Buylist, mtgban.ScraperInfo{Name: "Session", Shorthand: "zzs"}, rows1); err != nil {
+	if _, err := reg.Publish(nil, Buylist, mtgban.ScraperInfo{Name: "Session", Shorthand: "zzs"}, rows1); err != nil {
 		t.Fatalf("publishing the buylist side: %s", err)
 	}
 	if len(host.sellers) != 1 || len(host.vendors) != 1 {
@@ -255,7 +255,7 @@ func TestRegistryPublishReplacesItsOwnStore(t *testing.T) {
 // config has since claimed, or one already removed, is refused.
 func TestRegistryRemove(t *testing.T) {
 	reg, host := newRegistry()
-	if _, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"},
+	if _, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"},
 		[]docparse.Entry{priced("uuid-a", 1)}); err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
@@ -284,7 +284,7 @@ func TestRegistryRemove(t *testing.T) {
 // finds it, and can still take it down.
 func TestRegistryIsAndRemoveIgnoreCase(t *testing.T) {
 	reg, host := newRegistry()
-	if _, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"},
+	if _, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"},
 		[]docparse.Entry{priced("uuid-a", 1)}); err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
@@ -311,7 +311,7 @@ func TestRegistryIsAndRemoveIgnoreCase(t *testing.T) {
 // may not touch what now serves under it.
 func TestRegistryRemoveYieldsToTheConfig(t *testing.T) {
 	reg, host := newRegistry()
-	if _, err := reg.Publish(Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"},
+	if _, err := reg.Publish(nil, Retail, mtgban.ScraperInfo{Name: "Session", Shorthand: "ZZS"},
 		[]docparse.Entry{priced("uuid-a", 1)}); err != nil {
 		t.Fatalf("publishing: %s", err)
 	}

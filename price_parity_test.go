@@ -113,7 +113,7 @@ func TestPriceParityRetail(t *testing.T) {
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 	found := searchSellersNG(cardIDs, config)
 
-	api := getSellerPrices(currentDatastore(), "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
+	api := getSellerPrices(backend(), "", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: the search row per condition and the API conditions map must
 	// carry the same numbers.
@@ -203,7 +203,7 @@ func TestPriceParityBuylist(t *testing.T) {
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 	found := searchVendorsNG(cardIDs, config)
 
-	api := getVendorPrices(currentDatastore(), "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
+	api := getVendorPrices(backend(), "", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: raw buylist prices must match; the credit multiplier is a
 	// search-side display value layered on the same base number.
@@ -316,7 +316,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	stores := []string{"PARITYA", "PARITYIDX"}
 
 	// Funnel path (hash filter): finish=foil keeps only the foil printing
-	api := getSellerPrices(currentDatastore(), "", stores, "", cardIDs, "foil", false, false, false, "")
+	api := getSellerPrices(backend(), "", stores, "", cardIDs, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil")
 	}
@@ -325,7 +325,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	}
 
 	// Full dump path: the same predicate through EntryRule.Finish
-	api = getSellerPrices(currentDatastore(), "", stores, "", nil, "foil", false, false, false, "")
+	api = getSellerPrices(backend(), "", stores, "", nil, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil in a full dump")
 	}
@@ -429,10 +429,10 @@ func TestZeroPricedListings(t *testing.T) {
 	}
 
 	t.Run("funnel path", func(t *testing.T) {
-		check(t, getSellerPrices(currentDatastore(), "", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
+		check(t, getSellerPrices(backend(), "", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
 	})
 	t.Run("full dump path", func(t *testing.T) {
-		check(t, getSellerPrices(currentDatastore(), "", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
+		check(t, getSellerPrices(backend(), "", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
 	})
 }
 

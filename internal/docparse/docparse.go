@@ -82,9 +82,8 @@ type Entry struct {
 // Parser matches uploaded rows against the card database. The zero value is
 // usable; the optional fields hook it up to the host's services.
 type Parser struct {
-	// Backend is the card datastore this parser matches against. Nil means
-	// an empty backend (below), so every row of one parser's operation
-	// matches against the same snapshot.
+	// Backend is the datastore every row is matched against; nil means an
+	// empty one.
 	Backend *mtgmatcher.Backend
 	// Logf receives diagnostic lines about header detection. Optional.
 	Logf func(format string, v ...any)

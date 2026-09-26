@@ -42,7 +42,8 @@ func TestCatalogIsNotBuiltWithoutCards(t *testing.T) {
 	s.deps.Sellers = func() []mtgban.Seller { return nil }
 	s.deps.Vendors = func() []mtgban.Vendor { return nil }
 
-	s.refreshCatalog()
+	b, source := s.datastore()
+	s.refreshCatalog(b, source)
 
 	if v := s.catalogVersion(); v != "" {
 		t.Errorf("catalog version is %q with no datastore, want it unbuilt", v)

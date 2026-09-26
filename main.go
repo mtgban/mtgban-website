@@ -733,7 +733,7 @@ var LogDir string
 // and read by the admin dashboard. Held behind atomic.Pointer so concurrent
 // reads can't observe a torn time.Time (it's a 24-byte struct, not a single
 // word). The datastore's own timestamp lives on the published datastore
-// instead - see datastore.go and GetLastDatastoreUpdate below.
+// instead - see datastore.go's loadedAt field.
 var (
 	lastStashUpdatePtr     atomic.Pointer[time.Time]
 	lastNewspaperUpdatePtr atomic.Pointer[time.Time]
@@ -744,10 +744,8 @@ var (
 func SetLastStashUpdate(t time.Time)     { lastStashUpdatePtr.Store(&t) }
 func SetLastNewspaperUpdate(t time.Time) { lastNewspaperUpdatePtr.Store(&t) }
 
-// GetLastDatastoreUpdate / GetLastStashUpdate / GetLastNewspaperUpdate
-// return the most recent timestamp, or the zero time if none has been
-// published yet.
-func GetLastDatastoreUpdate() time.Time { return currentDatastore().loadedAt }
+// GetLastStashUpdate / GetLastNewspaperUpdate return the most recent
+// timestamp, or the zero time if none has been published yet.
 func GetLastStashUpdate() time.Time     { return loadTime(lastStashUpdatePtr.Load()) }
 func GetLastNewspaperUpdate() time.Time { return loadTime(lastNewspaperUpdatePtr.Load()) }
 
@@ -863,25 +861,28 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 
 // offlineService wires the offline API endpoints to the live scraper state.
 var offlineService = offlineapi.NewService(offlineapi.Deps{
-	Backend: backend,
-	Allow:   offlineModeAllowed,
+	Datastore: func() (*mtgmatcher.Backend, time.Time) {
+		ds := currentDatastore()
+		return ds.backend, ds.loadedAt
+	},
+	Allow: offlineModeAllowed,
 
-	CanonicalSetCode: func(setCode string) (string, error) {
-		set, err := backend().GetSet(setCode)
+	CanonicalSetCode: func(b *mtgmatcher.Backend, setCode string) (string, error) {
+		set, err := b.GetSet(setCode)
 		if err != nil {
 			return "", err
 		}
 		return set.Code, nil
 	},
 
-	BuildSetPayload: func(setCode string, stores []string) (*offline.SetPayload, error) {
-		set, err := backend().GetSet(setCode)
+	BuildSetPayload: func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error) {
+		set, err := b.GetSet(setCode)
 		if err != nil {
 			return nil, err
 		}
-		retail := getSellerPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, false, "")
-		buylist := getVendorPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, false, "")
-		for id, m := range getSellerPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, true, "") {
+		retail := getSellerPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
+		buylist := getVendorPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
+		for id, m := range getSellerPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
 			if retail[id] == nil {
 				retail[id] = m
 				continue
@@ -890,7 +891,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 				retail[id][store] = entry
 			}
 		}
-		for id, m := range getVendorPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, true, "") {
+		for id, m := range getVendorPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
 			if buylist[id] == nil {
 				buylist[id] = m
 				continue
@@ -925,9 +926,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	ScraperName:       scraperName,
 	CardObjectSources: cardobject2sources,
 	FinishNames:       finishNames,
-	Finishes:          func() []palette.Finish { return paletteService.FinishList(backend()) },
-
-	LastDatastoreUpdate: GetLastDatastoreUpdate,
+	Finishes:          paletteService.FinishList,
 
 	ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		omPath := Config.Offline.ManifestPath

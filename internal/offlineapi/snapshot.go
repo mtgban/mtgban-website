@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
@@ -23,12 +24,12 @@ type manifestFile struct {
 	Sets      map[string]setVersion `json:"sets"`
 }
 
-// computeFingerprints hashes every in-memory price tuple, per set.
-func (s *Service) computeFingerprints() map[string]string {
-	backend := s.backend()
+// computeFingerprints hashes every in-memory price tuple, per set, resolving
+// each uuid's set code against b.
+func (s *Service) computeFingerprints(b *mtgmatcher.Backend) map[string]string {
 	fps := map[string]*offline.Fingerprint{}
 	add := func(store, uuid, tag string, price float64, qty int) {
-		co, err := backend.GetUUID(uuid)
+		co, err := b.GetUUID(uuid)
 		if err != nil {
 			return
 		}
@@ -70,13 +71,17 @@ func (s *Service) refreshManifest() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// One read for the whole refresh: the catalog's cards and the
+	// fingerprints' set-code lookups both resolve against the same backend.
+	b, source := s.datastore()
+
 	// Neither of these is made of prices: the catalog is cards and sets out
 	// of the datastore, with only its store list coming from the scrapers,
 	// and the images manifest is written by the mirror worker. They ran
 	// below the scraper check, so a site whose scrapers had not landed (or
 	// never load at all) served "catalog not ready" for as long as that was
 	// true, though most of the answer was sitting in memory.
-	s.refreshCatalog()
+	s.refreshCatalog(b, source)
 	s.refreshImagesManifest()
 
 	if len(s.deps.Sellers()) == 0 && len(s.deps.Vendors()) == 0 {
@@ -90,7 +95,7 @@ func (s *Service) refreshManifest() {
 
 	next := manifestFile{Generated: now, Sets: map[string]setVersion{}}
 	changed := 0
-	for code, fp := range s.computeFingerprints() {
+	for code, fp := range s.computeFingerprints(b) {
 		old, found := prev[code]
 		if found && old.Fingerprint == fp {
 			next.Sets[code] = old
