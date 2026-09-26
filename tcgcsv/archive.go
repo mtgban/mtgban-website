@@ -2,6 +2,7 @@ package tcgcsv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,17 +17,23 @@ import (
 // Backfill starts here by default.
 var ArchiveEpoch = time.Date(2024, 2, 8, 0, 0, 0, 0, time.UTC)
 
+// ErrArchiveUnavailable reports that tcgcsv is not serving the price archive at
+// all: every date under /archive/ answers 403 with a notice, not just the one
+// asked for. It is withdrawn, not gone -- tcgcsv says it still records prices
+// and means to publish them again -- so the archive reader stays put and starts
+// working the moment the 403 stops. Callers match on this to fall back to the
+// live snapshot instead of asking for hundreds more dates that will all refuse.
+var ErrArchiveUnavailable = errors.New("tcgcsv: the daily price archive is not being served")
+
+// ErrArchiveTooling reports that no 7z binary was found. Like
+// ErrArchiveUnavailable it says nothing about the date asked for, so a caller
+// looping over days should stop on it rather than count it as one bad day.
+var ErrArchiveTooling = errors.New("tcgcsv: no 7z binary")
+
 // sevenZipBinaries are the 7z CLIs we accept, in order of preference. The
 // archives use solid PPMd compression, which pure-Go 7z readers do not reliably
 // decode (they fail on solid blocks), so extraction shells out to p7zip.
 var sevenZipBinaries = []string{"7z", "7za", "7zr"}
-
-// CheckArchiveTooling verifies a usable 7z binary is on PATH. Backfill calls
-// this once up front so a missing dependency fails fast with a clear message.
-func CheckArchiveTooling() error {
-	_, err := find7z()
-	return err
-}
 
 func find7z() (string, error) {
 	for _, name := range sevenZipBinaries {
@@ -34,7 +41,7 @@ func find7z() (string, error) {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("tcgcsv: no 7z binary found (looked for %s); install p7zip", strings.Join(sevenZipBinaries, ", "))
+	return "", fmt.Errorf("%w found (looked for %s); install p7zip", ErrArchiveTooling, strings.Join(sevenZipBinaries, ", "))
 }
 
 // FetchPriceArchive downloads the daily price archive for date, extracts it with
@@ -42,13 +49,9 @@ func find7z() (string, error) {
 // wantCategories are unpacked (pass an empty map to take all).
 //
 // found is false when tcgcsv has no archive for date (HTTP 404), which the
-// caller should treat as "skip this day", not an error.
+// caller should treat as "skip this day", not an error. A 403 is the different,
+// whole-archive answer and comes back as ErrArchiveUnavailable.
 func (c *Client) FetchPriceArchive(ctx context.Context, date time.Time, wantCategories map[int]bool) (byCategory map[int][]Price, found bool, err error) {
-	bin, err := find7z()
-	if err != nil {
-		return nil, false, err
-	}
-
 	dateStr := date.Format("2006-01-02")
 	url := fmt.Sprintf("%s/archive/tcgplayer/prices-%s.ppmd.7z", c.baseURL, dateStr)
 	body, status, err := c.do(ctx, url, archiveTimeout)
@@ -58,8 +61,21 @@ func (c *Client) FetchPriceArchive(ctx context.Context, date time.Time, wantCate
 	if status == http.StatusNotFound {
 		return nil, false, nil
 	}
+	// The withdrawal notice is served as the 403 body and says what happened and
+	// why, so carry it through instead of paraphrasing it.
+	if status == http.StatusForbidden {
+		return nil, false, fmt.Errorf("%w: %s: %s", ErrArchiveUnavailable, url, snippet(body))
+	}
 	if status != http.StatusOK {
 		return nil, false, fmt.Errorf("tcgcsv: %s -> %d: %s", url, status, snippet(body))
+	}
+
+	// Looked up after the fetch, not before: a run that only learns the archive
+	// is withdrawn needs no extractor, and demanding one first would hide that
+	// answer behind a missing dependency.
+	bin, err := find7z()
+	if err != nil {
+		return nil, false, err
 	}
 
 	tmpDir, err := os.MkdirTemp("", "tcgcsv-archive-")

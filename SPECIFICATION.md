@@ -62,7 +62,9 @@ relaxed auth), `-sig` (force signature checks in dev), `-noload`, `-nonews`,
 `-tcgcsv-daily`, `-tcgcsv-products` each run one ingest job against
 `tcg_prices`/`tcg_products` and exit without starting the web server (the
 same jobs `cmd/tcgcsvd` runs as its own process); `-tcgcsv-from`/
-`-tcgcsv-to`/`-tcgcsv-force`/`-tcgcsv-categories` tune the backfill. There is
+`-tcgcsv-to`/`-tcgcsv-force`/`-tcgcsv-categories` tune the backfill, which
+since tcgcsv withdrew its archives stores the current snapshot in their
+place (`docs/tcgcsv-archive-withdrawal.md`). There is
 no `-offline` flag any more — the old "run without B2, load prices from
 another BAN instance's API" mode is gone (see §2.3).
 
@@ -527,8 +529,8 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
 | `collectr/` | Client for Collectr showcase pages (product listings, Magic + Lorcana categories) |
 | `fuzzy/` | Levenshtein-distance string similarity powering "did you mean" suggestions |
 | `observability/` | Postgres page-visit recorder backing the admin usage dashboard |
-| `tcgcsv/` | Client for tcgcsv.com's category→group→product/price hierarchy, used to ingest non-Magic prices |
-| `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`) |
+| `tcgcsv/` | Client for tcgcsv.com's category→group→product/price hierarchy, used to ingest non-Magic prices. The daily-archive reader stays here but every date answers 403 upstream; `ErrArchiveUnavailable` is how callers learn that |
+| `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs (`/api/userstate/`), keyed by a hash of the login email |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
 | `internal/` | No longer empty — 14 packages: `dsreload` (single-flight datastore reload, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` ("did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
