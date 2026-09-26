@@ -138,9 +138,8 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   lists, and its own load time are one `datastore` value (datastore.go),
   built by `newDatastore()` and published in a single
   `liveDatastore.Store()`. Readers go through `currentDatastore()` (never
-  nil, even before the first load), or
-  `backend()`/`GetEditions()`/`GetLastDatastoreUpdate()` for one field of
-  it.
+  nil, even before the first load), or `backend()` for the backend alone;
+  entry points read either once and pass `b`/`ds` down to what they call.
 - `Config` is loaded once and swapped whole on admin reload (`admin.go`);
   per-user API secrets read behind `apiUsersMutex`; affiliate data behind
   `affiliatesMu`/`affiliatesPtr`.

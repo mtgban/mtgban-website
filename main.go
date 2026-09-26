@@ -733,7 +733,7 @@ var LogDir string
 // and read by the admin dashboard. Held behind atomic.Pointer so concurrent
 // reads can't observe a torn time.Time (it's a 24-byte struct, not a single
 // word). The datastore's own timestamp lives on the published datastore
-// instead - see datastore.go and GetLastDatastoreUpdate below.
+// instead - see datastore.go's loadedAt field.
 var (
 	lastStashUpdatePtr     atomic.Pointer[time.Time]
 	lastNewspaperUpdatePtr atomic.Pointer[time.Time]
@@ -744,10 +744,8 @@ var (
 func SetLastStashUpdate(t time.Time)     { lastStashUpdatePtr.Store(&t) }
 func SetLastNewspaperUpdate(t time.Time) { lastNewspaperUpdatePtr.Store(&t) }
 
-// GetLastDatastoreUpdate / GetLastStashUpdate / GetLastNewspaperUpdate
-// return the most recent timestamp, or the zero time if none has been
-// published yet.
-func GetLastDatastoreUpdate() time.Time { return currentDatastore().loadedAt }
+// GetLastStashUpdate / GetLastNewspaperUpdate return the most recent
+// timestamp, or the zero time if none has been published yet.
 func GetLastStashUpdate() time.Time     { return loadTime(lastStashUpdatePtr.Load()) }
 func GetLastNewspaperUpdate() time.Time { return loadTime(lastNewspaperUpdatePtr.Load()) }
 

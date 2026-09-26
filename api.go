@@ -78,6 +78,7 @@ func getDecklist(b *mtgmatcher.Backend, uuid string) ([]string, error) {
 }
 
 func TCGHandler(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	w.Header().Set("Content-Type", "application/json")
 
 	isLastSold := strings.Contains(r.URL.Path, "lastsold")
@@ -94,13 +95,13 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	var useCSV bool
 	if isLastSold {
 		UserNotify("tcgLastSold", cardID)
-		data, err = getLastSold(r.Context(), backend(), cardID, false)
+		data, err = getLastSold(r.Context(), b, cardID, false)
 	} else if isDirectQty {
 		UserNotify("tcgDirectQty", cardID)
-		data, err = getDirectQty(r.Context(), backend(), cardID)
+		data, err = getDirectQty(r.Context(), b, cardID)
 	} else if isDecklist {
 		UserNotify("tcgDecklist", cardID)
-		data, err = getDecklist(backend(), cardID)
+		data, err = getDecklist(b, cardID)
 		useCSV = true
 	} else {
 		err = errors.New("invalid endpoint")
@@ -112,12 +113,12 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if useCSV {
-		co, _ := backend().GetUUID(cardID)
+		co, _ := b.GetUUID(cardID)
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
 		csvWriter := csv.NewWriter(w)
-		err = UUID2TCGCSV(backend(), csvWriter, data.([]string), nil, nil)
+		err = UUID2TCGCSV(b, csvWriter, data.([]string), nil, nil)
 		if err != nil {
 			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -407,6 +408,7 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 }
 
 func MKMHandler(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	w.Header().Set("Content-Type", "application/json")
 
 	isDecklist := strings.Contains(r.URL.Path, "decklist")
@@ -419,7 +421,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	var useCSV bool
 	if isDecklist {
 		UserNotify("mkmDecklist", cardID)
-		data, err = getDecklist(backend(), cardID)
+		data, err = getDecklist(b, cardID)
 		useCSV = true
 	} else {
 		err = errors.New("invalid endpoint")
@@ -431,12 +433,12 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if useCSV {
-		co, _ := backend().GetUUID(cardID)
+		co, _ := b.GetUUID(cardID)
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
 		csvWriter := csv.NewWriter(w)
-		err = UUID2MKMCSV(backend(), csvWriter, data.([]string), nil, nil)
+		err = UUID2MKMCSV(b, csvWriter, data.([]string), nil, nil)
 		if err != nil {
 			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -662,6 +664,8 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
+	b := ds.backend
 	// The API middleware checks a ?sig= and lets a request without one
 	// through unchecked, so a cookie counts only once it is checked here.
 	sig := r.FormValue("sig")
@@ -732,21 +736,21 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	config := parseSearchOptionsNG(backend(), query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	// The export links carry the sticky bar as its own parameter rather
 	// than spliced into the path, so the csv holds the rows the page did.
-	applySearchScope(&config, scopeFilters(backend(), strings.TrimSpace(r.FormValue("scope"))))
+	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(r.FormValue("scope"))))
 	if isSealed {
 		config.SearchMode = "sealed"
 		idOpt = "mtgjson"
 	}
 
 	// Perform search
-	allKeys, _ := searchAndFilter(currentDatastore(), config)
+	allKeys, _ := searchAndFilter(ds, config)
 
 	// Sort results to match the search page order
 	sortOpt := r.FormValue("sort")
-	sortData := resolveSortingData(backend(), allKeys)
+	sortData := resolveSortingData(b, allKeys)
 	switch sortOpt {
 	case "alpha":
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -810,7 +814,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			cfg.StoreFilters = demoFilter("seller", true)
 		}
 		foundSellers = searchSellersNG(allKeys, cfg)
-		out.Retail = banPricesFromRows(backend(), allKeys, foundSellers, idOpt, tagName, true, true, false)
+		out.Retail = banPricesFromRows(b, allKeys, foundSellers, idOpt, tagName, true, true, false)
 	}
 	if isBuylist && canBuylist {
 		cfg := config
@@ -818,7 +822,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			cfg.StoreFilters = demoFilter("vendor", false)
 		}
 		foundVendors = searchVendorsNG(allKeys, cfg)
-		out.Buylist = banPricesFromRows(backend(), allKeys, foundVendors, idOpt, tagName, true, true, true)
+		out.Buylist = banPricesFromRows(b, allKeys, foundVendors, idOpt, tagName, true, true, true)
 	}
 
 	if isJSON {
@@ -835,12 +839,12 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		// the full store policy)
 		var results map[string]map[string]*BanPrice
 		if isRetail && canRetail {
-			results = banPricesFromRows(backend(), allKeys, foundSellers, "", tagName, true, true, false)
+			results = banPricesFromRows(b, allKeys, foundSellers, "", tagName, true, true, false)
 		} else if isBuylist && canBuylist {
-			results = banPricesFromRows(backend(), allKeys, foundVendors, "", tagName, true, true, true)
+			results = banPricesFromRows(b, allKeys, foundVendors, "", tagName, true, true, true)
 		}
 
-		err := BanPrice2CSV(backend(), w, results, allKeys)
+		err := BanPrice2CSV(b, w, results, allKeys)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")

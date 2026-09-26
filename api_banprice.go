@@ -106,6 +106,7 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 }
 
 func PriceAPI(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	sig := r.FormValue("sig")
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()
@@ -122,12 +123,12 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Endpoint for retrieving the set codes
 	if strings.HasPrefix(urlPath, "sets") {
-		sets := backend().GetAllSets()
+		sets := b.GetAllSets()
 		filter := r.FormValue("filter")
 		if filter == "singles" {
 			var filtered []string
 			for _, code := range sets {
-				set, err := backend().GetSet(code)
+				set, err := b.GetSet(code)
 				if err != nil {
 					continue
 				}
@@ -139,7 +140,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		} else if filter == "sealed" {
 			var filtered []string
 			for _, code := range sets {
-				set, err := backend().GetSet(code)
+				set, err := b.GetSet(code)
 				if err != nil {
 					continue
 				}
@@ -270,7 +271,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Check if the path element is a set name or a hash
-		set, err := backend().GetSet(base)
+		set, err := b.GetSet(base)
 		if err == nil {
 			filterByEdition = set.Code
 		} else {
@@ -278,7 +279,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 				// Check for nonfoil, foil, etched
 				{false, false}, {true, false}, {false, true},
 			} {
-				uuid, err := backend().MatchID(base, opts...)
+				uuid, err := b.MatchID(base, opts...)
 				if err != nil {
 					continue
 				}
@@ -290,7 +291,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 			}
 			// Speed up search by keeping only the needed edition
 			if len(filterByHash) > 0 {
-				co, err := backend().GetUUID(filterByHash[0])
+				co, err := b.GetUUID(filterByHash[0])
 				if err == nil {
 					filterByEdition = co.SetCode
 				}
@@ -334,11 +335,11 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
 		dumpType += "retail"
-		out.Retail = getSellerPrices(backend(), idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
-		out.Buylist = getVendorPrices(backend(), idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -371,9 +372,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(urlPath, ".csv") {
 		var err error
 		if out.Retail != nil {
-			err = BanPrice2CSV(backend(), w, out.Retail, nil)
+			err = BanPrice2CSV(b, w, out.Retail, nil)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(backend(), w, out.Buylist, nil)
+			err = BanPrice2CSV(b, w, out.Buylist, nil)
 		}
 		if err != nil {
 			log.Println(err)
