@@ -3,6 +3,12 @@
 Ingests TCGplayer prices and product catalogs for the non-Magic games from
 [tcgcsv.com](https://tcgcsv.com) into the shared price database.
 
+tcgcsv stopped serving its daily price archives in September 2026, so the live
+per-group price files are the only source of prices right now and history is out
+of reach. The archive reader stays here because the archives are still being
+recorded upstream, just not published; `docs/tcgcsv-archive-withdrawal.md` has
+the notice tcgcsv serves and what a backfill can still do.
+
 This is a library plus a standalone binary. The website imports the library for
 its crons and the admin "Ingest TCGCSV" button; `cmd/tcgcsvd` runs the same jobs
 as its own process, with no web server, datastore, or template stack loaded.
@@ -65,18 +71,22 @@ are, so a typo can't read as a clean backfill that quietly wrote nothing.
 
 ## Adding a game
 
-Add one entry to `tcgcsv_config.games`, then run a plain backfill:
+Add one entry to `tcgcsv_config.games`, then run the daily job:
 
 ```
-tcgcsvd -config config.json -backfill
+tcgcsvd -config config.json -daily
 ```
 
-No date arguments, no category filter. Backfill keeps a per-category resume
-cursor — the newest date already stored for that category — and skips any day at
-or below it. A game added today has no rows, so its cursor is empty and every day
-back to the archive epoch (2024-02-08) is fetched for it, while the games that
-are already current skip all of those days. The new game's history lands without
-re-ingesting or disturbing anything already stored.
+A game with no rows has an empty freshness cursor, so the daily pull ingests it
+on its first run while the games already holding the snapshot date skip it. While
+the archive is withdrawn that is all the history a new game gets: one day, plus
+one a day from there.
+
+Backfill is how the rest arrives once tcgcsv serves the archives again. It keeps
+a per-category resume cursor — the newest date already stored for that category —
+and skips any day at or below it, so a game added today pulls every day back to
+the archive epoch (2024-02-08) while the games that are already current skip all
+of them. Nothing already stored is re-ingested or disturbed.
 
 The archives are per-day, not per-game: a day that any category still needs is
 downloaded once and the wanted categories are extracted from it. Adding the
@@ -90,9 +100,9 @@ run it once after adding a game and weekly thereafter.
 
 | Job | What it does | Cadence |
 |---|---|---|
-| `-daily` | Pulls tcgcsv's current snapshot for every configured game. Gates on tcgcsv's `last-updated`, so extra runs are cheap no-ops. | daily, after tcgcsv's ~20:00 UTC refresh |
+| `-daily` | Pulls tcgcsv's current snapshot for every configured game, one request per group. Gates on tcgcsv's `last-updated`, so extra runs are cheap no-ops. | daily, after tcgcsv's ~20:00 UTC refresh |
 | `-products` | Refreshes the `tcg_products` catalog for every configured game. | weekly |
-| `-backfill` | Fills prices from the daily archives over a date range. | on demand |
+| `-backfill` | Fills prices from the daily archives over a date range. With the archives withdrawn it stores the current snapshot instead, when the range covers it. | on demand |
 
 ```
 tcgcsvd -config config.json -daily
@@ -113,9 +123,18 @@ Backfill flags:
 - The upsert is keyed on `(date, category, product, sub-type)`, so re-covering
   stored days overwrites them in place instead of duplicating them.
 
+While the archives are withdrawn, a backfill gives up after one refused day and
+stores the current snapshot in its place — the run above with no arguments still
+leaves every game current, and posts a Discord notice saying which range stayed
+missing. The last of the four examples, a range wholly in the past, fails instead
+and names it: today's prices are not what it asked for, and what it asked for is
+gone.
+
 Backfill shells out to a `7z` binary (`p7zip` / `7zz`): the archives use solid
 PPMd compression that pure-Go readers do not reliably decode. A missing binary
-is reported before the first day rather than failing 900 times.
+ends the run on its first day rather than failing 900 times, and it is looked for
+only once an archive downloads, so a box without `p7zip` still reports the
+archive as withdrawn rather than stopping on the extractor.
 
 ## Configuration
 

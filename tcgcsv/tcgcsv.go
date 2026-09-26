@@ -78,14 +78,23 @@ type Client struct {
 	lastReq time.Time
 }
 
+// ClientOption customizes a Client at construction.
+type ClientOption func(*Client)
+
+// WithBaseURL points the client at another origin than tcgcsv.com. Tests use it
+// to stand a fake service up in front of the ingest jobs.
+func WithBaseURL(u string) ClientOption {
+	return func(c *Client) { c.baseURL = strings.TrimSuffix(u, "/") }
+}
+
 // NewClient builds a client from cfg. A blank User-Agent falls back to a
 // descriptive default; tcgcsv.com blocks generic agents.
-func NewClient(cfg Config) *Client {
+func NewClient(cfg Config, opts ...ClientOption) *Client {
 	ua := strings.TrimSpace(cfg.UserAgent)
 	if ua == "" {
 		ua = defaultUserAgent
 	}
-	return &Client{
+	c := &Client{
 		baseURL:   DefaultBaseURL,
 		userAgent: ua,
 		// No client-level Timeout: each request is bounded by its own context
@@ -96,6 +105,10 @@ func NewClient(cfg Config) *Client {
 		retryWait:  500 * time.Millisecond,
 		maxRetries: 3,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // envelope is the common response wrapper. The prices endpoint omits totalItems,

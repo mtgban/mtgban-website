@@ -15,7 +15,11 @@ cheap no-op.
 Backfill (Service.Backfill) fills the same table from tcgcsv's daily archives,
 one day at a time, for any range back to the archive epoch (2024-02-08). It is
 how a gap left by a missed daily run gets closed, and how a newly added game
-gets its history.
+gets its history — while tcgcsv serves the archives. It has not since September
+2026: every date under /archive/ answers 403, so a backfill now stores the
+current snapshot when the requested range covers it and fails naming the range
+when it doesn't. docs/tcgcsv-archive-withdrawal.md has the notice tcgcsv serves
+and what that leaves reachable.
 
 Products (Service.SyncProducts) refreshes the tcg_products catalog — names,
 collector numbers, rarities, images — which changes slowly and runs weekly.
@@ -56,16 +60,20 @@ clean backfill that quietly wrote nothing.
 
 # Adding a game
 
-Add one entry to tcgcsv_config.games and run a backfill:
+Add one entry to tcgcsv_config.games and run the daily job:
 
-	tcgcsvd -config config.json -backfill
+	tcgcsvd -config config.json -daily
 
-The run needs no other argument. Backfill keeps a per-category resume cursor —
-the newest date already stored for that category — and skips any day at or below
-it. A game added today has no rows, so its cursor is empty and every day from the
-archive epoch forward is fetched for it, while the games that are already current
-skip every one of those days. The full history arrives without re-ingesting or
-disturbing what is already stored.
+A game with no rows has an empty freshness cursor, so the daily pull ingests it
+on its first run while the games already holding the snapshot date skip it. That
+is as much history as a new game gets while the archive is withdrawn: one day,
+growing by one a day from there.
+
+Backfill is what fills the rest in, once tcgcsv serves the archives again. It
+keeps a per-category resume cursor — the newest date already stored for that
+category — and skips any day at or below it, so a game added today pulls every
+day from the archive epoch forward while the games that are already current skip
+every one of them.
 
 Two consequences worth knowing. The daily archives are per-day, not per-game, so
 a day any category still needs is downloaded once and the wanted categories are
@@ -99,7 +107,10 @@ As a standalone process, one job per invocation, exiting when it finishes:
 	tcgcsvd -config config.json -backfill -categories 71 -from 2026-07-08 -to 2026-07-14 -force
 
 Backfill shells out to a 7z binary: the archives use solid PPMd compression that
-pure-Go readers do not reliably decode. CheckArchiveTooling reports a missing
-binary up front rather than failing per-day.
+pure-Go readers do not reliably decode. A missing binary comes back as
+tcgcsv.ErrArchiveTooling, which the day loop treats as terminal, so it is
+reported once rather than per day — and it is looked up only after an archive
+actually downloads, so a box without p7zip still learns the archive is withdrawn
+rather than stopping on an extractor it has nothing to extract with.
 */
 package tcgcsvd

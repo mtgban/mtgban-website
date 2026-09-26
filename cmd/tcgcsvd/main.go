@@ -20,6 +20,11 @@
 // Each invocation runs one job and exits, non-zero on failure, so cron or a
 // systemd timer can drive it. See the tcgcsvd package docs for what the chosen
 // categories are and how a newly added game gets backfilled.
+//
+// tcgcsv has not served the archives since September 2026, so -daily is the only
+// job that stores prices today: a backfill gives up after one refused day and
+// stores the current snapshot when the requested range covers it. See
+// docs/tcgcsv-archive-withdrawal.md.
 package main
 
 import (
@@ -96,7 +101,7 @@ func main() {
 	games := flag.Bool("games", false, "Print the configured games and what is stored for each, then exit")
 	daily := flag.Bool("daily", false, "Pull the current price snapshot for every configured game")
 	products := flag.Bool("products", false, "Refresh the product catalog for every configured game")
-	backfill := flag.Bool("backfill", false, "Fill prices from tcgcsv's daily archives")
+	backfill := flag.Bool("backfill", false, "Fill prices from tcgcsv's daily archives (withdrawn upstream: stores the current snapshot instead when the range covers it)")
 	from := flag.String("from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
 	to := flag.String("to", "", "Backfill end date YYYY-MM-DD (default: today)")
 	force := flag.Bool("force", false, "Re-ingest dates already stored (ignore the resume cursor)")
@@ -161,7 +166,9 @@ func main() {
 		err = svc.WithCrawlLock(ctx, "tcgcsvd -products", func() error { return svc.SyncProducts(ctx) })
 	case *backfill:
 		// Outside the lock on purpose: hours of archives under a session
-		// advisory lock would block every daily ingest for the whole run.
+		// advisory lock would block every daily ingest for the whole run. The
+		// snapshot fallback is one crawl, so it is inside the same exception
+		// rather than worth its own lock handling.
 		err = svc.Backfill(ctx, tcgcsvd.BackfillOptions{
 			From: *from, To: *to, Categories: *categories, Force: *force,
 		})

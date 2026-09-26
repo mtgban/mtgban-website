@@ -66,6 +66,10 @@ func priceToRow(date string, categoryID int, p tcgcsv.Price) timeseries.TCGPrice
 // YYYY-MM-DD strings as typed on a command line, and the zero value means
 // "every configured game, from the archive epoch through today, resuming from
 // each category's high-water mark".
+//
+// Only the archive can reach a past day, and tcgcsv has not served it since
+// September 2026, so a range wholly in the past currently fails whatever is
+// asked for here. See docs/tcgcsv-archive-withdrawal.md.
 type BackfillOptions struct {
 	// From and To bound the range, inclusive. Empty From starts at the archive
 	// epoch; empty To ends today (UTC).
@@ -77,8 +81,9 @@ type BackfillOptions struct {
 	Force bool
 }
 
-// Backfill fills tcg_prices from tcgcsv's daily archives over the requested
-// range. Invoked by the -tcgcsv-backfill server flag and by cmd/tcgcsvd.
+// Backfill fills tcg_prices over the requested range, from tcgcsv's daily
+// archives where they are served and from the current snapshot where they are
+// not. Invoked by the -tcgcsv-backfill server flag and by cmd/tcgcsvd.
 func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	games, err := s.SelectGames(opts.Categories)
 	if err != nil {
@@ -114,19 +119,13 @@ func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	return s.backfill(ctx, games, from, to, resume)
 }
 
-// backfill fills tcg_prices from tcgcsv's daily archives for each of the given
-// games, one day at a time. When resume is set it skips a day for a category
-// once that category already has data on or after it (the default backfill's
-// per-category high-water mark); when resume is false it fetches every day in
-// [from, to]. Archives are downloaded only for days that at least one category
-// still needs, so resumed re-runs are cheap and a game added to the config today
-// pulls its whole history while the games already current skip every day.
+// backfill fills tcg_prices for the given games over [from, to]. It prefers
+// tcgcsv's daily archives, which are the only thing that can reach a past day,
+// and falls back to the current snapshot when tcgcsv isn't serving them -- the
+// live per-group price files it now asks callers to read instead.
 func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time, resume bool) error {
 	if s.store.ReadOnly() {
 		return errors.New("tcgcsv: price database is read-only; nothing would be written")
-	}
-	if err := tcgcsv.CheckArchiveTooling(); err != nil {
-		return err
 	}
 	if err := s.store.EnsureTCGSchema(ctx); err != nil {
 		return err
@@ -135,6 +134,55 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 		return err
 	}
 
+	err := s.backfillFromArchive(ctx, games, from, to, resume)
+	if !errors.Is(err, tcgcsv.ErrArchiveUnavailable) {
+		return err
+	}
+	log.Printf("tcgcsv backfill: %v", err)
+	return s.backfillFromSnapshot(ctx, games, from, to)
+}
+
+// backfillFromSnapshot is what a backfill can still do once tcgcsv withdraws
+// the archive: store the one day it does publish. That is only worth doing when
+// the snapshot's own date falls inside the requested range -- writing today's
+// prices because someone asked for last July would be a surprise, and the range
+// they asked for is genuinely gone, so say so instead.
+func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time) error {
+	snapshot, dateStr, err := s.snapshotDate(ctx)
+	if err != nil {
+		return err
+	}
+	fromStr, toStr := from.Format("2006-01-02"), to.Format("2006-01-02")
+	if snapshot.Before(from) || snapshot.After(to) {
+		return fmt.Errorf("tcgcsv backfill: the price archive is no longer served, and the only prices tcgcsv still publishes are the %s snapshot, outside the requested %s..%s; that range cannot be recovered",
+			dateStr, fromStr, toStr)
+	}
+
+	// force: the operator named these dates, so re-fetch the snapshot even for a
+	// category already holding it. It is the one day still reachable, and the
+	// freshness gate would otherwise turn the whole run into a no-op.
+	rows, _, err := s.ingestSnapshot(ctx, games, snapshot, dateStr, true)
+	if err != nil {
+		return fmt.Errorf("tcgcsv backfill from the %s snapshot: %w", dateStr, err)
+	}
+	// Worth waking someone for: a backfill that was meant to close a hole has
+	// stored one day and left the rest of the range permanently missing.
+	s.notifyf("backfill: the price archive is no longer served; stored the %s snapshot (%d rows), but %s..%s cannot be recovered",
+		dateStr, rows, fromStr, toStr)
+	log.Printf("tcgcsv backfill: stored the %s snapshot, %d rows; %s..%s stays missing while the archive is withdrawn",
+		dateStr, rows, fromStr, toStr)
+	return nil
+}
+
+// backfillFromArchive fills tcg_prices from tcgcsv's daily archives for each of
+// the given games, one day at a time. When resume is set it skips a day for a
+// category once that category already has data on or after it (the default
+// backfill's per-category high-water mark); when resume is false it fetches
+// every day in [from, to]. Archives are downloaded only for days that at least
+// one category still needs, so resumed re-runs are cheap and a game added to the
+// config today pulls its whole history while the games already current skip
+// every day.
+func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time, resume bool) error {
 	// Resume cursor: the newest date already stored per category. Consulted only
 	// when resuming; an explicit range or force fetches every day in [from, to].
 	latest := make(map[int]time.Time)
@@ -153,7 +201,7 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 	log.Printf("tcgcsv backfill: %s..%s across %d game(s), resume=%v",
 		from.Format("2006-01-02"), to.Format("2006-01-02"), len(games), resume)
 
-	var totalRows, daysWithData, daysEmpty, daysFailed int
+	var totalRows, daysNeeded, daysWithData, daysEmpty, daysMissing, daysFailed int
 	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
 		// Which categories still need this day?
 		need := make(map[int]bool)
@@ -165,8 +213,16 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 		if len(need) == 0 {
 			continue
 		}
+		daysNeeded++
 
 		byCat, ok, err := s.client.FetchPriceArchive(ctx, day, need)
+		if errors.Is(err, tcgcsv.ErrArchiveUnavailable) || errors.Is(err, tcgcsv.ErrArchiveTooling) {
+			// Neither says anything about this one day: the archive isn't being
+			// served, or nothing on this box can unpack it. Every remaining day
+			// would answer the same, so stop instead of asking hundreds more
+			// times, and let the caller decide what to do about it.
+			return err
+		}
 		if err != nil {
 			// A single bad or unreachable archive shouldn't halt a multi-year
 			// backfill; log it, count it, and move on. The day can be retried
@@ -176,6 +232,7 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 			continue
 		}
 		if !ok {
+			daysMissing++
 			continue // no archive published for that day (HTTP 404)
 		}
 
@@ -210,10 +267,18 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 		log.Printf("tcgcsv backfill %s: %d rows (%d categories)", dateStr, n, len(byCat))
 	}
 
-	log.Printf("tcgcsv backfill complete: %d rows over %d days (%d empty, %d failed)",
-		totalRows, daysWithData, daysEmpty, daysFailed)
+	log.Printf("tcgcsv backfill complete: %d rows over %d days (%d empty, %d missing, %d failed)",
+		totalRows, daysWithData, daysEmpty, daysMissing, daysFailed)
 	if daysFailed > 0 {
 		return fmt.Errorf("tcgcsv backfill: %d day(s) failed; re-run with -force to retry them", daysFailed)
+	}
+	// Every day answering "no archive published" is how the archive disappearing
+	// would look if it ever 404s rather than 403s, and the loop above would
+	// otherwise report that as a clean run over zero days. One unpublished day at
+	// the tail of a range is ordinary -- today's archive lands after tcgcsv's
+	// evening refresh -- so only a range that is entirely missing counts.
+	if daysWithData == 0 && daysNeeded > 1 && daysMissing == daysNeeded {
+		return fmt.Errorf("%w: all %d requested day(s) answered 404", tcgcsv.ErrArchiveUnavailable, daysMissing)
 	}
 	// Fetching archives but storing nothing anywhere is not a real "complete":
 	// it is almost always broken extraction tooling or a category filter that
@@ -276,63 +341,87 @@ func (s *Service) IngestLatest(ctx context.Context) error {
 		return err
 	}
 
-	updated, err := s.client.LastUpdated(ctx)
+	snapshot, dateStr, err := s.snapshotDate(ctx)
 	if err != nil {
-		return fmt.Errorf("tcgcsv: last-updated: %w", err)
-	}
-	// tcgcsv names each day's archive (prices-YYYY-MM-DD) for the UTC date of
-	// this same last-updated stamp, verified against the live service:
-	// last-updated 2026-07-05T20:05Z is served by prices-2026-07-05, and the
-	// refresh runs at a steady ~20:05 UTC, well clear of midnight. Truncating to
-	// the UTC day therefore yields the archive's filename date, so a live pull
-	// and a later backfill of the same snapshot key the same row instead of
-	// recording it under two adjacent dates.
-	snapshot := updated.UTC().Truncate(24 * time.Hour)
-	dateStr := snapshot.Format("2006-01-02")
-
-	// Ingest each game independently: one game's failure (a flaky endpoint, a bad
-	// group) is logged and collected, not fatal, so the remaining games still get
-	// pulled. A game is all-or-nothing — its rows land in a single upsert only
-	// after every group fetched cleanly — so a failed game writes nothing and its
-	// freshness cursor doesn't advance, leaving it safe to retry next run.
-	var totalRows int
-	var errs []error
-	for _, g := range s.games {
-		n, err := s.ingestGame(ctx, g.CategoryID, snapshot, dateStr)
-		if err != nil {
-			log.Printf("tcgcsv daily %s: category %d failed: %v", dateStr, g.CategoryID, err)
-			errs = append(errs, fmt.Errorf("category %d: %w", g.CategoryID, err))
-			continue
-		}
-		totalRows += n
+		return err
 	}
 
+	totalRows, failed, err := s.ingestSnapshot(ctx, s.games, snapshot, dateStr, false)
 	if totalRows > 0 {
 		s.notifyf("daily ingest %s: %d rows", dateStr, totalRows)
 	}
-	if len(errs) > 0 {
+	if err != nil {
 		log.Printf("tcgcsv daily ingest %s: %d rows, %d of %d game(s) failed",
-			dateStr, totalRows, len(errs), len(s.games))
-		return fmt.Errorf("tcgcsv daily ingest: %d of %d game(s) failed: %w",
-			len(errs), len(s.games), errors.Join(errs...))
+			dateStr, totalRows, failed, len(s.games))
+		return fmt.Errorf("tcgcsv daily ingest: %w", err)
 	}
 	log.Printf("tcgcsv daily ingest complete: %d rows for %s", totalRows, dateStr)
 	return nil
 }
 
+// snapshotDate asks tcgcsv when it last refreshed and returns the date its rows
+// are keyed by, both as a time and as the string the table stores.
+//
+// tcgcsv names each day's archive (prices-YYYY-MM-DD) for the UTC date of this
+// same last-updated stamp, verified against the live service: last-updated
+// 2026-07-05T20:05Z is served by prices-2026-07-05, and the refresh runs at a
+// steady ~20:05 UTC, well clear of midnight. Truncating to the UTC day therefore
+// yields the archive's filename date, so a live pull and a later backfill of the
+// same snapshot key the same row instead of recording it under two adjacent
+// dates.
+func (s *Service) snapshotDate(ctx context.Context) (time.Time, string, error) {
+	updated, err := s.client.LastUpdated(ctx)
+	if err != nil {
+		return time.Time{}, "", fmt.Errorf("tcgcsv: last-updated: %w", err)
+	}
+	snapshot := updated.UTC().Truncate(24 * time.Hour)
+	return snapshot, snapshot.Format("2006-01-02"), nil
+}
+
+// ingestSnapshot pulls tcgcsv's current per-group prices for each game and
+// upserts them under the snapshot's date, returning the rows written and how
+// many games failed.
+//
+// Each game is ingested independently: one game's failure (a flaky endpoint, a
+// bad group) is logged and collected, not fatal, so the remaining games still
+// get pulled. A game is all-or-nothing — its rows land in a single upsert only
+// after every group fetched cleanly — so a failed game writes nothing and its
+// freshness cursor doesn't advance, leaving it safe to retry next run. force
+// ignores that cursor, which is what a backfill onto the snapshot's own date
+// needs.
+func (s *Service) ingestSnapshot(ctx context.Context, games []tcgcsv.GameConfig, snapshot time.Time, dateStr string, force bool) (rows, failed int, err error) {
+	var errs []error
+	for _, g := range games {
+		n, gerr := s.ingestGame(ctx, g.CategoryID, snapshot, dateStr, force)
+		if gerr != nil {
+			log.Printf("tcgcsv snapshot %s: category %d failed: %v", dateStr, g.CategoryID, gerr)
+			errs = append(errs, fmt.Errorf("category %d: %w", g.CategoryID, gerr))
+			continue
+		}
+		rows += n
+	}
+	if len(errs) > 0 {
+		return rows, len(errs), fmt.Errorf("%d of %d game(s) failed: %w",
+			len(errs), len(games), errors.Join(errs...))
+	}
+	return rows, 0, nil
+}
+
 // ingestGame pulls one game's current snapshot and upserts it under dateStr. It
 // returns the number of rows written, which is 0 when the category already holds
-// the snapshot date (the freshness gate) or the game reports no prices. All of a
-// game's rows are written in one upsert, so a mid-fetch failure leaves the
-// category untouched and safe to retry.
-func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.Time, dateStr string) (int, error) {
-	latest, ok, err := s.store.GetTCGLatestDate(ctx, categoryID)
-	if err != nil {
-		return 0, fmt.Errorf("latest date: %w", err)
-	}
-	if ok && !snapshot.After(latest) {
-		log.Printf("tcgcsv daily %s: category %d already current", dateStr, categoryID)
-		return 0, nil
+// the snapshot date (the freshness gate, which force skips) or the game reports
+// no prices. All of a game's rows are written in one upsert, so a mid-fetch
+// failure leaves the category untouched and safe to retry.
+func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.Time, dateStr string, force bool) (int, error) {
+	if !force {
+		latest, ok, err := s.store.GetTCGLatestDate(ctx, categoryID)
+		if err != nil {
+			return 0, fmt.Errorf("latest date: %w", err)
+		}
+		if ok && !snapshot.After(latest) {
+			log.Printf("tcgcsv snapshot %s: category %d already current", dateStr, categoryID)
+			return 0, nil
+		}
 	}
 
 	groups, err := s.client.Groups(ctx, categoryID)
@@ -359,9 +448,9 @@ func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.
 	}
 	if s.longForm {
 		if _, lerr := s.writeLongForm(ctx, rows); lerr != nil {
-			log.Printf("tcgcsv daily long-form category %d: %v", categoryID, lerr)
+			log.Printf("tcgcsv snapshot long-form category %d: %v", categoryID, lerr)
 		}
 	}
-	log.Printf("tcgcsv daily %s: category %d, %d rows (%d groups)", dateStr, categoryID, n, len(groups))
+	log.Printf("tcgcsv snapshot %s: category %d, %d rows (%d groups)", dateStr, categoryID, n, len(groups))
 	return n, nil
 }
