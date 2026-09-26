@@ -209,7 +209,7 @@ func TestParseEmptyQueryIsNotACrash(t *testing.T) {
 				retail, buylist = []string{"CK"}, []string{"CK"}
 			}
 
-			config := parseSearchOptionsNG(tc.query, retail, buylist, nil)
+			config := parseSearchOptionsNG(backend(), tc.query, retail, buylist, nil)
 
 			// The blocklists are the one thing an empty query still carries:
 			// they are what keeps a search off the stores a reader blocked.

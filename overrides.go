@@ -75,7 +75,7 @@ func saveKeyOverrides(overrides KeyOverrides) error {
 // overrides: any non-empty target UUID that does not resolve to a known card.
 // Wrong-key UUIDs are not validated — a stale/typo'd key is a harmless no-op at
 // load time, whereas a bogus target would silently create a dead inventory key.
-func validateKeyOverrides(overrides KeyOverrides) []string {
+func validateKeyOverrides(b *mtgmatcher.Backend, overrides KeyOverrides) []string {
 	var bad []string
 	for shorthand, byKind := range overrides {
 		for kind, remap := range byKind {
@@ -83,7 +83,7 @@ func validateKeyOverrides(overrides KeyOverrides) []string {
 				if correct == "" {
 					continue // "" means drop the listing, always valid
 				}
-				if _, err := backend().GetUUID(correct); err != nil {
+				if _, err := b.GetUUID(correct); err != nil {
 					bad = append(bad, fmt.Sprintf("%s/%s: %s → %s (unknown card)", shorthand, kind, wrong, correct))
 				}
 			}
@@ -135,8 +135,8 @@ func uuidCardLabel(co *mtgmatcher.CardObject) string {
 }
 
 // newOverrideCard builds the display data for a card uuid, or nil if unknown.
-func newOverrideCard(uuid string) *OverrideCard {
-	co, err := backend().GetUUID(uuid)
+func newOverrideCard(b *mtgmatcher.Backend, uuid string) *OverrideCard {
+	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return nil
 	}
@@ -151,14 +151,14 @@ func newOverrideCard(uuid string) *OverrideCard {
 // printing that shares its name — the realistic targets when fixing a bad
 // match. Everything comes from the in-memory card database at render time;
 // there is no lookup endpoint. Returns nil when the uuid is unknown.
-func overrideFixCandidates(wrongUUID string) (wrong *OverrideCard, candidates []OverrideCard) {
-	co, err := backend().GetUUID(wrongUUID)
+func overrideFixCandidates(b *mtgmatcher.Backend, wrongUUID string) (wrong *OverrideCard, candidates []OverrideCard) {
+	co, err := b.GetUUID(wrongUUID)
 	if err != nil {
 		return nil, nil
 	}
-	wrong = newOverrideCard(wrongUUID)
+	wrong = newOverrideCard(b, wrongUUID)
 
-	uuids, err := backend().SearchEquals(co.Name)
+	uuids, err := b.SearchEquals(co.Name)
 	if err != nil {
 		return wrong, nil
 	}
@@ -166,7 +166,7 @@ func overrideFixCandidates(wrongUUID string) (wrong *OverrideCard, candidates []
 		if id == wrongUUID {
 			continue
 		}
-		if card := newOverrideCard(id); card != nil {
+		if card := newOverrideCard(b, id); card != nil {
 			candidates = append(candidates, *card)
 		}
 	}

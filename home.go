@@ -32,14 +32,14 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	pageVars.PopularSearches = getPopularSearches()
+	pageVars.PopularSearches = getPopularSearches(currentDatastore())
 
 	// The chart "add a card" modal loads the homepage in an iframe with
 	// ?modal=1&chart=<roster>. In that mode we render chrome-free and carry the
 	// roster forward so a search from here lands back on the results page still
 	// in modal context (with the add-to-chart affordance).
 	pageVars.ModalMode = r.FormValue("modal") == "1"
-	chartIDs, _ := parseChartIDs(r.FormValue("chart"))
+	chartIDs, _ := parseChartIDs(backend(), r.FormValue("chart"))
 	pageVars.ChartIDsCSV = strings.Join(chartIDs, ",")
 
 	render(w, "home.html", pageVars)

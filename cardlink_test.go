@@ -36,9 +36,9 @@ func TestCardLinkResolvesToItsPrinting(t *testing.T) {
 		}
 		checked++
 
-		card := uuid2card(uuids[i], true, false, false)
+		card := uuid2card(backend(), uuids[i], true, false, false)
 		query := linkQuery(t, card.SearchURL)
-		keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 		if err != nil {
 			t.Errorf("%s #%s: %v", co.SetCode, co.Number, err)
 			continue
@@ -100,7 +100,7 @@ func TestCardLinkIsThePrintingsQuery(t *testing.T) {
 		}
 		co, _ := backend().GetUUID(tt.id)
 		want := tt.page + url.QueryEscape(genQuery(co))
-		if got := uuid2card(tt.id, true, false, false).SearchURL; got != want {
+		if got := uuid2card(backend(), tt.id, true, false, false).SearchURL; got != want {
 			t.Errorf("%s links to %q, want %q", co.Name, got, want)
 		}
 	}

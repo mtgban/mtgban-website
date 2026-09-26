@@ -26,7 +26,7 @@ func TestPatternKeepsItsBrackets(t *testing.T) {
 		{`ee:(Secret|Special)`, "edition_regexp", "(Secret|Special)"},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
-			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			var elem *FilterElem
 			for i := range config.CardFilters {
 				if config.CardFilters[i].Name == tt.filter {
@@ -69,7 +69,7 @@ func TestPatternWithBracketsMatches(t *testing.T) {
 		{`ee:(Secret|Special)`, "edition_regexp", true},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
-			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			var elem *FilterElem
 			for i := range config.CardFilters {
 				if config.CardFilters[i].Name == tt.filter {

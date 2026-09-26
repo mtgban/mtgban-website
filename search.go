@@ -172,11 +172,11 @@ var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 // dropped, because pinning a name is what the main bar is for. A bar
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
-func scopeFilters(scope string) []FilterElem {
+func scopeFilters(b *mtgmatcher.Backend, scope string) []FilterElem {
 	if scope == "" {
 		return nil
 	}
-	return parseSearchOptionsNG(scope, nil, nil, nil).CardFilters
+	return parseSearchOptionsNG(b, scope, nil, nil, nil).CardFilters
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
@@ -211,14 +211,14 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 
 // searchSuggestions adapts a parsed search that found nothing into the
 // suggest package's inputs.
-func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
+func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
 	return suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
 		CleanQuery:     config.CleanQuery,
 		SearchMode:     config.SearchMode,
 		AppliedFilters: config.AppliedFilters,
 		Sealed:         sealed,
-		Backend:        backend(),
+		Backend:        b,
 	})
 }
 
@@ -231,7 +231,7 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 // Every filter the query already carried is kept, so "s:OGN metal" still means
 // that set; only the name is read a second way. A hashing search names its own
 // cards and is left alone.
-func searchFallback(config SearchConfig) []string {
+func searchFallback(ds *datastore, config SearchConfig) []string {
 	if config.CleanQuery == "" || config.SearchMode == "hashing" {
 		return nil
 	}
@@ -241,12 +241,12 @@ func searchFallback(config SearchConfig) []string {
 	config.FullQuery = ""
 	base := slices.Clone(config.CardFilters)
 
-	if promoTypes := promoTypeMatches(query); len(promoTypes) > 0 {
+	if promoTypes := promoTypeMatches(ds.backend, query); len(promoTypes) > 0 {
 		config.CardFilters = append(slices.Clone(base), FilterElem{
 			Name:   "is",
 			Values: promoTypes,
 		})
-		if keys, err := searchAndFilter(config); err == nil && len(keys) > 0 {
+		if keys, err := searchAndFilter(ds, config); err == nil && len(keys) > 0 {
 			return keys
 		}
 	}
@@ -258,12 +258,12 @@ func searchFallback(config SearchConfig) []string {
 		return nil
 	}
 
-	if codes := setCodeMatches(query); len(codes) > 0 {
+	if codes := setCodeMatches(ds.backend, query); len(codes) > 0 {
 		config.CardFilters = append(slices.Clone(base), FilterElem{
 			Name:   "edition",
 			Values: codes,
 		})
-		if keys, err := searchAndFilter(config); err == nil && len(keys) > 0 {
+		if keys, err := searchAndFilter(ds, config); err == nil && len(keys) > 0 {
 			return keys
 		}
 	}
@@ -280,8 +280,8 @@ func searchFallback(config SearchConfig) []string {
 // resolution has a fallback for exactly that case: a printing the datastore
 // retired but the archive still holds prices for charts from our own history.
 // Refusing it here is what decides it never gets asked about.
-func isValidChartID(part string) bool {
-	if _, err := backend().GetUUID(part); err == nil {
+func isValidChartID(b *mtgmatcher.Backend, part string) bool {
+	if _, err := b.GetUUID(part); err == nil {
 		return true
 	}
 	switch prefix, _ := splitIDPrefix(part); prefix {
@@ -300,8 +300,8 @@ func isValidChartID(part string) bool {
 // mtgmatcher gives each finish its own id ("_f", "_e"), so handing the bare uuid
 // back to the search always lands on the nonfoil printing. Falls back to the
 // uuid when the finish has no id of its own.
-func magicFinishSearchID(uuid string, foil, etched bool) string {
-	if matched, err := backend().MatchID(uuid, foil, etched); err == nil {
+func magicFinishSearchID(b *mtgmatcher.Backend, uuid string, foil, etched bool) string {
+	if matched, err := b.MatchID(uuid, foil, etched); err == nil {
 		return matched
 	}
 	return uuid
@@ -331,7 +331,7 @@ func noteChartIDsDropped(pageVars *PageVars, dropped, total int, why string) {
 // handed back as it came: the results table will find no row for it, so the
 // card drops out of the page it was asked for. The caller says so rather than
 // letting it vanish.
-func chartSearchID(id string, target *chartTarget) (string, bool) {
+func chartSearchID(b *mtgmatcher.Backend, id string, target *chartTarget) (string, bool) {
 	if target != nil {
 		if target.SearchID != "" {
 			return target.SearchID, true
@@ -347,7 +347,7 @@ func chartSearchID(id string, target *chartTarget) (string, bool) {
 
 	// Nothing resolved, so there is no archive to have resolved against -
 	// a deployment without one, where the matcher still places a plain id.
-	if _, err := backend().GetUUID(id); err == nil {
+	if _, err := b.GetUUID(id); err == nil {
 		return id, true // already a matcher id (bare uuid / variant string)
 	}
 	prefix, val := splitIDPrefix(id)
@@ -359,7 +359,7 @@ func chartSearchID(id string, target *chartTarget) (string, bool) {
 
 	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
 	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
-	if matched, merr := backend().MatchID(val); merr == nil {
+	if matched, merr := b.MatchID(val); merr == nil {
 		return matched, true
 	}
 	return id, false
@@ -375,7 +375,7 @@ func chartSearchID(id string, target *chartTarget) (string, bool) {
 // handler by a crafted many-UUID chart= URL. truncated reports whether at
 // least one otherwise-valid, distinct card was dropped for exceeding the cap,
 // so the caller can tell the user instead of silently swallowing it.
-func parseChartIDs(chartParam string) (ids []string, truncated bool) {
+func parseChartIDs(b *mtgmatcher.Backend, chartParam string) (ids []string, truncated bool) {
 	if chartParam == "" {
 		return nil, false
 	}
@@ -384,7 +384,7 @@ func parseChartIDs(chartParam string) (ids []string, truncated bool) {
 		if part == "" {
 			continue
 		}
-		if !isValidChartID(part) {
+		if !isValidChartID(b, part) {
 			continue
 		}
 		if slices.Contains(ids, part) {
@@ -419,7 +419,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// The pinned bar lives in the url alone, so a page opened without it
 	// starts with nothing pinned.
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(scope)
+	pinned := scopeFilters(backend(), scope)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -475,7 +475,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	if query == "" && !scopeOnly {
 		if !pageVars.IsSealed && !isSetsPage {
-			pageVars.SetKeyrunes = getSetKeyrunes()
+			pageVars.SetKeyrunes = getSetKeyrunes(backend())
 		}
 	}
 
@@ -555,7 +555,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// disable the affordance at the boundary instead of dropping silently.
 	pageVars.MaxChartCards = len(multiCardPalette)
 
-	chartIDs, chartTruncated := parseChartIDs(chartParam)
+	chartIDs, chartTruncated := parseChartIDs(backend(), chartParam)
 
 	chartID := ""
 	// Roster id -> resolved search id, computed once per request: a ban:<id>
@@ -574,7 +574,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if target, asked := chartTargets[id]; asked {
 			return target
 		}
-		target, err := resolveChartTarget(r.Context(), id)
+		target, err := resolveChartTarget(r.Context(), backend(), id)
 		if err != nil {
 			target = nil
 		}
@@ -608,7 +608,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			searchIDs := make([]string, len(chartIDs))
 			var unresolved int
 			for i, id := range chartIDs {
-				searchID, ok := chartSearchID(id, chartTargetFor(id))
+				searchID, ok := chartSearchID(backend(), id, chartTargetFor(id))
 				if !ok {
 					unresolved++
 				}
@@ -710,7 +710,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
-	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchOptionsNG(backend(), query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
@@ -723,22 +723,22 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform search
-	allKeys, err := searchAndFilter(config)
+	allKeys, err := searchAndFilter(currentDatastore(), config)
 	if err != nil {
 		// No card carries the name, so read it another way before giving up.
 		// Only here: further down the results are empty because the cards that
 		// were found carry no listing, which is a fact about stock rather than
 		// an invitation to answer a different question.
-		allKeys = searchFallback(config)
+		allKeys = searchFallback(currentDatastore(), config)
 		if len(allKeys) == 0 {
 			if oembed {
 				oembedError(w, http.StatusNotFound)
 				return
 			}
 			pageVars.InfoMessage = NoCardsMessage
-			pageVars.PopularSearches = getPopularSearches()
+			pageVars.PopularSearches = getPopularSearches(currentDatastore())
 			pageVars.CleanSearchQuery = config.CleanQuery
-			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(query, config, pageVars.IsSealed)
+			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(backend(), query, config, pageVars.IsSealed)
 			render(w, "search.html", pageVars)
 			return
 		}
@@ -757,7 +757,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
 	if canUploadCustom && !config.SkipBuylist {
-		searchCustomBuylist(r, allKeys, foundVendors)
+		searchCustomBuylist(backend(), r, allKeys, foundVendors)
 	}
 
 	// Filter away any empty result
@@ -773,9 +773,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
 		}
-		pageVars.PopularSearches = getPopularSearches()
+		pageVars.PopularSearches = getPopularSearches(currentDatastore())
 		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(query, config, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(backend(), query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -783,8 +783,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Offered once the search has found cards to switch between. A product
 	// that holds nothing but other products answers with those products: rows
 	// on the page, but not cards, and reading them another way finds nothing.
-	if containsSingles(allKeys) {
-		pageVars.Contents = contentsViews(query, config)
+	if containsSingles(backend(), allKeys) {
+		pageVars.Contents = contentsViews(backend(), query, config)
 	}
 
 	// Only used in hashing searches, fill in data with what is available
@@ -824,11 +824,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.TotalUnique = len(allKeys)
 
 	if pageVars.IsMobile && !pageVars.IsSealed {
-		pageVars.EditionFilterList = editionsForSearch(allKeys)
+		pageVars.EditionFilterList = editionsForSearch(currentDatastore(), allKeys)
 	}
 
 	// Sort sets as requested, default to chronological
-	odds := dropOdds(config)
+	odds := dropOdds(backend(), config)
 	switch pageVars.SearchSort {
 	case "odds":
 		// Ascending by default, unlike every other field here: what a
@@ -841,7 +841,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// an expected count is actually known for. Missing sorts last
 		// regardless of direction, ranked among itself by the fallback the
 		// other fields use.
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			oddsI, hasI := odds[allKeys[i]]
 			oddsJ, hasJ := odds[allKeys[j]]
@@ -854,17 +854,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return oddsI < oddsJ
 		})
 	case "alpha":
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "hybrid":
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "number":
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
@@ -875,7 +875,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			retSellers = append([]string{retSeller}, defaultSellerPriorityOpt...)
 		}
 
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		prices := resolveBestPrices(allKeys, retSellers, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
 			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
@@ -891,7 +891,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			blVendors = append([]string{blVendor}, defaultVendorPriorityOpt...)
 		}
 
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
 		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -906,7 +906,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	default:
-		sortData := resolveSortingData(allKeys)
+		sortData := resolveSortingData(backend(), allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
@@ -933,11 +933,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		card := uuid2card(cardID, false, true, preferFlavor)
+		card := uuid2card(backend(), cardID, false, true, preferFlavor)
 		// Search results chart cards, so upgrade the chart handle to the cached
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
-		card.ChartID = chartIDForCard(cardID)
+		card.ChartID = chartIDForCard(backend(), cardID)
 		pageVars.Metadata[cardID] = card
 	}
 
@@ -986,7 +986,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
-	preview := embed.Generate(backend(), externalURL(r), allKeys, editionTitle, func(cardID string) []embed.Entry {
+	preview := embed.Generate(backend(), externalURL(r), allKeys, func(cardID string) string {
+		return editionTitle(backend(), cardID)
+	}, func(cardID string) []embed.Entry {
 		return EmbedSellerEntries(foundSellers, cardID, true)
 	})
 	if oembed {
@@ -1013,7 +1015,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if len(co.Printings) > 0 {
 				pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", embed.PrintingsLine(co.Printings))
 			} else {
-				pageVars.Embed.Description = fmt.Sprintf("%s - %s", co.Name, editionTitle(allKeys[0]))
+				pageVars.Embed.Description = fmt.Sprintf("%s - %s", co.Name, editionTitle(backend(), allKeys[0]))
 			}
 			imgCrop := co.Images["crop"]
 			if imgCrop != "" {
@@ -1203,7 +1205,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
 		// non-empty and the template renders the results+chart layout rather than
 		// the empty-query editions browse.
-		cfg := parseSearchOptionsNG(chartSearchIDs[chartID], nil, nil, nil)
+		cfg := parseSearchOptionsNG(backend(), chartSearchIDs[chartID], nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
@@ -1290,10 +1292,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					for i, card := range cards {
 						names[i] = card.Name
 					}
-					pageVars.Checkpoints = multiCardCheckpoints(names, earliest)
+					pageVars.Checkpoints = multiCardCheckpoints(currentDatastore(), names, earliest)
 				} else {
 					pageVars.Datasets = cards[0].Datasets
-					pageVars.Checkpoints = relevantCheckpoints(cards[0].Name, earliest)
+					pageVars.Checkpoints = relevantCheckpoints(currentDatastore(), cards[0].Name, earliest)
 				}
 				// A card the archive did not answer for is missing from the chart,
 				// which says nothing about its prices: never call such a chart
@@ -1322,8 +1324,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
-			pageVars.Datasets = getDatasets(r.Context(), chartID, co.Sealed, pageVars.AxisLabels, lb)
-			pageVars.Checkpoints = relevantCheckpoints(co.Name, earliest)
+			pageVars.Datasets = getDatasets(r.Context(), backend(), chartID, co.Sealed, pageVars.AxisLabels, lb)
+			pageVars.Checkpoints = relevantCheckpoints(currentDatastore(), co.Name, earliest)
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"
 			}
@@ -1355,12 +1357,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
-				datasets, refs := getDatasetsForMulti(r.Context(), chartIDs, pageVars.AxisLabels, lb)
+				datasets, refs := getDatasetsForMulti(r.Context(), backend(), chartIDs, pageVars.AxisLabels, lb)
 				pageVars.Datasets = datasets
 				pageVars.ChartReferences = refs
 				// Shared timeline across the roster: the union of every card's
 				// releases, reprints and bans/unbans, deduped onto one axis.
-				pageVars.Checkpoints = multiCardCheckpoints(chartNames, earliest)
+				pageVars.Checkpoints = multiCardCheckpoints(currentDatastore(), chartNames, earliest)
 				if len(datasets) == 0 {
 					pageVars.InfoMessage = "No chart data available"
 				}
@@ -1704,7 +1706,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 
 // Append a virtual buylist to search results, priced off the reference
 // seller inventories according to the custom buylist rule settings
-func searchCustomBuylist(r *http.Request, cardIDs []string, foundVendors map[string]map[string][]SearchEntry) {
+func searchCustomBuylist(b *mtgmatcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[string][]SearchEntry) {
 	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 	if !slices.Contains(customOpts, "enabled") {
 		return
@@ -1728,7 +1730,7 @@ func searchCustomBuylist(r *http.Request, cardIDs []string, foundVendors map[str
 	// Decklist/hashing searches repeat a key once per copy; foundVendors is
 	// keyed by the unique card, so dedupe to avoid appending an entry per copy.
 	for _, cardID := range dedupeKeys(cardIDs) {
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -1811,9 +1813,9 @@ const (
 
 // containsSingles answers whether a result set holds a card, as opposed to
 // holding only the products that cards come in.
-func containsSingles(cardIDs []string) bool {
+func containsSingles(b *mtgmatcher.Backend, cardIDs []string) bool {
 	for _, cardID := range cardIDs {
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err == nil && !co.Sealed {
 			return true
 		}
@@ -1856,16 +1858,16 @@ type ContentsViews struct {
 // every product in the datastore it answers in half a second, the slowest
 // single product in 4ms and the slowest with a variable part in 1.4ms,
 // against a search that then prices every card found.
-func dropOdds(config SearchConfig) map[string]float64 {
+func dropOdds(b *mtgmatcher.Backend, config SearchConfig) map[string]float64 {
 	if config.ContentsMode != ContentsVariable || config.ContentsProduct == "" {
 		return nil
 	}
-	co, err := backend().GetUUID(config.ContentsProduct)
+	co, err := b.GetUUID(config.ContentsProduct)
 	if err != nil {
 		LogPages["Search"].Println("dropOdds:", config.ContentsProduct, err)
 		return nil
 	}
-	probs, err := backend().GetProbabilitiesForSealed(co.SetCode, co.UUID)
+	probs, err := b.GetProbabilitiesForSealed(co.SetCode, co.UUID)
 	if err != nil {
 		LogPages["Search"].Println("dropOdds:", co.Name, err)
 		return nil
@@ -1878,19 +1880,19 @@ func dropOdds(config SearchConfig) map[string]float64 {
 	return counts
 }
 
-func contentsViews(query string, config SearchConfig) *ContentsViews {
+func contentsViews(b *mtgmatcher.Backend, query string, config SearchConfig) *ContentsViews {
 	if config.ContentsProduct == "" || config.ContentsMode == "" {
 		return nil
 	}
 
-	co, err := backend().GetUUID(config.ContentsProduct)
+	co, err := b.GetUUID(config.ContentsProduct)
 	if err != nil {
 		return nil
 	}
-	if !backend().SealedHasDecklist(co.SetCode, co.UUID) {
+	if !b.SealedHasDecklist(co.SetCode, co.UUID) {
 		return nil
 	}
-	if !backend().SealedIsRandom(co.SetCode, co.UUID) {
+	if !b.SealedIsRandom(co.SetCode, co.UUID) {
 		return nil
 	}
 
@@ -1966,7 +1968,7 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 // names what a card must not have among possibly many others it does, which
 // is not a set this can name by enumerating one store's keys - and a
 // negated store filter carries no Values to enumerate regardless.
-func storeSeedUUIDs(config SearchConfig) ([]string, bool) {
+func storeSeedUUIDs(b *mtgmatcher.Backend, config SearchConfig) ([]string, bool) {
 	var f *FilterPostElem
 	for i := range config.PostFilters {
 		if config.PostFilters[i].Name == "any" && len(config.PostFilters[i].Values) > 0 {
@@ -1984,7 +1986,7 @@ func storeSeedUUIDs(config SearchConfig) ([]string, bool) {
 	// rather than handed to a mode that otherwise never returns one.
 	var uuids []string
 	addCard := func(cardID string) {
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		if err != nil || co.Sealed {
 			return
 		}
@@ -2019,7 +2021,7 @@ func storeSeedUUIDs(config SearchConfig) ([]string, bool) {
 	return dedupeKeys(uuids), true
 }
 
-func searchAndFilter(config SearchConfig) ([]string, error) {
+func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 	query := config.CleanQuery
 	filters := config.CardFilters
 
@@ -2042,10 +2044,10 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			for _, code := range codes {
 				switch config.SearchMode {
 				case "", "prefix", "any":
-					uuids = append(uuids, backend().GetUUIDsInSet(code)...)
+					uuids = append(uuids, ds.backend.GetUUIDsInSet(code)...)
 					seeded = true
 				case "sealed":
-					uuids = append(uuids, backend().GetSealedUUIDsInSet(code)...)
+					uuids = append(uuids, ds.backend.GetSealedUUIDsInSet(code)...)
 					seeded = true
 				}
 			}
@@ -2056,7 +2058,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		if !seeded {
 			switch config.SearchMode {
 			case "", "prefix", "any":
-				uuids, seeded = numberSeedUUIDs(currentDatastore().numbers, filters)
+				uuids, seeded = numberSeedUUIDs(ds.numbers, filters)
 			}
 		}
 		// A plain store:/seller:/vendor: query names its own exact result
@@ -2071,7 +2073,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		if !seeded {
 			switch config.SearchMode {
 			case "", "prefix", "any":
-				uuids, seeded = storeSeedUUIDs(config)
+				uuids, seeded = storeSeedUUIDs(ds.backend, config)
 			}
 		}
 	}
@@ -2079,31 +2081,31 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 	if !seeded {
 		switch config.SearchMode {
 		case "exact":
-			uuids, err = backend().SearchEquals(query)
+			uuids, err = ds.backend.SearchEquals(query)
 		case "any":
-			uuids, err = backend().SearchContains(query)
+			uuids, err = ds.backend.SearchContains(query)
 		case "prefix":
-			uuids, err = backend().SearchHasPrefix(query)
+			uuids, err = ds.backend.SearchHasPrefix(query)
 		case "hashing":
 			uuids = config.UUIDs
 		case "regexp":
-			uuids, err = backend().SearchRegexp(query)
+			uuids, err = ds.backend.SearchRegexp(query)
 		case "sealed":
-			uuids, err = backend().SearchSealedEquals(query)
+			uuids, err = ds.backend.SearchSealedEquals(query)
 			if err != nil {
-				uuids, err = backend().SearchSealedContains(query)
+				uuids, err = ds.backend.SearchSealedContains(query)
 			}
 		case "scryfall":
-			uuids, err = searchScryfall(query)
+			uuids, err = searchScryfall(ds.backend, query)
 		case "mixed":
-			uuids, err = backend().SearchSealedEquals(query)
+			uuids, err = ds.backend.SearchSealedEquals(query)
 			if err != nil {
-				uuids, err = backend().SearchSealedContains(query)
+				uuids, err = ds.backend.SearchSealedContains(query)
 			}
-			moreUUIDs, _ := backend().SearchEquals(query)
+			moreUUIDs, _ := ds.backend.SearchEquals(query)
 			uuids = append(uuids, moreUUIDs...)
 		default:
-			uuids, err = backend().SearchEquals(query)
+			uuids, err = ds.backend.SearchEquals(query)
 			// An exact name match can be a red herring: "serra" names a
 			// Vanguard card, so "s:leb serra" would stop at it and then
 			// filter it out, finding nothing. When the filters reject every
@@ -2112,19 +2114,19 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			// surviving exact matches return directly so the filters run
 			// once either way.
 			if err == nil && len(filters) != 0 {
-				selected := filterUUIDs(uuids, filters)
+				selected := filterUUIDs(ds.backend, uuids, filters)
 				if len(selected) != 0 {
 					return selected, nil
 				}
-				moreUUIDs, moreErr := backend().SearchHasPrefix(query)
+				moreUUIDs, moreErr := ds.backend.SearchHasPrefix(query)
 				if moreErr == nil {
 					uuids = moreUUIDs
 				}
 			}
 			if err != nil {
-				uuids, err = backend().SearchHasPrefix(query)
+				uuids, err = ds.backend.SearchHasPrefix(query)
 				if err != nil {
-					uuids, err = backend().SearchRegexp(query)
+					uuids, err = ds.backend.SearchRegexp(query)
 				}
 			}
 		}
@@ -2132,21 +2134,21 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		// the sealed tab: what is asked there is which product carries the
 		// name, and none is a better answer than a card nobody asked for.
 		if err != nil && config.SearchMode != "sealed" {
-			uuids, err = attemptMatch(query)
+			uuids, err = attemptMatch(ds.backend, query)
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return filterUUIDs(uuids, filters), nil
+	return filterUUIDs(ds.backend, uuids, filters), nil
 }
 
 // filterUUIDs returns the uuids that pass every card filter.
-func filterUUIDs(uuids []string, filters []FilterElem) []string {
+func filterUUIDs(b *mtgmatcher.Backend, uuids []string, filters []FilterElem) []string {
 	var selected []string
 	for _, uuid := range uuids {
-		if shouldSkipCardNG(uuid, filters) {
+		if shouldSkipCardNG(b, uuid, filters) {
 			continue
 		}
 		selected = append(selected, uuid)
@@ -2154,16 +2156,16 @@ func filterUUIDs(uuids []string, filters []FilterElem) []string {
 	return selected
 }
 
-func editionsForSearch(allKeys []string) []EditionEntry {
+func editionsForSearch(ds *datastore, allKeys []string) []EditionEntry {
 	codes := map[string]bool{}
 	seenNames := map[string]bool{}
 	for _, cardID := range allKeys {
-		co, err := backend().GetUUID(cardID)
+		co, err := ds.backend.GetUUID(cardID)
 		if err != nil || seenNames[co.Name] {
 			continue
 		}
 		seenNames[co.Name] = true
-		printings, err := backend().Printings4Card(co.Name)
+		printings, err := ds.backend.Printings4Card(co.Name)
 		if err != nil {
 			continue
 		}
@@ -2175,7 +2177,7 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 		return nil
 	}
 
-	editions := GetEditions()
+	editions := ds.editions
 	out := make([]EditionEntry, 0, len(codes))
 	for code := range codes {
 		if entry, ok := editions.AllEditionsMap[code]; ok {
@@ -2190,9 +2192,9 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 
 // addFinishVariants appends id's foil and etched finishes to uuids, skipping
 // any that don't exist, equal id, or are already present.
-func addFinishVariants(uuids []string, id string) []string {
-	foilID, _ := backend().MatchID(id, true)
-	etchedID, _ := backend().MatchID(id, false, true)
+func addFinishVariants(b *mtgmatcher.Backend, uuids []string, id string) []string {
+	foilID, _ := b.MatchID(id, true)
+	etchedID, _ := b.MatchID(id, false, true)
 	for _, otherFinishID := range []string{foilID, etchedID} {
 		if otherFinishID != "" && otherFinishID != id && !slices.Contains(uuids, otherFinishID) {
 			uuids = append(uuids, otherFinishID)
@@ -2201,7 +2203,7 @@ func addFinishVariants(uuids []string, id string) []string {
 	return uuids
 }
 
-func searchScryfall(query string) ([]string, error) {
+func searchScryfall(b *mtgmatcher.Backend, query string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
 	defer cancel()
 
@@ -2226,14 +2228,14 @@ func searchScryfall(query string) ([]string, error) {
 
 		// Sort through the results, add the possible foil and etched variants
 		for _, card := range result.Cards {
-			id := backend().ConvertID(mtgmatcher.IDSpaceScryfall, card.ID)
+			id := b.ConvertID(mtgmatcher.IDSpaceScryfall, card.ID)
 			if id == "" {
 				continue
 			}
 			if !slices.Contains(out, id) {
 				out = append(out, id)
 			}
-			out = addFinishVariants(out, id)
+			out = addFinishVariants(b, out, id)
 		}
 
 		// Exit the loop when there are no more results
@@ -2248,9 +2250,9 @@ func searchScryfall(query string) ([]string, error) {
 }
 
 // Try searching for cards usign the Match algorithm
-func attemptMatch(query string) ([]string, error) {
+func attemptMatch(b *mtgmatcher.Backend, query string) ([]string, error) {
 	var uuids []string
-	uuid, err := backend().Match(&mtgmatcher.InputCard{
+	uuid, err := b.Match(&mtgmatcher.InputCard{
 		Name: query,
 	})
 	if err != nil {
@@ -2268,7 +2270,7 @@ func attemptMatch(query string) ([]string, error) {
 	// Repeat for foil and etched (only add if not previously found)
 	// Add as needed depending on the previous query result
 	for _, id := range uuids {
-		uuids = addFinishVariants(uuids, id)
+		uuids = addFinishVariants(b, uuids, id)
 	}
 
 	return uuids, nil
@@ -2309,16 +2311,16 @@ type SortingData struct {
 	editionLower string
 }
 
-func getSortingData(uuid string) (*SortingData, error) {
-	co, err := backend().GetUUID(uuid)
+func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
+	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
-	set, err := backend().GetSet(co.SetCode)
+	set, err := b.GetSet(co.SetCode)
 	if err != nil {
 		return nil, err
 	}
-	releaseDate, err := backend().CardReleaseDate(uuid)
+	releaseDate, err := b.CardReleaseDate(uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -2337,14 +2339,14 @@ func getSortingData(uuid string) (*SortingData, error) {
 // elements, so nothing is saved by resolving lazily. Unknown ids get a
 // nil entry, which the cmp* comparators order like the lookup error it
 // stands for.
-func resolveSortingData(cardIDs []string) map[string]*SortingData {
+func resolveSortingData(b *mtgmatcher.Backend, cardIDs []string) map[string]*SortingData {
 	data := make(map[string]*SortingData, len(cardIDs))
 	for _, cardID := range cardIDs {
 		_, found := data[cardID]
 		if found {
 			continue
 		}
-		sorting, _ := getSortingData(cardID)
+		sorting, _ := getSortingData(b, cardID)
 		data[cardID] = sorting
 	}
 	return data
@@ -2441,9 +2443,9 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 }
 
 // Sort cards grouping them by edition, and then by their collector number
-func sortSets(uuidI, uuidJ string) bool {
-	sortingI, _ := getSortingData(uuidI)
-	sortingJ, _ := getSortingData(uuidJ)
+func sortSets(b *mtgmatcher.Backend, uuidI, uuidJ string) bool {
+	sortingI, _ := getSortingData(b, uuidI)
+	sortingJ, _ := getSortingData(b, uuidJ)
 	return cmpSets(sortingI, sortingJ)
 }
 

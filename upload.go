@@ -94,7 +94,7 @@ var uploadParser = &docparse.Parser{
 	TCGSkuToUUID:      tcgSKU2UUID,
 	TCGSkuToCondition: tcgSKU2Condition,
 	MKMIDToUUID:       mkmIDs.Resolve,
-	PreferredPrinting: sortSets,
+	PreferredPrinting: func(x, y string) bool { return sortSets(backend(), x, y) },
 }
 
 // unpackedTally accumulates one opened product's numbers as the results loop
@@ -324,6 +324,8 @@ func keepInOrder(all, enabled []string) []string {
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Upload", sig)
@@ -346,7 +348,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		if hashes != nil && hashTag == "SCGRetail" {
 			log.Println("Preparing a mass-entry call to SCG")
-			dataID, err := SCGRetailRedirect(r.Context(), hashes, hashesQtys, hashesCond)
+			dataID, err := SCGRetailRedirect(r.Context(), b, hashes, hashesQtys, hashesCond)
 			if err != nil {
 				log.Println(err)
 				pageVars.ErrorMessage = "Unable to forward data to SCG: " + err.Error()
@@ -372,7 +374,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			case "SCG":
 				err = UUID2SCGCSV(csvWriter, hashes, hashesQtys)
 			case "TCG":
-				err = UUID2TCGCSV(csvWriter, hashes, hashesQtys, hashesCond)
+				err = UUID2TCGCSV(b, csvWriter, hashes, hashesQtys, hashesCond)
 			}
 			if err != nil {
 				w.Header().Del("Content-Type")
@@ -820,7 +822,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Before the merge, so a card that turns up twice - loose and inside a box
 	// - is added up by the rule that merges any other repeated row.
 	if r.FormValue("unpack") == "true" {
-		uploadedData = unpackSealed(uploadedData)
+		uploadedData = unpackSealed(b, uploadedData)
 	}
 
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
@@ -874,7 +876,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].CardID == "" {
 				continue
 			}
-			co, err := backend().GetUUID(uploadedData[i].CardID)
+			co, err := b.GetUUID(uploadedData[i].CardID)
 			if err != nil {
 				continue
 			}
@@ -924,7 +926,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_deckbox.csv\"")
 		csvWriter := csv.NewWriter(w)
 
-		err = deckboxIDConvert(csvWriter, uploadedData)
+		err = deckboxIDConvert(b, csvWriter, uploadedData)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("upload", err.Error())
@@ -955,7 +957,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			conds = append(conds, uploadedData[i].OriginalCondition)
 		}
 
-		err = UUID2TCGCSV(csvWriter, ids, qtys, conds)
+		err = UUID2TCGCSV(b, csvWriter, ids, qtys, conds)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("upload", err.Error())
@@ -975,7 +977,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		co, err := backend().GetUUID(uploadedData[i].CardID)
+		co, err := b.GetUUID(uploadedData[i].CardID)
 		if err == nil && co.Sealed {
 			sealedProductIDs = append(sealedProductIDs, uploadedData[i].CardID)
 		} else {
@@ -1012,7 +1014,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// way the sealed and index fetches below already do.
 		results = map[string]map[string]*BanPrice{}
 		if len(cardIDs) > 0 {
-			results = getVendorPrices("", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+			results = getVendorPrices(b, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Build the custom buylist if requested
@@ -1034,7 +1036,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if customSeller != "" {
 				ref, _ := findSellerInventory(customSeller)
 				for _, cardID := range cardIDs {
-					processEntry(results, ref[cardID], "", cardID, "CUSTOM", false, shouldCheckForConditions, false, rule)
+					processEntry(b, results, ref[cardID], "", cardID, "CUSTOM", false, shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, "CUSTOM")
 			}
@@ -1043,7 +1045,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if customSealedSeller != "" && len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				ref, _ := findSellerInventory(customSealedSeller)
 				for _, productID := range sealedProductIDs {
-					processEntry(results, ref[productID], "", productID, "CUSTOM_SEALED", false, false, false, rule)
+					processEntry(b, results, ref[productID], "", productID, "CUSTOM_SEALED", false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, "CUSTOM_SEALED")
 			}
@@ -1051,7 +1053,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Fetch sealed vendor prices and merge
 		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			sealedResults := getVendorPrices("", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
+			sealedResults := getVendorPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
 			for cardID, stores := range sealedResults {
 				if results[cardID] == nil {
 					results[cardID] = map[string]*BanPrice{}
@@ -1074,12 +1076,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// upload has no singles (see the comment above).
 		results = map[string]map[string]*BanPrice{}
 		if len(cardIDs) > 0 {
-			results = getSellerPrices("", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+			results = getSellerPrices(b, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Fetch sealed seller prices and merge
 		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			sealedResults := getSellerPrices("", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
+			sealedResults := getSellerPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
 			for cardID, stores := range sealedResults {
 				if results[cardID] == nil {
 					results[cardID] = map[string]*BanPrice{}
@@ -1111,7 +1113,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		indexResults := map[string]map[string]*BanPrice{}
 		if len(cardIDs) > 0 && len(csvIndexKeys) > 0 {
-			indexResults = getSellerPrices("", csvIndexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+			indexResults = getSellerPrices(b, "", csvIndexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Copy these index prices in the final results
@@ -1124,7 +1126,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err = SimplePrice2CSV(csvWriter, results, uploadedData, nil, preferFlavor)
+		err = SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, preferFlavor)
 		if err != nil {
 			// The page that goes out instead is a page, so it must not keep
 			// the headers that promised a file to save.
@@ -1152,7 +1154,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if !slices.Contains(indexKeys, altPriceSource) {
 			indexKeys = append(indexKeys, altPriceSource)
 		}
-		indexResults = getSellerPrices("", indexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+		indexResults = getSellerPrices(b, "", indexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
 	// An index that is also a selected store (TCGSealed) already gets its
@@ -1167,7 +1169,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch sealed index prices
 	if len(sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		sealedIndexResults := getSellerPrices("", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref)
+		sealedIndexResults := getSellerPrices(b, "", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref)
 		for cardID, stores := range sealedIndexResults {
 			if indexResults[cardID] == nil {
 				indexResults[cardID] = map[string]*BanPrice{}
@@ -1211,7 +1213,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Offer to open the sealed rows only when there are any left to open, and
 	// say so when this list is already the contents of some.
-	pageVars.UnpackSealed = unpackableSealed(uploadedData)
+	pageVars.UnpackSealed = unpackableSealed(b, uploadedData)
 	for i := range uploadedData {
 		if uploadedData[i].Unpacked {
 			pageVars.UnpackedFrom++
@@ -1228,12 +1230,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		pageVars.Metadata[data.CardID] = uuid2card(data.CardID, true, false, preferFlavor)
+		pageVars.Metadata[data.CardID] = uuid2card(b, data.CardID, true, false, preferFlavor)
 
 		// Load metadata for alternative printings (used by pick-printing picker)
 		for _, alias := range data.PossibleAliases {
 			if _, exists := pageVars.Metadata[alias]; !exists {
-				pageVars.Metadata[alias] = uuid2card(alias, true, false, preferFlavor)
+				pageVars.Metadata[alias] = uuid2card(b, alias, true, false, preferFlavor)
 			}
 		}
 	}
@@ -1281,7 +1283,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// Pick the right store list for this entry. The sealed id list was
 		// built from this same lookup, so ask the datastore directly instead
 		// of scanning the list per row.
-		co, err := backend().GetUUID(cardID)
+		co, err := b.GetUUID(cardID)
 		isSealed := err == nil && co.Sealed
 		entryStores := enabledStores
 		if isSealed {
@@ -1529,7 +1531,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CanFilterByPrice = priceSource == ""
 	}
 
-	sortResults(uploadedData, optimizedResults, sorting)
+	sortResults(b, uploadedData, optimizedResults, sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
 	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, sealedProductIDs)
@@ -1577,7 +1579,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.OptimizedTotals = optimizedTotals
 		pageVars.HighestTotal = highestTotal
-		uploadEditions := GetEditions()
+		uploadEditions := ds.editions
 		pageVars.Editions = uploadEditions.AllEditionsKeys
 		pageVars.EditionsMap = uploadEditions.AllEditionsMap
 	}
@@ -1596,7 +1598,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	render(w, "upload.html", pageVars)
 }
 
-func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
+func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
 	// The card-data sorts below order both the uploaded rows and every
 	// per-store optimized list, so resolve the ids of both up front.
 	resolveUploadSortingData := func() map[string]*SortingData {
@@ -1609,7 +1611,7 @@ func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]Optim
 				cardIDs = append(cardIDs, entries[i].CardID)
 			}
 		}
-		return resolveSortingData(cardIDs)
+		return resolveSortingData(b, cardIDs)
 	}
 
 	switch sorting {
@@ -1744,7 +1746,7 @@ func adjustQty(qty, multiplier, maxQty int) int {
 // unpackableSealed counts the rows that hold a decklist, which is what decides
 // whether the results offer to open them. Counting rather than opening: the
 // answer is wanted on every result page, the contents only when asked for.
-func unpackableSealed(entries []UploadEntry) int {
+func unpackableSealed(b *mtgmatcher.Backend, entries []UploadEntry) int {
 	var n int
 	for _, entry := range entries {
 		// A product already opened is not one left to open, so the offer goes
@@ -1752,11 +1754,11 @@ func unpackableSealed(entries []UploadEntry) int {
 		if entry.CardID == "" || entry.Unpacked {
 			continue
 		}
-		co, err := backend().GetUUID(entry.CardID)
+		co, err := b.GetUUID(entry.CardID)
 		if err != nil || !co.Sealed {
 			continue
 		}
-		if backend().SealedHasDecklist(co.SetCode, co.UUID) {
+		if b.SealedHasDecklist(co.SetCode, co.UUID) {
 			n++
 		}
 	}
@@ -1784,17 +1786,17 @@ func unpackableSealed(entries []UploadEntry) int {
 // it. Duplicates are left to MergeIdenticalEntries, which the caller runs next
 // and which already knows how to add a card to itself - two precons sharing a
 // staple hold two of it.
-func unpackSealed(entries []UploadEntry) []UploadEntry {
+func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) []UploadEntry {
 	var out []UploadEntry
 
 	for _, entry := range entries {
-		co, err := backend().GetUUID(entry.CardID)
+		co, err := b.GetUUID(entry.CardID)
 		if entry.CardID == "" || entry.Unpacked || err != nil || !co.Sealed ||
-			!backend().SealedHasDecklist(co.SetCode, co.UUID) {
+			!b.SealedHasDecklist(co.SetCode, co.UUID) {
 			continue
 		}
 
-		picks, err := backend().GetDecklist(co.SetCode, co.UUID)
+		picks, err := b.GetDecklist(co.SetCode, co.UUID)
 		if err != nil || len(picks) == 0 {
 			continue
 		}
