@@ -732,6 +732,7 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 }
 
 func runSealedAnalysis() {
+	b := backend()
 	log.Println("Running set analysis")
 
 	tcgInventory, _ := findSellerInventory("TCGLow")
@@ -740,13 +741,13 @@ func runSealedAnalysis() {
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
-	reprintsKeys, reprintsMap := getReprintsGlobal(backend(), tcgInventory, tcgMarket)
+	reprintsKeys, reprintsMap := getReprintsGlobal(b, tcgInventory, tcgMarket)
 	reprintsPtr.Store(&reprintsSnapshot{Keys: reprintsKeys, Map: reprintsMap})
 
 	infos := map[string]mtgban.InventoryRecord{}
 
-	runRawSetValue(backend(), infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	for label, record := range buylistMetrics(backend(), "CK", map[string]buylistReducer{
+	runRawSetValue(b, infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
+	for label, record := range buylistMetrics(b, "CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
 		"highest": highestBuylistPrice,
 		"goodP90": goodBuylistPrice,

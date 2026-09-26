@@ -655,6 +655,8 @@ func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	ds := currentDatastore()
+	b := ds.backend
 	// Ignore requests if starting up
 	if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
 		return
@@ -706,9 +708,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					continue
 				}
 				mid := u.Query().Get("multiverseid")
-				uuids := backend().GetUUIDs()
+				uuids := b.GetUUIDs()
 				for _, uuid := range uuids {
-					co, _ := backend().GetUUID(uuid)
+					co, _ := b.GetUUID(uuid)
 					if co.Identifiers["multiverseId"] == mid {
 						m.Content = fmt.Sprintf("!%s|%s|%s", co.Name, co.SetCode, co.Number)
 						messageCreate(s, m)
@@ -718,7 +720,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
-			reply := checkForLinks(backend(), m.GuildID, m.Content)
+			reply := checkForLinks(b, m.GuildID, m.Content)
 			if reply == nil {
 				break
 			}
@@ -742,7 +744,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	content = strings.TrimPrefix(content, "$$")
 
 	// Search a single card match
-	searchRes, errMsg := parseMessage(currentDatastore(), content, sealed)
+	searchRes, errMsg := parseMessage(ds, content, sealed)
 	if errMsg != "" {
 		if DevMode {
 			errMsg = "[DEV] " + errMsg
@@ -756,7 +758,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	co, err := backend().GetUUID(searchRes.CardID)
+	co, err := b.GetUUID(searchRes.CardID)
 	if err != nil {
 		return
 	}
@@ -765,7 +767,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		config := parseSearchOptionsNG(backend(), searchRes.CardID, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
+		config := parseSearchOptionsNG(b, searchRes.CardID, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a
 		// reason to drop a foreign shop and not a reason to drop a foreign
@@ -789,12 +791,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			OnlyForVendor: true,
 		})
 
-		cardIDs, _ := searchAndFilter(currentDatastore(), config)
+		cardIDs, _ := searchAndFilter(ds, config)
 		foundSellers, foundVendors := searchParallelNG(cardIDs, config)
 
-		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(backend(), foundSellers, true)
-		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(backend(), foundSellers, false)
-		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(backend(), foundVendors)
+		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(b, foundSellers, true)
+		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(b, foundSellers, false)
+		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(b, foundVendors)
 
 		ogFields = embed.FormatSearchResult(externalURL(nil), searchRes)
 	} else if lastSold {
@@ -808,7 +810,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			// report back to the reader.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			var lastSales []tcgplayer.LatestSalesData
-			lastSales, err = getLastSold(ctx, backend(), searchRes.CardID, false)
+			lastSales, err = getLastSold(ctx, b, searchRes.CardID, false)
 			cancel()
 			if err == nil {
 				ogFields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
@@ -823,7 +825,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			} else if len(ogFields) == 0 {
 				errMsg = fmt.Sprintf("No Last Sold Price available for \"%s\" %s", content, emoteShurg)
 			}
-			embed := prepareCard(backend(), searchRes, ogFields, m.GuildID, lastSold)
+			embed := prepareCard(b, searchRes, ogFields, m.GuildID, lastSold)
 			if errMsg != "" {
 				embed.Description += errMsg
 			}
@@ -831,7 +833,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}()
 	}
 
-	embed := prepareCard(backend(), searchRes, ogFields, m.GuildID, lastSold)
+	embed := prepareCard(b, searchRes, ogFields, m.GuildID, lastSold)
 	if lastSold {
 		embed.Description += "Grabbing last sold prices, hang tight " + emoteHappy
 	}
@@ -849,7 +851,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		case edit = <-channel:
 			break
 		case <-time.After(LastSoldTimeout * time.Second):
-			edit = prepareCard(backend(), searchRes, ogFields, m.GuildID, lastSold)
+			edit = prepareCard(b, searchRes, ogFields, m.GuildID, lastSold)
 			edit.Description += "Connection time out " + emoteSleep
 			break
 		}

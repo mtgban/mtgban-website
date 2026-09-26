@@ -496,6 +496,7 @@ func cacheNewspaper() {
 		return
 	}
 
+	b := backend()
 	log.Println("Caching Newspaper data")
 
 	newspaperUUIDs := map[string]struct{}{}
@@ -533,14 +534,14 @@ func cacheNewspaper() {
 		// Both editions are fetched independently: a bad refresh on one of
 		// them keeps the previously cached data for that edition instead of
 		// blanking the page or skipping the other edition entirely.
-		if results, ok := refreshNewspaperEdition(backend(), next[i].Option, query, next[i].Results); ok {
+		if results, ok := refreshNewspaperEdition(b, next[i].Option, query, next[i].Results); ok {
 			next[i].Results = results
 			next[i].AvailableEditions, next[i].PossibleFinish = newspaperFilterValues(results)
 			refreshed++
 		}
 
 		query3day := strings.ReplaceAll(query, "0 DAY", "3 DAY")
-		if results, ok := refreshNewspaperEdition(backend(), next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
+		if results, ok := refreshNewspaperEdition(b, next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
 			next[i].Results3Day = results
 			next[i].AvailableEditions3Day, next[i].PossibleFinish3Day = newspaperFilterValues(results)
 			refreshed++
@@ -1089,6 +1090,8 @@ var BucketNames = []string{
 }
 
 func Newspaper(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Newspaper", sig)
@@ -1097,7 +1100,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	editions := GetEditions()
+	editions := ds.editions
 	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
 	pageVars.EditionsByCategory = editions.AllEditionsByCategory
 	pageVars.PickerID = "news-editions-picker"
@@ -1187,7 +1190,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		if r.FormValue("format") == "csv" {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", `attachment; filename="syp-buylist.csv"`)
-			if err := mtgban.WriteBuylistToCSV(backend(), syp, 1, w); err != nil {
+			if err := mtgban.WriteBuylistToCSV(b, syp, 1, w); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			return
@@ -1217,7 +1220,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		switch sorting {
 		default:
-			sortData := resolveSortingData(backend(), arbitCardIDs(arbit))
+			sortData := resolveSortingData(b, arbitCardIDs(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
@@ -1225,7 +1228,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				return cmpSets(sortData[arbit[i].CardID], sortData[arbit[j].CardID])
 			})
 		case "alpha":
-			sortData := resolveSortingData(backend(), arbitCardIDs(arbit))
+			sortData := resolveSortingData(b, arbitCardIDs(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
@@ -1257,7 +1260,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, preferFlavor)
+			pageVars.Metadata[entry.CardID] = uuid2card(b, entry.CardID, true, false, preferFlavor)
 		}
 
 		// The HasNo* flags and the name were how this list asked arbit.html
@@ -1334,7 +1337,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		for _, result := range results {
 			if skipEditionsOpt != "" {
 				filters := strings.Split(skipEditionsOpt, ",")
-				set, err := backend().GetSetByName(result.Edition)
+				set, err := b.GetSetByName(result.Edition)
 				if err == nil && slices.Contains(filters, set.Code) {
 					continue
 				}
@@ -1372,22 +1375,22 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			}
 
 			sort.SliceStable(results, func(i, j int) bool {
-				a := results[i].FieldValue(sorting)
-				b := results[j].FieldValue(sorting)
-				var af, bf float64
-				af, _ = strconv.ParseFloat(a, 64)
-				bf, _ = strconv.ParseFloat(b, 64)
-				numberSort := af != 0 || bf != 0
+				vi := results[i].FieldValue(sorting)
+				vj := results[j].FieldValue(sorting)
+				var vif, vjf float64
+				vif, _ = strconv.ParseFloat(vi, 64)
+				vjf, _ = strconv.ParseFloat(vj, 64)
+				numberSort := vif != 0 || vjf != 0
 				if dir == "asc" {
 					if numberSort {
-						return af < bf
+						return vif < vjf
 					}
-					return a < b
+					return vi < vj
 				}
 				if numberSort {
-					return af > bf
+					return vif > vjf
 				}
-				return a > b
+				return vi > vj
 			})
 			break
 		}
@@ -1403,7 +1406,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
-		c := uuid2card(backend(), result.UUID, true, false, preferFlavor)
+		c := uuid2card(b, result.UUID, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result.UUID)
 	}

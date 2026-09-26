@@ -10,6 +10,7 @@ import (
 )
 
 func Redirect(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	path := strings.TrimPrefix(r.URL.Path, "/go/")
 	fields := strings.Split(path, "/")
 
@@ -24,9 +25,9 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-		co, err := backend().GetUUID(hash)
+		co, err := b.GetUUID(hash)
 		if err != nil {
-			co, err = backend().GetUUID(externalUUID(backend(), hash))
+			co, err = b.GetUUID(externalUUID(b, hash))
 			if err != nil {
 				http.NotFound(w, r)
 				return
@@ -144,6 +145,7 @@ func namesFinish(b *mtgmatcher.Backend, cards []mtgmatcher.Card, word string) bo
 //     on the whole family and bad set/number spellings fail as a search
 //   - match numbers with cns: (as-printed) so stars/daggers distinguish twins
 func CardRedirect(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	// Split the path as it was written rather than as it decodes, so a slash
 	// inside a part stays inside it: Flesh and Blood numbers a double-faced
 	// card WTR040//WTR039, which travels as %2F%2F and would otherwise arrive
@@ -177,12 +179,12 @@ func CardRedirect(w http.ResponseWriter, r *http.Request) {
 			number := fields[1]
 			query += " cns:" + number
 
-			cards := printingsAt(backend(), set, number)
+			cards := printingsAt(b, set, number)
 			name := openingName(cards)
 			if name != "" {
 				query = name + " " + query
 			}
-			if len(fields) > 2 && namesFinish(backend(), cards, fields[2]) {
+			if len(fields) > 2 && namesFinish(b, cards, fields[2]) {
 				query += " f:" + fields[2]
 			}
 		}

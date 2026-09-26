@@ -400,6 +400,8 @@ func parseChartIDs(b *mtgmatcher.Backend, chartParam string) (ids []string, trun
 }
 
 func Search(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Search", sig)
@@ -419,7 +421,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// The pinned bar lives in the url alone, so a page opened without it
 	// starts with nothing pinned.
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(backend(), scope)
+	pinned := scopeFilters(b, scope)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -475,16 +477,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	if query == "" && !scopeOnly {
 		if !pageVars.IsSealed && !isSetsPage {
-			pageVars.SetKeyrunes = getSetKeyrunes(backend())
+			pageVars.SetKeyrunes = getSetKeyrunes(b)
 		}
 	}
 
-	pageVars.HasAvailable = len(backend().GetSealedUUIDs()) > 0
+	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
 
 	// Image corpus picker: only populate for entitled users.
 	if _, ok := offlineModeAllowed(r); ok {
 		pageVars.OfflineModeAllowed = true
-		editions := GetEditions()
+		editions := ds.editions
 		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
 		pageVars.EditionsByCategory = editions.AllEditionsByCategory
 		pageVars.PickerID = "offline-img-editions-picker"
@@ -555,7 +557,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// disable the affordance at the boundary instead of dropping silently.
 	pageVars.MaxChartCards = len(multiCardPalette)
 
-	chartIDs, chartTruncated := parseChartIDs(backend(), chartParam)
+	chartIDs, chartTruncated := parseChartIDs(b, chartParam)
 
 	chartID := ""
 	// Roster id -> resolved search id, computed once per request: a ban:<id>
@@ -574,7 +576,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if target, asked := chartTargets[id]; asked {
 			return target
 		}
-		target, err := resolveChartTarget(r.Context(), backend(), id)
+		target, err := resolveChartTarget(r.Context(), b, id)
 		if err != nil {
 			target = nil
 		}
@@ -608,7 +610,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			searchIDs := make([]string, len(chartIDs))
 			var unresolved int
 			for i, id := range chartIDs {
-				searchID, ok := chartSearchID(backend(), id, chartTargetFor(id))
+				searchID, ok := chartSearchID(b, id, chartTargetFor(id))
 				if !ok {
 					unresolved++
 				}
@@ -635,7 +637,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// If neither bar holds anything there is nothing to do
 	if query == "" && !scopeOnly {
-		editions := GetEditions()
+		editions := ds.editions
 		// Hijack sealed list
 		if pageVars.IsSealed {
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
@@ -710,7 +712,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
-	config := parseSearchOptionsNG(backend(), query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
@@ -723,22 +725,22 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform search
-	allKeys, err := searchAndFilter(currentDatastore(), config)
+	allKeys, err := searchAndFilter(ds, config)
 	if err != nil {
 		// No card carries the name, so read it another way before giving up.
 		// Only here: further down the results are empty because the cards that
 		// were found carry no listing, which is a fact about stock rather than
 		// an invitation to answer a different question.
-		allKeys = searchFallback(currentDatastore(), config)
+		allKeys = searchFallback(ds, config)
 		if len(allKeys) == 0 {
 			if oembed {
 				oembedError(w, http.StatusNotFound)
 				return
 			}
 			pageVars.InfoMessage = NoCardsMessage
-			pageVars.PopularSearches = getPopularSearches(currentDatastore())
+			pageVars.PopularSearches = getPopularSearches(ds)
 			pageVars.CleanSearchQuery = config.CleanQuery
-			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(backend(), query, config, pageVars.IsSealed)
+			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
 			render(w, "search.html", pageVars)
 			return
 		}
@@ -757,7 +759,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
 	if canUploadCustom && !config.SkipBuylist {
-		searchCustomBuylist(backend(), r, allKeys, foundVendors)
+		searchCustomBuylist(b, r, allKeys, foundVendors)
 	}
 
 	// Filter away any empty result
@@ -773,9 +775,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
 		}
-		pageVars.PopularSearches = getPopularSearches(currentDatastore())
+		pageVars.PopularSearches = getPopularSearches(ds)
 		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(backend(), query, config, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -783,8 +785,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Offered once the search has found cards to switch between. A product
 	// that holds nothing but other products answers with those products: rows
 	// on the page, but not cards, and reading them another way finds nothing.
-	if containsSingles(backend(), allKeys) {
-		pageVars.Contents = contentsViews(backend(), query, config)
+	if containsSingles(b, allKeys) {
+		pageVars.Contents = contentsViews(b, query, config)
 	}
 
 	// Only used in hashing searches, fill in data with what is available
@@ -824,11 +826,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.TotalUnique = len(allKeys)
 
 	if pageVars.IsMobile && !pageVars.IsSealed {
-		pageVars.EditionFilterList = editionsForSearch(currentDatastore(), allKeys)
+		pageVars.EditionFilterList = editionsForSearch(ds, allKeys)
 	}
 
 	// Sort sets as requested, default to chronological
-	odds := dropOdds(backend(), config)
+	odds := dropOdds(b, config)
 	switch pageVars.SearchSort {
 	case "odds":
 		// Ascending by default, unlike every other field here: what a
@@ -841,7 +843,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// an expected count is actually known for. Missing sorts last
 		// regardless of direction, ranked among itself by the fallback the
 		// other fields use.
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			oddsI, hasI := odds[allKeys[i]]
 			oddsJ, hasJ := odds[allKeys[j]]
@@ -854,17 +856,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return oddsI < oddsJ
 		})
 	case "alpha":
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "hybrid":
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "number":
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
@@ -875,7 +877,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			retSellers = append([]string{retSeller}, defaultSellerPriorityOpt...)
 		}
 
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		prices := resolveBestPrices(allKeys, retSellers, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
 			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
@@ -891,7 +893,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			blVendors = append([]string{blVendor}, defaultVendorPriorityOpt...)
 		}
 
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
 		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -906,7 +908,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	default:
-		sortData := resolveSortingData(backend(), allKeys)
+		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
@@ -933,11 +935,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		card := uuid2card(backend(), cardID, false, true, preferFlavor)
+		card := uuid2card(b, cardID, false, true, preferFlavor)
 		// Search results chart cards, so upgrade the chart handle to the cached
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
-		card.ChartID = chartIDForCard(backend(), cardID)
+		card.ChartID = chartIDForCard(b, cardID)
 		pageVars.Metadata[cardID] = card
 	}
 
@@ -986,8 +988,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
-	preview := embed.Generate(backend(), externalURL(r), allKeys, func(cardID string) string {
-		return editionTitle(backend(), cardID)
+	preview := embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
+		return editionTitle(b, cardID)
 	}, func(cardID string) []embed.Entry {
 		return EmbedSellerEntries(foundSellers, cardID, true)
 	})
@@ -1006,7 +1008,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
 		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
 
-		co, err := backend().GetUUID(allKeys[0])
+		co, err := b.GetUUID(allKeys[0])
 		if err == nil {
 			// A sealed product has no printings line, so it says what it is
 			// instead. Either way this is prose: the preview panel reads as
@@ -1015,7 +1017,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if len(co.Printings) > 0 {
 				pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", embed.PrintingsLine(co.Printings))
 			} else {
-				pageVars.Embed.Description = fmt.Sprintf("%s - %s", co.Name, editionTitle(backend(), allKeys[0]))
+				pageVars.Embed.Description = fmt.Sprintf("%s - %s", co.Name, editionTitle(b, allKeys[0]))
 			}
 			imgCrop := co.Images["crop"]
 			if imgCrop != "" {
@@ -1121,7 +1123,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		// Same for CM
 		if !hasMKM && hasMKMScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
-			co, err := backend().GetUUID(cardID)
+			co, err := b.GetUUID(cardID)
 			if err == nil {
 				var link string
 
@@ -1197,7 +1199,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if chartID != "" {
 		isMultiChart := len(chartIDs) > 1
 
-		chartEditions := GetEditions()
+		chartEditions := ds.editions
 		pageVars.EditionSort = chartEditions.SealedEditionsSorted
 		pageVars.EditionList = chartEditions.SealedEditionsList
 
@@ -1205,7 +1207,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
 		// non-empty and the template renders the results+chart layout rather than
 		// the empty-query editions browse.
-		cfg := parseSearchOptionsNG(backend(), chartSearchIDs[chartID], nil, nil, nil)
+		cfg := parseSearchOptionsNG(b, chartSearchIDs[chartID], nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
@@ -1292,10 +1294,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					for i, card := range cards {
 						names[i] = card.Name
 					}
-					pageVars.Checkpoints = multiCardCheckpoints(currentDatastore(), names, earliest)
+					pageVars.Checkpoints = multiCardCheckpoints(ds, names, earliest)
 				} else {
 					pageVars.Datasets = cards[0].Datasets
-					pageVars.Checkpoints = relevantCheckpoints(currentDatastore(), cards[0].Name, earliest)
+					pageVars.Checkpoints = relevantCheckpoints(ds, cards[0].Name, earliest)
 				}
 				// A card the archive did not answer for is missing from the chart,
 				// which says nothing about its prices: never call such a chart
@@ -1311,7 +1313,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if !isMultiChart {
-			co, err := backend().GetUUID(chartID)
+			co, err := b.GetUUID(chartID)
 			if err != nil {
 				fmt.Println("Search: Failed to GetUUID: %w", err)
 				return
@@ -1324,8 +1326,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
-			pageVars.Datasets = getDatasets(r.Context(), backend(), chartID, co.Sealed, pageVars.AxisLabels, lb)
-			pageVars.Checkpoints = relevantCheckpoints(currentDatastore(), co.Name, earliest)
+			pageVars.Datasets = getDatasets(r.Context(), b, chartID, co.Sealed, pageVars.AxisLabels, lb)
+			pageVars.Checkpoints = relevantCheckpoints(ds, co.Name, earliest)
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"
 			}
@@ -1340,7 +1342,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			var earliest time.Time
 			var chartNames []string
 			for _, id := range chartIDs {
-				co, gerr := backend().GetUUID(id)
+				co, gerr := b.GetUUID(id)
 				if gerr != nil {
 					continue
 				}
@@ -1357,12 +1359,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
-				datasets, refs := getDatasetsForMulti(r.Context(), backend(), chartIDs, pageVars.AxisLabels, lb)
+				datasets, refs := getDatasetsForMulti(r.Context(), b, chartIDs, pageVars.AxisLabels, lb)
 				pageVars.Datasets = datasets
 				pageVars.ChartReferences = refs
 				// Shared timeline across the roster: the union of every card's
 				// releases, reprints and bans/unbans, deduped onto one axis.
-				pageVars.Checkpoints = multiCardCheckpoints(currentDatastore(), chartNames, earliest)
+				pageVars.Checkpoints = multiCardCheckpoints(ds, chartNames, earliest)
 				if len(datasets) == 0 {
 					pageVars.InfoMessage = "No chart data available"
 				}
@@ -1376,9 +1378,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// the matcher.
 		if !isMultiChart {
 			searchID := chartSearchIDs[chartID]
-			co, gerr := backend().GetUUID(searchID)
+			co, gerr := b.GetUUID(searchID)
 			if gerr == nil && !co.Sealed {
-				altID, err := backend().Match(&mtgmatcher.InputCard{
+				altID, err := b.Match(&mtgmatcher.InputCard{
 					ID:   searchID,
 					Foil: !co.Foil,
 				})
@@ -1386,7 +1388,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					pageVars.Alternative = altID
 				}
 
-				altID, err = backend().Match(&mtgmatcher.InputCard{
+				altID, err = b.Match(&mtgmatcher.InputCard{
 					ID:        searchID,
 					Variation: "Etched",
 				})

@@ -681,6 +681,7 @@ func stashInTimeseries() {
 		return
 	}
 
+	b := backend()
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
 
@@ -714,7 +715,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				card, err := backend().GetUUID(id)
+				card, err := b.GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
 					continue
@@ -745,7 +746,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				card, err := backend().GetUUID(id)
+				card, err := b.GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
 					continue
