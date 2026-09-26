@@ -7,7 +7,14 @@
       "monthly": 20000,
       "store_scope": "explicit",
       "included_stores": 1,
-      "modes": ["retail", "buylist"]
+      "modes": ["retail", "buylist"],
+      "icon": "sliders",
+      "subtitle": "Entry level access",
+      "bullets": [
+        "Enjoy TCGplayer data in an easy to ingest format",
+        "Add data from any store, the first one is on us",
+        "Pick any additional store available for a small fee"
+      ]
     },
     {
       "key": "all_stores",
@@ -15,7 +22,14 @@
       "monthly": 50000,
       "store_scope": "BASE_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist"]
+      "modes": ["retail", "buylist"],
+      "icon": "globe",
+      "subtitle": "Single region market overview",
+      "bullets": [
+        "Singles prices from every US store available",
+        "EU index prices from Cardmarket",
+        "No Sealed or EV data"
+      ]
     },
     {
       "key": "all_data",
@@ -23,7 +37,15 @@
       "monthly": 80000,
       "store_scope": "ALL_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist", "sealed"]
+      "modes": ["retail", "buylist", "sealed"],
+      "icon": "crown",
+      "subtitle": "One stop solution for all our data",
+      "bullets": [
+        "What you see on the website is what you get",
+        "Includes Singles, Sealed, and EV calculations",
+        "Real arbitrage: all available markets are added",
+        "Priority support"
+      ]
     }
   ],
   "addons": [
@@ -50,13 +72,23 @@
       "key": "TCG",
       "name": "TCGplayer",
       "implied": true,
-      "shorthands": ["TCGLow", "TCGMarket", "TCGDirect", "TCGDirectNet", "TCGPlayer"]
+      "shorthands": ["TCGLow", "TCGDirectLow", "TCGMarket", "TCGMid", "TCGDirect", "TCGDirectNet", "TCGPlayer", "SYP"]
     },
-    { "key": "CK", "name": "Card Kingdom", "shorthands": ["CK"] },
+    { "key": "CK", "name": "Card Kingdom", "shorthands": ["CK", "CKGraded", "CKBLLast"] },
     { "key": "SCG", "name": "Star City Games", "shorthands": ["SCG"] },
-    { "key": "CSI", "name": "Cool Stuff Inc", "shorthands": ["CSI"] },
-    { "key": "ABU", "name": "ABU Games", "shorthands": ["ABUGames", "ABU"] },
-    { "key": "MKM", "name": "Cardmarket", "shorthands": ["MKM", "MKMLow", "MKMTrend"] },
-    { "key": "CT", "name": "Card Trader", "shorthands": ["CT", "CT0"] }
+    { "key": "CSI", "name": "Cool Stuff Inc", "shorthands": ["CSI", "CSIUnique"] },
+    { "key": "ABU", "name": "ABU Games", "shorthands": ["ABU", "ABUGames", "ABUCredit", "ABUScans"] },
+    { "key": "MKM", "name": "Cardmarket", "shorthands": ["MKM", "MKMLow", "MKMTrend", "MKMPS"] },
+    { "key": "CT", "name": "Card Trader", "shorthands": ["CT", "CT0", "CT1DR"] },
+    { "key": "GN", "name": "Game Nerdz", "shorthands": ["GN"] },
+    { "key": "HA", "name": "Hareruya", "shorthands": ["HA"] },
+    { "key": "MMC", "name": "MTG Mint Card", "shorthands": ["MMC"] },
+    { "key": "MS", "name": "MTGSeattle", "shorthands": ["MS"] },
+    { "key": "MC", "name": "Magic Corner", "shorthands": ["MC"] },
+    { "key": "MP", "name": "Mana Pool", "shorthands": ["MP"] },
+    { "key": "ML", "name": "Manaleak", "shorthands": ["ML"] },
+    { "key": "SZ", "name": "Strike Zone", "shorthands": ["SZ"] },
+    { "key": "VS", "name": "Vegas Singles", "shorthands": ["VS"] },
+    { "key": "AF", "name": "Arcana Frisia", "shorthands": ["AF"] }
   ]
 }

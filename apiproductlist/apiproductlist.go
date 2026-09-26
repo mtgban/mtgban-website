@@ -60,6 +60,11 @@ type Package struct {
 	// IncludedStores is how many selectable stores the price includes beyond the implied ones.
 	IncludedStores int      `json:"included_stores"`
 	Modes          []string `json:"modes"`
+	// Icon, Subtitle, and Bullets are the pricing page copy. Icon names one
+	// of the page's tier icons.
+	Icon     string   `json:"icon"`
+	Subtitle string   `json:"subtitle"`
+	Bullets  []string `json:"bullets"`
 }
 
 // Addon is a per-unit extra a package can carry.
@@ -157,6 +162,20 @@ func (c *ProductList) Validate() error {
 		}
 		if p.Name == "" {
 			return fmt.Errorf("package %s: name is empty", p.Key)
+		}
+		if p.Icon == "" {
+			return fmt.Errorf("package %s: icon is empty", p.Key)
+		}
+		if p.Subtitle == "" {
+			return fmt.Errorf("package %s: subtitle is empty", p.Key)
+		}
+		if len(p.Bullets) == 0 {
+			return fmt.Errorf("package %s: at least one bullet is required", p.Key)
+		}
+		for i, b := range p.Bullets {
+			if strings.TrimSpace(b) == "" {
+				return fmt.Errorf("package %s: bullet %d is empty", p.Key, i+1)
+			}
 		}
 		if p.Monthly <= 0 {
 			return fmt.Errorf("package %s: monthly must be positive", p.Key)

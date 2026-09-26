@@ -39,13 +39,16 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if c.IncludedGames != 1 {
 		t.Errorf("included games %v", c.IncludedGames)
 	}
-	if implied := c.ImpliedStores(); len(implied) != 1 || implied[0].Key != "TCG" || !containsAll(implied[0].Shorthands, "TCGLow", "TCGDirectNet", "TCGPlayer") {
+	if implied := c.ImpliedStores(); len(implied) != 1 || implied[0].Key != "TCG" || !containsAll(implied[0].Shorthands, "TCGLow", "TCGDirectLow", "TCGDirectNet", "TCGMarket", "TCGMid", "TCGPlayer") {
 		t.Errorf("implied stores %+v", implied)
 	}
-	if selectable := c.SelectableStores(); len(selectable) != 6 || selectable[0].Key != "CK" {
-		t.Errorf("selectable stores %+v", selectable)
+	if selectable := c.SelectableStores(); len(selectable) != 16 || selectable[0].Key != "CK" {
+		t.Errorf("selectable stores %d %+v", len(selectable), selectable)
 	}
-	if abu, ok := c.Store("ABU"); !ok || !containsAll(abu.Shorthands, "ABUGames", "ABU") {
+	if st, ok := c.Store("GN"); !ok || st.Name != "Game Nerdz" || !containsAll(st.Shorthands, "GN") {
+		t.Errorf("Game Nerdz missing: %+v ok=%v", st, ok)
+	}
+	if abu, ok := c.Store("ABU"); !ok || !containsAll(abu.Shorthands, "ABU", "ABUGames", "ABUScans") {
 		t.Errorf("ABU carries both retail and buylist shorthands: %+v", abu)
 	}
 }
@@ -74,7 +77,7 @@ func TestMustLoadDoesNotPanic(t *testing.T) {
 
 const minimal = `{
   "currency": "usd",
-  "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"]}],
+  "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"], "icon": "globe", "subtitle": "S", "bullets": ["B"]}],
   "addons": [],
   "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
   "included_games": 1,
@@ -84,7 +87,7 @@ const minimal = `{
 // explicit is minimal with a store-picking package, which needs an implied store.
 const explicit = `{
   "currency": "usd",
-  "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "explicit", "included_stores": 1, "modes": ["retail"]}],
+  "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "explicit", "included_stores": 1, "modes": ["retail"], "icon": "globe", "subtitle": "S", "bullets": ["B"]}],
   "addons": [],
   "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
   "included_games": 1,
@@ -108,7 +111,7 @@ func rep(doc, old, with string) string {
 }
 
 func TestValidateRejects(t *testing.T) {
-	const pkg = `"packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"]}]`
+	const pkg = `"packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"], "icon": "globe", "subtitle": "S", "bullets": ["B"]}]`
 	const ivs = `"intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}]`
 	cases := []struct {
 		name string
@@ -121,6 +124,9 @@ func TestValidateRejects(t *testing.T) {
 		{"bad key", rep(minimal, `"key": "p"`, `"key": "P-1"`), `key "P-1" must match`},
 		{"package key taken by an interval", rep(minimal, `"key": "p"`, `"key": "monthly"`), `duplicate key "monthly"`},
 		{"empty package name", rep(minimal, `"name": "P"`, `"name": ""`), "package p: name is empty"},
+		{"no icon", rep(minimal, `, "icon": "globe"`, ``), "package p: icon is empty"},
+		{"no subtitle", rep(minimal, `, "subtitle": "S"`, ``), "package p: subtitle is empty"},
+		{"no bullets", rep(minimal, `"bullets": ["B"]`, `"bullets": []`), "package p: at least one bullet is required"},
 		{"zero amount", rep(minimal, `"monthly": 100`, `"monthly": 0`), "package p: monthly must be positive"},
 		{"negative amount", rep(minimal, `"monthly": 100`, `"monthly": -5`), "package p: monthly must be positive"},
 		{"unknown scope", rep(minimal, `"ALL_ACCESS"`, `"DEV_ACCESS"`), "package p: store_scope must be one of"},
@@ -170,8 +176,8 @@ func TestValidateRejectsLookupKeyCollision(t *testing.T) {
 	c := ProductList{
 		Currency: "usd",
 		Packages: []Package{
-			{Key: "a_b", Name: "A B", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}},
-			{Key: "a", Name: "A", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}},
+			{Key: "a_b", Name: "A B", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}, Icon: "globe", Subtitle: "S", Bullets: []string{"B"}},
+			{Key: "a", Name: "A", Monthly: 100, StoreScope: StoreScopeAll, Modes: []string{"retail"}, Icon: "globe", Subtitle: "S", Bullets: []string{"B"}},
 		},
 		Intervals: []Interval{
 			{Key: "monthly", Interval: "month", Count: 1, Public: true},
