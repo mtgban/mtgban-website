@@ -15,7 +15,9 @@ on:
       - synchronize
       - reopened
       - ready_for_review
-      - review_requested
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
 
 # Curl-only job: no checkout, no forge writes.
 permissions: {}
