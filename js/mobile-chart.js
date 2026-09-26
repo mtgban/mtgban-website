@@ -107,17 +107,14 @@
         return prefetchPromise;
     }
 
+    // The wider window can hold stores the drawn one lacks, which shifts where
+    // /api/chart lists the rest, so the lines are rebuilt from it: matched by
+    // position, a line would draw another store's prices.
     function installPrefetched() {
         if (!prefetched || !currentChart) return;
         currentChart.data.labels = prefetched.data.axisLabels;
-        prefetched.data.datasets.forEach(function(ds, i) {
-            if (currentChart.data.datasets[i]) {
-                currentChart.data.datasets[i].data = ds.data.map(function(v) {
-                    var n = parseFloat(v);
-                    return isNaN(n) ? null : n;
-                });
-            }
-        });
+        currentChart.data.datasets = chartDatasets(prefetched.data.datasets);
+        renderChartLegend(prefetched.data.datasets, currentChart);
         currentMaxLoaded = prefetched.days;
         prefetched = null;
     }
@@ -167,17 +164,18 @@
         return window.getComputedStyle(el).getPropertyValue(name).trim();
     }
 
-    function createChart(canvas, data) {
-        var textColor = readVar('--chartjs-text') || '#aaa';
-        var gridColor = readVar('--chartjs-grid') || 'rgba(150,150,150,0.06)';
-
-        var datasets = data.datasets.map(function(ds) {
+    // chartDatasets turns /api/chart's datasets into the chart's lines, one per
+    // store, hiding the stores the viewer hid on this card or an earlier one.
+    function chartDatasets(datasets) {
+        var hidden = readHiddenVendors();
+        return datasets.map(function(ds) {
             return {
                 label: ds.name,
                 data: ds.data.map(function(v) {
                     var n = parseFloat(v);
                     return isNaN(n) ? null : n;
                 }),
+                hidden: hidden.indexOf(ds.name) !== -1,
                 borderColor: ds.color,
                 fill: 'origin',
                 tension: 0.15,
@@ -187,6 +185,13 @@
                 pointHitRadius: 8,
             };
         });
+    }
+
+    function createChart(canvas, data) {
+        var textColor = readVar('--chartjs-text') || '#aaa';
+        var gridColor = readVar('--chartjs-grid') || 'rgba(150,150,150,0.06)';
+
+        var datasets = chartDatasets(data.datasets);
 
         var gradientPlugin = {
             id: 'mobileGradient',
@@ -403,18 +408,6 @@
                     canvas.style.display = 'block';
                     resetBtn.style.display = 'inline-block';
                     currentChart = createChart(canvas.getContext('2d'), data);
-
-                    // Restore previously hidden vendors (global preference across cards)
-                    var hidden = readHiddenVendors();
-                    if (hidden.length) {
-                        data.datasets.forEach(function(ds, i) {
-                            if (hidden.indexOf(ds.name) !== -1) {
-                                currentChart.setDatasetVisibility(i, false);
-                            }
-                        });
-                        currentChart.update('none');
-                    }
-
                     renderChartLegend(data.datasets, currentChart);
                     currentMaxLoaded = loaded;
                     setRangePickerDisabled(false);
