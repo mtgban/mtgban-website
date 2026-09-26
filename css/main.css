@@ -1065,6 +1065,10 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
        classes and outrank the identity-keyed overrides below. */
     border-radius: var(--card-radius, 8px);
 }
+.hoverWrap.foil-wrap[data-foil="true"]::after,
+.hoverWrap.foil-wrap[data-etched="true"]::after {
+    border-radius: var(--card-radius, 8px);
+}
 
 /* ── Card scan corners ── */
 /* Some printings are photographed with a much rounder corner than the modern
@@ -1154,7 +1158,8 @@ img.content-warning.cw-revealed {
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: 12px;
+    /* No radius here: each surface rounds the sheen as it rounds its card,
+       and the favorites and recent thumbs clip it with theirs. */
     background: linear-gradient(
         105deg,
         rgba(255, 0, 0, 0.22) 0%,

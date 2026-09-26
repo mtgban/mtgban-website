@@ -332,3 +332,9 @@
 .m-sleep-card img {
     transition: transform 100ms ease;
 }
+
+/* Matches the img's inline 8px, which does not read --card-radius. */
+.m-sleep-card .foil-wrap[data-foil="true"]::after,
+.m-sleep-card .foil-wrap[data-etched="true"]::after {
+    border-radius: 8px;
+}

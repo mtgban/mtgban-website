@@ -1119,7 +1119,8 @@
     flex-shrink: 0;
     border: 1px solid var(--border-subtle);
 }
-.ures-card-cell .foil-wrap[data-foil="true"]::after {
+.ures-card-cell .foil-wrap[data-foil="true"]::after,
+.ures-card-cell .foil-wrap[data-etched="true"]::after {
     border-radius: 4px;
 }
 .ures-card-name .result-badge {
