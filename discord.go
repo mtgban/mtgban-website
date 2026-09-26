@@ -16,7 +16,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 )
@@ -40,6 +39,10 @@ const (
 	defaultDiscordDevChannelID   = "769323295526748160"
 	defaultDiscordRecapChannelID = "798588735259279453"
 	defaultDiscordChatChannelID  = "736007847560609794"
+
+	// Affiliate redirects a posted store link is wrapped in
+	tcgPartnerURL = "https://partner.tcgplayer.com/c/%s/1830156/21018"
+	scgPartnerURL = "https://goto.starcitygames.com/c/%s/3052179/37198"
 )
 
 var DiscordRetailBlocklist []string
@@ -485,7 +488,7 @@ var AffiliateStores = []AffiliateConfig{
 			u.RawQuery = v.Encode()
 
 			link := u.String()
-			u, _ = u.Parse(fmt.Sprintf(tcgplayer.PartnerProductURL, Affiliates().Codes["TCG"]))
+			u, _ = u.Parse(fmt.Sprintf(tcgPartnerURL, Affiliates().Codes["TCG"]))
 			v = url.Values{}
 			v.Set("u", link)
 			u.RawQuery = v.Encode()
@@ -500,7 +503,7 @@ var AffiliateStores = []AffiliateConfig{
 		Name:    "Star City Games",
 		URLFunc: func(u *url.URL) *url.URL {
 			link := u.String()
-			u, _ = u.Parse(fmt.Sprintf(starcitygames.PartnerProductURL, Affiliates().Codes["SCG"]))
+			u, _ = u.Parse(fmt.Sprintf(scgPartnerURL, Affiliates().Codes["SCG"]))
 			v := url.Values{}
 			v.Set("u", link)
 			u.RawQuery = v.Encode()
