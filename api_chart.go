@@ -163,9 +163,10 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	// date, so the axis needs no query of its own.
 	series := fetchRosterPrices(r.Context(), resolved, lb)
 
-	// An archive that answered for none of the cards is an outage, not an
-	// empty chart, and a client told so can say so rather than ask for more.
-	if !archiveAnswered(series) {
+	// A card the archive did not answer for is an outage, not an empty chart.
+	// A roster's answer replaces the chart it widens, so answering with the
+	// other cards would drop that card's line unannounced: fail the lot.
+	if readFailures(series) > 0 {
 		errorResponse(w, http.StatusServiceUnavailable, "charts not available")
 		return
 	}
