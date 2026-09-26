@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 )
@@ -49,9 +50,9 @@ func chartAPIDatasets(datasets []Dataset) []ChartAPIDataset {
 	return out
 }
 
-// writeChartAPIResponse sends a chart payload. An empty chart is a database
-// outage or a warm-up rather than an answer, so it must not be cached for an
-// hour the way a real one is.
+// writeChartAPIResponse sends a chart payload. An empty one is not cached for an
+// hour the way a real one is: the legacy read still reports an outage that way,
+// and a window with nothing in it yet may have prices after the next snapshot.
 func writeChartAPIResponse(w http.ResponseWriter, resp ChartAPIResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	if len(resp.Datasets) != 0 {
@@ -162,6 +163,13 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	// One read per card, issued together: the series carries its own oldest
 	// date, so the axis needs no query of its own.
 	series := fetchRosterPrices(r.Context(), resolved, lb)
+
+	// An archive that answered for none of the cards is an outage, not an
+	// empty chart, and a client told so can say so rather than ask for more.
+	if !slices.ContainsFunc(series, func(s chartSeries) bool { return s.Err == nil }) {
+		errorResponse(w, http.StatusServiceUnavailable, "charts not available")
+		return
+	}
 
 	var earliest time.Time
 	for _, s := range series {
