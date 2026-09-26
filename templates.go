@@ -236,7 +236,7 @@ var funcMap = template.FuncMap{
 	// alone - a PromoTypes or Treatments entry - so a card row asks for the
 	// spelling at render time rather than a Go field baking one in ahead of
 	// it.
-	"promo_label": promoTypeLabel,
+	"promo_label": func(v string) string { return promoTypeLabel(backend(), v) },
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")
 		if err != nil {
@@ -249,7 +249,7 @@ var funcMap = template.FuncMap{
 		return entries[0].OriginalID
 	},
 	"uuid2tcgid": func(s string) string {
-		return findTCGproductID(s)
+		return findTCGproductID(backend(), s)
 	},
 	"isSussy": func(m map[string]float64, s string) bool {
 		_, found := m[s]

@@ -17,7 +17,7 @@ func promoTypeCards(t *testing.T) (plain, chipped string) {
 		if err != nil || co.Sealed {
 			continue
 		}
-		card := uuid2card(uuid, false, false, false)
+		card := uuid2card(backend(), uuid, false, false, false)
 		if plain == "" && len(card.PromoTypes) > 0 {
 			plain = uuid
 		}
@@ -44,7 +44,7 @@ func TestPromoTypesAndTreatmentsAreDisjoint(t *testing.T) {
 		t.Skip("this datastore has no printing with a treatment chip")
 	}
 
-	card := uuid2card(chipped, false, false, false)
+	card := uuid2card(backend(), chipped, false, false, false)
 	for _, chip := range card.Treatments {
 		for _, p := range card.PromoTypes {
 			if p == chip {
@@ -72,7 +72,7 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 		if err != nil || co.Sealed {
 			continue
 		}
-		if showVariant(uuid) {
+		if showVariant(backend(), uuid) {
 			continue // only the pre-PromosForEverybodyYay case is interesting here
 		}
 		hasFrame := false
@@ -85,7 +85,7 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 			continue
 		}
 		found = true
-		card := uuid2card(uuid, false, false, false)
+		card := uuid2card(backend(), uuid, false, false, false)
 		var shown bool
 		for _, p := range card.PromoTypes {
 			if p == "showcase" || p == "extendedart" || p == "borderless" {
@@ -114,11 +114,11 @@ func TestRetroFrameStaysDateGated(t *testing.T) {
 		if err != nil || co.Sealed || co.FrameVersion != "1997" {
 			continue
 		}
-		if showVariant(uuid) {
+		if showVariant(backend(), uuid) {
 			continue // only the gated-off case is interesting here
 		}
 		found = true
-		card := uuid2card(uuid, false, false, false)
+		card := uuid2card(backend(), uuid, false, false, false)
 		for _, p := range card.PromoTypes {
 			if p == "retro" {
 				t.Errorf("%s (%s): \"retro\" shows despite predating PromosForEverybodyYay", co.Name, co.SetCode)
@@ -143,7 +143,7 @@ func TestPromoTypeLabel(t *testing.T) {
 		{"ffi", "FFI"},
 		{"ffxvi", "FFXVI"},
 	} {
-		if got := promoTypeLabel(tt.value); got != tt.want {
+		if got := promoTypeLabel(backend(), tt.value); got != tt.want {
 			t.Errorf("promoTypeLabel(%q) = %q, want %q", tt.value, got, tt.want)
 		}
 	}
@@ -155,7 +155,7 @@ func TestPromoTypeLabel(t *testing.T) {
 		if strings.HasPrefix(value, "ff") {
 			continue
 		}
-		if got, want := promoTypeLabel(value), backend().PromoTypeLabel(value); got != want {
+		if got, want := promoTypeLabel(backend(), value), backend().PromoTypeLabel(value); got != want {
 			t.Errorf("promoTypeLabel(%q) = %q, want mtgmatcher's own %q", value, got, want)
 		}
 	}

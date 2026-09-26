@@ -131,8 +131,8 @@ func BenchmarkSetPricesSearchQuery(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		config := parseSearchOptionsNG("s:"+benchSetCode, nil, nil, nil)
-		uuids, err := searchAndFilter(config)
+		config := parseSearchOptionsNG(backend(), "s:"+benchSetCode, nil, nil, nil)
+		uuids, err := searchAndFilter(currentDatastore(), config)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -151,8 +151,8 @@ func BenchmarkSetPricesAPIEdition(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retail := getSellerPrices("", stores, benchSetCode, nil, "", true, true, false, "")
-		buylist := getVendorPrices("", stores, benchSetCode, nil, "", true, true, false, "")
+		retail := getSellerPrices(backend(), "", stores, benchSetCode, nil, "", true, true, false, "")
+		buylist := getVendorPrices(backend(), "", stores, benchSetCode, nil, "", true, true, false, "")
 		if len(retail) == 0 || len(buylist) == 0 {
 			b.Fatal("no results")
 		}
@@ -166,8 +166,8 @@ func BenchmarkSetPricesAPIByHash(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		retail := getSellerPrices("", stores, "", benchSetUUIDs, "", true, true, false, "")
-		buylist := getVendorPrices("", stores, "", benchSetUUIDs, "", true, true, false, "")
+		retail := getSellerPrices(backend(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
+		buylist := getVendorPrices(backend(), "", stores, "", benchSetUUIDs, "", true, true, false, "")
 		if len(retail) == 0 || len(buylist) == 0 {
 			b.Fatal("no results")
 		}
@@ -178,7 +178,7 @@ func BenchmarkSetPricesAPIByHash(b *testing.B) {
 // of the API ByHash variant (no text->uuid resolution included).
 func BenchmarkSetPricesSearchByHash(b *testing.B) {
 	seedBenchScrapers(b)
-	config := parseSearchOptionsNG(benchSetUUIDs[0], nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), benchSetUUIDs[0], nil, nil, nil)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -196,7 +196,7 @@ func BenchmarkSetPricesSearchByHash(b *testing.B) {
 // what the search machinery costs when nothing is pre-filtered.
 func BenchmarkSetPricesSearchScan(b *testing.B) {
 	seedBenchScrapers(b)
-	config := parseSearchOptionsNG(benchSetUUIDs[0], nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), benchSetUUIDs[0], nil, nil, nil)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

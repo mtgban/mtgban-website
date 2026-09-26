@@ -55,7 +55,7 @@ func TestFromEntriesSplitsSealedFromSinglesWithRealCards(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 	sealed := backend().GetSealedUUIDs()[0]
-	single := randomUUID(false)
+	single := randomUUID(backend(), false)
 	entries := []UploadEntry{
 		{CardID: sealed, OriginalPrice: 100},
 		{CardID: single, OriginalPrice: 1},

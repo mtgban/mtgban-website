@@ -79,7 +79,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	// bare uuid/number) and non-Magic products. The legacy path below stays
 	// mtgjson-uuid only.
 	if Config.TimeseriesConfig.LongFormReads {
-		chartDataAPILong(w, r, uuid)
+		chartDataAPILong(currentDatastore(), w, r, uuid)
 		return
 	}
 
@@ -105,14 +105,14 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasets(r.Context(), uuid, co.Sealed, axisLabels, lb)
+	datasets := getDatasets(r.Context(), backend(), uuid, co.Sealed, axisLabels, lb)
 
 	writeChartAPIResponse(w, ChartAPIResponse{
 		MaxLookbackDays: maxDays,
 		LoadedDays:      lb.Days(),
 		AxisLabels:      axisLabels,
 		Datasets:        chartAPIDatasets(datasets),
-		Checkpoints:     relevantCheckpoints(co.Name, earliest),
+		Checkpoints:     relevantCheckpoints(currentDatastore(), co.Name, earliest),
 	})
 }
 
@@ -124,8 +124,8 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 // multi-card chart: it names the same ids the ?chart= url carries, and gets the
 // (card × reference) datasets a roster renders, in the same shape the page
 // built inline.
-func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
-	ids, _ := parseChartIDs(rawID)
+func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, rawID string) {
+	ids, _ := parseChartIDs(ds.backend, rawID)
 	if len(ids) == 0 {
 		errorResponse(w, http.StatusNotFound, "card not found")
 		return
@@ -140,7 +140,7 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 		target, asked := seen[id]
 		if !asked {
 			var err error
-			if target, err = resolveChartTarget(r.Context(), id); err != nil {
+			if target, err = resolveChartTarget(r.Context(), ds.backend, id); err != nil {
 				target = nil
 			}
 			seen[id] = target
@@ -205,13 +205,13 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	}
 
 	// Checkpoints match set releases by card name; a non-Magic name matches none.
-	checkpoints := relevantCheckpoints(series[0].Name, earliest)
+	checkpoints := relevantCheckpoints(ds, series[0].Name, earliest)
 	if len(series) > 1 {
 		names := make([]string, len(series))
 		for i, s := range series {
 			names[i] = s.Name
 		}
-		checkpoints = multiCardCheckpoints(names, earliest)
+		checkpoints = multiCardCheckpoints(ds, names, earliest)
 	}
 
 	writeChartAPIResponse(w, ChartAPIResponse{

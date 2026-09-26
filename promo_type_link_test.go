@@ -25,11 +25,11 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		card := uuid2card(uuid, false, false, false)
+		card := uuid2card(backend(), uuid, false, false, false)
 		values := append(append([]string{}, card.PromoTypes...), card.Treatments...)
 		for _, value := range values {
 			checked++
-			if cardFilterIs([]string{value}, co) {
+			if cardFilterIs(backend(), []string{value}, co) {
 				t.Errorf("%s (%s): is:%s does not match the card its own link names", co.Name, co.SetCode, value)
 			}
 		}
@@ -45,7 +45,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 		if err != nil || co.Sealed || co.FrameVersion != "1997" {
 			continue
 		}
-		card := uuid2card(uuid, false, false, false)
+		card := uuid2card(backend(), uuid, false, false, false)
 		for _, p := range card.PromoTypes {
 			if p == "retro" {
 				retroUUID = uuid
@@ -59,7 +59,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 		t.Skip("this datastore has no retro-framed printing recent enough to show it")
 	}
 	co, _ := backend().GetUUID(retroUUID)
-	if cardFilterIs([]string{"retro"}, co) {
+	if cardFilterIs(backend(), []string{"retro"}, co) {
 		t.Errorf("%s (%s): is:retro does not match a card whose own PromoTypes names it", co.Name, co.SetCode)
 	}
 }
@@ -76,9 +76,9 @@ func TestSearchTemplatesLinkPromoTypes(t *testing.T) {
 	if chipped == "" {
 		t.Skip("this datastore has no printing with a treatment chip")
 	}
-	card := uuid2card(chipped, false, false, false)
+	card := uuid2card(backend(), chipped, false, false, false)
 	value := card.Treatments[0]
-	label := promoTypeLabel(value)
+	label := promoTypeLabel(backend(), value)
 	pageVars := PageVars{
 		SearchQuery: card.Name,
 		SearchRan:   true,

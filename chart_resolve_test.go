@@ -154,7 +154,7 @@ func TestTCGFinishID(t *testing.T) {
 		"Foil":      foil,
 		"Cold Foil": "",
 	} {
-		if got := tcgFinishID(pid, subType); got != want {
+		if got := tcgFinishID(backend(), pid, subType); got != want {
 			t.Errorf("tcgFinishID(%d, %q) = %q, want %q", pid, subType, got, want)
 		}
 	}
@@ -188,10 +188,10 @@ func TestMagicFinishSearchID(t *testing.T) {
 		t.Skip("no card with both a foil and a nonfoil printing")
 	}
 
-	if got := magicFinishSearchID(uuid, true, false); got != foilID {
+	if got := magicFinishSearchID(backend(), uuid, true, false); got != foilID {
 		t.Errorf("magicFinishSearchID(%q, foil) = %q, want %q", uuid, got, foilID)
 	}
-	if got := magicFinishSearchID(uuid, false, false); got != uuid {
+	if got := magicFinishSearchID(backend(), uuid, false, false); got != uuid {
 		t.Errorf("magicFinishSearchID(%q, nonfoil) = %q, want %q", uuid, got, uuid)
 	}
 }

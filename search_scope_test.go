@@ -19,7 +19,7 @@ func filterNames(filters []FilterElem) []string {
 
 func parseForTest(t *testing.T, query string) SearchConfig {
 	t.Helper()
-	return parseSearchOptionsNG(query, nil, nil, nil)
+	return parseSearchOptionsNG(backend(), query, nil, nil, nil)
 }
 
 // TestSearchScopeAddsFilters is the case the bar exists for: a set pinned
@@ -31,7 +31,7 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 
 	for _, typed := range []string{"is:foil", "is:nonfoil"} {
 		config := parseForTest(t, typed)
-		applySearchScope(&config, scopeFilters("s:sos"))
+		applySearchScope(&config, scopeFilters(backend(), "s:sos"))
 
 		names := filterNames(config.CardFilters)
 		if !slices.Contains(names, "edition") {
@@ -62,7 +62,7 @@ func TestSearchScopeKeepsBothSides(t *testing.T) {
 		t.Run(tt.typed+" + "+tt.pinned, func(t *testing.T) {
 			config := parseForTest(t, tt.typed)
 			before := len(config.CardFilters)
-			pinned := scopeFilters(tt.pinned)
+			pinned := scopeFilters(backend(), tt.pinned)
 			applySearchScope(&config, pinned)
 
 			if len(config.CardFilters) != before+len(pinned) {
@@ -83,7 +83,7 @@ func TestSearchScopeIgnoresNames(t *testing.T) {
 
 	config := parseForTest(t, "is:foil")
 	before := len(config.CardFilters)
-	applySearchScope(&config, scopeFilters("abrade"))
+	applySearchScope(&config, scopeFilters(backend(), "abrade"))
 
 	if len(config.CardFilters) != before {
 		t.Errorf("a name in the pinned bar changed the search: %v", filterNames(config.CardFilters))
@@ -104,7 +104,7 @@ func TestSearchScopeSkipsPassthroughModes(t *testing.T) {
 		config := parseForTest(t, "is:foil")
 		config.SearchMode = mode
 		before := len(config.CardFilters)
-		applySearchScope(&config, scopeFilters("s:sos"))
+		applySearchScope(&config, scopeFilters(backend(), "s:sos"))
 
 		if len(config.CardFilters) != before {
 			t.Errorf("%s mode was narrowed by the pinned bar: %v", mode, filterNames(config.CardFilters))
@@ -226,8 +226,8 @@ func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
 	}
 
 	for _, opts := range [][]string{nil, {"hidePromos"}, {"hidePrelPack"}} {
-		config := parseSearchOptionsNG("s:soa", nil, nil, opts)
-		applySearchScope(&config, scopeFilters("is:foil"))
+		config := parseSearchOptionsNG(backend(), "s:soa", nil, nil, opts)
+		applySearchScope(&config, scopeFilters(backend(), "is:foil"))
 
 		var applied bool
 		for _, filter := range config.CardFilters {
@@ -263,7 +263,7 @@ func TestScopeIgnoredIsWhatTheBarSays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.scope, func(t *testing.T) {
-			got := len(scopeFilters(tt.scope)) == 0 && tt.scope != ""
+			got := len(scopeFilters(backend(), tt.scope)) == 0 && tt.scope != ""
 			if got != tt.ignored {
 				t.Errorf("%q: ignored=%v, want %v", tt.scope, got, tt.ignored)
 			}

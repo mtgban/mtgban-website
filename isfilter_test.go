@@ -34,7 +34,7 @@ func TestWCDAndGoldFiltersDiverge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			card := &mtgmatcher.CardObject{Card: mtgmatcher.Card{SetCode: tt.setCode, BorderColor: tt.border}}
-			got := !cardFilterIs([]string{tt.filter}, card)
+			got := !cardFilterIs(backend(), []string{tt.filter}, card)
 			if got != tt.wantMatch {
 				t.Fatalf("is:%s match = %v, want %v", tt.filter, got, tt.wantMatch)
 			}
@@ -68,7 +68,7 @@ func TestIsFilterCasesAgreeWithMagicPromoTypes(t *testing.T) {
 			continue
 		}
 		for _, name := range both {
-			byCase := !cardFilterIs([]string{name}, co)
+			byCase := !cardFilterIs(backend(), []string{name}, co)
 			if byCase != co.HasPromoType(name) {
 				t.Errorf("is:%s answers %v for %s by its case and %v by the promo type", name, byCase, uuid, co.HasPromoType(name))
 			}
@@ -88,12 +88,12 @@ func TestIsFilterStillMatchesAPromoType(t *testing.T) {
 
 	co := &mtgmatcher.CardObject{}
 	co.PromoTypes = []string{promoType}
-	if cardFilterIs([]string{promoType}, co) {
+	if cardFilterIs(backend(), []string{promoType}, co) {
 		t.Errorf("is:%s did not match a card carrying it", promoType)
 	}
 
 	co.PromoTypes = nil
-	if !cardFilterIs([]string{promoType}, co) {
+	if !cardFilterIs(backend(), []string{promoType}, co) {
 		t.Errorf("is:%s matched a card without it", promoType)
 	}
 }
