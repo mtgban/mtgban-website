@@ -365,6 +365,17 @@ func archiveAnswered(series []chartSeries) bool {
 	return slices.ContainsFunc(series, func(s chartSeries) bool { return s.Err == nil })
 }
 
+// readFailures counts the roster cards the archive did not answer for.
+func readFailures(series []chartSeries) int {
+	failed := 0
+	for _, s := range series {
+		if s.Err != nil {
+			failed++
+		}
+	}
+	return failed
+}
+
 // earliestChartedDate is the oldest date a fetched series holds, which is where
 // the axis starts. Empty series fall back to the lookback boundary, the same
 // answer the archive gave when it was asked directly.

@@ -307,12 +307,12 @@ func magicFinishSearchID(uuid string, foil, etched bool) string {
 	return uuid
 }
 
-// noteChartIDsDropped tells the reader that part of the roster could not be
-// matched to a printing, appending to whatever the page already said.
-func noteChartIDsDropped(pageVars *PageVars, dropped, total int) {
-	notice := fmt.Sprintf("%d of the %d charted cards could not be matched to a printing and were left out.", dropped, total)
+// noteChartIDsDropped tells the reader that part of the roster was left out of
+// the chart and why, appending to whatever the page already said.
+func noteChartIDsDropped(pageVars *PageVars, dropped, total int, why string) {
+	notice := fmt.Sprintf("%d of the %d charted cards %s and were left out.", dropped, total, why)
 	if dropped == 1 {
-		notice = "One of the charted cards could not be matched to a printing and was left out."
+		notice = "One of the charted cards " + why + " and was left out."
 	}
 	if pageVars.InfoMessage == "" {
 		pageVars.InfoMessage = notice
@@ -620,7 +620,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// went: a roster the user built by hand, or a link they were sent,
 			// otherwise comes back quietly short.
 			if unresolved > 0 {
-				noteChartIDsDropped(&pageVars, unresolved, len(chartIDs))
+				noteChartIDsDropped(&pageVars, unresolved, len(chartIDs), "could not be matched to a printing")
 			}
 			query = strings.Join(searchIDs, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
@@ -1270,10 +1270,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					earliest = e
 				}
 			}
-			if len(series) > 0 && !archiveAnswered(series) {
-				// An archive that did not answer says nothing about the card.
-				pageVars.InfoMessage = "Failed to load chart"
-			} else if len(series) == 0 || earliest.IsZero() {
+			if len(series) == 0 || earliest.IsZero() {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
@@ -1298,8 +1295,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					pageVars.Datasets = cards[0].Datasets
 					pageVars.Checkpoints = relevantCheckpoints(cards[0].Name, earliest)
 				}
-				if len(pageVars.Datasets) == 0 {
+				// A card the archive did not answer for is missing from the chart,
+				// which says nothing about its prices: never call such a chart
+				// empty, and when the rest drew, say what was left out.
+				failed := readFailures(series)
+				switch {
+				case len(pageVars.Datasets) == 0 && failed > 0:
+					pageVars.InfoMessage = "Failed to load chart"
+				case len(pageVars.Datasets) == 0:
 					pageVars.InfoMessage = "No chart data available"
+				case failed > 0:
+					noteChartIDsDropped(&pageVars, failed, len(chartIDs), "failed to load")
 				}
 			}
 		} else if !isMultiChart {
