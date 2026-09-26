@@ -78,6 +78,7 @@ var FilterOptKeys = []string{
 	"nosyp",
 	"nostock",
 	"nosus",
+	"novolatile",
 	"noindex",
 }
 
@@ -255,12 +256,7 @@ var FilterOptConfig = map[string]FilterOpt{
 			oldFunc := opts.CustomPriceFilter
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
-				co, err := backend().GetUUID(cardId)
-				if err == nil && co.Sealed {
-					if getTCGSimulationIQR(cardId) > IQRThreshold {
-						return 0, true
-					}
-				} else if invalidDirectIn(tcgMarket, cardId, invEntry.Price) {
+				if invalidDirectIn(tcgMarket, cardId, invEntry.Price) {
 					return 0, true
 				}
 				if oldFunc != nil {
@@ -270,6 +266,24 @@ var FilterOptConfig = map[string]FilterOpt{
 			}
 		},
 		GlobalOnly: true,
+		NoSealed:   true,
+	},
+	"novolatile": {
+		Title: "only Stable",
+		Func: func(opts *mtgban.ArbitOpts) {
+			oldFunc := opts.CustomPriceFilter
+			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
+				if getTCGSimulationIQR(cardId) > IQRThreshold {
+					return 0, true
+				}
+				if oldFunc != nil {
+					return oldFunc(cardId, invEntry)
+				}
+				return 1, false
+			}
+		},
+		GlobalOnly: true,
+		SealedOnly: true,
 	},
 	"noindex": {
 		Title:       "only Tradable",
@@ -624,6 +638,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		arbitFilters["nopenny"] = !arbitFilters["nopenny"]
 		arbitFilters["nodiff"] = !arbitFilters["nodiff"]
 		arbitFilters["nosus"] = !arbitFilters["nosus"]
+		arbitFilters["novolatile"] = !arbitFilters["novolatile"]
 	}
 
 	// Same for reverse, where what it drops would otherwise fill the whole
@@ -950,7 +965,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 				}
 			}
 		}
-		if !arbitFilters["nosus"] && scraper.Info().SealedMode {
+		if !arbitFilters["novolatile"] && scraper.Info().SealedMode {
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {
