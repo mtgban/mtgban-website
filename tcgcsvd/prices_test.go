@@ -89,8 +89,8 @@ func (f *fakeTCGCSV) calls() int {
 	return f.archiveCalls
 }
 
-// fakeService wires a Service to fake and store, with the client's throttle off
-// so the test isn't paced by tcgcsv etiquette.
+// fakeService wires a Service to fake and store. The client keeps its real
+// throttle, so keep the request counts in these tests small.
 func fakeService(t *testing.T, fake *fakeTCGCSV, store Store) (*Service, *[]string) {
 	t.Helper()
 	srv := httptest.NewServer(fake.handler())
@@ -235,11 +235,15 @@ func TestBackfillArchiveEntirelyMissingRange(t *testing.T) {
 		t.Errorf("asked the archive for %d day(s), want 4", n)
 	}
 
-	// And a single unpublished day is ordinary: today's archive lands after
-	// tcgcsv's evening refresh, so one 404 at the tail of a range is not a
-	// withdrawn archive.
+	// And unpublished days at the tail of a range are ordinary: today's archive
+	// lands after tcgcsv's evening refresh, so a 404 there is not a withdrawn
+	// archive -- misreading it would send the snapshot fallback on a full crawl.
 	if err := svc.backfillFromArchive(context.Background(), svc.Games(), from, from, false); err != nil {
 		t.Errorf("a one-day range with no archive yet: %v", err)
+	}
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := svc.backfillFromArchive(context.Background(), svc.Games(), today.AddDate(0, 0, -1), today, false); err != nil {
+		t.Errorf("yesterday..today before tcgcsv's refresh: %v", err)
 	}
 }
 
@@ -250,7 +254,7 @@ func TestBackfillArchiveEntirelyMissingRange(t *testing.T) {
 func TestBackfillSnapshotYieldsTheCrawlLock(t *testing.T) {
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	fake := &fakeTCGCSV{lastUpdated: today.Add(20 * time.Hour), archiveStatus: http.StatusForbidden}
-	// lockedOutStore embeds stubStore, whose TryAdvisoryLock never acquires.
+	// lockedOutStore overrides TryAdvisoryLock so it never acquires.
 	store := &lockedOutStore{}
 	svc, notified := fakeService(t, fake, store)
 
