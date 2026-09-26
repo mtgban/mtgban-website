@@ -7,17 +7,15 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-// TestNumberIndexMatchesScan pins the index to the scan it stands in for. A
-// key spelled one way and a query the other does not raise anything: the
-// search simply finds nothing and reads as "no such card", so the agreement
-// is worth asserting rather than assuming.
-func TestNumberIndexMatchesScan(t *testing.T) {
+// TestNumbersSnapshotMatchesScan pins the snapshot to the scan it stands in
+// for. A key spelled one way and a query the other does not raise anything:
+// the search simply finds nothing and reads as "no such card", so the
+// agreement is worth asserting rather than assuming.
+func TestNumbersSnapshotMatchesScan(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore loaded to run this test")
 	}
-	previous := numberIdx.Load()
-	t.Cleanup(func() { numberIdx.Store(previous) })
-	numberIdx.Store(buildNumberIndex(backend()))
+	numbers := newNumbersSnapshot(backend())
 
 	for _, tt := range []struct {
 		query, filter string
@@ -33,7 +31,7 @@ func TestNumberIndexMatchesScan(t *testing.T) {
 	} {
 		t.Run(tt.query, func(t *testing.T) {
 			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
-			seeded, ok := numberSeedUUIDs(config.CardFilters)
+			seeded, ok := numberSeedUUIDs(numbers, config.CardFilters)
 			if !ok {
 				t.Fatalf("%s did not seed", tt.query)
 			}
@@ -56,9 +54,7 @@ func TestNumberSeedDeclines(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore loaded to run this test")
 	}
-	previous := numberIdx.Load()
-	t.Cleanup(func() { numberIdx.Store(previous) })
-	numberIdx.Store(buildNumberIndex(backend()))
+	numbers := newNumbersSnapshot(backend())
 
 	for _, query := range []string{
 		"-cn:635",    // names what to leave out
@@ -68,40 +64,46 @@ func TestNumberSeedDeclines(t *testing.T) {
 	} {
 		t.Run(query, func(t *testing.T) {
 			config := parseSearchOptionsNG(query, nil, nil, nil)
-			if _, ok := numberSeedUUIDs(config.CardFilters); ok {
+			_, ok := numberSeedUUIDs(numbers, config.CardFilters)
+			if ok {
 				t.Errorf("%s seeded, but it does not bound the result set", query)
 			}
 		})
 	}
 }
 
-func TestNumberIndexKeepsStoredForms(t *testing.T) {
+func TestNumbersSnapshotKeepsStoredForms(t *testing.T) {
 	b := &mtgmatcher.Backend{
 		AllUUIDs: []string{"card"},
 		UUIDs:    map[string]*mtgmatcher.CardObject{"card": {Card: mtgmatcher.Card{UUID: "card", Number: "021★", PlainNumber: "21"}}},
 	}
-	idx := buildNumberIndex(b)
-	if !slices.Equal(idx.loose["21"], []string{"card"}) || !slices.Equal(idx.strict["021★"], []string{"card"}) {
-		t.Fatal("index did not retain the stored plain and printed numbers")
+	numbers := newNumbersSnapshot(b)
+	if !slices.Equal(numbers.loose["21"], []string{"card"}) || !slices.Equal(numbers.strict["021★"], []string{"card"}) {
+		t.Fatal("snapshot did not retain the stored plain and printed numbers")
 	}
-	if len(idx.strict["21★"]) != 0 || len(idx.strict["21"]) != 0 {
-		t.Fatal("strict index normalized the printed number")
+	if len(numbers.strict["21★"]) != 0 || len(numbers.strict["21"]) != 0 {
+		t.Fatal("strict snapshot normalized the printed number")
 	}
 }
 
+// TestNumberSearchMatchesUnseededSearch publishes a copy of the live
+// datastore with numbers disabled, then the live datastore itself (whose
+// numbers newDatastore already built), so searchAndFilter sees each in turn
+// through currentDatastore() the way a request would.
 func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore")
 	}
-	previous := numberIdx.Load()
-	t.Cleanup(func() { numberIdx.Store(previous) })
-	idx := buildNumberIndex(backend())
+	base := currentDatastore()
+	withoutNumbers := *base
+	withoutNumbers.numbers = nil
+
 	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
 			config := parseSearchOptionsNG(query, nil, nil, nil)
-			numberIdx.Store(nil)
+			useDatastore(t, &withoutNumbers)
 			want, wantErr := searchAndFilter(config)
-			numberIdx.Store(idx)
+			useDatastore(t, base)
 			got, gotErr := searchAndFilter(config)
 			slices.Sort(want)
 			slices.Sort(got)
@@ -112,39 +114,42 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 	}
 }
 
-// BenchmarkNumberIndexSearch measures the same request path with the index
-// disabled and enabled, after first checking that the result sets agree.
-func BenchmarkNumberIndexSearch(b *testing.B) {
+// BenchmarkNumbersSnapshotSearch measures the same request path with the
+// snapshot disabled and enabled, after first checking that the result sets
+// agree.
+func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 	if len(backend().GetUUIDs()) == 0 {
 		b.Skip("Need a datastore")
 	}
-	previous := numberIdx.Load()
-	b.Cleanup(func() { numberIdx.Store(previous) })
-	idx := buildNumberIndex(backend())
+	base := currentDatastore()
+	withoutNumbers := *base
+	withoutNumbers.numbers = nil
+
 	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
 		config := parseSearchOptionsNG(query, nil, nil, nil)
-		numberIdx.Store(nil)
+		useDatastore(b, &withoutNumbers)
 		scanned, err := searchAndFilter(config)
 		if err != nil {
 			b.Fatal(err)
 		}
-		numberIdx.Store(idx)
-		indexed, err := searchAndFilter(config)
+		useDatastore(b, base)
+		seeded, err := searchAndFilter(config)
 		if err != nil {
 			b.Fatal(err)
 		}
 		slices.Sort(scanned)
-		slices.Sort(indexed)
-		if !slices.Equal(scanned, indexed) {
-			b.Fatalf("%s: indexed and scanned results differ", query)
+		slices.Sort(seeded)
+		if !slices.Equal(scanned, seeded) {
+			b.Fatalf("%s: seeded and scanned results differ", query)
 		}
-		b.Logf("%s: %d identical results", query, len(indexed))
-		for _, mode := range []string{"scan", "index"} {
+		b.Logf("%s: %d identical results", query, len(seeded))
+		for _, mode := range []string{"scan", "seeded"} {
 			b.Run(query+"/"+mode, func(b *testing.B) {
-				numberIdx.Store(nil)
-				if mode == "index" {
-					numberIdx.Store(idx)
+				ds := &withoutNumbers
+				if mode == "seeded" {
+					ds = base
 				}
+				useDatastore(b, ds)
 				b.ReportAllocs()
 				for b.Loop() {
 					if _, err := searchAndFilter(config); err != nil {
@@ -156,15 +161,15 @@ func BenchmarkNumberIndexSearch(b *testing.B) {
 	}
 }
 
-func BenchmarkNumberIndexBuild(b *testing.B) {
+func BenchmarkNumbersSnapshotBuild(b *testing.B) {
 	backend := backend()
 	if len(backend.GetUUIDs()) == 0 {
 		b.Skip("Need a datastore")
 	}
 	b.ReportAllocs()
 	for b.Loop() {
-		if buildNumberIndex(backend) == nil {
-			b.Fatal("missing index")
+		if newNumbersSnapshot(backend) == nil {
+			b.Fatal("missing snapshot")
 		}
 	}
 }

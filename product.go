@@ -101,13 +101,12 @@ func GetTCGCategoryID() int {
 	return p.CategoryID
 }
 
-// EditionsSnapshot bundles every piece of edition-derived state produced by
-// updateStaticData. Publishing them together under a single atomic.Pointer
-// guarantees readers always see a fully-consistent view — previously the 12
-// individual stores could be observed out of sync, e.g. AllEditionsKeys
-// updated while AllEditionsMap was still the previous version, producing
-// nil-map lookups in search.
-type EditionsSnapshot struct {
+// editionsSnapshot bundles every piece of edition-derived state produced by
+// newEditionsSnapshot. It is one field of datastore, so one read of the
+// datastore gives fields that all describe the same load - e.g.
+// AllEditionsKeys and AllEditionsMap from the same build, never one from
+// each, which used to produce nil-map lookups in search.
+type editionsSnapshot struct {
 	// All editions containing sealed products
 	SealedEditionsSorted []string
 	SealedEditionsList   map[string][]EditionEntry
@@ -129,18 +128,10 @@ type EditionsSnapshot struct {
 	TotalUnique int
 }
 
-var editionsPtr atomic.Pointer[EditionsSnapshot]
-
-func init() {
-	// Seed an empty snapshot so accessors return a usable value before
-	// updateStaticData first runs.
-	editionsPtr.Store(&EditionsSnapshot{})
-}
-
 // GetEditions returns the current editions snapshot. The returned struct's
 // fields are shared and MUST NOT be modified by callers.
-func GetEditions() *EditionsSnapshot {
-	return editionsPtr.Load()
+func GetEditions() *editionsSnapshot {
+	return currentDatastore().editions
 }
 
 // Long time no reprint data. ReprintsKeys is the ordered list of section
@@ -274,13 +265,13 @@ func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
 	}
 }
 
-func getAllEditions() ([]string, map[string]EditionEntry) {
-	sets := backend().GetAllSets()
+func getAllEditions(b *mtgmatcher.Backend) ([]string, map[string]EditionEntry) {
+	sets := b.GetAllSets()
 
 	sortedEditions := make([]string, 0, len(sets))
 	listEditions := map[string]EditionEntry{}
 	for _, code := range sets {
-		set, err := backend().GetSet(code)
+		set, err := b.GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -297,14 +288,14 @@ func getAllEditions() ([]string, map[string]EditionEntry) {
 	return sortedEditions, listEditions
 }
 
-func getTreeEditions() ([]string, map[string][]EditionEntry) {
-	sets := backend().GetAllSets()
+func getTreeEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
+	sets := b.GetAllSets()
 
 	var sortedEditions []string
 	listEditions := map[string][]EditionEntry{}
 	for _, code := range sets {
 		// Skip empty sets
-		set, err := backend().GetSet(code)
+		set, err := b.GetSet(code)
 		if err != nil || len(set.Cards) == 0 {
 			continue
 		}
@@ -324,7 +315,7 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 			// Find the very fist parent
 			topParentCode := set.ParentCode
 			for {
-				topset, err := backend().GetSet(topParentCode)
+				topset, err := b.GetSet(topParentCode)
 				if err != nil || topset.ParentCode == "" {
 					break
 				}
@@ -335,7 +326,7 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 			_, found := listEditions[topParentCode]
 			if !found {
 				// If not, create it
-				set, err := backend().GetSet(topParentCode)
+				set, err := b.GetSet(topParentCode)
 				if err != nil {
 					continue
 				}
@@ -424,16 +415,16 @@ func flattenEditions(keys []string, tree map[string][]EditionEntry) []FlatEditio
 	return flat
 }
 
-func getSealedEditions() ([]string, map[string][]EditionEntry) {
+func getSealedEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
 	sortedEditions := []string{}
 	listEditions := map[string][]EditionEntry{}
-	for _, code := range backend().GetAllSets() {
+	for _, code := range b.GetAllSets() {
 		switch code {
 		case "DRKITA", "LEGITA", "4EDALT":
 			continue
 		}
 
-		set, err := backend().GetSet(code)
+		set, err := b.GetSet(code)
 		if err != nil || len(set.SealedProduct) == 0 {
 			continue
 		}
@@ -474,12 +465,12 @@ func getSealedEditions() ([]string, map[string][]EditionEntry) {
 // getAllEditionsByCategory returns the same edition set as getAllEditions()
 // grouped by category (using the same categoryEdition / categoryOverrides maps
 // that drive SealedEditionsList). Uncategorized set types land in "Other".
-func getAllEditionsByCategory() ([]string, map[string][]EditionEntry) {
+func getAllEditionsByCategory(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
 	sortedCategories := []string{}
 	listEditions := map[string][]EditionEntry{}
 
-	for _, code := range backend().GetAllSets() {
-		set, err := backend().GetSet(code)
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -1045,16 +1036,19 @@ func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDi
 	}
 }
 
-func updateStaticData() {
-	snap := &EditionsSnapshot{}
-	snap.SealedEditionsSorted, snap.SealedEditionsList = getSealedEditions()
-	snap.AllEditionsKeys, snap.AllEditionsMap = getAllEditions()
-	snap.AllEditionsCategoriesSorted, snap.AllEditionsByCategory = getAllEditionsByCategory()
-	snap.TreeEditionsKeys, snap.TreeEditionsMap = getTreeEditions()
+// newEditionsSnapshot derives every edition-related view from b. Called by
+// newDatastore, so it runs before that datastore is published - it must
+// read only b, never the (still previous) live datastore.
+func newEditionsSnapshot(b *mtgmatcher.Backend) *editionsSnapshot {
+	snap := &editionsSnapshot{}
+	snap.SealedEditionsSorted, snap.SealedEditionsList = getSealedEditions(b)
+	snap.AllEditionsKeys, snap.AllEditionsMap = getAllEditions(b)
+	snap.AllEditionsCategoriesSorted, snap.AllEditionsByCategory = getAllEditionsByCategory(b)
+	snap.TreeEditionsKeys, snap.TreeEditionsMap = getTreeEditions(b)
 
 	var filteredEditions []string
 	for _, code := range snap.AllEditionsKeys {
-		set, err := backend().GetSet(code)
+		set, err := b.GetSet(code)
 		if err != nil {
 			continue
 		}
@@ -1069,7 +1063,7 @@ func updateStaticData() {
 	snap.AllEditionsKeysNoFoilOrPromos = filteredEditions
 
 	snap.TotalSets = len(snap.AllEditionsKeys)
-	snap.TotalUnique = len(backend().GetUUIDs())
+	snap.TotalUnique = len(b.GetUUIDs())
 	var totalCards int
 	for _, key := range snap.AllEditionsKeys {
 		totalCards += snap.AllEditionsMap[key].Size
@@ -1080,5 +1074,5 @@ func updateStaticData() {
 		log.Printf("AllEditionsByCategory: %d uncategorized sets", len(other))
 	}
 
-	editionsPtr.Store(snap)
+	return snap
 }

@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -39,9 +40,6 @@ var gameDatastores = map[string]string{
 // the predicate, because a check written against the predicate passed while
 // the search was broken.
 func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
-	saved := backend()
-	t.Cleanup(func() { matcherBackend.Store(saved) })
-
 	var ran int
 	for game, envVar := range gameDatastores {
 		path := os.Getenv(envVar)
@@ -53,48 +51,52 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		datastore, err := mtgmatcher.Open(game, f)
+		loaded, err := mtgmatcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
 			continue
 		}
-		matcherBackend.Store(datastore)
 		ran++
 
-		var tightened int
-		for _, uuid := range backend().GetUUIDs() {
-			co, err := backend().GetUUID(uuid)
-			if err != nil || co.Sealed || co.SetCode == "" || co.Number == "" {
-				continue
-			}
-			if mtgmatcher.ExtractNumberAny(co.Number) == "" ||
-				!strings.ContainsFunc(co.Number, isNotDigit) {
-				continue
-			}
-			if _, err := backend().GetSet(co.SetCode); err != nil {
-				continue
-			}
-			tightened++
+		t.Run(game, func(t *testing.T) {
+			useDatastore(t, newDatastore(loaded, time.Now()))
 
-			query := co.SetCode + " " + co.Number
-			keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
-			if err != nil {
-				t.Errorf("%s: %q: %v", game, query, err)
-				continue
+			var tightened int
+			for _, uuid := range backend().GetUUIDs() {
+				co, err := backend().GetUUID(uuid)
+				if err != nil || co.Sealed || co.SetCode == "" || co.Number == "" {
+					continue
+				}
+				if mtgmatcher.ExtractNumberAny(co.Number) == "" ||
+					!strings.ContainsFunc(co.Number, isNotDigit) {
+					continue
+				}
+				_, err = backend().GetSet(co.SetCode)
+				if err != nil {
+					continue
+				}
+				tightened++
+
+				query := co.SetCode + " " + co.Number
+				keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+				if err != nil {
+					t.Errorf("%s: %q: %v", game, query, err)
+					continue
+				}
+				if len(keys) == 0 {
+					t.Errorf("%s: %q was tightened and reaches no printing", game, query)
+				}
+				if tightened >= 50 {
+					break
+				}
 			}
-			if len(keys) == 0 {
-				t.Errorf("%s: %q was tightened and reaches no printing", game, query)
-			}
-			if tightened >= 50 {
-				break
-			}
-		}
-		// A number typed without its padding is not checked: no printing
-		// carries it, so it reaches nothing, the same answer "neo 30a"
-		// gets and for the same reason. 54 of Pokemon's numbers and 88 of
-		// Palworld's can be typed that way.
-		t.Logf("%-14s %d tightened numbers checked", game, tightened)
+			// A number typed without its padding is not checked: no printing
+			// carries it, so it reaches nothing, the same answer "neo 30a"
+			// gets and for the same reason. 54 of Pokemon's numbers and 88 of
+			// Palworld's can be typed that way.
+			t.Logf("%-14s %d tightened numbers checked", game, tightened)
+		})
 	}
 
 	if ran == 0 {

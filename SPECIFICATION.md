@@ -92,10 +92,11 @@ Boot sequence (`main()`, main.go:1299-1674):
    build (`buildTemplateCache()`) — see §7.
 4. Async goroutine: `loadDatastore(Config.DatastorePath)` — opens the site's
    game via `mtgmatcher.Open(datastoreGame(), reader)` (not the old
-   `mtgmatcher.LoadDatastore()`) and publishes it, then itself spawns
-   `rebuildSuggestIndex()`, `updateStaticData()`, `cacheNewspaper()`, and
-   `paletteService.BuildSetsCache()`/`BuildPromosCache()`/`BuildFinishesCache()`
-   as further goroutines.
+   `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
+   snapshots and the palette's sets/promos/finishes lists from it
+   (`newDatastore()`, datastore.go), publishes backend and snapshots
+   together in one `liveDatastore.Store()`, then itself spawns
+   `cacheNewspaper()` as a further goroutine.
 5. Unless `-noload` (`SkipPrices`): async goroutine `loadScrapersNG()`, then
    `runSealedAnalysis()`, `warmVariantCacheIfEnabled()`,
    `offlineService.RefreshManifest()`.
@@ -127,11 +128,19 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   not regress; a new inventory/buylist under half the previous size is
   rejected once the previous one held over 100 entries) and `.Store()` a new
   slice under `scrapersWriteMu`. Zero-downtime reloads.
-- Same pattern for newspaper page cache (`newspaperPagesPtr`), editions
-  snapshot (`editionsPtr`), reprints (`reprintsPtr`), checkpoints
-  (`checkpointsStore`, an `internal/bucketstore.Store[T]` — also an
-  atomic-pointer swap, not a mutex), and last-update timestamps
-  (`lastDatastoreUpdatePtr` and siblings).
+- Same pattern for newspaper page cache (`newspaperPagesPtr`), reprints
+  (`reprintsPtr`), checkpoints (`checkpointsStore`, an
+  `internal/bucketstore.Store[T]` — also an atomic-pointer swap, not a
+  mutex), and last-update timestamps for the stash and newspaper crons
+  (`lastStashUpdatePtr`/`lastNewspaperUpdatePtr`).
+- The card datastore is the same pattern once more: backend plus its
+  numbers/names/editions snapshots, the palette's sets/promos/finishes
+  lists, and its own load time are one `datastore` value (datastore.go),
+  built by `newDatastore()` and published in a single
+  `liveDatastore.Store()`. Readers go through `currentDatastore()` (never
+  nil, even before the first load), or
+  `backend()`/`GetEditions()`/`GetLastDatastoreUpdate()` for one field of
+  it.
 - `Config` is loaded once and swapped whole on admin reload (`admin.go`);
   per-user API secrets read behind `apiUsersMutex`; affiliate data behind
   `affiliatesMu`/`affiliatesPtr`.
@@ -308,8 +317,9 @@ override; phone UA detection via `mileusna/useragent`).
   what ranking, "best price" highlighting and the embed's price columns
   ask instead of assuming every row is a dollar amount.
 - **Suggest** (`api_suggest.go`): no longer a live prefix scan of
-  `mtgmatcher.AllNames()` per request. A `suggestIndex` is built once when
-  the datastore (re)loads (`rebuildSuggestIndex()`), folding every name
+  `mtgmatcher.AllNames()` per request. A `namesSnapshot` is built once when
+  the datastore (re)loads (`newNamesSnapshot()`, called from
+  `newDatastore()`), folding every name
   (diacritics/case/punctuation stripped) and also "squashing" spaces out of
   the folded form, into separate sorted singles/sealed views searched by
   binary search — so a typed space or hyphen reaches either spelling
@@ -401,8 +411,8 @@ three 90-day CK buylist metrics from `PricesArchiveDB`/`timeseries`
 every TCGplayer SKU (singles + sealed) to its card UUID plus the TCGplayer
 catalog IDs CSV exports rely on. The editions snapshot (set lists,
 categories, parent/child trees) published for the Sets/Sealed pages is
-built separately, by `updateStaticData()` (§2.1) — not by
-`runSealedAnalysis()`.
+built separately, by `newEditionsSnapshot()` as part of a datastore load
+(§2.1) — not by `runSealedAnalysis()`.
 
 ### 5.6 Charts (`chart.go`, `chart_resolve.go`, `api_chart.go`, `timeseries/`, `db_migration/`)
 
@@ -547,7 +557,7 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
 - **Testing**: broad and per-feature, not thin — 82 `*_test.go` files in the
   root package as of this writing (`ls *_test.go`), organized by subsystem
   rather than one-per-source-file: search/searchfilter (query parser, sort
-  orders, sealed/number-index edge cases), upload (parsers, unpack, magic
+  orders, sealed/collector-number edge cases), upload (parsers, unpack, magic
   export/CSV), arbit (best-of, language handling, suspicious-spread
   heuristics), charts (axis, buttons, resolve/search-by-id), admin (ajax,
   datastore, table-sort, usage), games-coverage/game-badge/game-body (every

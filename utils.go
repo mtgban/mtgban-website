@@ -623,9 +623,9 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 // Cold Foil and Rainbow Foil, so every row reads the same whichever half of
 // the list it came from. Only a trailing "foil" moves: Double Rainbow and
 // Step-and-Compleat are not "something foil" and keep their own shape.
-func finishListLabel(finish string) string {
+func finishListLabel(b *mtgmatcher.Backend, finish string) string {
 	if slices.Contains(altFoilTags, finish) {
-		label := backend().PromoTypeLabel(finish)
+		label := b.PromoTypeLabel(finish)
 		if label != mtgmatcher.Title(finish) {
 			if strings.HasSuffix(label, " foil") {
 				label = strings.TrimSuffix(label, " foil") + " Foil"

@@ -4,6 +4,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -66,9 +67,6 @@ func TestSetFilterNamesNothing(t *testing.T) {
 //
 //	YUGIOH_PATH=... go test -run NameThatIsFilterSyntaxIsStillFound
 func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
-	saved := backend()
-	t.Cleanup(func() { matcherBackend.Store(saved) })
-
 	var games []string
 	for game := range gameDatastores {
 		games = append(games, game)
@@ -86,52 +84,55 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 			t.Logf("%s: %v", game, err)
 			continue
 		}
-		datastore, err := mtgmatcher.Open(game, f)
+		loaded, err := mtgmatcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
 			continue
 		}
-		matcherBackend.Store(datastore)
 
-		for _, uuid := range backend().GetUUIDs() {
-			co, err := backend().GetUUID(uuid)
-			if err != nil || co.Sealed || !re.MatchString(co.Name) {
-				continue
-			}
-			checked++
+		t.Run(game, func(t *testing.T) {
+			useDatastore(t, newDatastore(loaded, time.Now()))
 
-			// The name alone, the way a person searches for it, and the
-			// query the site writes to link this very printing.
-			//
-			// A printing with no number is left to the first of those: its
-			// genQuery carries a bare "cns:" that no filter matches, so the
-			// two characters stay in the query and spoil the name. That is
-			// genQuery's own fault and predates this - 136 Yu-Gi-Oh
-			// printings are numberless - and is not what this fixes.
-			queries := []string{co.Name}
-			if co.Number != "" {
-				queries = append(queries, genQuery(co))
-			}
-			for _, query := range queries {
-				keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
-				if err != nil {
-					t.Errorf("%q does not run: %v", query, err)
+			for _, uuid := range backend().GetUUIDs() {
+				co, err := backend().GetUUID(uuid)
+				if err != nil || co.Sealed || !re.MatchString(co.Name) {
 					continue
 				}
-				var found bool
-				for _, key := range keys {
-					if key == uuid {
-						found = true
-						break
+				checked++
+
+				// The name alone, the way a person searches for it, and the
+				// query the site writes to link this very printing.
+				//
+				// A printing with no number is left to the first of those: its
+				// genQuery carries a bare "cns:" that no filter matches, so the
+				// two characters stay in the query and spoil the name. That is
+				// genQuery's own fault and predates this - 136 Yu-Gi-Oh
+				// printings are numberless - and is not what this fixes.
+				queries := []string{co.Name}
+				if co.Number != "" {
+					queries = append(queries, genQuery(co))
+				}
+				for _, query := range queries {
+					keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+					if err != nil {
+						t.Errorf("%q does not run: %v", query, err)
+						continue
+					}
+					var found bool
+					for _, key := range keys {
+						if key == uuid {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("%q does not find %s, %s #%s (%d results)",
+							query, uuid, co.SetCode, co.Number, len(keys))
 					}
 				}
-				if !found {
-					t.Errorf("%q does not find %s, %s #%s (%d results)",
-						query, uuid, co.SetCode, co.Number, len(keys))
-				}
 			}
-		}
+		})
 	}
 
 	if checked == 0 {

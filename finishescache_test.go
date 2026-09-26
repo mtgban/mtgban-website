@@ -36,7 +36,6 @@ func TestFinishesCacheComesFromTheDatastore(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	paletteService.BuildFinishesCache()
 	finishes := fetchFinishes(t)
 
 	if len(finishes) < 4 {
@@ -88,7 +87,6 @@ func TestFinishesCacheUsesTheGamesSpelling(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	paletteService.BuildFinishesCache()
 
 	for _, finish := range fetchFinishes(t) {
 		if finish.Value != "doublerainbow" {
@@ -109,7 +107,6 @@ func TestFinishesCacheFilesShortForms(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	paletteService.BuildFinishesCache()
 
 	found := false
 	for _, finish := range fetchFinishes(t) {
@@ -159,7 +156,8 @@ func TestFinishListLabelCapitalisesFoil(t *testing.T) {
 		{"1stedition", "1st Edition"},
 	}
 	for _, test := range tests {
-		if got := finishListLabel(test.finish); got != test.want {
+		got := finishListLabel(backend(), test.finish)
+		if got != test.want {
 			t.Errorf("finishListLabel(%q) = %q, want %q", test.finish, got, test.want)
 		}
 	}
@@ -170,7 +168,6 @@ func TestFinishesCacheCapitalisesFoil(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
 	}
-	paletteService.BuildFinishesCache()
 
 	for _, finish := range fetchFinishes(t) {
 		if strings.HasSuffix(finish.Label, " foil") {
