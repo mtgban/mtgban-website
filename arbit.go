@@ -680,13 +680,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			if !anyOptionEnabled && FilterOptConfig[k].BetaFlag {
 				continue
 			}
-			// Skip sealed options when on sealed
-			if source != nil && source.Info().SealedMode && FilterOptConfig[k].NoSealed {
-				continue
-			}
-			if source != nil && !source.Info().SealedMode && FilterOptConfig[k].SealedOnly {
-				continue
-			}
 			arbitFilters[k], _ = strconv.ParseBool(v[0])
 		}
 	}
