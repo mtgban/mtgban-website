@@ -342,18 +342,50 @@ function rethemeFirstAxes(chart) {
 
 /* ── Legend persistence ── */
 
-// Remember which datasets (stores) are hidden, so the next load can restore
-// the same set via applySavedLegendState. The built-in Chart.js legend is
-// disabled (display: false); toggling happens through the custom HTML legend
-// (renderChartLegend), which calls this on every click.
+// The stores a single-card chart hides, saved by name. /api/chart lists only
+// the stores with prices in the window, so a position names a different store
+// from one card, or one window, to the next.
+function savedHiddenStores(storageKey) {
+    var saved;
+    try {
+        saved = JSON.parse(localStorage.getItem(storageKey));
+    } catch (e) {
+        return [];
+    }
+    if (!Array.isArray(saved)) return [];
+    // The old format saved a flag per position, which names no store: it reads
+    // as nothing hidden until the next click replaces it.
+    return saved.filter(function (name) { return typeof name === 'string'; });
+}
+
+// Remember which stores are hidden, so the next load can restore the same set
+// via applySavedLegendState. The built-in Chart.js legend is disabled
+// (display: false); toggling happens through the custom HTML legend
+// (renderChartLegend), which calls this on every click. The preference spans
+// cards, so a store this chart does not draw keeps whatever was saved for it.
 function saveLegendState(chart, storageKey) {
     if (!storageKey) return;
-    var hidden = chart.data.datasets.map(function (_, i) {
-        return !chart.isDatasetVisible(i);
+    var drawn = chart.data.datasets.map(function (ds) { return ds.label; });
+    var hidden = savedHiddenStores(storageKey).filter(function (name) {
+        return drawn.indexOf(name) === -1;
+    });
+    chart.data.datasets.forEach(function (ds, i) {
+        if (!chart.isDatasetVisible(i)) hidden.push(ds.label);
     });
     try {
         localStorage.setItem(storageKey, JSON.stringify(hidden));
     } catch (e) { /* localStorage unavailable; non-fatal */ }
+}
+
+// Hide the saved stores on datasets just built: the page's first draw, and
+// each rebuild from a wider window.
+function applySavedLegendState(chart, storageKey) {
+    var hidden = savedHiddenStores(storageKey);
+    if (!hidden.length) return;
+    chart.data.datasets.forEach(function (ds) {
+        ds.hidden = hidden.indexOf(ds.label) !== -1;
+    });
+    chart.update();
 }
 
 /* ── Checkpoint annotations ── */
@@ -1078,22 +1110,4 @@ function restoreCheckpointTypes() {
             var el = document.getElementById(pair[1]);
             if (el) el.checked = visibleCheckpointTypes.has(pair[0]);
         });
-}
-
-
-function applySavedLegendState(chart, storageKey) {
-    var raw = localStorage.getItem(storageKey);
-    if (!raw) return;
-
-    try {
-        var hidden = JSON.parse(raw);
-        hidden.forEach(function (isHidden, i) {
-            if (!chart.data.datasets[i]) return;
-            chart.data.datasets[i].hidden = !!isHidden;
-        });
-        chart.update();
-    } catch (e) {
-        console.error('Failed to parse legend state:', e);
-        localStorage.removeItem(storageKey);
-    }
 }
