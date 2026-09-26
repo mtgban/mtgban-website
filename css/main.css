@@ -1087,15 +1087,12 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
     --card-radius: 0;
 }
 /* Every card in these sets is oversized, so the set alone selects them;
-   adding a set is one more entry here. */
+   adding a set is one more entry here. OC13-OC20, OCM1 and OCMD are
+   oversized too but keep the standard radius on purpose. */
 :is(
-    [data-set="OARC"], [data-set="PSSC"], [data-set="OC20"],
-    [data-set="OC19"], [data-set="OC18"], [data-set="OC17"],
-    [data-set="OE01"], [data-set="OPCA"], [data-set="OC16"],
-    [data-set="OC15"], [data-set="OC14"], [data-set="PPC1"],
-    [data-set="OC13"], [data-set="OCM1"], [data-set="OPC2"],
-    [data-set="PHOP"], [data-set="PCMD"], [data-set="OCMD"],
-    [data-set="OHOP"]
+    [data-set="OARC"], [data-set="PSSC"], [data-set="OE01"],
+    [data-set="OPCA"], [data-set="PPC1"], [data-set="OPC2"],
+    [data-set="PHOP"], [data-set="PCMD"], [data-set="OHOP"]
 ) {
     --card-radius: 18px;
 }
