@@ -50,11 +50,11 @@ publishes:
 
 - The current snapshot is stored when its own date falls inside the
   requested range, so a plain `tcgcsvd -backfill` still leaves every game
-  current, and a Discord notice says which range stayed missing. A named
-  range or `-force` also ignores the per-category freshness gate, which
-  would otherwise make re-fetching the one reachable date a no-op; a plain
-  resumed run keeps the gate, so repeating it costs one `last-updated`
-  request rather than a whole catalog crawl.
+  current, and a Discord notice says which range stayed missing. An
+  explicit `-from` or `-force` also ignores the per-category freshness
+  gate, which would otherwise make re-fetching the one reachable date a
+  no-op; a plain resumed run keeps the gate, so repeating it costs one
+  `last-updated` request rather than a whole catalog crawl.
 - That crawl runs under the cross-process crawl lock, which the archive
   walk it replaces is exempt from. The exemption is about holding a lock
   for hours; this is the same ~1,630 requests the daily job makes, and
@@ -73,7 +73,8 @@ needs. And a range where *every* requested day answers 404 — how the
 archive disappearing would look if it ever 404s instead of 403s — reports
 `ErrArchiveUnavailable` rather than a clean run over zero days. A single
 404 at the tail of a range stays ordinary: today's archive used to land
-after tcgcsv's ~20:05 UTC refresh.
+after tcgcsv's ~20:05 UTC refresh, so the verdict also needs a missing day
+old enough to have been published.
 
 ## The gap this leaves
 

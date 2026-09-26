@@ -109,6 +109,13 @@ func (s *Service) Backfill(ctx context.Context, opts BackfillOptions) error {
 	if from.Before(tcgcsv.ArchiveEpoch) {
 		from = tcgcsv.ArchiveEpoch
 	}
+	// An inverted range walks zero days, which would otherwise be reported as a
+	// clean backfill that stored nothing -- the same silent success the checks
+	// below exist to prevent.
+	if from.After(to) {
+		return fmt.Errorf("tcgcsv: backfill range %s..%s is empty; the start date is after the end date",
+			from.Format("2006-01-02"), to.Format("2006-01-02"))
+	}
 	// The resume cursor (per-category MAX(date) high-water mark) auto-advances the
 	// default, no-argument backfill so re-runs are cheap. An explicit start date
 	// or Force means "fetch this whole range", so bypass the cursor — otherwise a
@@ -169,8 +176,10 @@ func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameC
 	// another process is already pulling this snapshot, so the run is a no-op
 	// that says so and exits 0.
 	var rows int
+	var crawled bool
 	err = s.WithCrawlLock(ctx, "tcgcsv backfill snapshot", func() error {
 		var ierr error
+		crawled = true
 		// force means the operator named a range or passed -force, so re-fetch the
 		// snapshot even for a category already holding it: it is the one day still
 		// reachable, and the freshness gate would otherwise turn that run into a
@@ -180,7 +189,20 @@ func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameC
 		return ierr
 	})
 	if err != nil {
+		// Some games may have stored their rows before another failed; say so,
+		// since the error alone reads as if nothing landed.
+		if rows > 0 {
+			log.Printf("tcgcsv backfill: stored %d row(s) for the %s snapshot before failing", rows, dateStr)
+		}
 		return fmt.Errorf("tcgcsv backfill from the %s snapshot: %w", dateStr, err)
+	}
+	if !crawled {
+		// The lock went to another process, which is already pulling this same
+		// snapshot. Nothing was even attempted here, so don't claim the games are
+		// current -- WithCrawlLock has already logged who to blame.
+		log.Printf("tcgcsv backfill: the price archive is no longer served and this run yielded the crawl lock; %s..%s stays missing",
+			fromStr, toStr)
+		return nil
 	}
 	if rows == 0 {
 		// Nothing was written -- every game already holds the snapshot date -- so
@@ -226,7 +248,12 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 	log.Printf("tcgcsv backfill: %s..%s across %d game(s), resume=%v",
 		from.Format("2006-01-02"), to.Format("2006-01-02"), len(games), resume)
 
-	var totalRows, daysNeeded, daysWithData, daysEmpty, daysMissing, daysFailed int
+	// settledBefore is the first day whose archive tcgcsv has had time to publish:
+	// the refresh runs at ~20:05 UTC, so the last two days of a range can be
+	// legitimately unpublished. A day missing at or before this is not ordinary
+	// lag, and the "the whole archive is gone" verdict below needs one.
+	settledBefore := to.AddDate(0, 0, -1)
+	var totalRows, daysNeeded, daysWithData, daysEmpty, daysMissing, daysMissingSettled, daysFailed int
 	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
 		// Which categories still need this day?
 		need := make(map[int]bool)
@@ -264,6 +291,9 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 		}
 		if !ok {
 			daysMissing++
+			if day.Before(settledBefore) {
+				daysMissingSettled++
+			}
 			continue // no archive published for that day (HTTP 404)
 		}
 
@@ -305,10 +335,12 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 	}
 	// Every day answering "no archive published" is how the archive disappearing
 	// would look if it ever 404s rather than 403s, and the loop above would
-	// otherwise report that as a clean run over zero days. One unpublished day at
-	// the tail of a range is ordinary -- today's archive lands after tcgcsv's
-	// evening refresh -- so only a range that is entirely missing counts.
-	if daysWithData == 0 && daysNeeded > 1 && daysMissing == daysNeeded {
+	// otherwise report that as a clean run over zero days. Unpublished days at
+	// the tail of a range are ordinary -- today's archive lands after tcgcsv's
+	// evening refresh -- so the range must be entirely missing *and* include a
+	// settled day, or asking for the last day or two before the refresh would
+	// read as a withdrawn archive and trigger the snapshot fallback's full crawl.
+	if daysWithData == 0 && daysMissing == daysNeeded && daysMissingSettled > 0 {
 		return fmt.Errorf("%w: all %d requested day(s) answered 404", tcgcsv.ErrArchiveUnavailable, daysMissing)
 	}
 	// Fetching archives but storing nothing anywhere is not a real "complete":
