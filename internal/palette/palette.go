@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -51,18 +50,17 @@ type Service struct {
 	PromoAliases func() map[string]string
 
 	// FinishLabel spells a finish name the way a person writes it, since the
-	// matcher stores one as a single lowercase word.
-	FinishLabel func(string) string
+	// matcher stores one as a single lowercase word. Called with the backend
+	// being listed, which during a pre-publish build is not yet the live one.
+	FinishLabel func(b *mtgmatcher.Backend, finish string) string
 
 	// FinishNames are the names the finish filter reaches a printing by, so
 	// the list offers what f: accepts and nothing else.
 	FinishNames func(*mtgmatcher.CardObject) []string
 
-	// The lists each endpoint serves, built on datastore load and read on
-	// every request.
-	setsCache     atomic.Pointer[[]byte]
-	promosCache   atomic.Pointer[[]byte]
-	finishesCache atomic.Pointer[[]byte]
+	// Snapshot returns the sets, promos and finishes lists built alongside
+	// the datastore currently served, nil before the first load.
+	Snapshot func() *Snapshot
 }
 
 func (s *Service) backend() *mtgmatcher.Backend {
@@ -84,13 +82,27 @@ type Set struct {
 	Colors   []string `json:"colors,omitempty"`
 }
 
-// BuildSetsCache rebuilds the JSON-serialized sets cache from mtgmatcher.
-// Called on datastore load.
-func (s *Service) BuildSetsCache() {
-	backend := s.backend()
+// Snapshot is the sets, promo and finish lists the palette serves, built
+// from one datastore alongside it.
+type Snapshot struct {
+	sets, promos, finishes []byte
+}
+
+// NewSnapshot builds the lists from b.
+func (s *Service) NewSnapshot(b *mtgmatcher.Backend) *Snapshot {
+	return &Snapshot{
+		sets:     s.buildSets(b),
+		promos:   s.buildPromos(b),
+		finishes: s.buildFinishes(b),
+	}
+}
+
+// buildSets is the JSON-serialized sets list, built from b. A marshal error
+// leaves it nil, same as the unbuilt list before the first load.
+func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
 	sets := []Set{}
-	for _, code := range backend.GetAllSets() {
-		set, err := backend.GetSet(code)
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
 		if err != nil || set == nil {
 			continue
 		}
@@ -124,9 +136,9 @@ func (s *Service) BuildSetsCache() {
 	})
 	data, err := json.Marshal(sets)
 	if err != nil {
-		return
+		return nil
 	}
-	s.setsCache.Store(&data)
+	return data
 }
 
 // Promo is a promo type as the palette and the guide offer it: the token an
@@ -139,20 +151,18 @@ type Promo struct {
 	Aliases []string `json:"aliases,omitempty"`
 }
 
-// BuildPromosCache rebuilds the promo type list from the loaded game. Called
-// on datastore load, beside the sets cache.
+// buildPromos is the promo type list, built from the game b holds.
 //
 // The list is the loaded game's own: Magic answers with its 129 types,
 // Riftbound with 10, One Piece with 464. Nothing here knows which game it is
 // serving, which is the point - the guide and the palette can offer what the
 // datastore actually holds instead of a table written for one game.
-func (s *Service) BuildPromosCache() {
-	backend := s.backend()
+func (s *Service) buildPromos(b *mtgmatcher.Backend) []byte {
 	// One pass over the printings, rather than a scan per type: with a few
 	// hundred types and a few thousand printings the difference is real.
 	counts := map[string]int{}
-	for _, uuid := range backend.GetUUIDs() {
-		co, err := backend.GetUUID(uuid)
+	for _, uuid := range b.GetUUIDs() {
+		co, err := b.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -167,10 +177,10 @@ func (s *Service) BuildPromosCache() {
 	}
 
 	promos := []Promo{}
-	for _, promoType := range backend.AllPromoTypes {
+	for _, promoType := range b.AllPromoTypes {
 		entry := Promo{
 			Value: promoType,
-			Label: backend.PromoTypeLabel(promoType),
+			Label: b.PromoTypeLabel(promoType),
 			Count: counts[promoType],
 		}
 		for shorthand, target := range aliases {
@@ -192,27 +202,41 @@ func (s *Service) BuildPromosCache() {
 
 	data, err := json.Marshal(promos)
 	if err != nil {
-		return
+		return nil
 	}
-	s.promosCache.Store(&data)
+	return data
 }
 
-// serveCached writes a list built on datastore load. Until it is built the
-// answer is an empty list the browser must not keep for an hour.
-func serveCached(w http.ResponseWriter, data *[]byte) {
+// serveCached writes a list built alongside the datastore it describes.
+// Until the first load completes, the answer is an empty list the browser
+// must not keep for an hour.
+func serveCached(w http.ResponseWriter, data []byte) {
 	w.Header().Set("Content-Type", "application/json")
-	if data == nil || len(*data) == 0 {
+	if len(data) == 0 {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write([]byte(`[]`))
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write(*data)
+	w.Write(data)
+}
+
+// snapshot returns the lists built alongside the datastore currently
+// served, or an empty Snapshot before the first load.
+func (s *Service) snapshot() *Snapshot {
+	if s.Snapshot == nil {
+		return &Snapshot{}
+	}
+	snap := s.Snapshot()
+	if snap == nil {
+		return &Snapshot{}
+	}
+	return snap
 }
 
 // Promos returns the loaded game's promo types.
 func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
-	serveCached(w, s.promosCache.Load())
+	serveCached(w, s.snapshot().promos)
 }
 
 // Finish is one finish the loaded game prints, as the palette lists it.
@@ -223,32 +247,30 @@ type Finish struct {
 	Aliases []string `json:"aliases,omitempty"`
 }
 
-// BuildFinishesCache rebuilds the finish list from the loaded game. Called on
-// datastore load, beside the promos cache.
-func (s *Service) BuildFinishesCache() {
-	data, err := json.Marshal(s.FinishList())
+// buildFinishes is the JSON-serialized finish list, built from b.
+func (s *Service) buildFinishes(b *mtgmatcher.Backend) []byte {
+	data, err := json.Marshal(s.FinishList(b))
 	if err != nil {
-		return
+		return nil
 	}
-	s.finishesCache.Store(&data)
+	return data
 }
 
-// FinishList is every name the finish filter reaches the loaded game's
-// printings by, commonest first, each with how many printings it reaches.
+// FinishList is every name the finish filter reaches b's printings by,
+// commonest first, each with how many printings it reaches.
 //
 // Read off the printings rather than from a table, because the vocabulary is
 // the game's: Lorcana prints cold foil and holofoil, Flesh and Blood rainbow
 // and cold, Yu-Gi-Oh prices print runs, and a game added tomorrow brings its
 // own.
-func (s *Service) FinishList() []Finish {
+func (s *Service) FinishList(b *mtgmatcher.Backend) []Finish {
 	finishes := []Finish{}
 	if s.FinishNames == nil {
 		return finishes
 	}
-	backend := s.backend()
 	counts := map[string]int{}
-	for _, uuid := range backend.GetUUIDs() {
-		co, err := backend.GetUUID(uuid)
+	for _, uuid := range b.GetUUIDs() {
+		co, err := b.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
@@ -280,7 +302,7 @@ func (s *Service) FinishList() []Finish {
 	for value, count := range counts {
 		label := value
 		if s.FinishLabel != nil {
-			label = s.FinishLabel(value)
+			label = s.FinishLabel(b, value)
 		}
 		finishes = append(finishes, Finish{Value: value, Label: label, Count: count, Aliases: shortForms[value]})
 	}
@@ -295,7 +317,7 @@ func (s *Service) FinishList() []Finish {
 
 // Finishes returns the loaded game's finishes.
 func (s *Service) Finishes(w http.ResponseWriter, r *http.Request) {
-	serveCached(w, s.finishesCache.Load())
+	serveCached(w, s.snapshot().finishes)
 }
 
 // CardMetaResponse describes one card for the frontend.
@@ -375,7 +397,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 
 // Sets returns all known set codes with display metadata.
 func (s *Service) Sets(w http.ResponseWriter, r *http.Request) {
-	serveCached(w, s.setsCache.Load())
+	serveCached(w, s.snapshot().sets)
 }
 
 // Store is one scraper as the frontend lists it.

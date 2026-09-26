@@ -32,7 +32,7 @@ func TestFoldSuggestName(t *testing.T) {
 }
 
 func TestSuggestPrefixMatchesFoldedNames(t *testing.T) {
-	idx := newSuggestIndex([]string{
+	snap := newNamesSnapshot([]string{
 		"Ursula - Whisper of the Sea",
 		"Jace's Ire",
 		"Fire // Ice",
@@ -50,13 +50,14 @@ func TestSuggestPrefixMatchesFoldedNames(t *testing.T) {
 		{"fire ice", "Fire // Ice"},
 		{"limduls", "Lim-Dûl's Vault"},
 	} {
-		matches := idx.matchesFor(tt.typed, false)
+		matches := snap.matchesFor(tt.typed, false)
 		if len(matches) != 1 || matches[0].name != tt.want {
 			t.Errorf("%q matched %v, want just %q", tt.typed, matches, tt.want)
 		}
 	}
 
-	if matches := idx.matchesFor("counterspell", false); len(matches) != 0 {
+	matches := snap.matchesFor("counterspell", false)
+	if len(matches) != 0 {
 		t.Errorf("counterspell matched %v, want nothing", matches)
 	}
 }
@@ -66,7 +67,7 @@ func TestSuggestPrefixMatchesFoldedNames(t *testing.T) {
 // cases mirror tests/offline/autocomplete.test.js - both matchers have to find
 // the same names, and 1,131 of Yu-Gi-Oh's 16,419 names carry such a hyphen.
 func TestSuggestReachesAJoiningHyphenFromEitherSpelling(t *testing.T) {
-	idx := newSuggestIndex([]string{
+	snap := newNamesSnapshot([]string{
 		"Blue-Eyed Silver Zombie",
 		"Roar of the Blue-Eyed Dragons",
 		"3-Hump Lacooda",
@@ -88,7 +89,7 @@ func TestSuggestReachesAJoiningHyphenFromEitherSpelling(t *testing.T) {
 		{"fireice", "Fire // Ice"},
 		{"fire ice", "Fire // Ice"},
 	} {
-		matches := idx.matchesFor(tt.typed, false)
+		matches := snap.matchesFor(tt.typed, false)
 		if len(matches) != 1 || matches[0].name != tt.want {
 			t.Errorf("%q matched %v, want just %q", tt.typed, names(matches), tt.want)
 		}
@@ -96,7 +97,8 @@ func TestSuggestReachesAJoiningHyphenFromEitherSpelling(t *testing.T) {
 
 	// Closing the spaces must not make everything match everything.
 	for _, typed := range []string{"counterspell", "eyed silver", "silver zombie"} {
-		if matches := idx.matchesFor(typed, false); len(matches) != 0 {
+		matches := snap.matchesFor(typed, false)
+		if len(matches) != 0 {
 			t.Errorf("%q matched %v, want nothing", typed, names(matches))
 		}
 	}
@@ -105,9 +107,9 @@ func TestSuggestReachesAJoiningHyphenFromEitherSpelling(t *testing.T) {
 // A name found by both folds is offered once, in the place the folded search
 // gave it, rather than twice.
 func TestSuggestOffersANameFoundTwiceOnlyOnce(t *testing.T) {
-	idx := newSuggestIndex([]string{"Blue-Eyed Silver Zombie", "Blue Eyed Rival"}, nil)
+	snap := newNamesSnapshot([]string{"Blue-Eyed Silver Zombie", "Blue Eyed Rival"}, nil)
 
-	got := names(idx.matchesFor("blueeyed", false))
+	got := names(snap.matchesFor("blueeyed", false))
 	want := []string{"Blue Eyed Rival", "Blue-Eyed Silver Zombie"}
 	if len(got) != 2 {
 		t.Fatalf("matched %v, want both names once each", got)
@@ -121,7 +123,7 @@ func TestSuggestOffersANameFoundTwiceOnlyOnce(t *testing.T) {
 	}
 }
 
-func names(entries []suggestEntry) []string {
+func names(entries []nameEntry) []string {
 	out := make([]string, len(entries))
 	for i, e := range entries {
 		out[i] = e.name
@@ -134,8 +136,8 @@ func TestSuggestPrefixMatchesCapsTheAnswer(t *testing.T) {
 	for i := range names {
 		names[i] = fmt.Sprintf("Same Prefix %02d", i)
 	}
-	idx := newSuggestIndex(names, nil)
-	matches := idx.matchesFor("same prefix", false)
+	snap := newNamesSnapshot(names, nil)
+	matches := snap.matchesFor("same prefix", false)
 	if len(matches) != maxSuggestions {
 		t.Errorf("got %d matches, want the %d cap", len(matches), maxSuggestions)
 	}
@@ -147,9 +149,6 @@ func TestSuggestAPIFoldsTheQuery(t *testing.T) {
 	if !datastoreLoaded() {
 		t.Skip("mtgmatcher datastore not loaded")
 	}
-	// The datastore load kicks the index build off as a goroutine; build it
-	// here so the test doesn't race it.
-	rebuildSuggestIndex()
 
 	w := httptest.NewRecorder()
 	SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=fire+ice", nil))

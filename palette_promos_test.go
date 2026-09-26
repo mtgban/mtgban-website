@@ -20,15 +20,13 @@ func TestPromosEndpoint(t *testing.T) {
 		t.Skip("no datastore loaded; skipping promo endpoint test")
 	}
 
-	paletteService.BuildPromosCache()
-
 	rec := httptest.NewRecorder()
 	paletteService.Promos(rec, httptest.NewRequest(http.MethodGet, "/api/palette/promos.json", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d, want 200", rec.Code)
 	}
 	if got := rec.Header().Get("Cache-Control"); got == "no-store" {
-		t.Fatal("cache never warmed, so the endpoint served an empty list")
+		t.Fatal("the list was never built, so the endpoint served an empty answer")
 	}
 
 	var promos []palette.Promo

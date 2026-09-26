@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -47,17 +48,7 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 	if err != nil {
 		t.Skip("loading the datastore:", err)
 	}
-	matcherBackend.Store(b)
-	t.Cleanup(func() {
-		restore, err := os.Open(Config.DatastorePath)
-		if err != nil {
-			return
-		}
-		defer restore.Close()
-		if b, err := mtgmatcher.Open(datastoreGame(), restore); err == nil {
-			matcherBackend.Store(b)
-		}
-	})
+	useDatastore(t, newDatastore(b, time.Now()))
 
 	var split int
 	for _, uuid := range backend().GetUUIDs() {

@@ -729,38 +729,25 @@ var SkipPrices bool
 var SkipNewspaper bool
 var LogDir string
 
-// Timestamps written by background goroutines (datastore reload, stash
-// cron, newspaper cron) and read by the admin dashboard. Held behind
-// atomic.Pointer so concurrent reads can't observe a torn time.Time
-// (it's a 24-byte struct, not a single word).
+// Timestamps written by background goroutines (stash cron, newspaper cron)
+// and read by the admin dashboard. Held behind atomic.Pointer so concurrent
+// reads can't observe a torn time.Time (it's a 24-byte struct, not a single
+// word). The datastore's own timestamp lives on the published datastore
+// instead - see datastore.go and GetLastDatastoreUpdate below.
 var (
-	matcherBackend         atomic.Pointer[mtgmatcher.Backend]
-	lastDatastoreUpdatePtr atomic.Pointer[time.Time]
 	lastStashUpdatePtr     atomic.Pointer[time.Time]
 	lastNewspaperUpdatePtr atomic.Pointer[time.Time]
 )
 
-// backend is the website's live datastore. The backend itself is
-// immutable after Open; only the pointer changes when a datastore reloads.
-var emptyMatcherBackend = &mtgmatcher.Backend{}
-
-func backend() *mtgmatcher.Backend {
-	if backend := matcherBackend.Load(); backend != nil {
-		return backend
-	}
-	return emptyMatcherBackend
-}
-
-// SetLastDatastoreUpdate / SetLastStashUpdate / SetLastNewspaperUpdate
-// publish a new timestamp atomically.
-func SetLastDatastoreUpdate(t time.Time) { lastDatastoreUpdatePtr.Store(&t) }
+// SetLastStashUpdate / SetLastNewspaperUpdate publish a new timestamp
+// atomically.
 func SetLastStashUpdate(t time.Time)     { lastStashUpdatePtr.Store(&t) }
 func SetLastNewspaperUpdate(t time.Time) { lastNewspaperUpdatePtr.Store(&t) }
 
 // GetLastDatastoreUpdate / GetLastStashUpdate / GetLastNewspaperUpdate
 // return the most recent timestamp, or the zero time if none has been
 // published yet.
-func GetLastDatastoreUpdate() time.Time { return loadTime(lastDatastoreUpdatePtr.Load()) }
+func GetLastDatastoreUpdate() time.Time { return currentDatastore().loadedAt }
 func GetLastStashUpdate() time.Time     { return loadTime(lastStashUpdatePtr.Load()) }
 func GetLastNewspaperUpdate() time.Time { return loadTime(lastNewspaperUpdatePtr.Load()) }
 
@@ -938,7 +925,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	ScraperName:       scraperName,
 	CardObjectSources: cardobject2sources,
 	FinishNames:       finishNames,
-	Finishes:          paletteService.FinishList,
+	Finishes:          func() []palette.Finish { return paletteService.FinishList(backend()) },
 
 	LastDatastoreUpdate: GetLastDatastoreUpdate,
 
@@ -994,6 +981,7 @@ var paletteService = &palette.Service{
 	},
 	FinishLabel: finishListLabel,
 	FinishNames: finishNames,
+	Snapshot:    func() *palette.Snapshot { return currentDatastore().palette },
 
 	Sellers: GetSellers,
 	Vendors: GetVendors,
@@ -1395,21 +1383,13 @@ func loadDatastore(ds string) error {
 	if err != nil {
 		return err
 	}
-	// Build from the loaded backend before publishing it. Disable seeding
-	// during the swap; queries without an index use the existing scan path.
-	idx := buildNumberIndex(backend)
-	numberIdx.Store(nil)
-	matcherBackend.Store(backend)
-	numberIdx.Store(idx)
+	// Build every derived snapshot - including the palette lists - before
+	// publishing: one read of the datastore gives the backend and the
+	// snapshots of the same load.
+	liveDatastore.Store(newDatastore(backend, time.Now()))
 
 	ServerNotify("init", "Datastore installed")
-	SetLastDatastoreUpdate(time.Now())
-	go rebuildSuggestIndex()
-	go updateStaticData()
 	go cacheNewspaper()
-	go paletteService.BuildSetsCache()
-	go paletteService.BuildPromosCache()
-	go paletteService.BuildFinishesCache()
 
 	return nil
 }
@@ -1451,7 +1431,7 @@ func datastoreGame() string {
 func main() {
 	configFilePath := flag.String("cfg", "", "Load configuration file")
 	port := flag.String("port", "", "Override server port")
-	datastore := flag.String("ds", "", "Override datastore path")
+	dsPath := flag.String("ds", "", "Override datastore path")
 	aclPath := flag.String("acl", "", "Override access table path")
 	grantsPath := flag.String("grants", "", "Override Patreon grants path")
 
@@ -1482,7 +1462,7 @@ func main() {
 	if err != nil {
 		log.Fatalln("unable to preload config file:", err)
 	}
-	err = loadVars(*port, *datastore, *aclPath, *grantsPath)
+	err = loadVars(*port, *dsPath, *aclPath, *grantsPath)
 	if err != nil {
 		if DevMode {
 			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")

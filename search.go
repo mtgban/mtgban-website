@@ -1911,9 +1911,8 @@ func contentsViews(query string, config SearchConfig) *ContentsViews {
 // and an ApplyTo-scoped one passes every card outside its scope untouched, so
 // neither bounds anything. A filter carrying subfilters is a range, which
 // names no key of its own.
-func numberSeedUUIDs(filters []FilterElem) ([]string, bool) {
-	idx := numberIdx.Load()
-	if idx == nil {
+func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, bool) {
+	if numbers == nil {
 		return nil, false
 	}
 	for i := range filters {
@@ -1924,9 +1923,9 @@ func numberSeedUUIDs(filters []FilterElem) ([]string, bool) {
 		var bucket map[string][]string
 		switch filters[i].Name {
 		case "number":
-			bucket = idx.loose
+			bucket = numbers.loose
 		case "number_strict":
-			bucket = idx.strict
+			bucket = numbers.strict
 		default:
 			continue
 		}
@@ -2046,12 +2045,12 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			}
 		}
 		// A number bounds the set the same way an edition does, and the
-		// index holds cards alone, so the sealed modes keep to the set
-		// index above.
+		// numbers snapshot holds cards alone, so the sealed modes keep to
+		// the set index above.
 		if !seeded {
 			switch config.SearchMode {
 			case "", "prefix", "any":
-				uuids, seeded = numberSeedUUIDs(filters)
+				uuids, seeded = numberSeedUUIDs(currentDatastore().numbers, filters)
 			}
 		}
 		// A plain store:/seller:/vendor: query names its own exact result
