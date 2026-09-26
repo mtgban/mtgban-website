@@ -63,6 +63,19 @@ game has a hole and re-fetching the other nine would be wasted work. It can only
 narrow: an id that isn't a configured game is an error listing the ones that
 are, so a typo can't read as a clean backfill that quietly wrote nothing.
 
+## The price archive is currently withdrawn
+
+Since September 2026 tcgcsv answers every `/archive/tcgplayer/prices-*.ppmd.7z`
+date with a 403, back to the epoch, carrying a note from its operator: the
+archive was pulled over bandwidth cost and moderation load, and callers are
+asked to read categories, groups and prices instead, no more than once per file
+per 24 hours. Everything below about `-backfill` describes what it does when the
+archive is available; today it stops on the first day with that note, rather
+than asking nine hundred more times.
+
+`-daily` is unaffected and is already the shape the operator asks for: one pass
+over groups and prices, gated on `last-updated` so a snapshot is pulled once.
+
 ## Adding a game
 
 Add one entry to `tcgcsv_config.games`, then run a plain backfill:
@@ -92,7 +105,7 @@ run it once after adding a game and weekly thereafter.
 |---|---|---|
 | `-daily` | Pulls tcgcsv's current snapshot for every configured game. Gates on tcgcsv's `last-updated`, so extra runs are cheap no-ops. | daily, after tcgcsv's ~20:00 UTC refresh |
 | `-products` | Refreshes the `tcg_products` catalog for every configured game. | weekly |
-| `-backfill` | Fills prices from the daily archives over a date range. | on demand |
+| `-backfill` | Fills prices from the daily archives over a date range. Stops immediately while the archive is withdrawn (see above). | on demand |
 
 ```
 tcgcsvd -config config.json -daily

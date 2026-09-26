@@ -310,7 +310,12 @@ func (c *Client) wait() {
 }
 
 func snippet(b []byte) string {
-	const maxLen = 200
+	return snippetLen(b, 200)
+}
+
+// snippetLen is snippet with the cut-off spelled out, for a body worth relaying
+// at more than error-context length.
+func snippetLen(b []byte, maxLen int) string {
 	s := strings.TrimSpace(string(b))
 	if len(s) > maxLen {
 		return s[:maxLen] + "..."

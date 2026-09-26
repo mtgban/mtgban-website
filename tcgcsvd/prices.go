@@ -167,6 +167,13 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 		}
 
 		byCat, ok, err := s.client.FetchPriceArchive(ctx, day, need)
+		if errors.Is(err, tcgcsv.ErrArchiveForbidden) {
+			// Not this day - the endpoint. Asking for the rest of the range
+			// would be hundreds of requests that can only be refused, at a
+			// service that withdrew the archive to save bandwidth. Stop on the
+			// first one and hand the operator's own note back up.
+			return fmt.Errorf("tcgcsv backfill stopped at %s: %w", day.Format("2006-01-02"), err)
+		}
 		if err != nil {
 			// A single bad or unreachable archive shouldn't halt a multi-year
 			// backfill; log it, count it, and move on. The day can be retried
