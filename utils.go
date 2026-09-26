@@ -1178,7 +1178,7 @@ func genQuery(co *mtgmatcher.CardObject) string {
 }
 
 func genCardPrintings(co *mtgmatcher.CardObject) string {
-	var b strings.Builder
+	var sb strings.Builder
 	// Hack to generate HTML in the template
 	//
 	// drawn, not the loop index: a printing whose set the backend cannot
@@ -1194,7 +1194,7 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&b, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
+		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
 
 		keyruneCode := strings.ToLower(set.KeyruneCode)
 		if keyruneCode == "" {
@@ -1206,15 +1206,15 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 			if len(setCode) > 3 {
 				fontSize = 16.0 * 3 / float64(len(setCode))
 			}
-			fmt.Fprintf(&b, `
+			fmt.Fprintf(&sb, `
                     <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
                         <circle r="15" cx="16" cy="16" fill="var(--normal)"/>
                         <text font-size="%.1f" font-family="monospace" font-weight="bold" x="50%%" y="50%%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">%s</text>
                     </svg>`, fontSize, setCode)
 		} else {
-			fmt.Fprintf(&b, `<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
+			fmt.Fprintf(&sb, `<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
 		}
-		b.WriteString(`</a>`)
+		sb.WriteString(`</a>`)
 
 		drawn++
 
@@ -1223,11 +1223,11 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 			// moves this line into itself, where it belongs - it is a note
 			// about what the panel is not showing, not about the row of
 			// symbols beside it.
-			b.WriteString(`<span class="sidebar-printings-note">and many more (too many to list)...</span>`)
+			sb.WriteString(`<span class="sidebar-printings-note">and many more (too many to list)...</span>`)
 			break
 		}
 	}
-	return b.String()
+	return sb.String()
 }
 
 func genSealedPrintings(co *mtgmatcher.CardObject) string {

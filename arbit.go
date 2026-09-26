@@ -309,57 +309,57 @@ func arbitCardIDs(entries []mtgban.ArbitEntry) []string {
 // arbitLess returns the comparator for sorting entries in the given
 // mode, or nil for unknown modes (caller leaves the slice unsorted,
 // matching the prior switch's absence of a default case).
-func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode bool) func(a, b *mtgban.ArbitEntry) bool {
+func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i, j *mtgban.ArbitEntry) bool {
 	switch mode {
 	case "available":
-		return func(a, b *mtgban.ArbitEntry) bool {
-			return a.InventoryEntry.Quantity > b.InventoryEntry.Quantity
+		return func(i, j *mtgban.ArbitEntry) bool {
+			return i.InventoryEntry.Quantity > j.InventoryEntry.Quantity
 		}
 	case "sell_price":
-		return func(a, b *mtgban.ArbitEntry) bool {
-			return a.InventoryEntry.Price > b.InventoryEntry.Price
+		return func(i, j *mtgban.ArbitEntry) bool {
+			return i.InventoryEntry.Price > j.InventoryEntry.Price
 		}
 	case "buy_price":
 		if globalMode {
-			return func(a, b *mtgban.ArbitEntry) bool {
-				return a.ReferenceEntry.Price > b.ReferenceEntry.Price
+			return func(i, j *mtgban.ArbitEntry) bool {
+				return i.ReferenceEntry.Price > j.ReferenceEntry.Price
 			}
 		}
-		return func(a, b *mtgban.ArbitEntry) bool {
-			return a.BuylistEntry.BuyPrice > b.BuylistEntry.BuyPrice
+		return func(i, j *mtgban.ArbitEntry) bool {
+			return i.BuylistEntry.BuyPrice > j.BuylistEntry.BuyPrice
 		}
 	case "profitability":
-		return func(a, b *mtgban.ArbitEntry) bool {
+		return func(i, j *mtgban.ArbitEntry) bool {
 			// Profitability is NaN when spread < 0; fall back to raw
 			// spread ordering so the NaN doesn't poison the comparator.
-			if a.Spread < 0 || b.Spread < 0 {
-				return a.Spread > b.Spread
+			if i.Spread < 0 || j.Spread < 0 {
+				return i.Spread > j.Spread
 			}
-			return a.Profitability > b.Profitability
+			return i.Profitability > j.Profitability
 		}
 	case "diff":
-		return func(a, b *mtgban.ArbitEntry) bool {
-			return a.Difference > b.Difference
+		return func(i, j *mtgban.ArbitEntry) bool {
+			return i.Difference > j.Difference
 		}
 	case "spread":
-		return func(a, b *mtgban.ArbitEntry) bool {
-			return a.Spread > b.Spread
+		return func(i, j *mtgban.ArbitEntry) bool {
+			return i.Spread > j.Spread
 		}
 	case "edition":
 		sortData := resolveSortingData(arbitCardIDs(entries))
-		return func(a, b *mtgban.ArbitEntry) bool {
-			if a.CardID == b.CardID {
-				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
+		return func(i, j *mtgban.ArbitEntry) bool {
+			if i.CardID == j.CardID {
+				return i.InventoryEntry.Conditions < j.InventoryEntry.Conditions
 			}
-			return cmpSets(sortData[a.CardID], sortData[b.CardID])
+			return cmpSets(sortData[i.CardID], sortData[j.CardID])
 		}
 	case "alpha":
 		sortData := resolveSortingData(arbitCardIDs(entries))
-		return func(a, b *mtgban.ArbitEntry) bool {
-			if a.CardID == b.CardID {
-				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
+		return func(i, j *mtgban.ArbitEntry) bool {
+			if i.CardID == j.CardID {
+				return i.InventoryEntry.Conditions < j.InventoryEntry.Conditions
 			}
-			return cmpSetsAlphabetical(sortData[a.CardID], sortData[b.CardID])
+			return cmpSetsAlphabetical(sortData[i.CardID], sortData[j.CardID])
 		}
 	}
 	return nil
