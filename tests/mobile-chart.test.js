@@ -31,6 +31,7 @@ async function openDrawer(answer) {
     const window = { getComputedStyle: () => ({ getPropertyValue: () => '' }) };
     function Chart(ctx, config) {
         this.data = config.data;
+        this.options = config.options;
         this.drawnFrom = config.data.labels;
         charts.push(this);
     }
@@ -51,7 +52,7 @@ async function openDrawer(answer) {
     window.showChartDrawer('ban:1', false, 'Black Lotus');
     await new Promise((done) => setTimeout(done, 0));
 
-    return { calls, charts, errors, window, loading: nodes['m-chart-loading'] };
+    return { calls, charts, errors, window, loading: nodes['m-chart-loading'], select: nodes['m-chart-range'] };
 }
 
 const empty = (range) => ({ maxLookbackDays: 3650, loadedDays: range, axisLabels: [], datasets: [] });
@@ -63,6 +64,19 @@ const priced = (range) => ({
 });
 // What /api/chart sends when the archive answered for no card.
 const unavailable = () => ({ status: 503, error: 'charts not available' });
+
+// days lists n daily labels, newest first, the way /api/chart sends its axis.
+function days(n) {
+    const today = Date.UTC(2026, 8, 25);
+    return Array.from({ length: n }, (_, i) => new Date(today - i * 86400000).toISOString().slice(0, 10));
+}
+// A card priced on every day of the range asked for.
+const daily = (range) => ({
+    maxLookbackDays: 3650,
+    loadedDays: range,
+    axisLabels: days(range),
+    datasets: [{ name: 'TCG Low', data: days(range).map(() => 1), color: 'rgb(1, 2, 3)' }],
+});
 
 test('an empty first window asks for all the tier allows, and draws that', async () => {
     const { calls, charts, errors, loading } = await openDrawer((range) => range === 3650 ? priced(range) : empty(range));
@@ -125,4 +139,36 @@ test('a prefetch that fails is asked again when the range widens', async () => {
     await new Promise((done) => setTimeout(done, 0));
 
     expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650', '/api/chart/ban%3A1?range=365']);
+});
+
+test('the prefetched ceiling is not drawn over the range the select names', async () => {
+    const { calls, charts, errors, select } = await openDrawer(daily);
+
+    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650']);
+    expect(select.value).toBe('180');
+    expect(charts[0].data.labels).toEqual(days(180));
+    expect(charts[0].options.scales.x.min).toBeUndefined();
+    expect(errors).toEqual([]);
+});
+
+test('a wider range draws the prefetched ceiling without asking again', async () => {
+    const { calls, charts, errors, select, window } = await openDrawer(daily);
+
+    window.changeChartRange(365);
+    await new Promise((done) => setTimeout(done, 0));
+
+    expect(calls.length).toBe(2);
+    expect(charts[0].data.labels).toEqual(days(3650));
+    expect(charts[0].options.scales.x.min).toBe(days(3650)[364]);
+    expect(select.disabled).toBe(false);
+    expect(errors).toEqual([]);
+});
+
+test('a narrower range only moves the start of what is drawn', async () => {
+    const { charts, window } = await openDrawer(daily);
+
+    window.changeChartRange(90);
+
+    expect(charts[0].data.labels).toEqual(days(180));
+    expect(charts[0].options.scales.x.min).toBe(days(180)[89]);
 });
