@@ -4,8 +4,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+
+	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -127,5 +131,173 @@ func TestNonMagicSnapshotKeepsLastWriteLast(t *testing.T) {
 
 	if len(s.Rows) != 2 || s.Rows[len(s.Rows)-1].Price != 2 {
 		t.Errorf("rows = %+v, want the later price last", s.Rows)
+	}
+}
+
+// withTCGCSVGames points the config's ingestion registry at the given category
+// ids and loads a catalog for one of them, which is how the site learns which
+// slice of the shared archive is its own.
+func withTCGCSVGames(t *testing.T, ownCategory int, ingested []int) {
+	t.Helper()
+	prevConfig := Config().TCGCSVConfig
+	prevCatalog := tcgCatalogPtr.Load()
+	t.Cleanup(func() {
+		Config().TCGCSVConfig = prevConfig
+		tcgCatalogPtr.Store(prevCatalog)
+	})
+
+	if ingested == nil {
+		Config().TCGCSVConfig = nil
+	} else {
+		cfg := &tcgcsv.Config{}
+		for _, id := range ingested {
+			cfg.Games = append(cfg.Games, tcgcsv.GameConfig{CategoryID: id})
+		}
+		Config().TCGCSVConfig = cfg
+	}
+	if ownCategory == 0 {
+		tcgCatalogPtr.Store(nil)
+	} else {
+		tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: ownCategory})
+	}
+}
+
+// The ingest owns the TCGplayer series where the config lists this game. With no
+// tcgcsv_config at all the snapshot keeps writing them, because otherwise nobody
+// would; with a config but no catalog yet - the boot window, scrapers published
+// and the category not named - it defers to the ingest rather than overwrite a
+// whole-category pass with the subset this process loaded.
+func TestTCGCSVOwnsTCGSeries(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		ownCategory int
+		ingested    []int
+		want        bool
+	}{
+		{"own game is ingested", 71, []int{1, 71, 85}, true},
+		{"another game is ingested", 71, []int{1, 85}, false},
+		{"no tcgcsv_config at all", 71, nil, false},
+		{"config but no catalog yet", 0, []int{71}, true},
+		{"no tcgcsv_config and no catalog", 0, nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withTCGCSVGames(t, tc.ownCategory, tc.ingested)
+			if got := tcgcsvOwnsTCGSeries(); got != tc.want {
+				t.Errorf("tcgcsvOwnsTCGSeries() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// Both writers key on (ban_id, date, provider) against a DO UPDATE upsert, so
+// before this the TCGplayer series a chart drew was whichever job ran second.
+// The ingest covers the whole category, so it keeps them and the snapshot counts
+// what it handed over rather than reporting it as a fault.
+func TestNonMagicSnapshotLeavesTCGSeriesToTheIngest(t *testing.T) {
+	s := nonMagicSnapshot{tcgcsvOwns: tcgcsvOwnedProviders}
+	low := DatasetConfig{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow}
+	mid := DatasetConfig{PublicName: "TCGplayer Mid", Provider: timeseries.ProviderTCGMid}
+	mkm := DatasetConfig{PublicName: "Cardmarket Low", Provider: timeseries.ProviderMKMLow}
+
+	s.add(4242, low, "2026-09-26", 10)
+	s.add(4242, mid, "2026-09-26", 11)
+	s.add(4242, mkm, "2026-09-26", 9)
+
+	want := []timeseries.LongPrice{
+		{BanID: 4242, Date: "2026-09-26", Provider: timeseries.ProviderMKMLow, Price: 9},
+	}
+	if !slices.Equal(s.Rows, want) {
+		t.Errorf("rows = %+v, want only the Cardmarket price %+v", s.Rows, want)
+	}
+	if s.TCGCSVOwned != 2 {
+		t.Errorf("TCGCSVOwned = %d, want 2", s.TCGCSVOwned)
+	}
+	if s.NoVariant != 0 || s.NoProvider != 0 {
+		t.Errorf("a declined provider is not a fault: %+v", s)
+	}
+	if got := s.skipped(); !strings.Contains(got, "2 left to the tcgcsv ingest") {
+		t.Errorf("skipped() = %q, want the handover named", got)
+	}
+}
+
+// A card with no variant row is a missing variant even on a provider the ingest
+// owns, and counting it as one would send an operator after a catalog gap for a
+// series the snapshot was never going to write. The ownership check comes first.
+func TestNonMagicSnapshotDeclinesBeforeResolvingAVariant(t *testing.T) {
+	s := nonMagicSnapshot{tcgcsvOwns: tcgcsvOwnedProviders}
+	s.add(0, DatasetConfig{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow}, "2026-09-26", 10)
+
+	if s.NoVariant != 0 {
+		t.Errorf("NoVariant = %d, want 0: the price was declined, not unresolvable", s.NoVariant)
+	}
+	if s.TCGCSVOwned != 1 {
+		t.Errorf("TCGCSVOwned = %d, want 1", s.TCGCSVOwned)
+	}
+}
+
+// serveSellerN publishes one seller holding several cards, each at one NM price.
+func serveSellerN(shorthand string, prices map[string]float64, ts time.Time) mtgban.Seller {
+	inv := mtgban.InventoryRecord{}
+	for cardID, price := range prices {
+		inv[cardID] = []mtgban.InventoryEntry{{Price: price, Conditions: "NM"}}
+	}
+	return mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{
+		Name: shorthand, Shorthand: shorthand, InventoryTimestamp: &ts,
+	})
+}
+
+// The whole snapshot short of the upsert: served scrapers in, long price rows
+// out. The ban_id resolver stands in for the warmed variant cache, which is the
+// one piece that needs a database, so the accumulator's three outcomes are
+// exercised against a real walk rather than against hand-built calls.
+func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
+	ids := nRealUUIDs(t, 2)
+	known, unknown := ids[0], ids[1]
+
+	keepScrapers(t)
+	withTCGCSVGames(t, 71, []int{71})
+	withDatasets(t, []DatasetConfig{
+		{Retail: []string{"ZZMKM"}, PublicName: "Cardmarket Low", Provider: timeseries.ProviderMKMLow},
+		{Buylist: []string{"ZZSCG"}, PublicName: "Star City Games Buylist", Provider: timeseries.ProviderSCGBuylist},
+		{Retail: []string{"ZZTCG"}, PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow},
+		{Retail: []string{"ZZCK"}, PublicName: "Card Kingdom Retail"},
+	})
+
+	now := time.Now()
+	serve(
+		[]mtgban.Seller{
+			serveSellerN("ZZMKM", map[string]float64{known: 2, unknown: 5}, now),
+			serveSellerN("ZZTCG", map[string]float64{known: 9}, now),
+			serveSellerN("ZZCK", map[string]float64{known: 7}, now),
+		},
+		[]mtgban.Vendor{serveVendor("ZZSCG", known, mtgban.BuylistEntry{BuyPrice: 1, Conditions: "NM"}, now)},
+	)
+
+	// The cache holds a variant for one of the two cards, as it does for a
+	// product the tcgcsv catalog has reached and not for one it has not.
+	snapshot := collectNonMagicSnapshot(backend(), now, func(card *mtgmatcher.CardObject) int64 {
+		if card.UUID == known {
+			return 555
+		}
+		return 0
+	})
+
+	date := now.Format("2006-01-02")
+	want := []timeseries.LongPrice{
+		{BanID: 555, Date: date, Provider: timeseries.ProviderMKMLow, Price: 2},
+		{BanID: 555, Date: date, Provider: timeseries.ProviderSCGBuylist, Price: 1},
+	}
+	// Retail is walked before buylist, so the two rows land in this order.
+	if !slices.Equal(snapshot.Rows, want) {
+		t.Errorf("rows = %+v, want %+v", snapshot.Rows, want)
+	}
+	if snapshot.NoVariant != 1 {
+		t.Errorf("NoVariant = %d, want 1 for the Cardmarket price on the unminted card", snapshot.NoVariant)
+	}
+	if snapshot.TCGCSVOwned != 1 {
+		t.Errorf("TCGCSVOwned = %d, want 1 for the TCGplayer price the ingest writes", snapshot.TCGCSVOwned)
+	}
+	if snapshot.NoProvider != 1 {
+		t.Errorf("NoProvider = %d, want 1 for the dataset with no provider id", snapshot.NoProvider)
 	}
 }

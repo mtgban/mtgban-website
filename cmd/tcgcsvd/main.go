@@ -50,7 +50,13 @@ import (
 type config struct {
 	SQLConfig    *timeseries.SQLConfig `json:"sql_config"`
 	TCGCSVConfig *tcgcsv.Config        `json:"tcgcsv_config"`
-	Discord      struct {
+	// Game is what the deployment this config belongs to serves. A non-Magic
+	// one charts out of the long prices table and nothing else, and its own
+	// snapshot leaves the TCGplayer series to this ingest, so the long-form
+	// write is implied for it rather than flagged. Same reading the server's
+	// longFormWrites gives the field.
+	Game    string `json:"game"`
+	Discord struct {
 		ServerWebhookURL string `json:"server_webhook_url"`
 	} `json:"discord"`
 	LegacyDiscordNotifHook string `json:"discord_notif_hook"`
@@ -58,6 +64,18 @@ type config struct {
 	TimeseriesConfig struct {
 		LongFormWrites bool `json:"long_form_writes"`
 	} `json:"timeseries_config"`
+}
+
+// defaultGame is the game an unset "game" means, the same reading the server
+// gives it: a config that spells out "game": "" is a Magic deployment.
+const defaultGame = "magic"
+
+// longFormWrites reports whether this ingest has to land in the long prices
+// table. The raw flag is the Magic cutover; a non-Magic deployment is not part
+// of it because the wide table cannot hold one of its rows, and its site skips
+// the TCGplayer providers on the assumption this job writes them.
+func (c *config) longFormWrites() bool {
+	return (c.Game != "" && c.Game != defaultGame) || c.TimeseriesConfig.LongFormWrites
 }
 
 // loadConfig reads the config from wherever the path names - a local file, a
@@ -135,7 +153,7 @@ func main() {
 		log.Fatalln("tcgcsvd: opening the price database:", err)
 	}
 
-	opts := []tcgcsvd.Option{tcgcsvd.WithLongFormWrites(cfg.TimeseriesConfig.LongFormWrites)}
+	opts := []tcgcsvd.Option{tcgcsvd.WithLongFormWrites(cfg.longFormWrites())}
 	if cfg.Discord.ServerWebhookURL != "" {
 		// Synchronous on purpose: a one-shot process would exit before a
 		// backgrounded post ever left the machine.
