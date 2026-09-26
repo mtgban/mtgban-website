@@ -91,12 +91,9 @@ func InfoFromForm(r *http.Request) mtgban.ScraperInfo {
 // what the store can list counts: a row without a price is not an offer, and
 // a sealed store holds products where a singles store holds cards, the way
 // the scrapers that come in pairs are split. An unmatched row has nothing to
-// key on, and an opened product is not being traded as itself.
-func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry, backends ...*mtgmatcher.Backend) (mtgban.Scraper, Report, error) {
-	var backend *mtgmatcher.Backend
-	if len(backends) > 0 {
-		backend = backends[0]
-	}
+// key on, and an opened product is not being traded as itself. A nil backend
+// reads as empty, so nothing resolves as sealed.
+func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry, backend *mtgmatcher.Backend) (mtgban.Scraper, Report, error) {
 	if backend == nil {
 		backend = &mtgmatcher.Backend{}
 	}
@@ -169,8 +166,6 @@ func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry,
 // host's own (a snapshot-write mutex, say) must never be held by code that
 // then calls into the Registry, or the two lock orders can deadlock.
 type Hooks struct {
-	// Backend returns the current card datastore used to classify uploaded rows.
-	Backend func() *mtgmatcher.Backend
 	// Sellers and Vendors return the currently served scrapers, of every
 	// kind - session stores included, since Registry itself is what tells
 	// the two apart.
@@ -232,12 +227,12 @@ func (reg *Registry) Is(kind, shorthand string) bool {
 	return reg.stores[key(kind, shorthand)]
 }
 
-// Publish builds the store from entries and installs it beside the host's
-// other scrapers. A shorthand the host's config claims, or one already
-// serving that was not published this way, is refused: a session store may
-// replace an earlier one of its own kind, never a real one. The lookups a
-// host does are case-insensitive, so this is too.
-func (reg *Registry) Publish(kind string, info mtgban.ScraperInfo, entries []docparse.Entry) (Report, error) {
+// Publish builds the store from entries (matched against b) and installs it
+// beside the host's other scrapers. A shorthand the host's config claims, or
+// one already serving that was not published this way, is refused: a
+// session store may replace an earlier one of its own kind, never a real
+// one. The lookups a host does are case-insensitive, so this is too.
+func (reg *Registry) Publish(b *mtgmatcher.Backend, kind string, info mtgban.ScraperInfo, entries []docparse.Entry) (Report, error) {
 	var report Report
 	if info.Name == "" || info.Shorthand == "" {
 		return report, errors.New("a store needs a name and a shorthand")
@@ -246,11 +241,7 @@ func (reg *Registry) Publish(kind string, info mtgban.ScraperInfo, entries []doc
 		return report, fmt.Errorf("shorthand %q may only hold letters, digits, - and _", info.Shorthand)
 	}
 
-	var backend *mtgmatcher.Backend
-	if reg.hooks.Backend != nil {
-		backend = reg.hooks.Backend()
-	}
-	scraper, report, err := FromEntries(kind, info, entries, backend)
+	scraper, report, err := FromEntries(kind, info, entries, b)
 	if err != nil {
 		return report, err
 	}
