@@ -463,6 +463,7 @@ func atoiDefault(s string, def int) int {
 }
 
 func Screener(w http.ResponseWriter, r *http.Request) {
+	b := backend()
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Screener", sig)
@@ -561,7 +562,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := cachedMovers(r.Context(), backend(), metric, window, minPrice, minWas)
+	rows, err := cachedMovers(r.Context(), b, metric, window, minPrice, minWas)
 	if err != nil {
 		pageVars.InfoMessage = "Screener data is temporarily unavailable, please try again shortly"
 		render(w, "screener.html", pageVars)
@@ -594,11 +595,11 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 
 	for _, res := range paged {
 		// DB uuid is finish-agnostic; resolve the priced foil/etched variant.
-		cardID, err := backend().MatchID(res.UUID, res.IsFoil, res.IsEtched)
+		cardID, err := b.MatchID(res.UUID, res.IsFoil, res.IsEtched)
 		if err != nil {
 			cardID = res.UUID
 		}
-		c := uuid2card(backend(), cardID, true, false, preferFlavor)
+		c := uuid2card(b, cardID, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, cardID)
 	}

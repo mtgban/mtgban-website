@@ -10,7 +10,7 @@ import (
 func almostEqual(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
 func TestAllEditionsByCategoryCoversAllEditions(t *testing.T) {
-	editions := GetEditions()
+	editions := currentDatastore().editions
 	if len(editions.AllEditionsKeys) == 0 {
 		t.Skip("mtgmatcher data not loaded; skipping")
 	}
@@ -25,7 +25,7 @@ func TestAllEditionsByCategoryCoversAllEditions(t *testing.T) {
 }
 
 func TestAllEditionsByCategoryHasKnownCategories(t *testing.T) {
-	editions := GetEditions()
+	editions := currentDatastore().editions
 	if len(editions.AllEditionsByCategory) == 0 {
 		t.Skip("mtgmatcher data not loaded; skipping")
 	}

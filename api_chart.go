@@ -63,6 +63,7 @@ func writeChartAPIResponse(w http.ResponseWriter, resp ChartAPIResponse) {
 }
 
 func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
 	uuid := strings.TrimPrefix(r.URL.Path, "/api/chart/")
 	uuid = strings.TrimSuffix(uuid, "/")
 	if uuid == "" {
@@ -79,11 +80,11 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	// bare uuid/number) and non-Magic products. The legacy path below stays
 	// mtgjson-uuid only.
 	if Config.TimeseriesConfig.LongFormReads {
-		chartDataAPILong(currentDatastore(), w, r, uuid)
+		chartDataAPILong(ds, w, r, uuid)
 		return
 	}
 
-	co, err := backend().GetUUID(uuid)
+	co, err := ds.backend.GetUUID(uuid)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, "card not found")
 		return
@@ -105,14 +106,14 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasets(r.Context(), backend(), uuid, co.Sealed, axisLabels, lb)
+	datasets := getDatasets(r.Context(), ds.backend, uuid, co.Sealed, axisLabels, lb)
 
 	writeChartAPIResponse(w, ChartAPIResponse{
 		MaxLookbackDays: maxDays,
 		LoadedDays:      lb.Days(),
 		AxisLabels:      axisLabels,
 		Datasets:        chartAPIDatasets(datasets),
-		Checkpoints:     relevantCheckpoints(currentDatastore(), co.Name, earliest),
+		Checkpoints:     relevantCheckpoints(ds, co.Name, earliest),
 	})
 }
 

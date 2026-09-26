@@ -61,6 +61,8 @@ var sleepersLanguages = []string{
 }
 
 func Sleepers(w http.ResponseWriter, r *http.Request) {
+	ds := currentDatastore()
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(r, "Sleepers", sig)
@@ -116,7 +118,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
-	editions := GetEditions()
+	editions := ds.editions
 	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
 	pageVars.EditionsByCategory = editions.AllEditionsByCategory
 	pageVars.PickerID = "sleep-editions-picker"
@@ -139,7 +141,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "bulk":
 		pageVars.Subtitle = "Bulk me up"
 
-		tiers = getBulks(backend(), skipEditions)
+		tiers = getBulks(b, skipEditions)
 
 	case "reprint":
 		pageVars.Subtitle = "Long time no reprint"
@@ -148,19 +150,19 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "mismatch":
 		pageVars.Subtitle = "Market Mismatch"
 
-		tiers = getTiers(backend(), blocklistRetail, blocklistBuylist, skipEditions)
+		tiers = getTiers(b, blocklistRetail, blocklistBuylist, skipEditions)
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
 		ref, target := r.FormValue("ref"), r.FormValue("target")
-		tiers = getGap(backend(), blocklistRetail, ref, target, skipEditions)
+		tiers = getGap(b, blocklistRetail, ref, target, skipEditions)
 	case "hotlist":
 		pageVars.Subtitle = "Highest buylist growth"
 
-		tiers = getHotlist(backend(), skipEditions)
+		tiers = getHotlist(b, skipEditions)
 	}
 
-	sleepers, err := sleepersLayout(backend(), tiers)
+	sleepers, err := sleepersLayout(b, tiers)
 	if err != nil {
 		ServerNotify("sleep", "unable to generate sleepers: "+err.Error())
 
@@ -180,7 +182,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		for _, cardID := range cardIDs {
 			_, found := pageVars.Metadata[cardID]
 			if !found {
-				pageVars.Metadata[cardID] = uuid2card(backend(), cardID, true, false, preferFlavor)
+				pageVars.Metadata[cardID] = uuid2card(b, cardID, true, false, preferFlavor)
 			}
 		}
 	}

@@ -128,12 +128,6 @@ type editionsSnapshot struct {
 	TotalUnique int
 }
 
-// GetEditions returns the current editions snapshot. The returned struct's
-// fields are shared and MUST NOT be modified by callers.
-func GetEditions() *editionsSnapshot {
-	return currentDatastore().editions
-}
-
 // Long time no reprint data. ReprintsKeys is the ordered list of section
 // titles; ReprintsMap holds the entries per section. They are published
 // together as a single immutable snapshot so readers can never observe new
@@ -732,6 +726,7 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 }
 
 func runSealedAnalysis() {
+	b := backend()
 	log.Println("Running set analysis")
 
 	tcgInventory, _ := findSellerInventory("TCGLow")
@@ -740,13 +735,13 @@ func runSealedAnalysis() {
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
-	reprintsKeys, reprintsMap := getReprintsGlobal(backend(), tcgInventory, tcgMarket)
+	reprintsKeys, reprintsMap := getReprintsGlobal(b, tcgInventory, tcgMarket)
 	reprintsPtr.Store(&reprintsSnapshot{Keys: reprintsKeys, Map: reprintsMap})
 
 	infos := map[string]mtgban.InventoryRecord{}
 
-	runRawSetValue(backend(), infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	for label, record := range buylistMetrics(backend(), "CK", map[string]buylistReducer{
+	runRawSetValue(b, infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
+	for label, record := range buylistMetrics(b, "CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
 		"highest": highestBuylistPrice,
 		"goodP90": goodBuylistPrice,
