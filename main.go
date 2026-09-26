@@ -579,6 +579,7 @@ func init() {
 			SubPages: []NavElem{
 				{Name: "APITrial", Link: "/api-trial", ShouldHide: func() bool { return true }},
 				{Name: "APILogin", Link: "/api-login", ShouldHide: func() bool { return true }},
+				{Name: "APIStores", Link: "/api-plans/stores.json", ShouldHide: func() bool { return true }},
 			},
 		},
 		"Admin": {

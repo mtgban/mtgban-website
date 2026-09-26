@@ -3,8 +3,9 @@
 // from it and the gateway seeds Stripe from it, so both read this one
 // embedded file.
 //
-// The list carries structure (package keys, scopes, modes, store families,
-// intervals) and the amounts Stripe is seeded with. Stripe holds the live
+// The list carries structure (package keys, scopes, modes, the implied store
+// family's key and name, intervals) and the amounts Stripe is seeded with. The selectable
+// store families are not listed: each game site serves its own. Stripe holds the live
 // Prices, keyed by LookupKey; the gateway looks them up by key and never
 // parses a key. The gateway pins this module by commit, so an edit here
 // reaches customers when the gateway bumps its dependency. The Patreon bundle
@@ -20,7 +21,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"unicode"
 )
 
 //go:embed products.json
@@ -45,9 +45,9 @@ var Modes = []string{"retail", "buylist", "sealed"}
 var Currencies = []string{"usd"}
 
 var (
-	keyPattern      = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	storeKeyPattern = regexp.MustCompile(`^[A-Z0-9]+$`)
-	validIntervals  = []string{"month"}
+	keyPattern       = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	familyKeyPattern = regexp.MustCompile(`^[a-z0-9]+$`)
+	validIntervals   = []string{"month"}
 )
 
 // Package is one price-data tier.
@@ -84,17 +84,6 @@ type Interval struct {
 	Public   bool   `json:"public"`
 }
 
-// Store is one seller a customer can name, with every shorthand the price
-// API knows it by. Keys are uppercase because the gateway uppercases what a
-// customer typed before matching; shorthands keep the backend's spelling.
-type Store struct {
-	Key  string `json:"key"`
-	Name string `json:"name"`
-	// Implied stores are part of every explicit-scope package and are not selectable.
-	Implied    bool     `json:"implied"`
-	Shorthands []string `json:"shorthands"`
-}
-
 // ProductList is the whole price list.
 type ProductList struct {
 	Currency  string     `json:"currency"`
@@ -103,10 +92,14 @@ type ProductList struct {
 	Intervals []Interval `json:"intervals"`
 	// IncludedGames is how many games the base price covers; the buyer picks which.
 	IncludedGames int `json:"included_games"`
-	// Stores is the starter picker and the pricing page's store names. A
-	// preset scope is expanded by the backend from its live scrapers and
-	// never reads this list.
-	Stores []Store `json:"stores"`
+	// Implied is the store family every explicit package includes.
+	Implied ImpliedStore `json:"implied"`
+}
+
+// ImpliedStore names a store family by its key, the scraper config key up to its first underscore.
+type ImpliedStore struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // Load parses the embedded list.
@@ -230,57 +223,18 @@ func (c *ProductList) Validate() error {
 	if c.IncludedGames < 1 {
 		return errors.New("included_games must be at least 1")
 	}
-	if err := c.validateStores(explicit); err != nil {
-		return err
-	}
-	selectable := len(c.SelectableStores())
-	for _, p := range c.Packages {
-		if p.StoreScope == StoreScopeExplicit && p.IncludedStores > selectable {
-			return fmt.Errorf("package %s: included_stores %d exceeds the %d selectable stores", p.Key, p.IncludedStores, selectable)
+	if explicit || c.Implied != (ImpliedStore{}) {
+		if c.Implied.Key == "" {
+			return errors.New("an explicit package needs an implied store")
+		}
+		if !familyKeyPattern.MatchString(c.Implied.Key) {
+			return fmt.Errorf("implied key %q must be lowercase letters and digits", c.Implied.Key)
+		}
+		if c.Implied.Name == "" {
+			return fmt.Errorf("implied %s: name is empty", c.Implied.Key)
 		}
 	}
 	return c.checkLookupKeyCollisions()
-}
-
-// validateStores checks keys, names, shorthands, and that an explicit
-// package has something implied and something to pick.
-func (c *ProductList) validateStores(explicit bool) error {
-	if len(c.Stores) == 0 {
-		return errors.New("stores is empty")
-	}
-	shorthandOwner := map[string]string{}
-	implied, selectable := false, false
-	for i, s := range c.Stores {
-		if !storeKeyPattern.MatchString(s.Key) {
-			return fmt.Errorf("store %q: key must be uppercase letters and digits", s.Key)
-		}
-		for _, prev := range c.Stores[:i] {
-			if prev.Key == s.Key {
-				return fmt.Errorf("duplicate store %q", s.Key)
-			}
-		}
-		if s.Name == "" {
-			return fmt.Errorf("store %s: name is empty", s.Key)
-		}
-		if err := uniqueList("store "+s.Key+" shorthands", s.Shorthands, isToken, "a shorthand with no comma or whitespace"); err != nil {
-			return err
-		}
-		for _, sh := range s.Shorthands {
-			if owner, ok := shorthandOwner[sh]; ok {
-				return fmt.Errorf("shorthand %q belongs to both %s and %s", sh, owner, s.Key)
-			}
-			shorthandOwner[sh] = s.Key
-		}
-		implied = implied || s.Implied
-		selectable = selectable || !s.Implied
-	}
-	if explicit && !implied {
-		return errors.New("an explicit package needs an implied store")
-	}
-	if explicit && !selectable {
-		return errors.New("an explicit package needs a selectable store")
-	}
-	return nil
 }
 
 // checkLookupKeyCollisions reports when two items and intervals produce the same Stripe lookup key.
@@ -342,11 +296,6 @@ func isMode(m string) bool {
 	return slices.Contains(Modes, m)
 }
 
-// isToken accepts a value that survives comma-joining into metadata and signatures.
-func isToken(s string) bool {
-	return s != "" && !strings.ContainsRune(s, ',') && strings.IndexFunc(s, unicode.IsSpace) < 0
-}
-
 func (c *ProductList) hasPackage(key string) bool {
 	_, ok := c.Package(key)
 	return ok
@@ -382,44 +331,12 @@ func (c *ProductList) Interval(key string) (Interval, bool) {
 	return Interval{}, false
 }
 
-// Store returns the store with that key.
-func (c *ProductList) Store(key string) (Store, bool) {
-	for _, s := range c.Stores {
-		if s.Key == key {
-			return s, true
-		}
-	}
-	return Store{}, false
-}
-
 // PublicIntervals returns the intervals a customer may pick without an invite.
 func (c *ProductList) PublicIntervals() []Interval {
 	var out []Interval
 	for _, iv := range c.Intervals {
 		if iv.Public {
 			out = append(out, iv)
-		}
-	}
-	return out
-}
-
-// ImpliedStores returns the stores every explicit-scope package includes.
-func (c *ProductList) ImpliedStores() []Store {
-	var out []Store
-	for _, s := range c.Stores {
-		if s.Implied {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// SelectableStores returns the stores a customer may pick on an explicit-scope package.
-func (c *ProductList) SelectableStores() []Store {
-	var out []Store
-	for _, s := range c.Stores {
-		if !s.Implied {
-			out = append(out, s)
 		}
 	}
 	return out

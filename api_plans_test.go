@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,12 +45,10 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 		"À la carte", "$200", "Base Access", "$500", "All Access", "$800", "$150",
 		"No Sealed or EV data", "Single region market overview", "Priority support", "Choose All Access",
 		"one included, $150/month for each additional",
-		"TCGplayer always included, your first store is on us, each additional is $150/month",
 		`id="api-total-package">All Access</span> <strong id="api-total">$800</strong>`,
 		`action="https://api.example/checkout"`,
 		`name="package" id="api-package-all_data" value="all_data" checked`,
 		`name="games" value="pokemon"`,
-		`name="stores" value="CK" checked`,
 		`name="return_to" value="https://mtgban.com/api-plans"`,
 		`href="https://api.example/account"`,
 		"/guide",
@@ -65,9 +65,6 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	}
 	if strings.Contains(body, `value="quarterly"`) {
 		t.Error("quarterly shown without an invite")
-	}
-	if strings.Contains(body, `name="stores" value="TCG"`) {
-		t.Error("implied store offered as a checkbox")
 	}
 	if strings.Contains(body, "Patreon bundle") || strings.Contains(body, "Magic is included") {
 		t.Error("page still mentions the Patreon bundle or an included game")
@@ -189,89 +186,156 @@ func TestAPIPlansUnverifiedEmailKeepsTheGatewayLink(t *testing.T) {
 	}
 }
 
-// stubStores installs sellers with the given shorthands and restores the real ones after the test.
-func stubStores(t *testing.T, shorthands ...string) {
+// scraperStub names the served scrapers, the scraper config, and the search blocklists of a test site.
+type scraperStub struct {
+	config       map[string]map[string][]string
+	sellers      []string
+	vendors      []string
+	sealed       []string
+	names        map[string]string
+	overrides    map[string]string
+	retailBlock  []string
+	buylistBlock []string
+}
+
+// stubScrapers installs the stub and restores the real scrapers and config after the test.
+func stubScrapers(t *testing.T, s scraperStub) {
 	t.Helper()
-	prev := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev); vendorsPtr.Store(prevVendors) })
-	var sellers []mtgban.Seller
-	for _, sh := range shorthands {
-		sellers = append(sellers, mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: sh, Name: sh}))
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	prevCfg, prevRetail, prevBuylist := Config.ScraperConfig, Config.SearchRetailBlockList, Config.SearchBuylistBlockList
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+		Config.ScraperConfig, Config.SearchRetailBlockList, Config.SearchBuylistBlockList = prevCfg, prevRetail, prevBuylist
+	})
+	info := func(sh string) mtgban.ScraperInfo {
+		name, ok := s.names[sh]
+		if !ok {
+			name = sh
+		}
+		return mtgban.ScraperInfo{Shorthand: sh, Name: name, SealedMode: slices.Contains(s.sealed, sh)}
+	}
+	sellers := []mtgban.Seller{}
+	for _, sh := range s.sellers {
+		sellers = append(sellers, mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info(sh)))
+	}
+	vendors := []mtgban.Vendor{}
+	for _, sh := range s.vendors {
+		vendors = append(vendors, mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, info(sh)))
 	}
 	sellersPtr.Store(&sellers)
-	var vendors []mtgban.Vendor
 	vendorsPtr.Store(&vendors)
+	Config.ScraperConfig = ScraperConfig{Config: s.config, NameOverride: s.overrides}
+	Config.SearchRetailBlockList, Config.SearchBuylistBlockList = s.retailBlock, s.buylistBlock
 }
 
-// stubConfiguredStores names the scrapers this site boots with and restores the real config after the test.
-func stubConfiguredStores(t *testing.T, shorthands ...string) {
-	t.Helper()
-	prev := Config.ScraperConfig.Config
-	t.Cleanup(func() { Config.ScraperConfig.Config = prev })
-	Config.ScraperConfig.Config = map[string]map[string][]string{"stub": {"retail": shorthands}}
+// magicStub mirrors the live magic config: split tcg_* and cardkingdom_* keys, blocklists, sealed scrapers, a session store.
+var magicStub = scraperStub{
+	config: map[string]map[string][]string{
+		"tcg_index":          {"retail": {"TCGLow", "TCGDirectLow"}},
+		"tcg_market":         {"retail": {"TCGMarket"}},
+		"tcg_syplist":        {"buylist": {"SYP"}},
+		"cardkingdom":        {"retail": {"CK"}, "buylist": {"CKBLLast"}},
+		"cardkingdom_graded": {"retail": {"CKGraded"}},
+		"cardkingdom_sealed": {"retail": {"CKSealed"}},
+		"abugames":           {"retail": {"ABU"}, "buylist": {"ABUCredit"}},
+		"starcitygames":      {"retail": {"SCG"}, "buylist": {"SCGBL"}},
+		"strikezone":         {"retail": {"SZ"}},
+		"manapool":           {"retail": {"MP"}},
+		"magiccorner":        {"retail": {"MC"}},
+		"sealed_ev":          {"retail": {"CKEV"}},
+		"coolstuffinc":       {"retail": {"CSI"}},
+	},
+	sellers: []string{"TCGLow", "TCGDirectLow", "TCGMarket", "CK", "CKGraded", "ABU", "SCG", "SZ", "MP", "MC", "CKSealed", "CKEV", "GN"},
+	vendors: []string{"SYP", "CKBLLast", "ABUCredit", "SCGBL"},
+	sealed:  []string{"CKEV"},
+	names: map[string]string{
+		"TCGLow": "TCG Low", "TCGDirectLow": "TCG Direct Low", "TCGMarket": "TCG Market", "SYP": "TCG SYP List",
+		"CK": "Card Kingdom", "CKBLLast": "Card Kingdom", "CKGraded": "card kingdom Graded",
+		"CKSealed": "Card Kingdom Sealed", "CKEV": "Card Kingdom EV",
+		"ABU": "ABU Games", "ABUCredit": "ABU Credit",
+		"SCG": "StarCityGames", "SCGBL": "StarCityGames",
+		"SZ": "Strike Zone", "MP": "mana pool",
+		"MC": "Magic Corner", "GN": "Game Nerdz",
+	},
+	// The second entry renames a family, not a scraper.
+	overrides:    map[string]string{"StarCityGames": "Star City Games", "ABU": "ABU Games"},
+	retailBlock:  []string{"TCGDirectLow", "MC"},
+	buylistBlock: []string{"SCGBL"},
 }
 
-func TestAPIPlansOffersOnlyTheStoresThisSiteCarries(t *testing.T) {
-	stubConfiguredStores(t, "TCGLow", "CT0", "GN", "SZ")
-	stubStores(t)
+func TestStoreFamiliesFromTheServedScrapers(t *testing.T) {
+	stubScrapers(t, magicStub)
+	implied, selectable := storeFamilies()
+	// The tcg_* keys merge into one family, named by the price list.
+	if len(implied) != 1 || implied[0].Key != "tcg" || implied[0].Name != "TCGplayer" || !slices.Equal(implied[0].Shorthands, []string{"SYP", "TCGLow", "TCGMarket"}) {
+		t.Errorf("implied %+v", implied)
+	}
+	want := []StoreFamily{
+		{Key: "abugames", Name: "ABU Games", Shorthands: []string{"ABU", "ABUCredit"}},
+		{Key: "cardkingdom", Name: "Card Kingdom", Shorthands: []string{"CK", "CKBLLast", "CKGraded"}},
+		{Key: "manapool", Name: "mana pool", Shorthands: []string{"MP"}},
+		{Key: "starcitygames", Name: "Star City Games", Shorthands: []string{"SCG"}},
+		{Key: "strikezone", Name: "Strike Zone", Shorthands: []string{"SZ"}},
+	}
+	if !slices.EqualFunc(selectable, want, func(a, b StoreFamily) bool {
+		return a.Key == b.Key && a.Name == b.Name && slices.Equal(a.Shorthands, b.Shorthands)
+	}) {
+		t.Errorf("selectable %+v, want %+v", selectable, want)
+	}
+}
+
+func TestFamilyName(t *testing.T) {
+	cases := []struct {
+		names []string
+		want  string
+	}{
+		{[]string{"MKM Low", "MKM Trend"}, "MKM"},
+		{[]string{"Card Kingdom Graded", "Card Kingdom"}, "Card Kingdom"},
+		{[]string{"card kingdom graded", "Card Kingdom", "Card Kingdom"}, "Card Kingdom"},
+		{[]string{"TCG Market", "TCG Low", "TCG Direct Low"}, "TCG"},
+		{[]string{"Card Kingdom", "Cardmarket"}, "Cardmarket"},
+		{[]string{"Solo"}, "Solo"},
+		{[]string{"Foo Bar", "Baz Qux Long"}, "Foo Bar"},
+		{nil, ""},
+	}
+	for _, c := range cases {
+		if got := familyName(c.names); got != c.want {
+			t.Errorf("%q: got %q want %q", c.names, got, c.want)
+		}
+	}
+}
+
+func TestStoreFamiliesEmptyWithNothingServed(t *testing.T) {
+	stubScrapers(t, scraperStub{config: magicStub.config})
+	implied, selectable := storeFamilies()
+	if len(implied) != 0 || len(selectable) != 0 {
+		t.Errorf("implied %+v selectable %+v", implied, selectable)
+	}
+}
+
+func TestAPIPlansStoreRowComesFromTheServedScrapers(t *testing.T) {
+	stubScrapers(t, magicStub)
 	body := apiPlansPage(t, "")
-	for _, want := range []string{`name="stores" value="CT" checked`, `name="stores" value="GN"`, `name="stores" value="SZ"`} {
+	if !strings.Contains(body, "TCGplayer always included, your first store is on us, each additional is $150/month") {
+		t.Error("legend lacks the implied family")
+	}
+	for _, want := range []string{`name="stores" value="abugames" checked disabled> ABU Games`, `name="stores" value="cardkingdom" disabled> Card Kingdom`, `name="stores" value="starcitygames" disabled> Star City Games`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	for _, absent := range []string{`value="CK"`, `value="SCG"`, `value="HA"`} {
-		if strings.Contains(body, `name="stores" `+absent) {
-			t.Errorf("page offers a store this site does not carry: %s", absent)
+	for _, absent := range []string{"tcg", "tcg_index", "magiccorner", "cardkingdom_graded", "cardkingdom_sealed", "sealed", "sealed_ev", "coolstuffinc", "GN", "CK"} {
+		if strings.Contains(body, `name="stores" value="`+absent+`"`) {
+			t.Errorf("page offers %s", absent)
 		}
 	}
-}
-
-func TestAPIPlansIgnoresASessionPublishedStore(t *testing.T) {
-	stubConfiguredStores(t, "TCGLow", "CT0")
-	// An upload session publishes into the served snapshot, which the price list must not read.
-	stubStores(t, "TCGLow", "CT0", "GN")
-	body := apiPlansPage(t, "")
-	if !strings.Contains(body, `name="stores" value="CT" checked`) {
-		t.Error("page lacks the configured store")
+	if strings.Contains(body, "No stores are loaded") {
+		t.Error("empty-row sentence shown with stores loaded")
 	}
-	if strings.Contains(body, `name="stores" value="GN"`) {
-		t.Error("a session-published store reached the price list")
-	}
-}
-
-func TestAPIPlansFallsBackToTheLoadedScrapers(t *testing.T) {
-	stubConfiguredStores(t)
-	stubStores(t, "TCGLow", "SZ")
-	body := apiPlansPage(t, "")
-	if !strings.Contains(body, `name="stores" value="SZ" checked`) {
-		t.Error("with nothing configured the page should offer what is loaded")
-	}
-	if strings.Contains(body, `name="stores" value="CK"`) {
-		t.Error("page offers a store neither configured nor loaded")
-	}
-}
-
-func TestAPIPlansOffersEveryStoreWhenNoneAreLoaded(t *testing.T) {
-	stubConfiguredStores(t)
-	stubStores(t)
-	body := apiPlansPage(t, "")
-	if !strings.Contains(body, `name="stores" value="CK" checked`) || !strings.Contains(body, `name="stores" value="AF"`) {
-		t.Error("with no scrapers loaded the page should fall back to the whole list")
-	}
-}
-
-func TestAPIPlansDisablesTheStoreBoxesItHides(t *testing.T) {
-	stubStores(t)
-	// The page opens on a preset package, so a no-JS submit must not send stores=.
-	body := apiPlansPage(t, "")
-	if !strings.Contains(body, `name="stores" value="CK" checked disabled`) {
-		t.Error("the hidden store boxes are not disabled")
-	}
-	// A change link names an explicit package, and then the boxes are live again.
+	// An explicit package leaves the boxes live and the fieldset shown.
 	explicit := apiPlansPageAt(t, "", "/api-plans?package=starter")
-	if !strings.Contains(explicit, `name="stores" value="CK" checked>`) {
+	if !strings.Contains(explicit, `name="stores" value="abugames" checked>`) {
 		t.Error("an explicit package should leave the store boxes enabled")
 	}
 	if strings.Contains(explicit, `<fieldset class="api-fieldset" id="api-stores" hidden>`) {
@@ -279,17 +343,127 @@ func TestAPIPlansDisablesTheStoreBoxesItHides(t *testing.T) {
 	}
 }
 
+func TestAPIPlansSaysWhenNoStoresAreLoaded(t *testing.T) {
+	stubScrapers(t, scraperStub{config: magicStub.config})
+	body := apiPlansPageAt(t, "", "/api-plans?package=starter")
+	if !strings.Contains(body, `<p class="api-note">No stores are loaded on this site right now.</p>`) {
+		t.Error("empty row does not say so")
+	}
+	if strings.Contains(body, `name="stores"`) {
+		t.Error("empty row renders a store box")
+	}
+}
+
 func TestAPIPlansKeepsAStoreTheCustomerPaysFor(t *testing.T) {
-	stubConfiguredStores(t, "TCGLow", "SZ", "MS")
-	stubStores(t)
-	body := apiPlansPageAt(t, "", "/api-plans?change=1&package=starter&stores=CK,SZ")
-	for _, want := range []string{`name="stores" value="CK"`, `name="stores" value="SZ"`, `name="stores" value="MS"`} {
+	stubScrapers(t, magicStub)
+	body := apiPlansPageAt(t, "", "/api-plans?change=1&package=starter&stores=cardkingdom,Retired&stores=tcg")
+	for _, want := range []string{`name="stores" value="abugames">`, `name="stores" value="cardkingdom" checked>`, `name="stores" value="starcitygames">`, `name="stores" value="retired" checked> retired`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	if strings.Contains(body, `name="stores" value="HA"`) {
-		t.Error("page offers a store this site does not carry and the reader does not pay for")
+	if strings.Count(body, `value="cardkingdom"`) != 1 {
+		t.Error("an offered family was rendered twice")
+	}
+	if strings.Contains(body, `name="stores" value="tcg"`) {
+		t.Error("the implied family became a checkbox")
+	}
+	// A legacy change link names shorthands; each maps to its family.
+	legacy := apiPlansPageAt(t, "", "/api-plans?change=1&package=starter&stores=CK,sz")
+	for _, want := range []string{`name="stores" value="abugames">`, `name="stores" value="cardkingdom" checked>`, `name="stores" value="strikezone" checked>`} {
+		if !strings.Contains(legacy, want) {
+			t.Errorf("legacy link: page lacks %q", want)
+		}
+	}
+	if strings.Contains(legacy, `value="ck"`) || strings.Contains(legacy, `value="sz"`) {
+		t.Error("a legacy shorthand became its own box")
+	}
+	if !strings.Contains(legacy, `"storeKeys":["cardkingdom","strikezone"]`) {
+		t.Error("the configurator data lacks the resolved store keys")
+	}
+	// Outside a change request the query names nothing to keep.
+	plain := apiPlansPageAt(t, "", "/api-plans?package=starter&stores=retired")
+	if strings.Contains(plain, `value="retired"`) {
+		t.Error("a stores query outside a change request added a box")
+	}
+}
+
+func TestAPIStoresServesTheFamilies(t *testing.T) {
+	stubScrapers(t, magicStub)
+	savedGame := Config.Game
+	t.Cleanup(func() { Config.Game = savedGame })
+	Config.Game = "magic"
+	rec := httptest.NewRecorder()
+	APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "public, max-age=300" {
+		t.Errorf("Cache-Control %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type %q", got)
+	}
+	var doc struct {
+		Game    string        `json:"game"`
+		Implied []StoreFamily `json:"implied"`
+		Stores  []StoreFamily `json:"stores"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Game != "magic" {
+		t.Errorf("game %q", doc.Game)
+	}
+	if len(doc.Implied) != 1 || doc.Implied[0].Key != "tcg" || doc.Implied[0].Name != "TCGplayer" || !slices.Equal(doc.Implied[0].Shorthands, []string{"SYP", "TCGLow", "TCGMarket"}) {
+		t.Errorf("implied %+v", doc.Implied)
+	}
+	if len(doc.Stores) != 5 || doc.Stores[0].Name != "ABU Games" || doc.Stores[1].Name != "Card Kingdom" || doc.Stores[2].Name != "mana pool" || doc.Stores[3].Name != "Star City Games" {
+		t.Errorf("stores %+v", doc.Stores)
+	}
+	for _, f := range append(doc.Implied, doc.Stores...) {
+		if f.Key != strings.ToLower(f.Key) {
+			t.Errorf("key %q is not lowercase", f.Key)
+		}
+	}
+	if !strings.Contains(rec.Body.String(), `{"key":"cardkingdom","name":"Card Kingdom","shorthands":["CK","CKBLLast","CKGraded"]}`) {
+		t.Errorf("body %s", rec.Body.String())
+	}
+}
+
+func TestAPIStoresEmptyListsAreArrays(t *testing.T) {
+	// Loaded, but nothing the scraper config names.
+	stubScrapers(t, scraperStub{sellers: []string{"GN"}, vendors: []string{"GN"}})
+	rec := httptest.NewRecorder()
+	APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	if body := rec.Body.String(); !strings.Contains(body, `"implied":[]`) || !strings.Contains(body, `"stores":[]`) {
+		t.Errorf("body %s", body)
+	}
+}
+
+func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
+	for _, stub := range []scraperStub{{}, {config: magicStub.config, sellers: magicStub.sellers}, {config: magicStub.config, vendors: magicStub.vendors}} {
+		stubScrapers(t, stub)
+		rec := httptest.NewRecorder()
+		APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Errorf("status %d", rec.Code)
+		}
+		if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("Cache-Control %q", got)
+		}
+		if got := strings.TrimSpace(rec.Body.String()); got != `{"error":"Stores are still loading."}` {
+			t.Errorf("body %s", got)
+		}
+	}
+}
+
+func TestAPIStoresIsGetOnly(t *testing.T) {
+	stubScrapers(t, magicStub)
+	rec := httptest.NewRecorder()
+	APIPlans(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status %d", rec.Code)
 	}
 }
 

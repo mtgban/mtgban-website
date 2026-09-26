@@ -1,14 +1,18 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"html/template"
+	"log"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apiproductlist"
 )
@@ -43,11 +47,24 @@ type APIPlansVars struct {
 	CanTrial bool
 	// HandoffOn is true when this site can send this reader through the gateway handoff.
 	HandoffOn bool
-	// Stores are the selectable families this site carries, in list order.
-	Stores []apiproductlist.Store
+	// Stores are the selectable families this site serves, sorted by name.
+	Stores []StoreFamily
+	// ImpliedStores are the families every explicit package includes.
+	ImpliedStores []StoreFamily
+	// WantedStores are the family keys a change request names, checked on arrival.
+	WantedStores []string
+	// PaidStores are keys a change request names that this site no longer offers.
+	PaidStores []string
 
 	// TrialDays must match the gateway's trial_days config.
 	TrialDays int
+}
+
+// StoreFamily is the config keys sharing a prefix and the shorthands of them this site serves.
+type StoreFamily struct {
+	Key        string   `json:"key"`
+	Name       string   `json:"name"`
+	Shorthands []string `json:"shorthands"`
 }
 
 // APIPlanGame is one game checkbox in the configurator.
@@ -67,6 +84,9 @@ func APIPlans(w http.ResponseWriter, r *http.Request) {
 	case "/api-login":
 		APILogin(w, r)
 		return
+	case "/api-plans/stores.json":
+		APIStores(w, r)
+		return
 	}
 	// The page may be served without enforceSigning, so only a verified signature names the reader.
 	sig := verifiedSignature(r)
@@ -77,6 +97,36 @@ func APIPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.API = apiPlansVars(r, sig)
 	render(w, "api-plans.html", pageVars)
+}
+
+// APIStores serves this site's store families for the gateway to price and resolve.
+func APIStores(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	// A cold start would serve a partial list, so the gateway keeps its last good one.
+	if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		if err := json.NewEncoder(w).Encode(map[string]string{"error": "Stores are still loading."}); err != nil {
+			log.Println("api-plans stores.json:", err)
+		}
+		return
+	}
+	out := struct {
+		Game    string        `json:"game"`
+		Implied []StoreFamily `json:"implied"`
+		Stores  []StoreFamily `json:"stores"`
+	}{Game: Config.Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}}
+	implied, stores := storeFamilies()
+	out.Implied = append(out.Implied, implied...)
+	out.Stores = append(out.Stores, stores...)
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		log.Println("api-plans stores.json:", err)
+	}
 }
 
 // apiPlansVars gathers what the page and its configurator need.
@@ -109,9 +159,10 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		TrialDays:  15,
 	}
 	v.Cards, v.TopCard = podiumOrder(apiProducts.Packages)
-	v.Stores = siteStores(apiProducts)
+	v.ImpliedStores, v.Stores = storeFamilies()
 	if change {
-		v.Stores = paidStores(apiProducts, v.Stores, r.URL.Query()["stores"])
+		v.WantedStores = wantedStores(r.URL.Query()["stores"])
+		v.PaidStores = paidStores(v.WantedStores, v.Stores)
 	}
 	v.Default = apiProducts.Packages[0]
 	for _, p := range apiProducts.Packages {
@@ -142,85 +193,146 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	return v
 }
 
-// siteStores keeps the selectable families with at least one shorthand this
-// site is configured to load. With nothing configured it falls back to the
-// served snapshot, and with nothing loaded either (tests, a cold start) it
-// keeps them all rather than offer an empty row.
-func siteStores(cat *apiproductlist.ProductList) []apiproductlist.Store {
-	carried := configuredShorthands()
-	if len(carried) == 0 {
-		carried = loadedShorthands()
-	}
-	all := cat.SelectableStores()
-	if len(carried) == 0 {
-		return all
-	}
-	var out []apiproductlist.Store
-	for _, st := range all {
-		for _, sh := range st.Shorthands {
-			if carried[strings.ToLower(sh)] {
-				out = append(out, st)
-				break
-			}
+// familyKeys maps each lowercased configured shorthand to its family key, the config key up to its first underscore.
+func familyKeys() map[string]string {
+	keyOf := map[string]string{}
+	for _, key := range slices.Sorted(maps.Keys(Config.ScraperConfig.Config)) {
+		if strings.HasSuffix(key, "_sealed") {
+			continue
 		}
-	}
-	if len(out) == 0 {
-		return all
-	}
-	return out
-}
-
-// configuredShorthands are the scrapers the site boots with, lowercased the
-// way isConfiguredScraper compares them.
-func configuredShorthands() map[string]bool {
-	out := map[string]bool{}
-	for _, sections := range Config.ScraperConfig.Config {
-		for _, list := range sections {
+		// tcg_index and tcg_market are both the tcg family.
+		family, _, _ := strings.Cut(strings.ToLower(key), "_")
+		for _, list := range Config.ScraperConfig.Config[key] {
 			for _, sh := range list {
-				out[strings.ToLower(sh)] = true
+				if _, taken := keyOf[strings.ToLower(sh)]; !taken {
+					keyOf[strings.ToLower(sh)] = family
+				}
 			}
 		}
 	}
-	return out
+	return keyOf
 }
 
-// loadedShorthands are the scrapers currently served, session uploads included.
-func loadedShorthands() map[string]bool {
-	out := map[string]bool{}
-	for _, s := range GetSellers() {
-		out[strings.ToLower(s.Info().Shorthand)] = true
+// storeFamilies groups the served scrapers by config key prefix, minus what the search blocklists hide.
+func storeFamilies() (implied, selectable []StoreFamily) {
+	keyOf := familyKeys()
+	var families []*StoreFamily
+	add := func(info mtgban.ScraperInfo, blocklist []string) {
+		shorthand := info.Shorthand
+		key, ok := keyOf[strings.ToLower(shorthand)]
+		if !ok || info.SealedMode || !storeEligible(shorthand, nil, blocklist) {
+			return
+		}
+		i := slices.IndexFunc(families, func(f *StoreFamily) bool { return f.Key == key })
+		if i < 0 {
+			families = append(families, &StoreFamily{Key: key})
+			i = len(families) - 1
+		}
+		if !slices.Contains(families[i].Shorthands, shorthand) {
+			families[i].Shorthands = append(families[i].Shorthands, shorthand)
+		}
 	}
-	for _, v := range GetVendors() {
-		out[strings.ToLower(v.Info().Shorthand)] = true
+	for _, seller := range GetSellers() {
+		add(seller.Info(), Config.SearchRetailBlockList)
 	}
-	return out
+	for _, vendor := range GetVendors() {
+		add(vendor.Info(), Config.SearchBuylistBlockList)
+	}
+	for _, f := range families {
+		slices.Sort(f.Shorthands)
+		if f.Key == apiProducts.Implied.Key {
+			f.Name = apiProducts.Implied.Name
+			implied = append(implied, *f)
+			continue
+		}
+		names := make([]string, 0, len(f.Shorthands))
+		for _, sh := range f.Shorthands {
+			if name := scraperName(sh); name != "" {
+				names = append(names, name)
+			}
+		}
+		name := familyName(names)
+		if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
+			name = override
+		}
+		f.Name = cmp.Or(name, f.Key)
+		selectable = append(selectable, *f)
+	}
+	slices.SortFunc(selectable, func(a, b StoreFamily) int {
+		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Key, b.Key))
+	})
+	return implied, selectable
 }
 
-// paidStores adds back the families named in the request's stores query, so a
-// store the reader already pays for is always offered.
-func paidStores(cat *apiproductlist.ProductList, stores []apiproductlist.Store, query []string) []apiproductlist.Store {
-	want := map[string]bool{}
+// familyName is the leading words every name shares, ignoring case, else the shortest name.
+func familyName(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	shortest := slices.MinFunc(names, func(a, b string) int {
+		return cmp.Or(len(a)-len(b), strings.Compare(a, b))
+	})
+	words := strings.Fields(shortest)
+	shared := len(words)
+	for _, n := range names {
+		other := strings.Fields(n)
+		i := 0
+		for i < shared && i < len(other) && strings.EqualFold(words[i], other[i]) {
+			i++
+		}
+		shared = i
+	}
+	if shared == 0 {
+		return shortest
+	}
+	return strings.Join(words[:shared], " ")
+}
+
+// wantedStores resolves a change request's stores query to family keys; the implied family is left out.
+func wantedStores(query []string) []string {
+	keyOf := familyKeys()
+	served := map[string]bool{}
+	for _, seller := range GetSellers() {
+		served[strings.ToLower(seller.Info().Shorthand)] = true
+	}
+	for _, vendor := range GetVendors() {
+		served[strings.ToLower(vendor.Info().Shorthand)] = true
+	}
+	families := map[string]bool{}
+	for _, key := range keyOf {
+		families[key] = true
+	}
+	var out []string
 	for _, field := range query {
 		for _, key := range strings.Split(field, ",") {
-			if key = strings.ToUpper(strings.TrimSpace(key)); key != "" {
-				want[key] = true
+			key = strings.ToLower(strings.TrimSpace(key))
+			// A legacy link names a served shorthand rather than its family.
+			if family, ok := keyOf[key]; ok && served[key] && !families[key] {
+				key = family
 			}
-		}
-	}
-	if len(want) == 0 {
-		return stores
-	}
-	have := map[string]bool{}
-	for _, st := range stores {
-		have[st.Key] = true
-	}
-	var out []apiproductlist.Store
-	for _, st := range cat.SelectableStores() {
-		if have[st.Key] || want[st.Key] {
-			out = append(out, st)
+			if key == "" || key == apiProducts.Implied.Key || slices.Contains(out, key) {
+				continue
+			}
+			out = append(out, key)
 		}
 	}
 	return out
+}
+
+// paidStores are wanted keys not on offer, so a store the customer pays for is kept.
+func paidStores(wanted []string, offered []StoreFamily) []string {
+	var out []string
+	for _, key := range wanted {
+		if !hasFamily(offered, key) {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
+// hasFamily reports whether a family with that key is listed.
+func hasFamily(families []StoreFamily, key string) bool {
+	return slices.ContainsFunc(families, func(f StoreFamily) bool { return f.Key == key })
 }
 
 // podiumOrder puts the priciest package in the middle with the runner-up on
@@ -258,7 +370,8 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		Addons        map[string]int64 `json:"addons"`
 		Intervals     []interval       `json:"intervals"`
 		IncludedGames int              `json:"includedGames"`
-	}{Addons: map[string]int64{}, IncludedGames: v.Products.IncludedGames}
+		StoreKeys     []string         `json:"storeKeys,omitempty"`
+	}{Addons: map[string]int64{}, IncludedGames: v.Products.IncludedGames, StoreKeys: v.WantedStores}
 	for _, p := range v.Products.Packages {
 		out.Packages = append(out.Packages, pkg{p.Key, p.Name, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores})
 	}

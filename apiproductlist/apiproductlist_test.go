@@ -39,34 +39,9 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if c.IncludedGames != 1 {
 		t.Errorf("included games %v", c.IncludedGames)
 	}
-	if implied := c.ImpliedStores(); len(implied) != 1 || implied[0].Key != "TCG" || !containsAll(implied[0].Shorthands, "TCGLow", "TCGDirectLow", "TCGDirectNet", "TCGMarket", "TCGMid", "TCGPlayer") {
-		t.Errorf("implied stores %+v", implied)
+	if c.Implied.Key != "tcg" || c.Implied.Name != "TCGplayer" {
+		t.Errorf("implied %+v", c.Implied)
 	}
-	if selectable := c.SelectableStores(); len(selectable) != 16 || selectable[0].Key != "CK" {
-		t.Errorf("selectable stores %d %+v", len(selectable), selectable)
-	}
-	if st, ok := c.Store("GN"); !ok || st.Name != "Game Nerdz" || !containsAll(st.Shorthands, "GN") {
-		t.Errorf("Game Nerdz missing: %+v ok=%v", st, ok)
-	}
-	if abu, ok := c.Store("ABU"); !ok || !containsAll(abu.Shorthands, "ABU", "ABUGames", "ABUScans") {
-		t.Errorf("ABU carries both retail and buylist shorthands: %+v", abu)
-	}
-}
-
-// containsAll reports whether every want is in have.
-func containsAll(have []string, want ...string) bool {
-	for _, w := range want {
-		found := false
-		for _, h := range have {
-			if h == w {
-				found = true
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 func TestMustLoadDoesNotPanic(t *testing.T) {
@@ -80,8 +55,7 @@ const minimal = `{
   "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"], "icon": "globe", "subtitle": "S", "bullets": ["B"]}],
   "addons": [],
   "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
-  "included_games": 1,
-  "stores": [{"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}]
+  "included_games": 1
 }`
 
 // explicit is minimal with a store-picking package, which needs an implied store.
@@ -91,10 +65,7 @@ const explicit = `{
   "addons": [],
   "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
   "included_games": 1,
-  "stores": [
-    {"key": "TCG", "name": "TCGplayer", "implied": true, "shorthands": ["TCGLow"]},
-    {"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}
-  ]
+  "implied": {"key": "tcg", "name": "TCGplayer"}
 }`
 
 func TestParseMinimal(t *testing.T) {
@@ -132,7 +103,6 @@ func TestValidateRejects(t *testing.T) {
 		{"unknown scope", rep(minimal, `"ALL_ACCESS"`, `"DEV_ACCESS"`), "package p: store_scope must be one of"},
 		{"explicit without stores", rep(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": "explicit"`), "included_stores must be at least 1"},
 		{"preset with stores", rep(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": "ALL_ACCESS", "included_stores": 1`), "included_stores applies to an explicit scope only"},
-		{"more included stores than selectable", rep(explicit, `"included_stores": 1`, `"included_stores": 2`), "package p: included_stores 2 exceeds the 1 selectable stores"},
 		{"bad mode", rep(minimal, `["retail"]`, `["all"]`), `package p modes: "all" must be one of`},
 		{"duplicate mode", rep(minimal, `["retail"]`, `["retail", "retail"]`), `package p modes: duplicate "retail"`},
 		{"modes out of order", rep(minimal, `["retail"]`, `["buylist", "retail"]`), "package p modes: must be listed in the order"},
@@ -150,19 +120,12 @@ func TestValidateRejects(t *testing.T) {
 		{"year interval", rep(minimal, `"interval": "month"`, `"interval": "year"`), "interval monthly: interval must be one of [month]"},
 		{"zero count", rep(minimal, `"count": 1`, `"count": 0`), "interval monthly: count must be at least 1"},
 		{"zero included games", rep(minimal, `"included_games": 1`, `"included_games": 0`), "included_games must be at least 1"},
-		{"no stores", rep(minimal, `"stores": [{"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}]`, `"stores": []`), "stores is empty"},
-		{"lowercase store key", rep(minimal, `"key": "CK"`, `"key": "ck"`), `store "ck": key must be uppercase letters and digits`},
-		{"store key with space", rep(minimal, `"key": "CK"`, `"key": "C K"`), `store "C K": key must be uppercase letters and digits`},
-		{"duplicate store", rep(minimal, `"shorthands": ["CK"]}`, `"shorthands": ["CK"]}, {"key": "CK", "name": "Again", "shorthands": ["CK2"]}`), `duplicate store "CK"`},
-		{"store empty name", rep(minimal, `"name": "Card Kingdom"`, `"name": ""`), "store CK: name is empty"},
-		{"store no shorthands", rep(minimal, `"shorthands": ["CK"]`, `"shorthands": []`), "store CK shorthands is empty"},
-		{"shorthand with comma", rep(minimal, `"shorthands": ["CK"]`, `"shorthands": ["CK,SCG"]`), `store CK shorthands: "CK,SCG" must be a shorthand with no comma or whitespace`},
-		{"shorthand with space", rep(minimal, `"shorthands": ["CK"]`, `"shorthands": ["C K"]`), `store CK shorthands: "C K" must be a shorthand with no comma or whitespace`},
-		{"duplicate shorthand", rep(minimal, `"shorthands": ["CK"]`, `"shorthands": ["CK", "CK"]`), `store CK shorthands: duplicate "CK"`},
-		{"shorthand in two stores", rep(minimal, `"shorthands": ["CK"]}`, `"shorthands": ["CK"]}, {"key": "SCG", "name": "SCG", "shorthands": ["CK"]}`), `shorthand "CK" belongs to both CK and SCG`},
-		{"explicit without implied store", rep(explicit, `"implied": true, `, ``), "an explicit package needs an implied store"},
-		{"explicit without selectable store", rep(explicit, `,
-    {"key": "CK", "name": "Card Kingdom", "shorthands": ["CK"]}`, ``), "an explicit package needs a selectable store"},
+		{"explicit without implied store", rep(explicit, `,
+  "implied": {"key": "tcg", "name": "TCGplayer"}`, ``), "an explicit package needs an implied store"},
+		{"explicit with empty implied key", rep(explicit, `"key": "tcg"`, `"key": ""`), "an explicit package needs an implied store"},
+		{"uppercase implied key", rep(explicit, `"key": "tcg"`, `"key": "TCG"`), `implied key "TCG" must be lowercase letters and digits`},
+		{"implied key with underscore", rep(explicit, `"key": "tcg"`, `"key": "tcg_index"`), `implied key "tcg_index" must be lowercase letters and digits`},
+		{"implied without name", rep(explicit, `"name": "TCGplayer"`, `"name": ""`), "implied tcg: name is empty"},
 	}
 	for _, c := range cases {
 		_, err := Parse([]byte(c.json))
@@ -184,7 +147,6 @@ func TestValidateRejectsLookupKeyCollision(t *testing.T) {
 			{Key: "b_monthly", Interval: "month", Count: 1},
 		},
 		IncludedGames: 1,
-		Stores:        []Store{{Key: "CK", Name: "Card Kingdom", Shorthands: []string{"CK"}}},
 	}
 	err := c.Validate()
 	if err == nil || !strings.Contains(err.Error(), `lookup key "a_b_monthly" is produced by more than one`) {
@@ -223,17 +185,6 @@ func TestLookups(t *testing.T) {
 	}
 	if pub := c.PublicIntervals(); len(pub) != 1 || pub[0].Key != "monthly" {
 		t.Errorf("public intervals %+v", pub)
-	}
-	if s, ok := c.Store("MKM"); !ok || s.Implied || s.Name != "Cardmarket" {
-		t.Errorf("store lookup %+v %v", s, ok)
-	}
-	if _, ok := c.Store("mkm"); ok {
-		t.Error("store keys are exact; lowercase matched")
-	}
-	for _, s := range c.SelectableStores() {
-		if s.Implied {
-			t.Errorf("selectable list holds implied store %s", s.Key)
-		}
 	}
 }
 
