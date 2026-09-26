@@ -489,3 +489,8 @@
     border-radius: var(--card-radius, 12px);
     display: block;
 }
+
+.sleep-card-wrap.foil-wrap[data-foil="true"]::after,
+.sleep-card-wrap.foil-wrap[data-etched="true"]::after {
+    border-radius: var(--card-radius, 12px);
+}
