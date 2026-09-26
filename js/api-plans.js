@@ -82,6 +82,13 @@
             games: checkedGames
         });
         if (!total) return;
+        var name = document.getElementById('api-total-package');
+        if (name && pkg) name.textContent = pkg.name;
+        var ctas = form.querySelectorAll('.api-cta');
+        for (var c = 0; c < ctas.length; c++) {
+            var mine = pkg && ctas[c].getAttribute('data-package') === pkg.key;
+            ctas[c].textContent = ctas[c].getAttribute(mine ? 'data-selected' : 'data-label');
+        }
         document.getElementById('api-total').textContent = formatUSD(total.cents);
         document.getElementById('api-total-period').textContent = total.count === 1 ? '/month' : '/' + total.count + ' months';
     }
@@ -103,6 +110,19 @@
                 if (boxes[i].disabled) continue;
                 boxes[i].checked = wanted.indexOf(boxes[i].value) !== -1;
             }
+        });
+    }
+
+    // The card's button picks the package and brings the rest of the form into view.
+    var ctas = form.querySelectorAll('.api-cta');
+    for (var b = 0; b < ctas.length; b++) {
+        ctas[b].addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            var radio = form.querySelector('input[name="package"][value="' + this.getAttribute('data-package') + '"]');
+            if (radio) radio.checked = true;
+            update();
+            var target = document.getElementById('api-configure');
+            if (target && target.scrollIntoView) target.scrollIntoView({behavior: 'smooth', block: 'start'});
         });
     }
 

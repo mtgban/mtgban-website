@@ -337,8 +337,7 @@ var funcMap = template.FuncMap{
 	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
 	"api_plans_json":            apiPlansJSON,
-	"addon_scope":               addonScope,
-	"scope_bullets":             scopeBullets,
+	"plan_icon":                 planIcon,
 	"usage_path_url":            observability.PathURL,
 	"dict": func(values ...any) (map[string]any, error) {
 		if len(values)%2 != 0 {
