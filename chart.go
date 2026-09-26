@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -275,40 +276,43 @@ func buildProviderRegistry() {
 // fetchChartPrices reads one resolved target's series: by exact ban_id when the
 // target has one, else the Magic canonical (uuid, foil, etched) path.
 //
+// An empty series is the archive answering that it holds nothing in the
+// window. An error is a read that got no answer, which is not an empty chart.
+//
 // This is the only read the chart path makes. The axis used to come from a
 // second query asking the archive for the card's oldest date, which cost a
 // round-trip to learn something the rows themselves say - and against a
 // hundred-partition prices table a round-trip is mostly planning, not data.
-func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lookback) map[string]timeseries.ProviderPrices {
+func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lookback) (map[string]timeseries.ProviderPrices, error) {
 	if PricesArchiveDB == nil {
-		return nil
+		return nil, errors.New("chart: no price archive")
 	}
 	if target.BanID != 0 {
 		results, err := PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
 		if err != nil {
 			log.Printf("chart: ban_id %d (%s): %v", target.BanID, target.Name, err)
-			return nil
+			return nil, err
 		}
-		return results
+		return results, nil
 	}
 
 	// No ban_id and no uuid to fall back on means this printing has no identity
 	// the archive can be asked about - a non-Magic finish the product carries no
-	// sub-type for, most often. Asking anyway is not an empty chart, it is a
-	// type error the caller cannot tell apart from one.
+	// sub-type for, most often. Asking anyway would fail as a type error and
+	// read as an outage, where there is simply nothing to chart.
 	if !hasCanonicalIdentity(target) {
 		log.Printf("chart: %q (%s) resolved to no ban_id and is not an mtgjson uuid, so the archive has no identity to look it up by",
 			target.UUID, target.Name)
-		return nil
+		return nil, nil
 	}
 
 	results, err := PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
 	if err != nil {
 		log.Printf("chart: uuid %s foil=%t etched=%t (%s): %v",
 			target.UUID, target.Foil, target.Etched, target.Name, err)
-		return nil
+		return nil, err
 	}
-	return results
+	return results, nil
 }
 
 // chartRosterConcurrency caps how many of a roster's cards are read at once.
@@ -323,6 +327,9 @@ type chartSeries struct {
 	CardID string
 	Name   string
 	Prices map[string]timeseries.ProviderPrices
+	// Err is set when the archive did not answer for this card, which is not
+	// the same as answering that it holds nothing.
+	Err error
 
 	// target is what the archive is asked about. Set by the caller when it
 	// resolves the roster; nil entries are dropped before the fetch.
@@ -345,7 +352,7 @@ func fetchRosterPrices(ctx context.Context, targets []chartSeries, lb timeseries
 		wg.Go(func() {
 			slots <- struct{}{}
 			defer func() { <-slots }()
-			out[i].Prices = fetchChartPrices(ctx, out[i].target, lb)
+			out[i].Prices, out[i].Err = fetchChartPrices(ctx, out[i].target, lb)
 		})
 	}
 	wg.Wait()
