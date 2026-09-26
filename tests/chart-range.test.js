@@ -49,8 +49,9 @@ test('a wider range fetches the whole entitlement, once', async () => {
     const { api, calls } = loadRange({ payload });
     const { loader, installed, busy } = newLoader(api, {});
 
-    await new Promise((done) => loader.ensure(730, done));
+    const failure = await new Promise((done) => loader.ensure(730, done));
 
+    expect(failure).toBeNull();
     expect(calls).toEqual(['/api/chart/ban%3A1?range=3650']);
     expect(installed).toEqual([payload]);
     expect(busy).toEqual([true, false]);
@@ -73,13 +74,15 @@ test('the All option asks for the ceiling, not for everything', () => {
 });
 
 // A chart that cannot widen is a shorter chart, not a broken one, and the
-// failure must not be remembered as success or the retry never happens.
-test('a failed fetch still draws, and can be retried', async () => {
+// failure must not be remembered as success or the retry never happens. The
+// callback is told, so the page can say the wider range did not load.
+test('a failed fetch still draws, says so, and can be retried', async () => {
     const { api, calls } = loadRange({ fail: true });
     const { loader, installed, busy } = newLoader(api, {});
 
-    await new Promise((done) => loader.ensure(730, done));
+    const failure = await new Promise((done) => loader.ensure(730, done));
 
+    expect(failure).toBeInstanceOf(Error);
     expect(installed).toEqual([]);
     expect(busy).toEqual([true, false]);
     expect(loader.loadedDays).toBe(180);

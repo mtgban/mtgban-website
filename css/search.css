@@ -1724,6 +1724,13 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 }
 .chart-controls select:hover { border-color: var(--accent-border, var(--ainfo)); }
 .chart-controls select:focus { border-color: var(--ainfo); }
+/* Its own line under the controls, so showing it moves none of the buttons. */
+.chart-range-failed {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--adanger);
+    font-size: var(--text-lg);
+}
 .chart-pill {
     display: inline-block;
     padding: 4px 12px;

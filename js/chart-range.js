@@ -29,8 +29,9 @@ ChartRangeLoader.prototype.want = function(rangeDays) {
 // is already true it calls back synchronously, so the common case - narrowing,
 // or picking a range inside what was rendered - does no work at all.
 //
-// A failed fetch still calls back: the chart keeps the window it has and draws
-// that, which is a shorter chart rather than a broken one.
+// A failed fetch still calls back, with the error: the chart keeps the window
+// it has, which is a shorter chart rather than a broken one, and the page can
+// say the wider one did not load.
 ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
     var want = this.want(rangeDays);
     if (want <= this.loadedDays) {
@@ -51,6 +52,7 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
     this.inflight = ask;
     this.onBusy(true);
 
+    var failure = null;
     fetch('/api/chart/' + encodeURIComponent(this.ids) + '?range=' + ask)
         .then(function(r) {
             if (!r.ok) throw new Error('chart range ' + r.status);
@@ -70,6 +72,7 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
         })
         .catch(function(err) {
             // Leave loadedDays alone so a later attempt can retry.
+            failure = err;
             if (typeof console !== 'undefined') console.warn(err);
         })
         .then(function() {
@@ -77,7 +80,7 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
             self.onBusy(false);
             var pending = self.waiting;
             self.waiting = [];
-            pending.forEach(function(fn) { fn(); });
+            pending.forEach(function(fn) { fn(failure); });
         });
 };
 

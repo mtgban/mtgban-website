@@ -763,6 +763,7 @@
                                     <span class="btn default chart-add-btn chart-add-full" title="Charts hold up to {{.MaxChartCards}} cards - remove one to add another">&#10133; Add card</span>
                                     {{end}}
                                 </p>
+                                <p class="chart-range-failed" id="chartRangeFailed" hidden>Failed to load more history. Pick the range again to retry.</p>
                                 {{/* A chart that can widen may gain checkpoints it has
                                      none of in the window rendered here, so the toggles
                                      exist from the start and installCheckpoints shows
@@ -1148,20 +1149,30 @@
                                 cardChart.update();
                             }
 
+                            // drawRange draws a range once the loader holds it. A widening that
+                            // failed leaves the chart what it had, so it draws all of that, sets
+                            // the select to it, where picking the range again retries, and says so.
+                            function drawRange(rangeDays) {
+                                return function(err) {
+                                    document.getElementById('chartRangeFailed').hidden = !err;
+                                    if (err) {
+                                        rangeDays = chartRange.loadedDays;
+                                        document.getElementById('dateRange').value = String(rangeDays);
+                                    }
+                                    applyRangeWindow(rangeDays);
+                                };
+                            }
+
                             function changeRange(rangeDays) {
                                 rememberRange(rangeDays);
-                                chartRange.ensure(rangeDays, function() {
-                                    applyRangeWindow(rangeDays);
-                                });
+                                chartRange.ensure(rangeDays, drawRange(rangeDays));
                             }
 
                             // The select can start on a range wider than the page rendered -
                             // a saved preference, or a roster, which defaults to the whole
                             // span. Fill it in now so the chart matches what the control says.
                             if (chartRange.want(initialRange) > chartLoadedDays) {
-                                chartRange.ensure(initialRange, function() {
-                                    applyRangeWindow(initialRange);
-                                });
+                                chartRange.ensure(initialRange, drawRange(initialRange));
                             }
                             function toggleGaps() {
                                 cardChart.options.spanGaps = !cardChart.options.spanGaps;
