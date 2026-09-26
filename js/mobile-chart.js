@@ -4,6 +4,9 @@
     var currentCardId = null;
     var currentMaxLoaded = 0;
     var prefetchPromise = null;
+    // The ceiling's answer, fetched ahead and kept off the chart until a range
+    // past what it draws is picked.
+    var prefetched = null;
     var libsLoaded = false;
     var libsLoading = false;
 
@@ -86,23 +89,30 @@
             .then(function(data) {
                 if (currentCardId !== cardId || !currentChart) return;
                 if (!data || !data.datasets) return;
-                currentChart.data.labels = data.axisLabels;
-                data.datasets.forEach(function(ds, i) {
-                    if (currentChart.data.datasets[i]) {
-                        currentChart.data.datasets[i].data = ds.data.map(function(v) {
-                            var n = parseFloat(v);
-                            return isNaN(n) ? null : n;
-                        });
-                    }
-                });
-                currentChart.update('none');
-                currentMaxLoaded = fullRange;
+                // Drawing it now would widen the chart past the range the
+                // select still names.
+                prefetched = { data: data, days: fullRange };
             })
             .catch(function(err) {
                 console.error('chart prefetch failed', err);
                 prefetchPromise = null;
             });
         return prefetchPromise;
+    }
+
+    function installPrefetched() {
+        if (!prefetched || !currentChart) return;
+        currentChart.data.labels = prefetched.data.axisLabels;
+        prefetched.data.datasets.forEach(function(ds, i) {
+            if (currentChart.data.datasets[i]) {
+                currentChart.data.datasets[i].data = ds.data.map(function(v) {
+                    var n = parseFloat(v);
+                    return isNaN(n) ? null : n;
+                });
+            }
+        });
+        currentMaxLoaded = prefetched.days;
+        prefetched = null;
     }
 
     function loadChartLibs(callback) {
@@ -357,6 +367,7 @@
         currentCardId = cardId;
         currentMaxLoaded = 0;
         prefetchPromise = null;
+        prefetched = null;
 
         var initialRange = pickInitialRange();
         setRangePickerValue(initialRange);
@@ -449,6 +460,7 @@
 
         p.then(function() {
             if (currentCardId !== cardId) return;
+            installPrefetched();
             applyRangeFilter(range);
         }).catch(function() {
             // Swallow - the catch in prefetchFullRange already logged.
