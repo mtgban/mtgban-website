@@ -808,6 +808,9 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 // sub-type, and that name comes from the tcgcsv catalog — inventing one here
 // would file a second, permanently empty variant beside the real one. The next
 // snapshot after that ingest picks the card up.
+//
+// The TCGplayer series are left out when the tcgcsv ingest already covers this
+// game; see tcgcsvOwnedProviders.
 func stashNonMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start time.Time) {
 	// Every ban_id below is resolved from this cache, so a cold one is not a
 	// slow snapshot, it is an empty one.
@@ -817,10 +820,7 @@ func stashNonMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start t
 		return
 	}
 
-	var snapshot nonMagicSnapshot
-	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
-		snapshot.add(cachedBanIDForCard(card), config, date, price)
-	})
+	snapshot := collectNonMagicSnapshot(b, start, cachedBanIDForCard)
 
 	// UpsertLongPrices dedupes on (ban_id, date, provider) keeping the last
 	// write, which is the same last-wins the wide path gets from overwriting a
@@ -843,26 +843,108 @@ func stashNonMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start t
 	backgroundJobs.Report(jobStash, fmt.Sprintf("%d rows written", upserted), problem)
 }
 
+// tcgcsvOwnedProviders are the provider ids the tcgcsv ingest writes from
+// tcgcsv.com's own daily price file. A deployment that scrapes TCGplayer
+// directly produces the first two as well, and both writers key on
+// (ban_id, date, provider) against a DO UPDATE upsert — so the series a chart
+// drew was whichever of the two jobs happened to run second that day.
+//
+// The ingest keeps them. It reads every product and sub-type in the category,
+// where the snapshot reaches only the cards the site's scraper loaded, so
+// handing the ids to the narrower writer would trade coverage for nothing.
+//
+// What that leans on is the ingest writing the long form, which is implied for a
+// non-Magic game rather than flagged (longFormWrites, and the same reading in
+// cmd/tcgcsvd for a deployment that runs the job out of process). An ingest
+// writing only the legacy wide table would leave these series with no writer at
+// all.
+var tcgcsvOwnedProviders = []int16{
+	timeseries.ProviderTCGLow,
+	timeseries.ProviderTCGMarket,
+	timeseries.ProviderTCGMid,
+	timeseries.ProviderTCGHigh,
+	timeseries.ProviderTCGDirectLow,
+}
+
+// tcgcsvOwnsTCGSeries reports whether the tcgcsv ingest covers this
+// deployment's own game. The cron that runs it is registered off the same
+// config section, so a game listed there is one whose TCGplayer prices arrive
+// without the snapshot's help. A deployment carrying no tcgcsv_config at all
+// keeps writing them itself, since nothing else would.
+func tcgcsvOwnsTCGSeries() bool {
+	if Config().TCGCSVConfig == nil {
+		return false
+	}
+	id := GetTCGCategoryID()
+	if id == 0 {
+		// A snapshot can fire before the catalog is in: the boot goroutine
+		// publishes the scrapers first and loads the catalog after them, so a
+		// process that restarted shortly before the 12h cron is serving prices
+		// while it still cannot name its own category. Both answers are a guess
+		// there and this is the cheap one — the day's TCGplayer rows arrive from
+		// the ingest anyway, where writing them here would overwrite its
+		// whole-category pass with the subset this scraper loaded.
+		return true
+	}
+	for _, game := range Config().TCGCSVConfig.Games {
+		if game.CategoryID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// collectNonMagicSnapshot walks the served scrapers and accumulates every price
+// it can key on a ban_id. The resolver is a parameter so the whole path from a
+// served scraper to a long price row is exercisable without a warmed variant
+// cache behind it; the one caller passes cachedBanIDForCard.
+func collectNonMagicSnapshot(b *mtgmatcher.Backend, start time.Time, banIDFor func(*mtgmatcher.CardObject) int64) nonMagicSnapshot {
+	snapshot := newNonMagicSnapshot()
+	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
+		snapshot.add(banIDFor(card), config, date, price)
+	})
+	return snapshot
+}
+
+// newNonMagicSnapshot builds the accumulator for one snapshot, declining up
+// front whichever providers another writer owns.
+func newNonMagicSnapshot() nonMagicSnapshot {
+	var s nonMagicSnapshot
+	if tcgcsvOwnsTCGSeries() {
+		s.tcgcsvOwns = tcgcsvOwnedProviders
+	}
+	return s
+}
+
 // nonMagicSnapshot accumulates a non-Magic snapshot's long price rows, along
 // with the two reasons a scraped price can fail to become one.
 type nonMagicSnapshot struct {
 	Rows []timeseries.LongPrice
 
+	// tcgcsvOwns are the provider ids to leave to the tcgcsv ingest, empty when
+	// it does not cover this game.
+	tcgcsvOwns []int16
+
 	// NoProvider counts prices whose dataset names no provider id; NoVariant
 	// those whose card has no variant row to key on. They are separate faults —
 	// a config mistake against a product the tcgcsv ingest has not reached —
-	// and a snapshot that quietly reported one total could not tell an operator
-	// which one to go fix.
-	NoProvider, NoVariant int
+	// and a snapshot reporting one total could not tell an operator which one to
+	// go fix. TCGCSVOwned is not a fault at all, only how much of the walk
+	// another writer already covers.
+	NoProvider, NoVariant, TCGCSVOwned int
 }
 
 // add records one scraped price against the ban_id resolved for its card, or
-// counts why it could not be stored. A zero banID means no variant.
+// counts why it was not stored. A zero banID means no variant.
 func (s *nonMagicSnapshot) add(banID int64, config DatasetConfig, date string, price float64) {
 	if config.Provider == 0 {
 		// buildProviderRegistry already named this dataset at startup; the
 		// count is how much of the snapshot the omission cost.
 		s.NoProvider++
+		return
+	}
+	if slices.Contains(s.tcgcsvOwns, config.Provider) {
+		s.TCGCSVOwned++
 		return
 	}
 	if banID == 0 {
@@ -882,6 +964,9 @@ func (s *nonMagicSnapshot) skipped() string {
 	}
 	if s.NoProvider > 0 {
 		out += fmt.Sprintf(", %d skipped with no provider id", s.NoProvider)
+	}
+	if s.TCGCSVOwned > 0 {
+		out += fmt.Sprintf(", %d left to the tcgcsv ingest", s.TCGCSVOwned)
 	}
 	return out
 }
