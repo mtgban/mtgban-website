@@ -633,13 +633,14 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	// and aggregate the rows. Full dumps keep the direct scan below - they
 	// have no filter to resolve, and aggregating in place costs orders of
 	// magnitude less than materializing rows for the whole pool.
+	//
+	// apiSearchConfig builds hashing mode with no query, where searchAndFilter
+	// only filters the uuids it is handed; filterUUIDs does that directly,
+	// without the datastore snapshot searchAndFilter reads.
 	if filterByEdition != "" || filterByHash != nil {
 		uuids := resolveEditionFilter(filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(uuids, enabledStores, filterByFinish, sealed)
-		cardIDs, err := searchAndFilter(config)
-		if err != nil {
-			return out
-		}
+		cardIDs := filterUUIDs(config.UUIDs, config.CardFilters)
 		return banPricesFromRows(cardIDs, searchSellersNG(cardIDs, config), mode, tagName, qty, conds, false)
 	}
 
@@ -850,14 +851,12 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering, exactly
-	// like getSellerPrices
+	// like getSellerPrices (see its comment for why filterUUIDs stands in
+	// for searchAndFilter here).
 	if filterByEdition != "" || filterByHash != nil {
 		uuids := resolveEditionFilter(filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(uuids, enabledStores, filterByFinish, sealed)
-		cardIDs, err := searchAndFilter(config)
-		if err != nil {
-			return out
-		}
+		cardIDs := filterUUIDs(config.UUIDs, config.CardFilters)
 		return banPricesFromRows(cardIDs, searchVendorsNG(cardIDs, config), mode, tagName, qty, conds, true)
 	}
 
