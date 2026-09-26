@@ -20,7 +20,6 @@ var Sessions = sessionstore.New(sessionHooks())
 
 func sessionHooks() sessionstore.Hooks {
 	return sessionstore.Hooks{
-		Backend:      backend,
 		Sellers:      GetSellers,
 		Vendors:      GetVendors,
 		IsConfigured: isConfiguredScraper,

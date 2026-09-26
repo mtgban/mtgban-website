@@ -863,25 +863,28 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 
 // offlineService wires the offline API endpoints to the live scraper state.
 var offlineService = offlineapi.NewService(offlineapi.Deps{
-	Backend: backend,
-	Allow:   offlineModeAllowed,
+	Datastore: func() (*mtgmatcher.Backend, time.Time) {
+		ds := currentDatastore()
+		return ds.backend, ds.loadedAt
+	},
+	Allow: offlineModeAllowed,
 
-	CanonicalSetCode: func(setCode string) (string, error) {
-		set, err := backend().GetSet(setCode)
+	CanonicalSetCode: func(b *mtgmatcher.Backend, setCode string) (string, error) {
+		set, err := b.GetSet(setCode)
 		if err != nil {
 			return "", err
 		}
 		return set.Code, nil
 	},
 
-	BuildSetPayload: func(setCode string, stores []string) (*offline.SetPayload, error) {
-		set, err := backend().GetSet(setCode)
+	BuildSetPayload: func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error) {
+		set, err := b.GetSet(setCode)
 		if err != nil {
 			return nil, err
 		}
-		retail := getSellerPrices(backend(), "", stores, set.Code, nil, "", true, true, false, "")
-		buylist := getVendorPrices(backend(), "", stores, set.Code, nil, "", true, true, false, "")
-		for id, m := range getSellerPrices(backend(), "", stores, set.Code, nil, "", true, true, true, "") {
+		retail := getSellerPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
+		buylist := getVendorPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
+		for id, m := range getSellerPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
 			if retail[id] == nil {
 				retail[id] = m
 				continue
@@ -890,7 +893,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 				retail[id][store] = entry
 			}
 		}
-		for id, m := range getVendorPrices(backend(), "", stores, set.Code, nil, "", true, true, true, "") {
+		for id, m := range getVendorPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
 			if buylist[id] == nil {
 				buylist[id] = m
 				continue
@@ -925,9 +928,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	ScraperName:       scraperName,
 	CardObjectSources: cardobject2sources,
 	FinishNames:       finishNames,
-	Finishes:          func() []palette.Finish { return paletteService.FinishList(backend()) },
-
-	LastDatastoreUpdate: GetLastDatastoreUpdate,
+	Finishes:          paletteService.FinishList,
 
 	ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		omPath := Config.Offline.ManifestPath

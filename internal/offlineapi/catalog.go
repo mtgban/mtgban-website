@@ -127,10 +127,9 @@ type catalogFragments struct {
 	nSets    int
 }
 
-// buildCatalogFragments marshals the cards and sets of the current
-// datastore. Returns nil when the datastore holds no cards.
-func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, error) {
-	backend := s.backend()
+// buildCatalogFragments marshals the cards and sets of backend, keyed on
+// source. Returns nil when the datastore holds no cards.
+func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time.Time) (*catalogFragments, error) {
 	cards := map[string]catalogCard{}
 	magic := s.magicImageKeys()
 	addCard := func(uuid string) {
@@ -181,7 +180,7 @@ func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, er
 
 	finishes := []palette.Finish{}
 	if s.deps.Finishes != nil {
-		finishes = s.deps.Finishes()
+		finishes = s.deps.Finishes(backend)
 	}
 
 	rawCards, err := json.Marshal(cards)
@@ -207,18 +206,13 @@ func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, er
 	}, nil
 }
 
-// refreshCatalog rebuilds the gzipped catalog document from the current
-// mtgmatcher datastore and scraper list. Only the store list is rebuilt
-// per call: the cards and sets are reused until the datastore is replaced.
-func (s *Service) refreshCatalog() {
-	source := time.Time{}
-	if s.deps.LastDatastoreUpdate != nil {
-		source = s.deps.LastDatastoreUpdate()
-	}
-
+// refreshCatalog rebuilds the gzipped catalog document from backend and
+// scraper list. Only the store list is rebuilt per call: the cards and sets
+// are reused until source no longer matches the cached fragments.
+func (s *Service) refreshCatalog(backend *mtgmatcher.Backend, source time.Time) {
 	frags := s.fragments
 	if frags == nil || !frags.source.Equal(source) {
-		next, err := s.buildCatalogFragments(source)
+		next, err := s.buildCatalogFragments(backend, source)
 		if err != nil {
 			log.Println("offline: catalog marshal failed:", err)
 			return

@@ -16,8 +16,9 @@ func TestUploadSealedCSV(t *testing.T) {
 		t.Skip("mtgmatcher data not loaded; skipping")
 	}
 
+	parser := newUploadParser(backend())
 	header := []string{"Key", "Name", "Edition", "Finish", "Number", "Rarity", "Conditions", "Price", "Quantity", "URL", "Seller", "Bundle", "Original Id", "Instance Id"}
-	indexMap, err := uploadParser.ParseHeader(header)
+	indexMap, err := parser.ParseHeader(header)
 	if err != nil {
 		t.Fatalf("ParseHeader: %v", err)
 	}
@@ -37,7 +38,7 @@ func TestUploadSealedCSV(t *testing.T) {
 			t.Logf("uuid %s not in local datastore, skipping id check", row[0])
 			continue
 		}
-		res, err := uploadParser.ParseRow(indexMap, append([]string{}, row...))
+		res, err := parser.ParseRow(indexMap, append([]string{}, row...))
 		if err != nil {
 			t.Fatalf("ParseRow(%s): %v", row[1], err)
 		}
@@ -53,7 +54,7 @@ func TestUploadSealedCSV(t *testing.T) {
 	for _, row := range rows {
 		nameOnly := append([]string{}, row...)
 		nameOnly[0] = ""
-		res, err := uploadParser.ParseRow(indexMap, nameOnly)
+		res, err := parser.ParseRow(indexMap, nameOnly)
 		if err != nil {
 			t.Fatalf("ParseRow(%s): %v", row[1], err)
 		}
@@ -83,7 +84,7 @@ func TestResolveMoxItemPrinting(t *testing.T) {
 
 	check := func(item moxfield.Item, wantNumber string, wantFoil bool) string {
 		t.Helper()
-		cardID, err := resolveMoxItem(item)
+		cardID, err := resolveMoxItem(backend(), item)
 		if err != nil {
 			t.Fatalf("resolve %+v: %s", item, err)
 		}
@@ -109,7 +110,7 @@ func TestResolveMoxItemPrinting(t *testing.T) {
 	}
 
 	// Unknown printings surface a mismatch error instead of a silent match
-	if _, err := resolveMoxItem(moxfield.Item{Name: "Island", SetCode: "unf", Number: "9999"}); err == nil {
+	if _, err := resolveMoxItem(backend(), moxfield.Item{Name: "Island", SetCode: "unf", Number: "9999"}); err == nil {
 		t.Error("unknown collector number should error")
 	}
 }

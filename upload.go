@@ -82,19 +82,23 @@ var ErrReloadFirstRow = docparse.ErrReloadFirstRow
 // Data coming from the user upload
 type UploadEntry = docparse.Entry
 
-// uploadParser matches uploaded rows, wired to the site's logger, the
-// TCGplayer SKU index, and the set-recency ordering for alias candidates.
-var uploadParser = &docparse.Parser{
-	Backend: backend,
-	Logf: func(format string, v ...any) {
-		if logger := LogPages["Upload"]; logger != nil {
-			logger.Printf(format, v...)
-		}
-	},
-	TCGSkuToUUID:      tcgSKU2UUID,
-	TCGSkuToCondition: tcgSKU2Condition,
-	MKMIDToUUID:       mkmIDs.Resolve,
-	PreferredPrinting: func(x, y string) bool { return sortSets(backend(), x, y) },
+// newUploadParser builds a parser bound to b, wired to the site's logger,
+// the TCGplayer SKU index, and the set-recency ordering for alias
+// candidates. Built once per upload, so every row matches against the same
+// datastore.
+func newUploadParser(b *mtgmatcher.Backend) *docparse.Parser {
+	return &docparse.Parser{
+		Backend: b,
+		Logf: func(format string, v ...any) {
+			if logger := LogPages["Upload"]; logger != nil {
+				logger.Printf(format, v...)
+			}
+		},
+		TCGSkuToUUID:      tcgSKU2UUID,
+		TCGSkuToCondition: tcgSKU2Condition,
+		MKMIDToUUID:       mkmIDs.Resolve,
+		PreferredPrinting: func(x, y string) bool { return sortSets(b, x, y) },
+	}
 }
 
 // unpackedTally accumulates one opened product's numbers as the results loop
@@ -766,6 +770,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		maxRows = MaxUploadTotalEntries
 	}
 	start := time.Now()
+	parser := newUploadParser(b)
 
 	// Load data
 	var uploadedData []UploadEntry
@@ -775,14 +780,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			hashesNotes, hashesFrom, hashesFromQtys)
 		uploadedData = restoreOpenedProducts(uploadedData)
 	} else if textArea != "" {
-		uploadedData, err = loadCsv(strings.NewReader(textArea), ',', maxRows)
+		uploadedData, err = loadCsv(parser, strings.NewReader(textArea), ',', maxRows)
 	} else if handler != nil {
 		if strings.HasSuffix(handler.Filename, ".xls") {
-			uploadedData, err = loadOldXls(file, maxRows)
+			uploadedData, err = loadOldXls(parser, file, maxRows)
 		} else if strings.HasSuffix(handler.Filename, ".xlsx") {
-			uploadedData, err = loadXlsx(file, maxRows)
+			uploadedData, err = loadXlsx(parser, file, maxRows)
 		} else {
-			uploadedData, err = loadCsv(file, ',', maxRows)
+			uploadedData, err = loadCsv(parser, file, ',', maxRows)
 		}
 	} else if gdocURL != "" {
 		var u *url.URL
@@ -790,15 +795,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			switch u.Host {
 			case "store.tcgplayer.com":
-				uploadedData, uploadName, err = loadCollection(r.Context(), gdocURL, maxRows)
+				uploadedData, uploadName, err = loadCollection(r.Context(), parser, gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
-				uploadedData, uploadName, err = loadMoxfield(r.Context(), u.Path, maxRows)
+				uploadedData, uploadName, err = loadMoxfield(r.Context(), b, u.Path, maxRows)
 			case "manabox.app", "www.manabox.app":
-				uploadedData, uploadName, err = loadManabox(r.Context(), gdocURL, maxRows)
+				uploadedData, uploadName, err = loadManabox(r.Context(), b, gdocURL, maxRows)
 			case "app.getcollectr.com":
-				uploadedData, uploadName, err = loadCollectr(r.Context(), gdocURL, maxRows)
+				uploadedData, uploadName, err = loadCollectr(r.Context(), b, gdocURL, maxRows)
 			case "docs.google.com":
-				uploadedData, uploadName, err = loadSpreadsheet(u.Path, maxRows)
+				uploadedData, uploadName, err = loadSpreadsheet(parser, u.Path, maxRows)
 			default:
 				err = errors.New("unsupported URL")
 			}
@@ -842,7 +847,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		info := sessionstore.InfoFromForm(r)
 
-		report, err := Sessions.Publish(kind, info, uploadedData)
+		report, err := Sessions.Publish(b, kind, info, uploadedData)
 		if err != nil {
 			pageVars.WarningMessage = "store not published: " + err.Error()
 			render(w, "upload.html", pageVars)
@@ -1986,7 +1991,7 @@ func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]U
 	return uploadEntries, nil
 }
 
-func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadMoxfield(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	var uploadEntries []UploadEntry
 
 	deckID := path.Base(link)
@@ -2015,7 +2020,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	}
 
 	for _, item := range items {
-		cardID, err := resolveMoxItem(item)
+		cardID, err := resolveMoxItem(b, item)
 		entry := UploadEntry{
 			HasQuantity:       true,
 			Quantity:          item.Quantity,
@@ -2030,7 +2035,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	return uploadEntries, deckName, nil
 }
 
-func loadManabox(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadManabox(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	items, deckName, err := manabox.Load(ctx, link, maxRows)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to fetch ManaBox deck: %w", err)
@@ -2038,7 +2043,7 @@ func loadManabox(ctx context.Context, link string, maxRows int) ([]UploadEntry, 
 
 	var uploadEntries []UploadEntry
 	for _, item := range items {
-		cardID, err := backend().MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		cardID, err := b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
 		entry := UploadEntry{
 			Card: mtgmatcher.InputCard{
 				Name: item.Name,
@@ -2058,7 +2063,7 @@ func loadManabox(ctx context.Context, link string, maxRows int) ([]UploadEntry, 
 // loadCollectr fetches a public Collectr showcase (through the configured
 // proxy, which carries a browser TLS fingerprint - direct fetches from
 // datacenter IPs get blocked by Cloudflare) and matches its products.
-func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	proxyBase := Config.Uploader["collectr"]
 	if proxyBase == "" {
 		return nil, "", errors.New("no Collectr proxy is configured")
@@ -2075,19 +2080,19 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 		var matchErr error
 
 		// Try matching via TCGplayer product ID first
-		uuid := backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, item.ProductID)
+		uuid := b.ConvertID(mtgmatcher.IDSpaceTCGplayer, item.ProductID)
 		if uuid != "" {
-			cardID, matchErr = backend().MatchID(uuid, item.IsFoil)
+			cardID, matchErr = b.MatchID(uuid, item.IsFoil)
 		}
 
 		// Fall back to name-based matching
 		if cardID == "" {
 			if item.IsSealed {
 				// Search sealed products by name
-				results, err := backend().SearchSealedEquals(item.Name)
+				results, err := b.SearchSealedEquals(item.Name)
 				if err != nil {
 					// Try a looser search
-					results, err = backend().SearchSealedContains(item.Name)
+					results, err = b.SearchSealedContains(item.Name)
 				}
 				if err != nil {
 					matchErr = err
@@ -2101,7 +2106,7 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 					Variation: item.Number,
 					Foil:      item.IsFoil,
 				}
-				cardID, matchErr = backend().Match(&card)
+				cardID, matchErr = b.Match(&card)
 			}
 		}
 
@@ -2130,19 +2135,19 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 // scryfall id; deck per-copy printings carry name plus set and collector
 // number instead, resolved through the set catalog with the finish applied
 // on top.
-func resolveMoxItem(item moxfield.Item) (string, error) {
+func resolveMoxItem(b *mtgmatcher.Backend, item moxfield.Item) (string, error) {
 	if item.ScryfallID != "" {
-		return backend().MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
+		return b.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
 	}
 
-	printings := backend().MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
+	printings := b.MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
 	if len(printings) == 0 {
 		return "", fmt.Errorf("unknown printing %s (%s) %s", item.Name, item.SetCode, item.Number)
 	}
-	return backend().MatchID(printings[0].UUID, item.IsFoil, item.IsEtched)
+	return b.MatchID(printings[0].UUID, item.IsFoil, item.IsEtched)
 }
 
-func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+func loadCollection(ctx context.Context, parser *docparse.Parser, link string, maxRows int) ([]UploadEntry, string, error) {
 	// Re-validate the URL locally rather than trusting the caller's host
 	// switch: parse it here and require the exact TCGplayer store host so
 	// the request target can't be pointed at an arbitrary (e.g. internal)
@@ -2184,7 +2189,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		header = append(header, s.Text())
 	})
 
-	indexMap, err := uploadParser.ParseHeader(header)
+	indexMap, err := parser.ParseHeader(header)
 	if err != nil {
 		return nil, "", err
 	}
@@ -2209,7 +2214,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		}
 
 		// Override header map and save relevant fields
-		if backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
+		if parser.Backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
 			record[5] = tcgID
 
 			record[2] = "Normal"
@@ -2222,7 +2227,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 			indexMap["printing"] = 2
 		}
 
-		res, err := uploadParser.ParseRow(indexMap, record)
+		res, err := parser.ParseRow(indexMap, record)
 		if err != nil {
 			return true
 		}
@@ -2234,7 +2239,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 	return uploadEntries, collectionName, nil
 }
 
-func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, string, error) {
+func loadSpreadsheet(parser *docparse.Parser, urlPath string, maxRows int) ([]UploadEntry, string, error) {
 	service := spreadsheet.NewServiceWithClient(GoogleDocsClient)
 
 	hash := path.Base(strings.TrimSuffix(urlPath, "/edit"))
@@ -2268,7 +2273,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, string, error)
 	}
 
 	var i int
-	indexMap, err := uploadParser.ParseHeader(record)
+	indexMap, err := parser.ParseHeader(record)
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		i-- // Parse the first line again
 	} else if err != nil {
@@ -2291,7 +2296,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, string, error)
 			record[j] = sheet.Rows[i][j].Value
 		}
 
-		res, err := uploadParser.ParseRow(indexMap, record)
+		res, err := parser.ParseRow(indexMap, record)
 		if err != nil {
 			continue
 		}
@@ -2302,7 +2307,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, string, error)
 	return uploadEntries, docName, nil
 }
 
-func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
+func loadOldXls(parser *docparse.Parser, reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
 	f, err := xls.OpenReader(reader, "")
 	if err != nil {
 		return nil, err
@@ -2329,7 +2334,7 @@ func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
 	}
 
 	var i int
-	indexMap, err := uploadParser.ParseHeader(record)
+	indexMap, err := parser.ParseHeader(record)
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		i-- // Parse the first line again
 	} else if err != nil {
@@ -2352,7 +2357,7 @@ func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
 			record[j] = sheet.Row(i).Col(j)
 		}
 
-		res, err := uploadParser.ParseRow(indexMap, record)
+		res, err := parser.ParseRow(indexMap, record)
 		if err != nil {
 			continue
 		}
@@ -2363,7 +2368,7 @@ func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
 	return uploadEntries, nil
 }
 
-func loadXlsx(reader io.Reader, maxRows int) ([]UploadEntry, error) {
+func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadEntry, error) {
 	f, err := excelize.OpenReader(reader)
 	if err != nil {
 		return nil, err
@@ -2394,7 +2399,7 @@ func loadXlsx(reader io.Reader, maxRows int) ([]UploadEntry, error) {
 	}
 
 	var i int
-	indexMap, err := uploadParser.ParseHeader(rows[0])
+	indexMap, err := parser.ParseHeader(rows[0])
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		i-- // Parse the first line again
 	} else if err != nil {
@@ -2413,7 +2418,7 @@ func loadXlsx(reader io.Reader, maxRows int) ([]UploadEntry, error) {
 			continue
 		}
 
-		res, err := uploadParser.ParseRow(indexMap, rows[i])
+		res, err := parser.ParseRow(indexMap, rows[i])
 		if err != nil {
 			continue
 		}
@@ -2424,7 +2429,7 @@ func loadXlsx(reader io.Reader, maxRows int) ([]UploadEntry, error) {
 	return uploadEntries, nil
 }
 
-func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, error) {
+func loadCsv(parser *docparse.Parser, reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, error) {
 	csvReader := csv.NewReader(reader)
 	csvReader.ReuseRecord = true
 	csvReader.Comma = comma
@@ -2466,10 +2471,10 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 		} else if comma == '\t' {
 			comma = ';'
 		}
-		return loadCsv(reader, comma, maxRows)
+		return loadCsv(parser, reader, comma, maxRows)
 	}
 
-	indexMap, err := uploadParser.ParseHeader(first)
+	indexMap, err := parser.ParseHeader(first)
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		// Reload reader to catch the first name too
 		_, suberr := reader.Seek(0, io.SeekStart)
@@ -2526,7 +2531,7 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 			continue
 		}
 
-		res, err := uploadParser.ParseRow(indexMap, record)
+		res, err := parser.ParseRow(indexMap, record)
 		if err != nil {
 			continue
 		}

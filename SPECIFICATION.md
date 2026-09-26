@@ -335,9 +335,10 @@ Sheets, Moxfield decks/collections (`moxfield` package), TCGplayer
 collection scrapes (goquery), **Collectr showcase pages** (new `collectr`
 package, `app.getcollectr.com`, Magic/Lorcana only), and plain decklists.
 Header/row parsing has moved out of `upload.go` into the `internal/docparse`
-package: a shared `uploadParser` (`*docparse.Parser`, upload.go:85) exposes
-`ParseHeader()`/`ParseRow()` (internal/docparse/docparse.go:183,333) —
-there is no longer a standalone `parseHeader()`/`parseRow()` in `upload.go`.
+package: a per-upload parser from `newUploadParser(b)` (`*docparse.Parser`,
+upload.go:89) exposes `ParseHeader()`/`ParseRow()`
+(internal/docparse/docparse.go:183,333) — there is no longer a standalone
+`parseHeader()`/`parseRow()` in `upload.go`.
 Row resolution still goes through `mtgmatcher.Match()` (preserving alias
 candidates and mismatch errors). Prices come from the same
 `getSellerPrices()`/`getVendorPrices()` machinery as the API. The
