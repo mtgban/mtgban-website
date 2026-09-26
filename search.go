@@ -1249,8 +1249,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 			series := fetchRosterPrices(r.Context(), resolved, lb)
 			// An empty window hides the chart and the select that could widen it,
-			// so a card whose prices all predate the window reads the ceiling.
-			if lb.Days() < maxDays && !slices.ContainsFunc(series, func(s chartSeries) bool { return len(s.Prices) > 0 }) {
+			// so a card whose prices all predate the window reads the ceiling. A
+			// read that failed is not an empty window, so it is not retried wider.
+			answered := slices.ContainsFunc(series, func(s chartSeries) bool { return s.Err == nil })
+			priced := slices.ContainsFunc(series, func(s chartSeries) bool { return len(s.Prices) > 0 })
+			if lb.Days() < maxDays && answered && !priced {
 				lb, _ = chartWindow(sig, 0)
 				pageVars.ChartLoadedDays = lb.Days()
 				series = fetchRosterPrices(r.Context(), resolved, lb)
