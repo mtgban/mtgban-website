@@ -170,9 +170,9 @@ var filteredEditions = []string{
 	"WC99",
 }
 
-func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
+func parseMessage(ds *datastore, content string, sealed bool) (*EmbedSearchResult, string) {
 	// Clean up query, no blocklist because we only need keys
-	config := parseSearchOptionsNG(content, nil, nil, nil)
+	config := parseSearchOptionsNG(ds.backend, content, nil, nil, nil)
 	query := config.CleanQuery
 
 	// Enable sealed mode
@@ -203,16 +203,16 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 		})
 	}
 
-	uuids, err := searchAndFilter(config)
+	uuids, err := searchAndFilter(ds, config)
 	if err != nil {
 		// Not found again, let's provide a meaningful error
 		if editionSearched != "" {
-			set, err := backend().GetSet(editionSearched)
+			set, err := ds.backend.GetSet(editionSearched)
 			if err != nil {
 				return nil, fmt.Sprintf("No edition found for \"%s\"", editionSearched)
 			}
 			msg := fmt.Sprintf("No card found named \"%s\" in %s", query, set.Name)
-			printings, err := backend().Printings4Card(query)
+			printings, err := ds.backend.Printings4Card(query)
 			if err == nil {
 				msg = fmt.Sprintf("%s\n\"%s\" is printed in %s.", msg, query, embed.PrintingsLine(printings))
 			}
@@ -221,7 +221,7 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 
 		// Do a quick retry to look through sealed
 		if !sealed {
-			return parseMessage(content, true)
+			return parseMessage(ds, content, true)
 		}
 		return nil, fmt.Sprintf("No card found for \"%s\"", query)
 	}
@@ -231,7 +231,7 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 	}
 
 	// Keep the first (most recent) result
-	sortData := resolveSortingData(uuids)
+	sortData := resolveSortingData(ds.backend, uuids)
 	sort.Slice(uuids, func(i, j int) bool {
 		return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
 	})
@@ -280,7 +280,7 @@ type AffiliateConfig struct {
 	// the card on this site beside the store's own link, so it answers with
 	// nothing rather than with a guess: a link to the wrong card is worse
 	// than no link at all.
-	CardFunc func(*url.URL) *mtgmatcher.CardObject
+	CardFunc func(*mtgmatcher.Backend, *url.URL) *mtgmatcher.CardObject
 }
 
 // unknownTitle is the title a store's link carries where the printing behind
@@ -365,14 +365,14 @@ func printingTitle(co *mtgmatcher.CardObject) string {
 // the query form is what a deep link to one finish's listing carries. Mana
 // Pool also serves a /card/<slug> shape for a card across every set, which
 // names no printing at all and so is answered with nothing.
-func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
+func manapoolCard(b *mtgmatcher.Backend, u *url.URL) *mtgmatcher.CardObject {
 	fields := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(fields) < 3 {
 		return nil
 	}
 
-	for _, card := range printingsAt(fields[1], fields[2]) {
-		co, err := backend().GetUUID(card.UUID)
+	for _, card := range printingsAt(b, fields[1], fields[2]) {
+		co, err := b.GetUUID(card.UUID)
 		if err != nil {
 			continue
 		}
@@ -381,11 +381,11 @@ func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 		if finish == "" {
 			return co
 		}
-		sibling, err := backend().MatchIDFinish(co.UUID, finish)
+		sibling, err := b.MatchIDFinish(co.UUID, finish)
 		if err != nil {
 			return nil
 		}
-		co, err = backend().GetUUID(sibling)
+		co, err = b.GetUUID(sibling)
 		if err != nil {
 			return nil
 		}
@@ -407,7 +407,7 @@ func manapoolCard(u *url.URL) *mtgmatcher.CardObject {
 // datastore's 1,219 etched ids: 333 answer a non-etched printing when the
 // finish is read off the URL, and 1 when it is read off the id - that one
 // being a printing the datastore holds no etched sibling for at all.
-func tcgplayerCard(u *url.URL) *mtgmatcher.CardObject {
+func tcgplayerCard(b *mtgmatcher.Backend, u *url.URL) *mtgmatcher.CardObject {
 	var id string
 	for _, id = range strings.Split(u.Path, "/") {
 		_, err := strconv.Atoi(id)
@@ -418,14 +418,14 @@ func tcgplayerCard(u *url.URL) *mtgmatcher.CardObject {
 
 	// A printing files its plain and its etched product under one id space,
 	// so the id is etched exactly when it is the one filed as etched.
-	base, err := backend().GetUUID(backend().ConvertID(mtgmatcher.IDSpaceTCGplayer, id))
+	base, err := b.GetUUID(b.ConvertID(mtgmatcher.IDSpaceTCGplayer, id))
 	etched := err == nil && base.Identifiers["tcgplayerEtchedProductId"] == id
 
-	cardID, err := backend().MatchID(id, u.Query().Get("Printing") == "Foil", etched)
+	cardID, err := b.MatchID(id, u.Query().Get("Printing") == "Foil", etched)
 	if err != nil {
 		return nil
 	}
-	co, err := backend().GetUUID(cardID)
+	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return nil
 	}
@@ -565,7 +565,7 @@ var AffiliateStores = []AffiliateConfig{
 // this guild or this game does not answer for, and a link that parsed into
 // nothing all end the same way, and there is nothing a caller could do
 // differently about any of them.
-func checkForLinks(mGuildID, mContent string) *discordgo.MessageEmbed {
+func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.MessageEmbed {
 	// Only for the main discord and only for the main game
 	if mGuildID != discordGuildID() || Config.Game != DefaultGame {
 		return nil
@@ -609,7 +609,7 @@ func checkForLinks(mGuildID, mContent string) *discordgo.MessageEmbed {
 			// happen before URLFunc folds it into a partner redirect.
 			var co *mtgmatcher.CardObject
 			if store.CardFunc != nil {
-				co = store.CardFunc(u)
+				co = store.CardFunc(b, u)
 			}
 
 			// Extract a sensible link title
@@ -718,7 +718,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
-			reply := checkForLinks(m.GuildID, m.Content)
+			reply := checkForLinks(backend(), m.GuildID, m.Content)
 			if reply == nil {
 				break
 			}
@@ -742,7 +742,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	content = strings.TrimPrefix(content, "$$")
 
 	// Search a single card match
-	searchRes, errMsg := parseMessage(content, sealed)
+	searchRes, errMsg := parseMessage(currentDatastore(), content, sealed)
 	if errMsg != "" {
 		if DevMode {
 			errMsg = "[DEV] " + errMsg
@@ -765,7 +765,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		config := parseSearchOptionsNG(searchRes.CardID, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
+		config := parseSearchOptionsNG(backend(), searchRes.CardID, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a
 		// reason to drop a foreign shop and not a reason to drop a foreign
@@ -789,12 +789,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			OnlyForVendor: true,
 		})
 
-		cardIDs, _ := searchAndFilter(config)
+		cardIDs, _ := searchAndFilter(currentDatastore(), config)
 		foundSellers, foundVendors := searchParallelNG(cardIDs, config)
 
-		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(foundSellers, true)
-		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(foundSellers, false)
-		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(foundVendors)
+		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(backend(), foundSellers, true)
+		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(backend(), foundSellers, false)
+		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(backend(), foundVendors)
 
 		ogFields = embed.FormatSearchResult(externalURL(nil), searchRes)
 	} else if lastSold {
@@ -808,7 +808,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			// report back to the reader.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			var lastSales []tcgplayer.LatestSalesData
-			lastSales, err = getLastSold(ctx, searchRes.CardID, false)
+			lastSales, err = getLastSold(ctx, backend(), searchRes.CardID, false)
 			cancel()
 			if err == nil {
 				ogFields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
@@ -823,7 +823,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			} else if len(ogFields) == 0 {
 				errMsg = fmt.Sprintf("No Last Sold Price available for \"%s\" %s", content, emoteShurg)
 			}
-			embed := prepareCard(searchRes, ogFields, m.GuildID, lastSold)
+			embed := prepareCard(backend(), searchRes, ogFields, m.GuildID, lastSold)
 			if errMsg != "" {
 				embed.Description += errMsg
 			}
@@ -831,7 +831,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}()
 	}
 
-	embed := prepareCard(searchRes, ogFields, m.GuildID, lastSold)
+	embed := prepareCard(backend(), searchRes, ogFields, m.GuildID, lastSold)
 	if lastSold {
 		embed.Description += "Grabbing last sold prices, hang tight " + emoteHappy
 	}
@@ -849,7 +849,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		case edit = <-channel:
 			break
 		case <-time.After(LastSoldTimeout * time.Second):
-			edit = prepareCard(searchRes, ogFields, m.GuildID, lastSold)
+			edit = prepareCard(backend(), searchRes, ogFields, m.GuildID, lastSold)
 			edit.Description += "Connection time out " + emoteSleep
 			break
 		}
@@ -861,7 +861,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
+func prepareCard(b *mtgmatcher.Backend, searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
 	for _, field := range ogFields {
@@ -886,14 +886,14 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 	}
 
 	// Prepare card data
-	card := uuid2card(searchRes.CardID, true, false, false)
-	co, _ := backend().GetUUID(searchRes.CardID)
+	card := uuid2card(b, searchRes.CardID, true, false, false)
+	co, _ := b.GetUUID(searchRes.CardID)
 
 	printings := embed.PrintingsLine(co.Printings)
 	if searchRes.EditionSearched != "" && len(co.Variations) > 0 {
 		cn := []string{co.Number}
 		for _, varid := range co.Variations {
-			co, err := backend().GetUUID(varid)
+			co, err := b.GetUUID(varid)
 			if err != nil {
 				continue
 			}
@@ -924,7 +924,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 	if lastSold {
 		title = "TCG Last Sold prices for " + name
 
-		tcgID := findTCGproductID(co.UUID)
+		tcgID := findTCGproductID(b, co.UUID)
 		productID, _ := strconv.Atoi(tcgID)
 		printing := "Normal"
 		if co.Etched || co.Foil {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 const (
@@ -280,7 +281,7 @@ var newspaperColumnSetters = map[string]func(*NewspaperResult, string){
 	"custom_sort":           func(r *NewspaperResult, s string) { r.CustomSort = s },
 }
 
-func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
+func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperResult, error) {
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -327,12 +328,12 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 
 		// Override a few fields for better integration with the site
 		if db == NewNewspaperDB {
-			uuid, err := backend().MatchID(raw[1], raw[6] != "Normal")
+			uuid, err := b.MatchID(raw[1], raw[6] != "Normal")
 			if err != nil {
 				LogPages["Newspaper"].Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
 				continue
 			}
-			co, _ := backend().GetUUID(uuid)
+			co, _ := b.GetUUID(uuid)
 			raw[0] = co.Rarity
 			raw[1] = uuid
 			raw[3] = co.Name
@@ -453,8 +454,8 @@ func noteNewspaperStaleness(pageVars *PageVars) {
 // return value reports whether the results are good enough to replace what is
 // already cached: a failed query, an empty response, or a response that lost
 // more than half of the rows we had all keep the older data.
-func refreshNewspaperEdition(label, query string, cached []NewspaperResult) ([]NewspaperResult, bool) {
-	results, err := getResults(NewNewspaperDB, query)
+func refreshNewspaperEdition(b *mtgmatcher.Backend, label, query string, cached []NewspaperResult) ([]NewspaperResult, bool) {
+	results, err := getResults(b, NewNewspaperDB, query)
 	if err != nil {
 		log.Println(query, err)
 		return nil, false
@@ -532,14 +533,14 @@ func cacheNewspaper() {
 		// Both editions are fetched independently: a bad refresh on one of
 		// them keeps the previously cached data for that edition instead of
 		// blanking the page or skipping the other edition entirely.
-		if results, ok := refreshNewspaperEdition(next[i].Option, query, next[i].Results); ok {
+		if results, ok := refreshNewspaperEdition(backend(), next[i].Option, query, next[i].Results); ok {
 			next[i].Results = results
 			next[i].AvailableEditions, next[i].PossibleFinish = newspaperFilterValues(results)
 			refreshed++
 		}
 
 		query3day := strings.ReplaceAll(query, "0 DAY", "3 DAY")
-		if results, ok := refreshNewspaperEdition(next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
+		if results, ok := refreshNewspaperEdition(backend(), next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
 			next[i].Results3Day = results
 			next[i].AvailableEditions3Day, next[i].PossibleFinish3Day = newspaperFilterValues(results)
 			refreshed++
@@ -1216,7 +1217,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		switch sorting {
 		default:
-			sortData := resolveSortingData(arbitCardIDs(arbit))
+			sortData := resolveSortingData(backend(), arbitCardIDs(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
@@ -1224,7 +1225,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				return cmpSets(sortData[arbit[i].CardID], sortData[arbit[j].CardID])
 			})
 		case "alpha":
-			sortData := resolveSortingData(arbitCardIDs(arbit))
+			sortData := resolveSortingData(backend(), arbitCardIDs(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
@@ -1256,7 +1257,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			pageVars.Metadata[entry.CardID] = uuid2card(entry.CardID, true, false, preferFlavor)
+			pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, preferFlavor)
 		}
 
 		// The HasNo* flags and the name were how this list asked arbit.html
@@ -1402,7 +1403,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
-		c := uuid2card(result.UUID, true, false, preferFlavor)
+		c := uuid2card(backend(), result.UUID, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result.UUID)
 	}

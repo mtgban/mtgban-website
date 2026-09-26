@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 )
@@ -41,13 +42,13 @@ func searchEntries2embed(results []SearchEntry) []embed.Entry {
 
 // firstEmbedCard names the card an embed speaks for when it can only speak
 // for one: the earliest by set, over every card the search found.
-func firstEmbedCard(found map[string]map[string][]SearchEntry) string {
+func firstEmbedCard(b *mtgmatcher.Backend, found map[string]map[string][]SearchEntry) string {
 	sortedKeys := make([]string, 0, len(found))
 	for cardID := range found {
 		sortedKeys = append(sortedKeys, cardID)
 	}
 	if len(sortedKeys) > 1 {
-		sortData := resolveSortingData(sortedKeys)
+		sortData := resolveSortingData(b, sortedKeys)
 		sort.Slice(sortedKeys, func(i, j int) bool {
 			return cmpSets(sortData[sortedKeys[i]], sortData[sortedKeys[j]])
 		})
@@ -56,11 +57,11 @@ func firstEmbedCard(found map[string]map[string][]SearchEntry) string {
 }
 
 // Retrieve cards from Sellers using the very first result
-func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]SearchEntry, index bool) []embed.Entry {
+func ProcessEmbedSearchResultsSellers(b *mtgmatcher.Backend, foundSellers map[string]map[string][]SearchEntry, index bool) []embed.Entry {
 	if len(foundSellers) == 0 {
 		return nil
 	}
-	return EmbedSellerEntries(foundSellers, firstEmbedCard(foundSellers), index)
+	return EmbedSellerEntries(foundSellers, firstEmbedCard(b, foundSellers), index)
 }
 
 // EmbedSellerEntries picks the offers an embed shows for one named card.
@@ -140,12 +141,12 @@ func lastSales2embed(sales []tcgplayer.LatestSalesData) []embed.Sale {
 }
 
 // Retrieve cards from Vendors using the very first result
-func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]SearchEntry) []embed.Entry {
+func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[string]map[string][]SearchEntry) []embed.Entry {
 	if len(foundVendors) == 0 {
 		return nil
 	}
 
-	return searchEntries2embed(foundVendors[firstEmbedCard(foundVendors)]["NM"])
+	return searchEntries2embed(foundVendors[firstEmbedCard(b, foundVendors)]["NM"])
 }
 
 // externalURL is the origin this site is reachable at: what an oEmbed

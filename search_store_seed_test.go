@@ -93,7 +93,7 @@ func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
 
 	for _, query := range []string{`vendor:TEST`, `store:TEST`} {
 		t.Run(query, func(t *testing.T) {
-			results, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+			results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -119,7 +119,7 @@ func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
 
 	for _, query := range []string{`seller:TESTSELL`, `store:TESTSELL`} {
 		t.Run(query, func(t *testing.T) {
-			results, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+			results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -139,7 +139,7 @@ func TestUnknownStoreQuerySeedsEmptyRatherThanEverything(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 
-	results, err := searchAndFilter(parseSearchOptionsNG(`vendor:NoSuchStoreExists`, nil, nil, nil))
+	results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), `vendor:NoSuchStoreExists`, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -166,14 +166,14 @@ func TestNegatedStoreQueryDoesNotSeed(t *testing.T) {
 	}
 	registerTestVendor(t, "TEST", uuids)
 
-	config := parseSearchOptionsNG(`-vendor:TEST`, nil, nil, nil)
-	seeded, ok := storeSeedUUIDs(config)
+	config := parseSearchOptionsNG(backend(), `-vendor:TEST`, nil, nil, nil)
+	seeded, ok := storeSeedUUIDs(backend(), config)
 	if ok || seeded != nil {
 		t.Errorf("storeSeedUUIDs(-vendor:TEST) = (%v, %v), want (nil, false)", seeded, ok)
 	}
 
 	// The full search still has to run cleanly on the unseeded path.
-	if _, err := searchAndFilter(config); err != nil {
+	if _, err := searchAndFilter(currentDatastore(), config); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
@@ -201,11 +201,11 @@ func TestStoreQuerySeedsAlongsideACompanionPostFilter(t *testing.T) {
 		`vendor:TEST skip:empty`,
 	} {
 		t.Run(query, func(t *testing.T) {
-			config := parseSearchOptionsNG(query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 			if len(config.PostFilters) < 2 {
 				t.Fatalf("%s: expected a companion PostFilter alongside the store one, got %+v", query, config.PostFilters)
 			}
-			results, err := searchAndFilter(config)
+			results, err := searchAndFilter(currentDatastore(), config)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -233,11 +233,11 @@ func TestStoreQuerySeedsWithASecondStoreFilterPresent(t *testing.T) {
 	registerTestVendor(t, "TEST", uuids)
 	registerTestSeller(t, "OTHER", uuids)
 
-	config := parseSearchOptionsNG(`vendor:TEST seller:OTHER`, nil, nil, nil)
+	config := parseSearchOptionsNG(backend(), `vendor:TEST seller:OTHER`, nil, nil, nil)
 	if len(config.PostFilters) != 2 {
 		t.Fatalf("expected two store PostFilters, got %+v", config.PostFilters)
 	}
-	results, err := searchAndFilter(config)
+	results, err := searchAndFilter(currentDatastore(), config)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -268,7 +268,7 @@ func TestStoreQueryDefersToAnEditionFilterAlreadySeeding(t *testing.T) {
 	}
 	registerTestVendor(t, "TEST", uuids)
 
-	results, err := searchAndFilter(parseSearchOptionsNG(`s:LEA vendor:TEST`, nil, nil, nil))
+	results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), `s:LEA vendor:TEST`, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -299,11 +299,11 @@ func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	plain, err := searchAndFilter(parseSearchOptionsNG(co.Name, nil, nil, nil))
+	plain, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), co.Name, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	withStore, err := searchAndFilter(parseSearchOptionsNG(co.Name+` vendor:TEST`, nil, nil, nil))
+	withStore, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), co.Name+` vendor:TEST`, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -345,7 +345,7 @@ func TestStoreQueryUnionsACommaJoinedList(t *testing.T) {
 	registerTestVendor(t, "STOREA", uuidsA)
 	registerTestVendor(t, "STOREB", uuidsB)
 
-	results, err := searchAndFilter(parseSearchOptionsNG(`vendor:STOREA,STOREB`, nil, nil, nil))
+	results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), `vendor:STOREA,STOREB`, nil, nil, nil))
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"golang.org/x/sync/singleflight"
 )
@@ -310,7 +311,7 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
 // through the external id map with the sub-type naming the finish. Overridable
 // in tests.
-var moverCardID = func(row timeseries.MoverRow) (string, bool, bool) {
+var moverCardID = func(b *mtgmatcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
@@ -320,7 +321,7 @@ var moverCardID = func(row timeseries.MoverRow) (string, bool, bool) {
 
 	// One product covers every finish of a card, so the sub-type is where the
 	// finish lives: Lorcana prices Cold Foil and Holofoil as two printings.
-	uuid := tcgFinishID(row.TCGProductID, row.TCGSubType)
+	uuid := tcgFinishID(b, row.TCGProductID, row.TCGSubType)
 	if uuid == "" {
 		return "", false, false
 	}
@@ -328,7 +329,7 @@ var moverCardID = func(row timeseries.MoverRow) (string, bool, bool) {
 	// The finish belongs to the printing that was resolved, not to the name of
 	// the sub-type that led there.
 	isFoil := false
-	finished, err := backend().GetUUID(uuid)
+	finished, err := b.GetUUID(uuid)
 	if err == nil {
 		isFoil = finished.Foil || finished.Etched
 	}
@@ -342,8 +343,8 @@ type screenerMeta struct {
 }
 
 // Classification is static, so resolve once at cache build, not per request; overridable in tests.
-var screenerClassify = func(uuid string) (screenerMeta, bool) {
-	co, err := backend().GetUUID(uuid)
+var screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) {
+	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return screenerMeta{}, false
 	}
@@ -364,7 +365,7 @@ func cachedScreenerRows(key string) ([]screenerRow, bool) {
 	return e.rows, ok && time.Since(e.fetched) < screenerCacheTTL
 }
 
-func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
+func cachedMovers(ctx context.Context, b *mtgmatcher.Backend, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	key := screenerCacheKey(metric, window, minPrice, minPriorPrice)
 
 	if rows, live := cachedScreenerRows(key); live {
@@ -379,7 +380,7 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPri
 		if rows, live := cachedScreenerRows(key); live {
 			return rows, nil
 		}
-		return buildMovers(ctx, key, metric, window, minPrice, minPriorPrice)
+		return buildMovers(ctx, b, key, metric, window, minPrice, minPriorPrice)
 	})
 	if err != nil {
 		return nil, err
@@ -393,7 +394,7 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPri
 
 // buildMovers reads a page of movers, resolves every row to this game's uuid,
 // and caches the result under key.
-func buildMovers(ctx context.Context, key string, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
+func buildMovers(ctx context.Context, b *mtgmatcher.Backend, key string, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	raw, err := screenerFetch(ctx, metric, window, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
@@ -402,13 +403,13 @@ func buildMovers(ctx context.Context, key string, metric, window int, minPrice, 
 	for _, row := range raw {
 		// Resolve non-Magic rows to this game's uuid so the rest of the
 		// pipeline (classification, dedup keys, links) is id-uniform
-		uuid, isFoil, ok := moverCardID(row)
+		uuid, isFoil, ok := moverCardID(b, row)
 		if !ok {
 			continue
 		}
 		row.MtgjsonUUID = uuid
 		row.IsFoil = isFoil
-		if meta, ok := screenerClassify(row.MtgjsonUUID); ok {
+		if meta, ok := screenerClassify(b, row.MtgjsonUUID); ok {
 			rows = append(rows, screenerRow{MoverRow: row, Sealed: meta.Sealed, SetCode: meta.SetCode, Edition: meta.Edition})
 		}
 	}
@@ -560,7 +561,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := cachedMovers(r.Context(), metric, window, minPrice, minWas)
+	rows, err := cachedMovers(r.Context(), backend(), metric, window, minPrice, minWas)
 	if err != nil {
 		pageVars.InfoMessage = "Screener data is temporarily unavailable, please try again shortly"
 		render(w, "screener.html", pageVars)
@@ -597,7 +598,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cardID = res.UUID
 		}
-		c := uuid2card(cardID, true, false, preferFlavor)
+		c := uuid2card(backend(), cardID, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, cardID)
 	}

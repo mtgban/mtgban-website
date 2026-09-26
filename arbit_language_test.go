@@ -56,8 +56,8 @@ func TestSleepersDropForeignPrintings(t *testing.T) {
 	// Without scrapers there is nothing to compare and both come back empty,
 	// which is not the same as passing.
 	results := map[string]map[string]int{
-		"mismatch": getTiers(nil, nil, nil),
-		"gap":      getGap(nil, "TCGLow", "CK", nil),
+		"mismatch": getTiers(backend(), nil, nil, nil),
+		"gap":      getGap(backend(), nil, "TCGLow", "CK", nil),
 	}
 	if len(results["mismatch"]) == 0 && len(results["gap"]) == 0 {
 		t.Skip("no scrapers loaded, nothing to filter")

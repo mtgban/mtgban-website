@@ -12,6 +12,7 @@ import (
 
 	"github.com/mtgban/simplecloud"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
 )
 
@@ -135,20 +136,20 @@ func currentCheckpointsJSON() (string, error) {
 // the given card. Bans are curated; releases and reprints both come from
 // SealedEditionsList — the same source that used to feed the keyrune-at-top
 // renderer — so the two systems can't drift apart.
-func relevantCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
+func relevantCheckpoints(ds *datastore, cardName string, earliest time.Time) []ChartCheckpoint {
 	if cardName == "" {
 		return nil
 	}
 
 	printingSet := map[string]bool{}
-	if codes, err := backend().Printings4Card(cardName); err == nil {
+	if codes, err := ds.backend.Printings4Card(cardName); err == nil {
 		for _, c := range codes {
 			printingSet[strings.ToUpper(c)] = true
 		}
 	}
 
 	out := curatedCheckpoints(cardName, earliest)
-	out = append(out, setCheckpointsFromEditions(cardName, earliest, printingSet)...)
+	out = append(out, setCheckpointsFromEditions(ds, cardName, earliest, printingSet)...)
 
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].Date < out[j].Date
@@ -161,7 +162,7 @@ func relevantCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint 
 // of bans/unbans and reprints across all cards, plus set releases. When cards
 // resolve the same set on the same day, a reprint (a card was actually
 // reprinted there) takes precedence over a plain release marker.
-func multiCardCheckpoints(cardNames []string, earliest time.Time) []ChartCheckpoint {
+func multiCardCheckpoints(ds *datastore, cardNames []string, earliest time.Time) []ChartCheckpoint {
 	rank := func(t string) int {
 		if t == "reprint" {
 			return 1
@@ -173,7 +174,7 @@ func multiCardCheckpoints(cardNames []string, earliest time.Time) []ChartCheckpo
 	var out []ChartCheckpoint
 
 	for _, name := range cardNames {
-		for _, cp := range relevantCheckpoints(name, earliest) {
+		for _, cp := range relevantCheckpoints(ds, name, earliest) {
 			if cp.Type == "release" || cp.Type == "reprint" {
 				key := cp.Date + "|" + cp.Title
 				if i, ok := setIdx[key]; ok {
@@ -287,8 +288,8 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 // release date. For reprints in those sets we emit one checkpoint per
 // distinct card release date so the marker lands where the card actually
 // appeared, rather than collapsing every drop onto SLD's original 2019 date.
-func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet map[string]bool) []ChartCheckpoint {
-	sealedList := GetEditions().SealedEditionsList
+func setCheckpointsFromEditions(ds *datastore, cardName string, earliest time.Time, printingSet map[string]bool) []ChartCheckpoint {
+	sealedList := ds.editions.SealedEditionsList
 	if sealedList == nil {
 		return nil
 	}
@@ -318,7 +319,7 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 			isReprint := printingSet[strings.ToUpper(e.Code)]
 
 			if isReprint && (e.Code == "SLD" || e.Code == "PLST") {
-				out = append(out, perCardSetCheckpoints(cardName, e, earliest, now)...)
+				out = append(out, perCardSetCheckpoints(ds.backend, cardName, e, earliest, now)...)
 				continue
 			}
 
@@ -340,7 +341,7 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 
 			cp.Type = "release"
 			cp.Detail = "Set released"
-			pri := releasePriority(e.Code)
+			pri := releasePriority(ds.backend, e.Code)
 			existing, ok := bestRelease[cp.Date]
 			if !ok || pri > existing.priority || (pri == existing.priority && e.Code < existing.code) {
 				bestRelease[cp.Date] = releasePick{cp: cp, priority: pri, code: e.Code}
@@ -358,8 +359,8 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 // reliable signal: expansion/core are full new-card sets, draft_innovation is
 // a half-step down (Conspiracy/Battlebond/MH-style), and the rest (commander,
 // promo, masters, starter, etc.) are typically companion products.
-func releasePriority(code string) int {
-	set, err := backend().GetSet(code)
+func releasePriority(b *mtgmatcher.Backend, code string) int {
+	set, err := b.GetSet(code)
 	if err != nil {
 		return 0
 	}
@@ -380,8 +381,8 @@ func releasePriority(code string) int {
 // perCardSetCheckpoints emits a reprint checkpoint at each distinct date the
 // card was printed in the given set. Falls back to the set's release date for
 // printings that don't carry a per-card date in MTGJSON.
-func perCardSetCheckpoints(cardName string, e EditionEntry, earliest, now time.Time) []ChartCheckpoint {
-	cards := backend().MatchInSet(cardName, e.Code)
+func perCardSetCheckpoints(b *mtgmatcher.Backend, cardName string, e EditionEntry, earliest, now time.Time) []ChartCheckpoint {
+	cards := b.MatchInSet(cardName, e.Code)
 	if len(cards) == 0 {
 		return nil
 	}

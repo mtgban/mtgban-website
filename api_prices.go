@@ -18,7 +18,7 @@ type PriceResult struct {
 func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	// During warmup every answer would be empty; a 503 makes clients retry
 	// later instead of caching blank prices and images for their tiles
-	if !dataReady() {
+	if !dataReady(backend()) {
 		w.Header().Set("Cache-Control", "no-store")
 		errorResponse(w, http.StatusServiceUnavailable, "not ready")
 		return

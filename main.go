@@ -879,9 +879,9 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 		if err != nil {
 			return nil, err
 		}
-		retail := getSellerPrices("", stores, set.Code, nil, "", true, true, false, "")
-		buylist := getVendorPrices("", stores, set.Code, nil, "", true, true, false, "")
-		for id, m := range getSellerPrices("", stores, set.Code, nil, "", true, true, true, "") {
+		retail := getSellerPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, false, "")
+		buylist := getVendorPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, false, "")
+		for id, m := range getSellerPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, true, "") {
 			if retail[id] == nil {
 				retail[id] = m
 				continue
@@ -890,7 +890,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 				retail[id][store] = entry
 			}
 		}
-		for id, m := range getVendorPrices("", stores, set.Code, nil, "", true, true, true, "") {
+		for id, m := range getVendorPrices(currentDatastore(), "", stores, set.Code, nil, "", true, true, true, "") {
 			if buylist[id] == nil {
 				buylist[id] = m
 				continue

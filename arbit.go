@@ -83,7 +83,7 @@ var FilterOptKeys = []string{
 
 type FilterOpt struct {
 	Title string
-	Func  func(*mtgban.ArbitOpts)
+	Func  func(*mtgmatcher.Backend, *mtgban.ArbitOpts)
 
 	ArbitOnly  bool
 	GlobalOnly bool
@@ -100,35 +100,35 @@ type FilterOpt struct {
 var FilterOptConfig = map[string]FilterOpt{
 	"nocond": {
 		Title: "only NM/SP",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.Conditions = BadConditions
 		},
 		NoSealed: true,
 	},
 	"nofoil": {
 		Title: "only non-Foil",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.NoFoil = true
 		},
 		NoSealed: true,
 	},
 	"onlyfoil": {
 		Title: "only Foil",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.OnlyFoil = true
 		},
 		NoSealed: true,
 	},
 	"nocomm": {
 		Title: "only Rare/Mythic",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.Rarities = UCRarity
 		},
 		NoSealed: true,
 	},
 	"nononrl": {
 		Title: "only RL",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.OnlyReserveList = true
 		},
 		BetaFlag: true,
@@ -136,7 +136,7 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"nononabu4h": {
 		Title: "only ABU4H",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.OnlyEditions = ABU4H
 		},
 		ArbitOnly: true,
@@ -145,7 +145,7 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"onlyprof": {
 		Title: "only Profitable",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinProfitability = MinProfitable
 		},
 		BetaFlag: true,
@@ -153,7 +153,7 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"noposi": {
 		Title: "only Negative",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinSpread = MinSpreadNegative
 			opts.MinDiff = MinDiffNegative
 			opts.MaxSpread = MinSpread
@@ -163,14 +163,14 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"nopenny": {
 		Title: "only Bucks+",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinPrice = 1
 		},
 		NoSealed: true,
 	},
 	"nobuypenny": {
 		Title: "only BuyBucks+",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinBuyPrice = 1
 		},
 		ArbitOnly: true,
@@ -178,39 +178,39 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"nolow": {
 		Title: "only Yield+",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinSpread = MinSpreadHighYield
 		},
 	},
 	"nodiff": {
 		Title: "only Difference+",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinDiff = 1
 		},
 	},
 	"nodiffplus": {
 		Title: "only Difference++",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinDiff = 5
 		},
 	},
 	"noqty": {
 		Title: "only Quantity+",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.MinQuantity = 1
 		},
 		ArbitOnly: true,
 	},
 	"norand": {
 		Title: "only Decklists+",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			opts.SealedDecklist = true
 		},
 		SealedOnly: true,
 	},
 	"nosyp": {
 		Title: "only SYP",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
 			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
 				syp, err := findVendorBuylist("SYP")
@@ -232,7 +232,7 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"nostock": {
 		Title: "only Stocks",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
 			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
 				inv, _ := findSellerInventory("STKS")
@@ -251,11 +251,11 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 	"nosus": {
 		Title: "only Legit",
-		Func: func(opts *mtgban.ArbitOpts) {
+		Func: func(b *mtgmatcher.Backend, opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
-				co, err := backend().GetUUID(cardId)
+				co, err := b.GetUUID(cardId)
 				if err == nil && co.Sealed {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
 						return 0, true
@@ -309,7 +309,7 @@ func arbitCardIDs(entries []mtgban.ArbitEntry) []string {
 // arbitLess returns the comparator for sorting entries in the given
 // mode, or nil for unknown modes (caller leaves the slice unsorted,
 // matching the prior switch's absence of a default case).
-func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i, j *mtgban.ArbitEntry) bool {
+func arbitLess(b *mtgmatcher.Backend, entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i, j *mtgban.ArbitEntry) bool {
 	switch mode {
 	case "available":
 		return func(i, j *mtgban.ArbitEntry) bool {
@@ -346,7 +346,7 @@ func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i
 			return i.Spread > j.Spread
 		}
 	case "edition":
-		sortData := resolveSortingData(arbitCardIDs(entries))
+		sortData := resolveSortingData(b, arbitCardIDs(entries))
 		return func(i, j *mtgban.ArbitEntry) bool {
 			if i.CardID == j.CardID {
 				return i.InventoryEntry.Conditions < j.InventoryEntry.Conditions
@@ -354,7 +354,7 @@ func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode bool) func(i
 			return cmpSets(sortData[i.CardID], sortData[j.CardID])
 		}
 	case "alpha":
-		sortData := resolveSortingData(arbitCardIDs(entries))
+		sortData := resolveSortingData(b, arbitCardIDs(entries))
 		return func(i, j *mtgban.ArbitEntry) bool {
 			if i.CardID == j.CardID {
 				return i.InventoryEntry.Conditions < j.InventoryEntry.Conditions
@@ -393,14 +393,14 @@ type Arbitrage struct {
 }
 
 func Arbit(w http.ResponseWriter, r *http.Request) {
-	arbit(w, r, false)
+	arbit(backend(), w, r, false)
 }
 
 func Reverse(w http.ResponseWriter, r *http.Request) {
-	arbit(w, r, true)
+	arbit(backend(), w, r, true)
 }
 
-func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
+func arbit(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, reverse bool) {
 	sig := getSignatureFromCookies(r)
 
 	pageName := "Arbitrage"
@@ -466,7 +466,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	scraperCompare(b, w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults:       true,
 		AnyOptionEnabled: anyOptionEnabled,
 	})
@@ -551,7 +551,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	scraperCompare(backend(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults: anyEnabled,
 		AnySpread:  anySpread,
 	})
@@ -605,7 +605,7 @@ func suspectPriceFor(globalMode, reverseMode bool, sourceShort, scraperShort str
 	return nil
 }
 
-func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
 
 	var source mtgban.Scraper
@@ -811,7 +811,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if config.Func == nil {
 			continue
 		}
-		FilterOptConfig[key].Func(opts)
+		FilterOptConfig[key].Func(b, opts)
 	}
 
 	// Customize opts for Globals
@@ -900,13 +900,13 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		var arbit []mtgban.ArbitEntry
 		if pageVars.GlobalMode && source.Info().SealedMode {
-			arbit = mtgban.Mismatch(backend(), opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
+			arbit = mtgban.Mismatch(b, opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
 		} else if pageVars.GlobalMode {
-			arbit = mtgban.Mismatch(backend(), opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
+			arbit = mtgban.Mismatch(b, opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
 		} else if pageVars.ReverseMode {
-			arbit = mtgban.Arbit(backend(), opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
+			arbit = mtgban.Arbit(b, opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
 		} else {
-			arbit = mtgban.Arbit(backend(), opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
+			arbit = mtgban.Arbit(b, opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
 		}
 		if len(arbit) == 0 {
 			continue
@@ -972,7 +972,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if sorting == "" {
 			sorting = DefaultSortingOption
 		}
-		less := arbitLess(arbit, sorting, pageVars.GlobalMode)
+		less := arbitLess(b, arbit, sorting, pageVars.GlobalMode)
 		if less != nil {
 			sort.Slice(arbit, func(i, j int) bool { return less(&arbit[i], &arbit[j]) })
 		}
@@ -1015,7 +1015,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardID] = uuid2card(cardID, true, false, preferFlavor)
+			pageVars.Metadata[cardID] = uuid2card(b, cardID, true, false, preferFlavor)
 		}
 	}
 

@@ -30,14 +30,14 @@ func TestNumbersSnapshotMatchesScan(t *testing.T) {
 		{"cn:999999999", "number"},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
-			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			seeded, ok := numberSeedUUIDs(numbers, config.CardFilters)
 			if !ok {
 				t.Fatalf("%s did not seed", tt.query)
 			}
 			// The scan the seed replaces: every uuid, same filters.
-			scanned := filterUUIDs(backend().GetUUIDs(), config.CardFilters)
-			got := filterUUIDs(seeded, config.CardFilters)
+			scanned := filterUUIDs(backend(), backend().GetUUIDs(), config.CardFilters)
+			got := filterUUIDs(backend(), seeded, config.CardFilters)
 
 			slices.Sort(got)
 			slices.Sort(scanned)
@@ -63,7 +63,7 @@ func TestNumberSeedDeclines(t *testing.T) {
 		"cne:^6.5$",  // a pattern, which names no key
 	} {
 		t.Run(query, func(t *testing.T) {
-			config := parseSearchOptionsNG(query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 			_, ok := numberSeedUUIDs(numbers, config.CardFilters)
 			if ok {
 				t.Errorf("%s seeded, but it does not bound the result set", query)
@@ -100,11 +100,11 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 
 	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
-			config := parseSearchOptionsNG(query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 			useDatastore(t, &withoutNumbers)
-			want, wantErr := searchAndFilter(config)
+			want, wantErr := searchAndFilter(currentDatastore(), config)
 			useDatastore(t, base)
-			got, gotErr := searchAndFilter(config)
+			got, gotErr := searchAndFilter(currentDatastore(), config)
 			slices.Sort(want)
 			slices.Sort(got)
 			if !slices.Equal(got, want) || (gotErr == nil) != (wantErr == nil) {
@@ -126,14 +126,14 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 	withoutNumbers.numbers = nil
 
 	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
-		config := parseSearchOptionsNG(query, nil, nil, nil)
+		config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 		useDatastore(b, &withoutNumbers)
-		scanned, err := searchAndFilter(config)
+		scanned, err := searchAndFilter(currentDatastore(), config)
 		if err != nil {
 			b.Fatal(err)
 		}
 		useDatastore(b, base)
-		seeded, err := searchAndFilter(config)
+		seeded, err := searchAndFilter(currentDatastore(), config)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 				useDatastore(b, ds)
 				b.ReportAllocs()
 				for b.Loop() {
-					if _, err := searchAndFilter(config); err != nil {
+					if _, err := searchAndFilter(currentDatastore(), config); err != nil {
 						b.Fatal(err)
 					}
 				}

@@ -34,7 +34,7 @@ func TestRegexpFilterCompiledWithQuery(t *testing.T) {
 			co.Name = "Toxin Sliver"
 			co.Edition = "Secret Lair Drop"
 
-			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
 			var elem *FilterElem
 			for i := range config.CardFilters {
 				if config.CardFilters[i].Name == tt.filter {

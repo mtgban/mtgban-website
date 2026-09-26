@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // We could add two extra headers, "TcgPlayer ID" and "Scryfall ID", but then each card
@@ -13,7 +15,7 @@ var deckboxHeader = []string{
 	"Printing Id", "Printing Note", "Tags", "My Price",
 }
 
-func deckboxIDConvert(w *csv.Writer, uploadedData []UploadEntry) error {
+func deckboxIDConvert(b *mtgmatcher.Backend, w *csv.Writer, uploadedData []UploadEntry) error {
 	err := w.Write(deckboxHeader)
 	if err != nil {
 		return err
@@ -23,7 +25,7 @@ func deckboxIDConvert(w *csv.Writer, uploadedData []UploadEntry) error {
 			continue
 		}
 
-		co, err := backend().GetUUID(uploadedData[i].CardID)
+		co, err := b.GetUUID(uploadedData[i].CardID)
 		if err != nil {
 			continue
 		}

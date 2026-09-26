@@ -79,7 +79,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 				tightened++
 
 				query := co.SetCode + " " + co.Number
-				keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+				keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 				if err != nil {
 					t.Errorf("%s: %q: %v", game, query, err)
 					continue

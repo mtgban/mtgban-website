@@ -86,11 +86,11 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 	if !datastoreLoaded() {
 		t.Skip("no datastore loaded")
 	}
-	uuids, err := searchAndFilter(parseSearchOptionsWrapper("Plaguecrafter s:SLD cns:1116jpn f:nonfoil"))
+	uuids, err := searchAndFilter(currentDatastore(), parseSearchOptionsWrapper("Plaguecrafter s:SLD cns:1116jpn f:nonfoil"))
 	if err != nil || len(uuids) != 1 {
 		t.Skipf("expected one printing, got %d (%v)", len(uuids), err)
 	}
-	card := uuid2card(uuids[0], false, true, false)
+	card := uuid2card(backend(), uuids[0], false, true, false)
 	if card.SearchURL == "" {
 		t.Fatal("the printing carries no SearchURL to hand over")
 	}

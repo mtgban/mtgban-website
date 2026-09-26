@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -44,7 +45,7 @@ func TestScreenerDefersTheColdBuild(t *testing.T) {
 		fetches++
 		return []timeseries.MoverRow{{MtgjsonUUID: uuid, Current: 10, Prior: 5}}, nil
 	}
-	screenerClassify = func(string) (screenerMeta, bool) {
+	screenerClassify = func(*mtgmatcher.Backend, string) (screenerMeta, bool) {
 		return screenerMeta{SetCode: "STX", Edition: "Strixhaven"}, true
 	}
 

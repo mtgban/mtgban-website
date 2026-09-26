@@ -27,7 +27,7 @@ func TestAlphabeticalSortUsesEnglishNames(t *testing.T) {
 		t.Skip("no Japanese SOA printings in the datastore")
 	}
 
-	sortData := resolveSortingData(keys)
+	sortData := resolveSortingData(backend(), keys)
 	sort.Slice(keys, func(i, j int) bool {
 		return cmpSetsAlphabetical(sortData[keys[i]], sortData[keys[j]])
 	})
@@ -66,7 +66,7 @@ func TestAlphabeticalSortGroupsLocalizedReprints(t *testing.T) {
 		t.Skip("not enough printings of the test card")
 	}
 
-	sortData := resolveSortingData(keys)
+	sortData := resolveSortingData(backend(), keys)
 	sort.Slice(keys, func(i, j int) bool {
 		return cmpSetsAlphabetical(sortData[keys[i]], sortData[keys[j]])
 	})

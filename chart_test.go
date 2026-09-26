@@ -30,17 +30,17 @@ func twoRealUUIDs(t *testing.T) (string, string) {
 }
 
 func TestParseChartIDsEmpty(t *testing.T) {
-	if got, truncated := parseChartIDs(""); got != nil || truncated {
+	if got, truncated := parseChartIDs(backend(), ""); got != nil || truncated {
 		t.Fatalf("expected (nil, false) for empty input, got (%v, %v)", got, truncated)
 	}
-	if got, truncated := parseChartIDs(",,"); got != nil || truncated {
+	if got, truncated := parseChartIDs(backend(), ",,"); got != nil || truncated {
 		t.Fatalf("expected (nil, false) for all-empty parts, got (%v, %v)", got, truncated)
 	}
 }
 
 func TestParseChartIDsSingle(t *testing.T) {
 	a, _ := twoRealUUIDs(t)
-	got, _ := parseChartIDs(a)
+	got, _ := parseChartIDs(backend(), a)
 	if !slices.Equal(got, []string{a}) {
 		t.Fatalf("expected [%s], got %v", a, got)
 	}
@@ -48,7 +48,7 @@ func TestParseChartIDsSingle(t *testing.T) {
 
 func TestParseChartIDsTrimsWhitespaceAndSkipsEmpty(t *testing.T) {
 	a, b := twoRealUUIDs(t)
-	got, _ := parseChartIDs("  " + a + " , ," + b + "  ")
+	got, _ := parseChartIDs(backend(), "  "+a+" , ,"+b+"  ")
 	want := []string{a, b}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -57,7 +57,7 @@ func TestParseChartIDsTrimsWhitespaceAndSkipsEmpty(t *testing.T) {
 
 func TestParseChartIDsDedupesPreservingOrder(t *testing.T) {
 	a, b := twoRealUUIDs(t)
-	got, _ := parseChartIDs(a + "," + b + "," + a)
+	got, _ := parseChartIDs(backend(), a+","+b+","+a)
 	want := []string{a, b}
 	if !slices.Equal(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -66,14 +66,14 @@ func TestParseChartIDsDedupesPreservingOrder(t *testing.T) {
 
 func TestParseChartIDsDropsInvalid(t *testing.T) {
 	a, _ := twoRealUUIDs(t)
-	got, _ := parseChartIDs("not-a-real-uuid," + a + ",also-bogus")
+	got, _ := parseChartIDs(backend(), "not-a-real-uuid,"+a+",also-bogus")
 	if !slices.Equal(got, []string{a}) {
 		t.Fatalf("expected only [%s], got %v", a, got)
 	}
 }
 
 func TestParseChartIDsAllInvalid(t *testing.T) {
-	if got, truncated := parseChartIDs("not-a-real-uuid,nope"); got != nil || truncated {
+	if got, truncated := parseChartIDs(backend(), "not-a-real-uuid,nope"); got != nil || truncated {
 		t.Fatalf("expected (nil, false) when nothing validates, got (%v, %v)", got, truncated)
 	}
 }
@@ -84,7 +84,7 @@ func TestParseChartIDsCapsRoster(t *testing.T) {
 
 	// More distinct valid ids than the chart can render: keep the first
 	// maxCards in order and flag the drop.
-	got, truncated := parseChartIDs(strings.Join(ids, ","))
+	got, truncated := parseChartIDs(backend(), strings.Join(ids, ","))
 	if !slices.Equal(got, ids[:maxCards]) {
 		t.Fatalf("expected first %d ids in order, got %v", maxCards, got)
 	}
@@ -93,13 +93,13 @@ func TestParseChartIDsCapsRoster(t *testing.T) {
 	}
 
 	// Exactly the cap: full roster, nothing dropped.
-	if got, truncated := parseChartIDs(strings.Join(ids[:maxCards], ",")); len(got) != maxCards || truncated {
+	if got, truncated := parseChartIDs(backend(), strings.Join(ids[:maxCards], ",")); len(got) != maxCards || truncated {
 		t.Fatalf("expected (%d ids, false) at the cap, got (%d ids, %v)", maxCards, len(got), truncated)
 	}
 
 	// A duplicate past the cap is skipped before the cap check, so it doesn't
 	// count as dropping a renderable card.
-	if got, truncated := parseChartIDs(strings.Join(ids[:maxCards], ",") + "," + ids[0]); len(got) != maxCards || truncated {
+	if got, truncated := parseChartIDs(backend(), strings.Join(ids[:maxCards], ",")+","+ids[0]); len(got) != maxCards || truncated {
 		t.Fatalf("expected a trailing duplicate not to flag truncation, got (%d ids, %v)", len(got), truncated)
 	}
 }

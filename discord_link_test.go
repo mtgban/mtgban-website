@@ -128,7 +128,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 				sharedTCG++
 			} else {
 				checkedTCG++
-				got := offeredPrinting(t, checkForLinks(discordGuildID(), "look at "+link))
+				got := offeredPrinting(t, checkForLinks(backend(), discordGuildID(), "look at "+link))
 				if got == "" {
 					t.Errorf("%s %s #%s: %s offered no printing", co.Name, co.SetCode, co.Number, link)
 				} else if got != co.UUID {
@@ -150,7 +150,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
 				strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
 			checkedMP++
-			reply := checkForLinks(discordGuildID(), link)
+			reply := checkForLinks(backend(), discordGuildID(), link)
 			got := offeredPrinting(t, reply)
 			title := printingTitle(co) + " at Manapool"
 			if got == "" {
@@ -158,7 +158,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 				// files one name per number, so this does not fire here; it
 				// keeps the test honest against a datastore for a game that
 				// does - see openingName in redirect.go.
-				if openingName(printingsAt(co.SetCode, co.Number)) == "" {
+				if openingName(printingsAt(backend(), co.SetCode, co.Number)) == "" {
 					continue
 				}
 				t.Errorf("%s %s #%s: %s offered no printing", co.Name, co.SetCode, co.Number, link)
@@ -210,7 +210,7 @@ func TestManaPoolFinishItDoesNotSellNamesNothing(t *testing.T) {
 
 		link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?finish=etched",
 			strings.ToLower(co.SetCode), strings.ToLower(co.Number))
-		if got := offeredPrinting(t, checkForLinks(discordGuildID(), link)); got != "" {
+		if got := offeredPrinting(t, checkForLinks(backend(), discordGuildID(), link)); got != "" {
 			t.Errorf("%s %s #%s is not sold etched, yet %s offers %s",
 				co.Name, co.SetCode, co.Number, link, got)
 		}
@@ -250,7 +250,7 @@ func TestTCGplayerEtchedIDNamesTheEtchedPrinting(t *testing.T) {
 		if err != nil {
 			t.Fatalf("parsing the link for %s: %v", id, err)
 		}
-		co := tcgplayerCard(link)
+		co := tcgplayerCard(backend(), link)
 		if co == nil {
 			t.Errorf("etched product %s named no printing", id)
 			continue
@@ -301,7 +301,7 @@ func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
 		{"a mana pool card across every set", "https://manapool.com/card/caravan-vigil"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			reply := checkForLinks(discordGuildID(), tt.message)
+			reply := checkForLinks(backend(), discordGuildID(), tt.message)
 			if reply == nil {
 				t.Fatal("the store's own link went unanswered")
 			}
@@ -320,7 +320,7 @@ func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
 func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
 	message := "https://www.tcgplayer.com/product/1435/magic-product"
 
-	if reply := checkForLinks("some-other-guild", message); reply != nil {
+	if reply := checkForLinks(backend(), "some-other-guild", message); reply != nil {
 		t.Errorf("another guild was answered: %q", reply.Title)
 	}
 
@@ -328,7 +328,7 @@ func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
 	Config.Game = "lorcana"
 	defer func() { Config.Game = previous }()
 
-	if reply := checkForLinks(discordGuildID(), message); reply != nil {
+	if reply := checkForLinks(backend(), discordGuildID(), message); reply != nil {
 		t.Errorf("another game was answered: %q", reply.Title)
 	}
 }
@@ -341,11 +341,11 @@ func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
 		t.Skip("no datastore loaded")
 	}
 
-	single, err := backend().GetUUID(randomUUID(false))
+	single, err := backend().GetUUID(randomUUID(backend(), false))
 	if err != nil {
 		t.Fatalf("a single: %v", err)
 	}
-	sealed, err := backend().GetUUID(randomUUID(true))
+	sealed, err := backend().GetUUID(randomUUID(backend(), true))
 	if err != nil {
 		t.Fatalf("a sealed product: %v", err)
 	}
@@ -396,11 +396,11 @@ func TestStoreLinkDescriptionOffersOnlyWhatItResolved(t *testing.T) {
 		t.Errorf("a link that named nothing reads %q, want %q", got, affiliateLine)
 	}
 
-	single, err := backend().GetUUID(randomUUID(false))
+	single, err := backend().GetUUID(randomUUID(backend(), false))
 	if err != nil {
 		t.Fatalf("a single: %v", err)
 	}
-	sealed, err := backend().GetUUID(randomUUID(true))
+	sealed, err := backend().GetUUID(randomUUID(backend(), true))
 	if err != nil {
 		t.Fatalf("a sealed product: %v", err)
 	}
@@ -450,7 +450,7 @@ func TestBanSearchLinkFindsItsPrinting(t *testing.T) {
 			t.Fatalf("parsing the link for %s: %v", co.Name, err)
 		}
 		query := parsed.Query().Get("q")
-		keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+		keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 		if err != nil {
 			t.Errorf("%s %s #%s: %v", co.Name, co.SetCode, co.Number, err)
 			continue

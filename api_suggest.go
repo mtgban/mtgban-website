@@ -238,7 +238,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Cache response for 5 minutes, unless it was served while the
 	// datastore was still loading
-	if dataReady() {
+	if dataReady(backend()) {
 		w.Header().Set("Cache-Control", "public, max-age=300")
 	} else {
 		w.Header().Set("Cache-Control", "no-store")
