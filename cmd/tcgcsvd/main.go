@@ -167,8 +167,8 @@ func main() {
 	case *backfill:
 		// Outside the lock on purpose: hours of archives under a session
 		// advisory lock would block every daily ingest for the whole run. The
-		// snapshot fallback is one crawl, so it is inside the same exception
-		// rather than worth its own lock handling.
+		// snapshot fallback is the exception -- it is the same full crawl the
+		// daily job makes, so Backfill takes the lock around that part itself.
 		err = svc.Backfill(ctx, tcgcsvd.BackfillOptions{
 			From: *from, To: *to, Categories: *categories, Force: *force,
 		})

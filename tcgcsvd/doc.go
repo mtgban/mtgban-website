@@ -28,9 +28,11 @@ The two scheduled jobs run under a shared Postgres advisory lock
 (Service.WithCrawlLock, which Service.StashPrices and Service.StashProducts
 apply for you), so several server instances — or a server and a standalone
 tcgcsvd — never crawl tcgcsv.com at once. Per tcgcsv.com's FAQ a full sync
-belongs at most once per 24h. Backfill deliberately stays outside the lock: it
-is operator-driven and can run for hours, and holding the lock that long would
-starve the daily pull, which is the one that must not be missed.
+belongs at most once per 24h. The archive walk deliberately stays outside the
+lock: it is operator-driven and can run for hours, and holding the lock that
+long would starve the daily pull, which is the one that must not be missed. Its
+snapshot fallback does take the lock, being the same full crawl the daily job
+makes.
 
 # Chosen categories
 
