@@ -194,8 +194,7 @@ body:has(.search-layout) {
     min-height: 0;
     /* Scroll the body (image, set value, printings) rather than let a tall
        product photo push it over the pinned footer. The printings dropdown
-       lives in the scrollable overflow, so it stays reachable. Hidden x
-       hides the 2px the image borders poke out, instead of a scrollbar. */
+       lives in the scrollable overflow, so it stays reachable. */
     overflow-y: auto;
     overflow-x: hidden;
     /* Scrollable but chromeless, like the sidebar always was: the page keeps
@@ -287,6 +286,9 @@ body:has(.search-layout) {
        has to set --card-radius (see main.css); the fallback is the default. */
     border-radius: var(--card-radius, var(--radius-lg));
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    /* Count the border in max-width/max-height, so the fit-content wrapper
+       (and its sheen) always match this element's actual rendered box. */
+    box-sizing: border-box;
     display: block;
     background: var(--search-surface-2);
 }
