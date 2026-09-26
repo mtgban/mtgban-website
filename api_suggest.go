@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"golang.org/x/text/unicode/norm"
 )
@@ -174,7 +175,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	ds := currentDatastore()
 
 	if r.FormValue("all") == "true" {
-		AllNames := ds.backend.Names("canonical", sealed)
+		AllNames := ds.backend.Names(mtgmatcher.NameFormCanonical, sealed)
 		// An empty pool means the datastore isn't (fully) loaded; make sure
 		// no cache holds on to the degraded answer
 		if len(AllNames) == 0 {

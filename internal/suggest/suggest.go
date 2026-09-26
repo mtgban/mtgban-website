@@ -28,7 +28,7 @@ func Closest(query string, sealed bool, backend *mtgmatcher.Backend) string {
 	if backend == nil {
 		backend = &mtgmatcher.Backend{}
 	}
-	return fuzzy.Closest(query, backend.Names("canonical", sealed))
+	return fuzzy.Closest(query, backend.Names(mtgmatcher.NameFormCanonical, sealed))
 }
 
 // AltSearch is a suggested query offered when a search yields no results,
