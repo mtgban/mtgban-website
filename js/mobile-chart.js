@@ -73,7 +73,12 @@
 
     function fetchChart(cardId, range) {
         return fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + range)
-            .then(function(r) { return r.json(); });
+            .then(function(r) {
+                // An error status is a chart that failed to load, not a card
+                // with no history, so it must not read as an empty answer.
+                if (!r.ok) throw new Error('chart ' + r.status);
+                return r.json();
+            });
     }
 
     function prefetchFullRange(cardId, fullRange) {
