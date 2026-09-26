@@ -1676,7 +1676,7 @@ func findInDeck(sealedUUID, opt string) []string {
 	return output
 }
 
-func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc func(a, b time.Time) bool) bool {
+func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc func(i, j time.Time) bool) bool {
 	if filters == nil {
 		return false
 	}
@@ -2201,20 +2201,20 @@ var promoShortForms = func() map[string][]string {
 }()
 
 func cardFilterDate(filters []string, co *mtgmatcher.CardObject) bool {
-	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
-		return !a.Equal(b)
+	return compareReleaseDate(filters, co, func(i, j time.Time) bool {
+		return !i.Equal(j)
 	})
 }
 
 func cardFilterDateGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
-	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
-		return a.Before(b)
+	return compareReleaseDate(filters, co, func(i, j time.Time) bool {
+		return i.Before(j)
 	})
 }
 
 func cardFilterDateLessThan(filters []string, co *mtgmatcher.CardObject) bool {
-	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
-		return a.After(b)
+	return compareReleaseDate(filters, co, func(i, j time.Time) bool {
+		return i.After(j)
 	})
 }
 

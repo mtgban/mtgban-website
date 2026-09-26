@@ -1371,22 +1371,22 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			}
 
 			sort.SliceStable(results, func(i, j int) bool {
-				a := results[i].FieldValue(sorting)
-				b := results[j].FieldValue(sorting)
-				var af, bf float64
-				af, _ = strconv.ParseFloat(a, 64)
-				bf, _ = strconv.ParseFloat(b, 64)
-				numberSort := af != 0 || bf != 0
+				vi := results[i].FieldValue(sorting)
+				vj := results[j].FieldValue(sorting)
+				var vif, vjf float64
+				vif, _ = strconv.ParseFloat(vi, 64)
+				vjf, _ = strconv.ParseFloat(vj, 64)
+				numberSort := vif != 0 || vjf != 0
 				if dir == "asc" {
 					if numberSort {
-						return af < bf
+						return vif < vjf
 					}
-					return a < b
+					return vi < vj
 				}
 				if numberSort {
-					return af > bf
+					return vif > vjf
 				}
-				return a > b
+				return vi > vj
 			})
 			break
 		}
