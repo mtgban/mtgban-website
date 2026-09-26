@@ -139,7 +139,10 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 		return err
 	}
 	log.Printf("tcgcsv backfill: %v", err)
-	return s.backfillFromSnapshot(ctx, games, from, to)
+	// !resume is the operator having named a range or passed -force, which is
+	// what re-fetching a date already stored means now that the snapshot's own
+	// date is the only one reachable.
+	return s.backfillFromSnapshot(ctx, games, from, to, !resume)
 }
 
 // backfillFromSnapshot is what a backfill can still do once tcgcsv withdraws
@@ -147,7 +150,7 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 // the snapshot's own date falls inside the requested range -- writing today's
 // prices because someone asked for last July would be a surprise, and the range
 // they asked for is genuinely gone, so say so instead.
-func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time) error {
+func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time, force bool) error {
 	snapshot, dateStr, err := s.snapshotDate(ctx)
 	if err != nil {
 		return err
@@ -158,12 +161,34 @@ func (s *Service) backfillFromSnapshot(ctx context.Context, games []tcgcsv.GameC
 			dateStr, fromStr, toStr)
 	}
 
-	// force: the operator named these dates, so re-fetch the snapshot even for a
-	// category already holding it. It is the one day still reachable, and the
-	// freshness gate would otherwise turn the whole run into a no-op.
-	rows, _, err := s.ingestSnapshot(ctx, games, snapshot, dateStr, true)
+	// Under the crawl lock, unlike the archive walk this replaces. That walk is
+	// exempt because it runs for hours and holding the lock across it would
+	// starve the daily pull; this is one pass over every group of every game --
+	// the same ~1,600 requests the daily job makes -- and letting it run beside
+	// that job is exactly what the lock exists to prevent. Losing the lock means
+	// another process is already pulling this snapshot, so the run is a no-op
+	// that says so and exits 0.
+	var rows int
+	err = s.WithCrawlLock(ctx, "tcgcsv backfill snapshot", func() error {
+		var ierr error
+		// force means the operator named a range or passed -force, so re-fetch the
+		// snapshot even for a category already holding it: it is the one day still
+		// reachable, and the freshness gate would otherwise turn that run into a
+		// no-op. A plain resumed backfill keeps the gate, so a repeat run costs the
+		// last-updated request instead of re-crawling every group of every game.
+		rows, _, ierr = s.ingestSnapshot(ctx, games, snapshot, dateStr, force)
+		return ierr
+	})
 	if err != nil {
 		return fmt.Errorf("tcgcsv backfill from the %s snapshot: %w", dateStr, err)
+	}
+	if rows == 0 {
+		// Nothing was written -- every game already holds the snapshot date -- so
+		// there is no news here, and a range that is out of reach was already
+		// reported by the run that did store it.
+		log.Printf("tcgcsv backfill: the price archive is no longer served and every game already holds the %s snapshot; %s..%s stays missing",
+			dateStr, fromStr, toStr)
+		return nil
 	}
 	// Worth waking someone for: a backfill that was meant to close a hole has
 	// stored one day and left the rest of the range permanently missing.
@@ -220,7 +245,13 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 			// Neither says anything about this one day: the archive isn't being
 			// served, or nothing on this box can unpack it. Every remaining day
 			// would answer the same, so stop instead of asking hundreds more
-			// times, and let the caller decide what to do about it.
+			// times, and let the caller decide what to do about it. Report what
+			// the run did get first -- the refusal currently lands on the first
+			// day, but one arriving mid-range would otherwise bury it.
+			if daysWithData > 0 {
+				log.Printf("tcgcsv backfill stopped at %s: %d rows over %d days before that",
+					day.Format("2006-01-02"), totalRows, daysWithData)
+			}
 			return err
 		}
 		if err != nil {

@@ -14,9 +14,10 @@ its crons and the admin "Ingest TCGCSV" button; `cmd/tcgcsvd` runs the same jobs
 as its own process, with no web server, datastore, or template stack loaded.
 The two scheduled jobs take the same cross-process Postgres advisory lock before
 crawling, so a server with its crons on and a standalone run never hit
-tcgcsv.com at once; a run that loses the lock says so and exits 0. Backfill
-stays outside the lock on purpose — it is operator-driven and can run for hours,
-and holding the lock that long would starve the daily pull.
+tcgcsv.com at once; a run that loses the lock says so and exits 0. The backfill's
+archive walk stays outside the lock on purpose — it is operator-driven and can
+run for hours, and holding the lock that long would starve the daily pull — but
+its snapshot fallback takes it, being the same full crawl the daily job makes.
 
 ```
 go install github.com/mtgban/mtgban-website/cmd/tcgcsvd@latest

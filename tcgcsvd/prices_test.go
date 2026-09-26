@@ -25,6 +25,12 @@ type recordingStore struct {
 	rows []timeseries.TCGPriceRow
 }
 
+// The snapshot fallback crawls under the crawl lock, so a store that never
+// grants it would make every test here a skip.
+func (s *recordingStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
+	return true, func() {}, nil
+}
+
 func (s *recordingStore) GetTCGLatestDate(context.Context, int) (time.Time, bool, error) {
 	if s.latest.IsZero() {
 		return time.Time{}, false, nil
@@ -162,6 +168,31 @@ func TestBackfillSnapshotIgnoresTheFreshnessGate(t *testing.T) {
 	}
 }
 
+// A plain resumed backfill keeps the gate, though: it still reaches the fallback
+// (today is past the resume cursor, and asking for it is what learns the archive
+// is gone), but the snapshot it can reach is one every game already holds, so it
+// must not re-crawl every group of every game to rewrite that date.
+func TestBackfillResumedSnapshotKeepsTheFreshnessGate(t *testing.T) {
+	yesterday := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -1)
+	fake := &fakeTCGCSV{lastUpdated: yesterday.Add(20 * time.Hour), archiveStatus: http.StatusForbidden}
+	store := &recordingStore{latest: yesterday}
+	svc, notified := fakeService(t, fake, store)
+
+	if err := svc.Backfill(context.Background(), BackfillOptions{}); err != nil {
+		t.Fatalf("Backfill: %v", err)
+	}
+	if n := fake.calls(); n == 0 {
+		t.Fatal("the archive was never asked for, so the fallback was not reached")
+	}
+	if rows := store.stored(); len(rows) != 0 {
+		t.Errorf("stored %d rows for the %s snapshot the category already holds, want 0",
+			len(rows), yesterday.Format("2006-01-02"))
+	}
+	if len(*notified) != 0 {
+		t.Errorf("notifications = %v, want none for a run that stored nothing", *notified)
+	}
+}
+
 // A range in the past is genuinely unrecoverable now. Storing today's prices
 // because someone asked for last July would be a surprise, so the run fails and
 // names the range instead.
@@ -210,4 +241,36 @@ func TestBackfillArchiveEntirelyMissingRange(t *testing.T) {
 	if err := svc.backfillFromArchive(context.Background(), svc.Games(), from, from, false); err != nil {
 		t.Errorf("a one-day range with no archive yet: %v", err)
 	}
+}
+
+// The fallback is the same full crawl the daily job makes, so it takes the crawl
+// lock the archive walk is exempt from. A process that loses the lock leaves the
+// crawl to whoever holds it rather than doubling the request volume against
+// tcgcsv, and that is a no-op, not a failure.
+func TestBackfillSnapshotYieldsTheCrawlLock(t *testing.T) {
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	fake := &fakeTCGCSV{lastUpdated: today.Add(20 * time.Hour), archiveStatus: http.StatusForbidden}
+	// lockedOutStore embeds stubStore, whose TryAdvisoryLock never acquires.
+	store := &lockedOutStore{}
+	svc, notified := fakeService(t, fake, store)
+
+	if err := svc.Backfill(context.Background(), BackfillOptions{Force: true}); err != nil {
+		t.Fatalf("Backfill: %v", err)
+	}
+	if n := fake.calls(); n != 1 {
+		t.Fatalf("asked the archive for %d day(s), want 1 -- the fallback was not reached", n)
+	}
+	if len(store.stored()) != 0 {
+		t.Error("crawled and stored without holding the crawl lock")
+	}
+	if len(*notified) != 0 {
+		t.Errorf("notifications = %v, want none for a run that yielded the lock", *notified)
+	}
+}
+
+// lockedOutStore records upserts but never wins the crawl lock.
+type lockedOutStore struct{ recordingStore }
+
+func (s *lockedOutStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
+	return false, func() {}, nil
 }

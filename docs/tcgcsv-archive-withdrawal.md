@@ -49,9 +49,17 @@ way — and one refusal, not several hundred, ends the archive attempt.
 publishes:
 
 - The current snapshot is stored when its own date falls inside the
-  requested range, ignoring the per-category freshness gate, so a plain
-  `tcgcsvd -backfill` still leaves every game current. A Discord notice
-  says which range stayed missing.
+  requested range, so a plain `tcgcsvd -backfill` still leaves every game
+  current, and a Discord notice says which range stayed missing. A named
+  range or `-force` also ignores the per-category freshness gate, which
+  would otherwise make re-fetching the one reachable date a no-op; a plain
+  resumed run keeps the gate, so repeating it costs one `last-updated`
+  request rather than a whole catalog crawl.
+- That crawl runs under the cross-process crawl lock, which the archive
+  walk it replaces is exempt from. The exemption is about holding a lock
+  for hours; this is the same ~1,630 requests the daily job makes, and
+  running it beside that job is what the lock is for. A run that loses the
+  lock leaves the crawl to whoever holds it and exits 0.
 - A range entirely in the past fails and names it. Storing today's prices
   because someone asked for last July would be a surprise, and that range
   is genuinely unrecoverable.
