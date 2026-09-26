@@ -27,9 +27,14 @@
         document.cookie = HIDDEN_COOKIE + '=' + encodeURIComponent(names.join(',')) + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
     }
 
-    // Remember which stores are currently hidden so the next chart restores them.
+    // Remember which stores are currently hidden so the next chart restores
+    // them. The preference spans cards, so a store this chart does not draw
+    // keeps whatever the cookie already says about it.
     function saveHiddenVendors(chart) {
-        var hidden = [];
+        var drawn = chart.data.datasets.map(function(ds) { return ds.label; });
+        var hidden = readHiddenVendors().filter(function(name) {
+            return drawn.indexOf(name) === -1;
+        });
         chart.data.datasets.forEach(function(ds, i) {
             if (!chart.isDatasetVisible(i)) hidden.push(ds.label);
         });

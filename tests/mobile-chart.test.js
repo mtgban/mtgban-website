@@ -76,7 +76,7 @@ async function openDrawer(answer, cookie = '') {
     await new Promise((done) => setTimeout(done, 0));
 
     return {
-        calls, charts, errors, window,
+        calls, charts, errors, window, document,
         loading: nodes['m-chart-loading'],
         select: nodes['m-chart-range'],
         rangeFailed: nodes['m-chart-range-failed'],
@@ -272,6 +272,10 @@ const legendOf = (legend) => [...legend.innerHTML.matchAll(/class="m-chart-legen
 // hiding is the cookie of a viewer who hid these stores on an earlier card.
 const hiding = (...stores) => 'MobileChartHidden=' + encodeURIComponent(stores.map((s) => s.name).join(','));
 
+// saved is the cookie a drawer leaves, as the next page sends it back: without
+// the attributes it was written with.
+const saved = (drawer) => drawer.document.cookie.split(';')[0];
+
 // A store can stop pricing a card before the drawer's first window starts, so
 // only the wider window has it.
 test('a store only the wider window holds joins the chart and its legend', async () => {
@@ -321,4 +325,34 @@ test('the stores the viewer hid stay hidden in the wider window', async () => {
 
     expect(lines(earlier.charts[0])).toEqual([line(LOW), line(MARKET, false), line(BUYLIST)]);
     expect(legendOf(earlier.legend)).toEqual(['TCG Low', 'TCG Market (hidden)', 'CK Buylist']);
+});
+
+// The cookie is one preference across cards, so a card that does not draw a
+// store the viewer hid must leave it hidden, whether the viewer only opens and
+// closes that card or taps another store in its legend.
+test('a store hidden on an earlier card stays hidden when a card without it closes', async () => {
+    const drawer = await openDrawer(pricedBy(LOW, BUYLIST), hiding(MARKET));
+    drawer.window.hideChartDrawer();
+
+    expect(saved(drawer)).toBe(hiding(MARKET));
+});
+
+test('a store hidden on an earlier card stays hidden through a tap on another', async () => {
+    const drawer = await openDrawer(firstThen(pricedBy(LOW, BUYLIST), pricedBy(LOW, MARKET, BUYLIST)), hiding(MARKET));
+    drawer.legend.buttons[1].tap();
+
+    expect(saved(drawer)).toBe(hiding(MARKET, BUYLIST));
+
+    // It comes in hidden wherever it is drawn next: on the next card, or in
+    // this card's wider range, where a tap that shows it forgets it.
+    const next = await openDrawer(pricedBy(LOW, MARKET), saved(drawer));
+    expect(lines(next.charts[0])).toEqual([line(LOW), line(MARKET, false)]);
+
+    drawer.window.changeChartRange(730);
+    await new Promise((done) => setTimeout(done, 0));
+    expect(lines(drawer.charts[0])).toEqual([line(LOW), line(MARKET, false), line(BUYLIST, false)]);
+    expect(legendOf(drawer.legend)).toEqual(['TCG Low', 'TCG Market (hidden)', 'CK Buylist (hidden)']);
+
+    drawer.legend.buttons[1].tap();
+    expect(saved(drawer)).toBe(hiding(BUYLIST));
 });
