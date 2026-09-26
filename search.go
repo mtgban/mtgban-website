@@ -510,6 +510,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if sig == "" && SigCheck {
 		pageVars.DisableChart = true
 	}
+	// Not only for the chart page: every mobile results page carries the
+	// chart drawer, whose range select locks what the tier does not reach.
+	pageVars.MaxLookbackDays = chartLookback(sig).Days()
 
 	// Load sort option from preferences, merge the alpha query parameter if needed
 	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
@@ -1228,7 +1231,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// roster's select starts on "All", so absent a choice it renders
 			// the lot. See docs/chart-page-loading.md.
 			lb, maxDays := chartWindow(sig, chartInitialRange(r, isMultiChart))
-			pageVars.MaxLookbackDays = maxDays
 			pageVars.ChartLoadedDays = lb.Days()
 
 			// Generic path: resolve every roster id to a target and chart it by
@@ -1307,7 +1309,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			lb := chartLookback(sig)
-			pageVars.MaxLookbackDays = lb.Days()
 			// The legacy read has no ranged endpoint behind it, so the page
 			// renders the whole window and the front-end never widens.
 			pageVars.ChartLoadedDays = pageVars.MaxLookbackDays
@@ -1322,7 +1323,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			lb := chartLookback(sig)
-			pageVars.MaxLookbackDays = lb.Days()
 			// The legacy read has no ranged endpoint behind it, so the page
 			// renders the whole window and the front-end never widens.
 			pageVars.ChartLoadedDays = pageVars.MaxLookbackDays
