@@ -171,8 +171,18 @@ func getChangelogEntries() ([]changelogEntry, error) {
 		done := cachedChangelog.refreshDone
 		changelogCacheMu.Unlock()
 
-		entries, err := fetchChangelogEntriesFunc()
+		// Like the waiters, loop to serve what the refresh left in the cache.
+		refreshChangelog(done)
+	}
+}
 
+// refreshChangelog fills the cache and wakes the callers waiting on done.
+// A panicking fetch leaves err at its initial value, so the deferred
+// bookkeeping backs off as after any failure while the panic carries on.
+func refreshChangelog(done chan struct{}) {
+	var entries []changelogEntry
+	err := errors.New("refresh panicked")
+	defer func() {
 		changelogCacheMu.Lock()
 		if err == nil {
 			cachedChangelog.entries = entries
@@ -186,15 +196,10 @@ func getChangelogEntries() ([]changelogEntry, error) {
 		cachedChangelog.refreshing = false
 		close(done)
 		cachedChangelog.refreshDone = nil
-
-		result := cloneChangelogEntries(cachedChangelog.entries)
-		resultErr := cachedChangelog.lastErr
 		changelogCacheMu.Unlock()
-		if len(result) > 0 {
-			return result, nil
-		}
-		return result, resultErr
-	}
+	}()
+
+	entries, err = fetchChangelogEntriesFunc()
 }
 
 func fetchChangelogEntries() ([]changelogEntry, error) {

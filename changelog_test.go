@@ -127,6 +127,56 @@ func TestGetChangelogEntriesBacksOffColdFailures(t *testing.T) {
 	}
 }
 
+func TestGetChangelogEntriesSurvivesPanickingFetch(t *testing.T) {
+	resetChangelogCache()
+	defer resetChangelogCache()
+
+	oldFetch := fetchChangelogEntriesFunc
+	defer func() { fetchChangelogEntriesFunc = oldFetch }()
+
+	calls := 0
+	fetchChangelogEntriesFunc = func() ([]changelogEntry, error) {
+		calls++
+		if calls == 1 {
+			panic("unexpected message shape")
+		}
+		return []changelogEntry{{Content: "fresh"}}, nil
+	}
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("the fetch's panic did not reach the caller")
+			}
+		}()
+		_, _ = getChangelogEntries()
+	}()
+
+	// Every call after the panic runs here, so one that waits forever on
+	// the dead refresh fails the test instead of hanging it.
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		_, err := getChangelogEntries()
+		if err == nil || calls != 1 {
+			t.Errorf("during the backoff: %v after %d fetches, want the panic's error after 1", err, calls)
+		}
+
+		changelogCacheMu.Lock()
+		cachedChangelog.retryAfter = time.Time{}
+		changelogCacheMu.Unlock()
+		entries, err := getChangelogEntries()
+		if err != nil || len(entries) != 1 || calls != 2 {
+			t.Errorf("after the backoff: %#v, %v after %d fetches, want a second fetch's entries", entries, err, calls)
+		}
+	}()
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("getChangelogEntries blocked on the refresh that panicked")
+	}
+}
+
 func TestGetChangelogChannelIDRequiresDiscord(t *testing.T) {
 	oldID := Config.Discord.ChangelogChannelID
 	oldSession := dg
