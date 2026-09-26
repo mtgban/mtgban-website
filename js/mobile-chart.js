@@ -63,6 +63,11 @@
         if (select) select.disabled = disabled;
     }
 
+    function setRangeFailed(failed) {
+        var note = document.getElementById('m-chart-range-failed');
+        if (note) note.hidden = !failed;
+    }
+
     function applyRangeFilter(range) {
         if (!currentChart) return;
         var labels = currentChart.data.labels;
@@ -88,7 +93,9 @@
         prefetchPromise = fetchChart(cardId, fullRange)
             .then(function(data) {
                 if (currentCardId !== cardId || !currentChart) return;
-                if (!data || !data.datasets) return;
+                // A wider window holds the one drawn, so an empty answer is a
+                // failed widening, as the desktop loader takes it too.
+                if (!data || !data.datasets || !data.datasets.length) throw new Error('chart prefetch: empty payload');
                 // Drawing it now would widen the chart past the range the
                 // select still names.
                 prefetched = { data: data, days: fullRange };
@@ -355,6 +362,7 @@
         canvas.style.display = 'none';
         resetBtn.style.display = 'none';
         setRangePickerDisabled(true);
+        setRangeFailed(false);
         overlay.classList.add('open');
         drawer.classList.add('open');
         // Lock background scrolling while the chart drawer is open
@@ -443,6 +451,7 @@
         if (currentChart) currentChart.resetZoom();
 
         if (range <= currentMaxLoaded) {
+            setRangeFailed(false);
             applyRangeFilter(range);
             return;
         }
@@ -461,6 +470,15 @@
         p.then(function() {
             if (currentCardId !== cardId) return;
             installPrefetched();
+            // A widening that failed leaves the chart what it had: draw all of
+            // it, set the select to it so picking the range again retries, and
+            // say so.
+            var failed = range > currentMaxLoaded;
+            setRangeFailed(failed);
+            if (failed) {
+                range = currentMaxLoaded;
+                setRangePickerValue(range);
+            }
             applyRangeFilter(range);
         }).catch(function() {
             // Swallow - the catch in prefetchFullRange already logged.

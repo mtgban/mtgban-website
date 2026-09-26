@@ -52,7 +52,12 @@ async function openDrawer(answer) {
     window.showChartDrawer('ban:1', false, 'Black Lotus');
     await new Promise((done) => setTimeout(done, 0));
 
-    return { calls, charts, errors, window, loading: nodes['m-chart-loading'], select: nodes['m-chart-range'] };
+    return {
+        calls, charts, errors, window,
+        loading: nodes['m-chart-loading'],
+        select: nodes['m-chart-range'],
+        rangeFailed: nodes['m-chart-range-failed'],
+    };
 }
 
 const empty = (range) => ({ maxLookbackDays: 3650, loadedDays: range, axisLabels: [], datasets: [] });
@@ -171,4 +176,38 @@ test('a narrower range only moves the start of what is drawn', async () => {
 
     expect(charts[0].data.labels).toEqual(days(180));
     expect(charts[0].options.scales.x.min).toBe(days(180)[89]);
+});
+
+// Picking a range the drawer cannot load must not leave the select naming it
+// over a chart that still draws less: it goes back to what is drawn, where
+// picking the range again retries, and a note says why.
+test('a wider range that fails to load says so, and names the range drawn', async () => {
+    const { charts, rangeFailed, select, window } = await openDrawer((range) => range === 180 ? daily(range) : unavailable());
+    expect(rangeFailed.hidden).toBe(true);
+
+    window.changeChartRange(730);
+    await new Promise((done) => setTimeout(done, 0));
+
+    expect(rangeFailed.hidden).toBe(false);
+    expect(select.value).toBe('180');
+    expect(charts[0].data.labels).toEqual(days(180));
+    expect(charts[0].options.scales.x.min).toBeUndefined();
+
+    // A range inside what is drawn needs no load, and clears the note.
+    window.changeChartRange(90);
+    expect(rangeFailed.hidden).toBe(true);
+});
+
+// The legacy read still reports an archive error as an empty chart. A wider
+// window holds the one drawn, so that is a failed widening, not labels to draw.
+test('an empty wider answer is a failed widening too', async () => {
+    const { calls, charts, rangeFailed, select, window } = await openDrawer((range) => range === 180 ? daily(range) : empty(range));
+
+    window.changeChartRange(730);
+    await new Promise((done) => setTimeout(done, 0));
+
+    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650', '/api/chart/ban%3A1?range=730']);
+    expect(charts[0].data.labels).toEqual(days(180));
+    expect(rangeFailed.hidden).toBe(false);
+    expect(select.value).toBe('180');
 });
