@@ -120,9 +120,9 @@ test('a narrower response is refused rather than installed', async () => {
     expect(loader.loadedDays).toBe(180);
 });
 
-// An archive error reaches the page as an empty chart the server marks
-// no-store. Installing it would blank the drawn chart and record the ceiling
-// as loaded, so no later range change would fetch again.
+// On the legacy read an archive error reaches the page as an empty chart the
+// server marks no-store. Installing it would blank the drawn chart and record
+// the ceiling as loaded, so no later range change would fetch again.
 test('an empty response is refused, and can be retried', async () => {
     const payload = { loadedDays: 3650, axisLabels: ['2026-09-24'], datasets: [] };
     const { api, calls } = loadRange({ payload });
