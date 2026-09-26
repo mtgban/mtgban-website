@@ -7,7 +7,14 @@
       "monthly": 20000,
       "store_scope": "explicit",
       "included_stores": 1,
-      "modes": ["retail", "buylist"]
+      "modes": ["retail", "buylist"],
+      "icon": "sliders",
+      "subtitle": "Entry level access",
+      "bullets": [
+        "Enjoy TCGplayer data in an easy to ingest format",
+        "Add data from any store, the first one is on us",
+        "Pick any additional store available for a small fee"
+      ]
     },
     {
       "key": "all_stores",
@@ -15,7 +22,14 @@
       "monthly": 50000,
       "store_scope": "BASE_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist"]
+      "modes": ["retail", "buylist"],
+      "icon": "globe",
+      "subtitle": "Single region market overview",
+      "bullets": [
+        "Singles prices from every US store available",
+        "EU index prices from Cardmarket",
+        "No Sealed or EV data"
+      ]
     },
     {
       "key": "all_data",
@@ -23,7 +37,15 @@
       "monthly": 80000,
       "store_scope": "ALL_ACCESS",
       "included_stores": 0,
-      "modes": ["retail", "buylist", "sealed"]
+      "modes": ["retail", "buylist", "sealed"],
+      "icon": "crown",
+      "subtitle": "One stop solution for all our data",
+      "bullets": [
+        "What you see on the website is what you get",
+        "Includes Singles, Sealed, and EV calculations",
+        "Real arbitrage: all available markets are added",
+        "Priority support"
+      ]
     }
   ],
   "addons": [
@@ -45,18 +67,5 @@
     { "key": "quarterly", "interval": "month", "count": 3, "public": false }
   ],
   "included_games": 1,
-  "stores": [
-    {
-      "key": "TCG",
-      "name": "TCGplayer",
-      "implied": true,
-      "shorthands": ["TCGLow", "TCGMarket", "TCGDirect", "TCGDirectNet", "TCGPlayer"]
-    },
-    { "key": "CK", "name": "Card Kingdom", "shorthands": ["CK"] },
-    { "key": "SCG", "name": "Star City Games", "shorthands": ["SCG"] },
-    { "key": "CSI", "name": "Cool Stuff Inc", "shorthands": ["CSI"] },
-    { "key": "ABU", "name": "ABU Games", "shorthands": ["ABUGames", "ABU"] },
-    { "key": "MKM", "name": "Cardmarket", "shorthands": ["MKM", "MKMLow", "MKMTrend"] },
-    { "key": "CT", "name": "Card Trader", "shorthands": ["CT", "CT0"] }
-  ]
+  "implied": { "key": "tcg", "name": "TCGplayer" }
 }

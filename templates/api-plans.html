@@ -11,7 +11,11 @@
         <div>
             <h1>Price data API</h1>
         </div>
+        {{if and .Email .HandoffOn}}
+        <a class="page-action" href="/api-login?return_to={{.ReturnTo}}">Manage your API access</a>
+        {{else}}
         <a class="page-action" href="{{.GatewayURL}}/account">Manage your API access</a>
+        {{end}}
     </div>
 
     <form method="GET" action="{{.GatewayURL}}/checkout" id="api-config-form">
@@ -20,31 +24,49 @@
         {{if .Change}}<input type="hidden" name="change" value="1">{{end}}
 
         <section class="api-section">
-            <h2>{{if .Change}}Change your plan{{else}}Pick a package{{end}}</h2>
-            <div class="api-cards api-podium">
+            <h2 class="api-visually-hidden">{{if .Change}}Change your plan{{else}}Pick a package{{end}}</h2>
+            <div class="api-cards">
                 {{range .Cards}}
                 <div class="card api-card{{if eq .Key $.API.TopCard}} api-card-top{{end}}">
                     <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
+                    <div class="api-tier-icon">{{plan_icon .Icon}}</div>
                     <h3><label for="api-package-{{.Key}}">{{.Name}}</label></h3>
-                    <p class="api-amount">{{usd .Monthly}}<span>/month</span></p>
-                    <ul>
-                        {{range scope_bullets . $.API.Products}}<li>{{.}}</li>{{end}}
-                        <li>Modes: {{range $i, $m := .Modes}}{{if $i}}, {{end}}{{$m}}{{end}}</li>
+                    <p class="api-sub">{{.Subtitle}}</p>
+                    <p class="api-amount">{{usd .Monthly}}<span>per month</span></p>
+                    <ul class="api-bullets">
+                        {{range .Bullets}}<li>{{.}}</li>{{end}}
                     </ul>
+                    <button type="button" class="api-btn api-cta" data-package="{{.Key}}" data-label="Choose {{.Name}}" data-selected="Selected">Choose {{.Name}}</button>
+                    {{if eq .Key $.API.TopCard}}
+                    {{if $.API.CanTrial}}
+                    <p class="api-cta-note"><a href="/api-trial?return_to={{$.API.ReturnTo}}">Try the API before you commit</a>: as a Patreon supporter you can request a one time key with FULL ACCESS for {{$.API.TrialDays}} days</p>
+                    {{else}}
+                    <p class="api-cta-note">Patreon supporters can try the API before they commit: a one time key with FULL ACCESS for {{$.API.TrialDays}} days</p>
+                    {{end}}
+                    {{else}}
+                    <p class="api-cta-note">Billed monthly, cancel any time</p>
+                    {{end}}
                 </div>
                 {{end}}
             </div>
-            <p class="api-note">{{range .Products.Addons}}{{.Name}} is {{usd .Monthly}}/month, {{addon_scope . $.API.Products.Packages}}. {{end}}</p>
         </section>
 
-        <section class="api-section api-configurator">
-            <fieldset class="api-fieldset" id="api-stores">
-                <legend>Stores <span class="api-legend-note">{{range $i, $s := .Products.ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included</span></legend>
+        <section class="api-section api-configurator" id="api-configure">
+            <h2>{{if .Change}}Change your plan{{else}}Your plan{{end}}</h2>
+            <fieldset class="api-fieldset" id="api-stores"{{if not .DefaultExplicit}} hidden{{end}}>
+                <legend>Stores <span class="api-legend-note">{{if .ImpliedStores}}{{range $i, $s := .ImpliedStores}}{{if $i}}, {{end}}{{$s.Name}}{{end}} always included, {{end}}your first store is on us, each additional is {{usd .ExtraStoreMonthly}}/month</span></legend>
+                {{if or .Stores .PaidStores}}
                 <div class="api-choices">
-                    {{range $i, $s := .Products.SelectableStores}}
-                    <label class="api-choice"><input type="checkbox" name="stores" value="{{$s.Key}}"{{if eq $i 0}} checked{{end}}> {{$s.Name}}</label>
+                    {{range $i, $s := .Stores}}
+                    <label class="api-choice"><input type="checkbox" name="stores" value="{{$s.Key}}"{{if $.API.WantedStores}}{{if slice_has $.API.WantedStores $s.Key}} checked{{end}}{{else if eq $i 0}} checked{{end}}{{if not $.API.DefaultExplicit}} disabled{{end}}> {{$s.Name}}</label>
+                    {{end}}
+                    {{range .PaidStores}}
+                    <label class="api-choice"><input type="checkbox" name="stores" value="{{.}}" checked{{if not $.API.DefaultExplicit}} disabled{{end}}> {{.}}</label>
                     {{end}}
                 </div>
+                {{else}}
+                <p class="api-note">No stores are loaded on this site right now.</p>
+                {{end}}
             </fieldset>
 
             <fieldset class="api-fieldset"{{if le (len .Games) 1}} hidden{{end}}>
@@ -68,26 +90,18 @@
             </fieldset>
 
             <div class="api-total-row">
-                <p class="api-total">Total <strong id="api-total">{{usd (index .Products.Packages 0).Monthly}}</strong><span id="api-total-period">/month</span></p>
+                <p class="api-total"><span id="api-total-package">{{.Default.Name}}</span> <strong id="api-total">{{usd .Default.Monthly}}</strong><span id="api-total-period">/month</span></p>
                 <button type="submit" class="api-btn">{{if .Change}}Review the change{{else}}Continue to checkout{{end}}</button>
                 <p class="api-note">Confirmed at checkout before anything is charged. Promotion codes are entered there.</p>
             </div>
         </section>
     </form>
 
-    <section class="api-section">
-        <h2>Patreon supporters</h2>
-        {{if .CanTrial}}
-        <div class="api-trial-row">
-            <a class="api-btn" href="/api-trial?return_to={{.ReturnTo}}">Try the API free for {{.TrialDays}} days</a>
-            <p class="api-note">{{.TrialDays}} days of all data across every game, no card required. One trial per Patreon email every six months.</p>
-        </div>
-        {{else if .Email}}
-        <p class="api-note">Supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> pledge can try the API free for {{.TrialDays}} days from this page.</p>
-        {{else}}
-        <p class="api-note">Signed-in <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> supporters can try the API free for {{.TrialDays}} days from this page.</p>
-        {{end}}
-    </section>
+    {{if and (not .CanTrial) .Email}}
+    <p class="api-note">The trial key is for supporters with an active <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">MTGBAN Patreon</a> pledge.</p>
+    {{else if not .Email}}
+    <p class="api-note">Sign in with Patreon to request the trial key.</p>
+    {{end}}
 </div>
 {{end}}
 {{end}}

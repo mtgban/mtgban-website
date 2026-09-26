@@ -80,6 +80,9 @@ type PageVars struct {
 
 	IsMobile bool
 
+	// GatewayURL is the API gateway's origin, for links to its account and admin pages.
+	GatewayURL string
+
 	// HandoffOrigins are the sites the upload handoff page will take a card
 	// list from. It reads them rather than naming one itself, so the list
 	// lives in Go where it can be tested.
@@ -576,6 +579,7 @@ func init() {
 			SubPages: []NavElem{
 				{Name: "APITrial", Link: "/api-trial", ShouldHide: func() bool { return true }},
 				{Name: "APILogin", Link: "/api-login", ShouldHide: func() bool { return true }},
+				{Name: "APIStores", Link: "/api-plans/stores.json", ShouldHide: func() bool { return true }},
 			},
 		},
 		"Admin": {
@@ -1057,6 +1061,7 @@ func genPageNav(r *http.Request, activeTab, sig string) PageVars {
 		PatreonURL:   patreonURL,
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
+		GatewayURL:   Config.APIGateway.URL,
 
 		// Read off the signature that is already parsed above, so the navbar
 		// can wear the tier without asking anybody

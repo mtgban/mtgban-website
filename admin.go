@@ -287,19 +287,20 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			os.Exit(0)
 		}()
 
-	case "newKey", "demokey":
+	case "newKey":
 		v = url.Values{}
 		doReboot = true
 
 		user := r.FormValue("user")
-		if user == "" {
-			user = DefaultAPIDemoUser
-		}
 		dur := r.FormValue("duration")
+		// A blank duration is the picker back on its placeholder, not a request for a permanent key.
 		if dur == "" {
-			dur = DefaultAPIDemoKeyDuration
+			dur = "30"
 		}
-		duration, _ := strconv.Atoi(dur)
+		duration, err := strconv.Atoi(dur)
+		if err != nil {
+			duration = 30
+		}
 
 		key, err := generateAPIKey(r.Context(), user, time.Duration(duration)*24*time.Hour)
 		msg := key
@@ -1136,10 +1137,7 @@ func disk() string {
 	return fmt.Sprintf("%.2f%% of %.2fGB", float64(used)/float64(total)*100, float64(total)/1024/1024/1024)
 }
 
-const (
-	DefaultAPIDemoKeyDuration = "30"
-	DefaultAPIDemoUser        = "demo@mtgban.com"
-)
+const DefaultAPIDemoUser = "demo@mtgban.com"
 
 var apiUsersMutex sync.RWMutex
 
