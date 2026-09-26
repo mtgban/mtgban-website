@@ -203,3 +203,124 @@ func TestSuspectPriceFor(t *testing.T) {
 		})
 	}
 }
+
+// seedArbitScraper publishes one seller under the given shorthand, so a
+// filter-option test can render the page as either a sealed or a singles
+// source without depending on real scraper data being loaded.
+func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
+	t.Helper()
+
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+
+	inv := mtgban.InventoryRecord{}
+	inv.Add("card-a", &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1, URL: "u"})
+
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{
+			Name: "Filter Test", Shorthand: shorthand, SealedMode: sealed,
+		}),
+	}
+	sellersPtr.Store(&sellers)
+}
+
+// TestArbitFilterOptionsRouteBySealedMode pins which of nosus/novolatile a
+// global page offers as a chip. Checks match "><title><" since the page
+// also embeds an always-on palette listing of every filter, sealed or not.
+func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
+	seedArbitScraper(t, "SEALEDCHIP", true)
+	page := renderArbit(t, PageVars{
+		ScraperShort:   "SEALEDCHIP",
+		GlobalMode:     true,
+		BetaNav:        &NavElem{Short: "beta"},
+		ArbitOptKeys:   FilterOptKeys,
+		ArbitOptConfig: FilterOptConfig,
+		ArbitFilters:   map[string]bool{},
+	})
+	if !strings.Contains(page, ">only Stable<") {
+		t.Error("a sealed global page does not offer novolatile")
+	}
+	if strings.Contains(page, ">only Legit<") {
+		t.Error("a sealed global page still offers nosus")
+	}
+
+	seedArbitScraper(t, "SINGLESCHIP", false)
+	page = renderArbit(t, PageVars{
+		ScraperShort:   "SINGLESCHIP",
+		GlobalMode:     true,
+		BetaNav:        &NavElem{Short: "beta"},
+		ArbitOptKeys:   FilterOptKeys,
+		ArbitOptConfig: FilterOptConfig,
+		ArbitFilters:   map[string]bool{},
+	})
+	if !strings.Contains(page, ">only Legit<") {
+		t.Error("a singles global page does not offer nosus")
+	}
+	if strings.Contains(page, ">only Stable<") {
+		t.Error("a singles global page still offers novolatile")
+	}
+}
+
+// seedVolatileSealed publishes a sealed source and probe holding one
+// product, and the simulation that rates its contents too uneven to trust.
+func seedVolatileSealed(t *testing.T, productID string) {
+	t.Helper()
+
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+
+	src := mtgban.InventoryRecord{}
+	src.Add(productID, &mtgban.InventoryEntry{Conditions: "NM", Price: 100, Quantity: 1, URL: "u"})
+	probe := mtgban.InventoryRecord{}
+	probe.Add(productID, &mtgban.InventoryEntry{Conditions: "NM", Price: 50, Quantity: 1, URL: "u"})
+	sim := mtgban.InventoryRecord{}
+	sim.Add(productID, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, URL: "u",
+		ExtraValues: map[string]float64{"iqr": IQRThreshold + 1}})
+
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(src, mtgban.ScraperInfo{Name: "Sealed Source", Shorthand: "SEALSRC", SealedMode: true}),
+		mtgban.NewSellerFromInventory(probe, mtgban.ScraperInfo{Name: "Sealed Probe", Shorthand: "SEALPRB", SealedMode: true}),
+		mtgban.NewSellerFromInventory(sim, mtgban.ScraperInfo{Name: "TCG Low Sim", Shorthand: "TCGLowSim", SealedMode: true, MetadataOnly: true}),
+	}
+	sellersPtr.Store(&sellers)
+}
+
+// renderGlobal runs one global comparison from the given source the way the
+// handler does.
+func renderGlobal(t *testing.T, source, query string) string {
+	t.Helper()
+
+	oldDev := DevMode
+	DevMode = true
+	t.Cleanup(func() { DevMode = oldDev })
+
+	r := httptest.NewRequest("GET", "/global?source="+source+query, nil)
+	w := httptest.NewRecorder()
+	pageVars := PageVars{GlobalMode: true, BetaNav: &NavElem{Short: "beta"}}
+	scraperCompare(w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
+	return w.Body.String()
+}
+
+// TestGlobalSealedDropsVolatile pins "only Stable" as on by default for a
+// sealed source, and turning it off as what brings the product back, flagged.
+func TestGlobalSealedDropsVolatile(t *testing.T) {
+	sealed := backend().GetSealedUUIDs()
+	if len(sealed) == 0 {
+		t.Skip("mtgmatcher data not loaded")
+	}
+	seedVolatileSealed(t, sealed[0])
+	row := `data-arb-id="` + sealed[0] + `"`
+
+	page := renderGlobal(t, "SEALSRC", "")
+	if strings.Contains(page, row) {
+		t.Error("a volatile product is listed by default")
+	}
+
+	page = renderGlobal(t, "SEALSRC", "&novolatile=false")
+	if !strings.Contains(page, row) {
+		t.Fatal("turning the option off does not bring the product back")
+	}
+	if !strings.Contains(page, "IQR:") {
+		t.Error("the volatile product carries no warning")
+	}
+}
