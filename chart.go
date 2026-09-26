@@ -359,6 +359,12 @@ func fetchRosterPrices(ctx context.Context, targets []chartSeries, lb timeseries
 	return out
 }
 
+// archiveAnswered reports whether the archive answered for any of a roster's
+// cards, even if only to say it holds nothing for them.
+func archiveAnswered(series []chartSeries) bool {
+	return slices.ContainsFunc(series, func(s chartSeries) bool { return s.Err == nil })
+}
+
 // earliestChartedDate is the oldest date a fetched series holds, which is where
 // the axis starts. Empty series fall back to the lookback boundary, the same
 // answer the archive gave when it was asked directly.

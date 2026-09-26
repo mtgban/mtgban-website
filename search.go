@@ -1251,9 +1251,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// An empty window hides the chart and the select that could widen it,
 			// so a card whose prices all predate the window reads the ceiling. A
 			// read that failed is not an empty window, so it is not retried wider.
-			answered := slices.ContainsFunc(series, func(s chartSeries) bool { return s.Err == nil })
 			priced := slices.ContainsFunc(series, func(s chartSeries) bool { return len(s.Prices) > 0 })
-			if lb.Days() < maxDays && answered && !priced {
+			if lb.Days() < maxDays && archiveAnswered(series) && !priced {
 				lb, _ = chartWindow(sig, 0)
 				pageVars.ChartLoadedDays = lb.Days()
 				series = fetchRosterPrices(r.Context(), resolved, lb)
@@ -1269,7 +1268,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					earliest = e
 				}
 			}
-			if len(series) == 0 || earliest.IsZero() {
+			if len(series) > 0 && !archiveAnswered(series) {
+				// An archive that did not answer says nothing about the card.
+				pageVars.InfoMessage = "Failed to load chart"
+			} else if len(series) == 0 || earliest.IsZero() {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)

@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 )
@@ -166,7 +165,7 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 
 	// An archive that answered for none of the cards is an outage, not an
 	// empty chart, and a client told so can say so rather than ask for more.
-	if !slices.ContainsFunc(series, func(s chartSeries) bool { return s.Err == nil }) {
+	if !archiveAnswered(series) {
 		errorResponse(w, http.StatusServiceUnavailable, "charts not available")
 		return
 	}
