@@ -216,16 +216,17 @@ type PageVars struct {
 	SleepersKeys   []string
 	SleepersColors []string
 
-	Tables       [][][]string
-	LastUpdate   time.Time
-	LastNews     time.Time
-	LastStash    time.Time
-	Uptime       string
-	DiskStatus   string
-	MemoryStatus string
-	LatestHash   string
-	Tiers        []string
-	Finishes     []string
+	Tables          [][][]string
+	LastUpdate      time.Time
+	DatastoreReload dsreload.State
+	LastNews        time.Time
+	LastStash       time.Time
+	Uptime          string
+	DiskStatus      string
+	MemoryStatus    string
+	LatestHash      string
+	Tiers           []string
+	Finishes        []string
 
 	SelectableField bool
 	SelectableLabel string

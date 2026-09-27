@@ -809,6 +809,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.LatestHash = BuildCommit
 
 	pageVars.DisableChart = IsStashingInProgress()
+	// Read last: ?reboot=datastore above may have just started one.
+	pageVars.DatastoreReload = datastoreReloads.Status()
 
 	// Only the Usage tab reads these aggregates and each one scans a 30-day
 	// window, so leave them alone unless that is the tab being rendered.

@@ -26,7 +26,7 @@
         {{end}}
     {{end}}
 
-    {{with datastore_reload}}
+    {{with .DatastoreReload}}
         {{if .Running}}
             <div class="admin-msg admin-msg-progress">
                 <span class="admin-spinner"></span>
@@ -51,7 +51,7 @@
         <span class="admin-sep"></span>
         <div class="admin-stat"><span class="sl">Hash</span><a target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{.LatestHash}}</a></div>
         <span class="admin-sep"></span>
-        <div class="admin-stat"><span class="sl">Datastore</span><span class="sv">{{if datastore_reload.Running}}<span class="admin-updating">updating, {{datastore_reload.Elapsed}}</span>{{else}}<time class="admin-localtime" datetime="{{.LastUpdate.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastUpdate.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
+        <div class="admin-stat"><span class="sl">Datastore</span><span class="sv">{{if .DatastoreReload.Running}}<span class="admin-updating">updating, {{.DatastoreReload.Elapsed}}</span>{{else}}<time class="admin-localtime" datetime="{{.LastUpdate.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastUpdate.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
         <span class="admin-sep"></span>
         <div class="admin-stat"><span class="sl">Newspaper</span><span class="sv">{{if .LastNews.IsZero}}not set{{else}}<time class="admin-localtime" datetime="{{.LastNews.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastNews.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
         <span class="admin-sep"></span>
@@ -424,10 +424,10 @@
             <div class="card tools-card">
                 <h3>Server Actions</h3>
                 <div class="admin-action-list">
-                    {{if datastore_reload.Running}}
+                    {{if .DatastoreReload.Running}}
                     <span class="admin-action admin-action-disabled">
                         <span class="act-icon">⏳</span> Reload Datastore
-                        <span class="act-desc">Already running, {{datastore_reload.Elapsed}} so far</span>
+                        <span class="act-desc">Already running, {{.DatastoreReload.Elapsed}} so far</span>
                     </span>
                     {{else}}
                     <a class="admin-action" href="?reboot=datastore" onclick="return confirm('Reload datastore?')">

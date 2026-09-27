@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -11,10 +13,9 @@ import (
 )
 
 // TestAdminPageReportsTheReload renders the admin page in each state the
-// datastore reload can be in. The page reads the reload through a template
-// function rather than a page variable, so a call spelled wrong compiles
-// fine and only fails when the page is drawn - which is while a reload is
-// running, the moment the page is most wanted.
+// datastore reload can be in. renderAdmin fills DatastoreReload by hand, the
+// way Admin's own handler does from datastoreReloads.Status(), since this
+// test drives the template directly rather than through the handler.
 func TestAdminPageReportsTheReload(t *testing.T) {
 	for _, tt := range []struct {
 		desc       string
@@ -78,6 +79,38 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 	}
 }
 
+// The click that starts a reload is answered by a page that says it is
+// running: the handler reads the tracker after the reboot action, not
+// before. The load blocks on a server that answers only once released.
+func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
+	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
+	DevMode, SigCheck = true, false
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	defer func(path string) { Config.DatastorePath = path }(Config.DatastorePath)
+	Config.DatastorePath = srv.URL + "/allprintings5.json.xz"
+	datastoreReloads = dsreload.Tracker{}
+
+	rec := httptest.NewRecorder()
+	Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?reboot=datastore", nil))
+	close(release)
+	waitForReload(t)
+
+	page := rec.Body.String()
+	for _, want := range []string{"Datastore update in progress", "Already running"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page that started the reload does not say %q", want)
+		}
+	}
+	if strings.Contains(page, `href="?reboot=datastore"`) {
+		t.Error("the page that started the reload still offers to start one")
+	}
+}
+
 var errTest = errTestType("bucket said no")
 
 type errTestType string
@@ -92,7 +125,7 @@ func renderAdmin(t *testing.T) string {
 		t.Fatalf("parsing admin.html: %v", err)
 	}
 	var buf bytes.Buffer
-	vars := PageVars{Title: "Admin", BetaNav: &NavElem{}, LastUpdate: time.Now()}
+	vars := PageVars{Title: "Admin", BetaNav: &NavElem{}, LastUpdate: time.Now(), DatastoreReload: datastoreReloads.Status()}
 	if err := tmpl.ExecuteTemplate(&buf, baseName, vars); err != nil {
 		t.Fatalf("rendering admin.html: %v", err)
 	}
