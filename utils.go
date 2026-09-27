@@ -433,11 +433,11 @@ func loadRarityBadges() {
 }
 
 // promoTypeLabel spells a promo type the way a page should show it - what
-// the promo_label template function calls. A "ff" token (Final Fantasy's
-// "ffi", "ffii", ...) reads as its own initialism rather than the fuller
-// spelling PromoTypeLabels carries for it ("FF I"); everything else is
-// mtgmatcher's own spelling, which - unlike title-casing the token - can put
-// back a space the token dropped ("bestof" -> "Best Of").
+// fills a GenericCard's PromoLabels, one entry per promo token. A "ff" token
+// (Final Fantasy's "ffi", "ffii", ...) reads as its own initialism rather than
+// the fuller spelling PromoTypeLabels carries for it ("FF I"); everything
+// else is mtgmatcher's own spelling, which - unlike title-casing the token -
+// can put back a space the token dropped ("bestof" -> "Best Of").
 func promoTypeLabel(b *mtgmatcher.Backend, value string) string {
 	if strings.HasPrefix(value, "ff") {
 		return strings.ToUpper(value)
@@ -464,8 +464,8 @@ type GenericCard struct {
 	// Prerelease or Bundle, so it needs no field of its own and arrives here
 	// like any other. The one exception is the pre-8th-edition border, which
 	// carries no promo type in the datastore; "retro" is added for it by
-	// hand, since is:retro is a real filter despite that. The template
-	// spells each token with promo_label and links it to that search.
+	// hand, since is:retro is a real filter despite that. Spelled for
+	// display via PromoLabels, keyed by the token itself.
 	PromoTypes []string
 	Keyrune    string
 	// SetSymbol is the set's own published symbol image, from the same
@@ -479,7 +479,11 @@ type GenericCard struct {
 	// Treatments is the alt-foil-style promo type badge beside a non-foil
 	// card's name - a raw token each, same as PromoTypes, since every entry
 	// here is a promo type and nothing else ever fills the slice.
-	Treatments  []string
+	Treatments []string
+	// PromoLabels spells every token PromoTypes or Treatments carries the
+	// way a page should show it, keyed by the token. Nil when the card
+	// carries neither.
+	PromoLabels map[string]string
 	Reserved    bool
 	Title       string
 	SearchURL   string
@@ -1018,6 +1022,20 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		promoTypes = append(promoTypes, "retro")
 	}
 
+	// Spelled once here rather than by the template at render time, so a
+	// reload between the handler's snapshot and the draw can't disagree
+	// with the rest of the page about what a token means.
+	var promoLabels map[string]string
+	if len(promoTypes) > 0 || len(treatments) > 0 {
+		promoLabels = make(map[string]string, len(promoTypes)+len(treatments))
+		for _, promoType := range promoTypes {
+			promoLabels[promoType] = promoTypeLabel(b, promoType)
+		}
+		for _, promoType := range treatments {
+			promoLabels[promoType] = promoTypeLabel(b, promoType)
+		}
+	}
+
 	name, flavor := co.Name, co.FlavorName
 	if flavor != "" {
 		// Use allLanguageFlags to check whether the card should always
@@ -1132,6 +1150,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		FinishTag:   finishTag,
 		FinishClass: finishClass,
 		Treatments:  treatments,
+		PromoLabels: promoLabels,
 		Keyrune:     keyrune,
 		SetSymbol:   setSymbol,
 		ImageURL:    imgURL,
