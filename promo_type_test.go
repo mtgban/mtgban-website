@@ -130,7 +130,7 @@ func TestRetroFrameStaysDateGated(t *testing.T) {
 	}
 }
 
-// promo_label is what every card row asks to spell a raw token: mtgmatcher's
+// promoTypeLabel is what fills a card row's PromoLabels: mtgmatcher's
 // own spelling, with a space put back where title-casing the token could not
 // ("bestof" -> "Best Of"), except a "ff" token (Final Fantasy's "ffi", ...),
 // which reads as its own initialism rather than the fuller spelling

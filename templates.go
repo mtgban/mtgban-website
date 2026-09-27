@@ -212,12 +212,6 @@ var funcMap = template.FuncMap{
 		}
 		return fitCode(badge, code)
 	},
-	// promo_label spells a raw promo type token ("galaxyfoil") the way a
-	// page should show it ("Galaxy foil"). GenericCard carries the token
-	// alone - a PromoTypes or Treatments entry - so a card row asks for the
-	// spelling at render time rather than a Go field baking one in ahead of
-	// it.
-	"promo_label": func(v string) string { return promoTypeLabel(backend(), v) },
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")
 		if err != nil {
