@@ -94,8 +94,13 @@ Boot sequence (`main()`):
    (non-fatal if unconfigured), `reloadCheckpoints()`,
    `s.offline.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
-5. Async goroutine: `s.loadDatastore(Config.DatastorePath)` — opens the
-   site's game via `mtgmatcher.Open(datastoreGame(), reader)` (not the old
+5. `s.reloads.Start("startup", Config.DatastorePath, ...)` runs
+   `s.loadDatastore(Config.DatastorePath)` in the background through the
+   same single-flight tracker an admin/API reload uses (`internal/dsreload`):
+   a reload requested before this finishes gets "already running" instead of
+   racing it, and a panic building a snapshot is recovered instead of
+   killing the process. `loadDatastore` opens the site's game via
+   `mtgmatcher.Open(datastoreGame(), reader)` (not the old
    `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots

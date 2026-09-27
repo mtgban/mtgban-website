@@ -1409,13 +1409,16 @@ func main() {
 		log.Fatalln("template cache:", err)
 	}
 
-	// load website up
-	go func() {
+	// Load through the tracker: a panic is recovered and recorded rather than
+	// killing the process, and a reload requested before this finishes is told
+	// one is already running instead of racing it.
+	s.reloads.Start("startup", Config.DatastorePath, func() error {
 		err := s.loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
-	}()
+		return nil
+	})
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
