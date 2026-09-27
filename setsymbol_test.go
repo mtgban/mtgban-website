@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"html/template"
 	"os"
 	"strings"
 	"testing"
@@ -67,44 +66,36 @@ func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
 }
 
 // Published symbols take precedence over glyphs and badges; sets without an
-// image retain their existing rendering.
+// image retain their existing rendering. Each case hands the partial its
+// symbol the way a page's data does.
 func TestSetSymbolImages(t *testing.T) {
 	oldGame, oldBadges := Config.Game, rarityBadges
 	t.Cleanup(func() { Config.Game, rarityBadges = oldGame, oldBadges })
 	Config.Game = "onepiece"
 	loadRarityBadges()
-	symbolFuncs := template.FuncMap{}
-	for name, fn := range funcMap {
-		symbolFuncs[name] = fn
-	}
-	symbolFuncs["set_symbol"] = func(code string) string {
-		if code == "SVI" {
-			return "https://assets.tcgdex.net/univ/sv/sv01/symbol.webp"
-		}
-		return ""
-	}
-	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, symbolFuncs)
+	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, funcMap)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tc := range []struct{ name, code, keyrune, want string }{
-		{"symbol card", "SVI", "", `src="https://assets.tcgdex.net/univ/sv/sv01/symbol.webp"`},
-		{"symbol sized", "SVI", "", `width="20" height="20"`},
-		{"symbol keeps code", "SVI", "", `alt="SVI"`},
-		{"symbol precedes glyph", "SVI", "ss-svi", `class="set-symbol-art`},
-		{"no symbol still badges", "OP01", "", `>OP01</text>`},
-		{"no symbol keeps glyph", "LEA", "ss-lea", `<i class="ss ss-lea`},
+	const sviSymbol = "https://assets.tcgdex.net/univ/sv/sv01/symbol.webp"
+	for _, tc := range []struct{ name, code, keyrune, symbol, want string }{
+		{"symbol card", "SVI", "", sviSymbol, `src="https://assets.tcgdex.net/univ/sv/sv01/symbol.webp"`},
+		{"symbol sized", "SVI", "", sviSymbol, `width="20" height="20"`},
+		{"symbol keeps code", "SVI", "", sviSymbol, `alt="SVI"`},
+		{"symbol precedes glyph", "SVI", "ss-svi", sviSymbol, `class="set-symbol-art`},
+		{"no symbol still badges", "OP01", "", "", `>OP01</text>`},
+		{"no symbol keeps glyph", "LEA", "ss-lea", "", `<i class="ss ss-lea`},
 		// A published symbol's address is the vendor's to move, and it did:
 		// every Pokemon symbol 404ed for nine days once. onerror falls the
 		// image back to a hidden copy of the same glyph a set with none at
 		// all would show, rather than an empty box.
-		{"symbol has a fallback for a failed load", "SVI", "", `onerror="this.style.display='none';this.nextElementSibling.hidden=false;"`},
-		{"symbol's fallback is hidden", "SVI", "", `<span hidden>`},
-		{"symbol's fallback is the same glyph a bare set would draw", "SVI", "ss-svi", `<span hidden> <i class="ss ss-svi`},
-		{"symbol's fallback badges too, where a bare set would", "SVI", "", `<span hidden> <svg`},
+		{"symbol has a fallback for a failed load", "SVI", "", sviSymbol, `onerror="this.style.display='none';this.nextElementSibling.hidden=false;"`},
+		{"symbol's fallback is hidden", "SVI", "", sviSymbol, `<span hidden>`},
+		{"symbol's fallback is the same glyph a bare set would draw", "SVI", "ss-svi", sviSymbol, `<span hidden> <i class="ss ss-svi`},
+		{"symbol's fallback badges too, where a bare set would", "SVI", "", sviSymbol, `<span hidden> <svg`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			arg := map[string]any{"Keyrune": tc.keyrune, "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Size": 20, "Class": "x"}
+			arg := map[string]any{"Keyrune": tc.keyrune, "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Symbol": tc.symbol, "Size": 20, "Class": "x"}
 			var b bytes.Buffer
 			if err := tmpl.ExecuteTemplate(&b, "set-symbol", arg); err != nil {
 				t.Fatal(err)

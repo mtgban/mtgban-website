@@ -54,7 +54,7 @@
      would get, hidden until then, so a vendor moving the file again reads as
      a code in a badge rather than a hole where an icon should be. */}}
 {{define "set-symbol"}}
-    {{$symbol := set_symbol .Code}}
+    {{$symbol := .Symbol}}
     {{if $symbol}}
         <img class="set-symbol-art {{.Class}}" src="{{$symbol}}" alt="{{.Code}}" title="{{.Code}}" width="{{.Size}}" height="{{.Size}}" loading="lazy"
              onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
