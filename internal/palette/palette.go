@@ -29,8 +29,8 @@ type ArbitFilter struct {
 	ArbitOnly bool
 }
 
-// Service exposes the palette endpoints, wired to the host's live scraper
-// and page registries via callbacks so it always reflects current state.
+// Service exposes the palette endpoints, wired to the host's live datastore
+// and scraper lists via callbacks so it always reflects current state.
 type Service struct {
 	// Backend returns the current card datastore.
 	Backend func() *mtgmatcher.Backend
@@ -38,12 +38,6 @@ type Service struct {
 	// endpoint.
 	Sellers func() []mtgban.Seller
 	Vendors func() []mtgban.Vendor
-
-	// NewspaperPages returns the newspaper views offered as jump targets.
-	NewspaperPages func() []NewspaperPage
-
-	// ArbitFilters returns the arbitrage filter options, in display order.
-	ArbitFilters func() []ArbitFilter
 
 	// PromoAliases returns the shorthands a promo type also answers to, so
 	// the endpoint can offer them beside the type itself.
@@ -478,20 +472,19 @@ type ArbitTargets struct {
 }
 
 // NewspaperTargetsJSON returns JSON for all newspaper page views.
-func (s *Service) NewspaperTargetsJSON() template.JS {
+func NewspaperTargetsJSON(pages []NewspaperPage) template.JS {
 	out := []NavTarget{}
 	titleCounts := map[string]int{}
 
 	// First pass: count title occurrences so we know which need disambiguation.
-	newspaperPages := s.NewspaperPages()
-	for _, p := range newspaperPages {
+	for _, p := range pages {
 		if p.Option == "" || p.Option == "options" {
 			continue
 		}
 		titleCounts[p.Title]++
 	}
 
-	for _, p := range newspaperPages {
+	for _, p := range pages {
 		if p.Option == "" || p.Option == "options" {
 			continue
 		}
@@ -521,7 +514,7 @@ func (s *Service) NewspaperTargetsJSON() template.JS {
 			Group: group,
 		})
 	}
-	// Include Newspaper SubPages from the nav tree that aren't in NewspaperPages
+	// Include Newspaper SubPages from the nav tree that aren't in pages
 	out = append(out, NavTarget{
 		Value: "syp",
 		Label: "TCG Syp List",
@@ -564,7 +557,7 @@ func SleepersTargetsJSON() template.JS {
 // ArbitTargetsJSON produces targets for /arbit. variant adjusts visibility:
 // "reverse" hides ArbitOnly filters; "global" shows only those relevant to
 // the global view.
-func (s *Service) ArbitTargetsJSON(variant string) template.JS {
+func ArbitTargetsJSON(variant string, filters []ArbitFilter) template.JS {
 	out := ArbitTargets{
 		Filters: []NavTarget{},
 		Sorts: []NavTarget{
@@ -578,7 +571,7 @@ func (s *Service) ArbitTargetsJSON(variant string) template.JS {
 			{Value: "alpha", Label: "Alphabetical"},
 		},
 	}
-	for _, filter := range s.ArbitFilters() {
+	for _, filter := range filters {
 		if variant == "global" && filter.ArbitOnly {
 			continue
 		}

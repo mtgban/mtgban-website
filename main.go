@@ -975,8 +975,33 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	BuylistBlockList: func() []string { return Config.SearchBuylistBlockList },
 })
 
-// paletteService wires the command-palette endpoints to the live scraper lists,
-// the newspaper page registry, and the arbit filter options.
+// paletteNewspaperPages lists the newspaper views the command palette
+// offers as jump targets.
+func paletteNewspaperPages() []palette.NewspaperPage {
+	pages := GetNewspaperPages()
+	out := make([]palette.NewspaperPage, 0, len(pages))
+	for _, page := range pages {
+		out = append(out, palette.NewspaperPage{Title: page.Title, Option: page.Option})
+	}
+	return out
+}
+
+// paletteArbitFilters lists the arbitrage filter options the command
+// palette offers, in display order.
+func paletteArbitFilters() []palette.ArbitFilter {
+	out := make([]palette.ArbitFilter, 0, len(FilterOptKeys))
+	for _, key := range FilterOptKeys {
+		cfg, ok := FilterOptConfig[key]
+		if !ok {
+			continue
+		}
+		out = append(out, palette.ArbitFilter{Key: key, Title: cfg.Title, ArbitOnly: cfg.ArbitOnly})
+	}
+	return out
+}
+
+// paletteService wires the command-palette endpoints to the live datastore
+// and scraper lists.
 var paletteService = &palette.Service{
 	Backend: backend,
 	PromoAliases: func() map[string]string {
@@ -988,25 +1013,6 @@ var paletteService = &palette.Service{
 
 	Sellers: GetSellers,
 	Vendors: GetVendors,
-	NewspaperPages: func() []palette.NewspaperPage {
-		pages := GetNewspaperPages()
-		out := make([]palette.NewspaperPage, 0, len(pages))
-		for _, page := range pages {
-			out = append(out, palette.NewspaperPage{Title: page.Title, Option: page.Option})
-		}
-		return out
-	},
-	ArbitFilters: func() []palette.ArbitFilter {
-		out := make([]palette.ArbitFilter, 0, len(FilterOptKeys))
-		for _, key := range FilterOptKeys {
-			cfg, ok := FilterOptConfig[key]
-			if !ok {
-				continue
-			}
-			out = append(out, palette.ArbitFilter{Key: key, Title: cfg.Title, ArbitOnly: cfg.ArbitOnly})
-		}
-		return out
-	},
 }
 
 const (

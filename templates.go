@@ -329,11 +329,11 @@ var funcMap = template.FuncMap{
 		}
 		return true
 	},
-	"palette_newspaper_targets": func() template.JS { return paletteService.NewspaperTargetsJSON() },
+	"palette_newspaper_targets": func() template.JS { return palette.NewspaperTargetsJSON(paletteNewspaperPages()) },
 	"palette_sleepers_targets":  palette.SleepersTargetsJSON,
-	"palette_arbit_targets":     func() template.JS { return paletteService.ArbitTargetsJSON("arbit") },
-	"palette_reverse_targets":   func() template.JS { return paletteService.ArbitTargetsJSON("reverse") },
-	"palette_global_targets":    func() template.JS { return paletteService.ArbitTargetsJSON("global") },
+	"palette_arbit_targets":     func() template.JS { return palette.ArbitTargetsJSON("arbit", paletteArbitFilters()) },
+	"palette_reverse_targets":   func() template.JS { return palette.ArbitTargetsJSON("reverse", paletteArbitFilters()) },
+	"palette_global_targets":    func() template.JS { return palette.ArbitTargetsJSON("global", paletteArbitFilters()) },
 	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
 	"api_plans_json":            apiPlansJSON,
