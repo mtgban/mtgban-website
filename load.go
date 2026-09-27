@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"net"
-	"net/url"
 	"path"
 	"slices"
 	"strings"
@@ -36,6 +36,11 @@ const (
 	// blazer's range parallelism within a single object. It multiplies with
 	// the fan-out above, hence lower than what a serial loader could afford.
 	bucketConcurrentDownloads = 4
+
+	// dumpsBucket is where bantool publishes every game's dumps, each at
+	// <game>/<store>/<kind>/<shorthand>.<dumpFormat>.
+	dumpsBucket = "mtgban-dumps"
+	dumpFormat  = "json.xz"
 )
 
 var DataBucket simplecloud.Reader
@@ -74,37 +79,206 @@ func GetVendors() []mtgban.Vendor {
 }
 
 type ScraperConfig struct {
-	BucketAccessKey  string `json:"bucket_access_key"`
-	BucketSecretKey  string `json:"bucket_access_secret"`
-	BucketPath       string `json:"bucket_path"`
-	BucketFileFormat string `json:"bucket_file_format"`
-
-	Config map[string]map[string][]string `json:"config"`
-
 	Icons        map[string]string `json:"icons"`
 	NameOverride map[string]string `json:"name_override"`
 }
 
-func loadScrapersNG(config ScraperConfig) error {
-	u, err := url.Parse(config.BucketPath)
-	if err != nil {
-		return err
-	}
+// scraperIndex is a snapshot of what the dumps bucket publishes: byStore is
+// store -> kind -> shorthands, byShorthand is the reverse lookup the admin
+// dashboard uses. Immutable once published.
+type scraperIndex struct {
+	byStore     map[string]map[string][]string
+	byShorthand map[string]string
+}
 
-	switch u.Scheme {
-	case "":
-		DataBucket = &simplecloud.FileBucket{}
-	case "b2":
-		b2Bucket, err := simplecloud.NewB2Client(context.Background(), config.BucketAccessKey, config.BucketSecretKey, u.Host)
-		if err != nil {
-			return err
+func newScraperIndex() *scraperIndex {
+	return &scraperIndex{byStore: map[string]map[string][]string{}, byShorthand: map[string]string{}}
+}
+
+// add records one dump. Safe to call more than once for the same triple.
+func (idx *scraperIndex) add(store, kind, shorthand string) {
+	if idx.byStore[store] == nil {
+		idx.byStore[store] = map[string][]string{}
+	}
+	if !slices.Contains(idx.byStore[store][kind], shorthand) {
+		idx.byStore[store][kind] = append(idx.byStore[store][kind], shorthand)
+	}
+	idx.byShorthand[shorthand] = store
+}
+
+// replaceStore replaces store's entries with kinds, dropping any shorthand
+// not in kinds from the reverse lookup.
+func (idx *scraperIndex) replaceStore(store string, kinds map[string][]string) {
+	for sh, s := range idx.byShorthand {
+		if s == store {
+			delete(idx.byShorthand, sh)
 		}
-		b2Bucket.ConcurrentDownloads = bucketConcurrentDownloads
-
-		DataBucket = b2Bucket
-	default:
-		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
+	delete(idx.byStore, store)
+	for kind, list := range kinds {
+		for _, sh := range list {
+			idx.add(store, kind, sh)
+		}
+	}
+}
+
+// buildScraperIndex derives a scraperIndex - including the reverse
+// shorthand->store lookup - from a store -> kind -> shorthands map, the shape
+// a listing produces and tests already build by hand.
+func buildScraperIndex(byStore map[string]map[string][]string) *scraperIndex {
+	idx := newScraperIndex()
+	for store, kinds := range byStore {
+		for kind, list := range kinds {
+			for _, sh := range list {
+				idx.add(store, kind, sh)
+			}
+		}
+	}
+	return idx
+}
+
+// scraperIndexPtr holds the currently published scraperIndex, next to
+// sellersPtr/vendorsPtr above. Only loadScrapersNG (full replace) and
+// updateScraperIndexStore (single-store replace) publish to it.
+var scraperIndexPtr atomic.Pointer[scraperIndex]
+
+// emptyScraperIndex is served before the first listing publishes.
+var emptyScraperIndex = newScraperIndex()
+
+// currentScraperIndex returns the live scraperIndex, or an empty one before
+// the first load. Never nil.
+func currentScraperIndex() *scraperIndex {
+	idx := scraperIndexPtr.Load()
+	if idx != nil {
+		return idx
+	}
+	return emptyScraperIndex
+}
+
+// scraperStoreConfig returns the current store -> kind -> shorthands map.
+// Callers must not mutate it.
+func scraperStoreConfig() map[string]map[string][]string {
+	return currentScraperIndex().byStore
+}
+
+// scraperStoreOf returns the store that publishes shorthand, per the last
+// listing - the dashboard's per-row "Id" column.
+func scraperStoreOf(shorthand string) (string, bool) {
+	store, ok := currentScraperIndex().byShorthand[shorthand]
+	return store, ok
+}
+
+// updateScraperIndexStore replaces store's entry in the published index
+// with kinds. It copies the current maps rather than rebuilding them, so
+// the store takes the shorthands it publishes and every other entry keeps
+// its owner. Serialized on scrapersWriteMu.
+func updateScraperIndexStore(store string, kinds map[string][]string) {
+	scrapersWriteMu.Lock()
+	defer scrapersWriteMu.Unlock()
+
+	current := currentScraperIndex()
+	next := newScraperIndex()
+	maps.Copy(next.byStore, current.byStore)
+	maps.Copy(next.byShorthand, current.byShorthand)
+	next.replaceStore(store, kinds)
+	scraperIndexPtr.Store(next)
+}
+
+// parseDumpKey parses a bucket key of the form
+// "<game>/<store>/<kind>/<shorthand>.json.xz", or reports ok=false for a
+// stray object, a wrong kind, or the wrong extension.
+func parseDumpKey(key, game string) (store, kind, shorthand string, ok bool) {
+	rest, ok := strings.CutPrefix(key, game+"/")
+	if !ok {
+		return "", "", "", false
+	}
+	parts := strings.Split(rest, "/")
+	if len(parts) != 3 {
+		return "", "", "", false
+	}
+	store, kind, filename := parts[0], parts[1], parts[2]
+	if kind != "retail" && kind != "buylist" {
+		return "", "", "", false
+	}
+	shorthand, ok = strings.CutSuffix(filename, "."+dumpFormat)
+	if !ok || store == "" || shorthand == "" {
+		return "", "", "", false
+	}
+	return store, kind, shorthand, true
+}
+
+// listDumps lists every dump under prefix and returns it as a scraperIndex,
+// parsing each key against game+"/" regardless of how much further prefix
+// narrows it. bucket must implement simplecloud.Lister.
+func listDumps(ctx context.Context, bucket simplecloud.Reader, game, prefix string) (*scraperIndex, error) {
+	lister, ok := bucket.(simplecloud.Lister)
+	if !ok {
+		return nil, fmt.Errorf("%T cannot list dumps", bucket)
+	}
+
+	idx := newScraperIndex()
+	for obj, err := range lister.List(ctx, prefix) {
+		if err != nil {
+			return nil, err
+		}
+		store, kind, shorthand, ok := parseDumpKey(obj.Key, game)
+		if !ok {
+			log.Printf("ignoring unrecognized dump key %q", obj.Key)
+			continue
+		}
+		idx.add(store, kind, shorthand)
+	}
+	return idx, nil
+}
+
+// listDumpsWithRetry is listDumps with loadScraperWithRetry's policy: each
+// attempt times out after scraperLoadTimeout, and only a timeout is
+// retried.
+func listDumpsWithRetry(bucket simplecloud.Reader, game, prefix string) (*scraperIndex, error) {
+	var lastErr error
+	for attempt := range scraperLoadRetries {
+		if attempt > 0 {
+			delay := time.Duration(attempt) * 5 * time.Second
+			log.Printf("retrying listing %s (attempt %d/%d) after %v", prefix, attempt+1, scraperLoadRetries, delay)
+			time.Sleep(delay)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), scraperLoadTimeout)
+		idx, err := listDumps(ctx, bucket, game, prefix)
+		cancel()
+		if err == nil {
+			return idx, nil
+		}
+		lastErr = err
+		if !isTimeout(lastErr) {
+			return nil, lastErr
+		}
+		log.Printf("listing %s timed out: %v", prefix, lastErr)
+	}
+	return nil, lastErr
+}
+
+// openDumpsBucket opens dumpsBucket with its bucket_keys key pair.
+func openDumpsBucket(ctx context.Context) (*simplecloud.B2Bucket, error) {
+	bucket, err := newB2ClientFor(ctx, dumpsBucket)
+	if err != nil {
+		return nil, err
+	}
+	bucket.ConcurrentDownloads = bucketConcurrentDownloads
+	return bucket, nil
+}
+
+func loadScrapersNG(bucket simplecloud.Reader) error {
+	idx, err := listDumpsWithRetry(bucket, Config.Game, Config.Game+"/")
+	if err != nil {
+		return fmt.Errorf("listing dumps: %w", err)
+	}
+
+	// Publish before loading, so no reader sees every store as unknown
+	// during the load, and a concurrent /api/load isn't overwritten.
+	scrapersWriteMu.Lock()
+	scraperIndexPtr.Store(idx)
+	scrapersWriteMu.Unlock()
 
 	type scraperLoad struct {
 		name      string
@@ -113,13 +287,14 @@ func loadScrapersNG(config ScraperConfig) error {
 	}
 
 	var loads []scraperLoad
-	for name, scrapersConfig := range config.Config {
+	for name, scrapersConfig := range idx.byStore {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
 				loads = append(loads, scraperLoad{name, kind, shorthand})
 			}
 		}
 	}
+	log.Println("Loading", len(loads), "scrapers")
 
 	type loadResult struct {
 		entry string
@@ -135,7 +310,7 @@ func loadScrapersNG(config ScraperConfig) error {
 	// the summary reports it and loadScraperWithRetry has already logged it.
 	mtgban.WorkerPool(context.Background(), scraperLoadConcurrency, loads,
 		func(ctx context.Context, load scraperLoad, results chan<- loadResult) error {
-			err := loadScraperWithRetry(DataBucket, config.BucketPath, Config.Game, load.name, load.kind, load.shorthand, config.BucketFileFormat)
+			err := loadScraperWithRetry(bucket, Config.Game, load.name, load.kind, load.shorthand)
 			results <- loadResult{
 				entry: fmt.Sprintf("%s/%s/%s", load.name, load.kind, load.shorthand),
 				err:   err,
@@ -186,7 +361,7 @@ func isTimeout(err error) bool {
 	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
-func loadScraperWithRetry(bucket simplecloud.Reader, base, game, name, kind, shorthand, format string) error {
+func loadScraperWithRetry(bucket simplecloud.Reader, game, name, kind, shorthand string) error {
 	var lastErr error
 	for attempt := range scraperLoadRetries {
 		if attempt > 0 {
@@ -196,7 +371,7 @@ func loadScraperWithRetry(bucket simplecloud.Reader, base, game, name, kind, sho
 			time.Sleep(delay)
 		}
 
-		lastErr = loadScraper(bucket, base, game, name, kind, shorthand, format)
+		lastErr = loadScraper(bucket, game, name, kind, shorthand)
 		if lastErr == nil {
 			return nil
 		}
@@ -209,20 +384,15 @@ func loadScraperWithRetry(bucket simplecloud.Reader, base, game, name, kind, sho
 	return lastErr
 }
 
-func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, format string) error {
-	u, err := url.Parse(base)
-	if err != nil {
-		return err
-	}
+func loadScraper(bucket simplecloud.Reader, game, name, kind, shorthand string) error {
+	key := path.Join(game, name, kind, shorthand) + "." + dumpFormat
 
-	u.Path = path.Join(game, name, kind, shorthand) + "." + format
-
-	log.Println("loading", u.String())
+	log.Println("loading", key)
 
 	ctx, cancel := context.WithTimeout(context.Background(), scraperLoadTimeout)
 	defer cancel()
 
-	reader, err := simplecloud.InitReader(ctx, bucket, u.String())
+	reader, err := simplecloud.InitReader(ctx, bucket, key)
 	if err != nil {
 		return err
 	}

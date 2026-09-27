@@ -18,7 +18,7 @@ import (
 )
 
 // keepScrapers starts the test from an empty site and a fresh session-store
-// registry, and puts the served snapshots, the scraper config and the
+// registry, and puts the served snapshots, the scraper index and the
 // registry back the way they were afterwards, so what TestMain loaded is
 // neither counted here nor left over for the next test. Sessions is a
 // package-level var precisely so a test can swap it out this way.
@@ -26,7 +26,7 @@ func keepScrapers(t *testing.T) {
 	t.Helper()
 	prevSellers := sellersPtr.Load()
 	prevVendors := vendorsPtr.Load()
-	prevConfig := Config.ScraperConfig.Config
+	prevIdx := scraperIndexPtr.Load()
 	prevSessions := Sessions
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
@@ -36,7 +36,7 @@ func keepScrapers(t *testing.T) {
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
-		Config.ScraperConfig.Config = prevConfig
+		scraperIndexPtr.Store(prevIdx)
 		Sessions = prevSessions
 	})
 }
@@ -170,9 +170,9 @@ func TestPublishAndRemoveSessionStore(t *testing.T) {
 // GetSellers, updateSellers - deliver the same refusal.
 func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 	keepScrapers(t)
-	Config.ScraperConfig.Config = map[string]map[string][]string{
+	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
 		"cardkingdom": {"retail": {"CK"}, "buylist": {"CK"}},
-	}
+	}))
 	err := updateSellers(inventoryOf("ZZREAL", 5, time.Now()))
 	if err != nil {
 		t.Fatalf("loading a real seller: %s", err)
@@ -221,16 +221,16 @@ func TestPublishSessionStoreRefusesARealStore(t *testing.T) {
 // dashboard's remove nor a fresh publish may touch what serves under it.
 func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 	keepScrapers(t)
-	Config.ScraperConfig.Config = map[string]map[string][]string{}
+	scraperIndexPtr.Store(newScraperIndex())
 	rows := []UploadEntry{{CardID: "uuid-a", OriginalPrice: 1}}
 
 	_, err := Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), rows)
 	if err != nil {
 		t.Fatalf("publishing: %s", err)
 	}
-	Config.ScraperConfig.Config = map[string]map[string][]string{
+	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
 		"zzs": {"retail": {"ZZS"}},
-	}
+	}))
 
 	err = Sessions.Remove(sessionstore.Retail, "ZZS")
 	if err == nil {

@@ -1589,8 +1589,13 @@ func main() {
 		log.Println("no prices loaded as requested")
 	} else {
 		go func() {
-			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
-			err := loadScrapersNG(Config.ScraperConfig)
+			log.Println("Loading scrapers")
+			bucket, err := openDumpsBucket(context.Background())
+			if err != nil {
+				log.Fatalln("error opening the dumps bucket:", err)
+			}
+			DataBucket = bucket
+			err = loadScrapersNG(bucket)
 			if err != nil {
 				log.Fatalln("error loading scrapers:", err)
 			}

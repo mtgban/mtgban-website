@@ -110,7 +110,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	if reload != "" {
 		v := url.Values{}
 		v.Set("msg", reload+" reloaded")
-		err := loadScraper(DataBucket, Config.ScraperConfig.BucketPath, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"), Config.ScraperConfig.BucketFileFormat)
+		err := loadScraper(DataBucket, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"))
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
 		}
@@ -149,8 +149,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// If it's not a Page, look if there is anything configured with that name
-		_, found = Config.ScraperConfig.Config[logs]
+		// If it's not a Page, look if the last listing named it as a store
+		_, found = currentScraperIndex().byStore[logs]
 		if found {
 			link := fmt.Sprintf(gaLogURL, logs)
 			http.Redirect(w, r, link, http.StatusFound)
@@ -551,11 +551,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	var sellerTable [][]string
 	for _, seller := range GetSellers() {
 		key := "UNKNOWN"
-		for name, scrapersConfig := range Config.ScraperConfig.Config {
-			if slices.Contains(scrapersConfig["retail"], seller.Info().Shorthand) {
-				key = name
-				break
-			}
+		store, found := scraperStoreOf(seller.Info().Shorthand)
+		if found {
+			key = store
 		}
 
 		lastUpdate := ""
@@ -611,11 +609,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	var vendorTable [][]string
 	for _, vendor := range GetVendors() {
 		key := "UNKNOWN"
-		for name, scrapersConfig := range Config.ScraperConfig.Config {
-			if slices.Contains(scrapersConfig["buylist"], vendor.Info().Shorthand) {
-				key = name
-				break
-			}
+		store, found := scraperStoreOf(vendor.Info().Shorthand)
+		if found {
+			key = store
 		}
 
 		lastUpdate := ""

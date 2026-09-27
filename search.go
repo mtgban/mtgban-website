@@ -1054,7 +1054,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// resulting reference rows alphabetically by store name.
 	for _, cardID := range allKeys {
 		indexArray := foundSellers[cardID]["INDEX"]
-		evShorts := Config.ScraperConfig.Config["sealed_ev"]["retail"]
+		evShorts := scraperStoreConfig()["sealed_ev"]["retail"]
 
 		tcgRow, hasTCG := collapseIndex(indexArray, "TCGLow", "TCGMarket", "", "", "TCG (Low / Market)")
 		mkmRow, hasMKM := collapseIndex(indexArray, "MKMLow", "MKMTrend", "Cardmarket Low", "Cardmarket Trend", "CM (Low / Trend)")
