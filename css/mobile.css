@@ -456,6 +456,9 @@ body.mobile:has(.m-home) .m-nav-home {
     font-weight: 600;
     border-radius: 6px;
     text-decoration: none;
+    /* One width for every label, so the theme toggle between them stays centred */
+    min-width: 4.5em;
+    text-align: center;
 }
 
 .m-home-login-btn.patreon {
