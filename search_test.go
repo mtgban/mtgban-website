@@ -26,6 +26,14 @@ func TestMain(m *testing.M) {
 	Config.Game = DefaultGame
 	testSite = newSite()
 
+	// Tests written against fixtures build their own site, so this lets them
+	// run - under -race included - without the real datastore load. Pair it
+	// with -run (e.g. TestSite): some tests need the real data and don't skip.
+	if os.Getenv("MTGBAN_TEST_DATASTORE") == "off" {
+		log.Println("MTGBAN_TEST_DATASTORE=off: not loading the real datastore")
+		os.Exit(m.Run())
+	}
+
 	// Best-effort datastore load: tests that need real card data guard
 	// themselves with t.Skip when the data isn't loaded, so a missing local
 	// datastore file shouldn't take down the whole package's test run.
