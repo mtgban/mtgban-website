@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mtgban/mtgban-website/internal/dsreload"
-
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/observability"
 )
@@ -70,12 +68,6 @@ var funcMap = template.FuncMap{
 			return "[]"
 		}
 		return string(encoded)
-	},
-	// The datastore reload runs in the background, so the page that reports
-	// it asks at render time rather than being handed a copy that is stale
-	// by the time it is drawn.
-	"datastore_reload": func() dsreload.State {
-		return datastoreReloads.Status()
 	},
 	// sourceLink answers with a URL a results row can be made clickable
 	// with, or "" for a note that is not one.
