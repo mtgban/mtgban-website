@@ -1651,6 +1651,11 @@ func main() {
 		// succeeded leaves the index empty and every chart without its markers.
 		c.AddFunc("15 */6 * * *", refreshCheckpoints)
 
+		// Alarm on a store whose retail or buylist data has gone stale (see
+		// staleness.go); notifies only on the transition, so this can run
+		// often without repeating itself.
+		c.AddFunc("0 * * * *", checkStaleness)
+
 		c.Start()
 	}
 
