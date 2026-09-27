@@ -241,6 +241,23 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
 }
+/* Staleness: a scraper row whose retail or buylist data is older than the
+   48h alarm threshold (staleness.go). Reuses the danger red already used
+   elsewhere on this page (.admin-action.danger, .admin-msg-error). */
+.admin-stale-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    background: rgba(248,81,73,0.12);
+    border: 1px solid rgba(248,81,73,0.25);
+    color: var(--adanger);
+}
+.admin-stale-count { color: var(--adanger); font-weight: 600; }
+td.admin-stale-date { color: var(--adanger); font-weight: 600; }
 /* ── Usage Tab ── */
 .admin-usage-bar {
     display: flex;

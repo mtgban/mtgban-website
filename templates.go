@@ -206,6 +206,33 @@ var funcMap = template.FuncMap{
 	"bantool_run_name": func(store string) string {
 		return newBantoolWorkflow(Config.Game, store).RunName
 	},
+	// stale_count counts the rows of an admin scraper table whose stale
+	// badge, column 8, is set.
+	"stale_count": func(rows [][]string) int {
+		count := 0
+		for _, row := range rows {
+			if row[8] != "" {
+				count++
+			}
+		}
+		return count
+	},
+	// stale_stores lists the store, column 2, of every stale row in the admin
+	// tables, sorted and deduplicated, leaving out "UNKNOWN" and "session".
+	"stale_stores": func(tables [][][]string) []string {
+		var stores []string
+		for _, rows := range tables {
+			for _, row := range rows {
+				// Only the scraper tables reach column 8.
+				if len(row) < 9 || row[8] == "" || row[2] == "UNKNOWN" || row[2] == "session" {
+					continue
+				}
+				stores = append(stores, row[2])
+			}
+		}
+		slices.Sort(stores)
+		return slices.Compact(stores)
+	},
 	"card_back": func() string {
 		return "/img/backs/" + Config.Game + ".webp"
 	},

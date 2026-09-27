@@ -570,6 +570,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// now anchors every staleness check below, so one row is never compared
+	// against a slightly later "now" than its neighbor.
+	now := time.Now()
+
 	// -- Dashboard: Retail Scrapers --
 	var sellerTable [][]string
 	for _, seller := range GetSellers() {
@@ -623,6 +627,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			ref,
 			status,
 			session,
+			staleBadge(seller.Info().InventoryTimestamp, now),
 		}
 		sellerTable = append(sellerTable, row)
 	}
@@ -678,6 +683,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			ref,
 			status,
 			session,
+			staleBadge(vendor.Info().BuylistTimestamp, now),
 		}
 		vendorTable = append(vendorTable, row)
 	}

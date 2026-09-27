@@ -16,6 +16,11 @@
     {{if ne .WarningMessage ""}}
         <div class="admin-msg admin-msg-error">{{.WarningMessage}}</div>
     {{end}}
+    {{with stale_stores .Tables}}
+        <div class="admin-msg admin-msg-error">
+            Stale ({{len .}}): {{range $i, $store := .}}{{if $i}}, {{end}}<a href="?logs={{$store}}">{{$store}}</a>{{end}}
+        </div>
+    {{end}}
     {{if ne .InfoMessage ""}}
         {{if .SelectableField}}
             <div class="admin-msg">
@@ -80,7 +85,7 @@
         <div class="admin-section">
             <div class="admin-section-header">
                 <h2>Retail Scrapers</h2>
-                <span class="count">{{len (index .Tables 0)}} providers</span>
+                <span class="count">{{len (index .Tables 0)}} providers{{with stale_count (index .Tables 0)}} &middot; <span class="admin-stale-count">{{.}} stale</span>{{end}}</span>
             </div>
             <div class="admin-table-wrap">
             <table class="table-data admin-table" data-sortable>
@@ -93,10 +98,10 @@
                 {{range $row := index .Tables 0}}
                     <tr data-tag="{{bantool_run_name (index $row 2)}}">
                         {{template "admin-scraper-cells" $row}}
-                        <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
+                        <td class="admin-mono{{if index $row 8}} admin-stale-date{{end}}"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
-                        <td class="c admin-status">{{index $row 6}}</td>
+                        <td class="c admin-status">{{template "admin-status-cell" $row}}</td>
                     </tr>
                 {{end}}
                 </tbody>
@@ -109,7 +114,7 @@
         <div class="admin-section">
             <div class="admin-section-header">
                 <h2>Buylist Scrapers</h2>
-                <span class="count">{{len (index .Tables 1)}} providers</span>
+                <span class="count">{{len (index .Tables 1)}} providers{{with stale_count (index .Tables 1)}} &middot; <span class="admin-stale-count">{{.}} stale</span>{{end}}</span>
             </div>
             <div class="admin-table-wrap">
             <table class="table-data admin-table" data-sortable>
@@ -122,10 +127,10 @@
                 {{range $row := index .Tables 1}}
                     <tr data-tag="{{bantool_run_name (index $row 2)}}">
                         {{template "admin-scraper-cells" $row}}
-                        <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
+                        <td class="admin-mono{{if index $row 8}} admin-stale-date{{end}}"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
-                        <td class="c admin-status">{{index $row 6}}</td>
+                        <td class="c admin-status">{{template "admin-status-cell" $row}}</td>
                     </tr>
                 {{end}}
                 </tbody>
@@ -552,6 +557,14 @@
     {{end}}
 {{end}}
 
+{{/* The Status cell: the load-state icon (index 6), possibly overridden to
+     🔶 by the running-workflow poll (extra-scripts below, matched on
+     data-tag rather than this cell so it can't clobber the badge next to
+     it), plus a "stale Nd" badge (index 8) when the row is stale. */}}
+{{define "admin-status-cell"}}
+    <span class="admin-status-icon">{{index . 6}}</span>{{if index . 8}} <span class="admin-stale-badge">{{index . 8}}</span>{{end}}
+{{end}}
+
 {{define "extra-scripts"}}
 <script>
 // The scraper rows render with the status the server can answer for free
@@ -578,7 +591,7 @@
                 if (!running[row.getAttribute('data-tag')]) {
                     return;
                 }
-                var cell = row.querySelector('.admin-status');
+                var cell = row.querySelector('.admin-status-icon');
                 if (cell) {
                     cell.textContent = '🔶';
                     cell.title = 'refresh running';
