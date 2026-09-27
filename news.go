@@ -376,6 +376,8 @@ func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperRes
 // from it panics the newspaper cache at startup, so an entry has to exist
 // before an instance of that game is stood up - which is why the games
 // mtgmatcher registers are all here whether or not one is deployed yet.
+// Each name is TCGplayer's productLineName, spelled exactly: the newspaper
+// files its rows under it and the pages match it with =.
 var gameMap = map[string]string{
 	"magic":         "Magic: The Gathering",
 	"lorcana":       "Disney Lorcana",
@@ -385,7 +387,7 @@ var gameMap = map[string]string{
 	"fleshandblood": "Flesh and Blood TCG",
 	"pokemon":       "Pokemon",
 	"gundam":        "Gundam Card Game",
-	"palworld":      "Palworld Official Card Game",
+	"palworld":      "Palworld OFFICIAL CARD GAME",
 }
 
 // gameBadgeMap is the short form the brand wears under the wordmark on a

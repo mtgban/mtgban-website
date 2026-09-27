@@ -122,7 +122,11 @@ One binary, switched by `Config.Game` in the config file: each of `lorcana`,
 `Seller`/`Vendor` set, its own card database, its own set of pages the ACL
 allows. `gameMap`/`gameBadgeMap` (`news.go`) name every game a deployment can
 be; a game the matcher registers but that isn't in those two maps panics the
-newspaper cache at startup rather than failing to compile.
+newspaper cache at startup rather than failing to compile. `gameMap`'s names
+are TCGplayer's `productLineName`s, spelled exactly (Palworld's is `Palworld
+OFFICIAL CARD GAME`), because the newspaper stores `game_name` that way and
+the pages match it with `=`: keep them in step with MTGBan_Newspaper's
+`games.py`.
 
 Rarity badges (the colour and, for a few games, a drawn shape standing in for
 Magic's keyrune glyph) are a separate system with its own recipe and its own
