@@ -689,7 +689,7 @@ func TestExportPostsAListPastTheFormLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	if got := rec.Header().Get("Content-Type"); got != "text/csv" {
 		t.Fatalf("a 2500-row export came back as %q, want a file", got)
@@ -792,7 +792,7 @@ func TestUnpackedPageSurvivesItsOwnRoundTrip(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	out := rec.Body.String()
 	if !strings.Contains(out, "ures-block-unpacked") {

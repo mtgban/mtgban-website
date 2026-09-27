@@ -7,8 +7,8 @@ import (
 )
 
 // Handler for / renders the home.html page
-func Home(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) Home(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	sig := getSignatureFromCookies(r)
 	errmsg := r.FormValue("errmsg")
 	message := ""
@@ -26,7 +26,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageVars := genPageNav(r, "Home", sig)
+	pageVars := genPageNav(s, r, "Home", sig)
 	pageVars.ErrorMessage = message
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {

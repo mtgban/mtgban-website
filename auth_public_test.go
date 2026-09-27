@@ -29,7 +29,7 @@ func anyTierNav(t *testing.T, marker string) http.Handler {
 	DevMode, SigCheck = true, true
 	ExtraNavs = map[string]*NavElem{
 		"Open": {Name: "Open", Link: "/open", Page: "home.html", SubPages: []NavElem{
-			{Name: "OpenSub", Link: "/open-sub", ShouldHide: func() bool { return true }},
+			{Name: "OpenSub", Link: "/open-sub", ShouldHide: func(*site) bool { return true }},
 		}},
 		"Gated": {Name: "Gated", Link: "/gated", Page: "home.html"},
 	}
@@ -47,7 +47,7 @@ func anyTierNav(t *testing.T, marker string) http.Handler {
 	if err := Access.Load(context.Background(), access.Sources{TablePath: "acl", GrantsPath: "grants"}); err != nil {
 		t.Fatal(err)
 	}
-	return enforceSigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return enforceSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(marker))
 	}))
 }
@@ -73,7 +73,7 @@ func TestAnyTierPageNeedsNoSignature(t *testing.T) {
 
 func TestAnyTierPageIsInNavForEveryone(t *testing.T) {
 	anyTierNav(t, "")
-	pageVars := genPageNav(httptest.NewRequest("GET", "/open", nil), "Open", "")
+	pageVars := genPageNav(testSite, httptest.NewRequest("GET", "/open", nil), "Open", "")
 	var names []string
 	for _, n := range pageVars.Nav {
 		names = append(names, n.Name)

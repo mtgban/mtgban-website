@@ -78,8 +78,8 @@ func getDecklist(b *mtgmatcher.Backend, uuid string) ([]string, error) {
 	return b.GetDecklist(co.SetCode, co.UUID)
 }
 
-func TCGHandler(w http.ResponseWriter, r *http.Request) {
-	b := backend()
+func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 
 	isLastSold := strings.Contains(r.URL.Path, "lastsold")
@@ -408,8 +408,8 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 	return nil
 }
 
-func MKMHandler(w http.ResponseWriter, r *http.Request) {
-	b := backend()
+func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 
 	isDecklist := strings.Contains(r.URL.Path, "decklist")
@@ -664,8 +664,8 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 	xml.NewEncoder(w).Encode(&openSearchDescription)
 }
 
-func SearchAPI(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	b := ds.backend
 	// The API middleware checks a ?sig= and lets a request without one
 	// through unchecked, so a cookie counts only once it is checked here.
@@ -684,7 +684,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Only allow JSON from a different (protected) endpoint
 	if isJSON && !strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
-		pageVars := genPageNav(r, "Error", sig)
+		pageVars := genPageNav(s, r, "Error", sig)
 		pageVars.Title = "Unauthorized"
 		pageVars.ErrorMessage = "Invalid endpoint for JSON"
 		render(w, "home.html", pageVars)
@@ -695,7 +695,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	if isCSV && !canDownloadCSV {
-		pageVars := genPageNav(r, "Error", sig)
+		pageVars := genPageNav(s, r, "Error", sig)
 		pageVars.Title = "Unauthorized"
 		pageVars.ErrorMessage = "Unable to download CSV"
 		render(w, "home.html", pageVars)
@@ -850,7 +850,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
 			UserNotify("search", err.Error())
-			pageVars := genPageNav(r, "Error", sig)
+			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Error"
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "home.html", pageVars)
@@ -864,7 +864,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 // LoadFromCloud refuses anything else before listing.
 var validStoreName = regexp.MustCompile(`^[a-z0-9_]+$`)
 
-func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
+func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path
 	name = strings.TrimPrefix(name, "/api/load/")
 
@@ -920,7 +920,7 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status": "ok"}`))
 }
 
-func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
+func (s *site) LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	err := verify(r)

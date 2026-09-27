@@ -355,7 +355,7 @@ func TestHandoffHandlerAsksBeforeItReceives(t *testing.T) {
 			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 		}
 		rec := httptest.NewRecorder()
-		UploadHandoff(rec, req)
+		testSite.UploadHandoff(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", rec.Code)
 		}

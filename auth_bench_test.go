@@ -90,6 +90,6 @@ func BenchmarkGenPageNav(b *testing.B) {
 	sig := benchSig("")
 	b.ReportAllocs()
 	for b.Loop() {
-		genPageNav(nil, "Search", sig)
+		genPageNav(testSite, nil, "Search", sig)
 	}
 }

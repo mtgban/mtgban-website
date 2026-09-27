@@ -327,12 +327,12 @@ func keepInOrder(all, enabled []string) []string {
 	return out
 }
 
-func Upload(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav(r, "Upload", sig)
+	pageVars := genPageNav(s, r, "Upload", sig)
 
 	// Maximum form size. ParseForm is run first and on its own so that its
 	// error survives: ParseMultipartForm returns "not multipart" for a form

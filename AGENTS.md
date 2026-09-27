@@ -100,6 +100,7 @@ output, not a claim written here.
 | File | Responsibility |
 |---|---|
 | `main.go` | Startup, flags, config, routing, `NavElem` page registry, `PageVars`, template cache, cron jobs |
+| `site.go` | The `site` value page handlers hang off, as methods |
 | `templates.go` | The template `FuncMap` — pure helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
@@ -192,7 +193,11 @@ commit to this repo can complete on its own.
 
 4. **Page registration is declarative.** Add a page by adding a `NavElem` (its
    route, handler, template, `CanPOST`, access flags) — this wires routing,
-   auth, navbar, and logging together. Don't register routes ad hoc.
+   auth, navbar, and logging together. Don't register routes ad hoc. Handlers
+   are methods on `*site` (site.go); `Handle` takes a method expression
+   (`Handle: (*site).NewPage`) and `ShouldHide func(*site) bool` reads the
+   site's current datastore for visibility only — both are built once in
+   `init()`, before any `*site` exists, and bound to one at registration.
 
 5. **Templates**: production pre-parses every page in `buildTemplateCache()`;
    a new template/partial must be wired into the cache. Use `-dev` for

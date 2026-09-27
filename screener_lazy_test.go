@@ -52,7 +52,7 @@ func TestScreenerDefersTheColdBuild(t *testing.T) {
 	get := func(t *testing.T, url string) string {
 		t.Helper()
 		rec := httptest.NewRecorder()
-		Screener(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		testSite.Screener(rec, httptest.NewRequest(http.MethodGet, url, nil))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s answered %d", url, rec.Code)
 		}

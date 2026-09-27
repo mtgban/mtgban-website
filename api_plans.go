@@ -76,13 +76,13 @@ type APIPlanGame struct {
 
 // APIPlans renders the public pricing page and configurator, and serves the
 // handoff sub-pages that hang off it.
-func APIPlans(w http.ResponseWriter, r *http.Request) {
+func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/api-trial":
-		APITrial(w, r)
+		s.APITrial(w, r)
 		return
 	case "/api-login":
-		APILogin(w, r)
+		s.APILogin(w, r)
 		return
 	case "/api-plans/stores.json":
 		APIStores(w, r)
@@ -90,7 +90,7 @@ func APIPlans(w http.ResponseWriter, r *http.Request) {
 	}
 	// The page may be served without enforceSigning, so only a verified signature names the reader.
 	sig := verifiedSignature(r)
-	pageVars := genPageNav(r, "API", sig)
+	pageVars := genPageNav(s, r, "API", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

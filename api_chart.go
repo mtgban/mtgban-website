@@ -62,8 +62,8 @@ func writeChartAPIResponse(w http.ResponseWriter, resp ChartAPIResponse) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) ChartDataAPI(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	uuid := strings.TrimPrefix(r.URL.Path, "/api/chart/")
 	uuid = strings.TrimSuffix(uuid, "/")
 	if uuid == "" {

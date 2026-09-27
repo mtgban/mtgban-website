@@ -32,7 +32,7 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 	}
 	rec := httptest.NewRecorder()
-	APIPlans(rec, req)
+	testSite.APIPlans(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -113,7 +113,7 @@ func TestAPIPlansInviteRevealsQuarterly(t *testing.T) {
 	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
 	DevMode, SigCheck = true, false
 	rec := httptest.NewRecorder()
-	APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans?invite=abc", nil))
+	testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans?invite=abc", nil))
 	body := rec.Body.String()
 	if !strings.Contains(body, `value="quarterly"`) || !strings.Contains(body, `name="invite" value="abc"`) {
 		t.Error("invite did not reveal quarterly or was dropped")
@@ -400,7 +400,7 @@ func TestAPIStoresServesTheFamilies(t *testing.T) {
 	t.Cleanup(func() { Config.Game = savedGame })
 	Config.Game = "magic"
 	rec := httptest.NewRecorder()
-	APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -441,7 +441,7 @@ func TestAPIStoresEmptyListsAreArrays(t *testing.T) {
 	// Loaded, but nothing the scraper config names.
 	stubScrapers(t, scraperStub{sellers: []string{"GN"}, vendors: []string{"GN"}})
 	rec := httptest.NewRecorder()
-	APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if body := rec.Body.String(); !strings.Contains(body, `"implied":[]`) || !strings.Contains(body, `"stores":[]`) {
 		t.Errorf("body %s", body)
 	}
@@ -451,7 +451,7 @@ func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
 	for _, stub := range []scraperStub{{}, {config: magicStub.config, sellers: magicStub.sellers}, {config: magicStub.config, vendors: magicStub.vendors}} {
 		stubScrapers(t, stub)
 		rec := httptest.NewRecorder()
-		APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+		testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Errorf("status %d", rec.Code)
 		}
@@ -467,7 +467,7 @@ func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
 func TestAPIStoresIsGetOnly(t *testing.T) {
 	stubScrapers(t, magicStub)
 	rec := httptest.NewRecorder()
-	APIPlans(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
+	testSite.APIPlans(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status %d", rec.Code)
 	}

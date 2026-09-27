@@ -31,17 +31,17 @@ func apiGatewaySecret() string {
 }
 
 // APITrial hands a pledged supporter to the gateway to start a trial.
-func APITrial(w http.ResponseWriter, r *http.Request) {
-	apiHandoff(w, r, apihandoff.PurposeTrial, "/trial")
+func (s *site) APITrial(w http.ResponseWriter, r *http.Request) {
+	s.apiHandoff(w, r, apihandoff.PurposeTrial, "/trial")
 }
 
 // APILogin signs a Patreon user into the gateway.
-func APILogin(w http.ResponseWriter, r *http.Request) {
-	apiHandoff(w, r, apihandoff.PurposeLogin, "/session")
+func (s *site) APILogin(w http.ResponseWriter, r *http.Request) {
+	s.apiHandoff(w, r, apihandoff.PurposeLogin, "/session")
 }
 
 // apiHandoff mints the token for the signed-in reader and redirects to path on the gateway.
-func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
+func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 	sig := verifiedSignature(r)
 	email := GetParamFromSig(sig, "UserEmail")
 	secret := apiGatewaySecret()
@@ -71,7 +71,7 @@ func apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path string) {
 		}
 	}
 	if msg != "" {
-		pageVars := genPageNav(r, "API", sig)
+		pageVars := genPageNav(s, r, "API", sig)
 		pageVars.IsMobile = isMobileRequest(r)
 		if pageVars.IsMobile {
 			pageVars.Nav = filterNavForMobile(pageVars.Nav)

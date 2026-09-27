@@ -151,7 +151,7 @@ func TestSuggestAPIFoldsTheQuery(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=fire+ice", nil))
+	testSite.SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=fire+ice", nil))
 	if w.Code != 200 {
 		t.Fatalf("code = %d, want 200", w.Code)
 	}
@@ -186,7 +186,7 @@ func TestSuggestAPIRefusesAnEmptyFold(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=----", nil))
+	testSite.SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=----", nil))
 	if w.Code != 204 {
 		t.Errorf("code = %d, want 204", w.Code)
 	}

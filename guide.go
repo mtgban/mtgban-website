@@ -6,9 +6,9 @@ import (
 	"net/http"
 )
 
-func Guide(w http.ResponseWriter, r *http.Request) {
+func (s *site) Guide(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
-	pageVars := genPageNav(r, "Guide", sig)
+	pageVars := genPageNav(s, r, "Guide", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

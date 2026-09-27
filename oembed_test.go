@@ -40,7 +40,7 @@ func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 		{"a card we do carry", "/search/oembed?format=json&url=https%3A%2F%2Fmtgban.com%2Fsearch%3Fq%3DCounterspell", http.StatusOK},
 	} {
 		w := httptest.NewRecorder()
-		Search(w, httptest.NewRequest(http.MethodGet, probe.url, nil))
+		testSite.Search(w, httptest.NewRequest(http.MethodGet, probe.url, nil))
 		res := w.Result()
 		body, _ := io.ReadAll(res.Body)
 

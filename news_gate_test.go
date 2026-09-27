@@ -30,12 +30,12 @@ func TestNewspaperHiddenWhenNothingCached(t *testing.T) {
 	}
 
 	withNewspaperUUIDs(t, 0)
-	if !nav.ShouldHide() {
+	if !nav.ShouldHide(testSite) {
 		t.Error("nothing cached, want the section hidden")
 	}
 
 	withNewspaperUUIDs(t, 3)
-	if nav.ShouldHide() {
+	if nav.ShouldHide(testSite) {
 		t.Error("uuids cached, want the section shown")
 	}
 }
@@ -49,7 +49,7 @@ func TestNavHonoursShouldHideOnASection(t *testing.T) {
 
 	names := func() []string {
 		var out []string
-		for _, n := range genPageNav(nil, "Search", "").Nav {
+		for _, n := range genPageNav(testSite, nil, "Search", "").Nav {
 			out = append(out, n.Name)
 		}
 		return out

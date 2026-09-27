@@ -406,22 +406,22 @@ type Arbitrage struct {
 	SussyList map[string]float64
 }
 
-func Arbit(w http.ResponseWriter, r *http.Request) {
-	arbit(backend(), w, r, false)
+func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
+	arbit(s, s.backend(), w, r, false)
 }
 
-func Reverse(w http.ResponseWriter, r *http.Request) {
-	arbit(backend(), w, r, true)
+func (s *site) Reverse(w http.ResponseWriter, r *http.Request) {
+	arbit(s, s.backend(), w, r, true)
 }
 
-func arbit(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, reverse bool) {
+func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, reverse bool) {
 	sig := getSignatureFromCookies(r)
 
 	pageName := "Arbitrage"
 	if reverse {
 		pageName = "Reverse"
 	}
-	pageVars := genPageNav(r, pageName, sig)
+	pageVars := genPageNav(s, r, pageName, sig)
 	pageVars.ReverseMode = reverse
 
 	var anyOptionEnabled bool
@@ -491,10 +491,10 @@ func arbit(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, revers
 	LogPages["Arbitrage"].Println(msg)
 }
 
-func Global(w http.ResponseWriter, r *http.Request) {
+func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav(r, "Global", sig)
+	pageVars := genPageNav(s, r, "Global", sig)
 	pageVars.GlobalMode = true
 
 	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
@@ -565,7 +565,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(backend(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	scraperCompare(s.backend(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults: anyEnabled,
 		AnySpread:  anySpread,
 	})

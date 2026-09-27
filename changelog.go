@@ -119,9 +119,9 @@ var (
 // Changelog renders the public release notes page. Discord is the source of
 // truth; this process-local cache keeps page views from turning into a Discord
 // API request for every visitor.
-func Changelog(w http.ResponseWriter, r *http.Request) {
+func (s *site) Changelog(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
-	pageVars := genPageNav(r, "Changelog", sig)
+	pageVars := genPageNav(s, r, "Changelog", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

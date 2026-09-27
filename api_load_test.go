@@ -57,7 +57,7 @@ func TestLoadFromCloudLoadsEveryDumpAStoreLists(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/load/cardkingdom?sig="+apiLoadSig(t, "cardkingdom"), nil)
 	w := httptest.NewRecorder()
-	LoadFromCloud(w, req)
+	testSite.LoadFromCloud(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
@@ -80,7 +80,7 @@ func TestLoadFromCloud404sWhenTheStoreListsNothing(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/load/nostore?sig="+apiLoadSig(t, "nostore"), nil)
 	w := httptest.NewRecorder()
-	LoadFromCloud(w, req)
+	testSite.LoadFromCloud(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status = %d, body = %s, want 404", w.Code, w.Body.String())
@@ -94,7 +94,7 @@ func TestLoadFromCloud404sOnAMismatchedSignature(t *testing.T) {
 	// Signed for a different store than the one requested.
 	req := httptest.NewRequest(http.MethodGet, "/api/load/cardkingdom?sig="+apiLoadSig(t, "abugames"), nil)
 	w := httptest.NewRecorder()
-	LoadFromCloud(w, req)
+	testSite.LoadFromCloud(w, req)
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404 for a signature minted for a different store", w.Code)
@@ -115,7 +115,7 @@ func TestLoadFromCloudUpdatesTheIndexToWhatItJustListed(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/load/cardkingdom?sig="+apiLoadSig(t, "cardkingdom"), nil)
 	w := httptest.NewRecorder()
-	LoadFromCloud(w, req)
+	testSite.LoadFromCloud(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())

@@ -71,7 +71,7 @@ var BuildCommit = func() string {
 	return ""
 }()
 
-func Admin(w http.ResponseWriter, r *http.Request) {
+func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// The dashboard asks for the workflow status once it has rendered, so a
 	// round trip to GitHub never delays the page. Answered from here rather
 	// than a route of its own, to stay behind the same signing middleware.
@@ -80,12 +80,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ds := currentDatastore()
+	ds := s.datastore()
 	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
 	page := r.FormValue("page")
-	pageVars := genPageNav(r, "Admin", sig)
+	pageVars := genPageNav(s, r, "Admin", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
@@ -544,8 +544,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	// -- Key overrides: store list for the builder dropdown --
 	storeSet := map[string]struct{}{}
-	for _, s := range GetSellers() {
-		storeSet[s.Info().Shorthand] = struct{}{}
+	for _, seller := range GetSellers() {
+		storeSet[seller.Info().Shorthand] = struct{}{}
 	}
 	for _, v := range GetVendors() {
 		storeSet[v.Info().Shorthand] = struct{}{}

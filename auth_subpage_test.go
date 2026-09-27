@@ -37,14 +37,14 @@ func navWithHiddenSubPage(t *testing.T, parentLink, subLink, marker string) http
 				{
 					Name:       "Hidden",
 					Link:       subLink,
-					ShouldHide: func() bool { return true },
+					ShouldHide: func(*site) bool { return true },
 				},
 			},
 		},
 	}
 	OrderNav = []string{"Testing"}
 
-	return enforceSigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return enforceSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(marker))
 	}))
 }

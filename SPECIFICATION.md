@@ -68,7 +68,7 @@ place (`docs/tcgcsv-archive-withdrawal.md`). There is
 no `-offline` flag any more — the old "run without B2, load prices from
 another BAN instance's API" mode is gone (see §2.3).
 
-Boot sequence (`main()`, main.go:1299-1674):
+Boot sequence (`main()`):
 
 1. `preloadConfig()` → resolves `ConfigBucket` to a local file or `b2://`
    bucket only (an `http(s)://` config path is rejected). `loadVars()`
@@ -77,10 +77,12 @@ Boot sequence (`main()`, main.go:1299-1674):
    `DefaultSecret` when unset in any mode (outside dev a defaulted secret
    only logs a warning). `loadCommonConfig()` loads the ACL/grants table and
    affiliates. `loadRarityBadges()` (no-op for the default game).
-2. If any `-tcgcsv-*` job flag is set: `openDBs()`, `initTCGCSVService()`,
+2. `s := newSite()` (site.go) — the site the routes are bound to; pure, no
+   I/O.
+3. If any `-tcgcsv-*` job flag is set: `openDBs()`, `initTCGCSVService()`,
    run the requested job, `os.Exit(0)` — the datastore and price data are
    never loaded and `ListenAndServe` never runs.
-3. Otherwise: `loadKeyOverrides()`, create `LogDir`, load Google credentials,
+4. Otherwise: `loadKeyOverrides()`, create `LogDir`, load Google credentials,
    `openDBs()` → `PricesArchiveDB` (PostgreSQL, `timeseries` package, price
    history for charts, plus `tcg_prices`/`tcg_products` when TCGCSV
    ingestion is configured), `NewNewspaperDB` (PostgreSQL), `UserStateDB`
@@ -92,20 +94,20 @@ Boot sequence (`main()`, main.go:1299-1674):
    (non-fatal if unconfigured), `reloadCheckpoints()`,
    `offlineService.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
-4. Async goroutine: `loadDatastore(Config.DatastorePath)` — opens the site's
+5. Async goroutine: `loadDatastore(Config.DatastorePath)` — opens the site's
    game via `mtgmatcher.Open(datastoreGame(), reader)` (not the old
    `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
    (`newDatastore()`, datastore.go), publishes backend and snapshots
    together in one `liveDatastore.Store()`, then itself spawns
    `cacheNewspaper()` as a further goroutine.
-5. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
+6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
    `loadScrapersNG()` on it, then `runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `offlineService.RefreshManifest()`.
-6. `offlineService.StartRefresher()` — one debounced goroutine that every
+7. `offlineService.StartRefresher()` — one debounced goroutine that every
    runtime manifest refresh funnels through.
-7. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go:1477-1513):
+8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go):
    - `0 */12 * * *` — `stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `runSealedAnalysis()`
    - `33 */3 * * *` — `cacheNewspaper()`
@@ -116,7 +118,7 @@ Boot sequence (`main()`, main.go:1299-1674):
    - when tcgcsv ingestion is configured: `0 21 * * *` —
      `stashTCGCSVPrices()`; `0 22 * * 1` — `stashTCGCSVProducts()`
    - the old per-scraper `force_reload_at` cron expressions no longer exist
-8. `setupDiscord()`, then handlers are registered and `http.Server`
+9. `setupDiscord()`, then handlers are registered and `http.Server`
    `ListenAndServe`s on `Config.Port` (default `:8080`, no TLS — assumes
    reverse proxy); graceful shutdown on SIGINT/SIGTERM with a 5 s timeout,
    Discord notify, and `ObservabilityRecorder.Close()`. `/healthz` returns
@@ -141,9 +143,11 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   numbers/names/editions snapshots, the palette's sets/promos/finishes
   lists, and its own load time are one `datastore` value (datastore.go),
   built by `newDatastore()` and published in a single
-  `liveDatastore.Store()`. Readers go through `currentDatastore()` (never
-  nil, even before the first load), or `backend()` for the backend alone;
-  entry points read either once and pass `b`/`ds` down to what they call.
+  `liveDatastore.Store()`. Page handlers are methods on `*site` (site.go) and
+  read it through `s.datastore()` (never nil, even before the first load) or
+  `s.backend()` for the backend alone, which read the package-level
+  `currentDatastore()`/`backend()` (datastore.go); entry points read either
+  once and pass `b`/`ds` down to what they call.
 - `Config` is loaded once and swapped whole on admin reload (`admin.go`);
   per-user API secrets read behind `apiUsersMutex`; affiliate data behind
   `affiliatesMu`/`affiliatesPtr`.
@@ -268,23 +272,33 @@ advertised) unless the signature carries the `Admin` grant.
 ## 4. Routing & page system
 
 Routes are registered in `main()` from the declarative `NavElem` struct
-(main.go:318-360) and the `ExtraNavs` map (declared main.go:417, populated by
-`init()` at main.go:420-544): each entry declares its link, name, icon,
+(main.go) and the `ExtraNavs` map (declared and populated by `init()` in
+main.go): each entry declares its link, name, icon,
 description, handler func, template, `CanPOST`, `AlwaysOnForDev`, optional
 `ShouldHide` (a predicate that drops the entry - and, for a section like
 Newspaper, its subpages with it - when e.g. no data is loaded yet for the
 current game), `SubPages` (e.g. `/sets`, `/sealed` under Search) and
-`HasSettings`. `genPageNav(activeTab, sig)` builds the per-request navbar by
-filtering `OrderNav` (Search, Newspaper, Screener, Sleepers, Upload, Global,
-Arbit, Reverse, Admin) against the signature/ACL; the list itself is
-identical across all 9 games, but per-entry `ShouldHide` (Newspaper hides
-itself whenever the active game has no cached newspaper UUIDs yet) and
-per-deployment ACL config narrow what actually renders for a non-Magic site.
-A mobile request runs the result through `filterNavForMobile()` (mobile.go),
-called from every page handler right after `genPageNav`, which keeps only
-the handful of pages that ship a mobile template. Every page handler
-receives a giant `PageVars` struct (main.go:64-316) that carries nav,
-alerts, and all page-specific fields into the templates.
+`HasSettings`. Page handlers are methods on `*site` (site.go); `NavElem.Handle`
+is `func(*site, http.ResponseWriter, *http.Request)`, filled with method
+expressions (`Handle: (*site).Search`) so `ExtraNavs` stays static data built
+in `init()`, before any `*site` exists (`DefaultNav`'s entries, Home and
+Changelog, carry no `Handle`). `ShouldHide` is
+`func(*site) bool` for the same reason (it reads the site's current datastore
+for visibility only, e.g. the Sealed sub-tab hides when the loaded backend has
+no sealed product). `main()` builds `s := newSite()` and binds it at
+registration: `nav.Handle(s, w, r)` for declarative pages, plain method values
+(`s.Search`, …) for the rest.
+`genPageNav(s, r, activeTab, sig)` builds the per-request navbar by filtering
+`OrderNav` (Search, Newspaper, Screener, Sleepers, Upload, Global, Arbit,
+Reverse, Admin) against the signature/ACL; the list itself is identical across
+all 9 games, but per-entry `ShouldHide` (Newspaper hides itself whenever the
+active game has no cached newspaper UUIDs yet) and per-deployment ACL config
+narrow what actually renders for a non-Magic site. A mobile request runs the
+result through `filterNavForMobile()` (mobile.go), called from every page
+handler right after `genPageNav`, which keeps only the handful of pages that
+ship a mobile template. Every page handler receives a giant `PageVars` struct
+(main.go) that carries nav, alerts, and all page-specific fields into the
+templates.
 
 Other routes: static `/css|/js|/img` (plus `/favicon.ico`, `/robots.txt`)
 served from disk via `ServeFile` with `Cache-Control: public, max-age=86400`

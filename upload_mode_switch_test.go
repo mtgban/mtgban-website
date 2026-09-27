@@ -123,7 +123,7 @@ func TestModeSwitchPricesTheSameRowsTheOtherWay(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	out := rec.Body.String()
 	if !strings.Contains(out, "Buylist mode") {
@@ -162,7 +162,7 @@ func TestModeSwitchKeepsIgnoredConditions(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	out := rec.Body.String()
 	if !strings.Contains(out, "Buylist mode") {
@@ -213,7 +213,7 @@ func TestModeSwitchKeepsAnOpenedListOpen(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	out := rec.Body.String()
 	if !strings.Contains(out, "Buylist mode") {
@@ -251,7 +251,7 @@ func TestModeSwitchCannotBuyTheGrant(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	out := rec.Body.String()
 	if strings.Contains(out, "Buylist mode") {

@@ -8,12 +8,12 @@ import (
 )
 
 // RawCardAPI serves the record behind one card id exactly as the backend
-// holds it: the CardObject that backend().GetUUID resolves, every field
+// holds it: the CardObject that s.backend().GetUUID resolves, every field
 // present since the mtgmatcher structs carry no omitempty. It exists to
 // debug what the matcher knows about a printing - finishes, identifiers,
 // number decorations - beside the Fix links that correct its matches, so it
 // is gated like them: admins, or a sigless dev build.
-func RawCardAPI(w http.ResponseWriter, r *http.Request) {
+func (s *site) RawCardAPI(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
 	if !canAdmin && !(DevMode && !SigCheck) {
@@ -22,7 +22,7 @@ func RawCardAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cardID := strings.TrimPrefix(r.URL.Path, "/api/mtgmatcher/raw/")
-	co, err := backend().GetUUID(cardID)
+	co, err := s.backend().GetUUID(cardID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

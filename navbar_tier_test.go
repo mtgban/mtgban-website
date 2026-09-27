@@ -30,7 +30,8 @@ func TestPageNavCarriesTheTier(t *testing.T) {
 		// A reader who is not signed in has no tier to wear.
 		{"", ""},
 	} {
-		if got := genPageNav(nil, "Search", tt.sig).UserTier; got != tt.want {
+		got := genPageNav(testSite, nil, "Search", tt.sig).UserTier
+		if got != tt.want {
 			t.Errorf("tier %q, want %q", got, tt.want)
 		}
 	}

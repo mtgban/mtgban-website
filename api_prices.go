@@ -15,8 +15,8 @@ type PriceResult struct {
 	ImageURL   string   `json:"imageURL,omitempty"`
 }
 
-func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
-	b := backend()
+func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	// During warmup every answer would be empty; a 503 makes clients retry
 	// later instead of caching blank prices and images for their tiles
 	if !dataReady(b) {

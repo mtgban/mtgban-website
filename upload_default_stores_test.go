@@ -67,7 +67,7 @@ func uploadWithoutStores(t *testing.T, id string, cookies ...*http.Cookie) []str
 		req.AddCookie(cookie)
 	}
 	rec := httptest.NewRecorder()
-	Upload(rec, req)
+	testSite.Upload(rec, req)
 
 	var labels []string
 	stat := regexp.MustCompile(`<div class="res-summary-stat">\s*<span class="label">([^<]*)</span>`)

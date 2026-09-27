@@ -399,12 +399,12 @@ func parseChartIDs(b *mtgmatcher.Backend, chartParam string) (ids []string, trun
 	return ids, truncated
 }
 
-func Search(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) Search(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav(r, "Search", sig)
+	pageVars := genPageNav(s, r, "Search", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
@@ -1257,7 +1257,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// An empty window hides the chart and the select that could widen it,
 			// so a card whose prices all predate the window reads the ceiling. A
 			// read that failed is not an empty window, so it is not retried wider.
-			priced := slices.ContainsFunc(series, func(s chartSeries) bool { return len(s.Prices) > 0 })
+			priced := slices.ContainsFunc(series, func(cs chartSeries) bool { return len(cs.Prices) > 0 })
 			if lb.Days() < maxDays && archiveAnswered(series) && !priced {
 				lb, _ = chartWindow(sig, 0)
 				pageVars.ChartLoadedDays = lb.Days()
@@ -1269,8 +1269,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// against a hundred-partition prices table a round-trip is
 			// mostly planning.
 			var earliest time.Time
-			for _, s := range series {
-				if e := earliestChartedDate(s.Prices, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+			for _, cs := range series {
+				e := earliestChartedDate(cs.Prices, lb)
+				if !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
 					earliest = e
 				}
 			}
@@ -1279,11 +1280,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
 				cards := make([]multiCardInput, len(series))
-				for i, s := range series {
+				for i, cs := range series {
 					cards[i] = multiCardInput{
-						CardID:   s.CardID,
-						Name:     s.Name,
-						Datasets: chartDatasetsFrom(s.Prices, pageVars.AxisLabels),
+						CardID:   cs.CardID,
+						Name:     cs.Name,
+						Datasets: chartDatasetsFrom(cs.Prices, pageVars.AxisLabels),
 					}
 				}
 				if isMultiChart {
