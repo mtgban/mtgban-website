@@ -305,6 +305,8 @@
     font-size: 13px; font-weight: 600;
     text-decoration: none; transition: all 0.15s;
     border: 1px solid;
+    /* One width for every label, so the theme toggle between them stays centred */
+    min-width: 4.5em; text-align: center;
 }
 .landing-login-btn.patreon {
     background: rgba(255,66,77,0.1); border-color: rgba(255,66,77,0.25); color: #ff424d;
