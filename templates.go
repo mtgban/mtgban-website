@@ -200,6 +200,12 @@ var funcMap = template.FuncMap{
 	"game": func() string {
 		return Config.Game
 	},
+	// bantool_run_name is the GitHub Actions run name a store's bantool
+	// workflow gets, which the admin dashboard's running-workflow poll
+	// matches a row against (see newBantoolWorkflow).
+	"bantool_run_name": func(store string) string {
+		return newBantoolWorkflow(Config.Game, store).RunName
+	},
 	"card_back": func() string {
 		return "/img/backs/" + Config.Game + ".webp"
 	},

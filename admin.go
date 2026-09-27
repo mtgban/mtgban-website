@@ -37,8 +37,25 @@ const (
 	dispatchURL = "https://api.github.com/repos/mtgban/go-mtgban/dispatches"
 	workflowURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/workflows/"
 	gaStatusURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/runs?status="
-	gaLogURL    = "https://github.com/mtgban/go-mtgban/actions/workflows/bantool-%s.yml"
+	gaLogURL    = "https://github.com/mtgban/go-mtgban/actions/workflows/%s"
 )
+
+// bantoolWorkflow names a store's bantool workflow: EventType is the
+// repository_dispatch event_type and the part of File between "bantool-"
+// and ".yml"; RunName is the run's GitHub display name.
+type bantoolWorkflow struct {
+	EventType string
+	File      string
+	RunName   string
+}
+
+func newBantoolWorkflow(game, store string) bantoolWorkflow {
+	return bantoolWorkflow{
+		EventType: game + "-" + store,
+		File:      "bantool-" + game + "-" + store + ".yml",
+		RunName:   game + " / " + store,
+	}
+}
 
 // Time when server started
 var StartTime = time.Now()
@@ -97,10 +114,16 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	refresh := r.FormValue("refresh")
 	if refresh != "" {
 		v := url.Values{}
-		v.Set("msg", "Scheduling a refresh for "+refresh+" in the background...")
-		err := sendGithubAction(refresh)
-		if err != nil {
-			v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
+		_, found := currentScraperIndex().byStore[refresh]
+		if !found {
+			v.Set("msg", refresh+" not found")
+		} else {
+			err := sendGithubAction(Config.Game, refresh)
+			if err != nil {
+				v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
+			} else {
+				v.Set("msg", "Scheduling a refresh for "+refresh+" in the background...")
+			}
 		}
 		r.URL.RawQuery = v.Encode()
 		http.Redirect(w, r, r.URL.String(), http.StatusFound)
@@ -152,7 +175,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		// If it's not a Page, look if the last listing named it as a store
 		_, found = currentScraperIndex().byStore[logs]
 		if found {
-			link := fmt.Sprintf(gaLogURL, logs)
+			link := fmt.Sprintf(gaLogURL, newBantoolWorkflow(Config.Game, logs).File)
 			http.Redirect(w, r, link, http.StatusFound)
 			return
 		}
@@ -898,12 +921,12 @@ func subViewsOf(all []observability.PathAgg) []observability.PathAgg {
 	return out
 }
 
-func isBusyGithubAction(key string) (bool, error) {
-	totProgres, err := queryGithubAction(key, "in_progress")
+func isBusyGithubAction(wf bantoolWorkflow) (bool, error) {
+	totProgres, err := queryGithubAction(wf.File, "in_progress")
 	if err != nil {
 		return false, errors.New("cannot retrieve in_progress status")
 	}
-	totQueue, err := queryGithubAction(key, "queued")
+	totQueue, err := queryGithubAction(wf.File, "queued")
 	if err != nil {
 		return false, errors.New("cannot retrieve queued status")
 	}
@@ -913,8 +936,8 @@ func isBusyGithubAction(key string) (bool, error) {
 	return false, nil
 }
 
-func queryGithubAction(key, state string) (int, error) {
-	url := workflowURL + "bantool-" + key + ".yml/runs?status=" + state
+func queryGithubAction(file, state string) (int, error) {
+	url := workflowURL + file + "/runs?status=" + state
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -943,8 +966,10 @@ func queryGithubAction(key, state string) (int, error) {
 	return payload.TotalCount, nil
 }
 
-func sendGithubAction(key string) error {
-	busy, err := isBusyGithubAction(key)
+func sendGithubAction(game, store string) error {
+	wf := newBantoolWorkflow(game, store)
+
+	busy, err := isBusyGithubAction(wf)
 	if err != nil {
 		return err
 	}
@@ -952,7 +977,7 @@ func sendGithubAction(key string) error {
 		return errors.New("job already running")
 	}
 
-	payload := strings.NewReader(`{"event_type":"` + key + `"}`)
+	payload := strings.NewReader(`{"event_type":"` + wf.EventType + `"}`)
 	req, err := http.NewRequest(http.MethodPost, dispatchURL, payload)
 	if err != nil {
 		return err
