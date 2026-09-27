@@ -105,8 +105,8 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 	return !info.SealedMode && (info.CountryFlag == "" || info.MetadataOnly)
 }
 
-func PriceAPI(w http.ResponseWriter, r *http.Request) {
-	b := backend()
+func (s *site) PriceAPI(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	sig := r.FormValue("sig")
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()

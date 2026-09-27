@@ -558,7 +558,7 @@ func TestStoresFilterNarrowsBothWays(t *testing.T) {
 
 	for filter, want := range map[string]string{"sealed": `["SEALED1"]`, "singles": `["SINGLES1"]`} {
 		rec := httptest.NewRecorder()
-		PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter="+filter, nil))
+		testSite.PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter="+filter, nil))
 		got := strings.TrimSpace(rec.Body.String())
 		if got != want {
 			t.Errorf("stores.json?filter=%s = %s, want %s", filter, got, want)
@@ -569,7 +569,7 @@ func TestStoresFilterNarrowsBothWays(t *testing.T) {
 	singles := sellers[:1]
 	sellersPtr.Store(&singles)
 	rec := httptest.NewRecorder()
-	PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter=sealed", nil))
+	testSite.PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/stores.json?filter=sealed", nil))
 	got := strings.TrimSpace(rec.Body.String())
 	if got != "[]" {
 		t.Errorf("stores.json?filter=sealed with no sealed store = %s, want []", got)

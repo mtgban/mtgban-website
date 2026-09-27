@@ -169,9 +169,9 @@ func appendPrefixMatches(out, entries []nameEntry, prefix string, seen map[strin
 	return out
 }
 
-func SuggestAPI(w http.ResponseWriter, r *http.Request) {
+func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	sealed, _ := strconv.ParseBool(r.FormValue("sealed"))
-	ds := currentDatastore()
+	ds := s.datastore()
 
 	if r.FormValue("all") == "true" {
 		AllNames := ds.backend.Names("canonical", sealed)

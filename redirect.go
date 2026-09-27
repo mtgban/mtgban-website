@@ -9,8 +9,8 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-func Redirect(w http.ResponseWriter, r *http.Request) {
-	b := backend()
+func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	path := strings.TrimPrefix(r.URL.Path, "/go/")
 	fields := strings.Split(path, "/")
 
@@ -144,8 +144,8 @@ func namesFinish(b *mtgmatcher.Backend, cards []mtgmatcher.Card, word string) bo
 //   - hand off to search rather than resolve here, so missing finishes land
 //     on the whole family and bad set/number spellings fail as a search
 //   - match numbers with cns: (as-printed) so stars/daggers distinguish twins
-func CardRedirect(w http.ResponseWriter, r *http.Request) {
-	b := backend()
+func (s *site) CardRedirect(w http.ResponseWriter, r *http.Request) {
+	b := s.backend()
 	// Split the path as it was written rather than as it decodes, so a slash
 	// inside a part stays inside it: Flesh and Blood numbers a double-faced
 	// card WTR040//WTR039, which travels as %2F%2F and would otherwise arrive
@@ -235,7 +235,7 @@ func sealedProductBySlug(b *mtgmatcher.Backend, setCode, slug string) *mtgmatche
 // it: /sealed/<set> is that set's products, and /sealed is the tab itself. A
 // slug that names no product in the set is searched for as the words it is
 // made of, so it fails as a search that says so rather than as a dead link.
-func SealedRedirect(w http.ResponseWriter, r *http.Request) {
+func (s *site) SealedRedirect(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(strings.TrimPrefix(r.URL.Path, "/sealed/"), "/")
 	fields := strings.Split(path, "/")
 
@@ -246,7 +246,7 @@ func SealedRedirect(w http.ResponseWriter, r *http.Request) {
 
 		if len(fields) > 1 && fields[1] != "" {
 			slug := fields[1]
-			product := sealedProductBySlug(backend(), set, slug)
+			product := sealedProductBySlug(s.backend(), set, slug)
 			if product != nil {
 				query = product.Name
 			} else {
@@ -265,8 +265,8 @@ func SealedRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, r.URL.String(), http.StatusFound)
 }
 
-func RandomSearch(w http.ResponseWriter, r *http.Request) {
-	uuid := randomUUID(backend(), false)
+func (s *site) RandomSearch(w http.ResponseWriter, r *http.Request) {
+	uuid := randomUUID(s.backend(), false)
 
 	v := r.URL.Query()
 	v.Set("q", uuid)
@@ -276,8 +276,8 @@ func RandomSearch(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, r.URL.String(), http.StatusFound)
 }
 
-func RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
-	uuid := randomUUID(backend(), true)
+func (s *site) RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
+	uuid := randomUUID(s.backend(), true)
 
 	v := r.URL.Query()
 	v.Set("q", uuid)

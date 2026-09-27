@@ -51,7 +51,7 @@ func TestMobileChartRangeFollowsTheTier(t *testing.T) {
 			req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
 			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: testSig(params)})
 			rec := httptest.NewRecorder()
-			Search(rec, req)
+			testSite.Search(rec, req)
 
 			page := rec.Body.String()
 			start := strings.Index(page, `id="m-chart-range"`)

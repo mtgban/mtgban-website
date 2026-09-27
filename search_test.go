@@ -16,10 +16,15 @@ var NameToBeFound string
 var EditionToBeFound string
 var NumberToBeFound string
 
+// testSite is the *site every test in this package shares unless it builds
+// its own.
+var testSite *site
+
 func TestMain(m *testing.M) {
 	LogDir = "logs"
 	Config.DatastorePath = "allprintings5.json"
 	Config.Game = DefaultGame
+	testSite = newSite()
 
 	// Best-effort datastore load: tests that need real card data guard
 	// themselves with t.Skip when the data isn't loaded, so a missing local

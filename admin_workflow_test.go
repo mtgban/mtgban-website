@@ -62,7 +62,7 @@ func TestAdminDashboardShowsStaleBadgeAndBanner(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
-	Admin(rec, req)
+	testSite.Admin(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)

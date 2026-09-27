@@ -60,12 +60,12 @@ var sleepersLanguages = []string{
 	"Sanskrit",
 }
 
-func Sleepers(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav(r, "Sleepers", sig)
+	pageVars := genPageNav(s, r, "Sleepers", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

@@ -16,7 +16,7 @@ import (
 func sealedRedirectQuery(t *testing.T, path string) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	SealedRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	testSite.SealedRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
 	if rec.Code != http.StatusFound {
 		t.Fatalf("%s answered %d, want a redirect", path, rec.Code)
 	}
@@ -108,11 +108,11 @@ func TestSealedPathLandsOnTheProduct(t *testing.T) {
 	co, _ := backend().GetUUID(product.UUID)
 
 	rec := httptest.NewRecorder()
-	SealedRedirect(rec, httptest.NewRequest(http.MethodGet, sealedPath(co), nil))
+	testSite.SealedRedirect(rec, httptest.NewRequest(http.MethodGet, sealedPath(co), nil))
 	landing := rec.Header().Get("Location")
 
 	page := httptest.NewRecorder()
-	Search(page, httptest.NewRequest(http.MethodGet, landing, nil))
+	testSite.Search(page, httptest.NewRequest(http.MethodGet, landing, nil))
 	body := page.Body.String()
 	if !strings.Contains(body, product.UUID) {
 		t.Errorf("%s -> %s does not show %q", sealedPath(co), landing, product.Name)

@@ -18,7 +18,7 @@ func inviteSig(t *testing.T, query string) url.Values {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin?reboot=invite&"+query, nil)
 	rec := httptest.NewRecorder()
-	Admin(rec, req)
+	testSite.Admin(rec, req)
 
 	if rec.Code != http.StatusFound {
 		t.Fatalf("the tool answered %d, want a redirect carrying the link", rec.Code)
@@ -97,7 +97,7 @@ func TestInviteLinkIsOneTheSiteAccepts(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/admin?reboot=invite&tier=Pioneer&duration=7", nil)
 	rec := httptest.NewRecorder()
-	Admin(rec, req)
+	testSite.Admin(rec, req)
 
 	location, err := url.Parse(rec.Header().Get("Location"))
 	if err != nil {

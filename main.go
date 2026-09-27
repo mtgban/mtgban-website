@@ -364,7 +364,7 @@ type NavElem struct {
 	Description string
 
 	// Response handler
-	Handle func(w http.ResponseWriter, r *http.Request)
+	Handle func(*site, http.ResponseWriter, *http.Request)
 
 	// Which page to render
 	Page string
@@ -378,8 +378,9 @@ type NavElem struct {
 	// Alternative endpoints connected to this handler
 	SubPages []NavElem
 
-	// Condition upon which the page should not be made visible
-	ShouldHide func() bool
+	// Condition upon which the page should not be made visible. Reads the
+	// site's current datastore for visibility only.
+	ShouldHide func(*site) bool
 
 	// True for pages whose settings modal has bindings (mirrors
 	// PAGE_BINDINGS in js/settings.js). Used by the navbar inline
@@ -462,7 +463,7 @@ func init() {
 			Short:       "🔍",
 			Description: "Find a card by name",
 			Link:        "/search",
-			Handle:      Search,
+			Handle:      (*site).Search,
 			Page:        "search.html",
 			HasSettings: true,
 			SubPages: []NavElem{
@@ -478,8 +479,8 @@ func init() {
 					Description: "Sealed product search",
 					Link:        "/sealed",
 					HasSettings: true,
-					ShouldHide: func() bool {
-						return len(backend().GetSealedUUIDs()) == 0
+					ShouldHide: func(s *site) bool {
+						return len(s.backend().GetSealedUUIDs()) == 0
 					},
 				},
 			},
@@ -489,7 +490,7 @@ func init() {
 			Short:       "🗞️",
 			Description: "Market movers & recent activity",
 			Link:        "/newspaper",
-			Handle:      Newspaper,
+			Handle:      (*site).Newspaper,
 			Page:        "news.html",
 			HasSettings: true,
 			// Every page of it is built from the cached uuids, so with none
@@ -498,7 +499,7 @@ func init() {
 			// gets no entry rather than a dead end. The cron rebuilds the
 			// cache every three hours, so it appears on its own once the
 			// data does.
-			ShouldHide: func() bool {
+			ShouldHide: func(*site) bool {
 				return len(GetNewspaperUUIDs()) == 0
 			},
 			SubPages: []NavElem{
@@ -508,7 +509,7 @@ func init() {
 					Description: "Cards TCGplayer wants now",
 					Link:        "/newspaper?page=syp",
 					HasSettings: true,
-					ShouldHide: func() bool {
+					ShouldHide: func(*site) bool {
 						_, err := findVendorBuylist("SYP")
 						return err != nil
 					},
@@ -520,7 +521,7 @@ func init() {
 			Short:       "🔎",
 			Description: "Find cards by price movement over time",
 			Link:        "/screener",
-			Handle:      Screener,
+			Handle:      (*site).Screener,
 			Page:        "screener.html",
 		},
 		"Sleepers": {
@@ -528,7 +529,7 @@ func init() {
 			Short:       "💤",
 			Description: "Under-the-radar picks",
 			Link:        "/sleepers",
-			Handle:      Sleepers,
+			Handle:      (*site).Sleepers,
 			Page:        "sleep.html",
 			HasSettings: true,
 		},
@@ -537,7 +538,7 @@ func init() {
 			Short:       "🚢",
 			Description: "Bulk price your collection",
 			Link:        "/upload",
-			Handle:      Upload,
+			Handle:      (*site).Upload,
 			Page:        "upload.html",
 			HasSettings: true,
 			CanPOST:     true,
@@ -547,7 +548,7 @@ func init() {
 			Short:       "🌍",
 			Description: "Cross-region price view",
 			Link:        "/global",
-			Handle:      Global,
+			Handle:      (*site).Global,
 			Page:        "arbit.html",
 			HasSettings: true,
 		},
@@ -556,7 +557,7 @@ func init() {
 			Short:       "📈",
 			Description: "Buy low, sell high spreads",
 			Link:        "/arbit",
-			Handle:      Arbit,
+			Handle:      (*site).Arbit,
 			Page:        "arbit.html",
 			HasSettings: true,
 		},
@@ -565,7 +566,7 @@ func init() {
 			Short:       "📉",
 			Description: "Reverse-direction arbitrage",
 			Link:        "/reverse",
-			Handle:      Reverse,
+			Handle:      (*site).Reverse,
 			Page:        "arbit.html",
 			HasSettings: true,
 		},
@@ -574,13 +575,13 @@ func init() {
 			Short:       "🔑",
 			Description: "Price data API plans and access",
 			Link:        "/api-plans",
-			Handle:      APIPlans,
+			Handle:      (*site).APIPlans,
 			Page:        "api-plans.html",
 			// The handoffs are reached from the plans page, never from the navbar.
 			SubPages: []NavElem{
-				{Name: "APITrial", Link: "/api-trial", ShouldHide: func() bool { return true }},
-				{Name: "APILogin", Link: "/api-login", ShouldHide: func() bool { return true }},
-				{Name: "APIStores", Link: "/api-plans/stores.json", ShouldHide: func() bool { return true }},
+				{Name: "APITrial", Link: "/api-trial", ShouldHide: func(*site) bool { return true }},
+				{Name: "APILogin", Link: "/api-login", ShouldHide: func(*site) bool { return true }},
+				{Name: "APIStores", Link: "/api-plans/stores.json", ShouldHide: func(*site) bool { return true }},
 			},
 		},
 		"Admin": {
@@ -588,7 +589,7 @@ func init() {
 			Short:       "❌",
 			Description: "Restricted control panel",
 			Link:        "/admin",
-			Handle:      Admin,
+			Handle:      (*site).Admin,
 			Page:        "admin.html",
 
 			CanPOST:        true,
@@ -1035,7 +1036,7 @@ func ServeFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
-func genPageNav(r *http.Request, activeTab, sig string) PageVars {
+func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	// Decode the sig once; this function reads it for expiry, every nav
 	// feature, and the user email, and each GetParamFromSig call would
 	// re-parse the whole thing.
@@ -1111,13 +1112,13 @@ func genPageNav(r *http.Request, activeTab, sig string) PageVars {
 
 		// A hidden section takes its subpages with it: they are reached
 		// through it, and half a section is worse than none.
-		if ExtraNavs[feat].ShouldHide != nil && ExtraNavs[feat].ShouldHide() {
+		if ExtraNavs[feat].ShouldHide != nil && ExtraNavs[feat].ShouldHide(s) {
 			continue
 		}
 
 		pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
 		for _, subPage := range ExtraNavs[feat].SubPages {
-			if subPage.ShouldHide != nil && subPage.ShouldHide() {
+			if subPage.ShouldHide != nil && subPage.ShouldHide(s) {
 				continue
 			}
 			pageVars.Nav = append(pageVars.Nav, subPage)
@@ -1497,6 +1498,8 @@ func main() {
 
 	loadRarityBadges()
 
+	s := newSite()
+
 	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
 	// web server. Needs only the config and the price DB. The same jobs run as
 	// their own process via cmd/tcgcsvd, which needs neither this binary nor its
@@ -1681,31 +1684,31 @@ func main() {
 	http.HandleFunc("/sw.js", ServeServiceWorker)
 
 	// custom redirector
-	http.HandleFunc("/go/", Redirect)
+	http.HandleFunc("/go/", s.Redirect)
 	http.HandleFunc("/http:/", UploadURLRedirect)
 	http.HandleFunc("/https:/", UploadURLRedirect)
-	http.HandleFunc("/card/", CardRedirect)
-	http.HandleFunc("/sealed/", SealedRedirect)
-	http.HandleFunc("/random", RandomSearch)
-	http.HandleFunc("/randomsealed", RandomSealedSearch)
+	http.HandleFunc("/card/", s.CardRedirect)
+	http.HandleFunc("/sealed/", s.SealedRedirect)
+	http.HandleFunc("/random", s.RandomSearch)
+	http.HandleFunc("/randomsealed", s.RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, Config.Discord.InviteURL, http.StatusFound)
 	})
 
 	// Public changelog sourced from the Discord announcement channel.
-	http.Handle("/changelog", noSigning(http.HandlerFunc(Changelog)))
+	http.Handle("/changelog", noSigning(http.HandlerFunc(s.Changelog)))
 
 	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(Home)))
+	http.Handle("/", noSigning(http.HandlerFunc(s.Home)))
 
 	// Public guide page
-	http.Handle("/guide", noSigning(http.HandlerFunc(Guide)))
+	http.Handle("/guide", noSigning(http.HandlerFunc(s.Guide)))
 
 	// Public privacy policy (cookie + Amazon Associates disclosures)
-	http.Handle("/privacy", noSigning(http.HandlerFunc(Privacy)))
+	http.Handle("/privacy", noSigning(http.HandlerFunc(s.Privacy)))
 
 	// Offline shell page, precached by the service worker
-	http.Handle("/offline", noSigning(http.HandlerFunc(OfflinePage)))
+	http.Handle("/offline", noSigning(http.HandlerFunc(s.OfflinePage)))
 
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
@@ -1726,7 +1729,9 @@ func main() {
 		}
 
 		// Set up the handler
-		handler := enforceSigning(http.HandlerFunc(nav.Handle))
+		handler := enforceSigning(s, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			nav.Handle(s, w, r)
+		}))
 		http.Handle(nav.Link, handler)
 
 		// Add any additional endpoints to it
@@ -1745,22 +1750,22 @@ func main() {
 	// would take to use it. It grants nothing by being read - the rows it
 	// receives are posted to /upload, which is enforced as it always was -
 	// and it checks the signature itself before it agrees to receive any.
-	http.Handle("/upload/handoff", noSigning(http.HandlerFunc(UploadHandoff)))
+	http.Handle("/upload/handoff", noSigning(http.HandlerFunc(s.UploadHandoff)))
 
-	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(SearchAPI)))
-	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
-	http.Handle("/api/cardmarket/", enforceSigning(http.HandlerFunc(MKMHandler)))
-	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
-	http.Handle("/api/mtgmatcher/raw/", enforceSigning(http.HandlerFunc(RawCardAPI)))
-	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
-	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
+	http.Handle("/search/oembed", noSigning(http.HandlerFunc(s.Search)))
+	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
+	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(s.PriceAPI)))
+	http.Handle("/api/tcgplayer/", enforceSigning(s, http.HandlerFunc(s.TCGHandler)))
+	http.Handle("/api/cardmarket/", enforceSigning(s, http.HandlerFunc(s.MKMHandler)))
+	http.Handle("/api/search/", enforceSigning(s, http.HandlerFunc(s.SearchAPI)))
+	http.Handle("/api/mtgmatcher/raw/", enforceSigning(s, http.HandlerFunc(s.RawCardAPI)))
+	http.Handle("/api/suggest", noSigning(http.HandlerFunc(s.SuggestAPI)))
+	http.Handle("/api/chart/", noSigning(http.HandlerFunc(s.ChartDataAPI)))
+	http.Handle("/api/prices/", enforceSigning(s, http.HandlerFunc(s.BatchPricesAPI)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
-	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
-	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
+	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
+	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))
 	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(paletteService.CardMeta)))
 	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(paletteService.Sealed)))
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
@@ -1775,7 +1780,7 @@ func main() {
 
 	// /healthz: returns 200 only if dependencies are OK.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		uuids := len(backend().GetUUIDs())
+		uuids := len(s.backend().GetUUIDs())
 		sellers, vendors := len(GetSellers()), len(GetVendors())
 		if uuids == 0 || sellers == 0 || vendors == 0 {
 			log.Printf("healthz: not ready (uuids=%d, sellers=%d, vendors=%d)", uuids, sellers, vendors)
@@ -1791,7 +1796,7 @@ func main() {
 	// routes cannot be wrapped individually like the other pages; steer
 	// them through the standard signing middleware (plus the Admin grant)
 	// here instead, and everything else straight to the mux
-	debugHandler := enforceSigning(adminOnly(http.DefaultServeMux))
+	debugHandler := enforceSigning(s, adminOnly(http.DefaultServeMux))
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

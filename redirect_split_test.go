@@ -17,7 +17,7 @@ import (
 // than as it decodes, so the slash stays inside the part it belongs to.
 func TestCardRedirectReadsAnEscapedSlash(t *testing.T) {
 	rec := httptest.NewRecorder()
-	CardRedirect(rec, httptest.NewRequest(http.MethodGet,
+	testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet,
 		"/card/WTR/"+url.PathEscape("WTR040//WTR039")+"/1steditionnormal", nil))
 
 	loc, err := url.Parse(rec.Header().Get("Location"))
@@ -64,7 +64,7 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 		}
 
 		rec := httptest.NewRecorder()
-		CardRedirect(rec, httptest.NewRequest(http.MethodGet, link, nil))
+		testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, link, nil))
 		loc, err := url.Parse(rec.Header().Get("Location"))
 		if err != nil {
 			t.Fatal(err)

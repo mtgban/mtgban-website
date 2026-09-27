@@ -19,7 +19,7 @@ func TestRawCardAPIRefusesNonAdmins(t *testing.T) {
 	withSigMode(t, false, true)
 
 	w := httptest.NewRecorder()
-	RawCardAPI(w, httptest.NewRequest("GET", "/api/mtgmatcher/raw/whatever", nil))
+	testSite.RawCardAPI(w, httptest.NewRequest("GET", "/api/mtgmatcher/raw/whatever", nil))
 	if w.Code != http.StatusForbidden {
 		t.Errorf("code = %d, want %d", w.Code, http.StatusForbidden)
 	}
@@ -37,7 +37,7 @@ func TestRawCardAPIDumpsEveryField(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	RawCardAPI(w, httptest.NewRequest("GET", "/api/mtgmatcher/raw/"+uuids[0], nil))
+	testSite.RawCardAPI(w, httptest.NewRequest("GET", "/api/mtgmatcher/raw/"+uuids[0], nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("code = %d, want %d: %s", w.Code, http.StatusOK, w.Body.String())
 	}
@@ -63,7 +63,7 @@ func TestRawCardAPIUnknownId(t *testing.T) {
 	withSigMode(t, true, false)
 
 	w := httptest.NewRecorder()
-	RawCardAPI(w, httptest.NewRequest("GET", "/api/mtgmatcher/raw/not-a-card-id", nil))
+	testSite.RawCardAPI(w, httptest.NewRequest("GET", "/api/mtgmatcher/raw/not-a-card-id", nil))
 	if w.Code != http.StatusNotFound {
 		t.Errorf("code = %d, want %d", w.Code, http.StatusNotFound)
 	}

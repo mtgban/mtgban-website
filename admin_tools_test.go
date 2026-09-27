@@ -17,7 +17,7 @@ func TestAdminToolsLinkTheGatewayAdmin(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
-	Admin(rec, req)
+	testSite.Admin(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -51,7 +51,7 @@ func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&reboot=newKey&user="+user+"&duration=", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
-	Admin(rec, req)
+	testSite.Admin(rec, req)
 	if rec.Code != http.StatusFound {
 		t.Fatalf("status %d", rec.Code)
 	}

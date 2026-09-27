@@ -24,7 +24,7 @@ func TestCardRedirectFollowsScryfallsShape(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
 
 			if rec.Code != http.StatusFound {
 				t.Fatalf("%s answered %d, want a redirect", tt.path, rec.Code)
@@ -58,7 +58,7 @@ func TestCardRedirectWidensAShortPath(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
 
 			if rec.Code != http.StatusFound {
 				t.Fatalf("%s answered %d, want a redirect", tt.path, rec.Code)
@@ -92,7 +92,7 @@ func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	CardRedirect(rec, httptest.NewRequest(http.MethodGet, "/card/lea", nil))
+	testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, "/card/lea", nil))
 	loc, err := url.Parse(rec.Header().Get("Location"))
 	if err != nil {
 		t.Fatal(err)
@@ -129,7 +129,7 @@ func TestCardRedirectLandsOnThePrinting(t *testing.T) {
 	card := set.Cards[0]
 
 	rec := httptest.NewRecorder()
-	CardRedirect(rec, httptest.NewRequest(http.MethodGet, "/card/lea/"+card.Number, nil))
+	testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, "/card/lea/"+card.Number, nil))
 	loc, err := url.Parse(rec.Header().Get("Location"))
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +172,7 @@ func TestCardRedirectTakesAFinishOrTheName(t *testing.T) {
 		{"/card/otj/1/etched", "Another Round s:otj cns:1"},
 	} {
 		rec := httptest.NewRecorder()
-		CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+		testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
 		got, err := url.Parse(rec.Header().Get("Location"))
 		if err != nil {
 			t.Fatal(err)
@@ -195,7 +195,7 @@ func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
 
 	run := func(path string) []string {
 		rec := httptest.NewRecorder()
-		CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		loc, err := url.Parse(rec.Header().Get("Location"))
 		if err != nil {
 			t.Fatal(err)
@@ -235,7 +235,7 @@ func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	CardRedirect(rec, httptest.NewRequest(http.MethodGet, "/card/4ed/107†", nil))
+	testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, "/card/4ed/107†", nil))
 	loc, err := url.Parse(rec.Header().Get("Location"))
 	if err != nil {
 		t.Fatal(err)
@@ -281,7 +281,7 @@ func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
 	ask := func(path string) (string, []string) {
 		t.Helper()
 		rec := httptest.NewRecorder()
-		CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		loc, err := url.Parse(rec.Header().Get("Location"))
 		if err != nil {
 			t.Fatal(err)
@@ -349,7 +349,7 @@ func TestCardPathComesBackWithItsName(t *testing.T) {
 		path := cardPath(co, co.Finish)
 
 		rec := httptest.NewRecorder()
-		CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		loc, err := url.Parse(rec.Header().Get("Location"))
 		if err != nil {
 			t.Fatal(err)

@@ -71,7 +71,7 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 		apiUsersMutex.Unlock()
 	})
 
-	handler := enforceAPISigning(http.HandlerFunc(SearchAPI))
+	handler := enforceAPISigning(http.HandlerFunc(testSite.SearchAPI))
 	requests := 0
 	// A key scoped to scope, or none at all when scope is empty.
 	search := func(scope, cookie string) string {
@@ -134,7 +134,7 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(name)+".csv", nil)
 	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 	rec := httptest.NewRecorder()
-	SearchAPI(rec, req)
+	testSite.SearchAPI(rec, req)
 	if !strings.Contains(rec.Body.String(), "Star City Games") {
 		t.Errorf("the search page's export lost a store: %s", rec.Body.String())
 	}

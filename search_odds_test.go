@@ -149,7 +149,7 @@ func TestVariableReadingShowsAndSortsByDropRate(t *testing.T) {
 	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 
 	page := httptest.NewRecorder()
-	Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query)+"&sort=odds", nil))
+	testSite.Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query)+"&sort=odds", nil))
 	body := page.Body.String()
 
 	if !strings.Contains(body, "Avg Copies") {
@@ -274,7 +274,7 @@ func TestDropRateShowsOnlyOnTheBuyersSide(t *testing.T) {
 	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 
 	page := httptest.NewRecorder()
-	Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil))
+	testSite.Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil))
 	body := page.Body.String()
 
 	// data-card-id repeats within a card's own block (chart and favorite
@@ -336,7 +336,7 @@ func TestDropRateDoesNotBorrowACKBadgeOrAFixLink(t *testing.T) {
 	odds := dropOdds(backend(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
 
 	page := httptest.NewRecorder()
-	Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil))
+	testSite.Search(page, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(query), nil))
 	body := page.Body.String()
 
 	blocks := strings.Split(body, `data-chart-id="`)
@@ -405,7 +405,7 @@ func TestDropRateVisibilityDoesNotDependOnSort(t *testing.T) {
 			u += "&sort=" + sort
 		}
 		page := httptest.NewRecorder()
-		Search(page, httptest.NewRequest(http.MethodGet, u, nil))
+		testSite.Search(page, httptest.NewRequest(http.MethodGet, u, nil))
 		counts = append(counts, strings.Count(page.Body.String(), "Avg Copies"))
 	}
 	for i := 1; i < len(counts); i++ {

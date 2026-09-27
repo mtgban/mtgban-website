@@ -151,10 +151,10 @@ func uploadQuery(hashes []string, textArea, handedFrom, gdocURL, gdocName, filen
 // the page says so and declines to receive anything. Refusing here rather
 // than at the far end is the difference between reading somebody's whole
 // shelf and then being told no, and being told no before the walk starts.
-func UploadHandoff(w http.ResponseWriter, r *http.Request) {
+func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav(r, "Upload", sig)
+	pageVars := genPageNav(s, r, "Upload", sig)
 	pageVars.Title = "Receiving a card list"
 	pageVars.HandoffOrigins = HandoffOrigins
 

@@ -56,7 +56,7 @@ func TestChartDataAPILive(t *testing.T) {
 	get := func(t *testing.T, target string) ChartAPIResponse {
 		t.Helper()
 		w := httptest.NewRecorder()
-		ChartDataAPI(w, httptest.NewRequest("GET", target, nil))
+		testSite.ChartDataAPI(w, httptest.NewRequest("GET", target, nil))
 		if w.Code != 200 {
 			t.Fatalf("GET %s: status %d, body %s", target, w.Code, w.Body.String())
 		}
@@ -108,7 +108,7 @@ func TestChartDataAPILive(t *testing.T) {
 	// Gaps go over as null, and the response carries no sentinel string.
 	t.Run("gaps are null on the wire", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		ChartDataAPI(w, httptest.NewRequest("GET", "/api/chart/"+id+"?range=30", nil))
+		testSite.ChartDataAPI(w, httptest.NewRequest("GET", "/api/chart/"+id+"?range=30", nil))
 		body := w.Body.String()
 		if strings.Contains(body, "Number.NaN") {
 			t.Error("response still carries the Number.NaN sentinel")

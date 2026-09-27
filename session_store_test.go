@@ -312,7 +312,7 @@ func TestAdminRemovesASessionStore(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/admin", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
-		Admin(rec, req)
+		testSite.Admin(rec, req)
 		return rec
 	}
 
@@ -395,7 +395,7 @@ func TestUploadPublishesAStoreWhenGranted(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
-		Upload(rec, req)
+		testSite.Upload(rec, req)
 		return rec
 	}
 
@@ -480,7 +480,7 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 		rec := httptest.NewRecorder()
-		Upload(rec, req)
+		testSite.Upload(rec, req)
 		return rec
 	}
 

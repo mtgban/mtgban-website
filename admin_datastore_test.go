@@ -96,7 +96,7 @@ func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 	datastoreReloads = dsreload.Tracker{}
 
 	rec := httptest.NewRecorder()
-	Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?reboot=datastore", nil))
+	testSite.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?reboot=datastore", nil))
 	close(release)
 	waitForReload(t)
 

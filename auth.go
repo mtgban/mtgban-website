@@ -555,7 +555,9 @@ func targetsSubPage(r *http.Request, link string) bool {
 	return true
 }
 
-func enforceSigning(next http.Handler) http.Handler {
+// enforceSigning takes the site because it builds the nav (genPageNav) and
+// checks ShouldHide, both of which read the site's current datastore.
+func enforceSigning(s *site, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
@@ -606,7 +608,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		// happy path — nearly every request — it would be thrown away, and
 		// the handler builds its own right after.
 		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
-			pageVars := genPageNav(r, "Error", sig)
+			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
 
@@ -616,7 +618,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
-			pageVars := genPageNav(r, "Error", sig)
+			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -629,7 +631,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		v, err := url.ParseQuery(string(raw))
 		if SigCheck && err != nil {
-			pageVars := genPageNav(r, "Error", sig)
+			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -660,7 +662,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
 			}
-			pageVars := genPageNav(r, "Error", sig)
+			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if valid == expectedSig && expires < time.Now().Unix() {
@@ -692,7 +694,7 @@ func enforceSigning(next http.Handler) http.Handler {
 					canDo = true
 				}
 				if SigCheck && !canDo {
-					pageVars := genPageNav(r, nav.Name, sig)
+					pageVars := genPageNav(s, r, nav.Name, sig)
 					pageVars.Title = "This feature is BANned"
 					pageVars.ErrorMessage = ErrMsgPlus
 
@@ -702,8 +704,8 @@ func enforceSigning(next http.Handler) http.Handler {
 
 				// A section hidden from the nav is not reachable by typing its
 				// url either, the same as its subpages below.
-				if nav.ShouldHide != nil && nav.ShouldHide() {
-					pageVars := genPageNav(r, "Error", sig)
+				if nav.ShouldHide != nil && nav.ShouldHide(s) {
+					pageVars := genPageNav(s, r, "Error", sig)
 					pageVars.Title = "Unauthorized"
 					render(w, "home.html", pageVars)
 					return
@@ -712,8 +714,8 @@ func enforceSigning(next http.Handler) http.Handler {
 				// Check if link is a subpage, and validate if viewing conditions are met
 				for _, subPage := range nav.SubPages {
 					if targetsSubPage(r, subPage.Link) &&
-						subPage.ShouldHide != nil && subPage.ShouldHide() {
-						pageVars := genPageNav(r, "Error", sig)
+						subPage.ShouldHide != nil && subPage.ShouldHide(s) {
+						pageVars := genPageNav(s, r, "Error", sig)
 						pageVars.Title = "Unauthorized"
 						render(w, "home.html", pageVars)
 						return

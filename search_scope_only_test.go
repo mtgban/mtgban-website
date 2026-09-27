@@ -57,7 +57,7 @@ func searchWithStock(t *testing.T, stocked string, target string, cookies ...*ht
 		req.AddCookie(cookie)
 	}
 	rec := httptest.NewRecorder()
-	Search(rec, req)
+	testSite.Search(rec, req)
 	return rec.Body.String()
 }
 

@@ -1091,12 +1091,12 @@ var BucketNames = []string{
 	"", "$2+", "$5+", "$10+", "$20+", "$35+", "$50+", "$75+",
 }
 
-func Newspaper(w http.ResponseWriter, r *http.Request) {
-	ds := currentDatastore()
+func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
 	b := ds.backend
 	sig := getSignatureFromCookies(r)
 
-	pageVars := genPageNav(r, "Newspaper", sig)
+	pageVars := genPageNav(s, r, "Newspaper", sig)
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)

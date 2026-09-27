@@ -49,7 +49,7 @@ func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
 		sellersPtr.Store(&sellers)
 
 		rec := httptest.NewRecorder()
-		Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))
+		testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))
 		return rec.Body.String()
 	}
 
