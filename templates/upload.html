@@ -1365,7 +1365,7 @@
                         {{if and (not $.IsBuylist) (has_prefix $sourceKey "TCG")}}
                             <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
-                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardID}}||{{end}}"/>
+                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
                                 <noscript>
                                     <input type="submit" value="Load at TCG"/>
