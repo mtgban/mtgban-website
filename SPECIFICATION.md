@@ -99,9 +99,10 @@ Boot sequence (`main()`, main.go:1299-1674):
    (`newDatastore()`, datastore.go), publishes backend and snapshots
    together in one `liveDatastore.Store()`, then itself spawns
    `cacheNewspaper()` as a further goroutine.
-5. Unless `-noload` (`SkipPrices`): async goroutine `loadScrapersNG()`, then
-   `runSealedAnalysis()`, `warmVariantCacheIfEnabled()`,
-   `offlineService.RefreshManifest()`.
+5. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
+   bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
+   `loadScrapersNG()` on it, then `runSealedAnalysis()`,
+   `warmVariantCacheIfEnabled()`, `offlineService.RefreshManifest()`.
 6. `offlineService.StartRefresher()` — one debounced goroutine that every
    runtime manifest refresh funnels through.
 7. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go:1477-1513):
@@ -111,6 +112,7 @@ Boot sequence (`main()`, main.go:1299-1674):
    - `20 */12 * * *` — `offlineService.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()`
+   - `0 * * * *` - `checkStaleness()` (staleness.go): the Discord alarm below
    - when tcgcsv ingestion is configured: `0 21 * * *` —
      `stashTCGCSVPrices()`; `0 22 * * 1` — `stashTCGCSVProducts()`
    - the old per-scraper `force_reload_at` cron expressions no longer exist
@@ -154,11 +156,39 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   and indexed per game — this is now a multi-game site (magic, lorcana,
   onepiece, yugioh, riftbound, fleshandblood, pokemon, gundam, palworld).
   Reloadable from the admin panel (`?reboot=datastore`/`datastore-backup`).
-- **Scraper price data** (`loadScrapersNG()`, load.go:88-160): config maps
-  scraper name → `{retail|buylist: [shorthands]}`; each is fetched from B2
-  at `game/name/kind/shorthand.<format>` (format from `BucketFileFormat`),
-  deserialized via `mtgban.ReadSellerFromJSON`/`ReadVendorFromJSON`. 3
-  retries with backoff, 2-minute timeout per scraper.
+- **Scraper price data** (`loadScrapersNG()`, load.go): discovered, not
+  configured. bantool publishes every game's dumps to the B2 bucket
+  `mtgban-dumps` (`dumpsBucket`) as
+  `<game>/<store>/<kind>/<shorthand>.json.xz` (kind `retail` or `buylist`),
+  and `openDumpsBucket()` opens it through `newB2ClientFor` with the
+  `bucket_keys["mtgban-dumps"]` key pair, like every other bucket;
+  `scraper_config` keeps only `icons` and `name_override`. At startup the
+  bucket is listed under `<game>/` (`listDumps`, via `simplecloud.Lister`,
+  with a timeout and retry per attempt); every key of that form becomes one
+  load, and anything else is skipped with a log line. Each load is fetched
+  at that same key and deserialized via
+  `mtgban.ReadSellerFromJSON`/`ReadVendorFromJSON`, 3 retries with backoff
+  and a 2-minute timeout per scraper. The listing also builds a
+  `scraperIndex`: store → kind → shorthands, and the reverse shorthand →
+  store, published behind its own `atomic.Pointer` next to
+  `sellersPtr`/`vendorsPtr` before any dump loads; the admin dashboard,
+  `familyKeys()` and `isConfiguredScraper` all read it. A bucket that cannot
+  be opened or listed is a startup error.
+
+  **`/api/load/<store>`** (`LoadFromCloud`, api.go): store must match
+  `^[a-z0-9_]+$` or this 404s before ever asking the bucket to list
+  anything - a signature can carry other values in its API field (a stray
+  `..`, an `ALL_ACCESS` minted for the price API), and none of them name a
+  real store. The signature check itself is `GetParamFromSig(sig, "API") ==
+  store`. It lists `<game>/<store>/` alone, 404s if that lists nothing,
+  loads every dump found, and replaces that store's entries in the index: a
+  shorthand another store also publishes moves to this one, and every other
+  store's own entries are copied across untouched. The listing and the loads
+  retry a timeout as startup does, each attempt on its own
+  `context.Background()`, so a transient B2 timeout is not a 500 to the
+  scraper that just published, and a reload finishes even if that caller
+  hangs up. `?reload=` from the admin page names the store, kind and
+  shorthand directly.
 - **"Offline" now means the PWA offline experience**, not a data-loading
   mode — `api_load.go` and the old "run without B2, reconstruct
   sellers/vendors from another instance's `/api/mtgban/all.json` +
@@ -516,6 +546,36 @@ live 🔶 status from a `?workflows=` GitHub Actions poll, registered pages,
 uptime, memory via `go-osstat`, and disk via the platform-specific
 `internal/diskusage.Stats` — a no-op returning zero on Windows. The Usage
 tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
+
+Each row's store name comes from the scraper index's reverse lookup
+(`scraperStoreOf`). Every place the dashboard talks to GitHub (the
+`?refresh=` dispatch and the busy check in front of it, and the `?logs=`
+redirect) names the target workflow through `newBantoolWorkflow(game,
+store)`, one helper with no Magic special case: `EventType`
+(`<game>-<store>`, also the `repository_dispatch` payload), `File`
+(`bantool-<game>-<store>.yml`) it dispatches and polls by, and `RunName`
+(`<game> / <store>`), which the `?workflows=` poll's running-indicator
+script matches a row's `data-tag` against - the Actions API returns a run's
+display name but not the `event_type` that started it.
+
+**Staleness** (staleness.go): a row is stale when its
+`InventoryTimestamp`/`BuylistTimestamp` is more than `StaleAfter` (48h) old,
+or unset. The dashboard shows this three ways: a "stale Nd" badge in the
+Status cell (alongside, not instead of, the 🔶 running indicator), the
+Last Update cell in red, and a per-table "N stale" next to "N providers",
+plus a page-top banner listing every stale store, each linking to
+`?logs=<store>`. The badge is column 8 of each scraper-table row in
+`PageVars.Tables`, and the template derives the rest from it rather than
+reading `PageVars` fields: `stale_count` counts a table's stale rows, and
+`stale_stores` lists their stores (column 2), sorted and deduplicated,
+leaving out `UNKNOWN` and `session`. Separately, an hourly cron job
+(`checkStaleness()`, registered in `main()`) compares every served
+seller's/vendor's staleness against an in-memory map and calls
+`notifyStale` (which posts through `ServerNotify`) only on a transition
+(`classifyStaleTransition`, a pure function): once going stale, once
+recovering, never on repeat. A session store (an admin's upload) is
+skipped, the same as the banner. The map is in memory only, so a restart's
+first check may announce every already-stale row once.
 
 ## 6. Support packages
 

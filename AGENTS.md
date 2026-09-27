@@ -67,8 +67,13 @@ output, not a claim written here.
 - `BAN_SECRET` (env var) keys the HMAC signing; `BAN_CONFIG_PATH` sets the
   default config path.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
-  for the current line — it moves): scraper config, Patreon OAuth, ACL (tier →
-  page → flags), affiliates, DB addresses, B2 bucket credentials.
+  for the current line, it moves): scraper config (only `icons` and
+  `name_override`), Patreon OAuth, ACL (tier → page → flags), affiliates, DB
+  addresses, B2 bucket credentials. The store list is not configured: it
+  comes from listing bantool's dumps at startup (`load.go`'s
+  `loadScrapersNG`/`listDumps`), which always live in bucket `mtgban-dumps`
+  as `<game>/<store>/<kind>/<shorthand>.json.xz` and are read with the
+  `bucket_keys["mtgban-dumps"]` key pair; see SPECIFICATION.md §2.3.
 
 ## Repository conventions
 
