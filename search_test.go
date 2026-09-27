@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -27,19 +28,20 @@ func TestMain(m *testing.M) {
 		log.Println("loadDatastore skipped:", err)
 		os.Exit(m.Run())
 	}
-	Config.ScraperConfig.BucketAccessKey = os.Getenv("B2_KEY_ID")
-	Config.ScraperConfig.BucketSecretKey = os.Getenv("B2_APP_KEY")
-	Config.ScraperConfig.BucketPath = os.Getenv("PATH_DATA")
-	Config.ScraperConfig.BucketFileFormat = os.Getenv("PATH_SUFFIX")
-	Config.ScraperConfig.Config = map[string]map[string][]string{
-		"cardkingdom": {
-			"retail": {"CK"},
-		},
-	}
 
-	if err := loadScrapersNG(Config.ScraperConfig); err != nil {
-		log.Println("loadScrapersNG skipped:", err)
-		os.Exit(m.Run())
+	// A dev convenience: a B2 key pair in the environment loads every dump
+	// of Config.Game. CI sets none and loads nothing.
+	keyID, appKey := os.Getenv("B2_KEY_ID"), os.Getenv("B2_APP_KEY")
+	if keyID != "" && appKey != "" {
+		Config.BucketKeys = map[string]BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
+		bucket, err := openDumpsBucket(context.Background())
+		if err == nil {
+			err = loadScrapersNG(bucket)
+		}
+		if err != nil {
+			log.Println("loadScrapersNG skipped:", err)
+			os.Exit(m.Run())
+		}
 	}
 
 	uuid := randomUUID(backend(), false)

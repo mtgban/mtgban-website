@@ -196,13 +196,14 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 // familyKeys maps each lowercased configured shorthand to its family key, the config key up to its first underscore.
 func familyKeys() map[string]string {
 	keyOf := map[string]string{}
-	for _, key := range slices.Sorted(maps.Keys(Config.ScraperConfig.Config)) {
+	config := scraperStoreConfig()
+	for _, key := range slices.Sorted(maps.Keys(config)) {
 		if strings.HasSuffix(key, "_sealed") {
 			continue
 		}
 		// tcg_index and tcg_market are both the tcg family.
 		family, _, _ := strings.Cut(strings.ToLower(key), "_")
-		for _, list := range Config.ScraperConfig.Config[key] {
+		for _, list := range config[key] {
 			for _, sh := range list {
 				if _, taken := keyOf[strings.ToLower(sh)]; !taken {
 					keyOf[strings.ToLower(sh)] = family

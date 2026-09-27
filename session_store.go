@@ -59,17 +59,13 @@ func dropSessionScraper(kind, shorthand string) {
 	vendorsPtr.Store(&next)
 }
 
-// isConfiguredScraper reports whether any section of the scraper config
-// names the shorthand, loaded or not, compared the way the site's own
-// lookups are: case-insensitively.
+// isConfiguredScraper reports whether the dumps bucket's last listing named
+// the shorthand under any store, loaded or not, compared the way the site's
+// own lookups are: case-insensitively.
 func isConfiguredScraper(shorthand string) bool {
-	for _, sections := range Config.ScraperConfig.Config {
-		for _, list := range sections {
-			if slices.ContainsFunc(list, func(configured string) bool {
-				return strings.EqualFold(configured, shorthand)
-			}) {
-				return true
-			}
+	for configured := range currentScraperIndex().byShorthand {
+		if strings.EqualFold(configured, shorthand) {
+			return true
 		}
 	}
 	return false

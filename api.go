@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -859,18 +860,31 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// validStoreName matches the names bantool publishes stores under;
+// LoadFromCloud refuses anything else before listing.
+var validStoreName = regexp.MustCompile(`^[a-z0-9_]+$`)
+
 func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Path
 	name = strings.TrimPrefix(name, "/api/load/")
 
+	if !validStoreName.MatchString(name) {
+		errorResponse(w, http.StatusNotFound, "not found")
+		return
+	}
 	if GetParamFromSig(r.FormValue("sig"), "API") != name {
 		errorResponse(w, http.StatusNotFound, "not found")
 		return
 	}
 
-	config := Config.ScraperConfig
-	scrapersConfig, found := config.Config[name]
-	if !found {
+	prefix := Config.Game + "/" + name + "/"
+	idx, err := listDumpsWithRetry(DataBucket, Config.Game, prefix)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	scrapersConfig := idx.byStore[name]
+	if len(scrapersConfig) == 0 {
 		errorResponse(w, http.StatusNotFound, "not found")
 		return
 	}
@@ -878,7 +892,7 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	var failed []string
 	for kind, list := range scrapersConfig {
 		for _, shorthand := range list {
-			err := loadScraper(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
+			err := loadScraperWithRetry(DataBucket, Config.Game, name, kind, shorthand)
 			if err != nil {
 				log.Println(err)
 				failed = append(failed, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
@@ -886,6 +900,8 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	updateScraperIndexStore(name, scrapersConfig)
 
 	// A scraper that just finished producing and still will not load is the
 	// case worth waking someone for, unlike the same absence at startup.

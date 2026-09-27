@@ -198,15 +198,20 @@ type scraperStub struct {
 	buylistBlock []string
 }
 
-// stubScrapers installs the stub and restores the real scrapers and config after the test.
+// stubScrapers installs the stub and restores the real scrapers, index and
+// config after the test.
 func stubScrapers(t *testing.T, s scraperStub) {
 	t.Helper()
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
-	prevCfg, prevRetail, prevBuylist := Config.ScraperConfig, Config.SearchRetailBlockList, Config.SearchBuylistBlockList
+	prevIdx := scraperIndexPtr.Load()
+	prevOverrides := Config.ScraperConfig.NameOverride
+	prevRetail, prevBuylist := Config.SearchRetailBlockList, Config.SearchBuylistBlockList
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
-		Config.ScraperConfig, Config.SearchRetailBlockList, Config.SearchBuylistBlockList = prevCfg, prevRetail, prevBuylist
+		scraperIndexPtr.Store(prevIdx)
+		Config.ScraperConfig.NameOverride = prevOverrides
+		Config.SearchRetailBlockList, Config.SearchBuylistBlockList = prevRetail, prevBuylist
 	})
 	info := func(sh string) mtgban.ScraperInfo {
 		name, ok := s.names[sh]
@@ -225,7 +230,8 @@ func stubScrapers(t *testing.T, s scraperStub) {
 	}
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
-	Config.ScraperConfig = ScraperConfig{Config: s.config, NameOverride: s.overrides}
+	scraperIndexPtr.Store(buildScraperIndex(s.config))
+	Config.ScraperConfig.NameOverride = s.overrides
 	Config.SearchRetailBlockList, Config.SearchBuylistBlockList = s.retailBlock, s.buylistBlock
 }
 

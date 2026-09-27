@@ -187,12 +187,11 @@ func reloadOverriddenScrapers(shorthands map[string]struct{}) {
 	if DataBucket == nil || len(shorthands) == 0 {
 		return
 	}
-	cfg := Config.ScraperConfig
-	for name, scrapersConfig := range cfg.Config {
+	for name, scrapersConfig := range scraperStoreConfig() {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
 				if _, ok := shorthands[shorthand]; ok {
-					go loadScraperWithRetry(DataBucket, cfg.BucketPath, Config.Game, name, kind, shorthand, cfg.BucketFileFormat)
+					go loadScraperWithRetry(DataBucket, Config.Game, name, kind, shorthand)
 				}
 			}
 		}
