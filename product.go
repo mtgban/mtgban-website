@@ -18,10 +18,13 @@ import (
 )
 
 type EditionEntry struct {
-	Name     string
-	Code     string
-	Date     time.Time
-	Keyrune  string
+	Name    string
+	Code    string
+	Date    time.Time
+	Keyrune string
+	// Symbol is the set's own published symbol image (Pokemon, on most of
+	// its sets); empty everywhere else, same as set.Symbol itself.
+	Symbol   string
 	Size     int
 	FmtDate  string
 	Special  bool
@@ -248,6 +251,7 @@ func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
 		Code:     set.Code,
 		Date:     date,
 		Keyrune:  keyruneClass(set.KeyruneCode),
+		Symbol:   set.Symbol,
 		Size:     len(set.Cards),
 		FmtDate:  set.ReleaseDate,
 		Special:  special,

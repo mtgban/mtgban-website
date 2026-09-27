@@ -54,7 +54,7 @@
                                 <h4 style="display:inline; padding: 0px 10px 0px 10px">&nbsp;</h6>
                                 {{end}}
 
-                                {{template "set-symbol" dict "Keyrune" $edition.Keyrune "Code" $edition.Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}}
+                                {{template "set-symbol" dict "Keyrune" $edition.Keyrune "Code" $edition.Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" $edition.Symbol "Size" 20 "Class" ""}}
                                 <a class="btn normal" href="/search?q=s:{{$edition.Code}}">
                                     {{.Name}}
                                 </a>

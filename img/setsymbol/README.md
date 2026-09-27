@@ -132,9 +132,11 @@ The pieces, and where each lives:
 - Magic never touches any of this: `loadRarityBadges` returns immediately for
   `Config.Game == DefaultGame`, and the template branches on `.Keyrune`
   before it ever asks for a badge.
-- A published symbol image (the `set_symbol` func, backed by a vendor's own
-  CDN) takes precedence over both the keyrune glyph and the drawn badge, with
-  the drawn badge kept hidden as its `onerror` fallback. That fallback is not
+- A published symbol image (the set's `Symbol`, which the handler puts in
+  the page as `GenericCard.SetSymbol` / `EditionEntry.Symbol` and the
+  partial reads as `.Symbol`; backed by a vendor's own CDN) takes
+  precedence over both the keyrune glyph and the drawn badge, with the
+  drawn badge kept hidden as its `onerror` fallback. That fallback is not
   hypothetical: every Pokemon symbol 404ed for nine days once, when the
   vendor changed where the file lived out from under a URL this site had
   already been handed.

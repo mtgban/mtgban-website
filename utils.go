@@ -466,8 +466,11 @@ type GenericCard struct {
 	// carries no promo type in the datastore; "retro" is added for it by
 	// hand, since is:retro is a real filter despite that. The template
 	// spells each token with promo_label and links it to that search.
-	PromoTypes  []string
-	Keyrune     string
+	PromoTypes []string
+	Keyrune    string
+	// SetSymbol is the set's own published symbol image, from the same
+	// b.GetSet lookup keyruneForCardSet makes for Keyrune.
+	SetSymbol   string
 	ImageURL    string
 	Foil        bool
 	Etched      bool
@@ -533,10 +536,12 @@ func fileExists(filename string) bool {
 	return !fi.IsDir()
 }
 
-func keyruneForCardSet(b *mtgmatcher.Backend, cardID string) string {
+// keyruneForCardSet returns a card's keyrune CSS class and its set's
+// published symbol image, both off the one GetSet lookup a card needs.
+func keyruneForCardSet(b *mtgmatcher.Backend, cardID string) (keyrune, symbol string) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 
 	set, err := b.GetSet(co.Card.SetCode)
@@ -546,13 +551,13 @@ func keyruneForCardSet(b *mtgmatcher.Backend, cardID string) string {
 			set, err = b.GetSet(strings.TrimPrefix(co.Card.SetCode, "T"))
 		}
 		if err != nil {
-			return ""
+			return "", ""
 		}
 	}
 
-	keyrune := set.KeyruneCode
+	keyrune = set.KeyruneCode
 	if keyrune == "" {
-		return ""
+		return "", set.Symbol
 	}
 
 	out := "ss-" + strings.ToLower(keyrune)
@@ -575,7 +580,7 @@ func keyruneForCardSet(b *mtgmatcher.Backend, cardID string) string {
 		out += " ss-foil ss-grad"
 	}
 
-	return out
+	return out, set.Symbol
 }
 
 // getSetKeyrunes returns a map of set code -> bare "ss-CODE" keyrune class.
@@ -1100,7 +1105,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 	}
 
 	var rarityColor string
-	keyrune := keyruneForCardSet(b, cardID)
+	keyrune, setSymbol := keyruneForCardSet(b, cardID)
 	if keyrune == "" {
 		rarityColor = colorRarityMap[Config.Game][co.Rarity]
 	}
@@ -1128,6 +1133,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		FinishClass: finishClass,
 		Treatments:  treatments,
 		Keyrune:     keyrune,
+		SetSymbol:   setSymbol,
 		ImageURL:    imgURL,
 		Title:       editionTitle(b, cardID),
 		Reserved:    co.Card.IsReserved,

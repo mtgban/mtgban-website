@@ -39,7 +39,7 @@
         <a class="m-set-card{{if .IsChild}} child{{end}}" href="/search?q=s:{{.Code}}" data-name="{{.Name}}">
             <div class="m-set-card-header">
                 <div class="m-set-icon">
-                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}}
+                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}}
                 </div>
                 <span class="m-set-name">{{.Name}}</span>
                 <div class="m-set-stats">
