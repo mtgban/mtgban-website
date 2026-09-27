@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -146,6 +147,35 @@ func assertDatastoreDescribesLoad(t *testing.T, setCode, number, namePrefix stri
 
 	if !ds.loadedAt.Equal(loadedAt) {
 		t.Errorf("loadedAt = %v, want %v", ds.loadedAt, loadedAt)
+	}
+}
+
+// A card row keeps the set symbol and TCG id of the datastore its handler
+// read, even when another is published before the page is drawn.
+func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
+	a := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
+	a.Sets["FIXTUREA"].Symbol = "https://example.test/fixturea.webp"
+	a.UUIDs["FIXTUREA-1"].Identifiers = map[string]string{"tcgplayerProductId": "4242"}
+	card := uuid2card(a, "FIXTUREA-1", false, false, false)
+
+	useDatastore(t, newDatastore(fixtureBackend("FIXTUREB", "Fixture Edition Beta", "2021-06-15",
+		[][2]string{{"Fixture Card Beta", "1"}}), time.Now()))
+
+	metadata := map[string]GenericCard{"FIXTUREA-1": card}
+	search := PageVars{SearchQuery: card.Name, SearchRan: true, CardHashes: []string{"FIXTUREA-1"},
+		AllKeys: []string{"FIXTUREA-1"}, Metadata: metadata}
+	for _, page := range []string{"search.html", "mobile/search.html"} {
+		if out := renderSearch(t, page, search); !strings.Contains(out, `src="https://example.test/fixturea.webp"`) {
+			t.Errorf("%s: the row lost its set symbol to the datastore published after it was built", page)
+		}
+	}
+
+	out := renderArbit(t, PageVars{ScraperShort: "TCGPlayer", BetaNav: &NavElem{}, Metadata: metadata,
+		Arb: []Arbitrage{{Name: "CK", Key: "CK", Arbit: []mtgban.ArbitEntry{{CardID: "FIXTUREA-1"}}}}})
+	for _, want := range []string{`data-arb-tcgid="4242"`, `1-4242||`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("arbit.html does not carry %s", want)
+		}
 	}
 }
 
