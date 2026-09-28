@@ -1094,7 +1094,9 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	if err != nil && !DevMode {
 		return err
 	}
+	apiUsersMutex.Lock()
 	Config = config
+	apiUsersMutex.Unlock()
 
 	applyOverrides(port, datastorePath, aclPath, grantsPath)
 	finishConfig()
