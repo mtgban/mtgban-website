@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -123,5 +124,28 @@ func TestRecoverPanicReportsItsOwnStack(t *testing.T) {
 	// even this trace past the cut, and then nothing follows it to check.
 	if len(stack) >= 1024 {
 		t.Skipf("the trace is %d bytes here, too long to show what follows it", len(stack))
+	}
+}
+
+// A handler's panic is answered with a 500 and reported with the request
+// it came from.
+func TestRecoverPanicReportsTheRequest(t *testing.T) {
+	posts := serverWebhook(t)
+
+	panicky := noSigning(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic(errors.New("the handler broke"))
+	}))
+	rec := httptest.NewRecorder()
+	panicky.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/search?q=bolt", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	message, _, source := panicReport(t, posts)
+	if message != "the handler broke" {
+		t.Errorf("message = %q, want the panic's", message)
+	}
+	if source != "source request: /search?q=bolt" {
+		t.Errorf("source = %q, want the request", source)
 	}
 }
