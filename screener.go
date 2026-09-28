@@ -309,9 +309,8 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 
 // moverCardID resolves a mover row to this game's uuid: Magic rows carry the
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
-// through the external id map with the sub-type naming the finish. Overridable
-// in tests.
-var moverCardID = func(b *mtgmatcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
+// through the external id map with the sub-type naming the finish.
+func moverCardID(b *mtgmatcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
