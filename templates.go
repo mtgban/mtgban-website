@@ -313,6 +313,75 @@ var funcMap = template.FuncMap{
 		}
 		return template.HTML(fmt.Sprintf(`<span class="bl-prices">%s</span>`, prices))
 	},
+	// buylist_state is how a buylist price is highlighted. Card Kingdom's NM
+	// offer follows CK's signal ("best" to take it, "wait" when CK is likely
+	// to pay more soon; ckbuylist.go), any other store's offer is "best" at or
+	// above CK's P90.
+	"buylist_state": func(shorthand, conditions string, isOffer bool, price, good float64, ckSignal string) string {
+		switch {
+		case !isOffer:
+			return ""
+		case shorthand == "CK" && conditions != "NM":
+			return ""
+		case shorthand == "CK" && ckSignal == "sell":
+			return "best"
+		case shorthand == "CK":
+			return ckSignal
+		case good > 0 && price >= good:
+			return "best"
+		}
+		return ""
+	},
+	// buylist_title is the tooltip of a buylist price: CK's P90 and 90-day
+	// high, plus CK's stock facts and the signal's odds on CK's NM offer.
+	"buylist_title": func(shorthand, conditions string, good, highest float64, facts, tip string) string {
+		var lines []string
+		if good > 0 {
+			line := fmt.Sprintf("Card Kingdom P90 $ %.2f", good)
+			if highest > 0 {
+				line += fmt.Sprintf("; 90-day high $ %.2f", highest)
+			}
+			lines = append(lines, line)
+		}
+		if shorthand == "CK" && conditions == "NM" {
+			if facts != "" {
+				lines = append(lines, facts)
+			}
+			if tip != "" {
+				lines = append(lines, tip)
+			}
+		}
+		return strings.Join(lines, "\n")
+	},
+	// buylist_wait marks Card Kingdom's NM offer while CK is likely to pay
+	// more soon.
+	"buylist_wait": func(shorthand, conditions, ckSignal, tip string) template.HTML {
+		if shorthand != "CK" || conditions != "NM" || ckSignal != "wait" {
+			return ""
+		}
+		return template.HTML(` <span class="ck-wait" title="` + template.HTMLEscapeString(tip) + `">&#8593;</span>`)
+	},
+	// buylist_ck is a card's CK signal and stock facts on one line, for the
+	// pages with a column of card details.
+	"buylist_ck": func(ckSignal, tip, facts string) template.HTML {
+		var parts []string
+		attrs := `class="bl-ck"`
+		switch ckSignal {
+		case "wait":
+			parts = append(parts, "&#8593; Wait")
+			attrs = `class="bl-ck bl-ck-wait" title="` + template.HTMLEscapeString(tip) + `"`
+		case "sell":
+			parts = append(parts, "Sell now")
+			attrs = `class="bl-ck bl-ck-sell" title="` + template.HTMLEscapeString(tip) + `"`
+		}
+		if facts != "" {
+			parts = append(parts, template.HTMLEscapeString(facts))
+		}
+		if len(parts) == 0 {
+			return ""
+		}
+		return template.HTML(`<span ` + attrs + `>` + strings.Join(parts, " · ") + `</span>`)
+	},
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
 	},
