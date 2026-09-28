@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,9 +42,6 @@ const (
 	defaultDiscordRecapChannelID = "798588735259279453"
 	defaultDiscordChatChannelID  = "736007847560609794"
 )
-
-var DiscordRetailBlocklist []string
-var DiscordBuylistBlocklist []string
 
 var dg *discordgo.Session
 
@@ -93,9 +91,6 @@ func (s *site) setupDiscord() error {
 	dg.Identify.Intents = discordgo.MakeIntent(
 		discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent,
 	)
-
-	DiscordRetailBlocklist = append(Config.SearchRetailBlockList, "TCGDirectLow")
-	DiscordBuylistBlocklist = append(Config.SearchBuylistBlockList, "ABUCredit")
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -775,7 +770,11 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		config := parseSearchOptionsNG(b, searchRes.CardID, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
+		// Read per message, so a config reload reaches the bot, and clipped,
+		// so the bot's own additions never land in the config's slices.
+		blocklistRetail := append(slices.Clip(Config.SearchRetailBlockList), "TCGDirectLow")
+		blocklistBuylist := append(slices.Clip(Config.SearchBuylistBlockList), "ABUCredit")
+		config := parseSearchOptionsNG(b, searchRes.CardID, blocklistRetail, blocklistBuylist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a
 		// reason to drop a foreign shop and not a reason to drop a foreign
