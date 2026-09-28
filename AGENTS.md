@@ -31,9 +31,20 @@ go build -o mtgban-website .   # build the server binary (gitignored)
 # Run locally in dev mode (hot-reload templates, relaxed auth):
 ./mtgban-website -dev -cfg config.json
 
+# The same, loading one store's dumps from the bucket rather than every one:
+./mtgban-website -dev -cfg config.json -stores cardkingdom
+
+# Or from a local copy laid out like the bucket, with no B2 key; -stores
+# narrows it the same way. A symlink os.Root won't follow (absolute, or
+# leaving the directory) fails the listing at startup.
+b2 sync b2://mtgban-dumps/magic/cardkingdom/ ~/mtgban-dumps/magic/cardkingdom/
+./mtgban-website -dev -cfg config.json -dumps ~/mtgban-dumps
+
 # Useful flags (defined in main(), main.go): -port, -ds <datastore.json.xz>,
-# -acl / -grants (override those table paths), -noload (skip price load),
-# -nonews, -sig (force signature checks in dev), -log <dir>.
+# -acl / -grants (override those table paths), -dumps <dir> (read the dumps
+# from a local directory), -noload (skip price load), -stores a,b (load
+# only those stores' dumps at startup), -nonews, -sig (force signature
+# checks in dev), -log <dir>.
 # Also: -tcgcsv-daily / -tcgcsv-products / -tcgcsv-backfill (see
 # tcgcsvd/README.md) run one ingest job and exit rather than serving.
 ```
@@ -67,13 +78,15 @@ output, not a claim written here.
 - `BAN_SECRET` (env var) keys the HMAC signing; `BAN_CONFIG_PATH` sets the
   default config path.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
-  for the current line, it moves): scraper config (only `icons` and
-  `name_override`), Patreon OAuth, ACL (tier → page → flags), affiliates, DB
-  addresses, B2 bucket credentials. The store list is not configured: it
-  comes from listing bantool's dumps at startup (`load.go`'s
-  `loadScrapersNG`/`listDumps`), which always live in bucket `mtgban-dumps`
-  as `<game>/<store>/<kind>/<shorthand>.json.xz` and are read with the
-  `bucket_keys["mtgban-dumps"]` key pair; see SPECIFICATION.md §2.3.
+  for the current line, it moves): scraper config (`icons`, `name_override`
+  and `stores`), Patreon OAuth, ACL (tier → page → flags), affiliates, DB
+  addresses, B2 bucket credentials. The store list comes from listing
+  bantool's dumps at startup (`load.go`'s `loadScrapersNG`/`listDumps`),
+  which live in bucket `mtgban-dumps` (or a local copy, with `-dumps`) as
+  `<game>/<store>/<kind>/<shorthand>.json.xz` and are read with the
+  `bucket_keys["mtgban-dumps"]` key pair. `scraper_config.stores`, or
+  `-stores` for one run, narrows what loads at startup to the stores
+  named; empty loads every store listed. See SPECIFICATION.md §2.3.
 
 ## Repository conventions
 
