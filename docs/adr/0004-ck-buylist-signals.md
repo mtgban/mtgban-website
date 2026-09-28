@@ -1,0 +1,212 @@
+# ADR-0004: Card Kingdom buylist signals read CK's stock
+
+**Status:** Accepted
+**Date:** 2026-09-28
+**Deciders:** Vittorio Giovara
+**Change:** PR #682
+
+## Context
+
+The site flags Card Kingdom buylist prices with three signals, all built
+from CK's own price history over 90 days:
+
+- **Good** is CK's 90-day P90: `percentile_disc(0.9)` of the buying-day
+  prices, shown once a card has 30 of them. An offer at or above it turns
+  green (`price-best`), and `on:ckp90` finds cards where CK's offer meets it.
+- **Highest** is the 90-day maximum, shown next to Good.
+- **The hotlist** (`on:hotlist`, "Highest price in 3 months") marks a card
+  whose current CK price ties or beats that maximum.
+
+None of them looks at CK's retail stock, and CK's buylist moves with it: CK
+raises what it pays for cards it has sold out of and trims cards it is
+restocking. The newspaper database keeps a daily snapshot of CK's whole
+price list (`cardkingdomproductmodel`: buy price, quantity wanted, retail
+stock), which is enough to measure what each signal predicts.
+
+### How it was measured
+
+CK snapshots from 2025-12-28 to 2026-09-27: 255 of 274 days (a missing day
+carries the previous snapshot). Every day from 2026-03-28 to 2026-08-28,
+every card CK was buying at $1 or more with a P90 the site would show:
+4,901,662 card-days over 50,057 cards. The P90 is recomputed from the
+snapshots the way the site computes it from its own price archive.
+
+The outcome is CK's buy price 14 days later:
+
+- **up**: at least 5% higher, CK still buying;
+- **down**: at least 5% lower, or CK no longer buying;
+- **higher at some point**: at least 5% higher on any day of the 14;
+- **avg**: mean log change over the 14 days while CK still buys.
+
+Across all card-days: 33.0% up, 44.6% higher at some point, 35.1% down,
+−0.4% avg.
+
+### What the old signals say
+
+An offer at or above P90 is 44.5% of all card-days. CK moves prices in steps
+and holds them, so the top step often covers more than a tenth of the last
+90 days and today's price *is* the P90. By CK's stock:
+
+| CK's price vs P90 | CK's stock | Rows | Up | Higher at some point | Down | Avg |
+|---|---|---|---|---|---|---|
+| equals P90 | out of stock | 5.0% | 48.0% | 57.7% | 21.6% | +3.3% |
+| equals P90 | halved since yesterday | 0.2% | 47.9% | 70.0% | 27.7% | +2.1% |
+| equals P90 | in stock | 23.5% | 25.7% | 33.7% | 31.0% | −2.4% |
+| above P90 | out of stock | 5.3% | 34.0% | 41.0% | 28.5% | 0.0% |
+| above P90 | halved since yesterday | 0.2% | 39.2% | 60.7% | 33.8% | −2.3% |
+| above P90 | in stock | 10.3% | 27.2% | 40.0% | 41.9% | −6.8% |
+
+Only the last row behaves like "take this offer". The first is the opposite:
+CK is about to pay more.
+
+The hotlist fires on 32.9% of card-days, and 93% of those are ties with a
+flat 90-day maximum. A strict new high is 2.34%, and it reads as a peak:
+24.2% up, 33.1% higher at some point, 40.0% down, −6.1% avg. By stock:
+
+| CK's price vs the previous 90 days' max | CK's stock | Rows | Up | Higher at some point | Down | Avg |
+|---|---|---|---|---|---|---|
+| new high | in stock | 1.5% | 24.8% | 35.1% | 44.7% | −8.4% |
+| new high | out of stock | 0.9% | 23.2% | 29.6% | 31.6% | −2.2% |
+| ties the high | in stock | 22.1% | 25.6% | 34.3% | 32.8% | −3.1% |
+| ties the high | out of stock | 8.4% | 42.7% | 51.0% | 24.7% | +1.9% |
+
+### What predicts a move
+
+Evaluated in this order, each row excluding the ones above it:
+
+| State | Rows | Up | Higher at some point | Down | Avg |
+|---|---|---|---|---|---|
+| stock halved since yesterday, from 3 or more | 1.0% | 51.4% | 73.1% | 27.0% | +3.7% |
+| out of stock, price at or below P90 | 6.9% | 48.2% | 57.8% | 20.5% | +4.2% |
+| buy price cut 20% or more in 7 days | 6.1% | 47.5% | 68.0% | 42.1% | +14.1% |
+
+- **Stock at zero is the signal, not a falling count.** In stock, a week's
+  10–25% drop is followed by more cuts than raises (34.1% up, 42.9% down).
+  1–5 copies is not bullish (28.4% up); it is merely quiet.
+- **Buyouts are fast.** In 50.6% of them CK has already raised its price in
+  the same day's snapshot, and 49.2% see a further raise within 7 days. A
+  buyout two or three days old has lost most of its edge (38.1% up against
+  32.7% without one).
+- **Cuts come back, but not overnight.** Of one-day cuts of 20% or more,
+  13.7% are back within 5% the next day, 32.7% within 7 days, 36.7% within
+  14. So they are not feed glitches. 19.7% of the cut cards stop being
+  bought within 14 days, which is why the down column is high too.
+- **Days out of stock change the downside, not the upside.** Out of stock at
+  or below P90: 50.0% up / 23.2% down after 1–2 days, 50.1% up / 14.1% down
+  after more than 30.
+- **Foils and nonfoils differ in degree.** Out of stock at or below P90,
+  nonfoils mostly stop falling (19.9% down against 41.3% for nonfoils
+  generally) while foils also rise (50.2% up against 29.6%).
+
+The same pattern shows in both halves of the period, with one sample per
+week instead of every day, and within each price band from $1–3 to $30+.
+
+### Other stores' offers
+
+The site's own price archive keeps SCG's, ABU's and CSI's buylist prices
+since February 2025, without stock. Every Wednesday from 2025-10-01 to
+2026-09-09, every offer of $1 or more from those stores on a card with a CK
+P90: 3.7M offers over 50,279 cards. The outcome is the store's own offer 14
+days later, with "dropped" when the store no longer buys the card:
+
+| Store's offer | Rows | Up | Down | Dropped |
+|---|---|---|---|---|
+| at or above CK's P90 | 9.8% | 3.6% | 16.1% | 6.6% |
+| below CK's P90 | 90.2% | 9.9% | 9.2% | 4.3% |
+| above CK's listed price that day | 20.5% | 3.8% | 15.8% | 6.4% |
+
+These stores move far less than CK, but an offer at or above CK's P90 is one
+they seldom raise and more often cut or drop. That holds for each store and
+in both halves of the period, and by price band everywhere but nonfoils at
+$30+, which are cut no more often (9.0% against 8.8%) though raised less
+(2.2% against 8.1%). CK paid as much within 14 days for a quarter of these
+offers. 85% of them are at or above CK's listed price that day, and "above
+CK's listed price" predicts the same on twice the offers.
+
+## Decision
+
+1. **Good and Highest stay** as reference prices, the level other stores'
+   offers are compared with. Good's tint in the optimizer and arbitrage
+   details follows the signal (green for sell now, amber for wait) instead
+   of the unmeasured 110% and 80% of P90 margins.
+2. **The rules apply only where they were measured**: CK buying the card at
+   $1 or more, and the card having a P90.
+3. **Sell now (green)**: CK's buy price is strictly above its P90, CK has
+   stock, and its stock did not halve since yesterday.
+4. **Wait (↑)**: CK's stock halved since yesterday from 3 or more; or CK is
+   out of stock and its price is at or below P90; or CK cut its buy price by
+   20% or more in 7 days. Wait wins over sell now.
+5. **Neutral** otherwise.
+6. **Only CK's NM offer takes these states.** Other stores' offers keep the
+   plain comparison with CK's P90: green at or above it, which for SCG, ABU
+   and CSI is a time to sell to them as well.
+7. **Facts** show whenever CK is buying: its stock now and a week ago, days
+   out of stock, and a buy price change of 10% or more this week.
+8. **The tooltips quote the measurements above**, and are updated when the
+   measurements are.
+9. **Filters**: `on:cksell` finds sell now and `on:ckwait` finds wait.
+   `on:ckp90`, which matched any price at or above P90, is dropped rather
+   than redefined under the same name.
+10. **Two pills mark CK's 90-day high**, one at a time: `90d high` when CK
+    ties or beats it, the hotlist's meaning, which `on:hotlist` and the
+    sleepers page's Hotlist keep; `New high` when CK strictly beats it
+    (`on:newhigh`), with its odds.
+11. **Stock is CK's total across conditions**, as measured. "Now" comes from
+    the site's own CK scraper; yesterday and last week come from the
+    newspaper's daily snapshots, reloaded when the day or the newest snapshot
+    changes. A missed day or two carries the last snapshot, as in the
+    backtest; history more than 3 days old is not used, and yesterday's
+    stock only in a history loaded the same day.
+12. **Without that history**, buyouts and cuts cannot be seen: wait fires
+    only on out of stock, and sell now skips its buyout check (buyouts are
+    0.2% of card-days, against 10.3% for sell now).
+13. **Signals are computed when their inputs change**: CK's buylist or stock
+    reloading, the P90s refreshing, and hourly, which also picks up a new day
+    of history. Pages and filters read the result.
+
+Windows: 1 day for buyouts, 7 days for stock and price changes, 90 days for
+P90, and predictions stated over 14 days.
+
+## Options considered
+
+Each flag as a sell-now signal, over the same card-days (up and down as
+above; a good flag has a low up and a high down):
+
+| Flag | Rows | Up | Higher at some point | Down | Avg |
+|---|---|---|---|---|---|
+| A: price at or above P90 (before) | 44.5% | 29.7% | 39.0% | 32.2% | −2.4% |
+| B: strictly above P90 | 15.8% | 29.6% | 40.6% | 37.3% | −4.4% |
+| C: strictly above P90, in stock, no buyout (chosen) | 10.3% | 27.2% | 40.0% | 41.9% | −6.8% |
+| D: C, or a 20% raise this week while in stock | 19.9% | 30.1% | 44.0% | 44.2% | −6.2% |
+| E: at the 90-day high | 32.8% | 29.9% | 38.5% | 31.2% | −2.0% |
+| F: at the 90-day high, in stock | 23.3% | 25.4% | 34.0% | 33.6% | −3.5% |
+| G: 20% above the 90-day median, in stock | 19.0% | 31.7% | 45.7% | 42.1% | −6.6% |
+
+C has the lowest chance of CK paying more later among the flags with a high
+down rate. F has a lower up rate, but CK cuts less often after it than on a
+typical day (33.6% against 35.1%). D and G fire twice as often at the cost
+of more missed raises.
+
+**Dropping P90 altogether** was considered too. It would lose the reference
+price other stores' offers are compared with, and the stock rules still need
+a level to call "high".
+
+## Consequences
+
+- Green fires on about a tenth of CK's rows instead of nearly half, and out
+  of stock cards at their P90 show wait instead of green.
+- The hotlist's 33% of CK's rows show a `90d high` pill, except the 2.3%
+  that are strict new highs, which show `New high`. `on:hotlist` and the
+  sleepers page's Hotlist are unchanged.
+- The site reads the newspaper database's CK table: a `MAX(date)` every hour,
+  and a one-month aggregate (about 20 seconds) when the day or the newest
+  snapshot changes. If it is unreachable the history-based rules stop
+  firing; P90 and the live stock still work.
+- Every card CK is buying keeps its signal in memory: about 11 MB and 40 ms
+  to rebuild per 60,000 cards.
+- The odds in the tooltips come from one period (March to August 2026).
+  They should be re-measured, not assumed to hold.
+- Stock is total across conditions, as measured. NM-only stock, which the
+  site's CK scraper has, is untested.
+- Other stores' green is measured on SCG, ABU and CSI, the buylists the
+  price archive keeps; the site's other buylists have no history to measure.
