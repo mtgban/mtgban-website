@@ -1430,7 +1430,7 @@ func main() {
 				log.Fatalln("error opening the dumps bucket:", err)
 			}
 			DataBucket = bucket
-			err = loadScrapersNG(bucket)
+			err = loadScrapersNG(bucket, Config.ScraperConfig.Stores)
 			if err != nil {
 				log.Fatalln("error loading scrapers:", err)
 			}

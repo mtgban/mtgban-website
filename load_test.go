@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -327,7 +328,7 @@ func TestLoadScrapersNGFromLocalDirectory(t *testing.T) {
 	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
 	writeSellerDump(t, filepath.Join("magic", "abugames", "retail", "ABU.json.xz"), inventoryOf("ABU", 2, now))
 
-	err := loadScrapersNG(&simplecloud.FileBucket{})
+	err := loadScrapersNG(&simplecloud.FileBucket{}, nil)
 	if err != nil {
 		t.Fatalf("loadScrapersNG: %v", err)
 	}
@@ -347,6 +348,55 @@ func TestLoadScrapersNGFromLocalDirectory(t *testing.T) {
 	store, ok = scraperStoreOf("CK")
 	if !ok || store != "cardkingdom" {
 		t.Errorf("scraperStoreOf(CK) = %q, %v, want cardkingdom, true", store, ok)
+	}
+}
+
+// A store list narrows the load and the index alike, and a name the listing
+// lacks does not fail the load.
+func TestLoadScrapersNGLoadsOnlyTheNamedStores(t *testing.T) {
+	withLocalDumpsBucket(t, "magic")
+
+	now := time.Now()
+	writeSellerDump(t, filepath.Join("magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, now))
+	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
+	writeSellerDump(t, filepath.Join("magic", "abugames", "retail", "ABU.json.xz"), inventoryOf("ABU", 2, now))
+	writeVendorDump(t, filepath.Join("magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, now))
+
+	err := loadScrapersNG(&simplecloud.FileBucket{}, []string{"cardkingdom", "nosuchstore"})
+	if err != nil {
+		t.Fatalf("loadScrapersNG: %v", err)
+	}
+
+	sellers := GetSellers()
+	if len(sellers) != 1 || sellers[0].Info().Shorthand != "CK" {
+		t.Errorf("got %d sellers, want CK alone", len(sellers))
+	}
+	vendors := GetVendors()
+	if len(vendors) != 1 || vendors[0].Info().Shorthand != "CK" {
+		t.Errorf("got %d vendors, want CK alone", len(vendors))
+	}
+	stores := slices.Sorted(maps.Keys(scraperStoreConfig()))
+	if !slices.Equal(stores, []string{"cardkingdom"}) {
+		t.Errorf("indexed stores = %v, want [cardkingdom]", stores)
+	}
+	_, ok := scraperStoreOf("ABU")
+	if ok {
+		t.Error("ABU, outside the store list, is indexed")
+	}
+}
+
+// A shorthand two named stores publish goes to the store the full listing
+// gives it, whatever order the two were named in.
+func TestOnlyStoresKeepsASharedShorthandsOwner(t *testing.T) {
+	idx := newScraperIndex()
+	idx.add("cardmarket", "retail", "MKMLow")
+	idx.add("tcg_index", "retail", "MKMLow")
+
+	for _, stores := range [][]string{{"cardmarket", "tcg_index"}, {"tcg_index", "cardmarket"}} {
+		got := onlyStores(idx, stores).byShorthand["MKMLow"]
+		if got != "tcg_index" {
+			t.Errorf("onlyStores(%v) gives MKMLow to %q, want tcg_index", stores, got)
+		}
 	}
 }
 
