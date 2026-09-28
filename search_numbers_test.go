@@ -12,9 +12,7 @@ import (
 // the search simply finds nothing and reads as "no such card", so the
 // agreement is worth asserting rather than assuming.
 func TestNumbersSnapshotMatchesScan(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("Need a datastore loaded to run this test")
-	}
+	skipWithoutDatastore(t)
 	numbers := newNumbersSnapshot(backend())
 
 	for _, tt := range []struct {
@@ -51,9 +49,7 @@ func TestNumbersSnapshotMatchesScan(t *testing.T) {
 // TestNumberSeedDeclines pins the shapes that do not bound the result set, and
 // so must keep scanning rather than seed a wrong answer.
 func TestNumberSeedDeclines(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("Need a datastore loaded to run this test")
-	}
+	skipWithoutDatastore(t)
 	numbers := newNumbersSnapshot(backend())
 
 	for _, query := range []string{
@@ -91,9 +87,7 @@ func TestNumbersSnapshotKeepsStoredForms(t *testing.T) {
 // numbers newDatastore already built), feeding searchAndFilter each one
 // directly the way a caller already holding a ds would.
 func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("Need a datastore")
-	}
+	skipWithoutDatastore(t)
 	base := currentDatastore()
 	withoutNumbers := *base
 	withoutNumbers.numbers = nil
@@ -116,9 +110,7 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 // snapshot disabled and enabled, after first checking that the result sets
 // agree.
 func BenchmarkNumbersSnapshotSearch(b *testing.B) {
-	if len(backend().GetUUIDs()) == 0 {
-		b.Skip("Need a datastore")
-	}
+	skipWithoutDatastore(b)
 	base := currentDatastore()
 	withoutNumbers := *base
 	withoutNumbers.numbers = nil
@@ -158,10 +150,8 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 }
 
 func BenchmarkNumbersSnapshotBuild(b *testing.B) {
+	skipWithoutDatastore(b)
 	backend := backend()
-	if len(backend.GetUUIDs()) == 0 {
-		b.Skip("Need a datastore")
-	}
 	b.ReportAllocs()
 	for b.Loop() {
 		if newNumbersSnapshot(backend) == nil {

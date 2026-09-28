@@ -39,9 +39,7 @@ func sealedPath(co *mtgmatcher.CardObject) string {
 // slug, and the slug is enough to find it again: every product in the
 // datastore, spelled as a path, comes back as itself.
 func TestSealedPathRoundTrips(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var products int
 	for _, code := range backend().GetAllSets() {
@@ -69,9 +67,7 @@ func TestSealedPathRoundTrips(t *testing.T) {
 // Each part narrows the one before it, and a path that stops early stops
 // narrowing rather than failing.
 func TestSealedPathNamesLessAsksForMore(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	for _, tt := range []struct{ path, want string }{
 		{"/sealed/", ""},
 		{"/sealed/sld", "s:sld"},
@@ -87,9 +83,7 @@ func TestSealedPathNamesLessAsksForMore(t *testing.T) {
 // The path is only as good as the search it lands on: followed through the
 // redirect into the sealed tab, a product's path shows that product.
 func TestSealedPathLandsOnTheProduct(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
 	DevMode, SigCheck = true, false
 	if LogPages == nil {

@@ -36,9 +36,7 @@ func promoTypeCards(t *testing.T) (plain, chipped string) {
 // also appears in PromoTypes: the two lists are disjoint by construction,
 // not by a later filtering step.
 func TestPromoTypesAndTreatmentsAreDisjoint(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	_, chipped := promoTypeCards(t)
 	if chipped == "" {
 		t.Skip("this datastore has no printing with a treatment chip")
@@ -63,9 +61,7 @@ func TestPromoTypesAndTreatmentsAreDisjoint(t *testing.T) {
 // that only fired past PromosForEverybodyYay just avoided duplicating what
 // an unconditional loop over co.PromoTypes always added regardless.
 func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	var found bool
 	for _, uuid := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(uuid)
@@ -105,9 +101,7 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 // its own in the datastore, so nothing adds "retro" to PromoTypes except the
 // hand-added case in uuid2card, gated the same way the old switch gated it.
 func TestRetroFrameStaysDateGated(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	var found bool
 	for _, uuid := range backend().GetUUIDs() {
 		co, err := backend().GetUUID(uuid)
@@ -148,9 +142,7 @@ func TestPromoTypeLabel(t *testing.T) {
 		}
 	}
 
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded for the mtgmatcher.PromoTypeLabel comparison")
-	}
+	skipWithoutDatastore(t)
 	for _, value := range backend().AllPromoTypes {
 		if strings.HasPrefix(value, "ff") {
 			continue

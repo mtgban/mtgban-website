@@ -33,9 +33,7 @@ func fetchFinishes(t *testing.T) []paletteFinish {
 // whatever this game prints - which on Magic is the three shared finishes plus
 // the treatments its printings actually wear.
 func TestFinishesCacheComesFromTheDatastore(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	finishes := fetchFinishes(t)
 
 	if len(finishes) < 4 {
@@ -84,9 +82,7 @@ func TestFinishesCacheComesFromTheDatastore(t *testing.T) {
 // A game spells its own treatments better than any rule can, so where it has a
 // spelling the list uses it rather than title-casing the token.
 func TestFinishesCacheUsesTheGamesSpelling(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	for _, finish := range fetchFinishes(t) {
 		if finish.Value != "doublerainbow" {
@@ -104,9 +100,7 @@ func TestFinishesCacheUsesTheGamesSpelling(t *testing.T) {
 // A short form is filed under the treatment it stands for, the way the promo
 // list carries its aliases, rather than listed a second time.
 func TestFinishesCacheFilesShortForms(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	found := false
 	for _, finish := range fetchFinishes(t) {
@@ -130,9 +124,7 @@ func TestFinishesCacheFilesShortForms(t *testing.T) {
 // spelling the finishes a game names itself already use - Cold Foil, Rainbow
 // Foil - so every row reads the same whichever half it came from.
 func TestFinishListLabelCapitalisesFoil(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	tests := []struct{ finish, want string }{
 		// The fifteen the game spells lowercase.
@@ -165,9 +157,7 @@ func TestFinishListLabelCapitalisesFoil(t *testing.T) {
 
 // Whatever the source, no row in the served list may spell it the other way.
 func TestFinishesCacheCapitalisesFoil(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	for _, finish := range fetchFinishes(t) {
 		if strings.HasSuffix(finish.Label, " foil") {
@@ -187,9 +177,7 @@ func TestFinishesCacheCapitalisesFoil(t *testing.T) {
 // what it looks like - Double Rainbow, Silver Scroll, Step-and-Compleat - is
 // still a judgement, and still has to be added by hand.
 func TestFoilTreatmentsCoverTheOnesNamedFoil(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var missing []string
 	for _, promoType := range backend().AllPromoTypes {

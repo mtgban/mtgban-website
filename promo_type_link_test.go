@@ -11,9 +11,7 @@ import (
 // stops finding it. "retro" is the one value not drawn from co.PromoTypes
 // itself, so it is checked here too rather than assumed.
 func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	plain, chipped := promoTypeCards(t)
 	if plain == "" || chipped == "" {
 		t.Skip("this datastore has no printing carrying a promo type")
@@ -69,9 +67,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 // token, and mobile's version stops the tap from also opening the card
 // drawer the row's own onclick would trigger.
 func TestSearchTemplatesLinkPromoTypes(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	_, chipped := promoTypeCards(t)
 	if chipped == "" {
 		t.Skip("this datastore has no printing with a treatment chip")

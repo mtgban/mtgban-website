@@ -15,9 +15,7 @@ import (
 // The index section links a marketplace it has no price from, which is worth
 // offering only where the site carries that marketplace at all.
 func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	uuid := backend().GetUUIDs()[0]
 
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)

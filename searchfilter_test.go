@@ -426,6 +426,8 @@ func TestSetNumberShorthand(t *testing.T) {
 // queries find decorated printings; cns keeps the query verbatim and
 // matches the full decorated number only.
 func TestCollectorNumberStrict(t *testing.T) {
+	// The loaded game's rules reduce a loose number; an empty backend has none.
+	skipWithoutDatastore(t)
 	co := &mtgmatcher.CardObject{}
 	co.Number = "107★"
 	co.PlainNumber = "107"

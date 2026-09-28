@@ -108,9 +108,7 @@ func tcgplayerSharedProductIDs() map[string]bool {
 // reads exactly like a population that does not hold it. Some 300k lookups,
 // about three seconds beside the datastore's own load.
 func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	shared := tcgplayerSharedProductIDs()
 
@@ -194,9 +192,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 // other is a different card at a different price, and offering it would be
 // the wrong-card mistake wearing the right name.
 func TestManaPoolFinishItDoesNotSellNamesNothing(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var checked int
 	for _, uuid := range backend().GetUUIDs() {
@@ -233,9 +229,7 @@ func TestManaPoolFinishItDoesNotSellNamesNothing(t *testing.T) {
 // that still misses is a printing this datastore holds no etched sibling for,
 // which no finish flag can conjure.
 func TestTCGplayerEtchedIDNamesTheEtchedPrinting(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var checked, missed int
 	for id, uuid := range backend().ExternalIdentifiers[mtgmatcher.IDSpaceTCGplayer] {
@@ -285,9 +279,7 @@ func TestTCGplayerEtchedIDNamesTheEtchedPrinting(t *testing.T) {
 // whatever card TCGplayer happens to file under that number. The number here
 // is a real TCGplayer product id, so that mistake cannot pass quietly.
 func TestCheckForLinksNamesNothingItCannotResolve(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	for _, tt := range []struct{ name, message string }{
 		{"card kingdom", "https://www.cardkingdom.com/mtg/revised-edition/goblin-king"},
@@ -337,9 +329,7 @@ func TestCheckForLinksStaysOnItsOwnGuildAndGame(t *testing.T) {
 // it goes to the page that answers for the product's kind and keeps the tags
 // that attribute the visit back to the bot.
 func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	single, err := backend().GetUUID(randomUUID(backend(), false))
 	if err != nil {
@@ -386,9 +376,7 @@ func TestBanSearchLinkAddressesThePrinting(t *testing.T) {
 // render. A store link that named no printing has to read exactly as it did
 // before any of this existed.
 func TestStoreLinkDescriptionOffersOnlyWhatItResolved(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	const affiliateLine = "Support **MTGBAN** by using this link"
 
@@ -427,9 +415,7 @@ func TestStoreLinkDescriptionOffersOnlyWhatItResolved(t *testing.T) {
 // links are held to it. A uuid query is answered by searchAndFilter directly,
 // so this asks the search the same question the reader's click does.
 func TestBanSearchLinkFindsItsPrinting(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := backend().GetUUIDs()
 	step := len(uuids) / 100

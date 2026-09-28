@@ -96,9 +96,7 @@ func buildBenchData() {
 
 func seedBenchScrapers(b *testing.B) (stores []string) {
 	b.Helper()
-	if len(backend().GetUUIDs()) == 0 {
-		b.Skip("mtgmatcher data not loaded")
-	}
+	skipWithoutDatastore(b)
 	benchSeedOnce.Do(buildBenchData)
 	if benchSetCode == "" || len(benchSetUUIDs) == 0 {
 		b.Skip("no suitable set found for benchmarking")

@@ -83,9 +83,7 @@ func TestTheSearchPageHandsOverTheReadableQuery(t *testing.T) {
 // rebuilding a query string. A search with many results names no single card
 // and carries no link.
 func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	uuids, err := searchAndFilter(currentDatastore(), parseSearchOptionsWrapper("Plaguecrafter s:SLD cns:1116jpn f:nonfoil"))
 	if err != nil || len(uuids) != 1 {
 		t.Skipf("expected one printing, got %d (%v)", len(uuids), err)

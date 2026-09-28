@@ -45,9 +45,7 @@ func sealedProducts(t *testing.T) (withDeck, withoutDeck string) {
 // The quantity travels into the contents: two of a precon is two of every card
 // in it.
 func TestUnpackSealedCarriesTheQuantityInside(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -70,9 +68,7 @@ func TestUnpackSealedCarriesTheQuantityInside(t *testing.T) {
 // say nothing about what is inside a box, and keeping them is what would make
 // a card held both loose and inside one read as two.
 func TestUnpackSealedHoldsOnlyWhatCameOutOfTheBoxes(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, booster := sealedProducts(t)
 	if sealed == "" || booster == "" {
 		t.Skip("this datastore lacks one of the two product kinds")
@@ -116,9 +112,7 @@ func TestUnpackSealedHoldsOnlyWhatCameOutOfTheBoxes(t *testing.T) {
 // The opened product keeps its row, ahead of what it became, and is marked so
 // nothing counts it: it is not one of the cards, it is where they came from.
 func TestUnpackSealedKeepsTheProductAsAGhost(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -144,9 +138,7 @@ func TestUnpackSealedKeepsTheProductAsAGhost(t *testing.T) {
 // product is two of every card in it, and a card the decklist holds twice is
 // held twice again.
 func TestUnpackSealedAddsUpThroughTheMerge(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -186,9 +178,7 @@ func TestUnpackSealedAddsUpThroughTheMerge(t *testing.T) {
 // The count is what decides whether the offer is made, and it counts only what
 // can actually be opened.
 func TestUnpackableSealedCountsOnlyDecklists(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, booster := sealedProducts(t)
 	if sealed == "" || booster == "" {
 		t.Skip("this datastore lacks one of the two product kinds")
@@ -223,9 +213,7 @@ func renderUpload(t *testing.T, pageVars PageVars) string {
 // The offer carries no list with it: the rows are read off the page when it is
 // taken, so a reader who never asks pays nothing for it.
 func TestUnpackActionShipsNoList(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -264,9 +252,7 @@ func mustCard(t *testing.T, uuid string) *mtgmatcher.CardObject {
 
 // Nothing to open, nothing to offer.
 func TestUnpackActionAbsentWithoutSealed(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	entries := []UploadEntry{{CardID: backend().GetUUIDs()[0], Quantity: 1, HasQuantity: true}}
 	out := renderUpload(t, PageVars{
 		UploadEntries: entries,
@@ -280,9 +266,7 @@ func TestUnpackActionAbsentWithoutSealed(t *testing.T) {
 // Taking the offer retires it: the product left behind is marked as opened, so
 // nothing counts it as something still to open.
 func TestUnpackOfferRetiresItself(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -309,9 +293,7 @@ func TestUnpackOfferRetiresItself(t *testing.T) {
 // The setting asks for this on every upload, so a list holding nothing that
 // can be opened has to come back as it went in.
 func TestUnpackSealedLeavesAListWithNothingToOpen(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	_, booster := sealedProducts(t)
 	entries := []UploadEntry{
 		{CardID: backend().GetUUIDs()[0], Quantity: 1, HasQuantity: true},
@@ -354,9 +336,7 @@ func TestUnpackIsOfferedInTheSettings(t *testing.T) {
 // Every card that came out of a product says which one, so the export can
 // too - the CSV already has a Notes column, and this is what fills it.
 func TestUnpackSealedNamesTheProductEachCardCameFrom(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -423,9 +403,7 @@ func TestLoadHashesToleratesMissingNotes(t *testing.T) {
 // The sections are the unpacked view: one per opened product, holding the
 // cards that came out of that one and nothing else.
 func TestUnpackedSectionsGatherEachProduct(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -519,9 +497,7 @@ func TestUnpackedSectionsKeepACardHeldByTwoProducts(t *testing.T) {
 // The page reads a box at a time: a section headed by the product, footed by
 // what its own contents come to, and never by the page's totals.
 func TestUnpackedResultsRenderASectionPerProduct(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -661,9 +637,7 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 // End to end, at a size the old shape could not post: a few opened precons is
 // well past 2,000 rows, and what came back then was the uploader page.
 func TestExportPostsAListPastTheFormLimit(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
 	DevMode, SigCheck = true, false
 	if LogPages == nil {
@@ -756,9 +730,7 @@ func TestExportsLeaveTheOpenedProductsBehind(t *testing.T) {
 // The whole round trip: a page of unpacked results posts itself back and comes
 // back as sections rather than as one flat list of cards.
 func TestUnpackedPageSurvivesItsOwnRoundTrip(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -808,9 +780,7 @@ func TestUnpackedPageSurvivesItsOwnRoundTrip(t *testing.T) {
 // so its rows are not the reader's to remove: the comparison would be left
 // standing while one side of it stopped being the product's contents.
 func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
@@ -863,9 +833,7 @@ func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
 // buy and where, which is a different question, and a standing preference for
 // it does not carry here.
 func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")

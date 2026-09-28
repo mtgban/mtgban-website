@@ -19,10 +19,8 @@ func TestChartSearchID(t *testing.T) {
 	// No archive to resolve against - a deployment without one, or an id that
 	// resolved to nothing - still maps a plain matcher id.
 	t.Run("a matcher id resolves without a target", func(t *testing.T) {
+		skipWithoutDatastore(t)
 		uuids := backend().GetUUIDs()
-		if len(uuids) == 0 {
-			t.Skip("datastore not loaded")
-		}
 		got, ok := chartSearchID(backend(), uuids[0], nil)
 		if !ok || got != uuids[0] {
 			t.Errorf("chartSearchID = %q/%v, want %q/true", got, ok, uuids[0])
@@ -45,10 +43,8 @@ func TestChartSearchID(t *testing.T) {
 // verdict nor the ban: marker may be second-guessed by asking the matcher's
 // external map about the raw digits.
 func TestChartSearchIDDoesNotGuessBanIDs(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("datastore not loaded")
-	}
 
 	// A product id the matcher really does resolve, so the test turns on the
 	// guard rather than on the number failing to match anything.

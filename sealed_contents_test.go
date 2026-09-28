@@ -35,9 +35,7 @@ func productWithBothKinds(t *testing.T) *mtgmatcher.CardObject {
 // What the reading is for: such a product lists a great deal more than it
 // always holds, so what it might hold is worth asking for on its own.
 func TestAProductHoldsMoreThanItGuarantees(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
@@ -60,9 +58,7 @@ func TestAProductHoldsMoreThanItGuarantees(t *testing.T) {
 // The variable reading is the contents with the fixed list taken back out, so
 // it is two filters composed rather than a list built.
 func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
@@ -104,9 +100,7 @@ func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
 // Each of the three queries says which product it asked about and which
 // reading it wanted, so the page can offer the other two.
 func TestEachReadingNamesItselfAndItsProduct(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
@@ -133,9 +127,7 @@ func TestEachReadingNamesItselfAndItsProduct(t *testing.T) {
 // with those products. They are rows on the page, so the search is not empty,
 // but there is no card in it to read another way.
 func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var wrapper string
 	for _, code := range backend().GetAllSets() {
@@ -177,9 +169,7 @@ func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
 
 // Only a card counts as something to read another way.
 func TestContainsSingles(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
@@ -205,9 +195,7 @@ func TestContainsSingles(t *testing.T) {
 
 // The switch is offered only where all three readings mean something.
 func TestContentsSwitchOnlyWhereAllThreeMeanSomething(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	co := productWithBothKinds(t)
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
@@ -341,9 +329,7 @@ func twoProductsWithBothKinds(t *testing.T) (a, b *mtgmatcher.CardObject) {
 // everything it holds. And with more than one product named, no single
 // switch between readings applies, so neither is offered.
 func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	a, b := twoProductsWithBothKinds(t)
 	if a == nil || b == nil {
 		t.Skip("this datastore has fewer than two products with both a fixed and a variable part")

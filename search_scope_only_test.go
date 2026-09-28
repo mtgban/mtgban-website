@@ -66,10 +66,8 @@ func searchWithStock(t *testing.T, stocked string, target string, cookies ...*ht
 func scopedCard(t *testing.T) (uuid, name, scope string) {
 	t.Helper()
 
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
 	for _, id := range uuids {
 		co, err := backend().GetUUID(id)
 		if err != nil || co.Sealed {

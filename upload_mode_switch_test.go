@@ -180,9 +180,7 @@ func TestModeSwitchKeepsIgnoredConditions(t *testing.T) {
 // side is priced against the same sections rather than a flat list - and
 // nothing is opened a second time.
 func TestModeSwitchKeepsAnOpenedListOpen(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	sealed, _ := sealedProducts(t)
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")

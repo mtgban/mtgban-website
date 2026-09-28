@@ -9,10 +9,8 @@ import (
 // benchCards returns a fixed prefix of the uuid index. Load sorts that
 // index, so every run measures the same cards in the same order.
 func benchCards(b *testing.B, n int) []string {
+	skipWithoutDatastore(b)
 	all := backend().GetUUIDs()
-	if len(all) == 0 {
-		b.Skip("datastore not loaded")
-	}
 	return all[:min(n, len(all))]
 }
 
@@ -74,9 +72,7 @@ func BenchmarkUUID2Card(b *testing.B) {
 // no index behind it, an edition filter served from the set index, and a
 // numeric comparison over the whole pool.
 func BenchmarkSearchAndFilter(b *testing.B) {
-	if len(backend().GetUUIDs()) == 0 {
-		b.Skip("datastore not loaded")
-	}
+	skipWithoutDatastore(b)
 	for _, query := range []string{"r:mythic", "s:MH2", "cn>300"} {
 		b.Run(query, func(b *testing.B) {
 			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)

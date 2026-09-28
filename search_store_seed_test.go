@@ -81,9 +81,7 @@ func somePlainCardUUIDs(t *testing.T, n int) []string {
 // inventory/buylist keys instead, the same way an edition or collector
 // number filter already seeds an empty query.
 func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := somePlainCardUUIDs(t, 6)
 	if len(uuids) < 6 {
@@ -107,9 +105,7 @@ func TestPlainStoreQuerySeedsFromTheStoreItself(t *testing.T) {
 // seller:/store: seeds from a seller's inventory the same way vendor: does
 // from a buylist.
 func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := somePlainCardUUIDs(t, 6)
 	if len(uuids) < 6 {
@@ -135,9 +131,7 @@ func TestPlainSellerQuerySeedsFromTheSellerItself(t *testing.T) {
 // filter it down to zero later. Same "a seed that finds nothing has still
 // answered" principle the edition and number seeds already document.
 func TestUnknownStoreQuerySeedsEmptyRatherThanEverything(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	results, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), `vendor:NoSuchStoreExists`, nil, nil, nil))
 	if err != nil {
@@ -156,9 +150,7 @@ func TestUnknownStoreQuerySeedsEmptyRatherThanEverything(t *testing.T) {
 // fallback would satisfy that weaker check too, without actually locking
 // down that negation is left unseeded.
 func TestNegatedStoreQueryDoesNotSeed(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := somePlainCardUUIDs(t, 6)
 	if len(uuids) < 6 {
@@ -186,9 +178,7 @@ func TestNegatedStoreQueryDoesNotSeed(t *testing.T) {
 // appends a PostFilter of its own and would have made storeSeedUUIDs bail
 // straight back to the full-datastore fallback.
 func TestStoreQuerySeedsAlongsideACompanionPostFilter(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := somePlainCardUUIDs(t, 6)
 	if len(uuids) < 6 {
@@ -222,9 +212,7 @@ func TestStoreQuerySeedsAlongsideACompanionPostFilter(t *testing.T) {
 // other still narrows the final results later via PostSearchFilter in the
 // real request handler, which this test does not exercise.
 func TestStoreQuerySeedsWithASecondStoreFilterPresent(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := somePlainCardUUIDs(t, 6)
 	if len(uuids) < 6 {
@@ -253,9 +241,7 @@ func TestStoreQuerySeedsWithASecondStoreFilterPresent(t *testing.T) {
 // exercise - only that seeding here is the whole named edition, not merely
 // what one store happens to carry.
 func TestStoreQueryDefersToAnEditionFilterAlreadySeeding(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	leaUUIDs := backend().GetUUIDsInSet("LEA")
 	if len(leaUUIDs) == 0 {
@@ -284,9 +270,7 @@ func TestStoreQueryDefersToAnEditionFilterAlreadySeeding(t *testing.T) {
 // narrows the final results later via PostSearchFilter, not exercised
 // here).
 func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := somePlainCardUUIDs(t, 6)
 	if len(uuids) < 6 {
@@ -317,10 +301,8 @@ func TestStoreQueryWithSearchTextIsUnaffectedByTheSeed(t *testing.T) {
 // ...) against every value, not just the first, so two disjoint vendors
 // both contribute their own cards to the seed.
 func TestStoreQueryUnionsACommaJoinedList(t *testing.T) {
+	skipWithoutDatastore(t)
 	all := backend().GetUUIDs()
-	if len(all) == 0 {
-		t.Skip("no datastore loaded")
-	}
 
 	var uuidsA, uuidsB []string
 	for _, uuid := range all {

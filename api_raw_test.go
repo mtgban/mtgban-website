@@ -26,9 +26,7 @@ func TestRawCardAPIRefusesNonAdmins(t *testing.T) {
 }
 
 func TestRawCardAPIDumpsEveryField(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
 
 	uuids := backend().GetUUIDs()
@@ -57,9 +55,7 @@ func TestRawCardAPIDumpsEveryField(t *testing.T) {
 }
 
 func TestRawCardAPIUnknownId(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
 
 	w := httptest.NewRecorder()

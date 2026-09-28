@@ -22,9 +22,7 @@ func sealedSearch(t *testing.T, query string) []string {
 // the card matcher when no product carried the name, so /sealed?q=the+last+ronin
 // showed the Magic card called The Last Ronin.
 func TestSealedTabNeverAnswersWithACard(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	// A card whose name no product carries, so the search has to fall back.
 	var orphan string

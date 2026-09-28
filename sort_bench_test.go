@@ -11,10 +11,8 @@ import (
 // benchSortUUIDs picks n uuids spread across the datastore pool,
 // deterministically so every run sorts the same input.
 func benchSortUUIDs(b *testing.B, n int) []string {
+	skipWithoutDatastore(b)
 	all := backend().GetUUIDs()
-	if len(all) == 0 {
-		b.Skip("mtgmatcher datastore not loaded")
-	}
 	if len(all) < n {
 		n = len(all)
 	}
@@ -173,10 +171,8 @@ func BenchmarkSortSetsByBuylist(b *testing.B) {
 // one order. Also serves as a fixture to eyeball order stability across
 // implementations of the comparators.
 func TestSortSetsDeterministic(t *testing.T) {
+	skipWithoutDatastore(t)
 	all := backend().GetUUIDs()
-	if len(all) == 0 {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
 	uuids := make([]string, 0, 500)
 	step := max(len(all)/500, 1)
 	for i := 0; i < len(all) && len(uuids) < 500; i += step {
