@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -268,5 +273,86 @@ func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
 		if co.Name != "Serra" {
 			t.Errorf("bare exact query widened unexpectedly to %s", co.Name)
 		}
+	}
+}
+
+// brokenStore is a seller whose inventory panics when read, as a scan would
+// on a bug in a store's data. Its Info still answers, so only a scan panics.
+type brokenStore struct{ mtgban.Seller }
+
+func (brokenStore) Inventory() mtgban.InventoryRecord {
+	panic("the inventory broke")
+}
+
+// brokenBuylist is brokenStore for a vendor.
+type brokenBuylist struct{ mtgban.Vendor }
+
+func (brokenBuylist) Buylist() mtgban.BuylistRecord {
+	panic("the buylist broke")
+}
+
+// A store scan that panics is reported and costs only its side of the
+// search: the page still renders, with the other side's price.
+func TestSearchSurvivesAPanickingScan(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+
+	uuid := backend().GetUUIDs()[0]
+	inventory := mtgban.InventoryRecord{}
+	err := inventory.Add(uuid, &mtgban.InventoryEntry{Conditions: "NM", Price: 12.34, Quantity: 1, URL: "https://example.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	buylist := mtgban.BuylistRecord{}
+	err = buylist.Add(uuid, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 12.34, Quantity: 1, URL: "https://example.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seller := mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Name: "Seller", Shorthand: "SLR"})
+	vendor := mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Name: "Vendor", Shorthand: "VND"})
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	for _, probe := range []struct {
+		job     string
+		value   string
+		sellers []mtgban.Seller
+		vendors []mtgban.Vendor
+	}{
+		{"search sellers scan", "the inventory broke", []mtgban.Seller{brokenStore{seller}}, []mtgban.Vendor{vendor}},
+		{"search vendors scan", "the buylist broke", []mtgban.Seller{seller}, []mtgban.Vendor{brokenBuylist{vendor}}},
+	} {
+		t.Run(probe.job, func(t *testing.T) {
+			posts := serverWebhook(t)
+			sellersPtr.Store(&probe.sellers)
+			vendorsPtr.Store(&probe.vendors)
+
+			rec := httptest.NewRecorder()
+			testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))
+			if rec.Code != http.StatusOK {
+				t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+			}
+			if !strings.Contains(rec.Body.String(), "12.34") {
+				t.Error("the other side's price is missing from the page")
+			}
+
+			message, _, source := panicReport(t, posts)
+			if message != probe.value {
+				t.Errorf("message = %q, want the scan's panic", message)
+			}
+			if source != "source job: "+probe.job {
+				t.Errorf("source = %q, want the scan", source)
+			}
+		})
 	}
 }
