@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"math"
 	"math/rand"
@@ -68,9 +69,15 @@ func cookiePath(r *http.Request, cookieName string, global bool) string {
 	return "/" + path
 }
 
-// colorRarityMap paints the rarity badge. The Lorcana entries are sampled
-// from the rarity symbols the cards actually carry: a grey ink drop, a copper
-// triangle, a silver diamond, a gold pentagon.
+// colorRarityMap paints the rarity badge, and the top border of the mobile
+// search card. That border is set in a style attribute, where html/template
+// would refuse var(--normal) from a plain string and write ZgotmplZ. The
+// values are template.CSS instead, which it trusts as written, so each has
+// to stay a literal.
+//
+// The Lorcana entries are sampled from the rarity symbols the cards actually
+// carry: a grey ink drop, a copper triangle, a silver diamond, a gold
+// pentagon.
 //
 // The three tiers above those share one prismatic symbol, differing in shape
 // rather than color, so each takes a different arc of that one wheel: its
@@ -85,7 +92,7 @@ func cookiePath(r *http.Request, cookieName string, global bool) string {
 // Illumineer's Quest and promo cards are "special", which carries the gold
 // Lorcana emblem rather than a rarity gem; the invented purple stays, since
 // the emblem's gold is legendary's.
-var colorRarityMap = map[string]map[string]string{
+var colorRarityMap = map[string]map[string]template.CSS{
 	"lorcana": {
 		"common":    "var(--normal)",
 		"uncommon":  "#707883",
@@ -502,7 +509,7 @@ type GenericCard struct {
 	LangTag     string
 
 	Rarity            string
-	RarityColor       string
+	RarityColor       template.CSS
 	ScryfallURL       string
 	DeckboxURL        string
 	CKRestockURL      string
@@ -1122,7 +1129,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		deckboxURL += "&printing=" + deckboxID
 	}
 
-	var rarityColor string
+	var rarityColor template.CSS
 	keyrune, setSymbol := keyruneForCardSet(b, cardID)
 	if keyrune == "" {
 		rarityColor = colorRarityMap[Config.Game][co.Rarity]
