@@ -606,7 +606,8 @@ the bot session, via `internal/notify`, configured per
 `Config.Discord.UserWebhookURL` / `Config.Discord.ServerWebhookURL` /
 `Config.Discord.APIWebhookURL` — deliver server notifications:
 reload/refresh, panics (with stack trace), shutdown, checkpoint/datastore
-reload failures.
+reload failures. A post longer than the 2000 characters Discord accepts is
+cut to fit, and one Discord refuses is logged.
 
 ### 5.9 Admin (`admin.go`)
 
