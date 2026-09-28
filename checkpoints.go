@@ -348,8 +348,25 @@ func setCheckpointsFromEditions(ds *datastore, cardName string, earliest time.Ti
 			}
 		}
 	}
-	for _, pick := range bestRelease {
-		out = append(out, pick.cp)
+	// Both maps range in a different order per request, and callers sort by
+	// date alone: reprints go by date and set, then releases by date, so
+	// markers sharing a day keep one order.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Date != out[j].Date {
+			return out[i].Date < out[j].Date
+		}
+		if out[i].Title != out[j].Title {
+			return out[i].Title < out[j].Title
+		}
+		return out[i].KeyruneCode < out[j].KeyruneCode
+	})
+	dates := make([]string, 0, len(bestRelease))
+	for date := range bestRelease {
+		dates = append(dates, date)
+	}
+	sort.Strings(dates)
+	for _, date := range dates {
+		out = append(out, bestRelease[date].cp)
 	}
 	return out
 }
