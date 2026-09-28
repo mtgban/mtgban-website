@@ -81,6 +81,7 @@ func GetVendors() []mtgban.Vendor {
 type ScraperConfig struct {
 	Icons        map[string]string `json:"icons"`
 	NameOverride map[string]string `json:"name_override"`
+	Stores       []string          `json:"stores"`
 }
 
 // scraperIndex is a snapshot of what the dumps bucket publishes: byStore is
@@ -268,10 +269,37 @@ func openDumpsBucket(ctx context.Context) (*simplecloud.B2Bucket, error) {
 	return bucket, nil
 }
 
-func loadScrapersNG(bucket simplecloud.Reader) error {
+// onlyStores narrows idx to stores, logging each one it does not list. It
+// adds them sorted, the order a listing adds them in, so a shorthand two of
+// them publish keeps the owner the full listing gives it.
+func onlyStores(idx *scraperIndex, stores []string) *scraperIndex {
+	log.Println("Loading only these stores:", strings.Join(stores, ", "))
+
+	next := newScraperIndex()
+	for _, store := range slices.Sorted(slices.Values(stores)) {
+		kinds, found := idx.byStore[store]
+		if !found {
+			log.Println("Store", store, "is not in the dumps listing")
+			continue
+		}
+		for kind, list := range kinds {
+			for _, shorthand := range list {
+				next.add(store, kind, shorthand)
+			}
+		}
+	}
+	return next
+}
+
+// loadScrapersNG lists the dumps in bucket, publishes the index and loads
+// every dump. A non-empty stores narrows both to those stores.
+func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 	idx, err := listDumpsWithRetry(bucket, Config.Game, Config.Game+"/")
 	if err != nil {
 		return fmt.Errorf("listing dumps: %w", err)
+	}
+	if len(stores) > 0 {
+		idx = onlyStores(idx, stores)
 	}
 
 	// Publish before loading, so no reader sees every store as unknown

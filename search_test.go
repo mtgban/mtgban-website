@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 		Config.BucketKeys = map[string]BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
 		bucket, err := openDumpsBucket(context.Background())
 		if err == nil {
-			err = loadScrapersNG(bucket)
+			err = loadScrapersNG(bucket, nil)
 		}
 		if err != nil {
 			log.Println("loadScrapersNG skipped:", err)
