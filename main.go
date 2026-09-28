@@ -1278,6 +1278,7 @@ func main() {
 	dsPath := flag.String("ds", "", "Override datastore path")
 	aclPath := flag.String("acl", "", "Override access table path")
 	grantsPath := flag.String("grants", "", "Override Patreon grants path")
+	dumpsDir := flag.String("dumps", "", "Read scraper dumps from this local directory instead of the mtgban-dumps bucket")
 
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
@@ -1443,12 +1444,23 @@ func main() {
 		}
 		go func() {
 			log.Println("Loading scrapers")
-			bucket, err := openDumpsBucket(context.Background())
-			if err != nil {
-				log.Fatalln("error opening the dumps bucket:", err)
+			var bucket simplecloud.Reader
+			if *dumpsDir != "" {
+				// A missing directory would list nothing and load nothing.
+				_, err := os.Stat(*dumpsDir)
+				if err != nil {
+					log.Fatalln("error opening the dumps directory:", err)
+				}
+				bucket = &simplecloud.FileBucket{Root: *dumpsDir}
+			} else {
+				b2, err := openDumpsBucket(context.Background())
+				if err != nil {
+					log.Fatalln("error opening the dumps bucket:", err)
+				}
+				bucket = b2
 			}
 			DataBucket = bucket
-			err = loadScrapersNG(bucket, stores)
+			err := loadScrapersNG(bucket, stores)
 			if err != nil {
 				log.Fatalln("error loading scrapers:", err)
 			}
