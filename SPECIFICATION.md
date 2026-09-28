@@ -370,9 +370,10 @@ override; phone UA detection via `mileusna/useragent`).
   per case), which is exactly what a chance cannot mean. `IsOffer()` is
   what ranking, "best price" highlighting and the embed's price columns
   ask instead of assuming every row is a dollar amount.
-- **Suggest** (`api_suggest.go`): no longer a live prefix scan of
-  `mtgmatcher.AllNames()` per request. A `namesSnapshot` is built once when
-  the datastore (re)loads (`newNamesSnapshot()`, called from
+- **Suggest** (`SuggestAPI` in `api_suggest.go`, matching in
+  `internal/suggest`): no longer a live prefix scan of
+  `mtgmatcher.AllNames()` per request. A `suggest.Names` is built once when
+  the datastore (re)loads (`suggest.NewNames()`, called from
   `s.newDatastore()`), folding every name
   (diacritics/case/punctuation stripped) and also "squashing" spaces out of
   the folded form, into separate sorted singles/sealed views searched by
@@ -617,7 +618,7 @@ first check may announce every already-stale row once.
 | `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs (`/api/userstate/`), keyed by a hash of the login email |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
-| `internal/` | No longer empty — 14 packages: `dsreload` (single-flight datastore reload, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` ("did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
+| `internal/` | No longer empty — 14 packages: `dsreload` (single-flight datastore reload, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
 
 ## 7. Frontend
 

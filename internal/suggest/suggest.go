@@ -1,5 +1,6 @@
-// Package suggest builds "did you mean..." and alternative-search hints for
-// queries that return no results.
+// Package suggest builds the names the browser's suggestion bar offers
+// through OpenSearch, and the "did you mean..." and alternative-search hints
+// for queries that return no results.
 package suggest
 
 import (

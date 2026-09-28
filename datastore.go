@@ -5,6 +5,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/palette"
+	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
 // datastore is one loaded card datastore and the snapshots the site derives
@@ -17,7 +18,7 @@ import (
 type datastore struct {
 	backend  *mtgmatcher.Backend
 	numbers  *numbersSnapshot
-	names    *namesSnapshot
+	names    *suggest.Names
 	editions *editionsSnapshot
 	palette  *palette.Snapshot
 	loadedAt time.Time
