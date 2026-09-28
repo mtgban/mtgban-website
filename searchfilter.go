@@ -2245,14 +2245,15 @@ func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
 			if found {
 				return false
 			}
-		case "ckp90":
-			// Cards whose current Card Kingdom buylist meets its latest P90.
-			if good := getGoodBuylistPrice(co.UUID); good > 0 {
-				if bl, err := findVendorBuylist("CK"); err == nil {
-					if entries, ok := bl[co.UUID]; ok && len(entries) > 0 && entries[0].BuyPrice >= good {
-						return false
-					}
-				}
+		case "cksell":
+			// Cards whose Card Kingdom offer is worth taking now (ckbuylist.go).
+			if ckSignalForCard(co.UUID).State == "sell" {
+				return false
+			}
+		case "ckwait":
+			// Cards CK is likely to pay more for soon (ckbuylist.go).
+			if ckSignalForCard(co.UUID).State == "wait" {
+				return false
 			}
 		case "newspaper":
 			if uuids := GetNewspaperUUIDs(); uuids != nil {
