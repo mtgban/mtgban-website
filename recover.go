@@ -25,3 +25,25 @@ func reportPanic(errPanic any, source string) {
 	ServerNotify("panic", string(buf))
 	ServerNotify("panic", source)
 }
+
+// recoverJob reports and recovers a panic that nothing else would recover,
+// and that would otherwise end the process. Defer it directly, as the first
+// statement of the function whose panics it should stop: a goroutine's, or
+// one run of a long-lived loop. Deferred inside a closure instead, its
+// recover returns nil and stops nothing.
+func recoverJob(job string) {
+	errPanic := recover()
+	if errPanic != nil {
+		reportPanic(errPanic, "source job: "+job)
+	}
+}
+
+// recovered wraps fn to run under recoverJob, for code that is handed a
+// job to run on a goroutine of its own, such as a cron schedule or a loop
+// that runs one per signal.
+func recovered(job string, fn func()) func() {
+	return func() {
+		defer recoverJob(job)
+		fn()
+	}
+}
