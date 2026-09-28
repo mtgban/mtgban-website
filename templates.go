@@ -290,22 +290,23 @@ var funcMap = template.FuncMap{
 	// buylist_badge). With always=false it returns "" unless the store is the
 	// hotlist store or the offer meets good; with always=true it shows the
 	// prices whenever they exist.
-	"buylist_detail": func(shorthand, hotlistStore string, price, good, highest float64, always bool) template.HTML {
+	"buylist_detail": func(shorthand, hotlistStore string, price, good, highest float64, always bool, ckSignal string) template.HTML {
 		hasBadge := shorthand == hotlistStore || (good > 0 && price >= good)
 		if !hasBadge && !always {
 			return ""
 		}
 		prices := ""
 		if good > 0 {
-			// In always-show (optimizer) mode, tint Good by how the offer compares
-			// to it: green well above the latest P90, red well below.
+			// In always-show (optimizer) mode, tint Good by CK's signal: green
+			// when its offer is worth taking now, amber while CK is likely to
+			// pay more soon (ckbuylist.go).
 			goodClass := ""
-			if always {
-				if price > good*1.10 {
-					goodClass = ` class="bl-good-high"`
-				} else if price < good*0.80 {
-					goodClass = ` class="bl-good-low"`
-				}
+			switch {
+			case !always:
+			case ckSignal == "sell":
+				goodClass = ` class="bl-good-sell"`
+			case ckSignal == "wait":
+				goodClass = ` class="bl-good-wait"`
 			}
 			prices += fmt.Sprintf(`<span%s title="Card Kingdom's latest P90">Good: $ %.2f</span>`, goodClass, good)
 		}
