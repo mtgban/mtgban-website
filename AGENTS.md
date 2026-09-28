@@ -100,7 +100,7 @@ output, not a claim written here.
 | File | Responsibility |
 |---|---|
 | `main.go` | Startup, flags, config, routing, `NavElem` page registry, `PageVars`, template cache, cron jobs |
-| `site.go` | The `site` value page handlers hang off, as methods; owns the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
+| `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
 | `templates.go` | The template `FuncMap` — pure helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |

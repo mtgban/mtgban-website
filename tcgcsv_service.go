@@ -23,7 +23,7 @@ var TCGCSVService *tcgcsvd.Service
 // it after openDBs. It errors when ingestion isn't configured, which is a normal
 // state for a deployment that doesn't carry the non-Magic games — the caller
 // decides whether that is worth logging.
-func initTCGCSVService() error {
+func initTCGCSVService(s *site) error {
 	if Config.TCGCSVConfig == nil {
 		return errors.New("tcgcsv: no tcgcsv_config section")
 	}
@@ -33,7 +33,7 @@ func initTCGCSVService() error {
 	svc, err := tcgcsvd.New(*Config.TCGCSVConfig, PricesArchiveDB,
 		tcgcsvd.WithLongFormWrites(Config.TimeseriesConfig.LongFormWrites),
 		tcgcsvd.WithNotifier(func(kind, message string) { ServerNotify(kind, message) }),
-		tcgcsvd.WithProductReport(logTCGProductMatchReport))
+		tcgcsvd.WithProductReport(s.logTCGProductMatchReport))
 	if err != nil {
 		return err
 	}
@@ -77,8 +77,8 @@ func stashTCGCSVProducts() {
 // the display work runs a per-game backend. It needs the loaded datastore, which
 // is why it is wired in here rather than living in tcgcsvd — the standalone
 // service has no datastore to match against.
-func logTCGProductMatchReport(categoryID int, products []timeseries.TCGProduct) {
-	b := backend()
+func (s *site) logTCGProductMatchReport(categoryID int, products []timeseries.TCGProduct) {
+	b := s.backend()
 	var matched int
 	var sampleUnmatched []string
 	for _, p := range products {

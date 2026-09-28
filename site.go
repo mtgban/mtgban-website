@@ -65,7 +65,7 @@ func (s *site) loadDatastore(path string) error {
 	liveDatastore.Store(s.newDatastore(backend, time.Now()))
 
 	ServerNotify("init", "Datastore installed")
-	go cacheNewspaper()
+	go s.cacheNewspaper()
 
 	return nil
 }

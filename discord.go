@@ -69,7 +69,7 @@ func discordGuildID() string {
 	return defaultDiscordGuildID
 }
 
-func setupDiscord() error {
+func (s *site) setupDiscord() error {
 	var err error
 
 	if Config.Discord.BotToken == "" {
@@ -86,7 +86,7 @@ func setupDiscord() error {
 	dg.AddHandler(guildCreate)
 
 	// Register the messageCreate func as a callback for MessageCreate events.
-	dg.AddHandler(messageCreate)
+	dg.AddHandler(s.messageCreate)
 
 	// The changelog reads message content, embeds, and attachments through the
 	// Discord API, so request the corresponding privileged intent as well.
@@ -654,8 +654,8 @@ func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.
 
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	ds := currentDatastore()
+func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCreate) {
+	ds := s.datastore()
 	b := ds.backend
 	// Ignore requests if starting up
 	if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
@@ -687,14 +687,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			fields := squareBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
 				m.Content = "!" + strings.Trim(field, "[]")
-				messageCreate(s, m)
+				s.messageCreate(session, m)
 			}
 		// Check if the message uses the Pricefall syntax
 		case strings.Contains(m.Content, "{{"):
 			fields := curlyBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
 				m.Content = "!" + strings.Trim(field, "{}")
-				messageCreate(s, m)
+				s.messageCreate(session, m)
 			}
 		// Check if we can intercept Gatherer requests
 		case strings.Contains(m.Content, "gatherer.wizards.com"):
@@ -713,7 +713,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					co, _ := b.GetUUID(uuid)
 					if co.Identifiers["multiverseId"] == mid {
 						m.Content = fmt.Sprintf("!%s|%s|%s", co.Name, co.SetCode, co.Number)
-						messageCreate(s, m)
+						s.messageCreate(session, m)
 						return
 					}
 				}
@@ -726,7 +726,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 
 			// Spam time!
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, reply)
+			_, err := session.ChannelMessageSendEmbed(m.ChannelID, reply)
 			if err != nil {
 				log.Println(err)
 			}
@@ -748,7 +748,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if errMsg != "" {
 		if DevMode {
 			errMsg = "[DEV] " + errMsg
-			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			session.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 				Description: errMsg,
 			})
 		}
@@ -838,7 +838,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		embed.Description += "Grabbing last sold prices, hang tight " + emoteHappy
 	}
 
-	out, err := s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	out, err := session.ChannelMessageSendEmbed(m.ChannelID, embed)
 	if err != nil {
 		log.Println(err)
 		return
@@ -856,7 +856,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			break
 		}
 
-		_, err = s.ChannelMessageEditEmbed(m.ChannelID, out.ID, edit)
+		_, err = session.ChannelMessageEditEmbed(m.ChannelID, out.ID, edit)
 		if err != nil {
 			log.Println(err)
 		}

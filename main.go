@@ -1457,8 +1457,9 @@ func main() {
 		if err := openDBs(); err != nil {
 			log.Fatalln("error opening databases:", err)
 		}
-		if err := initTCGCSVService(); err != nil {
-			log.Fatalln("tcgcsv:", err)
+		tcgErr := initTCGCSVService(s)
+		if tcgErr != nil {
+			log.Fatalln("tcgcsv:", tcgErr)
 		}
 		// The ingest resolves a ban_id per price row, so warm the categories
 		// it is about to write. No catalog is loaded on this path and none is
@@ -1513,7 +1514,8 @@ func main() {
 
 	// tcgcsv ingestion is optional: a deployment with no configured games or no
 	// price database simply doesn't get the crons or the admin button.
-	if err := initTCGCSVService(); err != nil {
+	err = initTCGCSVService(s)
+	if err != nil {
 		log.Println("tcgcsv ingestion disabled:", err)
 	}
 
@@ -1560,7 +1562,7 @@ func main() {
 			}
 
 			// Update set values after loading prices
-			runSealedAnalysis()
+			s.runSealedAnalysis()
 			// runSealedAnalysis loads the catalog, which is what names this
 			// site's own TCGplayer category, so the variant scope is only
 			// complete now.
@@ -1577,13 +1579,13 @@ func main() {
 		c := cron.New()
 
 		// Take a snapshot twice a day
-		c.AddFunc("0 */12 * * *", stashInTimeseries)
+		c.AddFunc("0 */12 * * *", s.stashInTimeseries)
 
 		// Update set values with new prices
-		c.AddFunc("30 */12 * * *", runSealedAnalysis)
+		c.AddFunc("30 */12 * * *", s.runSealedAnalysis)
 
 		// Reload DB Newspaper every 3 hours
-		c.AddFunc("33 */3 * * *", cacheNewspaper)
+		c.AddFunc("33 */3 * * *", s.cacheNewspaper)
 
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
 		c.AddFunc("20 */12 * * *", offlineService.RequestRefresh)
@@ -1618,7 +1620,7 @@ func main() {
 		c.Start()
 	}
 
-	err = setupDiscord()
+	err = s.setupDiscord()
 	if err != nil {
 		log.Println("Error connecting to discord", err)
 	}
