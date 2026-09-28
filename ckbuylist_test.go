@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -331,5 +332,45 @@ func TestLoadScraperRebuildsCKSignals(t *testing.T) {
 	got = ckSignalForCard("a")
 	if got.State != "" || got.Facts != "CK stock 0" {
 		t.Errorf("after the retail reload: got %+v, want no state at stock 0", got)
+	}
+}
+
+// TestCardFilterOnCK checks on:cksell keeps the sell-now cards and on:ckwait
+// the wait ones.
+func TestCardFilterOnCK(t *testing.T) {
+	setTestCK(t,
+		mtgban.BuylistRecord{
+			"sell":    {{Conditions: "NM", BuyPrice: 10, Quantity: 4, OriginalID: "1"}},
+			"wait":    {{Conditions: "NM", BuyPrice: 9, Quantity: 4, OriginalID: "2"}},
+			"neutral": {{Conditions: "NM", BuyPrice: 9, Quantity: 4, OriginalID: "3"}},
+		},
+		mtgban.InventoryRecord{
+			"sell":    {{Conditions: "NM", Quantity: 5}},
+			"neutral": {{Conditions: "NM", Quantity: 5}},
+		})
+	prevInfos := infosPtr.Load()
+	t.Cleanup(func() { infosPtr.Store(prevInfos) })
+	infos := map[string]mtgban.InventoryRecord{"goodP90": {
+		"sell": {{Price: 9}}, "wait": {{Price: 9}}, "neutral": {{Price: 9}},
+	}}
+	infosPtr.Store(&infos)
+	rebuildCKSignals()
+
+	for _, tc := range []struct {
+		card         string
+		cksell, wait bool
+	}{
+		{"sell", true, false},
+		{"wait", false, true},
+		{"neutral", false, false},
+	} {
+		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: tc.card}}
+		// cardFilterOn reports whether to skip the card.
+		if cardFilterOn([]string{"cksell"}, co) == tc.cksell {
+			t.Errorf("on:cksell %s: kept %v, want %v", tc.card, !tc.cksell, tc.cksell)
+		}
+		if cardFilterOn([]string{"ckwait"}, co) == tc.wait {
+			t.Errorf("on:ckwait %s: kept %v, want %v", tc.card, !tc.wait, tc.wait)
+		}
 	}
 }

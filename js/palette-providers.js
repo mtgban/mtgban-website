@@ -211,7 +211,8 @@
         getCandidates: function (query) {
             var base = [
                 { value: 'hotlist', label: 'Hotlist (3mo buylist peak)' },
-                { value: 'ckp90', label: "Card Kingdom buylist at/above its P90" },
+                { value: 'cksell', label: "Card Kingdom offer worth taking now" },
+                { value: 'ckwait', label: 'Card Kingdom likely to pay more soon' },
                 { value: 'tcgsyp', label: 'TCGplayer SYP List' },
                 { value: 'newspaper', label: 'Newspaper spike scores' }
             ];
