@@ -916,7 +916,7 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ServerNotify("reload", "Server reloaded "+name)
-	offlineService.RequestRefresh()
+	s.offline.RequestRefresh()
 	w.Write([]byte(`{"status": "ok"}`))
 }
 

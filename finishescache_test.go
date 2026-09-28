@@ -20,7 +20,7 @@ type paletteFinish struct {
 func fetchFinishes(t *testing.T) []paletteFinish {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	paletteService.Finishes(rec, httptest.NewRequest("GET", "/api/palette/finishes.json", nil))
+	testSite.palette.Finishes(rec, httptest.NewRequest("GET", "/api/palette/finishes.json", nil))
 
 	var finishes []paletteFinish
 	if err := json.Unmarshal(rec.Body.Bytes(), &finishes); err != nil {
