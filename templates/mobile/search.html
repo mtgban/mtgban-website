@@ -552,17 +552,19 @@
                                     </span>
                                 </div>
                                 {{else}}
-                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM"))}}
+                                {{$ckNote := and (eq $entry.Shorthand "CK") (eq $conditions "NM") $card.CKFacts}}
+                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote}}
+                                {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal}}
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name">
                                             {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
-                                            {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}
+                                            {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price{{if and $entry.IsOffer (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
+                                            <span class="m-vendor-price{{if eq $mState "best"}} m-price-best{{end}}{{if eq $mState "wait"}} m-price-wait{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                             <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
@@ -586,17 +588,20 @@
                                             <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.MarketCredit}}</span><span class="m-vendor-qty"></span></span>
                                         </div>
                                         {{end}}
+                                        {{if $ckNote}}
+                                        <div class="m-detail-note">{{$card.CKFacts}}{{if $card.CKSignalTip}}<br>{{$card.CKSignalTip}}{{end}}</div>
+                                        {{end}}
                                     </div>
                                 </details>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
                                     <span class="m-vendor-name">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
-                                        {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}
+                                        {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price{{if and $entry.IsOffer (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
+                                        <span class="m-vendor-price{{if eq $mState "best"}} m-price-best{{end}}{{if eq $mState "wait"}} m-price-wait{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                         <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                     </span>
                                 </div>

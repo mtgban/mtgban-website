@@ -1680,9 +1680,9 @@
                                                 {{else}}
                                                     <span class="store-cell">
                                                     {{if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
+                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}</a>
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}</a>
                                                     {{end}}
                                                     {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
                                                         <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
@@ -1694,10 +1694,10 @@
                                                 {{if eq .Shorthand "TCGDirectNet"}}
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
-                                                {{$aboveP90 := false}}
-                                                {{if and .IsOffer (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
+                                                {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal}}
+                                                {{$blTitle := buylist_title .Shorthand $conditions $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}
                                                 <span class="price-right has-buylist-extra">
-                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $aboveP90}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if gt $card.GoodBuylist 0.0}}title="Card Kingdom P90 $ {{printf "%.2f" $card.GoodBuylist}}{{if gt $card.HighestBuylist 0.0}}; 90-day high $ {{printf "%.2f" $card.HighestBuylist}}{{end}}"{{end}}>
+                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if $blTitle}}title="{{$blTitle}}"{{end}}>
                                                     {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                 </span>
                                                 <span class="buylist-extra"
