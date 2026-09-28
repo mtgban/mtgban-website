@@ -65,13 +65,65 @@ func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
 	t.Skip("no registered game ships set symbols in this checkout")
 }
 
+// A card and an edition carry the badge the partial draws, already fitted to
+// their set code, so no page asks the rarity table for one as it renders: a
+// card the drawing of its own rarity, an edition the default circle.
+func TestCardDataCarriesTheBadge(t *testing.T) {
+	oldGame, oldBadges := Config.Game, rarityBadges
+	t.Cleanup(func() { Config.Game, rarityBadges = oldGame, oldBadges })
+
+	for _, tc := range []struct {
+		game, rarity, drawing string
+	}{
+		// One Piece draws its circle for every rarity
+		{"onepiece", "SR", ""},
+		// Lorcana draws a rare a shape of its own
+		{"lorcana", "rare", "rare"},
+	} {
+		Config.Game = tc.game
+		rarityBadges = map[string]rarityBadge{}
+		loadRarityBadges()
+		circle := fitCode(rarityBadges[""], "TST")
+		want := fitCode(rarityBadges[tc.drawing], "TST")
+		if want.Path == "" {
+			t.Fatalf("%s loaded no %q drawing", tc.game, tc.drawing)
+		}
+		if tc.drawing != "" && want == circle {
+			t.Fatalf("%s draws a %s as its default circle", tc.game, tc.rarity)
+		}
+
+		b := fixtureBackend("TST", "Test Set", "2024-01-01", [][2]string{{"Test Card", "1"}})
+		b.UUIDs["TST-1"].Rarity = tc.rarity
+		got := uuid2card(b, "TST-1", true, false, false).Badge
+		if got != want {
+			t.Errorf("%s card badge = %+v, want %+v", tc.game, got, want)
+		}
+		set, err := b.GetSet("TST")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = makeEditionEntry(set).Badge
+		if got != circle {
+			t.Errorf("%s edition badge = %+v, want the circle's %+v", tc.game, got, circle)
+		}
+
+		// A card the datastore does not know still carries a drawing, so its
+		// symbol stays blank rather than falling back to an empty glyph.
+		got = uuid2card(b, "TST-9", true, false, false).Badge
+		if got != fitCode(rarityBadges[""], "") {
+			t.Errorf("%s unknown card badge = %+v, want the uncoded circle", tc.game, got)
+		}
+	}
+}
+
 // Published symbols take precedence over glyphs and badges; sets without an
 // image retain their existing rendering. Each case hands the partial its
-// symbol the way a page's data does.
+// symbol and badge the way a page's data does.
 func TestSetSymbolImages(t *testing.T) {
 	oldGame, oldBadges := Config.Game, rarityBadges
 	t.Cleanup(func() { Config.Game, rarityBadges = oldGame, oldBadges })
 	Config.Game = "onepiece"
+	rarityBadges = map[string]rarityBadge{}
 	loadRarityBadges()
 	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, funcMap)
 	if err != nil {
@@ -95,7 +147,7 @@ func TestSetSymbolImages(t *testing.T) {
 		{"symbol's fallback badges too, where a bare set would", "SVI", "", sviSymbol, `<span hidden> <svg`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			arg := map[string]any{"Keyrune": tc.keyrune, "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Symbol": tc.symbol, "Size": 20, "Class": "x"}
+			arg := map[string]any{"Keyrune": tc.keyrune, "Code": tc.code, "Badge": rarityBadgeFor("", tc.code), "Color": "var(--normal)", "Foil": false, "Symbol": tc.symbol, "Size": 20, "Class": "x"}
 			var b bytes.Buffer
 			if err := tmpl.ExecuteTemplate(&b, "set-symbol", arg); err != nil {
 				t.Fatal(err)

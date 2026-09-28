@@ -185,7 +185,7 @@
                         <div class="sealed-grid">
                             {{range $editionList}}
                                 <a class="sealed-edition" href="/sealed?q=s:{{.Code}}">
-                                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}} {{.Name}}
+                                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Badge" .Badge "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}} {{.Name}}
                                 </a>
                             {{end}}
                         </div>
@@ -1428,7 +1428,7 @@
                                  data-crop-url="{{$card.CropURL}}"
                                  onmouseenter="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
-                                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}
+                                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Badge" $card.Badge "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}
                                 </a>
                                 <div class="result-card-info">
                                     <div class="result-card-name-row">

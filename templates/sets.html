@@ -63,7 +63,7 @@
                         <tr {{if .IsChild}}class="child-row"{{end}}>
                             <td>
                                 <div class="sets-name-cell">
-                                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" "set-icon"}}
+                                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Badge" .Badge "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" "set-icon"}}
                                     <a href="/search?q=s:{{.Code}}">{{.Name}}</a>
                                     <span class="set-code">{{.Code}}</span>
                                 </div>

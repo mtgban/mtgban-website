@@ -68,7 +68,7 @@
                 {{if $edition}}
                 <label class="m-news-opts-label">
                     <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                    {{template "set-symbol" dict "Keyrune" $edition.Keyrune "Code" $edition.Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" $edition.Symbol "Size" 20 "Class" ""}}
+                    {{template "set-symbol" dict "Keyrune" $edition.Keyrune "Code" $edition.Code "Badge" $edition.Badge "Color" "var(--normal)" "Foil" false "Symbol" $edition.Symbol "Size" 20 "Class" ""}}
                     <span>{{$edition.Name}}</span>
                 </label>
                 {{end}}

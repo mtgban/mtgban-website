@@ -382,14 +382,25 @@ func readBadge(path string) (rarityBadge, error) {
 }
 
 // rarityBadges holds the drawings, keyed by rarity, with the default circle
-// under the empty key. loadRarityBadges fills it at startup, before anything
-// renders, so nothing reads a file per card.
+// under the empty key. loadRarityBadges fills it at startup, before the
+// datastore loads, so nothing reads a file per card.
 var rarityBadges = map[string]rarityBadge{}
+
+// rarityBadgeFor is the drawing the set-symbol block paints for one rarity,
+// already sized for the code it has to hold. Cards and editions carry it in
+// their data, so the templates never read the table themselves.
+func rarityBadgeFor(rarity, code string) rarityBadge {
+	badge, found := rarityBadges[rarity]
+	if !found {
+		badge = rarityBadges[""]
+	}
+	return fitCode(badge, code)
+}
 
 // loadRarityBadges reads the game's own shapes from its directory, and the
 // circle beside them. A game with no directory draws that circle throughout.
-// Magic draws keyrune glyphs instead and never asks for a badge, so it reads
-// nothing.
+// Magic draws keyrune glyphs instead, so it reads nothing, and every badge a
+// Magic card or edition carries is empty.
 func loadRarityBadges() {
 	if Config.Game == DefaultGame {
 		return
@@ -470,7 +481,10 @@ type GenericCard struct {
 	Keyrune    string
 	// SetSymbol is the set's own published symbol image, from the same
 	// b.GetSet lookup keyruneForCardSet makes for Keyrune.
-	SetSymbol   string
+	SetSymbol string
+	// Badge is the drawing a set with no keyrune paints for the card's
+	// rarity, fitted to SetCode; empty on Magic.
+	Badge       rarityBadge
 	ImageURL    string
 	Foil        bool
 	Etched      bool
@@ -934,7 +948,10 @@ func showVariant(b *mtgmatcher.Backend, cardID string) bool {
 func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
-		return GenericCard{}
+		// Even a card nobody knows carries the badge its empty rarity and
+		// code draw, so a game with badges leaves its symbol blank rather
+		// than drawing an empty keyrune glyph.
+		return GenericCard{Badge: rarityBadgeFor("", "")}
 	}
 
 	var stocksURL string
@@ -1153,6 +1170,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		PromoLabels: promoLabels,
 		Keyrune:     keyrune,
 		SetSymbol:   setSymbol,
+		Badge:       rarityBadgeFor(co.Rarity, co.Card.SetCode),
 		ImageURL:    imgURL,
 		Title:       editionTitle(b, cardID),
 		Reserved:    co.Card.IsReserved,

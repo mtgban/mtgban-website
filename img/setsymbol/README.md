@@ -15,6 +15,8 @@ The pieces, and where each lives:
 - `img/setsymbol/<game>/*.svg` (optional) — one outline per rarity, loaded at
   startup by `loadRarityBadges`. A game with no directory here — or no file
   for a given rarity — draws `img/setsymbol/default.svg`, a plain circle.
+  The page carries each drawing already fitted to its set code, in
+  `GenericCard.Badge` and `EditionEntry.Badge` (`rarityBadgeFor`).
 - `templates/partials/set-symbol.html` — the block that actually paints:
   a published symbol image where one exists, falling back to the keyrune
   glyph or the drawn badge above if the image fails to load or none exists.
@@ -131,8 +133,8 @@ The pieces, and where each lives:
 ## Other things worth knowing
 
 - Magic never touches any of this: `loadRarityBadges` returns immediately for
-  `Config.Game == DefaultGame`, and the template branches on `.Keyrune`
-  before it ever asks for a badge.
+  `Config.Game == DefaultGame`, so every badge a Magic page carries is empty
+  and the partial draws the keyrune glyph.
 - A published symbol image (the set's `Symbol`, which the handler puts in
   the page as `GenericCard.SetSymbol` / `EditionEntry.Symbol` and the
   partial reads as `.Symbol`; backed by a vendor's own CDN) takes

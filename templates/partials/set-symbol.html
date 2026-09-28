@@ -39,12 +39,13 @@
 {{end}}
 
 {{/* The icon that stands for one set. Callers hand it what they have — a
-     keyrune class, a set code, and for a card its rarity and finish — and it
-     paints the keyrune where the game defines one and the rarity badge where
-     it draws those instead. A deployment with no drawings loaded is a keyrune
-     one, so it keeps the font's fallback glyph for a set the font does not
-     know. Deciding here is the point: no page has to know which kind of game
-     it is serving.
+     keyrune class, a set code, the badge drawn for it (a card's rarity, an
+     edition's circle), and for a card its finish — and it paints the keyrune
+     where the game defines one and the rarity badge where it draws those
+     instead. A deployment with no drawings loaded is a keyrune one, so its
+     badges are empty and it keeps the font's fallback glyph for a set the
+     font does not know. Deciding here is the point: no page has to know
+     which kind of game it is serving.
 
      A published symbol is an address on someone else's server, not an asset
      this site controls, and that address moving is not hypothetical: every
@@ -69,7 +70,7 @@
      load. Split out so both callers of set-symbol above render exactly the
      same fallback rather than two hand-kept copies of it. */}}
 {{define "set-symbol-drawn"}}
-    {{$badge := rarity_badge .Rarity .Code}}
+    {{$badge := .Badge}}
     {{if or .Keyrune (not $badge.Path)}}
         <i class="ss {{.Keyrune}} {{if gt .Size 20}}ss-2x{{else}}ss-1x{{end}} ss-fw {{.Class}}"></i>
     {{else if .Color}}

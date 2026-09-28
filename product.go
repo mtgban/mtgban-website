@@ -24,7 +24,10 @@ type EditionEntry struct {
 	Keyrune string
 	// Symbol is the set's own published symbol image (Pokemon, on most of
 	// its sets); empty everywhere else, same as set.Symbol itself.
-	Symbol   string
+	Symbol string
+	// Badge is the drawing a set with no keyrune paints, the default
+	// circle fitted to Code; empty on Magic.
+	Badge    rarityBadge
 	Size     int
 	FmtDate  string
 	Special  bool
@@ -251,6 +254,7 @@ func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
 		Date:     date,
 		Keyrune:  keyruneClass(set.KeyruneCode),
 		Symbol:   set.Symbol,
+		Badge:    rarityBadgeFor("", set.Code),
 		Size:     len(set.Cards),
 		FmtDate:  set.ReleaseDate,
 		Special:  special,
