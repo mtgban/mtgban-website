@@ -237,10 +237,11 @@ type providerDisplay struct {
 // providerRegistry is the ordered, game-agnostic list of chart providers. A chart
 // renders one dataset per provider that actually has data for the card, in this
 // order, so a new game (which reuses the shared TCGplayer providers) charts with
-// no extra code. Built once at startup from the dataset config, which owns every
-// provider's id, name, color, and position: a provider a deployment wants on its
-// charts needs an entry in timeseries_config.datasets, including the TCGplayer
-// metrics a non-Magic deployment charts.
+// no extra code. Built at startup, and again on ?reboot=config or an admin-editor
+// save, from the dataset config, which owns every provider's id, name, color, and
+// position: a provider a deployment wants on its charts needs an entry in
+// timeseries_config.datasets, including the TCGplayer metrics a non-Magic
+// deployment charts.
 var providerRegistry []providerDisplay
 
 // buildProviderRegistry (re)builds providerRegistry from the loaded config. Call
