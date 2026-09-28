@@ -174,6 +174,38 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   per-user API secrets read behind `apiUsersMutex`; affiliate data behind
   `affiliatesMu`/`affiliatesPtr`.
 
+**Panics.** A panic in a handler behind one of the three signing wrappers
+is recovered by `recoverPanic` (auth.go): `reportPanic` (recover.go) logs
+it and posts what `fmt.Sprint` makes of the value, the first 1024 bytes of
+the panicking goroutine's stack and a `source request:` line to the server
+webhook, and the request is answered 500 if the handler has not started
+its response. net/http itself recovers a panic in any other handler,
+logging it and dropping the connection. Off the serving goroutines, these
+recover and report the same way under a `source job:` line: the cron jobs
+and each debounced offline refresh through `recovered()`; the Discord
+handlers and the `$$` lookup's fetch, the newspaper refresh a datastore
+load starts, the goroutines the admin page's `update`, `snapshot` and
+`tcgcsv` actions start, the scraper reloads a key-overrides save starts,
+and each access-listener reload through `recoverJob()`. A deploy through
+`update` that fails, by an error or a recovered panic, leaves the old
+process serving, with no restart to wait for; a panic is reported, an
+error only logged. `dsreload` recovers its own panics without posting
+them, logging one and recording it as the reload's error, and
+`ObservabilityRecorder` recovers only a panic in its batch insert, which
+it logs. A few goroutines are left bare, as none can realistically panic:
+`listener.Ping` (access_notify.go), the event callback lib/pq runs for
+that listener on a goroutine of its own, the `notify.Post` goroutines
+(utils.go), the report's own three posts among them, the ratelimit
+janitor, the goroutine `loadScraper` closes its reader on (load.go), and
+the admin `server` action's, which only sleeps, logs and calls
+`os.Exit(0)`, past which no deferred call would run anyway. Two startup
+goroutines stay fatal on purpose, as their errors are: the scraper
+goroutine in `main()`, including the `runSealedAnalysis()`,
+`warmVariantCacheIfEnabled()` and `RefreshManifest()` it runs after the
+load, and the one running `ListenAndServe`. The goroutines
+`searchParallelNG`, `fetchRosterPrices` and `runningWorkflows` fan out to
+do not recover, so a panic in one still ends the process.
+
 ### 2.3 Data loading pipeline
 
 - **Card datastore**: `Config.DatastorePath` (per-deployment; falls back to
