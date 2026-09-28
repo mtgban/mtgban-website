@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"sort"
 )
 
 func (s *site) Guide(w http.ResponseWriter, r *http.Request) {
@@ -28,8 +29,9 @@ type GuideStore struct {
 }
 
 // guideStoresJSON returns every registered store shorthand with its role
-// markers, sorted by display name. The full set is always emitted: any
-// shorthand is valid syntax regardless of tier, which only gates results.
+// markers, sorted by display name and then by shorthand. The full set is
+// always emitted: any shorthand is valid syntax regardless of tier, which
+// only gates results.
 func guideStoresJSON() template.JS {
 	stores := map[string]*GuideStore{}
 
@@ -67,6 +69,9 @@ func guideStoresJSON() template.JS {
 	for k := range stores {
 		keys = append(keys, k)
 	}
+	// In shorthand order first, so the stable sort by name keeps stores whose
+	// names tie, like CK and CKSealed, in that order rather than the map's.
+	sort.Strings(keys)
 	keys = sortKeysByScraperName(keys)
 
 	out := make([]*GuideStore, 0, len(keys))
