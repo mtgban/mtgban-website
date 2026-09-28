@@ -137,7 +137,8 @@ func TestLongFormLive(t *testing.T) {
 
 	// --- GetAggregatePriceStatsLong: isolated to sentinel provider ---
 	sinceAll := Lookback(3650).Since()
-	stats, err := c.GetAggregatePriceStatsLong(ctx, liveSentinelProvider, sinceAll)
+	cutoff := time.Date(2024, 2, 20, 0, 0, 0, 0, time.UTC)
+	stats, err := c.GetAggregatePriceStatsLong(ctx, liveSentinelProvider, sinceAll, cutoff)
 	if err != nil {
 		t.Fatalf("GetAggregatePriceStatsLong: %v", err)
 	}
@@ -147,9 +148,10 @@ func TestLongFormLive(t *testing.T) {
 	}
 	// Grouped by (uuid, foil, etched) ACROSS language (matching the legacy
 	// GetAggregatePriceStats), so the same-uuid Japanese row (99.00) is included
-	// alongside the base 5.00 and 8.00: max 99, min 5, count 3.
-	if s.Max != 99.00 || s.Min != 5.00 || s.Count != 3 {
-		t.Errorf("stats = %+v, want max 99 min 5 count 3", s)
+	// alongside the base 5.00 and 8.00: max 99, min 5, count 3. Only the
+	// 2024-02-08 row is before the cutoff: prior max 5.
+	if s.Max != 99.00 || s.Min != 5.00 || s.Count != 3 || s.PriorMax != 5.00 {
+		t.Errorf("stats = %+v, want max 99 min 5 count 3 prior max 5", s)
 	}
 
 	// --- GetMoversLong: 2024-02-08 -> 2024-02-20 for the sentinel ---

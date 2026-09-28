@@ -143,23 +143,25 @@ func (c *Client) GetEarliestDateByBanID(ctx context.Context, banID int64, lb Loo
 }
 
 // GetAggregatePriceStatsLong returns per-card max/min/p90/count of one provider
-// over rows with date >= since, keyed by (uuid, foil, etched) so callers do O(1)
+// over rows with date >= since, and PriorMax over those before cutoff, keyed by
+// (uuid, foil, etched) so callers do O(1)
 // lookups while iterating a buylist/inventory. Scoped to Magic variants
 // (mtgjson_uuid IS NOT NULL) so a shared provider (3/4) doesn't pull other games'
 // rows (plan 17.3). price > 0 is redundant with the zero-omitting backfill but
 // kept defensive.
-func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
+func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
 	rows, err := c.db.QueryContext(ctx, `
 		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
 		       MAX(p.price)                                          AS max_price,
 		       MIN(p.price)                                          AS min_price,
 		       percentile_disc(0.9) WITHIN GROUP (ORDER BY p.price)  AS p90_price,
-		       COUNT(*)                                              AS sample_count
+		       COUNT(*)                                              AS sample_count,
+		       COALESCE(MAX(p.price) FILTER (WHERE p.date < $3), 0)  AS prior_max
 		  FROM prices p
 		  JOIN variants v ON v.ban_id = p.ban_id
 		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0
 		   AND v.mtgjson_uuid IS NOT NULL
-		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched`, provider, since)
+		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched`, provider, since, cutoff)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +171,9 @@ func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16,
 	for rows.Next() {
 		var key AggregatePriceKey
 		var stats AggregatePriceStats
-		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched,
-			&stats.Max, &stats.Min, &stats.P90, &stats.Count); err != nil {
+		err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched,
+			&stats.Max, &stats.Min, &stats.P90, &stats.Count, &stats.PriorMax)
+		if err != nil {
 			return nil, err
 		}
 		result[key] = stats

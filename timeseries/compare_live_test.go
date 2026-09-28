@@ -110,13 +110,13 @@ func TestCompareReadPaths(t *testing.T) {
 	// --- aggregate buylist metrics over ~90 days (whole-provider scan) ---
 	since := time.Now().AddDate(0, 0, -90)
 	t0 := time.Now()
-	wideStats, err := c.GetAggregatePriceStats(ctx, cmpDatasetIndex, since)
+	wideStats, err := c.GetAggregatePriceStats(ctx, cmpDatasetIndex, since, time.Now())
 	oldAgg := time.Since(t0)
 	if err != nil {
 		t.Fatalf("GetAggregatePriceStats: %v", err)
 	}
 	t1 := time.Now()
-	longStats, err := c.GetAggregatePriceStatsLong(ctx, cmpProvider, since)
+	longStats, err := c.GetAggregatePriceStatsLong(ctx, cmpProvider, since, time.Now())
 	newAgg := time.Since(t1)
 	if err != nil {
 		t.Fatalf("GetAggregatePriceStatsLong: %v", err)

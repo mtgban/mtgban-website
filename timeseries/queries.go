@@ -265,12 +265,15 @@ type AggregatePriceKey struct {
 // AggregatePriceStats holds per-card summary statistics of one price column
 // over a date window: max, min, discrete 90th percentile, and the count of
 // rows that contributed to them. Computed from rows where the column is
-// strictly positive, so Count is the number of buying days.
+// strictly positive, so Count is the number of buying days. PriorMax is the
+// max over the window's days before the caller's cutoff, 0 when there are
+// none, so a price above everything before today tells apart from a tie.
 type AggregatePriceStats struct {
-	Max   float64
-	Min   float64
-	P90   float64
-	Count int64
+	Max      float64
+	Min      float64
+	P90      float64
+	Count    int64
+	PriorMax float64
 }
 
 // columnForDataset returns the database column name matching a dataset config
@@ -303,13 +306,13 @@ func columnForDataset(index int) string {
 }
 
 // GetAggregatePriceStats returns per-card summary statistics of the price
-// column matching datasetIndex, over rows with date >= since. The result is
-// keyed by (uuid, foil, etched) so callers can do O(1) lookups while iterating
-// a buylist or inventory.
+// column matching datasetIndex, over rows with date >= since, with PriorMax
+// over those before cutoff. The result is keyed by (uuid, foil, etched) so
+// callers can do O(1) lookups while iterating a buylist or inventory.
 //
 // The > 0 filter excludes both NULLs and any 0 stored on a not-buying day, so
 // each card's stats reflect only days the vendor was actually buying.
-func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, since time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
+func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
 	column := columnForDataset(datasetIndex)
 	if column == "" {
 		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
@@ -321,12 +324,13 @@ func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, s
 		       MAX(%[1]s)                                            AS max_price,
 		       MIN(%[1]s)                                            AS min_price,
 		       percentile_disc(0.9) WITHIN GROUP (ORDER BY %[1]s)    AS p90_price,
-		       COUNT(*)                                              AS sample_count
+		       COUNT(*)                                              AS sample_count,
+		       COALESCE(MAX(%[1]s) FILTER (WHERE date < $2), 0)      AS prior_max
 		  FROM product_prices
 		 WHERE date >= $1 AND %[1]s > 0
 		 GROUP BY mtgjson_uuid, is_foil, is_etched`, column)
 
-	rows, err := c.db.QueryContext(ctx, q, since)
+	rows, err := c.db.QueryContext(ctx, q, since, cutoff)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +340,8 @@ func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, s
 	for rows.Next() {
 		var key AggregatePriceKey
 		var stats AggregatePriceStats
-		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &stats.Max, &stats.Min, &stats.P90, &stats.Count); err != nil {
+		err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &stats.Max, &stats.Min, &stats.P90, &stats.Count, &stats.PriorMax)
+		if err != nil {
 			return nil, err
 		}
 		result[key] = stats
