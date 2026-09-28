@@ -395,7 +395,10 @@
                             Buylist price exceeds your loaded price
                         </div>
                         <div class="upload-legend-row">
-                            <span class="upload-legend-sym">&#127775;</span> Highest buylist price in 3 months
+                            <span class="bl-pill bl-pill-high">90d high</span> Highest buylist price in 3 months
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="bl-pill bl-pill-new">New high</span> Card Kingdom just beat every price of the last 3 months
                         </div>
                         <div class="upload-legend-row">
                             <span class="upload-legend-sym">&#9888;&#65039;</span> Offer above custom spread threshold
@@ -1477,7 +1480,7 @@
                             <tr data-opt-id="{{.CardID}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardID).Name}}" data-opt-ckid="{{uuid2ckid .CardID}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
-                                    <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{buylist_badge $scraperKey $card.HotlistStore}}
+                                    <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew}}
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                 </td>
                                 <td class="opt-set">

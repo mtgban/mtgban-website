@@ -88,7 +88,7 @@ window.__BAN_GUIDE = {
                     { value: 'skip:', short: 'Skip categories (retail, buylist, empty, index)' },
                     { value: 'sort:', short: 'Sort order' },
                     { value: 'sm:', short: 'Search mode' },
-                    { value: 'on:', short: 'Special lists (hotlist, cksell, ckwait, tcgsyp, newspaper)' }
+                    { value: 'on:', short: 'Special lists (hotlist, newhigh, cksell, ckwait, tcgsyp, newspaper)' }
                 ],
                 examples: [
                     { query: 'Birds of Paradise + Tab + s:', desc: 'Sets dropdown narrows to BoP printings' },
@@ -258,7 +258,7 @@ window.__BAN_GUIDE = {
                     { value: 'skip:', short: 'Skip categories' },
                     { value: 'sort:', short: 'Sort order (singleton)' },
                     { value: 'sm:', short: 'Search mode (singleton)' },
-                    { value: 'on:', short: 'Special lists (hotlist, cksell, ckwait, tcgsyp, newspaper)' }
+                    { value: 'on:', short: 'Special lists (hotlist, newhigh, cksell, ckwait, tcgsyp, newspaper)' }
                 ],
                 examples: []
             }
@@ -876,13 +876,14 @@ window.__BAN_GUIDE = {
             category: 'Search Syntax',
             title: 'Special Lists',
             icon: 'list-checks',
-            summary: 'Filter cards on curated lists: on:hotlist, on:cksell, on:ckwait, on:tcgsyp, on:newspaper.',
-            snippets: ['on:hotlist', 'on:cksell', 'on:ckwait', 'on:tcgsyp', 'on:newspaper', 'on:mtgstocks'],
-            keywords: ['list', 'on:', 'hotlist', 'cksell', 'ckwait', 'p90', 'wait', 'sell now', 'card kingdom', 'tcgsyp', 'syp', 'newspaper', 'mtgstocks', 'stocks', 'spike', 'hot', 'curated', 'special', 'TCGplayer'],
+            summary: 'Filter cards on curated lists: on:hotlist, on:newhigh, on:cksell, on:ckwait, on:tcgsyp, on:newspaper.',
+            snippets: ['on:hotlist', 'on:newhigh', 'on:cksell', 'on:ckwait', 'on:tcgsyp', 'on:newspaper', 'on:mtgstocks'],
+            keywords: ['list', 'on:', 'hotlist', 'newhigh', 'new high', 'cksell', 'ckwait', 'p90', 'wait', 'sell now', 'card kingdom', 'tcgsyp', 'syp', 'newspaper', 'mtgstocks', 'stocks', 'spike', 'hot', 'curated', 'special', 'TCGplayer'],
             content: {
                 description: 'Check if a card belongs to a curated list using <code>on:VALUE</code>:',
                 table: [
-                    { value: 'hotlist', short: 'Highest buylist prices over 3 months' },
+                    { value: 'hotlist', short: 'Highest buylist prices over 3 months (the 90d high and New high pills)' },
+                    { value: 'newhigh', short: 'Card Kingdom just beat every buylist price of the last 3 months (the New high pill)' },
                     { value: 'cksell', short: "Card Kingdom's offer is worth taking: above its 90-day P90, with CK in stock" },
                     { value: 'ckwait', short: 'Card Kingdom is likely to pay more soon: sold out, bought out, or just cut' },
                     { value: 'tcgsyp / syp', short: 'Present on the TCGplayer SYP list' },
@@ -891,6 +892,7 @@ window.__BAN_GUIDE = {
                 ],
                 examples: [
                     { query: 'on:hotlist', desc: 'Cards on the buylist hot list' },
+                    { query: 'on:newhigh', desc: 'Cards Card Kingdom just set a new 3-month high on' },
                     { query: 'on:cksell', desc: "Cards where CK's offer is worth taking now (green)" },
                     { query: 'on:ckwait', desc: 'Cards to hold: CK is likely to pay more soon (↑)' },
                     { query: 'on:tcgsyp', desc: 'Cards available on TCGplayer SYP' },

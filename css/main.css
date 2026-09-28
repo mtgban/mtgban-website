@@ -933,6 +933,28 @@ span.emoji {
 .bl-prices .bl-good-high { color: var(--asuccess); }
 .bl-prices .bl-good-low { color: var(--adanger); }
 
+/* Card Kingdom's hotlist pills (buylist_badge) */
+.bl-pill {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    line-height: 1.4;
+    vertical-align: middle;
+    white-space: nowrap;
+    cursor: help;
+}
+.bl-pill-high {
+    background: var(--accent-muted);
+    color: var(--ainfo);
+}
+.bl-pill-new {
+    background: color-mix(in srgb, var(--asuccess) 14%, transparent);
+    color: var(--asuccess);
+}
+
 /* Card Kingdom's buylist signal and stock facts (buylist_ck) */
 .bl-ck {
     display: block;

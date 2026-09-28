@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -168,6 +169,36 @@ func TestGoodBuylistPrice(t *testing.T) {
 		got, ok := goodBuylistPrice(tc.stats, 0)
 		if ok != tc.ok || !almostEqual(got, tc.want) {
 			t.Errorf("%s: got (%v, %v), want (%v, %v)", tc.name, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+// TestCardFilterOnHotlist checks on:hotlist keeps both pills' cards and
+// on:newhigh only the new highs.
+func TestCardFilterOnHotlist(t *testing.T) {
+	prev := infosPtr.Load()
+	t.Cleanup(func() { infosPtr.Store(prev) })
+	infos := map[string]mtgban.InventoryRecord{
+		"hotlist": {"tie": {{Price: 2}}},
+		"newhigh": {"new": {{Price: 3}}},
+	}
+	infosPtr.Store(&infos)
+
+	for _, tc := range []struct {
+		card             string
+		hotlist, newhigh bool
+	}{
+		{"tie", true, false},
+		{"new", true, true},
+		{"none", false, false},
+	} {
+		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: tc.card}}
+		// cardFilterOn reports whether to skip the card.
+		if cardFilterOn([]string{"hotlist"}, co) == tc.hotlist {
+			t.Errorf("on:hotlist %s: kept %v, want %v", tc.card, !tc.hotlist, tc.hotlist)
+		}
+		if cardFilterOn([]string{"newhigh"}, co) == tc.newhigh {
+			t.Errorf("on:newhigh %s: kept %v, want %v", tc.card, !tc.newhigh, tc.newhigh)
 		}
 	}
 }

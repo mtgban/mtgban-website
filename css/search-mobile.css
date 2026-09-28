@@ -677,10 +677,6 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     margin-left: 0.3em;
 }
 
-.m-hot {
-    font-size: 0.8rem;
-}
-
 /* Expanded detail — must match summary width */
 .m-vendor-detail {
     background: color-mix(in srgb, var(--text) 3%, var(--background));

@@ -851,6 +851,13 @@ func newHighReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 	return stats.PriorMax, true
 }
 
+// The hotlist pills' tooltips; the odds are from the backtest in
+// docs/adr/0004-ck-buylist-signals.md.
+const (
+	ckAtHighTip  = "Card Kingdom is paying its highest price of the last 90 days, often one it has held for weeks."
+	ckNewHighTip = "Card Kingdom just beat every price of the last 90 days. Two weeks later CK paid 5% more only 24% of the time, and 5% less or stopped buying 40% of the time (typical: 33% and 35%)."
+)
+
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
 // one aggregate query covers the whole 90-day window, then every card runs
 // through every reducer. The result is keyed by the same labels passed in.
