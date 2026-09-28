@@ -15,7 +15,6 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,8 +26,6 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/apisig"
-	"github.com/mtgban/mtgban-website/internal/offline"
-	"github.com/mtgban/mtgban-website/internal/offlineapi"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
@@ -865,118 +862,6 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 	return downloadBase, token, time.Now().Add(valid), nil
 }
 
-// offlineService wires the offline API endpoints to the live scraper state.
-var offlineService = offlineapi.NewService(offlineapi.Deps{
-	Datastore: func() (*mtgmatcher.Backend, time.Time) {
-		ds := currentDatastore()
-		return ds.backend, ds.loadedAt
-	},
-	Allow: offlineModeAllowed,
-
-	CanonicalSetCode: func(b *mtgmatcher.Backend, setCode string) (string, error) {
-		set, err := b.GetSet(setCode)
-		if err != nil {
-			return "", err
-		}
-		return set.Code, nil
-	},
-
-	BuildSetPayload: func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error) {
-		set, err := b.GetSet(setCode)
-		if err != nil {
-			return nil, err
-		}
-		retail := getSellerPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
-		buylist := getVendorPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
-		for id, m := range getSellerPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
-			if retail[id] == nil {
-				retail[id] = m
-				continue
-			}
-			for store, entry := range m {
-				retail[id][store] = entry
-			}
-		}
-		for id, m := range getVendorPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
-			if buylist[id] == nil {
-				buylist[id] = m
-				continue
-			}
-			for store, entry := range m {
-				buylist[id][store] = entry
-			}
-		}
-		return banprice2offline(set.Code, time.Now().UTC(), retail, buylist), nil
-	},
-
-	EnabledStores: func() []string {
-		var all []string
-		for _, seller := range GetSellers() {
-			shorthand := seller.Info().Shorthand
-			if !slices.Contains(Config.SearchRetailBlockList, shorthand) && !slices.Contains(all, shorthand) {
-				all = append(all, shorthand)
-			}
-		}
-		for _, vendor := range GetVendors() {
-			shorthand := vendor.Info().Shorthand
-			if !slices.Contains(Config.SearchBuylistBlockList, shorthand) && !slices.Contains(all, shorthand) {
-				all = append(all, shorthand)
-			}
-		}
-		return all
-	},
-
-	Sellers: GetSellers,
-	Vendors: GetVendors,
-
-	ScraperName:       scraperName,
-	CardObjectSources: cardobject2sources,
-	FinishNames:       finishNames,
-	Finishes:          paletteService.FinishList,
-
-	ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		omPath := Config.Offline.ManifestPath
-		if omPath == "" {
-			return nil, "", errors.New("offline.manifest_path not configured")
-		}
-		u, err := url.Parse(omPath)
-		if err != nil {
-			return nil, "", err
-		}
-		switch {
-		case u.Scheme == "" || len(u.Scheme) == 1:
-			return &simplecloud.FileBucket{}, omPath, nil
-		case u.Scheme == "b2":
-			bucket, err := newB2ClientFor(ctx, u.Host)
-			return bucket, omPath, err
-		default:
-			return nil, "", fmt.Errorf("unsupported offline manifest path scheme: %s", u.Scheme)
-		}
-	},
-
-	ImagesManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		bucket, base, err := offlineImagesFactory(ctx)
-		if err != nil {
-			return nil, "", err
-		}
-		return bucket, offlineapi.JoinBucketPath(base, "images-manifest.json"), nil
-	},
-
-	ImagesBucket: offlineImagesFactory,
-
-	ImagesDownloadAuth: offlineImagesDownloadAuth,
-
-	Game: func() string { return Config.Game },
-
-	ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
-	ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
-
-	WatermarkSecret: func() []byte { return []byte(os.Getenv("BAN_SECRET")) },
-
-	RetailBlockList:  func() []string { return Config.SearchRetailBlockList },
-	BuylistBlockList: func() []string { return Config.SearchBuylistBlockList },
-})
-
 // paletteNewspaperPages lists the newspaper views the command palette
 // offers as jump targets.
 func paletteNewspaperPages() []palette.NewspaperPage {
@@ -1000,21 +885,6 @@ func paletteArbitFilters() []palette.ArbitFilter {
 		out = append(out, palette.ArbitFilter{Key: key, Title: cfg.Title, ArbitOnly: cfg.ArbitOnly})
 	}
 	return out
-}
-
-// paletteService wires the command-palette endpoints to the live datastore
-// and scraper lists.
-var paletteService = &palette.Service{
-	Backend: backend,
-	PromoAliases: func() map[string]string {
-		return isKnownPromo
-	},
-	FinishLabel: finishListLabel,
-	FinishNames: finishNames,
-	Snapshot:    func() *palette.Snapshot { return currentDatastore().palette },
-
-	Sellers: GetSellers,
-	Vendors: GetVendors,
 }
 
 const (
@@ -1528,7 +1398,8 @@ func main() {
 		log.Println("offline: BAN_SECRET is defaulted, price watermarks are predictable")
 	}
 
-	if err := offlineService.LoadPersisted(context.Background()); err != nil {
+	err = s.offline.LoadPersisted(context.Background())
+	if err != nil {
 		log.Println("offline: manifest load failed:", err)
 	}
 
@@ -1567,12 +1438,12 @@ func main() {
 			// site's own TCGplayer category, so the variant scope is only
 			// complete now.
 			warmVariantCacheIfEnabled()
-			offlineService.RefreshManifest()
+			s.offline.RefreshManifest()
 		}()
 	}
 
 	// Runtime manifest refreshes funnel through one debounced goroutine.
-	offlineService.StartRefresher()
+	s.offline.StartRefresher()
 
 	if !DevMode {
 		// Set up new refreshes as needed
@@ -1588,7 +1459,7 @@ func main() {
 		c.AddFunc("33 */3 * * *", s.cacheNewspaper)
 
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
-		c.AddFunc("20 */12 * * *", offlineService.RequestRefresh)
+		c.AddFunc("20 */12 * * *", s.offline.RequestRefresh)
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
@@ -1717,13 +1588,13 @@ func main() {
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))
-	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(paletteService.CardMeta)))
-	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(paletteService.Sealed)))
-	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
-	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
-	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(paletteService.Promos)))
-	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(paletteService.Finishes)))
-	http.Handle("/api/offline/", noSigning(http.HandlerFunc(offlineService.Handle)))
+	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(s.palette.CardMeta)))
+	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(s.palette.Sealed)))
+	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(s.palette.Sets)))
+	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(s.palette.Stores)))
+	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(s.palette.Promos)))
+	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(s.palette.Finishes)))
+	http.Handle("/api/offline/", noSigning(http.HandlerFunc(s.offline.Handle)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 

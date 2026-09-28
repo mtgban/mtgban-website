@@ -77,8 +77,8 @@ Boot sequence (`main()`):
    `DefaultSecret` when unset in any mode (outside dev a defaulted secret
    only logs a warning). `loadCommonConfig()` loads the ACL/grants table and
    affiliates. `loadRarityBadges()` (no-op for the default game).
-2. `s := newSite()` (site.go) — the site the routes and jobs are bound to;
-   pure, no I/O.
+2. `s := newSite()` (site.go) — the site the routes and jobs are bound to,
+   with its palette and offline services; pure, no I/O.
 3. If any `-tcgcsv-*` job flag is set: `openDBs()`, `initTCGCSVService(s)`,
    run the requested job, `os.Exit(0)` — the datastore and price data are
    never loaded and `ListenAndServe` never runs.
@@ -92,26 +92,26 @@ Boot sequence (`main()`):
    no longer exist. Then `startAccessReloadListener()` (picks up ACL/grant
    saves made by peer deployments sharing the price DB), `initTCGCSVService(s)`
    (non-fatal if unconfigured), `reloadCheckpoints()`,
-   `offlineService.LoadPersisted()`, then the production template cache
+   `s.offline.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
-5. Async goroutine: `s.loadDatastore(Config.DatastorePath)` (site.go) —
-   opens the site's game via `mtgmatcher.Open(datastoreGame(), reader)` (not
-   the old `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
+5. Async goroutine: `s.loadDatastore(Config.DatastorePath)` — opens the
+   site's game via `mtgmatcher.Open(datastoreGame(), reader)` (not the old
+   `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
-   (`s.newDatastore()`), publishes backend and snapshots together in one
-   `liveDatastore.Store()`, then itself spawns `s.cacheNewspaper()` as a
-   further goroutine.
+   (`s.newDatastore()`, site.go), publishes backend and snapshots
+   together in one `liveDatastore.Store()`, then itself spawns
+   `s.cacheNewspaper()` as a further goroutine.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
    `loadScrapersNG()` on it, then `s.runSealedAnalysis()`,
-   `warmVariantCacheIfEnabled()`, `offlineService.RefreshManifest()`.
-7. `offlineService.StartRefresher()` — one debounced goroutine that every
+   `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
+7. `s.offline.StartRefresher()` — one debounced goroutine that every
    runtime manifest refresh funnels through.
 8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go):
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
    - `33 */3 * * *` — `s.cacheNewspaper()`
-   - `20 */12 * * *` — `offlineService.RequestRefresh()` (backstop; normal
+   - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
      a plain function rather than a site method)
@@ -200,7 +200,7 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   mode — `api_load.go` and the old "run without B2, reconstruct
   sellers/vendors from another instance's `/api/mtgban/all.json` +
   `sealed.json` + `stores.json`" path are gone. `internal/offlineapi.Service`
-  (wired as `offlineService`, main.go:758) instead serves a manifest,
+  (wired as `s.offline`, built in `newSite()`, site.go) instead serves a manifest,
   catalog fragments, image metadata, and cached prices to the site's service
   worker for offline browsing: it loads persisted state at boot
   (`LoadPersisted()`), refreshes after scraper loads (`RefreshManifest()`),
@@ -290,7 +290,7 @@ Changelog, carry no `Handle`). `ShouldHide` is
 for visibility only, e.g. the Sealed sub-tab hides when the loaded backend has
 no sealed product). `main()` builds `s := newSite()` and binds it at
 registration: `nav.Handle(s, w, r)` for declarative pages, plain method values
-(`s.Search`, …) for the rest.
+(`s.Search`, `s.palette.CardMeta`, `s.offline.Handle`, …) for the rest.
 `genPageNav(s, r, activeTab, sig)` builds the per-request navbar by filtering
 `OrderNav` (Search, Newspaper, Screener, Sleepers, Upload, Global, Arbit,
 Reverse, Admin) against the signature/ACL; the list itself is identical across

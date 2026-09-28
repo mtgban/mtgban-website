@@ -21,7 +21,7 @@ func TestPromosEndpoint(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	paletteService.Promos(rec, httptest.NewRequest(http.MethodGet, "/api/palette/promos.json", nil))
+	testSite.palette.Promos(rec, httptest.NewRequest(http.MethodGet, "/api/palette/promos.json", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d, want 200", rec.Code)
 	}

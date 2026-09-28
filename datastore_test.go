@@ -132,9 +132,9 @@ func assertDatastoreDescribesLoad(t *testing.T, setCode, number, namePrefix stri
 		serve     func(http.ResponseWriter, *http.Request)
 		key, want string
 	}{
-		{paletteService.Sets, "code", setCode},
-		{paletteService.Promos, "value", strings.ToLower(setCode)},
-		{paletteService.Finishes, "value", strings.ToLower(setCode)},
+		{testSite.palette.Sets, "code", setCode},
+		{testSite.palette.Promos, "value", strings.ToLower(setCode)},
+		{testSite.palette.Finishes, "value", strings.ToLower(setCode)},
 	} {
 		rec := httptest.NewRecorder()
 		list.serve(rec, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -185,7 +185,7 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 func TestEmptyDatastoreServesPaletteListsUncached(t *testing.T) {
 	useDatastore(t, nil)
 	for _, serve := range []func(http.ResponseWriter, *http.Request){
-		paletteService.Sets, paletteService.Promos, paletteService.Finishes,
+		testSite.palette.Sets, testSite.palette.Promos, testSite.palette.Finishes,
 	} {
 		rec := httptest.NewRecorder()
 		serve(rec, httptest.NewRequest(http.MethodGet, "/", nil))
