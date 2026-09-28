@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -734,20 +733,7 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 func recoverPanic(r *http.Request, w http.ResponseWriter) {
 	errPanic := recover()
 	if errPanic != nil {
-		log.Println("panic occurred:", errPanic)
-
-		// Restrict stack size to fit into discord message
-		buf := make([]byte, 1<<16)
-		n := runtime.Stack(buf, false)
-		buf = buf[:n]
-		if len(buf) > 1024 {
-			buf = buf[:1024]
-		}
-
-		msg := fmt.Sprint(errPanic)
-		ServerNotify("panic", msg, true)
-		ServerNotify("panic", string(buf))
-		ServerNotify("panic", "source request: "+r.URL.String())
+		reportPanic(errPanic, "source request: "+r.URL.String())
 
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
