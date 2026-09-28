@@ -123,3 +123,81 @@ func collectTemplateRefs(node parse.Node, out *[]string) {
 		collectTemplateRefs(n.ElseList, out)
 	}
 }
+
+// TestBuylistCKHelpers pins the CK buylist helpers and executes them with the
+// argument types the pages pass: html/template checks those only when it runs.
+func TestBuylistCKHelpers(t *testing.T) {
+	state, ok := funcMap["buylist_state"].(func(string, string, bool, float64, float64, string) string)
+	if !ok {
+		t.Fatal("buylist_state has another signature")
+	}
+	for _, tc := range []struct {
+		name       string
+		shorthand  string
+		conditions string
+		isOffer    bool
+		price      float64
+		ckSignal   string
+		want       string
+	}{
+		{"CK NM sell", "CK", "NM", true, 10, "sell", "best"},
+		{"CK NM wait", "CK", "NM", true, 9, "wait", "wait"},
+		{"CK NM neutral at P90", "CK", "NM", true, 9, "", ""},
+		{"CK SP never", "CK", "SP", true, 12, "sell", ""},
+		{"other store at P90", "SCG", "NM", true, 9, "wait", "best"},
+		{"other store below P90", "SCG", "NM", true, 8, "", ""},
+		{"not an offer", "SCG", "NM", false, 12, "", ""},
+	} {
+		got := state(tc.shorthand, tc.conditions, tc.isOffer, tc.price, 9, tc.ckSignal)
+		if got != tc.want {
+			t.Errorf("buylist_state %s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+
+	title, ok := funcMap["buylist_title"].(func(string, string, float64, float64, string, string) string)
+	if !ok {
+		t.Fatal("buylist_title has another signature")
+	}
+	got := title("CK", "NM", 9, 12, "CK stock 0", "odds")
+	if got != "Card Kingdom P90 $ 9.00; 90-day high $ 12.00\nCK stock 0\nodds" {
+		t.Errorf("buylist_title CK NM: got %q", got)
+	}
+	got = title("SCG", "NM", 9, 0, "CK stock 0", "odds")
+	if got != "Card Kingdom P90 $ 9.00" {
+		t.Errorf("buylist_title other store: got %q", got)
+	}
+
+	const page = `{{buylist_state .Shorthand .Cond .IsOffer .Price .Good .Signal}}|` +
+		`{{buylist_wait .Shorthand .Cond .Signal .Tip}}|{{buylist_ck .Signal .Tip .Facts}}|` +
+		`<span title="{{buylist_title .Shorthand .Cond .Good .Highest .Facts .Tip}}"></span>`
+	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(page))
+	var b strings.Builder
+	err := tmpl.Execute(&b, struct {
+		Shorthand, Cond      string
+		IsOffer              bool
+		Price, Good, Highest float64
+		Signal, Tip, Facts   string
+	}{"CK", "NM", true, 9, 9, 12, "wait", `CK "odds"`, "CK stock 0 · out 9 days"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"wait|",
+		`<span class="ck-wait" title="CK &#34;odds&#34;">&#8593;</span>`,
+		`<span class="bl-ck bl-ck-wait" title="CK &#34;odds&#34;">&#8593; Wait · CK stock 0 · out 9 days</span>`,
+	} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("rendered %s, want %s", b.String(), want)
+		}
+	}
+
+	// Only the known states become a class.
+	ck, ok := funcMap["buylist_ck"].(func(string, string, string) template.HTML)
+	if !ok {
+		t.Fatal("buylist_ck has another signature")
+	}
+	got = string(ck("best x", "odds", "CK stock 0"))
+	if got != `<span class="bl-ck">CK stock 0</span>` {
+		t.Errorf("buylist_ck unknown state: got %s", got)
+	}
+}
