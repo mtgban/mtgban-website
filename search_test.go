@@ -88,6 +88,14 @@ func skipWithoutDatastore(tb testing.TB) {
 	}
 }
 
+// withSigMode runs one test under the given auth flags, restoring them after.
+func withSigMode(t *testing.T, devMode, sigCheck bool) {
+	t.Helper()
+	savedDev, savedSig := DevMode, SigCheck
+	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
+	DevMode, SigCheck = devMode, sigCheck
+}
+
 // A variant-qualified name (e.g. "(Borderless)") skips the plain-name search
 // index and falls back to attemptMatch, which must still surface every finish
 // of the matched printing. Regression guard: the foil used to be dropped

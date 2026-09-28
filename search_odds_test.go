@@ -128,8 +128,7 @@ func TestFormatExpectedCount(t *testing.T) {
 // every other sort.
 func TestVariableReadingShowsAndSortsByDropRate(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -251,8 +250,7 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 // for, not with those.
 func TestDropRateShowsOnlyOnTheBuyersSide(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -311,8 +309,7 @@ func TestDropRateShowsOnlyOnTheBuyersSide(t *testing.T) {
 // it is the only side that could show it.
 func TestDropRateDoesNotBorrowACKBadgeOrAFixLink(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -373,8 +370,7 @@ func TestDropRateDoesNotBorrowACKBadgeOrAFixLink(t *testing.T) {
 // same number of Avg Copies rows, and the pill only reorders them.
 func TestDropRateVisibilityDoesNotDependOnSort(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

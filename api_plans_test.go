@@ -109,9 +109,7 @@ func TestAPIPlansTrialButtonNeedsPledgeAndSecret(t *testing.T) {
 }
 
 func TestAPIPlansInviteRevealsQuarterly(t *testing.T) {
-	savedDev, savedSig := DevMode, SigCheck
-	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	rec := httptest.NewRecorder()
 	testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans?invite=abc", nil))
 	body := rec.Body.String()

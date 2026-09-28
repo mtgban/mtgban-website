@@ -21,18 +21,16 @@ func TestScreenerDefersTheColdBuild(t *testing.T) {
 	prevFetch := screenerFetch
 	prevClassify := screenerClassify
 	prevDB := PricesArchiveDB
-	prevDev, prevSig := DevMode, SigCheck
 	t.Cleanup(func() {
 		screenerFetch = prevFetch
 		screenerClassify = prevClassify
 		PricesArchiveDB = prevDB
-		DevMode, SigCheck = prevDev, prevSig
 		screenerCacheMu.Lock()
 		screenerCache = map[string]screenerCacheEntry{}
 		screenerCacheMu.Unlock()
 	})
 
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	PricesArchiveDB = &timeseries.Client{}
 	screenerCacheMu.Lock()
 	screenerCache = map[string]screenerCacheEntry{}

@@ -83,8 +83,7 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 // running: the handler reads the tracker after the reboot action, not
 // before. The load blocks on a server that answers only once released.
 func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-release

@@ -176,9 +176,7 @@ func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
-	oldCheck, oldDev := SigCheck, DevMode
-	SigCheck, DevMode = true, false
-	t.Cleanup(func() { SigCheck, DevMode = oldCheck, oldDev })
+	withSigMode(t, false, true)
 
 	apiUsersMutex.Lock()
 	if Config.APIUserSecrets == nil {
@@ -223,9 +221,7 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
-	oldCheck, oldDev := SigCheck, DevMode
-	SigCheck, DevMode = true, false
-	t.Cleanup(func() { SigCheck, DevMode = oldCheck, oldDev })
+	withSigMode(t, false, true)
 
 	apiUsersMutex.Lock()
 	if Config.APIUserSecrets == nil {

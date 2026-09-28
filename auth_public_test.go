@@ -18,15 +18,13 @@ import (
 func anyTierNav(t *testing.T, marker string) http.Handler {
 	t.Helper()
 	savedNavs, savedOrder := ExtraNavs, OrderNav
-	savedDev, savedSig := DevMode, SigCheck
 	savedLimiter, savedAccess := UserRateLimiter, Access
 	t.Cleanup(func() {
 		ExtraNavs, OrderNav = savedNavs, savedOrder
-		DevMode, SigCheck = savedDev, savedSig
 		UserRateLimiter, Access = savedLimiter, savedAccess
 	})
 	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
-	DevMode, SigCheck = true, true
+	withSigMode(t, true, true)
 	ExtraNavs = map[string]*NavElem{
 		"Open": {Name: "Open", Link: "/open", Page: "home.html", SubPages: []NavElem{
 			{Name: "OpenSub", Link: "/open-sub", ShouldHide: func(*site) bool { return true }},

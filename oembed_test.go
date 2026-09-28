@@ -17,8 +17,7 @@ import (
 // html page, which a consumer asking for json cannot read.
 func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

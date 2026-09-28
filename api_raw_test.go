@@ -7,14 +7,6 @@ import (
 	"testing"
 )
 
-// withSigMode runs one test under the given auth flags, restoring them after.
-func withSigMode(t *testing.T, devMode, sigCheck bool) {
-	t.Helper()
-	savedDev, savedSig := DevMode, SigCheck
-	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
-	DevMode, SigCheck = devMode, sigCheck
-}
-
 func TestRawCardAPIRefusesNonAdmins(t *testing.T) {
 	withSigMode(t, false, true)
 

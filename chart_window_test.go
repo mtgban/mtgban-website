@@ -20,8 +20,7 @@ import (
 func TestChartWindowClampsToTheTier(t *testing.T) {
 	// DevMode without signature checking hands every request the maximum, which
 	// would make every case below the same case.
-	defer func(dev, sigcheck bool) { DevMode, SigCheck = dev, sigcheck }(DevMode, SigCheck)
-	DevMode, SigCheck = false, true
+	withSigMode(t, false, true)
 
 	// No signature, so the lookback falls back to its 30-day default.
 	for _, tc := range []struct {
@@ -53,8 +52,7 @@ func TestChartWindowClampsToTheTier(t *testing.T) {
 // handler has to end up on the 30-day fallback rather than on the ten years the
 // caller wrote for itself.
 func TestChartLookbackIgnoresAnUnsignedGrant(t *testing.T) {
-	defer func(dev, sigcheck bool) { DevMode, SigCheck = dev, sigcheck }(DevMode, SigCheck)
-	DevMode, SigCheck = false, true
+	withSigMode(t, false, true)
 
 	// Complete enough to get past every check but the HMAC: unexpired, and
 	// carrying a Signature field. Without those it would be turned away for
@@ -132,8 +130,7 @@ func TestChartInitialRangeFollowsTheViewersChoice(t *testing.T) {
 
 // Whatever the cookie says, it is still only a request: the tier decides.
 func TestChartInitialRangeIsStillClampedToTheTier(t *testing.T) {
-	defer func(dev, sigcheck bool) { DevMode, SigCheck = dev, sigcheck }(DevMode, SigCheck)
-	DevMode, SigCheck = false, true
+	withSigMode(t, false, true)
 
 	r := httptest.NewRequest("GET", "/search?chart=ban:1", nil)
 	r.AddCookie(&http.Cookie{Name: "SearchChartRange", Value: "3650"})

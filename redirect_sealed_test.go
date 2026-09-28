@@ -84,8 +84,7 @@ func TestSealedPathNamesLessAsksForMore(t *testing.T) {
 // redirect into the sealed tab, a product's path shows that product.
 func TestSealedPathLandsOnTheProduct(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

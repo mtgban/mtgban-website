@@ -31,9 +31,7 @@ func searchWithStock(t *testing.T, stocked string, target string, cookies ...*ht
 	// render() only reparses templates from disk while DevMode is set, which
 	// is the only template cache a test binary has; SigCheck off keeps every
 	// page open to an unsigned request.
-	prevDev, prevSig := DevMode, SigCheck
-	DevMode, SigCheck = true, false
-	t.Cleanup(func() { DevMode, SigCheck = prevDev, prevSig })
+	withSigMode(t, true, false)
 
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}

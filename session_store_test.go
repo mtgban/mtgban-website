@@ -299,8 +299,7 @@ func TestAdminDashboardOffersToRemoveSessionStores(t *testing.T) {
 // comes back to the page saying so.
 func TestAdminRemovesASessionStore(t *testing.T) {
 	keepScrapers(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 
 	_, err := Sessions.Publish(backend(), sessionstore.Retail, sessionInfo("ZZS"), []UploadEntry{{CardID: "uuid-a", OriginalPrice: 1}})
 	if err != nil {
@@ -371,8 +370,7 @@ func TestUploadResultsOfferToPublishWhenGranted(t *testing.T) {
 // other.
 func TestUploadPublishesAStoreWhenGranted(t *testing.T) {
 	keepScrapers(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -460,8 +458,7 @@ func testSig(params map[string]string) string {
 // path works without a prebuilt TemplateCache, which no test populates.
 func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 	keepScrapers(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, true
+	withSigMode(t, true, true)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
