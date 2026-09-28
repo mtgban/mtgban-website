@@ -757,6 +757,7 @@ func (s *site) runSealedAnalysis() {
 	runRawSetValue(b, infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
 	for label, record := range buylistMetrics(b, "CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
+		"newhigh": newHighReducer,
 		"highest": highestBuylistPrice,
 		"goodP90": goodBuylistPrice,
 	}) {
@@ -835,6 +836,17 @@ func hotlistReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 		return 0, false
 	}
 	return stats.Min, true
+}
+
+// newHighReducer flags cards whose current buylist price beats every price
+// stored before today, reporting that previous high. A tie is not a new high:
+// CK holds prices flat for weeks, and ties are 93% of what hotlistReducer
+// flags (docs/adr/0004-ck-buylist-signals.md).
+func newHighReducer(stats timeseries.AggregatePriceStats, current float64) (float64, bool) {
+	if stats.PriorMax == 0 || current <= stats.PriorMax {
+		return 0, false
+	}
+	return stats.PriorMax, true
 }
 
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
