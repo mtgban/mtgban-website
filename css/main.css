@@ -1284,6 +1284,28 @@ table.tiers td div {
     opacity: 1;
 }
 
+/* Every [title], shown as soon as the pointer is over it (js/tooltips.js) */
+#ban-tooltip {
+    position: fixed;
+    z-index: 10000;
+    max-width: min(320px, calc(100vw - 16px));
+    padding: 6px 10px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    color: var(--normaltext);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: left;
+    white-space: pre-line;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+}
+#ban-tooltip[hidden] {
+    display: none;
+}
+
 /* ═══ Tooltip (merged from tooltip.css) ═══ */
 .tooltip {
     position: relative;

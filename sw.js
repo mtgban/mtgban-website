@@ -29,6 +29,7 @@ var SHELL_URLS = [
     '/js/cookies.js?hash=' + BUILD,
     '/js/editions-picker.js?hash=' + BUILD,
     '/js/settings.js?hash=' + BUILD,
+    '/js/tooltips.js?hash=' + BUILD,
     '/css/search.css?hash=' + BUILD,
     '/css/offline.css?hash=' + BUILD,
     '/js/offline/offline-db.js?hash=' + BUILD,

@@ -167,3 +167,22 @@ test('the bar is handed the shared autocomplete', () => {
     expect(bound[0].box).toBe(nodes['nav-scopebox']);
     expect(bound[0].sealed).toBe('false');
 });
+
+// While the pointer is over the box, js/tooltips.js holds its title in
+// data-ban-title and puts it back on the way out, unless that copy is gone.
+test('typing an ignored scope away drops its warning and the tooltip copy', () => {
+    const removed = [];
+    const box = element({
+        value: 's:XYZ',
+        id: 'nav-scopebox',
+        title: 'This scope is ignored',
+        classList: { contains: name => name === 'is-ignored', toggle: () => {}, add: () => {}, remove: () => {} },
+        removeAttribute: name => removed.push(name),
+    });
+    loadBar('s:XYZ', { 'nav-scopebox': box });
+    expect(removed).toEqual([]);
+
+    box.value = 's:LEA';
+    box.handlers.input();
+    expect(removed).toEqual(['title', 'data-ban-title']);
+});

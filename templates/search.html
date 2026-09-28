@@ -494,7 +494,7 @@
                     filter.addEventListener('input', function() {
                         const q = this.value.trim().toLowerCase();
                         list.querySelectorAll('a.printing-symbol').forEach(function(a) {
-                            const title = (a.getAttribute('title') || '').toLowerCase();
+                            const title = (a.getAttribute('title') || a.getAttribute('data-ban-title') || '').toLowerCase();
                             const href = (a.getAttribute('href') || '').toLowerCase();
                             const matches = !q || title.indexOf(q) !== -1 || href.indexOf(q) !== -1;
                             a.style.display = matches ? '' : 'none';
@@ -1625,7 +1625,7 @@
                                                         {{else}}
                                                         <span class="price-right">
                                                         {{end}}
-                                                        <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
+                                                        <span class="price{{if $priceWarn}} price-warn{{end}}" {{if $priceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}}>
                                                             {{if or .PriceUnit .Price}}
                                                                 {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                             {{else if .BundleIcon}}
