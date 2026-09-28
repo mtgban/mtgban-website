@@ -23,6 +23,10 @@ func (s *Service) RequestRefresh() {
 // StartRefresher runs the background manifest refresher. All runtime refreshes
 // funnel through this single goroutine, so refreshManifest never overlaps
 // itself. Call once after startup loads are kicked off.
-func (s *Service) StartRefresher() {
-	go debounce.Loop(s.refreshSignal, refreshDebounce, s.refreshManifest)
+//
+// Each refresh runs through recovered, which the caller supplies to report
+// and recover a panic. It wraps every refresh rather than the loop, so one
+// that panics leaves the loop serving the next request.
+func (s *Service) StartRefresher(recovered func(job string, fn func()) func()) {
+	go debounce.Loop(s.refreshSignal, refreshDebounce, recovered("offline refreshManifest", s.refreshManifest))
 }

@@ -92,7 +92,8 @@ Boot sequence (`main()`):
    `ObservabilityDB` (usage telemetry, only if `Config.ObservabilityConfig`
    + an instance name are set). `Newspaper1dayDB`/`Newspaper3dayDB` (MySQL)
    no longer exist. Then `startAccessReloadListener()` (picks up ACL/grant
-   saves made by peer deployments sharing the price DB), `initTCGCSVService(s)`
+   saves made by peer deployments sharing the price DB, recovering a reload
+   that panics so it keeps listening), `initTCGCSVService(s)`
    (non-fatal if unconfigured), `reloadCheckpoints()`,
    `s.offline.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
@@ -116,8 +117,10 @@ Boot sequence (`main()`):
    stores to load (`-stores` when it names any, else
    `scraper_config.stores`), then `s.runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
-7. `s.offline.StartRefresher()` — one debounced goroutine that every
-   runtime manifest refresh funnels through.
+7. `s.offline.StartRefresher(recovered)` — one debounced goroutine that
+   every runtime manifest refresh funnels through, each run through
+   `recovered()` (recover.go), so a refresh that panics is reported and the
+   loop serves the next one.
 8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go). The
    library runs each on a bare goroutine, so each is registered through
    `recovered()` (recover.go): a panic is logged and posted to the server

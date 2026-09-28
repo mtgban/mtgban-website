@@ -273,3 +273,18 @@ func TestAdminSnapshotRecovers(t *testing.T) {
 		t.Error("the stash still counts as running after its panic")
 	}
 }
+
+// The access listener runs every reload on its goroutine, where a panic
+// would end the process and the listening with it.
+func TestAccessReloadRecovers(t *testing.T) {
+	posts := serverWebhook(t)
+
+	go runAccessReload(aclReloadChannel, "test", func(context.Context) error {
+		panic(errors.New("the table broke"))
+	})
+
+	_, _, source := panicReport(t, posts)
+	if source != "source job: access reload acl_reload" {
+		t.Errorf("source = %q, want the reload", source)
+	}
+}

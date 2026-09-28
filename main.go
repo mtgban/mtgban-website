@@ -1475,8 +1475,9 @@ func main() {
 		}()
 	}
 
-	// Runtime manifest refreshes funnel through one debounced goroutine.
-	s.offline.StartRefresher()
+	// Runtime manifest refreshes funnel through one debounced goroutine, each
+	// under recovered so that one that panics does not end the loop.
+	s.offline.StartRefresher(recovered)
 
 	if !DevMode {
 		// Set up new refreshes as needed. The library runs each job on a bare

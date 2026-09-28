@@ -6,7 +6,8 @@ import "time"
 
 // Loop runs `run` once per burst of signals: after the first signal it waits
 // for `wait` of quiet, resetting the window each time another signal
-// arrives, then runs.
+// arrives, then runs. A panic in run ends the loop, so a caller that must
+// outlive one hands in a run that recovers it.
 func Loop(signal <-chan struct{}, wait time.Duration, run func()) {
 	for range signal {
 		timer := time.NewTimer(wait)
