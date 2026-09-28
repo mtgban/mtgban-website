@@ -177,6 +177,9 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   Those two and a new API key (`generateAPIKey`) also hold `configMu`
   across their file I/O, so none lands inside another; the lookups never
   wait on it.
+  The admin page reads the secrets under `apiUsersMutex` too, to list
+  the API users and fill the config editor, so it never waits on the
+  bucket either.
 - Affiliate data sits behind `affiliatesMu`/`affiliatesPtr`.
 
 **Panics.** A panic in a handler behind one of the three signing wrappers

@@ -403,14 +403,13 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	if newConfig != "" && pageVars.WarningMessage != "" {
 		pageVars.CleanSearchQuery = newConfig
 	} else {
-		var configOut bytes.Buffer
-		err := writeConfigFile(Config, &configOut)
+		text, err := configEditorText()
 		if err != nil {
 			if pageVars.InfoMessage == "" {
 				pageVars.InfoMessage = err.Error()
 			}
 		} else {
-			pageVars.CleanSearchQuery = configOut.String()
+			pageVars.CleanSearchQuery = text
 		}
 	}
 
@@ -801,14 +800,8 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.Tables = append(pageVars.Tables, userTable)
 
 	// -- People: API Users --
-	var emails []string
-	for person := range Config.APIUserSecrets {
-		emails = append(emails, person)
-	}
-	sort.Strings(emails)
-
 	var apiTable [][]string
-	for i, email := range emails {
+	for i, email := range apiUsers() {
 		row := []string{
 			fmt.Sprintf("%d", i+1),
 			email,
@@ -1171,8 +1164,9 @@ func disk() string {
 
 const DefaultAPIDemoUser = "demo@mtgban.com"
 
-// apiUsersMutex guards Config.APIUserSecrets, which API requests read under
-// it: a write to the map, and a swap of Config whole, take it for writing.
+// apiUsersMutex guards Config.APIUserSecrets, which API requests and the
+// admin page read under it: a write to the map, and a swap of Config whole,
+// take it for writing.
 var apiUsersMutex sync.RWMutex
 
 func writeConfigFile(config ConfigType, writer io.Writer) error {
@@ -1181,6 +1175,29 @@ func writeConfigFile(config ConfigType, writer io.Writer) error {
 	e.SetEscapeHTML(false)
 	e.SetIndent("", "    ")
 	return e.Encode(&config)
+}
+
+// configEditorText is the live config as the admin editor shows it.
+func configEditorText() (string, error) {
+	apiUsersMutex.RLock()
+	defer apiUsersMutex.RUnlock()
+
+	var text bytes.Buffer
+	err := writeConfigFile(Config, &text)
+	return text.String(), err
+}
+
+// apiUsers lists the users that hold an API secret, sorted.
+func apiUsers() []string {
+	apiUsersMutex.RLock()
+	defer apiUsersMutex.RUnlock()
+
+	var emails []string
+	for email := range Config.APIUserSecrets {
+		emails = append(emails, email)
+	}
+	sort.Strings(emails)
+	return emails
 }
 
 // storeConfigFile writes config to the config file.

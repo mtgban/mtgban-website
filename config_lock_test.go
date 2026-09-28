@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -226,4 +228,100 @@ func TestNewKeyWhoseSaveFailsIsNotKept(t *testing.T) {
 	if found {
 		t.Error("the key that was not saved is live")
 	}
+}
+
+// Every admin page view lists the API users and encodes the whole config for
+// its editor, both from the secrets map a new key is written into.
+func TestAdminPageDoesNotRaceNewKeys(t *testing.T) {
+	path := withConfigFile(t)
+	writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)
+	err := loadVars("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Render the page from disk, as the other admin tests do.
+	withSigMode(t, true, false)
+
+	stop := make(chan struct{})
+	var admin sync.WaitGroup
+	defer admin.Wait()
+	defer close(stop)
+	admin.Go(func() {
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+				_, err := generateAPIKey(context.Background(), fmt.Sprintf("user%d@example.com", i), 0)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+			}
+		}
+	})
+	for range 5 {
+		rec := httptest.NewRecorder()
+		testSite.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin", nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("status %d", rec.Code)
+			break
+		}
+	}
+}
+
+// stuckReadBucket holds the config's reads until release closes, as a bucket
+// that stops answering does; entered closes on the first.
+type stuckReadBucket struct {
+	simplecloud.ReadWriter
+	once    sync.Once
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (b *stuckReadBucket) NewReader(ctx context.Context, path string) (io.ReadCloser, error) {
+	b.once.Do(func() { close(b.entered) })
+	<-b.release
+	return b.ReadWriter.NewReader(ctx, path)
+}
+
+// A reload holds configMu across its read of the config file, which nothing
+// times out. The admin page reads the config under apiUsersMutex alone, so
+// it still renders while that read hangs.
+func TestAdminPageRendersWhileAConfigReadHangs(t *testing.T) {
+	path := withConfigFile(t)
+	writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)
+	err := loadVars("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	withSigMode(t, true, false)
+
+	stuck := &stuckReadBucket{ReadWriter: ConfigBucket, entered: make(chan struct{}), release: make(chan struct{})}
+	ConfigBucket = stuck
+	reloaded := make(chan error, 1)
+	go func() { reloaded <- reloadConfig() }()
+	<-stuck.entered
+
+	var render sync.WaitGroup
+	rendered := make(chan int, 1)
+	render.Go(func() {
+		rec := httptest.NewRecorder()
+		testSite.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin", nil))
+		rendered <- rec.Code
+	})
+	select {
+	case code := <-rendered:
+		if code != http.StatusOK {
+			t.Errorf("status %d", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("the admin page still waits on the config read after 5s")
+	}
+	close(stuck.release)
+	err = <-reloaded
+	if err != nil {
+		t.Error(err)
+	}
+	render.Wait()
 }
