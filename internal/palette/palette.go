@@ -32,7 +32,7 @@ type ArbitFilter struct {
 // Service exposes the palette endpoints, wired to the host's live datastore
 // and scraper lists via callbacks so it always reflects current state.
 type Service struct {
-	// Backend returns the current card datastore.
+	// Backend returns the current card datastore, never nil.
 	Backend func() *mtgmatcher.Backend
 	// Sellers and Vendors return the live scraper lists for the stores
 	// endpoint.
@@ -55,15 +55,6 @@ type Service struct {
 	// Snapshot returns the sets, promos and finishes lists built alongside
 	// the datastore currently served, nil before the first load.
 	Snapshot func() *Snapshot
-}
-
-func (s *Service) backend() *mtgmatcher.Backend {
-	if s.Backend != nil {
-		if backend := s.Backend(); backend != nil {
-			return backend
-		}
-	}
-	return &mtgmatcher.Backend{}
 }
 
 // Set is one edition as the frontend palette lists it.
@@ -218,9 +209,6 @@ func serveCached(w http.ResponseWriter, data []byte) {
 // snapshot returns the lists built alongside the datastore currently
 // served, or an empty Snapshot before the first load.
 func (s *Service) snapshot() *Snapshot {
-	if s.Snapshot == nil {
-		return &Snapshot{}
-	}
 	snap := s.Snapshot()
 	if snap == nil {
 		return &Snapshot{}
@@ -327,7 +315,7 @@ type CardMetaResponse struct {
 // CardMeta returns metadata (printings, rarities, colors, types) for a card
 // name, used by the chip-based filter builder.
 func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
-	b := s.backend()
+	b := s.Backend()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 
@@ -597,7 +585,7 @@ type SealedMetaResponse struct {
 // Sealed reports availability of contents-mode and pack-pull-mode searches
 // for a sealed product, used by the palette to gate action rows.
 func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
-	b := s.backend()
+	b := s.Backend()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 

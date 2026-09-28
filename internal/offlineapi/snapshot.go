@@ -73,7 +73,7 @@ func (s *Service) refreshManifest() {
 
 	// One read for the whole refresh: the catalog's cards and the
 	// fingerprints' set-code lookups both resolve against the same backend.
-	b, source := s.datastore()
+	b, source := s.deps.Datastore()
 
 	// Neither of these is made of prices: the catalog is cards and sets out
 	// of the datastore, with only its store list coming from the scrapers,

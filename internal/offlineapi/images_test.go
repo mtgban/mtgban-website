@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -15,6 +17,10 @@ func newTestService(t *testing.T) (*Service, string) {
 	t.Helper()
 	dir := filepath.ToSlash(t.TempDir())
 	s := NewService(Deps{
+		// The empty datastore a site serves before its first load.
+		Datastore: func() (*mtgmatcher.Backend, time.Time) {
+			return &mtgmatcher.Backend{}, time.Time{}
+		},
 		ImagesBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 			return &simplecloud.FileBucket{}, dir, nil
 		},

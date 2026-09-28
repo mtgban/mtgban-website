@@ -32,7 +32,7 @@ func (s *Service) enabledStores(r *http.Request) []string {
 // backend once, so the set code it resolves and the prices it builds from
 // come from the same load.
 func (s *Service) servePrices(w http.ResponseWriter, r *http.Request, email, rest string) {
-	b, _ := s.datastore()
+	b, _ := s.deps.Datastore()
 	setCode := strings.TrimSuffix(rest, ".bin")
 	canonCode, err := s.deps.CanonicalSetCode(b, setCode)
 	if err != nil {
