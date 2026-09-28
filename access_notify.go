@@ -126,6 +126,10 @@ func startAccessReloadListener() {
 }
 
 func runAccessReload(channel, source string, reload func(context.Context) error) {
+	// This runs on the listener's goroutine, which has to outlive a reload
+	// that panics to serve the next notification.
+	defer recoverJob("access reload " + channel)
+
 	err := reload(context.Background())
 	if err != nil {
 		log.Printf("access reload: %s (%s): %v", channel, source, err)
