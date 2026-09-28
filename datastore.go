@@ -24,27 +24,14 @@ type datastore struct {
 	loadedAt time.Time
 }
 
-// newDatastore builds every derived snapshot from b; an empty backend gives
-// empty snapshots.
-func newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastore {
-	return &datastore{
-		backend:  b,
-		numbers:  newNumbersSnapshot(b),
-		names:    newNamesSnapshot(b.Names("canonical", false), b.Names("canonical", true)),
-		editions: newEditionsSnapshot(b),
-		palette:  paletteService.NewSnapshot(b),
-		loadedAt: loadedAt,
-	}
-}
-
 // liveDatastore holds the one datastore the site currently serves. Only
 // loadDatastore stores into it; everything else reads it through
 // currentDatastore.
 var liveDatastore atomic.Pointer[datastore]
 
 // emptyDatastore is served before the first load: nil numbers, names and
-// palette make those answers scan, 204 and no-store. newDatastore would
-// fill them, but cycles back here through paletteService's Backend hook.
+// palette make those answers scan, 204 and no-store. site.newDatastore would
+// fill them, but no site exists this early to build them with.
 var emptyDatastore = &datastore{
 	backend:  &mtgmatcher.Backend{},
 	editions: &editionsSnapshot{},

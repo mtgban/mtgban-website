@@ -48,7 +48,7 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 	if err != nil {
 		t.Skip("loading the datastore:", err)
 	}
-	useDatastore(t, newDatastore(b, time.Now()))
+	useDatastore(t, testSite.newDatastore(b, time.Now()))
 
 	var split int
 	for _, uuid := range backend().GetUUIDs() {

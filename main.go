@@ -1379,57 +1379,6 @@ func loadGoogleCredentials() (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-// Bucket serving the datastore and any other file living alongside it,
-// created once at startup
-func loadDatastore(ds string) error {
-	log.Println("Loading datastore from", ds)
-
-	reader, err := openBucketPath(context.Background(), ds)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	// LoadDatastore would read the file whole and try every registered loader.
-	backend, err := mtgmatcher.Open(datastoreGame(), reader)
-	if err != nil {
-		return err
-	}
-	// Build every derived snapshot - including the palette lists - before
-	// publishing: one read of the datastore gives the backend and the
-	// snapshots of the same load.
-	liveDatastore.Store(newDatastore(backend, time.Now()))
-
-	ServerNotify("init", "Datastore installed")
-	go cacheNewspaper()
-
-	return nil
-}
-
-// datastoreReloads owns the one datastore reload that may be under way.
-var datastoreReloads dsreload.Tracker
-
-// StartDatastoreReload loads the datastore in the background, reporting
-// whether this call is the one that started it. See dsreload.Tracker.Start.
-//
-// The path is all it takes: openBucketPath reads the backend off the scheme,
-// so a datastore and a backup living in different places are the same call.
-func StartDatastoreReload(path, source string) bool {
-	return datastoreReloads.Start(source, path, func() error {
-		err := loadDatastore(path)
-		if err != nil {
-			return err
-		}
-		// What the endpoint used to do once the load returned. The offline
-		// manifest is derived from the datastore, so a reload that leaves it
-		// alone leaves it describing the previous one; the admin action never
-		// asked for the refresh at all, and now does.
-		ServerNotify("reload", "Datastore reloaded from "+path)
-		offlineService.RequestRefresh()
-		return nil
-	})
-}
-
 // datastoreGame names the game whose loader reads this site's datastore. An
 // unset game is the default one, the same reading the rest of the site gives
 // it.
@@ -1589,7 +1538,7 @@ func main() {
 
 	// load website up
 	go func() {
-		err := loadDatastore(Config.DatastorePath)
+		err := s.loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
