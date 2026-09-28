@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/observability"
@@ -334,11 +335,13 @@ var funcMap = template.FuncMap{
 		}
 		return true
 	},
-	"palette_newspaper_targets": func() template.JS { return palette.NewspaperTargetsJSON(paletteNewspaperPages()) },
-	"palette_sleepers_targets":  palette.SleepersTargetsJSON,
-	"palette_arbit_targets":     func() template.JS { return palette.ArbitTargetsJSON("arbit", paletteArbitFilters()) },
-	"palette_reverse_targets":   func() template.JS { return palette.ArbitTargetsJSON("reverse", paletteArbitFilters()) },
-	"palette_global_targets":    func() template.JS { return palette.ArbitTargetsJSON("global", paletteArbitFilters()) },
+	// Every desktop page embeds these, and their lists never change: build
+	// each one once.
+	"palette_newspaper_targets": sync.OnceValue(func() template.JS { return palette.NewspaperTargetsJSON(paletteNewspaperPages()) }),
+	"palette_sleepers_targets":  sync.OnceValue(palette.SleepersTargetsJSON),
+	"palette_arbit_targets":     sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("arbit", paletteArbitFilters()) }),
+	"palette_reverse_targets":   sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("reverse", paletteArbitFilters()) }),
+	"palette_global_targets":    sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("global", paletteArbitFilters()) }),
 	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
 	"api_plans_json":            apiPlansJSON,
