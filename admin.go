@@ -286,7 +286,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if IsStashingInProgress() {
 			v.Set("msg", "Stashing is already in progress")
 		} else {
-			go stashInTimeseries()
+			go s.stashInTimeseries()
 		}
 
 	case "tcgcsv":

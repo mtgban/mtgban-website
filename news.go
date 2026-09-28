@@ -493,12 +493,12 @@ func newspaperFilterValues(results []NewspaperResult) (editions, variants []stri
 	return editions, variants
 }
 
-func cacheNewspaper() {
+func (s *site) cacheNewspaper() {
 	if SkipNewspaper {
 		return
 	}
 
-	b := backend()
+	b := s.backend()
 	log.Println("Caching Newspaper data")
 
 	newspaperUUIDs := map[string]struct{}{}

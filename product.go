@@ -729,8 +729,8 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 	return tcgcatalog.Load(reader)
 }
 
-func runSealedAnalysis() {
-	b := backend()
+func (s *site) runSealedAnalysis() {
+	b := s.backend()
 	log.Println("Running set analysis")
 
 	tcgInventory, _ := findSellerInventory("TCGLow")

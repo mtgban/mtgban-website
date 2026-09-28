@@ -667,7 +667,7 @@ func IsStashingInProgress() bool {
 	return stashingInProgress.Load()
 }
 
-func stashInTimeseries() {
+func (s *site) stashInTimeseries() {
 	// Only one stash may run at a time. The cron fires every 12h and the
 	// admin button can fire at any moment; CompareAndSwap is the real gate.
 	if !stashingInProgress.CompareAndSwap(false, true) {
@@ -681,7 +681,7 @@ func stashInTimeseries() {
 		return
 	}
 
-	b := backend()
+	b := s.backend()
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
 

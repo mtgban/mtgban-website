@@ -77,9 +77,9 @@ Boot sequence (`main()`):
    `DefaultSecret` when unset in any mode (outside dev a defaulted secret
    only logs a warning). `loadCommonConfig()` loads the ACL/grants table and
    affiliates. `loadRarityBadges()` (no-op for the default game).
-2. `s := newSite()` (site.go) — the site the routes are bound to; pure, no
-   I/O.
-3. If any `-tcgcsv-*` job flag is set: `openDBs()`, `initTCGCSVService()`,
+2. `s := newSite()` (site.go) — the site the routes and jobs are bound to;
+   pure, no I/O.
+3. If any `-tcgcsv-*` job flag is set: `openDBs()`, `initTCGCSVService(s)`,
    run the requested job, `os.Exit(0)` — the datastore and price data are
    never loaded and `ListenAndServe` never runs.
 4. Otherwise: `loadKeyOverrides()`, create `LogDir`, load Google credentials,
@@ -90,7 +90,7 @@ Boot sequence (`main()`):
    `ObservabilityDB` (usage telemetry, only if `Config.ObservabilityConfig`
    + an instance name are set). `Newspaper1dayDB`/`Newspaper3dayDB` (MySQL)
    no longer exist. Then `startAccessReloadListener()` (picks up ACL/grant
-   saves made by peer deployments sharing the price DB), `initTCGCSVService()`
+   saves made by peer deployments sharing the price DB), `initTCGCSVService(s)`
    (non-fatal if unconfigured), `reloadCheckpoints()`,
    `offlineService.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
@@ -99,26 +99,27 @@ Boot sequence (`main()`):
    the old `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`), publishes backend and snapshots together in one
-   `liveDatastore.Store()`, then itself spawns `cacheNewspaper()` as a
+   `liveDatastore.Store()`, then itself spawns `s.cacheNewspaper()` as a
    further goroutine.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
-   `loadScrapersNG()` on it, then `runSealedAnalysis()`,
+   `loadScrapersNG()` on it, then `s.runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `offlineService.RefreshManifest()`.
 7. `offlineService.StartRefresher()` — one debounced goroutine that every
    runtime manifest refresh funnels through.
 8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go):
-   - `0 */12 * * *` — `stashInTimeseries()` (snapshot prices to Postgres)
-   - `30 */12 * * *` — `runSealedAnalysis()`
-   - `33 */3 * * *` — `cacheNewspaper()`
+   - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
+   - `30 */12 * * *` — `s.runSealedAnalysis()`
+   - `33 */3 * * *` — `s.cacheNewspaper()`
    - `20 */12 * * *` — `offlineService.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
-   - `15 */6 * * *` — `refreshCheckpoints()`
+   - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
+     a plain function rather than a site method)
    - `0 * * * *` - `checkStaleness()` (staleness.go): the Discord alarm below
    - when tcgcsv ingestion is configured: `0 21 * * *` —
      `stashTCGCSVPrices()`; `0 22 * * 1` — `stashTCGCSVProducts()`
    - the old per-scraper `force_reload_at` cron expressions no longer exist
-9. `setupDiscord()`, then handlers are registered and `http.Server`
+9. `s.setupDiscord()`, then handlers are registered and `http.Server`
    `ListenAndServe`s on `Config.Port` (default `:8080`, no TLS — assumes
    reverse proxy); graceful shutdown on SIGINT/SIGTERM with a 5 s timeout,
    Discord notify, and `ObservabilityRecorder.Close()`. `/healthz` returns
@@ -145,11 +146,11 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   built by `s.newDatastore()` (site.go) and published in a single
   `liveDatastore.Store()` by `s.loadDatastore()`, itself started by
   `s.startDatastoreReload()` (an admin or `/api/load/datastore` reload) or
-  once at startup. Page handlers are methods on `*site` (site.go) and
-  read it through `s.datastore()` (never nil, even before the first load) or
-  `s.backend()` for the backend alone, which read the package-level
-  `currentDatastore()`/`backend()` (datastore.go); entry points read either
-  once and pass `b`/`ds` down to what they call.
+  once at startup. Page handlers, crons and Discord callbacks are methods
+  on `*site` (site.go) and read it through `s.datastore()` (never nil, even
+  before the first load) or `s.backend()` for the backend alone, which read
+  the package-level `currentDatastore()`/`backend()` (datastore.go); entry
+  points read either once and pass `b`/`ds` down to what they call.
 - `Config` is loaded once and swapped whole on admin reload (`admin.go`);
   per-user API secrets read behind `apiUsersMutex`; affiliate data behind
   `affiliatesMu`/`affiliatesPtr`.
