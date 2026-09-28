@@ -452,8 +452,14 @@ func getSealedEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEnt
 		sortedEditions = append(sortedEditions, key)
 	}
 
+	// Newest first; a tie on date goes by name, not map order
 	sort.Slice(sortedEditions, func(i, j int) bool {
-		return listEditions[sortedEditions[i]][0].Date.After(listEditions[sortedEditions[j]][0].Date)
+		di := listEditions[sortedEditions[i]][0].Date
+		dj := listEditions[sortedEditions[j]][0].Date
+		if di.Equal(dj) {
+			return sortedEditions[i] < sortedEditions[j]
+		}
+		return di.After(dj)
 	})
 
 	return sortedEditions, listEditions
@@ -496,9 +502,14 @@ func getAllEditionsByCategory(b *mtgmatcher.Backend) ([]string, map[string][]Edi
 		sortedCategories = append(sortedCategories, key)
 	}
 
+	// Newest first; a tie on date goes by name, not map order
 	sort.Slice(sortedCategories, func(i, j int) bool {
-		return listEditions[sortedCategories[i]][0].Date.After(
-			listEditions[sortedCategories[j]][0].Date)
+		di := listEditions[sortedCategories[i]][0].Date
+		dj := listEditions[sortedCategories[j]][0].Date
+		if di.Equal(dj) {
+			return sortedCategories[i] < sortedCategories[j]
+		}
+		return di.After(dj)
 	})
 
 	return sortedCategories, listEditions
