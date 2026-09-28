@@ -75,6 +75,14 @@ type PageVars struct {
 	UserTier string
 	Hash     string
 
+	// The game the deployment serves: Game is its slug, for what styles or
+	// addresses it, GameTitle what prose calls it, and GameBadge the short
+	// name the brand wears under the wordmark, empty on Magic, whose logo
+	// already reads MTGBAN.
+	Game      string
+	GameTitle string
+	GameBadge string
+
 	IsMobile bool
 
 	// GatewayURL is the API gateway's origin, for links to its account and admin pages.
@@ -930,6 +938,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	if origin != "" {
 		patreonURL = origin + "/auth"
 	}
+	game := Config.Game
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
@@ -943,11 +952,15 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		// Read off the signature that is already parsed above, so the navbar
 		// can wear the tier without asking anybody
 		UserTier: strings.ToLower(sigParams.Get("UserTier")),
+
+		Game:      game,
+		GameTitle: gameMap[game],
 	}
 
-	if Config.Game != DefaultGame {
-		// Append which game this site is for
-		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
+	if game != DefaultGame {
+		// Append which game this site is for, and name it under the wordmark
+		pageVars.Title += " - " + mtgmatcher.Title(game)
+		pageVars.GameBadge = gameBadgeMap[game]
 
 		// Charts for a non-Magic game are served only by the long-form read
 		// path; the legacy wide table is mtgjson-uuid keyed and has no rows for

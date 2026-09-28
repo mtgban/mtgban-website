@@ -736,7 +736,7 @@
                     {{$firstName := ""}}
 
                     {{if and .PatreonLogin .AllKeys (not .ChartID)}}
-                        <p class="search-results-blurb">Compare prices and availability for {{game_title}} singles and sealed products across markets below. On the left sidebar you can refine your search or expand it looking for products containing your search results. You may tweak sorting as needed.</p>
+                        <p class="search-results-blurb">Compare prices and availability for {{.GameTitle}} singles and sealed products across markets below. On the left sidebar you can refine your search or expand it looking for products containing your search results. You may tweak sorting as needed.</p>
                     {{end}}
 
                     {{if and .ChartID .Datasets}}
@@ -1746,7 +1746,7 @@
                 </div>{{/* Close .search-results */}}
 
                     {{if eq $firstImg ""}}
-                        {{$firstImg = card_back}}
+                        {{$firstImg = printf "/img/backs/%s.webp" $.Game}}
                     {{end}}
                 <script type="text/javascript">
                     updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}}, {{$firstProductCount}}, {{$firstDate}}, {{$firstName}});

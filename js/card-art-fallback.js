@@ -28,9 +28,9 @@ var CARD_ART_SELECTOR = '#cardImage, #cardImageModalImg, #m-drawer-img, .hoverIm
 var CARD_ART_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 window.cardArtPlaceholder = CARD_ART_PLACEHOLDER;
 
-// data-game is server-rendered - see the "game" template function, which
-// hands back Config.Game verbatim - never user input. Validated against the
-// slug shape before it becomes a URL so malformed DOM values cannot turn the
+// data-game is server-rendered from PageVars.Game, which genPageNav copies
+// from Config.Game verbatim - never user input. Validated against the slug
+// shape before it becomes a URL so malformed DOM values cannot turn the
 // fallback into a different navigation.
 var GAME_SLUG_RE = /^[a-z0-9]+$/;
 function cardBackForGame() {
@@ -104,9 +104,9 @@ document.addEventListener('error', function (e) {
     }
     img.dataset.cardArtFallback = '1';
     // data-game is already on <body> for every deployment (base.html and
-    // base-mobile.html both set it); mirrors what the card_back template
-    // function computes server-side, so a page needs neither to call it nor
-    // to thread the value through to script-generated images.
+    // base-mobile.html both set it); mirrors the /img/backs/<game>.webp path
+    // the templates build server-side, so a page needs neither to build it
+    // nor to thread the value through to script-generated images.
     var back = cardBackForGame();
     if (!back) {
         return;

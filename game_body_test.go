@@ -23,14 +23,23 @@ func renderPage(t *testing.T, name string, mobile bool, pv PageVars) string {
 	return b.String()
 }
 
+// gamePage is the page data genPageNav builds for a deployment of game. The
+// config is back to what it was before anything renders, so a page naming
+// the game can only have read it from its data.
+func gamePage(game string, mobile bool) PageVars {
+	prev := Config.Game
+	defer func() { Config.Game = prev }()
+	Config.Game = game
+	pv := genPageNav(testSite, nil, "Search", "")
+	pv.IsMobile = mobile
+	return pv
+}
+
 // The card-corner rules key on the set a card belongs to, which cannot say
 // "every card in this game". Yu-Gi-Oh needs that, so the body carries the game
 // for CSS to select on - and it has to be on every base template, since a page
 // rendered through one that lacks it would round its cards.
 func TestBodyCarriesTheGame(t *testing.T) {
-	prev := Config.Game
-	t.Cleanup(func() { Config.Game = prev })
-
 	for _, page := range []struct {
 		name   string
 		mobile bool
@@ -40,8 +49,7 @@ func TestBodyCarriesTheGame(t *testing.T) {
 		{"search.html", true},  // base-mobile.html
 	} {
 		for _, game := range []string{"yugioh", DefaultGame} {
-			Config.Game = game
-			rendered := renderPage(t, page.name, page.mobile, PageVars{BetaNav: &NavElem{Short: "b"}, IsMobile: page.mobile})
+			rendered := renderPage(t, page.name, page.mobile, gamePage(game, page.mobile))
 
 			body := rendered[strings.Index(rendered, "<body"):]
 			body = body[:strings.Index(body, ">")+1]

@@ -24,8 +24,8 @@ The pieces, and where each lives:
   configured as. For a game missing from `gameMap`, the newspaper stays
   empty and every refresh logs an error, so this has to exist before the
   game is stood up, not after.
-- `img/backs/<game>.webp` — the card back, served at `/img/backs/<game>.webp`
-  by the `card_back` template func.
+- `img/backs/<game>.webp` — the card back, which the templates address as
+  `/img/backs/{{$.Game}}.webp`, from the game `genPageNav` puts in the page.
 - `registeredGames` (`games_coverage_test.go`) — kept in step with
   go-mtgban's `mtgmatcher/games/games.go` by hand; nothing generates it.
 

@@ -96,7 +96,7 @@
                 </tr></thead>
                 <tbody>
                 {{range $row := index .Tables 0}}
-                    <tr data-tag="{{bantool_run_name (index $row 2)}}">
+                    <tr data-tag="{{bantool_run_name $.Game (index $row 2)}}">
                         {{template "admin-scraper-cells" $row}}
                         <td class="admin-mono{{if index $row 8}} admin-stale-date{{end}}"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
@@ -125,7 +125,7 @@
                 </tr></thead>
                 <tbody>
                 {{range $row := index .Tables 1}}
-                    <tr data-tag="{{bantool_run_name (index $row 2)}}">
+                    <tr data-tag="{{bantool_run_name $.Game (index $row 2)}}">
                         {{template "admin-scraper-cells" $row}}
                         <td class="admin-mono{{if index $row 8}} admin-stale-date{{end}}"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>

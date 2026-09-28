@@ -184,28 +184,11 @@ var funcMap = template.FuncMap{
 	"load_partner": func(s string) string {
 		return Affiliates().Codes[s]
 	},
-	"game_title": func() string {
-		return gameMap[Config.Game]
-	},
-	// game_badge names the game a deployment serves for the brand lockup,
-	// where the wordmark alone says nothing about which site this is. Empty
-	// on Magic, whose logo already reads MTGBAN.
-	"game_badge": func() string {
-		if Config.Game == DefaultGame {
-			return ""
-		}
-		return gameBadgeMap[Config.Game]
-	},
-	// game is the slug the deployment serves, for the places that style or
-	// address a game rather than name it.
-	"game": func() string {
-		return Config.Game
-	},
 	// bantool_run_name is the GitHub Actions run name a store's bantool
 	// workflow gets, which the admin dashboard's running-workflow poll
 	// matches a row against (see newBantoolWorkflow).
-	"bantool_run_name": func(store string) string {
-		return newBantoolWorkflow(Config.Game, store).RunName
+	"bantool_run_name": func(game, store string) string {
+		return newBantoolWorkflow(game, store).RunName
 	},
 	// stale_count counts the rows of an admin scraper table whose stale
 	// badge, column 8, is set.
@@ -233,9 +216,6 @@ var funcMap = template.FuncMap{
 		}
 		slices.Sort(stores)
 		return slices.Compact(stores)
-	},
-	"card_back": func() string {
-		return "/img/backs/" + Config.Game + ".webp"
 	},
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")

@@ -1118,7 +1118,7 @@
         <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}">
             <td>
                 <div class="ures-card-cell">
-                    <img src="{{card_back}}" loading="lazy">
+                    <img src="/img/backs/{{$.Game}}.webp" loading="lazy">
                     <div class="ures-card-info">
                         <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
                         <span class="ures-card-set ures-not-found">Not found</span>
@@ -1267,7 +1267,7 @@
                 <div class="ures-block ures-block-notfound">
                     <h3 class="ures-block-title">Not Found</h3>
                     <div class="ures-wrap">
-                        {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries)}}
+                        {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries "Game" .Game)}}
                     </div>
                 </div>
                 {{end}}
@@ -1290,7 +1290,7 @@
                 </div>
             </div>
             <div class="ures-wrap">
-                {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries)}}
+                {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries "Game" .Game)}}
             </div>
         {{end}}
     </div>
