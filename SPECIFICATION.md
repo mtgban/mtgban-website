@@ -556,6 +556,12 @@ buylist row priced above ~111% of some listed retail price; `$$card`
 last-sold lookups (5 s fetch timeout, 30 s message-edit timeout);
 `[[card]]`/`{{card}}` syntax, recognized only in three hardcoded channels
 (dev/recap/chat); and Gatherer-link interception by multiverse id.
+`discordgo` runs every handler on a bare goroutine, so `guildCreate` and
+`messageCreate` each defer `recoverJob()` (recover.go), as does the
+goroutine a `$$` lookup fetches on: a panic on one of them is logged and
+posted to the server webhook, and costs that one event (a `$$` reply falls
+back to the timeout) rather than the process. The goroutines the search of
+a `!card`/`?card` lookup fans out to (`searchParallelNG`) do not recover.
 Automatic affiliate-link rewriting (`checkForLinks`: Card Kingdom, Cool
 Stuff Inc, TCGplayer, Star City Games, Manapool, CardTrader, Amazon) is
 gated to the configured Discord server *and* the default game, so a non-Magic
