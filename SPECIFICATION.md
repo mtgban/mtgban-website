@@ -107,7 +107,8 @@ Boot sequence (`main()`):
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
    together in one `s.ds.Store()`, then itself spawns
-   `s.cacheNewspaper()` as a further goroutine.
+   `s.cacheNewspaper()` as a further goroutine, which the tracker's recover
+   does not reach: it defers `recoverJob()` (recover.go) of its own.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
    `simplecloud.FileBucket{Root: dir}` in its place; either is kept as

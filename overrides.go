@@ -191,7 +191,10 @@ func reloadOverriddenScrapers(shorthands map[string]struct{}) {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
 				if _, ok := shorthands[shorthand]; ok {
-					go loadScraperWithRetry(DataBucket, Config.Game, name, kind, shorthand)
+					go func(bucket simplecloud.Reader, game, name, kind, shorthand string) {
+						defer recoverJob("override reload " + name + "/" + kind + "/" + shorthand)
+						_ = loadScraperWithRetry(bucket, game, name, kind, shorthand)
+					}(DataBucket, Config.Game, name, kind, shorthand)
 				}
 			}
 		}

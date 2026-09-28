@@ -213,7 +213,12 @@ func (s *site) loadDatastore(path string) error {
 	s.ds.Store(s.newDatastore(backend, time.Now()))
 
 	ServerNotify("init", "Datastore installed")
-	go s.cacheNewspaper()
+
+	// The reload tracker recovers this load, not a goroutine it starts.
+	go func() {
+		defer recoverJob("datastore load cacheNewspaper")
+		s.cacheNewspaper()
+	}()
 
 	return nil
 }
