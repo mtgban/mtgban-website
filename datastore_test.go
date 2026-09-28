@@ -105,7 +105,7 @@ func assertDatastoreDescribesLoad(t *testing.T, s *site, setCode, number, namePr
 	// Every edition view a load can appear in - getAllEditions,
 	// getTreeEditions, getAllEditionsByCategory and getSealedEditions
 	// each build their own, and newEditionsSnapshot itself reads
-	// GetSet/GetUUIDs directly - so a builder that reads the wrong backend
+	// GetUUIDs directly - so a builder that reads the wrong backend
 	// has nowhere to hide.
 	editions := ds.editions
 	var codes []string
@@ -119,8 +119,7 @@ func assertDatastoreDescribesLoad(t *testing.T, s *site, setCode, number, namePr
 			codes = append(codes, entry.Code)
 		}
 	}
-	codes = append(codes, editions.AllEditionsKeysNoFoilOrPromos...)
-	if !slices.Equal(codes, slices.Repeat([]string{setCode}, 5)) || editions.TotalUnique != len(ds.backend.GetUUIDs()) {
+	if !slices.Equal(codes, slices.Repeat([]string{setCode}, 4)) || editions.TotalUnique != len(ds.backend.GetUUIDs()) {
 		t.Errorf("editions: views name %v over %d printings, want only %q", codes, editions.TotalUnique, setCode)
 	}
 
