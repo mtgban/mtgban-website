@@ -451,8 +451,8 @@ func adminOnly(next http.Handler) http.Handler {
 	})
 }
 
-// This function is mostly here only for initializing the host
-// and the signature from invite links
+// noSigning runs the handler it wraps without checking a signature; it only
+// keeps the one an invite link carries in ?sig= as the cookie.
 func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
