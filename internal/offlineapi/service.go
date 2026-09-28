@@ -21,9 +21,9 @@ import (
 
 // Deps holds all main-package knowledge the service needs.
 type Deps struct {
-	// Datastore returns the current card datastore and when it was loaded,
-	// together: a catalog refresh reads this once so the cards it marshals
-	// and the source time it keys them on describe the same load.
+	// Datastore returns the current card datastore, never nil, and when it
+	// was loaded, together: a catalog refresh reads this once so the cards
+	// it marshals and the source time it keys them on describe the same load.
 	Datastore func() (*mtgmatcher.Backend, time.Time)
 	// Allow authenticates a request and returns the caller's email.
 	Allow func(r *http.Request) (email string, ok bool)
@@ -78,20 +78,6 @@ type Deps struct {
 
 	RetailBlockList  func() []string
 	BuylistBlockList func() []string
-}
-
-// datastore reads the live backend and its load time together. A nil hook
-// or nil backend reads as an empty datastore, which never equals a later
-// real load, so it just rebuilds every time.
-func (s *Service) datastore() (*mtgmatcher.Backend, time.Time) {
-	if s.deps.Datastore == nil {
-		return &mtgmatcher.Backend{}, time.Time{}
-	}
-	b, t := s.deps.Datastore()
-	if b == nil {
-		return &mtgmatcher.Backend{}, time.Time{}
-	}
-	return b, t
 }
 
 // Service exposes the offline API endpoints and background refresh logic.

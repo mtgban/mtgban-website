@@ -22,13 +22,10 @@ var sealedTypeKeywords = []string{
 	"tournament", "spellbook",
 }
 
-// Closest returns the canonical card (or sealed product) name closest to
-// query, used to power "did you mean..." suggestions.
-func Closest(query string, sealed bool, backend *mtgmatcher.Backend) string {
-	if backend == nil {
-		backend = &mtgmatcher.Backend{}
-	}
-	return fuzzy.Closest(query, backend.Names("canonical", sealed))
+// Closest returns the canonical card (or sealed product) name in b closest
+// to query, used to power "did you mean..." suggestions.
+func Closest(b *mtgmatcher.Backend, query string, sealed bool) string {
+	return fuzzy.Closest(query, b.Names("canonical", sealed))
 }
 
 // AltSearch is a suggested query offered when a search yields no results,
@@ -99,10 +96,7 @@ func relaxedSearches(rawQuery, cleanQuery string, appliedFilters []string) []Alt
 // (mapped to t: filters) and a set-name fragment (containment-matched
 // against sets that actually carry sealed product), then rebuild a query
 // the sealed engine understands. Returns nil when no set can be identified.
-func sealedQuerySuggestion(rawQuery string, backend *mtgmatcher.Backend) *AltSearch {
-	if backend == nil {
-		backend = &mtgmatcher.Backend{}
-	}
+func sealedQuerySuggestion(b *mtgmatcher.Backend, rawQuery string) *AltSearch {
 	fields := strings.Fields(strings.ToLower(rawQuery))
 	if len(fields) == 0 {
 		return nil
@@ -126,8 +120,8 @@ func sealedQuerySuggestion(rawQuery string, backend *mtgmatcher.Backend) *AltSea
 	// shortest matching name, which tends to be the most direct match and
 	// avoids longer sets that merely happen to include the same words.
 	var bestName, bestCode string
-	for _, code := range backend.GetAllSets() {
-		set, err := backend.GetSet(code)
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
 		if err != nil || len(set.SealedProduct) == 0 {
 			continue
 		}
@@ -171,7 +165,7 @@ func Build(p Params) (string, []AltSearch) {
 
 	var didYouMean string
 	if p.CleanQuery != "" {
-		didYouMean = Closest(p.CleanQuery, p.Sealed, p.Backend)
+		didYouMean = Closest(p.Backend, p.CleanQuery, p.Sealed)
 	}
 
 	alts := relaxedSearches(p.RawQuery, p.CleanQuery, p.AppliedFilters)
@@ -179,7 +173,8 @@ func Build(p Params) (string, []AltSearch) {
 	// For a free-text sealed search (no filters typed) that found nothing,
 	// offer a decomposed set + product-type query as the first suggestion.
 	if p.Sealed && len(p.AppliedFilters) == 0 {
-		if s := sealedQuerySuggestion(p.RawQuery, p.Backend); s != nil {
+		s := sealedQuerySuggestion(p.Backend, p.RawQuery)
+		if s != nil {
 			alts = append([]AltSearch{*s}, alts...)
 		}
 	}

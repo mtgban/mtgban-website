@@ -42,7 +42,7 @@ func TestCatalogIsNotBuiltWithoutCards(t *testing.T) {
 	s.deps.Sellers = func() []mtgban.Seller { return nil }
 	s.deps.Vendors = func() []mtgban.Vendor { return nil }
 
-	b, source := s.datastore()
+	b, source := s.deps.Datastore()
 	s.refreshCatalog(b, source)
 
 	if v := s.catalogVersion(); v != "" {

@@ -389,9 +389,6 @@ func LastSoldFields(lastSales []Sale, lang string) []Field {
 // renders a card's edition line, and indexFor returns the index-price offers
 // for one card, so every card in the panel is quoted with its own prices.
 func Generate(backend *mtgmatcher.Backend, providerURL string, allKeys []string, editionTitle func(cardID string) string, indexFor func(cardID string) []Entry) *OEmbed {
-	if backend == nil {
-		backend = &mtgmatcher.Backend{}
-	}
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""
