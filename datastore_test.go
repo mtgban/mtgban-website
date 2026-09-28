@@ -181,12 +181,17 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 }
 
 // TestEmptyDatastoreServesPaletteListsUncached pins what a request gets
-// before the first load completes: every palette list empty and marked
-// no-store, per the pre-stored datastore's nil palette snapshot.
+// before the first load completes: a backend with no cards, and every
+// palette list empty and marked no-store, per the pre-stored datastore's
+// nil palette snapshot.
 func TestEmptyDatastoreServesPaletteListsUncached(t *testing.T) {
 	// A private site, not testSite: this wants the state before anything
 	// has published, which testSite left behind in TestMain.
 	s := newSite()
+	cards := s.datastore().backend.GetUUIDs()
+	if len(cards) != 0 {
+		t.Errorf("before the first load the backend held %d cards", len(cards))
+	}
 	for _, serve := range []func(http.ResponseWriter, *http.Request){
 		s.palette.Sets, s.palette.Promos, s.palette.Finishes,
 	} {
