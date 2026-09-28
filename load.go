@@ -454,6 +454,10 @@ func loadScraper(bucket simplecloud.Reader, game, name, kind, shorthand string) 
 
 	cancel()
 	reader.Close()
+	// CK's buylist signals are computed from its buylist and stock.
+	if installErr == nil && strings.EqualFold(shorthand, "CK") {
+		rebuildCKSignals()
+	}
 	return installErr
 }
 

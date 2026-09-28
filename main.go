@@ -1519,10 +1519,10 @@ func main() {
 	// under recovered so that one that panics does not end the loop.
 	s.offline.StartRefresher(recovered)
 
-	// Card Kingdom's stock history, for the buylist signals (ckbuylist.go).
+	// Card Kingdom's stock history and buylist signals (ckbuylist.go).
 	go func() {
-		defer recoverJob("loadCKHistory")
-		s.loadCKHistory()
+		defer recoverJob("refreshCKSignals")
+		s.refreshCKSignals()
 	}()
 
 	if !DevMode {
@@ -1540,9 +1540,9 @@ func main() {
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", recovered("cron cacheNewspaper", s.cacheNewspaper))
 
-		// Reload CK's stock history once the newspaper has a new day; until
-		// then each run is one indexed MAX(date).
-		c.AddFunc("45 * * * *", recovered("cron loadCKHistory", s.loadCKHistory))
+		// Rebuild CK's buylist signals, reloading its stock history once the
+		// newspaper has a new day; until then that is one indexed MAX(date).
+		c.AddFunc("45 * * * *", recovered("cron refreshCKSignals", s.refreshCKSignals))
 
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
 		c.AddFunc("20 */12 * * *", recovered("cron RequestRefresh", s.offline.RequestRefresh))

@@ -785,6 +785,8 @@ func (s *site) runSealedAnalysis() {
 	infos["tcgskuid"] = skuIndex
 
 	infosPtr.Store(&infos)
+	// The P90s are one of the inputs of CK's buylist signals.
+	rebuildCKSignals()
 
 	// Index TCGplayer's own identifiers for every product, used to report
 	// values TCGplayer always recognizes in exported CSVs. A missing dump
