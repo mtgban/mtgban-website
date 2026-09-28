@@ -808,6 +808,11 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 
 		ogFields = embed.FormatSearchResult(externalURL(nil), searchRes)
 	} else if lastSold {
+		// Made before the goroutine, so the select below never waits on a
+		// nil channel, and buffered, so the goroutine's one send completes
+		// even after this handler has timed out or returned early.
+		channel = make(chan *discordgo.MessageEmbed, 1)
+
 		// Since the fetch is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message
 		go func() {
@@ -815,17 +820,18 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 			// here, a panic leaves the reply to the timeout below.
 			defer recoverJob("discord last sold")
 
-			channel = make(chan *discordgo.MessageEmbed)
+			// Its own fields and error, not the handler's ogFields and err:
+			// the handler reads and writes those while this runs.
 			var errMsg string
+			var fields []EmbedField
 			// The fetch lives here rather than behind the formatting: it is
 			// the half that needs a context, a timeout and an error to
 			// report back to the reader.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			var lastSales []tcgplayer.LatestSalesData
-			lastSales, err = s.fetchLastSold(ctx, b, searchRes.CardID, false)
+			lastSales, err := s.fetchLastSold(ctx, b, searchRes.CardID, false)
 			cancel()
 			if err == nil {
-				ogFields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
+				fields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
 			}
 			if err != nil {
 				if errors.Is(err, ErrMissingTCGId) {
@@ -834,10 +840,10 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 					errMsg = "Internal bot error " + emoteSad
 					log.Println("Bot error:", err, "from", content)
 				}
-			} else if len(ogFields) == 0 {
+			} else if len(fields) == 0 {
 				errMsg = fmt.Sprintf("No Last Sold Price available for \"%s\" %s", content, emoteShurg)
 			}
-			embed := prepareCard(b, searchRes, ogFields, m.GuildID, lastSold)
+			embed := prepareCard(b, searchRes, fields, m.GuildID, lastSold)
 			if errMsg != "" {
 				embed.Description += errMsg
 			}
@@ -863,7 +869,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		case edit = <-channel:
 			break
 		case <-time.After(LastSoldTimeout * time.Second):
-			edit = prepareCard(b, searchRes, ogFields, m.GuildID, lastSold)
+			edit = prepareCard(b, searchRes, nil, m.GuildID, lastSold)
 			edit.Description += "Connection time out " + emoteSleep
 			break
 		}
