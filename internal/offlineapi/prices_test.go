@@ -16,8 +16,8 @@ import (
 // and BuildSetPayload call, and that the served payload carries the manifest
 // snapshot time rather than the current clock.
 //
-// GetSet requires the live mtgmatcher datastore which is unavailable in
-// package tests, so canonicalization is injected via Deps.CanonicalSetCode.
+// The test service's backend holds no sets, so canonicalization is injected
+// via Deps.CanonicalSetCode.
 func TestServePricesCanonicalSetCode(t *testing.T) {
 	s, _ := newTestService(t)
 

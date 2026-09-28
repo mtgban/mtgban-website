@@ -86,8 +86,8 @@ func TestNumbersSnapshotKeepsStoredForms(t *testing.T) {
 	}
 }
 
-// TestNumberSearchMatchesUnseededSearch compares a copy of the live
-// datastore with numbers disabled against the live datastore itself (whose
+// TestNumberSearchMatchesUnseededSearch compares a copy of testSite's
+// datastore with numbers disabled against that datastore itself (whose
 // numbers newDatastore already built), feeding searchAndFilter each one
 // directly the way a caller already holding a ds would.
 func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
