@@ -327,3 +327,49 @@ func TestGlobalSealedDropsVolatile(t *testing.T) {
 		t.Error("the volatile product carries no warning")
 	}
 }
+
+// seedCKBuylist publishes a seller of one card and Card Kingdom buying it
+// under ckID, CK's own id for it, which is what CK's sell cart takes.
+func seedCKBuylist(t *testing.T, cardID, ckID string) {
+	t.Helper()
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+
+	inv := mtgban.InventoryRecord{}
+	inv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1, URL: "u"})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Source Shop", Shorthand: "ZZSRC"}),
+	}
+	bl := mtgban.BuylistRecord{}
+	bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 10, Quantity: 1, URL: "u", OriginalID: ckID})
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"}),
+	}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+}
+
+// An arbit row hands CK's sell cart the id CK's own buylist gives the card,
+// read by the handler along with the rest of the page.
+func TestArbitRowsCarryCKsOwnID(t *testing.T) {
+	skipWithoutDatastore(t)
+	cardID := backend().GetUUIDs()[0]
+	seedCKBuylist(t, cardID, "424242")
+	withSigMode(t, true, false)
+
+	r := httptest.NewRequest("GET", "/arbit?source=ZZSRC", nil)
+	w := httptest.NewRecorder()
+	scraperCompare(backend(), w, r, genPageNav(testSite, r, "Arbitrage", ""), []string{"ZZSRC"}, nil, scraperCompareOpts{AllResults: true})
+
+	page := w.Body.String()
+	if !strings.Contains(page, `data-arb-ckid="424242"`) {
+		t.Error("the row does not carry CK's id")
+	}
+	if !strings.Contains(page, `"id": 424242,`) {
+		t.Error("the CK sell cart is not sent CK's id")
+	}
+}

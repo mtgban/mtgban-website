@@ -857,6 +857,9 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	// the search results do, so they follow the same setting.
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 
+	// Every row carries its CK id for the CK sell cart, read off one buylist
+	ckBuylist, _ := findVendorBuylist("CK")
+
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
@@ -1023,7 +1026,9 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardID] = uuid2card(b, cardID, true, false, preferFlavor)
+			card := uuid2card(b, cardID, true, false, preferFlavor)
+			card.CKID = ckIDIn(ckBuylist, cardID)
+			pageVars.Metadata[cardID] = card
 		}
 	}
 

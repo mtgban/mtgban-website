@@ -63,3 +63,37 @@ func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
 		t.Error("a site carrying no Cardmarket linked it anyway")
 	}
 }
+
+// A TCG Direct price over twice the market is flagged against the market
+// price the handler read for the card, and the warning says what it was.
+func TestSearchFlagsDirectAgainstTheMarketItRead(t *testing.T) {
+	skipWithoutDatastore(t)
+	uuid := backend().GetUUIDs()[0]
+
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+
+	prev := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prev) })
+	market := mtgban.InventoryRecord{}
+	market.Add(uuid, &mtgban.InventoryEntry{Conditions: "NM", Price: 2, URL: "https://example.test"})
+	direct := mtgban.InventoryRecord{}
+	direct.Add(uuid, &mtgban.InventoryEntry{Conditions: "NM", Price: 9.99, Quantity: 1, URL: "https://example.test"})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(market, mtgban.ScraperInfo{Name: "TCG Market", Shorthand: "TCGMarket", MetadataOnly: true}),
+		mtgban.NewSellerFromInventory(direct, mtgban.ScraperInfo{Name: "TCG Direct", Shorthand: "TCGDirect"}),
+	}
+	sellersPtr.Store(&sellers)
+
+	rec := httptest.NewRecorder()
+	testSite.Search(rec, httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil))
+	if !strings.Contains(rec.Body.String(), `data-tooltip="Price looks off - TCG Market is $ 2.00"`) {
+		t.Error("the Direct price is not flagged against the market price")
+	}
+}

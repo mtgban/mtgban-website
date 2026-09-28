@@ -527,6 +527,12 @@ type GenericCard struct {
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
+
+	// CKID is Card Kingdom's own id for the card, and TCGMarketPrice
+	// TCGplayer's market price for it. Only the pages that show them fill
+	// them, from the one read of that store their handler makes.
+	CKID           string
+	TCGMarketPrice float64
 }
 
 // altFoilChipLabels overrides the default title-cased chip label for
@@ -1601,15 +1607,6 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	return slice[head:tail], page
 }
 
-// Retrieve the TCGplayer Market price of any given card
-func getTCGMarketPrice(cardID string) float64 {
-	inv, err := findSellerInventory("TCGMarket")
-	if err != nil {
-		return 0
-	}
-	return tcgMarketPriceIn(inv, cardID)
-}
-
 // tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
 // per-row loops resolve the seller once instead of per card.
 func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardID string) float64 {
@@ -1618,6 +1615,16 @@ func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardID string) float64 {
 		return 0
 	}
 	return entries[0].Price
+}
+
+// ckIDIn reads Card Kingdom's own id for a card off an already-resolved CK
+// buylist, which is what CK's sell cart takes; "" for a card it does not buy.
+func ckIDIn(bl mtgban.BuylistRecord, cardID string) string {
+	entries, found := bl[cardID]
+	if !found {
+		return ""
+	}
+	return entries[0].OriginalID
 }
 
 // getGoodBuylistPrice returns the "good" buylist threshold for a card — Card
@@ -1752,21 +1759,18 @@ func (names storeNames) Sealed(shorthand string) bool {
 // Special function to detect if the input price is bigger than
 // twice as much the market price on TCGplayer - used to detect
 // invalid Direct prices. Ignored for anything lower than $1
-// since Direct minimum is $0.40.
-func invalidDirect(id string, price float64) bool {
-	inv, _ := findSellerInventory("TCGMarket")
-	return invalidDirectIn(inv, id, price)
+// since Direct minimum is $0.40. A missing market price reads as 0.
+func invalidDirect(price, marketPrice float64) bool {
+	if price < 1 {
+		return false
+	}
+	return price > marketPrice*2
 }
 
 // invalidDirectIn is invalidDirect over an already-resolved TCGMarket
 // inventory; a nil inventory reads as no market price.
 func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool {
-	if price < 1 {
-		return false
-	}
-
-	marketPrice := tcgMarketPriceIn(inv, id)
-	return price > marketPrice*2
+	return invalidDirect(price, tcgMarketPriceIn(inv, id))
 }
 
 // keyruneClass turns a set's keyrune code into the class the font wants, and

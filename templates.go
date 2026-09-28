@@ -201,17 +201,6 @@ var funcMap = template.FuncMap{
 		slices.Sort(stores)
 		return slices.Compact(stores)
 	},
-	"uuid2ckid": func(s string) string {
-		bl, err := findVendorBuylist("CK")
-		if err != nil {
-			return ""
-		}
-		entries, found := bl[s]
-		if !found {
-			return ""
-		}
-		return entries[0].OriginalID
-	},
 	"isSussy": func(m map[string]float64, s string) bool {
 		_, found := m[s]
 		return found
@@ -223,9 +212,6 @@ var funcMap = template.FuncMap{
 			return "#111111"
 		}
 		return color
-	},
-	"tcg_market_price": func(s string) float64 {
-		return getTCGMarketPrice(s)
 	},
 	// buylist_badge renders Card Kingdom's 3-month hotlist star next to the store
 	// name when the store is the card's hotlist store, otherwise "".

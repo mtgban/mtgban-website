@@ -304,3 +304,32 @@ func TestResultIconsDoNotWaitOnALibrary(t *testing.T) {
 		}
 	}
 }
+
+// An optimized row hands CK's sell cart the id CK's own buylist gives the
+// card, read by the handler along with the rest of the page.
+func TestUploadRowsCarryCKsOwnID(t *testing.T) {
+	cardID := twoCards(t)[0]
+	seedCKBuylist(t, cardID, "424242")
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Upload"] == nil {
+		LogPages["Upload"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Upload")
+	}
+
+	form := url.Values{"mode": {"true"}, "stores": {"CK"}, "rows": {cardID + "\t1\t\t0\t\n"}}
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	testSite.Upload(rec, req)
+
+	out := rec.Body.String()
+	if !strings.Contains(out, `data-opt-ckid="424242"`) {
+		t.Error("the optimized row does not carry CK's id")
+	}
+	if !strings.Contains(out, `"id": 424242,`) {
+		t.Error("the CK sell cart is not sent CK's id")
+	}
+}

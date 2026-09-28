@@ -929,7 +929,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		allKeys, pageVars.Pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
 	}
 
-	// Load up image links and other metadata
+	// Load up image links and other metadata, with the market price a TCG
+	// Direct row is checked against, off one read of TCG Market
+	tcgMarket, _ := findSellerInventory("TCGMarket")
 	for _, cardID := range allKeys {
 		_, found := pageVars.Metadata[cardID]
 		if found {
@@ -940,6 +942,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
 		card.ChartID = chartIDForCard(b, cardID)
+		card.TCGMarketPrice = tcgMarketPriceIn(tcgMarket, cardID)
 		pageVars.Metadata[cardID] = card
 	}
 

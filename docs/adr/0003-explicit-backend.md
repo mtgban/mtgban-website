@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-28
 **Deciders:** Vittorio Giovara
-**Change:** PRs #655, #667, #674, #679 and #680
+**Change:** PRs #655, #667, #674, #679, #680 and #686
 
 ## Context
 
@@ -51,7 +51,7 @@ Every change is reviewed against seven rules:
    `weak.Pointer`, as `internal/mkmidparser` does for its sellers.
 6. **Never nil.** Before the first load the site serves the empty
    datastore, so a function handed `b` or `ds` may assume it is not nil.
-7. **Templates read no datastore.** See below.
+7. **Templates read no site state.** See below.
 
 A load is one value, `datastore` (datastore.go): the backend, the numbers,
 names, editions and palette snapshots built from it, and its load time.
@@ -83,6 +83,18 @@ What a page needs from the datastore rides in its data, filled by the
 handler from the snapshot it read: `EditionEntry.Symbol`,
 `GenericCard.SetSymbol`, `PromoLabels` and `TCGId`, and
 `PageVars.DatastoreReload`.
+
+The rest of the site's state a page shows is in its data too, filled
+before rendering. Once per request, `genPageNav` fills the game
+(`PageVars.Game`, `GameTitle`, `GameBadge`) from one read of the config
+and the store names (`PageVars.Stores`) from one read each of the
+sellers, the vendors and the name overrides; the guide fills its store
+list, `PageVars.GuideStores`; and the pages that show a CK id or a
+TCGplayer market price fill `GenericCard.CKID` and `TCGMarketPrice` from
+one read of that store. Cards and editions carry their rarity badge
+(`GenericCard.Badge`, `EditionEntry.Badge`), fitted from the table loaded
+at startup. What the FuncMap keeps is pure or constant, save
+`load_partner`, which reads the affiliate codes every deployment shares.
 
 ### Tests
 
@@ -140,9 +152,7 @@ guard, and the root package runs in 3 s, or 31 s under `-race`.
     screener, popular searches): plain values that pin nothing, but can lag
     a reload by one refresh;
   - `LogPages`, the database handles, the Discord session, cron
-    registration, `ServerContext` and the screener's test seams;
-  - the FuncMap's reads of scraper state (`uuid2ckid`, `tcg_market_price`,
-    `invalid_direct`), which go into page data or a per-site FuncMap.
+    registration, `ServerContext` and the screener's test seams.
 
 ## Action items
 

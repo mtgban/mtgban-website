@@ -1245,6 +1245,14 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Every card carries its CK id for the CK sell cart, read off one buylist;
+	// an alias may be the first to add a card, so this runs over them all.
+	ckBuylist, _ := findVendorBuylist("CK")
+	for cardID, card := range pageVars.Metadata {
+		card.CKID = ckIDIn(ckBuylist, cardID)
+		pageVars.Metadata[cardID] = card
+	}
+
 	var highestTotal float64
 	var singlesHighest, sealedHighest float64
 
