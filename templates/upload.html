@@ -155,7 +155,7 @@
                     <div class="upload-index-row" id="singlesIndexRow">
                         <span class="upload-index-label">Index prices</span>
                         <div class="upload-index-grid">
-                            {{range .IndexAllKeys}}{{$name := scraper_name .}}{{if $name}}
+                            {{range .IndexAllKeys}}{{$name := $.Stores.Name .}}{{if $name}}
                                 <label class="upload-index-item">
                                     <input type="checkbox" name="index_stores" id="index-{{.}}" value="{{.}}" {{if slice_has $.EnabledIndexes .}}checked{{end}}>
                                     <span class="upload-store-name">{{$name}}</span>
@@ -169,7 +169,7 @@
                             {{range .SealedIndexAllKeys}}
                                 <label class="upload-index-item">
                                     <input type="checkbox" name="sealed_index_stores" id="index-sealed-{{.}}" value="{{.}}" {{if slice_has $.EnabledSealedIndexes .}}checked{{end}}>
-                                    <span class="upload-store-name">{{scraper_name .}}</span>
+                                    <span class="upload-store-name">{{$.Stores.Name .}}</span>
                                 </label>
                             {{end}}
                             {{if not .SealedIndexAllKeys}}
@@ -509,7 +509,7 @@
                         singlesBox.innerHTML = " \
                             {{range .VendorKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
+                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{$.Stores.Name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -517,7 +517,7 @@
                         singlesBox.innerHTML = " \
                             {{range .SellerKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
+                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{$.Stores.Name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -533,7 +533,7 @@
                         sealedBox.innerHTML = " \
                             {{range .SealedVendorKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{$.Stores.Name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -541,7 +541,7 @@
                         sealedBox.innerHTML = " \
                             {{range .SealedSellerKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{$.Stores.Name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -917,7 +917,7 @@
             <th class="c">Cond</th>
             <th class="c">Qty</th>
             {{range $storeKeys}}
-                <th class="r">{{scraper_name .}}</th>
+                <th class="r">{{$root.Stores.Name .}}</th>
             {{end}}
             {{if $indexKeys}}<th title="Reference prices for the printing as a whole. Unlike the store columns, these are not adjusted for the condition in the Cond column.">Index<span class="ures-index-note">per printing</span></th>{{end}}
         </tr>
@@ -974,7 +974,7 @@
                             {{$indexName := .}}
                             {{$idxPrice := (index $scraperEntries $indexName)}}
                             {{if $idxPrice}}
-                            <span><span class="idx-label">{{scraper_name $indexName}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
+                            <span><span class="idx-label">{{$root.Stores.Name $indexName}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
                             {{end}}
                         {{end}}
                     </div>
@@ -1002,7 +1002,7 @@
                     {{range $indexKeys}}
                         {{$total := (index $totals .)}}
                         {{if $total}}
-                        <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" $total}}</span></span>
+                        <span><span class="idx-label">{{$root.Stores.Name .}}</span><span class="idx-val">$ {{printf "%.2f" $total}}</span></span>
                         {{end}}
                     {{end}}
                 </div>
@@ -1022,7 +1022,7 @@
     </div>
     {{range .StoreKeys}}
         <div class="res-summary-stat">
-            <span class="label">{{scraper_name .}}</span>
+            <span class="label">{{$root.Stores.Name .}}</span>
             <span class="val">$ {{printf "%.2f" (index $root.TotalEntries .)}}</span>
             {{$missing := (index $root.MissingCounts .)}}
             {{if ne $missing 0}}
@@ -1034,7 +1034,7 @@
         {{$total := (index $root.TotalEntries .)}}
         {{if $total}}
         <div class="res-summary-stat">
-            <span class="label">{{scraper_name .}}</span>
+            <span class="label">{{$root.Stores.Name .}}</span>
             <span class="val blue">$ {{printf "%.2f" $total}}</span>
         </div>
         {{end}}
@@ -1060,7 +1060,7 @@
     </div>
     {{range .StoreKeys}}
         <div class="res-summary-stat">
-            <span class="label">{{scraper_name .}}</span>
+            <span class="label">{{$.Stores.Name .}}</span>
             <span class="val">$ {{printf "%.2f" (index $s.Totals .)}}</span>
             {{$gone := (index $s.Missing .)}}
             {{if ne $gone 0}}
@@ -1072,7 +1072,7 @@
         {{$total := (index $s.Totals .)}}
         {{if $total}}
         <div class="res-summary-stat">
-            <span class="label">{{scraper_name .}}</span>
+            <span class="label">{{$.Stores.Name .}}</span>
             <span class="val blue">$ {{printf "%.2f" $total}}</span>
         </div>
         {{end}}
@@ -1089,7 +1089,7 @@
         {{$expected := (index $s.ProductIndex .)}}
         {{if $expected}}
         <div class="res-summary-stat">
-            <span class="label">{{scraper_name .}}</span>
+            <span class="label">{{$.Stores.Name .}}</span>
             <span class="val blue">$ {{printf "%.2f" $expected}}</span>
         </div>
         {{end}}
@@ -1194,7 +1194,7 @@
                         <a href="{{$card.SearchURL}}" target="_blank">{{$card.Name}}</a>
                         <span class="ures-block-sub">{{$card.Edition}}{{if gt .Product.Quantity 1}} &middot; &times;{{.Product.Quantity}}{{end}}</span>
                     </h3>
-                    {{template "ures-unpacked-strip" (dict "Section" . "StoreKeys" $root.ScraperKeys "IndexKeys" $root.IndexKeys "SealedIndexKeys" $root.SealedIndexKeys)}}
+                    {{template "ures-unpacked-strip" (dict "Section" . "StoreKeys" $root.ScraperKeys "IndexKeys" $root.IndexKeys "SealedIndexKeys" $root.SealedIndexKeys "Stores" $root.Stores)}}
                     <div class="ures-wrap">
                         {{template "ures-results-table" (dict "Entries" .Entries "StoreKeys" $root.ScraperKeys "IndexKeys" $root.IndexKeys "Quantity" .Quantity "Noun" "card" "Root" $root "Scoped" true "Unpacked" true "Totals" .Totals "Missing" .Missing "MissingPrices" .MissingPrices)}}
                     </div>
@@ -1312,7 +1312,7 @@
                 {{if $entries}}
                     {{$total := index $.OptimizedTotals .}}
                     <a class="opt-toc-item" href="#opt-{{.}}">
-                        <span class="toc-store">{{scraper_name .}}</span>
+                        <span class="toc-store">{{$.Stores.Name .}}</span>
                         <span class="toc-stats">{{len $entries}} cards</span>
                         <span class="toc-total">$ {{printf "%.2f" $total}}</span>
                     </a>
@@ -1340,7 +1340,7 @@
                                 <span>&#9660;</span>
                             {{end}}
                         </div>
-                        <h3>{{scraper_name .}}</h3>
+                        <h3>{{$.Stores.Name .}}</h3>
                         <div class="opt-header-actions">
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
@@ -2177,7 +2177,7 @@
             <label class="settings-field-row">
                 <span>Alternate price source</span>
                 <select id="opt-altPrice" data-cookie="UploadAltPrice">
-                    {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                    {{range $.AltKeys}}{{$name := $.Stores.Name .}}{{if $name}}
                     <option value="{{.}}">{{$name}}</option>
                     {{end}}{{end}}
                 </select>
@@ -2213,12 +2213,12 @@
                 <span>Reference seller (singles)</span>
                 <select id="opt-customseller" data-cookie="UploadCustomBuyer">
                     <optgroup label="Index">
-                        {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                        {{range $.AltKeys}}{{$name := $.Stores.Name .}}{{if $name}}
                         <option value="{{.}}" {{if eq . "TCGLow"}}selected{{end}}>{{$name}}</option>
                         {{end}}{{end}}
                     </optgroup>
                     <optgroup label="Retailers">
-                        {{range $.SellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                        {{range $.SellerKeys}}{{$name := $.Stores.Name .}}{{if $name}}
                         <option value="{{.}}">{{$name}}</option>
                         {{end}}{{end}}
                     </optgroup>
@@ -2227,7 +2227,7 @@
             <label class="settings-field-row">
                 <span>Reference seller (sealed)</span>
                 <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer">
-                    {{range $.SealedSellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                    {{range $.SealedSellerKeys}}{{$name := $.Stores.Name .}}{{if $name}}
                     <option value="{{.}}" {{if eq . "TCGSealed"}}selected{{end}}>{{$name}}</option>
                     {{end}}{{end}}
                 </select>

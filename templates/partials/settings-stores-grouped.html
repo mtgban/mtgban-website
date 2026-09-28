@@ -2,15 +2,16 @@
     settings-stores-grouped-section - render one half (Singles or Sealed) of a
     scraper-shorthand list as a settings-grid. Use `Section = "singles"` or
     `Section = "sealed"`. Sealed classification uses the canonical SealedMode
-    flag via the is_sealed_scraper template func. Renders nothing if the
-    selected section is empty.
+    flag, through the page's Stores. Renders nothing if the selected section
+    is empty.
 
     Expected dot context:
         {
-            "Keys":       []string,  // shorthands to render
-            "GridId":     string,    // id prefix; final id is "{GridId}-{Section}"
-            "CookieName": string,    // data-cookie="..." for the grid
-            "Section":    string,    // "singles" | "sealed"
+            "Keys":       []string,   // shorthands to render
+            "GridId":     string,     // id prefix; final id is "{GridId}-{Section}"
+            "CookieName": string,     // data-cookie="..." for the grid
+            "Section":    string,     // "singles" | "sealed"
+            "Stores":     storeNames, // the page's Stores, naming each key
         }
 */}}
 {{define "settings-stores-grouped-section"}}
@@ -20,11 +21,11 @@
     don't shift cells when one column has no entries for this section. */}}
 <div class="settings-grid" id="{{.GridId}}-{{.Section}}" data-cookie="{{.CookieName}}">
     {{range $key := $keys}}
-        {{if and $wantSealed (is_sealed_scraper $key)}}
-        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+        {{if and $wantSealed ($.Stores.Sealed $key)}}
+        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
         {{end}}
-        {{if and (not $wantSealed) (not (is_sealed_scraper $key))}}
-        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+        {{if and (not $wantSealed) (not ($.Stores.Sealed $key))}}
+        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
         {{end}}
     {{end}}
 </div>
@@ -39,18 +40,18 @@
 <div class="settings-subgroup">
     {{$keys := .Keys}}
     {{$hasSingles := false}}
-    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+    {{range $k := $keys}}{{if not ($.Stores.Sealed $k)}}{{$hasSingles = true}}{{end}}{{end}}
     {{$hasSealed := false}}
-    {{range $k := $keys}}{{if is_sealed_scraper $k}}{{$hasSealed = true}}{{end}}{{end}}
+    {{range $k := $keys}}{{if $.Stores.Sealed $k}}{{$hasSealed = true}}{{end}}{{end}}
 
     {{if $hasSingles}}
     <h5 class="settings-subgroup-label">Singles</h5>
-    {{template "settings-stores-grouped-section" (dict "Keys" $keys "GridId" .GridId "CookieName" .CookieName "Section" "singles")}}
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "GridId" .GridId "CookieName" .CookieName "Section" "singles" "Stores" .Stores)}}
     {{end}}
 
     {{if $hasSealed}}
     <h5 class="settings-subgroup-label">Sealed</h5>
-    {{template "settings-stores-grouped-section" (dict "Keys" $keys "GridId" .GridId "CookieName" .CookieName "Section" "sealed")}}
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "GridId" .GridId "CookieName" .CookieName "Section" "sealed" "Stores" .Stores)}}
     {{end}}
 </div>
 {{end}}

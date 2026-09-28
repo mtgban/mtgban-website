@@ -142,8 +142,7 @@ guard, and the root package runs in 3 s, or 31 s under `-race`.
   - `LogPages`, the database handles, the Discord session, cron
     registration, `ServerContext` and the screener's test seams;
   - the FuncMap's reads of scraper state (`uuid2ckid`, `tcg_market_price`,
-    `is_sealed_scraper`, `scraper_name`, `invalid_direct`, `guide_stores`),
-    which go into page data or a per-site FuncMap.
+    `invalid_direct`), which go into page data or a per-site FuncMap.
 
 ## Action items
 

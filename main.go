@@ -83,6 +83,12 @@ type PageVars struct {
 	GameTitle string
 	GameBadge string
 
+	// Stores is what the page calls each store, and whether it is a sealed
+	// one, read once from the scrapers by genPageNav.
+	Stores storeNames
+	// GuideStores is every store the guide lists, as JSON for its script.
+	GuideStores template.JS
+
 	IsMobile bool
 
 	// GatewayURL is the API gateway's origin, for links to its account and admin pages.
@@ -955,6 +961,8 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 		Game:      game,
 		GameTitle: gameMap[game],
+
+		Stores: newStoreNames(GetSellers(), GetVendors(), Config.ScraperConfig.NameOverride),
 	}
 
 	if game != DefaultGame {

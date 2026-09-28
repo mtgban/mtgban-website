@@ -131,7 +131,8 @@ func renderReverse(t *testing.T, query string) string {
 
 	r := httptest.NewRequest("GET", "/reverse?"+query, nil)
 	w := httptest.NewRecorder()
-	pageVars := PageVars{ReverseMode: true, BetaNav: &NavElem{Short: "beta"}}
+	pageVars := genPageNav(testSite, r, "Reverse", "")
+	pageVars.ReverseMode = true
 	scraperCompare(backend(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
@@ -204,7 +205,8 @@ func TestSuspectPriceFor(t *testing.T) {
 
 // seedArbitScraper publishes one seller under the given shorthand, so a
 // filter-option test can render the page as either a sealed or a singles
-// source without depending on real scraper data being loaded.
+// source without depending on real scraper data being loaded. The page names
+// it through its Stores, built from what is published, as genPageNav does.
 func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 	t.Helper()
 
@@ -234,6 +236,7 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 		ArbitOptKeys:   FilterOptKeys,
 		ArbitOptConfig: FilterOptConfig,
 		ArbitFilters:   map[string]bool{},
+		Stores:         newStoreNames(GetSellers(), GetVendors(), nil),
 	})
 	if !strings.Contains(page, ">only Stable<") {
 		t.Error("a sealed global page does not offer novolatile")
@@ -250,6 +253,7 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 		ArbitOptKeys:   FilterOptKeys,
 		ArbitOptConfig: FilterOptConfig,
 		ArbitFilters:   map[string]bool{},
+		Stores:         newStoreNames(GetSellers(), GetVendors(), nil),
 	})
 	if !strings.Contains(page, ">only Legit<") {
 		t.Error("a singles global page does not offer nosus")
@@ -294,7 +298,8 @@ func renderGlobal(t *testing.T, source, query string) string {
 
 	r := httptest.NewRequest("GET", "/global?source="+source+query, nil)
 	w := httptest.NewRecorder()
-	pageVars := PageVars{GlobalMode: true, BetaNav: &NavElem{Short: "beta"}}
+	pageVars := genPageNav(testSite, r, "Global", "")
+	pageVars.GlobalMode = true
 	scraperCompare(backend(), w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }

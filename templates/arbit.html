@@ -95,7 +95,7 @@
 {{define "arbit-results"}}
 {{/* Whether the arbit source is a sealed-mode scraper. The table is
      homogeneous, so this single lookup applies to every row. */}}
-{{$sealedSource := is_sealed_scraper $.ScraperShort}}
+{{$sealedSource := $.Stores.Sealed $.ScraperShort}}
 {{/* INFO column: for singles it carries CK's P90/Highest (buylist_detail); for
      sealed it instead holds the 🔎 link to the product's contents/decklist.
      Shown on every non-global table, and in global mode only when sealed. */}}
@@ -378,7 +378,7 @@
                     <th class="c">
                         <a href="javascript:sortBy('sell_price', '{{.Name}}')">
                             {{if $.GlobalMode}}
-                                {{if $sealedSource}}{{.Name}}{{else}}{{scraper_name $.ScraperShort}}{{end}}
+                                {{if $sealedSource}}{{.Name}}{{else}}{{$.Stores.Name $.ScraperShort}}{{end}}
                             {{else}}
                                 Sell Price
                             {{end}}
@@ -388,7 +388,7 @@
                         <th class="c">
                             <a href="javascript:sortBy('buy_price', '{{.Name}}')">
                                 {{if $.GlobalMode}}
-                                    {{if $sealedSource}}{{scraper_name $.ScraperShort}}{{else}}{{.Name}}{{end}}
+                                    {{if $sealedSource}}{{$.Stores.Name $.ScraperShort}}{{else}}{{.Name}}{{end}}
                                 {{else}}
                                     Buy Price
                                 {{end}}
@@ -626,7 +626,7 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="settings-section-body">
         <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
-        {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-arbit-vendors" "CookieName" $cookieName)}}
+        {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-arbit-vendors" "CookieName" $cookieName "Stores" .Stores)}}
     </div>
 </section>
 {{end}}

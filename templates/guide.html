@@ -4,7 +4,7 @@
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>
-    <script>window.__BAN_STORES = {{guide_stores}};</script>
+    <script>window.__BAN_STORES = {{.GuideStores}};</script>
 {{end}}
 
 {{define "content"}}

@@ -1692,6 +1692,63 @@ func sortKeysByScraperName(keys []string) []string {
 	return out
 }
 
+// storeNames is what a page calls each store, keyed by shorthand, and
+// whether the store deals in sealed product. genPageNav builds it once per
+// request, so a page names every store from the same scrapers.
+type storeNames map[string]storeName
+
+type storeName struct {
+	Name   string
+	Sealed bool
+}
+
+// newStoreNames resolves every shorthand the way scraperName does: the first
+// seller, then the first vendor, carrying it, renamed by its override, and
+// failing both, the override of the shorthand itself.
+func newStoreNames(sellers []mtgban.Seller, vendors []mtgban.Vendor, overrides map[string]string) storeNames {
+	names := make(storeNames, len(sellers)+len(vendors))
+	add := func(info mtgban.ScraperInfo) {
+		_, found := names[info.Shorthand]
+		if found {
+			return
+		}
+		name := info.Name
+		override, found := overrides[info.Name]
+		if found {
+			name = override
+		}
+		names[info.Shorthand] = storeName{Name: name, Sealed: info.SealedMode}
+	}
+	for _, seller := range sellers {
+		if seller != nil {
+			add(seller.Info())
+		}
+	}
+	for _, vendor := range vendors {
+		if vendor != nil {
+			add(vendor.Info())
+		}
+	}
+	for shorthand, name := range overrides {
+		_, found := names[shorthand]
+		if !found {
+			names[shorthand] = storeName{Name: name}
+		}
+	}
+	return names
+}
+
+// Name is what the page calls the store, or "" for a shorthand it does not
+// know.
+func (names storeNames) Name(shorthand string) string {
+	return names[shorthand].Name
+}
+
+// Sealed says whether the store deals in sealed product rather than singles.
+func (names storeNames) Sealed(shorthand string) bool {
+	return names[shorthand].Sealed
+}
+
 // Special function to detect if the input price is bigger than
 // twice as much the market price on TCGplayer - used to detect
 // invalid Direct prices. Ignored for anything lower than $1

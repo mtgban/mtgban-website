@@ -126,7 +126,7 @@
                 <select name="ref" id="ref" onchange="checkSleepersCompare()">
                     <option value="" disabled selected>Pick a reference...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{$.Stores.Name .}}</option>
                     {{end}}
                 </select>
                 <div class="sleepers-comp-vs-divider">VS</div>
@@ -134,7 +134,7 @@
                 <select name="target" id="target" onchange="checkSleepersCompare()">
                     <option value="" disabled selected>Pick where to buy...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{$.Stores.Name .}}</option>
                     {{end}}
                 </select>
                 <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled>Compare</button>
@@ -219,7 +219,7 @@ function checkSleepersCompare() {
                 <h4>Retail</h4>
                 <div class="settings-grid" id="settings-sleep-sellers">
                     {{range $key := .ModalSellerKeys}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
                     {{end}}
                 </div>
             </div>
@@ -227,7 +227,7 @@ function checkSleepersCompare() {
                 <h4>Buylist</h4>
                 <div class="settings-grid" id="settings-sleep-vendors">
                     {{range $key := .ModalVendorKeys}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
                     {{end}}
                 </div>
             </div>

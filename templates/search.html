@@ -2150,12 +2150,12 @@ body.modal-embed .cp-overlay { display: none !important; }
             <h4 class="settings-stores-col-label">Buylist</h4>
 
             <h5 class="settings-stores-row-label">Singles</h5>
-            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles")}}
-            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles" "Stores" .Stores)}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles" "Stores" .Stores)}}
 
             <h5 class="settings-stores-row-label">Sealed</h5>
-            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed")}}
-            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed" "Stores" .Stores)}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed" "Stores" .Stores)}}
         </div>
     </div>
 </section>
@@ -2210,7 +2210,7 @@ body.modal-embed .cp-overlay { display: none !important; }
                 <select id="settings-sellers-priority" data-cookie="SearchSellersPriority">
                     <option value="">Reset to Default</option>
                     {{range $key := .SellerKeys}}
-                    <option value="{{$key}}">{{scraper_name $key}}</option>
+                    <option value="{{$key}}">{{$.Stores.Name $key}}</option>
                     {{end}}
                 </select>
             </div>
@@ -2219,7 +2219,7 @@ body.modal-embed .cp-overlay { display: none !important; }
                 <select id="settings-vendors-priority" data-cookie="SearchVendorsPriority">
                     <option value="">Reset to Default</option>
                     {{range $key := .VendorKeys}}
-                    <option value="{{$key}}">{{scraper_name $key}}</option>
+                    <option value="{{$key}}">{{$.Stores.Name $key}}</option>
                     {{end}}
                 </select>
             </div>

@@ -132,9 +132,6 @@ var funcMap = template.FuncMap{
 		n, _ := strconv.ParseFloat(s, 64)
 		return fmt.Sprintf("$ %0.2f", n)
 	},
-	"scraper_name": func(s string) string {
-		return scraperName(s)
-	},
 	"strip_edition": func(name, edition string, sealed bool) string {
 		if !sealed || edition == "" {
 			return name
@@ -167,19 +164,6 @@ var funcMap = template.FuncMap{
 	},
 	"contains": func(s, p string) bool {
 		return strings.Contains(s, p)
-	},
-	"is_sealed_scraper": func(shorthand string) bool {
-		for _, seller := range GetSellers() {
-			if seller != nil && seller.Info().Shorthand == shorthand {
-				return seller.Info().SealedMode
-			}
-		}
-		for _, vendor := range GetVendors() {
-			if vendor != nil && vendor.Info().Shorthand == shorthand {
-				return vendor.Info().SealedMode
-			}
-		}
-		return false
 	},
 	"load_partner": func(s string) string {
 		return Affiliates().Codes[s]
@@ -313,7 +297,6 @@ var funcMap = template.FuncMap{
 	"palette_arbit_targets":     sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("arbit", paletteArbitFilters()) }),
 	"palette_reverse_targets":   sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("reverse", paletteArbitFilters()) }),
 	"palette_global_targets":    sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("global", paletteArbitFilters()) }),
-	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
 	"api_plans_json":            apiPlansJSON,
 	"plan_icon":                 planIcon,

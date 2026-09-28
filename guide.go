@@ -13,6 +13,7 @@ func (s *site) Guide(w http.ResponseWriter, r *http.Request) {
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
+	pageVars.GuideStores = guideStoresJSON()
 	render(w, "guide.html", pageVars)
 }
 

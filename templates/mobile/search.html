@@ -776,7 +776,7 @@
                         <select class="m-settings-select" id="m-set-sellers-priority">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .SellerKeys}}
-                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            <option value="{{$key}}">{{$.Stores.Name $key}}</option>
                             {{end}}
                         </select>
                     </div>
@@ -785,7 +785,7 @@
                         <select class="m-settings-select" id="m-set-vendors-priority">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .VendorKeys}}
-                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            <option value="{{$key}}">{{$.Stores.Name $key}}</option>
                             {{end}}
                         </select>
                     </div>
@@ -840,22 +840,22 @@
                     </div>
                     {{$keys := .SellerKeys}}
                     {{$hasSingles := false}}
-                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if not ($.Stores.Sealed $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
-                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if ($.Stores.Sealed $k)}}{{$hasSealed = true}}{{end}}{{end}}
                     {{if $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{range $key := $keys}}{{if not ($.Stores.Sealed $key)}}
+                        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}
                     {{if $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{range $key := $keys}}{{if ($.Stores.Sealed $key)}}
+                        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}
@@ -875,22 +875,22 @@
                     </div>
                     {{$keys := .VendorKeys}}
                     {{$hasSingles := false}}
-                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if not ($.Stores.Sealed $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
-                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if ($.Stores.Sealed $k)}}{{$hasSealed = true}}{{end}}{{end}}
                     {{if $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{range $key := $keys}}{{if not ($.Stores.Sealed $key)}}
+                        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}
                     {{if $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
-                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{range $key := $keys}}{{if ($.Stores.Sealed $key)}}
+                        <label><input type="checkbox" name="{{$key}}"> {{$.Stores.Name $key}}</label>
                         {{end}}{{end}}
                     </div>
                     {{end}}

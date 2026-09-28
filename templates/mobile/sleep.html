@@ -98,14 +98,14 @@
                 <select name="ref" id="ref" onchange="checkSleepersCompare()">
                     <option value="" disabled selected>Reference seller...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{$.Stores.Name .}}</option>
                     {{end}}
                 </select>
                 <span class="m-sleep-vs">VS</span>
                 <select name="target" id="target" onchange="checkSleepersCompare()">
                     <option value="" disabled selected>Target seller...</option>
                     {{range .SellerKeys}}
-                        <option value="{{.}}">{{scraper_name .}}</option>
+                        <option value="{{.}}">{{$.Stores.Name .}}</option>
                     {{end}}
                 </select>
                 <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" disabled>Compare</button>
@@ -160,14 +160,14 @@
         <h3>Retail</h3>
         <div class="m-sleep-opts-grid" id="sellers">
             {{range $i, $key := .SellerKeys}}
-                <label class="m-sleep-opts-label"><input type="checkbox" id="s{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
+                <label class="m-sleep-opts-label"><input type="checkbox" id="s{{$key}}" name="{{$key}}"> {{$.Stores.Name $key}}</label>
             {{end}}
         </div>
 
         <h3>Buylist</h3>
         <div class="m-sleep-opts-grid" id="vendors">
             {{range $i, $key := .VendorKeys}}
-                <label class="m-sleep-opts-label"><input type="checkbox" id="v{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
+                <label class="m-sleep-opts-label"><input type="checkbox" id="v{{$key}}" name="{{$key}}"> {{$.Stores.Name $key}}</label>
             {{end}}
         </div>
     </div>
