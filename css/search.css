@@ -1539,6 +1539,15 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 .price-row .price-best {
     color: var(--asuccess);
 }
+/* Card Kingdom is likely to pay more soon (buylist_state, buylist_wait) */
+.price-row .price-wait {
+    color: var(--awarning);
+}
+.store-name .ck-wait {
+    color: var(--awarning);
+    font-weight: 700;
+    cursor: help;
+}
 .price-row .price-warn[data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute;

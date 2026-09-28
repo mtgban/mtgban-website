@@ -645,6 +645,16 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--asuccess);
 }
 
+/* Card Kingdom is likely to pay more soon (buylist_state, buylist_wait) */
+.m-vendor-price.m-price-wait {
+    color: var(--awarning);
+}
+
+.m-vendor-name .ck-wait {
+    color: var(--awarning);
+    font-weight: 700;
+}
+
 .m-vendor-qty {
     font-size: 0.7rem;
     color: var(--greytext);
@@ -700,6 +710,14 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 .m-detail-row .m-vendor-price {
+    color: var(--greytext);
+}
+
+/* Card Kingdom's stock facts and the odds behind its signal */
+.m-vendor-row .m-detail-note {
+    padding: 0.25rem 1rem 0.5rem 0.75rem;
+    font-size: 0.7rem;
+    line-height: 1.35;
     color: var(--greytext);
 }
 
