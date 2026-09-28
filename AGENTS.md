@@ -228,6 +228,20 @@ commit to this repo can complete on its own.
    (`Config`, DB handles, atomic snapshots). Don't add unsynchronized mutable
    package state.
 
+7. **New background work recovers its own panics.** net/http recovers a
+   panic only on the goroutine serving the request (`recoverPanic` reports
+   it there, behind the three signing wrappers); on any other goroutine an
+   unrecovered panic ends the process. So register a new cron job through
+   `recovered()`, start a new goroutine or Discord handler with
+   `defer recoverJob("<name>")` (recover.go), and have a loop that must
+   keep serving recover each run in a function of its own, as
+   `runAccessReload` does, not the loop around it. Among the goroutines
+   that do not recover: two startup ones, fatal on purpose (the scraper
+   goroutine in `main()`, with the `runSealedAnalysis()`,
+   `warmVariantCacheIfEnabled()` and `RefreshManifest()` it runs, and the
+   one running `ListenAndServe`), and those `searchParallelNG`,
+   `fetchRosterPrices` and `runningWorkflows` fan out to.
+
 ## Known issues / refactors pending
 
 `todo/refactor.md` has the full prioritized plan, but it's a local, untracked
