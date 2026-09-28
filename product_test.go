@@ -2,7 +2,10 @@ package main
 
 import (
 	"math"
+	"slices"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -33,6 +36,34 @@ func TestAllEditionsByCategoryHasKnownCategories(t *testing.T) {
 	for _, w := range wanted {
 		if _, ok := editions.AllEditionsByCategory[w]; !ok {
 			t.Errorf("expected category %q in AllEditionsByCategory", w)
+		}
+	}
+}
+
+// TestEditionCategoriesTiedOnDateSortByName gives three categories the same
+// newest release date and an older one a name that sorts first. Both category
+// lists must rank by date, then by name, and do so on every build: the tied
+// ones used to come out in map order.
+func TestEditionCategoriesTiedOnDateSortByName(t *testing.T) {
+	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{}}
+	for _, set := range []*mtgmatcher.Set{
+		{Code: "EXP", Type: "expansion", ReleaseDate: "2026-11-13"},
+		{Code: "CMD", Type: "commander", ReleaseDate: "2026-11-13"},
+		{Code: "FUN", Type: "funny", ReleaseDate: "2026-11-13"},
+		{Code: "BOX", Type: "box", ReleaseDate: "2017-11-24"},
+	} {
+		set.Name = set.Code
+		set.SealedProduct = []mtgmatcher.SealedProduct{{UUID: set.Code + "-box"}}
+		b.Sets[set.Code] = set
+		b.AllSets = append(b.AllSets, set.Code)
+	}
+
+	want := []string{"Commander Decks", "Expansions", "Funny Sets", "Boxed Sets"}
+	for range 20 {
+		sealed, _ := getSealedEditions(b)
+		all, _ := getAllEditionsByCategory(b)
+		if !slices.Equal(sealed, want) || !slices.Equal(all, want) {
+			t.Fatalf("sealed categories %v, all categories %v, want %v", sealed, all, want)
 		}
 	}
 }
