@@ -45,7 +45,9 @@
         if (on) {
             box.title = ignoredTitle;
         } else {
+            // Also the copy js/tooltips.js holds while the box is hovered.
             box.removeAttribute('title');
+            box.removeAttribute('data-ban-title');
         }
     }
 
