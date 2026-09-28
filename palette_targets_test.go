@@ -51,18 +51,17 @@ func TestPaletteArbitTargets(t *testing.T) {
 
 // TestPaletteNewspaperTargets pins the newspaper pages the palette offers
 // in each game to the ones the newspaper shows there: the three built on a
-// buylist are Magic's alone. syp stays on every game's list, since whether
-// a game has an SYP buylist is only known once its vendors load, while the
-// list is built once.
+// buylist are Magic's alone. The SYP list is not among them: it is a nav
+// entry, which the palette offers wherever the nav does.
 func TestPaletteNewspaperTargets(t *testing.T) {
 	prev := Config.Game
 	t.Cleanup(func() { Config.Game = prev })
 
 	magic := []string{"combined_spike_score", "spike_score",
 		"greatest_increase_listings", "greatest_decrease_listings",
-		"greatest_increase_buylist", "greatest_decrease_buylist", "syp"}
+		"greatest_increase_buylist", "greatest_decrease_buylist"}
 	others := []string{"spike_score", "greatest_increase_listings",
-		"greatest_decrease_listings", "syp"}
+		"greatest_decrease_listings"}
 	for _, game := range slices.Sorted(maps.Keys(gameMap)) {
 		Config.Game = game
 		var targets []palette.NavTarget

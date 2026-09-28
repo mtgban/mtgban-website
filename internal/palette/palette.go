@@ -459,7 +459,7 @@ type ArbitTargets struct {
 }
 
 // NewspaperTargetsJSON returns JSON for the newspaper page views given, the
-// ones the newspaper shows, and for the SYP list.
+// ones the newspaper shows.
 func NewspaperTargetsJSON(pages []NewspaperPage) template.JS {
 	out := []NavTarget{}
 	titleCounts := map[string]int{}
@@ -502,12 +502,6 @@ func NewspaperTargetsJSON(pages []NewspaperPage) template.JS {
 			Group: group,
 		})
 	}
-	// Include Newspaper SubPages from the nav tree that aren't in pages
-	out = append(out, NavTarget{
-		Value: "syp",
-		Label: "TCG Syp List",
-		Group: "Other",
-	})
 	data, _ := json.Marshal(out)
 	return template.JS(data)
 }
