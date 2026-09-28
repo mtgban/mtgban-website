@@ -30,8 +30,7 @@ type Deps struct {
 
 	// CanonicalSetCode returns the canonical (uppercased) set code for the
 	// given input, matched against b. Returns an error if the set is
-	// unknown. Main provides this by wrapping mtgmatcher.GetSet; tests
-	// inject a fake so the package does not need the live datastore.
+	// unknown. Main provides this by wrapping b.GetSet.
 	CanonicalSetCode func(b *mtgmatcher.Backend, setCode string) (string, error)
 
 	// BuildSetPayload gathers and converts one set's prices for the given

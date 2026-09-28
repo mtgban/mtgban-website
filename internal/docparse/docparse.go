@@ -30,7 +30,7 @@ type Entry struct {
 	// The UUID of the card
 	CardID string
 
-	// Error when mtgmatcher.Match() fails
+	// Error when the backend's Match fails
 	MismatchError error
 
 	// Error when multiple results are found
