@@ -372,12 +372,13 @@ func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperRes
 	return results, nil
 }
 
-// gameMap names every game a deployment can be configured as. A game missing
-// from it panics the newspaper cache at startup, so an entry has to exist
-// before an instance of that game is stood up - which is why the games
-// mtgmatcher registers are all here whether or not one is deployed yet.
-// Each name is TCGplayer's productLineName, spelled exactly: the newspaper
-// files its rows under it and the pages match it with =.
+// gameMap names every game a deployment can be configured as. For a game
+// missing from it, the newspaper stays empty and every refresh logs an
+// error, so an entry has to exist before an instance of that game is stood
+// up - which is why the games mtgmatcher registers are all here whether or
+// not one is deployed yet. Each name is TCGplayer's productLineName, spelled
+// exactly: the newspaper files its rows under it and the pages match it
+// with =.
 var gameMap = map[string]string{
 	"magic":         "Magic: The Gathering",
 	"lorcana":       "Disney Lorcana",
@@ -505,7 +506,8 @@ func (s *site) cacheNewspaper() {
 
 	game, found := gameMap[Config.Game]
 	if !found {
-		panic("missing game in newspaper map")
+		log.Printf("newspaper: %q is missing from gameMap, not caching", Config.Game)
+		return
 	}
 
 	if NewNewspaperDB == nil {

@@ -19,8 +19,9 @@ The pieces, and where each lives:
   a published symbol image where one exists, falling back to the keyrune
   glyph or the drawn badge above if the image fails to load or none exists.
 - `gameMap` / `gameBadgeMap` (`news.go`) — every game a deployment can be
-  configured as. Missing from `gameMap` panics the newspaper cache at
-  startup, so this has to exist before the game is stood up, not after.
+  configured as. For a game missing from `gameMap`, the newspaper stays
+  empty and every refresh logs an error, so this has to exist before the
+  game is stood up, not after.
 - `img/backs/<game>.webp` — the card back, served at `/img/backs/<game>.webp`
   by the `card_back` template func.
 - `registeredGames` (`games_coverage_test.go`) — kept in step with

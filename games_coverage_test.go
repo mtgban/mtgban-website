@@ -15,14 +15,14 @@ import (
 // blank import lands here doesn't first need a matching edit in this file.
 var registeredGames = mtgmatcher.RegisteredGames()
 
-// A game absent from gameMap panics the newspaper cache at startup
-// (news.go's "missing game in newspaper map"), so the entry has to exist
-// before an instance of that game is stood up rather than after the crash.
+// A game absent from gameMap gets no newspaper, cacheNewspaper logging an
+// error on every refresh, so the entry has to exist before an instance of
+// that game is stood up.
 func TestEveryRegisteredGameIsNamed(t *testing.T) {
 	for _, game := range registeredGames {
 		name, found := gameMap[game]
 		if !found {
-			t.Errorf("game %q has no gameMap entry; a deployment of it would panic at startup", game)
+			t.Errorf("game %q has no gameMap entry; a deployment of it would serve no newspaper", game)
 			continue
 		}
 		if name == "" {

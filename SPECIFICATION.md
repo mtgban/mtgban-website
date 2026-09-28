@@ -458,8 +458,8 @@ with their SQL (`newspaperPagesInitial`), all query one PostgreSQL
 `NewNewspaperDB` populated by external scripts into `scripts__*_cards`
 tables. Each page's query filters on `game_name`, substituted per
 deployment from `gameMap` (full game names for every game `mtgmatcher`
-registers, gundam/palworld included — a missing entry panics
-`cacheNewspaper()` at startup — each TCGplayer's exact `productLineName`,
+registers, gundam/palworld included — without an entry, every refresh
+logs it, pages left empty — each TCGplayer's exact `productLineName`,
 which is what the newspaper stores); the short form for the navbar wordmark
 comes from the sibling `gameBadgeMap`. `cacheNewspaper()` refreshes every
 3 h into an atomic pointer (`newspaperPagesPtr`), caching both a same-day

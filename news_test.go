@@ -2,6 +2,8 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"strings"
 	"testing"
 )
@@ -59,5 +61,26 @@ func TestNewspaperCalcDateFilterWithoutRowFilter(t *testing.T) {
 	}
 	if strings.Count(fragment, "0 DAY") != 1 {
 		t.Error("fragment should carry exactly one delay interval")
+	}
+}
+
+// A game missing from gameMap leaves the newspaper empty and logs which game
+// it was, rather than panicking: the entry only names the rows to read. The
+// lookup comes before the database check, so no database is needed here.
+func TestCacheNewspaperLogsAGameMissingFromGameMap(t *testing.T) {
+	prevGame, prevSkip, prevLog := Config.Game, SkipNewspaper, log.Writer()
+	t.Cleanup(func() {
+		Config.Game, SkipNewspaper = prevGame, prevSkip
+		log.SetOutput(prevLog)
+	})
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	Config.Game, SkipNewspaper = "nosuchgame", false
+
+	newSite().cacheNewspaper()
+
+	log.SetOutput(prevLog)
+	if !strings.Contains(logged.String(), `"nosuchgame" is missing from gameMap`) {
+		t.Errorf("log = %q, want a line naming the missing game", logged.String())
 	}
 }
