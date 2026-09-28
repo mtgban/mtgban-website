@@ -517,6 +517,9 @@ type GenericCard struct {
 	HotlistStore      string
 	GoodBuylist       float64
 	HighestBuylist    float64
+	CKSignal          string // "sell", "wait" or "", see ckbuylist.go
+	CKSignalTip       string
+	CKFacts           string
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
@@ -1142,6 +1145,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 	}
 	goodBuylist := getGoodBuylistPrice(cardID)
 	highestBuylist := getHighestBuylistPrice(cardID)
+	ck := ckSignalForCard(cardID)
 
 	return GenericCard{
 		UUID:        co.UUID,
@@ -1187,6 +1191,9 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		HotlistStore:      hotlistStore,
 		GoodBuylist:       goodBuylist,
 		HighestBuylist:    highestBuylist,
+		CKSignal:          ck.State,
+		CKSignalTip:       ck.Tip,
+		CKFacts:           ck.Facts,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,

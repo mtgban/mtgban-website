@@ -8,8 +8,11 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // Card Kingdom's buylist moves with its retail stock: CK pays more for cards
@@ -280,4 +283,85 @@ func ckFacts(q ckQuote, h ckHistory, hasHistory bool, today time.Time) string {
 		}
 	}
 	return strings.Join(parts, " · ")
+}
+
+// ckQuoteFrom reads CK's offer for a card from its buylist entries and its
+// stock from its inventory entries. CK's buylist keeps entries for cards it
+// is not buying, with no quantity, so buying needs a quantity as well as a
+// price.
+func ckQuoteFrom(offers []mtgban.BuylistEntry, stock []mtgban.InventoryEntry, stockKnown bool) ckQuote {
+	var q ckQuote
+	for _, entry := range offers {
+		if entry.Conditions != "NM" {
+			continue
+		}
+		q.ID = entry.OriginalID
+		q.Buy = entry.BuyPrice
+		q.Buying = entry.Quantity > 0 && entry.BuyPrice > 0
+		break
+	}
+	q.StockKnown = stockKnown
+	if stockKnown {
+		for _, entry := range stock {
+			q.Stock += entry.Quantity
+		}
+	}
+	return q
+}
+
+// ckSignalsPtr holds the signal of every card CK is buying.
+var ckSignalsPtr atomic.Pointer[map[string]ckSignal]
+
+// ckSignalsMu runs one rebuild at a time, so the last one to start, which
+// read the newest inputs, is the last one to publish.
+var ckSignalsMu sync.Mutex
+
+// rebuildCKSignals computes every card's signal from CK's live buylist and
+// stock, the loaded history and the P90s. It runs when any of them changes,
+// and hourly because the rules and facts count days.
+func rebuildCKSignals() {
+	ckSignalsMu.Lock()
+	defer ckSignalsMu.Unlock()
+
+	offers, _ := findVendorBuylist("CK")
+	// A missing inventory leaves stock unknown rather than zero.
+	stock, err := findSellerInventory("CK")
+	stockKnown := err == nil && len(stock) > 0
+	good := GetInfos()["goodP90"]
+	history := ckHistoryPtr.Load()
+	today := ckToday(time.Now())
+
+	signals := map[string]ckSignal{}
+	for cardID, entries := range offers {
+		q := ckQuoteFrom(entries, stock[cardID], stockKnown)
+		if !q.Buying {
+			continue
+		}
+		var p90 float64
+		if len(good[cardID]) > 0 {
+			p90 = good[cardID][0].Price
+		}
+		h, found := history.historyFor(q.ID, today)
+		sig := ckSignalFor(q, h, found, p90, today)
+		if sig != (ckSignal{}) {
+			signals[cardID] = sig
+		}
+	}
+	ckSignalsPtr.Store(&signals)
+}
+
+// refreshCKSignals reloads the history when the newspaper has a new day, and
+// rebuilds the signals either way.
+func (s *site) refreshCKSignals() {
+	s.loadCKHistory()
+	rebuildCKSignals()
+}
+
+// ckSignalForCard is a card's CK signal as of the last rebuild.
+func ckSignalForCard(cardID string) ckSignal {
+	signals := ckSignalsPtr.Load()
+	if signals == nil {
+		return ckSignal{}
+	}
+	return (*signals)[cardID]
 }
