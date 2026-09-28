@@ -597,6 +597,13 @@ func init() {
 
 var Config ConfigType
 
+// configMu serializes what changes Config while the site serves - a reload,
+// an editor save, a new API key - each across its file I/O, so none lands
+// between another's change and its save; its holder reads Config freely.
+// A change to the API secrets also takes apiUsersMutex, inside this lock:
+// readers that take only that one never wait on the bucket.
+var configMu sync.Mutex
+
 // APIGatewayConfig locates the API gateway the pricing page hands off to.
 type APIGatewayConfig struct {
 	// URL is the gateway's public origin, no trailing slash
@@ -1081,6 +1088,9 @@ func preloadConfig(configPath string) error {
 }
 
 func loadVars(port, datastorePath, aclPath, grantsPath string) error {
+	configMu.Lock()
+	defer configMu.Unlock()
+
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err

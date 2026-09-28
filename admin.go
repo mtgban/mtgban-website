@@ -1204,6 +1204,9 @@ func storeConfigFile(ctx context.Context, config ConfigType) error {
 // saveConfig writes config to the config file and, once it is there, makes
 // it the live one: the admin editor's save.
 func saveConfig(ctx context.Context, config ConfigType) error {
+	configMu.Lock()
+	defer configMu.Unlock()
+
 	err := storeConfigFile(ctx, config)
 	if err != nil {
 		return err
@@ -1227,10 +1230,10 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 		return "", errors.New("demo user API keys must expire")
 	}
 
-	apiUsersMutex.RLock()
-	key, found := Config.APIUserSecrets[user]
-	apiUsersMutex.RUnlock()
+	configMu.Lock()
+	defer configMu.Unlock()
 
+	key, found := Config.APIUserSecrets[user]
 	if !found {
 		var err error
 		key, err = randomString(15)
@@ -1246,14 +1249,13 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 		Config.APIUserSecrets[user] = key
 		apiUsersMutex.Unlock()
 
-		writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config.sourcePath)
+		err = storeConfigFile(ctx, Config)
 		if err != nil {
-			return "", err
-		}
-		defer writer.Close()
-
-		err = writeConfigFile(Config, writer)
-		if err != nil {
+			// Unsaved, the key would verify only until the next reload, and a
+			// second request for this user would find it and skip the save.
+			apiUsersMutex.Lock()
+			delete(Config.APIUserSecrets, user)
+			apiUsersMutex.Unlock()
 			return "", err
 		}
 	}
