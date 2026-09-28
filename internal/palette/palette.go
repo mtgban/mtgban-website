@@ -24,9 +24,8 @@ type NewspaperPage struct {
 
 // ArbitFilter is one arbitrage filter option offered as a palette target.
 type ArbitFilter struct {
-	Key       string
-	Title     string
-	ArbitOnly bool
+	Key   string
+	Title string
 }
 
 // Service exposes the palette endpoints, wired to the host's live datastore
@@ -542,10 +541,9 @@ func SleepersTargetsJSON() template.JS {
 	return template.JS(data)
 }
 
-// ArbitTargetsJSON produces targets for /arbit. variant adjusts visibility:
-// "reverse" hides ArbitOnly filters; "global" shows only those relevant to
-// the global view.
-func ArbitTargetsJSON(variant string, filters []ArbitFilter) template.JS {
+// ArbitTargetsJSON produces the targets for one arbitrage page: its sort
+// options, and the filters given, which are the ones that page shows.
+func ArbitTargetsJSON(filters []ArbitFilter) template.JS {
 	out := ArbitTargets{
 		Filters: []NavTarget{},
 		Sorts: []NavTarget{
@@ -560,9 +558,6 @@ func ArbitTargetsJSON(variant string, filters []ArbitFilter) template.JS {
 		},
 	}
 	for _, filter := range filters {
-		if variant == "global" && filter.ArbitOnly {
-			continue
-		}
 		out.Filters = append(out.Filters, NavTarget{
 			Value: filter.Key,
 			Label: filter.Title,

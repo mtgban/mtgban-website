@@ -339,9 +339,9 @@ var funcMap = template.FuncMap{
 	// each one once.
 	"palette_newspaper_targets": sync.OnceValue(func() template.JS { return palette.NewspaperTargetsJSON(paletteNewspaperPages()) }),
 	"palette_sleepers_targets":  sync.OnceValue(palette.SleepersTargetsJSON),
-	"palette_arbit_targets":     sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("arbit", paletteArbitFilters()) }),
-	"palette_reverse_targets":   sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("reverse", paletteArbitFilters()) }),
-	"palette_global_targets":    sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON("global", paletteArbitFilters()) }),
+	"palette_arbit_targets":     sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON(paletteArbitFilters("arbit")) }),
+	"palette_reverse_targets":   sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON(paletteArbitFilters("reverse")) }),
+	"palette_global_targets":    sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON(paletteArbitFilters("global")) }),
 	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
 	"api_plans_json":            apiPlansJSON,

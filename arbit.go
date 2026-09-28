@@ -97,6 +97,23 @@ type FilterOpt struct {
 	ReverseOnly bool
 }
 
+// Shown reports whether an arbitrage page shows the option as a chip, given
+// which page it is, whether the reader may use the beta options, and whether
+// the source is sealed. The page's filter bar and the command palette both
+// ask it.
+func (opt FilterOpt) Shown(globalMode, reverseMode, canShowAll, sealedSource bool) bool {
+	switch {
+	case opt.BetaFlag && !canShowAll,
+		opt.ArbitOnly && globalMode,
+		opt.GlobalOnly && !globalMode,
+		opt.ReverseOnly && !reverseMode,
+		opt.NoSealed && sealedSource,
+		opt.SealedOnly && !sealedSource:
+		return false
+	}
+	return true
+}
+
 // User-readable option name and associated function/visibility option
 var FilterOptConfig = map[string]FilterOpt{
 	"nocond": {

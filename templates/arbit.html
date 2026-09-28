@@ -169,18 +169,10 @@
             <span class="arb-filter-label">Show</span>
             {{range $.ArbitOptKeys}}
                 {{$key := .}}
-                {{$skipIfTesting := and (index $.ArbitOptConfig .).BetaFlag (not $.CanShowAll)}}
-                {{$skipIfGlobal := and (index $.ArbitOptConfig .).ArbitOnly $.GlobalMode}}
-                {{$skipIfArbit := and (index $.ArbitOptConfig .).GlobalOnly (not $.GlobalMode)}}
-                {{$skipIfNotReverse := and (index $.ArbitOptConfig .).ReverseOnly (not $.ReverseMode)}}
-                {{$skipIfSealed := and (index $.ArbitOptConfig .).NoSealed $sealedSource}}
-                {{$skipIfNotSealed := and (index $.ArbitOptConfig .).SealedOnly (not $sealedSource)}}
-                {{if and (and (not $skipIfTesting) (not $skipIfGlobal)) (and (and (not $skipIfNotSealed) (not $skipIfSealed)) (and (not $skipIfArbit) (not $skipIfNotReverse)))}}
-                    {{$cfg := index $.ArbitOptConfig .}}
-                    {{if $cfg}}
-                        {{$name := $cfg.Title}}
-                        <a class="arb-filter-chip {{if index $.ArbitFilters .}}on{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
-                    {{end}}
+                {{$cfg := index $.ArbitOptConfig .}}
+                {{if $cfg.Shown $.GlobalMode $.ReverseMode $.CanShowAll $sealedSource}}
+                    {{$name := $cfg.Title}}
+                    <a class="arb-filter-chip {{if index $.ArbitFilters .}}on{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
                 {{end}}
             {{end}}
             <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Filter edition...">
