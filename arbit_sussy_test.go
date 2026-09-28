@@ -224,7 +224,7 @@ func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 
 // TestArbitFilterOptionsRouteBySealedMode pins which of nosus/novolatile a
 // global page offers as a chip. Checks match "><title><" since the page
-// also embeds an always-on palette listing of every filter, sealed or not.
+// also embeds the palette's global list, which offers both for any source.
 func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 	seedArbitScraper(t, "SEALEDCHIP", true)
 	page := renderArbit(t, PageVars{
