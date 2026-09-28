@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
@@ -28,13 +29,17 @@ type site struct {
 	palette *palette.Service
 	offline *offlineapi.Service
 	reloads dsreload.Tracker
+
+	// fetchLastSold is how the Discord $$ lookup fetches a printing's recent
+	// sales: getLastSold, held here so a test can answer in its place.
+	fetchLastSold func(ctx context.Context, b *mtgmatcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error)
 }
 
 // newSite builds the services a deployment serves through. It runs at
 // startup, before any datastore has loaded, so every hook below reads the
 // site's current datastore at call time rather than now.
 func newSite() *site {
-	s := &site{}
+	s := &site{fetchLastSold: getLastSold}
 
 	// Pre-stored before the first load, so s.ds is never nil: nil numbers,
 	// names and palette keep the pre-load answers scan, 204 and no-store.

@@ -808,7 +808,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 
 		ogFields = embed.FormatSearchResult(externalURL(nil), searchRes)
 	} else if lastSold {
-		// Since grabLastSold is slow, spawn a goroutine and wait for the real
+		// Since the fetch is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message
 		go func() {
 			// The handler's recover does not reach this goroutine. Recovered
@@ -822,7 +822,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 			// report back to the reader.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			var lastSales []tcgplayer.LatestSalesData
-			lastSales, err = getLastSold(ctx, b, searchRes.CardID, false)
+			lastSales, err = s.fetchLastSold(ctx, b, searchRes.CardID, false)
 			cancel()
 			if err == nil {
 				ogFields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
