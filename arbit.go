@@ -444,7 +444,9 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	var blocklistVendors []string
 	blocklistVendorsOpt := GetParamFromSig(sig, "ArbitDisabledVendors")
 	if blocklistVendorsOpt == "" {
-		blocklistVendors = Config.ArbitBlockVendors
+		// Clipped: the cookie's vendors are appended below, and an append into
+		// the config's spare capacity would be seen by every other request
+		blocklistVendors = slices.Clip(Config.ArbitBlockVendors)
 	} else if blocklistVendorsOpt != "NONE" {
 		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
 	}
