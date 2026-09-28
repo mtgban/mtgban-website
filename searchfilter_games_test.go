@@ -60,11 +60,11 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 		ran++
 
 		t.Run(game, func(t *testing.T) {
-			useDatastore(t, testSite.newDatastore(loaded, time.Now()))
+			ds := testSite.newDatastore(loaded, time.Now())
 
 			var tightened int
-			for _, uuid := range backend().GetUUIDs() {
-				co, err := backend().GetUUID(uuid)
+			for _, uuid := range ds.backend.GetUUIDs() {
+				co, err := ds.backend.GetUUID(uuid)
 				if err != nil || co.Sealed || co.SetCode == "" || co.Number == "" {
 					continue
 				}
@@ -72,14 +72,14 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 					!strings.ContainsFunc(co.Number, isNotDigit) {
 					continue
 				}
-				_, err = backend().GetSet(co.SetCode)
+				_, err = ds.backend.GetSet(co.SetCode)
 				if err != nil {
 					continue
 				}
 				tightened++
 
 				query := co.SetCode + " " + co.Number
-				keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+				keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 				if err != nil {
 					t.Errorf("%s: %q: %v", game, query, err)
 					continue

@@ -86,10 +86,10 @@ func TestNumbersSnapshotKeepsStoredForms(t *testing.T) {
 	}
 }
 
-// TestNumberSearchMatchesUnseededSearch publishes a copy of the live
-// datastore with numbers disabled, then the live datastore itself (whose
-// numbers newDatastore already built), so searchAndFilter sees each in turn
-// through currentDatastore() the way a request would.
+// TestNumberSearchMatchesUnseededSearch compares a copy of the live
+// datastore with numbers disabled against the live datastore itself (whose
+// numbers newDatastore already built), feeding searchAndFilter each one
+// directly the way a caller already holding a ds would.
 func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 	if len(backend().GetUUIDs()) == 0 {
 		t.Skip("Need a datastore")
@@ -101,10 +101,8 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
 			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
-			useDatastore(t, &withoutNumbers)
-			want, wantErr := searchAndFilter(currentDatastore(), config)
-			useDatastore(t, base)
-			got, gotErr := searchAndFilter(currentDatastore(), config)
+			want, wantErr := searchAndFilter(&withoutNumbers, config)
+			got, gotErr := searchAndFilter(base, config)
 			slices.Sort(want)
 			slices.Sort(got)
 			if !slices.Equal(got, want) || (gotErr == nil) != (wantErr == nil) {
@@ -127,13 +125,11 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 
 	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
 		config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
-		useDatastore(b, &withoutNumbers)
-		scanned, err := searchAndFilter(currentDatastore(), config)
+		scanned, err := searchAndFilter(&withoutNumbers, config)
 		if err != nil {
 			b.Fatal(err)
 		}
-		useDatastore(b, base)
-		seeded, err := searchAndFilter(currentDatastore(), config)
+		seeded, err := searchAndFilter(base, config)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -149,10 +145,10 @@ func BenchmarkNumbersSnapshotSearch(b *testing.B) {
 				if mode == "seeded" {
 					ds = base
 				}
-				useDatastore(b, ds)
 				b.ReportAllocs()
 				for b.Loop() {
-					if _, err := searchAndFilter(currentDatastore(), config); err != nil {
+					_, err := searchAndFilter(ds, config)
+					if err != nil {
 						b.Fatal(err)
 					}
 				}

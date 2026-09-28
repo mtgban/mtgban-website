@@ -7,29 +7,30 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-// useDatastore publishes ds for the duration of the calling test or
-// benchmark, restoring whatever was live when it returns. Safe to call more
-// than once per test: each call restores to what it overwrote, so nested or
-// repeated swaps unwind back to the true original.
-func useDatastore(tb testing.TB, ds *datastore) {
-	tb.Helper()
-	previous := liveDatastore.Swap(ds)
-	tb.Cleanup(func() { liveDatastore.Store(previous) })
-}
+// backend and currentDatastore read testSite, which TestMain loads; a test
+// with a site of its own reads that site. Production code declares neither,
+// and one reintroduced there would collide with these.
+func backend() *mtgmatcher.Backend { return testSite.backend() }
+func currentDatastore() *datastore { return testSite.datastore() }
 
-func TestCurrentDatastorePublishesAndRestoresAtomically(t *testing.T) {
-	useDatastore(t, nil)
-	got := currentDatastore()
+// TestSiteDatastorePublishesAtomically checks that a site never serves a nil
+// datastore, even before anything has been published to it, and that
+// publishing one atomically flips every reader to the new value.
+func TestSiteDatastorePublishesAtomically(t *testing.T) {
+	// A private site, not testSite: this wants the state before anything at
+	// all has published, which testSite left behind in TestMain.
+	s := newSite()
+	got := s.datastore()
 	if got == nil {
-		t.Fatal("currentDatastore() returned nil before any datastore was published")
+		t.Fatal("datastore() returned nil before any datastore was published")
 	} else if len(got.backend.GetUUIDs()) != 0 {
 		t.Fatalf("empty datastore contained %d cards", len(got.backend.GetUUIDs()))
 	}
 
-	want := testSite.newDatastore(&mtgmatcher.Backend{}, time.Now())
-	useDatastore(t, want)
-	got = currentDatastore()
+	want := s.newDatastore(&mtgmatcher.Backend{}, time.Now())
+	s.ds.Store(want)
+	got = s.datastore()
 	if got != want {
-		t.Fatal("currentDatastore() did not return the atomically published datastore")
+		t.Fatal("datastore() did not return the atomically published datastore")
 	}
 }

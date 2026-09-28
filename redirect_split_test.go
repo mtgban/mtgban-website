@@ -29,9 +29,8 @@ func TestCardRedirectReadsAnEscapedSlash(t *testing.T) {
 	}
 }
 
-// The same against the datastore that numbers this way, where one is at hand.
-// Loading a second datastore replaces the one TestMain loaded, so this runs
-// only when asked for by name and puts the first one back after:
+// The same against the datastore that numbers this way, where one is at
+// hand. Opening it is slow, so this runs only when asked for by name:
 //
 //	FLESHANDBLOOD_PATH=... go test -run SplitNumbersAgainstTheGameThatHasThem
 func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
@@ -48,11 +47,16 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 	if err != nil {
 		t.Skip("loading the datastore:", err)
 	}
-	useDatastore(t, testSite.newDatastore(b, time.Now()))
+
+	// A private site, not testSite: CardRedirect below must resolve
+	// against this datastore, not whatever testSite has loaded.
+	s := newSite()
+	ds := s.newDatastore(b, time.Now())
+	s.ds.Store(ds)
 
 	var split int
-	for _, uuid := range backend().GetUUIDs() {
-		co, err := backend().GetUUID(uuid)
+	for _, uuid := range ds.backend.GetUUIDs() {
+		co, err := ds.backend.GetUUID(uuid)
 		if err != nil || co.Sealed || !strings.Contains(co.Number, "/") {
 			continue
 		}
@@ -64,13 +68,13 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 		}
 
 		rec := httptest.NewRecorder()
-		testSite.CardRedirect(rec, httptest.NewRequest(http.MethodGet, link, nil))
+		s.CardRedirect(rec, httptest.NewRequest(http.MethodGet, link, nil))
 		loc, err := url.Parse(rec.Header().Get("Location"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		query := loc.Query().Get("q")
-		keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+		keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 		if err != nil {
 			t.Fatal(err)
 		}
