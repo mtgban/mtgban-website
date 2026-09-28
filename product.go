@@ -867,7 +867,11 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 
 	log.Printf("Running %d buylist metrics for %s", len(reducers), store)
 
-	threeMonthsAgo := time.Now().AddDate(0, 0, -90)
+	now := time.Now()
+	threeMonthsAgo := now.AddDate(0, 0, -90)
+	// PriorMax leaves out today's row, which the stash dates by this same
+	// local clock (snapshotDate).
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	// One aggregate query for the whole buylist instead of N per-card lookups.
 	// Postgres computes the stats; each reducer just selects the field it
@@ -881,9 +885,9 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 			return nil
 		}
 		source = fmt.Sprintf("provider %d", provider)
-		statsByCard, err = PricesArchiveDB.GetAggregatePriceStatsLong(context.Background(), provider, threeMonthsAgo)
+		statsByCard, err = PricesArchiveDB.GetAggregatePriceStatsLong(context.Background(), provider, threeMonthsAgo, today)
 	} else {
-		statsByCard, err = PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo)
+		statsByCard, err = PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo, today)
 	}
 	if err != nil {
 		log.Println(err)
