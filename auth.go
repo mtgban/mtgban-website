@@ -738,18 +738,13 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 
 		// Restrict stack size to fit into discord message
 		buf := make([]byte, 1<<16)
-		runtime.Stack(buf, true)
+		n := runtime.Stack(buf, false)
+		buf = buf[:n]
 		if len(buf) > 1024 {
 			buf = buf[:1024]
 		}
 
-		var msg string
-		err, ok := errPanic.(error)
-		if ok {
-			msg = err.Error()
-		} else {
-			msg = "unknown error"
-		}
+		msg := fmt.Sprint(errPanic)
 		ServerNotify("panic", msg, true)
 		ServerNotify("panic", string(buf))
 		ServerNotify("panic", "source request: "+r.URL.String())
