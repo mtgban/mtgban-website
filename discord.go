@@ -654,8 +654,8 @@ func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
 func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCreate) {
-	// Recovered as guildCreate is, but only on this goroutine: the search
-	// below fans out to goroutines of its own, which do not recover.
+	// Recovered as guildCreate is. The scans the search below fans out to
+	// recover their own panics, each costing only its side of the reply.
 	defer recoverJob("discord messageCreate")
 
 	ds := s.datastore()

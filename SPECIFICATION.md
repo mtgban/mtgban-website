@@ -202,9 +202,11 @@ the admin `server` action's, which only sleeps, logs and calls
 goroutines stay fatal on purpose, as their errors are: the scraper
 goroutine in `main()`, including the `runSealedAnalysis()`,
 `warmVariantCacheIfEnabled()` and `RefreshManifest()` it runs after the
-load, and the one running `ListenAndServe`. The goroutines
-`searchParallelNG`, `fetchRosterPrices` and `runningWorkflows` fan out to
-do not recover, so a panic in one still ends the process.
+load, and the one running `ListenAndServe`. The workers
+`searchParallelNG` fans out to each defer `recoverJob()` too, so a panic
+in one costs only its share of the answer: its side of the search. The
+goroutines `fetchRosterPrices` and `runningWorkflows` fan out to do not
+recover, so a panic in one still ends the process.
 
 ### 2.3 Data loading pipeline
 
@@ -596,8 +598,9 @@ last-sold lookups (5 s fetch timeout, 30 s message-edit timeout);
 `messageCreate` each defer `recoverJob()` (recover.go), as does the
 goroutine a `$$` lookup fetches on: a panic on one of them is logged and
 posted to the server webhook, and costs that one event (a `$$` reply falls
-back to the timeout) rather than the process. The goroutines the search of
-a `!card`/`?card` lookup fans out to (`searchParallelNG`) do not recover.
+back to the timeout) rather than the process. The scans the search of a
+`!card`/`?card` lookup fans out to (`searchParallelNG`) recover their own
+panics, so one that panics costs only its side of the reply's prices.
 Automatic affiliate-link rewriting (`checkForLinks`: Card Kingdom, Cool
 Stuff Inc, TCGplayer, Star City Games, Manapool, CardTrader, Amazon) is
 gated to the configured Discord server *and* the default game, so a non-Magic

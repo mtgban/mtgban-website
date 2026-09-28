@@ -235,12 +235,13 @@ commit to this repo can complete on its own.
    `recovered()`, start a new goroutine or Discord handler with
    `defer recoverJob("<name>")` (recover.go), and have a loop that must
    keep serving recover each run in a function of its own, as
-   `runAccessReload` does, not the loop around it. Among the goroutines
-   that do not recover: two startup ones, fatal on purpose (the scraper
-   goroutine in `main()`, with the `runSealedAnalysis()`,
-   `warmVariantCacheIfEnabled()` and `RefreshManifest()` it runs, and the
-   one running `ListenAndServe`), and those `searchParallelNG`,
-   `fetchRosterPrices` and `runningWorkflows` fan out to.
+   `runAccessReload` does, not the loop around it. A request's fan-out
+   workers defer it too, so a panic costs only that worker's share of the
+   answer. Among the goroutines that do not recover: two startup ones,
+   fatal on purpose (the scraper goroutine in `main()`, with the
+   `runSealedAnalysis()`, `warmVariantCacheIfEnabled()` and
+   `RefreshManifest()` it runs, and the one running `ListenAndServe`), and
+   those `fetchRosterPrices` and `runningWorkflows` fan out to.
 
 ## Known issues / refactors pending
 

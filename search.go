@@ -2286,13 +2286,17 @@ func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[s
 	foundSellers = map[string]map[string][]SearchEntry{}
 	foundVendors = map[string]map[string][]SearchEntry{}
 
+	// Each scan recovers its own panic, which then costs only its side: the
+	// map it would have filled stays empty.
 	var wg sync.WaitGroup
 	wg.Go(func() {
+		defer recoverJob("search sellers scan")
 		if !config.SkipRetail {
 			foundSellers = searchSellersNG(cardIDs, config)
 		}
 	})
 	wg.Go(func() {
+		defer recoverJob("search vendors scan")
 		if !config.SkipBuylist {
 			foundVendors = searchVendorsNG(cardIDs, config)
 		}
