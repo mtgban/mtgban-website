@@ -1081,13 +1081,17 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 		return err
 	}
 
-	// Build the game-agnostic chart provider registry from the dataset config.
-	buildProviderRegistry()
+	applyOverrides(port, datastorePath, aclPath, grantsPath)
+	finishConfig()
+	return nil
+}
 
-	// The -port and -ds flags, when provided, override whatever the config
-	// file set. This must happen after the decode above, which would otherwise
-	// clobber the flag values with the config's fields (breaking blue-green
-	// deploys that run instances on distinct ports).
+// applyOverrides sets the port and the datastore, ACL and grants paths to the
+// values given, over whatever the config file said; an empty one leaves the
+// file's. Startup passes the flags, ?reboot=config the running values. It must
+// follow the decode, which would otherwise clobber them (breaking blue-green
+// deploys that run instances on distinct ports).
+func applyOverrides(port, datastorePath, aclPath, grantsPath string) {
 	if port != "" {
 		Config.Port = port
 	}
@@ -1100,6 +1104,14 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	if grantsPath != "" {
 		Config.PatreonGrantsPath = grantsPath
 	}
+}
+
+// finishConfig completes a newly loaded Config: it rebuilds the chart provider
+// registry from it, defaults what it left unset, and defaults BAN_SECRET when
+// the environment has none.
+func finishConfig() {
+	// Build the game-agnostic chart provider registry from the dataset config.
+	buildProviderRegistry()
 
 	// Ensure needed defaults
 	if Config.Port == "" {
@@ -1127,8 +1139,6 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	if apiGatewaySecret() == "" {
 		log.Println("api_user_secrets has no " + apiGatewayUser + " entry, API trial and sign-in handoff disabled")
 	}
-
-	return nil
 }
 
 // applyAPIGatewayDefaults fills api_gateway so the pricing page always has a
