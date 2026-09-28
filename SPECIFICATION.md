@@ -129,6 +129,9 @@ Boot sequence (`main()`):
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
    - `33 */3 * * *` — `s.cacheNewspaper()`
+   - `45 * * * *` — `s.loadCKHistory()` (ckbuylist.go): reloads CK's stock
+     history once the newspaper has a new day; `main()` also runs it once
+     at startup, on a goroutine of its own under `recoverJob()`
    - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
@@ -186,7 +189,8 @@ and each debounced offline refresh through `recovered()`; the Discord
 handlers and the `$$` lookup's fetch, the newspaper refresh a datastore
 load starts, the goroutines the admin page's `update`, `snapshot` and
 `tcgcsv` actions start, the scraper reloads a key-overrides save starts,
-and each access-listener reload through `recoverJob()`. A deploy through
+the startup run of `s.loadCKHistory()`, and each access-listener
+reload through `recoverJob()`. A deploy through
 `update` that fails, by an error or a recovered panic, leaves the old
 process serving, with no restart to wait for; a panic is reported, an
 error only logged. `dsreload` recovers its own panics without posting
