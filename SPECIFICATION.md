@@ -319,7 +319,7 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 
 | Wrapper | Used for | Behavior |
 |---|---|---|
-| `noSigning` | Home, Guide, Privacy, Offline page, suggest/chart/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie; lazily initializes `ServerURL` on the first trusted-host request |
+| `noSigning` | Home, Guide, Privacy, Offline page, suggest/chart/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
 | `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email; POST only when `NavElem.CanPOST` |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET` |
 
@@ -429,7 +429,7 @@ override; phone UA detection via `mileusna/useragent`).
 - **Suggest** (`SuggestAPI` in `api_suggest.go`, matching in
   `internal/suggest`): no longer a live prefix scan of
   `mtgmatcher.AllNames()` per request. A `suggest.Names` is built once when
-  the datastore (re)loads (`suggest.NewNames()`, called from
+  the datastore (re)loads (`suggest.NewNames(singles, sealed)`, called from
   `s.newDatastore()`), folding every name
   (diacritics/case/punctuation stripped) and also "squashing" spaces out of
   the folded form, into separate sorted singles/sealed views searched by

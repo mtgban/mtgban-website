@@ -244,9 +244,8 @@ commit to this repo can complete on its own.
 
 ## Known issues / refactors pending
 
-`todo/refactor.md` has the full prioritized plan, but it's a local, untracked
-planning doc — not every clone of this repo will have it. Highlights, spot-
-checked against the current tree rather than copied wholesale:
+`todo/refactor.md` has the full prioritized plan. Highlights, spot-checked
+against the current tree rather than copied wholesale:
 
 - **Phase 0** (done): tests compile, `filterEnabledStores` removed.
 - **Phase 1** (high ROI, behavior-preserving): extract shared helpers. Done so
@@ -264,8 +263,8 @@ checked against the current tree rather than copied wholesale:
 - **Phase 4** (testing): add tests for auth logic, search parser, price aggregation, arbitrage math
 
 Phases 2–4 above are copied from `todo/refactor.md` as of the same date and
-were not independently re-verified — check that file directly if you have it,
-rather than trusting this list indefinitely.
+were not independently re-verified — check that file directly rather than
+trusting this list indefinitely.
 
 ## Gotchas
 
