@@ -118,6 +118,10 @@ func cleanupDiscord() {
 // This function will be called every time the bot is invited to a discord
 // server and tries to join it.
 func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
+	// discordgo runs each handler on a bare goroutine, where a panic would
+	// end the process; recovered, it costs only this event.
+	defer recoverJob("discord guildCreate")
+
 	// Set a "is playing" status
 	s.UpdateGameStatus(0, "http://mtgban.com")
 
@@ -655,6 +659,10 @@ func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
 func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCreate) {
+	// Recovered as guildCreate is, but only on this goroutine: the search
+	// below fans out to goroutines of its own, which do not recover.
+	defer recoverJob("discord messageCreate")
+
 	ds := s.datastore()
 	b := ds.backend
 	// Ignore requests if starting up
@@ -803,6 +811,10 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		// Since grabLastSold is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message
 		go func() {
+			// The handler's recover does not reach this goroutine. Recovered
+			// here, a panic leaves the reply to the timeout below.
+			defer recoverJob("discord last sold")
+
 			channel = make(chan *discordgo.MessageEmbed)
 			var errMsg string
 			// The fetch lives here rather than behind the formatting: it is

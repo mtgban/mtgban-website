@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // serverWebhook points ServerNotify at a webhook of the test's own and
@@ -165,4 +168,48 @@ func TestRecoveredReportsTheJob(t *testing.T) {
 	if source != "source job: cron test" {
 		t.Errorf("source = %q, want the job", source)
 	}
+}
+
+// discordgo runs each event handler on a goroutine of its own, so a panic
+// in one is reported and costs only that event.
+func TestDiscordHandlersRecover(t *testing.T) {
+	session, err := discordgo.New("Bot test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("guildCreate", func(t *testing.T) {
+		posts := serverWebhook(t)
+
+		// A GuildCreate that carries no guild.
+		go guildCreate(session, &discordgo.GuildCreate{})
+
+		_, _, source := panicReport(t, posts)
+		if source != "source job: discord guildCreate" {
+			t.Errorf("source = %q, want the handler", source)
+		}
+	})
+
+	t.Run("messageCreate", func(t *testing.T) {
+		posts := serverWebhook(t)
+
+		// The handler ignores messages until scrapers are loaded: one nil
+		// each gets past that check, then a message with no author panics.
+		prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+		t.Cleanup(func() {
+			sellersPtr.Store(prevSellers)
+			vendorsPtr.Store(prevVendors)
+		})
+		sellers := []mtgban.Seller{nil}
+		vendors := []mtgban.Vendor{nil}
+		sellersPtr.Store(&sellers)
+		vendorsPtr.Store(&vendors)
+
+		go testSite.messageCreate(session, &discordgo.MessageCreate{Message: &discordgo.Message{Content: "!Lightning Bolt"}})
+
+		_, _, source := panicReport(t, posts)
+		if source != "source job: discord messageCreate" {
+			t.Errorf("source = %q, want the handler", source)
+		}
+	})
 }
