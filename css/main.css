@@ -933,6 +933,16 @@ span.emoji {
 .bl-prices .bl-good-high { color: var(--asuccess); }
 .bl-prices .bl-good-low { color: var(--adanger); }
 
+/* Card Kingdom's buylist signal and stock facts (buylist_ck) */
+.bl-ck {
+    display: block;
+    font-size: var(--text-2xs);
+    color: var(--greytext);
+}
+.bl-ck-sell { color: var(--asuccess); }
+.bl-ck-wait { color: var(--awarning); }
+.bl-ck[title] { cursor: help; }
+
 table.tiers {
     margin: 10px;
 }
