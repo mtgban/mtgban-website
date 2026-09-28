@@ -233,6 +233,12 @@ type NewspaperPage struct {
 	NeedsBuylist bool
 }
 
+// shown reports whether the newspaper shows the page on this deployment:
+// the pages built on a buylist are Magic's alone.
+func (page NewspaperPage) shown() bool {
+	return !page.NeedsBuylist || Config.Game == DefaultGame
+}
+
 // newspaperColumnSetters maps a SQL column name (everything past the
 // seven-column positional header read by getResults) to a function that
 // parses the raw cell value and writes it to the NewspaperResult. Several
@@ -529,7 +535,7 @@ func (s *site) cacheNewspaper() {
 		if next[i].Query == "" {
 			continue
 		}
-		if next[i].NeedsBuylist && Config.Game != DefaultGame {
+		if !next[i].shown() {
 			continue
 		}
 
@@ -1157,7 +1163,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	newspaperPages := GetNewspaperPages()
 	for _, newspage := range newspaperPages {
-		if newspage.NeedsBuylist && Config.Game != DefaultGame {
+		if !newspage.shown() {
 			continue
 		}
 		pageVars.ToC = append(pageVars.ToC, newspage)
