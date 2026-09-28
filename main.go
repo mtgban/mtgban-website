@@ -1259,6 +1259,19 @@ func datastoreGame() string {
 	return Config.Game
 }
 
+// splitStores reads a -stores value: comma-separated, each name trimmed of
+// spaces, empty names dropped.
+func splitStores(value string) []string {
+	var stores []string
+	for _, store := range strings.Split(value, ",") {
+		store = strings.TrimSpace(store)
+		if store != "" {
+			stores = append(stores, store)
+		}
+	}
+	return stores
+}
+
 func main() {
 	configFilePath := flag.String("cfg", "", "Load configuration file")
 	port := flag.String("port", "", "Override server port")
@@ -1269,6 +1282,7 @@ func main() {
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
+	storesFlag := flag.String("stores", "", "Load only these stores' dumps, comma-separated (default: scraper_config.stores, else every store)")
 	flag.BoolVar(&SkipNewspaper, "nonews", false, "Do not load newspaper data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
@@ -1423,6 +1437,10 @@ func main() {
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
 	} else {
+		stores := splitStores(*storesFlag)
+		if len(stores) == 0 {
+			stores = Config.ScraperConfig.Stores
+		}
 		go func() {
 			log.Println("Loading scrapers")
 			bucket, err := openDumpsBucket(context.Background())
@@ -1430,7 +1448,7 @@ func main() {
 				log.Fatalln("error opening the dumps bucket:", err)
 			}
 			DataBucket = bucket
-			err = loadScrapersNG(bucket, Config.ScraperConfig.Stores)
+			err = loadScrapersNG(bucket, stores)
 			if err != nil {
 				log.Fatalln("error loading scrapers:", err)
 			}
