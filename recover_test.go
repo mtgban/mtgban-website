@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/mtgban/go-mtgban/mtgban"
+
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // serverWebhook points ServerNotify at a webhook of the test's own and
@@ -212,4 +216,60 @@ func TestDiscordHandlersRecover(t *testing.T) {
 			t.Errorf("source = %q, want the handler", source)
 		}
 	})
+}
+
+// panicBucket is a dumps bucket whose every read panics.
+type panicBucket struct{}
+
+func (panicBucket) NewReader(context.Context, string) (io.ReadCloser, error) {
+	panic(errors.New("the bucket read broke"))
+}
+
+// Saving key overrides reloads each affected scraper on a goroutine of its
+// own, where a load that panics would otherwise end the process.
+func TestOverrideReloadRecovers(t *testing.T) {
+	posts := serverWebhook(t)
+
+	prevBucket, prevIdx := DataBucket, scraperIndexPtr.Load()
+	t.Cleanup(func() {
+		DataBucket = prevBucket
+		scraperIndexPtr.Store(prevIdx)
+	})
+	DataBucket = panicBucket{}
+	scraperIndexPtr.Store(newScraperIndex())
+	updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK"}})
+
+	reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
+
+	_, _, source := panicReport(t, posts)
+	if source != "source job: override reload cardkingdom/retail/CK" {
+		t.Errorf("source = %q, want the reload", source)
+	}
+}
+
+// The admin page hands a snapshot to a goroutine of its own. A panic there
+// is reported, and the stash is left free to run again.
+func TestAdminSnapshotRecovers(t *testing.T) {
+	posts := serverWebhook(t)
+
+	prevDB, prevSellers := PricesArchiveDB, sellersPtr.Load()
+	t.Cleanup(func() {
+		PricesArchiveDB = prevDB
+		sellersPtr.Store(prevSellers)
+	})
+	// Any archive gets the stash past its first check, and a nil seller
+	// panics it on the first read.
+	PricesArchiveDB = &timeseries.Client{}
+	sellers := []mtgban.Seller{nil}
+	sellersPtr.Store(&sellers)
+
+	testSite.Admin(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin?reboot=snapshot", nil))
+
+	_, _, source := panicReport(t, posts)
+	if source != "source job: admin stashInTimeseries" {
+		t.Errorf("source = %q, want the snapshot", source)
+	}
+	if IsStashingInProgress() {
+		t.Error("the stash still counts as running after its panic")
+	}
 }

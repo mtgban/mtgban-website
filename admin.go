@@ -211,7 +211,12 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "Deploying...")
 		doReboot = true
 
+		// recoverPanic does not reach a goroutine the handler starts. A
+		// deploy that fails here, by an error or a recovered panic, leaves
+		// this process serving: no restart follows "Deploying...".
 		go func() {
+			defer recoverJob("admin update")
+
 			out, err := pullCode()
 			if err != nil {
 				log.Println("git -", err)
@@ -286,7 +291,10 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if IsStashingInProgress() {
 			v.Set("msg", "Stashing is already in progress")
 		} else {
-			go s.stashInTimeseries()
+			go func() {
+				defer recoverJob("admin stashInTimeseries")
+				s.stashInTimeseries()
+			}()
 		}
 
 	case "tcgcsv":
@@ -297,7 +305,10 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if IsTCGCSVStashing() {
 			v.Set("msg", "TCGCSV ingestion is already in progress")
 		} else {
-			go stashTCGCSVPrices()
+			go func() {
+				defer recoverJob("admin stashTCGCSVPrices")
+				stashTCGCSVPrices()
+			}()
 		}
 
 	case "server":
