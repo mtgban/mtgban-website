@@ -1492,20 +1492,22 @@ func main() {
 	s.offline.StartRefresher()
 
 	if !DevMode {
-		// Set up new refreshes as needed
+		// Set up new refreshes as needed. The library runs each job on a bare
+		// goroutine, where a panic would end the process: recovered reports it
+		// instead, and the job runs again at its next time.
 		c := cron.New()
 
 		// Take a snapshot twice a day
-		c.AddFunc("0 */12 * * *", s.stashInTimeseries)
+		c.AddFunc("0 */12 * * *", recovered("cron stashInTimeseries", s.stashInTimeseries))
 
 		// Update set values with new prices
-		c.AddFunc("30 */12 * * *", s.runSealedAnalysis)
+		c.AddFunc("30 */12 * * *", recovered("cron runSealedAnalysis", s.runSealedAnalysis))
 
 		// Reload DB Newspaper every 3 hours
-		c.AddFunc("33 */3 * * *", s.cacheNewspaper)
+		c.AddFunc("33 */3 * * *", recovered("cron cacheNewspaper", s.cacheNewspaper))
 
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
-		c.AddFunc("20 */12 * * *", s.offline.RequestRefresh)
+		c.AddFunc("20 */12 * * *", recovered("cron RequestRefresh", s.offline.RequestRefresh))
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
@@ -1516,9 +1518,9 @@ func main() {
 		// leave tcgcsv_config out here and let the crons stay unregistered; the
 		// standalone process takes the same cross-process crawl lock either way.
 		if TCGCSVService != nil {
-			c.AddFunc("0 21 * * *", stashTCGCSVPrices)
+			c.AddFunc("0 21 * * *", recovered("cron stashTCGCSVPrices", stashTCGCSVPrices))
 			// Product metadata changes rarely; refresh the catalog weekly.
-			c.AddFunc("0 22 * * 1", stashTCGCSVProducts)
+			c.AddFunc("0 22 * * 1", recovered("cron stashTCGCSVProducts", stashTCGCSVProducts))
 		}
 
 		// Refresh the chart checkpoints. Magic reads its ban markers from a
@@ -1527,12 +1529,12 @@ func main() {
 		// load is not that, on a process that stays up for weeks. It doubles as
 		// the retry for a boot-time load that failed: a fetch that never
 		// succeeded leaves the index empty and every chart without its markers.
-		c.AddFunc("15 */6 * * *", refreshCheckpoints)
+		c.AddFunc("15 */6 * * *", recovered("cron refreshCheckpoints", refreshCheckpoints))
 
 		// Alarm on a store whose retail or buylist data has gone stale (see
 		// staleness.go); notifies only on the transition, so this can run
 		// often without repeating itself.
-		c.AddFunc("0 * * * *", checkStaleness)
+		c.AddFunc("0 * * * *", recovered("cron checkStaleness", checkStaleness))
 
 		c.Start()
 	}

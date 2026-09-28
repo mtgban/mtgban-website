@@ -117,7 +117,11 @@ Boot sequence (`main()`):
    `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
 7. `s.offline.StartRefresher()` — one debounced goroutine that every
    runtime manifest refresh funnels through.
-8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go):
+8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go). The
+   library runs each on a bare goroutine, so each is registered through
+   `recovered()` (recover.go): a panic is logged and posted to the server
+   webhook with its stack, as a request's is, and the job runs again at its
+   next time rather than taking the process down:
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
    - `33 */3 * * *` — `s.cacheNewspaper()`

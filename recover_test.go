@@ -149,3 +149,20 @@ func TestRecoverPanicReportsTheRequest(t *testing.T) {
 		t.Errorf("source = %q, want the request", source)
 	}
 }
+
+// cron.v2 runs each job on a goroutine of its own, where an unrecovered
+// panic ends the process. Run through recovered, the job's panic is
+// reported instead, naming the job.
+func TestRecoveredReportsTheJob(t *testing.T) {
+	posts := serverWebhook(t)
+
+	go recovered("cron test", func() { panic(errors.New("the job broke")) })()
+
+	message, _, source := panicReport(t, posts)
+	if message != "the job broke" {
+		t.Errorf("message = %q, want the panic's", message)
+	}
+	if source != "source job: cron test" {
+		t.Errorf("source = %q, want the job", source)
+	}
+}
