@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"html/template"
+	"maps"
 	"slices"
 	"testing"
 
@@ -44,6 +45,41 @@ func TestPaletteArbitTargets(t *testing.T) {
 		}
 		if !slices.Equal(got, tt.want) {
 			t.Errorf("%s offers %v\nwant %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestPaletteNewspaperTargets pins the newspaper pages the palette offers
+// in each game to the ones the newspaper shows there: the three built on a
+// buylist are Magic's alone. syp stays on every game's list, since whether
+// a game has an SYP buylist is only known once its vendors load, while the
+// list is built once.
+func TestPaletteNewspaperTargets(t *testing.T) {
+	prev := Config.Game
+	t.Cleanup(func() { Config.Game = prev })
+
+	magic := []string{"combined_spike_score", "spike_score",
+		"greatest_increase_listings", "greatest_decrease_listings",
+		"greatest_increase_buylist", "greatest_decrease_buylist", "syp"}
+	others := []string{"spike_score", "greatest_increase_listings",
+		"greatest_decrease_listings", "syp"}
+	for _, game := range slices.Sorted(maps.Keys(gameMap)) {
+		Config.Game = game
+		var targets []palette.NavTarget
+		err := json.Unmarshal([]byte(palette.NewspaperTargetsJSON(paletteNewspaperPages())), &targets)
+		if err != nil {
+			t.Fatalf("%s: %v", game, err)
+		}
+		var got []string
+		for _, target := range targets {
+			got = append(got, target.Value)
+		}
+		want := others
+		if game == DefaultGame {
+			want = magic
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s offers %v\nwant %v", game, got, want)
 		}
 	}
 }

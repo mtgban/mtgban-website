@@ -863,11 +863,15 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 }
 
 // paletteNewspaperPages lists the newspaper views the command palette
-// offers as jump targets. It reads the pages as declared: cacheNewspaper
-// refreshes a page's results, never its title or option.
+// offers as jump targets, those the newspaper shows on this deployment. It
+// reads the pages as declared: cacheNewspaper refreshes a page's results,
+// never its title or option.
 func paletteNewspaperPages() []palette.NewspaperPage {
 	out := make([]palette.NewspaperPage, 0, len(newspaperPagesInitial))
 	for _, page := range newspaperPagesInitial {
+		if !page.shown() {
+			continue
+		}
 		out = append(out, palette.NewspaperPage{Title: page.Title, Option: page.Option})
 	}
 	return out

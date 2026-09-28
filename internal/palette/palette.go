@@ -458,7 +458,8 @@ type ArbitTargets struct {
 	Sorts   []NavTarget `json:"sorts"`
 }
 
-// NewspaperTargetsJSON returns JSON for all newspaper page views.
+// NewspaperTargetsJSON returns JSON for the newspaper page views given, the
+// ones the newspaper shows, and for the SYP list.
 func NewspaperTargetsJSON(pages []NewspaperPage) template.JS {
 	out := []NavTarget{}
 	titleCounts := map[string]int{}
