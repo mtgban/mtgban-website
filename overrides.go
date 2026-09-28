@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -193,7 +194,10 @@ func reloadOverriddenScrapers(shorthands map[string]struct{}) {
 				if _, ok := shorthands[shorthand]; ok {
 					go func(bucket simplecloud.Reader, game, name, kind, shorthand string) {
 						defer recoverJob("override reload " + name + "/" + kind + "/" + shorthand)
-						_ = loadScraperWithRetry(bucket, game, name, kind, shorthand)
+						err := loadScraperWithRetry(bucket, game, name, kind, shorthand)
+						if err != nil {
+							log.Printf("override reload %s/%s/%s: %v", name, kind, shorthand, err)
+						}
 					}(DataBucket, Config.Game, name, kind, shorthand)
 				}
 			}
