@@ -994,7 +994,9 @@ func prepareCard(b *mtgmatcher.Backend, searchRes *EmbedSearchResult, ogFields [
 	if card.SypList {
 		embed.Footer.Text += "On TCGplayer SYP list\n"
 	}
-	if card.HotlistStore == "CK" {
+	if card.HotlistNew {
+		embed.Footer.Text += "New 90-day high on the Card Kingdom buylist\n"
+	} else if card.HotlistStore == "CK" {
 		embed.Footer.Text += "Highest buylist price in three months\n"
 	}
 

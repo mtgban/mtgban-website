@@ -2241,7 +2241,13 @@ func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
 				return false
 			}
 		case "hotlist":
-			_, found := GetInfos()["hotlist"][co.UUID]
+			_, atHigh := GetInfos()["hotlist"][co.UUID]
+			_, newHigh := GetInfos()["newhigh"][co.UUID]
+			if atHigh || newHigh {
+				return false
+			}
+		case "newhigh":
+			_, found := GetInfos()["newhigh"][co.UUID]
 			if found {
 				return false
 			}

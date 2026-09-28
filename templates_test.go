@@ -201,3 +201,30 @@ func TestBuylistCKHelpers(t *testing.T) {
 		t.Errorf("buylist_ck unknown state: got %s", got)
 	}
 }
+
+// TestBuylistBadgePills executes the hotlist pills the way the pages call them.
+func TestBuylistBadgePills(t *testing.T) {
+	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(`{{buylist_badge .Store .Hotlist .New}}`))
+	for _, tc := range []struct {
+		store, hotlist string
+		isNew          bool
+		want           string
+	}{
+		{"CK", "CK", true, `class="bl-pill bl-pill-new"`},
+		{"CK", "CK", false, `class="bl-pill bl-pill-high"`},
+		{"SCG", "CK", true, ""},
+		{"CK", "", false, ""},
+	} {
+		var b strings.Builder
+		err := tmpl.Execute(&b, struct {
+			Store, Hotlist string
+			New            bool
+		}{tc.store, tc.hotlist, tc.isNew})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (tc.want == "" && b.String() != "") || !strings.Contains(b.String(), tc.want) {
+			t.Errorf("%s/%s/%v: rendered %q, want %q", tc.store, tc.hotlist, tc.isNew, b.String(), tc.want)
+		}
+	}
+}

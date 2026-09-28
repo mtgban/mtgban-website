@@ -16,7 +16,7 @@ func ckSignalPageVars(state string) PageVars {
 		CondKeys: []string{"NM", "SP"},
 		AllKeys:  []string{cardID},
 		Metadata: map[string]GenericCard{cardID: {
-			Name: "Some Card", Edition: "Some Set", GoodBuylist: 9, HighestBuylist: 12,
+			Name: "Some Card", Edition: "Some Set", GoodBuylist: 9, HighestBuylist: 12, HotlistStore: "CK",
 			CKSignal: state, CKSignalTip: "the odds", CKFacts: "CK stock 0 · out 9 days",
 		}},
 		FoundSellers: map[string]map[string][]SearchEntry{},
@@ -72,6 +72,8 @@ func TestSearchBuylistFollowsCKSignal(t *testing.T) {
 			{mobile, " m-price-wait", tc.mWait},
 			{mobile, `class="ck-wait"`, tc.marker},
 			{mobile, `class="m-detail-note"`, 1},
+			{desktop, `class="bl-pill bl-pill-high"`, 1},
+			{mobile, `class="bl-pill bl-pill-high"`, 1},
 		} {
 			got := strings.Count(check.page, check.class)
 			if got != check.want {

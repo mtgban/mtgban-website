@@ -272,20 +272,24 @@ var funcMap = template.FuncMap{
 	"tcg_market_price": func(s string) float64 {
 		return getTCGMarketPrice(s)
 	},
-	// buylist_badge renders Card Kingdom's 3-month hotlist star next to the store
-	// name when the store is the card's hotlist store, otherwise "".
-	"buylist_badge": func(shorthand, hotlistStore string) template.HTML {
-		if shorthand == hotlistStore {
-			return template.HTML(` <span class="emoji" title="Highest price in 3 months">&#127775;</span>`)
+	// buylist_badge renders a pill next to the store name when the store is the
+	// card's hotlist store: "New high" when Card Kingdom's price beats every
+	// price of the last 90 days, "90d high" when it ties the highest.
+	"buylist_badge": func(shorthand, hotlistStore string, newHigh bool) template.HTML {
+		switch {
+		case shorthand != hotlistStore:
+			return ""
+		case newHigh:
+			return template.HTML(` <span class="bl-pill bl-pill-new" title="` + ckNewHighTip + `">New high</span>`)
 		}
-		return ""
+		return template.HTML(` <span class="bl-pill bl-pill-high" title="` + ckAtHighTip + `">90d high</span>`)
 	},
 	// buylist_detail renders a card's precomputed Card Kingdom "Good" (P90) and
 	// "Highest" (90-day) buylist prices (passed in) as small, labeled prices for a
-	// dedicated column — the badge emoji itself lives next to the card name (see
-	// buylist_badge). With always=false it returns "" unless the entry carries a
-	// badge (store is the hotlist store, or the offer meets good); with always=true
-	// it shows the prices whenever they exist.
+	// dedicated column — the pills live next to the card name (see
+	// buylist_badge). With always=false it returns "" unless the store is the
+	// hotlist store or the offer meets good; with always=true it shows the
+	// prices whenever they exist.
 	"buylist_detail": func(shorthand, hotlistStore string, price, good, highest float64, always bool) template.HTML {
 		hasBadge := shorthand == hotlistStore || (good > 0 && price >= good)
 		if !hasBadge && !always {
