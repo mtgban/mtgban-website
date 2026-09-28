@@ -170,9 +170,11 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   `s.datastore()` (never nil, even before the first load) or `s.backend()`
   for the backend alone; entry points read either once and pass `b`/`ds`
   down to what they call.
-- `Config` is loaded once and swapped whole on admin reload (`admin.go`);
-  per-user API secrets read behind `apiUsersMutex`; affiliate data behind
-  `affiliatesMu`/`affiliatesPtr`.
+- `Config` is loaded once, then swapped whole by a `?reboot=config`
+  reload (`loadVars`, main.go) or a config-editor save (`saveConfig`,
+  admin.go), under `apiUsersMutex`, which the per-user API secret
+  lookups read behind.
+- Affiliate data sits behind `affiliatesMu`/`affiliatesPtr`.
 
 **Panics.** A panic in a handler behind one of the three signing wrappers
 is recovered by `recoverPanic` (auth.go): `reportPanic` (recover.go) logs
