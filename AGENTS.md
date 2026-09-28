@@ -241,7 +241,7 @@ commit to this repo can complete on its own.
    fatal on purpose (the scraper goroutine in `main()`, with the
    `runSealedAnalysis()`, `warmVariantCacheIfEnabled()` and
    `RefreshManifest()` it runs, and the one running `ListenAndServe`), and
-   those `fetchRosterPrices` and `runningWorkflows` fan out to.
+   those `runningWorkflows` fans out to.
 
 ## Known issues / refactors pending
 

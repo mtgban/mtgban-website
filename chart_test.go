@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -353,5 +356,52 @@ func TestBuildProviderRegistryDeduplicates(t *testing.T) {
 	want := []providerDisplay{{timeseries.ProviderTCGLow, "TCGplayer Low", "red"}}
 	if !slices.Equal(providerRegistry, want) {
 		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
+	}
+}
+
+// A roster read that panics is reported and costs only its card, which
+// counts as a failed read, while the rest of the roster keeps its answers.
+// A card more than may be read at once panics, so the roster only finishes
+// if a read that panics gives its slot back.
+func TestFetchRosterPricesSurvivesAPanickingRead(t *testing.T) {
+	posts := serverWebhook(t)
+	prev := PricesArchiveDB
+	t.Cleanup(func() { PricesArchiveDB = prev })
+	// A client with no pool behind it panics on its first query.
+	PricesArchiveDB = &timeseries.Client{}
+
+	panicking := chartRosterConcurrency + 1
+	roster := make([]chartSeries, panicking, panicking+1)
+	for i := range roster {
+		banID := int64(i + 1)
+		roster[i] = chartSeries{CardID: fmt.Sprintf("ban:%d", banID), target: &chartTarget{BanID: banID}}
+	}
+	// No identity to read by, so it answers without asking the archive.
+	roster = append(roster, chartSeries{CardID: "none", target: &chartTarget{UUID: "none"}})
+
+	done := make(chan []chartSeries, 1)
+	go func() { done <- fetchRosterPrices(context.Background(), roster, timeseries.Lookback(30)) }()
+	var series []chartSeries
+	select {
+	case series = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the roster still reads after 10s: a read that panicked kept its slot")
+	}
+
+	for _, cs := range series[:panicking] {
+		if !errors.Is(cs.Err, errRosterReadPanicked) {
+			t.Errorf("%s: err = %v, want it counted as a failed read", cs.CardID, cs.Err)
+		}
+	}
+	if series[panicking].Err != nil {
+		t.Errorf("%s: err = %v, want its answer kept", series[panicking].CardID, series[panicking].Err)
+	}
+
+	message, _, source := panicReport(t, posts)
+	if message != "runtime error: invalid memory address or nil pointer dereference" {
+		t.Errorf("message = %q, want the read's panic", message)
+	}
+	if !strings.HasPrefix(source, "source job: chart roster read ban:") {
+		t.Errorf("source = %q, want the read", source)
 	}
 }

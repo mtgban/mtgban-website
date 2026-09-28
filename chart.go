@@ -329,14 +329,18 @@ type chartSeries struct {
 	CardID string
 	Name   string
 	Prices map[string]timeseries.ProviderPrices
-	// Err is set when the archive did not answer for this card, which is not
-	// the same as answering that it holds nothing.
+	// Err is set when the archive did not answer for this card, or reading it
+	// panicked, which is not the same as answering that it holds nothing.
 	Err error
 
 	// target is what the archive is asked about. Set by the caller when it
 	// resolves the roster; nil entries are dropped before the fetch.
 	target *chartTarget
 }
+
+// errRosterReadPanicked is the Err of a roster card whose read panicked: the
+// panic is reported, and the card counts as a failed read.
+var errRosterReadPanicked = errors.New("chart: the read panicked")
 
 // fetchRosterPrices reads a roster's cards concurrently, in roster order. Read
 // one at a time, ten cards cost 848ms against 301ms together. Targets are
@@ -352,8 +356,11 @@ func fetchRosterPrices(ctx context.Context, targets []chartSeries, lb timeseries
 	slots := make(chan struct{}, chartRosterConcurrency)
 	for i := range out {
 		wg.Go(func() {
+			defer recoverJob("chart roster read " + out[i].CardID)
 			slots <- struct{}{}
 			defer func() { <-slots }()
+			// Left in place if the read panics; a read that returns replaces it.
+			out[i].Err = errRosterReadPanicked
 			out[i].Prices, out[i].Err = fetchChartPrices(ctx, out[i].target, lb)
 		})
 	}
