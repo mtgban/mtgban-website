@@ -100,7 +100,7 @@ type FilterOpt struct {
 // Shown reports whether an arbitrage page shows the option as a chip, given
 // which page it is, whether the reader may use the beta options, and whether
 // the source is sealed. The page's filter bar and the command palette both
-// ask it.
+// ask it, and scraperCompare applies only the options it shows.
 func (opt FilterOpt) Shown(globalMode, reverseMode, canShowAll, sealedSource bool) bool {
 	switch {
 	case opt.BetaFlag && !canShowAll,
@@ -647,10 +647,9 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	arbitFilters := map[string]bool{}
 
 	limitedResults := !cmp.AllResults
-	anyOptionEnabled := cmp.AnyOptionEnabled
 	anySpread := cmp.AnySpread
 
-	pageVars.CanShowAll = anyOptionEnabled
+	pageVars.CanShowAll = cmp.AnyOptionEnabled
 
 	// Set these flags for global, since it's likely users will want them
 	if pageVars.GlobalMode {
@@ -706,14 +705,6 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 
 		// Assume anything else is a boolean option
 		default:
-			// Skip options reserved for arbit-only
-			if pageVars.GlobalMode && FilterOptConfig[k].ArbitOnly {
-				continue
-			}
-			// Skip experimental options
-			if !anyOptionEnabled && FilterOptConfig[k].BetaFlag {
-				continue
-			}
 			arbitFilters[k], _ = strconv.ParseBool(v[0])
 		}
 	}
@@ -811,7 +802,9 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		ProfitabilityConstant: ProfConst,
 	}
 
-	// Set options (if they apply to the right page mode)
+	// Set the options the page shows: one it has no chip for could not be
+	// turned off, so it does nothing, however it got into the URL
+	applied := map[string]bool{}
 	for _, key := range FilterOptKeys {
 		isSet := arbitFilters[key]
 		if !isSet {
@@ -821,18 +814,10 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		if !found {
 			continue
 		}
-		if config.ArbitOnly && pageVars.GlobalMode {
+		if !config.Shown(pageVars.GlobalMode, pageVars.ReverseMode, pageVars.CanShowAll, source.Info().SealedMode) {
 			continue
 		}
-		if config.NoSealed && source.Info().SealedMode {
-			continue
-		}
-		if config.SealedOnly && !source.Info().SealedMode {
-			continue
-		}
-		if config.BetaFlag && !anyOptionEnabled {
-			continue
-		}
+		applied[key] = true
 		// Options the page acts on itself, by choosing what to compare
 		// rather than by narrowing what a comparison keeps
 		if config.Func == nil {
@@ -850,13 +835,13 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		opts.MaxSpread = MaxSpreadGlobal
 		opts.MaxPriceRatio = MaxPriceRatio
 
-		if arbitFilters["nolow"] {
+		if applied["nolow"] {
 			opts.MinSpread = MinSpreadHighYieldGlobal
 		}
-		if arbitFilters["nodiff"] {
+		if applied["nodiff"] {
 			opts.MinDiff = 5
 		}
-		if arbitFilters["nodiffplus"] {
+		if applied["nodiffplus"] {
 			opts.MinDiff = 10
 		}
 
@@ -916,7 +901,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		// puts every such row above every real listing on the page. Global
 		// keeps them, since there the index is the reference the probe is
 		// measured against rather than a side of the trade
-		if pageVars.ReverseMode && arbitFilters["noindex"] && scraper.Info().MetadataOnly {
+		if applied["noindex"] && scraper.Info().MetadataOnly {
 			continue
 		}
 
@@ -962,7 +947,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		// reference's: the TCGDirect price it vetted is the reference there,
 		// and a Direct listing above twice the market passed. Both are dropped
 		// here, on the price suspectPriceFor names for the mode.
-		if suspectPrice != nil && ((pageVars.ReverseMode && arbitFilters["noindex"]) || (pageVars.GlobalMode && arbitFilters["nosus"])) {
+		if suspectPrice != nil && (applied["noindex"] || applied["nosus"]) {
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
 				return invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
@@ -973,7 +958,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		}
 
 		var sussy map[string]float64
-		if !arbitFilters["nosus"] && !arbitFilters["noindex"] && suspectPrice != nil {
+		if !applied["nosus"] && !applied["noindex"] && suspectPrice != nil {
 			sussy = map[string]float64{}
 
 			tcgMarket, _ := findSellerInventory("TCGMarket")
@@ -984,7 +969,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				}
 			}
 		}
-		if !arbitFilters["novolatile"] && scraper.Info().SealedMode {
+		if !applied["novolatile"] && scraper.Info().SealedMode {
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {

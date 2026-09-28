@@ -1131,7 +1131,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'condition', 'foil', 'rarity', 'filter', 'admin'],
             content: {
-                description: '<p>Arbitrage identifies cards where a meaningful gap exists between a vendor\'s retail price and another vendor\'s buylist offer - i.e. potential flip opportunities. The same filter preset set used by Global applies here (Yield+, Bucks+, Difference+, SYP, etc.), and the <code>&gt;arbit + Tab</code> palette menu composes filter URLs directly.</p><p>See also the <strong>Reverse</strong> page (buylists paying more than retail) and the <strong>Global</strong> page (cross-store comparison at the index level), which are part of the same toolkit.</p>',
+                description: '<p>Arbitrage identifies cards where a meaningful gap exists between a vendor\'s retail price and another vendor\'s buylist offer - i.e. potential flip opportunities. The same filter preset set used by Global applies here (Yield+, Bucks+, Difference+, etc.), and the <code>&gt;arbit + Tab</code> palette menu composes filter URLs directly.</p><p>See also the <strong>Reverse</strong> page (buylists paying more than retail) and the <strong>Global</strong> page (cross-store comparison at the index level), which are part of the same toolkit.</p>',
                 table: [],
                 examples: [
                     { query: '>arbit + Tab + "Yield+" + Tab + "Bucks+"', desc: 'Compose an Arbitrage URL with profit filters', palette: true }
@@ -1149,7 +1149,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['reverse', 'arbitrage', 'arb', 'buylist', 'retail', 'inverted', 'flip', 'admin', 'difference', 'profit'],
             content: {
-                description: '<p>Reverse is the inverted complement to <strong>Arbitrage</strong>: it surfaces cards where a buylist is paying <em>more</em> than another vendor is selling for retail. These are the most direct flip signals on the site - if a buylist is over retail elsewhere and the source has stock, the gap is real.</p><p>The same filter presets apply (Yield+, Bucks+, Difference+, SYP, etc.) and the palette\'s <code>&gt;reverse + Tab</code> menu builds filtered URLs.</p>',
+                description: '<p>Reverse is the inverted complement to <strong>Arbitrage</strong>: it surfaces cards where a buylist is paying <em>more</em> than another vendor is selling for retail. These are the most direct flip signals on the site - if a buylist is over retail elsewhere and the source has stock, the gap is real.</p><p>The same filter presets apply (Yield+, Bucks+, Difference+, etc.) and the palette\'s <code>&gt;reverse + Tab</code> menu builds filtered URLs.</p>',
                 table: [],
                 examples: [
                     { query: '>reverse + Tab + "Yield+"', desc: 'Reverse arbitrage results with yield filter', palette: true }
