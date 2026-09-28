@@ -429,8 +429,8 @@ override; phone UA detection via `mileusna/useragent`).
 - **Suggest** (`SuggestAPI` in `api_suggest.go`, matching in
   `internal/suggest`): no longer a live prefix scan of
   `mtgmatcher.AllNames()` per request. A `suggest.Names` is built once when
-  the datastore (re)loads (`suggest.NewNames()`, called from
-  `s.newDatastore()`), folding every name
+  the datastore (re)loads (`suggest.NewNames(singles, sealed)`, called
+  from `s.newDatastore()`), folding every name
   (diacritics/case/punctuation stripped) and also "squashing" spaces out of
   the folded form, into separate sorted singles/sealed views searched by
   binary search — so a typed space or hyphen reaches either spelling
