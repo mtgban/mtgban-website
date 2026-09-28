@@ -96,6 +96,33 @@ func TestHotlistReducer(t *testing.T) {
 	}
 }
 
+// TestNewHighReducer covers the new-high rule: keep cards whose current
+// buylist price beats every price before today, and report that high.
+func TestNewHighReducer(t *testing.T) {
+	stats := timeseries.AggregatePriceStats{Max: 6, Min: 2, Count: 10, PriorMax: 5}
+
+	cases := []struct {
+		name    string
+		stats   timeseries.AggregatePriceStats
+		current float64
+		want    float64
+		ok      bool
+	}{
+		{"below the prior high", stats, 4, 0, false},
+		{"ties the prior high", stats, 5, 0, false},
+		{"beats the prior high", stats, 6, 5, true},
+		{"not buying", stats, 0, 0, false},
+		{"only today's row", timeseries.AggregatePriceStats{Max: 6, Min: 6, Count: 1}, 6, 0, false},
+		{"flat window", timeseries.AggregatePriceStats{Max: 4, Min: 4, Count: 30, PriorMax: 4}, 4, 0, false},
+	}
+	for _, tc := range cases {
+		got, ok := newHighReducer(tc.stats, tc.current)
+		if ok != tc.ok || !almostEqual(got, tc.want) {
+			t.Errorf("%s: got (%v, %v), want (%v, %v)", tc.name, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
 // TestHighestBuylistPrice covers the absolute-peak metric: it reports stats.Max
 // whenever the card has any buying days in the window.
 func TestHighestBuylistPrice(t *testing.T) {
