@@ -115,11 +115,10 @@ type editionsSnapshot struct {
 	SealedEditionsList   map[string][]EditionEntry
 
 	// All different editions
-	AllEditionsKeys               []string
-	AllEditionsKeysNoFoilOrPromos []string
-	AllEditionsMap                map[string]EditionEntry
-	AllEditionsByCategory         map[string][]EditionEntry
-	AllEditionsCategoriesSorted   []string
+	AllEditionsKeys             []string
+	AllEditionsMap              map[string]EditionEntry
+	AllEditionsByCategory       map[string][]EditionEntry
+	AllEditionsCategoriesSorted []string
 
 	// Editions with parent sets
 	TreeEditionsKeys []string
@@ -1044,22 +1043,6 @@ func newEditionsSnapshot(b *mtgmatcher.Backend) *editionsSnapshot {
 	snap.AllEditionsKeys, snap.AllEditionsMap = getAllEditions(b)
 	snap.AllEditionsCategoriesSorted, snap.AllEditionsByCategory = getAllEditionsByCategory(b)
 	snap.TreeEditionsKeys, snap.TreeEditionsMap = getTreeEditions(b)
-
-	var filteredEditions []string
-	for _, code := range snap.AllEditionsKeys {
-		set, err := b.GetSet(code)
-		if err != nil {
-			continue
-		}
-		if set.IsFoilOnly {
-			continue
-		}
-		if strings.HasSuffix(set.Name, "Promos") {
-			continue
-		}
-		filteredEditions = append(filteredEditions, code)
-	}
-	snap.AllEditionsKeysNoFoilOrPromos = filteredEditions
 
 	snap.TotalSets = len(snap.AllEditionsKeys)
 	snap.TotalUnique = len(b.GetUUIDs())
