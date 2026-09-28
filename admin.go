@@ -377,36 +377,22 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	newConfig := r.FormValue("textArea")
 	if newConfig != "" {
 		var config ConfigType
-		configSourcePath := Config.sourcePath
-
 		err := json.Unmarshal([]byte(newConfig), &config)
 		if err != nil {
 			pageVars.WarningMessage = err.Error()
 		} else {
-			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			err = saveConfig(r.Context(), config)
 			if err != nil {
+				log.Println(err)
 				pageVars.WarningMessage = err.Error()
 			} else {
-				defer writer.Close()
-				err = writeConfigFile(config, writer)
+				pageVars.InfoMessage = "Config updated"
+				// The access table, grants and affiliate data are served
+				// from their own files, not this config; reload them here
+				// in case the edit changed the paths that name them.
+				err = loadCommonConfig(r.Context())
 				if err != nil {
-					log.Println(err)
 					pageVars.WarningMessage = err.Error()
-				} else {
-					Config = config
-					Config.sourcePath = configSourcePath
-					// No applyOverrides: the saved text goes live as written. With
-					// the running values, this editor would re-render the old ones
-					// and the next save would write them back to the file.
-					finishConfig()
-					pageVars.InfoMessage = "Config updated"
-					// The access table, grants and affiliate data are served
-					// from their own files, not this config; reload them here
-					// in case the edit changed the paths that name them.
-					err = loadCommonConfig(r.Context())
-					if err != nil {
-						pageVars.WarningMessage = err.Error()
-					}
 				}
 			}
 		}
@@ -1195,6 +1181,38 @@ func writeConfigFile(config ConfigType, writer io.Writer) error {
 	e.SetEscapeHTML(false)
 	e.SetIndent("", "    ")
 	return e.Encode(&config)
+}
+
+// storeConfigFile writes config to the config file.
+func storeConfigFile(ctx context.Context, config ConfigType) error {
+	writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config.sourcePath)
+	if err != nil {
+		return err
+	}
+	err = writeConfigFile(config, writer)
+	// Close finalises the upload, so its error is the write's error too, and
+	// a failure there must not be reported as a save.
+	cerr := writer.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
+}
+
+// saveConfig writes config to the config file and, once it is there, makes
+// it the live one: the admin editor's save.
+func saveConfig(ctx context.Context, config ConfigType) error {
+	err := storeConfigFile(ctx, config)
+	if err != nil {
+		return err
+	}
+	config.sourcePath = Config.sourcePath
+	Config = config
+	// No applyOverrides: the saved text goes live as written. With the
+	// running values, the editor would re-render the old ones and the next
+	// save would write them back to the file.
+	finishConfig()
+	return nil
 }
 
 func generateAPIKey(ctx context.Context, user string, duration time.Duration) (string, error) {
