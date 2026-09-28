@@ -53,7 +53,7 @@ Magic.
 
 ### 2.1 Startup (`main.go`)
 
-Flags (`main()`, main.go:1300-1318): `-cfg` (config path, default
+Flags (`main()`): `-cfg` (config path, default
 `$BAN_CONFIG_PATH` or `config.json`), `-port`, `-ds` (datastore path,
 default `AllPrintings.json.xz`), `-acl` (access-table path override),
 `-grants` (Patreon grants path override), `-dev` (hot-reload templates,
@@ -135,7 +135,7 @@ Boot sequence (`main()`):
 The dominant pattern is **immutable snapshots behind atomic pointers**:
 
 - `sellersPtr`/`vendorsPtr` (`atomic.Pointer[[]mtgban.Seller/Vendor]`,
-  load.go:47-54). Readers call `GetSellers()`/`GetVendors()`; writers go
+  load.go). Readers call `GetSellers()`/`GetVendors()`; writers go
   through `updateSellers()`/`updateVendors()` which validate (timestamp must
   not regress; a new inventory/buylist under half the previous size is
   rejected once the previous one held over 100 entries) and `.Store()` a new
@@ -223,7 +223,7 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
 
 ## 3. Authentication & authorization
 
-### 3.1 Patreon OAuth (auth.go:166-249)
+### 3.1 Patreon OAuth (`Auth`, auth.go)
 
 `/auth?code=…` exchanges the code via the `patreon` package, fetches user
 identity, and checks the shared grant list (`PatreonGrants()`, loaded from
@@ -233,7 +233,7 @@ hardcoded per-email tier override; failing that it fetches
 tiers (`Pioneer`, `Modern`, `Legacy`, `Vintage` — Patreon's own "Standard"
 tier folds into `Pioneer`), then issues a **signature**.
 
-### 3.2 Signature mechanism (auth.go:683-756)
+### 3.2 Signature mechanism (`sign`, `GetParamFromSig`, auth.go)
 
 A signature is a base64-encoded query string carrying the user's identity,
 tier, per-feature flags from the ACL, an `Expires` unix timestamp (11-day
@@ -324,10 +324,10 @@ override; phone UA detection via `mileusna/useragent`).
 
 ### 5.1 Search (`search.go`, `searchfilter.go`)
 
-- **Query language**: `parseSearchOptionsNG()` (searchfilter.go:593, moved
-  from :514) tokenizes `option:value` / `option>value` / `option<value`
-  pairs, with `-` negation, against the `FilterOperations` table
-  (searchfilter.go:502) of **49 operators, not ~35**: search-engine
+- **Query language**: `parseSearchOptionsNG()` (searchfilter.go) tokenizes
+  `option:value` / `option>value` / `option<value` pairs, with `-`
+  negation, against the `FilterOperations` table of **49 operators, not
+  ~35**: search-engine
   modifiers (`sm:` mode override incl. `sm:scryfall`, `skip:`
   retail/buylist/empty/index, `sort:` chrono/hybrid/alpha/number/retail/
   buylist), identity (`s:`/`set:`/`edition:`/`e:`, `cn:`/`number:` with
@@ -343,27 +343,27 @@ override; phone UA detection via `mileusna/useragent`).
   select finish (`*` foil, `~` etched, `&` nonfoil, `` ` `` alt-art foil).
   Bare hashes trigger UUID lookup mode; pipe syntax
   (`name|set|number|finish|cond`) supports the Scryfall-bot format.
-- **Execution**: parse → `searchAndFilter()` (search.go:1655) resolves
-  UUIDs through `mtgmatcher.Search*` (exact/any/prefix/regexp/sealed/
-  hashing modes, plus `scryfall` and a sealed+card `mixed` mode) →
-  `searchParallelNG()` (search.go:2058) runs seller and vendor scans in
+- **Execution**: parse → `searchAndFilter()` resolves UUIDs through the
+  backend's `Search*` methods (exact/any/prefix/regexp/sealed/hashing
+  modes, plus `scryfall` and a sealed+card `mixed` mode) →
+  `searchParallelNG()` runs seller and vendor scans in
   parallel goroutines, applying store/price/entry filter chains → optional
   custom-buylist injection → post-filters → sort (chrono/hybrid/alpha/
   number/retail/buylist, plus `odds` — a `variable:` search only, by each
   card's `dropOdds()` expected count, ascending) → `Paginate()`
-  (utils.go:1440) against the named constants `MaxSearchResults` (100/page)
-  and `MaxSearchTotalResults` (10k max, search.go:32,39).
+  (utils.go) against the named constants `MaxSearchResults` (100/page)
+  and `MaxSearchTotalResults` (10k max, search.go).
 - **Results**: `map[cardUUID]map[condition][]SearchEntry`; INDEX
   pseudo-conditions merge TCG Low/Market and MKM Low/Trend pairs into
   single rows with a `Secondary` price. Without a signature, non-affiliate
   entries are `Locked` (link disabled) against `Affiliates().List` /
-  `Affiliates().BuylistList` (common.go:70) — there is no longer a
+  `Affiliates().BuylistList` (common.go) — there is no longer a
   `Config.AffiliatesList` field; affiliates now live behind that accessor
-  as a split retail/buylist list. `SearchEntry.PriceUnit` (search.go:64)
+  as a split retail/buylist list. `SearchEntry.PriceUnit` (search.go)
   says what a row's number means: an offer (the default, ranked and shown
   as currency), a store's own want-count, or — under a `variable:` search
   only — a synthetic "Avg Copies (est.)" row per card, `dropOdds()`'
-  (search.go:1727) expected count of copies opening the named product once
+  expected count of copies opening the named product once
   yields, summed across every slot that can draw it. Deliberately not a
   percentage: summed across more than one slot the same card can average
   past 1 (a common land can exceed 1 per booster box, several times that
@@ -390,23 +390,22 @@ Sheets, Moxfield decks/collections (`moxfield` package), TCGplayer
 collection scrapes (goquery), **Collectr showcase pages** (new `collectr`
 package, `app.getcollectr.com`, Magic/Lorcana only), and plain decklists.
 Header/row parsing has moved out of `upload.go` into the `internal/docparse`
-package: a per-upload parser from `newUploadParser(b)` (`*docparse.Parser`,
-upload.go:89) exposes `ParseHeader()`/`ParseRow()`
-(internal/docparse/docparse.go:183,333) — there is no longer a standalone
-`parseHeader()`/`parseRow()` in `upload.go`.
-Row resolution still goes through `mtgmatcher.Match()` (preserving alias
-candidates and mismatch errors). Prices come from the same
+package: a per-upload parser from `newUploadParser(b)` (a
+`*docparse.Parser`) exposes `ParseHeader()`/`ParseRow()` — there is no
+longer a standalone `parseHeader()`/`parseRow()` in `upload.go`.
+Row resolution still goes through `Match` on the parser's backend
+(preserving alias candidates and mismatch errors). Prices come from the same
 `getSellerPrices()`/`getVendorPrices()` machinery as the API. The
 **optimizer** picks the best store per card (highest buylist / lowest
 retail within a percentage margin), with spread/absolute-value floors and a
 profitability score
 `((compare - price) / (price + 2)) * log10(1+factor) * sqrt(qty)`
-(upload.go:1438) — **the exponent on quantity is a square root, not
+— **the exponent on quantity is a square root, not
 `qty^0.25`**, and the log is base 10 (`math.Log10`), not a bare `log`; the
 `+2` is the named constant `ProfitabilityConstant`. Output: sub-tabbed
 tables (singles/sealed/not-found, via `docparse.PartitionEntries()`), CSV
 export, CardConduit estimate hand-off, sharable result URLs. Limits are now
-named constants (upload.go:41-44): `MaxUploadEntries` 350,
+named constants (upload.go): `MaxUploadEntries` 350,
 `MaxUploadProEntries` 1,000 (granted by the `UploadOptimizer` signature
 flag), `MaxUploadTotalEntries` **15,000, not 10,000** (granted by a
 `UploadNoLimit` flag, or implied by dev mode, the CardConduit estimate
@@ -618,11 +617,11 @@ first check may announce every already-stale row once.
 | `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs (`/api/userstate/`), keyed by a hash of the login email |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
-| `internal/` | No longer empty — 14 packages: `dsreload` (single-flight datastore reload, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
+| `internal/` | Packages only this module imports: `dsreload` (single-flight datastore reload, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
 
 ## 7. Frontend
 
-- **Templates** (`templates/`): Go `html/template`, parsed via `internal/tmplparse.ParseFiles` (strips the authoring indentation before parsing — see §6). Desktop `base.html` / `base-landing.html` and `mobile/base-mobile.html`, with `templates/mobile/<page>.html` overrides for 7 of the 13 page templates (admin, home, news, offline, search, sets, sleep — the rest fall back to the desktop template on mobile). Partials (`templates/partials/`, included per-page by `renderTemplateFiles()`, not blanket-loaded): navbar, settings-modal + settings-stores-grouped, editions-picker, set-symbol, admin-usage, guide-faq, search-landing, sussy-price. 48 custom template funcs in `templates.go`'s `funcMap` (price formatting, affiliate links, a UUID→store-ID lookup, game/rarity-badge dispatch for the multi-game skin, palette-target JSON). None reads the card datastore: a page's set symbols, promo labels and TCG ids are in its data, filled by the handler from the one snapshot it read, and so is the admin page's reload status. Some still read package state as they render: the scraper snapshots (`scraper_name`, `is_sealed_scraper`, `uuid2ckid`, `invalid_direct`, `tcg_market_price`, `guide_stores`), the affiliate codes (`load_partner`) and `Config`. Production pre-parses every page×(mobile|desktop) combination at startup (`buildTemplateCache()`); dev mode re-parses per request. Base templates inject `__BAN_NAV` / `__BAN_PALETTE*` JSON globals for the client.
+- **Templates** (`templates/`): Go `html/template`, parsed via `internal/tmplparse.ParseFiles` (strips the authoring indentation before parsing — see §6). Desktop `base.html` / `base-landing.html` and `mobile/base-mobile.html`, with `templates/mobile/<page>.html` overrides for 7 of the 13 page templates (admin, home, news, offline, search, sets, sleep — the rest fall back to the desktop template on mobile). Partials (`templates/partials/`, included per-page by `renderTemplateFiles()`, not blanket-loaded): navbar, settings-modal + settings-stores-grouped, editions-picker, set-symbol, admin-usage, guide-faq, search-landing, sussy-price. Custom template funcs live in `templates.go`'s `funcMap` (price formatting, affiliate links, a UUID→store-ID lookup, game/rarity-badge dispatch for the multi-game skin, palette-target JSON). None reads the card datastore: a page's set symbols, promo labels and TCG ids are in its data, filled by the handler from the one snapshot it read, and so is the admin page's reload status. Some still read package state as they render: the scraper snapshots (`scraper_name`, `is_sealed_scraper`, `uuid2ckid`, `invalid_direct`, `tcg_market_price`, `guide_stores`), the affiliate codes (`load_partner`) and `Config`. Production pre-parses every page×(mobile|desktop) combination at startup (`buildTemplateCache()`); dev mode re-parses per request. Base templates inject `__BAN_NAV` / `__BAN_PALETTE*` JSON globals for the client.
 - **JS** (`js/`): all vanilla, no framework, no bundler — one vendored exception, `js/vendor/fflate.min.js` (gzip, used by the offline cache). Notable modules: `command-palette.js` (Cmd+K nav/search) plus its `palette-chips.js` (chip-based input) and `palette-providers.js` (prefix-driven candidate providers) helpers; `settings.js` (cookie-backed settings registry with dirty-state confirmation — the formerly separate `settings-modal.js`/`settings-search.js` are gone, folded in); `confirm-dialog.js` (in-page replacement for `window.confirm`); `autocomplete.js`, `favorites.js` and `recent-searches.js` (localStorage); `user-state.js` (best-effort cross-device sync of favorites/recents/prefs for signed-in users, against `/api/userstate/`); `chartopts.js` (Chart.js v4 plugins: crosshair, gradients, HTML tooltips, checkpoint markers); `nightmode.js` theme toggle. `js/offline/` (16 files) plus a root `sw.js` service worker implement an installable offline mode (IndexedDB price cache, background sync, offline-first `/offline` shell). CDN libs: Chart.js v4 (+ date-fns adapter, annotation plugin), Lucide icons, Tablesort, Keyrune.
 - **CSS** (`css/`): custom design system in `main.css` (+ a generic `mobile.css` override pass) via CSS variables (light/dark themes by body class, layered surfaces, type scale, tier colors); one stylesheet per feature page plus 5 `*-mobile.css` overrides, plus `command-palette.css`, `settings-modal.css`, `offline.css`, and two embedded webfonts (`phyrexian.woff2`, `quenya.woff2`).
 - **State**: user preferences live in cookies (read server-side by handlers too — e.g. store blocklists, optimizer settings) and localStorage (favorites/recents/layout); signed-in users additionally get a best-effort Postgres sync of favorites/recents/prefs via `userstate/` + `js/user-state.js`.
@@ -652,8 +651,9 @@ first check may announce every already-stale row once.
   place), set-symbol, mobile variants, redirects, news, common ACL/affiliates,
   plus five dedicated `*_bench_test.go` files (auth, datastore, price-parity,
   searchfilter, sort). A separate `tests/offline/` tree holds ~14 Bun/JS tests
-  for the offline/service-worker mode. All Go tests need the local
-  `allprintings5.json` datastore (AGENTS.md). CI (`.github/workflows/ci.yml`)
+  for the offline/service-worker mode. Go tests that need card data skip
+  without the local `allprintings5.json` datastore, and
+  `MTGBAN_TEST_DATASTORE=off` skips loading it (AGENTS.md). CI (`.github/workflows/ci.yml`)
   runs on every PR and push to master: a `style` job (`gofmt -s -l .`,
   `go vet ./...`, `revive` pinned to v1.13.0 (its config also rejects any
   import of `reflect`, per `docs/adr/0002-no-reflect.md`), `staticcheck` pinned to
@@ -699,3 +699,7 @@ first check may announce every already-stale row once.
    JS only enhances.
 6. **Declarative page registry** (`NavElem`) ties routing, auth, nav,
    logging, and templates together in one place.
+7. **An explicit card datastore**: the site owns the loaded datastore and
+   publishes each load whole; an entry point reads it once and hands the
+   backend (or the datastore) down, and templates read none of it
+   (`docs/adr/0003-explicit-backend.md`).

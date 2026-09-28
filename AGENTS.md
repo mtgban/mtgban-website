@@ -101,7 +101,8 @@ output, not a claim written here.
 |---|---|
 | `main.go` | Startup, flags, config, routing, `NavElem` page registry, `PageVars`, template cache, cron jobs |
 | `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
-| `templates.go` | The template `FuncMap` — pure helper funcs templates call by name |
+| `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`), published together |
+| `templates.go` | The template `FuncMap` — the helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
@@ -112,13 +113,14 @@ output, not a claim written here.
 | `api*.go` | Price API, batch prices, chart/suggest APIs, CSV exports, API-mode loading |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
-| `utils.go`, `redirect.go`, `mobile.go`, `palette.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle, palette metadata APIs |
+| `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
 | `timeseries/` | PostgreSQL price-history client (charts) |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
 | `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); the API gateway repo imports it, so its payload bytes are frozen by golden tests |
 | `apihandoff/` | The signed Patreon handoff token (`Mint`, `Verify`) the game sites hand to the API gateway for trials and sign-in; the gateway imports it, so the golden test freezes its bytes |
 | `apiproductlist/` | The API price list (`products.json`, embedded; amounts in cents): packages, add-ons, intervals, store families. The API gateway repo pins this module by commit and seeds Stripe from it, so a price edit needs a gateway dependency bump; the pricing page renders from it |
 | `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
+| `internal/` | Packages only this module imports: the palette and offline APIs, suggest, upload row parsing, the reload tracker and more; SPECIFICATION.md §6 lists them |
 
 ## Non-Magic games
 
@@ -182,7 +184,8 @@ commit to this repo can complete on its own.
    owns it in `ds atomic.Pointer[datastore]`, pre-stored empty by `newSite()`
    so `s.datastore()`/`s.backend()` are never nil; code below an entry point
    reads the datastore only through the `b`/`ds` it was handed, never from
-   the site (the nav's `ShouldHide` visibility check aside).
+   the site (the nav's `ShouldHide` visibility check aside). The rules and
+   why: `docs/adr/0003-explicit-backend.md`.
 
 2. **Stateless auth.** Permissions live entirely in the signed `MTGBAN`
    cookie / `?sig=` (an HMAC-signed query string). There is no session store
@@ -192,9 +195,9 @@ commit to this repo can complete on its own.
    why a new signed field must not ride on every login:
    `docs/adr/0001-api-handoff-email-check.md`.
 
-3. **Card identity goes through `mtgmatcher`.** Resolve cards via
-   `mtgmatcher.Match()`/`GetUUID()`/`MatchId()` — don't hand-roll UUID or
-   set/number/finish parsing.
+3. **Card identity goes through `mtgmatcher`.** Resolve cards through the
+   `*mtgmatcher.Backend` a function was handed (`b.Match`, `b.GetUUID`,
+   `b.MatchID`) — don't hand-roll UUID or set/number/finish parsing.
 
 4. **Page registration is declarative.** Add a page by adding a `NavElem` (its
    route, handler, template, `CanPOST`, access flags) — this wires routing,
@@ -230,7 +233,7 @@ checked against the current tree rather than copied wholesale:
   - Standardize JSON error responses (api*.go mix hand-built strings + json.NewEncoder)
   - Table-driven sort dispatch (58 inline `sort.Slice` blocks across the root package as of this check, not just arbit.go/search.go)
 - **Phase 2** (decompose god-functions): split `Upload()`/`Search()`, consolidate CSV exporters, centralize external-ID resolution
-- **Phase 3** (frontend consolidation): extract shared JS helpers, consolidate settings system, delete dead `js/nav.js`
+- **Phase 3** (frontend consolidation): extract shared JS helpers, consolidate settings system
 - **Phase 4** (testing): add tests for auth logic, search parser, price aggregation, arbitrage math
 
 Phases 2–4 above are copied from `todo/refactor.md` as of the same date and
@@ -239,9 +242,10 @@ rather than trusting this list indefinitely.
 
 ## Gotchas
 
-- Tests load `allprintings5.json` from the repo root; without it,
-  search/upload/product tests fail to set up. Keep that in mind before
-  declaring tests "broken."
+- `TestMain` loads `allprintings5.json` from the repo root; without it the
+  tests that need card data skip (most through `skipWithoutDatastore`), so
+  a green run proves less. `MTGBAN_TEST_DATASTORE=off` skips the load (7 s,
+  3 GB) on purpose, for quick fixture runs, `-race` included.
 - Static assets are served from disk (not embedded) with `?hash=<git commit>`
   cache-busting; bumping assets relies on a rebuild changing the hash.
 - Mobile has separate templates under `templates/mobile/` and `*-mobile.css`;
