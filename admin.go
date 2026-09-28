@@ -1034,7 +1034,8 @@ func serveRunningWorkflows(w http.ResponseWriter) {
 // runningWorkflows lists the workflows queued or in progress. The two states
 // are queried at once: they are independent, and serialized they doubled the
 // wait. Empty without a token to ask with, and on failure - the dashboard
-// simply leaves its rows as rendered.
+// simply leaves its rows as rendered. A state whose fetch panics is skipped
+// the same way, once the panic is reported.
 func runningWorkflows() []string {
 	if Config.API["github_action_token"] == "" {
 		return nil
@@ -1046,6 +1047,7 @@ func runningWorkflows() []string {
 	var wg sync.WaitGroup
 	for i, state := range states {
 		wg.Go(func() {
+			defer recoverJob("admin workflow fetch " + state)
 			names, err := gaFetch(state)
 			if err != nil {
 				log.Println(err)
