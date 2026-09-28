@@ -26,7 +26,7 @@ func TestCurrentDatastorePublishesAndRestoresAtomically(t *testing.T) {
 		t.Fatalf("empty datastore contained %d cards", len(got.backend.GetUUIDs()))
 	}
 
-	want := newDatastore(&mtgmatcher.Backend{}, time.Now())
+	want := testSite.newDatastore(&mtgmatcher.Backend{}, time.Now())
 	useDatastore(t, want)
 	got = currentDatastore()
 	if got != want {

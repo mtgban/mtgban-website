@@ -200,7 +200,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 				doReboot = true
 			}
 		}
-		if StartDatastoreReload(dsPath, "admin") {
+		if s.startDatastoreReload(dsPath, "admin") {
 			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
 		} else {
 			pageVars.InfoMessage = "A datastore reload is already running"
@@ -835,7 +835,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.DisableChart = IsStashingInProgress()
 	// Read last: ?reboot=datastore above may have just started one.
-	pageVars.DatastoreReload = datastoreReloads.Status()
+	pageVars.DatastoreReload = s.reloads.Status()
 
 	// Only the Usage tab reads these aggregates and each one scans a 30-day
 	// window, so leave them alone unless that is the tab being rendered.

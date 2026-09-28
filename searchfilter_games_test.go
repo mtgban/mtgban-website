@@ -60,7 +60,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 		ran++
 
 		t.Run(game, func(t *testing.T) {
-			useDatastore(t, newDatastore(loaded, time.Now()))
+			useDatastore(t, testSite.newDatastore(loaded, time.Now()))
 
 			var tightened int
 			for _, uuid := range backend().GetUUIDs() {

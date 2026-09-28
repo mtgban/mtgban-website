@@ -94,13 +94,13 @@ Boot sequence (`main()`):
    (non-fatal if unconfigured), `reloadCheckpoints()`,
    `offlineService.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
-5. Async goroutine: `loadDatastore(Config.DatastorePath)` — opens the site's
-   game via `mtgmatcher.Open(datastoreGame(), reader)` (not the old
-   `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
+5. Async goroutine: `s.loadDatastore(Config.DatastorePath)` (site.go) —
+   opens the site's game via `mtgmatcher.Open(datastoreGame(), reader)` (not
+   the old `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
-   (`newDatastore()`, datastore.go), publishes backend and snapshots
-   together in one `liveDatastore.Store()`, then itself spawns
-   `cacheNewspaper()` as a further goroutine.
+   (`s.newDatastore()`), publishes backend and snapshots together in one
+   `liveDatastore.Store()`, then itself spawns `cacheNewspaper()` as a
+   further goroutine.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
    `loadScrapersNG()` on it, then `runSealedAnalysis()`,
@@ -142,8 +142,10 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
 - The card datastore is the same pattern once more: backend plus its
   numbers/names/editions snapshots, the palette's sets/promos/finishes
   lists, and its own load time are one `datastore` value (datastore.go),
-  built by `newDatastore()` and published in a single
-  `liveDatastore.Store()`. Page handlers are methods on `*site` (site.go) and
+  built by `s.newDatastore()` (site.go) and published in a single
+  `liveDatastore.Store()` by `s.loadDatastore()`, itself started by
+  `s.startDatastoreReload()` (an admin or `/api/load/datastore` reload) or
+  once at startup. Page handlers are methods on `*site` (site.go) and
   read it through `s.datastore()` (never nil, even before the first load) or
   `s.backend()` for the backend alone, which read the package-level
   `currentDatastore()`/`backend()` (datastore.go); entry points read either
@@ -364,7 +366,7 @@ override; phone UA detection via `mileusna/useragent`).
 - **Suggest** (`api_suggest.go`): no longer a live prefix scan of
   `mtgmatcher.AllNames()` per request. A `namesSnapshot` is built once when
   the datastore (re)loads (`newNamesSnapshot()`, called from
-  `newDatastore()`), folding every name
+  `s.newDatastore()`), folding every name
   (diacritics/case/punctuation stripped) and also "squashing" spaces out of
   the folded form, into separate sorted singles/sealed views searched by
   binary search — so a typed space or hyphen reaches either spelling
@@ -545,7 +547,7 @@ Overrides, Tools — through query-command dispatch: scraper refresh via
 GitHub Actions dispatch (`?refresh=`) or direct reload (`?reload=&table=&tag=`),
 log download or redirect to the CI log (`?logs=`), and a `?reboot=` family
 that is really a generic run-then-redirect dispatch, not all of it a literal
-reboot: `datastore`/`datastore-backup` (`StartDatastoreReload`), `update`
+reboot: `datastore`/`datastore-backup` (`s.startDatastoreReload`), `update`
 (git pull + `go build` + process exit), `build`/`code` (either step alone,
 no restart), `config` (reload config plus the ACL/grants/affiliates that
 ride beside it), `checkpoints` (chart checkpoints), `snapshot` (stash into

@@ -92,7 +92,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 		}
 
 		t.Run(game, func(t *testing.T) {
-			useDatastore(t, newDatastore(loaded, time.Now()))
+			useDatastore(t, testSite.newDatastore(loaded, time.Now()))
 
 			for _, uuid := range backend().GetUUIDs() {
 				co, err := backend().GetUUID(uuid)

@@ -73,10 +73,10 @@ func TestDatastorePublishSwapsEverySnapshotAtOnce(t *testing.T) {
 	loadedA := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	loadedB := time.Date(2021, 6, 15, 0, 0, 0, 0, time.UTC)
 
-	useDatastore(t, newDatastore(fixtureA, loadedA))
+	useDatastore(t, testSite.newDatastore(fixtureA, loadedA))
 	assertDatastoreDescribesLoad(t, "FIXTUREA", "1", "fixture card alpha", loadedA)
 
-	useDatastore(t, newDatastore(fixtureB, loadedB))
+	useDatastore(t, testSite.newDatastore(fixtureB, loadedB))
 	assertDatastoreDescribesLoad(t, "FIXTUREB", "3", "fixture card beta", loadedB)
 }
 
@@ -158,7 +158,7 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 	a.UUIDs["FIXTUREA-1"].Identifiers = map[string]string{"tcgplayerProductId": "4242"}
 	card := uuid2card(a, "FIXTUREA-1", false, false, false)
 
-	useDatastore(t, newDatastore(fixtureBackend("FIXTUREB", "Fixture Edition Beta", "2021-06-15",
+	useDatastore(t, testSite.newDatastore(fixtureBackend("FIXTUREB", "Fixture Edition Beta", "2021-06-15",
 		[][2]string{{"Fixture Card Beta", "1"}}), time.Now()))
 
 	metadata := map[string]GenericCard{"FIXTUREA-1": card}
