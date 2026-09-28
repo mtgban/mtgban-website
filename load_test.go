@@ -400,6 +400,54 @@ func TestOnlyStoresKeepsASharedShorthandsOwner(t *testing.T) {
 	}
 }
 
+// A FileBucket rooted at a directory laid out like the bucket serves it
+// wherever the process runs: it lists the bucket's own keys and loads each
+// from under its Root, as -dumps does.
+func TestLoadScrapersNGFromADumpsDirectory(t *testing.T) {
+	dir := t.TempDir()
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	prevIdx := scraperIndexPtr.Load()
+	prevGame := Config.Game
+	var noSellers []mtgban.Seller
+	var noVendors []mtgban.Vendor
+	sellersPtr.Store(&noSellers)
+	vendorsPtr.Store(&noVendors)
+	Config.Game = "magic"
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+		scraperIndexPtr.Store(prevIdx)
+		Config.Game = prevGame
+	})
+
+	now := time.Now()
+	writeSellerDump(t, filepath.Join(dir, "magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, now))
+	writeVendorDump(t, filepath.Join(dir, "magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, now))
+
+	err := loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
+	if err != nil {
+		t.Fatalf("loadScrapersNG: %v", err)
+	}
+
+	sellers := GetSellers()
+	if len(sellers) != 1 || sellers[0].Info().Shorthand != "CK" {
+		t.Errorf("got %d sellers, want CK alone", len(sellers))
+	}
+	vendors := GetVendors()
+	if len(vendors) != 1 || vendors[0].Info().Shorthand != "ABU" {
+		t.Errorf("got %d vendors, want ABU alone", len(vendors))
+	}
+	store, ok := scraperStoreOf("CK")
+	if !ok || store != "cardkingdom" {
+		t.Errorf("scraperStoreOf(CK) = %q, %v, want cardkingdom, true", store, ok)
+	}
+	store, ok = scraperStoreOf("ABU")
+	if !ok || store != "abugames" {
+		t.Errorf("scraperStoreOf(ABU) = %q, %v, want abugames, true", store, ok)
+	}
+}
+
 // A fresh listing replaces one store's entries and leaves every other
 // store alone.
 func TestUpdateScraperIndexStoreReplacesOnlyThatStore(t *testing.T) {
