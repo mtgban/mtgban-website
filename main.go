@@ -1066,20 +1066,20 @@ func preloadConfig(configPath string) error {
 }
 
 func loadVars(port, datastorePath, aclPath, grantsPath string) error {
-	// Preload
-	Config.Game = DefaultGame
-
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
 
-	// Load from config file
-	err = json.NewDecoder(reader).Decode(&Config)
+	// Decode into a fresh value, not the live one: decoding merges, so a map
+	// key or a field the file no longer has would survive a reload.
+	config := ConfigType{Game: DefaultGame, sourcePath: Config.sourcePath}
+	err = json.NewDecoder(reader).Decode(&config)
 	if err != nil && !DevMode {
 		return err
 	}
+	Config = config
 
 	applyOverrides(port, datastorePath, aclPath, grantsPath)
 	finishConfig()
@@ -1322,6 +1322,9 @@ func main() {
 	if err != nil {
 		if DevMode {
 			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
+			// loadVars returned before applying the flags and the defaults.
+			applyOverrides(*port, *dsPath, *aclPath, *grantsPath)
+			finishConfig()
 		} else {
 			log.Fatalln("unable to load config file:", err)
 		}
