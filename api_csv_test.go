@@ -13,10 +13,8 @@ import (
 // the condition each row was loaded with, and that the price API export (no
 // upload data, so no condition either) keeps its original columns.
 func TestSimplePrice2CSVTCGSKU(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher data not loaded")
-	}
 
 	var id string
 	for _, u := range uuids {
@@ -85,10 +83,8 @@ func runPrice2CSV(t *testing.T, pm map[string]map[string]*BanPrice, uploaded []U
 // conditions produces one row per (id, condition) with the right condition and
 // quantity — the case the old deduped-index code got wrong.
 func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher data not loaded")
-	}
 
 	// Inject empty TCG sellers so the inventory lookups in UUID2TCGCSV succeed
 	// (prices come out 0, which is fine — we only assert condition/quantity).

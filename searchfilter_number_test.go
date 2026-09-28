@@ -12,6 +12,7 @@ import (
 // serving nine of them, and which spelled the phi in a case no number carries
 // so that "cn:635Φ" reached nothing.
 func TestCollectorNumberPlainForm(t *testing.T) {
+	skipWithoutDatastore(t)
 	for _, tt := range []struct {
 		desc, query, number, original string
 		want                          bool

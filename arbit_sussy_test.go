@@ -141,10 +141,8 @@ func renderReverse(t *testing.T, query string) string {
 // market has no supply, and dividing a real buy price by that put every such
 // row above every real listing on the page.
 func TestReverseDropsIndexSellers(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher data not loaded")
-	}
 	seedReverseScrapers(t, uuids[0])
 
 	page := renderReverse(t, "source=REVBUY")

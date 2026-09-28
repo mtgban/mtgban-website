@@ -13,9 +13,7 @@ import (
 // variable: on a product with nothing guaranteed left no filter at all - both
 // answered a typo with the whole datastore.
 func TestContentsOfNothingIsNothing(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	for _, query := range []string{
 		`contents:"No Such Product Exists"`,
@@ -198,9 +196,7 @@ func twoDisjointSealedProducts(t *testing.T) (a, b *mtgmatcher.CardObject) {
 // sizes, and a single exact product is checked to still return only its own
 // cards.
 func TestContentsMultipleExactProductsUnion(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	a, b := twoDisjointSealedProducts(t)
 	if a == nil || b == nil {
@@ -245,9 +241,7 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 // name of a real product rather than a pinned word like "Scene Box", so the
 // test doesn't depend on that product line still existing.
 func TestContentsSubstringFallsBackToProductType(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var co *mtgmatcher.CardObject
 	var term string

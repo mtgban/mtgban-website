@@ -10,9 +10,7 @@ import (
 // recent list shows, and what a favorite links to. It names one printing, so
 // it has to find that printing and no other.
 func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	uuids := backend().GetUUIDs()
 	var checked, missed int
@@ -64,9 +62,7 @@ func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
 // language-tagged number is what genQuery puts in the query, and cn: would
 // strip it back to the plain number and find the wrong printings.
 func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var tagged *mtgmatcher.CardObject
 	for _, uuid := range backend().GetUUIDs() {

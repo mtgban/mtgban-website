@@ -12,6 +12,7 @@ import (
 
 // A scryfall link reaches the same card here: swap the host, keep the path.
 func TestCardRedirectFollowsScryfallsShape(t *testing.T) {
+	skipWithoutDatastore(t)
 	for _, tt := range []struct {
 		name string
 		path string
@@ -83,9 +84,7 @@ func TestCardRedirectWidensAShortPath(t *testing.T) {
 
 // And a set alone reaches the set.
 func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	set, err := backend().GetSet("LEA")
 	if err != nil {
 		t.Skip("this datastore has no LEA")
@@ -119,9 +118,7 @@ func TestCardRedirectSetAloneFindsTheSet(t *testing.T) {
 // And the query it hands over is one the search resolves to that printing -
 // every finish of it, which is the reason it is a search and not a lookup.
 func TestCardRedirectLandsOnThePrinting(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	set, err := backend().GetSet("LEA")
 	if err != nil || len(set.Cards) == 0 {
 		t.Skip("this datastore has no LEA")
@@ -156,9 +153,7 @@ func TestCardRedirectLandsOnThePrinting(t *testing.T) {
 // The third part is a finish, and scryfall fills the same position with the
 // card's name, so it counts only when it names one.
 func TestCardRedirectTakesAFinishOrTheName(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	if _, err := backend().GetSet("OTJ"); err != nil {
 		t.Skip("this datastore has no OTJ")
 	}
@@ -186,9 +181,7 @@ func TestCardRedirectTakesAFinishOrTheName(t *testing.T) {
 // And the finish narrows the search to that one printing rather than to
 // nothing, which is the only reason to pass it on.
 func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	if _, err := backend().GetSet("OTJ"); err != nil {
 		t.Skip("this datastore has no OTJ")
 	}
@@ -227,9 +220,7 @@ func TestCardRedirectFinishNarrowsTheResults(t *testing.T) {
 // The number is matched as printed: a star or a dagger is what tells two
 // printings of one number apart, and cn: answered both.
 func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	if _, err := backend().GetSet("4ED"); err != nil {
 		t.Skip("this datastore has no 4ED")
 	}
@@ -263,9 +254,7 @@ func TestCardRedirectKeepsTheNumberAsPrinted(t *testing.T) {
 // of it: the position means one thing wherever it is read, and the card entire
 // is the same link without the word.
 func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	ids, err := backend().SearchEquals("Foil")
 	if err != nil || len(ids) == 0 {
 		t.Skip("this datastore has no card named Foil")
@@ -333,9 +322,7 @@ func cardPath(co *mtgmatcher.CardObject, finish string) string {
 // A path that names a finish comes back with the name in front: the filters
 // find the printing, the name is what the search box shows for it.
 func TestCardPathComesBackWithItsName(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	set, err := backend().GetSet("LEA")
 	if err != nil || len(set.Cards) == 0 {
 		t.Skip("this datastore has no LEA")

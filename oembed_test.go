@@ -16,9 +16,7 @@ import (
 // gives has to be one - the search handler's own error paths render a whole
 // html page, which a consumer asking for json cannot read.
 func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
 	DevMode, SigCheck = true, false
 	if LogPages == nil {

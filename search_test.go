@@ -27,15 +27,15 @@ func TestMain(m *testing.M) {
 	testSite = newSite()
 
 	// Tests written against fixtures build their own site, so this lets them
-	// run - under -race included - without the real datastore load. Pair it
-	// with -run (e.g. TestSite): some tests need the real data and don't skip.
+	// run - under -race included - without the real datastore load; the
+	// tests that need it skip.
 	if os.Getenv("MTGBAN_TEST_DATASTORE") == "off" {
 		log.Println("MTGBAN_TEST_DATASTORE=off: not loading the real datastore")
 		os.Exit(m.Run())
 	}
 
-	// Best-effort datastore load: tests that need real card data guard
-	// themselves with t.Skip when the data isn't loaded, so a missing local
+	// Best-effort datastore load: tests that need real card data skip when
+	// it isn't loaded, most through skipWithoutDatastore, so a missing local
 	// datastore file shouldn't take down the whole package's test run.
 	err := testSite.loadDatastore(Config.DatastorePath)
 	if err != nil {
@@ -76,12 +76,16 @@ func parseSearchOptionsWrapper(input string) SearchConfig {
 	return parseSearchOptionsNG(backend(), input, nil, nil, nil)
 }
 
-// datastoreLoaded reports whether the mtgmatcher card datastore is available,
-// so data-dependent tests can skip when it isn't loaded locally or in CI.
-func datastoreLoaded() bool {
+// skipWithoutDatastore skips a test or benchmark that needs real card data
+// when TestMain has loaded none: MTGBAN_TEST_DATASTORE=off, or no datastore
+// file. The empty backend served then matches no Forest.
+func skipWithoutDatastore(tb testing.TB) {
+	tb.Helper()
 	_, err := backend().Match(&mtgmatcher.InputCard{Name: "Forest"})
 	var alias *mtgmatcher.AliasingError
-	return err == nil || errors.As(err, &alias)
+	if err != nil && !errors.As(err, &alias) {
+		tb.Skip("no datastore loaded")
+	}
 }
 
 // A variant-qualified name (e.g. "(Borderless)") skips the plain-name search
@@ -89,9 +93,7 @@ func datastoreLoaded() bool {
 // of the matched printing. Regression guard: the foil used to be dropped
 // because the variant already in the name clobbered the "Foil" match hint.
 func TestAttemptMatchVariantIncludesFoil(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 
 	const query = "Meren of Clan Nel Toth (Borderless)"
 	uuids, err := attemptMatch(backend(), query)

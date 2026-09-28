@@ -12,9 +12,7 @@ import (
 // Which words are a set filter and which are a card's name, decided against
 // the datastore the suite already has loaded.
 func TestSetFilterNamesNothing(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	if _, err := backend().GetSet("LEA"); err != nil {
 		t.Skip("this datastore has no LEA")
 	}

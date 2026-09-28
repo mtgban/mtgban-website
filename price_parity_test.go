@@ -22,10 +22,8 @@ import (
 // product from the datastore, skipping when unavailable.
 func parityCards(t *testing.T) (regular, foil, sealed string) {
 	t.Helper()
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher data not loaded")
-	}
 	for _, u := range uuids {
 		co, err := backend().GetUUID(u)
 		if err != nil || co.Sealed || co.Etched {

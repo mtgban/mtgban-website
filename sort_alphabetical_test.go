@@ -10,10 +10,8 @@ import (
 // has to read A-to-Z off the English names, not off whatever order the
 // kanji of the printed names happen to fall in.
 func TestAlphabeticalSortUsesEnglishNames(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
 
 	var keys []string
 	for _, uuid := range uuids {
@@ -49,10 +47,8 @@ func TestAlphabeticalSortUsesEnglishNames(t *testing.T) {
 // keying on the English name: a localized printing lands next to the
 // English one it reprints, instead of filing itself under its own name.
 func TestAlphabeticalSortGroupsLocalizedReprints(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
 
 	var keys []string
 	for _, uuid := range uuids {

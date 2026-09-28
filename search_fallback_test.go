@@ -64,9 +64,7 @@ func TestSetCodeMatches(t *testing.T) {
 // likely to have meant it, and declines the cases where the query already said
 // what it wanted.
 func TestSearchFallback(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore")
-	}
+	skipWithoutDatastore(t)
 
 	t.Run("a treatment", func(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "confetti", nil, nil, nil)

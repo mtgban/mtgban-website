@@ -140,9 +140,7 @@ func productInBothFinishes(t *testing.T) (int, string, string) {
 // sub-type names, not on the product's base printing, and on no row at all
 // for a sub-type the product is not sold in.
 func TestTCGFinishID(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 	pid, plain, foil := productInBothFinishes(t)
 	base, err := backend().MatchID(strconv.Itoa(pid))
 	if err != nil {
@@ -164,9 +162,7 @@ func TestTCGFinishID(t *testing.T) {
 // the base uuid, so handing that uuid straight to the search used to render the
 // nonfoil row for a foil chart (issue #295).
 func TestMagicFinishSearchID(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 
 	// Any printing that carries both finishes will do.
 	var uuid, foilID string

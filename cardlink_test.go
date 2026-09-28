@@ -19,9 +19,7 @@ func linkQuery(t *testing.T, link string) string {
 // carrying a language or variant suffix - 59ita, 349alt, 1110jpn - once went
 // out as cn:, which reads the number without it, and the link came back empty.
 func TestCardLinkResolvesToItsPrinting(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
 	step := len(uuids) / 300
 	if step < 1 {
@@ -72,9 +70,7 @@ func TestCardLinkResolvesToItsPrinting(t *testing.T) {
 // on the search, a product on the sealed page. No hop in between, so what the
 // address bar shows after the click is what the link said.
 func TestCardLinkIsThePrintingsQuery(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 
 	var card, sealed string
 	for _, uuid := range backend().GetUUIDs() {

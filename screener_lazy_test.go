@@ -15,9 +15,7 @@ import (
 // thousands of them. A cold page now paints without them and asks for them
 // itself; a warm one still answers in one go.
 func TestScreenerDefersTheColdBuild(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("no datastore loaded")
-	}
+	skipWithoutDatastore(t)
 	uuid := backend().GetUUIDs()[0]
 
 	prevFetch := screenerFetch

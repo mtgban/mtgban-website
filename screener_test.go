@@ -344,9 +344,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 	}
 
 	// TCG-keyed rows resolve through the id map (needs the datastore)
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 	pid, want, wantFoil := productInBothFinishes(t)
 
 	uuid, isFoil, ok = moverCardID(backend(), timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"})

@@ -22,10 +22,8 @@ func TestSleepersLanguagesAreEnglishMarket(t *testing.T) {
 // by hand: one the datastore gains later would be dropped silently, being
 // neither English nor on the list. This is where that shows up.
 func TestSleepersLanguagesCoverFlavourPrintings(t *testing.T) {
+	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
-	if len(uuids) == 0 {
-		t.Skip("mtgmatcher data not loaded")
-	}
 
 	missing := map[string]int{}
 	for _, u := range uuids {
@@ -50,9 +48,7 @@ func TestSleepersLanguagesCoverFlavourPrintings(t *testing.T) {
 // TestSleepersDropForeignPrintings exercises the two modes that go through
 // ArbitOpts, which is what issue #319 asks for.
 func TestSleepersDropForeignPrintings(t *testing.T) {
-	if len(backend().GetUUIDs()) == 0 {
-		t.Skip("mtgmatcher data not loaded")
-	}
+	skipWithoutDatastore(t)
 	// Without scrapers there is nothing to compare and both come back empty,
 	// which is not the same as passing.
 	results := map[string]map[string]int{

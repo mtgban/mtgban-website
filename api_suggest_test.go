@@ -9,9 +9,7 @@ import (
 // End to end through the handler against the real datastore, the way the
 // browser's search bar asks (opensearch.xml points q= here).
 func TestSuggestAPIFoldsTheQuery(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 
 	w := httptest.NewRecorder()
 	testSite.SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=fire+ice", nil))
@@ -44,9 +42,7 @@ func TestSuggestAPIFoldsTheQuery(t *testing.T) {
 // A query that folds to nothing must not match every name as an empty
 // prefix.
 func TestSuggestAPIRefusesAnEmptyFold(t *testing.T) {
-	if !datastoreLoaded() {
-		t.Skip("mtgmatcher datastore not loaded")
-	}
+	skipWithoutDatastore(t)
 
 	w := httptest.NewRecorder()
 	testSite.SuggestAPI(w, httptest.NewRequest("GET", "/api/suggest?q=----", nil))
