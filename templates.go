@@ -212,7 +212,7 @@ var funcMap = template.FuncMap{
 	"stale_count": func(rows [][]string) int {
 		count := 0
 		for _, row := range rows {
-			if row[8] != "" {
+			if len(row) > 8 && row[8] != "" {
 				count++
 			}
 		}
