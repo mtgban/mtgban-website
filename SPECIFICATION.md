@@ -203,10 +203,11 @@ goroutines stay fatal on purpose, as their errors are: the scraper
 goroutine in `main()`, including the `runSealedAnalysis()`,
 `warmVariantCacheIfEnabled()` and `RefreshManifest()` it runs after the
 load, and the one running `ListenAndServe`. The workers
-`searchParallelNG` fans out to each defer `recoverJob()` too, so a panic
-in one costs only its share of the answer: its side of the search. The
-goroutines `fetchRosterPrices` and `runningWorkflows` fan out to do not
-recover, so a panic in one still ends the process.
+`searchParallelNG` and `fetchRosterPrices` fan out to each defer
+`recoverJob()` too, so a panic in one costs only its share of the answer:
+its side of the search, or its roster card, counted as a failed read. The
+goroutines `runningWorkflows` fans out to do not recover, so a panic in
+one still ends the process.
 
 ### 2.3 Data loading pipeline
 
