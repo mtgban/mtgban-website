@@ -259,6 +259,72 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 	}
 }
 
+// TestArbitAppliesOnlyShownFilters pins a filter to the pages that show its
+// chip. Typed into an arbit url, global's "only SYP" cut the page to the SYP
+// list, and emptied it where no SYP buylist loads, and "only Legit" hid the
+// TCG Direct warnings, with no chip there to turn either off.
+func TestArbitAppliesOnlyShownFilters(t *testing.T) {
+	skipWithoutDatastore(t)
+	m10 := backend().GetUUIDsInSet("M10")
+	if len(m10) == 0 {
+		t.Skip("M10 not present in this datastore")
+	}
+	cardID := m10[0]
+	withSigMode(t, true, false)
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	shelf := func(price float64) mtgban.InventoryRecord {
+		inv := mtgban.InventoryRecord{}
+		inv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: price, Quantity: 1, URL: "u"})
+		return inv
+	}
+	// The market backs the source's price, so "only Legit", which global
+	// turns on by default, keeps the row
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(shelf(10), mtgban.ScraperInfo{Name: "Filter Shop", Shorthand: "FILTSHOP"}),
+		mtgban.NewSellerFromInventory(shelf(40), mtgban.ScraperInfo{Name: "Filter Market", Shorthand: "TCGMarket"}),
+	}
+	sellersPtr.Store(&sellers)
+	// TCG Direct (net) pays over twice the market, which arbit warns about
+	bl := mtgban.BuylistRecord{}
+	bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 100, URL: "u"})
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Filter Buyer", Shorthand: "TCGDirectNet"}),
+	}
+	vendorsPtr.Store(&vendors)
+
+	// No SYP buylist is loaded, so wherever "only SYP" applies it drops the row
+	row := `data-arb-id="` + cardID + `"`
+	for _, tt := range []struct {
+		global     bool
+		query      string
+		want, warn bool
+	}{
+		{false, "", true, true},
+		{false, "&nosyp=true", true, true},
+		{false, "&nosus=true", true, true},
+		{true, "", true, false},
+		{true, "&nosyp=true", false, false},
+	} {
+		r := httptest.NewRequest("GET", "/?source=FILTSHOP"+tt.query, nil)
+		w := httptest.NewRecorder()
+		pageVars := PageVars{GlobalMode: tt.global, BetaNav: &NavElem{Short: "beta"}}
+		scraperCompare(backend(), w, r, pageVars, []string{"FILTSHOP"}, nil, scraperCompareOpts{AllResults: true})
+		got := strings.Contains(w.Body.String(), row)
+		if got != tt.want {
+			t.Errorf("global=%v source=FILTSHOP%s lists the row: %v, want %v", tt.global, tt.query, got, tt.want)
+		}
+		warned := strings.Contains(w.Body.String(), "TCG Market is")
+		if warned != tt.warn {
+			t.Errorf("global=%v source=FILTSHOP%s warns: %v, want %v", tt.global, tt.query, warned, tt.warn)
+		}
+	}
+}
+
 // seedVolatileSealed publishes a sealed source and probe holding one
 // product, and the simulation that rates its contents too uneven to trust.
 func seedVolatileSealed(t *testing.T, productID string) {
