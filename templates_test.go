@@ -228,3 +228,37 @@ func TestBuylistBadgePills(t *testing.T) {
 		}
 	}
 }
+
+// TestBuylistDetailTint checks Good follows CK's signal, executed the way the
+// arbit and upload pages call it.
+func TestBuylistDetailTint(t *testing.T) {
+	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(
+		`{{buylist_detail .Store .Hotlist .Price .Good .Highest .Always .Signal}}`))
+	for _, tc := range []struct {
+		signal string
+		always bool
+		want   string
+		not    string
+	}{
+		{"sell", true, `<span class="bl-good-sell" title="Card Kingdom's latest P90">Good: $ 9.00</span>`, ""},
+		{"wait", true, `<span class="bl-good-wait" title="Card Kingdom's latest P90">Good: $ 9.00</span>`, ""},
+		{"", true, `<span title="Card Kingdom's latest P90">Good: $ 9.00</span>`, "bl-good-"},
+		{"sell", false, `<span title="Card Kingdom's latest P90">Good: $ 9.00</span>`, "bl-good-"},
+		// Only the known states become a class.
+		{"best x", true, `<span title="Card Kingdom's latest P90">Good: $ 9.00</span>`, "bl-good-"},
+	} {
+		var b strings.Builder
+		err := tmpl.Execute(&b, struct {
+			Store, Hotlist       string
+			Price, Good, Highest float64
+			Always               bool
+			Signal               string
+		}{"CK", "", 20, 9, 12, tc.always, tc.signal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), tc.want) || (tc.not != "" && strings.Contains(b.String(), tc.not)) {
+			t.Errorf("signal %q always %v: rendered %s", tc.signal, tc.always, b.String())
+		}
+	}
+}
