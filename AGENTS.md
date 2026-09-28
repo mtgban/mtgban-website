@@ -121,7 +121,7 @@ output, not a claim written here.
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
-| `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there or the newspaper cache panics at startup |
+| `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
 | `product.go`, `chart.go`, `checkpoints.go` | Sealed EV, price charts, chart annotations |
 | `api*.go` | Price API, batch prices, chart/suggest APIs, CSV exports, API-mode loading |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
@@ -142,8 +142,8 @@ One binary, switched by `Config.Game` in the config file: each of `lorcana`,
 `palworld` (alongside the default, `magic`) is its own deployment — its own
 `Seller`/`Vendor` set, its own card database, its own set of pages the ACL
 allows. `gameMap`/`gameBadgeMap` (`news.go`) name every game a deployment can
-be; a game the matcher registers but that isn't in those two maps panics the
-newspaper cache at startup rather than failing to compile. `gameMap`'s names
+be; a game the matcher registers that `gameMap` lacks still builds, but its
+newspaper stays empty and each refresh logs an error. `gameMap`'s names
 are TCGplayer's `productLineName`s, spelled exactly (Palworld's is `Palworld
 OFFICIAL CARD GAME`), because the newspaper stores `game_name` that way and
 the pages match it with `=`: keep them in step with MTGBan_Newspaper's
