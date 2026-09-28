@@ -174,6 +174,9 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   reload (`loadVars`, main.go) or a config-editor save (`saveConfig`,
   admin.go), under `apiUsersMutex`, which the per-user API secret
   lookups read behind.
+  Those two and a new API key (`generateAPIKey`) also hold `configMu`
+  across their file I/O, so none lands inside another; the lookups never
+  wait on it.
 - Affiliate data sits behind `affiliatesMu`/`affiliatesPtr`.
 
 **Panics.** A panic in a handler behind one of the three signing wrappers
