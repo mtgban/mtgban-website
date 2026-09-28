@@ -106,3 +106,28 @@ func TestServeRunningWorkflows(t *testing.T) {
 		t.Errorf("running = %v, want both states", payload.Running)
 	}
 }
+
+// A state whose fetch panics is reported and skipped, as a failing one is:
+// the poll still answers with the other state's names.
+func TestRunningWorkflowsSurvivesAPanickingFetch(t *testing.T) {
+	posts := serverWebhook(t)
+	stubGAFetch(t, func(state string) ([]string, error) {
+		if state == "queued" {
+			panic("the status fetch broke")
+		}
+		return []string{state}, nil
+	})
+
+	got := runningWorkflows()
+	if len(got) != 1 || got[0] != "in_progress" {
+		t.Errorf("running = %v, want just the state that answered", got)
+	}
+
+	message, _, source := panicReport(t, posts)
+	if message != "the status fetch broke" {
+		t.Errorf("message = %q, want the fetch's panic", message)
+	}
+	if source != "source job: admin workflow fetch queued" {
+		t.Errorf("source = %q, want the fetch", source)
+	}
+}

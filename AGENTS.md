@@ -240,8 +240,7 @@ commit to this repo can complete on its own.
    answer. Among the goroutines that do not recover: two startup ones,
    fatal on purpose (the scraper goroutine in `main()`, with the
    `runSealedAnalysis()`, `warmVariantCacheIfEnabled()` and
-   `RefreshManifest()` it runs, and the one running `ListenAndServe`), and
-   those `runningWorkflows` fans out to.
+   `RefreshManifest()` it runs, and the one running `ListenAndServe`).
 
 ## Known issues / refactors pending
 
