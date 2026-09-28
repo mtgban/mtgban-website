@@ -43,9 +43,7 @@ func TestNewspaperHiddenWhenNothingCached(t *testing.T) {
 // The nav loop used to consult ShouldHide only for subpages, so a hidden
 // section still rendered its own button.
 func TestNavHonoursShouldHideOnASection(t *testing.T) {
-	prevSig, prevDev := SigCheck, DevMode
-	t.Cleanup(func() { SigCheck, DevMode = prevSig, prevDev })
-	SigCheck, DevMode = false, true
+	withSigMode(t, true, false)
 
 	names := func() []string {
 		var out []string

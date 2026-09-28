@@ -19,9 +19,7 @@ func offlineTestSig(email, offlineFlag string) string {
 }
 
 func TestOfflineModeAllowed(t *testing.T) {
-	oldDev, oldSig := DevMode, SigCheck
-	DevMode, SigCheck = false, false
-	defer func() { DevMode, SigCheck = oldDev, oldSig }()
+	withSigMode(t, false, false)
 
 	tests := []struct {
 		name  string

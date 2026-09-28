@@ -31,9 +31,7 @@ func TestAdminToolsLinkTheGatewayAdmin(t *testing.T) {
 }
 
 func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
-	savedDev, savedSig := DevMode, SigCheck
-	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 
 	const user = "ops@example.com"
 	apiUsersMutex.Lock()

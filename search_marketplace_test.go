@@ -18,8 +18,7 @@ func TestSearchLinksOnlyTheMarketplacesItCarries(t *testing.T) {
 	skipWithoutDatastore(t)
 	uuid := backend().GetUUIDs()[0]
 
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

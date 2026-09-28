@@ -101,8 +101,7 @@ func TestModeSwitchUpsellsWithoutTheGrant(t *testing.T) {
 // with no file, no paste and no link involved - the list never left.
 func TestModeSwitchPricesTheSameRowsTheOtherWay(t *testing.T) {
 	cards := twoCards(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -144,8 +143,7 @@ func TestModeSwitchPricesTheSameRowsTheOtherWay(t *testing.T) {
 // differ only by condition must not come back merged into one row.
 func TestModeSwitchKeepsIgnoredConditions(t *testing.T) {
 	cards := twoCards(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -185,8 +183,7 @@ func TestModeSwitchKeepsAnOpenedListOpen(t *testing.T) {
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -230,10 +227,9 @@ func TestModeSwitchKeepsAnOpenedListOpen(t *testing.T) {
 // buylist mode is.
 func TestModeSwitchCannotBuyTheGrant(t *testing.T) {
 	cards := twoCards(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
 	// Signature checks on with no signature to read: the grants are all off,
 	// which is what a reader without them looks like to the handler.
-	DevMode, SigCheck = true, true
+	withSigMode(t, true, true)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

@@ -38,9 +38,7 @@ func TestNewBantoolWorkflow(t *testing.T) {
 // Pins the stale badge, the section header's count and the banner's own
 // "Stale (N):" text - not the row's logs link, which renders regardless.
 func TestAdminDashboardShowsStaleBadgeAndBanner(t *testing.T) {
-	savedDev, savedSig := DevMode, SigCheck
-	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevIdx := scraperIndexPtr.Load()

@@ -16,18 +16,16 @@ func navWithHiddenSubPage(t *testing.T, parentLink, subLink, marker string) http
 	t.Helper()
 
 	savedNavs, savedOrder := ExtraNavs, OrderNav
-	savedDev, savedSig := DevMode, SigCheck
 	savedLimiter := UserRateLimiter
 	t.Cleanup(func() {
 		ExtraNavs, OrderNav = savedNavs, savedOrder
-		DevMode, SigCheck = savedDev, savedSig
 		UserRateLimiter = savedLimiter
 	})
 
 	// These unsigned test requests use the shared empty-email key. Give each
 	// helper invocation a fresh limiter so tests cannot affect one another.
 	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	ExtraNavs = map[string]*NavElem{
 		"Testing": {
 			Name: "Testing",

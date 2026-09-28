@@ -27,13 +27,9 @@ func storesOfBothKinds(t *testing.T, kind string) (card, product string) {
 	}
 	card, product = cards[0], products[0]
 
-	dev, sig := DevMode, SigCheck
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	saved := affiliatesPtr.Load()
-	t.Cleanup(func() {
-		DevMode, SigCheck = dev, sig
-		affiliatesPtr.Store(saved)
-	})
+	t.Cleanup(func() { affiliatesPtr.Store(saved) })
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

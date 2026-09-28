@@ -638,8 +638,7 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 // well past 2,000 rows, and what came back then was the uploader page.
 func TestExportPostsAListPastTheFormLimit(t *testing.T) {
 	skipWithoutDatastore(t)
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -735,8 +734,7 @@ func TestUnpackedPageSurvivesItsOwnRoundTrip(t *testing.T) {
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}

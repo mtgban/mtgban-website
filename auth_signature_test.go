@@ -31,9 +31,7 @@ func signedAs(t *testing.T, fields url.Values, expires time.Time) string {
 // set, which is the only template cache a test binary has.
 func signingEnabled(t *testing.T, dev bool) {
 	t.Helper()
-	savedDev, savedCheck := DevMode, SigCheck
-	DevMode, SigCheck = dev, true
-	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedCheck })
+	withSigMode(t, dev, true)
 	// The runtime puts this one back itself, including unsetting it again
 	// where it was never set to begin with.
 	t.Setenv("BAN_SECRET", "test-secret")

@@ -544,8 +544,7 @@ func TestApiEnabledStores(t *testing.T) {
 // stores.json narrows to the singles or the sealed stores the way sets.json
 // narrows its sets, as the guide documents.
 func TestStoresFilterNarrowsBothWays(t *testing.T) {
-	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
-	DevMode, SigCheck = true, false
+	withSigMode(t, true, false)
 	prev := sellersPtr.Load()
 	t.Cleanup(func() { sellersPtr.Store(prev) })
 	sellers := []mtgban.Seller{
