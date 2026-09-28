@@ -16,6 +16,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
 	"github.com/mtgban/mtgban-website/internal/palette"
+	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -183,7 +184,7 @@ func (s *site) newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastor
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
-		names:    newNamesSnapshot(b.Names("canonical", false), b.Names("canonical", true)),
+		names:    suggest.NewNames(b.Names("canonical", false), b.Names("canonical", true)),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
 		loadedAt: loadedAt,

@@ -11,6 +11,8 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+
+	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
 // fixtureBackend builds a small in-memory Backend the way a game loader
@@ -123,7 +125,7 @@ func assertDatastoreDescribesLoad(t *testing.T, s *site, setCode, number, namePr
 		t.Errorf("editions: views name %v over %d printings, want only %q", codes, editions.TotalUnique, setCode)
 	}
 
-	matches := ds.names.matchesFor(namePrefix, false)
+	matches := ds.names.Matches(suggest.Fold(namePrefix), false)
 	if len(matches) == 0 {
 		t.Errorf("names: %q did not match this load's own name", namePrefix)
 	}
