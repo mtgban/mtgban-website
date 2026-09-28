@@ -96,9 +96,10 @@
 {{/* Whether the arbit source is a sealed-mode scraper. The table is
      homogeneous, so this single lookup applies to every row. */}}
 {{$sealedSource := is_sealed_scraper $.ScraperShort}}
-{{/* INFO column: for singles it carries CK's P90/Highest (buylist_detail); for
-     sealed it instead holds the 🔎 link to the product's contents/decklist.
-     Shown on every non-global table, and in global mode only when sealed. */}}
+{{/* INFO column: for singles it carries CK's P90/Highest (buylist_detail) and
+     CK's signal and stock (buylist_ck); for sealed it instead holds the 🔎
+     link to the product's contents/decklist. Shown on every non-global table,
+     and in global mode only when sealed. */}}
 {{$showInfo := or (not $.GlobalMode) $sealedSource}}
 <div class="page-standard arb-page arb-wide">
         <div id="hoverWrap" class="foil-wrap hoverWrap">
@@ -419,7 +420,7 @@
                             </div>
                         </td>
                         {{if $showInfo}}
-                            <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{else if not $.GlobalMode}}{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true}}{{end}}</td>
+                            <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{else if not $.GlobalMode}}{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true}}{{buylist_ck $card.CKSignal $card.CKSignalTip $card.CKFacts}}{{end}}</td>
                         {{end}}
                         {{if not $save.HasNoConds}}
                             <td>
