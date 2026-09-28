@@ -384,6 +384,10 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 				} else {
 					Config = config
 					Config.sourcePath = configSourcePath
+					// No applyOverrides: the saved text goes live as written. With
+					// the running values, this editor would re-render the old ones
+					// and the next save would write them back to the file.
+					finishConfig()
 					pageVars.InfoMessage = "Config updated"
 					// The access table, grants and affiliate data are served
 					// from their own files, not this config; reload them here
