@@ -56,8 +56,10 @@ Magic.
 Flags (`main()`): `-cfg` (config path, default
 `$BAN_CONFIG_PATH` or `config.json`), `-port`, `-ds` (datastore path,
 default `AllPrintings.json.xz`), `-acl` (access-table path override),
-`-grants` (Patreon grants path override), `-dev` (hot-reload templates,
-relaxed auth), `-sig` (force signature checks in dev), `-noload`, `-nonews`,
+`-grants` (Patreon grants path override), `-dumps` (a local directory to
+read the scraper dumps from; see §2.3), `-dev` (hot-reload templates,
+relaxed auth), `-sig` (force signature checks in dev), `-noload`,
+`-stores` (comma-separated stores to load at startup; see §2.3), `-nonews`,
 `-log` (default `logs/`), and a `tcgcsv-*` family — `-tcgcsv-backfill`,
 `-tcgcsv-daily`, `-tcgcsv-products` each run one ingest job against
 `tcg_prices`/`tcg_products` and exit without starting the web server (the
@@ -107,8 +109,11 @@ Boot sequence (`main()`):
    together in one `s.ds.Store()`, then itself spawns
    `s.cacheNewspaper()` as a further goroutine.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
-   bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
-   `loadScrapersNG()` on it, then `s.runSealedAnalysis()`,
+   bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
+   `simplecloud.FileBucket{Root: dir}` in its place; either is kept as
+   `DataBucket` for reloads) and runs `loadScrapersNG()` on it with the
+   stores to load (`-stores` when it names any, else
+   `scraper_config.stores`), then `s.runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
 7. `s.offline.StartRefresher()` — one debounced goroutine that every
    runtime manifest refresh funnels through.
@@ -174,12 +179,23 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   `mtgban-dumps` (`dumpsBucket`) as
   `<game>/<store>/<kind>/<shorthand>.json.xz` (kind `retail` or `buylist`),
   and `openDumpsBucket()` opens it through `newB2ClientFor` with the
-  `bucket_keys["mtgban-dumps"]` key pair, like every other bucket;
-  `scraper_config` keeps only `icons` and `name_override`. At startup the
-  bucket is listed under `<game>/` (`listDumps`, via `simplecloud.Lister`,
-  with a timeout and retry per attempt); every key of that form becomes one
-  load, and anything else is skipped with a log line. Each load is fetched
-  at that same key and deserialized via
+  `bucket_keys["mtgban-dumps"]` key pair, like every other bucket. With
+  `-dumps <dir>`, a `simplecloud.FileBucket{Root: dir}` stands in for it:
+  a local directory laid out the same way, listed as the same keys,
+  relative to dir, and read with no B2 credentials. `scraper_config` keeps
+  `icons`, `name_override` and `stores`. At startup the bucket is listed
+  under `<game>/` (`listDumps`, via `simplecloud.Lister`, with a timeout
+  and retry per attempt); every key of that form becomes one load, and
+  anything else is skipped with a log line. When `-stores`, else
+  `scraper_config.stores`, names any store, `onlyStores` narrows the
+  listing to those stores before the index is published, so only they
+  load at startup and only they are indexed; the list is logged once, and
+  a named store the listing lacks is logged and skipped. An empty list
+  loads every store listed. Reloads aren't held to the list:
+  `/api/load/<store>` loads and indexes whatever store it names, and admin
+  `?reload=` loads whatever dump it names. Each load is fetched at that
+  same key and
+  deserialized via
   `mtgban.ReadSellerFromJSON`/`ReadVendorFromJSON`, 3 retries with backoff
   and a 2-minute timeout per scraper. The listing also builds a
   `scraperIndex`: store → kind → shorthands, and the reverse shorthand →
