@@ -100,7 +100,7 @@ output, not a claim written here.
 | File | Responsibility |
 |---|---|
 | `main.go` | Startup, flags, config, routing, `NavElem` page registry, `PageVars`, template cache, cron jobs |
-| `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
+| `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
 | `templates.go` | The template `FuncMap` — pure helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
@@ -177,7 +177,12 @@ commit to this repo can complete on its own.
    in `atomic.Pointer` and read via `GetSellers()`/`GetVendors()`. Never mutate
    a returned slice/map in place. To change data, build a new value and publish
    it through the existing `updateSellers()`/`updateVendors()` (which also
-   validate that the dataset hasn't regressed) — keep that validation.
+   validate that the dataset hasn't regressed) — keep that validation. The
+   card datastore follows the same pattern one level up: `site` (site.go)
+   owns it in `ds atomic.Pointer[datastore]`, pre-stored empty by `newSite()`
+   so `s.datastore()`/`s.backend()` are never nil; code below an entry point
+   reads the datastore only through the `b`/`ds` it was handed, never from
+   the site (the nav's `ShouldHide` visibility check aside).
 
 2. **Stateless auth.** Permissions live entirely in the signed `MTGBAN`
    cookie / `?sig=` (an HMAC-signed query string). There is no session store

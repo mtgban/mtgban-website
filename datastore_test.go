@@ -73,20 +73,23 @@ func TestDatastorePublishSwapsEverySnapshotAtOnce(t *testing.T) {
 	loadedA := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	loadedB := time.Date(2021, 6, 15, 0, 0, 0, 0, time.UTC)
 
-	useDatastore(t, testSite.newDatastore(fixtureA, loadedA))
-	assertDatastoreDescribesLoad(t, "FIXTUREA", "1", "fixture card alpha", loadedA)
+	// A private site, not testSite: publishing twice here must not leak
+	// into any other test.
+	s := newSite()
+	s.ds.Store(s.newDatastore(fixtureA, loadedA))
+	assertDatastoreDescribesLoad(t, s, "FIXTUREA", "1", "fixture card alpha", loadedA)
 
-	useDatastore(t, testSite.newDatastore(fixtureB, loadedB))
-	assertDatastoreDescribesLoad(t, "FIXTUREB", "3", "fixture card beta", loadedB)
+	s.ds.Store(s.newDatastore(fixtureB, loadedB))
+	assertDatastoreDescribesLoad(t, s, "FIXTUREB", "3", "fixture card beta", loadedB)
 }
 
 // assertDatastoreDescribesLoad checks that the backend, numbers, editions,
-// names and the palette lists of the currently published datastore all
+// names and the palette lists of s's currently published datastore all
 // resolve to the load named by setCode/number/namePrefix, rather than some
 // other one.
-func assertDatastoreDescribesLoad(t *testing.T, setCode, number, namePrefix string, loadedAt time.Time) {
+func assertDatastoreDescribesLoad(t *testing.T, s *site, setCode, number, namePrefix string, loadedAt time.Time) {
 	t.Helper()
-	ds := currentDatastore()
+	ds := s.datastore()
 	wantUUID := setCode + "-" + number
 
 	_, err := ds.backend.GetSet(setCode)
@@ -132,9 +135,9 @@ func assertDatastoreDescribesLoad(t *testing.T, setCode, number, namePrefix stri
 		serve     func(http.ResponseWriter, *http.Request)
 		key, want string
 	}{
-		{testSite.palette.Sets, "code", setCode},
-		{testSite.palette.Promos, "value", strings.ToLower(setCode)},
-		{testSite.palette.Finishes, "value", strings.ToLower(setCode)},
+		{s.palette.Sets, "code", setCode},
+		{s.palette.Promos, "value", strings.ToLower(setCode)},
+		{s.palette.Finishes, "value", strings.ToLower(setCode)},
 	} {
 		rec := httptest.NewRecorder()
 		list.serve(rec, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -150,16 +153,13 @@ func assertDatastoreDescribesLoad(t *testing.T, setCode, number, namePrefix stri
 	}
 }
 
-// A card row keeps the set symbol and TCG id of the datastore its handler
-// read, even when another is published before the page is drawn.
+// A card row carries its own set symbol and TCG id in the page data it was
+// given, so drawing it reads no datastore.
 func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 	a := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
 	a.Sets["FIXTUREA"].Symbol = "https://example.test/fixturea.webp"
 	a.UUIDs["FIXTUREA-1"].Identifiers = map[string]string{"tcgplayerProductId": "4242"}
 	card := uuid2card(a, "FIXTUREA-1", false, false, false)
-
-	useDatastore(t, testSite.newDatastore(fixtureBackend("FIXTUREB", "Fixture Edition Beta", "2021-06-15",
-		[][2]string{{"Fixture Card Beta", "1"}}), time.Now()))
 
 	metadata := map[string]GenericCard{"FIXTUREA-1": card}
 	search := PageVars{SearchQuery: card.Name, SearchRan: true, CardHashes: []string{"FIXTUREA-1"},
@@ -181,11 +181,13 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 
 // TestEmptyDatastoreServesPaletteListsUncached pins what a request gets
 // before the first load completes: every palette list empty and marked
-// no-store, per emptyDatastore's nil palette snapshot.
+// no-store, per the pre-stored datastore's nil palette snapshot.
 func TestEmptyDatastoreServesPaletteListsUncached(t *testing.T) {
-	useDatastore(t, nil)
+	// A private site, not testSite: this wants the state before anything
+	// has published, which testSite left behind in TestMain.
+	s := newSite()
 	for _, serve := range []func(http.ResponseWriter, *http.Request){
-		testSite.palette.Sets, testSite.palette.Promos, testSite.palette.Finishes,
+		s.palette.Sets, s.palette.Promos, s.palette.Finishes,
 	} {
 		rec := httptest.NewRecorder()
 		serve(rec, httptest.NewRequest(http.MethodGet, "/", nil))

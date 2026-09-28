@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -18,9 +19,11 @@ import (
 	"github.com/mtgban/simplecloud"
 )
 
-// site is one deployment: its page handlers and jobs, the palette and
-// offline services they read, the datastore loader and the reload tracker.
+// site is one deployment: the live datastore, its page handlers and jobs,
+// the palette and offline services they read, the datastore loader and the
+// reload tracker.
 type site struct {
+	ds      atomic.Pointer[datastore]
 	palette *palette.Service
 	offline *offlineapi.Service
 	reloads dsreload.Tracker
@@ -31,6 +34,13 @@ type site struct {
 // site's current datastore at call time rather than now.
 func newSite() *site {
 	s := &site{}
+
+	// Pre-stored before the first load, so s.ds is never nil: nil numbers,
+	// names and palette keep the pre-load answers scan, 204 and no-store.
+	s.ds.Store(&datastore{
+		backend:  &mtgmatcher.Backend{},
+		editions: &editionsSnapshot{},
+	})
 
 	s.palette = &palette.Service{
 		Backend:      s.backend,
@@ -157,10 +167,10 @@ func newSite() *site {
 	return s
 }
 
-// datastore returns the live datastore, or the empty one before the first
-// load, from the package-level pointer.
+// datastore returns the live datastore. Never nil: newSite pre-stores the
+// empty one above, and loadDatastore is the only thing that replaces it.
 func (s *site) datastore() *datastore {
-	return currentDatastore()
+	return s.ds.Load()
 }
 
 func (s *site) backend() *mtgmatcher.Backend {
@@ -199,7 +209,7 @@ func (s *site) loadDatastore(path string) error {
 	// Build every derived snapshot - including the palette lists - before
 	// publishing: one read of the datastore gives the backend and the
 	// snapshots of the same load.
-	liveDatastore.Store(s.newDatastore(backend, time.Now()))
+	s.ds.Store(s.newDatastore(backend, time.Now()))
 
 	ServerNotify("init", "Datastore installed")
 	go s.cacheNewspaper()

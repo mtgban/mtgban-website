@@ -63,7 +63,7 @@ func TestSetFilterNamesNothing(t *testing.T) {
 // The queries are run rather than the predicate asked, because a check written
 // against the predicate passes while the search is broken.
 //
-// Loading a datastore replaces the one TestMain loaded, so this runs by name:
+// Opening a datastore is slow, so this runs by name:
 //
 //	YUGIOH_PATH=... go test -run NameThatIsFilterSyntaxIsStillFound
 func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
@@ -92,10 +92,10 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 		}
 
 		t.Run(game, func(t *testing.T) {
-			useDatastore(t, testSite.newDatastore(loaded, time.Now()))
+			ds := testSite.newDatastore(loaded, time.Now())
 
-			for _, uuid := range backend().GetUUIDs() {
-				co, err := backend().GetUUID(uuid)
+			for _, uuid := range ds.backend.GetUUIDs() {
+				co, err := ds.backend.GetUUID(uuid)
 				if err != nil || co.Sealed || !re.MatchString(co.Name) {
 					continue
 				}
@@ -114,7 +114,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 					queries = append(queries, genQuery(co))
 				}
 				for _, query := range queries {
-					keys, err := searchAndFilter(currentDatastore(), parseSearchOptionsNG(backend(), query, nil, nil, nil))
+					keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
 					if err != nil {
 						t.Errorf("%q does not run: %v", query, err)
 						continue

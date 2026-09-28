@@ -99,7 +99,7 @@ Boot sequence (`main()`):
    `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
-   together in one `liveDatastore.Store()`, then itself spawns
+   together in one `s.ds.Store()`, then itself spawns
    `s.cacheNewspaper()` as a further goroutine.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, kept as `DataBucket` for reloads) and runs
@@ -144,13 +144,14 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   numbers/names/editions snapshots, the palette's sets/promos/finishes
   lists, and its own load time are one `datastore` value (datastore.go),
   built by `s.newDatastore()` (site.go) and published in a single
-  `liveDatastore.Store()` by `s.loadDatastore()`, itself started by
+  `s.ds.Store()` by `s.loadDatastore()`, itself started by
   `s.startDatastoreReload()` (an admin or `/api/load/datastore` reload) or
-  once at startup. Page handlers, crons and Discord callbacks are methods
-  on `*site` (site.go) and read it through `s.datastore()` (never nil, even
-  before the first load) or `s.backend()` for the backend alone, which read
-  the package-level `currentDatastore()`/`backend()` (datastore.go); entry
-  points read either once and pass `b`/`ds` down to what they call.
+  once at startup. `site` owns the pointer (`ds atomic.Pointer[datastore]`,
+  pre-stored empty by `newSite()`); page handlers, crons and Discord
+  callbacks are methods on `*site` (site.go) and read it through
+  `s.datastore()` (never nil, even before the first load) or `s.backend()`
+  for the backend alone; entry points read either once and pass `b`/`ds`
+  down to what they call.
 - `Config` is loaded once and swapped whole on admin reload (`admin.go`);
   per-user API secrets read behind `apiUsersMutex`; affiliate data behind
   `affiliatesMu`/`affiliatesPtr`.
