@@ -81,6 +81,7 @@ function loadPage() {
             child.parent = this;
             this.children.push(child);
         }
+        get parentElement() { return this.parent || null; }
         contains(other) {
             for (let node = other; node; node = node.parent) {
                 if (node === this) return true;
@@ -176,11 +177,37 @@ test('moving inside the element keeps its tooltip, and a titled child takes over
 
     page.move(row, titled);
     expect(page.shown()).toBe('Cell');
-    expect(row.getAttribute('title')).toBe('Row');
+    // Aside too: with the cell's gone, the browser would show the row's.
+    expect(row.getAttribute('title')).toBeNull();
+    expect(row.getAttribute('data-ban-title')).toBe('Row');
 
     page.move(titled, plain);
     expect(page.shown()).toBe('Row');
     expect(titled.getAttribute('title')).toBe('Cell');
+});
+
+// The pill in a buylist row that carries its own title: the browser shows the
+// nearest title left under the pointer, so every one around the pill goes
+// aside while its tooltip is up, and all come back when the pointer leaves.
+test('a titled element\'s tooltip sets aside the titles around it', () => {
+    const page = loadPage();
+    const list = page.el({ title: 'List' }, page.body, 'x');
+    const row = page.el({ title: 'Ratio: 55%' }, list, 'Card Kingdom');
+    const pill = page.el({ title: '90-day high' }, row, '90d high');
+
+    page.move(page.body, pill);
+    expect(page.shown()).toBe('90-day high');
+    for (const el of [pill, row, list]) {
+        expect(el.hasAttribute('title')).toBe(false);
+    }
+
+    page.move(pill, page.body);
+    expect(pill.getAttribute('title')).toBe('90-day high');
+    expect(row.getAttribute('title')).toBe('Ratio: 55%');
+    expect(list.getAttribute('title')).toBe('List');
+    for (const el of [pill, row, list]) {
+        expect(el.hasAttribute('data-ban-title')).toBe(false);
+    }
 });
 
 test('touch and blank titles show nothing', () => {
