@@ -65,7 +65,7 @@ const (
 	ckPauseWaitFirstWeek  = 76
 	ckPauseWaitSecondWeek = 66
 	// The wait arrow's own tooltip; the pill and the price carry the chances.
-	ckPauseWaitTip = "**Wait**: don't undersell it elsewhere, CK's buylist may reopen."
+	ckPauseWaitTip = "**Wait**: don't undersell it elsewhere, CK's buylist may reopen soon."
 )
 
 // ckHistory is what the newspaper's snapshots say about one CK product.
@@ -306,10 +306,10 @@ func ckPauseTip(reopen []ckReopen, days int, wait bool) string {
 		verdict = "**Wait**: CK stopped buying this card " + since +
 			", and every other cash offer is 5%+ below the price it lists."
 	}
-	lines := []string{verdict}
+	var bullets []string
 	for _, chances := range reopen {
 		if days >= chances.MinDays {
-			lines = append(lines, "Chances CK buys it again:",
+			bullets = append(bullets,
 				fmt.Sprintf("• within a week: **%d%%**", chances.Week),
 				fmt.Sprintf("• within 30 days: **%d%%**", chances.Month))
 			break
@@ -320,9 +320,12 @@ func ckPauseTip(reopen []ckReopen, days int, wait bool) string {
 		if days >= 7 {
 			odds = ckPauseWaitSecondWeek
 		}
-		lines = append(lines, fmt.Sprintf("• within 30 days, paying 5%% more than the best other offer: **%d%%**", odds))
+		bullets = append(bullets, fmt.Sprintf("• within 30 days, paying 5%% more than the best other offer: **%d%%**", odds))
 	}
-	return strings.Join(lines, "\n")
+	if len(bullets) == 0 {
+		return verdict
+	}
+	return verdict + "\nChances CK buys it again:\n" + strings.Join(bullets, "\n")
 }
 
 // ckCashBuylist tells whether a vendor is a store's cash buylist, one a

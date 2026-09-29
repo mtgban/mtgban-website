@@ -266,7 +266,7 @@ func TestBuylistPause(t *testing.T) {
 			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>|`},
 		{"wait", "CKBLLast", "NM", "Paused 3d", true,
 			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>|` +
-				` <span class="ck-wait" title="Wait: don&#39;t undersell it elsewhere, CK&#39;s buylist may reopen." data-tip="**Wait**: don&#39;t undersell it elsewhere, CK&#39;s buylist may reopen.">&#8593;</span>`},
+				` <span class="ck-wait" title="Wait: don&#39;t undersell it elsewhere, CK&#39;s buylist may reopen soon." data-tip="**Wait**: don&#39;t undersell it elsewhere, CK&#39;s buylist may reopen soon.">&#8593;</span>`},
 		{"not paused", "CKBLLast", "NM", "", false, "|"},
 		{"another grade", "CKBLLast", "SP", "Paused 3d", true, "|"},
 		{"another store", "CK", "NM", "Paused 3d", true, "|"},
