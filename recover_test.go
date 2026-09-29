@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,12 +23,12 @@ import (
 // serverWebhook points ServerNotify at a webhook of the test's own and
 // returns what is posted to it, without the "[DEV] " marker. Each message
 // is posted from a goroutine of its own, so they arrive in no set order.
-// It clears the panic quiet window too, so the test's first panic posts
+// It clears the panic quiet windows too, so the test's first panic posts
 // its report whatever panicked before it.
 func serverWebhook(t *testing.T) <-chan string {
 	t.Helper()
 	panicReportMu.Lock()
-	lastPanicReport, quietPanics = time.Time{}, 0
+	panicWindows = map[string]panicWindow{}
 	panicReportMu.Unlock()
 
 	posts := make(chan string, 64)
@@ -165,9 +166,9 @@ func TestRecoverPanicReportsTheRequest(t *testing.T) {
 	}
 }
 
-// Once a report posts, the panics of the next panicQuietWindow are only
-// logged, value, stack and source alike, and the first report past the
-// window says how many there were.
+// Once a report posts, the panics from the same place in the next
+// panicQuietWindow are only logged, value, stack and source alike, and the
+// first report past the window says how many there were.
 func TestReportPanicPostsOncePerQuietWindow(t *testing.T) {
 	posts := serverWebhook(t)
 
@@ -177,29 +178,128 @@ func TestReportPanicPostsOncePerQuietWindow(t *testing.T) {
 		t.Errorf("message = %q, want the first panic's", message)
 	}
 
-	prevLog := log.Writer()
-	var logged bytes.Buffer
-	log.SetOutput(&logged)
-	reportPanic("the second panic", "source job: second")
-	log.SetOutput(prevLog)
-	for _, want := range []string{"the second panic", "goroutine ", "source job: second"} {
-		if !strings.Contains(logged.String(), want) {
-			t.Errorf("logged %q, want %q in it", logged.String(), want)
+	logged := captureLog(t, func() { reportPanic("the second panic", "source job: first") })
+	for _, want := range []string{"the second panic", "goroutine ", "source job: first"} {
+		if !strings.Contains(logged, want) {
+			t.Errorf("logged %q, want %q in it", logged, want)
 		}
 	}
 
 	panicReportMu.Lock()
-	lastPanicReport = lastPanicReport.Add(-panicQuietWindow)
+	window := panicWindows["source job: first"]
+	window.posted = window.posted.Add(-panicQuietWindow)
+	panicWindows["source job: first"] = window
 	panicReportMu.Unlock()
-	reportPanic("the third panic", "source job: third")
+	reportPanic("the third panic", "source job: first")
 
-	message, _, source := panicReport(t, posts)
+	message, _, _ = panicReport(t, posts)
 	if message != "the third panic (unposted panics since the last report: 1)" {
 		t.Errorf("message = %q, want the third panic's, counting the second", message)
 	}
-	if source != "source job: third" {
-		t.Errorf("source = %q, want the third panic's", source)
+}
+
+// A panic raised elsewhere posts its own report inside another's quiet
+// window, so a request that panics on every hit cannot hide a job's panic.
+func TestReportPanicKeepsAWindowPerSite(t *testing.T) {
+	posts := serverWebhook(t)
+
+	raise := func(value string) { panic(value) }
+	for range 2 {
+		func() {
+			defer recoverPanic(httptest.NewRequest(http.MethodGet, "/search", nil), httptest.NewRecorder())
+			raise("the handler broke")
+		}()
 	}
+	go recovered("cron test", func() { panic(errors.New("the job broke")) })()
+
+	var messages []string
+	timeout := time.After(5 * time.Second)
+	for len(messages) < 2 {
+		select {
+		case post := <-posts:
+			if message, ok := strings.CutPrefix(post, "@here "); ok {
+				messages = append(messages, message)
+			}
+		case <-timeout:
+			t.Fatalf("posted %q, want the handler's report and the job's", messages)
+		}
+	}
+	if !slices.Contains(messages, "the handler broke") || !slices.Contains(messages, "the job broke") {
+		t.Errorf("posted %q, want the handler's report and the job's", messages)
+	}
+	panicReportMu.Lock()
+	defer panicReportMu.Unlock()
+	var quiet int
+	for _, window := range panicWindows {
+		quiet += window.quiet
+	}
+	if len(panicWindows) != 2 || quiet != 1 {
+		t.Errorf("windows = %+v, want the handler's with its second panic and the job's", panicWindows)
+	}
+}
+
+// A report drops the windows that expired with nothing to count, and keeps
+// an expired one whose quiet panics its next report still has to count.
+func TestReportPanicDropsExpiredWindows(t *testing.T) {
+	posts := serverWebhook(t)
+
+	expired := time.Now().Add(-panicQuietWindow)
+	panicReportMu.Lock()
+	panicWindows["source job: done"] = panicWindow{posted: expired}
+	panicWindows["source job: counting"] = panicWindow{posted: expired, quiet: 2}
+	panicReportMu.Unlock()
+
+	reportPanic("a new panic", "source job: new")
+	panicReport(t, posts)
+
+	panicReportMu.Lock()
+	defer panicReportMu.Unlock()
+	if _, ok := panicWindows["source job: done"]; ok {
+		t.Error("kept an expired window with nothing to count")
+	}
+	if panicWindows["source job: counting"].quiet != 2 {
+		t.Error("dropped an expired window whose quiet panics are still uncounted")
+	}
+	if _, ok := panicWindows["source job: new"]; !ok {
+		t.Error("the new panic has no window")
+	}
+}
+
+// The log keeps a panic's whole stack; only the post is cut to fit.
+func TestReportPanicLogsTheWholeStack(t *testing.T) {
+	posts := serverWebhook(t)
+
+	var deep func(int)
+	deep = func(n int) {
+		if n == 0 {
+			panic("deep down")
+		}
+		deep(n - 1)
+	}
+	logged := captureLog(t, func() {
+		defer recoverJob("deep test")
+		deep(40)
+	})
+
+	_, stack, _ := panicReport(t, posts)
+	if len(stack) > maxPostedStack {
+		t.Errorf("posted %d bytes of stack, want at most %d", len(stack), maxPostedStack)
+	}
+	// The stack's last frame sits below forty recursions, far past the cut.
+	if !strings.Contains(logged, "testing.tRunner(") {
+		t.Errorf("logged stack lacks the frames past the cut:\n%s", logged)
+	}
+}
+
+// captureLog returns what fn logs.
+func captureLog(t *testing.T, fn func()) string {
+	t.Helper()
+	prev := log.Writer()
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	defer log.SetOutput(prev)
+	fn()
+	return logged.String()
 }
 
 // cron.v2 runs each job on a goroutine of its own, where an unrecovered

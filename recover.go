@@ -1,60 +1,96 @@
 package main
 
 import (
+	"cmp"
 	"fmt"
 	"log"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
 
 // panicQuietWindow is how long after a posted panic report the panics that
-// follow are only logged: a handler that panics on every request pings the
-// channel once a window, not once a request.
+// follow from the same place are only logged: a handler that panics on every
+// request pings the channel once a window, not once a request.
 const panicQuietWindow = 10 * time.Minute
 
-// panicReportMu guards when the last panic report was posted and how many
-// panics were only logged since. reportPanic holds it throughout, so each
-// panic's lines stay together in the log.
+// maxPostedStack is how much of a panic's stack its report posts, to fit in
+// a Discord message. The log keeps all of it.
+const maxPostedStack = 1024
+
+// panicWindow is one panic site's quiet window: when its last report was
+// posted, and how many of its panics were only logged since.
+type panicWindow struct {
+	posted time.Time
+	quiet  int
+}
+
+// panicReportMu guards panicWindows, keyed by panicSite. reportPanic holds
+// it throughout, so each panic's lines stay together in the log.
 var (
-	panicReportMu   sync.Mutex
-	lastPanicReport time.Time
-	quietPanics     int
+	panicReportMu sync.Mutex
+	panicWindows  = map[string]panicWindow{}
 )
 
-// reportPanic logs a recovered panic and posts it to the server webhook as
-// three messages: what panicked (an @here), the top of the stack, and
-// source, the line saying where it happened. For panicQuietWindow after a
-// report posts, the panics that follow log the same three lines without
-// posting them, and the next report says how many there were.
+// reportPanic logs a recovered panic, its whole stack and source, the line
+// saying where it happened, and posts them to the server webhook as three
+// messages: what panicked (an @here), the top of the stack, and source. For
+// panicQuietWindow after a report posts, the panics raised at the same place
+// are only logged, and its next report says how many there were.
 func reportPanic(errPanic any, source string) {
+	buf := make([]byte, 1<<16)
+	stack := buf[:runtime.Stack(buf, false)]
+	site := cmp.Or(panicSite(), source)
+
 	panicReportMu.Lock()
 	defer panicReportMu.Unlock()
 	log.Println("panic occurred:", errPanic)
+	log.Println(string(stack))
+	log.Println(source)
 
-	// Restrict stack size to fit into discord message
-	buf := make([]byte, 1<<16)
-	n := runtime.Stack(buf, false)
-	buf = buf[:n]
-	if len(buf) > 1024 {
-		buf = buf[:1024]
+	// An expired window with no panic to count reads as no window at all, so
+	// the map keeps only the sites that panicked lately.
+	for key, window := range panicWindows {
+		if window.quiet == 0 && time.Since(window.posted) >= panicQuietWindow {
+			delete(panicWindows, key)
+		}
 	}
-
-	msg := fmt.Sprint(errPanic)
-	if time.Since(lastPanicReport) < panicQuietWindow {
-		quietPanics++
-		log.Println(msg)
-		log.Println(string(buf))
-		log.Println(source)
+	window := panicWindows[site]
+	if time.Since(window.posted) < panicQuietWindow {
+		window.quiet++
+		panicWindows[site] = window
 		return
 	}
-	if quietPanics > 0 {
-		msg += fmt.Sprintf(" (unposted panics since the last report: %d)", quietPanics)
+	msg := fmt.Sprint(errPanic)
+	if window.quiet > 0 {
+		msg += fmt.Sprintf(" (unposted panics since the last report: %d)", window.quiet)
 	}
-	lastPanicReport, quietPanics = time.Now(), 0
-	ServerNotify("panic", msg, true)
-	ServerNotify("panic", string(buf))
-	ServerNotify("panic", source)
+	panicWindows[site] = panicWindow{posted: time.Now()}
+	serverPost("panic", msg, true)
+	serverPost("panic", string(stack[:min(len(stack), maxPostedStack)]), false)
+	serverPost("panic", source, false)
+}
+
+// panicSite names the line that raised the panic being recovered: the first
+// frame below runtime.gopanic that is not the runtime's own. It is "" when
+// no panic is unwinding, as when reportPanic is called directly.
+func panicSite() string {
+	pcs := make([]uintptr, 64)
+	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs)])
+	unwinding := false
+	for {
+		frame, more := frames.Next()
+		if unwinding && !strings.HasPrefix(frame.Function, "runtime.") {
+			return fmt.Sprintf("%s:%d", frame.File, frame.Line)
+		}
+		if frame.Function == "runtime.gopanic" {
+			unwinding = true
+		}
+		if !more {
+			return ""
+		}
+	}
 }
 
 // recoverJob reports and recovers a panic that nothing else would recover,
