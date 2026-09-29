@@ -1697,7 +1697,7 @@
                                                 {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal}}
                                                 {{$blTitle := buylist_title .Shorthand $conditions $blState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}
                                                 <span class="price-right has-buylist-extra">
-                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if $blTitle}}title="{{$blTitle}}"{{end}}>
+                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if $blTitle}}title="{{plain_tip $blTitle}}" data-tip="{{$blTitle}}"{{end}}>
                                                     {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                 </span>
                                                 <span class="buylist-extra"

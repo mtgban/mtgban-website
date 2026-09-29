@@ -164,9 +164,9 @@ func TestBuylistCKHelpers(t *testing.T) {
 		want                   string
 	}{
 		// The verdict, the facts, CK's reference prices, then the odds.
-		{"CK NM", "CK", "NM", "wait", "Wait: out\nCK stock 0\nP90 $ 9.00 · 90-day high $ 12.00\nodds 1\nodds 2"},
+		{"CK NM", "CK", "NM", "wait", "Wait: out\nCK stock 0\n**P90**: $ 9.00 · **90d high**: $ 12.00\nodds 1\nodds 2"},
 		{"CK SP", "CK", "SP", "", ""},
-		{"other store green", "SCG", "NM", "best", "A good price: at or above Card Kingdom's P90 ($ 9.00)"},
+		{"other store green", "SCG", "NM", "best", "**A good price**: at or above Card Kingdom's P90 ($ 9.00)"},
 		{"other store below P90", "SCG", "NM", "", ""},
 	} {
 		got := title(tc.shorthand, tc.cond, tc.state, 9, 12, "CK stock 0", "Wait: out\nodds 1\nodds 2")
@@ -175,7 +175,7 @@ func TestBuylistCKHelpers(t *testing.T) {
 		}
 	}
 	got := title("CK", "NM", "", 9, 0, "CK stock 3", "")
-	if got != "CK stock 3\nP90 $ 9.00" {
+	if got != "CK stock 3\n**P90**: $ 9.00" {
 		t.Errorf("buylist_title CK NM without a signal: got %q", got)
 	}
 
@@ -215,6 +215,29 @@ CK stock 0 · out 9 days">&#8593; Wait</span>`,
 		if got != "" {
 			t.Errorf("buylist_ck %q: got %s, want nothing", signal, got)
 		}
+	}
+}
+
+// TestTipHelpers checks a tooltip's ** marks become a data-tip beside a plain
+// title, and bold where a page writes the tooltip out in full.
+func TestTipHelpers(t *testing.T) {
+	got := tipAttrs(`**Wait:** CK "odds" <5%>`)
+	want := ` title="Wait: CK &#34;odds&#34; &lt;5%&gt;" data-tip="**Wait:** CK &#34;odds&#34; &lt;5%&gt;"`
+	if got != want {
+		t.Errorf("tipAttrs marked: got %s, want %s", got, want)
+	}
+	got = tipAttrs("90-day high")
+	if got != ` title="90-day high"` {
+		t.Errorf("tipAttrs plain: got %s", got)
+	}
+
+	html, ok := funcMap["tip_html"].(func(string) template.HTML)
+	if !ok {
+		t.Fatal("tip_html has another signature")
+	}
+	got = string(html("**Sell now:** <b>27%</b>"))
+	if got != "<strong>Sell now:</strong> &lt;b&gt;27%&lt;/b&gt;" {
+		t.Errorf("tip_html: got %s", got)
 	}
 }
 

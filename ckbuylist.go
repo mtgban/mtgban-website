@@ -40,24 +40,25 @@ const (
 )
 
 // Each state's verdict on a line of its own, then the odds behind it,
-// measured over March to August 2026.
+// measured over March to August 2026. The tooltip sets what sits between **
+// marks in bold (js/tooltips.js).
 const (
-	ckTipSell = "Sell now: CK pays above its P90 and has stock.\n" +
+	ckTipSell = "**Sell now**: CK pays above its P90 and has stock.\n" +
 		"Two weeks later CK paid:\n" +
-		"• 5% more, only 27% of the time (typical: 33%)\n" +
-		"• 5% less or stopped buying, 42% (typical: 35%)"
-	ckTipBuyout = "Wait: CK's stock halved since yesterday.\n" +
+		"• 5% more, only **27%** of the time (typical: 33%)\n" +
+		"• 5% less or stopped buying, **42%** (typical: 35%)"
+	ckTipBuyout = "**Wait**: CK's stock halved since yesterday.\n" +
 		"Two weeks later CK paid:\n" +
-		"• 5% more, 51% of the time (typical: 33%)\n" +
+		"• 5% more, **51%** of the time (typical: 33%)\n" +
 		"The effect fades in two to three days."
-	ckTipOutOfStock = "Wait: CK is out of stock, at or below its P90.\n" +
+	ckTipOutOfStock = "**Wait**: CK is out of stock, at or below its P90.\n" +
 		"Two weeks later CK paid:\n" +
-		"• 5% more, 48% of the time (typical: 33%)\n" +
-		"• 5% less, only 21% (typical: 35%)"
-	ckTipCut = "Wait: CK cut its buylist price 20% or more this week.\n" +
+		"• 5% more, **48%** of the time (typical: 33%)\n" +
+		"• 5% less, only **21%** (typical: 35%)"
+	ckTipCut = "**Wait**: CK cut its buylist price 20% or more this week.\n" +
 		"Two weeks later CK paid:\n" +
-		"• 5% more, 48% of the time (typical: 33%)\n" +
-		"• 20% of these cards stop being bought."
+		"• 5% more, **48%** of the time (typical: 33%)\n" +
+		"• **20%** of these cards stop being bought."
 )
 
 // ckHistory is what the newspaper's snapshots say about one CK product.
@@ -313,10 +314,10 @@ func joinLines(lines ...string) string {
 func ckReferencePrices(good, highest float64) string {
 	var parts []string
 	if good > 0 {
-		parts = append(parts, fmt.Sprintf("P90 $ %.2f", good))
+		parts = append(parts, fmt.Sprintf("**P90**: $ %.2f", good))
 	}
 	if highest > 0 {
-		parts = append(parts, fmt.Sprintf("90-day high $ %.2f", highest))
+		parts = append(parts, fmt.Sprintf("**90d high**: $ %.2f", highest))
 	}
 	return strings.Join(parts, " · ")
 }

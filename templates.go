@@ -43,6 +43,23 @@ func csvWithout(csv, drop string) string {
 	return strings.Join(out, ",")
 }
 
+// plainTip is a tooltip's text without the ** marks that set its parts in
+// bold (js/tooltips.js).
+func plainTip(tip string) string {
+	return strings.ReplaceAll(tip, "**", "")
+}
+
+// tipAttrs is the title, and the data-tip when it marks anything bold, of an
+// element whose tooltip is tip.
+func tipAttrs(tip string) string {
+	plain := plainTip(tip)
+	attrs := ` title="` + template.HTMLEscapeString(plain) + `"`
+	if plain != tip {
+		attrs += ` data-tip="` + template.HTMLEscapeString(tip) + `"`
+	}
+	return attrs
+}
+
 const cardArtPlaceholder = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
 var funcMap = template.FuncMap{
@@ -280,9 +297,9 @@ var funcMap = template.FuncMap{
 		case shorthand != hotlistStore:
 			return ""
 		case newHigh:
-			return template.HTML(` <span class="bl-pill bl-pill-new" title="` + ckNewHighTip + `">New high</span>`)
+			return template.HTML(` <span class="bl-pill bl-pill-new"` + tipAttrs(ckNewHighTip) + `>New high</span>`)
 		}
-		return template.HTML(` <span class="bl-pill bl-pill-high" title="` + ckAtHighTip + `">90d high</span>`)
+		return template.HTML(` <span class="bl-pill bl-pill-high"` + tipAttrs(ckAtHighTip) + `>90d high</span>`)
 	},
 	// buylist_detail renders a card's precomputed Card Kingdom "Good" (P90) and
 	// "Highest" (90-day) buylist prices (passed in) as small, labeled prices for a
@@ -346,7 +363,7 @@ var funcMap = template.FuncMap{
 			if state != "best" || good <= 0 {
 				return ""
 			}
-			return fmt.Sprintf("A good price: at or above Card Kingdom's P90 ($ %.2f)", good)
+			return fmt.Sprintf("**A good price**: at or above Card Kingdom's P90 ($ %.2f)", good)
 		}
 		if conditions != "NM" {
 			return ""
@@ -361,7 +378,7 @@ var funcMap = template.FuncMap{
 		if shorthand != "CK" || conditions != "NM" || ckSignal != "wait" {
 			return ""
 		}
-		return template.HTML(` <span class="ck-wait" title="` + template.HTMLEscapeString(tip) + `">&#8593;</span>`)
+		return template.HTML(` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`)
 	},
 	// buylist_ck is a card's CK signal on the pages with a column of card
 	// details: "Sell now" or "Wait", with the verdict, CK's stock facts and
@@ -377,8 +394,22 @@ var funcMap = template.FuncMap{
 			return ""
 		}
 		verdict, odds, _ := strings.Cut(tip, "\n")
-		title := template.HTMLEscapeString(joinLines(verdict, facts, odds))
-		return template.HTML(`<span class="` + class + `" title="` + title + `">` + label + `</span>`)
+		return template.HTML(`<span class="` + class + `"` + tipAttrs(joinLines(verdict, facts, odds)) + `>` + label + `</span>`)
+	},
+	// plain_tip is a tooltip without its ** bold marks, for a title.
+	"plain_tip": plainTip,
+	// tip_html writes a tooltip as HTML, its marked parts in bold, where a
+	// page shows it in full rather than on hover.
+	"tip_html": func(tip string) template.HTML {
+		var b strings.Builder
+		for i, part := range strings.Split(tip, "**") {
+			if i%2 == 1 {
+				b.WriteString("<strong>" + template.HTMLEscapeString(part) + "</strong>")
+				continue
+			}
+			b.WriteString(template.HTMLEscapeString(part))
+		}
+		return template.HTML(b.String())
 	},
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))

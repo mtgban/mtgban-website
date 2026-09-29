@@ -855,10 +855,10 @@ func newHighReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 // docs/adr/0004-ck-buylist-signals.md.
 const (
 	ckAtHighTip  = "Card Kingdom is paying its highest price of the last 90 days, often one it has held for weeks."
-	ckNewHighTip = "New high: Card Kingdom just beat every price of the last 90 days.\n" +
+	ckNewHighTip = "**New high**: Card Kingdom just beat every price of the last 90 days.\n" +
 		"Two weeks later CK paid:\n" +
-		"• 5% more, only 24% of the time (typical: 33%)\n" +
-		"• 5% less or stopped buying, 40% (typical: 35%)"
+		"• 5% more, only **24%** of the time (typical: 33%)\n" +
+		"• 5% less or stopped buying, **40%** (typical: 35%)"
 )
 
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
