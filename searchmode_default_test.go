@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
+)
 
 // A game other than Magic searches by substring, since its card names carry a
 // subtitle the searcher rarely types from the front of. Magic keeps the
@@ -10,7 +14,10 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 	t.Cleanup(func() { Config.Game = prev })
 
 	for _, tc := range []struct {
-		name, game, query, want string
+		name  string
+		game  mtgmatcher.Game
+		query string
+		want  string
 	}{
 		{"magic keeps the default mode", DefaultGame, "lightning bolt", ""},
 		{"lorcana searches by substring", "lorcana", "mickey mouse", "any"},

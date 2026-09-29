@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // sealedPage is one sealed product carrying the given INDEX rows.
@@ -14,10 +16,10 @@ func sealedPage(entries []SearchEntry) PageVars {
 		SearchQuery:  "a sealed thing",
 		SearchRan:    true,
 		AllKeys:      []string{id},
-		CondKeys:     []string{"INDEX"},
+		CondKeys:     []mtgban.Condition{"INDEX"},
 		Metadata:     map[string]GenericCard{id: {Name: "A Sealed Thing", Sealed: true, SetCode: "TST"}},
-		FoundSellers: map[string]map[string][]SearchEntry{id: {"INDEX": entries}},
-		FoundVendors: map[string]map[string][]SearchEntry{},
+		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{id: {"INDEX": entries}},
+		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
 	}
 }
 

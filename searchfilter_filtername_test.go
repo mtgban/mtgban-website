@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -65,11 +65,11 @@ func TestSetFilterNamesNothing(t *testing.T) {
 //
 //	YUGIOH_PATH=... go test -run NameThatIsFilterSyntaxIsStillFound
 func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
-	var games []string
+	var games []mtgmatcher.Game
 	for game := range gameDatastores {
 		games = append(games, game)
 	}
-	sort.Strings(games)
+	slices.Sort(games)
 
 	var checked int
 	for _, game := range games {
@@ -89,7 +89,7 @@ func TestNameThatIsFilterSyntaxIsStillFound(t *testing.T) {
 			continue
 		}
 
-		t.Run(game, func(t *testing.T) {
+		t.Run(string(game), func(t *testing.T) {
 			ds := testSite.newDatastore(loaded, time.Now())
 
 			for _, uuid := range ds.backend.GetUUIDs() {

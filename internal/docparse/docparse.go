@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -43,11 +44,11 @@ type Entry struct {
 	OriginalPrice float64
 
 	// Condition as found in the source data
-	OriginalCondition string
+	OriginalCondition mtgban.Condition
 
 	// The condition a buylist run was told to ignore, which blanks
 	// OriginalCondition; kept so the page can post the row back as sent.
-	IgnoredCondition string
+	IgnoredCondition mtgban.Condition
 
 	// Whether source data had Quantity information
 	HasQuantity bool
@@ -96,7 +97,7 @@ type Parser struct {
 	// TCGSkuToCondition resolves a TCGplayer SKU to the condition it encodes
 	// (NM/SP/MP/HP/PO), returning "" when unknown. Optional; used to infer the
 	// condition for SKU uploads that carry no explicit condition column.
-	TCGSkuToCondition func(sku string) string
+	TCGSkuToCondition func(sku string) mtgban.Condition
 
 	// MKMIDToUUID resolves a Cardmarket product id to a card uuid, returning
 	// "" for unknown ids. Optional; without it Cardmarket id columns are
@@ -186,7 +187,7 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 		// Use id + condition to mimic a "sku", and the product it came out of
 		// where there is one: two precons holding the same staple hold one
 		// each, and a view that reads a box at a time has to say so in both.
-		sku := uploadedData[i].CardID + uploadedData[i].OriginalCondition + uploadedData[i].UnpackedFrom
+		sku := uploadedData[i].CardID + string(uploadedData[i].OriginalCondition) + uploadedData[i].UnpackedFrom
 
 		if duplicatedHashes[sku] {
 			qty := 1

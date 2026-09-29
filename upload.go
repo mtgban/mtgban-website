@@ -241,7 +241,7 @@ type OptimizedUploadEntry struct {
 	CardID string
 
 	// Condition as found in the source data
-	Condition string
+	Condition mtgban.Condition
 
 	// Price of the card provided in the source data (or TCGLow)
 	Price float64
@@ -892,12 +892,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 			var cond string
 			if uploadedData[i].OriginalCondition != "" {
-				cond = map[string]string{
-					"NM": "nm",
-					"SP": "lp",
-					"MP": "mp",
-					"HP": "hp",
-					"PO": "dmg",
+				cond = map[mtgban.Condition]string{
+					mtgban.NM: "nm",
+					mtgban.SP: "lp",
+					mtgban.MP: "mp",
+					mtgban.HP: "hp",
+					mtgban.PO: "dmg",
 				}[uploadedData[i].OriginalCondition]
 			}
 			qty := 1
@@ -959,7 +959,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 			ids = append(ids, uploadedData[i].CardID)
 			qtys = append(qtys, fmt.Sprintf("%d", qty))
-			conds = append(conds, uploadedData[i].OriginalCondition)
+			conds = append(conds, string(uploadedData[i].OriginalCondition))
 		}
 
 		err = UUID2TCGCSV(b, csvWriter, ids, qtys, conds)
@@ -1324,7 +1324,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		if skipConds {
 			conds = ""
 		}
-		priceKey := cardID + conds
+		priceKey := cardID + string(conds)
 		for indexKey, indexResult := range indexResults[cardID] {
 			indexPrice := getPrice(indexResult, conds)
 
@@ -1458,7 +1458,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			// Load comparison price, either the loaded one or one of the alternatives
 			comparePrice := 0.0
 			if skipPrices {
-				compareConds := ""
+				var compareConds mtgban.Condition
 				prices := indexResults[cardID][altPriceSource]
 				if slices.Index(indexKeys, altPriceSource) >= len(UploadIndexKeys) {
 					compareConds = conds
@@ -1683,7 +1683,7 @@ func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedRes
 	}
 }
 
-func getPrice(banPrice *BanPrice, conds string) float64 {
+func getPrice(banPrice *BanPrice, conds mtgban.Condition) float64 {
 	if banPrice == nil {
 		return 0
 	}
@@ -1705,11 +1705,12 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 			}
 		}
 	} else {
-		price = banPrice.Conditions.Get(conds)
+		grade := string(conds)
+		price = banPrice.Conditions.Get(grade)
 		if price == 0 {
-			price = banPrice.Conditions.Get(conds + "_foil")
+			price = banPrice.Conditions.Get(grade + "_foil")
 			if price == 0 {
-				price = banPrice.Conditions.Get(conds + "_etched")
+				price = banPrice.Conditions.Get(grade + "_etched")
 			}
 		}
 		// A source with no grades of its own carries one price, filed under
@@ -1953,7 +1954,7 @@ func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]U
 		}
 
 		if len(cond) > i {
-			entry.OriginalCondition = cond[i]
+			entry.OriginalCondition = mtgban.Condition(cond[i])
 		}
 
 		if len(prices) > i {

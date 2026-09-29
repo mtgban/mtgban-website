@@ -54,7 +54,7 @@ func TestAdminConfigSaveGetsDefaultsAndRegistry(t *testing.T) {
 		t.Fatalf("datasets %+v: the save did not take", Config.TimeseriesConfig.Datasets)
 	}
 	for _, c := range []struct{ name, got, want string }{
-		{"game, which the text left out", Config.Game, DefaultGame},
+		{"game, which the text left out", string(Config.Game), string(DefaultGame)},
 		{"default gateway", Config.APIGateway.URL, DefaultAPIGatewayURL},
 		{"source path", Config.sourcePath, path},
 		{"the text's port", Config.Port, "9000"},

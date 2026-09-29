@@ -45,7 +45,7 @@ func (s *Service) computeFingerprints(b *mtgmatcher.Backend) map[string]string {
 		shorthand := seller.Info().Shorthand
 		for uuid, entries := range seller.Inventory() {
 			for _, e := range entries {
-				add(shorthand, uuid, e.Conditions, e.Price, e.Quantity)
+				add(shorthand, uuid, string(e.Conditions), e.Price, e.Quantity)
 			}
 		}
 	}
@@ -53,7 +53,7 @@ func (s *Service) computeFingerprints(b *mtgmatcher.Backend) map[string]string {
 		shorthand := vendor.Info().Shorthand
 		for uuid, entries := range vendor.Buylist() {
 			for _, e := range entries {
-				add(shorthand, uuid, e.Conditions, e.BuyPrice, e.Quantity)
+				add(shorthand, uuid, string(e.Conditions), e.BuyPrice, e.Quantity)
 			}
 		}
 	}

@@ -91,7 +91,7 @@ func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path 
 		Email:   email,
 		Name:    GetParamFromSig(sig, "UserName"),
 		Purpose: purpose,
-		Game:    Config.Game,
+		Game:    string(Config.Game),
 		Nonce:   nonce,
 		Expires: time.Now().Add(apihandoff.TTL),
 	})

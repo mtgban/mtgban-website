@@ -21,9 +21,9 @@ import (
 // whose behaviour visibly changes is the empty name, which used to file
 // img/setsymbol/default.svg a second time under "default".
 func TestSetSymbolsOnlyReadUnderTheirOwnDirectory(t *testing.T) {
-	for _, game := range []string{"../logo", "..", "../..", "/etc", "nosuchgame", ""} {
-		t.Run(game, func(t *testing.T) {
-			defer func(old string) { Config.Game = old }(Config.Game)
+	for _, game := range []mtgmatcher.Game{"../logo", "..", "../..", "/etc", "nosuchgame", ""} {
+		t.Run(string(game), func(t *testing.T) {
+			defer func(old mtgmatcher.Game) { Config.Game = old }(Config.Game)
 			defer func(old map[string]rarityBadge) { rarityBadges = old }(rarityBadges)
 			Config.Game = game
 			rarityBadges = map[string]rarityBadge{}
@@ -46,12 +46,12 @@ func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
 		if game == DefaultGame {
 			continue // the default returns before reading a directory
 		}
-		entries, err := os.ReadDir("img/setsymbol/" + game)
+		entries, err := os.ReadDir("img/setsymbol/" + string(game))
 		if err != nil || len(entries) == 0 {
 			continue
 		}
 
-		defer func(old string) { Config.Game = old }(Config.Game)
+		defer func(old mtgmatcher.Game) { Config.Game = old }(Config.Game)
 		defer func(old map[string]rarityBadge) { rarityBadges = old }(rarityBadges)
 		Config.Game = game
 		rarityBadges = map[string]rarityBadge{}

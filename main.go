@@ -40,6 +40,7 @@ import (
 	"gopkg.in/Iwark/spreadsheet.v2"
 	"gopkg.in/robfig/cron.v2"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	_ "github.com/mtgban/go-mtgban/mtgmatcher/games"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
@@ -109,9 +110,9 @@ type PageVars struct {
 	SearchQuery    string
 	SearchBest     bool
 	SearchSort     string
-	CondKeys       []string
-	FoundSellers   map[string]map[string][]SearchEntry
-	FoundVendors   map[string]map[string][]SearchEntry
+	CondKeys       []mtgban.Condition
+	FoundSellers   map[string]map[mtgban.Condition][]SearchEntry
+	FoundVendors   map[string]map[mtgban.Condition][]SearchEntry
 	Metadata       map[string]GenericCard
 	SetKeyrunes    map[string]string
 	NoSort         bool
@@ -174,7 +175,7 @@ type PageVars struct {
 	GlobalMode         bool
 	ReverseMode        bool
 	DefaultTab         string
-	DefaultView        string
+	DefaultView        mtgban.Condition
 	MobileSearchLayout string
 
 	Page               string
@@ -614,7 +615,7 @@ type APIGatewayConfig struct {
 	// URL is the gateway's public origin, no trailing slash
 	URL string `json:"url"`
 	// Games are the gateway's configured games, what the configurator offers
-	Games []string `json:"games"`
+	Games []mtgmatcher.Game `json:"games"`
 }
 
 // DiscordConfig contains the bot connection, community links, channel IDs,
@@ -647,8 +648,8 @@ type ConfigType struct {
 	} `json:"offline"`
 	BucketKeys map[string]BucketKey `json:"bucket_keys"`
 
-	Game         string `json:"game"`
-	InstanceName string `json:"instance_name"`
+	Game         mtgmatcher.Game `json:"game"`
+	InstanceName string          `json:"instance_name"`
 
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
@@ -918,7 +919,7 @@ const (
 	DefaultServerPort    = "8080"
 	DefaultConfigPath    = "config.json"
 	DefaultSecret        = "NotVerySecret!"
-	DefaultGame          = "magic"
+	DefaultGame          = mtgmatcher.GameMagic
 	DefaultServerURL     = apisig.DefaultLink
 	DefaultExternalURL   = "https://mtgban.com"
 	DefaultAPIGatewayURL = "https://api.mtgban.com"
@@ -974,7 +975,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 	if Config.Game != DefaultGame {
 		// Append which game this site is for
-		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
+		pageVars.Title += " - " + mtgmatcher.Title(string(Config.Game))
 
 		// Charts for a non-Magic game are served only by the long-form read
 		// path; the legacy wide table is mtgjson-uuid keyed and has no rows for
@@ -1187,7 +1188,7 @@ func finishConfig() {
 
 // applyAPIGatewayDefaults fills api_gateway so the pricing page always has a
 // target; game is this deployment's own game, added to the default game list.
-func applyAPIGatewayDefaults(c *APIGatewayConfig, game string) {
+func applyAPIGatewayDefaults(c *APIGatewayConfig, game mtgmatcher.Game) {
 	if c.URL == "" {
 		c.URL = DefaultAPIGatewayURL
 	}
@@ -1197,7 +1198,7 @@ func applyAPIGatewayDefaults(c *APIGatewayConfig, game string) {
 		c.URL = DefaultAPIGatewayURL
 	}
 	if len(c.Games) == 0 {
-		c.Games = []string{DefaultGame}
+		c.Games = []mtgmatcher.Game{DefaultGame}
 		if game != "" && game != DefaultGame {
 			c.Games = append(c.Games, game)
 		}
@@ -1306,7 +1307,7 @@ func loadGoogleCredentials() (*http.Client, error) {
 // datastoreGame names the game whose loader reads this site's datastore. An
 // unset game is the default one, the same reading the rest of the site gives
 // it.
-func datastoreGame() string {
+func datastoreGame() mtgmatcher.Game {
 	if Config.Game == "" {
 		return DefaultGame
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -42,12 +43,12 @@ func deckboxIDConvert(b *mtgmatcher.Backend, w *csv.Writer, uploadedData []Uploa
 
 		var cond string
 		if uploadedData[i].OriginalCondition != "" {
-			cond = map[string]string{
-				"NM": "Near Mint",
-				"SP": "Good (Lightly Played)",
-				"MP": "Played",
-				"HP": "Heavily Played",
-				"PO": "Poor",
+			cond = map[mtgban.Condition]string{
+				mtgban.NM: "Near Mint",
+				mtgban.SP: "Good (Lightly Played)",
+				mtgban.MP: "Played",
+				mtgban.HP: "Heavily Played",
+				mtgban.PO: "Poor",
 			}[uploadedData[i].OriginalCondition]
 		}
 

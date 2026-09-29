@@ -153,7 +153,7 @@ func (e SearchEntry) PriceLabel() string {
 	return symbol + " " + amount
 }
 
-var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
+var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP, mtgban.HP, mtgban.PO}
 
 // scopeFilters reads the pinned bar into the filters it contributes.
 //
@@ -531,7 +531,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
-	pageVars.DefaultView = readCookie(r, "SearchDefaultView")
+	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
 	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
 
 	// Load whether a user can download CSV and validate the query parameter
@@ -1084,7 +1084,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// the same qualifier an estimated buylist quote already wears.
 		if count, found := odds[cardID]; found {
 			if foundVendors[cardID] == nil {
-				foundVendors[cardID] = map[string][]SearchEntry{}
+				foundVendors[cardID] = map[mtgban.Condition][]SearchEntry{}
 			}
 			foundVendors[cardID]["INDEX"] = append(foundVendors[cardID]["INDEX"], SearchEntry{
 				ScraperName: "Avg Copies (est.)",
@@ -1127,7 +1127,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				var link string
 
-				game := cm.GameFromName(Config.Game)
+				game := cm.GameFromName(string(Config.Game))
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
@@ -1167,12 +1167,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 		// In case there are no results at all
 		if foundSellers[cardID] == nil {
-			foundSellers[cardID] = map[string][]SearchEntry{}
+			foundSellers[cardID] = map[mtgban.Condition][]SearchEntry{}
 		}
 		foundSellers[cardID]["INDEX"] = tmp
 
 		if sig == "" && SigCheck {
-			for j, foundSet := range []map[string]map[string][]SearchEntry{foundSellers, foundVendors} {
+			for j, foundSet := range []map[string]map[mtgban.Condition][]SearchEntry{foundSellers, foundVendors} {
 				for cond := range foundSet[cardID] {
 					// Index/reference prices stay visible to everyone.
 					if cond == "INDEX" {
@@ -1551,9 +1551,9 @@ func passthroughIndex(entries []SearchEntry, consumed []string) []SearchEntry {
 	return out
 }
 
-func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {
+func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
 	// Allocate memory
-	foundSellers = map[string]map[string][]SearchEntry{}
+	foundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
 
 	// Decklist/hashing searches repeat a key once per copy; the output is
 	// keyed by the unique card, so walking a repeated key could only append
@@ -1599,7 +1599,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 				// Check if card already has any entry
 				_, found := foundSellers[cardID]
 				if !found {
-					foundSellers[cardID] = map[string][]SearchEntry{}
+					foundSellers[cardID] = map[mtgban.Condition][]SearchEntry{}
 				}
 
 				// Set conditions - handle the special TCG one that appears
@@ -1637,8 +1637,8 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 	return
 }
 
-func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[string]map[string][]SearchEntry) {
-	foundVendors = map[string]map[string][]SearchEntry{}
+func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+	foundVendors = map[string]map[mtgban.Condition][]SearchEntry{}
 
 	cardIDs = dedupeKeys(cardIDs)
 
@@ -1675,7 +1675,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 
 				_, found = foundVendors[cardID]
 				if !found {
-					foundVendors[cardID] = map[string][]SearchEntry{}
+					foundVendors[cardID] = map[mtgban.Condition][]SearchEntry{}
 				}
 
 				conditions := entry.Conditions
@@ -1709,7 +1709,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 
 // Append a virtual buylist to search results, priced off the reference
 // seller inventories according to the custom buylist rule settings
-func searchCustomBuylist(b *mtgmatcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[string][]SearchEntry) {
+func searchCustomBuylist(b *mtgmatcher.Backend, r *http.Request, cardIDs []string, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 	if !slices.Contains(customOpts, "enabled") {
 		return
@@ -1756,14 +1756,14 @@ func searchCustomBuylist(b *mtgmatcher.Backend, r *http.Request, cardIDs []strin
 		}
 
 		if foundVendors[cardID] == nil {
-			foundVendors[cardID] = map[string][]SearchEntry{}
+			foundVendors[cardID] = map[mtgban.Condition][]SearchEntry{}
 		}
 
 		for _, entry := range entries {
 			if entry.Price == 0 {
 				continue
 			}
-			condition := "INDEX"
+			condition := mtgban.Condition("INDEX")
 			if !isIndex {
 				condition = entry.Conditions
 			}
@@ -2279,12 +2279,12 @@ func attemptMatch(b *mtgmatcher.Backend, query string) ([]string, error) {
 	return uuids, nil
 }
 
-func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry, foundVendors map[string]map[string][]SearchEntry) {
+func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
 	// Initialize up front so callers can always assign into them; when retail or
 	// buylist is skipped the corresponding search is never run and the map would
 	// otherwise stay nil, panicking on the first write (e.g. the INDEX block).
-	foundSellers = map[string]map[string][]SearchEntry{}
-	foundVendors = map[string]map[string][]SearchEntry{}
+	foundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
+	foundVendors = map[string]map[mtgban.Condition][]SearchEntry{}
 
 	// Each scan recovers its own panic, which then costs only its side: the
 	// map it would have filled stays empty.

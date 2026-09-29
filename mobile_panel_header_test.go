@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -33,15 +34,15 @@ func renderMobileSearch(t *testing.T, pageVars PageVars) string {
 func sealedPageVars(layout string, cardIDs ...string) PageVars {
 	vars := PageVars{
 		MobileSearchLayout: layout,
-		CondKeys:           []string{"INDEX", "NM"},
+		CondKeys:           []mtgban.Condition{"INDEX", "NM"},
 		Metadata:           map[string]GenericCard{},
-		FoundSellers:       map[string]map[string][]SearchEntry{},
-		FoundVendors:       map[string]map[string][]SearchEntry{},
+		FoundSellers:       map[string]map[mtgban.Condition][]SearchEntry{},
+		FoundVendors:       map[string]map[mtgban.Condition][]SearchEntry{},
 	}
 	for _, cardID := range cardIDs {
 		vars.AllKeys = append(vars.AllKeys, cardID)
 		vars.Metadata[cardID] = GenericCard{Name: "A Booster Box", Edition: "Foundations", Sealed: true}
-		vars.FoundSellers[cardID] = map[string][]SearchEntry{
+		vars.FoundSellers[cardID] = map[mtgban.Condition][]SearchEntry{
 			"INDEX": {
 				{ScraperName: "TCG (Low / Market)", Price: 402.10, URL: "https://example.test"},
 				{ScraperName: "TCG Low EV", Price: 406.83, IsEV: true},
@@ -49,7 +50,7 @@ func sealedPageVars(layout string, cardIDs ...string) PageVars {
 			},
 			"NM": {{ScraperName: "TCGplayer", Price: 908.99, URL: "https://example.test"}},
 		}
-		vars.FoundVendors[cardID] = map[string][]SearchEntry{
+		vars.FoundVendors[cardID] = map[mtgban.Condition][]SearchEntry{
 			"NM": {{ScraperName: "Card Kingdom", Price: 780.00, URL: "https://example.test"}},
 		}
 	}

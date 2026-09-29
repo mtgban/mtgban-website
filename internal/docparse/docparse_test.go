@@ -4,6 +4,8 @@ import (
 	"errors"
 	"slices"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 func TestPartitionEntries(t *testing.T) {
@@ -120,7 +122,7 @@ func TestGetQuantity(t *testing.T) {
 func TestParseRowInfersConditionFromSKU(t *testing.T) {
 	p := &Parser{
 		TCGSkuToUUID: func(sku string) string { return "uuid-" + sku },
-		TCGSkuToCondition: func(sku string) string {
+		TCGSkuToCondition: func(sku string) mtgban.Condition {
 			if sku == "SKU-SP" {
 				return "SP"
 			}
@@ -132,7 +134,7 @@ func TestParseRowInfersConditionFromSKU(t *testing.T) {
 		name     string
 		indexMap map[string]int
 		record   []string
-		want     string
+		want     mtgban.Condition
 	}{
 		{
 			"inferred from SKU when no condition column",

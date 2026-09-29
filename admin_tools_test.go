@@ -7,13 +7,15 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 func TestAdminToolsLinkTheGatewayAdmin(t *testing.T) {
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
 	t.Cleanup(func() { DevMode, SigCheck, Config.APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []string{"magic"}}
+	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()

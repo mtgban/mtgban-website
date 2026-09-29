@@ -385,31 +385,31 @@ func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperRes
 // not one is deployed yet. Each name is TCGplayer's productLineName, spelled
 // exactly: the newspaper files its rows under it and the pages match it
 // with =.
-var gameMap = map[string]string{
-	"magic":         "Magic: The Gathering",
-	"lorcana":       "Disney Lorcana",
-	"onepiece":      "One Piece Card Game",
-	"yugioh":        "YuGiOh",
-	"riftbound":     "Riftbound: League of Legends Trading Card Game",
-	"fleshandblood": "Flesh and Blood TCG",
-	"pokemon":       "Pokemon",
-	"gundam":        "Gundam Card Game",
-	"palworld":      "Palworld OFFICIAL CARD GAME",
+var gameMap = map[mtgmatcher.Game]string{
+	mtgmatcher.GameMagic:         "Magic: The Gathering",
+	mtgmatcher.GameLorcana:       "Disney Lorcana",
+	mtgmatcher.GameOnePiece:      "One Piece Card Game",
+	mtgmatcher.GameYuGiOh:        "YuGiOh",
+	mtgmatcher.GameRiftbound:     "Riftbound: League of Legends Trading Card Game",
+	mtgmatcher.GameFleshAndBlood: "Flesh and Blood TCG",
+	mtgmatcher.GamePokemon:       "Pokemon",
+	mtgmatcher.GameGundam:        "Gundam Card Game",
+	mtgmatcher.GamePalworld:      "Palworld OFFICIAL CARD GAME",
 }
 
 // gameBadgeMap is the short form the brand wears under the wordmark on a
 // non-Magic deployment. gameMap's full names are what prose wants and what a
 // two-line lockup cannot hold: "Riftbound: League of Legends Trading Card
 // Game" is wider than the navbar leaves for the logo.
-var gameBadgeMap = map[string]string{
-	"lorcana":       "Lorcana",
-	"onepiece":      "One Piece",
-	"yugioh":        "YuGiOh",
-	"riftbound":     "Riftbound",
-	"fleshandblood": "Flesh and Blood",
-	"pokemon":       "Pokemon",
-	"gundam":        "Gundam",
-	"palworld":      "Palworld",
+var gameBadgeMap = map[mtgmatcher.Game]string{
+	mtgmatcher.GameLorcana:       "Lorcana",
+	mtgmatcher.GameOnePiece:      "One Piece",
+	mtgmatcher.GameYuGiOh:        "YuGiOh",
+	mtgmatcher.GameRiftbound:     "Riftbound",
+	mtgmatcher.GameFleshAndBlood: "Flesh and Blood",
+	mtgmatcher.GamePokemon:       "Pokemon",
+	mtgmatcher.GameGundam:        "Gundam",
+	mtgmatcher.GamePalworld:      "Palworld",
 }
 
 // Cache of card UUIDs that appear in the newspaper spike score pages.

@@ -12,19 +12,22 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
+
 	"github.com/hashicorp/go-cleanhttp"
 )
 
 // CategoryID maps game names to Collectr category IDs.
-var CategoryID = map[string]string{
-	"magic":   "1",
-	"lorcana": "71",
+var CategoryID = map[mtgmatcher.Game]string{
+	mtgmatcher.GameMagic:   "1",
+	mtgmatcher.GameLorcana: "71",
 }
 
 // CategoryFilter maps game names to the catalog_category_name used by the API.
-var CategoryFilter = map[string]string{
-	"magic":   "Magic: The Gathering",
-	"lorcana": "Lorcana",
+var CategoryFilter = map[mtgmatcher.Game]string{
+	mtgmatcher.GameMagic:   "Magic: The Gathering",
+	mtgmatcher.GameLorcana: "Lorcana",
 }
 
 // Item is one product listing read off a showcase page.
@@ -35,7 +38,7 @@ type Item struct {
 	Number    string
 	Rarity    string
 	Quantity  int
-	Condition string
+	Condition mtgban.Condition
 	IsFoil    bool
 	IsSealed  bool
 	Price     float64
@@ -123,7 +126,7 @@ var sortVariants = []string{
 // fingerprint: direct fetches from datacenter IPs get served empty shells
 // or 403s by Cloudflare. Multiple page fetches with different sort orders
 // are combined to maximize coverage of the full collection.
-func Load(ctx context.Context, proxyBase, link, game string, maxRows int) ([]Item, error) {
+func Load(ctx context.Context, proxyBase, link string, game mtgmatcher.Game, maxRows int) ([]Item, error) {
 	handle, err := ParseShowcaseURL(link)
 	if err != nil {
 		return nil, err
@@ -390,7 +393,7 @@ func findArrayEnd(body string, start int) int {
 }
 
 // LoadReader parses product data from a pre-fetched page body.
-func LoadReader(r io.Reader, game string, maxRows int) ([]Item, error) {
+func LoadReader(r io.Reader, game mtgmatcher.Game, maxRows int) ([]Item, error) {
 	catName, ok := CategoryFilter[game]
 	if !ok {
 		return nil, fmt.Errorf("unsupported game: %s", game)
@@ -402,19 +405,19 @@ func LoadReader(r io.Reader, game string, maxRows int) ([]Item, error) {
 	return parseProducts(string(buf), catName, maxRows)
 }
 
-func mapCondition(cond string) string {
+func mapCondition(cond string) mtgban.Condition {
 	switch strings.ToUpper(strings.TrimSpace(cond)) {
 	case "NM", "NEAR MINT":
-		return "NM"
+		return mtgban.NM
 	case "LP", "LIGHTLY PLAYED":
-		return "SP"
+		return mtgban.SP
 	case "MP", "MODERATELY PLAYED":
-		return "MP"
+		return mtgban.MP
 	case "HP", "HEAVILY PLAYED":
-		return "HP"
+		return mtgban.HP
 	case "DMG", "DAMAGED":
-		return "PO"
+		return mtgban.PO
 	default:
-		return "NM"
+		return mtgban.NM
 	}
 }

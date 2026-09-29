@@ -415,9 +415,10 @@ func fixupIDs(b *mtgmatcher.Backend, code string) []string {
 		// A "space:id" value names the id space to convert through - "tcg"
 		// for short, anything else as the matcher spells it - which is what
 		// reaches a space the spaceless walk must skip, like multiverse
-		space, id, qualified := strings.Cut(field, ":")
+		prefix, id, qualified := strings.Cut(field, ":")
 		if qualified {
-			if space == "tcg" {
+			space := mtgmatcher.IDSpace(prefix)
+			if prefix == "tcg" {
 				space = mtgmatcher.IDSpaceTCGplayer
 			}
 			uuid := b.ConvertID(space, id)
@@ -2669,20 +2670,20 @@ func shouldSkipPriceNG(cardID string, entry mtgban.GenericEntry, filters []*Filt
 	return false
 }
 
-var conditionMap = map[string]int{
-	"NM": 4,
-	"SP": 3,
-	"MP": 2,
-	"HP": 1,
-	"PO": 0,
+var conditionMap = map[mtgban.Condition]int{
+	mtgban.NM: 4,
+	mtgban.SP: 3,
+	mtgban.MP: 2,
+	mtgban.HP: 1,
+	mtgban.PO: 0,
 }
 
 func entryFilterCondition(filters []string, entry mtgban.GenericEntry) bool {
-	return !slices.Contains(filters, entry.Condition())
+	return !slices.Contains(filters, string(entry.Condition()))
 }
 
 func entryFilterConditionGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
-	condIndex, found := conditionMap[filters[0]]
+	condIndex, found := conditionMap[mtgban.Condition(filters[0])]
 	if !found {
 		return true
 	}
@@ -2690,7 +2691,7 @@ func entryFilterConditionGreaterThan(filters []string, entry mtgban.GenericEntry
 }
 
 func entryFilterConditionLessThan(filters []string, entry mtgban.GenericEntry) bool {
-	condIndex, found := conditionMap[filters[0]]
+	condIndex, found := conditionMap[mtgban.Condition(filters[0])]
 	if !found {
 		return true
 	}
@@ -2777,12 +2778,12 @@ func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) boo
 	return false
 }
 
-func postFilterEmpty(filters []string, cardID string, foundScraper map[string]map[string][]SearchEntry) bool {
+func postFilterEmpty(filters []string, cardID string, foundScraper map[string]map[mtgban.Condition][]SearchEntry) bool {
 	return len(foundScraper[cardID]) == 0 ||
 		(len(foundScraper[cardID]) == 1 && len(foundScraper[cardID]["INDEX"]) != 0)
 }
 
-func postFilterAny(filters []string, cardID string, foundScraper map[string]map[string][]SearchEntry) bool {
+func postFilterAny(filters []string, cardID string, foundScraper map[string]map[mtgban.Condition][]SearchEntry) bool {
 	for _, cond := range AllConditions {
 		for _, entry := range foundScraper[cardID][cond] {
 			for _, shorthand := range filters {
@@ -2798,7 +2799,7 @@ func postFilterAny(filters []string, cardID string, foundScraper map[string]map[
 // applyPostFilter dispatches a post-search filter by name, mirroring
 // applyCardFilter. Unknown names panic, preserving the old registry
 // behavior.
-func applyPostFilter(name string, filters []string, cardID string, foundScraper map[string]map[string][]SearchEntry) bool {
+func applyPostFilter(name string, filters []string, cardID string, foundScraper map[string]map[mtgban.Condition][]SearchEntry) bool {
 	switch name {
 	case "empty":
 		return postFilterEmpty(filters, cardID, foundScraper)
@@ -2808,9 +2809,9 @@ func applyPostFilter(name string, filters []string, cardID string, foundScraper 
 	panic(name + " option not found")
 }
 
-func shouldSkipPostNG(cardID string, foundSellers, foundVendors map[string]map[string][]SearchEntry, filters []FilterPostElem) bool {
+func shouldSkipPostNG(cardID string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, filters []FilterPostElem) bool {
 	for i := range filters {
-		var foundScrapers map[string]map[string][]SearchEntry
+		var foundScrapers map[string]map[mtgban.Condition][]SearchEntry
 		if filters[i].OnlyForSeller {
 			foundScrapers = foundSellers
 		} else if filters[i].OnlyForVendor {
@@ -2834,7 +2835,7 @@ func shouldSkipPostNG(cardID string, foundSellers, foundVendors map[string]map[s
 	return false
 }
 
-func PostSearchFilter(config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry) []string {
+func PostSearchFilter(config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry) []string {
 	if len(config.PostFilters) == 0 {
 		return allKeys
 	}

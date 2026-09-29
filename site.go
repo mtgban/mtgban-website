@@ -159,7 +159,7 @@ func newSite() *site {
 
 		ImagesDownloadAuth: offlineImagesDownloadAuth,
 
-		Game: func() string { return Config.Game },
+		Game: func() mtgmatcher.Game { return Config.Game },
 
 		ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
 		ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
@@ -189,7 +189,7 @@ func (s *site) newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastor
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
-		names:    suggest.NewNames(b.Names("canonical", false), b.Names("canonical", true)),
+		names:    suggest.NewNames(b.Names(mtgmatcher.NameFormCanonical, false), b.Names(mtgmatcher.NameFormCanonical, true)),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
 		loadedAt: loadedAt,

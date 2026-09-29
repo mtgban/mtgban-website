@@ -393,7 +393,7 @@ func getTiers(b *mtgmatcher.Backend, blocklistRetail, blocklistBuylist, skipEdit
 		MaxSpread:        MaxSpread,
 		MinPrice:         SleepersMinPrice,
 		Editions:         skipEditions,
-		Conditions:       []string{"MP", "HP", "PO"},
+		Conditions:       BadConditions,
 		MaxPriceRatio:    MaxPriceRatio,
 		CustomCardFilter: noOversize,
 		// Safe to ask outright rather than name what to drop: the loop
@@ -484,7 +484,7 @@ func getGap(b *mtgmatcher.Backend, blocklistRetail []string, ref, target string,
 		MinPrice:         SleepersMinPrice * 2,
 		Editions:         skipEditions,
 		CustomCardFilter: noOversize,
-		Conditions:       []string{"MP", "HP", "PO"},
+		Conditions:       BadConditions,
 		// Same reasoning as getTiers: sealed sellers are skipped above.
 		OnlyLanguages: sleepersLanguages,
 	}

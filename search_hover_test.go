@@ -14,7 +14,7 @@ func TestSearchResultHoverAndInitialArt(t *testing.T) {
 	if !strings.Contains(out, "__sidebarCardKey") {
 		t.Error("search sidebar hover handler does not deduplicate the current result")
 	}
-	cardBack := "/img/backs/" + Config.Game + ".webp"
+	cardBack := "/img/backs/" + string(Config.Game) + ".webp"
 	if !strings.Contains(out, cardBack) {
 		t.Errorf("image-less first result does not seed the sidebar with %q", cardBack)
 	}
@@ -35,7 +35,7 @@ func TestSearchInitialArtKeepsFirstResultMetadata(t *testing.T) {
 		t.Fatal("rendered search page has no initial sidebar call")
 	}
 	call := out[start : start+end]
-	cardBack := "/img/backs/" + Config.Game + ".webp"
+	cardBack := "/img/backs/" + string(Config.Game) + ".webp"
 	if !strings.Contains(call, `"`+cardBack+`"`) || !strings.Contains(call, `"ONE"`) || !strings.Contains(call, `"2020-01-02"`) || !strings.Contains(call, `"First Product"`) || strings.Contains(call, `"TWO"`) || strings.Contains(call, " true ") {
 		t.Errorf("initial sidebar call used the wrong result metadata: %s", call)
 	}

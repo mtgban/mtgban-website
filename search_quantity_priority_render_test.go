@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // A PriceUnitCount vendor's row - the shape searchVendorsNG now builds - must
@@ -19,12 +21,12 @@ func quantityPriorityPage(mobile bool) PageVars {
 		SearchQuery: "a card",
 		SearchRan:   true,
 		AllKeys:     []string{id},
-		CondKeys:    []string{"INDEX", "NM"},
+		CondKeys:    []mtgban.Condition{"INDEX", "NM"},
 		Metadata:    map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
-		FoundSellers: map[string]map[string][]SearchEntry{
+		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{
 			id: {},
 		},
-		FoundVendors: map[string]map[string][]SearchEntry{
+		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{
 			id: {"INDEX": {
 				{ScraperName: "SYP", Shorthand: "SYP", Price: 5.00, Quantity: 12, PriceUnit: PriceUnitCount},
 			}},

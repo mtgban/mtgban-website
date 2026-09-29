@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -13,14 +14,14 @@ import (
 func ckSignalPageVars(state string) PageVars {
 	const cardID = "ck-signal-card"
 	return PageVars{
-		CondKeys: []string{"NM", "SP"},
+		CondKeys: []mtgban.Condition{"NM", "SP"},
 		AllKeys:  []string{cardID},
 		Metadata: map[string]GenericCard{cardID: {
 			Name: "Some Card", Edition: "Some Set", GoodBuylist: 9, HighestBuylist: 12, HotlistStore: "CK",
 			CKSignal: state, CKSignalTip: "the odds", CKFacts: "CK stock 0 · out 9 days",
 		}},
-		FoundSellers: map[string]map[string][]SearchEntry{},
-		FoundVendors: map[string]map[string][]SearchEntry{cardID: {
+		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{},
+		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{cardID: {
 			"NM": {
 				{ScraperName: "Card Kingdom", Shorthand: "CK", Price: 10, Ratio: 50, URL: "https://example.test"},
 				{ScraperName: "Other Store", Shorthand: "OS", Price: 9, URL: "https://example.test"},

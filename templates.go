@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/observability"
 )
@@ -216,7 +217,7 @@ var funcMap = template.FuncMap{
 	// game is the slug the deployment serves, for the places that style or
 	// address a game rather than name it.
 	"game": func() string {
-		return Config.Game
+		return string(Config.Game)
 	},
 	// bantool_run_name is the GitHub Actions run name a store's bantool
 	// workflow gets, which the admin dashboard's running-workflow poll
@@ -252,7 +253,7 @@ var funcMap = template.FuncMap{
 		return slices.Compact(stores)
 	},
 	"card_back": func() string {
-		return "/img/backs/" + Config.Game + ".webp"
+		return "/img/backs/" + string(Config.Game) + ".webp"
 	},
 	// rarity_badge hands the set-symbol block the drawing for one rarity,
 	// already sized for the code it has to hold.
@@ -335,11 +336,16 @@ var funcMap = template.FuncMap{
 		}
 		return template.HTML(fmt.Sprintf(`<span class="bl-prices">%s</span>`, prices))
 	},
+	// grade spells a grade for indexing the condition-keyed maps, which
+	// take a typed key where a template literal is a plain string.
+	"grade": func(s string) mtgban.Condition {
+		return mtgban.Condition(s)
+	},
 	// buylist_state is how a buylist price is highlighted. Card Kingdom's NM
 	// offer follows CK's signal ("best" to take it, "wait" when CK is likely
 	// to pay more soon; ckbuylist.go), any other store's offer is "best" at or
 	// above CK's P90.
-	"buylist_state": func(shorthand, conditions string, isOffer bool, price, good float64, ckSignal string, ckPauseWait bool) string {
+	"buylist_state": func(shorthand string, conditions mtgban.Condition, isOffer bool, price, good float64, ckSignal string, ckPauseWait bool) string {
 		switch {
 		case !isOffer:
 			return ""
@@ -364,7 +370,7 @@ var funcMap = template.FuncMap{
 	// have something to say: on CK's NM offer the signal's verdict, CK's
 	// stock facts, its P90 and 90-day high, and the odds behind the verdict;
 	// on another store's green offer, the P90 it reaches.
-	"buylist_title": func(shorthand, conditions, state string, good, highest float64, facts, tip string) string {
+	"buylist_title": func(shorthand string, conditions mtgban.Condition, state string, good, highest float64, facts, tip string) string {
 		if shorthand != "CK" {
 			if state != "best" || good <= 0 {
 				return ""
@@ -380,7 +386,7 @@ var funcMap = template.FuncMap{
 	},
 	// buylist_wait marks Card Kingdom's NM offer while CK is likely to pay
 	// more soon.
-	"buylist_wait": func(shorthand, conditions, ckSignal, tip string) template.HTML {
+	"buylist_wait": func(shorthand string, conditions mtgban.Condition, ckSignal, tip string) template.HTML {
 		if shorthand != "CK" || conditions != "NM" || ckSignal != "wait" {
 			return ""
 		}
@@ -388,7 +394,7 @@ var funcMap = template.FuncMap{
 	},
 	// buylist_pause marks Card Kingdom's last known NM offer on a card CK has
 	// paused with a pill saying for how long, the chances as its tooltip.
-	"buylist_pause": func(shorthand, conditions, label, tip string) template.HTML {
+	"buylist_pause": func(shorthand string, conditions mtgban.Condition, label, tip string) template.HTML {
 		if shorthand != "CKBLLast" || conditions != "NM" || label == "" {
 			return ""
 		}
@@ -396,7 +402,7 @@ var funcMap = template.FuncMap{
 	},
 	// buylist_pause_wait is the wait arrow on that offer, when waiting for CK
 	// beats every other cash offer.
-	"buylist_pause_wait": func(shorthand, conditions string, wait bool) template.HTML {
+	"buylist_pause_wait": func(shorthand string, conditions mtgban.Condition, wait bool) template.HTML {
 		if shorthand != "CKBLLast" || conditions != "NM" || !wait {
 			return ""
 		}

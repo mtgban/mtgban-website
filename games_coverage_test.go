@@ -66,7 +66,7 @@ func TestVariantCacheScope(t *testing.T) {
 
 	cases := []struct {
 		name string
-		game string
+		game mtgmatcher.Game
 		// catalog is the TCGplayer category the loaded dump names, which is
 		// how a non-Magic site learns its own; 0 stands for no dump loaded.
 		catalog int

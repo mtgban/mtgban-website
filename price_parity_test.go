@@ -94,7 +94,7 @@ func seedParityScrapers(t *testing.T, regular, foil string) {
 
 // searchPrice returns the price of the first row for the given store and
 // condition bucket, or -1 when the bucket has no row for it.
-func searchPrice(found map[string]map[string][]SearchEntry, cardID, cond, shorthand string) float64 {
+func searchPrice(found map[string]map[mtgban.Condition][]SearchEntry, cardID string, cond mtgban.Condition, shorthand string) float64 {
 	for _, res := range found[cardID][cond] {
 		if res.Shorthand == shorthand {
 			return res.Price
@@ -116,15 +116,15 @@ func TestPriceParityRetail(t *testing.T) {
 	// Parity: the search row per condition and the API conditions map must
 	// carry the same numbers.
 	for _, tc := range []struct {
-		cond string
+		cond mtgban.Condition
 		want float64
 	}{
-		{"NM", 10}, {"SP", 8},
+		{mtgban.NM, 10}, {mtgban.SP, 8},
 	} {
 		if got := searchPrice(found, regular, tc.cond, "PARITYA"); got != tc.want {
 			t.Errorf("search %s = %v, want %v", tc.cond, got, tc.want)
 		}
-		if got := api[regular]["PARITYA"].Conditions.Get(tc.cond); got != tc.want {
+		if got := api[regular]["PARITYA"].Conditions.Get(string(tc.cond)); got != tc.want {
 			t.Errorf("api conditions[%s] = %v, want %v", tc.cond, got, tc.want)
 		}
 	}
@@ -179,14 +179,14 @@ func TestWalkRepeatedIds(t *testing.T) {
 	config := parseSearchOptionsNG(backend(), regular, nil, nil, nil)
 
 	found := searchSellersNG(cardIDs, config)
-	for _, cond := range []string{"NM", "SP", "PO"} {
+	for _, cond := range []mtgban.Condition{mtgban.NM, mtgban.SP, mtgban.PO} {
 		if got := len(found[regular][cond]); got != 1 {
 			t.Errorf("sellers %s rows = %d, want 1", cond, got)
 		}
 	}
 
 	foundBl := searchVendorsNG(cardIDs, config)
-	for _, cond := range []string{"NM", "SP"} {
+	for _, cond := range []mtgban.Condition{mtgban.NM, mtgban.SP} {
 		if got := len(foundBl[regular][cond]); got != 1 {
 			t.Errorf("vendors %s rows = %d, want 1", cond, got)
 		}
@@ -274,7 +274,7 @@ func TestBanPricesSumsQuantityByPriceUnitCountOnly(t *testing.T) {
 	}
 	vendorsPtr.Store(&vendors)
 
-	found := map[string]map[string][]SearchEntry{
+	found := map[string]map[mtgban.Condition][]SearchEntry{
 		regular: {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitCount}}},
 		foil:    {"INDEX": {{Shorthand: "FAKEIDX", Price: 5, Quantity: 12, PriceUnit: PriceUnitExpectedCount}}},
 	}
