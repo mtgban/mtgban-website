@@ -30,38 +30,37 @@ func TestCKSignalFor(t *testing.T) {
 		hist       func(h *ckHistory)
 		noHistory  bool
 		good       float64
-		wantState  string
-		wantTip    string
+		wantRule   string
 		wantNoFact bool
 	}{
-		{name: "above P90 in stock", wantState: "sell", wantTip: ckTipSell},
+		{name: "above P90 in stock", wantRule: "sell"},
 		{name: "not buying", quote: func(q *ckQuote) { q.Buying = false }, wantNoFact: true},
 		{name: "under a dollar", quote: func(q *ckQuote) { q.Buy = 0.9 }, good: 0.5},
 		{name: "no P90", good: -1},
 		{name: "ties P90", quote: func(q *ckQuote) { q.Buy = 9 }},
 		{name: "stock halved since yesterday", quote: func(q *ckQuote) { q.Stock = 2 },
-			wantState: "wait", wantTip: ckTipBuyout},
+			wantRule: "buyout"},
 		{name: "halved from under three is no buyout",
 			quote: func(q *ckQuote) { q.Stock = 1 }, hist: func(h *ckHistory) { h.StockYesterday = 2 },
-			wantState: "sell", wantTip: ckTipSell},
+			wantRule: "sell"},
 		{name: "sold out since yesterday is a buyout", quote: func(q *ckQuote) { q.Stock = 0 },
-			wantState: "wait", wantTip: ckTipBuyout},
+			wantRule: "buyout"},
 		{name: "out of stock at P90",
 			quote: func(q *ckQuote) { q.Stock, q.Buy = 0, 9 }, hist: func(h *ckHistory) { h.StockYesterday = 0 },
-			wantState: "wait", wantTip: ckTipOutOfStock},
+			wantRule: "outofstock"},
 		{name: "out of stock above P90",
 			quote: func(q *ckQuote) { q.Stock = 0 }, hist: func(h *ckHistory) { h.StockYesterday = 0 }},
 		{name: "cut 20% wins over sell", hist: func(h *ckHistory) { h.BuyWeekAgo = 13 },
-			wantState: "wait", wantTip: ckTipCut},
+			wantRule: "cut"},
 		{name: "cut under 20%", hist: func(h *ckHistory) { h.BuyWeekAgo = 12 },
-			wantState: "sell", wantTip: ckTipSell},
+			wantRule: "sell"},
 		{name: "stock unknown", quote: func(q *ckQuote) { q.StockKnown, q.Stock = false, 0 }, wantNoFact: true},
-		{name: "no history still sells", noHistory: true, wantState: "sell", wantTip: ckTipSell},
+		{name: "no history still sells", noHistory: true, wantRule: "sell"},
 		{name: "no history, out of stock at P90", noHistory: true,
-			quote:     func(q *ckQuote) { q.Stock, q.Buy = 0, 9 },
-			wantState: "wait", wantTip: ckTipOutOfStock},
+			quote:    func(q *ckQuote) { q.Stock, q.Buy = 0, 9 },
+			wantRule: "outofstock"},
 		{name: "no history sees no buyout", noHistory: true, quote: func(q *ckQuote) { q.Stock = 2 },
-			wantState: "sell", wantTip: ckTipSell},
+			wantRule: "sell"},
 	}
 	for _, tc := range cases {
 		q, h, g := quote, hist, good
@@ -75,8 +74,8 @@ func TestCKSignalFor(t *testing.T) {
 			g = max(tc.good, 0)
 		}
 		got := ckSignalFor(q, h, !tc.noHistory, g, today)
-		if got.State != tc.wantState || got.Tip != tc.wantTip {
-			t.Errorf("%s: got (%q, %q), want (%q, %q)", tc.name, got.State, got.Tip, tc.wantState, tc.wantTip)
+		if got.Rule != tc.wantRule {
+			t.Errorf("%s: got rule %q, want %q", tc.name, got.Rule, tc.wantRule)
 		}
 		if (got.Facts == "") != tc.wantNoFact {
 			t.Errorf("%s: facts %q", tc.name, got.Facts)
@@ -301,8 +300,8 @@ func TestRebuildCKSignals(t *testing.T) {
 	}
 }
 
-// TestCKPauseFor pins how long a pause has lasted, the chances it reads for
-// that, and when waiting for CK beats the other cash offers.
+// TestCKPauseFor pins how long a pause has lasted, the pill and chances it
+// reads for that, and when waiting for CK beats the other cash offers.
 func TestCKPauseFor(t *testing.T) {
 	today := time.Date(2026, 9, 29, 0, 0, 0, 0, time.UTC)
 	daysAgo := func(n int) ckHistory { return ckHistory{LastBuying: today.AddDate(0, 0, -n)} }
@@ -320,7 +319,6 @@ func TestCKPauseFor(t *testing.T) {
 		{"third day", 2.4, daysAgo(4), nil, "Paused 3d", false, "within a week: **52%**"},
 		{"second week", 2.4, daysAgo(12), nil, "Paused 11d", false, "within a week: **45%**"},
 		{"not bought in the window", 2.4, ckHistory{}, nil, "Paused 30d+", false, "within a week: **20%**"},
-		{"under $1", 0.9, daysAgo(4), nil, "", false, ""},
 		{"others 5% below", 2.4, daysAgo(5), []float64{1.8, 2.2}, "Paused 4d", true, "best other offer: **76%**"},
 		{"others 5% below, second week", 2.4, daysAgo(9), []float64{2.2}, "Paused 8d", true, "best other offer: **66%**"},
 		{"an offer within 5%", 2.4, daysAgo(5), []float64{1.8, 2.3}, "Paused 4d", false, ""},
@@ -328,19 +326,22 @@ func TestCKPauseFor(t *testing.T) {
 		{"no other offer", 2.4, daysAgo(5), nil, "Paused 4d", false, ""},
 	} {
 		got := ckPauseFor(tc.listed, tc.h, today, tc.others)
-		if got.Label != tc.label || got.Wait != tc.wait || !strings.Contains(got.Tip, tc.chance) {
-			t.Errorf("%s: got %+v, want %q wait %v with %q", tc.name, got, tc.label, tc.wait, tc.chance)
+		label, tip := ckPauseLabel(got.Days), ckPauseTip(got.Days, got.Wait)
+		if !got.Paused || label != tc.label || got.Wait != tc.wait || !strings.Contains(tip, tc.chance) {
+			t.Errorf("%s: got %+v, %q, want %q wait %v with %q", tc.name, got, label, tc.label, tc.wait, tc.chance)
 		}
 	}
+	if got := ckPauseFor(0.9, daysAgo(4), today, nil); got.Paused {
+		t.Errorf("under $1: got %+v, want no pause", got)
+	}
 
-	got := ckPauseFor(2.4, daysAgo(5), today, []float64{1.8})
 	want := "**Wait**: CK stopped buying this card 4 days ago, and every other cash offer is 5%+ below the price it lists.\n" +
 		"Chances CK buys it again:\n" +
 		"• within a week: **52%**\n" +
 		"• within 30 days: **88%**\n" +
 		"• within 30 days, paying 5% more than the best other offer: **76%**"
-	if got.Tip != want {
-		t.Errorf("wait tip:\n%s\nwant:\n%s", got.Tip, want)
+	if tip := ckPauseTip(4, true); tip != want {
+		t.Errorf("wait tip:\n%s\nwant:\n%s", tip, want)
 	}
 }
 
@@ -381,17 +382,17 @@ func TestRebuildCKPauses(t *testing.T) {
 
 	rebuildCKSignals()
 	got := ckSignalForCard("p")
-	if got.Pause.Label != "Paused 4d" || !got.Pause.Wait || got.State != "" {
+	if got.PauseLabel != "Paused 4d" || !got.PauseWait || got.State != "" {
 		t.Errorf("paused 4 days, SCG 25%% below: got %+v, want a wait", got)
 	}
 	got = ckSignalForCard("blocked")
-	if got.Pause.Label != "Paused 4d" || got.Pause.Wait {
+	if got.PauseLabel != "Paused 4d" || got.PauseWait {
 		t.Errorf("SCG within 5%%: got %+v, want paused with no wait", got)
 	}
 	for _, cardID := range []string{"both", "nohist", "noid"} {
 		got = ckSignalForCard(cardID)
-		if got.Pause != (ckPause{}) {
-			t.Errorf("%s: got %+v, want no pause", cardID, got.Pause)
+		if got.PauseLabel != "" {
+			t.Errorf("%s: got %+v, want no pause", cardID, got)
 		}
 	}
 }

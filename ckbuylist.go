@@ -261,28 +261,27 @@ type ckQuote struct {
 	StockKnown bool
 }
 
-// ckSignal is a card's state on CK's buylist: "sell" when CK's offer is worth
-// taking now, "wait" when CK is likely to pay more soon, "" otherwise, with
-// the odds behind it and a line of facts about CK's stock and price.
+// ckSignal is what a rebuild found for one card: the rule of ADR-0004 CK's
+// offer meets ("sell", "buyout", "outofstock", "cut" or none), a line of
+// facts about CK's stock and price and, on a card CK is not buying, its
+// pause. ckSignalForCard tells the pages what it means.
 type ckSignal struct {
-	State string
-	Tip   string
+	Rule  string
 	Facts string
-	// Set instead on a card CK is not buying.
 	Pause ckPause
 }
 
-// ckPause is a card CK has paused: the pill on its last known offer, whether
-// waiting for CK beats every other cash offer, and the tooltip behind both.
+// ckPause is a card CK has paused: for how many days, and whether waiting
+// for CK beats every other cash offer.
 type ckPause struct {
-	Label string
-	Wait  bool
-	Tip   string
+	Paused bool
+	Days   int
+	Wait   bool
 }
 
 // ckPauseFor tells how long CK has had a card paused, from the last day it
-// bought it, and the chances of CK buying it again. listed is CK's price for
-// it and others the other cash buylists' NM offers.
+// bought it, and whether waiting beats selling elsewhere. listed is CK's
+// price for it and others the other cash buylists' NM offers.
 func ckPauseFor(listed float64, h ckHistory, today time.Time, others []float64) ckPause {
 	if listed < ckMinBuyPrice {
 		return ckPause{}
@@ -293,6 +292,28 @@ func ckPauseFor(listed float64, h ckHistory, today time.Time, others []float64) 
 	if !h.LastBuying.IsZero() {
 		days = max(int(today.Sub(h.LastBuying).Hours()/24)-1, 0)
 	}
+	best := 0.0
+	for _, price := range others {
+		best = max(best, price)
+	}
+	wait := days < ckPauseWaitDays && best > 0 && best < listed*ckPauseWaitRatio
+	return ckPause{Paused: true, Days: days, Wait: wait}
+}
+
+// ckPauseLabel is the pill of a pause that has lasted days.
+func ckPauseLabel(days int) string {
+	switch {
+	case days >= 30:
+		return "Paused 30d+"
+	case days == 0:
+		return "Paused today"
+	}
+	return "Paused " + strconv.Itoa(days) + "d"
+}
+
+// ckPauseTip is the tooltip of a pause that has lasted days: since when, and
+// the chances of CK buying the card again.
+func ckPauseTip(days int, wait bool) string {
 	chances := ckPauseChances[len(ckPauseChances)-1]
 	for _, c := range ckPauseChances {
 		if days >= c.MinDays {
@@ -300,28 +321,18 @@ func ckPauseFor(listed float64, h ckHistory, today time.Time, others []float64) 
 			break
 		}
 	}
-
-	var p ckPause
 	since := strconv.Itoa(days) + " days ago"
 	switch {
 	case days >= 30:
-		p.Label, since = "Paused 30d+", "30+ days ago"
+		since = "30+ days ago"
 	case days == 0:
-		p.Label, since = "Paused today", "today"
+		since = "today"
 	case days == 1:
-		p.Label, since = "Paused 1d", "yesterday"
-	default:
-		p.Label = "Paused " + strconv.Itoa(days) + "d"
+		since = "yesterday"
 	}
-
-	best := 0.0
-	for _, price := range others {
-		best = max(best, price)
-	}
-	p.Wait = days < ckPauseWaitDays && best > 0 && best < listed*ckPauseWaitRatio
 
 	verdict := "**Paused**: CK stopped buying this card " + since + "."
-	if p.Wait {
+	if wait {
 		verdict = "**Wait**: CK stopped buying this card " + since +
 			", and every other cash offer is 5%+ below the price it lists."
 	}
@@ -331,15 +342,14 @@ func ckPauseFor(listed float64, h ckHistory, today time.Time, others []float64) 
 		fmt.Sprintf("• within a week: **%d%%**", chances.Week),
 		fmt.Sprintf("• within 30 days: **%d%%**", chances.Month),
 	}
-	if p.Wait {
-		wait := ckPauseWaitFirstWeek
+	if wait {
+		odds := ckPauseWaitFirstWeek
 		if days >= 7 {
-			wait = ckPauseWaitSecondWeek
+			odds = ckPauseWaitSecondWeek
 		}
-		lines = append(lines, fmt.Sprintf("• within 30 days, paying 5%% more than the best other offer: **%d%%**", wait))
+		lines = append(lines, fmt.Sprintf("• within 30 days, paying 5%% more than the best other offer: **%d%%**", odds))
 	}
-	p.Tip = strings.Join(lines, "\n")
-	return p
+	return strings.Join(lines, "\n")
 }
 
 // ckCashBuylist tells whether a vendor is a store's cash buylist, one a
@@ -372,13 +382,13 @@ func ckSignalFor(q ckQuote, h ckHistory, hasHistory bool, good float64, today ti
 
 	switch {
 	case buyout:
-		sig.State, sig.Tip = "wait", ckTipBuyout
+		sig.Rule = "buyout"
 	case outOfStock:
-		sig.State, sig.Tip = "wait", ckTipOutOfStock
+		sig.Rule = "outofstock"
 	case cut:
-		sig.State, sig.Tip = "wait", ckTipCut
+		sig.Rule = "cut"
 	case q.StockKnown && q.Stock > 0 && q.Buy > good:
-		sig.State, sig.Tip = "sell", ckTipSell
+		sig.Rule = "sell"
 	}
 	return sig
 }
@@ -534,7 +544,7 @@ func rebuildCKSignals() {
 			}
 		}
 		pause := ckPauseFor(q.Buy, h, today, others)
-		if pause.Label != "" {
+		if pause.Paused {
 			signals[cardID] = ckSignal{Pause: pause}
 		}
 	}
@@ -548,11 +558,39 @@ func (s *site) refreshCKSignals() {
 	rebuildCKSignals()
 }
 
-// ckSignalForCard is a card's CK signal as of the last rebuild.
-func ckSignalForCard(cardID string) ckSignal {
+// ckView is a card's CK signal as the pages show it.
+type ckView struct {
+	State      string // "sell", "wait" or ""
+	Tip        string
+	Facts      string
+	PauseLabel string
+	PauseWait  bool
+	PauseTip   string
+}
+
+// ckSignalForCard is a card's CK signal as of the last rebuild: the verdict
+// its rule means, with the chances behind it.
+func ckSignalForCard(cardID string) ckView {
 	signals := ckSignalsPtr.Load()
 	if signals == nil {
-		return ckSignal{}
+		return ckView{}
 	}
-	return (*signals)[cardID]
+	sig := (*signals)[cardID]
+	v := ckView{Facts: sig.Facts}
+	switch sig.Rule {
+	case "sell":
+		v.State, v.Tip = "sell", ckTipSell
+	case "buyout":
+		v.State, v.Tip = "wait", ckTipBuyout
+	case "outofstock":
+		v.State, v.Tip = "wait", ckTipOutOfStock
+	case "cut":
+		v.State, v.Tip = "wait", ckTipCut
+	}
+	if sig.Pause.Paused {
+		v.PauseLabel = ckPauseLabel(sig.Pause.Days)
+		v.PauseWait = sig.Pause.Wait
+		v.PauseTip = ckPauseTip(sig.Pause.Days, sig.Pause.Wait)
+	}
+	return v
 }
