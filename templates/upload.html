@@ -930,6 +930,7 @@
             {{$cardId := .CardID}}
             {{$card := (index $root.Metadata .CardID)}}
             {{$scraperEntries := (index $root.ResultPrices (print .CardID .OriginalCondition))}}
+            {{$loadedPrice := .OriginalPrice}}
             {{/* The product a card came out of, and how many of it were
                  opened, travel with the row: they are what lets the sections
                  be rebuilt when the page posts itself back. */}}
@@ -962,7 +963,8 @@
                 <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
                 {{range $storeKeys}}
                     {{$price := (index $scraperEntries .)}}
-                    <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $storeKeys $root.IsBuylist)}}best{{end}}">
+                    {{/* The legend's green: a buylist offer above the price the list came with. */}}
+                    <td class="ures-price {{if and $root.IsBuylist (ne $loadedPrice 0.0) (gt $price $loadedPrice)}}best{{end}}">
                         {{if ne $price 0.0}}
                             <a href="https://mtgban.com/go/{{if $root.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
                         {{else}}

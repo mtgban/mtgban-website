@@ -390,25 +390,6 @@ var funcMap = template.FuncMap{
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
 	},
-	"is_best_price": func(prices map[string]float64, store string, storeKeys []string, isBuylist bool) bool {
-		target := prices[store]
-		if target == 0 {
-			return false
-		}
-		for _, key := range storeKeys {
-			price := prices[key]
-			if price == 0 {
-				continue
-			}
-			if !isBuylist && price > target {
-				return false
-			}
-			if isBuylist && price < target {
-				return false
-			}
-		}
-		return true
-	},
 	// Every desktop page embeds these, and their lists never change: build
 	// each one once.
 	"palette_newspaper_targets": sync.OnceValue(func() template.JS { return palette.NewspaperTargetsJSON(paletteNewspaperPages()) }),
