@@ -164,6 +164,54 @@ product is filed under in CK's dumps (MTGJSON's Card Kingdom ids agree on
 With every offer below 95%, waiting paid 76% of the time in a pause's
 first week, 66% in its second, 55% at 2–4 weeks and 41% after a month.
 
+### By card category
+
+The same card-days, each card in the first category that applies, by the
+rules go-mtgban's `cmd/ckodds` applies (`category.go`):
+
+| Category | A card is in it when |
+|---|---|
+| Reserved List | it is on the Reserved List |
+| vintage | its set was released through 1995 (Alpha to Homelands) |
+| Secret Lair | its set is `SLD`, or its set's name contains "Secret Lair" |
+| Booster Fun | it is borderless, or has a showcase, extended-art, inverted, etched or shattered-glass frame, in a set released since Throne of Eldraine (2019-10-04) |
+| promo | it is a promo printing, or its set's type is promo |
+| Commander | its set's type is commander |
+| Masters | its set's type is masters, masterpiece, from_the_vault, spellbook, premium_deck or duel_deck |
+| recent | its set is two years old or less that day |
+| older | none of the above |
+
+CK paid 5% more / 5% less or nothing 14 days on, "–" where the rule met
+fewer than 300 products:
+
+| Category | Typical | Sell now | Buyout | Out of stock | Cut 20% | New high |
+|---|---|---|---|---|---|---|
+| all | 33 / 35 | 27 / 42 | 52 / 27 | 48 / 20 | 48 / 42 | 24 / 40 |
+| Reserved List | 27 / 30 | 28 / 45 | – | 25 / 10 | 47 / 41 | – |
+| vintage | 26 / 32 | 28 / 47 | – | 29 / 21 | 49 / 43 | – |
+| Secret Lair | 38 / 36 | 28 / 39 | 46 / 23 | 45 / 23 | 52 / 38 | 24 / 38 |
+| Booster Fun | 36 / 37 | 27 / 43 | 51 / 27 | 51 / 22 | 49 / 42 | 24 / 43 |
+| promo | 30 / 33 | 30 / 33 | 62 / 17 | 56 / 20 | 36 / 48 | 26 / 28 |
+| Commander | 35 / 39 | 27 / 47 | 52 / 31 | 54 / 22 | 52 / 40 | 27 / 46 |
+| Masters | 34 / 40 | 24 / 50 | 52 / 29 | 50 / 22 | 50 / 42 | 22 / 48 |
+| recent | 37 / 42 | 27 / 47 | – | 56 / 18 | 50 / 42 | – |
+| older | 30 / 32 | 27 / 40 | 52 / 28 | 48 / 19 | 46 / 42 | 23 / 39 |
+
+Most categories follow the whole, around typical rates of their own. Two
+do not. On promos sell now shows no edge and a 20% cut is followed by more
+cuts, not a raise. On the Reserved List and vintage, out of stock is
+followed by a raise no more often than typical, only by far fewer cuts; so
+is it on older nonfoils (36 / 17 against a typical 38 / 42), while newer
+nonfoils rise (Booster Fun 56 / 27 against 41 / 42). Pauses end at their
+own pace too: CK buys again within a week of a pause starting 68% of the
+time on Booster Fun and 53–56% on promos and vintage, and after a month
+paused 30% against 15–16%.
+
+`cmd/ckodds` measures the same every day over the newspaper's last year of
+CK snapshots. Its first run, on 2026-09-29, agreed with this table within
+2 points on 50 of its 54 cells, filled 4 of the gaps, and gave the pause
+chances above.
+
 ## Decision
 
 1. **Good and Highest stay** as reference prices, the level other stores'
@@ -183,8 +231,8 @@ first week, 66% in its second, 55% at 2–4 weeks and 41% after a month.
    and CSI is a time to sell to them as well.
 7. **Facts** show whenever CK is buying: its stock now and a week ago, days
    out of stock, and a buy price change of 10% or more this week.
-8. **The tooltips quote the measurements above**, and are updated when the
-   measurements are.
+8. **The tooltips quote the chances measured every day** (17), not the
+   tables above.
 9. **Filters**: `on:cksell` finds sell now and `on:ckwait` finds wait.
    `on:ckp90`, which matched any price at or above P90, is dropped rather
    than redefined under the same name.
@@ -214,6 +262,25 @@ first week, 66% in its second, 55% at 2–4 weeks and 41% after a month.
     credit list, TCGplayer Direct's net payout and lists of wants. Other
     stores' offers get no mark, and paused cards stay out of `on:ckwait`.
 16. **CK's last known offer is never green**: CK does not pay it.
+17. **Chances by category, measured every day**: go-mtgban's `cmd/ckodds`
+    measures them the way this ADR does, over the newspaper's last year of
+    CK snapshots, and publishes them with every CK product's category as
+    `ck-odds.json.xz` beside the datastore. Every tooltip quotes its card's
+    category next to that category's typical chances, and for out of stock
+    those of its finish too; pauses and New high included. A cell under
+    300 products or 3,000 card-days reads the category's chances over both
+    finishes, then those over all cards. The site reads the file again once
+    it is 20 hours old; until one loads, tooltips carry their verdicts
+    alone.
+18. **A rule holds where it has an edge**: on a category and finish, its
+    chances beat the typical ones by 5 points or more, raises and cuts
+    together (fewer raises and more cuts for sell now, the other way round
+    for a wait). Where it does not, the card shows neutral and stays out
+    of `on:cksell` and `on:ckwait`. On the first run that takes sell now
+    and the cut's wait off promos.
+19. **Out of stock that stops cuts without bringing raises** (5 points or
+    less over typical) says CK seldom pays less after that, and stays a
+    wait.
 
 Windows: 1 day for buyouts, 7 days for stock and price changes, 90 days for
 P90, predictions stated over 14 days, and over 7 and 30 days for pauses.
@@ -255,8 +322,12 @@ a level to call "high".
   firing; P90 and the live stock still work.
 - Every card CK is buying keeps its signal in memory: about 11 MB and 40 ms
   to rebuild per 60,000 cards.
-- The odds in the tooltips come from one period (March to August 2026).
-  They should be re-measured, not assumed to hold.
+- The tooltips' odds, and which rules hold, follow a year of CK's history
+  as it moves; the tables above stay one period's (March to August 2026).
+  The pause's wait (15) and its 95% are still that one measurement, as it
+  needs the price archive of other stores' offers.
+- If `cmd/ckodds` stops running the site keeps the last file it loaded; a
+  site started without one shows verdicts without chances.
 - Stock is total across conditions, as measured. NM-only stock, which the
   site's CK scraper has, is untested.
 - Other stores' green is measured on SCG, ABU and CSI, the buylists the
@@ -266,3 +337,6 @@ a level to call "high".
 - Pauses need CK's product id on its last known offers, which go-mtgban
   records since mtgban/go-mtgban#1040, and see other buylists' reloads at
   the next hourly rebuild.
+- A card's category comes from the file, by CK's product id, not from the
+  card data, which ADR-0003 keeps out of state the site holds; every
+  tooltip is built once per load, so reading one is a lookup.

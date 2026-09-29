@@ -131,8 +131,10 @@ Boot sequence (`main()`):
    - `30 */12 * * *` — `s.runSealedAnalysis()`
    - `33 */3 * * *` — `s.cacheNewspaper()`
    - `45 * * * *` — `s.refreshCKSignals()` (ckbuylist.go): reloads CK's
-     stock history once the newspaper has a new day, and rebuilds every
-     card's buylist signal; `main()` also runs it once at startup, on a
+     stock history once the newspaper has a new day, rereads the odds its
+     tooltips quote (`ck-odds.json.xz` beside the datastore, ckodds.go)
+     once the loaded ones are 20 hours old, and rebuilds every card's
+     buylist signal; `main()` also runs it once at startup, on a
      goroutine of its own under `recoverJob()`
    - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
      TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
