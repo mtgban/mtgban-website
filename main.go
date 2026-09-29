@@ -26,6 +26,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/internal/jobs"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
@@ -215,6 +216,7 @@ type PageVars struct {
 	SleepersColors []string
 
 	Tables          [][][]string
+	Jobs            []jobs.Row
 	LastUpdate      time.Time
 	DatastoreReload dsreload.State
 	LastNews        time.Time
@@ -1527,17 +1529,16 @@ func main() {
 			// Card Kingdom's stock history and buylist signals (ckbuylist.go),
 			// where the prices just loaded include CK's buylist.
 			if ckAvailable() {
-				go func() {
-					defer recoverJob("refreshCKSignals")
-					s.refreshCKSignals()
-				}()
+				go tracked(jobCKSignals, s.refreshCKSignals)()
 			}
 
 			// Update set values after loading prices. The analysis reads the
 			// backend it starts with, so it waits for the datastore: read
 			// from a bucket, it can arrive after the prices.
 			<-datastoreLoaded
+			finish := backgroundJobs.Start(jobSetAnalysis)
 			s.runSealedAnalysis()
+			finish(nil)
 			// runSealedAnalysis loads the catalog, which is what names this
 			// site's own TCGplayer category, so the variant scope is only
 			// complete now.
@@ -1547,31 +1548,54 @@ func main() {
 	}
 
 	// Runtime manifest refreshes funnel through one debounced goroutine, each
-	// under recovered so that one that panics does not end the loop.
-	s.offline.StartRefresher(recovered)
+	// under tracked so that one that panics does not end the loop.
+	s.offline.StartRefresher(func(_ string, fn func()) func() { return tracked(jobOffline, fn) })
 
 	if !DevMode {
 		// Set up new refreshes as needed. The library runs each job on a bare
-		// goroutine, where a panic would end the process: recovered reports it
+		// goroutine, where a panic would end the process: tracked reports it
 		// instead, and the job runs again at its next time.
 		c := cron.New()
+		// addJob schedules fn at spec as the background job name, whose runs
+		// and schedule the admin dashboard reads.
+		addJob := func(spec, name string, fn func()) {
+			schedule, err := cron.Parse(spec)
+			if err != nil {
+				log.Fatalln("cron", name, err)
+			}
+			backgroundJobs.Schedule(name, schedule.Next)
+			c.Schedule(schedule, cron.FuncJob(tracked(name, fn)))
+		}
 
 		// Take a snapshot twice a day
-		c.AddFunc("0 */12 * * *", recovered("cron stashInTimeseries", s.stashInTimeseries))
+		addJob("0 */12 * * *", jobStash, s.stashInTimeseries)
 
 		// Update set values with new prices
-		c.AddFunc("30 */12 * * *", recovered("cron runSealedAnalysis", s.runSealedAnalysis))
+		addJob("30 */12 * * *", jobSetAnalysis, s.runSealedAnalysis)
 
 		// Reload DB Newspaper every 3 hours
-		c.AddFunc("33 */3 * * *", recovered("cron cacheNewspaper", s.cacheNewspaper))
+		addJob("33 */3 * * *", jobNewspaper, s.cacheNewspaper)
 
 		// Rebuild CK's buylist signals, reloading its stock history once the
 		// newspaper has a new day; until then that is one indexed MAX(date).
-		c.AddFunc("45 * * * *", recovered("cron refreshCKSignals", s.refreshCKSignals))
+		// Only where the site serves CK's buylist, which is known once the
+		// prices load: its runs, schedule and row start with that.
+		ckSchedule, err := cron.Parse("45 * * * *")
+		if err != nil {
+			log.Fatalln("cron", jobCKSignals, err)
+		}
+		ckJob := tracked(jobCKSignals, s.refreshCKSignals)
+		c.Schedule(ckSchedule, cron.FuncJob(func() {
+			if !ckAvailable() {
+				return
+			}
+			backgroundJobs.Schedule(jobCKSignals, ckSchedule.Next)
+			ckJob()
+		}))
 
 		// Reload TCGplayer's sellers and copies per grade once the newspaper
 		// finishes a scrape; until then that is one MAX(calc_date).
-		c.AddFunc("50 * * * *", recovered("cron loadTCGListings", s.loadTCGListings))
+		addJob("50 * * * *", jobTCGListings, s.loadTCGListings)
 
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
 		c.AddFunc("20 */12 * * *", recovered("cron RequestRefresh", s.offline.RequestRefresh))
@@ -1585,9 +1609,9 @@ func main() {
 		// leave tcgcsv_config out here and let the crons stay unregistered; the
 		// standalone process takes the same cross-process crawl lock either way.
 		if TCGCSVService != nil {
-			c.AddFunc("0 21 * * *", recovered("cron stashTCGCSVPrices", stashTCGCSVPrices))
+			addJob("0 21 * * *", jobTCGCSVPrices, stashTCGCSVPrices)
 			// Product metadata changes rarely; refresh the catalog weekly.
-			c.AddFunc("0 22 * * 1", recovered("cron stashTCGCSVProducts", stashTCGCSVProducts))
+			addJob("0 22 * * 1", jobTCGCSVProducts, stashTCGCSVProducts)
 		}
 
 		// Refresh the chart checkpoints. Magic reads its ban markers from a
@@ -1596,12 +1620,12 @@ func main() {
 		// load is not that, on a process that stays up for weeks. It doubles as
 		// the retry for a boot-time load that failed: a fetch that never
 		// succeeded leaves the index empty and every chart without its markers.
-		c.AddFunc("15 */6 * * *", recovered("cron refreshCheckpoints", refreshCheckpoints))
+		addJob("15 */6 * * *", jobCheckpoints, refreshCheckpoints)
 
 		// Alarm on a store whose retail or buylist data has gone stale (see
 		// staleness.go); notifies only on the transition, so this can run
 		// often without repeating itself.
-		c.AddFunc("0 * * * *", recovered("cron checkStaleness", checkStaleness))
+		addJob("0 * * * *", jobStaleness, checkStaleness)
 
 		c.Start()
 	}

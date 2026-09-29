@@ -220,15 +220,9 @@ func (s *site) loadDatastore(path string) error {
 	ServerNotify("init", "Datastore installed")
 
 	// The reload tracker recovers this load, not a goroutine it starts.
-	go func() {
-		defer recoverJob("datastore load cacheNewspaper")
-		s.cacheNewspaper()
-	}()
+	go tracked(jobNewspaper, s.cacheNewspaper)()
 	// TCGplayer's listing counts wait for a datastore to match them to.
-	go func() {
-		defer recoverJob("datastore load loadTCGListings")
-		s.loadTCGListings()
-	}()
+	go tracked(jobTCGListings, s.loadTCGListings)()
 
 	return nil
 }

@@ -114,3 +114,19 @@ func recovered(job string, fn func()) func() {
 		fn()
 	}
 }
+
+// tracked is recovered for one of the site's background jobs: it also
+// records each run, and a panic, in backgroundJobs under name.
+func tracked(name string, fn func()) func() {
+	return func() {
+		finish := backgroundJobs.Start(name)
+		defer func() {
+			errPanic := recover()
+			if errPanic != nil {
+				reportPanic(errPanic, "source job: "+name)
+			}
+			finish(errPanic)
+		}()
+		fn()
+	}
+}

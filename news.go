@@ -568,6 +568,7 @@ func (s *site) cacheNewspaper() {
 	newspaperPagesPtr.Store(&next)
 	newspaperUUIDsPtr.Store(&newspaperUUIDs)
 	log.Println("Newspaper UUIDs cached:", len(newspaperUUIDs))
+	backgroundJobs.Report(jobNewspaper, fmt.Sprintf("%d cards cached", len(newspaperUUIDs)), "")
 
 	// Only stamp a new update time when an edition actually took new rows.
 	// Every page keeps its last good slice through a bad refresh, so stamping

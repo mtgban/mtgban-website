@@ -38,6 +38,9 @@
             <div class="m-admin-stat"><span class="m-stat-label">Datastore</span><span class="m-stat-value">{{.LastUpdate.Format "Jan 02 15:04"}}</span></div>
             <div class="m-admin-stat"><span class="m-stat-label">Newspaper</span><span class="m-stat-value">{{if .LastNews.IsZero}}not set{{else}}{{.LastNews.Format "Jan 02 15:04"}}{{end}}</span></div>
             <div class="m-admin-stat"><span class="m-stat-label">Stash</span><span class="m-stat-value">{{if .LastStash.IsZero}}not set{{else}}{{.LastStash.Format "Jan 02 15:04"}}{{end}}</span></div>
+            {{range .Jobs}}
+            <div class="m-admin-stat"><span class="m-stat-label">{{.Name}}</span><span class="m-stat-value">{{if .Problem}}🔴 {{.Problem}}{{else if .Running}}🔶 running{{else if .Started.IsZero}}not run yet{{else}}✅ {{.Started.Format "Jan 02 15:04"}}{{end}}</span></div>
+            {{end}}
             <div class="m-admin-stat"><span class="m-stat-label">Hash</span><a class="m-stat-value m-stat-link" target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{.LatestHash}}</a></div>
         </div>
     </div>

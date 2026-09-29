@@ -396,6 +396,7 @@ func TestOverrideReloadRecovers(t *testing.T) {
 // is reported, and the stash is left free to run again.
 func TestAdminSnapshotRecovers(t *testing.T) {
 	posts := serverWebhook(t)
+	setTestJobs(t)
 
 	prevDB, prevSellers := PricesArchiveDB, sellersPtr.Load()
 	t.Cleanup(func() {
@@ -411,11 +412,20 @@ func TestAdminSnapshotRecovers(t *testing.T) {
 	testSite.Admin(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin?reboot=snapshot", nil))
 
 	_, _, source := panicReport(t, posts)
-	if source != "source job: admin stashInTimeseries" {
+	if source != "source job: "+jobStash {
 		t.Errorf("source = %q, want the snapshot", source)
 	}
 	if IsStashingInProgress() {
 		t.Error("the stash still counts as running after its panic")
+	}
+	// The run ends just after its report posts.
+	row := jobRow(t, jobStash)
+	for deadline := time.Now().Add(5 * time.Second); row.Running && time.Now().Before(deadline); {
+		time.Sleep(10 * time.Millisecond)
+		row = jobRow(t, jobStash)
+	}
+	if row.Running || !strings.HasPrefix(row.Problem, "panicked: ") {
+		t.Errorf("the dashboard's stash row: got %+v, want its panic", row)
 	}
 }
 
