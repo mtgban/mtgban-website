@@ -180,7 +180,7 @@ func TestBuylistCKHelpers(t *testing.T) {
 	}
 
 	const page = `{{buylist_state .Shorthand .Cond .IsOffer .Price .Good .Signal}}|` +
-		`{{buylist_wait .Shorthand .Cond .Signal .Tip}}|{{buylist_ck .Signal .Tip .Facts}}|` +
+		`{{buylist_wait .Shorthand .Cond .Signal .Tip}}|{{buylist_ck .Signal}}|` +
 		`<span title="{{buylist_title .Shorthand .Cond .Signal .Good .Highest .Facts .Tip}}"></span>`
 	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(page))
 	var b strings.Builder
@@ -196,9 +196,8 @@ func TestBuylistCKHelpers(t *testing.T) {
 	for _, want := range []string{
 		"wait|",
 		`<span class="ck-wait" title="CK &#34;odds&#34;">&#8593;</span>`,
-		// The facts go to the tooltip, after the verdict.
-		`<span class="bl-ck bl-ck-wait" title="CK &#34;odds&#34;
-CK stock 0 · out 9 days">&#8593; Wait</span>`,
+		// The column's tooltip carries the facts; the line only its verdict.
+		`<span class="bl-ck bl-ck-wait">&#8593; Wait</span>`,
 	} {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("rendered %s, want %s", b.String(), want)
@@ -206,12 +205,12 @@ CK stock 0 · out 9 days">&#8593; Wait</span>`,
 	}
 
 	// Only the known states become a class.
-	ck, ok := funcMap["buylist_ck"].(func(string, string, string) template.HTML)
+	ck, ok := funcMap["buylist_ck"].(func(string) template.HTML)
 	if !ok {
 		t.Fatal("buylist_ck has another signature")
 	}
 	for _, signal := range []string{"", "best x"} {
-		got = string(ck(signal, "odds", "CK stock 0"))
+		got = string(ck(signal))
 		if got != "" {
 			t.Errorf("buylist_ck %q: got %s, want nothing", signal, got)
 		}
@@ -279,12 +278,12 @@ func TestBuylistDetailTint(t *testing.T) {
 		want   string
 		not    string
 	}{
-		{"sell", true, `<span class="bl-good-sell" title="Card Kingdom's latest P90">Good: $ 9.00</span>`, ""},
-		{"wait", true, `<span class="bl-good-wait" title="Card Kingdom's latest P90">Good: $ 9.00</span>`, ""},
-		{"", true, `<span title="Card Kingdom's latest P90">Good: $ 9.00</span>`, "bl-good-"},
-		{"sell", false, `<span title="Card Kingdom's latest P90">Good: $ 9.00</span>`, "bl-good-"},
+		{"sell", true, `<span class="bl-good-sell">Good: $ 9.00</span>`, ""},
+		{"wait", true, `<span class="bl-good-wait">Good: $ 9.00</span>`, ""},
+		{"", true, `<span>Good: $ 9.00</span>`, "bl-good-"},
+		{"sell", false, `<span>Good: $ 9.00</span>`, "bl-good-"},
 		// Only the known states become a class.
-		{"best x", true, `<span title="Card Kingdom's latest P90">Good: $ 9.00</span>`, "bl-good-"},
+		{"best x", true, `<span>Good: $ 9.00</span>`, "bl-good-"},
 	} {
 		var b strings.Builder
 		err := tmpl.Execute(&b, struct {

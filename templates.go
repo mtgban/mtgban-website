@@ -325,10 +325,10 @@ var funcMap = template.FuncMap{
 			case ckSignal == "wait":
 				goodClass = ` class="bl-good-wait"`
 			}
-			prices += fmt.Sprintf(`<span%s title="Card Kingdom's latest P90">Good: $ %.2f</span>`, goodClass, good)
+			prices += fmt.Sprintf(`<span%s>Good: $ %.2f</span>`, goodClass, good)
 		}
 		if highest > 0 {
-			prices += fmt.Sprintf(`<span title="90-day high">Highest: $ %.2f</span>`, highest)
+			prices += fmt.Sprintf(`<span>Highest: $ %.2f</span>`, highest)
 		}
 		if prices == "" {
 			return ""
@@ -381,20 +381,15 @@ var funcMap = template.FuncMap{
 		return template.HTML(` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`)
 	},
 	// buylist_ck is a card's CK signal on the pages with a column of card
-	// details: "Sell now" or "Wait", with the verdict, CK's stock facts and
-	// the odds in its tooltip. The column has room for no more.
-	"buylist_ck": func(ckSignal, tip, facts string) template.HTML {
-		var label, class string
+	// details: "Sell now" or "Wait". The column's tooltip explains it.
+	"buylist_ck": func(ckSignal string) template.HTML {
 		switch ckSignal {
 		case "wait":
-			label, class = "&#8593; Wait", "bl-ck bl-ck-wait"
+			return `<span class="bl-ck bl-ck-wait">&#8593; Wait</span>`
 		case "sell":
-			label, class = "Sell now", "bl-ck bl-ck-sell"
-		default:
-			return ""
+			return `<span class="bl-ck bl-ck-sell">Sell now</span>`
 		}
-		verdict, odds, _ := strings.Cut(tip, "\n")
-		return template.HTML(`<span class="` + class + `"` + tipAttrs(joinLines(verdict, facts, odds)) + `>` + label + `</span>`)
+		return ""
 	},
 	// plain_tip is a tooltip without its ** bold marks, for a title.
 	"plain_tip": plainTip,
