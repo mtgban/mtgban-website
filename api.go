@@ -215,7 +215,7 @@ func SCGRetailRedirect(ctx context.Context, b *mtgmatcher.Backend, ids, qtys, co
 		if err != nil {
 			continue
 		}
-		sku := findInstanceID("SCG", hash, conds[i])
+		sku := findInstanceID("SCG", hash, mtgban.Condition(conds[i]))
 
 		data.WriteString(qtys[i])
 		data.WriteString(" ")
@@ -278,12 +278,12 @@ var tcgcsvHeader = []string{
 	"Photo URL",
 }
 
-var tcgConditionMap = map[string]string{
-	"NM": "Near Mint",
-	"SP": "Lightly Played",
-	"MP": "Moderately Played",
-	"HP": "Heavily Played",
-	"PO": "Damaged",
+var tcgConditionMap = map[mtgban.Condition]string{
+	mtgban.NM: "Near Mint",
+	mtgban.SP: "Lightly Played",
+	mtgban.MP: "Moderately Played",
+	mtgban.HP: "Heavily Played",
+	mtgban.PO: "Damaged",
 }
 
 // Convert a slice of ids (BAN uuids) to a list of TCG product SKUs on a CSV
@@ -321,7 +321,10 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 	// condition as its own row and ties the condition to its id — the old code
 	// re-derived it from conds[i] using the deduped index, which misaligned
 	// (and broke the qty lookup) after the first repeated id.
-	type tcgRow struct{ id, cond string }
+	type tcgRow struct {
+		id   string
+		cond mtgban.Condition
+	}
 	qty := map[string]int{}
 	rowByKey := map[string]tcgRow{}
 	var order []string
@@ -332,11 +335,11 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 				quantity = q
 			}
 		}
-		cond := "NM"
+		cond := mtgban.NM
 		if conds != nil && conds[i] != "" {
-			cond = conds[i]
+			cond = mtgban.Condition(conds[i])
 		}
-		key := id + cond
+		key := id + string(cond)
 		qty[key] += quantity
 		if _, ok := rowByKey[key]; !ok {
 			order = append(order, key)
@@ -477,12 +480,12 @@ var mkmcsvHeader = []string{
 	"listedAt",
 }
 
-var mkmConditionMap = map[string]string{
-	"NM": "NM",
-	"SP": "EX",
-	"MP": "GD",
-	"HP": "HP",
-	"PO": "PO",
+var mkmConditionMap = map[mtgban.Condition]string{
+	mtgban.NM: "NM",
+	mtgban.SP: "EX",
+	mtgban.MP: "GD",
+	mtgban.HP: "HP",
+	mtgban.PO: "PO",
 }
 
 // Convert a slice of ids (BAN uuids) to a list of TCG product SKUs on a CSV
@@ -511,11 +514,11 @@ func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 				quantity = q
 			}
 		}
-		cond := "NM"
+		cond := mtgban.NM
 		if conds != nil && conds[i] != "" {
-			cond = conds[i]
+			cond = mtgban.Condition(conds[i])
 		}
-		qty[id+cond] += quantity
+		qty[id+string(cond)] += quantity
 
 		if slices.Contains(cleanedIDs, id) {
 			continue
@@ -524,9 +527,9 @@ func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 	}
 
 	for i, id := range cleanedIDs {
-		cond := "NM"
+		cond := mtgban.NM
 		if conds != nil && conds[i] != "" {
-			cond = conds[i]
+			cond = mtgban.Condition(conds[i])
 		}
 
 		co, err := b.GetUUID(id)
@@ -556,7 +559,7 @@ func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 		record := make([]string, 0, len(mkmcsvHeader))
 
 		record = append(record, mkmID)
-		record = append(record, fmt.Sprint(qty[id+cond]))
+		record = append(record, fmt.Sprint(qty[id+string(cond)]))
 		record = append(record, co.Name)
 		record = append(record, co.Edition)
 		record = append(record, co.SetCode)
@@ -613,8 +616,8 @@ type OpenSearchURL struct {
 }
 
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
-	host := Config.Game
-	gameName := mtgmatcher.Title(Config.Game)
+	host := string(Config.Game)
+	gameName := mtgmatcher.Title(host)
 
 	images := []OpenSearchImage{
 		{
@@ -808,7 +811,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// Retrieve prices through the same gathering the search page uses, so
 	// every filter the query carries (stores, conditions, prices) shapes
 	// the output instead of only the card-level ones
-	var foundSellers, foundVendors map[string]map[string][]SearchEntry
+	var foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry
 	if isRetail && canRetail {
 		cfg := config
 		if demoStores {
@@ -877,7 +880,7 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefix := Config.Game + "/" + name + "/"
+	prefix := string(Config.Game) + "/" + name + "/"
 	idx, err := listDumpsWithRetry(DataBucket, Config.Game, prefix)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, err.Error())

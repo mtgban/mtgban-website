@@ -69,7 +69,7 @@ type StoreFamily struct {
 
 // APIPlanGame is one game checkbox in the configurator.
 type APIPlanGame struct {
-	Key     string
+	Key     mtgmatcher.Game
 	Name    string
 	Checked bool
 }
@@ -116,9 +116,9 @@ func APIStores(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := struct {
-		Game    string        `json:"game"`
-		Implied []StoreFamily `json:"implied"`
-		Stores  []StoreFamily `json:"stores"`
+		Game    mtgmatcher.Game `json:"game"`
+		Implied []StoreFamily   `json:"implied"`
+		Stores  []StoreFamily   `json:"stores"`
 	}{Game: Config.Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}}
 	implied, stores := storeFamilies()
 	out.Implied = append(out.Implied, implied...)
@@ -188,7 +188,7 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	v.CanTrial = v.HandoffOn && GetParamFromSig(sig, "UserTier") != ""
 	// The site's own game is preselected; the base price covers one game of the buyer's choice.
 	for _, g := range Config.APIGateway.Games {
-		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(g), Checked: g == Config.Game})
+		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(string(g)), Checked: g == Config.Game})
 	}
 	return v
 }

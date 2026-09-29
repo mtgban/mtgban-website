@@ -12,7 +12,7 @@ import (
 // gameDatastores names each game by the variable its datastore path lives in.
 // They are local builds, so a run without them skips rather than bundling a
 // trimmed copy of any of them.
-var gameDatastores = map[string]string{
+var gameDatastores = map[mtgmatcher.Game]string{
 	"lorcana":       "LORCANA_PATH",
 	"riftbound":     "RIFTBOUND_PATH",
 	"onepiece":      "ONEPIECE_PATH",
@@ -59,7 +59,7 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 		}
 		ran++
 
-		t.Run(game, func(t *testing.T) {
+		t.Run(string(game), func(t *testing.T) {
 			ds := testSite.newDatastore(loaded, time.Now())
 
 			var tightened int

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"text/template/parse"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // TestTemplatesParse parses every template the way production does (via the
@@ -127,14 +129,14 @@ func collectTemplateRefs(node parse.Node, out *[]string) {
 // TestBuylistCKHelpers pins the CK buylist helpers and executes them with the
 // argument types the pages pass: html/template checks those only when it runs.
 func TestBuylistCKHelpers(t *testing.T) {
-	state, ok := funcMap["buylist_state"].(func(string, string, bool, float64, float64, string, bool) string)
+	state, ok := funcMap["buylist_state"].(func(string, mtgban.Condition, bool, float64, float64, string, bool) string)
 	if !ok {
 		t.Fatal("buylist_state has another signature")
 	}
 	for _, tc := range []struct {
 		name       string
 		shorthand  string
-		conditions string
+		conditions mtgban.Condition
 		isOffer    bool
 		price      float64
 		ckSignal   string
@@ -159,14 +161,16 @@ func TestBuylistCKHelpers(t *testing.T) {
 		}
 	}
 
-	title, ok := funcMap["buylist_title"].(func(string, string, string, float64, float64, string, string) string)
+	title, ok := funcMap["buylist_title"].(func(string, mtgban.Condition, string, float64, float64, string, string) string)
 	if !ok {
 		t.Fatal("buylist_title has another signature")
 	}
 	for _, tc := range []struct {
-		name                   string
-		shorthand, cond, state string
-		want                   string
+		name      string
+		shorthand string
+		cond      mtgban.Condition
+		state     string
+		want      string
 	}{
 		// The verdict, the facts, CK's reference prices, then the odds.
 		{"CK NM", "CK", "NM", "wait", "Wait: out\nCK stock 0\n**P90**: $ 9.00 · **90d high**: $ 12.00\nodds 1\nodds 2"},
@@ -190,7 +194,8 @@ func TestBuylistCKHelpers(t *testing.T) {
 	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(page))
 	var b strings.Builder
 	err := tmpl.Execute(&b, struct {
-		Shorthand, Cond      string
+		Shorthand            string
+		Cond                 mtgban.Condition
 		IsOffer              bool
 		Price, Good, Highest float64
 		Signal, Tip, Facts   string
@@ -251,9 +256,11 @@ func TestBuylistPause(t *testing.T) {
 	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(
 		`{{buylist_pause .Shorthand .Cond .Label .Tip}}|{{buylist_pause_wait .Shorthand .Cond .Wait}}`))
 	for _, tc := range []struct {
-		name, shorthand, cond, label string
-		wait                         bool
-		want                         string
+		name, shorthand string
+		cond            mtgban.Condition
+		label           string
+		wait            bool
+		want            string
 	}{
 		{"paused", "CKBLLast", "NM", "Paused 3d", false,
 			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>|`},
@@ -266,8 +273,10 @@ func TestBuylistPause(t *testing.T) {
 	} {
 		var b strings.Builder
 		err := tmpl.Execute(&b, struct {
-			Shorthand, Cond, Label, Tip string
-			Wait                        bool
+			Shorthand  string
+			Cond       mtgban.Condition
+			Label, Tip string
+			Wait       bool
 		}{tc.shorthand, tc.cond, tc.label, "**Paused**: CK stopped", tc.wait})
 		if err != nil {
 			t.Fatal(err)

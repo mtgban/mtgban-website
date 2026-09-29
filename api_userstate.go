@@ -16,7 +16,7 @@ func userStateIdentity(email string) string {
 	if Config.Game == "" || Config.Game == DefaultGame {
 		return email
 	}
-	return email + "\x00" + Config.Game
+	return email + "\x00" + string(Config.Game)
 }
 
 // UserStateAPI authenticates the caller from their signed cookie/sig, then

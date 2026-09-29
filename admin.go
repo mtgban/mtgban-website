@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
@@ -49,11 +50,12 @@ type bantoolWorkflow struct {
 	RunName   string
 }
 
-func newBantoolWorkflow(game, store string) bantoolWorkflow {
+func newBantoolWorkflow(game mtgmatcher.Game, store string) bantoolWorkflow {
+	slug := string(game)
 	return bantoolWorkflow{
-		EventType: game + "-" + store,
-		File:      "bantool-" + game + "-" + store + ".yml",
-		RunName:   game + " / " + store,
+		EventType: slug + "-" + store,
+		File:      "bantool-" + slug + "-" + store + ".yml",
+		RunName:   slug + " / " + store,
 	}
 }
 
@@ -965,7 +967,7 @@ func queryGithubAction(file, state string) (int, error) {
 	return payload.TotalCount, nil
 }
 
-func sendGithubAction(game, store string) error {
+func sendGithubAction(game mtgmatcher.Game, store string) error {
 	wf := newBantoolWorkflow(game, store)
 
 	busy, err := isBusyGithubAction(wf)

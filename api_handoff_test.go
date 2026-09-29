@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apihandoff"
 )
 
@@ -32,7 +33,7 @@ func handoffRequest(t *testing.T, handler http.HandlerFunc, path, tier string, u
 	signingEnabled(t, true)
 	savedCfg := Config.APIGateway
 	t.Cleanup(func() { Config.APIGateway = savedCfg })
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []string{"magic"}}
+	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	if tier != "" || user != nil {
 		// Signed after the mode is set, so it carries the link the check expects.
@@ -73,7 +74,7 @@ func TestAPITrialNeedsAPledge(t *testing.T) {
 	signingEnabled(t, true)
 	savedCfg := Config.APIGateway
 	t.Cleanup(func() { Config.APIGateway = savedCfg })
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []string{"magic"}}
+	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	sig := signedAs(t, url.Values{"UserEmail": {"ann@example.com"}, "UserName": {"Ann"}}, time.Now().Add(time.Hour))
 
 	trial := httptest.NewRequest(http.MethodGet, "/api-trial", nil)
@@ -212,7 +213,7 @@ func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 	signingEnabled(t, true)
 	savedCfg := Config.APIGateway
 	t.Cleanup(func() { Config.APIGateway = savedCfg })
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []string{"magic"}}
+	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	// Signed after DevMode is set, so the signature carries the same link the check expects.
 	sig := sign("Legacy", user, nil, DefaultSignatureDuration)
 	req := httptest.NewRequest(http.MethodGet, "/api-login", nil)

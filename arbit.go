@@ -308,7 +308,7 @@ var FilterOptConfig = map[string]FilterOpt{
 	},
 }
 
-var BadConditions = []string{"MP", "HP", "PO"}
+var BadConditions = []mtgban.Condition{mtgban.MP, mtgban.HP, mtgban.PO}
 var UCRarity = []string{"uncommon", "common"}
 
 var ABU4H = []string{

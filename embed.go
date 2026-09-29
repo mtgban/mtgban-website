@@ -42,7 +42,7 @@ func searchEntries2embed(results []SearchEntry) []embed.Entry {
 
 // firstEmbedCard names the card an embed speaks for when it can only speak
 // for one: the earliest by set, over every card the search found.
-func firstEmbedCard(b *mtgmatcher.Backend, found map[string]map[string][]SearchEntry) string {
+func firstEmbedCard(b *mtgmatcher.Backend, found map[string]map[mtgban.Condition][]SearchEntry) string {
 	sortedKeys := make([]string, 0, len(found))
 	for cardID := range found {
 		sortedKeys = append(sortedKeys, cardID)
@@ -57,7 +57,7 @@ func firstEmbedCard(b *mtgmatcher.Backend, found map[string]map[string][]SearchE
 }
 
 // Retrieve cards from Sellers using the very first result
-func ProcessEmbedSearchResultsSellers(b *mtgmatcher.Backend, foundSellers map[string]map[string][]SearchEntry, index bool) []embed.Entry {
+func ProcessEmbedSearchResultsSellers(b *mtgmatcher.Backend, foundSellers map[string]map[mtgban.Condition][]SearchEntry, index bool) []embed.Entry {
 	if len(foundSellers) == 0 {
 		return nil
 	}
@@ -65,14 +65,14 @@ func ProcessEmbedSearchResultsSellers(b *mtgmatcher.Backend, foundSellers map[st
 }
 
 // EmbedSellerEntries picks the offers an embed shows for one named card.
-func EmbedSellerEntries(foundSellers map[string]map[string][]SearchEntry, cardID string, index bool) []embed.Entry {
+func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEntry, cardID string, index bool) []embed.Entry {
 	var results []SearchEntry
 
 	if index {
 		results = foundSellers[cardID]["INDEX"]
 
 		// Add the TCGplayer Direct to the Index section too, considering conditions
-		for _, cond := range []string{"NM", "SP"} {
+		for _, cond := range []mtgban.Condition{mtgban.NM, mtgban.SP} {
 			done := false
 			foundResults := foundSellers[cardID][cond]
 			for _, result := range foundResults {
@@ -87,7 +87,7 @@ func EmbedSellerEntries(foundSellers map[string]map[string][]SearchEntry, cardID
 			}
 		}
 	} else {
-		founders := map[string]string{}
+		founders := map[string]mtgban.Condition{}
 		// Query results with the known (ordered) conditions
 		for _, cond := range mtgban.DefaultGradeTags {
 			foundResults := foundSellers[cardID][cond]
@@ -102,7 +102,7 @@ func EmbedSellerEntries(foundSellers map[string]map[string][]SearchEntry, cardID
 				founders[result.ScraperName] = cond
 				// If not NM, add a small tag
 				if cond != "NM" {
-					result.ScraperName += " (" + cond + ")"
+					result.ScraperName += " (" + string(cond) + ")"
 				}
 				results = append(results, result)
 			}
@@ -141,7 +141,7 @@ func lastSales2embed(sales []tcgplayer.LatestSalesData) []embed.Sale {
 }
 
 // Retrieve cards from Vendors using the very first result
-func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[string]map[string][]SearchEntry) []embed.Entry {
+func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[string]map[mtgban.Condition][]SearchEntry) []embed.Entry {
 	if len(foundVendors) == 0 {
 		return nil
 	}

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -39,13 +40,13 @@ func TestBodyCarriesTheGame(t *testing.T) {
 		{"home.html", false},   // base-landing.html
 		{"search.html", true},  // base-mobile.html
 	} {
-		for _, game := range []string{"yugioh", DefaultGame} {
+		for _, game := range []mtgmatcher.Game{"yugioh", DefaultGame} {
 			Config.Game = game
 			rendered := renderPage(t, page.name, page.mobile, PageVars{BetaNav: &NavElem{Short: "b"}, IsMobile: page.mobile})
 
 			body := rendered[strings.Index(rendered, "<body"):]
 			body = body[:strings.Index(body, ">")+1]
-			if want := `data-game="` + game + `"`; !strings.Contains(body, want) {
+			if want := `data-game="` + string(game) + `"`; !strings.Contains(body, want) {
 				t.Errorf("%s (mobile=%v), game %q: body is %q, want it to carry %s",
 					page.name, page.mobile, game, body, want)
 			}

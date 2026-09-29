@@ -57,7 +57,7 @@ type Deps struct {
 	// keys are derived, because Magic's mirror keys on the scryfall id while
 	// every other game keys on the card's TCGplayer product. Nil or empty
 	// means Magic, which is what a deployment that never set it is.
-	Game func() string
+	Game func() mtgmatcher.Game
 
 	// Bucket factories: paths are read per call so config edits are picked
 	// up without rebuilding the service.
@@ -116,7 +116,7 @@ func (s *Service) magicImageKeys() bool {
 		return true
 	}
 	game := s.deps.Game()
-	return game == "" || game == "magic"
+	return game == "" || game == mtgmatcher.GameMagic
 }
 
 // Handle dispatches /api/offline/ endpoints.

@@ -29,7 +29,7 @@ import (
 // it lives in, the way mtgmatcher.ExternalUUID used to: the spaces in their
 // historical order, first hit wins.
 func externalUUID(b *mtgmatcher.Backend, id string) string {
-	for _, space := range []string{
+	for _, space := range []mtgmatcher.IDSpace{
 		mtgmatcher.IDSpaceMTGJSON,
 		mtgmatcher.IDSpaceScryfall,
 		mtgmatcher.IDSpaceTCGplayer,
@@ -92,8 +92,8 @@ func cookiePath(r *http.Request, cookieName string, global bool) string {
 // Illumineer's Quest and promo cards are "special", which carries the gold
 // Lorcana emblem rather than a rarity gem; the invented purple stays, since
 // the emblem's gold is legendary's.
-var colorRarityMap = map[string]map[string]template.CSS{
-	"lorcana": {
+var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
+	mtgmatcher.GameLorcana: {
 		"common":    "var(--normal)",
 		"uncommon":  "#707883",
 		"rare":      "#B06435",
@@ -113,7 +113,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	// A promo carries a banner over whatever gem the card already had rather
 	// than one of its own, so its purple stays invented. The "none" rarity,
 	// held by twelve tokens, is left out so those cards render no badge.
-	"riftbound": {
+	mtgmatcher.GameRiftbound: {
 		"common":   "var(--normal)",
 		"uncommon": "#187870",
 		"rare":     "#BF287F",
@@ -130,7 +130,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	// SP, TR and PR are treatments rather than tiers — a TR card's own box
 	// still reads C — so they sit off the end in the colors the other games
 	// give their treatments.
-	"onepiece": {
+	mtgmatcher.GameOnePiece: {
 		"C":   "var(--normal)",
 		"UC":  "#707883",
 		"R":   "#B06435",
@@ -152,7 +152,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	// rather than sampled: common takes the theme's neutral like every other
 	// game, and the rest take neighbouring tiers' colors. The 139 cards with
 	// no rarity are left out and draw no badge.
-	"fleshandblood": {
+	mtgmatcher.GameFleshAndBlood: {
 		"Common":       "var(--normal)",
 		"Basic":        "#707883",
 		"Token":        "#919495",
@@ -173,7 +173,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	// hue. They group by the tier their name claims — a Prismatic Secret Rare
 	// is a secret rare, a Duel Terminal Normal Parallel Rare is a rare — and
 	// each group climbs the ladder the other games already use.
-	"yugioh": {
+	mtgmatcher.GameYuGiOh: {
 		"Common":                          "var(--normal)",
 		"Duel Terminal Technology Common": "var(--normal)",
 
@@ -232,7 +232,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	// rare. The 197 cards marked None or Unconfirmed are left out and draw no
 	// badge; code cards, which are filler rather than a tier, take a grey
 	// darker than common's.
-	"pokemon": {
+	mtgmatcher.GamePokemon: {
 		"Common": "var(--normal)",
 
 		"Uncommon": "#707883",
@@ -283,7 +283,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	//
 	// So this climbs the placed ladder the other games use, in the order
 	// gundamRarityMap already ranks them.
-	"gundam": {
+	mtgmatcher.GameGundam: {
 		"Common":      "var(--normal)",
 		"C+":          "#919495",
 		"C++":         "#A88A3C",
@@ -307,7 +307,7 @@ var colorRarityMap = map[string]map[string]template.CSS{
 	// already ranks them: the trial-deck rarities run beside their booster
 	// counterparts rather than under them, so each lands its own adjacent
 	// step rather than sharing its counterpart's colour.
-	"palworld": {
+	mtgmatcher.GamePalworld: {
 		"Trial Deck":                 "var(--normal)",
 		"Common":                     "#707883",
 		"Uncommon":                   "#919495",
@@ -413,7 +413,7 @@ func loadRarityBadges() {
 	// actually registers and the registered spelling is what gets joined. A
 	// game nobody registered has no symbols to read, and a name like "../.."
 	// matches none of them.
-	var game string
+	var game mtgmatcher.Game
 	for _, registered := range mtgmatcher.RegisteredGames() {
 		if registered == Config.Game {
 			game = registered
@@ -425,12 +425,13 @@ func loadRarityBadges() {
 		return
 	}
 
-	entries, _ := os.ReadDir("img/setsymbol/" + game)
+	dir := "img/setsymbol/" + string(game)
+	entries, _ := os.ReadDir(dir)
 	for _, entry := range entries {
 		if !strings.HasSuffix(entry.Name(), ".svg") {
 			continue
 		}
-		badge, err := readBadge("img/setsymbol/" + game + "/" + entry.Name())
+		badge, err := readBadge(dir + "/" + entry.Name())
 		if err != nil {
 			log.Println("skipping set symbol:", err)
 			continue
@@ -860,7 +861,7 @@ func findTCGproductID(b *mtgmatcher.Backend, cardID string) string {
 }
 
 // Look for the instance id (sku) of a card in a given inventory
-func findInstanceID(sellerName, cardID, cond string) string {
+func findInstanceID(sellerName, cardID string, cond mtgban.Condition) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
 	for _, entry := range tcgplayer[cardID] {
 		if entry.Conditions == cond {
@@ -874,7 +875,7 @@ func findInstanceID(sellerName, cardID, cond string) string {
 // a card in a given condition, picking the inventory the product lives in.
 // Sources that carry no condition are assumed to be NM, the same way the
 // TCGplayer CSV export does. Returns "" when the card has no SKU on file.
-func uuid2TCGSKU(cardID string, sealed bool, cond string) string {
+func uuid2TCGSKU(cardID string, sealed bool, cond mtgban.Condition) string {
 	if cond == "" {
 		cond = "NM"
 	}
@@ -906,7 +907,7 @@ var mkmIDs = &mkmidparser.Parser{
 // tcgSKU2Condition resolves a TCGplayer SKU (instance id) to the condition it
 // encodes (NM/SP/MP/HP/PO) via the same "tcgskuid" index as tcgSKU2UUID, where
 // each entry's Conditions is preserved. Returns "" if the SKU is unknown.
-func tcgSKU2Condition(sku string) string {
+func tcgSKU2Condition(sku string) mtgban.Condition {
 	entries := GetInfos()["tcgskuid"][sku]
 	if len(entries) == 0 {
 		return ""
@@ -1340,7 +1341,7 @@ func UserNotify(kind, message string, flags ...bool) {
 
 // Only send the notification for a user action
 func APINotify(message string, flags ...bool) {
-	kind := Config.Game
+	kind := string(Config.Game)
 	log.Println(kind, "-", message)
 	if Config.Discord.APIWebhookURL == "" {
 		return

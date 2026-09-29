@@ -27,7 +27,7 @@ func firstPlainCard(t *testing.T) string {
 func TestIndexPriceIgnoresRowCondition(t *testing.T) {
 	cardID := firstPlainCard(t)
 
-	for _, indexCond := range []string{"NM", "INDEX"} {
+	for _, indexCond := range []mtgban.Condition{"NM", "INDEX"} {
 		out := map[string]map[string]*BanPrice{}
 		processEntry(backend(), out, []mtgban.InventoryEntry{{Conditions: indexCond, Price: 4.20}},
 			"", cardID, "TCGLow", false, true /* conds */, false /* shouldBaseCond: an index */)
@@ -35,7 +35,7 @@ func TestIndexPriceIgnoresRowCondition(t *testing.T) {
 
 		// Every grade gets the one price the index carries, including the
 		// grades it files nothing under.
-		for _, row := range []string{"", "NM", "SP", "MP", "HP", "PO"} {
+		for _, row := range []mtgban.Condition{"", mtgban.NM, mtgban.SP, mtgban.MP, mtgban.HP, mtgban.PO} {
 			if got := getPrice(price, row); got != 4.20 {
 				t.Errorf("index filing under %q, row %q: got %v, want the flat 4.20", indexCond, row, got)
 			}
@@ -57,7 +57,7 @@ func TestRealStoreKeepsRowCondition(t *testing.T) {
 	price := out[cardID]["TCGDirect"]
 
 	for _, tc := range []struct {
-		cond string
+		cond mtgban.Condition
 		want float64
 	}{
 		{"NM", 10.00},

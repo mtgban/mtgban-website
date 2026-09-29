@@ -485,7 +485,7 @@ func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filte
 // zero base price drops the store; Conditions are last-write-wins within a
 // grade exactly like the entry loop. INDEX rows are metadata prices whose
 // underlying grade is always NM.
-func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[string][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
+func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
 	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
@@ -576,7 +576,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 						price.Regular = row.Price
 					}
 					if cond != "INDEX" && !co.Sealed {
-						price.Cond = cond
+						price.Cond = string(cond)
 					}
 				}
 				if price == nil {
@@ -604,7 +604,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 				}
 
 				if conds && !co.Sealed {
-					condTag := cond
+					condTag := string(cond)
 					if condTag == "INDEX" {
 						condTag = "NM"
 					}
@@ -748,7 +748,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 	}
 
 	if shouldBaseCond {
-		out[id][scraperTag].Cond = entries[base].Condition()
+		out[id][scraperTag].Cond = string(entries[base].Condition())
 	}
 
 	if co.Sealed {
@@ -776,7 +776,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 				if entries[i].Pricing() == 0 {
 					continue
 				}
-				condTag := entries[i].Condition() + "_etched"
+				condTag := string(entries[i].Condition()) + "_etched"
 				if out[id][scraperTag].Conditions == nil {
 					out[id][scraperTag].Conditions = &BanConditions{}
 				}
@@ -804,7 +804,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 				if entries[i].Pricing() == 0 {
 					continue
 				}
-				condTag := entries[i].Condition() + "_foil"
+				condTag := string(entries[i].Condition()) + "_foil"
 				if out[id][scraperTag].Conditions == nil {
 					out[id][scraperTag].Conditions = &BanConditions{}
 				}
@@ -832,7 +832,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 				if entries[i].Pricing() == 0 {
 					continue
 				}
-				condTag := entries[i].Condition()
+				condTag := string(entries[i].Condition())
 				if out[id][scraperTag].Conditions == nil {
 					out[id][scraperTag].Conditions = &BanConditions{}
 				}
@@ -995,7 +995,7 @@ func SimplePrice2CSV(b *mtgmatcher.Backend, w *csv.Writer, pm map[string]map[str
 			if uploadedData[j].OriginalPrice != 0 {
 				ogPrice = fmt.Sprintf("%0.2f", uploadedData[j].OriginalPrice)
 			}
-			record = append(record, ogPrice, condition)
+			record = append(record, ogPrice, string(condition))
 
 			qty := ""
 			if uploadedData[j].HasQuantity {
@@ -1029,7 +1029,7 @@ func SimplePrice2CSV(b *mtgmatcher.Backend, w *csv.Writer, pm map[string]map[str
 	return w.Error()
 }
 
-func priceRowToCSV(b *mtgmatcher.Backend, pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor, withSKU bool) ([]string, error) {
+func priceRowToCSV(b *mtgmatcher.Backend, pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition mtgban.Condition, preferFlavor, withSKU bool) ([]string, error) {
 	co, err := b.GetUUID(id)
 	if err != nil {
 		uuid := externalUUID(b, id)

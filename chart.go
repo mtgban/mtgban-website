@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -622,8 +623,8 @@ func getDatasetsForMulti(ctx context.Context, b *mtgmatcher.Backend, cardIDs []s
 }
 
 // A default scale for converting non-NM prices to NM
-var defaultGradeMap = map[string]float64{
-	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
+var defaultGradeMap = map[mtgban.Condition]float64{
+	mtgban.NM: 1, mtgban.SP: 1.25, mtgban.MP: 1.67, mtgban.HP: 2.5, mtgban.PO: 4,
 }
 
 // snapshotDate returns now's date when ts falls on "today" or "tomorrow"

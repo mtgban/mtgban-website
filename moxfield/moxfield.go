@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // Item is one card pulled out of a deck or collection.
@@ -24,7 +25,7 @@ type Item struct {
 	Quantity  int
 	IsFoil    bool
 	IsEtched  bool
-	Condition string
+	Condition mtgban.Condition
 	Price     float64
 	Notes     string
 }
@@ -184,12 +185,12 @@ func getMoxCollectionPage(ctx context.Context, collectionURL string, page int) (
 	return &collection, nil
 }
 
-var conditionMap = map[string]string{
-	"nearMint":         "NM",
-	"slightlyPlayed":   "LP",
-	"moderatelyPlayed": "MP",
-	"heavilyPlayed":    "HP",
-	"damaged":          "PO",
+var conditionMap = map[string]mtgban.Condition{
+	"nearMint":         mtgban.NM,
+	"slightlyPlayed":   mtgban.SP,
+	"moderatelyPlayed": mtgban.MP,
+	"heavilyPlayed":    mtgban.HP,
+	"damaged":          mtgban.PO,
 }
 
 func getMoxCollection(ctx context.Context, collectionURL string, maxRows int) ([]Item, error) {

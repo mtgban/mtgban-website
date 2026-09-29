@@ -26,7 +26,7 @@ var sealedTypeKeywords = []string{
 // Closest returns the canonical card (or sealed product) name in b closest
 // to query, used to power "did you mean..." suggestions.
 func Closest(b *mtgmatcher.Backend, query string, sealed bool) string {
-	return fuzzy.Closest(query, b.Names("canonical", sealed))
+	return fuzzy.Closest(query, b.Names(mtgmatcher.NameFormCanonical, sealed))
 }
 
 // AltSearch is a suggested query offered when a search yields no results,
