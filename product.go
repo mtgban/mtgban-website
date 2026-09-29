@@ -851,15 +851,9 @@ func newHighReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 	return stats.PriorMax, true
 }
 
-// The hotlist pills' tooltips; the odds are from the backtest in
-// docs/adr/0004-ck-buylist-signals.md.
-const (
-	ckAtHighTip  = "Card Kingdom is paying its highest price of the last 90 days, often one it has held for weeks."
-	ckNewHighTip = "**New high**: Card Kingdom just beat every price of the last 90 days.\n" +
-		"Chances CK pays (two weeks from now):\n" +
-		"• 5% more: **24%** instead of 33%\n" +
-		"• 5% less or stops buying: **40%** instead of 35%"
-)
+// The 90d high pill's tooltip; New high's carries the chances of the card's
+// category (ckNewHighTipFor).
+const ckAtHighTip = "Card Kingdom is paying its highest price of the last 90 days, often one it has held for weeks."
 
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:
 // one aggregate query covers the whole 90-day window, then every card runs

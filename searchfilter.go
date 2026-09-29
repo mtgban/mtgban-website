@@ -2254,12 +2254,12 @@ func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
 			}
 		case "cksell":
 			// Cards whose Card Kingdom offer is worth taking now (ckbuylist.go).
-			if ckSignalForCard(co.UUID).State == "sell" {
+			if ckSignalForCard(co).State == "sell" {
 				return false
 			}
 		case "ckwait":
 			// Cards CK is likely to pay more for soon (ckbuylist.go).
-			if ckSignalForCard(co.UUID).State == "wait" {
+			if ckSignalForCard(co).State == "wait" {
 				return false
 			}
 		case "newspaper":

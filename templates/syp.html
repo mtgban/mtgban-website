@@ -59,7 +59,7 @@
                                     <span class="card-name-line">
                                         <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
                                         {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
-                                        {{buylist_badge $.ScraperShort $card.HotlistStore $card.HotlistNew}}
+                                        {{buylist_badge $.ScraperShort $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
                                     </span>
                                     <span class="card-edition">{{$card.Edition}} &middot; #{{$card.Number}}{{if $card.HasDeck}} &middot; Decklist{{else if $card.Etched}} &middot; Etched{{else if $card.Foil}} &middot; Foil{{end}}</span>
                                 </div>
