@@ -176,6 +176,32 @@ func TestNewKeySurvivesAConfigReloadOrSave(t *testing.T) {
 	}
 }
 
+// A reload that waits on an editor save keeps the port and paths the save
+// set. Kept from before it, they would show in the editor again, and its
+// next save would write them back to the file.
+func TestConfigReloadKeepsTheSavedPortAndPaths(t *testing.T) {
+	path := withConfigFile(t)
+	writeTestConfig(t, path, `{"port": "8080", "datastore_path": "old.json.xz"}`)
+	err := loadVars("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	save := func() error {
+		var config ConfigType
+		err := json.Unmarshal([]byte(`{"port": "8081", "datastore_path": "new.json.xz"}`), &config)
+		if err != nil {
+			return err
+		}
+		return saveConfig(context.Background(), config)
+	}
+
+	duringSave(t, save, reloadConfig)
+
+	if Config.Port != "8081" || Config.DatastorePath != "new.json.xz" {
+		t.Errorf("port %q, datastore path %q, want the saved 8081 and new.json.xz", Config.Port, Config.DatastorePath)
+	}
+}
+
 // Two keys generated at once: each save encodes the secrets map, which the
 // other key's write must not change under it, and the file keeps both.
 func TestNewKeysAtOnceDoNotRace(t *testing.T) {

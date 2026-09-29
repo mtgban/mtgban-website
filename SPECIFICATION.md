@@ -175,12 +175,13 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   for the backend alone; entry points read either once and pass `b`/`ds`
   down to what they call.
 - `Config` is loaded once, then swapped whole by a `?reboot=config`
-  reload (`loadVars`, main.go) or a config-editor save (`saveConfig`,
+  reload (`reloadConfig`, main.go) or a config-editor save (`saveConfig`,
   admin.go), under `apiUsersMutex`, which the per-user API secret
   lookups read behind.
   Those two and a new API key (`generateAPIKey`) also hold `configMu`
   across their file I/O, so none lands inside another; the lookups never
-  wait on it.
+  wait on it. The reload reads the running port and paths it keeps under
+  `configMu` too, so they are the ones a save it waited on set.
   The admin page reads the secrets under `apiUsersMutex` too, to list
   the API users and fill the config editor, so it never waits on the
   bucket either.
