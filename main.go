@@ -600,9 +600,14 @@ var Config ConfigType
 // configMu serializes what changes Config while the site serves - a reload,
 // an editor save, a new API key - each whole: what it reads of Config, its
 // file I/O and its change, so none lands inside another; its holder reads
-// Config freely. A change to the API secrets also takes apiUsersMutex,
-// inside this lock: readers that take only that one never wait on the bucket.
+// Config freely. The file I/O gives up after configFileTimeout, so a bucket
+// that stops answering holds the lock that long at most. A change to the
+// API secrets also takes apiUsersMutex, inside this lock: readers that take
+// only that one never wait on the bucket.
 var configMu sync.Mutex
+
+// configFileTimeout bounds each read and write of the config file.
+const configFileTimeout = 30 * time.Second
 
 // APIGatewayConfig locates the API gateway the pricing page hands off to.
 type APIGatewayConfig struct {
@@ -1087,11 +1092,14 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
-// loadVars reads the config file into a new live Config, then sets the port
-// and paths given over it and fills in the defaults. Once the site serves,
-// its caller holds configMu; startup calls it before anything else runs.
+// loadVars reads the config file into a new live Config, giving up after
+// configFileTimeout, then sets the port and paths given over it and fills in
+// the defaults. Once the site serves, its caller holds configMu; startup
+// calls it before anything else runs.
 func loadVars(port, datastorePath, aclPath, grantsPath string) error {
-	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
+	ctx, cancel := context.WithTimeout(context.Background(), configFileTimeout)
+	defer cancel()
+	reader, err := simplecloud.InitReader(ctx, ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
 	}

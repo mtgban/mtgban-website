@@ -1201,8 +1201,11 @@ func apiUsers() []string {
 	return emails
 }
 
-// storeConfigFile writes config to the config file.
+// storeConfigFile writes config to the config file, giving up after
+// configFileTimeout.
 func storeConfigFile(ctx context.Context, config ConfigType) error {
+	ctx, cancel := context.WithTimeout(ctx, configFileTimeout)
+	defer cancel()
 	writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
