@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -112,5 +113,43 @@ func TestCKSignalsReport(t *testing.T) {
 		if problem != tc.want {
 			t.Errorf("%s: got %q, want %q", tc.name, problem, tc.want)
 		}
+	}
+}
+
+// TestCheckJobHealthAnnouncesTransitions posts a job turning bad once, stays
+// quiet while it stays bad and while the site is starting, and posts its
+// recovery once.
+func TestCheckJobHealthAnnouncesTransitions(t *testing.T) {
+	setTestJobs(t)
+	prevState, prevNotify, prevGame := staleAlarmState.stale, notifyStale, Config.Game
+	t.Cleanup(func() {
+		staleAlarmState.stale, notifyStale, Config.Game = prevState, prevNotify, prevGame
+	})
+	staleAlarmState.stale = map[string]bool{}
+	Config.Game = DefaultGame
+	var notices []string
+	notifyStale = func(kind, message string) error {
+		notices = append(notices, message)
+		return nil
+	}
+
+	backgroundJobs.Report(jobSetAnalysis, "0 P90s", "found no P90s")
+	checkJobHealth()
+	checkJobHealth()
+	if len(notices) != 1 || notices[0] != "magic: Set analysis found no P90s" {
+		t.Fatalf("after two checks with no P90s: got %q, want the one alarm", notices)
+	}
+
+	backgroundJobs.Report(jobSetAnalysis, "74730 P90s", "")
+	checkJobHealth()
+	if len(notices) != 2 || !strings.HasSuffix(notices[1], "Set analysis is fine again") {
+		t.Fatalf("after the P90s came back: got %q, want the recovery", notices)
+	}
+
+	StartTime = time.Now()
+	backgroundJobs.Report(jobSetAnalysis, "0 P90s", "found no P90s")
+	checkJobHealth()
+	if len(notices) != 2 {
+		t.Errorf("just started: got %q, want nothing new", notices[2:])
 	}
 }

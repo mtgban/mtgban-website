@@ -1,7 +1,8 @@
 // Package jobs records what the site's background jobs did: when each last
 // ran and for how long, whether that run panicked, what the job reported
 // finding and what is wrong with it, and whether a scheduled one has missed
-// its time. The admin dashboard lists it.
+// its time. The admin dashboard lists it; the staleness alarm announces a job
+// turning bad.
 package jobs
 
 import (
