@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -220,5 +221,51 @@ func TestSaveTableWritesThePath(t *testing.T) {
 	}
 	if _, ok := onDisk["Mods"]; !ok || len(onDisk) != 2 {
 		t.Errorf("file holds %v, want the saved pair", onDisk)
+	}
+}
+
+var errWriteFailed = errors.New("upload failed at write")
+
+// failWriter fails every write, and records whether the save then closed
+// it, which commits what was written, or aborted it.
+type failWriter struct{ closed, aborted bool }
+
+func (*failWriter) Write([]byte) (int, error) { return 0, errWriteFailed }
+
+func (w *failWriter) Close() error {
+	w.closed = true
+	return nil
+}
+
+func (w *failWriter) Abort() error {
+	w.aborted = true
+	return nil
+}
+
+// A save whose write fails must abort it, not close it: Close would commit
+// a truncated table, which every deployment sharing it then fails to load.
+func TestSaveTableFailingAtWriteAborts(t *testing.T) {
+	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+	grantsPath := filepath.Join(dir, "grants.json")
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
+
+	writer := &failWriter{}
+	hooks := fileHooks()
+	hooks.OpenWrite = func(context.Context, string) (io.WriteCloser, error) {
+		return writer, nil
+	}
+	c := New(hooks)
+	err := c.Load(context.Background(), Sources{TablePath: tablePath, GrantsPath: grantsPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.SaveTable(context.Background(), Table{"Root": {"Search": {}}, "Mods": {"Search": {}}})
+	if !errors.Is(err, errWriteFailed) || len(c.Table()) != 1 {
+		t.Errorf("error %v, %d tiers: a save that failed at its write went live", err, len(c.Table()))
+	}
+	if !writer.aborted || writer.closed {
+		t.Errorf("aborted %t, closed %t: a failed write must be aborted, never closed", writer.aborted, writer.closed)
 	}
 }

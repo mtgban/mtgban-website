@@ -216,13 +216,19 @@ func (c *Client) writeJSONPath(ctx context.Context, path string, v any) error {
 		return err
 	}
 	err = json.NewEncoder(writer).Encode(v)
-	// Close finalises the upload, so its error is the write's error too, and
-	// a failure there must not be reported as a save.
-	cerr := writer.Close()
 	if err != nil {
-		return err
+		// Closing would commit a truncated file, which every deployment
+		// sharing it would then fail to load: abort instead where the
+		// writer can, as simplecloud's do.
+		aborter, ok := writer.(interface{ Abort() error })
+		if ok {
+			return errors.Join(err, aborter.Abort())
+		}
+		return errors.Join(err, writer.Close())
 	}
-	return cerr
+	// Close finalises the upload, so a failure there must not be reported
+	// as a save.
+	return writer.Close()
 }
 
 // readJSONPath decodes the json at a path into v, letting the caller's Open
