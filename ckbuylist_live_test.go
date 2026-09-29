@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
 	"strconv"
@@ -205,4 +206,12 @@ func TestCKOddsFileLive(t *testing.T) {
 		}
 	}
 	t.Logf("a Masters sell now: %q", odds.tipFor("masters", "nonfoil", "sell"))
+	var off []string
+	for key, isOff := range odds.off {
+		if isOff {
+			off = append(off, fmt.Sprintf("%s/%s/%s", key.Category, key.Finish, key.Rule))
+		}
+	}
+	slices.Sort(off)
+	t.Logf("rules off: %v", off)
 }

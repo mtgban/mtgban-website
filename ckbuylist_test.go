@@ -188,6 +188,56 @@ func TestCKOddsTips(t *testing.T) {
 	}
 }
 
+// TestCKOddsRulesByEdge switches a rule off a category whose chances do not
+// beat the typical ones, and words out of stock that only stops cuts.
+func TestCKOddsRulesByEdge(t *testing.T) {
+	var tables ckOddsTables
+	err := json.Unmarshal([]byte(`{
+	  "categories": {"p": "promo", "r": "reserved"},
+	  "odds": [
+	    {"category": "all", "rule": "typical", "up": 33, "down": 35},
+	    {"category": "promo", "rule": "typical", "up": 30, "down": 33},
+	    {"category": "promo", "rule": "sell", "up": 30, "down": 33},
+	    {"category": "promo", "rule": "cut", "up": 36, "down": 48},
+	    {"category": "promo", "rule": "buyout", "up": 62, "down": 17},
+	    {"category": "reserved", "rule": "typical", "up": 27, "down": 30},
+	    {"category": "reserved", "rule": "outofstock", "up": 25, "down": 10}
+	  ]}`), &tables)
+	if err != nil {
+		t.Fatal(err)
+	}
+	odds := newCKOdds(tables)
+	for _, tc := range []struct {
+		id, rule string
+		holds    bool
+	}{
+		{"p", "sell", false},      // no fewer raises, no more cuts
+		{"p", "cut", false},       // more cuts follow, not raises
+		{"p", "buyout", true},     // 32 points more raises, 16 fewer cuts
+		{"r", "outofstock", true}, // 2 fewer raises, but 20 fewer cuts
+		{"x", "sell", true},       // never measured
+	} {
+		if got := odds.holdsOn(tc.id, "nonfoil", tc.rule); got != tc.holds {
+			t.Errorf("%s %s: holds %v, want %v", tc.id, tc.rule, got, tc.holds)
+		}
+	}
+	if tip := odds.tip("r", "nonfoil", "outofstock"); !strings.HasPrefix(tip, ckVerdictStopsTheCut+"\n") {
+		t.Errorf("Reserved List out of stock: got %q", tip)
+	}
+
+	setTestCKOdds(t, odds)
+	prev := ckSignalsPtr.Load()
+	t.Cleanup(func() { ckSignalsPtr.Store(prev) })
+	signals := map[string]ckSignal{"sell": {ID: "p", Rule: "sell"}, "buyout": {ID: "p", Rule: "buyout"}}
+	ckSignalsPtr.Store(&signals)
+	if got := ckSignalForCard(ckTestCard("sell")); got.State != "" || got.Tip != "" {
+		t.Errorf("a promo meeting sell now: got %+v, want no state", got)
+	}
+	if got := ckSignalForCard(ckTestCard("buyout")); got.State != "wait" {
+		t.Errorf("a promo bought out: got %+v, want a wait", got)
+	}
+}
+
 // TestLoadCKOdds reads the odds from a file, as from the bucket.
 func TestLoadCKOdds(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ck-odds.json")

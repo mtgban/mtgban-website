@@ -21,6 +21,17 @@ const ckOddsFile = "ck-odds.json.xz"
 // file again; ckodds writes a new one every day.
 const ckOddsMaxAge = 20 * time.Hour
 
+// A rule holds on a category while its chances beat the typical ones by
+// ckMinEdge points in all, raises and cuts together: for sell now fewer
+// raises and more cuts, for a wait the other way round. Out of stock whose
+// raises beat the typical ones by ckRaiseEdge points or less only stops
+// cuts, and says so.
+const (
+	ckMinEdge            = 5
+	ckRaiseEdge          = 5
+	ckVerdictStopsTheCut = "**Wait**: CK is out of stock, at or below its P90, and seldom pays less after that."
+)
+
 // ckOddsPath is where the odds live: beside the datastore, like the TCGplayer
 // catalog.
 func ckOddsPath() string {
@@ -81,6 +92,7 @@ type ckOdds struct {
 	chances    map[ckOddsKey]ckChances
 	reopen     map[string][]ckReopen // by category, the longest pause first
 	tips       map[ckOddsKey]string
+	off        map[ckOddsKey]bool // rules with no edge on a category and finish
 	pauseTips  map[ckPauseTipKey]string
 }
 
@@ -97,6 +109,7 @@ func newCKOdds(t ckOddsTables) *ckOdds {
 		chances:    map[ckOddsKey]ckChances{},
 		reopen:     map[string][]ckReopen{},
 		tips:       map[ckOddsKey]string{},
+		off:        map[ckOddsKey]bool{},
 		pauseTips:  map[ckPauseTipKey]string{},
 	}
 	for _, row := range t.Odds {
@@ -118,7 +131,9 @@ func newCKOdds(t ckOddsTables) *ckOdds {
 	for _, category := range categories {
 		for _, finish := range []string{"foil", "nonfoil"} {
 			for rule := range ckVerdicts {
-				o.tips[ckOddsKey{category, finish, rule}] = o.tipFor(category, finish, rule)
+				key := ckOddsKey{category, finish, rule}
+				o.tips[key] = o.tipFor(category, finish, rule)
+				o.off[key] = !o.holds(category, finish, rule)
 			}
 		}
 		reopen, found := o.reopen[category]
@@ -148,6 +163,18 @@ func (o *ckOdds) oddsFor(category, finish, rule string) (odds, typical ckChances
 	return ckChances{}, ckChances{}, false
 }
 
+// holds tells whether a rule beats the typical chances on a category and
+// finish by ckMinEdge; one never measured holds. New high is a pill, not a
+// rule, and always holds.
+func (o *ckOdds) holds(category, finish, rule string) bool {
+	odds, typical, found := o.oddsFor(category, finish, rule)
+	edge := (odds.Up - typical.Up) + (typical.Down - odds.Down)
+	if rule == "sell" {
+		edge = -edge
+	}
+	return !found || rule == "newhigh" || edge >= ckMinEdge
+}
+
 // tipFor is a rule's tooltip on a card of category and finish: its verdict,
 // then its chances next to the typical ones where they were measured.
 func (o *ckOdds) tipFor(category, finish, rule string) string {
@@ -155,7 +182,11 @@ func (o *ckOdds) tipFor(category, finish, rule string) string {
 	if !found {
 		return ckVerdicts[rule]
 	}
-	return ckVerdicts[rule] + "\n" +
+	verdict := ckVerdicts[rule]
+	if rule == "outofstock" && odds.Up-typical.Up <= ckRaiseEdge {
+		verdict = ckVerdictStopsTheCut
+	}
+	return verdict + "\n" +
 		"Chances CK pays (two weeks from now):\n" +
 		fmt.Sprintf("• 5%% more: **%d%%** instead of %d%%\n", odds.Up, typical.Up) +
 		fmt.Sprintf("• 5%% less or stops buying: **%d%%** instead of %d%%", odds.Down, typical.Down)
@@ -178,6 +209,12 @@ func (o *ckOdds) tip(id, finish, rule string) string {
 		return ckVerdicts[rule]
 	}
 	return o.tips[ckOddsKey{o.category(id), finish, rule}]
+}
+
+// holdsOn tells whether a rule holds on a CK product of finish; every rule
+// holds until the odds are loaded.
+func (o *ckOdds) holdsOn(id, finish, rule string) bool {
+	return o == nil || !o.off[ckOddsKey{o.category(id), finish, rule}]
 }
 
 // pauseTip is the tooltip of a pause of days on a CK product.
