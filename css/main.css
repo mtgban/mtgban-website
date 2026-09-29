@@ -976,7 +976,8 @@ span.emoji {
 }
 .bl-ck-sell { color: var(--asuccess); }
 .bl-ck-wait { color: var(--awarning); }
-.bl-ck[title] { cursor: help; }
+/* The details column's one tooltip, CK's verdict, stock, P90 and odds */
+.bl-info[title] { cursor: help; }
 
 table.tiers {
     margin: 10px;
