@@ -108,8 +108,9 @@ Boot sequence (`main()`):
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
    together in one `s.ds.Store()`, then itself spawns
-   `s.cacheNewspaper()` as a further goroutine, which the tracker's recover
-   does not reach: it defers `recoverJob()` (recover.go) of its own.
+   `s.cacheNewspaper()` and `s.loadTCGListings()` as further goroutines,
+   which the tracker's recover does not reach: each defers `recoverJob()`
+   (recover.go) of its own.
 6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
    bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
    `simplecloud.FileBucket{Root: dir}` in its place; either is kept as
@@ -133,6 +134,9 @@ Boot sequence (`main()`):
      stock history once the newspaper has a new day, and rebuilds every
      card's buylist signal; `main()` also runs it once at startup, on a
      goroutine of its own under `recoverJob()`
+   - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
+     TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
+     once the newspaper finishes a scrape; every datastore load also runs it
    - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
@@ -202,8 +206,8 @@ not once a request. net/http itself recovers a panic in any other handler,
 logging it and dropping the connection. Off the serving goroutines, these
 recover and report the same way under a `source job:` line: the cron jobs
 and each debounced offline refresh through `recovered()`; the Discord
-handlers and the `$$` lookup's fetch, the newspaper refresh a datastore
-load starts, the goroutines the admin page's `update`, `snapshot` and
+handlers and the `$$` lookup's fetch, the newspaper refresh and the
+TCGplayer listings load a datastore load starts, the goroutines the admin page's `update`, `snapshot` and
 `tcgcsv` actions start, the scraper reloads a key-overrides save starts,
 the startup run of `s.refreshCKSignals()`, and each access-listener
 reload through `recoverJob()`. A deploy through
