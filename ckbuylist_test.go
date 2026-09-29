@@ -186,6 +186,13 @@ func TestCKOddsTips(t *testing.T) {
 			t.Errorf("%s paused 10 days: got\n%s\nwant %q", tc.name, got, tc.want)
 		}
 	}
+
+	// No buying day in the history: it may be a card CK never bought, so
+	// the pause is told without chances measured on cards it did.
+	got := odds.pauseTip("2", ckHistoryWindow, false)
+	if got != "**Paused**: CK stopped buying this card 30+ days ago." {
+		t.Errorf("paused since before the history: got\n%s\nwant the pause alone", got)
+	}
 }
 
 // TestCKOddsRulesByEdge switches a rule off a category whose chances do not

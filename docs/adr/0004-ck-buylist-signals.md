@@ -255,7 +255,9 @@ chances above.
 14. **A paused card** (CK's last known NM offer of $1 or more) gets a pill
     with the pause's length, from the last day the history saw CK buying:
     `Paused 11d`, or `Paused 30d+` past the history's month. Its tooltip has
-    the chances of CK buying again within 7 and 30 days.
+    the chances of CK buying again within 7 and 30 days, but for a pause
+    older than the history: that may be a card CK never bought, outside the
+    pauses measured.
 15. **Wait (↑) on a pause** when it is under 14 days old and every other cash
     buylist's NM offer is below 95% of CK's listed price, with at least one
     such offer. Cash buylists are every singles buylist but CK's own, ABU's
