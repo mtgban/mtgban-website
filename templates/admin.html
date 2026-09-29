@@ -82,6 +82,33 @@
          ═══════════════════════ -->
     <div class="admin-panel{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" id="panel-dashboard">
 
+        {{if .Jobs}}
+        <div class="admin-section">
+            <div class="admin-section-header">
+                <h2>Background Jobs</h2>
+                <span class="count">{{len .Jobs}} jobs</span>
+            </div>
+            <div class="admin-table-wrap">
+            <table class="table-data admin-table">
+                <thead><tr>
+                    <th>Job</th><th>Last Run</th><th>Took</th><th>Found</th><th class="c">Status</th>
+                </tr></thead>
+                <tbody>
+                {{range .Jobs}}
+                    <tr>
+                        <td>{{.Name}}</td>
+                        <td class="admin-mono{{if .Problem}} admin-stale-date{{end}}">{{if .Started.IsZero}}not run yet{{else}}<time class="admin-localtime" datetime="{{.Started.UTC.Format "2006-01-02T15:04:05Z"}}">{{.Started.Format "Jan 02 15:04"}}</time>{{end}}</td>
+                        <td class="admin-mono">{{.TookText}}</td>
+                        <td class="admin-mono">{{.Result}}</td>
+                        <td class="c admin-status">{{if .Problem}}<span class="admin-status-icon">🔴</span> <span class="admin-stale-badge">{{.Problem}}</span>{{else if .Running}}<span class="admin-status-icon">🔶</span> running{{else if not .Started.IsZero}}<span class="admin-status-icon">✅</span>{{end}}</td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        {{end}}
+
         {{if gt (len .Tables) 0}}
         <div class="admin-section">
             <div class="admin-section-header">

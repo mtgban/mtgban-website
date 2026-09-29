@@ -292,10 +292,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if IsStashingInProgress() {
 			v.Set("msg", "Stashing is already in progress")
 		} else {
-			go func() {
-				defer recoverJob("admin stashInTimeseries")
-				s.stashInTimeseries()
-			}()
+			go tracked(jobStash, s.stashInTimeseries)()
 		}
 
 	case "tcgcsv":
@@ -306,10 +303,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if IsTCGCSVStashing() {
 			v.Set("msg", "TCGCSV ingestion is already in progress")
 		} else {
-			go func() {
-				defer recoverJob("admin stashTCGCSVPrices")
-				stashTCGCSVPrices()
-			}()
+			go tracked(jobTCGCSVPrices, stashTCGCSVPrices)()
 		}
 
 	case "server":
@@ -829,6 +823,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.LatestHash = BuildCommit
 
 	pageVars.DisableChart = IsStashingInProgress()
+	pageVars.Jobs = backgroundJobs.Rows()
 	// Read last: ?reboot=datastore above may have just started one.
 	pageVars.DatastoreReload = s.reloads.Status()
 

@@ -739,8 +739,27 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 	return tcgcatalog.Load(reader)
 }
 
+// setAnalysisReport is what a set analysis found, and what is wrong with
+// it: a run on the empty datastore held before the first load, or, where the
+// site serves CK's buylist, no P90 at all, which CK's signals need.
+func setAnalysisReport(datastoreLoadedAt time.Time, infos map[string]mtgban.InventoryRecord) (string, string) {
+	var result, problem string
+	if ckAvailable() {
+		p90s := len(infos["goodP90"])
+		result = fmt.Sprintf("%d P90s, %d 90d highs, %d new highs", p90s, len(infos["hotlist"]), len(infos["newhigh"]))
+		if p90s == 0 {
+			problem = "found no P90s"
+		}
+	}
+	if datastoreLoadedAt.IsZero() {
+		problem = "ran before the datastore loaded"
+	}
+	return result, problem
+}
+
 func (s *site) runSealedAnalysis() {
-	b := s.backend()
+	ds := s.datastore()
+	b := ds.backend
 	log.Println("Running set analysis")
 
 	tcgInventory, _ := findSellerInventory("TCGLow")
@@ -785,6 +804,8 @@ func (s *site) runSealedAnalysis() {
 	infos["tcgskuid"] = skuIndex
 
 	infosPtr.Store(&infos)
+	result, problem := setAnalysisReport(ds.loadedAt, infos)
+	backgroundJobs.Report(jobSetAnalysis, result, problem)
 	// The P90s are one of the inputs of CK's buylist signals.
 	rebuildCKSignals()
 

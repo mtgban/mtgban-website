@@ -124,9 +124,10 @@ Boot sequence (`main()`):
    loop serves the next one.
 8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go). The
    library runs each on a bare goroutine, so each is registered through
-   `recovered()` (recover.go): a panic is reported as a request's is
-   (§2.2), and the job runs again at its next time rather than taking the
-   process down:
+   `addJob`, which runs it under `tracked()` (recover.go): a panic is
+   reported as a request's is (§2.2), the job runs again at its next time
+   rather than taking the process down, and its runs and schedule go to
+   the admin dashboard's Background Jobs ("Background jobs" in §5.9):
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
    - `33 */3 * * *` — `s.cacheNewspaper()`
@@ -134,10 +135,11 @@ Boot sequence (`main()`):
      stock history once the newspaper has a new day, rereads the odds its
      tooltips quote (`ck-odds.json.xz` beside the datastore, ckodds.go)
      once the loaded ones are 20 hours old, and rebuilds every card's
-     buylist signal, only where the site serves CK's buylist
-     (`ckAvailable()`); the scraper goroutine in `main()` also runs it once
-     the prices are in and include CK's, on a goroutine of its own under
-     `recoverJob()`
+     buylist signal. Only where the site serves CK's buylist
+     (`ckAvailable()`), which the prices loading tells: the cron checks it
+     each hour, its row appears with the first run that has CK, and the
+     scraper goroutine in `main()` also runs it once the prices are in,
+     on a goroutine of its own under `tracked()`
    - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
      TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
      once the newspaper finishes a scrape, and retries a scrape day whose
@@ -701,6 +703,22 @@ A session store (an admin's upload) is skipped, the same as the banner.
 The map is in memory only, so a restart's first check may announce every
 already-stale row once.
 
+**Background jobs** (jobs.go, `internal/jobs`): every cron job above, and
+the goroutines that run the same jobs off schedule (the startup set
+analysis and CK signals, the newspaper and TCG listings a datastore load
+starts, the admin stash buttons, the offline refresher), goes through
+`tracked()`, which records each run's start, length and panic under the
+job's name in `backgroundJobs`; `addJob` also records its schedule. The
+jobs whose output can be wrong while they succeed report what they found
+and what is wrong with it: the set analysis (a run on the empty datastore,
+and, where the site serves CK's buylist, no P90s), CK's signals (a missing or day-old stock history,
+missing odds or odds past 36 hours, no sell now or wait), the price stash
+(rows it failed to write), the newspaper cache and TCG listings (a failed
+load). A row's problem is its latest run's panic, then a scheduled time it
+missed or ran on past by more than 10 minutes, then its report. The
+dashboard's first table lists every job with its last run, length, what it
+found and its problem; mobile lists them in Status.
+
 ## 6. Support packages
 
 | Package | Purpose |
@@ -718,7 +736,7 @@ already-stale row once.
 | `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs (`/api/userstate/`), keyed by a hash of the login email |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
-| `internal/` | Packages only this module imports: `dsreload` (single-flight datastore reload that queues one request behind a running one, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
+| `internal/` | Packages only this module imports: `jobs` (what each background job last did, for the admin dashboard and the staleness alarm), `dsreload` (single-flight datastore reload that queues one request behind a running one, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
 
 ## 7. Frontend
 

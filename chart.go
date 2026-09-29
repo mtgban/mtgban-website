@@ -792,9 +792,11 @@ func (s *site) stashInTimeseries() {
 	// Dual-write the same snapshot into the long form (variants + prices).
 	// Best-effort: a long-form failure is logged but does not fail the stash,
 	// since the legacy wide upsert above already persisted this snapshot.
+	var problem string
 	if Config.TimeseriesConfig.LongFormWrites {
 		if n, lerr := stashLongForm(context.Background(), accumulated); lerr != nil {
 			ServerNotify("timeseries", fmt.Sprintf("long-form dual-write error: %s", lerr))
+			problem = fmt.Sprintf("failed the long-form write: %s", lerr)
 		} else {
 			log.Printf("long-form dual-write: %d price rows", n)
 		}
@@ -803,6 +805,14 @@ func (s *site) stashInTimeseries() {
 	SetLastStashUpdate(time.Now())
 	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
 	ServerNotify("timeseries", msg)
+
+	switch {
+	case err != nil:
+		problem = fmt.Sprintf("failed to write %d of %d rows: %s", errCount, len(rows), err)
+	case len(rows) == 0:
+		problem = "found no prices to stash"
+	}
+	backgroundJobs.Report(jobStash, fmt.Sprintf("%d rows written", upserted), problem)
 }
 
 // variantCacheScope is the slice of the shared variants table this process can

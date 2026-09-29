@@ -14,6 +14,8 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+
+	"github.com/mtgban/mtgban-website/internal/jobs"
 )
 
 // Card Kingdom's buylist moves with its retail stock: CK pays more for cards
@@ -529,6 +531,8 @@ func rebuildCKSignals() {
 		}
 	}
 	ckSignalsPtr.Store(&signals)
+	result, problem := ckSignalsReport(signals, history, ckOddsPtr.Load(), time.Now())
+	backgroundJobs.Report(jobCKSignals, result, problem)
 }
 
 // ckAvailable tells whether this site serves Card Kingdom's buylist, which
@@ -537,6 +541,43 @@ func rebuildCKSignals() {
 func ckAvailable() bool {
 	_, err := findVendorBuylist("CK")
 	return err == nil
+}
+
+// ckOddsMaxStale is how old the odds may get: ckodds runs daily, so a day
+// and a half means a run was missed.
+const ckOddsMaxStale = 36 * time.Hour
+
+// ckSignalsReport is what a rebuild of CK's signals found, and what is wrong
+// with its inputs or with it: no stock history, or one a day behind; no odds,
+// or odds a missed run old; not one sell now or wait.
+func ckSignalsReport(signals map[string]ckSignal, history *ckHistorySnapshot, odds *ckOdds, now time.Time) (string, string) {
+	var sell, wait, paused int
+	for _, sig := range signals {
+		switch sig.Rule {
+		case "sell":
+			sell++
+		case "buyout", "outofstock", "cut":
+			wait++
+		}
+		if sig.Pause.Paused {
+			paused++
+		}
+	}
+	result := fmt.Sprintf("%d sell now, %d wait, %d paused, of %d cards", sell, wait, paused, len(signals))
+	var problem string
+	switch {
+	case history == nil:
+		problem = "have no stock history"
+	case ckToday(now).Sub(history.Today) > 24*time.Hour:
+		problem = "read a stock history from " + history.Today.Format(time.DateOnly)
+	case odds == nil:
+		problem = "have no odds"
+	case now.Sub(odds.Generated) > ckOddsMaxStale:
+		problem = "quote odds " + jobs.Age(now.Sub(odds.Generated)) + " old"
+	case sell+wait == 0:
+		problem = "have no sell now or wait"
+	}
+	return result, problem
 }
 
 // refreshCKSignals reloads the history when the newspaper has a new day and

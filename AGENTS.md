@@ -232,7 +232,9 @@ commit to this repo can complete on its own.
    panic only on the goroutine serving the request (`recoverPanic` reports
    it there, behind the three signing wrappers); on any other goroutine an
    unrecovered panic ends the process. So register a new cron job through
-   `recovered()`, start a new goroutine or Discord handler with
+   `addJob` (main.go) and start a new background job's goroutine with
+   `tracked(name, fn)`, both of which also list it on the admin dashboard
+   (`jobs.go`); start any other goroutine or Discord handler with
    `defer recoverJob("<name>")` (recover.go), and have a loop that must
    keep serving recover each run in a function of its own, as
    `runAccessReload` does, not the loop around it. A request's fan-out

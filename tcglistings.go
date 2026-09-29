@@ -141,6 +141,7 @@ func (s *site) loadTCGListings() {
 	err := NewNewspaperDB.QueryRowContext(ctx, tcgListingsDayQuery, game).Scan(&day)
 	if err != nil {
 		log.Println("tcg listings:", err)
+		backgroundJobs.Report(jobTCGListings, "", "cannot read the newspaper: "+err.Error())
 		return
 	}
 	if !day.Valid {
@@ -155,10 +156,12 @@ func (s *site) loadTCGListings() {
 	if err != nil {
 		log.Println("tcg listings:", err)
 		tcgListingsFailed.Store(&tcgListingsFailure{Day: day.Time, At: time.Now()})
+		backgroundJobs.Report(jobTCGListings, "", "failed to load "+day.Time.Format(time.DateOnly)+": "+err.Error())
 		return
 	}
 	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day.Time, Cards: cards})
 	log.Println("tcg listings: loaded", len(cards), "printings from", day.Time.Format(time.DateOnly)+",", unmatched, "not matched")
+	backgroundJobs.Report(jobTCGListings, fmt.Sprintf("%d printings from %s, %d not matched", len(cards), day.Time.Format(time.DateOnly), unmatched), "")
 }
 
 // tcgListingsDue reports whether day's counts should be loaded, given the
