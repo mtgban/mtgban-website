@@ -239,7 +239,8 @@ chances above.
 10. **Two pills mark CK's 90-day high**, one at a time: `90d high` when CK
     ties or beats it, the hotlist's meaning, which `on:hotlist` and the
     sleepers page's Hotlist keep; `New high` when CK strictly beats it
-    (`on:newhigh`), with its odds.
+    (`on:newhigh`), with its odds, on cards CK pays $1 or more for with a
+    P90, where they were measured.
 11. **Stock is CK's total across conditions**, as measured. "Now" comes from
     the site's own CK scraper; yesterday and last week come from the
     newspaper's daily snapshots, reloaded when the day or the newest snapshot

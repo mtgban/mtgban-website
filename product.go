@@ -843,9 +843,10 @@ func hotlistReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 // newHighReducer flags cards whose current buylist price beats every price
 // stored before today, reporting that previous high. A tie is not a new high:
 // CK holds prices flat for weeks, and ties are 93% of what hotlistReducer
-// flags (docs/adr/0004-ck-buylist-signals.md).
+// flags (docs/adr/0004-ck-buylist-signals.md). Its chances were measured
+// where CK pays $1 or more with a P90, so it keeps to those cards.
 func newHighReducer(stats timeseries.AggregatePriceStats, current float64) (float64, bool) {
-	if stats.PriorMax == 0 || current <= stats.PriorMax {
+	if current < ckMinBuyPrice || stats.Count < minNumberDays || stats.PriorMax == 0 || current <= stats.PriorMax {
 		return 0, false
 	}
 	return stats.PriorMax, true
