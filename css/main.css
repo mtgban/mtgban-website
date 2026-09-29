@@ -966,6 +966,11 @@ span.emoji {
     background: color-mix(in srgb, var(--asuccess) 14%, transparent);
     color: var(--asuccess);
 }
+/* CK is not buying the card (buylist_pause) */
+.bl-pill-paused {
+    background: color-mix(in srgb, var(--grey) 18%, transparent);
+    color: var(--text-secondary);
+}
 
 /* Card Kingdom's buylist signal and stock facts (buylist_ck) */
 .bl-ck {

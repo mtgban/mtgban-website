@@ -339,7 +339,7 @@ var funcMap = template.FuncMap{
 	// offer follows CK's signal ("best" to take it, "wait" when CK is likely
 	// to pay more soon; ckbuylist.go), any other store's offer is "best" at or
 	// above CK's P90.
-	"buylist_state": func(shorthand, conditions string, isOffer bool, price, good float64, ckSignal string) string {
+	"buylist_state": func(shorthand, conditions string, isOffer bool, price, good float64, ckSignal string, ckPauseWait bool) string {
 		switch {
 		case !isOffer:
 			return ""
@@ -349,6 +349,12 @@ var funcMap = template.FuncMap{
 			return "best"
 		case shorthand == "CK":
 			return ckSignal
+		// CK is not paying its last known price: never one to take, at most
+		// one to wait for.
+		case shorthand == "CKBLLast" && conditions == "NM" && ckPauseWait:
+			return "wait"
+		case shorthand == "CKBLLast":
+			return ""
 		case good > 0 && price >= good:
 			return "best"
 		}
@@ -379,6 +385,19 @@ var funcMap = template.FuncMap{
 			return ""
 		}
 		return template.HTML(` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`)
+	},
+	// buylist_pause marks Card Kingdom's last known NM offer on a card CK has
+	// paused: a pill saying for how long, and the wait arrow when waiting for
+	// CK beats every other cash offer, both with the chances as tooltip.
+	"buylist_pause": func(shorthand, conditions, label string, wait bool, tip string) template.HTML {
+		if shorthand != "CKBLLast" || conditions != "NM" || label == "" {
+			return ""
+		}
+		out := ` <span class="bl-pill bl-pill-paused"` + tipAttrs(tip) + `>` + template.HTMLEscapeString(label) + `</span>`
+		if wait {
+			out += ` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`
+		}
+		return template.HTML(out)
 	},
 	// buylist_ck is a card's CK signal on the pages with a column of card
 	// details: "Sell now" or "Wait". The column's tooltip explains it.

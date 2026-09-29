@@ -1680,9 +1680,9 @@
                                                 {{else}}
                                                     <span class="store-cell">
                                                     {{if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}
+                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause .Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause .Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
                                                     {{end}}
                                                     {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
                                                         <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
@@ -1694,7 +1694,7 @@
                                                 {{if eq .Shorthand "TCGDirectNet"}}
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
-                                                {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal}}
+                                                {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
                                                 {{$blTitle := buylist_title .Shorthand $conditions $blState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}
                                                 <span class="price-right has-buylist-extra">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if $blTitle}}title="{{plain_tip $blTitle}}" data-tip="{{$blTitle}}"{{end}}>

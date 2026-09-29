@@ -553,14 +553,15 @@
                                 </div>
                                 {{else}}
                                 {{$ckNote := and (eq $entry.Shorthand "CK") (eq $conditions "NM") $card.CKFacts}}
-                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote}}
-                                {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal}}
+                                {{$pauseNote := and (eq $entry.Shorthand "CKBLLast") (eq $conditions "NM") $card.CKPauseTip}}
+                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote $pauseNote}}
+                                {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name">
                                             {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
-                                            {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}
+                                            {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
@@ -591,13 +592,16 @@
                                         {{if $ckNote}}
                                         <div class="m-detail-note">{{tip_html (buylist_title $entry.Shorthand $conditions $mState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip)}}</div>
                                         {{end}}
+                                        {{if $pauseNote}}
+                                        <div class="m-detail-note">{{tip_html $card.CKPauseTip}}</div>
+                                        {{end}}
                                     </div>
                                 </details>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
                                     <span class="m-vendor-name">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
-                                        {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}
+                                        {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
