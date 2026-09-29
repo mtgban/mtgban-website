@@ -1484,7 +1484,10 @@ func main() {
 	// Load through the tracker: a panic is recovered and recorded rather than
 	// killing the process, and a reload requested before this finishes is
 	// queued to follow it instead of racing it.
+	datastoreLoaded := make(chan struct{})
 	s.reloads.Start("startup", Config.DatastorePath, func() error {
+		// Closed on a panic too, so the prices below never wait forever.
+		defer close(datastoreLoaded)
 		err := s.loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
@@ -1522,7 +1525,10 @@ func main() {
 				log.Fatalln("error loading scrapers:", err)
 			}
 
-			// Update set values after loading prices
+			// Update set values after loading prices. The analysis reads the
+			// backend it starts with, so it waits for the datastore: read
+			// from a bucket, it can arrive after the prices.
+			<-datastoreLoaded
 			s.runSealedAnalysis()
 			// runSealedAnalysis loads the catalog, which is what names this
 			// site's own TCGplayer category, so the variant scope is only
