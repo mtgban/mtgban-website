@@ -58,6 +58,7 @@
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 24 "Class" "set-icon"}}
                                     <span class="card-name-line">
                                         <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
+                                        {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                         {{buylist_badge $.ScraperShort $card.HotlistStore $card.HotlistNew}}
                                     </span>
                                     <span class="card-edition">{{$card.Edition}} &middot; #{{$card.Number}}{{if $card.HasDeck}} &middot; Decklist{{else if $card.Etched}} &middot; Etched{{else if $card.Foil}} &middot; Foil{{end}}</span>

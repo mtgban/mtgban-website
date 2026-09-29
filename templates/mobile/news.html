@@ -184,7 +184,7 @@
 
                         {{/* Card identity — use $card (UUID lookup) for reliable fields */}}
                         <div class="m-news-card-info">
-                            <span class="m-news-card-name" lang="{{$card.LangTag}}">{{$card.Name}}</span>
+                            <span class="m-news-card-name" lang="{{$card.LangTag}}">{{$card.Name}} {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}</span>
                             <span class="m-news-card-set">{{$card.Edition}} · #{{$card.Number}}{{if $card.Foil}} · Foil{{end}}{{if $card.Etched}} · Etched{{end}}</span>
                         </div>
                     </div>

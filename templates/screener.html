@@ -205,6 +205,7 @@
                                     <div class="card-detail">
                                         <div class="screener-name-row">
                                             <a class="card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                            {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
                                         </div>
                                         <span class="set-sub">{{$card.Edition}} &bull; #{{$card.Number}}</span>

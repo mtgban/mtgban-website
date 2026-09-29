@@ -1437,7 +1437,7 @@
                                             {{$qty := index $.CardQuantities $cardId}}{{if gt $qty 1}}<span class="result-badge qty" title="{{$qty}} copies in this list">{{$qty}}x copies</span>{{end}}
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
                                             {{range $card.Treatments}}<a class="result-badge treatment" href="?q=is:{{.}}" title="Search every {{index $card.PromoLabels .}} printing">{{index $card.PromoLabels .}}</a>{{end}}
-                                            {{if $card.Reserved}}<span class="result-badge rl">RL</span>{{end}}
+                                            {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                             {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
                                             {{if $card.Newspaper}}<span class="result-badge news">News</span>{{end}}
                                         </div>
