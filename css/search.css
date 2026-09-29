@@ -1390,6 +1390,10 @@ body.modal-embed .search-sidebar {
 .price-row .store-cell .store-name {
     flex: 0 1 auto;
 }
+/* Outside the store's link, so it neither links nor underlines; the cell's
+   gap spaces it, and the name is what shortens. */
+.price-row .store-cell .bl-pill { margin-left: 0; flex-shrink: 0; }
+.price-row .store-cell .ck-wait { flex-shrink: 0; }
 /* Admin "Fix" link on each store row, revealed by the per-result Fix toggle. */
 .store-fix {
     display: none;
