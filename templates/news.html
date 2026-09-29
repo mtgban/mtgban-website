@@ -191,7 +191,7 @@
                                         <div class="news-cc">
                                             {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" "set-icon"}}
                                             <div class="card-detail">
-                                                <span class="card-name"><a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$row.CardName}}</a></span>
+                                                <span class="card-name"><a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$row.CardName}}</a> {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}</span>
                                                 <span class="set-sub">{{$row.Edition}} &bull; #{{$row.Number}}</span>
                                             </div>
                                         </div>

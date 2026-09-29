@@ -1209,10 +1209,6 @@ body.modal-embed .search-sidebar {
     color: var(--ainfo, var(--search-link));
     font-variant-numeric: tabular-nums;
 }
-.result-badge.rl {
-    background: rgba(210,153,34,0.1);
-    color: var(--awarning);
-}
 .result-badge.stocks {
     background: rgba(91,141,239,0.1);
     color: var(--search-link);
