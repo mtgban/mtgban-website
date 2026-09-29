@@ -84,9 +84,6 @@ func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 	case "/api-login":
 		s.APILogin(w, r)
 		return
-	case "/api-plans/stores.json":
-		APIStores(w, r)
-		return
 	}
 	// The page may be served without enforceSigning, so only a verified signature names the reader.
 	sig := verifiedSignature(r)
@@ -99,7 +96,10 @@ func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 	render(w, "api-plans.html", pageVars)
 }
 
-// APIStores serves this site's store families for the gateway to price and resolve.
+// APIStores serves this site's store families for the gateway to price and
+// resolve. It is registered on its own unsigned route, not as a sub-page of
+// the API page, so the gateway can read it whether or not the pricing page
+// is public.
 func APIStores(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)

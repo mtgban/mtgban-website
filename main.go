@@ -579,7 +579,6 @@ func init() {
 			SubPages: []NavElem{
 				{Name: "APITrial", Link: "/api-trial", ShouldHide: func(*site) bool { return true }},
 				{Name: "APILogin", Link: "/api-login", ShouldHide: func(*site) bool { return true }},
-				{Name: "APIStores", Link: "/api-plans/stores.json", ShouldHide: func(*site) bool { return true }},
 			},
 		},
 		"Admin": {
@@ -1700,6 +1699,10 @@ func main() {
 	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(s.palette.Sealed)))
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(s.palette.Sets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(s.palette.Stores)))
+	// The gateway reads the store families without a signature, so this
+	// cannot hang off the API page: a sub-page is served unsigned only when
+	// the ACL's Any tier grants the page (see enforceSigning).
+	http.Handle("/api-plans/stores.json", noSigning(http.HandlerFunc(APIStores)))
 	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(s.palette.Promos)))
 	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(s.palette.Finishes)))
 	http.Handle("/api/offline/", noSigning(http.HandlerFunc(s.offline.Handle)))

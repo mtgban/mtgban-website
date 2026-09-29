@@ -393,13 +393,24 @@ func TestAPIPlansKeepsAStoreTheCustomerPaysFor(t *testing.T) {
 	}
 }
 
+// enforceSigning serves a nav's sub-pages unsigned only when the ACL's Any
+// tier grants that nav, so stores.json must not hang off the API page: the
+// gateway reads it without a signature whether or not the pricing page is public.
+func TestAPIStoresIsNotGatedByTheAPIPage(t *testing.T) {
+	for _, sub := range ExtraNavs["API"].SubPages {
+		if sub.Link == "/api-plans/stores.json" {
+			t.Fatal("/api-plans/stores.json is a sub-page of the API page, so its access follows the pricing page's ACL")
+		}
+	}
+}
+
 func TestAPIStoresServesTheFamilies(t *testing.T) {
 	stubScrapers(t, magicStub)
 	savedGame := Config.Game
 	t.Cleanup(func() { Config.Game = savedGame })
 	Config.Game = "magic"
 	rec := httptest.NewRecorder()
-	testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
@@ -440,7 +451,7 @@ func TestAPIStoresEmptyListsAreArrays(t *testing.T) {
 	// Loaded, but nothing the scraper config names.
 	stubScrapers(t, scraperStub{sellers: []string{"GN"}, vendors: []string{"GN"}})
 	rec := httptest.NewRecorder()
-	testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+	APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if body := rec.Body.String(); !strings.Contains(body, `"implied":[]`) || !strings.Contains(body, `"stores":[]`) {
 		t.Errorf("body %s", body)
 	}
@@ -450,7 +461,7 @@ func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
 	for _, stub := range []scraperStub{{}, {config: magicStub.config, sellers: magicStub.sellers}, {config: magicStub.config, vendors: magicStub.vendors}} {
 		stubScrapers(t, stub)
 		rec := httptest.NewRecorder()
-		testSite.APIPlans(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
+		APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Errorf("status %d", rec.Code)
 		}
@@ -466,7 +477,7 @@ func TestAPIStoresIsUnavailableWhileLoading(t *testing.T) {
 func TestAPIStoresIsGetOnly(t *testing.T) {
 	stubScrapers(t, magicStub)
 	rec := httptest.NewRecorder()
-	testSite.APIPlans(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
+	APIStores(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status %d", rec.Code)
 	}
