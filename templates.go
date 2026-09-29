@@ -363,26 +363,22 @@ var funcMap = template.FuncMap{
 		}
 		return template.HTML(` <span class="ck-wait" title="` + template.HTMLEscapeString(tip) + `">&#8593;</span>`)
 	},
-	// buylist_ck is a card's CK signal and stock facts on one line, for the
-	// pages with a column of card details.
+	// buylist_ck is a card's CK signal on the pages with a column of card
+	// details: "Sell now" or "Wait", with the verdict, CK's stock facts and
+	// the odds in its tooltip. The column has room for no more.
 	"buylist_ck": func(ckSignal, tip, facts string) template.HTML {
-		var parts []string
-		attrs := `class="bl-ck"`
+		var label, class string
 		switch ckSignal {
 		case "wait":
-			parts = append(parts, "&#8593; Wait")
-			attrs = `class="bl-ck bl-ck-wait" title="` + template.HTMLEscapeString(tip) + `"`
+			label, class = "&#8593; Wait", "bl-ck bl-ck-wait"
 		case "sell":
-			parts = append(parts, "Sell now")
-			attrs = `class="bl-ck bl-ck-sell" title="` + template.HTMLEscapeString(tip) + `"`
-		}
-		if facts != "" {
-			parts = append(parts, template.HTMLEscapeString(facts))
-		}
-		if len(parts) == 0 {
+			label, class = "Sell now", "bl-ck bl-ck-sell"
+		default:
 			return ""
 		}
-		return template.HTML(`<span ` + attrs + `>` + strings.Join(parts, " · ") + `</span>`)
+		verdict, odds, _ := strings.Cut(tip, "\n")
+		title := template.HTMLEscapeString(joinLines(verdict, facts, odds))
+		return template.HTML(`<span class="` + class + `" title="` + title + `">` + label + `</span>`)
 	},
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
