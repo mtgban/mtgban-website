@@ -103,7 +103,7 @@ function loadPage() {
         getBoundingClientRect() { return this.rect; }
         // Ten pixels a letter up to the CSS max-width, in no more room than
         // its left leaves: a fixed box shrinks to fit.
-        get offsetWidth() { return Math.min(this.ownText.length * 10, 320, 1000 - (parseFloat(this.style.left) || 0)); }
+        get offsetWidth() { return Math.min(this.textContent.length * 10, 320, 1000 - (parseFloat(this.style.left) || 0)); }
         get offsetHeight() { return 30; }
     }
 
@@ -112,7 +112,8 @@ function loadPage() {
     const document = {
         body,
         documentElement: { clientWidth: 1000 },
-        createElement: () => new FakeElement(),
+        createElement: tag => Object.assign(new FakeElement(), { tagName: tag.toUpperCase() }),
+        createTextNode: text => ({ textContent: text }),
         addEventListener: on,
     };
     const window = {
@@ -352,4 +353,24 @@ test('a tooltip is measured with the whole viewport, not the room the last one l
     // 320 wide and centred on 510; measured where "Hi" sat, it would be 40.
     page.move(edge, middle);
     expect(page.tip().style.left).toBe('350px');
+});
+
+// A data-tip's **marks** come out bold, built as nodes, so markup in the text
+// stays text; a title a script sets later replaces it.
+test('a data-tip sets its marked parts in bold', () => {
+    const page = loadPage();
+    const price = page.el({
+        title: 'Sell now: CK pays above its P90, <b>27%</b>',
+        'data-tip': '**Sell now:** CK pays above its P90, **<b>27%</b>**',
+    }, page.body, '$ 11.00');
+    const bold = () => page.tip().children.filter(child => child.tagName === 'STRONG').map(child => child.textContent);
+
+    page.move(page.body, price);
+    expect(page.shown()).toBe('Sell now: CK pays above its P90, <b>27%</b>');
+    expect(bold()).toEqual(['Sell now:', '<b>27%</b>']);
+
+    price.setAttribute('title', 'Copied!');
+    page.flush();
+    expect(page.shown()).toBe('Copied!');
+    expect(bold()).toEqual([]);
 });

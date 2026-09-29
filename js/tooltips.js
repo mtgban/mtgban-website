@@ -5,6 +5,10 @@
 // leaves: code that reads a title can fall back to data-ban-title, and code
 // that removes one should remove both. Loaded after the other scripts, so
 // their setup finds every title where it was.
+//
+// An element may also carry data-tip, the same text with **marks** around
+// what the tooltip sets in bold; its title stays plain, for screen readers
+// and for the browser's own tooltip.
 
 // Pixels kept between the tooltip and the viewport edge, and between the
 // tooltip and its element.
@@ -62,23 +66,42 @@ function installTitleTooltips(document, window) {
         el.removeAttribute('data-ban-title');
     }
 
-    // Moves the title aside and shows it; a blank one shows nothing.
-    function take(text) {
+    // Writes text into the tooltip, what sits between ** marks in bold. It
+    // builds text nodes, so nothing in the text is ever read as markup.
+    function render(text) {
+        tip.textContent = '';
+        text.split('**').forEach(function (part, i) {
+            if (!part) {
+                return;
+            }
+            var node = document.createTextNode(part);
+            if (i % 2) {
+                var bold = document.createElement('strong');
+                bold.appendChild(node);
+                node = bold;
+            }
+            tip.appendChild(node);
+        });
+    }
+
+    // Moves the title aside and shows it, or its data-tip when it has one; a
+    // blank title shows nothing.
+    function take(text, rich) {
         setAside(current, text);
         if (labelled) {
             current.setAttribute('aria-label', text);
         }
-        tip.textContent = text;
+        render(rich || text);
         tip.hidden = !text.trim();
         place();
     }
 
     // A script setting the title while the tooltip is up (a "Copied!" after a
-    // click) takes over from the one being shown.
+    // click) takes over from the one being shown, data-tip included.
     function retitle() {
         var text = current.getAttribute('title');
         if (text !== null) {
-            take(text);
+            take(text, null);
         }
     }
 
@@ -107,7 +130,7 @@ function installTitleTooltips(document, window) {
         if (described) {
             el.setAttribute('aria-describedby', tip.id);
         }
-        take(text);
+        take(text, el.getAttribute('data-tip'));
         for (var up = el.parentElement; up; up = up.parentElement) {
             if (up.hasAttribute('title')) {
                 setAside(up, up.getAttribute('title'));
