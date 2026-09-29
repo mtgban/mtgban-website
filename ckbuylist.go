@@ -39,12 +39,25 @@ const (
 	ckFactsPriceChange = 0.10
 )
 
-// The odds each state carries, measured over March to August 2026.
+// Each state's verdict on a line of its own, then the odds behind it,
+// measured over March to August 2026.
 const (
-	ckTipSell       = "Above CK's P90 with CK in stock. Two weeks later CK paid 5% more only 27% of the time, and 5% less or stopped buying 42% of the time (typical: 33% and 35%)."
-	ckTipBuyout     = "CK's stock halved since yesterday. Two weeks later CK paid 5% more 51% of the time (typical: 33%); the effect fades in two to three days."
-	ckTipOutOfStock = "CK is out of stock and paying its P90 or less. Two weeks later CK paid 5% more 48% of the time, and 5% less only 21% of the time (typical: 33% and 35%)."
-	ckTipCut        = "CK cut its buy price 20% or more this week. Two weeks later it paid 5% more 48% of the time (typical: 33%), though 20% of these cards stop being bought."
+	ckTipSell = "Sell now: CK pays above its P90 and has stock.\n" +
+		"Two weeks later CK paid:\n" +
+		"• 5% more, only 27% of the time (typical: 33%)\n" +
+		"• 5% less or stopped buying, 42% (typical: 35%)"
+	ckTipBuyout = "Wait: CK's stock halved since yesterday.\n" +
+		"Two weeks later CK paid:\n" +
+		"• 5% more, 51% of the time (typical: 33%)\n" +
+		"The effect fades in two to three days."
+	ckTipOutOfStock = "Wait: CK is out of stock, at or below its P90.\n" +
+		"Two weeks later CK paid:\n" +
+		"• 5% more, 48% of the time (typical: 33%)\n" +
+		"• 5% less, only 21% (typical: 35%)"
+	ckTipCut = "Wait: CK cut its buylist price 20% or more this week.\n" +
+		"Two weeks later CK paid:\n" +
+		"• 5% more, 48% of the time (typical: 33%)\n" +
+		"• 20% of these cards stop being bought."
 )
 
 // ckHistory is what the newspaper's snapshots say about one CK product.
@@ -281,6 +294,29 @@ func ckFacts(q ckQuote, h ckHistory, hasHistory bool, today time.Time) string {
 			}
 			parts = append(parts, fmt.Sprintf("buylist %s%.0f%% this week", sign, math.Abs(change)*100))
 		}
+	}
+	return strings.Join(parts, " · ")
+}
+
+// joinLines joins the lines that are not empty, one per line.
+func joinLines(lines ...string) string {
+	var kept []string
+	for _, line := range lines {
+		if line != "" {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
+// ckReferencePrices is CK's P90 and 90-day high on one line, or "".
+func ckReferencePrices(good, highest float64) string {
+	var parts []string
+	if good > 0 {
+		parts = append(parts, fmt.Sprintf("P90 $ %.2f", good))
+	}
+	if highest > 0 {
+		parts = append(parts, fmt.Sprintf("90-day high $ %.2f", highest))
 	}
 	return strings.Join(parts, " · ")
 }

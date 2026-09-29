@@ -589,7 +589,7 @@
                                         </div>
                                         {{end}}
                                         {{if $ckNote}}
-                                        <div class="m-detail-note">{{$card.CKFacts}}{{if $card.CKSignalTip}}<br>{{$card.CKSignalTip}}{{end}}</div>
+                                        <div class="m-detail-note">{{buylist_title $entry.Shorthand $conditions $mState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}</div>
                                         {{end}}
                                     </div>
                                 </details>

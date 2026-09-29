@@ -154,22 +154,34 @@ func TestBuylistCKHelpers(t *testing.T) {
 		}
 	}
 
-	title, ok := funcMap["buylist_title"].(func(string, string, float64, float64, string, string) string)
+	title, ok := funcMap["buylist_title"].(func(string, string, string, float64, float64, string, string) string)
 	if !ok {
 		t.Fatal("buylist_title has another signature")
 	}
-	got := title("CK", "NM", 9, 12, "CK stock 0", "odds")
-	if got != "Card Kingdom P90 $ 9.00; 90-day high $ 12.00\nCK stock 0\nodds" {
-		t.Errorf("buylist_title CK NM: got %q", got)
+	for _, tc := range []struct {
+		name                   string
+		shorthand, cond, state string
+		want                   string
+	}{
+		// The verdict, the facts, CK's reference prices, then the odds.
+		{"CK NM", "CK", "NM", "wait", "Wait: out\nCK stock 0\nP90 $ 9.00 · 90-day high $ 12.00\nodds 1\nodds 2"},
+		{"CK SP", "CK", "SP", "", ""},
+		{"other store green", "SCG", "NM", "best", "A good price: at or above Card Kingdom's P90 ($ 9.00)"},
+		{"other store below P90", "SCG", "NM", "", ""},
+	} {
+		got := title(tc.shorthand, tc.cond, tc.state, 9, 12, "CK stock 0", "Wait: out\nodds 1\nodds 2")
+		if got != tc.want {
+			t.Errorf("buylist_title %s: got %q, want %q", tc.name, got, tc.want)
+		}
 	}
-	got = title("SCG", "NM", 9, 0, "CK stock 0", "odds")
-	if got != "Card Kingdom P90 $ 9.00" {
-		t.Errorf("buylist_title other store: got %q", got)
+	got := title("CK", "NM", "", 9, 0, "CK stock 3", "")
+	if got != "CK stock 3\nP90 $ 9.00" {
+		t.Errorf("buylist_title CK NM without a signal: got %q", got)
 	}
 
 	const page = `{{buylist_state .Shorthand .Cond .IsOffer .Price .Good .Signal}}|` +
 		`{{buylist_wait .Shorthand .Cond .Signal .Tip}}|{{buylist_ck .Signal .Tip .Facts}}|` +
-		`<span title="{{buylist_title .Shorthand .Cond .Good .Highest .Facts .Tip}}"></span>`
+		`<span title="{{buylist_title .Shorthand .Cond .Signal .Good .Highest .Facts .Tip}}"></span>`
 	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(page))
 	var b strings.Builder
 	err := tmpl.Execute(&b, struct {
