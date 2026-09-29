@@ -123,6 +123,47 @@ $30+, which are cut no more often (9.0% against 8.8%) though raised less
 offers. 85% of them are at or above CK's listed price that day, and "above
 CK's listed price" predicts the same on twice the offers.
 
+### When CK pauses a card
+
+CK stops buying a card by setting its buy quantity to 0, and keeps listing
+a price it does not pay; the site shows it as CK's last known offer
+(CKBLLast). From 2025-12-29 to 2026-09-27 there were 150,313 such pauses on
+cards CK had been paying $1 or more for. CK almost never drops a card for
+good: 93% of pauses end within 30 days and 99% within 90, and 51 lasted
+past 180 days. How long a pause has lasted is what predicts its end, over
+1.1M paused card-days:
+
+| Paused so far | CK buys again within 7 days | Within 30 days |
+|---|---|---|
+| 0–2 days | 62% | 92% |
+| 3–6 days | 52% | 88% |
+| 7–13 days | 45% | 83% |
+| 14–29 days | 32% | 74% |
+| 30+ days | 20% | 58% |
+
+CK's stock adds little: 40–49% within a week at every stock level, 54% when
+the stock fell over the last 7 days. CK does lower the price it lists while
+paused, and after 14 days paused it came back 5%+ below what it last paid
+75% of the time.
+
+Whether waiting beats selling elsewhere was measured on the same Wednesdays
+as other stores' offers, from 2026-01-07 to 2026-08-26: 168,945 paused
+card-days, 81% of them with an SCG, ABU or CSI cash offer of $0.95 or more.
+CK's product ids were tied to the archive's cards through the card each
+product is filed under in CK's dumps (MTGJSON's Card Kingdom ids agree on
+99.9% of products but cover fewer):
+
+| Best other offer vs CK's listed price | Card-days | CK back within 30 days | CK back paying 5%+ more than that offer |
+|---|---|---|---|
+| under 80% | 15,177 | 74% | 73% |
+| 80–95% | 20,385 | 82% | 62% |
+| 95–100% | 3,597 | 80% | 26% |
+| 100–110% | 18,316 | 83% | 20% |
+| 110%+ | 78,864 | 85% | 4% |
+
+With every offer below 95%, waiting paid 76% of the time in a pause's
+first week, 66% in its second, 55% at 2–4 weeks and 41% after a month.
+
 ## Decision
 
 1. **Good and Highest stay** as reference prices, the level other stores'
@@ -163,9 +204,19 @@ CK's listed price" predicts the same on twice the offers.
 13. **Signals are computed when their inputs change**: CK's buylist or stock
     reloading, the P90s refreshing, and hourly, which also picks up a new day
     of history. Pages and filters read the result.
+14. **A paused card** (CK's last known NM offer of $1 or more) gets a pill
+    with the pause's length, from the last day the history saw CK buying:
+    `Paused 11d`, or `Paused 30d+` past the history's month. Its tooltip has
+    the chances of CK buying again within 7 and 30 days.
+15. **Wait (↑) on a pause** when it is under 14 days old and every other cash
+    buylist's NM offer is below 95% of CK's listed price, with at least one
+    such offer. Cash buylists are every singles buylist but CK's own, ABU's
+    credit list, TCGplayer Direct's net payout and lists of wants. Other
+    stores' offers get no mark, and paused cards stay out of `on:ckwait`.
+16. **CK's last known offer is never green**: CK does not pay it.
 
 Windows: 1 day for buyouts, 7 days for stock and price changes, 90 days for
-P90, and predictions stated over 14 days.
+P90, predictions stated over 14 days, and over 7 and 30 days for pauses.
 
 ## Options considered
 
@@ -199,7 +250,7 @@ a level to call "high".
   that are strict new highs, which show `New high`. `on:hotlist` and the
   sleepers page's Hotlist are unchanged.
 - The site reads the newspaper database's CK table: a `MAX(date)` every hour,
-  and a one-month aggregate (about 20 seconds) when the day or the newest
+  and a one-month aggregate (about 30 seconds) when the day or the newest
   snapshot changes. If it is unreachable the history-based rules stop
   firing; P90 and the live stock still work.
 - Every card CK is buying keeps its signal in memory: about 11 MB and 40 ms
@@ -210,3 +261,8 @@ a level to call "high".
   site's CK scraper has, is untested.
 - Other stores' green is measured on SCG, ABU and CSI, the buylists the
   price archive keeps; the site's other buylists have no history to measure.
+- A pause's wait is measured against those three stores too, but compared on
+  the page with every cash buylist, which only makes it fire less.
+- Pauses need CK's product id on its last known offers, which go-mtgban
+  records since mtgban/go-mtgban#1040, and see other buylists' reloads at
+  the next hourly rebuild.
