@@ -39,26 +39,26 @@ const (
 	ckFactsPriceChange = 0.10
 )
 
-// Each state's verdict on a line of its own, then the odds behind it,
-// measured over March to August 2026. The tooltip sets what sits between **
-// marks in bold (js/tooltips.js).
+// Each state's verdict on a line of its own, then its chances two weeks on
+// next to the usual ones, measured over March to August 2026. The tooltip
+// sets what sits between ** marks in bold (js/tooltips.js).
 const (
 	ckTipSell = "**Sell now**: CK pays above its P90 and has stock.\n" +
-		"Two weeks later CK paid:\n" +
-		"• 5% more, only **27%** of the time (typical: 33%)\n" +
-		"• 5% less or stopped buying, **42%** (typical: 35%)"
+		"Chances CK pays (two weeks from now):\n" +
+		"• 5% more: **27%** instead of 33%\n" +
+		"• 5% less or stops buying: **42%** instead of 35%"
 	ckTipBuyout = "**Wait**: CK's stock halved since yesterday.\n" +
-		"Two weeks later CK paid:\n" +
-		"• 5% more, **51%** of the time (typical: 33%)\n" +
-		"The effect fades in two to three days."
+		"Chances CK pays (two weeks from now):\n" +
+		"• 5% more: **51%** instead of 33%\n" +
+		"• 5% less or stops buying: **27%** instead of 35%"
 	ckTipOutOfStock = "**Wait**: CK is out of stock, at or below its P90.\n" +
-		"Two weeks later CK paid:\n" +
-		"• 5% more, **48%** of the time (typical: 33%)\n" +
-		"• 5% less, only **21%** (typical: 35%)"
+		"Chances CK pays (two weeks from now):\n" +
+		"• 5% more: **48%** instead of 33%\n" +
+		"• 5% less or stops buying: **21%** instead of 35%"
 	ckTipCut = "**Wait**: CK cut its buylist price 20% or more this week.\n" +
-		"Two weeks later CK paid:\n" +
-		"• 5% more, **48%** of the time (typical: 33%)\n" +
-		"• **20%** of these cards stop being bought."
+		"Chances CK pays (two weeks from now):\n" +
+		"• 5% more: **48%** instead of 33%\n" +
+		"• 5% less or stops buying: **42%** instead of 35%"
 )
 
 // ckHistory is what the newspaper's snapshots say about one CK product.
@@ -266,23 +266,23 @@ func ckSignalFor(q ckQuote, h ckHistory, hasHistory bool, good float64, today ti
 	return sig
 }
 
-// ckFacts describes CK's stock and recent buy price, e.g. "CK stock 0 · out 9
-// days · buylist −25% this week". Unlike the rules it shows whatever is known.
+// ckFacts describes CK's stock and recent buy price, e.g. "**CK stock**: 0 - out
+// 9 days · buylist −25% this week". Unlike the rules it shows whatever is known.
 func ckFacts(q ckQuote, h ckHistory, hasHistory bool, today time.Time) string {
 	var parts []string
 	if q.StockKnown {
-		stock := "CK stock " + strconv.Itoa(q.Stock)
+		stock := "**CK stock**: " + strconv.Itoa(q.Stock)
 		switch {
 		case q.Stock == 0 && hasHistory && h.LastInStock.IsZero():
-			stock += fmt.Sprintf(" · out %d+ days", ckHistoryWindow-1)
+			stock += fmt.Sprintf(" - out %d+ days", ckHistoryWindow-1)
 		case q.Stock == 0 && hasHistory:
 			days := int(today.Sub(h.LastInStock).Hours() / 24)
-			stock += " · out " + strconv.Itoa(days) + " day"
+			stock += " - out " + strconv.Itoa(days) + " day"
 			if days != 1 {
 				stock += "s"
 			}
 		case q.Stock > 0 && hasHistory && h.HasStockWeekAgo:
-			stock += fmt.Sprintf(" · %d a week ago", h.StockWeekAgo)
+			stock += fmt.Sprintf(" - it was %d a week ago", h.StockWeekAgo)
 		}
 		parts = append(parts, stock)
 	}
