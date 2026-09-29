@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"sync/atomic"
@@ -95,8 +96,13 @@ func (s *Store[T]) Save(ctx context.Context, value T) error {
 		return err
 	}
 	if _, err := io.Copy(writer, &buf); err != nil {
-		_ = writer.Close()
-		return err
+		// Closing would commit a truncated document, which the next Load
+		// cannot decode: discard the write instead where the writer can.
+		aborter, ok := writer.(simplecloud.Aborter)
+		if ok {
+			return errors.Join(err, aborter.Abort())
+		}
+		return errors.Join(err, writer.Close())
 	}
 	if err := writer.Close(); err != nil {
 		return err

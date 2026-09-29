@@ -2,6 +2,8 @@ package bucketstore
 
 import (
 	"context"
+	"errors"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -92,5 +94,55 @@ func TestStoreJSON(t *testing.T) {
 	}
 	if !strings.Contains(out, "\n  ") {
 		t.Errorf("JSON should be indented, got %q", out)
+	}
+}
+
+var errWriteFailed = errors.New("upload failed at write")
+
+// failWriteBucket opens every write on writer.
+type failWriteBucket struct {
+	simplecloud.ReadWriter
+	writer *failWriter
+}
+
+func (b failWriteBucket) NewWriter(context.Context, string) (io.WriteCloser, error) {
+	return b.writer, nil
+}
+
+// failWriter fails every write, and records whether the save then closed
+// it, which commits what was written, or aborted it.
+type failWriter struct{ closed, aborted bool }
+
+func (*failWriter) Write([]byte) (int, error) { return 0, errWriteFailed }
+
+func (w *failWriter) Close() error {
+	w.closed = true
+	return nil
+}
+
+func (w *failWriter) Abort() error {
+	w.aborted = true
+	return nil
+}
+
+// A save whose copy fails must abort it, not close it: Close would commit a
+// truncated document, which the next Load cannot decode.
+func TestStoreSaveFailingAtWriteAborts(t *testing.T) {
+	writer := &failWriter{}
+	s := &Store[testDoc]{
+		Bucket: func(context.Context) (simplecloud.ReadWriter, string, error) {
+			return failWriteBucket{writer: writer}, "doc.json", nil
+		},
+	}
+
+	err := s.Save(context.Background(), testDoc{Events: []string{"a"}})
+	if !errors.Is(err, errWriteFailed) {
+		t.Errorf("Save = %v, want the write's error", err)
+	}
+	if s.Get().Events != nil {
+		t.Errorf("Get after a failed Save = %v, want the zero value", s.Get())
+	}
+	if !writer.aborted || writer.closed {
+		t.Errorf("aborted %t, closed %t: a failed write must be aborted, never closed", writer.aborted, writer.closed)
 	}
 }
