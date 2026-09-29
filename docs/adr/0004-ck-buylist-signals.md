@@ -253,12 +253,12 @@ chances above.
 13. **Signals are computed when their inputs change**: CK's buylist or stock
     reloading, the P90s refreshing, and hourly, which also picks up a new day
     of history. Pages and filters read the result.
-14. **A paused card** (CK's last known NM offer of $1 or more) gets a pill
-    with the pause's length, from the last day the history saw CK buying:
-    `Paused 11d`, or `Paused 30d+` past the history's month. Its tooltip has
-    the chances of CK buying again within 7 and 30 days, but for a pause
-    older than the history: that may be a card CK never bought, outside the
-    pauses measured.
+14. **A paused card** (CK's last known NM offer of $1 or more, on a card CK
+    bought in the past year) gets a pill with the pause's length, from the
+    last day CK bought it: `Paused 11d`, or `Paused 30d+` past a month. Its
+    tooltip has the chances of CK buying again within 7 and 30 days. A card
+    CK did not buy in the past year gets no pill: it was never paused, as
+    with the cards of a set CK lists before its release.
 15. **Wait (↑) on a pause** when it is under 14 days old and every other cash
     buylist's NM offer is below 95% of CK's listed price, with at least one
     such offer. Cash buylists are every singles buylist but CK's own, ABU's
@@ -320,8 +320,9 @@ a level to call "high".
   that are strict new highs, which show `New high`. `on:hotlist` and the
   sleepers page's Hotlist are unchanged.
 - The site reads the newspaper database's CK table: a `MAX(date)` every hour,
-  and a one-month aggregate (about 30 seconds) when the day or the newest
-  snapshot changes. If it is unreachable the history-based rules stop
+  and a one-year aggregate (about 15 seconds; only the last day CK bought
+  each card reaches back a year, the rest a month) when the day or the
+  newest snapshot changes. If it is unreachable the history-based rules stop
   firing; P90 and the live stock still work.
 - Every card CK is buying keeps its signal in memory: about 11 MB and 40 ms
   to rebuild per 60,000 cards.

@@ -30,9 +30,11 @@ const (
 	ckBuyoutMinStock = 3
 	// A cut is a buy price at this share or less of the one a week before.
 	ckCutRatio = 0.8
-	// Days back the loader looks for the last day CK had stock, and the last
-	// day it bought the card.
+	// Days back the loader looks for the last day CK had stock.
 	ckHistoryWindow = 31
+	// Days back it looks for the last day CK bought the card: one CK bought
+	// on none of them has no pause, as CK never bought it.
+	ckBoughtLookback = 365
 	// Yesterday's snapshot may be this many days old: a missed day or two
 	// carries over, as in the backtest; more means the newspaper stopped.
 	ckHistoryMaxAge = 3
@@ -76,7 +78,7 @@ type ckHistory struct {
 	HasBuyWeekAgo     bool
 	// Zero when CK had no stock anywhere in the window.
 	LastInStock time.Time
-	// Zero when CK bought the card on no day of the window.
+	// Zero when CK bought the card on no day of the past year.
 	LastBuying time.Time
 }
 
@@ -100,9 +102,10 @@ func ckToday(now time.Time) time.Time {
 }
 
 // loadCKHistory reads, for every CK product, its stock yesterday and a week
-// ago, its buy price a week ago, and the last days it had stock and CK bought
-// it in the past month. It reruns only when the day or the newspaper's newest snapshot
-// changed, and keeps the last good load on any error.
+// ago, its buy price a week ago, the last day it had stock in the past month
+// and the last day CK bought it in the past year. It reruns only when the day
+// or the newspaper's newest snapshot changed, and keeps the last good load on
+// any error.
 func (s *site) loadCKHistory() {
 	if Config.Game != DefaultGame || SkipNewspaper || NewNewspaperDB == nil {
 		return
@@ -152,11 +155,12 @@ func (s *site) loadCKHistory() {
 		       MAX(quantity_selling) FILTER (WHERE date = $2),
 		       MAX(quantity_selling) FILTER (WHERE date = $3),
 		       MAX(price_buy) FILTER (WHERE date = $3),
-		       MAX(date) FILTER (WHERE quantity_selling > 0),
+		       MAX(date) FILTER (WHERE quantity_selling > 0 AND date >= $4),
 		       MAX(date) FILTER (WHERE quantity_buying > 0)
 		  FROM cardkingdomproductmodel
 		 WHERE date >= $1 AND date <= $2
-		 GROUP BY ck_id`, today.AddDate(0, 0, -ckHistoryWindow), yesterday, weekAgoDate)
+		 GROUP BY ck_id`, today.AddDate(0, 0, -ckBoughtLookback), yesterday, weekAgoDate,
+		today.AddDate(0, 0, -ckHistoryWindow))
 	if err != nil {
 		log.Println("ck history:", err)
 		return
@@ -259,15 +263,11 @@ type ckPause struct {
 // bought it, and whether waiting beats selling elsewhere. listed is CK's
 // price for it and others the other cash buylists' NM offers.
 func ckPauseFor(listed float64, h ckHistory, today time.Time, others []float64) ckPause {
-	if listed < ckMinBuyPrice {
+	if listed < ckMinBuyPrice || h.LastBuying.IsZero() {
 		return ckPause{}
 	}
-	// The pause began the day after the last one CK bought the card; none in
-	// the window means it began before the window did.
-	days := ckHistoryWindow
-	if !h.LastBuying.IsZero() {
-		days = max(int(today.Sub(h.LastBuying).Hours()/24)-1, 0)
-	}
+	// The pause began the day after the last one CK bought the card.
+	days := max(int(today.Sub(h.LastBuying).Hours()/24)-1, 0)
 	best := 0.0
 	for _, price := range others {
 		best = max(best, price)
