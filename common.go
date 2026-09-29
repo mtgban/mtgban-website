@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/mtgban/mtgban-website/internal/access"
+	"github.com/mtgban/simplecloud"
 )
 
 // The access table, the grant list and the affiliate data live beside the
@@ -115,14 +116,21 @@ func saveAffiliates(ctx context.Context, value AffiliatesConfig) error {
 		return err
 	}
 	err = json.NewEncoder(writer).Encode(value)
-	// Close finalises the upload, so its error is the write's error too, and
-	// a failure there must not be reported as a save.
-	cerr := writer.Close()
+	if err != nil {
+		// Closing would commit a truncated file, which every deployment
+		// sharing it would then fail to load: discard the upload instead
+		// where the writer can.
+		aborter, ok := writer.(simplecloud.Aborter)
+		if ok {
+			return errors.Join(err, aborter.Abort())
+		}
+		return errors.Join(err, writer.Close())
+	}
+	// Close finalises the upload, so a failure there must not be reported
+	// as a save.
+	err = writer.Close()
 	if err != nil {
 		return err
-	}
-	if cerr != nil {
-		return cerr
 	}
 	affiliatesPtr.Store(&value)
 	notifyAccessReload(ctx, affiliatesReloadChannel)
