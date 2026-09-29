@@ -443,8 +443,9 @@ body.mobile:has(.m-home) .m-nav-home {
 }
 
 .m-home-login-row {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    width: 100%;
     align-items: center;
     gap: 0.5em;
     margin-bottom: 0.75em;
@@ -457,8 +458,20 @@ body.mobile:has(.m-home) .m-nav-home {
     border-radius: 6px;
     text-decoration: none;
     /* One width for every label, so the theme toggle between them stays centred */
-    min-width: 4.5em;
+    width: 8em;
+    box-sizing: border-box;
     text-align: center;
+}
+.m-home-login-row .m-home-login-btn.patreon {
+    grid-column: 2;
+}
+.m-home-login-row .ban-theme-toggle {
+    grid-column: 1;
+    justify-self: end;
+}
+.m-home-login-row .m-home-login-btn.discord {
+    grid-column: 3;
+    justify-self: start;
 }
 
 .m-home-login-btn.patreon {
