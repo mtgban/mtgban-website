@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -15,11 +18,16 @@ import (
 // scrape of every listing. They fill the quantity TCGplayer's own row on
 // search leaves empty.
 
+// tcgListingsStore is the shorthand of the TCGplayer store the counts go on.
+const tcgListingsStore = "TCGPlayer"
+
 // The grades in the order the counts are kept, as the site names them and
 // as TCGplayer does.
 var (
 	tcgGrades      = [...]string{"NM", "SP", "MP", "HP", "PO"}
+	tcgGradeNames  = [...]string{"Near Mint", "Lightly Played", "Moderately Played", "Heavily Played", "Damaged"}
 	tcgGradeByName = map[string]int{"Near Mint": 0, "Lightly Played": 1, "Moderately Played": 2, "Heavily Played": 3, "Damaged": 4}
+	tcgGradeBySite = map[mtgban.Condition]int{mtgban.NM: 0, mtgban.SP: 1, mtgban.MP: 2, mtgban.HP: 3, mtgban.PO: 4}
 )
 
 // tcgListings is one printing's listings on TCGplayer: sellers and copies
@@ -219,4 +227,48 @@ func buildTCGListings(rows []tcgListingsRow, match func(productID int64, printin
 		cards[cardID] = counts
 	}
 	return cards, unmatched
+}
+
+// tcgListingsFor is what the TCGplayer row of a grade shows: sellers/copies
+// with a tooltip, or, for a printing the scrape cut short, TCGplayer's own
+// count on the NM row only.
+func tcgListingsFor(cardID string, grade mtgban.Condition) (text, title string) {
+	snap := tcgListingsPtr.Load()
+	if snap == nil {
+		return "", ""
+	}
+	counts, found := snap.Cards[cardID]
+	if !found {
+		return "", ""
+	}
+	i, found := tcgGradeBySite[grade]
+	if !found {
+		return "", ""
+	}
+	total := plural(int(counts.Total), "total listing") + " across conditions"
+	day := "(as of " + snap.Date.Format("Jan 2") + ")"
+	if counts.Capped {
+		if i != 0 {
+			return "", ""
+		}
+		return fmt.Sprintf("%d*", counts.Total), total + "\nPer-condition counts unavailable\n" + day
+	}
+	if counts.Sellers[i] == 0 {
+		return "", ""
+	}
+	text = fmt.Sprintf("%d/%d", counts.Sellers[i], counts.Copies[i])
+	title = fmt.Sprintf("%s\n%s / %s for %s\n%s", total,
+		plural(int(counts.Sellers[i]), "seller"), plural(int(counts.Copies[i]), "copy"), tcgGradeNames[i], day)
+	return text, title
+}
+
+// plural spells a count with its noun, "1 seller" or "14 copies".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	if strings.HasSuffix(noun, "y") {
+		noun = strings.TrimSuffix(noun, "y") + "ie"
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }

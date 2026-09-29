@@ -660,6 +660,10 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     text-align: right;
 }
+/* TCGplayer's sellers/copies (tcglistings.go) need more than a quantity */
+.m-vendor-right:has(.tcg-listings) {
+    grid-template-columns: 6em 4.5em 1.4em;
+}
 
 /* Best price highlight */
 .m-best-price summary,

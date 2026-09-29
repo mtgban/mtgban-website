@@ -3,8 +3,21 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/mtgban/go-mtgban/mtgban"
 )
+
+// setTestTCGListings files cards as the loaded counts, as of 2026-09-28,
+// restoring whatever was loaded when the test ends.
+func setTestTCGListings(t *testing.T, cards map[string]*tcgListings) {
+	t.Helper()
+	prev := tcgListingsPtr.Load()
+	t.Cleanup(func() { tcgListingsPtr.Store(prev) })
+	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC), Cards: cards})
+}
 
 // TestBuildTCGListings groups the rows by printing, keeps the grades
 // TCGplayer names, totals every printing's listings, and marks the
@@ -68,6 +81,128 @@ func TestBuildTCGListings(t *testing.T) {
 		got := cards[id]
 		if got == nil || *got != w {
 			t.Errorf("%s: got %+v, want %+v", id, got, w)
+		}
+	}
+}
+
+// TestTCGListingsFor checks what each grade's row shows, and that a
+// printing the scrape cut short shows TCGplayer's own count on NM only.
+func TestTCGListingsFor(t *testing.T) {
+	setTestTCGListings(t, map[string]*tcgListings{
+		"complete": {Sellers: [5]int32{51, 1, 0, 11, 5}, Copies: [5]int32{83, 1, 0, 19, 1204}, Total: 195},
+		"single":   {Sellers: [5]int32{1}, Copies: [5]int32{1}, Total: 1},
+		"bulk":     {Sellers: [5]int32{75, 12}, Copies: [5]int32{704, 93}, Capped: true, Total: 2357},
+	})
+	for _, tc := range []struct {
+		card        string
+		grade       mtgban.Condition
+		text, title string
+	}{
+		{"complete", "NM", "51/83", "195 total listings across conditions\n51 sellers / 83 copies for Near Mint\n(as of Sep 28)"},
+		{"complete", "SP", "1/1", "195 total listings across conditions\n1 seller / 1 copy for Lightly Played\n(as of Sep 28)"},
+		{"complete", "MP", "", ""},
+		{"complete", "PO", "5/1204", "195 total listings across conditions\n5 sellers / 1204 copies for Damaged\n(as of Sep 28)"},
+		{"single", "NM", "1/1", "1 total listing across conditions\n1 seller / 1 copy for Near Mint\n(as of Sep 28)"},
+		{"complete", "INDEX", "", ""},
+		{"bulk", "NM", "2357*", "2357 total listings across conditions\nPer-condition counts unavailable\n(as of Sep 28)"},
+		{"bulk", "SP", "", ""},
+		{"missing", "NM", "", ""},
+	} {
+		text, title := tcgListingsFor(tc.card, tc.grade)
+		if text != tc.text || title != tc.title {
+			t.Errorf("%s %s: got %q, %q; want %q, %q", tc.card, tc.grade, text, title, tc.text, tc.title)
+		}
+	}
+
+	tcgListingsPtr.Store(nil)
+	text, _ := tcgListingsFor("complete", "NM")
+	if text != "" {
+		t.Errorf("nothing loaded: got %q", text)
+	}
+}
+
+// TestSearchSellersCarryTCGListings checks the counts go on the TCGplayer
+// store's rows and no other store's.
+func TestSearchSellersCarryTCGListings(t *testing.T) {
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	now := time.Now()
+	inv := mtgban.InventoryRecord{"complete": {{Conditions: "NM", Price: 7.5, Quantity: 1}}}
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "TCGplayer", Shorthand: tcgListingsStore, NoQuantityInventory: true, InventoryTimestamp: &now}),
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Other Store", Shorthand: "OS", InventoryTimestamp: &now}),
+	}
+	sellersPtr.Store(&sellers)
+	setTestTCGListings(t, map[string]*tcgListings{
+		"complete": {Sellers: [5]int32{51}, Copies: [5]int32{83}, Total: 60},
+	})
+
+	found := searchSellersNG([]string{"complete"}, SearchConfig{})
+	entries := found["complete"]["NM"]
+	if len(entries) != 2 {
+		t.Fatalf("got %d NM entries, want 2: %+v", len(entries), entries)
+	}
+	for _, entry := range entries {
+		want := ""
+		if entry.Shorthand == tcgListingsStore {
+			want = "51/83"
+		}
+		if entry.Listings != want {
+			t.Errorf("%s: got listings %q, want %q", entry.Shorthand, entry.Listings, want)
+		}
+	}
+}
+
+// TestSearchShowsTCGListings renders the counts in the TCGplayer row's
+// quantity cell, desktop and mobile, and leaves a store's own quantity alone.
+func TestSearchShowsTCGListings(t *testing.T) {
+	const cardID = "tcg-listings-card"
+	const title = "60 total listings across conditions\n51 sellers / 83 copies for Near Mint\n(as of Sep 28)"
+	pageVars := PageVars{
+		CondKeys: []mtgban.Condition{"NM"},
+		AllKeys:  []string{cardID},
+		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set"}},
+		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{cardID: {
+			"NM": {
+				{ScraperName: "TCGplayer", Shorthand: tcgListingsStore, Price: 7.5, NoQuantity: true, URL: "https://example.test",
+					Listings: "51/83", ListingsTitle: title},
+				{ScraperName: "Other Store", Shorthand: "OS", Price: 8, Quantity: 3, URL: "https://example.test"},
+			},
+		}},
+		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
+	}
+	want := `<span class="tcg-listings" title="` + title + `">51/83</span>`
+	for name, page := range map[string]string{
+		"desktop": renderDesktopSearch(t, pageVars),
+		"mobile":  renderMobileSearch(t, pageVars),
+	} {
+		if strings.Count(page, want) != 1 {
+			t.Errorf("%s: want the counts once in the TCGplayer row, rendered:\n%s", name, page)
+		}
+		if strings.Count(page, `class="tcg-listings"`) != 1 {
+			t.Errorf("%s: counts on more than the TCGplayer row", name)
+		}
+	}
+}
+
+// TestPlural spells the counts' nouns, singular for one.
+func TestPlural(t *testing.T) {
+	for _, tc := range []struct {
+		n    int
+		noun string
+		want string
+	}{
+		{1, "seller", "1 seller"},
+		{0, "seller", "0 sellers"},
+		{1, "copy", "1 copy"},
+		{14, "copy", "14 copies"},
+		{1204, "copy", "1204 copies"},
+		{2374, "total listing", "2374 total listings"},
+		{1, "total listing", "1 total listing"},
+	} {
+		got := plural(tc.n, tc.noun)
+		if got != tc.want {
+			t.Errorf("plural(%d, %q): got %q, want %q", tc.n, tc.noun, got, tc.want)
 		}
 	}
 }

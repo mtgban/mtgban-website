@@ -1587,6 +1587,17 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
+/* TCGplayer's sellers/copies for the grade (tcglistings.go) */
+.price-row .qty .tcg-listings {
+    font-size: var(--text-sm);
+    cursor: help;
+}
+
+/* Its tooltip, three short lines, is narrower than the rest: the tooltip
+   script sets an element's title aside as data-ban-title while it shows. */
+body:has(.tcg-listings[data-ban-title]) #ban-tooltip {
+    max-width: min(240px, calc(100vw - 16px));
+}
 
 .price-cond-header {
     display: flex;

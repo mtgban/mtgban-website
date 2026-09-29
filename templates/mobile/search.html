@@ -470,7 +470,7 @@
                                         </span>
                                         <span class="m-vendor-right">
                                             <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
-                                            <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                            <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{$entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
                                     </summary>
@@ -491,7 +491,7 @@
                                     </span>
                                     <span class="m-vendor-right">
                                         <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
-                                        <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                        <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{$entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
                                     </span>
                                 </div>
                                 {{end}}

@@ -55,6 +55,11 @@ type SearchEntry struct {
 	NoQuantity   bool
 	BundleIcon   string
 
+	// Listings is TCGplayer's sellers/copies for the grade, on the TCGplayer
+	// store's rows (tcglistings.go), and ListingsTitle says what they count.
+	Listings      string
+	ListingsTitle string
+
 	// PriceUnit says what the number in this row's price slot is worth: an
 	// offer to rank and show as currency (the zero value), a store's count
 	// of copies wanted (the scraper declares it), or a synthetic row's
@@ -1626,6 +1631,9 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 				}
 				if info.CreditMultiplier > 0 {
 					res.Credit = entry.Price / info.CreditMultiplier
+				}
+				if info.Shorthand == tcgListingsStore {
+					res.Listings, res.ListingsTitle = tcgListingsFor(cardID, conditions)
 				}
 
 				// Touchdown

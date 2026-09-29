@@ -1641,6 +1641,8 @@
                                                                     <img style="padding-top:4px;" src="{{.BundleIcon}}">
                                                                 {{else if not .NoQuantity}}
                                                                     {{.Quantity}}
+                                                                {{else if .Listings}}
+                                                                    <span class="tcg-listings" title="{{.ListingsTitle}}">{{.Listings}}</span>
                                                                 {{end}}
                                                             </span>
                                                         {{end}}
