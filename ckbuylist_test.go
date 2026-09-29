@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -293,6 +294,101 @@ func TestRebuildCKSignals(t *testing.T) {
 	got = ckSignalForCard("a")
 	if got.State != "sell" {
 		t.Errorf("history from the day before: got %+v, want sell", got)
+	}
+}
+
+// TestCKPauseFor pins how long a pause has lasted, the chances it reads for
+// that, and when waiting for CK beats the other cash offers.
+func TestCKPauseFor(t *testing.T) {
+	today := time.Date(2026, 9, 29, 0, 0, 0, 0, time.UTC)
+	daysAgo := func(n int) ckHistory { return ckHistory{LastBuying: today.AddDate(0, 0, -n)} }
+	for _, tc := range []struct {
+		name   string
+		listed float64
+		h      ckHistory
+		others []float64
+		label  string
+		wait   bool
+		chance string // the within-a-week chance, or the wait one
+	}{
+		{"bought yesterday", 2.4, daysAgo(1), nil, "Paused today", false, "within a week: **62%**"},
+		{"bought two days ago", 2.4, daysAgo(2), nil, "Paused 1d", false, "within a week: **62%**"},
+		{"third day", 2.4, daysAgo(4), nil, "Paused 3d", false, "within a week: **52%**"},
+		{"second week", 2.4, daysAgo(12), nil, "Paused 11d", false, "within a week: **45%**"},
+		{"not bought in the window", 2.4, ckHistory{}, nil, "Paused 30d+", false, "within a week: **20%**"},
+		{"under $1", 0.9, daysAgo(4), nil, "", false, ""},
+		{"others 5% below", 2.4, daysAgo(5), []float64{1.8, 2.2}, "Paused 4d", true, "best other offer: **76%**"},
+		{"others 5% below, second week", 2.4, daysAgo(9), []float64{2.2}, "Paused 8d", true, "best other offer: **66%**"},
+		{"an offer within 5%", 2.4, daysAgo(5), []float64{1.8, 2.3}, "Paused 4d", false, ""},
+		{"two weeks in", 2.4, daysAgo(15), []float64{1.8}, "Paused 14d", false, ""},
+		{"no other offer", 2.4, daysAgo(5), nil, "Paused 4d", false, ""},
+	} {
+		got := ckPauseFor(tc.listed, tc.h, today, tc.others)
+		if got.Label != tc.label || got.Wait != tc.wait || !strings.Contains(got.Tip, tc.chance) {
+			t.Errorf("%s: got %+v, want %q wait %v with %q", tc.name, got, tc.label, tc.wait, tc.chance)
+		}
+	}
+
+	got := ckPauseFor(2.4, daysAgo(5), today, []float64{1.8})
+	want := "**Wait**: CK stopped buying this card 4 days ago, and every other cash offer is 5%+ below the price it lists.\n" +
+		"Chances CK buys it again:\n" +
+		"• within a week: **52%**\n" +
+		"• within 30 days: **88%**\n" +
+		"• within 30 days, paying 5% more than the best other offer: **76%**"
+	if got.Tip != want {
+		t.Errorf("wait tip:\n%s\nwant:\n%s", got.Tip, want)
+	}
+}
+
+// TestRebuildCKPauses gives the cards on CK's last known buylist their pause,
+// against the other stores' cash offers only.
+func TestRebuildCKPauses(t *testing.T) {
+	prevVendors, prevSignals := vendorsPtr.Load(), ckSignalsPtr.Load()
+	t.Cleanup(func() {
+		vendorsPtr.Store(prevVendors)
+		ckSignalsPtr.Store(prevSignals)
+	})
+	vendor := func(shorthand string, bl mtgban.BuylistRecord) mtgban.Vendor {
+		return mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand})
+	}
+	vendors := []mtgban.Vendor{
+		vendor("CK", mtgban.BuylistRecord{"both": {{Conditions: "NM", BuyPrice: 3, Quantity: 2, OriginalID: "111"}}}),
+		vendor("CKBLLast", mtgban.BuylistRecord{
+			"p":       {{Conditions: "NM", BuyPrice: 2.4, OriginalID: "333"}},
+			"both":    {{Conditions: "NM", BuyPrice: 2.4, OriginalID: "334"}},
+			"nohist":  {{Conditions: "NM", BuyPrice: 2.4, OriginalID: "444"}},
+			"noid":    {{Conditions: "NM", BuyPrice: 2.4}},
+			"blocked": {{Conditions: "NM", BuyPrice: 2.4, OriginalID: "555"}},
+		}),
+		vendor("SCG", mtgban.BuylistRecord{
+			"p":       {{Conditions: "NM", BuyPrice: 1.8}},
+			"blocked": {{Conditions: "NM", BuyPrice: 2.3}},
+		}),
+		// A credit list pays more, but not in cash.
+		vendor("ABUCredit", mtgban.BuylistRecord{"p": {{Conditions: "NM", BuyPrice: 3}}}),
+	}
+	vendorsPtr.Store(&vendors)
+	today := ckToday(time.Now())
+	paused := ckHistory{LastBuying: today.AddDate(0, 0, -5)}
+	setTestCKInputs(t, mtgban.InventoryRecord{}, &ckHistorySnapshot{
+		Today: today, Yesterday: today.AddDate(0, 0, -1),
+		Products: map[string]ckHistory{"333": paused, "334": paused, "555": paused},
+	})
+
+	rebuildCKSignals()
+	got := ckSignalForCard("p")
+	if got.Pause.Label != "Paused 4d" || !got.Pause.Wait || got.State != "" {
+		t.Errorf("paused 4 days, SCG 25%% below: got %+v, want a wait", got)
+	}
+	got = ckSignalForCard("blocked")
+	if got.Pause.Label != "Paused 4d" || got.Pause.Wait {
+		t.Errorf("SCG within 5%%: got %+v, want paused with no wait", got)
+	}
+	for _, cardID := range []string{"both", "nohist", "noid"} {
+		got = ckSignalForCard(cardID)
+		if got.Pause != (ckPause{}) {
+			t.Errorf("%s: got %+v, want no pause", cardID, got.Pause)
+		}
 	}
 }
 

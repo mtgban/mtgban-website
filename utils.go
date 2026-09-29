@@ -521,6 +521,9 @@ type GenericCard struct {
 	CKSignal          string // "sell", "wait" or "", see ckbuylist.go
 	CKSignalTip       string
 	CKFacts           string
+	CKPause           string // "Paused 12d" on a card CK is not buying
+	CKPauseWait       bool
+	CKPauseTip        string
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
@@ -1197,6 +1200,9 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		CKSignal:          ck.State,
 		CKSignalTip:       ck.Tip,
 		CKFacts:           ck.Facts,
+		CKPause:           ck.Pause.Label,
+		CKPauseWait:       ck.Pause.Wait,
+		CKPauseTip:        ck.Pause.Tip,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,
