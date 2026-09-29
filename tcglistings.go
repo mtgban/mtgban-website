@@ -45,9 +45,8 @@ type tcgListings struct {
 
 // tcgListingsSnapshot is one load of the counts, keyed by card uuid.
 type tcgListingsSnapshot struct {
-	Date    time.Time // the day of the scrape
-	Backend *mtgmatcher.Backend
-	Cards   map[string]*tcgListings
+	Date  time.Time // the day of the scrape
+	Cards map[string]*tcgListings
 }
 
 var tcgListingsPtr atomic.Pointer[tcgListingsSnapshot]
@@ -105,8 +104,10 @@ type tcgListingsRow struct {
 }
 
 // loadTCGListings reads the counts of the newspaper's last finished scrape
-// for this site's game. It reruns only when a newer scrape finished or the
-// datastore changed, and keeps the last good load on any error.
+// for this site's game. It reruns only when another scrape finished, and
+// keeps the last good load on any error. A datastore reload keeps the day's
+// counts: card ids outlast it, and a card it adds gets counts with the next
+// scrape.
 func (s *site) loadTCGListings() {
 	game, found := gameMap[Config.Game]
 	if !found || SkipNewspaper || NewNewspaperDB == nil {
@@ -132,7 +133,7 @@ func (s *site) loadTCGListings() {
 	}
 	b := s.backend()
 	current := tcgListingsPtr.Load()
-	if current != nil && current.Date.Equal(day.Time) && current.Backend == b {
+	if current != nil && current.Date.Equal(day.Time) {
 		return
 	}
 
@@ -176,7 +177,7 @@ func (s *site) loadTCGListings() {
 		return
 	}
 
-	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day.Time, Backend: b, Cards: cards})
+	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day.Time, Cards: cards})
 	log.Println("tcg listings: loaded", len(cards), "printings from", day.Time.Format(time.DateOnly)+",", unmatched, "not matched")
 }
 
