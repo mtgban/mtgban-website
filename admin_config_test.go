@@ -66,8 +66,8 @@ func TestAdminConfigSaveGetsDefaultsAndRegistry(t *testing.T) {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
 		}
 	}
-	if len(providerRegistry) != 1 {
-		t.Errorf("registry %+v, want the saved dataset", providerRegistry)
+	if len(chartProviders()) != 1 {
+		t.Errorf("registry %+v, want the saved dataset", chartProviders())
 	}
 
 	// A text with an empty game and no port gets the defaults, not "" and

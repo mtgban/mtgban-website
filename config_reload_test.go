@@ -14,8 +14,11 @@ import (
 // does, and puts back what loadVars replaces or rebuilds when the test ends.
 func withConfigFile(t *testing.T) string {
 	t.Helper()
-	saved, savedBucket, savedRegistry := Config, ConfigBucket, providerRegistry
-	t.Cleanup(func() { Config, ConfigBucket, providerRegistry = saved, savedBucket, savedRegistry })
+	saved, savedBucket, savedRegistry := Config, ConfigBucket, chartProviders()
+	t.Cleanup(func() {
+		Config, ConfigBucket = saved, savedBucket
+		providerRegistry.Store(&savedRegistry)
+	})
 	withSigMode(t, false, true)
 	t.Setenv("BAN_SECRET", "test-secret")
 
@@ -51,8 +54,8 @@ func TestConfigReloadDropsWhatTheFileDropped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(providerRegistry) != 1 {
-		t.Fatalf("registry %+v, want the one configured dataset", providerRegistry)
+	if len(chartProviders()) != 1 {
+		t.Fatalf("registry %+v, want the one configured dataset", chartProviders())
 	}
 
 	writeTestConfig(t, path, `{
@@ -69,9 +72,9 @@ func TestConfigReloadDropsWhatTheFileDropped(t *testing.T) {
 	if found || Config.APIUserSecrets["kept@example.com"] != "a" {
 		t.Errorf("api_user_secrets %v, want only the key the file still has", Config.APIUserSecrets)
 	}
-	if Config.TimeseriesConfig.Datasets != nil || len(providerRegistry) != 0 {
+	if Config.TimeseriesConfig.Datasets != nil || len(chartProviders()) != 0 {
 		t.Errorf("datasets %+v, registry %+v, want both gone with timeseries_config",
-			Config.TimeseriesConfig.Datasets, providerRegistry)
+			Config.TimeseriesConfig.Datasets, chartProviders())
 	}
 
 	// What loadVars adds to the file it adds again.

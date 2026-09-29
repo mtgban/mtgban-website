@@ -137,12 +137,7 @@ func TestChartPayloadMultiCard(t *testing.T) {
 // template running.
 func BenchmarkChartDatasets(b *testing.B) {
 	providers := []int16{1, 2, 3, 4, 8, 9, 10, 11, 12, 13}
-	providerRegistry = nil
-	for _, p := range providers {
-		providerRegistry = append(providerRegistry, providerDisplay{
-			Provider: p, Name: fmt.Sprintf("provider %d", p), Color: "rgb(0,0,0)",
-		})
-	}
+	storeProviders(providers)
 	for _, days := range []int{180, 730, 3650} {
 		results := syntheticSeries(days, providers, 1)
 		earliest := earliestChartedDate(results, timeseries.Lookback(days))
@@ -160,14 +155,20 @@ func BenchmarkChartDatasets(b *testing.B) {
 // list, so the measurement does not depend on a loaded config.
 func buildProviderRegistryForTest(t *testing.T, providers []int16) {
 	t.Helper()
-	saved := providerRegistry
-	t.Cleanup(func() { providerRegistry = saved })
-	providerRegistry = nil
+	saved := chartProviders()
+	t.Cleanup(func() { providerRegistry.Store(&saved) })
+	storeProviders(providers)
+}
+
+// storeProviders publishes a registry of the given providers.
+func storeProviders(providers []int16) {
+	var registry []providerDisplay
 	for _, p := range providers {
-		providerRegistry = append(providerRegistry, providerDisplay{
+		registry = append(registry, providerDisplay{
 			Provider: p, Name: fmt.Sprintf("provider %d", p), Color: "rgb(0,0,0)",
 		})
 	}
+	providerRegistry.Store(&registry)
 }
 
 func humanBytes(n int) string {

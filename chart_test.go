@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -292,10 +293,10 @@ func TestMergeMultiCardDatasetsCardWithNoDatasetsSkipsPaletteSlot(t *testing.T) 
 func withDatasets(t *testing.T, datasets []DatasetConfig) {
 	t.Helper()
 	prevConfig := Config.TimeseriesConfig
-	prevRegistry := providerRegistry
+	prevRegistry := chartProviders()
 	t.Cleanup(func() {
 		Config.TimeseriesConfig = prevConfig
-		providerRegistry = prevRegistry
+		providerRegistry.Store(&prevRegistry)
 	})
 	Config.TimeseriesConfig = TimeseriesConfig{Datasets: datasets}
 }
@@ -315,8 +316,8 @@ func TestBuildProviderRegistryMirrorsConfig(t *testing.T) {
 		{timeseries.ProviderCKBuylist, "Card Kingdom Buylist", "blue"},
 		{timeseries.ProviderMKMTrend, "Cardmarket Trend", "grey"},
 	}
-	if !slices.Equal(providerRegistry, want) {
-		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
+	if !slices.Equal(chartProviders(), want) {
+		t.Errorf("registry = %+v, want %+v", chartProviders(), want)
 	}
 }
 
@@ -330,8 +331,8 @@ func TestBuildProviderRegistrySkipsDatasetsWithoutProvider(t *testing.T) {
 	buildProviderRegistry()
 
 	want := []providerDisplay{{timeseries.ProviderTCGLow, "TCGplayer Low", "red"}}
-	if !slices.Equal(providerRegistry, want) {
-		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
+	if !slices.Equal(chartProviders(), want) {
+		t.Errorf("registry = %+v, want %+v", chartProviders(), want)
 	}
 }
 
@@ -339,8 +340,8 @@ func TestBuildProviderRegistryEmptyConfig(t *testing.T) {
 	withDatasets(t, nil)
 	buildProviderRegistry()
 
-	if len(providerRegistry) != 0 {
-		t.Errorf("a config with no datasets should register no providers: %+v", providerRegistry)
+	if len(chartProviders()) != 0 {
+		t.Errorf("a config with no datasets should register no providers: %+v", chartProviders())
 	}
 }
 
@@ -354,8 +355,45 @@ func TestBuildProviderRegistryDeduplicates(t *testing.T) {
 	buildProviderRegistry()
 
 	want := []providerDisplay{{timeseries.ProviderTCGLow, "TCGplayer Low", "red"}}
-	if !slices.Equal(providerRegistry, want) {
-		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
+	if !slices.Equal(chartProviders(), want) {
+		t.Errorf("registry = %+v, want %+v", chartProviders(), want)
+	}
+}
+
+// Charts read the registry while a config reload or an admin save rebuilds
+// it, so the rebuild must not race them. Run with -race.
+func TestProviderRegistryRebuildDoesNotRaceCharts(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow, Color: "red"},
+	})
+	buildProviderRegistry()
+	results := syntheticSeries(30, []int16{timeseries.ProviderTCGLow}, 1)
+	labels := getDateAxisValues(earliestChartedDate(results, timeseries.Lookback(30)))
+
+	stop := make(chan struct{})
+	var readers, started sync.WaitGroup
+	defer readers.Wait()
+	defer close(stop)
+	for range 4 {
+		started.Add(1)
+		readers.Go(func() {
+			chartDatasetsFrom(results, labels)
+			started.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					chartDatasetsFrom(results, labels)
+				}
+			}
+		})
+	}
+	// Rebuilt only once every reader is charting, or 20 fast rebuilds can
+	// finish before any reader runs.
+	started.Wait()
+	for range 200 {
+		buildProviderRegistry()
 	}
 }
 
