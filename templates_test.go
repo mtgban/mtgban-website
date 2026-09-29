@@ -127,7 +127,7 @@ func collectTemplateRefs(node parse.Node, out *[]string) {
 // TestBuylistCKHelpers pins the CK buylist helpers and executes them with the
 // argument types the pages pass: html/template checks those only when it runs.
 func TestBuylistCKHelpers(t *testing.T) {
-	state, ok := funcMap["buylist_state"].(func(string, string, bool, float64, float64, string) string)
+	state, ok := funcMap["buylist_state"].(func(string, string, bool, float64, float64, string, bool) string)
 	if !ok {
 		t.Fatal("buylist_state has another signature")
 	}
@@ -138,17 +138,22 @@ func TestBuylistCKHelpers(t *testing.T) {
 		isOffer    bool
 		price      float64
 		ckSignal   string
+		pauseWait  bool
 		want       string
 	}{
-		{"CK NM sell", "CK", "NM", true, 10, "sell", "best"},
-		{"CK NM wait", "CK", "NM", true, 9, "wait", "wait"},
-		{"CK NM neutral at P90", "CK", "NM", true, 9, "", ""},
-		{"CK SP never", "CK", "SP", true, 12, "sell", ""},
-		{"other store at P90", "SCG", "NM", true, 9, "wait", "best"},
-		{"other store below P90", "SCG", "NM", true, 8, "", ""},
-		{"not an offer", "SCG", "NM", false, 12, "", ""},
+		{"CK NM sell", "CK", "NM", true, 10, "sell", false, "best"},
+		{"CK NM wait", "CK", "NM", true, 9, "wait", false, "wait"},
+		{"CK NM neutral at P90", "CK", "NM", true, 9, "", false, ""},
+		{"CK SP never", "CK", "SP", true, 12, "sell", false, ""},
+		{"other store at P90", "SCG", "NM", true, 9, "wait", false, "best"},
+		{"other store below P90", "SCG", "NM", true, 8, "", false, ""},
+		{"not an offer", "SCG", "NM", false, 12, "", false, ""},
+		// CK is not paying its last known price, even above its P90.
+		{"CK paused above P90", "CKBLLast", "NM", true, 12, "", false, ""},
+		{"CK paused, worth waiting", "CKBLLast", "NM", true, 12, "", true, "wait"},
+		{"CK paused SP", "CKBLLast", "SP", true, 12, "", true, ""},
 	} {
-		got := state(tc.shorthand, tc.conditions, tc.isOffer, tc.price, 9, tc.ckSignal)
+		got := state(tc.shorthand, tc.conditions, tc.isOffer, tc.price, 9, tc.ckSignal, tc.pauseWait)
 		if got != tc.want {
 			t.Errorf("buylist_state %s: got %q, want %q", tc.name, got, tc.want)
 		}
@@ -179,7 +184,7 @@ func TestBuylistCKHelpers(t *testing.T) {
 		t.Errorf("buylist_title CK NM without a signal: got %q", got)
 	}
 
-	const page = `{{buylist_state .Shorthand .Cond .IsOffer .Price .Good .Signal}}|` +
+	const page = `{{buylist_state .Shorthand .Cond .IsOffer .Price .Good .Signal false}}|` +
 		`{{buylist_wait .Shorthand .Cond .Signal .Tip}}|{{buylist_ck .Signal}}|` +
 		`<span title="{{buylist_title .Shorthand .Cond .Signal .Good .Highest .Facts .Tip}}"></span>`
 	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(page))
@@ -237,6 +242,39 @@ func TestTipHelpers(t *testing.T) {
 	got = string(html("**Sell now:** <b>27%</b>"))
 	if got != "<strong>Sell now:</strong> &lt;b&gt;27%&lt;/b&gt;" {
 		t.Errorf("tip_html: got %s", got)
+	}
+}
+
+// TestBuylistPause executes the pause pill the way search calls it: on CK's
+// last known NM offer only, with the wait arrow when waiting pays.
+func TestBuylistPause(t *testing.T) {
+	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(
+		`{{buylist_pause .Shorthand .Cond .Label .Wait .Tip}}`))
+	for _, tc := range []struct {
+		name, shorthand, cond, label string
+		wait                         bool
+		want                         string
+	}{
+		{"paused", "CKBLLast", "NM", "Paused 3d", false,
+			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>`},
+		{"wait", "CKBLLast", "NM", "Paused 3d", true,
+			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>` +
+				` <span class="ck-wait" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">&#8593;</span>`},
+		{"not paused", "CKBLLast", "NM", "", false, ""},
+		{"another grade", "CKBLLast", "SP", "Paused 3d", true, ""},
+		{"another store", "CK", "NM", "Paused 3d", true, ""},
+	} {
+		var b strings.Builder
+		err := tmpl.Execute(&b, struct {
+			Shorthand, Cond, Label, Tip string
+			Wait                        bool
+		}{tc.shorthand, tc.cond, tc.label, "**Paused**: CK stopped", tc.wait})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b.String() != tc.want {
+			t.Errorf("%s: got %s, want %s", tc.name, b.String(), tc.want)
+		}
 	}
 }
 
