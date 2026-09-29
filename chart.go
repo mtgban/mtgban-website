@@ -242,8 +242,17 @@ type providerDisplay struct {
 // save, from the dataset config, which owns every provider's id, name, color, and
 // position: a provider a deployment wants on its charts needs an entry in
 // timeseries_config.datasets, including the TCGplayer metrics a non-Magic
-// deployment charts.
-var providerRegistry []providerDisplay
+// deployment charts. Published whole, never modified: chartProviders reads it.
+var providerRegistry atomic.Pointer[[]providerDisplay]
+
+// chartProviders is the current provider registry.
+func chartProviders() []providerDisplay {
+	registry := providerRegistry.Load()
+	if registry == nil {
+		return nil
+	}
+	return *registry
+}
 
 // buildProviderRegistry (re)builds providerRegistry from the loaded config. Call
 // it once after the config is parsed. Nothing is substituted for a dataset the
@@ -273,7 +282,7 @@ func buildProviderRegistry() {
 	if len(registry) == 0 && longForm {
 		log.Println("no chart providers configured: every timeseries_config.datasets entry needs a \"provider\" id")
 	}
-	providerRegistry = registry
+	providerRegistry.Store(&registry)
 }
 
 // fetchChartPrices reads one resolved target's series: by exact ban_id when the
@@ -423,7 +432,7 @@ func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []st
 		}
 	}
 	datasets := make([]Dataset, 0, len(present))
-	for _, pd := range providerRegistry {
+	for _, pd := range chartProviders() {
 		if present[pd.Provider] {
 			datasets = append(datasets, buildProviderDataset(results, labels, pd))
 		}

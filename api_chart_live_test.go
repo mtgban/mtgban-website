@@ -42,9 +42,10 @@ func TestChartDataAPILive(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 
 	defer func(db *timeseries.Client, ts TimeseriesConfig, reg []providerDisplay, dev, sig bool) {
-		PricesArchiveDB, Config.TimeseriesConfig, providerRegistry = db, ts, reg
+		PricesArchiveDB, Config.TimeseriesConfig = db, ts
+		providerRegistry.Store(&reg)
 		DevMode, SigCheck = dev, sig
-	}(PricesArchiveDB, Config.TimeseriesConfig, providerRegistry, DevMode, SigCheck)
+	}(PricesArchiveDB, Config.TimeseriesConfig, chartProviders(), DevMode, SigCheck)
 
 	PricesArchiveDB = client
 	Config.TimeseriesConfig = cfg.TimeseriesConfig

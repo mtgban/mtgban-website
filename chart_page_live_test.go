@@ -52,7 +52,7 @@ func TestChartPageCostLive(t *testing.T) {
 		t.Fatalf("warm read: %v", err)
 	}
 
-	t.Logf("ban_id %d, %d providers configured", banID, len(providerRegistry))
+	t.Logf("ban_id %d, %d providers configured", banID, len(chartProviders()))
 	t.Log("lookback   read     project   labels  series  gaps    inline-HTML")
 	for _, days := range []int{30, 90, 180, 365, 730, 1825, 3650} {
 		lb := timeseries.Lookback(days)
