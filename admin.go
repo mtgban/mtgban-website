@@ -1211,13 +1211,18 @@ func storeConfigFile(ctx context.Context, config ConfigType) error {
 		return err
 	}
 	err = writeConfigFile(config, writer)
-	// Close finalises the upload, so its error is the write's error too, and
-	// a failure there must not be reported as a save.
-	cerr := writer.Close()
 	if err != nil {
-		return err
+		// Closing would commit a truncated config, which the next start
+		// cannot parse: discard the upload instead where the writer can.
+		aborter, ok := writer.(simplecloud.Aborter)
+		if ok {
+			return errors.Join(err, aborter.Abort())
+		}
+		return errors.Join(err, writer.Close())
 	}
-	return cerr
+	// Close finalises the upload, so a failure there must not be reported
+	// as a save.
+	return writer.Close()
 }
 
 // saveConfig writes config to the config file and, once it is there, makes

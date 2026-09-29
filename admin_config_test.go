@@ -113,3 +113,52 @@ func TestAdminConfigSaveFailingAtCloseChangesNothing(t *testing.T) {
 		t.Errorf("error %v, game %q: a save that failed at Close went live", err, Config.Game)
 	}
 }
+
+var errWriteFailed = errors.New("upload failed at write")
+
+// failWriteBucket opens every write on writer.
+type failWriteBucket struct {
+	simplecloud.ReadWriter
+	writer *failWriteWriter
+}
+
+func (b failWriteBucket) NewWriter(context.Context, string) (io.WriteCloser, error) {
+	return b.writer, nil
+}
+
+// failWriteWriter fails every write, and records whether the save then
+// closed it, which commits what was written, or aborted it.
+type failWriteWriter struct{ closed, aborted bool }
+
+func (*failWriteWriter) Write([]byte) (int, error) { return 0, errWriteFailed }
+
+func (w *failWriteWriter) Close() error {
+	w.closed = true
+	return nil
+}
+
+func (w *failWriteWriter) Abort() error {
+	w.aborted = true
+	return nil
+}
+
+// A save whose write fails must abort the upload, not close it: Close would
+// commit a truncated config, which the next start cannot parse.
+func TestAdminConfigSaveFailingAtWriteAborts(t *testing.T) {
+	path := withConfigFile(t)
+	writeTestConfig(t, path, `{"game": "lorcana"}`)
+	err := loadVars("", "", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := &failWriteWriter{}
+	ConfigBucket = failWriteBucket{ConfigBucket, writer}
+
+	err = saveConfig(context.Background(), ConfigType{Game: "onepiece"})
+	if !errors.Is(err, errWriteFailed) || Config.Game != "lorcana" {
+		t.Errorf("error %v, game %q: a save that failed at its write went live", err, Config.Game)
+	}
+	if !writer.aborted || writer.closed {
+		t.Errorf("aborted %t, closed %t: a failed write must be aborted, never closed", writer.aborted, writer.closed)
+	}
+}
