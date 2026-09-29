@@ -34,11 +34,6 @@ func writeTestConfig(t *testing.T, path, body string) {
 	}
 }
 
-// reloadConfig reloads the way the admin page's ?reboot=config does.
-func reloadConfig() error {
-	return loadVars(Config.Port, Config.DatastorePath, Config.ACLPath, Config.PatreonGrantsPath)
-}
-
 // A key or a field deleted from the file is gone after a reload, as after a
 // restart. Decoding into the live config merged instead, so a revoked API
 // secret kept verifying until the process restarted.

@@ -259,8 +259,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars(Config.Port, Config.DatastorePath,
-			Config.ACLPath, Config.PatreonGrantsPath)
+		err := reloadConfig()
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		} else {

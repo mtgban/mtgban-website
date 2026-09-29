@@ -598,10 +598,10 @@ func init() {
 var Config ConfigType
 
 // configMu serializes what changes Config while the site serves - a reload,
-// an editor save, a new API key - each across its file I/O, so none lands
-// between another's change and its save; its holder reads Config freely.
-// A change to the API secrets also takes apiUsersMutex, inside this lock:
-// readers that take only that one never wait on the bucket.
+// an editor save, a new API key - each whole: what it reads of Config, its
+// file I/O and its change, so none lands inside another; its holder reads
+// Config freely. A change to the API secrets also takes apiUsersMutex,
+// inside this lock: readers that take only that one never wait on the bucket.
 var configMu sync.Mutex
 
 // APIGatewayConfig locates the API gateway the pricing page hands off to.
@@ -1087,10 +1087,10 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
+// loadVars reads the config file into a new live Config, then sets the port
+// and paths given over it and fills in the defaults. Once the site serves,
+// its caller holds configMu; startup calls it before anything else runs.
 func loadVars(port, datastorePath, aclPath, grantsPath string) error {
-	configMu.Lock()
-	defer configMu.Unlock()
-
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
@@ -1113,9 +1113,18 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	return nil
 }
 
+// reloadConfig reloads the config file for the admin page's ?reboot=config,
+// keeping the running port and paths. It reads them under configMu, so they
+// are the ones any save it waited on set.
+func reloadConfig() error {
+	configMu.Lock()
+	defer configMu.Unlock()
+	return loadVars(Config.Port, Config.DatastorePath, Config.ACLPath, Config.PatreonGrantsPath)
+}
+
 // applyOverrides sets the port and the datastore, ACL and grants paths to the
 // values given, over whatever the config file said; an empty one leaves the
-// file's. Startup passes the flags, ?reboot=config the running values. It must
+// file's. Startup passes the flags, reloadConfig the running values. It must
 // follow the decode, which would otherwise clobber them (breaking blue-green
 // deploys that run instances on distinct ports).
 func applyOverrides(port, datastorePath, aclPath, grantsPath string) {
