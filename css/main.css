@@ -947,8 +947,8 @@ span.emoji {
     cursor: help;
 }
 .bl-pill-high {
-    background: var(--accent-muted);
-    color: var(--ainfo);
+    background: color-mix(in srgb, var(--blue) 14%, transparent);
+    color: var(--blue);
 }
 .bl-pill-new {
     background: color-mix(in srgb, var(--asuccess) 14%, transparent);
