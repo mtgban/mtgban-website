@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"html/template"
 	"regexp"
+	"slices"
 	"testing"
 )
 
@@ -51,11 +52,14 @@ func TestUploadResultsGreenFollowsTheLegend(t *testing.T) {
 		want    []string
 	}{
 		{"buylist above the loaded price", true, 10, []string{"HIGH"}},
+		{"buylist, both stores above", true, 5, []string{"LOW", "HIGH"}},
+		// Equal is not above.
+		{"buylist at the loaded price", true, 12, nil},
 		{"buylist with no loaded price", true, 0, nil},
 		{"retail", false, 10, nil},
 	} {
 		got := greenCells(t, tc.buylist, tc.loaded, prices)
-		if len(got) != len(tc.want) || (len(got) > 0 && got[0] != tc.want[0]) {
+		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: green %v, want %v", tc.name, got, tc.want)
 		}
 	}
