@@ -216,7 +216,10 @@ func TestCKQuoteFrom(t *testing.T) {
 		{Conditions: "NM", BuyPrice: 10, Quantity: 4, OriginalID: "111"},
 		{Conditions: "SP", BuyPrice: 8, Quantity: 4, OriginalID: "111"},
 	}
-	stock := []mtgban.InventoryEntry{{Conditions: "NM", Quantity: 3}, {Conditions: "SP", Quantity: 2}}
+	stock := []mtgban.InventoryEntry{{Conditions: "NM", Quantity: 3, Price: 20}, {Conditions: "SP", Quantity: 2, Price: 16}}
+	// A card CK has none of: a link and no price, which the record files as
+	// one NM copy.
+	placeholder := []mtgban.InventoryEntry{{Conditions: "NM", Quantity: 1, URL: "https://www.cardkingdom.com/mtg/x"}}
 	for _, tc := range []struct {
 		name       string
 		offers     []mtgban.BuylistEntry
@@ -227,6 +230,7 @@ func TestCKQuoteFrom(t *testing.T) {
 		{"buying, stock across grades", offers, stock, true, ckQuote{ID: "111", Buy: 10, Buying: true, Stock: 5, StockKnown: true}},
 		{"not buying", []mtgban.BuylistEntry{{Conditions: "NM", BuyPrice: 6.4}}, nil, true, ckQuote{Buy: 6.4, StockKnown: true}},
 		{"out of stock", offers, nil, true, ckQuote{ID: "111", Buy: 10, Buying: true, StockKnown: true}},
+		{"out of stock, as CK's dump has it", offers, placeholder, true, ckQuote{ID: "111", Buy: 10, Buying: true, StockKnown: true}},
 		// No CK inventory loaded: stock is unknown, not zero.
 		{"no inventory", offers, nil, false, ckQuote{ID: "111", Buy: 10, Buying: true}},
 	} {
@@ -260,7 +264,7 @@ func TestRebuildCKSignals(t *testing.T) {
 			"a":   {{Conditions: "NM", BuyPrice: 10, Quantity: 4, OriginalID: "111"}},
 			"off": {{Conditions: "NM", BuyPrice: 10, OriginalID: "222"}},
 		},
-		mtgban.InventoryRecord{"a": {{Conditions: "NM", Quantity: 1}}})
+		mtgban.InventoryRecord{"a": {{Conditions: "NM", Quantity: 1, Price: 20}}})
 	today := ckToday(time.Now())
 	products := map[string]ckHistory{"111": {StockYesterday: 6, HasStockYesterday: true}}
 	setTestCKInputs(t, mtgban.InventoryRecord{"a": {{Price: 9}}, "off": {{Price: 9}}},
@@ -441,8 +445,8 @@ func TestCardFilterOnCK(t *testing.T) {
 			"neutral": {{Conditions: "NM", BuyPrice: 9, Quantity: 4, OriginalID: "3"}},
 		},
 		mtgban.InventoryRecord{
-			"sell":    {{Conditions: "NM", Quantity: 5}},
-			"neutral": {{Conditions: "NM", Quantity: 5}},
+			"sell":    {{Conditions: "NM", Quantity: 5, Price: 20}},
+			"neutral": {{Conditions: "NM", Quantity: 5, Price: 20}},
 		})
 	prevInfos := infosPtr.Load()
 	t.Cleanup(func() { infosPtr.Store(prevInfos) })

@@ -442,7 +442,8 @@ func ckReferencePrices(good, highest float64) string {
 // ckQuoteFrom reads CK's offer for a card from its buylist entries and its
 // stock from its inventory entries. CK's buylist keeps entries for cards it
 // is not buying, with no quantity, so buying needs a quantity as well as a
-// price.
+// price. Its inventory keeps one for a card it has none of, a link with no
+// price that the record files as one copy, so stock counts priced ones.
 func ckQuoteFrom(offers []mtgban.BuylistEntry, stock []mtgban.InventoryEntry, stockKnown bool) ckQuote {
 	var q ckQuote
 	for _, entry := range offers {
@@ -457,7 +458,9 @@ func ckQuoteFrom(offers []mtgban.BuylistEntry, stock []mtgban.InventoryEntry, st
 	q.StockKnown = stockKnown
 	if stockKnown {
 		for _, entry := range stock {
-			q.Stock += entry.Quantity
+			if entry.Price > 0 {
+				q.Stock += entry.Quantity
+			}
 		}
 	}
 	return q
