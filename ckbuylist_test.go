@@ -547,6 +547,14 @@ func TestCKPauseFor(t *testing.T) {
 	if tip := ckPauseTip(ckTestReopen, 4, true); tip != want {
 		t.Errorf("wait tip:\n%s\nwant:\n%s", tip, want)
 	}
+
+	// Without the reopening chances the wait's own still has its heading.
+	want = "**Wait**: CK stopped buying this card 11 days ago, and every other cash offer is 5%+ below the price it lists.\n" +
+		"Chances CK buys it again:\n" +
+		"• within 30 days, paying 5% more than the best other offer: **66%**"
+	if tip := ckPauseTip(nil, 11, true); tip != want {
+		t.Errorf("wait tip without odds:\n%s\nwant:\n%s", tip, want)
+	}
 }
 
 // TestRebuildCKPauses gives the cards on CK's last known buylist their pause,
