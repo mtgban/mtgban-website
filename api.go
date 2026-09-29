@@ -937,10 +937,12 @@ func (s *site) LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 	// whatever sits in front gives up and reports a gateway error against a
 	// reload that is running perfectly well. What the load then did is on
 	// the admin page, and in the server notifications.
-	state := s.reloads.Status()
 	if !s.startDatastoreReload(Config.DatastorePath, "api") {
+		// Read after the call that queued this one, so it names the reload
+		// it waits for.
+		state := s.reloads.Status()
 		w.WriteHeader(http.StatusAccepted)
-		fmt.Fprintf(w, `{"status": "ok", "state": "already running", "started": %q}`, state.StartedAt.UTC().Format(time.RFC3339))
+		fmt.Fprintf(w, `{"status": "ok", "state": "queued", "after": %q}`, state.StartedAt.UTC().Format(time.RFC3339))
 		return
 	}
 

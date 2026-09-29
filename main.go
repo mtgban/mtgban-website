@@ -1482,8 +1482,8 @@ func main() {
 	}
 
 	// Load through the tracker: a panic is recovered and recorded rather than
-	// killing the process, and a reload requested before this finishes is told
-	// one is already running instead of racing it.
+	// killing the process, and a reload requested before this finishes is
+	// queued to follow it instead of racing it.
 	s.reloads.Start("startup", Config.DatastorePath, func() error {
 		err := s.loadDatastore(Config.DatastorePath)
 		if err != nil {

@@ -37,6 +37,7 @@
                 <span class="admin-spinner"></span>
                 Datastore update in progress - started by {{.Source}} {{.Elapsed}} ago from <code>{{.Path}}</code>.
                 The site keeps serving the datastore it already has until this finishes.
+                {{if .Queued}}Another reload is queued to follow it.{{end}}
                 <a href="?">Refresh</a>
             </div>
         {{else if ne .Err ""}}
