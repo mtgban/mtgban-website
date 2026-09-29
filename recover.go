@@ -4,12 +4,32 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sync"
+	"time"
+)
+
+// panicQuietWindow is how long after a posted panic report the panics that
+// follow are only logged: a handler that panics on every request pings the
+// channel once a window, not once a request.
+const panicQuietWindow = 10 * time.Minute
+
+// panicReportMu guards when the last panic report was posted and how many
+// panics were only logged since. reportPanic holds it throughout, so each
+// panic's lines stay together in the log.
+var (
+	panicReportMu   sync.Mutex
+	lastPanicReport time.Time
+	quietPanics     int
 )
 
 // reportPanic logs a recovered panic and posts it to the server webhook as
 // three messages: what panicked (an @here), the top of the stack, and
-// source, the line saying where it happened.
+// source, the line saying where it happened. For panicQuietWindow after a
+// report posts, the panics that follow log the same three lines without
+// posting them, and the next report says how many there were.
 func reportPanic(errPanic any, source string) {
+	panicReportMu.Lock()
+	defer panicReportMu.Unlock()
 	log.Println("panic occurred:", errPanic)
 
 	// Restrict stack size to fit into discord message
@@ -21,6 +41,17 @@ func reportPanic(errPanic any, source string) {
 	}
 
 	msg := fmt.Sprint(errPanic)
+	if time.Since(lastPanicReport) < panicQuietWindow {
+		quietPanics++
+		log.Println(msg)
+		log.Println(string(buf))
+		log.Println(source)
+		return
+	}
+	if quietPanics > 0 {
+		msg += fmt.Sprintf(" (unposted panics since the last report: %d)", quietPanics)
+	}
+	lastPanicReport, quietPanics = time.Now(), 0
 	ServerNotify("panic", msg, true)
 	ServerNotify("panic", string(buf))
 	ServerNotify("panic", source)
