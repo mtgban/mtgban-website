@@ -253,7 +253,7 @@ func ckSignalFor(q ckQuote, h ckHistory, hasHistory bool, good float64, today ti
 }
 
 // ckFacts describes CK's stock and recent buy price, e.g. "CK stock 0 · out 9
-// days · buy −25% this week". Unlike the rules it shows whatever is known.
+// days · buylist −25% this week". Unlike the rules it shows whatever is known.
 func ckFacts(q ckQuote, h ckHistory, hasHistory bool, today time.Time) string {
 	var parts []string
 	if q.StockKnown {
@@ -279,7 +279,7 @@ func ckFacts(q ckQuote, h ckHistory, hasHistory bool, today time.Time) string {
 			if change < 0 {
 				sign = "−"
 			}
-			parts = append(parts, fmt.Sprintf("buy %s%.0f%% this week", sign, math.Abs(change)*100))
+			parts = append(parts, fmt.Sprintf("buylist %s%.0f%% this week", sign, math.Abs(change)*100))
 		}
 	}
 	return strings.Join(parts, " · ")
