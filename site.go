@@ -224,6 +224,11 @@ func (s *site) loadDatastore(path string) error {
 		defer recoverJob("datastore load cacheNewspaper")
 		s.cacheNewspaper()
 	}()
+	// TCGplayer's listing counts are keyed by this datastore's card ids.
+	go func() {
+		defer recoverJob("datastore load loadTCGListings")
+		s.loadTCGListings()
+	}()
 
 	return nil
 }

@@ -1562,6 +1562,10 @@ func main() {
 		// newspaper has a new day; until then that is one indexed MAX(date).
 		c.AddFunc("45 * * * *", recovered("cron refreshCKSignals", s.refreshCKSignals))
 
+		// Reload TCGplayer's sellers and copies per grade once the newspaper
+		// finishes a scrape; until then that is one MAX(calc_date).
+		c.AddFunc("50 * * * *", recovered("cron loadTCGListings", s.loadTCGListings))
+
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
 		c.AddFunc("20 */12 * * *", recovered("cron RequestRefresh", s.offline.RequestRefresh))
 
