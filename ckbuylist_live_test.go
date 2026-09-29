@@ -98,6 +98,14 @@ func TestCKHistoryLive(t *testing.T) {
 			break
 		}
 	}
+	// And one CK stopped buying within the window.
+	for _, id := range ids {
+		h := snap.Products[id]
+		if !h.LastBuying.IsZero() && h.LastBuying.Before(snap.Yesterday) {
+			sample = append(sample, id)
+			break
+		}
+	}
 
 	// The sample's raw rows over the window, reduced here rather than in SQL.
 	sampleIDs := make([]int64, len(sample))
@@ -108,7 +116,7 @@ func TestCKHistoryLive(t *testing.T) {
 		}
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT ck_id, date, quantity_selling, price_buy
+		SELECT ck_id, date, quantity_selling, price_buy, quantity_buying
 		  FROM cardkingdomproductmodel
 		 WHERE ck_id = ANY($1) AND date >= $2 AND date <= $3`,
 		pq.Array(sampleIDs), today.AddDate(0, 0, -ckHistoryWindow), snap.Yesterday)
@@ -120,9 +128,9 @@ func TestCKHistoryLive(t *testing.T) {
 	for rows.Next() {
 		var id int64
 		var date time.Time
-		var stock sql.NullInt64
+		var stock, buying sql.NullInt64
 		var buy sql.NullFloat64
-		err := rows.Scan(&id, &date, &stock, &buy)
+		err := rows.Scan(&id, &date, &stock, &buy, &buying)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,6 +148,9 @@ func TestCKHistoryLive(t *testing.T) {
 		if stock.Int64 > 0 && date.After(h.LastInStock) {
 			h.LastInStock = date
 		}
+		if buying.Int64 > 0 && date.After(h.LastBuying) {
+			h.LastBuying = date
+		}
 		want[key] = h
 	}
 	err = rows.Err()
@@ -152,7 +163,11 @@ func TestCKHistoryLive(t *testing.T) {
 		if !got.LastInStock.Equal(expected.LastInStock) {
 			t.Errorf("ck_id %s: last in stock %v, raw rows say %v", id, got.LastInStock, expected.LastInStock)
 		}
+		if !got.LastBuying.Equal(expected.LastBuying) {
+			t.Errorf("ck_id %s: last bought %v, raw rows say %v", id, got.LastBuying, expected.LastBuying)
+		}
 		got.LastInStock, expected.LastInStock = time.Time{}, time.Time{}
+		got.LastBuying, expected.LastBuying = time.Time{}, time.Time{}
 		if got != expected {
 			t.Errorf("ck_id %s: loaded %+v, raw rows say %+v", id, got, expected)
 		}

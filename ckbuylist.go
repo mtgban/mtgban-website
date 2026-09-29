@@ -29,7 +29,8 @@ const (
 	ckBuyoutMinStock = 3
 	// A cut is a buy price at this share or less of the one a week before.
 	ckCutRatio = 0.8
-	// Days back the loader looks for the last day CK had stock.
+	// Days back the loader looks for the last day CK had stock, and the last
+	// day it bought the card.
 	ckHistoryWindow = 31
 	// Yesterday's snapshot may be this many days old: a missed day or two
 	// carries over, as in the backtest; more means the newspaper stopped.
@@ -71,6 +72,8 @@ type ckHistory struct {
 	HasBuyWeekAgo     bool
 	// Zero when CK had no stock anywhere in the window.
 	LastInStock time.Time
+	// Zero when CK bought the card on no day of the window.
+	LastBuying time.Time
 }
 
 // ckHistorySnapshot is one load of the history, keyed by CK's product id.
@@ -93,8 +96,8 @@ func ckToday(now time.Time) time.Time {
 }
 
 // loadCKHistory reads, for every CK product, its stock yesterday and a week
-// ago, its buy price a week ago, and the last day it had stock in the past
-// month. It reruns only when the day or the newspaper's newest snapshot
+// ago, its buy price a week ago, and the last days it had stock and CK bought
+// it in the past month. It reruns only when the day or the newspaper's newest snapshot
 // changed, and keeps the last good load on any error.
 func (s *site) loadCKHistory() {
 	if Config.Game != DefaultGame || SkipNewspaper || NewNewspaperDB == nil {
@@ -145,7 +148,8 @@ func (s *site) loadCKHistory() {
 		       MAX(quantity_selling) FILTER (WHERE date = $2),
 		       MAX(quantity_selling) FILTER (WHERE date = $3),
 		       MAX(price_buy) FILTER (WHERE date = $3),
-		       MAX(date) FILTER (WHERE quantity_selling > 0)
+		       MAX(date) FILTER (WHERE quantity_selling > 0),
+		       MAX(date) FILTER (WHERE quantity_buying > 0)
 		  FROM cardkingdomproductmodel
 		 WHERE date >= $1 AND date <= $2
 		 GROUP BY ck_id`, today.AddDate(0, 0, -ckHistoryWindow), yesterday, weekAgoDate)
@@ -160,8 +164,8 @@ func (s *site) loadCKHistory() {
 		var id int64
 		var stockYesterday, stockWeekAgo sql.NullInt64
 		var buyWeekAgo sql.NullFloat64
-		var lastInStock sql.NullTime
-		err := rows.Scan(&id, &stockYesterday, &stockWeekAgo, &buyWeekAgo, &lastInStock)
+		var lastInStock, lastBuying sql.NullTime
+		err := rows.Scan(&id, &stockYesterday, &stockWeekAgo, &buyWeekAgo, &lastInStock, &lastBuying)
 		if err != nil {
 			log.Println("ck history:", err)
 			return
@@ -174,6 +178,7 @@ func (s *site) loadCKHistory() {
 			BuyWeekAgo:        buyWeekAgo.Float64,
 			HasBuyWeekAgo:     buyWeekAgo.Valid,
 			LastInStock:       lastInStock.Time,
+			LastBuying:        lastBuying.Time,
 		}
 	}
 	err = rows.Err()
