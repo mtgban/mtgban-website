@@ -15,7 +15,7 @@ require (
 	github.com/mileusna/useragent v1.3.5
 	github.com/mtgban/go-cardmarket v0.3.1
 	github.com/mtgban/go-mtgban v0.9.2
-	github.com/mtgban/simplecloud v0.0.16
+	github.com/mtgban/simplecloud v0.0.17
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0

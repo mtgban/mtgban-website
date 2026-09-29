@@ -233,8 +233,7 @@ func TestNewKeysAtOnceDoNotRace(t *testing.T) {
 	}
 }
 
-// panicCloseBucket takes whatever is written and panics at Close, as B2's
-// writer does when an upload under its chunk size fails.
+// panicCloseBucket takes whatever is written and panics at Close.
 type panicCloseBucket struct{ simplecloud.ReadWriter }
 
 type panicCloseWriter struct{ failCloseWriter }
