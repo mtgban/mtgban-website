@@ -94,21 +94,21 @@ func TestCKFacts(t *testing.T) {
 		want      string
 	}{
 		{"out for days", ckQuote{Stock: 0, StockKnown: true, Buy: 5},
-			ckHistory{LastInStock: today.AddDate(0, 0, -9)}, false, "CK stock 0 · out 9 days"},
+			ckHistory{LastInStock: today.AddDate(0, 0, -9)}, false, "**CK stock**: 0 - out 9 days"},
 		{"out since yesterday", ckQuote{Stock: 0, StockKnown: true, Buy: 5},
-			ckHistory{LastInStock: today.AddDate(0, 0, -1)}, false, "CK stock 0 · out 1 day"},
+			ckHistory{LastInStock: today.AddDate(0, 0, -1)}, false, "**CK stock**: 0 - out 1 day"},
 		{"out all month", ckQuote{Stock: 0, StockKnown: true, Buy: 5},
-			ckHistory{}, false, "CK stock 0 · out 30+ days"},
+			ckHistory{}, false, "**CK stock**: 0 - out 30+ days"},
 		{"in stock, a week ago", ckQuote{Stock: 3, StockKnown: true, Buy: 5},
-			ckHistory{StockWeekAgo: 12, HasStockWeekAgo: true}, false, "CK stock 3 · 12 a week ago"},
+			ckHistory{StockWeekAgo: 12, HasStockWeekAgo: true}, false, "**CK stock**: 3 - it was 12 a week ago"},
 		{"price cut", ckQuote{Stock: 3, StockKnown: true, Buy: 7.5},
-			ckHistory{BuyWeekAgo: 10, HasBuyWeekAgo: true}, false, "CK stock 3 · buylist −25% this week"},
+			ckHistory{BuyWeekAgo: 10, HasBuyWeekAgo: true}, false, "**CK stock**: 3 · buylist −25% this week"},
 		{"price raise", ckQuote{Stock: 3, StockKnown: true, Buy: 12},
-			ckHistory{BuyWeekAgo: 10, HasBuyWeekAgo: true}, false, "CK stock 3 · buylist +20% this week"},
+			ckHistory{BuyWeekAgo: 10, HasBuyWeekAgo: true}, false, "**CK stock**: 3 · buylist +20% this week"},
 		{"small change", ckQuote{Stock: 3, StockKnown: true, Buy: 10.5},
-			ckHistory{BuyWeekAgo: 10, HasBuyWeekAgo: true}, false, "CK stock 3"},
+			ckHistory{BuyWeekAgo: 10, HasBuyWeekAgo: true}, false, "**CK stock**: 3"},
 		{"no history", ckQuote{Stock: 0, StockKnown: true, Buy: 5},
-			ckHistory{}, true, "CK stock 0"},
+			ckHistory{}, true, "**CK stock**: 0"},
 		{"nothing known", ckQuote{Buy: 5}, ckHistory{}, true, ""},
 	}
 	for _, tc := range cases {
@@ -330,7 +330,7 @@ func TestLoadScraperRebuildsCKSignals(t *testing.T) {
 	dump(0, now.Add(time.Minute))
 	load("retail")
 	got = ckSignalForCard("a")
-	if got.State != "" || got.Facts != "CK stock 0" {
+	if got.State != "" || got.Facts != "**CK stock**: 0" {
 		t.Errorf("after the retail reload: got %+v, want no state at stock 0", got)
 	}
 }
