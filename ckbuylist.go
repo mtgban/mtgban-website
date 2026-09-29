@@ -556,10 +556,11 @@ func ckSignalForCard(co *mtgmatcher.CardObject) ckView {
 	}
 	odds, finish := ckOddsPtr.Load(), ckFinishOf(co)
 	v := ckView{Facts: sig.Facts}
-	switch sig.Rule {
-	case "sell":
+	switch {
+	case !odds.holdsOn(sig.ID, finish, sig.Rule):
+	case sig.Rule == "sell":
 		v.State = "sell"
-	case "buyout", "outofstock", "cut":
+	case sig.Rule == "buyout" || sig.Rule == "outofstock" || sig.Rule == "cut":
 		v.State = "wait"
 	}
 	if v.State != "" {
