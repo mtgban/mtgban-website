@@ -293,12 +293,12 @@ var funcMap = template.FuncMap{
 	// buylist_badge renders a pill next to the store name when the store is the
 	// card's hotlist store: "New high" when Card Kingdom's price beats every
 	// price of the last 90 days, "90d high" when it ties the highest.
-	"buylist_badge": func(shorthand, hotlistStore string, newHigh bool) template.HTML {
+	"buylist_badge": func(shorthand, hotlistStore string, newHigh bool, newHighTip string) template.HTML {
 		switch {
 		case shorthand != hotlistStore:
 			return ""
 		case newHigh:
-			return template.HTML(` <span class="bl-pill bl-pill-new"` + tipAttrs(ckNewHighTip) + `>New high</span>`)
+			return template.HTML(` <span class="bl-pill bl-pill-new"` + tipAttrs(newHighTip) + `>New high</span>`)
 		}
 		return template.HTML(` <span class="bl-pill bl-pill-high"` + tipAttrs(ckAtHighTip) + `>90d high</span>`)
 	},

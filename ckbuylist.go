@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // Card Kingdom's buylist moves with its retail stock: CK pays more for cards
@@ -40,41 +41,15 @@ const (
 	ckFactsPriceChange = 0.10
 )
 
-// Each state's verdict on a line of its own, then its chances two weeks on
-// next to the usual ones, measured over March to August 2026. The tooltip
-// sets what sits between ** marks in bold (js/tooltips.js).
-const (
-	ckTipSell = "**Sell now**: CK pays above its P90 and has stock.\n" +
-		"Chances CK pays (two weeks from now):\n" +
-		"• 5% more: **27%** instead of 33%\n" +
-		"• 5% less or stops buying: **42%** instead of 35%"
-	ckTipBuyout = "**Wait**: CK's stock halved since yesterday.\n" +
-		"Chances CK pays (two weeks from now):\n" +
-		"• 5% more: **51%** instead of 33%\n" +
-		"• 5% less or stops buying: **27%** instead of 35%"
-	ckTipOutOfStock = "**Wait**: CK is out of stock, at or below its P90.\n" +
-		"Chances CK pays (two weeks from now):\n" +
-		"• 5% more: **48%** instead of 33%\n" +
-		"• 5% less or stops buying: **21%** instead of 35%"
-	ckTipCut = "**Wait**: CK cut its buylist price 20% or more this week.\n" +
-		"Chances CK pays (two weeks from now):\n" +
-		"• 5% more: **48%** instead of 33%\n" +
-		"• 5% less or stops buying: **42%** instead of 35%"
-)
-
-// A card CK is not buying sits on its last known buylist (CKBLLast) at the
-// price CK lists for it. How long CK has had it paused predicts CK buying it
-// again: the chances within 7 and 30 days, from the longest pause down,
-// measured over January to August 2026 on cards CK last paid $1 or more for.
-var ckPauseChances = []struct {
-	MinDays     int
-	Week, Month int
-}{
-	{30, 20, 58},
-	{14, 32, 74},
-	{7, 45, 83},
-	{3, 52, 88},
-	{0, 62, 92},
+// Each rule's verdict, the first line of its tooltip; the chances of the
+// card's category follow it (ckodds.go). The tooltip sets what sits between
+// ** marks in bold (js/tooltips.js).
+var ckVerdicts = map[string]string{
+	"sell":       "**Sell now**: CK pays above its P90 and has stock.",
+	"buyout":     "**Wait**: CK's stock halved since yesterday.",
+	"outofstock": "**Wait**: CK is out of stock, at or below its P90.",
+	"cut":        "**Wait**: CK cut its buylist price 20% or more this week.",
+	"newhigh":    "**New high**: Card Kingdom just beat every price of the last 90 days.",
 }
 
 const (
@@ -266,6 +241,7 @@ type ckQuote struct {
 // facts about CK's stock and price and, on a card CK is not buying, its
 // pause. ckSignalForCard tells the pages what it means.
 type ckSignal struct {
+	ID    string // CK's product id, which names the card's category
 	Rule  string
 	Facts string
 	Pause ckPause
@@ -312,15 +288,9 @@ func ckPauseLabel(days int) string {
 }
 
 // ckPauseTip is the tooltip of a pause that has lasted days: since when, and
-// the chances of CK buying the card again.
-func ckPauseTip(days int, wait bool) string {
-	chances := ckPauseChances[len(ckPauseChances)-1]
-	for _, c := range ckPauseChances {
-		if days >= c.MinDays {
-			chances = c
-			break
-		}
-	}
+// the chances of CK buying the card again, from the longest pause down,
+// where they were measured.
+func ckPauseTip(reopen []ckReopen, days int, wait bool) string {
 	since := strconv.Itoa(days) + " days ago"
 	switch {
 	case days >= 30:
@@ -336,11 +306,14 @@ func ckPauseTip(days int, wait bool) string {
 		verdict = "**Wait**: CK stopped buying this card " + since +
 			", and every other cash offer is 5%+ below the price it lists."
 	}
-	lines := []string{
-		verdict,
-		"Chances CK buys it again:",
-		fmt.Sprintf("• within a week: **%d%%**", chances.Week),
-		fmt.Sprintf("• within 30 days: **%d%%**", chances.Month),
+	lines := []string{verdict}
+	for _, chances := range reopen {
+		if days >= chances.MinDays {
+			lines = append(lines, "Chances CK buys it again:",
+				fmt.Sprintf("• within a week: **%d%%**", chances.Week),
+				fmt.Sprintf("• within 30 days: **%d%%**", chances.Month))
+			break
+		}
 	}
 	if wait {
 		odds := ckPauseWaitFirstWeek
@@ -514,6 +487,7 @@ func rebuildCKSignals() {
 		h, found := history.historyFor(q.ID, today)
 		sig := ckSignalFor(q, h, found, p90, today)
 		if sig != (ckSignal{}) {
+			sig.ID = q.ID
 			signals[cardID] = sig
 		}
 	}
@@ -545,16 +519,17 @@ func rebuildCKSignals() {
 		}
 		pause := ckPauseFor(q.Buy, h, today, others)
 		if pause.Paused {
-			signals[cardID] = ckSignal{Pause: pause}
+			signals[cardID] = ckSignal{ID: q.ID, Pause: pause}
 		}
 	}
 	ckSignalsPtr.Store(&signals)
 }
 
-// refreshCKSignals reloads the history when the newspaper has a new day, and
-// rebuilds the signals either way.
+// refreshCKSignals reloads the history when the newspaper has a new day and
+// the odds when they are a day old, and rebuilds the signals either way.
 func (s *site) refreshCKSignals() {
 	s.loadCKHistory()
+	refreshCKOdds()
 	rebuildCKSignals()
 }
 
@@ -569,28 +544,49 @@ type ckView struct {
 }
 
 // ckSignalForCard is a card's CK signal as of the last rebuild: the verdict
-// its rule means, with the chances behind it.
-func ckSignalForCard(cardID string) ckView {
+// its rule means, with the chances measured on cards of its category.
+func ckSignalForCard(co *mtgmatcher.CardObject) ckView {
 	signals := ckSignalsPtr.Load()
 	if signals == nil {
 		return ckView{}
 	}
-	sig := (*signals)[cardID]
+	sig, found := (*signals)[co.UUID]
+	if !found {
+		return ckView{}
+	}
+	odds, finish := ckOddsPtr.Load(), ckFinishOf(co)
 	v := ckView{Facts: sig.Facts}
 	switch sig.Rule {
 	case "sell":
-		v.State, v.Tip = "sell", ckTipSell
-	case "buyout":
-		v.State, v.Tip = "wait", ckTipBuyout
-	case "outofstock":
-		v.State, v.Tip = "wait", ckTipOutOfStock
-	case "cut":
-		v.State, v.Tip = "wait", ckTipCut
+		v.State = "sell"
+	case "buyout", "outofstock", "cut":
+		v.State = "wait"
+	}
+	if v.State != "" {
+		v.Tip = odds.tip(sig.ID, finish, sig.Rule)
 	}
 	if sig.Pause.Paused {
 		v.PauseLabel = ckPauseLabel(sig.Pause.Days)
 		v.PauseWait = sig.Pause.Wait
-		v.PauseTip = ckPauseTip(sig.Pause.Days, sig.Pause.Wait)
+		v.PauseTip = odds.pauseTip(sig.ID, sig.Pause.Days, sig.Pause.Wait)
 	}
 	return v
+}
+
+// ckNewHighTipFor is the New high pill's tooltip on a card.
+func ckNewHighTipFor(co *mtgmatcher.CardObject) string {
+	var id string
+	signals := ckSignalsPtr.Load()
+	if signals != nil {
+		id = (*signals)[co.UUID].ID
+	}
+	return ckOddsPtr.Load().tip(id, ckFinishOf(co), "newhigh")
+}
+
+// ckFinishOf is a card's finish as its chances were measured: etched is foil.
+func ckFinishOf(co *mtgmatcher.CardObject) string {
+	if co.Foil || co.Etched {
+		return "foil"
+	}
+	return "nonfoil"
 }

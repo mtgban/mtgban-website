@@ -289,22 +289,22 @@ func TestBuylistPause(t *testing.T) {
 
 // TestBuylistBadgePills executes the hotlist pills the way the pages call them.
 func TestBuylistBadgePills(t *testing.T) {
-	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(`{{buylist_badge .Store .Hotlist .New}}`))
+	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(`{{buylist_badge .Store .Hotlist .New .Tip}}`))
 	for _, tc := range []struct {
 		store, hotlist string
 		isNew          bool
 		want           string
 	}{
-		{"CK", "CK", true, `class="bl-pill bl-pill-new"`},
+		{"CK", "CK", true, `class="bl-pill bl-pill-new" title="New high: CK" data-tip="**New high**: CK"`},
 		{"CK", "CK", false, `class="bl-pill bl-pill-high"`},
 		{"SCG", "CK", true, ""},
 		{"CK", "", false, ""},
 	} {
 		var b strings.Builder
 		err := tmpl.Execute(&b, struct {
-			Store, Hotlist string
-			New            bool
-		}{tc.store, tc.hotlist, tc.isNew})
+			Store, Hotlist, Tip string
+			New                 bool
+		}{tc.store, tc.hotlist, "**New high**: CK", tc.isNew})
 		if err != nil {
 			t.Fatal(err)
 		}

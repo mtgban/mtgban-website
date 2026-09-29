@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -173,4 +174,35 @@ func TestCKHistoryLive(t *testing.T) {
 		}
 	}
 	t.Logf("checked %d products against their rows", len(sample))
+}
+
+// TestCKOddsFileLive loads a file go-mtgban's ckodds wrote and checks every
+// category it names gets every rule's tooltip with chances in it. Skipped
+// unless pointed at one:
+//
+//	CKODDS_FILE=ck-odds.json.xz go test -run TestCKOddsFileLive -v
+func TestCKOddsFileLive(t *testing.T) {
+	path := os.Getenv("CKODDS_FILE")
+	if path == "" {
+		t.Skip("CKODDS_FILE not set; skipping the live CK odds test")
+	}
+	odds, err := loadCKOdds(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("measured %s to %s, %d products", odds.From, odds.To, len(odds.categories))
+	for id, category := range odds.categories {
+		for rule := range ckVerdicts {
+			for _, finish := range []string{"foil", "nonfoil"} {
+				tip := odds.tip(id, finish, rule)
+				if !strings.Contains(tip, "Chances CK pays") {
+					t.Fatalf("%s (%s) %s %s: no chances in %q", id, category, finish, rule, tip)
+				}
+			}
+		}
+		if !strings.Contains(odds.pauseTip(id, 10, false), "Chances CK buys it again") {
+			t.Fatalf("%s (%s): no pause chances", id, category)
+		}
+	}
+	t.Logf("a Masters sell now: %q", odds.tipFor("masters", "nonfoil", "sell"))
 }

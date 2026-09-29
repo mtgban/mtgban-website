@@ -517,6 +517,7 @@ type GenericCard struct {
 	SourceSealed      []string
 	HotlistStore      string
 	HotlistNew        bool // a new 90-day high rather than a tie with it
+	HotlistNewTip     string
 	GoodBuylist       float64
 	HighestBuylist    float64
 	CKSignal          string // "sell", "wait" or "", see ckbuylist.go
@@ -1151,7 +1152,11 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 	}
 	goodBuylist := getGoodBuylistPrice(cardID)
 	highestBuylist := getHighestBuylistPrice(cardID)
-	ck := ckSignalForCard(cardID)
+	ck := ckSignalForCard(co)
+	var hotlistNewTip string
+	if newHigh {
+		hotlistNewTip = ckNewHighTipFor(co)
+	}
 
 	return GenericCard{
 		UUID:        co.UUID,
@@ -1196,6 +1201,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		SourceSealed:      sourceSealed,
 		HotlistStore:      hotlistStore,
 		HotlistNew:        newHigh,
+		HotlistNewTip:     hotlistNewTip,
 		GoodBuylist:       goodBuylist,
 		HighestBuylist:    highestBuylist,
 		CKSignal:          ck.State,

@@ -1,6 +1,10 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +15,22 @@ import (
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
+
+// ckTestCard is a card as the signal tests read it.
+func ckTestCard(id string) *mtgmatcher.CardObject {
+	return &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: id}}
+}
+
+// ckTestReopen are pause chances for the tests, the longest pause first.
+var ckTestReopen = []ckReopen{{30, 20, 58}, {14, 32, 74}, {7, 45, 83}, {3, 52, 88}, {0, 62, 92}}
+
+// setTestCKOdds loads odds for the test, nil for none.
+func setTestCKOdds(t *testing.T, odds *ckOdds) {
+	t.Helper()
+	prev := ckOddsPtr.Load()
+	t.Cleanup(func() { ckOddsPtr.Store(prev) })
+	ckOddsPtr.Store(odds)
+}
 
 // TestCKSignalFor pins the rules of ADR-0004 and their order.
 func TestCKSignalFor(t *testing.T) {
@@ -80,6 +100,128 @@ func TestCKSignalFor(t *testing.T) {
 		if (got.Facts == "") != tc.wantNoFact {
 			t.Errorf("%s: facts %q", tc.name, got.Facts)
 		}
+	}
+}
+
+// testCKTables are odds as ckodds writes them: products 1 (Masters) and 2
+// (vintage), Masters and all-card chances, and vintage pauses.
+const testCKTables = `{
+  "generated": "2026-09-29T08:00:00Z", "from": "2025-09-29", "to": "2026-09-28",
+  "categories": {"1": "masters", "2": "vintage"},
+  "odds": [
+    {"category": "all", "rule": "typical", "up": 33, "down": 35},
+    {"category": "all", "rule": "sell", "up": 27, "down": 42},
+    {"category": "all", "rule": "outofstock", "up": 48, "down": 20},
+    {"category": "masters", "rule": "typical", "up": 34, "down": 40},
+    {"category": "masters", "rule": "sell", "up": 24, "down": 50},
+    {"category": "masters", "rule": "newhigh", "up": 22, "down": 48},
+    {"category": "masters", "finish": "nonfoil", "rule": "typical", "up": 38, "down": 46},
+    {"category": "masters", "finish": "nonfoil", "rule": "outofstock", "up": 59, "down": 23}
+  ],
+  "pauses": [
+    {"category": "all", "min_days": 30, "week": 20, "month": 58},
+    {"category": "all", "min_days": 0, "week": 62, "month": 92},
+    {"category": "all", "min_days": 7, "week": 45, "month": 83},
+    {"category": "vintage", "min_days": 0, "week": 56, "month": 85},
+    {"category": "vintage", "min_days": 7, "week": 33, "month": 69},
+    {"category": "vintage", "min_days": 30, "week": 15, "month": 48}
+  ]
+}`
+
+func testCKOdds(t *testing.T) *ckOdds {
+	t.Helper()
+	var tables ckOddsTables
+	err := json.Unmarshal([]byte(testCKTables), &tables)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return newCKOdds(tables)
+}
+
+// TestCKOddsTips writes each product's tooltips with the chances of its
+// category: by finish where measured, else by category, else over all
+// cards, and the verdict alone where nothing was measured or nothing loaded.
+func TestCKOddsTips(t *testing.T) {
+	odds := testCKOdds(t)
+	chances := func(up, typicalUp, down, typicalDown int) string {
+		return fmt.Sprintf("• 5%% more: **%d%%** instead of %d%%\n• 5%% less or stops buying: **%d%%** instead of %d%%",
+			up, typicalUp, down, typicalDown)
+	}
+	for _, tc := range []struct {
+		name, id, finish, rule, want string
+	}{
+		{"Masters sell now", "1", "nonfoil", "sell", chances(24, 34, 50, 40)},
+		{"Masters nonfoil out of stock", "1", "nonfoil", "outofstock", chances(59, 38, 23, 46)},
+		{"Masters foil out of stock, not measured by finish", "1", "foil", "outofstock", chances(48, 33, 20, 35)},
+		{"a product the odds do not know", "999", "nonfoil", "sell", chances(27, 33, 42, 35)},
+		{"a rule never measured", "1", "nonfoil", "cut", ""},
+	} {
+		got := odds.tip(tc.id, tc.finish, tc.rule)
+		want := ckVerdicts[tc.rule]
+		if tc.want != "" {
+			want += "\nChances CK pays (two weeks from now):\n" + tc.want
+		}
+		if got != want {
+			t.Errorf("%s: got\n%s\nwant\n%s", tc.name, got, want)
+		}
+	}
+	var none *ckOdds
+	if got := none.tip("1", "nonfoil", "sell"); got != ckVerdicts["sell"] {
+		t.Errorf("no odds loaded: got %q, want the verdict alone", got)
+	}
+
+	for _, tc := range []struct {
+		name string
+		odds *ckOdds
+		id   string
+		want string
+	}{
+		{"vintage", odds, "2", "• within a week: **33%**\n• within 30 days: **69%**"},
+		{"Masters, no pauses measured", odds, "1", "• within a week: **45%**\n• within 30 days: **83%**"},
+		{"no odds loaded", nil, "2", ""},
+	} {
+		got := tc.odds.pauseTip(tc.id, 10, false)
+		if !strings.HasPrefix(got, "**Paused**: CK stopped buying this card 10 days ago.") ||
+			(tc.want == "") != !strings.Contains(got, "Chances") || !strings.Contains(got, tc.want) {
+			t.Errorf("%s paused 10 days: got\n%s\nwant %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestLoadCKOdds reads the odds from a file, as from the bucket.
+func TestLoadCKOdds(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ck-odds.json")
+	err := os.WriteFile(path, []byte(testCKTables), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	odds, err := loadCKOdds(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if odds.From != "2025-09-29" || odds.category("2") != "vintage" || !strings.Contains(odds.tip("1", "nonfoil", "sell"), "**24%**") {
+		t.Errorf("loaded %+v", odds)
+	}
+}
+
+// TestCKSignalForCardReadsItsCategory tells a card's verdict with the chances
+// of its CK product's category, New high's included.
+func TestCKSignalForCardReadsItsCategory(t *testing.T) {
+	setTestCK(t,
+		mtgban.BuylistRecord{"m": {{Conditions: "NM", BuyPrice: 10, Quantity: 4, OriginalID: "1"}}},
+		mtgban.InventoryRecord{"m": {{Conditions: "NM", Quantity: 5, Price: 20}}})
+	setTestCKInputs(t, mtgban.InventoryRecord{"m": {{Price: 9}}}, nil)
+	odds := testCKOdds(t)
+	setTestCKOdds(t, odds)
+	rebuildCKSignals()
+
+	co := ckTestCard("m")
+	got := ckSignalForCard(co)
+	if got.State != "sell" || got.Tip != odds.tip("1", "nonfoil", "sell") || !strings.Contains(got.Tip, "**24%**") {
+		t.Errorf("a Masters card selling: got %+v, want the Masters tip", got)
+	}
+	if tip := ckNewHighTipFor(co); !strings.Contains(tip, "**22%** instead of 34%") {
+		t.Errorf("New high on a Masters card: got %q", tip)
 	}
 }
 
@@ -258,6 +400,7 @@ func setTestCKInputs(t *testing.T, good mtgban.InventoryRecord, history *ckHisto
 // for every card CK is buying, and pages read the result until the next
 // rebuild.
 func TestRebuildCKSignals(t *testing.T) {
+	setTestCKOdds(t, nil)
 	setTestCK(t,
 		mtgban.BuylistRecord{
 			"a":   {{Conditions: "NM", BuyPrice: 10, Quantity: 4, OriginalID: "111"}},
@@ -270,8 +413,8 @@ func TestRebuildCKSignals(t *testing.T) {
 		&ckHistorySnapshot{Today: today, Yesterday: today.AddDate(0, 0, -1), Products: products})
 
 	rebuildCKSignals()
-	got := ckSignalForCard("a")
-	if got.State != "wait" || got.Tip != ckTipBuyout {
+	got := ckSignalForCard(ckTestCard("a"))
+	if got.State != "wait" || got.Tip != ckVerdicts["buyout"] {
 		t.Errorf("stock 6 to 1: got %+v, want a buyout wait", got)
 	}
 	_, stored := (*ckSignalsPtr.Load())["off"]
@@ -281,12 +424,12 @@ func TestRebuildCKSignals(t *testing.T) {
 
 	// Inputs change nothing until the next rebuild.
 	ckHistoryPtr.Store(nil)
-	got = ckSignalForCard("a")
+	got = ckSignalForCard(ckTestCard("a"))
 	if got.State != "wait" {
 		t.Errorf("before the rebuild: got %+v, want the buyout wait still", got)
 	}
 	rebuildCKSignals()
-	got = ckSignalForCard("a")
+	got = ckSignalForCard(ckTestCard("a"))
 	if got.State != "sell" {
 		t.Errorf("no history: got %+v, want sell", got)
 	}
@@ -294,7 +437,7 @@ func TestRebuildCKSignals(t *testing.T) {
 	// Loaded the day before, the history cannot see a buyout.
 	ckHistoryPtr.Store(&ckHistorySnapshot{Today: today.AddDate(0, 0, -1), Yesterday: today.AddDate(0, 0, -2), Products: products})
 	rebuildCKSignals()
-	got = ckSignalForCard("a")
+	got = ckSignalForCard(ckTestCard("a"))
 	if got.State != "sell" {
 		t.Errorf("history from the day before: got %+v, want sell", got)
 	}
@@ -326,7 +469,7 @@ func TestCKPauseFor(t *testing.T) {
 		{"no other offer", 2.4, daysAgo(5), nil, "Paused 4d", false, ""},
 	} {
 		got := ckPauseFor(tc.listed, tc.h, today, tc.others)
-		label, tip := ckPauseLabel(got.Days), ckPauseTip(got.Days, got.Wait)
+		label, tip := ckPauseLabel(got.Days), ckPauseTip(ckTestReopen, got.Days, got.Wait)
 		if !got.Paused || label != tc.label || got.Wait != tc.wait || !strings.Contains(tip, tc.chance) {
 			t.Errorf("%s: got %+v, %q, want %q wait %v with %q", tc.name, got, label, tc.label, tc.wait, tc.chance)
 		}
@@ -340,7 +483,7 @@ func TestCKPauseFor(t *testing.T) {
 		"• within a week: **52%**\n" +
 		"• within 30 days: **88%**\n" +
 		"• within 30 days, paying 5% more than the best other offer: **76%**"
-	if tip := ckPauseTip(4, true); tip != want {
+	if tip := ckPauseTip(ckTestReopen, 4, true); tip != want {
 		t.Errorf("wait tip:\n%s\nwant:\n%s", tip, want)
 	}
 }
@@ -348,6 +491,7 @@ func TestCKPauseFor(t *testing.T) {
 // TestRebuildCKPauses gives the cards on CK's last known buylist their pause,
 // against the other stores' cash offers only.
 func TestRebuildCKPauses(t *testing.T) {
+	setTestCKOdds(t, nil)
 	prevVendors, prevSignals := vendorsPtr.Load(), ckSignalsPtr.Load()
 	t.Cleanup(func() {
 		vendorsPtr.Store(prevVendors)
@@ -381,16 +525,16 @@ func TestRebuildCKPauses(t *testing.T) {
 	})
 
 	rebuildCKSignals()
-	got := ckSignalForCard("p")
+	got := ckSignalForCard(ckTestCard("p"))
 	if got.PauseLabel != "Paused 4d" || !got.PauseWait || got.State != "" {
 		t.Errorf("paused 4 days, SCG 25%% below: got %+v, want a wait", got)
 	}
-	got = ckSignalForCard("blocked")
+	got = ckSignalForCard(ckTestCard("blocked"))
 	if got.PauseLabel != "Paused 4d" || got.PauseWait {
 		t.Errorf("SCG within 5%%: got %+v, want paused with no wait", got)
 	}
 	for _, cardID := range []string{"both", "nohist", "noid"} {
-		got = ckSignalForCard(cardID)
+		got = ckSignalForCard(ckTestCard(cardID))
 		if got.PauseLabel != "" {
 			t.Errorf("%s: got %+v, want no pause", cardID, got)
 		}
@@ -423,14 +567,14 @@ func TestLoadScraperRebuildsCKSignals(t *testing.T) {
 	dump(2, now)
 	load("retail")
 	load("buylist")
-	got := ckSignalForCard("a")
+	got := ckSignalForCard(ckTestCard("a"))
 	if got.State != "sell" {
 		t.Errorf("after the buylist load: got %+v, want sell", got)
 	}
 
 	dump(0, now.Add(time.Minute))
 	load("retail")
-	got = ckSignalForCard("a")
+	got = ckSignalForCard(ckTestCard("a"))
 	if got.State != "" || got.Facts != "**CK stock**: 0" {
 		t.Errorf("after the retail reload: got %+v, want no state at stock 0", got)
 	}
