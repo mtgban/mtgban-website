@@ -62,6 +62,33 @@ const (
 		"• 5% less or stops buying: **42%** instead of 35%"
 )
 
+// A card CK is not buying sits on its last known buylist (CKBLLast) at the
+// price CK lists for it. How long CK has had it paused predicts CK buying it
+// again: the chances within 7 and 30 days, from the longest pause down,
+// measured over January to August 2026 on cards CK last paid $1 or more for.
+var ckPauseChances = []struct {
+	MinDays     int
+	Week, Month int
+}{
+	{30, 20, 58},
+	{14, 32, 74},
+	{7, 45, 83},
+	{3, 52, 88},
+	{0, 62, 92},
+}
+
+const (
+	// Waiting for CK beats the other buylists while the pause is younger
+	// than this, and only if every other cash offer is below this share of
+	// the price CK lists.
+	ckPauseWaitDays  = 14
+	ckPauseWaitRatio = 0.95
+	// The chances CK then comes back within 30 days paying 5% more than the
+	// best of them, in the pause's first week and in its second.
+	ckPauseWaitFirstWeek  = 76
+	ckPauseWaitSecondWeek = 66
+)
+
 // ckHistory is what the newspaper's snapshots say about one CK product.
 type ckHistory struct {
 	StockYesterday    int
@@ -239,6 +266,89 @@ type ckSignal struct {
 	State string
 	Tip   string
 	Facts string
+	// Set instead on a card CK is not buying.
+	Pause ckPause
+}
+
+// ckPause is a card CK has paused: the pill on its last known offer, whether
+// waiting for CK beats every other cash offer, and the tooltip behind both.
+type ckPause struct {
+	Label string
+	Wait  bool
+	Tip   string
+}
+
+// ckPauseFor tells how long CK has had a card paused, from the last day it
+// bought it, and the chances of CK buying it again. listed is CK's price for
+// it and others the other cash buylists' NM offers.
+func ckPauseFor(listed float64, h ckHistory, today time.Time, others []float64) ckPause {
+	if listed < ckMinBuyPrice {
+		return ckPause{}
+	}
+	// The pause began the day after the last one CK bought the card; none in
+	// the window means it began before the window did.
+	days := ckHistoryWindow
+	if !h.LastBuying.IsZero() {
+		days = max(int(today.Sub(h.LastBuying).Hours()/24)-1, 0)
+	}
+	chances := ckPauseChances[len(ckPauseChances)-1]
+	for _, c := range ckPauseChances {
+		if days >= c.MinDays {
+			chances = c
+			break
+		}
+	}
+
+	var p ckPause
+	since := strconv.Itoa(days) + " days ago"
+	switch {
+	case days >= 30:
+		p.Label, since = "Paused 30d+", "30+ days ago"
+	case days == 0:
+		p.Label, since = "Paused today", "today"
+	case days == 1:
+		p.Label, since = "Paused 1d", "yesterday"
+	default:
+		p.Label = "Paused " + strconv.Itoa(days) + "d"
+	}
+
+	best := 0.0
+	for _, price := range others {
+		best = max(best, price)
+	}
+	p.Wait = days < ckPauseWaitDays && best > 0 && best < listed*ckPauseWaitRatio
+
+	verdict := "**Paused**: CK stopped buying this card " + since + "."
+	if p.Wait {
+		verdict = "**Wait**: CK stopped buying this card " + since +
+			", and every other cash offer is 5%+ below the price it lists."
+	}
+	lines := []string{
+		verdict,
+		"Chances CK buys it again:",
+		fmt.Sprintf("• within a week: **%d%%**", chances.Week),
+		fmt.Sprintf("• within 30 days: **%d%%**", chances.Month),
+	}
+	if p.Wait {
+		wait := ckPauseWaitFirstWeek
+		if days >= 7 {
+			wait = ckPauseWaitSecondWeek
+		}
+		lines = append(lines, fmt.Sprintf("• within 30 days, paying 5%% more than the best other offer: **%d%%**", wait))
+	}
+	p.Tip = strings.Join(lines, "\n")
+	return p
+}
+
+// ckCashBuylist tells whether a vendor is a store's cash buylist, one a
+// seller could take instead of waiting for CK: not CK's own, a credit list,
+// sealed product, a list of wants or TCGplayer's marketplace payout.
+func ckCashBuylist(info mtgban.ScraperInfo) bool {
+	switch info.Shorthand {
+	case "CK", "CKBLLast", "ABUCredit", "TCGDirectNet":
+		return false
+	}
+	return !info.SealedMode && !info.MetadataOnly
 }
 
 // ckSignalFor applies the rules of ADR-0004. Wait wins over sell, and the
@@ -351,7 +461,8 @@ func ckQuoteFrom(offers []mtgban.BuylistEntry, stock []mtgban.InventoryEntry, st
 	return q
 }
 
-// ckSignalsPtr holds the signal of every card CK is buying.
+// ckSignalsPtr holds the signal of every card CK is buying, and the pause
+// of every card it is not.
 var ckSignalsPtr atomic.Pointer[map[string]ckSignal]
 
 // ckSignalsMu runs one rebuild at a time, so the last one to start, which
@@ -359,8 +470,10 @@ var ckSignalsPtr atomic.Pointer[map[string]ckSignal]
 var ckSignalsMu sync.Mutex
 
 // rebuildCKSignals computes every card's signal from CK's live buylist and
-// stock, the loaded history and the P90s. It runs when any of them changes,
-// and hourly because the rules and facts count days.
+// stock, the loaded history and the P90s, and every paused card's chances
+// from its history and the other cash buylists. It runs when CK's data, the
+// history or the P90s change, and hourly because the rules and facts count
+// days and the other buylists reload.
 func rebuildCKSignals() {
 	ckSignalsMu.Lock()
 	defer ckSignalsMu.Unlock()
@@ -387,6 +500,37 @@ func rebuildCKSignals() {
 		sig := ckSignalFor(q, h, found, p90, today)
 		if sig != (ckSignal{}) {
 			signals[cardID] = sig
+		}
+	}
+
+	lastKnown, _ := findVendorBuylist("CKBLLast")
+	var cash []mtgban.BuylistRecord
+	for _, vendor := range GetVendors() {
+		if ckCashBuylist(vendor.Info()) {
+			cash = append(cash, vendor.Buylist())
+		}
+	}
+	for cardID, entries := range lastKnown {
+		q := ckQuoteFrom(entries, nil, false)
+		if q.ID == "" || ckQuoteFrom(offers[cardID], nil, false).Buying {
+			continue
+		}
+		h, found := history.historyFor(q.ID, today)
+		if !found {
+			continue
+		}
+		var others []float64
+		for _, record := range cash {
+			for _, entry := range record[cardID] {
+				if entry.Conditions == "NM" {
+					others = append(others, entry.BuyPrice)
+					break
+				}
+			}
+		}
+		pause := ckPauseFor(q.Buy, h, today, others)
+		if pause.Label != "" {
+			signals[cardID] = ckSignal{Pause: pause}
 		}
 	}
 	ckSignalsPtr.Store(&signals)
