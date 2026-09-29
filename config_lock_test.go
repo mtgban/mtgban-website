@@ -129,9 +129,8 @@ func savedSecrets(t *testing.T, path string) map[string]string {
 	return saved.APIUserSecrets
 }
 
-// A new key goes into Config, then into the file. A reload landing between
-// the two replaced Config without it, and the key's save wrote that out; a
-// key landing inside an editor save was overwritten in both by the save.
+// A new key goes into the file, then into Config. A reload inside the key's
+// save, or the key inside an editor save, must leave it in both.
 func TestNewKeySurvivesAConfigReloadOrSave(t *testing.T) {
 	const user = "new@example.com"
 	newKey := func() error {
@@ -232,32 +231,69 @@ func TestNewKeysAtOnceDoNotRace(t *testing.T) {
 	}
 }
 
-// A key whose save fails, at Close included, must be neither handed out nor
-// kept: live but unsaved, it verified only until the next reload, and a
-// second request for the same user found it and returned a link unsaved.
-func TestNewKeyWhoseSaveFailsIsNotKept(t *testing.T) {
-	path := withConfigFile(t)
-	writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)
-	err := loadVars("", "", "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	ConfigBucket = failCloseBucket{ConfigBucket}
+// panicCloseBucket takes whatever is written and panics at Close, as B2's
+// writer does when an upload under its chunk size fails.
+type panicCloseBucket struct{ simplecloud.ReadWriter }
 
-	for range 2 {
-		link, err := generateAPIKey(context.Background(), "new@example.com", 0)
-		if err == nil || link != "" {
-			t.Errorf("link %q, error %v: a key that was not saved was handed out", link, err)
-		}
+type panicCloseWriter struct{ failCloseWriter }
+
+func (panicCloseWriter) Close() error { panic("upload failed at close") }
+
+func (panicCloseBucket) NewWriter(context.Context, string) (io.WriteCloser, error) {
+	return panicCloseWriter{}, nil
+}
+
+// A key whose save fails, by an error at Close or by a panic there, must be
+// neither handed out nor kept: live but unsaved, it would verify only until
+// the next reload, and the next request for the same user would find it and
+// return a link with nothing saved.
+func TestNewKeyWhoseSaveFailsIsNotKept(t *testing.T) {
+	// newKey takes a panic for the error it stands for.
+	newKey := func() (link string, err error) {
+		defer func() {
+			r := recover()
+			if r != nil {
+				err = fmt.Errorf("panic: %v", r)
+			}
+		}()
+		return generateAPIKey(context.Background(), "new@example.com", 0)
 	}
-	_, found := Config.APIUserSecrets["new@example.com"]
-	if found {
-		t.Error("the key that was not saved is live")
+	for _, c := range []struct {
+		name   string
+		bucket simplecloud.ReadWriter
+	}{
+		{"an error at Close", failCloseBucket{}},
+		{"a panic at Close", panicCloseBucket{}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			path := withConfigFile(t)
+			writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)
+			err := loadVars("", "", "", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ConfigBucket = c.bucket
+
+			for range 2 {
+				link, err := newKey()
+				if err == nil || link != "" {
+					t.Errorf("link %q, error %v: a key that was not saved was handed out", link, err)
+				}
+			}
+			_, found := Config.APIUserSecrets["new@example.com"]
+			if found {
+				t.Error("the key that was not saved is live")
+			}
+			if !configMu.TryLock() {
+				t.Fatal("configMu is still held")
+			}
+			configMu.Unlock()
+		})
 	}
 }
 
 // Every admin page view lists the API users and encodes the whole config for
-// its editor, both from the secrets map a new key is written into.
+// its editor, both from the secrets map a new key replaces.
 func TestAdminPageDoesNotRaceNewKeys(t *testing.T) {
 	path := withConfigFile(t)
 	writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)

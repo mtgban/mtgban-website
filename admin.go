@@ -1166,8 +1166,8 @@ func disk() string {
 const DefaultAPIDemoUser = "demo@mtgban.com"
 
 // apiUsersMutex guards Config.APIUserSecrets, which API requests and the
-// admin page read under it: a write to the map, and a swap of Config whole,
-// take it for writing.
+// admin page read under it: a new key's swap of the map, and a swap of
+// Config whole, take it for writing.
 var apiUsersMutex sync.RWMutex
 
 func writeConfigFile(config ConfigType, writer io.Writer) error {
@@ -1261,19 +1261,23 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 			return "", errors.New("config not loaded")
 		}
 
-		apiUsersMutex.Lock()
-		Config.APIUserSecrets[user] = key
-		apiUsersMutex.Unlock()
-
-		err = storeConfigFile(ctx, Config)
+		// Saved before it goes live, so a save that fails, even by
+		// panicking, leaves no key behind.
+		secrets := make(map[string]string, len(Config.APIUserSecrets)+1)
+		for email, secret := range Config.APIUserSecrets {
+			secrets[email] = secret
+		}
+		secrets[user] = key
+		config := Config
+		config.APIUserSecrets = secrets
+		err = storeConfigFile(ctx, config)
 		if err != nil {
-			// Unsaved, the key would verify only until the next reload, and a
-			// second request for this user would find it and skip the save.
-			apiUsersMutex.Lock()
-			delete(Config.APIUserSecrets, user)
-			apiUsersMutex.Unlock()
 			return "", err
 		}
+
+		apiUsersMutex.Lock()
+		Config.APIUserSecrets = secrets
+		apiUsersMutex.Unlock()
 	}
 
 	claims := apisig.Claims{
