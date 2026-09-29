@@ -95,3 +95,19 @@ func TestPostKeepsTheTokenOutOfTheLog(t *testing.T) {
 		t.Errorf("logged %q, want the kind and the failure", got)
 	}
 }
+
+// Send says whether the message went through, for a caller that tries
+// again later.
+func TestSendReturnsTheRefusal(t *testing.T) {
+	hook, _ := webhook(t, http.StatusTooManyRequests)
+	err := Send(hook, "stale", "refused", false)
+	if err == nil || !strings.Contains(err.Error(), "429") {
+		t.Errorf("err = %v, want the 429", err)
+	}
+
+	hook, _ = webhook(t, http.StatusNoContent)
+	err = Send(hook, "stale", "accepted", false)
+	if err != nil {
+		t.Errorf("err = %v, want none", err)
+	}
+}

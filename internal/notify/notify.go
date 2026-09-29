@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/url"
 	"strings"
@@ -29,6 +30,12 @@ type payload struct {
 // notifications are fire-and-forget. The log never quotes hook, whose path
 // carries the webhook's token.
 func Post(hook, kind, message string, dev bool) {
+	_ = Send(hook, kind, message, dev)
+}
+
+// Send is Post for a caller that tries again later: it also returns why
+// the message did not go through, which it logs either way.
+func Send(hook, kind, message string, dev bool) error {
 	var p payload
 	p.Username = kind
 	if dev {
@@ -43,7 +50,7 @@ func Post(hook, kind, message string, dev bool) {
 	reqBody, err := json.Marshal(&p)
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	resp, err := cleanhttp.DefaultClient().Post(hook, "application/json", bytes.NewReader(reqBody))
@@ -54,10 +61,12 @@ func Post(hook, kind, message string, dev bool) {
 			err = urlErr.Err
 		}
 		log.Printf("notify: %s post failed: %s", kind, err)
-		return
+		return err
 	}
 	resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		log.Printf("notify: %s post refused: %s", kind, resp.Status)
+		return fmt.Errorf("notify: %s post refused: %s", kind, resp.Status)
 	}
+	return nil
 }

@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/mtgban/mtgban-website/internal/notify"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 )
 
@@ -57,7 +60,7 @@ func classifyStaleTransition(was, is bool) staleTransition {
 	}
 }
 
-// staleAlarmState remembers which rows were stale last check, so
+// staleAlarmState remembers which rows were last announced stale, so
 // checkStaleness notifies only on a transition. In-memory only: a restart
 // may announce every already-stale row once more.
 var staleAlarmState = struct {
@@ -65,50 +68,91 @@ var staleAlarmState = struct {
 	stale map[string]bool
 }{stale: map[string]bool{}}
 
-// notifyStale is the alarm's notification hook, overridable in tests so a
-// check's actual Discord traffic can be asserted on directly.
-var notifyStale = func(kind, message string) { ServerNotify(kind, message) }
+// staleMessageBudget is how much of the alarm one message carries: under
+// the 2000 characters Discord takes, with room for notify's dev marker.
+const staleMessageBudget = 1900
+
+// notifyStale posts one alarm message and says whether it went through. It
+// is overridable in tests, so a check's Discord traffic can be asserted on
+// directly.
+var notifyStale = func(kind, message string) error {
+	log.Println(message)
+	if Config.Discord.ServerWebhookURL == "" {
+		return nil
+	}
+	return notify.Send(Config.Discord.ServerWebhookURL, kind, message, DevMode)
+}
 
 // checkStaleness compares every served seller's and vendor's staleness
-// against staleAlarmState and notifies only on a change. Session stores
-// (internal/sessionstore) are skipped, like the dashboard's own banner.
+// against staleAlarmState and announces the rows that changed. Session
+// stores (internal/sessionstore) are skipped, like the dashboard's own
+// banner.
 func checkStaleness() {
 	now := time.Now()
 
 	staleAlarmState.mu.Lock()
 	defer staleAlarmState.mu.Unlock()
 
+	var changes []staleChange
 	for _, seller := range GetSellers() {
 		info := seller.Info()
 		if Sessions.Is(sessionstore.Retail, info.Shorthand) {
 			continue
 		}
-		noteStaleTransition(info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
+		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
 	}
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
 		if Sessions.Is(sessionstore.Buylist, info.Shorthand) {
 			continue
 		}
-		noteStaleTransition(info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
+		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
 	}
+	announceStaleChanges(changes)
 }
 
-// noteStaleTransition updates staleAlarmState for one row and notifies if
-// its staleness changed. Callers must hold staleAlarmState.mu.
-func noteStaleTransition(key, kind, shorthand string, ts *time.Time, now time.Time) {
+// staleChange is one row's staleness flipping, and the line announcing it.
+type staleChange struct {
+	key   string
+	stale bool
+	line  string
+}
+
+// appendStaleChange appends the row to changes if its staleness differs
+// from the last one announced. Callers must hold staleAlarmState.mu.
+func appendStaleChange(changes []staleChange, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
 	switch classifyStaleTransition(staleAlarmState.stale[key], isStale(ts, now)) {
 	case becameStale:
-		staleAlarmState.stale[key] = true
-		label := staleLabel(kind, shorthand)
-		if ts == nil {
-			notifyStale("stale", label+" has no update time")
-		} else {
-			notifyStale("stale", label+" has not updated in "+staleAge(*ts, now))
+		line := staleLabel(kind, shorthand) + " has no update time"
+		if ts != nil {
+			line = staleLabel(kind, shorthand) + " has not updated in " + staleAge(*ts, now)
 		}
+		return append(changes, staleChange{key: key, stale: true, line: line})
 	case staleRecovered:
-		staleAlarmState.stale[key] = false
-		notifyStale("stale", staleLabel(kind, shorthand)+" is fresh again")
+		return append(changes, staleChange{key: key, stale: false, line: staleLabel(kind, shorthand) + " is fresh again"})
+	}
+	return changes
+}
+
+// announceStaleChanges posts changes in as few messages as fit, and records
+// each change once its message went through. It stops at the first refusal:
+// what was not recorded is announced at the next check. Callers must hold
+// staleAlarmState.mu.
+func announceStaleChanges(changes []staleChange) {
+	for len(changes) > 0 {
+		lines := []string{changes[0].line}
+		size := len(changes[0].line)
+		for len(lines) < len(changes) && size+1+len(changes[len(lines)].line) <= staleMessageBudget {
+			size += 1 + len(changes[len(lines)].line)
+			lines = append(lines, changes[len(lines)].line)
+		}
+		if notifyStale("stale", strings.Join(lines, "\n")) != nil {
+			return
+		}
+		for _, change := range changes[:len(lines)] {
+			staleAlarmState.stale[change.key] = change.stale
+		}
+		changes = changes[len(lines):]
 	}
 }
 
