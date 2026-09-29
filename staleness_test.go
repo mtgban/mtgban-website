@@ -1,6 +1,9 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,8 +98,9 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 	staleAlarmState.stale = map[string]bool{}
 
 	var notices []string
-	notifyStale = func(kind, message string) {
+	notifyStale = func(kind, message string) error {
 		notices = append(notices, message)
+		return nil
 	}
 
 	old := time.Now().Add(-72 * time.Hour)
@@ -158,8 +162,9 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 	Sessions = sessionstore.New(sessionHooks())
 
 	var notices []string
-	notifyStale = func(kind, message string) {
+	notifyStale = func(kind, message string) error {
 		notices = append(notices, message)
+		return nil
 	}
 
 	var noSellers []mtgban.Seller
@@ -184,5 +189,104 @@ func TestCheckStalenessSkipsSessionStores(t *testing.T) {
 	}
 	if staleAlarmState.stale["ZZUPLOAD/retail"] {
 		t.Error("a session store was recorded as stale")
+	}
+}
+
+// withStaleAlarm serves sellers and starts the alarm from nothing, with post
+// standing in for Discord.
+func withStaleAlarm(t *testing.T, sellers []mtgban.Seller, post func(message string) error) {
+	t.Helper()
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	prevState := staleAlarmState.stale
+	prevNotify := notifyStale
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+		staleAlarmState.stale = prevState
+		notifyStale = prevNotify
+	})
+	staleAlarmState.stale = map[string]bool{}
+	notifyStale = func(_, message string) error { return post(message) }
+	var noVendors []mtgban.Vendor
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&noVendors)
+}
+
+// The rows that go stale in one check are announced in one message, so a
+// burst of them does not run into Discord's rate limit.
+func TestCheckStalenessAnnouncesOneCheckTogether(t *testing.T) {
+	old := time.Now().Add(-72 * time.Hour)
+	var notices []string
+	withStaleAlarm(t, []mtgban.Seller{inventoryOf("ZZA", 1, old), inventoryOf("ZZB", 1, old), inventoryOf("ZZC", 1, old)},
+		func(message string) error {
+			notices = append(notices, message)
+			return nil
+		})
+
+	checkStaleness()
+	if len(notices) != 1 || strings.Count(notices[0], "has not updated in") != 3 {
+		t.Errorf("notices = %q, want one message naming all three", notices)
+	}
+}
+
+// A message Discord refuses is not recorded as announced, so the next check
+// posts it again; once it goes through, the row stays quiet.
+func TestCheckStalenessRetriesARefusedAlarm(t *testing.T) {
+	old := time.Now().Add(-72 * time.Hour)
+	refuse := true
+	var notices []string
+	withStaleAlarm(t, []mtgban.Seller{inventoryOf("ZZSTALE", 1, old)}, func(message string) error {
+		notices = append(notices, message)
+		if refuse {
+			return errors.New("429 Too Many Requests")
+		}
+		return nil
+	})
+
+	checkStaleness()
+	if staleAlarmState.stale["ZZSTALE/retail"] {
+		t.Error("a refused alarm was recorded as announced")
+	}
+	refuse = false
+	checkStaleness()
+	checkStaleness()
+	if len(notices) != 2 || notices[0] != notices[1] {
+		t.Errorf("notices = %q, want the refused alarm posted once more, then quiet", notices)
+	}
+	if !staleAlarmState.stale["ZZSTALE/retail"] {
+		t.Error("the delivered alarm was not recorded")
+	}
+}
+
+// Changes that do not fit one message go out in several; those in a
+// message that went through are recorded even when a later one is refused.
+func TestCheckStalenessSplitsWhatDoesNotFit(t *testing.T) {
+	old := time.Now().Add(-72 * time.Hour)
+	var sellers []mtgban.Seller
+	for i := range 60 {
+		sellers = append(sellers, inventoryOf(fmt.Sprintf("ZZSTORE%02d", i), 1, old))
+	}
+	var notices []string
+	withStaleAlarm(t, sellers, func(message string) error {
+		notices = append(notices, message)
+		if len(notices) > 1 {
+			return errors.New("429 Too Many Requests")
+		}
+		return nil
+	})
+
+	checkStaleness()
+	if len(notices) != 2 || len(notices[0]) > staleMessageBudget {
+		t.Fatalf("posted %d messages, the first of %d bytes: want two, within %d", len(notices), len(notices[0]), staleMessageBudget)
+	}
+	announced := strings.Count(notices[0], "\n") + 1
+	var recorded int
+	for _, stale := range staleAlarmState.stale {
+		if stale {
+			recorded++
+		}
+	}
+	if recorded != announced || announced >= len(sellers) {
+		t.Errorf("recorded %d rows, want the %d the first message announced of %d", recorded, announced, len(sellers))
 	}
 }

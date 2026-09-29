@@ -686,12 +686,15 @@ reading `PageVars` fields: `stale_count` counts a table's stale rows, and
 `stale_stores` lists their stores (column 2), sorted and deduplicated,
 leaving out `UNKNOWN` and `session`. Separately, an hourly cron job
 (`checkStaleness()`, registered in `main()`) compares every served
-seller's/vendor's staleness against an in-memory map and calls
-`notifyStale` (which posts through `ServerNotify`) only on a transition
-(`classifyStaleTransition`, a pure function): once going stale, once
-recovering, never on repeat. A session store (an admin's upload) is
-skipped, the same as the banner. The map is in memory only, so a restart's
-first check may announce every already-stale row once.
+seller's/vendor's staleness against an in-memory map and announces only
+a transition (`classifyStaleTransition`, a pure function): once going
+stale, once recovering, never on repeat. One check's transitions go out
+together through `notifyStale` (`notify.Send` to the server webhook), in
+as few messages as fit, and a transition is recorded only once its message
+went through, so one Discord refuses is announced again at the next check.
+A session store (an admin's upload) is skipped, the same as the banner.
+The map is in memory only, so a restart's first check may announce every
+already-stale row once.
 
 ## 6. Support packages
 
