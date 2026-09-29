@@ -1,9 +1,10 @@
 // Every [title] on the page shows its text the moment the pointer is over
 // it, in place of the browser's own tooltip, which waits a second and cannot
-// be styled. The title moves to data-ban-title while the tooltip is up and
-// comes back when the pointer leaves: code that reads a title can fall back
-// to data-ban-title, and code that removes one should remove both. Loaded
-// after the other scripts, so their setup finds every title where it was.
+// be styled. The title, and any title on the elements it sits in, move to
+// data-ban-title while the tooltip is up and come back when the pointer
+// leaves: code that reads a title can fall back to data-ban-title, and code
+// that removes one should remove both. Loaded after the other scripts, so
+// their setup finds every title where it was.
 
 // Pixels kept between the tooltip and the viewport edge, and between the
 // tooltip and its element.
@@ -26,6 +27,9 @@ function installTitleTooltips(document, window) {
     var tip = null;
     var current = null;
     var observer = null;
+    // current's titled ancestors, whose titles go aside with its own: the
+    // browser shows the nearest title left under the pointer, a second late.
+    var ancestors = [];
     // Set when the title is all that names the element (an icon), so it names
     // it as aria-label while it is aside.
     var labelled = false;
@@ -44,10 +48,23 @@ function installTitleTooltips(document, window) {
         tip.style.top = spot.top + 'px';
     }
 
+    function setAside(el, text) {
+        el.setAttribute('data-ban-title', text);
+        el.removeAttribute('title');
+    }
+
+    // Puts a title back unless the page set a new one or dropped it.
+    function putBack(el) {
+        var text = el.getAttribute('data-ban-title');
+        if (text !== null && !el.hasAttribute('title')) {
+            el.setAttribute('title', text);
+        }
+        el.removeAttribute('data-ban-title');
+    }
+
     // Moves the title aside and shows it; a blank one shows nothing.
     function take(text) {
-        current.setAttribute('data-ban-title', text);
-        current.removeAttribute('title');
+        setAside(current, text);
         if (labelled) {
             current.setAttribute('aria-label', text);
         }
@@ -91,6 +108,12 @@ function installTitleTooltips(document, window) {
             el.setAttribute('aria-describedby', tip.id);
         }
         take(text);
+        for (var up = el.parentElement; up; up = up.parentElement) {
+            if (up.hasAttribute('title')) {
+                setAside(up, up.getAttribute('title'));
+                ancestors.push(up);
+            }
+        }
         observer = new window.MutationObserver(retitle);
         observer.observe(el, { attributes: true, attributeFilter: ['title'] });
     }
@@ -100,12 +123,9 @@ function installTitleTooltips(document, window) {
             return;
         }
         observer.disconnect();
-        // Put the title back unless the page set a new one or dropped it.
-        var text = current.getAttribute('data-ban-title');
-        if (text !== null && !current.hasAttribute('title')) {
-            current.setAttribute('title', text);
-        }
-        current.removeAttribute('data-ban-title');
+        putBack(current);
+        ancestors.forEach(putBack);
+        ancestors = [];
         if (labelled) {
             current.removeAttribute('aria-label');
         }
