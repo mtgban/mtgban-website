@@ -1557,7 +1557,7 @@ func main() {
 		// instead, and the job runs again at its next time.
 		c := cron.New()
 		// addJob schedules fn at spec as the background job name, whose runs
-		// and schedule the admin dashboard reads.
+		// and schedule the admin dashboard and the staleness alarm read.
 		addJob := func(spec, name string, fn func()) {
 			schedule, err := cron.Parse(spec)
 			if err != nil {
@@ -1626,6 +1626,8 @@ func main() {
 		// staleness.go); notifies only on the transition, so this can run
 		// often without repeating itself.
 		addJob("0 * * * *", jobStaleness, checkStaleness)
+		// And on a background job turning bad, the same way.
+		c.AddFunc("0 * * * *", recovered("cron checkJobHealth", checkJobHealth))
 
 		c.Start()
 	}

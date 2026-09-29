@@ -150,6 +150,8 @@ Boot sequence (`main()`):
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
      a plain function rather than a site method)
    - `0 * * * *` - `checkStaleness()` (staleness.go): the Discord alarm below
+   - `0 * * * *` - `checkJobHealth()` (jobs.go): the same alarm for the
+     background jobs, below; under `recovered()`, not a job itself
    - when tcgcsv ingestion is configured: `0 21 * * *` —
      `stashTCGCSVPrices()`; `0 22 * * 1` — `stashTCGCSVProducts()`
    - the old per-scraper `force_reload_at` cron expressions no longer exist
@@ -717,7 +719,9 @@ missing odds or odds past 36 hours, no sell now or wait), the price stash
 load). A row's problem is its latest run's panic, then a scheduled time it
 missed or ran on past by more than 10 minutes, then its report. The
 dashboard's first table lists every job with its last run, length, what it
-found and its problem; mobile lists them in Status.
+found and its problem; mobile lists them in Status. The hourly
+`checkJobHealth()` announces a row turning bad or recovering through the
+staleness alarm's map and messages, from 15 minutes after startup.
 
 ## 6. Support packages
 
