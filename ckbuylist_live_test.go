@@ -121,7 +121,7 @@ func TestCKHistoryLive(t *testing.T) {
 		SELECT ck_id, date, quantity_selling, price_buy, quantity_buying
 		  FROM cardkingdomproductmodel
 		 WHERE ck_id = ANY($1) AND date >= $2 AND date <= $3`,
-		pq.Array(sampleIDs), today.AddDate(0, 0, -ckHistoryWindow), snap.Yesterday)
+		pq.Array(sampleIDs), today.AddDate(0, 0, -ckBoughtLookback), snap.Yesterday)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestCKHistoryLive(t *testing.T) {
 		if weekAgoUsed && date.Equal(weekAgo) && buy.Valid {
 			h.BuyWeekAgo, h.HasBuyWeekAgo = max(h.BuyWeekAgo, buy.Float64), true
 		}
-		if stock.Int64 > 0 && date.After(h.LastInStock) {
+		if stock.Int64 > 0 && date.After(h.LastInStock) && !date.Before(today.AddDate(0, 0, -ckHistoryWindow)) {
 			h.LastInStock = date
 		}
 		if buying.Int64 > 0 && date.After(h.LastBuying) {

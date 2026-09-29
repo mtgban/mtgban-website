@@ -219,12 +219,11 @@ func (o *ckOdds) holdsOn(id, finish, rule string) bool {
 
 // pauseTip is the tooltip of a pause of days on a CK product.
 func (o *ckOdds) pauseTip(id string, days int, wait bool) string {
-	// A pause older than the history may be a card CK never bought, which
-	// the odds, measured on cards it did, do not cover.
-	if o == nil || days >= ckHistoryWindow {
-		return ckPauseTip(nil, min(days, 30), wait)
+	days = min(days, 30)
+	if o == nil {
+		return ckPauseTip(nil, days, wait)
 	}
-	return o.pauseTips[ckPauseTipKey{o.category(id), min(days, 30), wait}]
+	return o.pauseTips[ckPauseTipKey{o.category(id), days, wait}]
 }
 
 // loadCKOdds reads the odds the path names.

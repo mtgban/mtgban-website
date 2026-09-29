@@ -187,11 +187,12 @@ func TestCKOddsTips(t *testing.T) {
 		}
 	}
 
-	// No buying day in the history: it may be a card CK never bought, so
-	// the pause is told without chances measured on cards it did.
-	got := odds.pauseTip("2", ckHistoryWindow, false)
-	if got != "**Paused**: CK stopped buying this card 30+ days ago." {
-		t.Errorf("paused since before the history: got\n%s\nwant the pause alone", got)
+	// A pause past a month reads the longest pauses' chances.
+	got := odds.pauseTip("2", 45, false)
+	want := "**Paused**: CK stopped buying this card 30+ days ago.\n" +
+		"Chances CK buys it again:\n• within a week: **15%**\n• within 30 days: **48%**"
+	if got != want {
+		t.Errorf("paused 45 days: got\n%s\nwant\n%s", got, want)
 	}
 }
 
@@ -518,7 +519,7 @@ func TestCKPauseFor(t *testing.T) {
 		{"bought two days ago", 2.4, daysAgo(2), nil, "Paused 1d", false, "within a week: **62%**"},
 		{"third day", 2.4, daysAgo(4), nil, "Paused 3d", false, "within a week: **52%**"},
 		{"second week", 2.4, daysAgo(12), nil, "Paused 11d", false, "within a week: **45%**"},
-		{"not bought in the window", 2.4, ckHistory{}, nil, "Paused 30d+", false, "within a week: **20%**"},
+		{"bought 45 days ago", 2.4, daysAgo(45), nil, "Paused 30d+", false, "within a week: **20%**"},
 		{"others 5% below", 2.4, daysAgo(5), []float64{1.8, 2.2}, "Paused 4d", true, "best other offer: **76%**"},
 		{"others 5% below, second week", 2.4, daysAgo(9), []float64{2.2}, "Paused 8d", true, "best other offer: **66%**"},
 		{"an offer within 5%", 2.4, daysAgo(5), []float64{1.8, 2.3}, "Paused 4d", false, ""},
@@ -533,6 +534,9 @@ func TestCKPauseFor(t *testing.T) {
 	}
 	if got := ckPauseFor(0.9, daysAgo(4), today, nil); got.Paused {
 		t.Errorf("under $1: got %+v, want no pause", got)
+	}
+	if got := ckPauseFor(2.4, ckHistory{}, today, nil); got.Paused {
+		t.Errorf("never bought in the past year: got %+v, want no pause", got)
 	}
 
 	want := "**Wait**: CK stopped buying this card 4 days ago, and every other cash offer is 5%+ below the price it lists.\n" +
