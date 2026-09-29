@@ -715,6 +715,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-size: 0.7rem;
     line-height: 1.35;
     color: var(--greytext);
+    white-space: pre-line;
 }
 
 /* Locked vendor */

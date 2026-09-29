@@ -337,26 +337,23 @@ var funcMap = template.FuncMap{
 		}
 		return ""
 	},
-	// buylist_title is the tooltip of a buylist price: CK's P90 and 90-day
-	// high, plus CK's stock facts and the signal's odds on CK's NM offer.
-	"buylist_title": func(shorthand, conditions string, good, highest float64, facts, tip string) string {
-		var lines []string
-		if good > 0 {
-			line := fmt.Sprintf("Card Kingdom P90 $ %.2f", good)
-			if highest > 0 {
-				line += fmt.Sprintf("; 90-day high $ %.2f", highest)
+	// buylist_title is the tooltip of a buylist price, on the offers that
+	// have something to say: on CK's NM offer the signal's verdict, CK's
+	// stock facts, its P90 and 90-day high, and the odds behind the verdict;
+	// on another store's green offer, the P90 it reaches.
+	"buylist_title": func(shorthand, conditions, state string, good, highest float64, facts, tip string) string {
+		if shorthand != "CK" {
+			if state != "best" || good <= 0 {
+				return ""
 			}
-			lines = append(lines, line)
+			return fmt.Sprintf("A good price: at or above Card Kingdom's P90 ($ %.2f)", good)
 		}
-		if shorthand == "CK" && conditions == "NM" {
-			if facts != "" {
-				lines = append(lines, facts)
-			}
-			if tip != "" {
-				lines = append(lines, tip)
-			}
+		if conditions != "NM" {
+			return ""
 		}
-		return strings.Join(lines, "\n")
+		// A tip is its verdict, then the odds behind it.
+		verdict, odds, _ := strings.Cut(tip, "\n")
+		return joinLines(verdict, facts, ckReferencePrices(good, highest), odds)
 	},
 	// buylist_wait marks Card Kingdom's NM offer while CK is likely to pay
 	// more soon.
