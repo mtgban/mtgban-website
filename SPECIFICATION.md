@@ -138,8 +138,9 @@ Boot sequence (`main()`):
      goroutine of its own under `recoverJob()`
    - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
      TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
-     once the newspaper finishes a scrape; every datastore load also runs it,
-     which queries only if no day is loaded yet
+     once the newspaper finishes a scrape, and retries a scrape day whose
+     load failed every 6 hours; every datastore load also runs it, which
+     queries only if no day is loaded yet
    - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays

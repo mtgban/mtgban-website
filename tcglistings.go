@@ -54,6 +54,17 @@ var tcgListingsPtr atomic.Pointer[tcgListingsSnapshot]
 // tcgListingsLoading gates concurrent loads (datastore loads and cron).
 var tcgListingsLoading atomic.Bool
 
+// tcgListingsFailure is the scrape day whose load last failed, and when.
+type tcgListingsFailure struct {
+	Day, At time.Time
+}
+
+var tcgListingsFailed atomic.Pointer[tcgListingsFailure]
+
+// tcgListingsRetryAfter is how long a scrape day whose load failed waits
+// before the hourly run tries it again: the query costs Magic 40-90s.
+const tcgListingsRetryAfter = 6 * time.Hour
+
 // The newspaper scores each game after scraping it, so a game's newest day
 // of scores is the day of its last finished scrape.
 const tcgListingsDayQuery = `SELECT MAX(calc_date) FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards WHERE game_name = $1`
@@ -104,13 +115,18 @@ type tcgListingsRow struct {
 }
 
 // loadTCGListings reads the counts of the newspaper's last finished scrape
-// for this site's game. It reruns only when another scrape finished, and
-// keeps the last good load on any error. A datastore reload keeps the day's
-// counts: card ids outlast it, and a card it adds gets counts with the next
-// scrape.
+// for this site's game. It reruns only when another scrape finished, keeps
+// the last good load on any error, and waits tcgListingsRetryAfter before
+// trying a failed day again. A datastore reload keeps the day's counts: card
+// ids outlast it, and a card it adds gets counts with the next scrape.
 func (s *site) loadTCGListings() {
 	game, found := gameMap[Config.Game]
 	if !found || SkipNewspaper || NewNewspaperDB == nil {
+		return
+	}
+	b := s.backend()
+	if len(b.GetUUIDs()) == 0 {
+		// No datastore yet: its load runs this once it is in.
 		return
 	}
 	if !tcgListingsLoading.CompareAndSwap(false, true) {
@@ -131,16 +147,37 @@ func (s *site) loadTCGListings() {
 		log.Println("tcg listings: the newspaper has no finished scrape")
 		return
 	}
-	b := s.backend()
-	current := tcgListingsPtr.Load()
-	if current != nil && current.Date.Equal(day.Time) {
+	if !tcgListingsDue(tcgListingsPtr.Load(), tcgListingsFailed.Load(), day.Time, time.Now()) {
 		return
 	}
 
-	rows, err := NewNewspaperDB.QueryContext(ctx, tcgListingsQuery, game, day.Time)
+	cards, unmatched, err := queryTCGListings(ctx, b, game, day.Time)
 	if err != nil {
 		log.Println("tcg listings:", err)
+		tcgListingsFailed.Store(&tcgListingsFailure{Day: day.Time, At: time.Now()})
 		return
+	}
+	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day.Time, Cards: cards})
+	log.Println("tcg listings: loaded", len(cards), "printings from", day.Time.Format(time.DateOnly)+",", unmatched, "not matched")
+}
+
+// tcgListingsDue reports whether day's counts should be loaded, given the
+// current load and the last failed one: only a day other than the loaded
+// one, and a day that failed only once tcgListingsRetryAfter has passed.
+func tcgListingsDue(current *tcgListingsSnapshot, failed *tcgListingsFailure, day, now time.Time) bool {
+	if current != nil && current.Date.Equal(day) {
+		return false
+	}
+	return failed == nil || !failed.Day.Equal(day) || now.Sub(failed.At) >= tcgListingsRetryAfter
+}
+
+// queryTCGListings reads day's counts for game and keys them by b's card
+// ids, answering how many printings matched no card. A load matching none
+// is an error, so the previous one stays.
+func queryTCGListings(ctx context.Context, b *mtgmatcher.Backend, game string, day time.Time) (map[string]*tcgListings, int, error) {
+	rows, err := NewNewspaperDB.QueryContext(ctx, tcgListingsQuery, game, day)
+	if err != nil {
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -150,16 +187,14 @@ func (s *site) loadTCGListings() {
 		var condition sql.NullString
 		err := rows.Scan(&row.ProductID, &row.Printing, &condition, &row.Sellers, &row.Listings, &row.Copies, &row.Reported)
 		if err != nil {
-			log.Println("tcg listings:", err)
-			return
+			return nil, 0, err
 		}
 		row.Condition = condition.String
 		all = append(all, row)
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Println("tcg listings:", err)
-		return
+		return nil, 0, err
 	}
 
 	// The card ids TCGplayer's own prices are filed under: the product id,
@@ -173,12 +208,9 @@ func (s *site) loadTCGListings() {
 	}
 	cards, unmatched := buildTCGListings(all, match)
 	if len(cards) == 0 {
-		log.Println("tcg listings: no cards matched, keeping the previous load")
-		return
+		return nil, unmatched, fmt.Errorf("no cards matched in %d rows from %s, keeping the previous load", len(all), day.Format(time.DateOnly))
 	}
-
-	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day.Time, Cards: cards})
-	log.Println("tcg listings: loaded", len(cards), "printings from", day.Time.Format(time.DateOnly)+",", unmatched, "not matched")
+	return cards, unmatched, nil
 }
 
 type tcgPrintingKey struct {

@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // setTestTCGListings files cards as the loaded counts, as of 2026-09-28,
@@ -204,5 +208,70 @@ func TestPlural(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("plural(%d, %q): got %q, want %q", tc.n, tc.noun, got, tc.want)
 		}
+	}
+}
+
+// TestTCGListingsDue loads a scrape day once, and retries a day whose load
+// failed only after tcgListingsRetryAfter, so the 40-90s query runs once a
+// day rather than on every datastore reload or every hour after a failure.
+func TestTCGListingsDue(t *testing.T) {
+	day := time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC)
+	prev := day.AddDate(0, 0, -1)
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
+	loaded := func(d time.Time) *tcgListingsSnapshot { return &tcgListingsSnapshot{Date: d} }
+	failed := func(d time.Time, ago time.Duration) *tcgListingsFailure {
+		return &tcgListingsFailure{Day: d, At: now.Add(-ago)}
+	}
+	for _, tc := range []struct {
+		desc    string
+		current *tcgListingsSnapshot
+		failed  *tcgListingsFailure
+		want    bool
+	}{
+		{"nothing loaded yet", nil, nil, true},
+		{"the day is loaded", loaded(day), nil, false},
+		{"a newer scrape finished", loaded(prev), nil, true},
+		{"the day failed an hour ago", loaded(prev), failed(day, time.Hour), false},
+		{"the day failed long enough ago", loaded(prev), failed(day, tcgListingsRetryAfter), true},
+		{"an older day failed", loaded(prev), failed(prev, time.Hour), true},
+		{"the first load failed an hour ago", nil, failed(day, time.Hour), false},
+	} {
+		got := tcgListingsDue(tc.current, tc.failed, day, now)
+		if got != tc.want {
+			t.Errorf("%s: due = %v, want %v", tc.desc, got, tc.want)
+		}
+	}
+}
+
+// refusingConnector is a database that counts the connections asked of it
+// and refuses each one.
+type refusingConnector struct{ dials atomic.Int32 }
+
+func (c *refusingConnector) Connect(context.Context) (driver.Conn, error) {
+	c.dials.Add(1)
+	return nil, errors.New("no database here")
+}
+
+func (c *refusingConnector) Driver() driver.Driver { return nil }
+
+// TestLoadTCGListingsWaitsForADatastore keeps the hourly run from querying
+// before a datastore is loaded: it would match nothing, and hold off the
+// run the datastore's own load starts.
+func TestLoadTCGListingsWaitsForADatastore(t *testing.T) {
+	prevDB, prevGame, prevSkip := NewNewspaperDB, Config.Game, SkipNewspaper
+	t.Cleanup(func() { NewNewspaperDB, Config.Game, SkipNewspaper = prevDB, prevGame, prevSkip })
+	conn := &refusingConnector{}
+	NewNewspaperDB, Config.Game, SkipNewspaper = sql.OpenDB(conn), DefaultGame, false
+
+	s := newSite()
+	s.loadTCGListings()
+	if n := conn.dials.Load(); n != 0 {
+		t.Errorf("queried the newspaper %d times with no datastore loaded", n)
+	}
+
+	s.ds.Store(&datastore{backend: &mtgmatcher.Backend{AllUUIDs: []string{"a-card"}}})
+	s.loadTCGListings()
+	if conn.dials.Load() == 0 {
+		t.Error("did not query the newspaper once a datastore was loaded")
 	}
 }
