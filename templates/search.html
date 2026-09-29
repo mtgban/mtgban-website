@@ -1680,9 +1680,9 @@
                                                 {{else}}
                                                     <span class="store-cell">
                                                     {{if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait $card.CKPauseTip}}
+                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait $card.CKPauseTip}}
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
                                                     {{end}}
                                                     {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
                                                         <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
