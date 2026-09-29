@@ -87,6 +87,8 @@ const (
 	// best of them, in the pause's first week and in its second.
 	ckPauseWaitFirstWeek  = 76
 	ckPauseWaitSecondWeek = 66
+	// The wait arrow's own tooltip; the pill and the price carry the chances.
+	ckPauseWaitTip = "**Wait**: don't undersell it elsewhere, CK's buylist may reopen."
 )
 
 // ckHistory is what the newspaper's snapshots say about one CK product.

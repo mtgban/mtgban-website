@@ -396,11 +396,11 @@ var funcMap = template.FuncMap{
 	},
 	// buylist_pause_wait is the wait arrow on that offer, when waiting for CK
 	// beats every other cash offer.
-	"buylist_pause_wait": func(shorthand, conditions string, wait bool, tip string) template.HTML {
+	"buylist_pause_wait": func(shorthand, conditions string, wait bool) template.HTML {
 		if shorthand != "CKBLLast" || conditions != "NM" || !wait {
 			return ""
 		}
-		return template.HTML(` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`)
+		return template.HTML(` <span class="ck-wait"` + tipAttrs(ckPauseWaitTip) + `>&#8593;</span>`)
 	},
 	// buylist_ck is a card's CK signal on the pages with a column of card
 	// details: "Sell now" or "Wait". The column's tooltip explains it.
