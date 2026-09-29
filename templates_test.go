@@ -245,24 +245,24 @@ func TestTipHelpers(t *testing.T) {
 	}
 }
 
-// TestBuylistPause executes the pause pill the way search calls it: on CK's
-// last known NM offer only, with the wait arrow when waiting pays.
+// TestBuylistPause executes the pause pill and its wait arrow the way search
+// calls them: on CK's last known NM offer only, the arrow when waiting pays.
 func TestBuylistPause(t *testing.T) {
 	tmpl := template.Must(template.New("t").Funcs(funcMap).Parse(
-		`{{buylist_pause .Shorthand .Cond .Label .Wait .Tip}}`))
+		`{{buylist_pause .Shorthand .Cond .Label .Tip}}|{{buylist_pause_wait .Shorthand .Cond .Wait .Tip}}`))
 	for _, tc := range []struct {
 		name, shorthand, cond, label string
 		wait                         bool
 		want                         string
 	}{
 		{"paused", "CKBLLast", "NM", "Paused 3d", false,
-			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>`},
+			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>|`},
 		{"wait", "CKBLLast", "NM", "Paused 3d", true,
-			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>` +
+			` <span class="bl-pill bl-pill-paused" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">Paused 3d</span>|` +
 				` <span class="ck-wait" title="Paused: CK stopped" data-tip="**Paused**: CK stopped">&#8593;</span>`},
-		{"not paused", "CKBLLast", "NM", "", false, ""},
-		{"another grade", "CKBLLast", "SP", "Paused 3d", true, ""},
-		{"another store", "CK", "NM", "Paused 3d", true, ""},
+		{"not paused", "CKBLLast", "NM", "", false, "|"},
+		{"another grade", "CKBLLast", "SP", "Paused 3d", true, "|"},
+		{"another store", "CK", "NM", "Paused 3d", true, "|"},
 	} {
 		var b strings.Builder
 		err := tmpl.Execute(&b, struct {

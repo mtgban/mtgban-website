@@ -1680,9 +1680,9 @@
                                                 {{else}}
                                                     <span class="store-cell">
                                                     {{if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause .Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
+                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait $card.CKPauseTip}}
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause .Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait $card.CKPauseTip}}
                                                     {{end}}
                                                     {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
                                                         <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
@@ -1696,15 +1696,24 @@
                                                 {{end}}
                                                 {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
                                                 {{$blTitle := buylist_title .Shorthand $conditions $blState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}
+                                                {{/* A card CK has paused shows its pill in the ratio/credit column,
+                                                     with no data for that column's script to write over it, and
+                                                     its chances on the price too, where that column folds away. */}}
+                                                {{$pausePill := buylist_pause .Shorthand $conditions $card.CKPause $card.CKPauseTip}}
+                                                {{if $pausePill}}{{$blTitle = $card.CKPauseTip}}{{end}}
                                                 <span class="price-right has-buylist-extra">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if eq $blState "best"}} price-best{{end}}{{if eq $blState "wait"}} price-wait{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off - TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if $blTitle}}title="{{plain_tip $blTitle}}" data-tip="{{$blTitle}}"{{end}}>
                                                     {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                 </span>
+                                                {{if $pausePill}}
+                                                <span class="buylist-extra">{{$pausePill}}</span>
+                                                {{else}}
                                                 <span class="buylist-extra"
                                                     data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'
                                                     data-credit='{{if .Credit}}{{printf "%.02f" .Credit}}{{end}}'
                                                     data-marketcredit='{{if .MarketCredit}}{{printf "%.02f" .MarketCredit}}{{end}}'>
                                                 </span>
+                                                {{end}}
                                                 <span class="qty">
                                                     {{if and .Quantity (eq $conditions "NM")}}
                                                         {{.Quantity}}

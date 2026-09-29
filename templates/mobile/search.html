@@ -561,7 +561,7 @@
                                     <summary>
                                         <span class="m-vendor-name">
                                             {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
-                                            {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
+                                            {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait $card.CKPauseTip}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
@@ -601,7 +601,7 @@
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
                                     <span class="m-vendor-name">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
-                                        {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseWait $card.CKPauseTip}}
+                                        {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait $card.CKPauseTip}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">

@@ -387,17 +387,20 @@ var funcMap = template.FuncMap{
 		return template.HTML(` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`)
 	},
 	// buylist_pause marks Card Kingdom's last known NM offer on a card CK has
-	// paused: a pill saying for how long, and the wait arrow when waiting for
-	// CK beats every other cash offer, both with the chances as tooltip.
-	"buylist_pause": func(shorthand, conditions, label string, wait bool, tip string) template.HTML {
+	// paused with a pill saying for how long, the chances as its tooltip.
+	"buylist_pause": func(shorthand, conditions, label, tip string) template.HTML {
 		if shorthand != "CKBLLast" || conditions != "NM" || label == "" {
 			return ""
 		}
-		out := ` <span class="bl-pill bl-pill-paused"` + tipAttrs(tip) + `>` + template.HTMLEscapeString(label) + `</span>`
-		if wait {
-			out += ` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`
+		return template.HTML(` <span class="bl-pill bl-pill-paused"` + tipAttrs(tip) + `>` + template.HTMLEscapeString(label) + `</span>`)
+	},
+	// buylist_pause_wait is the wait arrow on that offer, when waiting for CK
+	// beats every other cash offer.
+	"buylist_pause_wait": func(shorthand, conditions string, wait bool, tip string) template.HTML {
+		if shorthand != "CKBLLast" || conditions != "NM" || !wait {
+			return ""
 		}
-		return template.HTML(out)
+		return template.HTML(` <span class="ck-wait"` + tipAttrs(tip) + `>&#8593;</span>`)
 	},
 	// buylist_ck is a card's CK signal on the pages with a column of card
 	// details: "Sell now" or "Wait". The column's tooltip explains it.
