@@ -626,7 +626,8 @@ the bot session, via `internal/notify`, configured per
 `Config.Discord.APIWebhookURL` — deliver server notifications:
 reload/refresh, panics (with stack trace), shutdown, checkpoint/datastore
 reload failures. A post longer than the 2000 characters Discord accepts is
-cut to fit, and one Discord refuses is logged.
+cut to fit, and one Discord refuses is logged, as is one that fails before
+Discord answers, without its URL.
 
 ### 5.9 Admin (`admin.go`)
 

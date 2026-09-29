@@ -4,7 +4,9 @@ package notify
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
+	"net/url"
 	"strings"
 
 	"github.com/hashicorp/go-cleanhttp"
@@ -24,7 +26,8 @@ type payload struct {
 // username. When dev is set the message is prefixed with "[DEV] " so test
 // traffic stays recognizable. A message longer than Discord accepts is cut to
 // fit. Failures, a post Discord refuses among them, are logged and dropped —
-// notifications are fire-and-forget.
+// notifications are fire-and-forget. The log never quotes hook, whose path
+// carries the webhook's token.
 func Post(hook, kind, message string, dev bool) {
 	var p payload
 	p.Username = kind
@@ -45,7 +48,12 @@ func Post(hook, kind, message string, dev bool) {
 
 	resp, err := cleanhttp.DefaultClient().Post(hook, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		log.Println(err)
+		// A *url.Error's text quotes the URL it was posting to.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		log.Printf("notify: %s post failed: %s", kind, err)
 		return
 	}
 	resp.Body.Close()

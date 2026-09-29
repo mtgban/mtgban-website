@@ -75,3 +75,23 @@ func TestPostLogsARefusal(t *testing.T) {
 		t.Errorf("logged %q, want the refusal", logged.String())
 	}
 }
+
+// A post that never reaches Discord is logged with what went wrong, but not
+// with the webhook's URL, whose path carries its token.
+func TestPostKeepsTheTokenOutOfTheLog(t *testing.T) {
+	down := httptest.NewServer(http.NotFoundHandler())
+	down.Close()
+	var logged bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(prev) })
+
+	Post(down.URL+"/api/webhooks/1/SECRET", "panic", "unsent", false)
+	got := logged.String()
+	if strings.Contains(got, "SECRET") {
+		t.Errorf("logged %q, want no token", got)
+	}
+	if !strings.Contains(got, "notify: panic post failed: ") || !strings.Contains(got, "connection refused") {
+		t.Errorf("logged %q, want the kind and the failure", got)
+	}
+}
