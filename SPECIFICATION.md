@@ -100,9 +100,9 @@ Boot sequence (`main()`):
 5. `s.reloads.Start("startup", Config.DatastorePath, ...)` runs
    `s.loadDatastore(Config.DatastorePath)` in the background through the
    same single-flight tracker an admin/API reload uses (`internal/dsreload`):
-   a reload requested before this finishes gets "already running" instead of
-   racing it, and a panic building a snapshot is recovered instead of
-   killing the process. `loadDatastore` opens the site's game via
+   a reload requested before this finishes is queued to run once it ends
+   instead of racing it (one waits at most, the latest request), and a panic
+   building a snapshot is recovered instead of killing the process. `loadDatastore` opens the site's game via
    `mtgmatcher.Open(datastoreGame(), reader)` (not the old
    `mtgmatcher.LoadDatastore()`), builds the numbers/names/editions
    snapshots and the palette's sets/promos/finishes lists from it
@@ -710,7 +710,7 @@ first check may announce every already-stale row once.
 | `tcgcsvd/` | tcgcsv ingest service: library + `cmd/tcgcsvd` binary. Daily/products/backfill jobs take a cross-process Postgres advisory lock so a standalone process and the website's own crons never crawl tcgcsv.com at once (`tcgcsvd/README.md`). With the archives withdrawn, the per-group daily price files are the only source and backfill falls back to the current snapshot (`docs/tcgcsv-archive-withdrawal.md`) |
 | `userstate/` | Postgres-backed cross-device sync of per-user favorites/recents/prefs (`/api/userstate/`), keyed by a hash of the login email |
 | `cmd/` | Just `cmd/tcgcsvd/main.go` — a thin CLI over the `tcgcsvd` package (`-daily`/`-products`/`-backfill`/`-games`) |
-| `internal/` | Packages only this module imports: `dsreload` (single-flight datastore reload, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
+| `internal/` | Packages only this module imports: `dsreload` (single-flight datastore reload that queues one request behind a running one, remembers the outcome for late askers), `bucketstore` (atomic in-memory snapshot of a bucket JSON doc — key overrides, chart checkpoints), `access` (tier ACL table + Patreon grant list), `tmplparse` (indentation-stripping template parser used by all template loading, see §7), `docparse` (CSV/XLS/decklist row → matched card entry, used by `upload.go`), `offline` (offline-mode binary payload format, per-user watermarking, per-set fingerprints), `offlineapi` (serves the offline PWA data endpoints), `palette` (command-palette data endpoints + nav-target lists), `mkmidparser` (Cardmarket product id → the card it names, for uploads that carry one), `sessionstore` (an admin's upload published as a store for the running process), `embed` (oEmbed link-unfurl panels + Discord embed field lists), `suggest` (the names the browser's suggestion bar offers through OpenSearch, and "did you mean" hints for empty search results), `notify` (Discord webhook one-liners), `diskusage` (platform-specific disk stats, isolates build tags), `debounce` (shared burst-coalescing run loop for background refreshers), `tcgcatalog` (parses `tcgdumper`/go-tcgplayer catalog dumps) |
 
 ## 7. Frontend
 

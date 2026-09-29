@@ -3,14 +3,16 @@ package dsreload
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
-// TestSecondReloadIsRefused keeps a second load from being built beside the
-// one already running. Each costs several times the memory the site settles
-// at, so two at once is what the process cannot spare.
-func TestSecondReloadIsRefused(t *testing.T) {
+// TestSecondReloadWaitsForTheFirst keeps a second load from being built
+// beside the one already running, since each costs several times the memory
+// the site settles at, but runs it once the first ends: the first may have
+// read the datastore before a new one was published.
+func TestSecondReloadWaitsForTheFirst(t *testing.T) {
 	var tracker Tracker
 	release := make(chan struct{})
 	started := make(chan struct{})
@@ -24,24 +26,75 @@ func TestSecondReloadIsRefused(t *testing.T) {
 	}
 	<-started
 
+	secondRan := make(chan struct{})
 	if tracker.Start("second", "ds", func() error {
-		t.Error("the second reload ran while the first was still going")
+		close(secondRan)
 		return nil
 	}) {
 		t.Error("the second reload reported that it started")
 	}
-
-	if state := tracker.Status(); !state.Running || state.Source != "first" {
-		t.Errorf("status = %+v, want the first still running", state)
+	select {
+	case <-secondRan:
+		t.Error("the second reload ran while the first was still going")
+	default:
+	}
+	if state := tracker.Status(); !state.Running || state.Source != "first" || !state.Queued {
+		t.Errorf("status = %+v, want the first running and the second queued", state)
 	}
 
 	close(release)
+	select {
+	case <-secondRan:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the queued reload never ran")
+	}
 	waitFor(t, &tracker)
+	if state := tracker.Status(); state.Source != "second" || state.Queued {
+		t.Errorf("status = %+v, want the second's, nothing queued", state)
+	}
 
 	if !tracker.Start("third", "ds", func() error { return nil }) {
 		t.Error("a reload was refused after the running one finished")
 	}
 	waitFor(t, &tracker)
+}
+
+// TestOnlyTheLatestQueuedReloadRuns keeps the queue to one: requests that
+// pile up behind a running reload are answered by a single one after it.
+func TestOnlyTheLatestQueuedReloadRuns(t *testing.T) {
+	var tracker Tracker
+	release := make(chan struct{})
+	started := make(chan struct{})
+	tracker.Start("first", "ds", func() error {
+		close(started)
+		<-release
+		return nil
+	})
+	<-started
+
+	var ran []string
+	var mu sync.Mutex
+	for _, source := range []string{"second", "third", "fourth"} {
+		tracker.Start(source, "ds", func() error {
+			mu.Lock()
+			ran = append(ran, source)
+			mu.Unlock()
+			return nil
+		})
+	}
+	close(release)
+	deadline := time.Now().Add(5 * time.Second)
+	for tracker.Status().Source != "fourth" || tracker.Status().Running {
+		if time.Now().After(deadline) {
+			t.Fatalf("status = %+v, want the fourth to have run", tracker.Status())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(ran) != 1 || ran[0] != "fourth" {
+		t.Errorf("ran %q after the first, want the latest alone", ran)
+	}
 }
 
 // TestReloadRecordsWhyItFailed pins the failure onto the status the admin

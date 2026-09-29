@@ -21,6 +21,7 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 		desc       string
 		work       func() error
 		hold       bool
+		queue      bool
 		wantShown  []string
 		wantAbsent []string
 	}{
@@ -28,6 +29,13 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 			desc:       "a running reload says so and holds the action back",
 			hold:       true,
 			wantShown:  []string{"Datastore update in progress", "updating,", "Already running"},
+			wantAbsent: []string{"?reboot=datastore\""},
+		},
+		{
+			desc:       "a reload asked for meanwhile is said to follow it",
+			hold:       true,
+			queue:      true,
+			wantShown:  []string{"Datastore update in progress", "Another reload is queued to follow it."},
 			wantAbsent: []string{"?reboot=datastore\""},
 		},
 		{
@@ -53,6 +61,9 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 					return nil
 				})
 				<-started
+				if tt.queue {
+					reloads.Start("api", "allprintings5.json.xz", func() error { return nil })
+				}
 			} else {
 				reloads.Start("api", "allprintings5.json.xz", tt.work)
 				waitForReload(t, &reloads)

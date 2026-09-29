@@ -205,7 +205,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if s.startDatastoreReload(dsPath, "admin") {
 			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
 		} else {
-			pageVars.InfoMessage = "A datastore reload is already running"
+			pageVars.InfoMessage = "A datastore reload is already running, this one will start when it ends"
 		}
 
 	case "update":
