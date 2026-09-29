@@ -1524,6 +1524,14 @@ func main() {
 			if err != nil {
 				log.Fatalln("error loading scrapers:", err)
 			}
+			// Card Kingdom's stock history and buylist signals (ckbuylist.go),
+			// where the prices just loaded include CK's buylist.
+			if ckAvailable() {
+				go func() {
+					defer recoverJob("refreshCKSignals")
+					s.refreshCKSignals()
+				}()
+			}
 
 			// Update set values after loading prices. The analysis reads the
 			// backend it starts with, so it waits for the datastore: read
@@ -1541,12 +1549,6 @@ func main() {
 	// Runtime manifest refreshes funnel through one debounced goroutine, each
 	// under recovered so that one that panics does not end the loop.
 	s.offline.StartRefresher(recovered)
-
-	// Card Kingdom's stock history and buylist signals (ckbuylist.go).
-	go func() {
-		defer recoverJob("refreshCKSignals")
-		s.refreshCKSignals()
-	}()
 
 	if !DevMode {
 		// Set up new refreshes as needed. The library runs each job on a bare

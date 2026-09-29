@@ -688,3 +688,22 @@ func TestCardFilterOnCK(t *testing.T) {
 		}
 	}
 }
+
+// TestCKWorkNeedsCKBuylist builds no CK signals on a site that does not
+// serve CK's buylist, whatever its game.
+func TestCKWorkNeedsCKBuylist(t *testing.T) {
+	prevVendors, prevSignals := vendorsPtr.Load(), ckSignalsPtr.Load()
+	t.Cleanup(func() {
+		vendorsPtr.Store(prevVendors)
+		ckSignalsPtr.Store(prevSignals)
+	})
+	vendors := []mtgban.Vendor{buylistOf("SCG", 1, time.Now())}
+	vendorsPtr.Store(&vendors)
+	ckSignalsPtr.Store(nil)
+
+	(&site{}).refreshCKSignals()
+	rebuildCKSignals()
+	if ckSignalsPtr.Load() != nil {
+		t.Error("built CK signals without a CK buylist")
+	}
+}

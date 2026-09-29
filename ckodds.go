@@ -244,9 +244,6 @@ func loadCKOdds(ctx context.Context, path string) (*ckOdds, error) {
 // refreshCKOdds loads the odds when none are loaded or the loaded ones are
 // a day old. A failed load keeps the last one.
 func refreshCKOdds() {
-	if Config.Game != DefaultGame {
-		return
-	}
 	current := ckOddsPtr.Load()
 	if current != nil && time.Since(current.Generated) < ckOddsMaxAge {
 		return

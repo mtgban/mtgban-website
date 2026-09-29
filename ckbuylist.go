@@ -107,7 +107,7 @@ func ckToday(now time.Time) time.Time {
 // or the newspaper's newest snapshot changed, and keeps the last good load on
 // any error.
 func (s *site) loadCKHistory() {
-	if Config.Game != DefaultGame || SkipNewspaper || NewNewspaperDB == nil {
+	if SkipNewspaper || NewNewspaperDB == nil {
 		return
 	}
 	if !ckHistoryLoading.CompareAndSwap(false, true) {
@@ -466,6 +466,9 @@ var ckSignalsMu sync.Mutex
 // history or the P90s change, and hourly because the rules and facts count
 // days and the other buylists reload.
 func rebuildCKSignals() {
+	if !ckAvailable() {
+		return
+	}
 	ckSignalsMu.Lock()
 	defer ckSignalsMu.Unlock()
 
@@ -528,9 +531,20 @@ func rebuildCKSignals() {
 	ckSignalsPtr.Store(&signals)
 }
 
+// ckAvailable tells whether this site serves Card Kingdom's buylist, which
+// everything here starts from: the history, the odds and the signals are
+// loaded and built only where it does.
+func ckAvailable() bool {
+	_, err := findVendorBuylist("CK")
+	return err == nil
+}
+
 // refreshCKSignals reloads the history when the newspaper has a new day and
 // the odds when they are a day old, and rebuilds the signals either way.
 func (s *site) refreshCKSignals() {
+	if !ckAvailable() {
+		return
+	}
 	s.loadCKHistory()
 	refreshCKOdds()
 	rebuildCKSignals()
