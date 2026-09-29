@@ -312,6 +312,10 @@
     background: rgba(255,66,77,0.1); border-color: rgba(255,66,77,0.25); color: #ff424d;
 }
 .landing-login-btn.patreon:hover { background: rgba(255,66,77,0.2); text-decoration: none; }
+.landing-login-btn.patreon:disabled {
+    background: rgba(128,128,128,0.12); border-color: rgba(128,128,128,0.3); color: var(--text-dim);
+    cursor: not-allowed; opacity: 0.8;
+}
 .landing-login-btn.discord {
     background: rgba(79,195,247,0.12); border-color: rgba(79,195,247,0.35); color: #29b6f6;
 }
