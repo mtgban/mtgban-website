@@ -1324,10 +1324,16 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 // Log and send the notification for a user action
 func ServerNotify(kind, message string, flags ...bool) {
 	log.Println(message)
+	serverPost(kind, message, len(flags) > 0 && flags[0])
+}
+
+// serverPost sends message to the server webhook without logging it,
+// prefixed with @here when here is set.
+func serverPost(kind, message string, here bool) {
 	if Config.Discord.ServerWebhookURL == "" {
 		return
 	}
-	if len(flags) > 0 && flags[0] {
+	if here {
 		message = "@here " + message
 	}
 	go notify.Post(Config.Discord.ServerWebhookURL, kind, message, DevMode)

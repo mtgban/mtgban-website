@@ -197,14 +197,15 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
 
 **Panics.** A panic in a handler behind one of the three signing wrappers
 is recovered by `recoverPanic` (auth.go): `reportPanic` (recover.go) logs
-it and posts what `fmt.Sprint` makes of the value, the first 1024 bytes of
-the panicking goroutine's stack and a `source request:` line to the server
-webhook, and the request is answered 500 if the handler has not started
-its response. For 10 minutes after a report posts (`panicQuietWindow`),
-every later panic, whatever its source, is only logged, value, stack and
-source line alike, and the next report to post says how many there were:
-a handler that panics on every request pings the channel once a window,
-not once a request. net/http itself recovers a panic in any other handler,
+it with the panicking goroutine's whole stack and posts what `fmt.Sprint`
+makes of the value, the first 1024 bytes of that stack and a
+`source request:` line to the server webhook, and the request is answered
+500 if the handler has not started its response. For 10 minutes after a
+report posts (`panicQuietWindow`), later panics raised on the same line
+(`panicSite`) are only logged, value, stack and source line alike, and
+that line's next report says how many there were: a handler that panics
+on every request pings the channel once a window, not once a request,
+while a panic raised anywhere else still posts its own. net/http itself recovers a panic in any other handler,
 logging it and dropping the connection. Off the serving goroutines, these
 recover and report the same way under a `source job:` line: the cron jobs
 and each debounced offline refresh through `recovered()`; the Discord
