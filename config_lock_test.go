@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/mtgban/simplecloud"
@@ -347,9 +349,9 @@ func (b *stuckReadBucket) NewReader(ctx context.Context, path string) (io.ReadCl
 	return b.ReadWriter.NewReader(ctx, path)
 }
 
-// A reload holds configMu across its read of the config file, which nothing
-// times out. The admin page reads the config under apiUsersMutex alone, so
-// it still renders while that read hangs.
+// A reload holds configMu across its read of the config file, for up to
+// configFileTimeout. The admin page reads the config under apiUsersMutex
+// alone, so it still renders while that read hangs.
 func TestAdminPageRendersWhileAConfigReadHangs(t *testing.T) {
 	path := withConfigFile(t)
 	writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)
@@ -386,4 +388,61 @@ func TestAdminPageRendersWhileAConfigReadHangs(t *testing.T) {
 		t.Error(err)
 	}
 	render.Wait()
+}
+
+// hungBucket opens the config file at once, but a read, or the Close that
+// finishes a write, answers only once the context it was opened with is
+// done, as B2's do when the bucket stops answering.
+type hungBucket struct{}
+
+func (hungBucket) NewReader(ctx context.Context, _ string) (io.ReadCloser, error) {
+	return hungFile{ctx}, nil
+}
+
+func (hungBucket) NewWriter(ctx context.Context, _ string) (io.WriteCloser, error) {
+	return hungFile{ctx}, nil
+}
+
+// hungFile is the config file as hungBucket opens it.
+type hungFile struct{ ctx context.Context }
+
+func (f hungFile) Read([]byte) (int, error) {
+	<-f.ctx.Done()
+	return 0, f.ctx.Err()
+}
+
+func (hungFile) Write(p []byte) (int, error) { return len(p), nil }
+
+func (f hungFile) Close() error {
+	<-f.ctx.Done()
+	return f.ctx.Err()
+}
+
+// A reload or an editor save gives up on a bucket that stops answering after
+// configFileTimeout, and leaves configMu to the next: synctest's fake clock
+// runs the timeout at once.
+func TestConfigFileIOGivesUp(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		change func() error
+	}{
+		{"a reload", reloadConfig},
+		{"an editor save", func() error { return saveConfig(context.Background(), ConfigType{}) }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				withConfigFile(t)
+				ConfigBucket = hungBucket{}
+
+				err := c.change()
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Errorf("error %v, want the deadline's", err)
+				}
+				if !configMu.TryLock() {
+					t.Fatal("configMu is still held")
+				}
+				configMu.Unlock()
+			})
+		})
+	}
 }

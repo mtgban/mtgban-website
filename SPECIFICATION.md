@@ -180,8 +180,10 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   lookups read behind.
   Those two and a new API key (`generateAPIKey`) also hold `configMu`
   across their file I/O, so none lands inside another; the lookups never
-  wait on it. The reload reads the running port and paths it keeps under
-  `configMu` too, so they are the ones a save it waited on set.
+  wait on it. That I/O gives up after `configFileTimeout` (30 s), so a
+  bucket that stops answering holds the lock that long at most. The
+  reload reads the running port and paths it keeps under `configMu` too,
+  so they are the ones a save it waited on set.
   The admin page reads the secrets under `apiUsersMutex` too, to list
   the API users and fill the config editor, so it never waits on the
   bucket either.
