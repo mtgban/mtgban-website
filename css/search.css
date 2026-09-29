@@ -1393,7 +1393,6 @@ body.modal-embed .search-sidebar {
 /* Outside the store's link, so it neither links nor underlines; the cell's
    gap spaces it, and the name is what shortens. */
 .price-row .store-cell .bl-pill { margin-left: 0; flex-shrink: 0; }
-.price-row .store-cell .ck-wait { flex-shrink: 0; }
 /* Admin "Fix" link on each store row, revealed by the per-result Fix toggle. */
 .store-fix {
     display: none;
@@ -1547,7 +1546,8 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 .price-row .price-wait {
     color: var(--awarning);
 }
-.store-name .ck-wait {
+.price-row .store-cell .ck-wait {
+    flex-shrink: 0;
     color: var(--awarning);
     font-weight: 700;
     cursor: help;
