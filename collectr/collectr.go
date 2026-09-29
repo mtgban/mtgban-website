@@ -405,19 +405,11 @@ func LoadReader(r io.Reader, game mtgmatcher.Game, maxRows int) ([]Item, error) 
 	return parseProducts(string(buf), catName, maxRows)
 }
 
+// mapCondition reads a showcase grade, and an empty or unknown one as NM.
 func mapCondition(cond string) mtgban.Condition {
-	switch strings.ToUpper(strings.TrimSpace(cond)) {
-	case "NM", "NEAR MINT":
-		return mtgban.NM
-	case "LP", "LIGHTLY PLAYED":
-		return mtgban.SP
-	case "MP", "MODERATELY PLAYED":
-		return mtgban.MP
-	case "HP", "HEAVILY PLAYED":
-		return mtgban.HP
-	case "DMG", "DAMAGED":
-		return mtgban.PO
-	default:
+	grade, err := mtgban.ParseCondition(cond)
+	if err != nil {
 		return mtgban.NM
 	}
+	return grade
 }
