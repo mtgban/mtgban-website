@@ -123,9 +123,9 @@ Boot sequence (`main()`):
    loop serves the next one.
 8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go). The
    library runs each on a bare goroutine, so each is registered through
-   `recovered()` (recover.go): a panic is logged and posted to the server
-   webhook with its stack, as a request's is, and the job runs again at its
-   next time rather than taking the process down:
+   `recovered()` (recover.go): a panic is reported as a request's is
+   (§2.2), and the job runs again at its next time rather than taking the
+   process down:
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
    - `33 */3 * * *` — `s.cacheNewspaper()`
@@ -191,7 +191,11 @@ is recovered by `recoverPanic` (auth.go): `reportPanic` (recover.go) logs
 it and posts what `fmt.Sprint` makes of the value, the first 1024 bytes of
 the panicking goroutine's stack and a `source request:` line to the server
 webhook, and the request is answered 500 if the handler has not started
-its response. net/http itself recovers a panic in any other handler,
+its response. For 10 minutes after a report posts (`panicQuietWindow`),
+every later panic, whatever its source, is only logged, value, stack and
+source line alike, and the next report to post says how many there were:
+a handler that panics on every request pings the channel once a window,
+not once a request. net/http itself recovers a panic in any other handler,
 logging it and dropping the connection. Off the serving goroutines, these
 recover and report the same way under a `source job:` line: the cron jobs
 and each debounced offline refresh through `recovered()`; the Discord
@@ -609,9 +613,9 @@ last-sold lookups (5 s fetch timeout, 30 s message-edit timeout);
 (dev/recap/chat); and Gatherer-link interception by multiverse id.
 `discordgo` runs every handler on a bare goroutine, so `guildCreate` and
 `messageCreate` each defer `recoverJob()` (recover.go), as does the
-goroutine a `$$` lookup fetches on: a panic on one of them is logged and
-posted to the server webhook, and costs that one event (a `$$` reply falls
-back to the timeout) rather than the process. The scans the search of a
+goroutine a `$$` lookup fetches on: a panic on one of them is reported
+(§2.2) and costs that one event (a `$$` reply falls back to the timeout)
+rather than the process. The scans the search of a
 `!card`/`?card` lookup fans out to (`searchParallelNG`) recover their own
 panics, so one that panics costs only its side of the reply's prices.
 Automatic affiliate-link rewriting (`checkForLinks`: Card Kingdom, Cool

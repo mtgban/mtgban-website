@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,8 +22,14 @@ import (
 // serverWebhook points ServerNotify at a webhook of the test's own and
 // returns what is posted to it, without the "[DEV] " marker. Each message
 // is posted from a goroutine of its own, so they arrive in no set order.
+// It clears the panic quiet window too, so the test's first panic posts
+// its report whatever panicked before it.
 func serverWebhook(t *testing.T) <-chan string {
 	t.Helper()
+	panicReportMu.Lock()
+	lastPanicReport, quietPanics = time.Time{}, 0
+	panicReportMu.Unlock()
+
 	posts := make(chan string, 64)
 	hook := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		var p struct{ Content string }
@@ -154,6 +162,43 @@ func TestRecoverPanicReportsTheRequest(t *testing.T) {
 	}
 	if source != "source request: /search?q=bolt" {
 		t.Errorf("source = %q, want the request", source)
+	}
+}
+
+// Once a report posts, the panics of the next panicQuietWindow are only
+// logged, value, stack and source alike, and the first report past the
+// window says how many there were.
+func TestReportPanicPostsOncePerQuietWindow(t *testing.T) {
+	posts := serverWebhook(t)
+
+	reportPanic("the first panic", "source job: first")
+	message, _, _ := panicReport(t, posts)
+	if message != "the first panic" {
+		t.Errorf("message = %q, want the first panic's", message)
+	}
+
+	prevLog := log.Writer()
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	reportPanic("the second panic", "source job: second")
+	log.SetOutput(prevLog)
+	for _, want := range []string{"the second panic", "goroutine ", "source job: second"} {
+		if !strings.Contains(logged.String(), want) {
+			t.Errorf("logged %q, want %q in it", logged.String(), want)
+		}
+	}
+
+	panicReportMu.Lock()
+	lastPanicReport = lastPanicReport.Add(-panicQuietWindow)
+	panicReportMu.Unlock()
+	reportPanic("the third panic", "source job: third")
+
+	message, _, source := panicReport(t, posts)
+	if message != "the third panic (unposted panics since the last report: 1)" {
+		t.Errorf("message = %q, want the third panic's, counting the second", message)
+	}
+	if source != "source job: third" {
+		t.Errorf("source = %q, want the third panic's", source)
 	}
 }
 
