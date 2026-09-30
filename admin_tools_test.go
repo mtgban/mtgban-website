@@ -27,8 +27,58 @@ func TestAdminToolsLinkTheGatewayAdmin(t *testing.T) {
 	if !strings.Contains(body, `href="https://api.example/admin"`) {
 		t.Error("tools page does not link the gateway admin")
 	}
-	if strings.Contains(body, "Generate Demo Key") || strings.Contains(body, `value="demokey"`) {
-		t.Error("the demo key card is still there")
+	if !strings.Contains(body, `value="demokey"`) {
+		t.Error("tools page does not offer the demo key")
+	}
+}
+
+func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
+	withSigMode(t, true, false)
+
+	apiUsersMutex.Lock()
+	if Config.APIUserSecrets == nil {
+		Config.APIUserSecrets = map[string]string{}
+	}
+	saved, had := Config.APIUserSecrets[DefaultAPIDemoUser]
+	Config.APIUserSecrets[DefaultAPIDemoUser] = goldenSecret
+	apiUsersMutex.Unlock()
+	t.Cleanup(func() {
+		apiUsersMutex.Lock()
+		delete(Config.APIUserSecrets, DefaultAPIDemoUser)
+		if had {
+			Config.APIUserSecrets[DefaultAPIDemoUser] = saved
+		}
+		apiUsersMutex.Unlock()
+	})
+
+	// A blank user is the demo user, from the button and the form alike.
+	for _, reboot := range []string{"demokey", "newKey&user=&duration=30"} {
+		req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&reboot="+reboot, nil)
+		req.Host = "mtgban.com"
+		rec := httptest.NewRecorder()
+		testSite.Admin(rec, req)
+		if rec.Code != http.StatusFound {
+			t.Fatalf("status %d", rec.Code)
+		}
+		loc, err := url.Parse(rec.Header().Get("Location"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := loc.Query().Get("msg")
+		blob, err := base64.StdEncoding.DecodeString(key)
+		if err != nil {
+			t.Fatalf("%s did not mint a key: %q", reboot, key)
+		}
+		claims, err := url.ParseQuery(string(blob))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if claims.Get("Expires") == "" {
+			t.Errorf("the demo key is permanent: %v", claims)
+		}
+		if !strings.Contains(string(blob), url.QueryEscape(DefaultAPIDemoUser)) {
+			t.Errorf("the demo key is not the demo user's: %v", claims)
+		}
 	}
 }
 
