@@ -15,7 +15,7 @@ provider's `public_name` from `timeseries_config.datasets`
 between the window the page first renders (`chartInitialRange`: the
 viewer's last range, else 180 days) and a wider one fetched later from
 `/api/chart` (`ChartRangeLoader` in js/chart-range.js; the single-card
-`installChartPayload` in templates/search.html rebuilds the datasets from
+`installChartPayload` in js/search-chart.js rebuilds the datasets from
 it). The legacy read lists every configured series, priced or not, so
 positions held there.
 

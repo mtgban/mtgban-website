@@ -8,7 +8,7 @@ const scripts = ['chartopts.js', 'chart-range.js']
     .map((name) => readFileSync(join(import.meta.dir, '..', 'js', name), 'utf8'))
     .join('\n');
 
-// legendStorageKey in templates/search.html, for a card that is not sealed.
+// legendStorageKey in js/search-chart.js, for a card that is not sealed.
 const KEY = 'BANChart';
 
 // Chart.js keeps what setDatasetVisibility sets on a meta tied to the dataset
@@ -39,7 +39,7 @@ function storage(saved = {}) {
 }
 
 // openCard loads the scripts into a fresh page and draws a card's chart the way
-// the single-card branch of templates/search.html does: the window it rendered,
+// the single-card branch of js/search-chart.js does: the window it rendered,
 // the saved stores hidden, then the legend.
 function openCard(localStorage, stores) {
     // The legend's buttons are read back out of its html, so a test can click
