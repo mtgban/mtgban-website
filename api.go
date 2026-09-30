@@ -269,6 +269,44 @@ var tcgConditionMap = map[mtgban.Condition]string{
 	mtgban.PO: "Damaged",
 }
 
+// csvRow is one row of a marketplace CSV: a card in one condition, and its
+// quantity across every entry naming that pair.
+type csvRow struct {
+	id   string
+	cond mtgban.Condition
+	qty  int
+}
+
+// mergeCSVRows merges the entries naming the same card in the same condition
+// into one row, in first-seen order. qtys and conds, when present, are the
+// size of ids; a missing quantity counts as 1 and a missing condition as NM.
+func mergeCSVRows(ids, qtys, conds []string) []csvRow {
+	var rows []csvRow
+	index := map[csvRow]int{}
+	for i, id := range ids {
+		quantity := 1
+		if qtys != nil {
+			q, err := strconv.Atoi(qtys[i])
+			if err == nil {
+				quantity = q
+			}
+		}
+		cond := mtgban.NM
+		if conds != nil && conds[i] != "" {
+			cond = mtgban.Condition(conds[i])
+		}
+		key := csvRow{id: id, cond: cond}
+		j, found := index[key]
+		if !found {
+			j = len(rows)
+			index[key] = j
+			rows = append(rows, key)
+		}
+		rows[j].qty += quantity
+	}
+	return rows
+}
+
 // Convert a slice of ids (BAN uuids) to a list of TCG product SKUs on a CSV
 //
 // If present, qtys and conds need to be the same size of ids.
@@ -298,40 +336,7 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 		return err
 	}
 
-	// Accumulate per-(id, condition) quantities and remember the (id, condition)
-	// for each unique key, plus the keys in first-seen order so the CSV rows
-	// come out deterministically. Keying by id+condition keeps each distinct
-	// condition as its own row and ties the condition to its id — the old code
-	// re-derived it from conds[i] using the deduped index, which misaligned
-	// (and broke the qty lookup) after the first repeated id.
-	type tcgRow struct {
-		id   string
-		cond mtgban.Condition
-	}
-	qty := map[string]int{}
-	rowByKey := map[string]tcgRow{}
-	var order []string
-	for i, id := range ids {
-		quantity := 1
-		if qtys != nil {
-			if q, err := strconv.Atoi(qtys[i]); err == nil {
-				quantity = q
-			}
-		}
-		cond := mtgban.NM
-		if conds != nil && conds[i] != "" {
-			cond = mtgban.Condition(conds[i])
-		}
-		key := id + string(cond)
-		qty[key] += quantity
-		if _, ok := rowByKey[key]; !ok {
-			order = append(order, key)
-			rowByKey[key] = tcgRow{id, cond}
-		}
-	}
-
-	for _, key := range order {
-		row := rowByKey[key]
+	for _, row := range mergeCSVRows(ids, qtys, conds) {
 		id, cond := row.id, row.cond
 		var prices [3]float64
 
@@ -380,7 +385,7 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 		record = append(record, "")
 		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
-		record = append(record, fmt.Sprint(qty[key]))
+		record = append(record, fmt.Sprint(row.qty))
 		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
 		record = append(record, "")
 
