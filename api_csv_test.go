@@ -151,3 +151,46 @@ func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
 		}
 	}
 }
+
+// The CK and SCG exports write a row per id the vendor buys, from its first
+// buylist entry; CK also skips a card with no CK title. A quantity of "0",
+// or quantities not matching the ids, reads as 1.
+func TestUUID2BuylistCSV(t *testing.T) {
+	prev := vendorsPtr.Load()
+	t.Cleanup(func() { vendorsPtr.Store(prev) })
+	ck := mtgban.BuylistRecord{
+		"a": {{CustomFields: map[string]string{"CKTitle": "A", "CKEdition": "Set", "CKFoil": "true"}}},
+		"b": {{CustomFields: map[string]string{"CKEdition": "Set"}}},
+	}
+	scg := mtgban.BuylistRecord{
+		"a": {{InstanceID: "1", CustomFields: map[string]string{
+			"SCGName": "A", "SCGEdition": "Set", "SCGLanguage": "en", "SCGFinish": "foil"}}},
+		"b": {{InstanceID: "2"}},
+	}
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Shorthand: "CK"}),
+		mtgban.NewVendorFromBuylist(scg, mtgban.ScraperInfo{Shorthand: "SCG"}),
+	}
+	vendorsPtr.Store(&vendors)
+
+	ids := []string{"a", "b", "c", "a"}
+	for _, tc := range []struct {
+		export func(*csv.Writer, []string, []string) error
+		qtys   []string
+		want   string
+	}{
+		{UUID2CKCSV, []string{"3", "2", "1", "0"}, "Title,Edition,Foil,Quantity\nA,Set,true,3\nA,Set,true,1\n"},
+		{UUID2CKCSV, []string{"3"}, "Title,Edition,Foil,Quantity\nA,Set,true,1\nA,Set,true,1\n"},
+		{UUID2SCGCSV, []string{"3", "2", "1", "0"}, "quantity,productid,name,set_name,language,finish\n3,1,A,Set,en,foil\n2,2,,,,\n1,1,A,Set,en,foil\n"},
+		{UUID2SCGCSV, nil, "quantity,productid,name,set_name,language,finish\n1,1,A,Set,en,foil\n1,2,,,,\n1,1,A,Set,en,foil\n"},
+	} {
+		var buf bytes.Buffer
+		err := tc.export(csv.NewWriter(&buf), ids, tc.qtys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != tc.want {
+			t.Errorf("qtys %q: got\n%s\nwant\n%s", tc.qtys, buf.String(), tc.want)
+		}
+	}
+}

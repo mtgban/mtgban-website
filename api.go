@@ -136,49 +136,33 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {
-	buylist, err := findVendorBuylist("CK")
-	if err != nil {
-		return err
-	}
-
 	header := []string{"Title", "Edition", "Foil", "Quantity"}
-	err = w.Write(header)
-	if err != nil {
-		return err
-	}
-	for i, id := range ids {
-		blEntries, found := buylist[id]
+	return uuid2BuylistCSV(w, ids, qtys, "CK", header, func(entry mtgban.BuylistEntry, quantity string) []string {
+		name, found := entry.CustomFields["CKTitle"]
 		if !found {
-			continue
+			return nil
 		}
-		name, found := blEntries[0].CustomFields["CKTitle"]
-		if !found {
-			continue
-		}
-		edition := blEntries[0].CustomFields["CKEdition"]
-		finish := blEntries[0].CustomFields["CKFoil"]
-		quantity := "1"
-		if len(qtys) == len(ids) && qtys[i] != "0" {
-			quantity = qtys[i]
-		}
-
-		err = w.Write([]string{name, edition, finish, quantity})
-		if err != nil {
-			return err
-		}
-
-		w.Flush()
-	}
-	return nil
+		return []string{name, entry.CustomFields["CKEdition"], entry.CustomFields["CKFoil"], quantity}
+	})
 }
 
 func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
-	buylist, err := findVendorBuylist("SCG")
+	header := []string{"quantity", "productid", "name", "set_name", "language", "finish"}
+	return uuid2BuylistCSV(w, ids, qtys, "SCG", header, func(entry mtgban.BuylistEntry, quantity string) []string {
+		fields := entry.CustomFields
+		return []string{quantity, entry.InstanceID, fields["SCGName"], fields["SCGEdition"], fields["SCGLanguage"], fields["SCGFinish"]}
+	})
+}
+
+// uuid2BuylistCSV writes a row for each id the vendor buys, as row renders
+// its first buylist entry and quantity; a nil row skips the card. Quantities
+// default to 1, for a "0" or when qtys is not the size of ids.
+func uuid2BuylistCSV(w *csv.Writer, ids, qtys []string, vendor string, header []string, row func(mtgban.BuylistEntry, string) []string) error {
+	buylist, err := findVendorBuylist(vendor)
 	if err != nil {
 		return err
 	}
 
-	header := []string{"quantity", "productid", "name", "set_name", "language", "finish"}
 	err = w.Write(header)
 	if err != nil {
 		return err
@@ -188,17 +172,16 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		productID := blEntries[0].InstanceID
-		name := blEntries[0].CustomFields["SCGName"]
-		edition := blEntries[0].CustomFields["SCGEdition"]
-		language := blEntries[0].CustomFields["SCGLanguage"]
-		finish := blEntries[0].CustomFields["SCGFinish"]
 		quantity := "1"
 		if len(qtys) == len(ids) && qtys[i] != "0" {
 			quantity = qtys[i]
 		}
+		record := row(blEntries[0], quantity)
+		if record == nil {
+			continue
+		}
 
-		err = w.Write([]string{quantity, productID, name, edition, language, finish})
+		err = w.Write(record)
 		if err != nil {
 			return err
 		}
