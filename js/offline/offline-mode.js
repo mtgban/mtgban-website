@@ -24,10 +24,8 @@
 
     // The MTGBAN cookie is base64 over url.Values; SearchOfflineMode is an ACL flag.
     function available() {
-        var m = document.cookie.match(/(?:^|;\s*)MTGBAN=([^;]+)/);
-        if (!m) return false;
         try {
-            return new URLSearchParams(atob(decodeURIComponent(m[1]))).get('SearchOfflineMode') === 'true';
+            return new URLSearchParams(atob(getCookie('MTGBAN'))).get('SearchOfflineMode') === 'true';
         } catch (e) { return false; }
     }
 

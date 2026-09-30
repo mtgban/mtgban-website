@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const source = readFileSync(join(import.meta.dir, '..', 'js', 'mobile-chart.js'), 'utf8');
+const cookies = readFileSync(join(import.meta.dir, '..', 'js', 'cookies.js'), 'utf8');
 
 // openDrawer evaluates mobile-chart.js against a stubbed page, opens the chart
 // drawer on one card, and reports every url it fetched, every chart it drew and
@@ -70,7 +71,7 @@ async function openDrawer(answer, cookie = '') {
     const localStorage = { getItem: () => null, setItem() {} };
     const console = { error: (err) => errors.push(err) };
 
-    new Function('window', 'document', 'localStorage', 'fetch', 'Chart', 'console', source)(
+    new Function('window', 'document', 'localStorage', 'fetch', 'Chart', 'console', cookies + '\n' + source)(
         window, document, localStorage, fetch, Chart, console);
     window.showChartDrawer('ban:1', false, 'Black Lotus');
     await new Promise((done) => setTimeout(done, 0));
