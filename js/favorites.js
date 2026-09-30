@@ -1,33 +1,10 @@
 // Favorites — localStorage-backed card favorites for mobile
 (function() {
     var STORAGE_KEY = 'mtgban_favorites';
-    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-    var TOMB_CAP = 50;
-    function isLive(f) { return !f.del; }
-    function mtime(f) { return f.m || f.t || 0; }
-    function getLiveFavorites() { return getFavorites().filter(isLive); }
-
-    function getFavorites() {
-        try {
-            var data = localStorage.getItem(STORAGE_KEY);
-            return data ? JSON.parse(data) : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function saveFavorites(favs) {
-        try {
-            var MAX_FAVORITES = 50;
-            var now = Date.now();
-            var live = favs.filter(isLive);
-            var tombs = favs.filter(function(f) { return !isLive(f) && (now - mtime(f)) <= TOMB_TTL_MS; });
-            if (live.length > MAX_FAVORITES) live = live.slice(0, MAX_FAVORITES);
-            tombs.sort(function(a, b) { return mtime(b) - mtime(a); });
-            if (tombs.length > TOMB_CAP) tombs = tombs.slice(0, TOMB_CAP);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(live.concat(tombs)));
-        } catch (e) {}
-    }
+    var MAX_FAVORITES = 50;
+    function getLiveFavorites() { return getFavorites().filter(ListStorage.isLive); }
+    function getFavorites() { return ListStorage.read(STORAGE_KEY); }
+    function saveFavorites(favs) { ListStorage.save(STORAGE_KEY, favs, MAX_FAVORITES); }
 
     var SORT_KEY = 'mtgban_fav_sort';
     var SORT_DIR_KEY = 'mtgban_fav_sort_dir';
@@ -72,17 +49,6 @@
             }
         });
         return sorted;
-    }
-
-    function pinnedFirst(list) {
-        // Stable two-pass: pinned items first (by pin time desc), unpinned after (original order)
-        var pinned = [];
-        var unpinned = [];
-        list.forEach(function(item) {
-            if (item.pinned) pinned.push(item); else unpinned.push(item);
-        });
-        pinned.sort(function(a, b) { return (b.pinned || 0) - (a.pinned || 0); });
-        return pinned.concat(unpinned);
     }
 
     function sortPillsHtml() {
@@ -257,7 +223,7 @@
 
     function renderFavoritesInto(container, mode) {
         if (!container) return;
-        var favs = pinnedFirst(sortFavs(getLiveFavorites()));
+        var favs = ListStorage.pinnedFirst(sortFavs(getLiveFavorites()));
 
         var containerId = container.id;
         if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
@@ -638,7 +604,7 @@
     // shown (pinned first). The server caps the roster at the palette
     // size, so send at most that many rather than truncating silently.
     window.chartFavorites = function() {
-        var favs = pinnedFirst(sortFavs(getLiveFavorites()));
+        var favs = ListStorage.pinnedFirst(sortFavs(getLiveFavorites()));
         var ids = favs.slice(0, 10).map(function(f) { return encodeURIComponent(f.id); });
         if (ids.length < 2) return;
         window.location = '/search?chart=' + ids.join(',');

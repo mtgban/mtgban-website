@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
 
 const source = readFileSync(new URL('../js/recent-searches.js', import.meta.url), 'utf8');
+const listStorageSource = readFileSync(new URL('../js/list-storage.js', import.meta.url), 'utf8');
 
 test('multi-result sealed recents retain the sealed route', () => {
     const events = {};
@@ -28,8 +29,9 @@ test('multi-result sealed recents retain the sealed route', () => {
         addEventListener: () => {},
     };
 
-    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'DOMParser', source)(
-        window, document, localStorage, sessionStorage, undefined, undefined
+    const ListStorage = new Function('localStorage', listStorageSource + '\nreturn ListStorage;')(localStorage);
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'DOMParser', 'ListStorage', source)(
+        window, document, localStorage, sessionStorage, undefined, undefined, ListStorage
     );
     events.DOMContentLoaded();
 

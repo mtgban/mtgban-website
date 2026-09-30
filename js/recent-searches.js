@@ -5,9 +5,6 @@
     var MAX_ENTRIES = 15;
     var ART_REFRESH_CONCURRENCY = 3;
     var artRefreshInFlight = false;
-    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-    var TOMB_CAP = 50;
-    function isLive(s) { return !s.del; }
     // What the entry reads as. q stays the identity - the dedup key and what
     // pin and delete address - so a relabelled search still names exactly what
     // was typed.
@@ -35,8 +32,7 @@
         if (samePathOnThisSite(s.u)) return s.u;
         return '/search?q=' + encodeURIComponent(s.q);
     }
-    function mtime(s) { return s.m || s.t || 0; }
-    function getLiveSearches() { return getRecentSearches().filter(isLive); }
+    function getLiveSearches() { return getRecentSearches().filter(ListStorage.isLive); }
 
     // Parse a query for set tokens. Returns {set, keyrune} only when the query is
     // a "pure set search" - the first token is s:/e:/ee:. A query like "Birds s:7ed"
@@ -65,38 +61,8 @@
         return { set: '', keyrune: '' };
     }
 
-    function getRecentSearches() {
-        try {
-            var data = localStorage.getItem(STORAGE_KEY);
-            return data ? JSON.parse(data) : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function saveRecentSearches(searches) {
-        try {
-            var now = Date.now();
-            var live = searches.filter(isLive);
-            var tombs = searches.filter(function(s) { return !isLive(s) && (now - mtime(s)) <= TOMB_TTL_MS; });
-            if (live.length > MAX_ENTRIES) live = live.slice(0, MAX_ENTRIES);
-            tombs.sort(function(a, b) { return mtime(b) - mtime(a); });
-            if (tombs.length > TOMB_CAP) tombs = tombs.slice(0, TOMB_CAP);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(live.concat(tombs)));
-        } catch (e) {
-            // localStorage full or unavailable - silently fail
-        }
-    }
-
-    function pinnedFirst(list) {
-        var pinned = [];
-        var unpinned = [];
-        list.forEach(function(item) {
-            if (item.pinned) pinned.push(item); else unpinned.push(item);
-        });
-        pinned.sort(function(a, b) { return (b.pinned || 0) - (a.pinned || 0); });
-        return pinned.concat(unpinned);
-    }
+    function getRecentSearches() { return ListStorage.read(STORAGE_KEY); }
+    function saveRecentSearches(searches) { ListStorage.save(STORAGE_KEY, searches, MAX_ENTRIES); }
 
     // The label is the readable query the server rebuilt for this search, and
     // is stored only when it says something the raw query doesn't: an ordinary
@@ -167,7 +133,7 @@
         if (!container) return;
         var oldBody = container.querySelector('.landing-pane-body');
         var savedScroll = oldBody ? oldBody.scrollTop : 0;
-        var searches = pinnedFirst(getLiveSearches());
+        var searches = ListStorage.pinnedFirst(getLiveSearches());
 
         if (searches.length === 0) {
             if (mode === 'desktop') {
