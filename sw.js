@@ -38,6 +38,7 @@ var SHELL_URLS = [
     '/js/offline/offline-format.js?hash=' + BUILD,
     '/js/offline/offline-util.js?hash=' + BUILD,
     '/js/offline/offline-query.js?hash=' + BUILD,
+    '/js/offline/offline-render-shared.js?hash=' + BUILD,
     '/js/offline/offline-render.js?hash=' + BUILD,
     '/css/mobile.css?hash=' + BUILD,
     '/css/search-mobile.css?hash=' + BUILD,

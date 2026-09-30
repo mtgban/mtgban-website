@@ -4,6 +4,7 @@ import { readFileSync } from 'fs';
 globalThis.self = globalThis.self || globalThis;
 // utils.js is a plain script the page loads, so its helpers are globals.
 (0, eval)(readFileSync(new URL('../../js/utils.js', import.meta.url), 'utf8'));
+await import('../../js/offline/offline-render-shared.js');
 await import('../../js/offline/offline-render-mobile.js');
 
 const R = globalThis.OfflineRenderMobile;
