@@ -539,6 +539,12 @@ func TestApiEnabledStores(t *testing.T) {
 			t.Errorf("BASE_ACCESS should keep metadata-only store %s, got %v", store, got)
 		}
 	}
+	for _, opt := range []string{"ALL_ACCESS", "DEV_ACCESS"} {
+		got = apiEnabledStores(opt)
+		if !slices.Contains(got, "PARITYSEALED") || !slices.Contains(got, "PARITYEU") {
+			t.Errorf("%s should keep sealed and non-main-region stores, got %v", opt, got)
+		}
+	}
 }
 
 // stores.json narrows to the singles or the sealed stores the way sets.json
