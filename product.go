@@ -741,7 +741,8 @@ func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Categ
 
 // setAnalysisReport is what a set analysis found, and what is wrong with
 // it: a run on the empty datastore held before the first load, or, where the
-// site serves CK's buylist, no P90 at all, which CK's signals need.
+// site serves CK's buylist, no P90 at all, which Good and the other
+// stores' green offers need.
 func setAnalysisReport(datastoreLoadedAt time.Time, infos map[string]mtgban.InventoryRecord) (string, string) {
 	var result, problem string
 	if ckAvailable() {
@@ -806,7 +807,7 @@ func (s *site) runSealedAnalysis() {
 	infosPtr.Store(&infos)
 	result, problem := setAnalysisReport(ds.loadedAt, infos)
 	backgroundJobs.Report(jobSetAnalysis, result, problem)
-	// The P90s are one of the inputs of CK's buylist signals.
+	// The new highs are one of the inputs of CK's buylist signals.
 	rebuildCKSignals()
 
 	// Index TCGplayer's own identifiers for every product, used to report
@@ -862,19 +863,18 @@ func hotlistReducer(stats timeseries.AggregatePriceStats, current float64) (floa
 }
 
 // newHighReducer flags cards whose current buylist price beats every price
-// stored before today, reporting that previous high. A tie is not a new high:
-// CK holds prices flat for weeks, and ties are 93% of what hotlistReducer
-// flags (docs/adr/0004-ck-buylist-signals.md). Its chances were measured
-// where CK pays $1 or more with a P90, so it keeps to those cards.
+// stored in the 90 days before today, reporting that previous high, where CK
+// pays its signals' floor or more. A tie is not a new high: CK holds prices
+// flat for weeks (docs/adr/0004-ck-buylist-signals.md).
 func newHighReducer(stats timeseries.AggregatePriceStats, current float64) (float64, bool) {
-	if current < ckMinBuyPrice || stats.Count < minNumberDays || stats.PriorMax == 0 || current <= stats.PriorMax {
+	if current < ckMinBuyPrice || stats.PriorMax == 0 || current <= stats.PriorMax {
 		return 0, false
 	}
 	return stats.PriorMax, true
 }
 
 // The 90d high pill's tooltip; New high's carries the chances of the card's
-// category (ckNewHighTipFor).
+// cell (ckNewHighTipFor).
 const ckAtHighTip = "Card Kingdom is paying its highest price of the last 90 days, often one it has held for weeks."
 
 // buylistMetrics computes multiple per-card buylist metrics in a single pass:

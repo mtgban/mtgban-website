@@ -89,7 +89,7 @@ func TestCKSignalsReport(t *testing.T) {
 	now := time.Now()
 	fresh := &ckHistorySnapshot{Today: ckToday(now)}
 	odds := &ckOdds{Generated: now.Add(-10 * time.Hour)}
-	signals := map[string]ckSignal{"a": {Rule: "sell"}, "b": {Rule: "cut"}, "c": {Pause: ckPause{Paused: true}}}
+	signals := map[string]ckView{"a": {State: "sell"}, "b": {State: "wait"}, "c": {PauseLabel: "Paused 3d"}}
 
 	result, problem := ckSignalsReport(signals, fresh, odds, now)
 	if result != "1 sell now, 1 wait, 1 paused, of 3 cards" || problem != "" {
@@ -99,7 +99,7 @@ func TestCKSignalsReport(t *testing.T) {
 		name    string
 		history *ckHistorySnapshot
 		odds    *ckOdds
-		signals map[string]ckSignal
+		signals map[string]ckView
 		want    string
 	}{
 		{"no history", nil, odds, signals, "have no stock history"},
@@ -107,7 +107,7 @@ func TestCKSignalsReport(t *testing.T) {
 			"read a stock history from " + ckToday(now).AddDate(0, 0, -2).Format(time.DateOnly)},
 		{"no odds", fresh, nil, signals, "have no odds"},
 		{"odds a missed run old", fresh, &ckOdds{Generated: now.Add(-40 * time.Hour)}, signals, "quote odds 40h old"},
-		{"no sell now or wait", fresh, odds, map[string]ckSignal{"c": {Pause: ckPause{Paused: true}}}, "have no sell now or wait"},
+		{"no sell now or wait", fresh, odds, map[string]ckView{"c": {PauseLabel: "Paused 3d"}}, "have no sell now or wait"},
 	} {
 		_, problem := ckSignalsReport(tc.signals, tc.history, tc.odds, now)
 		if problem != tc.want {

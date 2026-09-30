@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -95,7 +93,7 @@ func TestCKHistoryLive(t *testing.T) {
 	}
 	for _, id := range ids {
 		h := snap.Products[id]
-		if h.StockYesterday > 0 && h.StockWeekAgo > 0 && h.BuyWeekAgo > 0 && !h.LastInStock.IsZero() {
+		if h.StockYesterday > 0 && h.StockWeekAgo > 0 && h.RetailYesterday > 0 && !h.LastInStock.IsZero() {
 			sample = append(sample, id)
 			break
 		}
@@ -118,7 +116,7 @@ func TestCKHistoryLive(t *testing.T) {
 		}
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT ck_id, date, quantity_selling, price_buy, quantity_buying
+		SELECT ck_id, date, quantity_selling, price_retail_nm, quantity_buying
 		  FROM cardkingdomproductmodel
 		 WHERE ck_id = ANY($1) AND date >= $2 AND date <= $3`,
 		pq.Array(sampleIDs), today.AddDate(0, 0, -ckBoughtLookback), snap.Yesterday)
@@ -131,8 +129,8 @@ func TestCKHistoryLive(t *testing.T) {
 		var id int64
 		var date time.Time
 		var stock, buying sql.NullInt64
-		var buy sql.NullFloat64
-		err := rows.Scan(&id, &date, &stock, &buy, &buying)
+		var retail sql.NullFloat64
+		err := rows.Scan(&id, &date, &stock, &retail, &buying)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,8 +142,8 @@ func TestCKHistoryLive(t *testing.T) {
 		if weekAgoUsed && date.Equal(weekAgo) && stock.Valid {
 			h.StockWeekAgo, h.HasStockWeekAgo = max(h.StockWeekAgo, int(stock.Int64)), true
 		}
-		if weekAgoUsed && date.Equal(weekAgo) && buy.Valid {
-			h.BuyWeekAgo, h.HasBuyWeekAgo = max(h.BuyWeekAgo, buy.Float64), true
+		if date.Equal(snap.Yesterday) && retail.Valid {
+			h.RetailYesterday = max(h.RetailYesterday, retail.Float64)
 		}
 		if stock.Int64 > 0 && date.After(h.LastInStock) && !date.Before(today.AddDate(0, 0, -ckHistoryWindow)) {
 			h.LastInStock = date
@@ -177,11 +175,11 @@ func TestCKHistoryLive(t *testing.T) {
 	t.Logf("checked %d products against their rows", len(sample))
 }
 
-// TestCKOddsFileLive loads a file go-mtgban's ckodds wrote and checks every
-// category it names gets every rule's tooltip with chances in it. Skipped
-// unless pointed at one:
+// TestCKOddsFileLive loads a file ckodds wrote and checks every
+// verdict has chances for both finishes, every pause age a cell, and the
+// products their finish and TCG Market. Skipped unless pointed at one:
 //
-//	CKODDS_FILE=ck-odds.json.xz go test -run TestCKOddsFileLive -v
+//	CKODDS_FILE=ck-odds-v2.json.xz go test -run TestCKOddsFileLive -v
 func TestCKOddsFileLive(t *testing.T) {
 	path := os.Getenv("CKODDS_FILE")
 	if path == "" {
@@ -191,27 +189,48 @@ func TestCKOddsFileLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("measured %s to %s, %d products", odds.From, odds.To, len(odds.categories))
-	for id, category := range odds.categories {
-		for rule := range ckVerdicts {
-			for _, finish := range []string{"foil", "nonfoil"} {
-				tip := odds.tip(id, finish, rule)
-				if !strings.Contains(tip, "Chances CK pays") {
-					t.Fatalf("%s (%s) %s %s: no chances in %q", id, category, finish, rule, tip)
+	t.Logf("measured %s to %s: %d cells, %d products", odds.From, odds.To, len(odds.chances), len(odds.products))
+	for _, group := range []string{"cohort", "exceptions"} {
+		for _, finish := range []string{"nonfoil", "foil"} {
+			for _, bucket := range []string{"5-10", "10-20", "20-50", "50-100", "100-200", "200+", "all"} {
+				for _, verdict := range []string{"wait", "sell", "newhigh"} {
+					_, chances, typical, found := odds.chancesFor(group, finish, bucket, verdict)
+					if !found {
+						t.Errorf("%s %s %s %s: no chances", group, finish, bucket, verdict)
+						continue
+					}
+					if bucket == "10-20" {
+						t.Logf("%s %s $10-20 %s: %+v against %+v", group, finish, verdict, chances, typical)
+					}
 				}
 			}
 		}
-		if !strings.Contains(odds.pauseTip(id, 10, false), "Chances CK buys it again") {
-			t.Fatalf("%s (%s): no pause chances", id, category)
+	}
+	for _, finish := range []string{"nonfoil", "foil"} {
+		for _, days := range []int{0, 1, 3, 7, 14, 30, 90} {
+			r := odds.reopenFor(finish, days)
+			if r == nil || len(r.Deciles) != 9 {
+				t.Errorf("%s paused %d days: got %+v", finish, days, r)
+			}
 		}
 	}
-	t.Logf("a Masters sell now: %q", odds.tipFor("masters", "nonfoil", "sell"))
-	var off []string
-	for key, isOff := range odds.off {
-		if isOff {
-			off = append(off, fmt.Sprintf("%s/%s/%s", key.Category, key.Finish, key.Rule))
+	var foils, exceptions, markets, released int
+	for _, p := range odds.products {
+		if p.Foil {
+			foils++
+		}
+		if p.Exception {
+			exceptions++
+		}
+		if p.Market > 0 {
+			markets++
+		}
+		if !p.SetReleased.IsZero() {
+			released++
 		}
 	}
-	slices.Sort(off)
-	t.Logf("rules off: %v", off)
+	t.Logf("%d foils, %d exceptions, %d with TCG Market, %d with a release date", foils, exceptions, markets, released)
+	if foils == 0 || exceptions == 0 || markets == 0 || released == 0 {
+		t.Error("a product field is never set")
+	}
 }

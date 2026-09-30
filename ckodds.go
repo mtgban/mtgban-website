@@ -11,26 +11,19 @@ import (
 	"time"
 )
 
-// The chances CK's tooltips quote are measured every day by go-mtgban's
-// cmd/ckodds, from the newspaper's history of CK's price list, and published
-// beside the datastore with every CK product's category; ADR-0004 has what
-// they measure. Until a load succeeds the tooltips carry their verdicts alone.
-const ckOddsFile = "ck-odds.json.xz"
+// The chances CK's tooltips quote, and what the rules read about each CK
+// product beyond its prices, are measured every day by ckodds in
+// mtgban/ck-buylist-analysis from the newspaper and published beside the
+// datastore; ADR-0004 has the rules. Until a load succeeds no CK offer is colored.
+const ckOddsFile = "ck-odds-v2.json.xz"
 
 // ckOddsMaxAge is how old a load can be before the next refresh reads the
 // file again; ckodds writes a new one every day.
 const ckOddsMaxAge = 20 * time.Hour
 
-// A rule holds on a category while its chances beat the typical ones by
-// ckMinEdge points in all, raises and cuts together: for sell now fewer
-// raises and more cuts, for a wait the other way round. Out of stock whose
-// raises beat the typical ones by ckRaiseEdge points or less only stops
-// cuts, and says so.
-const (
-	ckMinEdge            = 5
-	ckRaiseEdge          = 5
-	ckVerdictStopsTheCut = "**Wait**: CK is out of stock, at or below its P90, and seldom pays less after that."
-)
+// A cell quotes its own chances from this many printings; a thinner one
+// quotes its finish over every retail band.
+const ckMinPrintings = 300
 
 // ckOddsPath is where the odds live: beside the datastore, like the TCGplayer
 // catalog.
@@ -45,185 +38,184 @@ func ckOddsPath() string {
 
 // ckOddsTables is the file ckodds writes.
 type ckOddsTables struct {
-	Generated  time.Time         `json:"generated"`
-	From       string            `json:"from"`
-	To         string            `json:"to"`
-	Categories map[string]string `json:"categories"`
-	Odds       []struct {
-		Category string `json:"category"`
-		Finish   string `json:"finish"`
-		Rule     string `json:"rule"`
-		Up       int    `json:"up"`
-		Down     int    `json:"down"`
-	} `json:"odds"`
+	Generated time.Time `json:"generated"`
+	From      string    `json:"from"`
+	To        string    `json:"to"`
+	Cells     []struct {
+		Group     string `json:"group"`
+		Finish    string `json:"finish"`
+		Bucket    string `json:"bucket"`
+		Verdict   string `json:"verdict"`
+		WeekMore  int    `json:"week_more"`
+		WeekLess  int    `json:"week_less"`
+		MonthMore int    `json:"month_more"`
+		MonthLess int    `json:"month_less"`
+		Printings int    `json:"printings"`
+	} `json:"cells"`
 	Pauses []struct {
-		Category string `json:"category"`
-		MinDays  int    `json:"min_days"`
-		Week     int    `json:"week"`
-		Month    int    `json:"month"`
+		Finish         string    `json:"finish"`
+		MinDays        int       `json:"min_days"`
+		BackMonth      int       `json:"back_month"`
+		BackOverListed []float64 `json:"back_over_listed"`
 	} `json:"pauses"`
+	Products map[string]struct {
+		Foil          bool    `json:"foil"`
+		Exception     bool    `json:"exception"`
+		SetReleased   string  `json:"set_released"`
+		Reprinted     string  `json:"reprinted"`
+		Market        float64 `json:"market"`
+		MarketWeekAgo float64 `json:"market_week_ago"`
+	} `json:"products"`
 }
 
-// ckOddsKey names a cell of the odds: a card category ("all" for every
-// card), a finish ("" for either) and a rule, or "typical" for every
-// card-day of the category.
-type ckOddsKey struct{ Category, Finish, Rule string }
+// ckCellKey names a cell of the odds: the group ("cohort", or "exceptions"
+// for the Reserved List and sets through 1994), the finish, CK's retail band
+// ("all" for every band) and the verdict, or "typical" for every card-day.
+type ckCellKey struct{ Group, Finish, Bucket, Verdict string }
 
-// ckChances are the chances, in percent, of CK paying 5% more and 5% less
-// or nothing two weeks on.
-type ckChances struct{ Up, Down int }
+// ckChances are the chances, in percent, of CK paying more and less or
+// nothing a week and a month on.
+type ckChances struct{ WeekMore, WeekLess, MonthMore, MonthLess, Printings int }
 
-// ckReopen are the chances, in percent, of CK buying a paused card again
-// within 7 and 30 days, once the pause has lasted MinDays.
-type ckReopen struct{ MinDays, Week, Month int }
-
-// ckPauseTipKey names one of the pause tooltips; days stop at 30.
-type ckPauseTipKey struct {
-	Category string
-	Days     int
-	Wait     bool
+// ckReopen is, for a pause of MinDays or more, the chance in percent of CK
+// buying again within 30 days and the deciles of the price it comes back at
+// over the price it lists.
+type ckReopen struct {
+	MinDays   int
+	BackMonth int
+	Deciles   []float64
 }
 
-// ckOdds is one load of the odds, with every tooltip written from them.
+// ckProduct is what the rules read about a CK product beyond its prices.
+type ckProduct struct {
+	Foil, Exception        bool
+	SetReleased, Reprinted time.Time // zero when unknown or never
+	Market, MarketWeekAgo  float64   // TCG Market; zero when unknown
+}
+
+// ckOdds is one load of the odds.
 type ckOdds struct {
-	Generated  time.Time
-	From, To   string
-	categories map[string]string // CK product id -> category
-	chances    map[ckOddsKey]ckChances
-	reopen     map[string][]ckReopen // by category, the longest pause first
-	tips       map[ckOddsKey]string
-	off        map[ckOddsKey]bool // rules with no edge on a category and finish
-	pauseTips  map[ckPauseTipKey]string
+	Generated time.Time
+	From, To  string
+	chances   map[ckCellKey]ckChances
+	reopen    map[string][]ckReopen // by finish, the longest pause first
+	products  map[string]ckProduct
 }
 
 var ckOddsPtr atomic.Pointer[ckOdds]
 
-// newCKOdds reads the tables and writes every tooltip once, so pages look
-// them up rather than write them.
 func newCKOdds(t ckOddsTables) *ckOdds {
 	o := &ckOdds{
-		Generated:  t.Generated,
-		From:       t.From,
-		To:         t.To,
-		categories: t.Categories,
-		chances:    map[ckOddsKey]ckChances{},
-		reopen:     map[string][]ckReopen{},
-		tips:       map[ckOddsKey]string{},
-		off:        map[ckOddsKey]bool{},
-		pauseTips:  map[ckPauseTipKey]string{},
+		Generated: t.Generated,
+		From:      t.From,
+		To:        t.To,
+		chances:   map[ckCellKey]ckChances{},
+		reopen:    map[string][]ckReopen{},
+		products:  map[string]ckProduct{},
 	}
-	for _, row := range t.Odds {
-		o.chances[ckOddsKey{row.Category, row.Finish, row.Rule}] = ckChances{row.Up, row.Down}
+	for _, c := range t.Cells {
+		o.chances[ckCellKey{c.Group, c.Finish, c.Bucket, c.Verdict}] = ckChances{c.WeekMore, c.WeekLess, c.MonthMore, c.MonthLess, c.Printings}
 	}
-	for _, row := range t.Pauses {
-		o.reopen[row.Category] = append(o.reopen[row.Category], ckReopen{row.MinDays, row.Week, row.Month})
+	for _, p := range t.Pauses {
+		o.reopen[p.Finish] = append(o.reopen[p.Finish], ckReopen{p.MinDays, p.BackMonth, p.BackOverListed})
 	}
-	for category := range o.reopen {
-		slices.SortFunc(o.reopen[category], func(a, b ckReopen) int { return b.MinDays - a.MinDays })
+	for finish := range o.reopen {
+		slices.SortFunc(o.reopen[finish], func(a, b ckReopen) int { return b.MinDays - a.MinDays })
 	}
-
-	categories := []string{"all"}
-	for _, category := range t.Categories {
-		if !slices.Contains(categories, category) {
-			categories = append(categories, category)
-		}
-	}
-	for _, category := range categories {
-		for _, finish := range []string{"foil", "nonfoil"} {
-			for rule := range ckVerdicts {
-				key := ckOddsKey{category, finish, rule}
-				o.tips[key] = o.tipFor(category, finish, rule)
-				o.off[key] = !o.holds(category, finish, rule)
-			}
-		}
-		reopen, found := o.reopen[category]
-		if !found {
-			reopen = o.reopen["all"]
-		}
-		for days := 0; days <= 30; days++ {
-			for _, wait := range []bool{false, true} {
-				o.pauseTips[ckPauseTipKey{category, days, wait}] = ckPauseTip(reopen, days, wait)
-			}
-		}
+	for id, p := range t.Products {
+		cp := ckProduct{Foil: p.Foil, Exception: p.Exception, Market: p.Market, MarketWeekAgo: p.MarketWeekAgo}
+		cp.SetReleased, _ = time.Parse(time.DateOnly, p.SetReleased)
+		cp.Reprinted, _ = time.Parse(time.DateOnly, p.Reprinted)
+		o.products[id] = cp
 	}
 	return o
 }
 
-// oddsFor is a rule's chances for a card of category and finish, and the
-// typical ones they compare with: by finish where that was measured, else
-// by category, else over every card.
-func (o *ckOdds) oddsFor(category, finish, rule string) (odds, typical ckChances, found bool) {
-	for _, key := range []ckOddsKey{{category, finish, rule}, {category, "", rule}, {"all", "", rule}} {
-		odds, found = o.chances[key]
-		typical, hasTypical := o.chances[ckOddsKey{key.Category, key.Finish, "typical"}]
-		if found && hasTypical {
-			return odds, typical, true
+// ckBucketOf is the band of CK's retail the odds are quoted by, as ckodds
+// measures them.
+func ckBucketOf(retail float64) string {
+	switch {
+	case retail < 10:
+		return "5-10"
+	case retail < 20:
+		return "10-20"
+	case retail < 50:
+		return "20-50"
+	case retail < 100:
+		return "50-100"
+	case retail < 200:
+		return "100-200"
+	}
+	return "200+"
+}
+
+// chancesFor are a verdict's chances for a card, the typical ones they
+// compare with, and the cell they were read from: its group, finish and band
+// where that cell counts ckMinPrintings, else its group and finish over every
+// band, else every card of its finish. The exceptions are quoted over every
+// band. found is false when the file lists none of them: a verdict that is
+// not measured does not hold.
+func (o *ckOdds) chancesFor(group, finish, bucket, verdict string) (cell ckCellKey, odds, typical ckChances, found bool) {
+	if o == nil {
+		return ckCellKey{}, ckChances{}, ckChances{}, false
+	}
+	keys := []ckCellKey{{group, finish, "all", verdict}, {"cohort", finish, "all", verdict}}
+	if group == "cohort" {
+		keys = append([]ckCellKey{{group, finish, bucket, verdict}}, keys...)
+	}
+	for _, key := range keys {
+		c, ok := o.chances[key]
+		t, okTypical := o.chances[ckCellKey{key.Group, key.Finish, key.Bucket, "typical"}]
+		if ok && okTypical && c.Printings >= ckMinPrintings {
+			return key, c, t, true
 		}
 	}
-	return ckChances{}, ckChances{}, false
+	return ckCellKey{}, ckChances{}, ckChances{}, false
 }
 
-// holds tells whether a rule beats the typical chances on a category and
-// finish by ckMinEdge; one never measured holds. New high is a pill, not a
-// rule, and always holds.
-func (o *ckOdds) holds(category, finish, rule string) bool {
-	odds, typical, found := o.oddsFor(category, finish, rule)
-	edge := (odds.Up - typical.Up) + (typical.Down - odds.Down)
-	if rule == "sell" {
-		edge = -edge
+// ckChanceLines are the lines of a tooltip quoting a cell's chances: for a
+// wait the chances CK pays more, for a sell or a new high those it pays less
+// or nothing, a week and a month on, next to the typical ones; then what they
+// were measured on.
+func ckChanceLines(cell ckCellKey, odds, typical ckChances) string {
+	head, week, weekTypical, month, monthTypical := "Chances CK pays more", odds.WeekMore, typical.WeekMore, odds.MonthMore, typical.MonthMore
+	if cell.Verdict != "wait" {
+		head, week, weekTypical, month, monthTypical = "Chances CK pays less or nothing", odds.WeekLess, typical.WeekLess, odds.MonthLess, typical.MonthLess
 	}
-	return !found || rule == "newhigh" || edge >= ckMinEdge
+	measured := fmt.Sprintf("Measured on %d %ss", odds.Printings, cell.Finish)
+	if cell.Bucket != "all" {
+		measured += " at $" + cell.Bucket
+	}
+	if cell.Group == "exceptions" {
+		measured += ", RL or pre-1995"
+	}
+	return head + "\n" +
+		fmt.Sprintf("• in a week: **%d%%** instead of %d%%\n", week, weekTypical) +
+		fmt.Sprintf("• in a month: **%d%%** instead of %d%%\n", month, monthTypical) +
+		measured
 }
 
-// tipFor is a rule's tooltip on a card of category and finish: its verdict,
-// then its chances next to the typical ones where they were measured.
-func (o *ckOdds) tipFor(category, finish, rule string) string {
-	odds, typical, found := o.oddsFor(category, finish, rule)
-	if !found {
-		return ckVerdicts[rule]
-	}
-	verdict := ckVerdicts[rule]
-	if rule == "outofstock" && odds.Up-typical.Up <= ckRaiseEdge {
-		verdict = ckVerdictStopsTheCut
-	}
-	return verdict + "\n" +
-		"Chances CK pays (two weeks from now):\n" +
-		fmt.Sprintf("• 5%% more: **%d%%** instead of %d%%\n", odds.Up, typical.Up) +
-		fmt.Sprintf("• 5%% less or stops buying: **%d%%** instead of %d%%", odds.Down, typical.Down)
-}
-
-// category is a CK product's category, or "all" where the odds do not know
-// the product.
-func (o *ckOdds) category(id string) string {
-	category, found := o.categories[id]
-	if !found {
-		return "all"
-	}
-	return category
-}
-
-// tip is a rule's tooltip on a CK product of finish: its verdict alone
-// until the odds are loaded.
-func (o *ckOdds) tip(id, finish, rule string) string {
+// reopenFor is the pause cell of a finish for a pause of days, or nil.
+func (o *ckOdds) reopenFor(finish string, days int) *ckReopen {
 	if o == nil {
-		return ckVerdicts[rule]
+		return nil
 	}
-	return o.tips[ckOddsKey{o.category(id), finish, rule}]
+	for i, r := range o.reopen[finish] {
+		if days >= r.MinDays {
+			return &o.reopen[finish][i]
+		}
+	}
+	return nil
 }
 
-// holdsOn tells whether a rule holds on a CK product of finish; every rule
-// holds until the odds are loaded.
-func (o *ckOdds) holdsOn(id, finish, rule string) bool {
-	return o == nil || !o.off[ckOddsKey{o.category(id), finish, rule}]
-}
-
-// pauseTip is the tooltip of a pause of days on a CK product.
-func (o *ckOdds) pauseTip(id string, days int, wait bool) string {
-	days = min(days, 30)
+// product is what the file says about a CK product, and whether it says
+// anything.
+func (o *ckOdds) product(id string) (ckProduct, bool) {
 	if o == nil {
-		return ckPauseTip(nil, days, wait)
+		return ckProduct{}, false
 	}
-	return o.pauseTips[ckPauseTipKey{o.category(id), days, wait}]
+	p, found := o.products[id]
+	return p, found
 }
 
 // loadCKOdds reads the odds the path names.
@@ -254,5 +246,5 @@ func refreshCKOdds() {
 		return
 	}
 	ckOddsPtr.Store(odds)
-	log.Println("ck odds: loaded, measured", odds.From, "to", odds.To, "for", len(odds.categories), "products")
+	log.Println("ck odds: loaded, measured", odds.From, "to", odds.To, "for", len(odds.products), "products")
 }
