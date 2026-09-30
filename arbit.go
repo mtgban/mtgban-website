@@ -530,43 +530,25 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	anySpread = anySpread || (DevMode && !SigCheck)
 
 	// The "menu" section, the reference
-	var allowlistSellers []string
-	for _, seller := range GetSellers() {
+	allowlistSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
-			if slices.Contains(Config.GlobalAllowList, seller.Info().Shorthand) {
-				if !anyExperiment && slices.Contains(Config.SearchRetailBlockList, seller.Info().Shorthand) {
-					continue
-				}
-				allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
-			}
-		} else {
-			// These are hardcoded to provide a preview of the tool
-			if seller.Info().Shorthand != "TCGMarket" && seller.Info().Shorthand != "MKMTrend" {
-				continue
-			}
-			allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
+			return slices.Contains(Config.GlobalAllowList, info.Shorthand) &&
+				(anyExperiment || !slices.Contains(Config.SearchRetailBlockList, info.Shorthand))
 		}
-	}
+		// These are hardcoded to provide a preview of the tool
+		return info.Shorthand == "TCGMarket" || info.Shorthand == "MKMTrend"
+	})
 
 	// The "Jump to" section, the probe
-	var blocklistVendors []string
-	for _, seller := range GetSellers() {
-		if slices.Contains(Config.GlobalProbeList, seller.Info().Shorthand) {
-			continue
-		}
-		blocklistVendors = append(blocklistVendors, seller.Info().Shorthand)
-	}
+	blocklistVendors := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return !slices.Contains(Config.GlobalProbeList, info.Shorthand)
+	})
 
 	// Populate vendor keys for the settings modal (shown on every page load)
-	var globalVendorKeys []string
-	for _, vendor := range GetVendors() {
-		if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
-			continue
-		}
-		globalVendorKeys = append(globalVendorKeys, vendor.Info().Shorthand)
-	}
-	pageVars.VendorKeys = sortKeysByScraperName(globalVendorKeys)
+	pageVars.VendorKeys = sortKeysByScraperName(filterVendors(func(info mtgban.ScraperInfo) bool {
+		return !slices.Contains(blocklistVendors, info.Shorthand)
+	}))
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)

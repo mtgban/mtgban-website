@@ -106,14 +106,9 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 		skipEditions = strings.Split(skipEditionsOpt, ",")
 	}
 
-	for _, seller := range GetSellers() {
-		if seller.Info().SealedMode ||
-			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-			continue
-		}
-
-		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
-	}
+	pageVars.SellerKeys = filterSellers(func(info mtgban.ScraperInfo) bool {
+		return !info.SealedMode && !slices.Contains(blocklistRetail, info.Shorthand)
+	})
 
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
