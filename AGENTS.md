@@ -101,6 +101,11 @@ output, not a claim written here.
   wrapped at 72: the why and the number that proves it. Longer write-ups
   go in `docs/`, committed with the change, and the body points at them.
   Comments stay two or three lines the same way.
+- **A doc names a measurement's window relative to the run** ("the last 12
+  months of CK snapshots"), not as calendar dates, and its tables of
+  measured numbers come from the script that measured them rather than
+  being copied into the prose. Written-in dates drift apart between
+  sections, and they read as choices when nobody chose them.
 - **Do NOT add a `Co-Authored-By` trailer** to commits.
 - Match the surrounding code's style; this is plain idiomatic Go with a flat
   root package — most features live in one top-level file each.
