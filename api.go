@@ -491,34 +491,8 @@ func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 		return err
 	}
 
-	// Track total quantity, and skip repeats
-	qty := map[string]int{}
-	var cleanedIDs []string
-	for i, id := range ids {
-		quantity := 1
-		if qtys != nil {
-			q, err := strconv.Atoi(qtys[i])
-			if err == nil {
-				quantity = q
-			}
-		}
-		cond := mtgban.NM
-		if conds != nil && conds[i] != "" {
-			cond = mtgban.Condition(conds[i])
-		}
-		qty[id+string(cond)] += quantity
-
-		if slices.Contains(cleanedIDs, id) {
-			continue
-		}
-		cleanedIDs = append(cleanedIDs, id)
-	}
-
-	for i, id := range cleanedIDs {
-		cond := mtgban.NM
-		if conds != nil && conds[i] != "" {
-			cond = mtgban.Condition(conds[i])
-		}
+	for _, row := range mergeCSVRows(ids, qtys, conds) {
+		id, cond := row.id, row.cond
 
 		co, err := b.GetUUID(id)
 		if err != nil {
@@ -547,7 +521,7 @@ func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 		record := make([]string, 0, len(mkmcsvHeader))
 
 		record = append(record, mkmID)
-		record = append(record, fmt.Sprint(qty[id+string(cond)]))
+		record = append(record, fmt.Sprint(row.qty))
 		record = append(record, co.Name)
 		record = append(record, co.Edition)
 		record = append(record, co.SetCode)
