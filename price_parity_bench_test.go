@@ -9,7 +9,7 @@ import (
 )
 
 // Benchmarks comparing the two price pipelines on the same logical query:
-// "every card of one set" (see todo/unify-price-pipelines.md). The search
+// "every card of one set" (see docs/price-pipelines.md). The search
 // pipeline resolves the set to uuids first and then does map lookups per
 // store; the API scans every store's whole inventory and filters by edition
 // per entry. The ByHash variant runs the API walk with pre-resolved uuids —

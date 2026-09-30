@@ -13,7 +13,7 @@ import (
 )
 
 // Characterization suite for the search vs price-API unification (see
-// todo/unify-price-pipelines.md). Both pipelines walk the same seller/vendor
+// docs/price-pipelines.md). Both pipelines walk the same seller/vendor
 // records; these tests seed identical synthetic data into both and assert
 // where they must agree — and pin, explicitly, where they diverge today so
 // the unification work has to flip those pins on purpose.
