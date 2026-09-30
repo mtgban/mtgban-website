@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -22,6 +23,20 @@ func renderPage(t *testing.T, name string, mobile bool, pv PageVars) string {
 		t.Fatalf("rendering %s (mobile=%v): %v", name, mobile, err)
 	}
 	return b.String()
+}
+
+// loadedScript returns the js/ file a rendered page loads, failing the test
+// when the page does not load it.
+func loadedScript(t *testing.T, page, name string) string {
+	t.Helper()
+	if !strings.Contains(page, `src="/js/`+name+`?`) {
+		t.Fatalf("the page does not load js/%s", name)
+	}
+	script, err := os.ReadFile("js/" + name)
+	if err != nil {
+		t.Fatalf("reading js/%s: %v", name, err)
+	}
+	return string(script)
 }
 
 // The card-corner rules key on the set a card belongs to, which cannot say

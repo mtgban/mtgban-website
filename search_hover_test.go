@@ -11,7 +11,7 @@ func TestSearchResultHoverAndInitialArt(t *testing.T) {
 	if !strings.Contains(out, `onmouseenter="hoverSidebar(`) {
 		t.Error("search results do not use hover handlers")
 	}
-	if !strings.Contains(out, "__sidebarCardKey") {
+	if !strings.Contains(loadedScript(t, out, "search-sidebar.js"), "__sidebarCardKey") {
 		t.Error("search sidebar hover handler does not deduplicate the current result")
 	}
 	cardBack := "/img/backs/" + string(Config.Game) + ".webp"

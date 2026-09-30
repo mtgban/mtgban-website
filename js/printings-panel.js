@@ -6,7 +6,7 @@
  * can become one, and an absolutely positioned panel is clipped by the first
  * of them. Fixed leaves it with no offsets of its own, so this decides them.
  *
- * Kept apart from the DOM work in templates/search.html so the arithmetic can
+ * Kept apart from the DOM work in js/search-sidebar.js so the arithmetic can
  * be tested without a browser - the part with the edge cases in it is the
  * part that decides which side of the row to hang from, and that is all
  * numbers. */
