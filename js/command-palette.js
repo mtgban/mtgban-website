@@ -80,12 +80,6 @@
     //  Pure utilities
     // ════════════════════════════════════════════════════════════════
 
-    function esc(str) {
-        var d = document.createElement('div');
-        d.textContent = str == null ? '' : String(str);
-        return d.innerHTML;
-    }
-
     function scoreMatch(query, name, keywords) {
         var q = query.toLowerCase();
         var n = name.toLowerCase();
@@ -204,7 +198,7 @@
         resultsEl.innerHTML =
             '<div class="cp-result"><div class="cp-result-icon cp-spinner">'
             + '<i data-lucide="loader-2"></i></div>'
-            + '<div class="cp-result-body"><div class="cp-result-title">' + esc(msg) + '</div>'
+            + '<div class="cp-result-body"><div class="cp-result-title">' + escapeHtml(msg) + '</div>'
             + '<div class="cp-result-subtitle">Hang tight, this can take a few seconds...</div>'
             + '</div></div>';
         S.items = [];
@@ -1427,19 +1421,19 @@
         if (item.iconHtml) {
             iconBlock = '<div class="cp-result-icon">' + item.iconHtml + '</div>';
         } else {
-            var styleAttr = item.iconStyle ? ' style="' + esc(item.iconStyle) + '"' : '';
+            var styleAttr = item.iconStyle ? ' style="' + escapeHtml(item.iconStyle) + '"' : '';
             iconBlock = '<div class="cp-result-icon"' + styleAttr + '>'
-                      + '<i data-lucide="' + esc(item.icon || 'search') + '"></i></div>';
+                      + '<i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
         }
         var body;
         if (item.snippets) {
-            body = '<div class="cp-result-title">'  + esc(item.title) + '</div>'
-                 + '<div class="cp-result-inline">' + esc(item.snippets) + '</div>';
+            body = '<div class="cp-result-title">'  + escapeHtml(item.title) + '</div>'
+                 + '<div class="cp-result-inline">' + escapeHtml(item.snippets) + '</div>';
         } else if (item.subtitle) {
-            body = '<div class="cp-result-title">'    + esc(item.title)    + '</div>'
-                 + '<div class="cp-result-subtitle">' + esc(item.subtitle) + '</div>';
+            body = '<div class="cp-result-title">'    + escapeHtml(item.title)    + '</div>'
+                 + '<div class="cp-result-subtitle">' + escapeHtml(item.subtitle) + '</div>';
         } else {
-            body = '<div class="cp-result-title">'    + esc(item.title) + '</div>';
+            body = '<div class="cp-result-title">'    + escapeHtml(item.title) + '</div>';
         }
         return '<div class="' + cls + '" role="option" data-index="' + idx + '"' + aria + '>'
              + iconBlock
@@ -1454,15 +1448,15 @@
             render: function (item) {
                 var key = categoryKeyFor(item.title);
                 var ic  = categoryIconFor(item.title);
-                return '<div class="cp-category-header" data-category="' + esc(key) + '">'
+                return '<div class="cp-category-header" data-category="' + escapeHtml(key) + '">'
                      + (ic ? '<i data-lucide="' + ic + '"></i>' : '')
-                     + '<span>' + esc(item.title) + '</span></div>';
+                     + '<span>' + escapeHtml(item.title) + '</span></div>';
             }
         },
 
         shortcut: {
             render: function (item, idx, active) {
-                var right = '<kbd class="cp-shortcut">' + esc(item.shortcut) + '</kbd>';
+                var right = '<kbd class="cp-shortcut">' + escapeHtml(item.shortcut) + '</kbd>';
                 // Shortcuts row gets an extra utility class.
                 return rowHTML(item, idx, active, right)
                     .replace('cp-result', 'cp-result cp-shortcut-row');
@@ -1552,7 +1546,7 @@
 
         saved: {
             render: function (item, idx, active) {
-                var right = '<button class="cp-result-delete" data-saved-id="' + esc(item.savedId)
+                var right = '<button class="cp-result-delete" data-saved-id="' + escapeHtml(item.savedId)
                           + '" title="Delete"><i data-lucide="trash-2"></i></button>';
                 return rowHTML(item, idx, active, right);
             },

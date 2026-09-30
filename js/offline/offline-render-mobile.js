@@ -10,12 +10,6 @@
     ];
     var REF_STORES = ['CK', 'TCGPlayer', 'TCGLow', 'TCGMarket'];
 
-    function esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
     function money(v) { return Number(v).toFixed(2); }
 
     // keyruneClasses mirrors keyruneForCardSet's rarity/foil mapping (utils.go:110-152).
@@ -117,7 +111,7 @@
 
     function flatRow(name, price, qty, extra) {
         return '<div class="m-vendor-row m-vendor-flat' + (extra || '') + '">' +
-            '<span class="m-vendor-name">' + esc(name) + '</span>' +
+            '<span class="m-vendor-name">' + escapeHtml(name) + '</span>' +
             '<span class="m-vendor-right">' +
             '<span class="m-vendor-price">' + (price > 0 ? '$ ' + money(price) : 'n/a') + '</span>' +
             '<span class="m-vendor-qty">' + (qty > 0 ? qty : '') + '</span>' +
@@ -135,21 +129,21 @@
         var card = res.card;
         var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.webp' : '';
         var icon = res._setKey
-            ? '<i class="ss ss-' + esc(res._setKey) + keyruneClasses(card) + ' ss-fw"></i>'
-            : '<span>' + esc(card.set) + '</span>';
+            ? '<i class="ss ss-' + escapeHtml(res._setKey) + keyruneClasses(card) + ' ss-fw"></i>'
+            : '<span>' + escapeHtml(card.set) + '</span>';
         var finish = '';
         if (card.e) finish = '<span class="m-badge etched">Etched</span>';
         else if (card.f) finish = '<span class="m-badge foil">Foil</span>';
-        var num = card.num ? ' · #' + esc(card.num) : '';
+        var num = card.num ? ' · #' + escapeHtml(card.num) : '';
         return '<div class="m-card-header"' +
-            ' data-card-id="' + esc(res.uuid) + '"' +
-            ' data-card-name="' + esc(card.n) + '"' +
-            ' data-set-code="' + esc(card.set) + '"' +
-            ' data-image-url="' + esc(imgURL) + '">' +
+            ' data-card-id="' + escapeHtml(res.uuid) + '"' +
+            ' data-card-name="' + escapeHtml(card.n) + '"' +
+            ' data-set-code="' + escapeHtml(card.set) + '"' +
+            ' data-image-url="' + escapeHtml(imgURL) + '">' +
             '<div class="m-card-icon">' + icon + '</div>' +
             '<div class="m-card-info">' +
-            '<span class="m-card-name">' + esc(card.n) + '</span>' +
-            '<span class="m-card-set">' + esc(card.set) + num + '</span>' +
+            '<span class="m-card-name">' + escapeHtml(card.n) + '</span>' +
+            '<span class="m-card-set">' + escapeHtml(card.set) + num + '</span>' +
             '</div>' +
             '<div class="m-card-badges">' + finish + '</div>' +
             '</div>';
@@ -247,29 +241,29 @@
         var left = '';
         var first = true;
         conds.forEach(function (c) {
-            left += '<button class="m-cond-pill' + (first ? ' active' : '') + '" data-cond="' + esc(c) + '" data-card="' + esc(uuid) + '">' + esc(c) + '</button>';
+            left += '<button class="m-cond-pill' + (first ? ' active' : '') + '" data-cond="' + escapeHtml(c) + '" data-card="' + escapeHtml(uuid) + '">' + escapeHtml(c) + '</button>';
             first = false;
         });
         var right = hasIndex
-            ? '<span class="m-cond-pills-right"><button class="m-cond-pill' + (conds.length === 0 ? ' active' : '') + '" data-cond="INDEX" data-card="' + esc(uuid) + '">Index</button></span>'
+            ? '<span class="m-cond-pills-right"><button class="m-cond-pill' + (conds.length === 0 ? ' active' : '') + '" data-cond="INDEX" data-card="' + escapeHtml(uuid) + '">Index</button></span>'
             : '';
-        return '<div class="m-cond-pills" data-card="' + esc(uuid) + '">' +
+        return '<div class="m-cond-pills" data-card="' + escapeHtml(uuid) + '">' +
             '<span class="m-cond-pills-left">' + left + '</span>' + right + '</div>';
     }
 
     function tabsHTML(uuid, hasSellers, hasBuyers) {
-        var html = '<div class="m-tabs" data-card="' + esc(uuid) + '">';
-        if (hasSellers) html += '<button class="m-tab active" data-target="sellers-' + esc(uuid) + '">Sellers</button>';
-        if (hasBuyers) html += '<button class="m-tab' + (hasSellers ? '' : ' active') + '" data-target="buyers-' + esc(uuid) + '">Buyers</button>';
+        var html = '<div class="m-tabs" data-card="' + escapeHtml(uuid) + '">';
+        if (hasSellers) html += '<button class="m-tab active" data-target="sellers-' + escapeHtml(uuid) + '">Sellers</button>';
+        if (hasBuyers) html += '<button class="m-tab' + (hasSellers ? '' : ' active') + '" data-target="buyers-' + escapeHtml(uuid) + '">Buyers</button>';
         html += '</div>';
         return html;
     }
 
     function sellersPanel(uuid, data, ac, isSealed) {
-        var html = '<div class="m-tab-panel active" id="sellers-' + esc(uuid) + '">';
+        var html = '<div class="m-tab-panel active" id="sellers-' + escapeHtml(uuid) + '">';
         if (data.indexRows.length > 0) {
             var idxActive = Object.keys(data.groups).length === 0 ? ' active' : '';
-            html += '<div class="m-cond-group' + idxActive + '" data-cond="INDEX" data-card="' + esc(uuid) + '">';
+            html += '<div class="m-cond-group' + idxActive + '" data-cond="INDEX" data-card="' + escapeHtml(uuid) + '">';
             data.indexRows.forEach(function (r) {
                 html += flatRow(r.name, r.price, 0);
             });
@@ -282,13 +276,13 @@
             var rows = data.groups[cond];
             if (!rows) return;
             var isActive = ac.conds.length > 0 && ac.conds[0] === cond;
-            html += '<div class="m-cond-group' + (isActive ? ' active' : '') + '" data-cond="' + esc(cond) + '" data-card="' + esc(uuid) + '">';
+            html += '<div class="m-cond-group' + (isActive ? ' active' : '') + '" data-cond="' + escapeHtml(cond) + '" data-card="' + escapeHtml(uuid) + '">';
             if (isSealed) {
                 html += '<div class="m-cond-label">Purchase from</div>';
             }
             rows.forEach(function (r, i) {
                 html += '<div class="m-vendor-row m-vendor-flat' + (i === 0 ? ' m-best-price' : '') + '">' +
-                    '<span class="m-vendor-name">' + esc(r.name) + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
+                    '<span class="m-vendor-name">' + escapeHtml(r.name) + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
                     '<span class="m-vendor-right">' +
                     '<span class="m-vendor-price">' + (r.price > 0 ? '$ ' + money(r.price) : 'n/a') + '</span>' +
                     '<span class="m-vendor-qty">' + (r.qty > 0 ? r.qty : '') + '</span>' +
@@ -301,16 +295,16 @@
     }
 
     function buyersPanel(uuid, data, ac, res, isSealed) {
-        var html = '<div class="m-tab-panel" id="buyers-' + esc(uuid) + '">';
+        var html = '<div class="m-tab-panel" id="buyers-' + escapeHtml(uuid) + '">';
         if (data.indexRows.length > 0) {
             var idxActive = Object.keys(data.groups).length === 0 ? ' active' : '';
-            html += '<div class="m-cond-group' + idxActive + '" data-cond="INDEX" data-card="' + esc(uuid) + '">';
+            html += '<div class="m-cond-group' + idxActive + '" data-cond="INDEX" data-card="' + escapeHtml(uuid) + '">';
             data.indexRows.forEach(function (r) {
                 if (r.syp) {
                     html += '<div class="m-vendor-row m-vendor-flat">' +
-                        '<span class="m-vendor-name">' + esc(r.name) + '</span>' +
+                        '<span class="m-vendor-name">' + escapeHtml(r.name) + '</span>' +
                         '<span class="m-vendor-right">' +
-                        '<span class="m-vendor-price"># ' + esc(String(r.qty)) + '</span>' +
+                        '<span class="m-vendor-price"># ' + escapeHtml(String(r.qty)) + '</span>' +
                         '<span class="m-vendor-qty"></span>' +
                         '</span></div>';
                 } else {
@@ -327,7 +321,7 @@
             if (!rows) return;
             var isActive = ac.conds.length > 0 && ac.conds[0] === cond;
             var ref = refRetail(res, cond);
-            html += '<div class="m-cond-group' + (isActive ? ' active' : '') + '" data-cond="' + esc(cond) + '" data-card="' + esc(uuid) + '">';
+            html += '<div class="m-cond-group' + (isActive ? ' active' : '') + '" data-cond="' + escapeHtml(cond) + '" data-card="' + escapeHtml(uuid) + '">';
             if (isSealed) {
                 html += '<div class="m-cond-label">Sell to</div>';
             }
@@ -335,7 +329,7 @@
                 var ratio = (cond === 'NM' && ref > 0) ? (r.price / ref) * 100 : 0;
                 var title = ratio > 0 ? ' title="Ratio: ' + ratio.toFixed(2) + '%"' : '';
                 html += '<div class="m-vendor-row m-vendor-flat' + (i === 0 ? ' m-best-price' : '') + '"' + title + '>' +
-                    '<span class="m-vendor-name">' + esc(r.name) + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
+                    '<span class="m-vendor-name">' + escapeHtml(r.name) + (i === 0 ? '<span class="m-best-badge">Best</span>' : '') + '</span>' +
                     '<span class="m-vendor-right">' +
                     '<span class="m-vendor-price">' + (r.price > 0 ? '$ ' + money(r.price) : 'n/a') + '</span>' +
                     '<span class="m-vendor-qty">' + (cond === 'NM' && r.qty > 0 ? r.qty : '') + '</span>' +
@@ -360,7 +354,7 @@
         html += condPillsHTML(res.uuid, ac.conds, ac.hasIndex, !!card.s);
         html += tabsHTML(res.uuid, sData.hasAny, bData.hasAny);
         if (imgURL) {
-            html += '<img class="m-card-img-landscape" src="' + esc(imgURL) + '" loading="lazy" alt="' + esc(card.n) + '">';
+            html += '<img class="m-card-img-landscape" src="' + escapeHtml(imgURL) + '" loading="lazy" alt="' + escapeHtml(card.n) + '">';
         }
         html += sellersPanel(res.uuid, sData, ac, !!card.s);
         html += buyersPanel(res.uuid, bData, ac, res, !!card.s);
@@ -372,12 +366,12 @@
         var html = '';
         if (exec.unsupported && exec.unsupported.length > 0) {
             html += '<div class="offline-notice offline-notice-warn">Not available offline: ' +
-                exec.unsupported.map(esc).join(', ') + '</div>';
+                exec.unsupported.map(escapeHtml).join(', ') + '</div>';
         }
         (exec.missingSets || []).forEach(function (code) {
             var set = ctx.sets[code];
             html += '<div class="offline-notice offline-notice-missing">' +
-                esc(set && set.n ? set.n : code) + ' is not synced offline. ' +
+                escapeHtml(set && set.n ? set.n : code) + ' is not synced offline. ' +
                 '<a href="/search?settings=1">Choose synced editions in Settings</a> (requires connectivity).' +
                 '</div>';
         });

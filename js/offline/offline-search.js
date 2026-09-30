@@ -41,12 +41,6 @@
         });
     }
 
-    function escapeHtml(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
     function rowHtml(r) {
         var icon = r.keyrune
             ? '<i class="ss ss-fw ss-' + escapeHtml(r.keyrune) + '"></i>'
