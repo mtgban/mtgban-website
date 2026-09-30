@@ -114,3 +114,29 @@ func TestResolveMoxItemPrinting(t *testing.T) {
 		t.Error("unknown collector number should error")
 	}
 }
+
+// A "hide above" cap stands on its own while the floor filter is off; the
+// floor's amount only overrules it once that filter is switched on.
+func TestUpperBound(t *testing.T) {
+	tests := []struct {
+		name    string
+		v       float64
+		floor   float64
+		floorOn bool
+		want    float64
+	}{
+		{"cap equal to an unused floor", 0.5, 0.5, false, 0.5},
+		{"cap under an unused floor", 0.5, 1, false, 0.5},
+		{"cap above the floor", 0.5, 0.1, true, 0.5},
+		{"cap equal to the floor", 0.5, 0.5, true, 0},
+		{"cap under the floor", 0.5, 1, true, 0},
+		{"no cap", 0, 0.1, false, 0},
+		{"negative cap", -1, 0.1, false, 0},
+	}
+	for _, tt := range tests {
+		got := upperBound(tt.v, tt.floor, tt.floorOn)
+		if got != tt.want {
+			t.Errorf("%s: upperBound(%v, %v, %v) = %v, want %v", tt.name, tt.v, tt.floor, tt.floorOn, got, tt.want)
+		}
+	}
+}

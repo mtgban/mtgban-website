@@ -294,6 +294,16 @@ func uploadFloatSetting(r *http.Request, field, cookieName string) float64 {
 	return v
 }
 
+// upperBound returns the cap a "hide above" filter applies, 0 for none.
+// A cap at or below the floor would hide every offer, so it gives way to
+// the floor, but only while the floor's own filter is on.
+func upperBound(v, floor float64, floorOn bool) float64 {
+	if v <= 0 || (floorOn && v <= floor) {
+		return 0
+	}
+	return v
+}
+
 // uploadIntSetting returns the form field (or cookie fallback) parsed as
 // int; 0 if missing or unparseable.
 func uploadIntSetting(r *http.Request, field, cookieName string) int {
@@ -445,7 +455,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	percSpreadMax := MaxHighValueSpread
-	if v := uploadFloatSetting(r, "percspreadmax", "UploadPercSpreadMax"); v > percSpread {
+	if v := upperBound(uploadFloatSetting(r, "percspreadmax", "UploadPercSpreadMax"), percSpread, skipLowValue); v > 0 {
 		percSpreadMax = v
 	}
 
@@ -455,7 +465,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	maxHighVal := MaxHighValueAbs
-	if v := uploadFloatSetting(r, "maxval", "UploadMaxVal"); v > minLowVal {
+	if v := upperBound(uploadFloatSetting(r, "maxval", "UploadMaxVal"), minLowVal, skipLowValueAbs); v > 0 {
 		maxHighVal = v
 	}
 
