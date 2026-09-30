@@ -6,9 +6,7 @@
     var TTL_MS = 90 * 1000;
 
     // Tombstones: entries with a del timestamp. Newest intent (m) wins merges.
-    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-    var TOMB_CAP = 50;
-    function mtime(x) { return x.m || x.t || 0; }
+    var mtime = ListStorage.mtime;
 
     // Keys that map to dedicated server columns.
     var FAVORITES_KEY = 'mtgban_favorites';
@@ -335,7 +333,6 @@
     // Merge by id: the copy with newer intent (m, fallback t) wins wholesale,
     // including its del and pinned state. Ties keep the local copy.
     function mergeList(local, server, idOf, cap) {
-        var now = Date.now();
         var byId = {};
         var order = [];
         function add(item) {
@@ -353,7 +350,6 @@
         (server || []).forEach(add);
         var merged = order.map(function(id) { return byId[id]; });
         var live = merged.filter(function(x) { return !x.del; });
-        var tombs = merged.filter(function(x) { return x.del && (now - mtime(x)) <= TOMB_TTL_MS; });
         live.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
         if (cap && live.length > cap) {
             // Keep pinned even when old; fill the rest with newest unpinned.
@@ -361,9 +357,7 @@
             var unpinned = live.filter(function(x) { return !x.pinned; });
             live = pinned.concat(unpinned).slice(0, cap);
         }
-        tombs.sort(function(a, b) { return mtime(b) - mtime(a); });
-        if (tombs.length > TOMB_CAP) tombs = tombs.slice(0, TOMB_CAP);
-        return live.concat(tombs);
+        return live.concat(ListStorage.tombstones(merged));
     }
 
     // A payload and the server's copy of it agree on content but not on shape:
