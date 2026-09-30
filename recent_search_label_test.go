@@ -146,3 +146,20 @@ func TestCardArtFallbackLoadsBeforeContent(t *testing.T) {
 		}
 	}
 }
+
+// Search's modal calls sameSiteURL as it loads, from inside the content.
+func TestUtilsLoadsBeforeContent(t *testing.T) {
+	raw, err := os.ReadFile("templates/base.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	utils := strings.Index(s, "/js/utils.js")
+	content := strings.Index(s, `block "content"`)
+	if utils < 0 || content < 0 {
+		t.Fatal("base.html: missing utils.js or content block")
+	}
+	if utils > content {
+		t.Fatal("base.html: utils.js must load before content")
+	}
+}

@@ -1,6 +1,6 @@
-// Shared HTML helpers — loaded first in base.html so any later script
-// (favorites.js, recent-searches.js, chartopts.js, …) can call them as
-// globals without redefining its own copy.
+// Shared HTML helpers — loaded in base.html's <head>, ahead of the content,
+// so any later script (favorites.js, chartopts.js, a page's inline one, …)
+// can call them as globals without redefining its own copy.
 
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
