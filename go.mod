@@ -3,15 +3,15 @@ module github.com/mtgban/mtgban-website
 go 1.25.0
 
 require (
-	github.com/BlueMonday/go-scryfall v0.9.0
-	github.com/PuerkitoBio/goquery v1.10.3
-	github.com/bwmarrin/discordgo v0.27.1
+	github.com/BlueMonday/go-scryfall v0.10.0
+	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/bwmarrin/discordgo v0.29.0
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
 	github.com/extrame/xls v0.0.1
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
-	github.com/lib/pq v1.11.1
-	github.com/mackerelio/go-osstat v0.2.4
+	github.com/lib/pq v1.12.3
+	github.com/mackerelio/go-osstat v0.2.8
 	github.com/mileusna/useragent v1.3.5
 	github.com/mtgban/go-cardmarket v0.3.1
 	github.com/mtgban/go-mtgban v0.9.3
@@ -40,7 +40,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.60.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.60.0 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
-	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.45.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.33.0 // indirect
