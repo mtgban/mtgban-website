@@ -2,14 +2,18 @@ var hoverImage = document.getElementById("hoverImage");
 var hoverWrap = document.getElementById("hoverWrap");
 
 document.addEventListener("mousemove", getMouse);
-
-setInterval(followMouse, 10);
+// The image flips to stay inside the window, so it is placed again whenever
+// its size or the window's edges change under a still pointer.
+hoverImage.addEventListener("load", followMouse);
+window.addEventListener("scroll", followMouse);
+window.addEventListener("resize", followMouse);
 
 var mouseLoc = {x: 0, y: 0};
 
 function getMouse(e){
     mouseLoc.x = e.pageX + 10;
     mouseLoc.y = e.pageY + 10;
+    followMouse();
 }
 
 function followMouse(){
