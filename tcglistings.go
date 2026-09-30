@@ -329,9 +329,20 @@ func tcgDirectStock(cardID string, grade mtgban.Condition) (int, bool) {
 	return int(counts.Direct[i]), true
 }
 
+// tcgDirectStockNote is the tooltip on Direct's stock where it is shown,
+// dating the scrape it comes from. Empty until the listings load.
+func tcgDirectStockNote() string {
+	snap := tcgListingsPtr.Load()
+	if snap == nil {
+		return ""
+	}
+	return "Direct stock as of " + snap.Date.Format("Jan 2")
+}
+
 // tcgDirectStocked is seller with Direct's stock as the quantity of every
 // entry that has one, when seller is TCGplayer Direct, and seller itself
-// otherwise. Only arbitrage reads it: search does not show Direct's stock.
+// otherwise. Only the arbitrage pages read it: search does not show Direct's
+// stock.
 func tcgDirectStocked(seller mtgban.Seller) mtgban.Seller {
 	if seller.Info().Shorthand != tcgDirectStore {
 		return seller

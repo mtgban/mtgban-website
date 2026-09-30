@@ -587,6 +587,17 @@ type scraperCompareOpts struct {
 	AnySpread        bool // use the higher spread/profitability thresholds (global mode only)
 }
 
+// hasNoQty tells whether a table has no quantity column: a store keeping no
+// quantities, but for TCGplayer Direct's own stock on reverse, where its
+// copies are the table's.
+func hasNoQty(scraper mtgban.Scraper, reverseMode bool) bool {
+	_, stocked := scraper.(*stockedSeller)
+	if reverseMode && stocked && tcgListingsPtr.Load() != nil {
+		return false
+	}
+	return scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory
+}
+
 // suspectPriceFor answers the price on a row that one overpriced TCG Direct
 // listing can inflate, and nil where the page shows no such price.
 //
@@ -673,11 +684,8 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 
 				for _, seller := range GetSellers() {
 					if seller.Info().Shorthand == v[0] {
-						source = seller
-						// Arbitrage trades TCGplayer Direct's own stock.
-						if !pageVars.GlobalMode {
-							source = tcgDirectStocked(seller)
-						}
+						// TCGplayer Direct trades its own stock.
+						source = tcgDirectStocked(seller)
 						break
 					}
 				}
@@ -847,6 +855,8 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	// the search results do, so they follow the same setting.
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 
+	pageVars.DirectStockNote = tcgDirectStockNote()
+
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
@@ -861,7 +871,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				continue
 			}
 
-			scrapers = append(scrapers, seller)
+			scrapers = append(scrapers, tcgDirectStocked(seller))
 		}
 	} else {
 		for _, vendor := range GetVendors() {
@@ -995,7 +1005,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 			Key:              scraper.Info().Shorthand,
 			Arbit:            arbit,
 			HasNoCredit:      creditInfo.CreditMultiplier == 0,
-			HasNoQty:         scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
+			HasNoQty:         hasNoQty(scraper, pageVars.ReverseMode),
 			CreditMultiplier: creditInfo.CreditMultiplier,
 			SussyList:        sussy,
 		}
