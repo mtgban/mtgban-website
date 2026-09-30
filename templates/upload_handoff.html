@@ -8,17 +8,10 @@
 {{define "extra-css"}}<link rel="stylesheet" type="text/css" href="/css/handoff.css?hash={{.Hash}}">{{end}}
 
 {{define "extra-head"}}
+{{/* The login comes back here, where the card list the reader came with
+     is still waiting. */}}
 {{if .PatreonLogin}}
-<script type="text/javascript">
-    // The same construction the landing and search pages use: built at
-    // click time so this page rides along in the state param and the
-    // reader is returned here rather than to the home page - they came
-    // with a card list in hand, and it is still waiting in the tab that
-    // opened this one.
-    function getPatreonURL(patreonId, client) {
-        return "https://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash + ";" + client);
-    }
-</script>
+{{template "patreon-login-script" .}}
 {{end}}
 {{end}}
 
