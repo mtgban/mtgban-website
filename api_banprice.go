@@ -56,41 +56,23 @@ type PriceAPIOutput struct {
 func apiEnabledStores(storesOpt string) []string {
 	var enabledStores []string
 	switch storesOpt {
-	case "ALL_ACCESS", "DEV_ACCESS":
+	case "ALL_ACCESS", "DEV_ACCESS", "BASE_ACCESS":
 		var blocklistRetail, blocklistBuylist []string
-		if storesOpt == "ALL_ACCESS" {
+		if storesOpt != "DEV_ACCESS" {
 			blocklistRetail = Config.SearchRetailBlockList
 			blocklistBuylist = Config.SearchBuylistBlockList
 		}
-		for _, seller := range GetSellers() {
-			shorthand := seller.Info().Shorthand
-			if storeEligible(shorthand, nil, blocklistRetail) && !slices.Contains(enabledStores, shorthand) {
-				enabledStores = append(enabledStores, shorthand)
+		add := func(info mtgban.ScraperInfo, blocklist []string) {
+			if storeEligible(info.Shorthand, nil, blocklist) && !slices.Contains(enabledStores, info.Shorthand) &&
+				(storesOpt != "BASE_ACCESS" || baseAccessStoreEligible(info)) {
+				enabledStores = append(enabledStores, info.Shorthand)
 			}
+		}
+		for _, seller := range GetSellers() {
+			add(seller.Info(), blocklistRetail)
 		}
 		for _, vendor := range GetVendors() {
-			shorthand := vendor.Info().Shorthand
-			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) {
-				enabledStores = append(enabledStores, shorthand)
-			}
-		}
-	case "BASE_ACCESS":
-		blocklistRetail := Config.SearchRetailBlockList
-		blocklistBuylist := Config.SearchBuylistBlockList
-
-		for _, seller := range GetSellers() {
-			info := seller.Info()
-			shorthand := info.Shorthand
-			if storeEligible(shorthand, nil, blocklistRetail) && !slices.Contains(enabledStores, shorthand) && baseAccessStoreEligible(info) {
-				enabledStores = append(enabledStores, shorthand)
-			}
-		}
-		for _, vendor := range GetVendors() {
-			info := vendor.Info()
-			shorthand := info.Shorthand
-			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) && baseAccessStoreEligible(info) {
-				enabledStores = append(enabledStores, shorthand)
-			}
+			add(vendor.Info(), blocklistBuylist)
 		}
 	default:
 		enabledStores = strings.Split(storesOpt, ",")
