@@ -110,6 +110,7 @@ type PageVars struct {
 	CardQuantities map[string]int
 	SearchQuery    string
 	SearchBest     bool
+	ListingLocked  bool
 	SearchSort     string
 	CondKeys       []mtgban.Condition
 	FoundSellers   map[string]map[mtgban.Condition][]SearchEntry

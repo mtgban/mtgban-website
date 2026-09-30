@@ -2196,12 +2196,23 @@ body.modal-embed .cp-overlay { display: none !important; }
     </div>
     <div class="settings-section-body">
         <p class="section-desc">How buylist offers are grouped and labelled in result listings.</p>
+        {{/* Logged out, the server lists stores by name: the group shows that
+             and has no id, so settings.js leaves it and its cookie alone. */}}
+        {{if .ListingLocked}}
+        <div class="settings-pills settings-pills-locked" title="Join BAN to unlock sorting stores by price!">
+            <button class="settings-pill active" disabled>By Store Name</button>
+            <button class="settings-pill" disabled>By Price</button>
+            <button class="settings-pill" disabled>By Credit Price</button>
+            <button class="settings-pill" disabled>By Credit Market</button>
+        </div>
+        {{else}}
         <div class="settings-pills" id="settings-search-listing" data-cookie="SearchListingPriority">
             <button class="settings-pill" data-val="stores">By Store Name</button>
             <button class="settings-pill" data-val="prices">By Price</button>
             <button class="settings-pill" data-val="credit">By Credit Price</button>
             <button class="settings-pill" data-val="market">By Credit Market</button>
         </div>
+        {{end}}
     </div>
 </section>
 
