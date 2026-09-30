@@ -1894,6 +1894,9 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	if name == "guide.html" {
 		files = append(files, "templates/partials/guide-faq.html")
 	}
+	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" {
+		files = append(files, "templates/partials/patreon-login.html")
+	}
 
 	return path.Base(base), files
 }
