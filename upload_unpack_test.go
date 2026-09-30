@@ -320,15 +320,16 @@ func TestUnpackIsOfferedInTheSettings(t *testing.T) {
 	if !strings.Contains(out, `data-misc="unpack"`) {
 		t.Fatal("the settings offer no way to unpack a list on upload")
 	}
-	if !strings.Contains(out, `opts.indexOf('unpack') >= 0`) {
+	script := loadedScript(t, out, "upload-options.js")
+	if !strings.Contains(script, `opts.indexOf('unpack') >= 0`) {
 		t.Error("the setting is never read back into the upload form")
 	}
-	if !strings.Contains(out, `add('unpack', 'true')`) {
+	if !strings.Contains(script, `add('unpack', 'true')`) {
 		t.Error("the setting never reaches the handler as a field")
 	}
 	// The results page has its own field, set by the action; the setting must
 	// not speak over a click that already said what it wanted.
-	if !strings.Contains(out, `!form.querySelector('[name="unpack"]')`) {
+	if !strings.Contains(script, `!form.querySelector('[name="unpack"]')`) {
 		t.Error("the setting overrides the field the results page carries")
 	}
 }

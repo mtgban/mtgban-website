@@ -343,7 +343,7 @@ func TestUploadResultsOfferToPublishWhenGranted(t *testing.T) {
 	for _, granted := range []bool{true, false} {
 		out := renderUpload(t, PageVars{CanPublishStore: granted, UploadEntries: entries})
 		for _, marker := range []string{"openStorePrompt()", `name="store_shorthand"`, `id="res_publishstore"`,
-			`if (e.key === "Escape") closeStorePrompt();`} {
+			`src="/js/upload-store-prompt.js?`} {
 			if strings.Contains(out, marker) != granted {
 				t.Errorf("granted=%v: %s present=%v", granted, marker, !granted)
 			}
