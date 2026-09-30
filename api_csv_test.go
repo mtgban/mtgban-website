@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestSimplePrice2CSVTCGSKU checks that an upload export carries the SKU of
@@ -79,10 +80,10 @@ func runPrice2CSV(t *testing.T, pm map[string]map[string]*BanPrice, uploaded []U
 	return records[0], records[1]
 }
 
-// TestUUID2TCGCSVCondQtyIndexing checks that a repeated id with different
-// conditions produces one row per (id, condition) with the right condition and
-// quantity — the case the old deduped-index code got wrong.
-func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
+// TestCSVCondQtyIndexing checks that a repeated id with different conditions
+// produces one row per (id, condition) in the TCG and MKM exports, with the
+// right condition and quantity.
+func TestCSVCondQtyIndexing(t *testing.T) {
 	skipWithoutDatastore(t)
 	uuids := backend().GetUUIDs()
 
@@ -121,33 +122,39 @@ func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
 	conds := []string{"NM", "SP", "MP"}
 	qtys := []string{"1", "2", "3"}
 
-	var buf bytes.Buffer
-	w := csv.NewWriter(&buf)
-	if err := UUID2TCGCSV(backend(), w, ids, qtys, conds); err != nil {
-		t.Fatalf("UUID2TCGCSV: %v", err)
-	}
-	w.Flush()
-
-	records, err := csv.NewReader(&buf).ReadAll()
-	if err != nil {
-		t.Fatalf("parse csv: %v", err)
-	}
-	if len(records) != 4 { // header + 3 data rows
-		t.Fatalf("got %d records (incl header), want 4: %v", len(records), records)
-	}
-
-	const condCol, qtyCol = 7, 13
-	got := map[[2]string]bool{}
-	for _, r := range records[1:] {
-		got[[2]string{r[condCol], r[qtyCol]}] = true
-	}
-	for _, want := range [][2]string{
-		{"Near Mint", "1"},
-		{"Lightly Played", "2"},
-		{"Moderately Played", "3"},
+	for _, tc := range []struct {
+		export          func(*mtgmatcher.Backend, *csv.Writer, []string, []string, []string) error
+		condCol, qtyCol int
+		labels          map[mtgban.Condition]string
+	}{
+		{UUID2TCGCSV, 7, 13, tcgConditionMap},
+		{UUID2MKMCSV, 6, 1, mkmConditionMap},
 	} {
-		if !got[want] {
-			t.Errorf("missing row condition=%q qty=%q; got rows %v", want[0], want[1], got)
+		var buf bytes.Buffer
+		w := csv.NewWriter(&buf)
+		err := tc.export(backend(), w, ids, qtys, conds)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Flush()
+
+		records, err := csv.NewReader(&buf).ReadAll()
+		if err != nil {
+			t.Fatalf("parse csv: %v", err)
+		}
+		if len(records) != 4 { // header + 3 data rows
+			t.Fatalf("got %d records (incl header), want 4: %v", len(records), records)
+		}
+
+		got := map[[2]string]bool{}
+		for _, r := range records[1:] {
+			got[[2]string{r[tc.condCol], r[tc.qtyCol]}] = true
+		}
+		for i, cond := range conds {
+			want := [2]string{tc.labels[mtgban.Condition(cond)], qtys[i]}
+			if !got[want] {
+				t.Errorf("%s: missing row condition=%q qty=%q; got rows %v", records[0][0], want[0], want[1], got)
+			}
 		}
 	}
 }
