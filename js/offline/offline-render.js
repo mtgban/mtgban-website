@@ -13,12 +13,6 @@
     // Reference stores approximating the online ratio (online shows scraper-provided PriceRatio).
     var REF_STORES = ['CK', 'TCGPlayer', 'TCGLow', 'TCGMarket'];
 
-    function esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
     function money(v) {
         return Number(v).toFixed(2);
     }
@@ -123,7 +117,7 @@
     // sellerRow mirrors the URL-less seller branch (search.html:1150-1191).
     function sellerRow(name, price, qty) {
         return '<div class="price-row">' +
-            '<span class="store-cell"><a class="store-name dim">' + esc(name) + '</a></span>' +
+            '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
             '<span class="price-right">' +
             priceSpan(price) +
             '<span class="qty">' + (qty > 0 ? qty : '') + '</span>' +
@@ -134,7 +128,7 @@
     // indexRow mirrors the collapsed low/high reference row (search.html:1168-1183).
     function indexRow(label, low, high) {
         return '<div class="price-row">' +
-            '<span class="store-cell"><a class="store-name dim">' + esc(label) + '</a></span>' +
+            '<span class="store-cell"><a class="store-name dim">' + escapeHtml(label) + '</a></span>' +
             '<span class="price-right has-secondary">' +
             priceSpan(low) +
             '<span class="secondary"><span class="cur">$</span><span class="amt">' + money(high) + '</span></span>' +
@@ -145,7 +139,7 @@
     // sypBuyerRow mirrors the SYP-specific branch (search.html:1247).
     function sypBuyerRow(name, qty) {
         return '<div class="price-row">' +
-            '<span class="store-cell"><a class="store-name dim">' + esc(name) + '</a></span>' +
+            '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
             '<span class="price-right has-buylist-extra">' +
             '<span class="price"><span class="cur">#</span><span class="amt">' + qty + '</span></span>' +
             '<span class="buylist-extra" data-ratio="" data-credit="" data-marketcredit=""></span>' +
@@ -166,12 +160,12 @@
     function buyerRow(name, price, qty, ratio, isNM, extra) {
         var title = (ratio > 0 && isNM) ? ' title="Ratio: ' + ratio.toFixed(2) + '%"' : '';
         return '<div class="price-row"' + title + '>' +
-            '<span class="store-cell"><a class="store-name dim">' + esc(name) + '</a></span>' +
+            '<span class="store-cell"><a class="store-name dim">' + escapeHtml(name) + '</a></span>' +
             '<span class="price-right has-buylist-extra">' +
             priceSpan(price) +
             '<span class="buylist-extra"' +
             ' data-ratio="' + ((ratio > 0 && isNM) ? ratio.toFixed(2) : '') + '"' +
-            ' data-credit="" data-marketcredit="">' + esc(extra || '') + '</span>' +
+            ' data-credit="" data-marketcredit="">' + escapeHtml(extra || '') + '</span>' +
             '<span class="qty">' + ((isNM && qty > 0) ? qty : '') + '</span>' +
             '</span>' +
             '</div>';
@@ -339,9 +333,9 @@
 
         var icon;
         if (set.k) {
-            icon = '<i class="ss ss-' + esc(set.k) + keyruneClasses(card) + ' ss-2x ss-fw result-set-icon"></i>';
+            icon = '<i class="ss ss-' + escapeHtml(set.k) + keyruneClasses(card) + ' ss-2x ss-fw result-set-icon"></i>';
         } else {
-            icon = '<span>' + esc(card.set) + '</span>';
+            icon = '<span>' + escapeHtml(card.set) + '</span>';
         }
 
         var badge = '';
@@ -365,20 +359,20 @@
         return '<div class="result-header-cover" style="z-index: ' + i + '"></div>' +
             '<div class="result-header' + (i === 0 ? ' result-first' : '') + '"' +
             ' style="z-index: ' + (i + 100) + '"' +
-            ' data-card-id="' + esc(res.uuid) + '"' +
-            ' data-card-name="' + esc(card.n) + '"' +
-            ' data-set-code="' + esc(card.set) + '"' +
-            ' data-number="' + esc(card.num || '') + '"' +
-            ' data-image-url="' + esc(imgURL) + '"' +
+            ' data-card-id="' + escapeHtml(res.uuid) + '"' +
+            ' data-card-name="' + escapeHtml(card.n) + '"' +
+            ' data-set-code="' + escapeHtml(card.set) + '"' +
+            ' data-number="' + escapeHtml(card.num || '') + '"' +
+            ' data-image-url="' + escapeHtml(imgURL) + '"' +
             ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
             ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
             '<a class="result-set-link" href="' + setQuery + '">' + icon + '</a>' +
             '<div class="result-card-info">' +
             '<div class="result-card-name-row">' +
-            '<a class="result-card-name" href="' + nameQuery + '" title="' + esc(card.n) + '">' + esc(card.n) + '</a>' +
+            '<a class="result-card-name" href="' + nameQuery + '" title="' + escapeHtml(card.n) + '">' + escapeHtml(card.n) + '</a>' +
             '<div class="result-badges">' + badge + '</div>' +
             '</div>' +
-            '<span class="result-set-title"><a href="' + setQuery + '">' + esc(titleLine(card, set)) + '</a>' + productsLink + '</span>' +
+            '<span class="result-set-title"><a href="' + setQuery + '">' + escapeHtml(titleLine(card, set)) + '</a>' + productsLink + '</span>' +
             '</div>' +
             '</div>';
     }
@@ -386,8 +380,8 @@
     function bodyHTML(res, ctx, isLast) {
         var card = res.card;
         return '<div class="result-body' + (isLast ? ' result-last-body' : '') + '"' +
-            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.webp' : '') + '"' +
-            ' data-set-code="' + esc(card.set) + '"' +
+            ' data-image-url="' + escapeHtml(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.webp' : '') + '"' +
+            ' data-set-code="' + escapeHtml(card.set) + '"' +
             ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
             ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
             sellersColumn(res, ctx) +
@@ -408,12 +402,12 @@
         var html = '';
         if (exec.unsupported && exec.unsupported.length > 0) {
             html += '<div class="offline-notice offline-notice-warn">Not available offline: ' +
-                exec.unsupported.map(esc).join(', ') + '</div>';
+                exec.unsupported.map(escapeHtml).join(', ') + '</div>';
         }
         (exec.missingSets || []).forEach(function (code) {
             var set = ctx.sets[code];
             html += '<div class="offline-notice offline-notice-missing">' +
-                esc(set && set.n ? set.n : code) + ' is not synced offline. ' +
+                escapeHtml(set && set.n ? set.n : code) + ' is not synced offline. ' +
                 '<a href="/search?settings=1">Choose synced editions in Settings</a> (requires connectivity).' +
                 '</div>';
         });

@@ -16,12 +16,6 @@ var __acCardMetaInflight = {};
  * the completed value carries the filters along. */
 var __acFilterToken = /^-?(format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cns|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
 
-function __acEsc(s) {
-    var d = document.createElement('div');
-    d.textContent = s == null ? '' : String(s);
-    return d.innerHTML;
-}
-
 /* Leading words a name may be found without. Nobody types "Secret Lair Drop"
  * to find a drop, and 762 of the 4,184 sealed names begin with it. */
 var __acSkippablePrefixes = ["The ", "Secret Lair Drop "];
@@ -322,8 +316,8 @@ async function autocomplete(form, inp, sealed) {
 
         /* Fixed-width icon column so labels left-align regardless of symbol width. */
         var label = candidate.label || candidate.value || '';
-        var sub = candidate.sublabel ? '<span class="ac-sub">' + __acEsc(candidate.sublabel) + '</span>' : '';
-        row.innerHTML = '<span class="ac-icon">' + iconInner + '</span><span class="ac-label">' + __acEsc(label) + '</span>' + sub;
+        var sub = candidate.sublabel ? '<span class="ac-sub">' + escapeHtml(candidate.sublabel) + '</span>' : '';
+        row.innerHTML = '<span class="ac-icon">' + iconInner + '</span><span class="ac-label">' + escapeHtml(label) + '</span>' + sub;
 
         var newToken = prefix + committed + candidate.value;
         row.addEventListener("click", function () {
