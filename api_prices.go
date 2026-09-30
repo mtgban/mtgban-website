@@ -60,10 +60,7 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		if info.MetadataOnly || slices.Contains(blocklistRetail, info.Shorthand) {
 			continue
 		}
-		name := info.Name
-		if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
-			name = override
-		}
+		name := scraperName(info.Shorthand)
 		inventory := seller.Inventory()
 		for _, cardID := range cardIDs {
 			entries, found := inventory[cardID]
@@ -92,10 +89,7 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		if info.MetadataOnly || slices.Contains(blocklistBuylist, info.Shorthand) {
 			continue
 		}
-		name := info.Name
-		if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
-			name = override
-		}
+		name := scraperName(info.Shorthand)
 		buylist := vendor.Buylist()
 		for _, cardID := range cardIDs {
 			entries, found := buylist[cardID]
