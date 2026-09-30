@@ -847,15 +847,10 @@ func findTCGproductID(b *mtgmatcher.Backend, cardID string) string {
 		}
 	}
 	if tcgID == "" {
-		tcgLow, _ := findSellerInventory("TCGLow")
-		entries, found := tcgLow[cardID]
-		if !found {
-			tcgMarket, _ := findSellerInventory("TCGMarket")
-			entries, found = tcgMarket[co.UUID]
-		}
-		if found {
-			tcgID = entries[0].OriginalID
-		}
+		tcgID = findOriginalID("TCGLow", cardID)
+	}
+	if tcgID == "" {
+		tcgID = findOriginalID("TCGMarket", cardID)
 	}
 
 	return tcgID
