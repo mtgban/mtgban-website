@@ -1,7 +1,7 @@
 # Pinned filters in offline mode
 
 > **2026-09-16 state:** the pinned filter bar ships for online search only.
-> `CanScope` is set in exactly one place, `Search()` at `search.go:423`, so
+> `CanScope` is set in exactly one place, `Search()` in `search.go`, so
 > `/offline` draws no chip and no row — verified on both the desktop and the
 > mobile rendering (`nav-pin-btn`/`nav2-scope`/`has-scope`: zero hits). This
 > is deliberate, not an oversight: a filter that cannot be seen is one that
