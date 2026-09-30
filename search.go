@@ -848,6 +848,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Sort sets as requested, default to chronological
 	odds := dropOdds(b, config)
+	sortData := resolveSortingData(b, allKeys)
 	switch pageVars.SearchSort {
 	case "odds":
 		// Ascending by default, unlike every other field here: what a
@@ -860,7 +861,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// an expected count is actually known for. Missing sorts last
 		// regardless of direction, ranked among itself by the fallback the
 		// other fields use.
-		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			oddsI, hasI := odds[allKeys[i]]
 			oddsJ, hasJ := odds[allKeys[j]]
@@ -873,17 +873,14 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			return oddsI < oddsJ
 		})
 	case "alpha":
-		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "hybrid":
-		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "number":
-		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
@@ -894,7 +891,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			retSellers = append([]string{retSeller}, defaultSellerPriorityOpt...)
 		}
 
-		sortData := resolveSortingData(b, allKeys)
 		prices := resolveBestPrices(allKeys, retSellers, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
 			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
@@ -910,7 +906,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			blVendors = append([]string{blVendor}, defaultVendorPriorityOpt...)
 		}
 
-		sortData := resolveSortingData(b, allKeys)
 		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
 		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -925,7 +920,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	default:
-		sortData := resolveSortingData(b, allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
