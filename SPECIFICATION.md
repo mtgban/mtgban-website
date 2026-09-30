@@ -133,7 +133,7 @@ Boot sequence (`main()`):
    - `33 */3 * * *` — `s.cacheNewspaper()`
    - `45 * * * *` — `s.refreshCKSignals()` (ckbuylist.go): reloads CK's
      stock history once the newspaper has a new day, rereads the odds its
-     tooltips quote (`ck-odds.json.xz` beside the datastore, ckodds.go)
+     tooltips quote (`ck-odds-v2.json.xz` beside the datastore, ckodds.go)
      once the loaded ones are 20 hours old, and rebuilds every card's
      buylist signal. Only where the site serves CK's buylist
      (`ckAvailable()`), which the prices loading tells: the cron checks it

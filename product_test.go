@@ -97,8 +97,9 @@ func TestHotlistReducer(t *testing.T) {
 	}
 }
 
-// TestNewHighReducer covers the new-high rule: keep cards whose current
-// buylist price beats every price before today, and report that high.
+// TestNewHighReducer covers the new-high rule: keep cards CK pays $3 or more
+// for whose current buylist price beats every price before today, and report
+// that high.
 func TestNewHighReducer(t *testing.T) {
 	stats := timeseries.AggregatePriceStats{Max: 6, Min: 2, Count: 30, PriorMax: 5}
 
@@ -115,8 +116,9 @@ func TestNewHighReducer(t *testing.T) {
 		{"not buying", stats, 0, 0, false},
 		{"only today's row", timeseries.AggregatePriceStats{Max: 6, Min: 6, Count: 1}, 6, 0, false},
 		{"flat window", timeseries.AggregatePriceStats{Max: 4, Min: 4, Count: 30, PriorMax: 4}, 4, 0, false},
-		{"under a dollar", timeseries.AggregatePriceStats{Max: 0.9, Min: 0.5, Count: 30, PriorMax: 0.8}, 0.9, 0, false},
-		{"too few buying days for a P90", timeseries.AggregatePriceStats{Max: 6, Min: 2, Count: 29, PriorMax: 5}, 6, 0, false},
+		{"under $3", timeseries.AggregatePriceStats{Max: 2.9, Min: 2, Count: 30, PriorMax: 2.5}, 2.9, 0, false},
+		{"at $3", timeseries.AggregatePriceStats{Max: 3, Min: 2, Count: 30, PriorMax: 2.5}, 3, 2.5, true},
+		{"a few buying days", timeseries.AggregatePriceStats{Max: 6, Min: 2, Count: 5, PriorMax: 5}, 6, 5, true},
 	}
 	for _, tc := range cases {
 		got, ok := newHighReducer(tc.stats, tc.current)
