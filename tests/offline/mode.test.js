@@ -3,20 +3,29 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Load the shipped module with stubbed window/document; DOM/network wiring stays inert.
-function loadOfflineMode() {
+function loadOfflineMode(cookie = '') {
     const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-mode.js'), 'utf8');
+    const cookies = readFileSync(join(import.meta.dir, '..', '..', 'js', 'cookies.js'), 'utf8');
     const win = {};
     const doc = {
-        cookie: '',
+        cookie,
         readyState: 'complete',
         addEventListener: () => {},
         getElementById: () => null,
     };
-    new Function('window', 'document', src)(win, doc);
+    new Function('window', 'document', cookies + '\n' + src)(win, doc);
     return win.OfflineMode;
 }
 
 const OfflineMode = loadOfflineMode();
+
+// The flag rides in the signed MTGBAN cookie: base64 over url.Values.
+test('available reads SearchOfflineMode out of the MTGBAN cookie', () => {
+    const signed = (values) => 'theme=dark; MTGBAN=' + encodeURIComponent(btoa(values));
+    expect(loadOfflineMode(signed('UserTier=Pioneer&SearchOfflineMode=true')).available()).toBe(true);
+    expect(loadOfflineMode(signed('UserTier=Pioneer')).available()).toBe(false);
+    expect(loadOfflineMode('theme=dark').available()).toBe(false);
+});
 
 // --- Storage line sync-status text ---
 

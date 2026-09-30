@@ -13,10 +13,8 @@
     var HIDDEN_COOKIE = 'MobileChartHidden';
 
     function readHiddenVendors() {
-        var match = document.cookie.match(new RegExp('(?:^|; )' + HIDDEN_COOKIE + '=([^;]*)'));
-        if (!match) return [];
         try {
-            return decodeURIComponent(match[1]).split(',').filter(Boolean);
+            return getCookie(HIDDEN_COOKIE).split(',').filter(Boolean);
         } catch (e) {
             return [];
         }
