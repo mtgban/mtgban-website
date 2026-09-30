@@ -10,8 +10,8 @@ detail this file only summarizes.
 MTGBAN is a card price-aggregation website — Magic first, and now also
 Lorcana, One Piece, Yu-Gi-Oh, Riftbound, Flesh and Blood, Pokemon, Gundam and
 Palworld, each its own deployment of the same binary switched by `Config.Game`
-— a single Go server binary (~25k lines in the root `package main`, excluding
-tests) plus small support packages, server-rendered Go HTML templates, and
+— a single Go server binary (most of it one flat root `package main`) plus
+small support packages, server-rendered Go HTML templates, and
 vanilla JS/CSS (no frontend build step). It loads card data and per-store
 price dumps into memory and serves search, bulk-upload valuation, arbitrage,
 newspaper reports, price charts, a signed price API, and a Discord bot.
@@ -45,8 +45,10 @@ b2 sync b2://mtgban-dumps/magic/cardkingdom/ ~/mtgban-dumps/magic/cardkingdom/
 # from a local directory), -noload (skip price load), -stores a,b (load
 # only those stores' dumps at startup), -nonews, -sig (force signature
 # checks in dev), -log <dir>.
-# Also: -tcgcsv-daily / -tcgcsv-products / -tcgcsv-backfill (see
-# tcgcsvd/README.md) run one ingest job and exit rather than serving.
+# Also: -tcgcsv-daily / -tcgcsv-products / -tcgcsv-backfill (with
+# -tcgcsv-from/-to/-force/-categories) run one ingest job and exit rather
+# than serving; tcgcsvd/README.md covers the jobs and cmd/tcgcsvd, which
+# runs them as a process of its own.
 ```
 
 Switching the `go-mtgban` dependency during local work:
@@ -59,7 +61,7 @@ Switching the `go-mtgban` dependency during local work:
 
 There is no Makefile, but `.github/workflows/ci.yml` runs on every PR and on
 push to `master`: a `style` job (`gofmt -s -l .`, `go vet ./...`, `revive`,
-`staticcheck`), then `build-and-test` (`bun test tests/`, `go build ./...`,
+`staticcheck`), and alongside it `build-and-test` (`bun test tests/`, `go build ./...`,
 `go test ./...` against a real downloaded `allprintings5.json`). Match those
 same gates locally before pushing — `gofmt -s -l .` and the pinned `revive`/
 `staticcheck` versions in particular are easy to miss running only `go vet`.
@@ -122,17 +124,27 @@ output, not a claim written here.
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
-| `product.go`, `chart.go`, `checkpoints.go` | Sealed EV, price charts, chart annotations |
-| `api*.go` | Price API, batch prices, chart/suggest APIs, CSV exports, API-mode loading |
+| `product.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV; price charts and the ids they accept; chart annotations, ban-list markers among them |
+| `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
+| `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
+| `screener.go`, `popular.go`, `guide.go`, `changelog.go` | The price-movers screener; the landing page's featured searches; the guide; release notes read from Discord |
+| `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, CSV exports |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
+| `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them; per-bucket B2 keys |
+| `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
+| `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the stale-data alarm, panic recovery and reporting, page-visit recording |
+| `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
 | `timeseries/` | PostgreSQL price-history client (charts) |
+| `userstate/`, `observability/` | Postgres stores for per-user preferences and for page visits (the admin usage tab) |
+| `banprice/` | The price API's wire types |
+| `tcgcsv/` | tcgcsv.com client that `tcgcsvd/` ingests through |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
 | `apisig/` | Holds the API signature format (`Sign`, `Payload`, `Mint`, `Decode`, `Verify`); the API gateway repo imports it, so its payload bytes are frozen by golden tests |
 | `apihandoff/` | The signed Patreon handoff token (`Mint`, `Verify`) the game sites hand to the API gateway for trials and sign-in; the gateway imports it, so the golden test freezes its bytes |
 | `apiproductlist/` | The API price list (`products.json`, embedded; amounts in cents): packages, add-ons, intervals, store families. The API gateway repo pins this module by commit and seeds Stripe from it, so a price edit needs a gateway dependency bump; the pricing page renders from it |
-| `ratelimit/`, `patreon/`, `moxfield/`, `cardconduit/` | Support packages |
+| `ratelimit/`, `patreon/`, `moxfield/`, `manabox/`, `collectr/`, `cardconduit/`, `fuzzy/` | Support packages |
 | `internal/` | Packages only this module imports: the palette and offline APIs, suggest, upload row parsing, the reload tracker and more; SPECIFICATION.md §6 lists them |
 
 ## Non-Magic games
@@ -172,12 +184,13 @@ Two deploy patterns exist, chosen by how big the card pool is:
 - **DigitalOcean App Platform** (`lorcana`, `onepiece`, `fleshandblood`,
   `riftbound`, `gundam`, `palworld`, plus `beta`) — a `.github/workflows/
   <game>-deploy.yml` that does nothing but `doctl apps create-deployment
-  ${{ secrets.DO_<GAME>_APP_ID }} --wait` on a `v*`/`<game>-*` tag push (or
-  `workflow_dispatch`). All the actual build/deploy config lives in that
+  ${{ secrets.DO_<GAME>_APP_ID }} --wait` on a `v*`/`<game>-*` tag push
+  (`beta-*` alone for beta), or `workflow_dispatch`. All the actual build/deploy config lives in that
   DigitalOcean App's own spec, not in this repo. This is the one to copy for
   a small non-Magic game's card pool.
 - **Droplet over SSH** (`magic`, `pokemon`, `yugioh`) — the workflow SSHes
-  into a shared droplet and runs `deploy/deploy.sh <ref>`, which does its own
+  into that game's own droplet and runs `deploy/deploy.sh <ref>`, a
+  blue-green swap between two instances behind nginx, which does its own
   checkout and build. Reserved for the largest card pools; a new non-Magic
   game almost certainly wants the App Platform pattern instead.
 
@@ -246,27 +259,9 @@ commit to this repo can complete on its own.
 
 ## Known issues / refactors pending
 
-`todo/refactor.md` has the full prioritized plan. Highlights, spot-checked
-against the current tree rather than copied wholesale:
-
-- **Phase 0** (done): tests compile, `filterEnabledStores` removed.
-- **Phase 1** (high ROI, behavior-preserving): extract shared helpers. Done so
-  far: `canAccessMode(modes, target)` is now one helper (`utils.go`), called
-  from `api.go`/`api_banprice.go` rather than duplicated; `MaxUploadEntries`
-  and `IQRThreshold` are already named constants; the FuncMap already moved
-  to its own `templates.go`. Still open, last verified 2026-09-14:
-  - `ParamParser` for cookie/sig/form reads (duplicated across upload.go, search.go)
-  - `PartitionScrapersByMode` helper (4-way partition loop duplicated in upload.go, arbit.go, sleep.go)
-  - Named constants for conditions & finish order (inline map repeated in upload.go + search.go)
-  - Standardize JSON error responses (api*.go mix hand-built strings + json.NewEncoder)
-  - Table-driven sort dispatch (58 inline `sort.Slice` blocks across the root package as of this check, not just arbit.go/search.go)
-- **Phase 2** (decompose god-functions): split `Upload()`/`Search()`, consolidate CSV exporters, centralize external-ID resolution
-- **Phase 3** (frontend consolidation): extract shared JS helpers, consolidate settings system
-- **Phase 4** (testing): add tests for auth logic, search parser, price aggregation, arbitrage math
-
-Phases 2–4 above are copied from `todo/refactor.md` as of the same date and
-were not independently re-verified — check that file directly rather than
-trusting this list indefinitely.
+`todo/refactor.md` holds the measured, prioritized tech-debt list and the
+plan for it. Read it there; this file does not copy it, since a copy goes
+stale the moment an item lands.
 
 ## Gotchas
 
@@ -290,9 +285,9 @@ trusting this list indefinitely.
   this way and which side deploys first.
 - `embed.go` is Discord **embed** formatting, not Go `//go:embed` asset
   embedding — don't be misled by the name.
-- **Template FuncMap risks:** `templates.go` adds 30+ template helpers via
-  `template.FuncMap`. `templates_test.go` exists but tests that every template
-  parses and every reference resolves — it does not unit-test the individual
-  helpers' logic (`csvWithout`, `firstCSV`, `slug`, ...). Those are pure
-  functions that could be table-tested independently of page rendering; that
-  gap is still open.
+- **Template FuncMap risks:** `templates.go` adds about 60 template helpers
+  via `template.FuncMap`. `templates_test.go` checks that every template
+  parses and every reference resolves, not what each helper returns; only
+  `csvWithout` has a table test of its own (`chart_test.go`). The rest
+  (`firstCSV`, `slug`, ...) are pure functions that could be tested the
+  same way.

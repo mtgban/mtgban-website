@@ -475,7 +475,7 @@ override; phone UA detection via `mileusna/useragent`).
   ≥3 chars, capped at 30 results (`maxSuggestions`), 5-minute cache,
   OpenSearch-compatible array response — all unchanged from before.
 
-### 5.2 Upload (`upload.go`, ~2,480 lines, not ~2,200)
+### 5.2 Upload (`upload.go`)
 
 Accepts CSV (delimiter auto-detect: comma → tab → `;`, plus a `sep=`
 header-row override), XLS (`extrame/xls`), XLSX (`excelize`), Google
@@ -728,9 +728,12 @@ staleness alarm's map and messages, from 15 minutes after startup.
 | Package | Purpose |
 |---|---|
 | `timeseries/` | PostgreSQL price-history client (see §5.6) |
+| `apisig/`, `apihandoff/` | The API signature format and the signed Patreon handoff token; the API gateway imports both, so golden tests freeze their bytes |
+| `apiproductlist/` | The API price list (`products.json`, embedded), which the pricing page renders and the gateway seeds Stripe from |
 | `ratelimit/` | Per-IP token-bucket limiter wrapping `x/time/rate`; `IPAddress()` honors X-Forwarded-For |
 | `patreon/` | Patreon OAuth2 token exchange + identity/membership tier lookup |
 | `moxfield/` | Moxfield deck & paginated collection importer → `Item` list |
+| `manabox/` | Reader for public decks from ManaBox's cloud API |
 | `cardconduit/` | CardConduit bulk-estimate POST client |
 | `banprice/` | Wire types for the price API — `Price`, `ConditionTags` — in the exact JSON shape `api_banprice.go` and the templates share |
 | `collectr/` | Client for Collectr showcase pages (product listings, Magic + Lorcana categories) |
@@ -763,24 +766,22 @@ staleness alarm's map and messages, from 15 minutes after startup.
 - **Commit convention**: lowercase area prefix — `search:`, `upload:`,
   `api/banprice:`, `fix(mobile):` — small focused commits, no `Co-Authored-By`
   trailer.
-- **Testing**: broad and per-feature, not thin — 82 `*_test.go` files in the
-  root package as of this writing (`ls *_test.go`), organized by subsystem
-  rather than one-per-source-file: search/searchfilter (query parser, sort
+- **Testing**: broad and per-feature, organized by subsystem rather than
+  one-per-source-file: search/searchfilter (query parser, sort
   orders, sealed/collector-number edge cases), upload (parsers, unpack, magic
-  export/CSV), arbit (best-of, language handling, suspicious-spread
+  export/CSV), arbit (blocklists, language handling, suspicious-spread
   heuristics), charts (axis, buttons, resolve/search-by-id), admin (ajax,
   datastore, table-sort, usage), games-coverage/game-badge/game-body (every
   game the matcher registers needs a badge and a template — checked in one
   place), set-symbol, mobile variants, redirects, news, common ACL/affiliates,
-  plus five dedicated `*_bench_test.go` files (auth, datastore, price-parity,
-  searchfilter, sort). A separate `tests/offline/` tree holds ~14 Bun/JS tests
-  for the offline/service-worker mode. Go tests that need card data skip
+  plus `*_bench_test.go` benchmarks. `tests/` holds the Bun/JS tests, most of
+  them (`tests/offline/`) for the offline/service-worker mode. Go tests that need card data skip
   without the local `allprintings5.json` datastore, and
   `MTGBAN_TEST_DATASTORE=off` skips loading it (AGENTS.md). CI (`.github/workflows/ci.yml`)
   runs on every PR and push to master: a `style` job (`gofmt -s -l .`,
-  `go vet ./...`, `revive` pinned to v1.13.0 (its config also rejects any
-  import of `reflect`, per `docs/adr/0002-no-reflect.md`), `staticcheck` pinned to
-  2025.1.1) and a `build-and-test` job (`bun test tests/`, `go build ./...`,
+  `go vet ./...`, `revive` (its config also rejects any import of
+  `reflect`, per `docs/adr/0002-no-reflect.md`) and `staticcheck`, both
+  pinned in the workflow) and a `build-and-test` job (`bun test tests/`, `go build ./...`,
   `go test ./...` against a downloaded `allprintings5.json`).
 - **Deployment**: pushing a `v*` or `<game>-*` tag runs that game's
   `.github/workflows/<game>-deploy.yml`. App Platform games deploy with
@@ -795,19 +796,7 @@ staleness alarm's map and messages, from 15 minutes after startup.
   via `?logs=`. Discord webhooks act as the alerting channel. `/healthz` for
   liveness.
 - **Patch-based workflow**: work still being sequenced is sometimes staged as
-  `git format-patch` files in the repo root before merging rather than pushed
-  straight to a branch. This list is point-in-time — run `ls *.patch` for
-  what's actually pending rather than trusting an enumeration here; the set
-  this doc listed a few weeks ago is gone entirely. As of this writing there
-  are two: `0001-charts-stash-non-Magic-snapshots-through-the-long-fo.patch`
-  ("charts: stash non-Magic snapshots through the long form" — makes the
-  timeseries long-form dual-write game-aware, since non-Magic card ids like
-  Lorcana's aren't Postgres `uuid`s and were silently failing the wide-table
-  batch upsert) and `0001-upload-parse-rows-in-parallel.patch` ("upload: parse
-  rows in parallel" — fans `ParseRow()` out across a `GOMAXPROCS`-bounded
-  semaphore; ~4.7x measured on name-based rows, 37.7→176 rows/s). Otherwise
-  the working tree is clean — no other uncommitted or in-flight change as of
-  this writing.
+  untracked `git format-patch` files in the repo root; `ls *.patch` lists them.
 
 ## 9. Architectural principles observed
 
