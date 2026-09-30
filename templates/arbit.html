@@ -366,7 +366,7 @@
                         <th class="c">Cond</th>
                     {{end}}
                     {{if not .HasNoQty}}
-                        <th class="c"><a href="javascript:sortBy('available', '{{.Name}}')">Qty</a></th>
+                        <th class="c"{{if and $.DirectStockNote (eq $sourceKey "TCGDirect")}} title="{{$.DirectStockNote}}"{{end}}><a href="javascript:sortBy('available', '{{.Name}}')">Qty</a></th>
                     {{end}}
                     <th class="c">
                         <a href="javascript:sortBy('sell_price', '{{.Name}}')">
@@ -443,6 +443,7 @@
                             <td class="m">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
+                                    {{if and $.GlobalMode $.DirectStockNote (eq $scraperKey "TCGDirect")}}<span class="arb-direct-stock" title="{{$.DirectStockNote}}">{{.ReferenceEntry.Quantity}} in stock</span>{{end}}
                                 {{else}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .BuylistEntry.BuyPrice}}
                                 {{end}}

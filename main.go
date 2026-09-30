@@ -170,6 +170,7 @@ type PageVars struct {
 	CanDownloadCSV bool
 
 	Arb                []Arbitrage
+	DirectStockNote    string
 	ArbitOptKeys       []string
 	ArbitOptConfig     map[string]FilterOpt
 	ArbitFilters       map[string]bool

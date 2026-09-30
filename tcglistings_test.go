@@ -356,3 +356,37 @@ func TestBanPricesTakeTCGDirectStock(t *testing.T) {
 		}
 	}
 }
+
+// TestTCGDirectStockOnTheArbitPages shows reverse's TCGplayer Direct table
+// its quantity column once Direct's stock is loaded, keeps it off Global
+// and off other stores without quantities, and dates the stock's tooltip.
+func TestTCGDirectStockOnTheArbitPages(t *testing.T) {
+	info := mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true}
+	direct := tcgDirectStocked(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info))
+	other := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGLow", NoQuantityInventory: true})
+
+	setTestTCGListings(t, nil)
+	tcgListingsPtr.Store(nil)
+	if !hasNoQty(direct, true) || tcgDirectStockNote() != "" {
+		t.Error("before the listings load: Direct has a quantity column or a note")
+	}
+
+	setTestTCGListings(t, map[string]*tcgListings{})
+	for _, tc := range []struct {
+		name    string
+		scraper mtgban.Scraper
+		reverse bool
+		want    bool
+	}{
+		{"Direct on reverse", direct, true, false},
+		{"Direct on Global", direct, false, true},
+		{"another store without quantities", other, true, true},
+	} {
+		if got := hasNoQty(tc.scraper, tc.reverse); got != tc.want {
+			t.Errorf("%s: hasNoQty %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	if note := tcgDirectStockNote(); note != "Direct stock as of Sep 28" {
+		t.Errorf("note: got %q", note)
+	}
+}
