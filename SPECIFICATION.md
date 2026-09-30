@@ -782,10 +782,12 @@ staleness alarm's map and messages, from 15 minutes after startup.
   import of `reflect`, per `docs/adr/0002-no-reflect.md`), `staticcheck` pinned to
   2025.1.1) and a `build-and-test` job (`bun test tests/`, `go build ./...`,
   `go test ./...` against a downloaded `allprintings5.json`).
-- **Deployment**: single binary behind a reverse proxy; admin `?reboot=update`
-  runs `git fetch` + `git reset --hard origin/master`, then `go build`, then
-  `os.Exit(0)` (`pullCode()`/`build()` in admin.go — systemd restarts the
-  process). `update-mtgban.sh` is unrelated to this path: it's a local-dev
+- **Deployment**: pushing a `v*` or `<game>-*` tag runs that game's
+  `.github/workflows/<game>-deploy.yml`. App Platform games deploy with
+  `doctl apps create-deployment`; `magic`, `pokemon` and `yugioh` run
+  `deploy/deploy.sh <ref>` on their droplet, a blue-green swap between two
+  systemd instances behind nginx, gated on `/healthz` (`deploy/README.md`).
+  `update-mtgban.sh` is unrelated to this path: it's a local-dev
   helper that repoints the `go-mtgban` module dependency at a local checkout,
   the latest commit, or back to `go.mod`'s pinned version (`local`/`latest`/
   `remote` args) — not part of deploying the site. Logs rotate per page under

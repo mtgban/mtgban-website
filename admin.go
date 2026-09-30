@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"runtime/debug"
 	"slices"
@@ -206,54 +205,6 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
 		} else {
 			pageVars.InfoMessage = "A datastore reload is already running, this one will start when it ends"
-		}
-
-	case "update":
-		v = url.Values{}
-		v.Set("msg", "Deploying...")
-		doReboot = true
-
-		// recoverPanic does not reach a goroutine the handler starts. A
-		// deploy that fails here, by an error or a recovered panic, leaves
-		// this process serving: no restart follows "Deploying...".
-		go func() {
-			defer recoverJob("admin update")
-
-			out, err := pullCode()
-			if err != nil {
-				log.Println("git -", err)
-				return
-			}
-			log.Println(out)
-
-			out, err = build()
-			if err != nil {
-				log.Println("go -", err)
-				return
-			}
-			log.Println(out)
-
-			log.Println("Restarting")
-			os.Exit(0)
-		}()
-
-	case "build", "code":
-		v = url.Values{}
-		doReboot = true
-
-		var out string
-		var err error
-		if reboot == "build" {
-			out, err = build()
-		} else if reboot == "code" {
-			out, err = pullCode()
-		}
-		if err != nil {
-			log.Println(err)
-			v.Set("msg", err.Error())
-		} else {
-			log.Println(out)
-			v.Set("msg", out)
 		}
 
 	case "config":
@@ -1083,54 +1034,6 @@ func snapshotGithubAction(state string) ([]string, error) {
 	}
 
 	return names, nil
-}
-
-func pullCode() (string, error) {
-	gitExecPath, err := exec.LookPath("git")
-	if err != nil {
-		return "", err
-	}
-	log.Println("Found git at", gitExecPath)
-
-	var out bytes.Buffer
-
-	for _, cmds := range [][]string{
-		{"fetch"}, {"reset", "--hard", "origin/master"},
-	} {
-		cmd := exec.Command(gitExecPath, cmds...)
-		cmd.Stdout = &out
-
-		log.Println("Running git", strings.Join(cmds, " "))
-		err = cmd.Run()
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return out.String(), nil
-}
-
-func build() (string, error) {
-	goExecPath, err := exec.LookPath("go")
-	if err != nil {
-		return "", err
-	}
-	log.Println("Found go at", goExecPath)
-
-	var out bytes.Buffer
-	cmd := exec.Command(goExecPath, "build")
-	cmd.Stderr = &out
-
-	err = cmd.Run()
-	if err != nil {
-		return "", err
-	}
-
-	if out.Len() == 0 {
-		return "Build successful", nil
-	}
-
-	return "", errors.New(out.String())
 }
 
 // Custom time.Duration format to print days as well
