@@ -81,6 +81,16 @@ type SearchEntry struct {
 	Locked bool
 }
 
+// marketValue is what a buylist offer is worth on the market: its store
+// credit at the market rate, or its cash price where the store pays no
+// credit or its credit has no market rate.
+func (e SearchEntry) marketValue() float64 {
+	if e.MarketCredit == 0 {
+		return e.Price
+	}
+	return e.MarketCredit
+}
+
 // PriceUnit is what SearchEntry.PriceUnit names: what a row's price slot
 // measures, since not every row's number is a dollar amount to rank.
 type PriceUnit int
@@ -983,7 +993,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 						})
 					case "market":
 						sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-							return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
+							return foundVendors[cardID][cond][i].marketValue() > foundVendors[cardID][cond][j].marketValue()
 						})
 					}
 				}
