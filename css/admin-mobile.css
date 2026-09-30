@@ -274,9 +274,11 @@
     font-weight: 600;
     text-align: center;
     text-decoration: none;
+    border: none;
     border-radius: 6px;
     background: var(--dodgerblue);
     color: white;
+    cursor: pointer;
     min-height: 40px;
 }
 

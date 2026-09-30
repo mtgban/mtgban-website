@@ -318,11 +318,14 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 			os.Exit(0)
 		}()
 
-	case "newKey":
+	case "newKey", "demokey":
 		v = url.Values{}
 		doReboot = true
 
 		user := r.FormValue("user")
+		if user == "" {
+			user = DefaultAPIDemoUser
+		}
 		dur := r.FormValue("duration")
 		// A blank duration is the picker back on its placeholder, not a request for a permanent key.
 		if dur == "" {
