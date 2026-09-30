@@ -275,3 +275,84 @@ func TestLoadTCGListingsWaitsForADatastore(t *testing.T) {
 		t.Error("did not query the newspaper once a datastore was loaded")
 	}
 }
+
+// TestTCGDirectStocked gives arbitrage TCGplayer Direct's entries with
+// Direct's stock as their quantity where the listings saw some, and leaves
+// the store's own entries, which search reads, and other sellers alone.
+func TestTCGDirectStocked(t *testing.T) {
+	setTestTCGListings(t, map[string]*tcgListings{"card": {Direct: [5]int32{7, 0, 2}}})
+	inv := mtgban.InventoryRecord{
+		"card": {
+			{Conditions: "NM", Price: 3, Quantity: 1},
+			{Conditions: "SP", Price: 2, Quantity: 1},
+			{Conditions: "MP", Price: 1, Quantity: 1},
+		},
+		"other": {{Conditions: "NM", Price: 5, Quantity: 1}},
+	}
+	direct := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true})
+
+	stocked := tcgDirectStocked(direct)
+	got := stocked.Inventory()
+	for _, tc := range []struct {
+		cardID    string
+		i, want   int
+		condition string
+	}{
+		{"card", 0, 7, "NM"},
+		{"card", 1, 1, "SP, which Direct has none of"},
+		{"card", 2, 2, "MP"},
+		{"other", 0, 1, "NM of a card the listings did not see"},
+	} {
+		if q := got[tc.cardID][tc.i].Quantity; q != tc.want {
+			t.Errorf("%s %s: quantity %d, want %d", tc.cardID, tc.condition, q, tc.want)
+		}
+	}
+	if !stocked.Info().NoQuantityInventory || stocked.Info().Shorthand != tcgDirectStore {
+		t.Errorf("stocked info: got %+v, want Direct's own", stocked.Info())
+	}
+	if q := direct.Inventory()["card"][0].Quantity; q != 1 {
+		t.Errorf("the store's own NM entry: quantity %d, want 1 untouched", q)
+	}
+
+	scg := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "SCG"})
+	if tcgDirectStocked(scg) != scg {
+		t.Error("wrapped a seller other than Direct")
+	}
+}
+
+// TestBanPricesTakeTCGDirectStock gives the price API TCGplayer Direct's own
+// stock as its quantity where the listings saw some, and none where they did
+// not, as for any store without quantities.
+func TestBanPricesTakeTCGDirectStock(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+	setTestTCGListings(t, map[string]*tcgListings{regular: {Direct: [5]int32{7, 2}}})
+
+	found := map[string]map[mtgban.Condition][]SearchEntry{
+		regular: {
+			"NM": {{Shorthand: tcgDirectStore, Price: 3, Quantity: 1, NoQuantity: true}},
+			"SP": {{Shorthand: tcgDirectStore, Price: 2, Quantity: 1, NoQuantity: true}},
+		},
+		foil: {"NM": {{Shorthand: tcgDirectStore, Price: 9, Quantity: 1, NoQuantity: true}}},
+	}
+	out := banPricesFromRows(backend(), []string{regular, foil}, found, "", "", true, false, false)
+
+	for _, tc := range []struct {
+		cardID string
+		want   int
+	}{
+		{regular, 9},
+		{foil, 0},
+	} {
+		co, err := backend().GetUUID(tc.cardID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		price := out[getIDFromMode(backend(), "", co)][tcgDirectStore]
+		if price == nil {
+			t.Fatalf("%s: no Direct price", tc.cardID)
+		}
+		if got := price.Qty + price.QtyFoil; got != tc.want {
+			t.Errorf("%s: quantity %d, want %d", tc.cardID, got, tc.want)
+		}
+	}
+}
