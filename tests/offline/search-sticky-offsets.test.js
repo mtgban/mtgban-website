@@ -286,10 +286,10 @@ test('the collapsed icon row sizes both through one inherited token', () => {
     expect(star.slice(0, star.indexOf('}'))).toContain('--qi-icon-size');
 });
 
-// The editions panel spans three languages: a Go emitter, an inline script in
-// the template, and the stylesheet. The couplings between them are invisible
-// from any one of the three, so they are asserted here from the sources.
-const templateSrc = fs.readFileSync(path.join(__dirname, '../../templates/search.html'), 'utf8');
+// The editions panel spans three languages: a Go emitter, the sidebar script,
+// and the stylesheet. The couplings between them are invisible from any one of
+// the three, so they are asserted here from the sources.
+const sidebarSrc = fs.readFileSync(path.join(__dirname, '../../js/search-sidebar.js'), 'utf8');
 const utilsSrc = fs.readFileSync(path.join(__dirname, '../../utils.go'), 'utf8');
 
 test('there is always an overflow panel for the truncation note to move into', () => {
@@ -304,9 +304,9 @@ test('there is always an overflow panel for the truncation note to move into', (
     // broken one. This guards the two numbers against being retuned into
     // that state silently, since nothing else connects them.
     const cap = utilsSrc.match(/MaxRuneSymbols\s*=\s*(\d+)/);
-    const threshold = templateSrc.match(/PRINTINGS_THRESHOLD\s*=\s*(\d+)/);
+    const threshold = sidebarSrc.match(/PRINTINGS_THRESHOLD\s*=\s*(\d+)/);
     expect(cap, 'expected MaxRuneSymbols in utils.go').toBeTruthy();
-    expect(threshold, 'expected PRINTINGS_THRESHOLD in templates/search.html').toBeTruthy();
+    expect(threshold, 'expected PRINTINGS_THRESHOLD in js/search-sidebar.js').toBeTruthy();
     expect(
         Number(cap[1]),
         `MaxRuneSymbols (${cap[1]}) draws ${cap[1]} symbols before the note, `
@@ -319,10 +319,10 @@ test('the editions panel is placed by the script, since the stylesheet stopped p
     // its own - it is off at 0,0 until the script gives it geometry. The two
     // halves live in different files and neither reads as incomplete alone,
     // so this pins that the placement call survives beside the open.
-    expect(templateSrc).toContain('function positionPrintings(');
-    const open = templateSrc.indexOf("dropdown.classList.add('open')");
+    expect(sidebarSrc).toContain('function positionPrintings(');
+    const open = sidebarSrc.indexOf("dropdown.classList.add('open')");
     expect(open, 'expected the panel to be opened by class').toBeGreaterThan(0);
-    const before = templateSrc.slice(Math.max(0, open - 400), open);
+    const before = sidebarSrc.slice(Math.max(0, open - 400), open);
     expect(
         before,
         'expected positionPrintings() to run before the panel is shown, or it opens at 0,0',
@@ -331,5 +331,5 @@ test('the editions panel is placed by the script, since the stylesheet stopped p
     // And the focus that follows must not scroll: a fixed panel still sits
     // inside a scrollable column, and "revealing" it drags the card off the
     // top - the bug this rule exists to prevent.
-    expect(templateSrc).toContain('filter.focus({ preventScroll: true })');
+    expect(sidebarSrc).toContain('filter.focus({ preventScroll: true })');
 });

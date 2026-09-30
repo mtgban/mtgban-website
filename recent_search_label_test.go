@@ -33,7 +33,7 @@ func TestSearchSidebarResetsArtFallbackOnHover(t *testing.T) {
 		CardHashes:  []string{"some-uuid"},
 		AllKeys:     []string{"some-uuid"},
 	})
-	if !strings.Contains(out, "window.setCardArtSource(img, src);") {
+	if !strings.Contains(loadedScript(t, out, "search-sidebar.js"), "window.setCardArtSource(img, src);") {
 		t.Error("search sidebar does not reset the reused image's fallback marker")
 	}
 }
