@@ -35,10 +35,12 @@ var (
 // the scrape keeps only the cheapest 100 listings of the product, which
 // leave its other printings short too (MTGBan_Newspaper#37): Capped marks a
 // printing that stored fewer listings than TCGplayer counts, and its Total
-// is that count.
+// is that count. Direct is TCGplayer Direct's own stock per grade, which
+// TCGplayer repeats on every listing of the grade whoever the seller.
 type tcgListings struct {
 	Sellers [len(tcgGrades)]int32
 	Copies  [len(tcgGrades)]int32
+	Direct  [len(tcgGrades)]int32
 	Capped  bool
 	Total   int32
 }
@@ -74,22 +76,24 @@ const tcgListingsDayQuery = `SELECT MAX(calc_date) FROM scripts__tcgplayer_great
 // the cap were short by one or two, listings that changed during the scrape.
 const tcgListingsSlack = 2
 
-// Sellers, listings and copies per product, printing and grade on one day,
-// with TCGplayer's own count of the printing's listings; a printing with
-// none stored comes back once, with no grade. Counting per seller first
-// keeps both steps plain groupings, ~40s on Magic's ~11M listings a day
-// against ~2.5 minutes for count(DISTINCT seller_id).
+// Sellers, listings, copies and Direct's stock per product, printing and
+// grade on one day, with TCGplayer's own count of the printing's listings; a
+// printing with none stored comes back once, with no grade. Counting per
+// seller first keeps both steps plain groupings, ~40s on Magic's ~11M
+// listings a day against ~2.5 minutes for count(DISTINCT seller_id).
 const tcgListingsQuery = `
 	WITH per_seller AS (
 		SELECT l.product_id, l.printing, l.condition, l.seller_id,
-		       count(*) AS listings, sum(l.quantity) AS copies
+		       count(*) AS listings, sum(l.quantity) AS copies,
+		       max(l.direct_inventory) AS direct
 		  FROM tcgplayersellerproductlistingmodel l
 		  JOIN tcgplayerproductinfomodel p ON p.product_id = l.product_id
 		 WHERE p.game_name = $1 AND l.date = $2
 		 GROUP BY 1, 2, 3, 4
 	), counts AS (
 		SELECT product_id, printing, condition,
-		       count(*) AS sellers, sum(listings) AS listings, sum(copies) AS copies
+		       count(*) AS sellers, sum(listings) AS listings, sum(copies) AS copies,
+		       max(direct) AS direct
 		  FROM per_seller
 		 GROUP BY 1, 2, 3
 	), reported AS (
@@ -99,7 +103,8 @@ const tcgListingsQuery = `
 		 WHERE p.game_name = $1 AND r.date = $2 AND r.quantity_sellers > 0
 	)
 	SELECT coalesce(c.product_id, r.product_id), coalesce(c.printing, r.variant), c.condition,
-	       coalesce(c.sellers, 0), coalesce(c.listings, 0), coalesce(c.copies, 0), r.quantity_sellers
+	       coalesce(c.sellers, 0), coalesce(c.listings, 0), coalesce(c.copies, 0), r.quantity_sellers,
+	       coalesce(c.direct, 0)
 	  FROM counts c
 	  FULL JOIN reported r ON r.product_id = c.product_id AND r.variant = c.printing`
 
@@ -112,6 +117,7 @@ type tcgListingsRow struct {
 	Listings  int
 	Copies    int
 	Reported  sql.NullInt64 // TCGplayer's count of the printing's listings
+	Direct    int           // TCGplayer Direct's own stock of the grade
 }
 
 // loadTCGListings reads the counts of the newspaper's last finished scrape
@@ -188,7 +194,7 @@ func queryTCGListings(ctx context.Context, b *mtgmatcher.Backend, game string, d
 	for rows.Next() {
 		var row tcgListingsRow
 		var condition sql.NullString
-		err := rows.Scan(&row.ProductID, &row.Printing, &condition, &row.Sellers, &row.Listings, &row.Copies, &row.Reported)
+		err := rows.Scan(&row.ProductID, &row.Printing, &condition, &row.Sellers, &row.Listings, &row.Copies, &row.Reported, &row.Direct)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -244,6 +250,7 @@ func buildTCGListings(rows []tcgListingsRow, match func(productID int64, printin
 		}
 		counts.Sellers[grade] = int32(row.Sellers)
 		counts.Copies[grade] = int32(row.Copies)
+		counts.Direct[grade] = int32(row.Direct)
 	}
 
 	cards := make(map[string]*tcgListings, len(printings))

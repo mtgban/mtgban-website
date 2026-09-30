@@ -104,7 +104,7 @@ func TestTCGListingsLive(t *testing.T) {
 		var want tcgListings
 		var stored int
 		rows, err := db.Query(`
-			SELECT condition, count(DISTINCT seller_id), count(*), sum(quantity)
+			SELECT condition, count(DISTINCT seller_id), count(*), sum(quantity), max(direct_inventory)
 			  FROM tcgplayersellerproductlistingmodel
 			 WHERE product_id = $1 AND date = $2 AND printing = $3
 			 GROUP BY 1`, tc.productID, day, tc.printing)
@@ -113,15 +113,15 @@ func TestTCGListingsLive(t *testing.T) {
 		}
 		for rows.Next() {
 			var condition string
-			var sellers, listings, copies int
-			err := rows.Scan(&condition, &sellers, &listings, &copies)
+			var sellers, listings, copies, direct int
+			err := rows.Scan(&condition, &sellers, &listings, &copies, &direct)
 			if err != nil {
 				t.Fatal(err)
 			}
 			stored += listings
 			grade, found := tcgGradeByName[condition]
 			if found {
-				want.Sellers[grade], want.Copies[grade] = int32(sellers), int32(copies)
+				want.Sellers[grade], want.Copies[grade], want.Direct[grade] = int32(sellers), int32(copies), int32(direct)
 			}
 		}
 		rows.Close()

@@ -30,27 +30,27 @@ func TestBuildTCGListings(t *testing.T) {
 	reported := func(n int64) sql.NullInt64 { return sql.NullInt64{Int64: n, Valid: true} }
 	rows := []tcgListingsRow{
 		// Complete: 195 listings stored of the 195 TCGplayer counts.
-		{1, "Normal", "Near Mint", 51, 60, 83, reported(195)},
-		{1, "Normal", "Lightly Played", 77, 88, 135, reported(195)},
-		{1, "Normal", "Moderately Played", 27, 30, 37, reported(195)},
-		{1, "Normal", "Heavily Played", 11, 12, 19, reported(195)},
-		{1, "Normal", "Damaged", 5, 5, 5, reported(195)},
+		{1, "Normal", "Near Mint", 51, 60, 83, reported(195), 7},
+		{1, "Normal", "Lightly Played", 77, 88, 135, reported(195), 3},
+		{1, "Normal", "Moderately Played", 27, 30, 37, reported(195), 0},
+		{1, "Normal", "Heavily Played", 11, 12, 19, reported(195), 0},
+		{1, "Normal", "Damaged", 5, 5, 5, reported(195), 0},
 		// Cut short: 88 stored of 2,357, and the foil 11 of 966.
-		{2, "Normal", "Near Mint", 75, 76, 704, reported(2357)},
-		{2, "Normal", "Lightly Played", 12, 12, 93, reported(2357)},
-		{2, "Foil", "Near Mint", 4, 4, 6, reported(966)},
-		{2, "Foil", "Lightly Played", 6, 7, 12, reported(966)},
+		{2, "Normal", "Near Mint", 75, 76, 704, reported(2357), 0},
+		{2, "Normal", "Lightly Played", 12, 12, 93, reported(2357), 0},
+		{2, "Foil", "Near Mint", 4, 4, 6, reported(966), 0},
+		{2, "Foil", "Lightly Played", 6, 7, 12, reported(966), 0},
 		// A condition that is no grade still counts as stored.
-		{3, "Normal", "Near Mint", 2, 2, 2, reported(3)},
-		{3, "Normal", "Unopened", 1, 1, 1, reported(3)},
+		{3, "Normal", "Near Mint", 2, 2, 2, reported(3), 0},
+		{3, "Normal", "Unopened", 1, 1, 1, reported(3), 0},
 		// No price row to compare with.
-		{4, "Foil", "Near Mint", 1, 1, 1, sql.NullInt64{}},
+		{4, "Foil", "Near Mint", 1, 1, 1, sql.NullInt64{}, 0},
 		// None stored: the valuable foil a bulk nonfoil crowded out.
-		{6, "Foil", "", 0, 0, 0, reported(46)},
+		{6, "Foil", "", 0, 0, 0, reported(46), 0},
 		// Two short, listings that changed during the scrape.
-		{7, "Normal", "Near Mint", 40, 40, 60, reported(42)},
+		{7, "Normal", "Near Mint", 40, 40, 60, reported(42), 0},
 		// No card.
-		{5, "Normal", "Near Mint", 9, 9, 9, reported(9)},
+		{5, "Normal", "Near Mint", 9, 9, 9, reported(9), 0},
 	}
 	ids := map[tcgPrintingKey]string{
 		{1, "Normal"}: "complete", {2, "Normal"}: "bulk", {2, "Foil"}: "bulk-foil",
@@ -70,7 +70,7 @@ func TestBuildTCGListings(t *testing.T) {
 		t.Errorf("unmatched: got %d, want 1", unmatched)
 	}
 	want := map[string]tcgListings{
-		"complete":     {Sellers: [5]int32{51, 77, 27, 11, 5}, Copies: [5]int32{83, 135, 37, 19, 5}, Total: 195},
+		"complete":     {Sellers: [5]int32{51, 77, 27, 11, 5}, Copies: [5]int32{83, 135, 37, 19, 5}, Direct: [5]int32{7, 3}, Total: 195},
 		"bulk":         {Sellers: [5]int32{75, 12}, Copies: [5]int32{704, 93}, Capped: true, Total: 2357},
 		"bulk-foil":    {Sellers: [5]int32{4, 6}, Copies: [5]int32{6, 12}, Capped: true, Total: 966},
 		"unopened":     {Sellers: [5]int32{2}, Copies: [5]int32{2}, Total: 3},
