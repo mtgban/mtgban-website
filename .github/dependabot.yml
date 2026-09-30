@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    # go-mtgban and its siblings move with the change that needs them,
+    # through update-mtgban.sh.
+    ignore:
+      - dependency-name: "github.com/mtgban/*"
+    groups:
+      gomod:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
