@@ -692,6 +692,10 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				for _, seller := range GetSellers() {
 					if seller.Info().Shorthand == v[0] {
 						source = seller
+						// Arbitrage trades TCGplayer Direct's own stock.
+						if !pageVars.GlobalMode {
+							source = tcgDirectStocked(seller)
+						}
 						break
 					}
 				}

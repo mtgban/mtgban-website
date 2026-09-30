@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -303,6 +305,72 @@ func tcgListingsFor(cardID string, grade mtgban.Condition) (text, title string) 
 	title = fmt.Sprintf("%s\n%s / %s for %s\n%s", total,
 		plural(int(counts.Sellers[i]), "seller"), plural(int(counts.Copies[i]), "copy"), tcgGradeNames[i], day)
 	return text, title
+}
+
+// tcgDirectStore is the shorthand of TCGplayer Direct's own prices, whose
+// entries carry no quantity of their own.
+const tcgDirectStore = "TCGDirect"
+
+// tcgDirectStock is TCGplayer Direct's own stock of a card in a grade, as of
+// the last listings load, where the scrape saw some.
+func tcgDirectStock(cardID string, grade mtgban.Condition) (int, bool) {
+	snap := tcgListingsPtr.Load()
+	if snap == nil {
+		return 0, false
+	}
+	counts, found := snap.Cards[cardID]
+	if !found {
+		return 0, false
+	}
+	i, found := tcgGradeBySite[grade]
+	if !found || counts.Direct[i] == 0 {
+		return 0, false
+	}
+	return int(counts.Direct[i]), true
+}
+
+// tcgDirectStocked is seller with Direct's stock as the quantity of every
+// entry that has one, when seller is TCGplayer Direct, and seller itself
+// otherwise. Only arbitrage reads it: search does not show Direct's stock.
+func tcgDirectStocked(seller mtgban.Seller) mtgban.Seller {
+	if seller.Info().Shorthand != tcgDirectStore {
+		return seller
+	}
+	return &stockedSeller{Seller: seller}
+}
+
+// stockedSeller is a TCGplayer Direct seller for one request.
+type stockedSeller struct {
+	mtgban.Seller
+	once      sync.Once
+	inventory mtgban.InventoryRecord
+}
+
+// Inventory copies the entries Direct has stock of, once, and shares the
+// rest with the seller's own.
+func (s *stockedSeller) Inventory() mtgban.InventoryRecord {
+	s.once.Do(func() {
+		base := s.Seller.Inventory()
+		s.inventory = make(mtgban.InventoryRecord, len(base))
+		for cardID, entries := range base {
+			var stocked []mtgban.InventoryEntry
+			for i, entry := range entries {
+				stock, found := tcgDirectStock(cardID, entry.Conditions)
+				if !found {
+					continue
+				}
+				if stocked == nil {
+					stocked = slices.Clone(entries)
+				}
+				stocked[i].Quantity = stock
+			}
+			if stocked == nil {
+				stocked = entries
+			}
+			s.inventory[cardID] = stocked
+		}
+	})
+	return s.inventory
 }
 
 // plural spells a count with its noun, "1 seller" or "14 copies".

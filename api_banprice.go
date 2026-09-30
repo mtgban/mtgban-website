@@ -583,7 +583,16 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 					continue
 				}
 
-				shouldQty := qty && !row.NoQuantity
+				// TCGplayer Direct's own stock, where the listings saw some.
+				quantity, noQuantity := row.Quantity, row.NoQuantity
+				if !vendorSide && row.Shorthand == tcgDirectStore {
+					stock, found := tcgDirectStock(cardID, cond)
+					if found {
+						quantity, noQuantity = stock, false
+					}
+				}
+
+				shouldQty := qty && !noQuantity
 				if vendorSide {
 					// A row is read as a want-count only when its unit says
 					// so - !IsOffer() would also let a synthetic row like
@@ -593,13 +602,13 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 				}
 				if shouldQty {
 					if co.Sealed {
-						price.QtySealed += row.Quantity
+						price.QtySealed += quantity
 					} else if co.Etched {
-						price.QtyEtched += row.Quantity
+						price.QtyEtched += quantity
 					} else if co.Foil {
-						price.QtyFoil += row.Quantity
+						price.QtyFoil += quantity
 					} else {
-						price.Qty += row.Quantity
+						price.Qty += quantity
 					}
 				}
 
@@ -613,11 +622,11 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 						price.Conditions = &BanConditions{}
 					}
 					price.Conditions.Set(condTag, row.Price)
-					if shouldQty && row.Quantity > 0 {
+					if shouldQty && quantity > 0 {
 						if price.Quantities == nil {
 							price.Quantities = &BanQuantities{}
 						}
-						price.Quantities.Set(condTag, row.Quantity)
+						price.Quantities.Set(condTag, quantity)
 					}
 				}
 			}

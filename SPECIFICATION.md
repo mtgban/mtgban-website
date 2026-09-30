@@ -142,6 +142,9 @@ Boot sequence (`main()`):
      on a goroutine of its own under `tracked()`
    - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
      TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
+     and TCGplayer Direct's own stock per grade (`direct_inventory`, the
+     same on every listing of a grade), which only arbitrage's TCGDirect
+     source and the price API's `qty` quote as TCGDirect's quantity,
      once the newspaper finishes a scrape, and retries a scrape day whose
      load failed every 6 hours; every datastore load also runs it, which
      queries only if no day is loaded yet
