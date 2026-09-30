@@ -88,15 +88,17 @@ func TestChartPageDeclaresWhatItLoaded(t *testing.T) {
 	page := squashSpaces(renderChartPage(t, chartPageVars()))
 
 	for _, want := range []string{
-		"var chartLoadedDays = 180 ;",
-		"var chartMaxDays = 3650 ;",
-		`var chartRosterIDs = "ban:790";`,
+		"loadedDays: 180 ,",
+		"maxDays: 3650 ,",
+		`ids: "ban:790",`,
 		"/js/chart-range.js",
-		"new ChartRangeLoader(",
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page is missing %q", want)
 		}
+	}
+	if !strings.Contains(loadedScript(t, page, "search-chart.js"), "new ChartRangeLoader(") {
+		t.Error("the chart script builds no ChartRangeLoader")
 	}
 }
 
@@ -128,8 +130,8 @@ func TestChartPageLoadsEverythingForANarrowTier(t *testing.T) {
 	pv.ChartLoadedDays = 30
 	page := squashSpaces(renderChartPage(t, pv))
 
-	if !strings.Contains(page, "var chartLoadedDays = 30 ;") ||
-		!strings.Contains(page, "var chartMaxDays = 30 ;") {
+	if !strings.Contains(page, "loadedDays: 30 ,") ||
+		!strings.Contains(page, "maxDays: 30 ,") {
 		t.Error("a 30-day tier should render its whole window")
 	}
 }
