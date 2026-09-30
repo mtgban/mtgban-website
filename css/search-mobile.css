@@ -1824,6 +1824,22 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     box-shadow: 0 1px 4px rgba(30, 144, 255, 0.1);
 }
 
+/* A group only members can change; the hint under it says so. */
+.m-settings-pills-locked .m-settings-pill {
+    pointer-events: none;
+}
+.m-settings-pills-locked .m-settings-pill:not(.active) {
+    opacity: 0.45;
+}
+.m-settings-locked-hint {
+    display: block;
+    margin-top: 0.5em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--dodgerblue);
+    text-decoration: none;
+}
+
 /* Dropdowns */
 .m-settings-dropdowns {
     display: flex;

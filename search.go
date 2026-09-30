@@ -523,9 +523,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For open mode (Any), disable history charts
+	// For open mode (Any), disable history charts and keep each card's
+	// stores in name order, whatever the listing priority cookie says
 	if sig == "" && SigCheck {
 		pageVars.DisableChart = true
+		pageVars.ListingLocked = true
 	}
 	// Not only for the chart page: every mobile results page carries the
 	// chart drawer, whose range select locks what the tier does not reach.
@@ -543,7 +545,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
+	pageVars.SearchBest = !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores"
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))

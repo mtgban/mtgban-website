@@ -302,6 +302,18 @@
     font-weight: 600;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--settings-blue) 40%, transparent) inset;
 }
+/* A group only members can change: its title says so, and the pills let
+ * the pointer through to it. */
+.settings-pills-locked {
+    width: fit-content;
+    cursor: not-allowed;
+}
+.settings-pills-locked .settings-pill {
+    pointer-events: none;
+}
+.settings-pills-locked .settings-pill:not(.active) {
+    opacity: 0.45;
+}
 
 /* ── Toggles ─────────────────────────────────────────────── */
 .settings-toggle {

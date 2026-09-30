@@ -757,12 +757,23 @@
             {{/* Listing Priority */}}
             <div class="m-settings-section">
                 <div class="m-settings-label">Listing Priority</div>
+                {{if .ListingLocked}}
+                <div class="m-settings-pills m-settings-pills-locked" title="Join BAN to unlock sorting stores by price!">
+                    <button type="button" class="m-settings-pill active" disabled>By Store</button>
+                    <button type="button" class="m-settings-pill" disabled>By Price</button>
+                    <button type="button" class="m-settings-pill" disabled>By Credit</button>
+                    <button type="button" class="m-settings-pill" disabled>By Market</button>
+                </div>
+                {{/* A touch has no hover to show the title with. */}}
+                <a class="m-settings-locked-hint" href="https://www.patreon.com/MTGBAN" target="_blank">Join BAN to unlock sorting stores by price!</a>
+                {{else}}
                 <div class="m-settings-pills" id="m-set-listing-priority">
                     <button type="button" class="m-settings-pill active" data-val="stores">By Store</button>
                     <button type="button" class="m-settings-pill" data-val="prices">By Price</button>
                     <button type="button" class="m-settings-pill" data-val="credit">By Credit</button>
                     <button type="button" class="m-settings-pill" data-val="market">By Market</button>
                 </div>
+                {{end}}
             </div>
 
             {{/* Sealed Contents - which reading a product's link opens, where the
@@ -1262,11 +1273,11 @@ function loadSettings() {
         });
     }
 
-    // Listing Priority
+    // Listing Priority, absent while the server locks it to store order
     var lp = getCookie('SearchListingPriority');
-    if (lp) {
-        var group = document.getElementById('m-set-listing-priority');
-        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+    var lpGroup = document.getElementById('m-set-listing-priority');
+    if (lp && lpGroup) {
+        lpGroup.querySelectorAll('.m-settings-pill').forEach(function(p) {
             p.classList.toggle('active', p.getAttribute('data-val') === lp);
         });
     }
@@ -1330,9 +1341,11 @@ function saveSettings() {
     var viewPill = document.querySelector('#m-set-default-view .m-settings-pill.active');
     setCookie('SearchDefaultView', viewPill ? viewPill.getAttribute('data-val') : 'NM', 1000);
 
-    // Listing Priority
-    var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
-    setCookie('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores', 1000);
+    // Listing Priority, absent while the server locks it to store order
+    if (document.getElementById('m-set-listing-priority')) {
+        var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
+        setCookie('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores', 1000);
+    }
 
     // Sealed Contents
     var contentsPill = document.querySelector('#m-set-sealed-contents .m-settings-pill.active');
