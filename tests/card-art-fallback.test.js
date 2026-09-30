@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
 
 const source = readFileSync(new URL('../js/card-art-fallback.js', import.meta.url), 'utf8');
-const uploadTemplate = readFileSync(new URL('../templates/upload.html', import.meta.url), 'utf8');
+const uploadPrintings = readFileSync(new URL('../js/upload-printings.js', import.meta.url), 'utf8');
 
 function loadFallback(gameAttr, Preload) {
     let onError;
@@ -148,7 +148,7 @@ test('swapped-in art is decoded as it is painted', () => {
 });
 
 test('upload printing picker resets reused row art', () => {
-    expect(uploadTemplate).toContain('if (img) window.setCardArtSource(img, meta.image);');
+    expect(uploadPrintings).toContain('if (img) window.setCardArtSource(img, meta.image);');
 });
 
 // data-game is server-rendered from Config.Game, not user input - but the
