@@ -664,7 +664,7 @@
                                                                 {{else if not .NoQuantity}}
                                                                     {{.Quantity}}
                                                                 {{else if .Listings}}
-                                                                    <span class="tcg-listings" title="{{.ListingsTitle}}">{{.Listings}}</span>
+                                                                    <span class="tcg-listings" title="{{plain_tip .ListingsTitle}}" data-tip="{{.ListingsTitle}}">{{.Listings}}</span>
                                                                 {{end}}
                                                             </span>
                                                         {{end}}

@@ -274,9 +274,10 @@ func buildTCGListings(rows []tcgListingsRow, match func(productID int64, printin
 	return cards, unmatched
 }
 
-// tcgListingsFor is what the TCGplayer row of a grade shows: sellers/copies
-// with a tooltip, or, for a printing the scrape cut short, TCGplayer's own
-// count on the NM row only.
+// tcgListingsFor is what the TCGplayer row of a grade shows: sellers/copies,
+// with a tooltip tabling every condition that has a seller, Damaged aside,
+// the grade's own in bold; or, for a printing the scrape cut short,
+// TCGplayer's own count on the NM row only.
 func tcgListingsFor(cardID string, grade mtgban.Condition) (text, title string) {
 	snap := tcgListingsPtr.Load()
 	if snap == nil {
@@ -302,9 +303,22 @@ func tcgListingsFor(cardID string, grade mtgban.Condition) (text, title string) 
 		return "", ""
 	}
 	text = fmt.Sprintf("%d/%d", counts.Sellers[i], counts.Copies[i])
-	title = fmt.Sprintf("%s\n%s / %s for %s\n%s", total,
-		plural(int(counts.Sellers[i]), "seller"), plural(int(counts.Copies[i]), "copy"), tcgGradeNames[i], day)
-	return text, title
+	var rows []string
+	for g, name := range tcgGradeNames {
+		if g == tcgGradeByName["Damaged"] || counts.Sellers[g] == 0 {
+			continue
+		}
+		row := fmt.Sprintf("| %s | %d | %d", name, counts.Sellers[g], counts.Copies[g])
+		if g == i {
+			row = fmt.Sprintf("| **%s** | **%d** | **%d**", name, counts.Sellers[g], counts.Copies[g])
+		}
+		rows = append(rows, row)
+	}
+	foot := plural(int(counts.Total), "listing") + " across conditions · " + snap.Date.Format("Jan 2")
+	if len(rows) == 0 {
+		return text, foot
+	}
+	return text, "|# Condition | Sellers | Copies\n" + strings.Join(rows, "\n") + "\n" + foot
 }
 
 // tcgDirectStore is the shorthand of TCGplayer Direct's own prices, whose
