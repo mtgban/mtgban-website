@@ -11,6 +11,12 @@ on:
         type: boolean
         default: false
 
+# One deploy of a game at a time; a newer one waits for the running one.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+  queue: max
+
 permissions: {}
 
 jobs:
