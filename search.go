@@ -414,6 +414,65 @@ func parseChartIDs(b *mtgmatcher.Backend, chartParam string) (ids []string, trun
 	return ids, truncated
 }
 
+// SearchVars are the PageVars fields only the search page fills and reads.
+type SearchVars struct {
+	Embed struct {
+		OEmbedURL    string
+		PageURL      string
+		Title        string
+		ImageURL     string
+		ImageCropURL string
+		Description  string
+		RetailLabel  string
+		RetailPrice  float64
+		BuylistLabel string
+		BuylistPrice float64
+	}
+
+	AllKeys        []string
+	CardQuantities map[string]int
+	SearchBest     bool
+	ListingLocked  bool
+	SearchSort     string
+	CondKeys       []mtgban.Condition
+	FoundSellers   map[string]map[mtgban.Condition][]SearchEntry
+	FoundVendors   map[string]map[mtgban.Condition][]SearchEntry
+	SetKeyrunes    map[string]string
+	NoSort         bool
+	HasAvailable   bool
+	// A search ran for this request. Not the same as SearchQuery being set:
+	// a pinned filter searches on its own, and the page has results to draw
+	// (or an empty-handed answer to give) with the box above it empty.
+	SearchRan    bool
+	CanFixSearch bool
+
+	// Suggestions shown when a search returns no results
+	DidYouMean         string
+	AltSearches        []suggest.AltSearch
+	CanDownloadCSV     bool
+	DefaultTab         string
+	DefaultView        mtgban.Condition
+	MobileSearchLayout string
+	OfflineModeAllowed bool
+	MaxLookbackDays    int
+	// ChartLoadedDays is how much history the page actually rendered inline:
+	// the window the chart first draws, or everything the tier allows when
+	// that window holds no prices. The front-end fetches the rest from
+	// /api/chart only if the viewer asks for a wider range.
+	ChartLoadedDays   int
+	AxisLabels        []string
+	Datasets          []Dataset
+	Checkpoints       []ChartCheckpoint
+	ChartID           string
+	ChartIDs          []string
+	MaxChartCards     int
+	ChartReferences   []string
+	Alternative       string
+	StocksURL         string
+	AltEtchedID       string
+	EditionFilterList []EditionEntry
+}
+
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend

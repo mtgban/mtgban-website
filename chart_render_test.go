@@ -32,29 +32,31 @@ func renderChartPage(t *testing.T, pv PageVars) string {
 func chartPageVars() PageVars {
 	const id = "ban:790"
 	return PageVars{
-		SearchRan: true,
-		// The chart renders inside the results, so the page needs a result to
-		// render it in: a chart page is a search for the charted card.
-		AllKeys:         []string{id},
-		SearchQuery:     "Test Card",
-		ChartID:         id,
-		ChartIDs:        []string{id},
-		ChartIDsCSV:     id,
-		MaxChartCards:   len(multiCardPalette),
-		MaxLookbackDays: 3650,
-		ChartLoadedDays: defaultChartRange,
-		AxisLabels:      []string{"2026-09-24", "2026-09-23", "2026-09-22"},
-		Datasets: []Dataset{{
-			Name:      "TCG Low",
-			Color:     "rgb(54, 162, 235)",
-			Reference: "TCG Low",
-			Data: []ChartPoint{
-				{Price: 12.34, Known: true},
-				{},
-				{Price: 11, Known: true},
-			},
-		}},
-		Metadata: map[string]GenericCard{id: {Name: "Test Card"}},
+		SearchVars: SearchVars{
+			SearchRan: true,
+			// The chart renders inside the results, so the page needs a result to
+			// render it in: a chart page is a search for the charted card.
+			AllKeys:         []string{id},
+			ChartID:         id,
+			ChartIDs:        []string{id},
+			MaxChartCards:   len(multiCardPalette),
+			MaxLookbackDays: 3650,
+			ChartLoadedDays: defaultChartRange,
+			AxisLabels:      []string{"2026-09-24", "2026-09-23", "2026-09-22"},
+			Datasets: []Dataset{{
+				Name:      "TCG Low",
+				Color:     "rgb(54, 162, 235)",
+				Reference: "TCG Low",
+				Data: []ChartPoint{
+					{Price: 12.34, Known: true},
+					{},
+					{Price: 11, Known: true},
+				},
+			}},
+		},
+		SearchQuery: "Test Card",
+		ChartIDsCSV: id,
+		Metadata:    map[string]GenericCard{id: {Name: "Test Card"}},
 		// The base template dereferences these unconditionally; a handler
 		// always fills them in before rendering.
 		BetaNav: &NavElem{Name: "Beta", Link: "/beta"},

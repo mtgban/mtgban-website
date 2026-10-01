@@ -128,15 +128,17 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 		Title:       "BAN Search",
 		InfoMessage: NoCardsMessage,
 		SearchQuery: "s:M19 cns:235 Fountain sdfsdfsdf Renewal",
-		SearchRan:   true,
+		SearchVars: SearchVars{
+			SearchRan:  true,
+			DidYouMean: "Fountain of Renewal",
+			AltSearches: []suggest.AltSearch{
+				{Query: "Fountain sdfsdfsdf Renewal", Label: "without s:M19"},
+				{Query: "s:M19 Fountain sdfsdfsdf Renewal", Label: "without cns:235"},
+			},
+		},
 		SearchScope: "f:foil",
 		CanScope:    true,
-		DidYouMean:  "Fountain of Renewal",
-		AltSearches: []suggest.AltSearch{
-			{Query: "Fountain sdfsdfsdf Renewal", Label: "without s:M19"},
-			{Query: "s:M19 Fountain sdfsdfsdf Renewal", Label: "without cns:235"},
-		},
-		Metadata: map[string]GenericCard{},
+		Metadata:    map[string]GenericCard{},
 		// The navbar names the reader; a zero PageVars would fault on it
 		// long before reaching the suggestions this is about.
 		BetaNav: &NavElem{Short: "TEST"},

@@ -28,7 +28,7 @@ func TestScopeGoSitsBetweenTheBoxAndClear(t *testing.T) {
 		// SearchRan is what puts the mobile page on its results surface,
 		// which draws a bar of its own - so this reaches the second copy
 		// rather than rendering the first one twice.
-		{"mobile, over results", true, PageVars{SearchQuery: "bolt", SearchRan: true}},
+		{"mobile, over results", true, PageVars{SearchQuery: "bolt", SearchVars: SearchVars{SearchRan: true}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.pageVars.BetaNav = &NavElem{Short: "b"}

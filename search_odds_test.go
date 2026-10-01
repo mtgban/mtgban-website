@@ -214,10 +214,12 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 			BetaNav:     &NavElem{},
 			IsMobile:    mobile,
 			SearchQuery: views.Variable,
-			SearchRan:   true,
-			SearchSort:  "odds",
+			SearchVars: SearchVars{
+				SearchRan:  true,
+				SearchSort: "odds",
+				AllKeys:    []string{"a"},
+			},
 			TotalUnique: 4,
-			AllKeys:     []string{"a"},
 			Contents:    views,
 		})
 		if !strings.Contains(out, `data-lucide="copy"`) {
@@ -232,9 +234,11 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 			BetaNav:     &NavElem{},
 			IsMobile:    mobile,
 			SearchQuery: views.Fixed,
-			SearchRan:   true,
+			SearchVars: SearchVars{
+				SearchRan: true,
+				AllKeys:   []string{"a"},
+			},
 			TotalUnique: 4,
-			AllKeys:     []string{"a"},
 			Contents:    views,
 		})
 		if strings.Contains(out, `data-lucide="copy"`) {

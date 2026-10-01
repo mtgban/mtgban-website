@@ -171,17 +171,19 @@ func TestSearchShowsTCGListings(t *testing.T) {
 	const title = "|# Condition | Sellers | Copies\n| **Near Mint** | **51** | **83**\n60 listings across conditions · Sep 28"
 	const plain = "Condition\nNear Mint: sellers 51, copies 83\n60 listings across conditions · Sep 28"
 	pageVars := PageVars{
-		CondKeys: []mtgban.Condition{"NM"},
-		AllKeys:  []string{cardID},
+		SearchVars: SearchVars{
+			CondKeys: []mtgban.Condition{"NM"},
+			AllKeys:  []string{cardID},
+			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{cardID: {
+				"NM": {
+					{ScraperName: "TCGplayer", Shorthand: tcgListingsStore, Price: 7.5, NoQuantity: true, URL: "https://example.test",
+						Listings: "51/83", ListingsTitle: title},
+					{ScraperName: "Other Store", Shorthand: "OS", Price: 8, Quantity: 3, URL: "https://example.test"},
+				},
+			}},
+			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
+		},
 		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set"}},
-		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{cardID: {
-			"NM": {
-				{ScraperName: "TCGplayer", Shorthand: tcgListingsStore, Price: 7.5, NoQuantity: true, URL: "https://example.test",
-					Listings: "51/83", ListingsTitle: title},
-				{ScraperName: "Other Store", Shorthand: "OS", Price: 8, Quantity: 3, URL: "https://example.test"},
-			},
-		}},
-		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
 	}
 	// Desktop hovers the table; mobile, which cannot, keeps the sentences.
 	for name, tc := range map[string]struct{ page, want string }{

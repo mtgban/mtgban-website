@@ -29,9 +29,11 @@ func renderSearch(t *testing.T, template string, pageVars PageVars) string {
 func TestSearchSidebarResetsArtFallbackOnHover(t *testing.T) {
 	out := renderSearch(t, "search.html", PageVars{
 		SearchQuery: "Lightning Bolt",
-		SearchRan:   true,
-		CardHashes:  []string{"some-uuid"},
-		AllKeys:     []string{"some-uuid"},
+		SearchVars: SearchVars{
+			SearchRan: true,
+			AllKeys:   []string{"some-uuid"},
+		},
+		CardHashes: []string{"some-uuid"},
 	})
 	if !strings.Contains(loadedScript(t, out, "search-sidebar.js"), "window.setCardArtSource(img, src);") {
 		t.Error("search sidebar does not reset the reused image's fallback marker")
@@ -44,8 +46,10 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		found := renderSearch(t, template, PageVars{
 			SearchQuery: "Lightning Bolt",
-			SearchRan:   true,
-			CardHashes:  []string{"some-uuid"},
+			SearchVars: SearchVars{
+				SearchRan: true,
+			},
+			CardHashes: []string{"some-uuid"},
 		})
 		if !strings.Contains(found, "found: true") {
 			t.Errorf("%s: a page with results does not report found: true", template)
@@ -53,7 +57,9 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 
 		empty := renderSearch(t, template, PageVars{
 			SearchQuery: "Lightning Bolt",
-			SearchRan:   true,
+			SearchVars: SearchVars{
+				SearchRan: true,
+			},
 			InfoMessage: NoResultsMessage,
 		})
 		if !strings.Contains(empty, "found: false") {
@@ -69,8 +75,10 @@ func TestTheSearchPageHandsOverTheReadableQuery(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		out := renderSearch(t, template, PageVars{
 			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
-			SearchRan:   true,
-			CardHashes:  []string{"some-uuid"},
+			SearchVars: SearchVars{
+				SearchRan: true,
+			},
+			CardHashes: []string{"some-uuid"},
 		})
 		if !strings.Contains(out, `label: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil"`) {
 			t.Errorf("%s: the rebuilt query is not handed to the recent list", template)
@@ -96,9 +104,11 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		one := renderSearch(t, template, PageVars{
 			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
-			SearchRan:   true,
-			CardHashes:  uuids,
-			Metadata:    map[string]GenericCard{uuids[0]: card},
+			SearchVars: SearchVars{
+				SearchRan: true,
+			},
+			CardHashes: uuids,
+			Metadata:   map[string]GenericCard{uuids[0]: card},
 		})
 		if !strings.Contains(one, "url: \""+card.SearchURL+"\"") {
 			t.Errorf("%s: a single result does not hand over %q", template, card.SearchURL)
@@ -106,9 +116,11 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 
 		many := renderSearch(t, template, PageVars{
 			SearchQuery: "Plaguecrafter",
-			SearchRan:   true,
-			CardHashes:  []string{"a", "b"},
-			Metadata:    map[string]GenericCard{"a": card},
+			SearchVars: SearchVars{
+				SearchRan: true,
+			},
+			CardHashes: []string{"a", "b"},
+			Metadata:   map[string]GenericCard{"a": card},
 		})
 		if !strings.Contains(many, `url: "",`) {
 			t.Errorf("%s: a multi-result page hands over a link it has no right to", template)
@@ -121,8 +133,10 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 func TestTheReadableQueryCannotBreakOutOfItsString(t *testing.T) {
 	out := renderSearch(t, "search.html", PageVars{
 		SearchQuery: `Hero's Downfall" ; alert(1); "`,
-		SearchRan:   true,
-		CardHashes:  []string{"some-uuid"},
+		SearchVars: SearchVars{
+			SearchRan: true,
+		},
+		CardHashes: []string{"some-uuid"},
 	})
 	if !strings.Contains(out, `label: "Hero's Downfall\" ; alert(1); \"",`) {
 		t.Error("a quote in the query did not survive as an escaped quote")

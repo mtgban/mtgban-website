@@ -12,11 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"github.com/mtgban/mtgban-website/internal/jobs"
-	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 	"github.com/mtgban/mtgban-website/observability"
 )
@@ -301,6 +299,7 @@ type PageVars struct {
 	Pagination
 	// Each page's own fields: only that page fills them, and only its
 	// templates read them.
+	SearchVars
 	UploadVars
 
 	Nav      []NavElem
@@ -326,40 +325,16 @@ type PageVars struct {
 	// lives in Go where it can be tested.
 	HandoffOrigins []string
 
-	Embed struct {
-		OEmbedURL    string
-		PageURL      string
-		Title        string
-		ImageURL     string
-		ImageCropURL string
-		Description  string
-		RetailLabel  string
-		RetailPrice  float64
-		BuylistLabel string
-		BuylistPrice float64
-	}
-
 	Title          string
 	ErrorMessage   string
 	WarningMessage string
 	InfoMessage    string
 	UsageStats     *UsageDashboard
 
-	AllKeys        []string
-	CardQuantities map[string]int
-	SearchQuery    string
-	SearchBest     bool
-	ListingLocked  bool
-	SearchSort     string
-	CondKeys       []mtgban.Condition
-	FoundSellers   map[string]map[mtgban.Condition][]SearchEntry
-	FoundVendors   map[string]map[mtgban.Condition][]SearchEntry
-	Metadata       map[string]GenericCard
-	SetKeyrunes    map[string]string
-	NoSort         bool
-	HasSettings    bool
-	HasAvailable   bool
-	ShowUpsell     bool
+	SearchQuery string
+	Metadata    map[string]GenericCard
+	HasSettings bool
+	ShowUpsell  bool
 
 	PopularSearches []PopularSearch
 	Changelog       []changelogGroup
@@ -377,10 +352,6 @@ type PageVars struct {
 	// The bar holds something that parses to no filter at all, so the
 	// search passes over it whole.
 	ScopeIgnored bool
-	// A search ran for this request. Not the same as SearchQuery being set:
-	// a pinned filter searches on its own, and the page has results to draw
-	// (or an empty-handed answer to give) with the box above it empty.
-	SearchRan bool
 
 	// The switch between the three readings of a sealed product's contents,
 	// nil unless the search is one of them over a product that has all three
@@ -399,26 +370,17 @@ type PageVars struct {
 	OverrideFixKind    string
 	OverrideWrongCard  *OverrideCard
 	OverrideCandidates []OverrideCard
-	CanFixSearch       bool
 
-	// Suggestions shown when a search returns no results
-	DidYouMean  string
-	AltSearches []suggest.AltSearch
+	ScraperShort string
 
-	ScraperShort   string
-	CanDownloadCSV bool
-
-	Arb                []Arbitrage
-	DirectStockNote    string
-	ArbitOptKeys       []string
-	ArbitOptConfig     map[string]FilterOpt
-	ArbitFilters       map[string]bool
-	SortOption         string
-	GlobalMode         bool
-	ReverseMode        bool
-	DefaultTab         string
-	DefaultView        mtgban.Condition
-	MobileSearchLayout string
+	Arb             []Arbitrage
+	DirectStockNote string
+	ArbitOptKeys    []string
+	ArbitOptConfig  map[string]FilterOpt
+	ArbitFilters    map[string]bool
+	SortOption      string
+	GlobalMode      bool
+	ReverseMode     bool
 
 	Page               string
 	Subtitle           string
@@ -442,7 +404,6 @@ type PageVars struct {
 	EditionsCategories []string
 	EditionsByCategory map[string][]EditionEntry
 	PickerID           string
-	OfflineModeAllowed bool
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
@@ -472,34 +433,17 @@ type PageVars struct {
 	SelectableField bool
 	SelectableLabel string
 
-	DisableChart    bool
-	MaxLookbackDays int
-	// ChartLoadedDays is how much history the page actually rendered inline:
-	// the window the chart first draws, or everything the tier allows when
-	// that window holds no prices. The front-end fetches the rest from
-	// /api/chart only if the viewer asks for a wider range.
-	ChartLoadedDays int
-	AxisLabels      []string
-	Datasets        []Dataset
-	Checkpoints     []ChartCheckpoint
-	ChartID         string
-	ChartIDs        []string
-	ChartIDsCSV     string
-	MaxChartCards   int
-	IsMultiChart    bool
-	ChartReferences []string
-	ModalMode       bool
-	Alternative     string
-	StocksURL       string
-	AltEtchedID     string
+	DisableChart bool
+	ChartIDsCSV  string
+	IsMultiChart bool
+	ModalMode    bool
 
-	EditionSort       []string
-	EditionList       map[string][]EditionEntry
-	EditionFilterList []EditionEntry
-	IsSealed          bool
-	TotalSets         int
-	TotalCards        int
-	TotalUnique       int
+	EditionSort []string
+	EditionList map[string][]EditionEntry
+	IsSealed    bool
+	TotalSets   int
+	TotalCards  int
+	TotalUnique int
 
 	SellerKeys      []string
 	VendorKeys      []string

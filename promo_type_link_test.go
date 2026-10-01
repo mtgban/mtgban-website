@@ -77,10 +77,12 @@ func TestSearchTemplatesLinkPromoTypes(t *testing.T) {
 	label := promoTypeLabel(backend(), value)
 	pageVars := PageVars{
 		SearchQuery: card.Name,
-		SearchRan:   true,
-		CardHashes:  []string{chipped},
-		AllKeys:     []string{chipped},
-		Metadata:    map[string]GenericCard{chipped: card},
+		SearchVars: SearchVars{
+			SearchRan: true,
+			AllKeys:   []string{chipped},
+		},
+		CardHashes: []string{chipped},
+		Metadata:   map[string]GenericCard{chipped: card},
 	}
 
 	desktop := renderSearch(t, "search.html", pageVars)
