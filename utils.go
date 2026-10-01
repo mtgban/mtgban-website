@@ -1500,20 +1500,30 @@ func storeEligible(shorthand string, allowlist, blocklist []string) bool {
 // Callers append a reader's own stores, so the config lists are clipped:
 // an append into their spare capacity would be seen by every other request.
 func getDefaultBlocklists(sig string) ([]string, []string) {
-	var blocklistRetail, blocklistBuylist []string
-	blocklistRetailOpt := GetParamFromSig(sig, "SearchDisabled")
-	if blocklistRetailOpt == "" {
-		blocklistRetail = slices.Clip(Config().SearchRetailBlockList)
-	} else if blocklistRetailOpt != "NONE" {
-		blocklistRetail = strings.Split(blocklistRetailOpt, ",")
+	return blocklistsFromValues(parseSig(sig))
+}
+
+// blocklistsFromValues reads the store blocklists off ACL values: an absent
+// key falls back to the config list, NONE clears it.
+func blocklistsFromValues(v url.Values) ([]string, []string) {
+	var retail, buylist []string
+	opt := v.Get("SearchDisabled")
+	switch opt {
+	case "":
+		retail = slices.Clip(Config().SearchRetailBlockList)
+	case "NONE":
+	default:
+		retail = strings.Split(opt, ",")
 	}
-	blocklistBuylistOpt := GetParamFromSig(sig, "SearchBuylistDisabled")
-	if blocklistBuylistOpt == "" {
-		blocklistBuylist = slices.Clip(Config().SearchBuylistBlockList)
-	} else if blocklistBuylistOpt != "NONE" {
-		blocklistBuylist = strings.Split(blocklistBuylistOpt, ",")
+	opt = v.Get("SearchBuylistDisabled")
+	switch opt {
+	case "":
+		buylist = slices.Clip(Config().SearchBuylistBlockList)
+	case "NONE":
+	default:
+		buylist = strings.Split(opt, ",")
 	}
-	return blocklistRetail, blocklistBuylist
+	return retail, buylist
 }
 
 // getSearchBlocklists combines the signature/config policy with the
