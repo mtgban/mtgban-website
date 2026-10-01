@@ -127,7 +127,7 @@ output, not a claim written here.
 
 | File | Responsibility |
 |---|---|
-| `main.go` | Startup, flags, config, `NavElem` page registry, cron jobs |
+| `main.go` | Startup, flags, config, `NavElem` page registry |
 | `routes.go` | `registerRoutes`: static files, redirects, the `NavElem` pages and the APIs, each behind its signing middleware |
 | `pages.go` | `PageVars`, the per-request nav (`genPageNav`), the template cache and `render` |
 | `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
@@ -148,7 +148,7 @@ output, not a claim written here.
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
 | `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them; per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
-| `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the stale-data alarm, panic recovery and reporting, page-visit recording |
+| `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the cron schedule (`startCrons`), the stale-data alarm, panic recovery and reporting, page-visit recording |
 | `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
@@ -270,8 +270,8 @@ commit to this repo can complete on its own.
    panic only on the goroutine serving the request (`recoverPanic` reports
    it there, behind the three signing wrappers); on any other goroutine an
    unrecovered panic ends the process. So register a new cron job through
-   `addJob` (main.go) and start a new background job's goroutine with
-   `tracked(name, fn)`, both of which also list it on the admin dashboard
+   `addJob` (in `startCrons`) and start a new background job's goroutine
+   with `tracked(name, fn)`, both of which also list it on the admin dashboard
    (`jobs.go`); start any other goroutine or Discord handler with
    `defer recoverJob("<name>")` (recover.go), and have a loop that must
    keep serving recover each run in a function of its own, as
