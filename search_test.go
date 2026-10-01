@@ -27,8 +27,8 @@ var testSite *site
 
 func TestMain(m *testing.M) {
 	LogDir = "logs"
-	Config.DatastorePath = "allprintings5.json"
-	Config.Game = DefaultGame
+	Config().DatastorePath = "allprintings5.json"
+	Config().Game = DefaultGame
 	testSite = newSite()
 
 	// Tests written against fixtures build their own site, so this lets them
@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	// Best-effort datastore load: tests that need real card data skip when
 	// it isn't loaded, most through skipWithoutDatastore, so a missing local
 	// datastore file shouldn't take down the whole package's test run.
-	err := testSite.loadDatastore(Config.DatastorePath)
+	err := testSite.loadDatastore(Config().DatastorePath)
 	if err != nil {
 		log.Println("loadDatastore skipped:", err)
 		os.Exit(m.Run())
@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 	// of Config.Game. CI sets none and loads nothing.
 	keyID, appKey := os.Getenv("B2_KEY_ID"), os.Getenv("B2_APP_KEY")
 	if keyID != "" && appKey != "" {
-		Config.BucketKeys = map[string]BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
+		Config().BucketKeys = map[string]BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
 		bucket, err := openDumpsBucket(context.Background())
 		if err == nil {
 			err = loadScrapersNG(bucket, nil)

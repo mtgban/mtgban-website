@@ -120,7 +120,7 @@ type tcgListingsRow struct {
 // trying a failed day again. A datastore reload keeps the day's counts: card
 // ids outlast it, and a card it adds gets counts with the next scrape.
 func (s *site) loadTCGListings() {
-	game, found := gameMap[Config.Game]
+	game, found := gameMap[Config().Game]
 	if !found || SkipNewspaper || NewNewspaperDB == nil {
 		return
 	}

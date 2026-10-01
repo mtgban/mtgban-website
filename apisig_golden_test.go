@@ -124,17 +124,7 @@ func TestAPISignatureGolden(t *testing.T) {
 }
 
 func TestGenerateAPIKeyMatchesApisig(t *testing.T) {
-	apiUsersMutex.Lock()
-	if Config.APIUserSecrets == nil {
-		Config.APIUserSecrets = map[string]string{}
-	}
-	Config.APIUserSecrets["golden@example.com"] = goldenSecret
-	apiUsersMutex.Unlock()
-	t.Cleanup(func() {
-		apiUsersMutex.Lock()
-		delete(Config.APIUserSecrets, "golden@example.com")
-		apiUsersMutex.Unlock()
-	})
+	withAPIUserSecret(t, "golden@example.com", goldenSecret)
 
 	// Duration 0 means no Expires, so the output is deterministic.
 	got, err := generateAPIKey(context.Background(), "golden@example.com", 0)
@@ -178,17 +168,7 @@ func TestEnforceAPISigningDoesNotNeedServerURL(t *testing.T) {
 
 	withSigMode(t, false, true)
 
-	apiUsersMutex.Lock()
-	if Config.APIUserSecrets == nil {
-		Config.APIUserSecrets = map[string]string{}
-	}
-	Config.APIUserSecrets["golden@example.com"] = goldenSecret
-	apiUsersMutex.Unlock()
-	t.Cleanup(func() {
-		apiUsersMutex.Lock()
-		delete(Config.APIUserSecrets, "golden@example.com")
-		apiUsersMutex.Unlock()
-	})
+	withAPIUserSecret(t, "golden@example.com", goldenSecret)
 
 	called := false
 	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -223,17 +203,7 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 
 	withSigMode(t, false, true)
 
-	apiUsersMutex.Lock()
-	if Config.APIUserSecrets == nil {
-		Config.APIUserSecrets = map[string]string{}
-	}
-	Config.APIUserSecrets["golden@example.com"] = goldenSecret
-	apiUsersMutex.Unlock()
-	t.Cleanup(func() {
-		apiUsersMutex.Lock()
-		delete(Config.APIUserSecrets, "golden@example.com")
-		apiUsersMutex.Unlock()
-	})
+	withAPIUserSecret(t, "golden@example.com", goldenSecret)
 
 	blob := "QVBJPUFMTF9BQ0NFU1MmQVBJbW9kZT1hbGwmU2lnbmF0dXJlPU1tY0ZWZjBOMlBySzNvOHprOU81WWREcXo0ZyUzRCZVc2VyRW1haWw9Z29sZGVuJTQwZXhhbXBsZS5jb20="
 	const wantErr = `{"error": "invalid or expired signature"}`

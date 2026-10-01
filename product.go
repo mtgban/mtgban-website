@@ -720,7 +720,7 @@ const tcgCatalogFile = "tcgplayer-catalog.json.xz"
 // tcgCatalogPath returns the bucket path of the catalog dump: a sibling of
 // the datastore file, so it lives in the same place and bucket.
 func tcgCatalogPath() string {
-	p := Config.DatastorePath
+	p := Config().DatastorePath
 	if i := strings.LastIndex(p, "/"); i >= 0 {
 		return p[:i+1] + tcgCatalogFile
 	}
@@ -893,7 +893,7 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 
 	var datasetIndex int
 	var found bool
-	for _, config := range Config.TimeseriesConfig.Datasets {
+	for _, config := range Config().TimeseriesConfig.Datasets {
 		if slices.Contains(config.Buylist, store) {
 			datasetIndex = config.Index
 			found = true
@@ -918,7 +918,7 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 	// cares about.
 	var statsByCard map[timeseries.AggregatePriceKey]timeseries.AggregatePriceStats
 	source := fmt.Sprintf("dataset %d", datasetIndex)
-	if Config.TimeseriesConfig.LongFormReads {
+	if Config().TimeseriesConfig.LongFormReads {
 		provider, ok := providerForDatasetIndex(datasetIndex)
 		if !ok {
 			log.Println(store, "has no provider configured for long-form reads")

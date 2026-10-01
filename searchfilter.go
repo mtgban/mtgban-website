@@ -821,7 +821,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			// every hit to nothing. Drop it and let the game's own default
 			// take the query, the way an unrecognised mode is already
 			// dropped by the search itself.
-			if config.SearchMode == "scryfall" && Config.Game != DefaultGame {
+			if config.SearchMode == "scryfall" && Config().Game != DefaultGame {
 				config.SearchMode = ""
 			}
 		case "skip":
@@ -1501,7 +1501,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 	// Last, so the modes parsed out of the query above win, and so the checks
 	// above that read an unset mode - the Scryfall "|" syntax, the bare
 	// "<set> <number>" shorthand - still see the state they were written for.
-	if config.SearchMode == "" && Config.Game != DefaultGame {
+	if config.SearchMode == "" && Config().Game != DefaultGame {
 		config.SearchMode = "any"
 	}
 

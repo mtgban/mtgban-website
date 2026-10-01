@@ -442,12 +442,12 @@ func TestLoadCKHistoryKeepsTheLastLoad(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 
-	prevDB, prevGame, prevSkip, prevHistory := NewNewspaperDB, Config.Game, SkipNewspaper, ckHistoryPtr.Load()
+	prevDB, prevGame, prevSkip, prevHistory := NewNewspaperDB, Config().Game, SkipNewspaper, ckHistoryPtr.Load()
 	t.Cleanup(func() {
-		NewNewspaperDB, Config.Game, SkipNewspaper = prevDB, prevGame, prevSkip
+		NewNewspaperDB, Config().Game, SkipNewspaper = prevDB, prevGame, prevSkip
 		ckHistoryPtr.Store(prevHistory)
 	})
-	NewNewspaperDB, Config.Game, SkipNewspaper = db, DefaultGame, false
+	NewNewspaperDB, Config().Game, SkipNewspaper = db, DefaultGame, false
 
 	last := &ckHistorySnapshot{Products: map[string]ckHistory{"1": {}}}
 	ckHistoryPtr.Store(last)

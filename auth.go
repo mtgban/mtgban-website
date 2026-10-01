@@ -218,9 +218,9 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the access token for this connection
-	source := Config.Patreon.Source
-	clientID := Config.Patreon.Client[source]
-	secret := Config.Patreon.Secret[source]
+	source := Config().Patreon.Source
+	clientID := Config().Patreon.Client[source]
+	secret := Config().Patreon.Secret[source]
 	tokens, err := patreon.GetAuthToken(r.Context(), clientID, secret, origin, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
@@ -516,9 +516,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		}
 
 		secret := os.Getenv("BAN_SECRET")
-		apiUsersMutex.RLock()
-		userSecret, found := Config.APIUserSecrets[v.Get("UserEmail")]
-		apiUsersMutex.RUnlock()
+		userSecret, found := Config().APIUserSecrets[v.Get("UserEmail")]
 		if found {
 			secret = userSecret
 		}
@@ -782,7 +780,7 @@ var SignedFields = slices.Concat(OrderNav, OptionalFields)
 // API identity, while local development keeps the historical localhost link.
 func signatureLink() string {
 	if DevMode {
-		return "http://localhost:" + fmt.Sprint(Config.Port)
+		return "http://localhost:" + fmt.Sprint(Config().Port)
 	}
 	return DefaultServerURL
 }

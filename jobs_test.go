@@ -121,12 +121,12 @@ func TestCKSignalsReport(t *testing.T) {
 // recovery once.
 func TestCheckJobHealthAnnouncesTransitions(t *testing.T) {
 	setTestJobs(t)
-	prevState, prevNotify, prevGame := staleAlarmState.stale, notifyStale, Config.Game
+	prevState, prevNotify, prevGame := staleAlarmState.stale, notifyStale, Config().Game
 	t.Cleanup(func() {
-		staleAlarmState.stale, notifyStale, Config.Game = prevState, prevNotify, prevGame
+		staleAlarmState.stale, notifyStale, Config().Game = prevState, prevNotify, prevGame
 	})
 	staleAlarmState.stale = map[string]bool{}
-	Config.Game = DefaultGame
+	Config().Game = DefaultGame
 	var notices []string
 	notifyStale = func(kind, message string) error {
 		notices = append(notices, message)

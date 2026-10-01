@@ -188,19 +188,16 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   `s.datastore()` (never nil, even before the first load) or `s.backend()`
   for the backend alone; entry points read either once and pass `b`/`ds`
   down to what they call.
-- `Config` is loaded once, then swapped whole by a `?reboot=config`
-  reload (`reloadConfig`, main.go) or a config-editor save (`saveConfig`,
-  admin.go), under `apiUsersMutex`, which the per-user API secret
-  lookups read behind.
-  Those two and a new API key (`generateAPIKey`) also hold `configMu`
-  across their file I/O, so none lands inside another; the lookups never
-  wait on it. That I/O gives up after `configFileTimeout` (30 s), so a
+- The config lives behind `liveConfig` (`atomic.Pointer[ConfigType]`,
+  main.go) and is read through `Config()`, never nil. A `?reboot=config`
+  reload (`reloadConfig`), a config-editor save (`saveConfig`, admin.go)
+  and a new API key (`generateAPIKey`) each build a new value whole and
+  publish it; nothing writes into the live one, so readers take no lock.
+  Those three hold `configMu` across their file I/O, so none lands inside
+  another. That I/O gives up after `configFileTimeout` (30 s), so a
   bucket that stops answering holds the lock that long at most. The
   reload reads the running port and paths it keeps under `configMu` too,
   so they are the ones a save it waited on set.
-  The admin page reads the secrets under `apiUsersMutex` too, to list
-  the API users and fill the config editor, so it never waits on the
-  bucket either.
 - Affiliate data sits behind `affiliatesMu`/`affiliatesPtr`.
 
 **Panics.** A panic in a handler behind one of the three signing wrappers

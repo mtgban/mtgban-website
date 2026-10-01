@@ -47,7 +47,7 @@ type DatasetConfig struct {
 // the config. Used by the read callers (aggregate stats, movers) that still take
 // an index. Returns false if no dataset carries that index or its provider is unset.
 func providerForDatasetIndex(index int) (int16, bool) {
-	for _, c := range Config.TimeseriesConfig.Datasets {
+	for _, c := range Config().TimeseriesConfig.Datasets {
 		if c.Index == index {
 			return c.Provider, c.Provider != 0
 		}
@@ -58,7 +58,7 @@ func providerForDatasetIndex(index int) (int16, bool) {
 // earliestChartDate returns the oldest on-record date for a card (bounded by the
 // lookback), reading from the long tables or the legacy wide table per the flag.
 func earliestChartDate(ctx context.Context, uuid string, isFoil, isEtched bool, lb timeseries.Lookback) (time.Time, error) {
-	if Config.TimeseriesConfig.LongFormReads {
+	if Config().TimeseriesConfig.LongFormReads {
 		return PricesArchiveDB.GetEarliestDateLong(ctx, uuid, isFoil, isEtched, lb)
 	}
 	return PricesArchiveDB.GetEarliestDate(ctx, uuid, isFoil, isEtched, lb)
@@ -184,7 +184,7 @@ func getDatasets(ctx context.Context, b *mtgmatcher.Backend, cardID string, seal
 	// Pre-filter applicable configs so we don't pay for a DB round-trip
 	// or a UUID lookup when nothing will render.
 	var configs []DatasetConfig
-	for _, c := range Config.TimeseriesConfig.Datasets {
+	for _, c := range Config().TimeseriesConfig.Datasets {
 		if sealed && !c.HasSealed {
 			continue
 		}
@@ -205,7 +205,7 @@ func getDatasets(ctx context.Context, b *mtgmatcher.Backend, cardID string, seal
 
 	datasets := make([]Dataset, 0, len(configs))
 
-	if Config.TimeseriesConfig.LongFormReads {
+	if Config().TimeseriesConfig.LongFormReads {
 		results, err := PricesArchiveDB.HGetAllLong(ctx, co.UUID, co.Foil, co.Etched, lb)
 		if err != nil {
 			log.Println(err)
@@ -261,10 +261,10 @@ func chartProviders() []providerDisplay {
 // leaves the registry empty rather than charting a display the config never
 // asked for.
 func buildProviderRegistry() {
-	longForm := Config.TimeseriesConfig.LongFormReads || Config.TimeseriesConfig.LongFormWrites
+	longForm := Config().TimeseriesConfig.LongFormReads || Config().TimeseriesConfig.LongFormWrites
 	seen := map[int16]bool{}
-	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets))
-	for _, d := range Config.TimeseriesConfig.Datasets {
+	registry := make([]providerDisplay, 0, len(Config().TimeseriesConfig.Datasets))
+	for _, d := range Config().TimeseriesConfig.Datasets {
 		if d.Provider == 0 {
 			if longForm {
 				log.Printf("dataset %q (index %d) has no \"provider\" id in the config: it won't chart, dual-write, or screen",
@@ -712,7 +712,7 @@ func (s *site) stashInTimeseries() {
 		if Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
 			continue
 		}
-		for _, config := range Config.TimeseriesConfig.Datasets {
+		for _, config := range Config().TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Retail, seller.Info().Shorthand) {
 				continue
 			}
@@ -750,7 +750,7 @@ func (s *site) stashInTimeseries() {
 		if Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
 			continue
 		}
-		for _, config := range Config.TimeseriesConfig.Datasets {
+		for _, config := range Config().TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Buylist, vendor.Info().Shorthand) {
 				continue
 			}
@@ -793,7 +793,7 @@ func (s *site) stashInTimeseries() {
 	// Best-effort: a long-form failure is logged but does not fail the stash,
 	// since the legacy wide upsert above already persisted this snapshot.
 	var problem string
-	if Config.TimeseriesConfig.LongFormWrites {
+	if Config().TimeseriesConfig.LongFormWrites {
 		if n, lerr := stashLongForm(context.Background(), accumulated); lerr != nil {
 			ServerNotify("timeseries", fmt.Sprintf("long-form dual-write error: %s", lerr))
 			problem = fmt.Sprintf("failed the long-form write: %s", lerr)
@@ -827,16 +827,16 @@ func (s *site) stashInTimeseries() {
 // falls back to the whole table, correct but fat.
 func variantCacheScope() timeseries.VariantScope {
 	var scope timeseries.VariantScope
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		scope.Magic = true
 	} else if id := GetTCGCategoryID(); id != 0 {
 		scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, id)
 	} else {
-		log.Printf("variant cache: no catalog loaded for game %q, warming every game", Config.Game)
+		log.Printf("variant cache: no catalog loaded for game %q, warming every game", Config().Game)
 		return timeseries.VariantScope{}
 	}
-	if Config.TCGCSVConfig != nil {
-		for _, game := range Config.TCGCSVConfig.Games {
+	if Config().TCGCSVConfig != nil {
+		for _, game := range Config().TCGCSVConfig.Games {
 			if !slices.Contains(scope.TCGCategoryIDs, game.CategoryID) {
 				scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, game.CategoryID)
 			}
@@ -854,7 +854,7 @@ func variantCacheScope() timeseries.VariantScope {
 // where it could do anything about one, and a cold cache costs round-trips
 // rather than answers.
 func warmVariantCacheIfEnabled() {
-	if !Config.TimeseriesConfig.LongFormWrites && !Config.TimeseriesConfig.LongFormReads {
+	if !Config().TimeseriesConfig.LongFormWrites && !Config().TimeseriesConfig.LongFormReads {
 		return
 	}
 	if PricesArchiveDB == nil {
@@ -900,7 +900,7 @@ func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.Price
 			log.Println("long-form: resolve ban_id:", err)
 			continue
 		}
-		for _, ds := range Config.TimeseriesConfig.Datasets {
+		for _, ds := range Config().TimeseriesConfig.Datasets {
 			if ds.Provider == 0 {
 				continue
 			}

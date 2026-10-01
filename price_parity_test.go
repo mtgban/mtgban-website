@@ -466,13 +466,13 @@ func TestApiEnabledStores(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	prevRetail := Config.SearchRetailBlockList
-	prevBuylist := Config.SearchBuylistBlockList
-	Config.SearchRetailBlockList = []string{"PARITYIDX"}
-	Config.SearchBuylistBlockList = []string{"PARITYV"}
+	prevRetail := Config().SearchRetailBlockList
+	prevBuylist := Config().SearchBuylistBlockList
+	Config().SearchRetailBlockList = []string{"PARITYIDX"}
+	Config().SearchBuylistBlockList = []string{"PARITYV"}
 	t.Cleanup(func() {
-		Config.SearchRetailBlockList = prevRetail
-		Config.SearchBuylistBlockList = prevBuylist
+		Config().SearchRetailBlockList = prevRetail
+		Config().SearchBuylistBlockList = prevBuylist
 	})
 
 	got := apiEnabledStores("ALL_ACCESS")
@@ -602,13 +602,13 @@ func TestBaseAccessStoreEligible(t *testing.T) {
 // config blocklists apply, a sig can replace them with its own list, and
 // NONE disables them.
 func TestGetDefaultBlocklists(t *testing.T) {
-	prevRetail := Config.SearchRetailBlockList
-	prevBuylist := Config.SearchBuylistBlockList
-	Config.SearchRetailBlockList = []string{"RBLOCK"}
-	Config.SearchBuylistBlockList = []string{"BBLOCK"}
+	prevRetail := Config().SearchRetailBlockList
+	prevBuylist := Config().SearchBuylistBlockList
+	Config().SearchRetailBlockList = []string{"RBLOCK"}
+	Config().SearchBuylistBlockList = []string{"BBLOCK"}
 	t.Cleanup(func() {
-		Config.SearchRetailBlockList = prevRetail
-		Config.SearchBuylistBlockList = prevBuylist
+		Config().SearchRetailBlockList = prevRetail
+		Config().SearchBuylistBlockList = prevBuylist
 	})
 
 	retail, buylist := getDefaultBlocklists("")

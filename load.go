@@ -295,7 +295,7 @@ func onlyStores(idx *scraperIndex, stores []string) *scraperIndex {
 // loadScrapersNG lists the dumps in bucket, publishes the index and loads
 // every dump. A non-empty stores narrows both to those stores.
 func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
-	idx, err := listDumpsWithRetry(bucket, Config.Game, string(Config.Game)+"/")
+	idx, err := listDumpsWithRetry(bucket, Config().Game, string(Config().Game)+"/")
 	if err != nil {
 		return fmt.Errorf("listing dumps: %w", err)
 	}
@@ -339,7 +339,7 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 	// the summary reports it and loadScraperWithRetry has already logged it.
 	mtgban.WorkerPool(context.Background(), scraperLoadConcurrency, loads,
 		func(ctx context.Context, load scraperLoad, results chan<- loadResult) error {
-			err := loadScraperWithRetry(bucket, Config.Game, load.name, load.kind, load.shorthand)
+			err := loadScraperWithRetry(bucket, Config().Game, load.name, load.kind, load.shorthand)
 			results <- loadResult{
 				entry: fmt.Sprintf("%s/%s/%s", load.name, load.kind, load.shorthand),
 				err:   err,

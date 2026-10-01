@@ -258,10 +258,10 @@ func (c *refusingConnector) Driver() driver.Driver { return nil }
 // before a datastore is loaded: it would match nothing, and hold off the
 // run the datastore's own load starts.
 func TestLoadTCGListingsWaitsForADatastore(t *testing.T) {
-	prevDB, prevGame, prevSkip := NewNewspaperDB, Config.Game, SkipNewspaper
-	t.Cleanup(func() { NewNewspaperDB, Config.Game, SkipNewspaper = prevDB, prevGame, prevSkip })
+	prevDB, prevGame, prevSkip := NewNewspaperDB, Config().Game, SkipNewspaper
+	t.Cleanup(func() { NewNewspaperDB, Config().Game, SkipNewspaper = prevDB, prevGame, prevSkip })
 	conn := &refusingConnector{}
-	NewNewspaperDB, Config.Game, SkipNewspaper = sql.OpenDB(conn), DefaultGame, false
+	NewNewspaperDB, Config().Game, SkipNewspaper = sql.OpenDB(conn), DefaultGame, false
 
 	s := newSite()
 	s.loadTCGListings()

@@ -25,9 +25,7 @@ const apiGatewayUser = "gateway@mtgban.com"
 // apiGatewaySecret is the shared secret for this site, empty when the
 // gateway is not configured, which turns the handoffs off.
 func apiGatewaySecret() string {
-	apiUsersMutex.RLock()
-	defer apiUsersMutex.RUnlock()
-	return Config.APIUserSecrets[apiGatewayUser]
+	return Config().APIUserSecrets[apiGatewayUser]
 }
 
 // APITrial hands a pledged supporter to the gateway to start a trial.
@@ -91,7 +89,7 @@ func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path 
 		Email:   email,
 		Name:    GetParamFromSig(sig, "UserName"),
 		Purpose: purpose,
-		Game:    string(Config.Game),
+		Game:    string(Config().Game),
 		Nonce:   nonce,
 		Expires: time.Now().Add(apihandoff.TTL),
 	})
@@ -100,7 +98,7 @@ func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path 
 	if rt := r.FormValue("return_to"); trustedReturnTo(rt) {
 		q.Set("return_to", rt)
 	}
-	http.Redirect(w, r, Config.APIGateway.URL+path+"?"+q.Encode(), http.StatusFound)
+	http.Redirect(w, r, Config().APIGateway.URL+path+"?"+q.Encode(), http.StatusFound)
 }
 
 // trustedReturnTo is true for an absolute http(s) URL on one of our hosts.

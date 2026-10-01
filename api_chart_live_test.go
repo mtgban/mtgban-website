@@ -42,13 +42,13 @@ func TestChartDataAPILive(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 
 	defer func(db *timeseries.Client, ts TimeseriesConfig, reg []providerDisplay, dev, sig bool) {
-		PricesArchiveDB, Config.TimeseriesConfig = db, ts
+		PricesArchiveDB, Config().TimeseriesConfig = db, ts
 		providerRegistry.Store(&reg)
 		DevMode, SigCheck = dev, sig
-	}(PricesArchiveDB, Config.TimeseriesConfig, chartProviders(), DevMode, SigCheck)
+	}(PricesArchiveDB, Config().TimeseriesConfig, chartProviders(), DevMode, SigCheck)
 
 	PricesArchiveDB = client
-	Config.TimeseriesConfig = cfg.TimeseriesConfig
+	Config().TimeseriesConfig = cfg.TimeseriesConfig
 	buildProviderRegistry()
 	// Without this the lookback is unbounded in dev, and the point here is
 	// that the range bounds what gets read.

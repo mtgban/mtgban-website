@@ -19,10 +19,36 @@ import (
 	"github.com/mtgban/simplecloud"
 )
 
-// A reload and an editor save each swap Config whole while API requests look
-// their secrets up, as apiGatewaySecret does, under apiUsersMutex. Unless the
-// swap takes it too, -race reports the two.
-func TestConfigSwapDoesNotRaceSecretLookups(t *testing.T) {
+// withConfigCopy publishes a copy of the live config for the test to change,
+// and the config before it again when the test ends.
+func withConfigCopy(t *testing.T) {
+	t.Helper()
+	saved := Config()
+	config := *saved
+	liveConfig.Store(&config)
+	t.Cleanup(func() { liveConfig.Store(saved) })
+}
+
+// withAPIUserSecret publishes a config in which user holds secret, and the
+// config before it again when the test ends.
+func withAPIUserSecret(t *testing.T, user, secret string) {
+	t.Helper()
+	saved := Config()
+	config := *saved
+	config.APIUserSecrets = maps.Clone(saved.APIUserSecrets)
+	if config.APIUserSecrets == nil {
+		config.APIUserSecrets = map[string]string{}
+	}
+	config.APIUserSecrets[user] = secret
+	liveConfig.Store(&config)
+	t.Cleanup(func() { liveConfig.Store(saved) })
+}
+
+// A reload and an editor save each publish a new config while requests read
+// the live one: API secrets, as apiGatewaySecret does, and any field, as
+// every handler does, with no lock. -race reports a write into a config a
+// request can see.
+func TestConfigSwapDoesNotRaceReaders(t *testing.T) {
 	path := withConfigFile(t)
 	writeTestConfig(t, path, `{"api_user_secrets": {"gateway@mtgban.com": "a"}}`)
 	err := loadVars("", "", "", "")
@@ -42,6 +68,8 @@ func TestConfigSwapDoesNotRaceSecretLookups(t *testing.T) {
 					return
 				default:
 					apiGatewaySecret()
+					_ = string(Config().Game) + Config().Port
+					_ = len(Config().SearchRetailBlockList)
 				}
 			}
 		})
@@ -164,9 +192,9 @@ func TestNewKeySurvivesAConfigReloadOrSave(t *testing.T) {
 
 			duringSave(t, c.first, c.second)
 
-			_, found := Config.APIUserSecrets[user]
+			_, found := Config().APIUserSecrets[user]
 			if !found {
-				t.Errorf("api_user_secrets %v: the new key is gone", Config.APIUserSecrets)
+				t.Errorf("api_user_secrets %v: the new key is gone", Config().APIUserSecrets)
 			}
 			saved := savedSecrets(t, path)
 			_, found = saved[user]
@@ -198,8 +226,8 @@ func TestConfigReloadKeepsTheSavedPortAndPaths(t *testing.T) {
 
 	duringSave(t, save, reloadConfig)
 
-	if Config.Port != "8081" || Config.DatastorePath != "new.json.xz" {
-		t.Errorf("port %q, datastore path %q, want the saved 8081 and new.json.xz", Config.Port, Config.DatastorePath)
+	if Config().Port != "8081" || Config().DatastorePath != "new.json.xz" {
+		t.Errorf("port %q, datastore path %q, want the saved 8081 and new.json.xz", Config().Port, Config().DatastorePath)
 	}
 }
 
@@ -228,8 +256,8 @@ func TestNewKeysAtOnceDoNotRace(t *testing.T) {
 	admins.Wait()
 
 	saved := savedSecrets(t, path)
-	if len(saved) != 41 || !maps.Equal(saved, Config.APIUserSecrets) {
-		t.Errorf("%d secrets in the file, %d in Config, want the same 41", len(saved), len(Config.APIUserSecrets))
+	if len(saved) != 41 || !maps.Equal(saved, Config().APIUserSecrets) {
+		t.Errorf("%d secrets in the file, %d in Config, want the same 41", len(saved), len(Config().APIUserSecrets))
 	}
 }
 
@@ -281,7 +309,7 @@ func TestNewKeyWhoseSaveFailsIsNotKept(t *testing.T) {
 					t.Errorf("link %q, error %v: a key that was not saved was handed out", link, err)
 				}
 			}
-			_, found := Config.APIUserSecrets["new@example.com"]
+			_, found := Config().APIUserSecrets["new@example.com"]
 			if found {
 				t.Error("the key that was not saved is live")
 			}
@@ -349,8 +377,8 @@ func (b *stuckReadBucket) NewReader(ctx context.Context, path string) (io.ReadCl
 }
 
 // A reload holds configMu across its read of the config file, for up to
-// configFileTimeout. The admin page reads the config under apiUsersMutex
-// alone, so it still renders while that read hangs.
+// configFileTimeout. The admin page reads the live config without taking
+// it, so it still renders while that read hangs.
 func TestAdminPageRendersWhileAConfigReadHangs(t *testing.T) {
 	path := withConfigFile(t)
 	writeTestConfig(t, path, `{"api_user_secrets": {"kept@example.com": "a"}}`)

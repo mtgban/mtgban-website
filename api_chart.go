@@ -79,7 +79,7 @@ func (s *site) ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	// Long-form reads unlock charting by any id (ban:, tcg:, scryfall:, mtgjson:,
 	// bare uuid/number) and non-Magic products. The legacy path below stays
 	// mtgjson-uuid only.
-	if Config.TimeseriesConfig.LongFormReads {
+	if Config().TimeseriesConfig.LongFormReads {
 		chartDataAPILong(ds, w, r, uuid)
 		return
 	}

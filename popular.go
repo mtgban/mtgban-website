@@ -43,7 +43,7 @@ var (
 // rebuilt whenever the configured queries change (e.g. after a config
 // reload) or while the datastore is still loading.
 func getPopularSearches(ds *datastore) []PopularSearch {
-	cfg := Config.PopularSearches
+	cfg := Config().PopularSearches
 
 	popularSearchesMu.Lock()
 	defer popularSearchesMu.Unlock()

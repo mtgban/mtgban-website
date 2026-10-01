@@ -12,13 +12,10 @@ import (
 // value for one test, restoring the config and the published value after.
 func withAffiliateConfig(t *testing.T, path string) {
 	t.Helper()
-	saved := Config
+	withConfigCopy(t)
 	savedValue := affiliatesPtr.Load()
-	t.Cleanup(func() {
-		Config = saved
-		affiliatesPtr.Store(savedValue)
-	})
-	Config.AffiliatesPath = path
+	t.Cleanup(func() { affiliatesPtr.Store(savedValue) })
+	Config().AffiliatesPath = path
 }
 
 // With no path configured, both Load and Save refuse rather than reaching
@@ -97,7 +94,7 @@ func TestLoadAffiliatesKeepsTheValueOnError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	Config.AffiliatesPath = filepath.Join(t.TempDir(), "nope.json")
+	Config().AffiliatesPath = filepath.Join(t.TempDir(), "nope.json")
 	if err := loadAffiliates(context.Background()); err == nil {
 		t.Fatal("missing affiliates path did not error")
 	}

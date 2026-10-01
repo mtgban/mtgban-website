@@ -10,8 +10,8 @@ import (
 // subtitle the searcher rarely types from the front of. Magic keeps the
 // exact-then-prefix default. Anything the query names itself wins on both.
 func TestDefaultSearchModePerGame(t *testing.T) {
-	prev := Config.Game
-	t.Cleanup(func() { Config.Game = prev })
+	prev := Config().Game
+	t.Cleanup(func() { Config().Game = prev })
 
 	for _, tc := range []struct {
 		name  string
@@ -42,7 +42,7 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 		{"scryfall is dropped on onepiece", "onepiece", "luffy sm:scryfall", "any"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			Config.Game = tc.game
+			Config().Game = tc.game
 			config := parseSearchOptionsNG(backend(), tc.query, nil, nil, nil)
 			if config.SearchMode != tc.want {
 				t.Errorf("game %q, query %q: SearchMode = %q, want %q",
@@ -55,9 +55,9 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 // Dropping the mode must not leave its text in the query: the option is
 // stripped before the mode is read, so what is left is the name alone.
 func TestDroppedScryfallLeavesNoResidue(t *testing.T) {
-	prev := Config.Game
-	t.Cleanup(func() { Config.Game = prev })
-	Config.Game = "lorcana"
+	prev := Config().Game
+	t.Cleanup(func() { Config().Game = prev })
+	Config().Game = "lorcana"
 
 	config := parseSearchOptionsNG(backend(), "mickey sm:scryfall", nil, nil, nil)
 	if config.CleanQuery != "mickey" {
@@ -71,9 +71,9 @@ func TestDroppedScryfallLeavesNoResidue(t *testing.T) {
 // The sealed handlers assign their mode after the parse, so the per-game
 // default must not survive into a sealed search.
 func TestSealedOverridesTheGameDefault(t *testing.T) {
-	prev := Config.Game
-	t.Cleanup(func() { Config.Game = prev })
-	Config.Game = "lorcana"
+	prev := Config().Game
+	t.Cleanup(func() { Config().Game = prev })
+	Config().Game = "lorcana"
 
 	config := parseSearchOptionsNG(backend(), "illumineer's quest", nil, nil, nil)
 	if config.SearchMode != "any" {

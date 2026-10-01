@@ -53,7 +53,7 @@ func GetKeyOverrides() KeyOverrides {
 // keyOverridesPath returns the bucket path of the overrides file: a sibling of
 // the main config file, so it lives in the same place and bucket.
 func keyOverridesPath() string {
-	p := Config.sourcePath
+	p := Config().sourcePath
 	if i := strings.LastIndex(p, "/"); i >= 0 {
 		return p[:i+1] + keyOverridesFile
 	}
@@ -198,7 +198,7 @@ func reloadOverriddenScrapers(shorthands map[string]struct{}) {
 						if err != nil {
 							log.Printf("override reload %s/%s/%s: %v", name, kind, shorthand, err)
 						}
-					}(DataBucket, Config.Game, name, kind, shorthand)
+					}(DataBucket, Config().Game, name, kind, shorthand)
 				}
 			}
 		}

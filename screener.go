@@ -22,8 +22,8 @@ type ScreenerMetric struct {
 }
 
 func screenerMetricList() []ScreenerMetric {
-	out := make([]ScreenerMetric, 0, len(Config.TimeseriesConfig.Datasets))
-	for _, d := range Config.TimeseriesConfig.Datasets {
+	out := make([]ScreenerMetric, 0, len(Config().TimeseriesConfig.Datasets))
+	for _, d := range Config().TimeseriesConfig.Datasets {
 		out = append(out, ScreenerMetric{Index: d.Index, Name: d.PublicName})
 	}
 	return out
@@ -46,7 +46,7 @@ var screenerWindows = []ScreenerWindow{
 }
 
 func validMetric(index int) bool {
-	for _, d := range Config.TimeseriesConfig.Datasets {
+	for _, d := range Config().TimeseriesConfig.Datasets {
 		if d.Index == index {
 			return true
 		}
@@ -285,7 +285,7 @@ func gameTCGCategory() int {
 	if id := GetTCGCategoryID(); id > 0 {
 		return id
 	}
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		return timeseries.CategoryMagic
 	}
 	return -1
@@ -293,14 +293,14 @@ func gameTCGCategory() int {
 
 // overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
-	if Config.TimeseriesConfig.LongFormReads {
+	if Config().TimeseriesConfig.LongFormReads {
 		provider, ok := providerForDatasetIndex(metric)
 		if !ok {
 			return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
 		}
 		category := gameTCGCategory()
 		if category < 0 {
-			return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config.Game)
+			return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config().Game)
 		}
 		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice, category)
 	}

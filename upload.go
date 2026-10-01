@@ -497,7 +497,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// a card by an identifier only Magic cards carry - a Scryfall id for the
 	// estimate, a Deckbox id for the CSV. Anywhere else the export has nothing
 	// to name the cards with, so the page does not offer it.
-	magicOnlyExports := Config.Game == DefaultGame
+	magicOnlyExports := Config().Game == DefaultGame
 
 	// Set flags needed to show elements on the page ui
 	pageVars.IsBuylist = blMode
@@ -520,7 +520,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	})
 	sealedSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && info.SealedMode &&
-			!slices.Contains(Config.UploadSealedBlockList, info.Shorthand)
+			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
 	})
 	singlesVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode &&
@@ -528,7 +528,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	})
 	sealedVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
 		return info.SealedMode &&
-			!slices.Contains(Config.UploadSealedBlockList, info.Shorthand)
+			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
 	})
 
 	// Set the store names for the <select> box
@@ -925,7 +925,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		link, err := cardconduit.SendEstimate(r.Context(), Config.API["cardconduit"], items)
+		link, err := cardconduit.SendEstimate(r.Context(), Config().API["cardconduit"], items)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to process your list to CardConduit right now"
@@ -1399,7 +1399,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				if priceSource == "credit" {
 					price *= credits[shorthand]
 				} else if priceSource == "marketCredit" {
-					price *= credits[shorthand] * Config.BuylistMarketCredit[shorthand]
+					price *= credits[shorthand] * Config().BuylistMarketCredit[shorthand]
 				}
 			}
 
@@ -2018,7 +2018,7 @@ func loadMoxfield(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.Contains(link, "://") {
 		return nil, "", errors.New("invalid Moxfield deck URL")
 	}
-	base, err := url.Parse(Config.Uploader["moxfield"])
+	base, err := url.Parse(Config().Uploader["moxfield"])
 	if err != nil {
 		return nil, "", errors.New("invalid Moxfield uploader configuration")
 	}
@@ -2075,12 +2075,12 @@ func loadManabox(ctx context.Context, b *mtgmatcher.Backend, link string, maxRow
 // proxy, which carries a browser TLS fingerprint - direct fetches from
 // datacenter IPs get blocked by Cloudflare) and matches its products.
 func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
-	proxyBase := Config.Uploader["collectr"]
+	proxyBase := Config().Uploader["collectr"]
 	if proxyBase == "" {
 		return nil, "", errors.New("no Collectr proxy is configured")
 	}
 
-	items, err := collectr.Load(ctx, proxyBase, link, Config.Game, maxRows)
+	items, err := collectr.Load(ctx, proxyBase, link, Config().Game, maxRows)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to fetch Collectr showcase: %w", err)
 	}

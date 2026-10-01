@@ -37,14 +37,14 @@ func TestEveryRegisteredGameIsNamed(t *testing.T) {
 // degrades safely when no catalog is loaded: it widens to the whole table
 // rather than resolving to nothing.
 func TestVariantScopeWithoutCatalog(t *testing.T) {
-	origGame := Config.Game
-	t.Cleanup(func() { Config.Game = origGame })
+	origGame := Config().Game
+	t.Cleanup(func() { Config().Game = origGame })
 
 	for _, game := range registeredGames {
 		if game == DefaultGame {
 			continue
 		}
-		Config.Game = game
+		Config().Game = game
 		scope := variantCacheScope()
 		if scope.Magic || len(scope.TCGCategoryIDs) != 0 {
 			t.Errorf("game %q with no catalog: scope is %+v, want the unscoped fallback", game, scope)
@@ -53,9 +53,9 @@ func TestVariantScopeWithoutCatalog(t *testing.T) {
 }
 
 func TestVariantCacheScope(t *testing.T) {
-	origGame, origTCGCSV, origCatalog := Config.Game, Config.TCGCSVConfig, tcgCatalogPtr.Load()
+	origGame, origTCGCSV, origCatalog := Config().Game, Config().TCGCSVConfig, tcgCatalogPtr.Load()
 	t.Cleanup(func() {
-		Config.Game, Config.TCGCSVConfig = origGame, origTCGCSV
+		Config().Game, Config().TCGCSVConfig = origGame, origTCGCSV
 		tcgCatalogPtr.Store(origCatalog)
 	})
 
@@ -128,7 +128,7 @@ func TestVariantCacheScope(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			Config.Game, Config.TCGCSVConfig = tc.game, tc.tcgcsv
+			Config().Game, Config().TCGCSVConfig = tc.game, tc.tcgcsv
 			if tc.catalog != 0 {
 				tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: tc.catalog})
 			} else {

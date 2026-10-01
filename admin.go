@@ -119,7 +119,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		if !found {
 			v.Set("msg", refresh+" not found")
 		} else {
-			err := sendGithubAction(Config.Game, refresh)
+			err := sendGithubAction(Config().Game, refresh)
 			if err != nil {
 				v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
 			} else {
@@ -134,7 +134,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	if reload != "" {
 		v := url.Values{}
 		v.Set("msg", reload+" reloaded")
-		err := loadScraper(DataBucket, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"))
+		err := loadScraper(DataBucket, Config().Game, reload, r.FormValue("table"), r.FormValue("tag"))
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
 		}
@@ -176,7 +176,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		// If it's not a Page, look if the last listing named it as a store
 		_, found = currentScraperIndex().byStore[logs]
 		if found {
-			link := fmt.Sprintf(gaLogURL, newBantoolWorkflow(Config.Game, logs).File)
+			link := fmt.Sprintf(gaLogURL, newBantoolWorkflow(Config().Game, logs).File)
 			http.Redirect(w, r, link, http.StatusFound)
 			return
 		}
@@ -190,11 +190,11 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	var v url.Values
 	switch reboot {
 	case "datastore", "datastore-backup":
-		dsPath := Config.DatastorePath
+		dsPath := Config().DatastorePath
 		if reboot == "datastore-backup" {
 			// The backup may live somewhere else entirely, which used to mean
 			// building a second bucket by hand. The path names where it is.
-			dsPath = Config.Datastore.BackupPath
+			dsPath = Config().Datastore.BackupPath
 			if dsPath == "" {
 				v = url.Values{}
 				v.Set("msg", "No BackupPath set in config")
@@ -411,7 +411,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	} else {
 		pageVars.ACLText = string(aclText)
 	}
-	pageVars.ACLSource = Config.ACLPath
+	pageVars.ACLSource = Config().ACLPath
 	if pageVars.ACLSource == "" {
 		pageVars.ACLSource = "not configured"
 	}
@@ -444,7 +444,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	} else {
 		pageVars.AffiliatesText = string(affiliatesText)
 	}
-	pageVars.AffiliatesSource = Config.AffiliatesPath
+	pageVars.AffiliatesSource = Config().AffiliatesPath
 	if pageVars.AffiliatesSource == "" {
 		pageVars.AffiliatesSource = "not configured"
 	}
@@ -894,7 +894,7 @@ func queryGithubAction(file, state string) (int, error) {
 		return 0, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+Config.API["github_action_token"])
+	req.Header.Set("Authorization", "Bearer "+Config().API["github_action_token"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -933,7 +933,7 @@ func sendGithubAction(game mtgmatcher.Game, store string) error {
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+Config.API["github_action_token"])
+	req.Header.Set("Authorization", "Bearer "+Config().API["github_action_token"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -966,7 +966,7 @@ func serveRunningWorkflows(w http.ResponseWriter) {
 // simply leaves its rows as rendered. A state whose fetch panics is skipped
 // the same way, once the panic is reported.
 func runningWorkflows() []string {
-	if Config.API["github_action_token"] == "" {
+	if Config().API["github_action_token"] == "" {
 		return nil
 	}
 
@@ -1006,7 +1006,7 @@ func snapshotGithubAction(state string) ([]string, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+Config.API["github_action_token"])
+	req.Header.Set("Authorization", "Bearer "+Config().API["github_action_token"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -1068,11 +1068,6 @@ func disk() string {
 
 const DefaultAPIDemoUser = "demo@mtgban.com"
 
-// apiUsersMutex guards Config.APIUserSecrets, which API requests and the
-// admin page read under it: a new key's swap of the map, and a swap of
-// Config whole, take it for writing.
-var apiUsersMutex sync.RWMutex
-
 func writeConfigFile(config ConfigType, writer io.Writer) error {
 	e := json.NewEncoder(writer)
 	// Avoids & -> \u0026 and similar
@@ -1083,21 +1078,15 @@ func writeConfigFile(config ConfigType, writer io.Writer) error {
 
 // configEditorText is the live config as the admin editor shows it.
 func configEditorText() (string, error) {
-	apiUsersMutex.RLock()
-	defer apiUsersMutex.RUnlock()
-
 	var text bytes.Buffer
-	err := writeConfigFile(Config, &text)
+	err := writeConfigFile(*Config(), &text)
 	return text.String(), err
 }
 
 // apiUsers lists the users that hold an API secret, sorted.
 func apiUsers() []string {
-	apiUsersMutex.RLock()
-	defer apiUsersMutex.RUnlock()
-
 	var emails []string
-	for email := range Config.APIUserSecrets {
+	for email := range Config().APIUserSecrets {
 		emails = append(emails, email)
 	}
 	sort.Strings(emails)
@@ -1109,7 +1098,7 @@ func apiUsers() []string {
 func storeConfigFile(ctx context.Context, config ConfigType) error {
 	ctx, cancel := context.WithTimeout(ctx, configFileTimeout)
 	defer cancel()
-	writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config.sourcePath)
+	writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config().sourcePath)
 	if err != nil {
 		return err
 	}
@@ -1133,7 +1122,7 @@ func saveConfig(ctx context.Context, config ConfigType) error {
 	if err != nil {
 		return err
 	}
-	config.sourcePath = Config.sourcePath
+	config.sourcePath = Config().sourcePath
 	// No applyOverrides: the saved text goes live as written. With the
 	// running values, the editor would re-render the old ones and the next
 	// save would write them back to the file.
@@ -1152,7 +1141,7 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	key, found := Config.APIUserSecrets[user]
+	key, found := Config().APIUserSecrets[user]
 	if !found {
 		var err error
 		key, err = randomString(15)
@@ -1160,27 +1149,25 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 			return "", err
 		}
 
-		if Config.APIUserSecrets == nil {
+		if Config().APIUserSecrets == nil {
 			return "", errors.New("config not loaded")
 		}
 
 		// Saved before it goes live, so a save that fails, even by
 		// panicking, leaves no key behind.
-		secrets := make(map[string]string, len(Config.APIUserSecrets)+1)
-		for email, secret := range Config.APIUserSecrets {
+		secrets := make(map[string]string, len(Config().APIUserSecrets)+1)
+		for email, secret := range Config().APIUserSecrets {
 			secrets[email] = secret
 		}
 		secrets[user] = key
-		config := Config
+		config := *Config()
 		config.APIUserSecrets = secrets
 		err = storeConfigFile(ctx, config)
 		if err != nil {
 			return "", err
 		}
 
-		apiUsersMutex.Lock()
-		Config.APIUserSecrets = secrets
-		apiUsersMutex.Unlock()
+		liveConfig.Store(&config)
 	}
 
 	claims := apisig.Claims{

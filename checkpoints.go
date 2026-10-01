@@ -71,7 +71,7 @@ type ChartCheckpoint struct {
 // worth a long-lived client.
 var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		cpPath := Config.Datastore.CheckpointsPath
+		cpPath := Config().Datastore.CheckpointsPath
 		if cpPath == "" {
 			return nil, "", errors.New("checkpoints_path not configured")
 		}
@@ -95,14 +95,14 @@ var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 // Magic reads the published ban list, which is not ours to edit; every other
 // game reads the curated document on the bucket.
 func reloadCheckpoints() error {
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		return reloadBanlist(context.Background())
 	}
 
 	if err := checkpointsStore.Load(context.Background()); err != nil {
 		return err
 	}
-	cpPath := Config.Datastore.CheckpointsPath
+	cpPath := Config().Datastore.CheckpointsPath
 	source := "disk"
 	if strings.HasPrefix(cpPath, "b2://") {
 		source = "B2"
@@ -115,7 +115,7 @@ func reloadCheckpoints() error {
 // swaps the in-memory cache. Magic derives its markers instead, and has
 // nothing here to write.
 func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		return errors.New("checkpoints for Magic come from the published ban list and cannot be edited")
 	}
 	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
@@ -126,7 +126,7 @@ func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
 // `{"events": []}` document. Magic has no document to show: an empty string
 // is what tells the page to offer no editor at all.
 func currentCheckpointsJSON() (string, error) {
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		return "", nil
 	}
 	return checkpointsStore.JSON()
@@ -203,7 +203,7 @@ func multiCardCheckpoints(ds *datastore, cardNames []string, earliest time.Time)
 }
 
 func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		return banlistCheckpoints(cardName, earliest)
 	}
 

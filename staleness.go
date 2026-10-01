@@ -77,10 +77,10 @@ const staleMessageBudget = 1900
 // directly.
 var notifyStale = func(kind, message string) error {
 	log.Println(message)
-	if Config.Discord.ServerWebhookURL == "" {
+	if Config().Discord.ServerWebhookURL == "" {
 		return nil
 	}
-	return notify.Send(Config.Discord.ServerWebhookURL, kind, message, DevMode)
+	return notify.Send(Config().Discord.ServerWebhookURL, kind, message, DevMode)
 }
 
 // checkStaleness compares every served seller's and vendor's staleness
@@ -163,7 +163,7 @@ func staleLabel(kind, shorthand string) string {
 	if !ok {
 		store = "unknown store"
 	}
-	return fmt.Sprintf("%s/%s %s (%s)", Config.Game, store, kind, shorthand)
+	return fmt.Sprintf("%s/%s %s (%s)", Config().Game, store, kind, shorthand)
 }
 
 // staleAge is how long ts has been stale, in whole days (always at least 2,

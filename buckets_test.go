@@ -6,13 +6,12 @@ import "testing"
 // file, so it can never be a bucket_keys entry — which is why it needs an
 // answer of its own, ahead of the datastore fallback.
 func TestBucketCredentials(t *testing.T) {
-	saved := Config
-	t.Cleanup(func() { Config = saved })
+	withConfigCopy(t)
 
-	Config.sourcePath = "b2://mtgban-config/pokemon/config.json"
-	Config.Datastore.BucketAccessKey = "datastore-key"
-	Config.Datastore.BucketSecretKey = "datastore-secret"
-	Config.BucketKeys = map[string]BucketKey{
+	Config().sourcePath = "b2://mtgban-config/pokemon/config.json"
+	Config().Datastore.BucketAccessKey = "datastore-key"
+	Config().Datastore.BucketSecretKey = "datastore-secret"
+	Config().BucketKeys = map[string]BucketKey{
 		"mtgban-images": {AccessKey: "images-key", AccessSecret: "images-secret"},
 	}
 	t.Setenv("BAN_CONFIG_KEY", "config-key")
@@ -42,13 +41,12 @@ func TestBucketCredentials(t *testing.T) {
 // A local config path names no bucket, so nothing may match it — otherwise
 // every bucket would be "the config bucket" and take the environment's pair.
 func TestBucketCredentialsLocalConfig(t *testing.T) {
-	saved := Config
-	t.Cleanup(func() { Config = saved })
+	withConfigCopy(t)
 
-	Config.sourcePath = "config.json"
-	Config.BucketKeys = nil
-	Config.Datastore.BucketAccessKey = "datastore-key"
-	Config.Datastore.BucketSecretKey = "datastore-secret"
+	Config().sourcePath = "config.json"
+	Config().BucketKeys = nil
+	Config().Datastore.BucketAccessKey = "datastore-key"
+	Config().Datastore.BucketSecretKey = "datastore-secret"
 	t.Setenv("BAN_CONFIG_KEY", "config-key")
 	t.Setenv("BAN_CONFIG_SECRET", "config-secret")
 

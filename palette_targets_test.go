@@ -54,8 +54,8 @@ func TestPaletteArbitTargets(t *testing.T) {
 // buylist are Magic's alone. The SYP list is not among them: it is a nav
 // entry, which the palette offers wherever the nav does.
 func TestPaletteNewspaperTargets(t *testing.T) {
-	prev := Config.Game
-	t.Cleanup(func() { Config.Game = prev })
+	prev := Config().Game
+	t.Cleanup(func() { Config().Game = prev })
 
 	magic := []string{"combined_spike_score", "spike_score",
 		"greatest_increase_listings", "greatest_decrease_listings",
@@ -63,7 +63,7 @@ func TestPaletteNewspaperTargets(t *testing.T) {
 	others := []string{"spike_score", "greatest_increase_listings",
 		"greatest_decrease_listings"}
 	for _, game := range slices.Sorted(maps.Keys(gameMap)) {
-		Config.Game = game
+		Config().Game = game
 		var targets []palette.NavTarget
 		err := json.Unmarshal([]byte(palette.NewspaperTargetsJSON(paletteNewspaperPages())), &targets)
 		if err != nil {

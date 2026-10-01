@@ -598,15 +598,22 @@ func init() {
 	}
 }
 
-var Config ConfigType
+// liveConfig holds the config requests read. A load, a save or a new API
+// key publishes a new value whole; nothing writes into the live one.
+var liveConfig = func() *atomic.Pointer[ConfigType] {
+	var p atomic.Pointer[ConfigType]
+	p.Store(&ConfigType{})
+	return &p
+}()
 
-// configMu serializes what changes Config while the site serves - a reload,
-// an editor save, a new API key - each whole: what it reads of Config, its
-// file I/O and its change, so none lands inside another; its holder reads
-// Config freely. The file I/O gives up after configFileTimeout, so a bucket
-// that stops answering holds the lock that long at most. A change to the
-// API secrets also takes apiUsersMutex, inside this lock: readers that take
-// only that one never wait on the bucket.
+// Config returns the live config, for reading only.
+func Config() *ConfigType { return liveConfig.Load() }
+
+// configMu serializes what changes the config while the site serves - a
+// reload, an editor save, a new API key - each whole: what it reads of the
+// live config, its file I/O and its publish, so none lands inside another.
+// Readers never take it. The file I/O gives up after configFileTimeout, so a
+// bucket that stops answering holds the lock that long at most.
 var configMu sync.Mutex
 
 // configFileTimeout bounds each read and write of the config file.
@@ -804,7 +811,7 @@ var (
 )
 
 func offlineImagesFactory(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-	base := Config.Offline.ImagesPath
+	base := Config().Offline.ImagesPath
 	if base == "" {
 		return nil, "", errors.New("offline.images_path not configured")
 	}
@@ -964,26 +971,26 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
 
-		PatreonIDs:   Config.Patreon.Client,
+		PatreonIDs:   Config().Patreon.Client,
 		PatreonURL:   patreonURL,
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
-		GatewayURL:   Config.APIGateway.URL,
+		GatewayURL:   Config().APIGateway.URL,
 
 		// Read off the signature that is already parsed above, so the navbar
 		// can wear the tier without asking anybody
 		UserTier: strings.ToLower(sigParams.Get("UserTier")),
 	}
 
-	if Config.Game != DefaultGame {
+	if Config().Game != DefaultGame {
 		// Append which game this site is for
-		pageVars.Title += " - " + mtgmatcher.Title(string(Config.Game))
+		pageVars.Title += " - " + mtgmatcher.Title(string(Config().Game))
 
 		// Charts for a non-Magic game are served only by the long-form read
 		// path; the legacy wide table is mtgjson-uuid keyed and has no rows for
 		// them. Until reads flip on, keep the chart UI hidden rather than show
 		// buttons that resolve to an always-empty chart.
-		if !Config.TimeseriesConfig.LongFormReads {
+		if !Config().TimeseriesConfig.LongFormReads {
 			pageVars.DisableChart = true
 		}
 	}
@@ -1070,9 +1077,9 @@ func preloadConfig(configPath string) error {
 	}
 
 	// Save source, so we can reload later
-	Config.sourcePath = configPath
+	liveConfig.Store(&ConfigType{sourcePath: configPath})
 
-	u, err := url.Parse(Config.sourcePath)
+	u, err := url.Parse(Config().sourcePath)
 	if err != nil {
 		return err
 	}
@@ -1102,7 +1109,7 @@ func preloadConfig(configPath string) error {
 func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), configFileTimeout)
 	defer cancel()
-	reader, err := simplecloud.InitReader(ctx, ConfigBucket, Config.sourcePath)
+	reader, err := simplecloud.InitReader(ctx, ConfigBucket, Config().sourcePath)
 	if err != nil {
 		return err
 	}
@@ -1110,7 +1117,7 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 
 	// Decode into a fresh value, not the live one: decoding merges, so a map
 	// key or a field the file no longer has would survive a reload.
-	config := ConfigType{Game: DefaultGame, sourcePath: Config.sourcePath}
+	config := ConfigType{Game: DefaultGame, sourcePath: Config().sourcePath}
 	err = json.NewDecoder(reader).Decode(&config)
 	if err != nil && !DevMode {
 		return err
@@ -1126,7 +1133,7 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 func reloadConfig() error {
 	configMu.Lock()
 	defer configMu.Unlock()
-	return loadVars(Config.Port, Config.DatastorePath, Config.ACLPath, Config.PatreonGrantsPath)
+	return loadVars(Config().Port, Config().DatastorePath, Config().ACLPath, Config().PatreonGrantsPath)
 }
 
 // applyOverrides sets config's port and datastore, ACL and grants paths to
@@ -1167,9 +1174,7 @@ func finishConfig(config ConfigType) {
 	}
 	applyAPIGatewayDefaults(&config.APIGateway, config.Game)
 
-	apiUsersMutex.Lock()
-	Config = config
-	apiUsersMutex.Unlock()
+	liveConfig.Store(&config)
 
 	// Build the game-agnostic chart provider registry from the dataset config.
 	buildProviderRegistry()
@@ -1206,10 +1211,10 @@ func applyAPIGatewayDefaults(c *APIGatewayConfig, game mtgmatcher.Game) {
 }
 
 func openDBs() (err error) {
-	if Config.SQLConfig == nil {
+	if Config().SQLConfig == nil {
 		log.Println("no SQL configuration set, Charts won't be available")
 	} else {
-		PricesArchiveDB, err = timeseries.NewClient(*Config.SQLConfig)
+		PricesArchiveDB, err = timeseries.NewClient(*Config().SQLConfig)
 		if err != nil {
 			return fmt.Errorf("error opening the timeseries SQL client: %w", err)
 		}
@@ -1219,7 +1224,7 @@ func openDBs() (err error) {
 		// a dozen tables/partitions they never use. Non-fatal so a read-only or
 		// unprivileged DB user can't block startup; ingestion re-checks the
 		// schema before it runs.
-		if Config.TCGCSVConfig != nil {
+		if Config().TCGCSVConfig != nil {
 			if serr := PricesArchiveDB.EnsureTCGSchema(context.Background()); serr != nil {
 				log.Println("warning: could not ensure tcg_prices schema:", serr)
 			}
@@ -1229,7 +1234,7 @@ func openDBs() (err error) {
 		}
 		// Long-form dual-write: make sure the current and next month's price
 		// partitions exist ahead of any write. Writes-only (creates partitions).
-		if Config.TimeseriesConfig.LongFormWrites {
+		if Config().TimeseriesConfig.LongFormWrites {
 			now := time.Now()
 			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
 				log.Println("warning: could not ensure current price partition:", serr)
@@ -1240,22 +1245,22 @@ func openDBs() (err error) {
 		}
 	}
 
-	if Config.UserStateConfig == nil {
+	if Config().UserStateConfig == nil {
 		log.Println("no user_state configuration set, cross-device sync won't be available")
 	} else {
-		UserStateDB, err = userstate.NewClient(*Config.UserStateConfig)
+		UserStateDB, err = userstate.NewClient(*Config().UserStateConfig)
 		if err != nil {
 			return fmt.Errorf("error opening the user_state SQL client: %w", err)
 		}
 	}
 
-	observabilityInstance = Config.InstanceName
+	observabilityInstance = Config().InstanceName
 
-	if Config.ObservabilityConfig == nil {
+	if Config().ObservabilityConfig == nil {
 		log.Println("no observability configuration set, telemetry won't be recorded")
 	} else if observabilityInstance == "" {
 		log.Println("observability disabled: instance_name not set in config")
-	} else if obsDB, oerr := observability.NewClient(*Config.ObservabilityConfig); oerr != nil {
+	} else if obsDB, oerr := observability.NewClient(*Config().ObservabilityConfig); oerr != nil {
 		log.Println("observability disabled, init failed:", oerr)
 	} else {
 		ObservabilityDB = obsDB
@@ -1263,8 +1268,8 @@ func openDBs() (err error) {
 		log.Println("observability telemetry enabled")
 	}
 
-	if Config.NewNewspaperSQLConfig != nil {
-		NewNewspaperDB, err = Config.NewNewspaperSQLConfig.OpenDB()
+	if Config().NewNewspaperSQLConfig != nil {
+		NewNewspaperDB, err = Config().NewNewspaperSQLConfig.OpenDB()
 		if err != nil {
 			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
 		}
@@ -1276,7 +1281,7 @@ func openDBs() (err error) {
 }
 
 func loadGoogleCredentials() (*http.Client, error) {
-	if Config.GoogleCredentials == "" {
+	if Config().GoogleCredentials == "" {
 		log.Println("no google credentials, skipping")
 		return nil, nil
 	}
@@ -1285,7 +1290,7 @@ func loadGoogleCredentials() (*http.Client, error) {
 	// the url apart and ask the config bucket for the path half, so credentials
 	// named in another bucket were fetched from the config one, and a local
 	// path was read from wherever the config happened to live.
-	reader, err := openBucketPath(context.Background(), Config.GoogleCredentials)
+	reader, err := openBucketPath(context.Background(), Config().GoogleCredentials)
 	if err != nil {
 		return nil, err
 	}
@@ -1308,10 +1313,10 @@ func loadGoogleCredentials() (*http.Client, error) {
 // unset game is the default one, the same reading the rest of the site gives
 // it.
 func datastoreGame() mtgmatcher.Game {
-	if Config.Game == "" {
+	if Config().Game == "" {
 		return DefaultGame
 	}
-	return Config.Game
+	return Config().Game
 }
 
 // splitStores reads a -stores value: comma-separated, each name trimmed of
@@ -1366,9 +1371,9 @@ func main() {
 	err = loadVars(*port, *dsPath, *aclPath, *grantsPath)
 	if err != nil {
 		if DevMode {
-			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
+			log.Println("unable to load config file:", Config().sourcePath, "- using safe defaults")
 			// loadVars returned before applying the flags and the defaults.
-			config := Config
+			config := *Config()
 			applyOverrides(&config, *port, *dsPath, *aclPath, *grantsPath)
 			finishConfig(config)
 		} else {
@@ -1487,10 +1492,10 @@ func main() {
 	// killing the process, and a reload requested before this finishes is
 	// queued to follow it instead of racing it.
 	datastoreLoaded := make(chan struct{})
-	s.reloads.Start("startup", Config.DatastorePath, func() error {
+	s.reloads.Start("startup", Config().DatastorePath, func() error {
 		// Closed on a panic too, so the prices below never wait forever.
 		defer close(datastoreLoaded)
-		err := s.loadDatastore(Config.DatastorePath)
+		err := s.loadDatastore(Config().DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
@@ -1502,7 +1507,7 @@ func main() {
 	} else {
 		stores := splitStores(*storesFlag)
 		if len(stores) == 0 {
-			stores = Config.ScraperConfig.Stores
+			stores = Config().ScraperConfig.Stores
 		}
 		go func() {
 			log.Println("Loading scrapers")
@@ -1655,7 +1660,7 @@ func main() {
 	http.HandleFunc("/random", s.RandomSearch)
 	http.HandleFunc("/randomsealed", s.RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config.Discord.InviteURL, http.StatusFound)
+		http.Redirect(w, r, Config().Discord.InviteURL, http.StatusFound)
 	})
 
 	// Public changelog sourced from the Discord announcement channel.
@@ -1765,7 +1770,7 @@ func main() {
 	// here instead, and everything else straight to the mux
 	debugHandler := enforceSigning(s, adminOnly(http.DefaultServeMux))
 	srv := &http.Server{
-		Addr: ":" + Config.Port,
+		Addr: ":" + Config().Port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/debug") {
 				debugHandler.ServeHTTP(w, r)

@@ -75,9 +75,9 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
 	// Expand with any custom list if necessary
-	if Config.SleepersBlockList != nil {
-		blocklistRetail = append(blocklistRetail, Config.SleepersBlockList...)
-		blocklistBuylist = append(blocklistBuylist, Config.SleepersBlockList...)
+	if Config().SleepersBlockList != nil {
+		blocklistRetail = append(blocklistRetail, Config().SleepersBlockList...)
+		blocklistBuylist = append(blocklistBuylist, Config().SleepersBlockList...)
 	}
 
 	// Built before merging the user's cookie hide-list so hidden vendors still

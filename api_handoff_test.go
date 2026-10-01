@@ -16,12 +16,12 @@ import (
 // setGatewaySecret installs the shared secret the handoff signs with; empty turns the handoff off.
 func setGatewaySecret(t *testing.T, secret string) {
 	t.Helper()
-	saved, savedGame := Config.APIUserSecrets, Config.Game
-	t.Cleanup(func() { Config.APIUserSecrets, Config.Game = saved, savedGame })
-	Config.Game = "magic"
-	Config.APIUserSecrets = map[string]string{}
+	saved, savedGame := Config().APIUserSecrets, Config().Game
+	t.Cleanup(func() { Config().APIUserSecrets, Config().Game = saved, savedGame })
+	Config().Game = "magic"
+	Config().APIUserSecrets = map[string]string{}
 	if secret != "" {
-		Config.APIUserSecrets[apiGatewayUser] = secret
+		Config().APIUserSecrets[apiGatewayUser] = secret
 	}
 }
 
@@ -31,9 +31,9 @@ func setGatewaySecret(t *testing.T, secret string) {
 func handoffRequest(t *testing.T, handler http.HandlerFunc, path, tier string, user *PatreonUserData) *httptest.ResponseRecorder {
 	t.Helper()
 	signingEnabled(t, true)
-	savedCfg := Config.APIGateway
-	t.Cleanup(func() { Config.APIGateway = savedCfg })
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
+	savedCfg := Config().APIGateway
+	t.Cleanup(func() { Config().APIGateway = savedCfg })
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	if tier != "" || user != nil {
 		// Signed after the mode is set, so it carries the link the check expects.
@@ -72,9 +72,9 @@ func TestAPITrialRedirectsWithVerifiableToken(t *testing.T) {
 func TestAPITrialNeedsAPledge(t *testing.T) {
 	setGatewaySecret(t, "trial-secret")
 	signingEnabled(t, true)
-	savedCfg := Config.APIGateway
-	t.Cleanup(func() { Config.APIGateway = savedCfg })
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
+	savedCfg := Config().APIGateway
+	t.Cleanup(func() { Config().APIGateway = savedCfg })
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	sig := signedAs(t, url.Values{"UserEmail": {"ann@example.com"}, "UserName": {"Ann"}}, time.Now().Add(time.Hour))
 
 	trial := httptest.NewRequest(http.MethodGet, "/api-trial", nil)
@@ -144,9 +144,9 @@ func TestAPIHandoffNeedsAPatreonLogin(t *testing.T) {
 func TestAPIHandoffRefusalOffersALogin(t *testing.T) {
 	setGatewaySecret(t, "trial-secret")
 	signingEnabled(t, true)
-	savedPatreon := Config.Patreon
-	t.Cleanup(func() { Config.Patreon = savedPatreon })
-	Config.Patreon = PatreonConfig{Client: map[string]string{"ban": "client-id"}}
+	savedPatreon := Config().Patreon
+	t.Cleanup(func() { Config().Patreon = savedPatreon })
+	Config().Patreon = PatreonConfig{Client: map[string]string{"ban": "client-id"}}
 
 	rec := httptest.NewRecorder()
 	testSite.APILogin(rec, httptest.NewRequest(http.MethodGet, "https://www.mtgban.com/api-login", nil))
@@ -211,9 +211,9 @@ func TestAPIHandoffIgnoresATamperedSignature(t *testing.T) {
 	setGatewaySecret(t, "trial-secret")
 	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
 	signingEnabled(t, true)
-	savedCfg := Config.APIGateway
-	t.Cleanup(func() { Config.APIGateway = savedCfg })
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
+	savedCfg := Config().APIGateway
+	t.Cleanup(func() { Config().APIGateway = savedCfg })
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	// Signed after DevMode is set, so the signature carries the same link the check expects.
 	sig := sign("Legacy", user, nil, DefaultSignatureDuration)
 	req := httptest.NewRequest(http.MethodGet, "/api-login", nil)

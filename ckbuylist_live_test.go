@@ -53,12 +53,12 @@ func TestCKHistoryLive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prevDB, prevGame, prevSkip, prevHistory := NewNewspaperDB, Config.Game, SkipNewspaper, ckHistoryPtr.Load()
+	prevDB, prevGame, prevSkip, prevHistory := NewNewspaperDB, Config().Game, SkipNewspaper, ckHistoryPtr.Load()
 	t.Cleanup(func() {
-		NewNewspaperDB, Config.Game, SkipNewspaper = prevDB, prevGame, prevSkip
+		NewNewspaperDB, Config().Game, SkipNewspaper = prevDB, prevGame, prevSkip
 		ckHistoryPtr.Store(prevHistory)
 	})
-	NewNewspaperDB, Config.Game, SkipNewspaper = db, DefaultGame, false
+	NewNewspaperDB, Config().Game, SkipNewspaper = db, DefaultGame, false
 	ckHistoryPtr.Store(nil)
 
 	start := time.Now()

@@ -229,8 +229,8 @@ func fetchChangelogEntries() ([]changelogEntry, error) {
 }
 
 func getChangelogChannelID() (string, error) {
-	if Config.Discord.ChangelogChannelID != "" {
-		return Config.Discord.ChangelogChannelID, nil
+	if Config().Discord.ChangelogChannelID != "" {
+		return Config().Discord.ChangelogChannelID, nil
 	}
 	// Existing deployments can bootstrap by name; once the channel ID is
 	// configured, the stable ID path above avoids rename ambiguity.

@@ -47,10 +47,10 @@ func checkJobHealth() {
 		switch classifyStaleTransition(staleAlarmState.stale[key], row.Problem != "") {
 		case becameStale:
 			changes = append(changes, staleChange{key: key, stale: true,
-				line: fmt.Sprintf("%s: %s %s", Config.Game, row.Name, row.Problem)})
+				line: fmt.Sprintf("%s: %s %s", Config().Game, row.Name, row.Problem)})
 		case staleRecovered:
 			changes = append(changes, staleChange{key: key, stale: false,
-				line: fmt.Sprintf("%s: %s is fine again", Config.Game, row.Name)})
+				line: fmt.Sprintf("%s: %s is fine again", Config().Game, row.Name)})
 		}
 	}
 	announceStaleChanges(changes)

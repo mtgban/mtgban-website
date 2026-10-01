@@ -22,7 +22,7 @@ type BucketKey struct {
 // the config is a local file. Parsed rather than remembered, so it cannot go
 // stale against the path a reload reads.
 func configBucketName() string {
-	u, err := url.Parse(Config.sourcePath)
+	u, err := url.Parse(Config().sourcePath)
 	if err != nil || u.Scheme != "b2" {
 		return ""
 	}
@@ -42,13 +42,13 @@ func configBucketName() string {
 // here instead and fell through to the datastore key, which B2 answers with
 // 401 on a key scoped to another bucket.
 func bucketCredentials(bucketName string) (string, string) {
-	if creds, ok := Config.BucketKeys[bucketName]; ok {
+	if creds, ok := Config().BucketKeys[bucketName]; ok {
 		return creds.AccessKey, creds.AccessSecret
 	}
 	if bucketName != "" && bucketName == configBucketName() {
 		return os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET")
 	}
-	return Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey
+	return Config().Datastore.BucketAccessKey, Config().Datastore.BucketSecretKey
 }
 
 // newB2ClientFor builds a B2 client for the named bucket with its credentials.

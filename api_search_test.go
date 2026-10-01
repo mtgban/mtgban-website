@@ -59,17 +59,7 @@ func searchStores(t *testing.T) string {
 func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 	name := searchStores(t)
 	signingEnabled(t, false)
-	apiUsersMutex.Lock()
-	if Config.APIUserSecrets == nil {
-		Config.APIUserSecrets = map[string]string{}
-	}
-	Config.APIUserSecrets["plan@example.com"] = "plan-secret"
-	apiUsersMutex.Unlock()
-	t.Cleanup(func() {
-		apiUsersMutex.Lock()
-		delete(Config.APIUserSecrets, "plan@example.com")
-		apiUsersMutex.Unlock()
-	})
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
 
 	handler := enforceAPISigning(http.HandlerFunc(testSite.SearchAPI))
 	requests := 0

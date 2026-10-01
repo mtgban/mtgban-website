@@ -106,13 +106,13 @@ func newSite() *site {
 			var all []string
 			for _, seller := range GetSellers() {
 				shorthand := seller.Info().Shorthand
-				if !slices.Contains(Config.SearchRetailBlockList, shorthand) && !slices.Contains(all, shorthand) {
+				if !slices.Contains(Config().SearchRetailBlockList, shorthand) && !slices.Contains(all, shorthand) {
 					all = append(all, shorthand)
 				}
 			}
 			for _, vendor := range GetVendors() {
 				shorthand := vendor.Info().Shorthand
-				if !slices.Contains(Config.SearchBuylistBlockList, shorthand) && !slices.Contains(all, shorthand) {
+				if !slices.Contains(Config().SearchBuylistBlockList, shorthand) && !slices.Contains(all, shorthand) {
 					all = append(all, shorthand)
 				}
 			}
@@ -128,7 +128,7 @@ func newSite() *site {
 		Finishes:          s.palette.FinishList,
 
 		ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-			omPath := Config.Offline.ManifestPath
+			omPath := Config().Offline.ManifestPath
 			if omPath == "" {
 				return nil, "", errors.New("offline.manifest_path not configured")
 			}
@@ -159,15 +159,15 @@ func newSite() *site {
 
 		ImagesDownloadAuth: offlineImagesDownloadAuth,
 
-		Game: func() mtgmatcher.Game { return Config.Game },
+		Game: func() mtgmatcher.Game { return Config().Game },
 
-		ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
-		ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
+		ManifestPathConfigured: func() bool { return Config().Offline.ManifestPath != "" },
+		ImagesPathConfigured:   func() bool { return Config().Offline.ImagesPath != "" },
 
 		WatermarkSecret: func() []byte { return []byte(os.Getenv("BAN_SECRET")) },
 
-		RetailBlockList:  func() []string { return Config.SearchRetailBlockList },
-		BuylistBlockList: func() []string { return Config.SearchBuylistBlockList },
+		RetailBlockList:  func() []string { return Config().SearchRetailBlockList },
+		BuylistBlockList: func() []string { return Config().SearchBuylistBlockList },
 	})
 
 	return s

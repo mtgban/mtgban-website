@@ -61,8 +61,8 @@ func (c *DiscordConfig) applyDefaults() {
 }
 
 func discordGuildID() string {
-	if Config.Discord.GuildID != "" {
-		return Config.Discord.GuildID
+	if Config().Discord.GuildID != "" {
+		return Config().Discord.GuildID
 	}
 	return defaultDiscordGuildID
 }
@@ -70,12 +70,12 @@ func discordGuildID() string {
 func (s *site) setupDiscord() error {
 	var err error
 
-	if Config.Discord.BotToken == "" {
+	if Config().Discord.BotToken == "" {
 		return errors.New("no discord token")
 	}
 
 	// Create a new Discord session using the provided bot token.
-	dg, err = discordgo.New("Bot " + Config.Discord.BotToken)
+	dg, err = discordgo.New("Bot " + Config().Discord.BotToken)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (s *site) setupDiscord() error {
 
 // Cleanly close down the Discord session.
 func cleanupDiscord() {
-	if Config.Discord.BotToken == "" {
+	if Config().Discord.BotToken == "" {
 		return
 	}
 	log.Println("Closing connection with Discord")
@@ -566,7 +566,7 @@ var AffiliateStores = []AffiliateConfig{
 // differently about any of them.
 func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.MessageEmbed {
 	// Only for the main discord and only for the main game
-	if mGuildID != discordGuildID() || Config.Game != DefaultGame {
+	if mGuildID != discordGuildID() || Config().Game != DefaultGame {
 		return nil
 	}
 
@@ -676,7 +676,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	}
 
 	// Ingore messages not coming from the test channel when running in dev
-	if DevMode && m.ChannelID != Config.Discord.DevelopmentChannelID {
+	if DevMode && m.ChannelID != Config().Discord.DevelopmentChannelID {
 		return
 	}
 
@@ -686,7 +686,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		!strings.HasPrefix(m.Content, "$$") {
 		switch {
 		// Check if selected channels can replace scryfall searches
-		case (m.ChannelID == Config.Discord.DevelopmentChannelID || m.ChannelID == Config.Discord.RecapChannelID || m.ChannelID == Config.Discord.ChatChannelID) && strings.Contains(m.Content, "[["):
+		case (m.ChannelID == Config().Discord.DevelopmentChannelID || m.ChannelID == Config().Discord.RecapChannelID || m.ChannelID == Config().Discord.ChatChannelID) && strings.Contains(m.Content, "[["):
 			fields := squareBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
 				m.Content = "!" + strings.Trim(field, "[]")
@@ -772,8 +772,8 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	if allBls {
 		// Read per message, so a config reload reaches the bot, and clipped,
 		// so the bot's own additions never land in the config's slices.
-		blocklistRetail := append(slices.Clip(Config.SearchRetailBlockList), "TCGDirectLow")
-		blocklistBuylist := append(slices.Clip(Config.SearchBuylistBlockList), "ABUCredit")
+		blocklistRetail := append(slices.Clip(Config().SearchRetailBlockList), "TCGDirectLow")
+		blocklistBuylist := append(slices.Clip(Config().SearchBuylistBlockList), "ABUCredit")
 		config := parseSearchOptionsNG(b, searchRes.CardID, blocklistRetail, blocklistBuylist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a

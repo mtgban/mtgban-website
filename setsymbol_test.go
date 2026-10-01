@@ -23,9 +23,9 @@ import (
 func TestSetSymbolsOnlyReadUnderTheirOwnDirectory(t *testing.T) {
 	for _, game := range []mtgmatcher.Game{"../logo", "..", "../..", "/etc", "nosuchgame", ""} {
 		t.Run(string(game), func(t *testing.T) {
-			defer func(old mtgmatcher.Game) { Config.Game = old }(Config.Game)
+			defer func(old mtgmatcher.Game) { Config().Game = old }(Config().Game)
 			defer func(old map[string]rarityBadge) { rarityBadges = old }(rarityBadges)
-			Config.Game = game
+			Config().Game = game
 			rarityBadges = map[string]rarityBadge{}
 
 			loadRarityBadges()
@@ -51,9 +51,9 @@ func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
 			continue
 		}
 
-		defer func(old mtgmatcher.Game) { Config.Game = old }(Config.Game)
+		defer func(old mtgmatcher.Game) { Config().Game = old }(Config().Game)
 		defer func(old map[string]rarityBadge) { rarityBadges = old }(rarityBadges)
-		Config.Game = game
+		Config().Game = game
 		rarityBadges = map[string]rarityBadge{}
 
 		loadRarityBadges()
@@ -69,9 +69,9 @@ func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
 // image retain their existing rendering. Each case hands the partial its
 // symbol the way a page's data does.
 func TestSetSymbolImages(t *testing.T) {
-	oldGame, oldBadges := Config.Game, rarityBadges
-	t.Cleanup(func() { Config.Game, rarityBadges = oldGame, oldBadges })
-	Config.Game = "onepiece"
+	oldGame, oldBadges := Config().Game, rarityBadges
+	t.Cleanup(func() { Config().Game, rarityBadges = oldGame, oldBadges })
+	Config().Game = "onepiece"
 	loadRarityBadges()
 	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, funcMap)
 	if err != nil {

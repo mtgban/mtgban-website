@@ -21,10 +21,10 @@ func apiPlansPage(t *testing.T, sig string) string {
 // apiPlansPageAt renders the page for a request path of the caller's choosing.
 func apiPlansPageAt(t *testing.T, sig, target string) string {
 	t.Helper()
-	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
-	t.Cleanup(func() { DevMode, SigCheck, Config.APIGateway = savedDev, savedSig, savedCfg })
+	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config().APIGateway
+	t.Cleanup(func() { DevMode, SigCheck, Config().APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}}
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req.Host = "mtgban.com"
@@ -203,14 +203,14 @@ func stubScrapers(t *testing.T, s scraperStub) {
 	t.Helper()
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevIdx := scraperIndexPtr.Load()
-	prevOverrides := Config.ScraperConfig.NameOverride
-	prevRetail, prevBuylist := Config.SearchRetailBlockList, Config.SearchBuylistBlockList
+	prevOverrides := Config().ScraperConfig.NameOverride
+	prevRetail, prevBuylist := Config().SearchRetailBlockList, Config().SearchBuylistBlockList
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 		scraperIndexPtr.Store(prevIdx)
-		Config.ScraperConfig.NameOverride = prevOverrides
-		Config.SearchRetailBlockList, Config.SearchBuylistBlockList = prevRetail, prevBuylist
+		Config().ScraperConfig.NameOverride = prevOverrides
+		Config().SearchRetailBlockList, Config().SearchBuylistBlockList = prevRetail, prevBuylist
 	})
 	info := func(sh string) mtgban.ScraperInfo {
 		name, ok := s.names[sh]
@@ -230,8 +230,8 @@ func stubScrapers(t *testing.T, s scraperStub) {
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 	scraperIndexPtr.Store(buildScraperIndex(s.config))
-	Config.ScraperConfig.NameOverride = s.overrides
-	Config.SearchRetailBlockList, Config.SearchBuylistBlockList = s.retailBlock, s.buylistBlock
+	Config().ScraperConfig.NameOverride = s.overrides
+	Config().SearchRetailBlockList, Config().SearchBuylistBlockList = s.retailBlock, s.buylistBlock
 }
 
 // magicStub mirrors the live magic config: split tcg_* and cardkingdom_* keys, blocklists, sealed scrapers, a session store.
@@ -406,9 +406,9 @@ func TestAPIStoresIsNotGatedByTheAPIPage(t *testing.T) {
 
 func TestAPIStoresServesTheFamilies(t *testing.T) {
 	stubScrapers(t, magicStub)
-	savedGame := Config.Game
-	t.Cleanup(func() { Config.Game = savedGame })
-	Config.Game = "magic"
+	savedGame := Config().Game
+	t.Cleanup(func() { Config().Game = savedGame })
+	Config().Game = "magic"
 	rec := httptest.NewRecorder()
 	APIStores(rec, httptest.NewRequest(http.MethodGet, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusOK {
