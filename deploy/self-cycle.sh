@@ -26,20 +26,16 @@
 set -euo pipefail
 
 UNIT=${UNIT:-mtgban}
-UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(dirname "$SCRIPT_DIR")
-SRC_DIR=$(dirname "$REPO_DIR")
-REPO_NAME=$(basename "$REPO_DIR")
-CO_PREFIX=${CO_PREFIX:-$SRC_DIR/${REPO_NAME}-}
 DEPLOY_USER=${DEPLOY_USER:-$(stat -c '%U' "$REPO_DIR")}
 
 if ! needrestart -b 2>/dev/null | grep -q "^NEEDRESTART-SVC: ${UNIT}@"; then
     exit 0
 fi
 
-CUR=$(grep -oE '127\.0\.0\.1:[0-9]+' "$UPSTREAM_CONF" | cut -d: -f2)
-REF=$(sudo -u "$DEPLOY_USER" git -C "${CO_PREFIX}${CUR}" describe --tags --always)
-echo "==> needrestart flags ${UNIT}@ - cycling at current ref $REF"
-exec sudo -u "$DEPLOY_USER" -H "$SCRIPT_DIR/deploy.sh" "$REF"
+# deploy.sh reads the live ref once it holds the deploy lock, so a deploy
+# running now is waited for, not undone.
+echo "==> needrestart flags ${UNIT}@ - cycling at the live ref"
+exec sudo -u "$DEPLOY_USER" -H "$SCRIPT_DIR/deploy.sh" --live

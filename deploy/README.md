@@ -45,6 +45,14 @@ identically:
 deploy/deploy.sh <ref>
 ```
 
+One deploy runs at a time on a host. `deploy.sh` holds `flock` on
+`~/src/.mtgban-deploy.lock` for the whole swap and waits up to 20 minutes for
+one already running, and each `<game>-deploy.yml` queues behind its own
+running workflow. The hourly self-cycle passes `--live`, which `deploy.sh`
+resolves to the serving ref only once it holds the lock. Every workflow first
+waits for `ci.yml` to have passed on the commit (`ci-passed.yml`); a manual
+run can skip that with `skip_ci`.
+
 ## Host packages
 
 `deploy/host-packages.sh` is the list of what the droplet needs from the

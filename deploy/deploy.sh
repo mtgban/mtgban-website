@@ -38,14 +38,23 @@ UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}   # chown
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
 CO_PREFIX=${CO_PREFIX:-${SRC_DIR}/mtgban-website-}   # per-port checkouts: ${CO_PREFIX}8081 / ...8082
+LOCK_FILE=${LOCK_FILE:-${SRC_DIR}/.mtgban-deploy.lock}
+LOCK_WAIT=${LOCK_WAIT:-1200}             # seconds to wait for a deploy already running
 
 # Go isn't on the non-interactive SSH PATH by default; adjust to `which go`.
 export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"
 # ---------------------------------------------------------------------------
 
 REF="${1:-}"
-[ -n "$REF" ] || { echo "usage: deploy.sh <git-ref>"; exit 2; }
-echo "==> deploying ref: $REF"
+[ -n "$REF" ] || { echo "usage: deploy.sh <git-ref>|--live"; exit 2; }
+
+# One deploy at a time on this host: a workflow run and self-cycle.sh both
+# land here, and two at once would each flip nginx to the other's port.
+exec 9>"$LOCK_FILE"
+if ! flock -w "$LOCK_WAIT" 9; then
+    echo "!! another deploy still holds $LOCK_FILE after ${LOCK_WAIT}s"
+    exit 1
+fi
 
 # 1. Determine the current live port, flip to the idle one.
 CUR=$(grep -oE '127\.0\.0\.1:[0-9]+' "$UPSTREAM_CONF" | cut -d: -f2)
@@ -55,6 +64,10 @@ CUR_CO="${CO_PREFIX}${CUR}"
 # What is serving right now, which is what a failure falls back to. Printed on
 # every path, so the log always names the release the site is left running.
 LIVE_REF=$(git -C "$CUR_CO" describe --tags --always 2>/dev/null || echo unknown)
+# --live (self-cycle.sh) redeploys what is serving, read only now that the
+# lock is held: a ref read before it could be one a deploy just replaced.
+if [ "$REF" = "--live" ]; then REF=$LIVE_REF; fi
+echo "==> deploying ref: $REF"
 echo "==> current=$CUR ($LIVE_REF)  new=$NEW  checkout=$NEW_CO"
 [ -d "$NEW_CO/.git" ] || { echo "!! $NEW_CO is not a git checkout — run the one-time setup"; exit 1; }
 
