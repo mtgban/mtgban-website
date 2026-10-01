@@ -278,8 +278,8 @@ commit to this repo can complete on its own.
    `runAccessReload` does, not the loop around it. A request's fan-out
    workers defer it too, so a panic costs only that worker's share of the
    answer. Among the goroutines that do not recover: two startup ones,
-   fatal on purpose (the scraper goroutine in `main()`, with the
-   `runSealedAnalysis()`, `warmVariantCacheIfEnabled()` and
+   fatal on purpose (the scraper goroutine `startScraperLoad` starts, with
+   the `runSealedAnalysis()`, `warmVariantCacheIfEnabled()` and
    `RefreshManifest()` it runs, and the one running `ListenAndServe`).
 
 ## Known issues / refactors pending

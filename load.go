@@ -7,6 +7,7 @@ import (
 	"log"
 	"maps"
 	"net"
+	"os"
 	"path"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -290,6 +292,58 @@ func onlyStores(idx *scraperIndex, stores []string) *scraperIndex {
 		}
 	}
 	return next
+}
+
+// startScraperLoad opens the dumps, in dumpsDir or else the mtgban-dumps
+// bucket, and loads the stores' prices from them in the background; the jobs
+// that also need the datastore wait for datastoreLoaded. Failing to open or
+// to load ends the process.
+func (s *site) startScraperLoad(dumpsDir string, stores []string, datastoreLoaded <-chan struct{}) {
+	// Opened before the loader and the server start, so a request that
+	// reloads a store finds DataBucket already set.
+	var bucket simplecloud.Reader
+	if dumpsDir != "" {
+		// A missing directory would list nothing and load nothing.
+		_, err := os.Stat(dumpsDir)
+		if err != nil {
+			log.Fatalln("error opening the dumps directory:", err)
+		}
+		bucket = &simplecloud.FileBucket{Root: dumpsDir}
+	} else {
+		b2, err := openDumpsBucket(context.Background())
+		if err != nil {
+			log.Fatalln("error opening the dumps bucket:", err)
+		}
+		bucket = b2
+	}
+	DataBucket = bucket
+	go func() {
+		log.Println("Loading scrapers")
+		err := loadScrapersNG(bucket, stores)
+		if err != nil {
+			log.Fatalln("error loading scrapers:", err)
+		}
+		// Card Kingdom's stock history and buylist signals (ckbuylist.go),
+		// where the prices just loaded include CK's buylist.
+		if ckAvailable() {
+			go tracked(jobCKSignals, s.refreshCKSignals)()
+		}
+
+		// Update set values after loading prices. The analysis reads the
+		// backend it starts with, so it waits for the datastore: read
+		// from a bucket, it can arrive after the prices.
+		<-datastoreLoaded
+		// Alerts wait for both the datastore and the prices.
+		s.alerts.RequestEvaluate(alerts.SideRetail, alerts.SideBuylist)
+		finish := backgroundJobs.Start(jobSetAnalysis)
+		s.runSealedAnalysis()
+		finish(nil)
+		// runSealedAnalysis loads the catalog, which is what names this
+		// site's own TCGplayer category, so the variant scope is only
+		// complete now.
+		warmVariantCacheIfEnabled()
+		s.offline.RefreshManifest()
+	}()
 }
 
 // loadScrapersNG lists the dumps in bucket, publishes the index and loads
