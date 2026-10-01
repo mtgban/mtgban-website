@@ -48,13 +48,7 @@
 
 {{define "content"}}
 {{if .CanAlerts}}{{template "alert-modal" .}}{{end}}
-    {{if eq .Title "Options"}}
-        {{/* Redirect options page to search with settings drawer */}}
-        <script>window.location.href = '/search';</script>
-        <div class="m-page">
-            <p style="padding: 1em;"><a href="/search">Return to search</a></p>
-        </div>
-    {{else if and (eq .SearchQuery "") .EditionSort}}
+    {{if and (eq .SearchQuery "") .EditionSort}}
         {{template "m-sealed-landing" .}}
     {{else}}
         {{/* See the desktop template: a pinned filter is a search of its own,
