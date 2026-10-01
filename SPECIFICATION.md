@@ -111,11 +111,11 @@ Boot sequence (`main()`):
    `s.cacheNewspaper()` and `s.loadTCGListings()` as further goroutines,
    which the tracker's recover does not reach: each defers `recoverJob()`
    (recover.go) of its own.
-6. Unless `-noload` (`SkipPrices`): async goroutine that opens the dumps
-   bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
+6. Unless `-noload` (`SkipPrices`): `s.startScraperLoad()` (load.go) opens
+   the dumps bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
    `simplecloud.FileBucket{Root: dir}` in its place; either is kept as
-   `DataBucket` for reloads) and runs `loadScrapersNG()` on it with the
-   stores to load (`-stores` when it names any, else
+   `DataBucket` for reloads), then on a goroutine runs `loadScrapersNG()`
+   on it with the stores to load (`-stores` when it names any, else
    `scraper_config.stores`), then `s.runSealedAnalysis()`,
    `warmVariantCacheIfEnabled()`, `s.offline.RefreshManifest()`.
 7. `s.offline.StartRefresher(recovered)` — one debounced goroutine that
@@ -139,8 +139,8 @@ Boot sequence (`main()`):
      buylist signal. Only where the site serves CK's buylist
      (`ckAvailable()`), which the prices loading tells: the cron checks it
      each hour, its row appears with the first run that has CK, and the
-     scraper goroutine in `main()` also runs it once the prices are in,
-     on a goroutine of its own under `tracked()`
+     scraper goroutine `startScraperLoad()` starts also runs it once the
+     prices are in, on a goroutine of its own under `tracked()`
    - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
      TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
      and TCGplayer Direct's own stock per grade (`direct_inventory`, the
@@ -237,7 +237,7 @@ janitor, the goroutine `loadScraper` closes its reader on (load.go), and
 the admin `server` action's, which only sleeps, logs and calls
 `os.Exit(0)`, past which no deferred call would run anyway. Two startup
 goroutines stay fatal on purpose, as their errors are: the scraper
-goroutine in `main()`, including the `runSealedAnalysis()`,
+goroutine `startScraperLoad()` starts, including the `runSealedAnalysis()`,
 `warmVariantCacheIfEnabled()` and `RefreshManifest()` it runs after the
 load, and the one running `ListenAndServe`. The workers
 `searchParallelNG`, `fetchRosterPrices` and `runningWorkflows` fan out to
