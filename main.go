@@ -1509,24 +1509,26 @@ func main() {
 		if len(stores) == 0 {
 			stores = Config().ScraperConfig.Stores
 		}
+		// Opened before the loader and the server start, so a request that
+		// reloads a store finds DataBucket already set.
+		var bucket simplecloud.Reader
+		if *dumpsDir != "" {
+			// A missing directory would list nothing and load nothing.
+			_, err := os.Stat(*dumpsDir)
+			if err != nil {
+				log.Fatalln("error opening the dumps directory:", err)
+			}
+			bucket = &simplecloud.FileBucket{Root: *dumpsDir}
+		} else {
+			b2, err := openDumpsBucket(context.Background())
+			if err != nil {
+				log.Fatalln("error opening the dumps bucket:", err)
+			}
+			bucket = b2
+		}
+		DataBucket = bucket
 		go func() {
 			log.Println("Loading scrapers")
-			var bucket simplecloud.Reader
-			if *dumpsDir != "" {
-				// A missing directory would list nothing and load nothing.
-				_, err := os.Stat(*dumpsDir)
-				if err != nil {
-					log.Fatalln("error opening the dumps directory:", err)
-				}
-				bucket = &simplecloud.FileBucket{Root: *dumpsDir}
-			} else {
-				b2, err := openDumpsBucket(context.Background())
-				if err != nil {
-					log.Fatalln("error opening the dumps bucket:", err)
-				}
-				bucket = b2
-			}
-			DataBucket = bucket
 			err := loadScrapersNG(bucket, stores)
 			if err != nil {
 				log.Fatalln("error loading scrapers:", err)
