@@ -60,6 +60,15 @@ var sleepersLanguages = []string{
 	"Sanskrit",
 }
 
+// SleepVars are the PageVars fields only the sleepers page fills and reads.
+type SleepVars struct {
+	Sleepers        map[string][]string
+	SleepersKeys    []string
+	SleepersColors  []string
+	ModalSellerKeys []string
+	ModalVendorKeys []string
+}
+
 func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
