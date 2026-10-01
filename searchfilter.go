@@ -1116,7 +1116,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			})
 		case "c", "color", "ci", "identity":
 			opt := "color"
-			if option == "ci" || option == "color_identity" {
+			if option == "ci" || option == "identity" {
 				opt = "color_identity"
 			}
 			fixup := fixupColorNG

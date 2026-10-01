@@ -112,3 +112,18 @@ func TestColorFilterReadsEachGamesNames(t *testing.T) {
 		}
 	}
 }
+
+// identity: is the guide's alias of ci:, so both filter on colour identity.
+func TestIdentityIsAColorIdentityAlias(t *testing.T) {
+	b := colorBackend(mtgmatcher.GameMagic, nil)
+	for _, query := range []string{"ci:wu", "identity:wu"} {
+		config := parseSearchOptionsNG(b, query, nil, nil, nil)
+		var names []string
+		for _, filter := range config.CardFilters {
+			names = append(names, filter.Name)
+		}
+		if !slices.Contains(names, "color_identity") {
+			t.Errorf("%s filters on %v, want color_identity", query, names)
+		}
+	}
+}
