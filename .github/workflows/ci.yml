@@ -47,6 +47,12 @@ jobs:
       - name: Staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@2026.2.1 ./...
 
+      # The standard library ships with the toolchain, which Dependabot's
+      # go.mod updates do not cover. Not pinned: the verdict follows the
+      # vulnerability database, which moves whichever release reads it.
+      - name: Govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
   build-and-test:
     runs-on: ubuntu-latest
     env:
