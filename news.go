@@ -1100,6 +1100,26 @@ var BucketNames = []string{
 	"", "$2+", "$5+", "$10+", "$20+", "$35+", "$50+", "$75+",
 }
 
+// NewsVars are the PageVars fields only the newspaper fills and reads.
+type NewsVars struct {
+	ToC            []NewspaperPage
+	Headings       []Heading
+	Table          []NewspaperResult
+	IsOneDay       bool
+	CanSwitchDay   bool
+	OffsetCards    int
+	FilterSet      string
+	FilterRarity   string
+	FilterBucket   string
+	FilterFinish   string
+	FilterMinPrice float64
+	FilterMaxPrice float64
+
+	CanFilterByPercentage bool
+	FilterMinPercChange   float64
+	FilterMaxPercChange   float64
+}
+
 func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
