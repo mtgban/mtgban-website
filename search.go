@@ -497,6 +497,10 @@ type SearchVars struct {
 	TotalSets   int
 	TotalCards  int
 	TotalUnique int
+
+	// CanAlerts says the reader's ACL grants the Alerts page and an
+	// allowance, so result rows may offer the alert link.
+	CanAlerts bool
 }
 
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
@@ -505,6 +509,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
+	for _, n := range pageVars.Nav {
+		if n.Name == "Alerts" {
+			pageVars.CanAlerts = alertAllowance(parseSig(sig)) > 0
+			break
+		}
+	}
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
