@@ -400,7 +400,7 @@ narrow what actually renders for a non-Magic site. A mobile request runs the
 result through `filterNavForMobile()` (mobile.go), called from every page
 handler right after `genPageNav`, which keeps only the handful of pages that
 ship a mobile template. Every page handler receives a giant `PageVars` struct
-(main.go) that carries nav, alerts, and all page-specific fields into the
+(pages.go) that carries nav, alerts, and all page-specific fields into the
 templates.
 
 Other routes: static `/css|/js|/img` (plus `/favicon.ico`, `/robots.txt`)
