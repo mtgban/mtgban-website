@@ -1,26 +1,29 @@
 # Tech debt: the measured list and the plan
 
-Measured 2026-09-30 against master `9876f6e61`. Each item scores
-(Impact + Risk) × (6 − Effort), all three on 1-5; effort S is under half a
-day, M half a day to two, L longer. Numbers drift with every merge:
-re-measure (commands at the end) before acting on one.
+Measured 2026-09-30 against master `9876f6e61`; status updated 2026-10-01
+against `6df64a85c`, re-measuring the numbers the merged work could move.
+Each item scores (Impact + Risk) × (6 − Effort), all three on 1-5; effort
+S is under half a day, M half a day to two, L longer. Numbers drift with
+every merge: re-measure (commands at the end) before acting on one.
 
 Where it stood: 1,042 Go tests passing and 10 skipping, 55% statement
-coverage in the root package, CI green on 59 of the last 60 master runs, no
-dead code to speak of, three TODOs. The debt is concentrated, and some of
-it grows fast: the root package went from 18.0k to 30.8k lines between
-May 17 and Sep 30.
+coverage in the root package (56.5% on 2026-10-01), CI green on 59 of the
+last 60 master runs, no dead code to speak of, three TODOs. The debt is
+concentrated, and some of it grows fast: the root package went from 18.0k
+to 30.8k lines between May 17 and Sep 30.
 
-## In flight
+## Done
 
-| PR | Item |
+| PR | What landed |
 |---|---|
-| #732 | Drop the admin actions that deployed in-process (`git reset --hard origin/master`, build, exit) |
-| #733 | Build with Go 1.26.8 (a 1.25.0 build carries 34 reachable stdlib vulnerabilities), bump modules and staticcheck, pin secret-holding actions, Dependabot |
-| #734 | Load autocomplete/fetchnames once per page, stop the 10 ms hover-image timer |
-| #735 | Go duplication: CK/SCG exporters, the MKM condition misalignment, store-list loops, `name_override` |
-| #737 | Shared JS helpers: one `escapeHtml`, favorites/recents storage, `getPatreonURL`, the offline renderers' common code |
-| #739 | Move search.html's and upload.html's inline scripts (1,371 and 1,047 lines) into `js/` |
+| #732 | The admin actions that deployed in-process (`git reset --hard origin/master`, build, exit) are gone |
+| #733 | `go 1.26.0` + `toolchain go1.26.8`: 0 reachable vulnerabilities, from 34 under 1.25.0. Direct modules and simplecloud v0.1.1 bumped, staticcheck 2026.2.1, weekly Dependabot; actions stay on version tags |
+| #734 | autocomplete/fetchnames load once per page; the hover image moves on events, not a 10 ms timer |
+| #735 | CK/SCG exporters share one loop, MKM CSV rows key on id and condition, the store-list loops collapse, the batch API names stores through `scraperName` |
+| #737 | One `escapeHtml`, shared favorites/recents storage, one `getPatreonURL`, the offline renderers' common helpers |
+| #739 | search.html's and upload.html's inline scripts moved into `js/` |
+| #742 | `utils.js` loads in `<head>`, which fixed the add-to-chart modal's `sameSiteURL` error |
+| #740, #745 | This file, the AGENTS.md and SPECIFICATION.md corrections, and the page-scripts-in-`js/` convention |
 
 ## Open
 
@@ -29,16 +32,19 @@ May 17 and Sep 30.
 | Price API handlers thinly tested | Test | 2/4/2 | 24 | M | `PriceAPI` 25% covered, `BatchPricesAPI` 0% |
 | Deploys aren't safe to run | Infra | 2/4/2 | 24 | S-M | A tag push deploys without CI on that commit. Nothing serializes deploys, and the hourly self-cycle timer can collide with an Actions run. Rollback's `sudo systemctl start` isn't in `bootstrap.sh`'s sudoers, and `\|\| true` hides it. The 11 deploy workflows are near-copies |
 | Database code untested in CI | Test | 3/4/3 | 21 | M | No Postgres in CI; every DB test is env-gated. news.go 5%, `timeseries` 20% (the gateway imports it), `userstate` 1% |
-| main.go and `PageVars` collide | Arch | 4/1/2 | 20 | M | main.go touched by 197 of 1,221 commits since June; `main()` 238 -> 484 lines; `PageVars` has 194 fields, 140 read by one template |
+| main.go and `PageVars` collide | Arch | 4/1/2 | 20 | M | main.go touched by 198 of 1,261 commits since June; `main()` 238 -> 484 lines; `PageVars` has 194 fields, 140 read by one template |
 | Monitoring gaps | Infra | 2/3/2 | 20 | S-M | `/healthz` checks no database; every alert goes to one Discord webhook (none set: logged only); stale-data alarms live in memory and repeat after a restart |
 | Non-Magic games untested in CI | Test | 3/3/3 | 18 | M | 8 of 9 deployments; their tests skip without the `*_PATH` datastores |
-| Giant functions keep growing | Code | 5/3/4 | 16 | L | Since May 17: `Upload` 793 -> 1,275 lines, `Search` 630 -> 1,046, `Admin` 447 -> 765, `parseSearchOptionsNG` 646 -> 816. Plan below |
+| Giant functions keep growing | Code | 5/3/4 | 16 | L | Since May 17: `Upload` 793 -> 1,275 lines, `Search` 630 -> 1,040, `Admin` 447 -> 717 (#732 took its deploy actions), `parseSearchOptionsNG` 646 -> 816. Plan below |
 | Config reload races handlers | Arch | 2/3/3 | 15 | M | `loadVars` swaps `Config` whole while 223 unlocked `Config.X` reads may run; `DataBucket` is set after serving starts |
 
-Lower down, measured but not scored: 45 request values parsed with the error
-discarded (upload 13, search 7, news 7); 76 `window.X =` globals and 234
-inline `onclick`/`onchange` handlers; 110 inline `style=`; 18 scripts
-(388 KB, unminified) on every desktop page, `guide-data.js` (125 KB) and
+Lower down, measured but not scored: 45 request values parsed with the
+error discarded (upload 13, search 7, news 7); 80 `window.X =` globals (8
+of them `window.BAN_*` hand-offs, 5 added by #739) and 228 inline
+`onclick`/`onchange` handlers; 107 inline `style=`; 2,429 lines of inline
+script left in templates (4,683 before #739), most in guide.html (499),
+mobile/search.html (446) and admin.html (305); 18 scripts (379 KB,
+unminified) on every desktop page, `guide-data.js` (125 KB) and
 `command-palette.js` (101 KB) among them.
 
 ## Plan for the giant functions
@@ -75,6 +81,8 @@ inline `onclick`/`onchange` handlers; 110 inline `style=`; 18 scripts
 - Renaming the `*NG` functions: all 20 are live and none has an old twin.
 - Replacing `gopkg.in/robfig/cron.v2`: its successor (v3) is itself
   unreleased since 2020, and the five-field specs parse the same in both.
+- Pinning GitHub Actions to commit SHAs: a changed action should fail the
+  workflow where it can be seen, so actions stay on version tags.
 
 ## Re-measuring
 
