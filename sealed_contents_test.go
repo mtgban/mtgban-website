@@ -234,7 +234,7 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 	}
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:  &NavElem{},
+			UserNav:  &NavElem{},
 			IsMobile: mobile,
 			SearchVars: SearchVars{
 				SearchRan:   true,
@@ -259,7 +259,7 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 
 	// Every other search is unchanged.
 	out := renderPage(t, "search.html", false, PageVars{
-		BetaNav: &NavElem{},
+		UserNav: &NavElem{},
 		SearchVars: SearchVars{
 			SearchRan:   true,
 			AllKeys:     []string{"a"},

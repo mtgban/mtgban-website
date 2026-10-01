@@ -18,7 +18,7 @@ func TestRetailPriceCarriesOneTooltip(t *testing.T) {
 
 	const id = "card"
 	out := renderPage(t, "search.html", false, PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 		SearchVars: SearchVars{
 			SearchRan: true,
 			AllKeys:   []string{id},

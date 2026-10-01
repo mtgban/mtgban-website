@@ -18,7 +18,7 @@ func renderSearch(t *testing.T, template string, pageVars PageVars) string {
 	if err != nil {
 		t.Fatalf("parsing %s: %v", template, err)
 	}
-	pageVars.BetaNav = &NavElem{}
+	pageVars.UserNav = &NavElem{}
 	var b bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&b, baseName, pageVars); err != nil {
 		t.Fatalf("rendering %s: %v", template, err)

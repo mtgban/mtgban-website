@@ -42,7 +42,7 @@ func reversePageVars() PageVars {
 	return PageVars{
 		ScraperShort: "TCGDirectNet",
 		ReverseMode:  true,
-		BetaNav:      &NavElem{Short: "beta"},
+		UserNav:      &NavElem{Short: "beta"},
 		Arb: []Arbitrage{
 			{Name: "Store One", Key: "ONE", Arbit: []mtgban.ArbitEntry{
 				entry("card-a", 10, 14),
@@ -131,7 +131,7 @@ func renderReverse(t *testing.T, query string) string {
 
 	r := httptest.NewRequest("GET", "/reverse?"+query, nil)
 	w := httptest.NewRecorder()
-	pageVars := PageVars{ReverseMode: true, BetaNav: &NavElem{Short: "beta"}}
+	pageVars := PageVars{ReverseMode: true, UserNav: &NavElem{Short: "beta"}}
 	scraperCompare(backend(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
@@ -235,7 +235,7 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 			ArbitOptConfig: FilterOptConfig,
 			ArbitFilters:   map[string]bool{},
 		},
-		BetaNav: &NavElem{Short: "beta"},
+		UserNav: &NavElem{Short: "beta"},
 	})
 	if !strings.Contains(page, ">only Stable<") {
 		t.Error("a sealed global page does not offer novolatile")
@@ -253,7 +253,7 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 			ArbitOptConfig: FilterOptConfig,
 			ArbitFilters:   map[string]bool{},
 		},
-		BetaNav: &NavElem{Short: "beta"},
+		UserNav: &NavElem{Short: "beta"},
 	})
 	if !strings.Contains(page, ">only Legit<") {
 		t.Error("a singles global page does not offer nosus")
@@ -316,7 +316,7 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 	} {
 		r := httptest.NewRequest("GET", "/?source=FILTSHOP"+tt.query, nil)
 		w := httptest.NewRecorder()
-		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: tt.global}, BetaNav: &NavElem{Short: "beta"}}
+		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: tt.global}, UserNav: &NavElem{Short: "beta"}}
 		scraperCompare(backend(), w, r, pageVars, []string{"FILTSHOP"}, nil, scraperCompareOpts{AllResults: true})
 		got := strings.Contains(w.Body.String(), row)
 		if got != tt.want {
@@ -364,7 +364,7 @@ func renderGlobal(t *testing.T, source, query string) string {
 
 	r := httptest.NewRequest("GET", "/global?source="+source+query, nil)
 	w := httptest.NewRecorder()
-	pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, BetaNav: &NavElem{Short: "beta"}}
+	pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
 	scraperCompare(backend(), w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }

@@ -41,14 +41,14 @@ func TestPageNavCarriesTheTier(t *testing.T) {
 func TestNavbarWearsTheTier(t *testing.T) {
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, PageVars{
-			BetaNav: &NavElem{}, IsMobile: mobile, UserTier: "legacy",
+			UserNav: &NavElem{}, IsMobile: mobile, UserTier: "legacy",
 		})
 		if !strings.Contains(out, `data-tier="legacy"`) {
 			t.Errorf("mobile=%v: the bar does not say which tier is reading", mobile)
 		}
 
 		out = renderPage(t, "search.html", mobile, PageVars{
-			BetaNav: &NavElem{}, IsMobile: mobile,
+			UserNav: &NavElem{}, IsMobile: mobile,
 		})
 		if strings.Contains(out, "data-tier") {
 			t.Errorf("mobile=%v: a signed-out reader is given a tier", mobile)

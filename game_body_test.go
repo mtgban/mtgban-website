@@ -57,7 +57,7 @@ func TestBodyCarriesTheGame(t *testing.T) {
 	} {
 		for _, game := range []mtgmatcher.Game{"yugioh", DefaultGame} {
 			Config().Game = game
-			rendered := renderPage(t, page.name, page.mobile, PageVars{BetaNav: &NavElem{Short: "b"}, IsMobile: page.mobile})
+			rendered := renderPage(t, page.name, page.mobile, PageVars{UserNav: &NavElem{Short: "b"}, IsMobile: page.mobile})
 
 			body := rendered[strings.Index(rendered, "<body"):]
 			body = body[:strings.Index(body, ">")+1]

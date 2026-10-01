@@ -250,7 +250,7 @@ func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 // the refresh and the logs a scraper from the bucket has.
 func TestAdminDashboardOffersToRemoveSessionStores(t *testing.T) {
 	pv := PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 		AdminVars: AdminVars{
 			Tables: [][][]string{
 				{

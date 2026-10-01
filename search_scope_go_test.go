@@ -31,7 +31,7 @@ func TestScopeGoSitsBetweenTheBoxAndClear(t *testing.T) {
 		{"mobile, over results", true, PageVars{SearchVars: SearchVars{SearchRan: true, SearchQuery: "bolt"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.pageVars.BetaNav = &NavElem{Short: "b"}
+			tc.pageVars.UserNav = &NavElem{Short: "b"}
 			tc.pageVars.CanScope = true
 
 			out := renderPage(t, "search.html", tc.mobile, tc.pageVars)
@@ -51,7 +51,7 @@ func TestScopeGoSitsBetweenTheBoxAndClear(t *testing.T) {
 // The bar is drawn only where a search can be run from it, so the button it
 // gained is drawn on the same terms rather than on its own.
 func TestScopeGoIsDrawnOnlyWithTheBar(t *testing.T) {
-	out := renderPage(t, "search.html", false, PageVars{BetaNav: &NavElem{Short: "b"}})
+	out := renderPage(t, "search.html", false, PageVars{UserNav: &NavElem{Short: "b"}})
 
 	if strings.Contains(out, `id="nav-scope-go"`) {
 		t.Error("the GO button is drawn on a page that has no pinned bar to run")
@@ -61,7 +61,7 @@ func TestScopeGoIsDrawnOnlyWithTheBar(t *testing.T) {
 // The shortcuts under the bar are finishes, which is what the label says now.
 func TestScopeChipsAreLabelledForWhatTheyAre(t *testing.T) {
 	out := renderPage(t, "search.html", false, PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 		SearchVars: SearchVars{
 			CanScope: true,
 		},

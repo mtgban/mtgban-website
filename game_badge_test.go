@@ -24,7 +24,7 @@ func TestBrandNamesTheGame(t *testing.T) {
 		{"search.html", true, "m-nav-logo-game"},
 	} {
 		Config().Game = "onepiece"
-		pv := PageVars{BetaNav: &NavElem{Short: "b"}, IsMobile: page.mobile}
+		pv := PageVars{UserNav: &NavElem{Short: "b"}, IsMobile: page.mobile}
 		rendered := renderPage(t, page.name, page.mobile, pv)
 
 		want := `class="` + page.badge + `">One Piece<`

@@ -23,7 +23,7 @@ import (
 // itself is held to using it in tests/upload-handoff.test.js.
 func TestHandoffNamesItsOrigins(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:        &NavElem{Short: "b"},
+		UserNav:        &NavElem{Short: "b"},
 		Title:          "Receiving a card list",
 		HandoffOrigins: []string{"https://www.cardmarket.com"},
 	})
@@ -44,7 +44,7 @@ func TestHandoffNamesItsOrigins(t *testing.T) {
 // the extension's own origin would arrive without the cookie.
 func TestHandoffPostsToTheUpload(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:        &NavElem{Short: "b"},
+		UserNav:        &NavElem{Short: "b"},
 		HandoffOrigins: HandoffOrigins,
 	})
 
@@ -69,7 +69,7 @@ func TestHandoffPostsToTheUpload(t *testing.T) {
 // the moment the line is shown.
 func TestHandoffSpinsWhileItWaits(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:        &NavElem{Short: "b"},
+		UserNav:        &NavElem{Short: "b"},
 		HandoffOrigins: HandoffOrigins,
 	})
 
@@ -93,7 +93,7 @@ func TestHandoffSpinsWhileItWaits(t *testing.T) {
 // not one whose attribute is missing and might be read as anything.
 func TestHandoffWithNoOriginsTakesNothing(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 	})
 
 	if !strings.Contains(page, `data-handoff-origins="[]"`) {
@@ -129,7 +129,7 @@ func TestHandoffOriginsAreHTTPS(t *testing.T) {
 // all of that before saying no.
 func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:        &NavElem{Short: "b"},
+		UserNav:        &NavElem{Short: "b"},
 		HandoffOrigins: HandoffOrigins,
 		InfoMessage:    ErrMsg,
 	})
@@ -154,7 +154,7 @@ func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
 // where somebody arrives who has only ever seen the extension.
 func TestHandoffInvitesAReaderWithNoSignature(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:      &NavElem{Short: "b"},
+		UserNav:      &NavElem{Short: "b"},
 		InfoMessage:  ErrMsg,
 		PatreonLogin: true,
 		PatreonIDs:   map[string]string{"patreon": "12345"},
@@ -172,7 +172,7 @@ func TestHandoffInvitesAReaderWithNoSignature(t *testing.T) {
 // is not asked to log in again.
 func TestHandoffDoesNotAskASignedInReaderToLogIn(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:      &NavElem{Short: "b"},
+		UserNav:      &NavElem{Short: "b"},
 		InfoMessage:  ErrMsgPlus,
 		PatreonLogin: false,
 	})
@@ -425,7 +425,7 @@ func TestHandoffDocumentsItself(t *testing.T) {
 	// turned away. The message is what tells them apart.
 	for _, told := range []string{"", ErrMsg} {
 		page := renderPage(t, "upload_handoff.html", false, PageVars{
-			BetaNav:        &NavElem{Short: "b"},
+			UserNav:        &NavElem{Short: "b"},
 			HandoffOrigins: HandoffOrigins,
 			InfoMessage:    told,
 		})
@@ -466,7 +466,7 @@ func TestHandoffDocumentsItself(t *testing.T) {
 // column comes to be one nothing matches.
 func TestHandoffGuideNamesColumnsTheParserReads(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:        &NavElem{Short: "b"},
+		UserNav:        &NavElem{Short: "b"},
 		HandoffOrigins: HandoffOrigins,
 	})
 
@@ -604,7 +604,7 @@ func TestGuideNamesTheFieldsTheScriptReads(t *testing.T) {
 	}
 
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
-		BetaNav:        &NavElem{Short: "b"},
+		UserNav:        &NavElem{Short: "b"},
 		HandoffOrigins: HandoffOrigins,
 	})
 	table := regexp.MustCompile(`(?s)<table class="handoff-fields">(.*?)</table>`).FindStringSubmatch(page)
@@ -696,7 +696,7 @@ func TestHandoffButtonsOutrankTheLegalLinkColour(t *testing.T) {
 func TestHandoffClosesWhatItOpens(t *testing.T) {
 	for _, told := range []string{"", ErrMsg} {
 		page := renderPage(t, "upload_handoff.html", false, PageVars{
-			BetaNav:        &NavElem{Short: "b"},
+			UserNav:        &NavElem{Short: "b"},
 			HandoffOrigins: HandoffOrigins,
 			InfoMessage:    told,
 		})

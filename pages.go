@@ -293,7 +293,7 @@ type PageVars struct {
 	UploadVars
 
 	Nav     []NavElem
-	BetaNav *NavElem
+	UserNav *NavElem
 
 	PatreonIDs   map[string]string
 	PatreonURL   string
@@ -487,13 +487,13 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		}
 	}
 
-	extra := NavElem{
+	userNav := NavElem{
 		Active: true,
 		Class:  "beta",
 		Short:  user,
 		Link:   "javascript:void(0)",
 	}
-	pageVars.BetaNav = &extra
+	pageVars.UserNav = &userNav
 	return pageVars
 }
 

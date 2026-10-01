@@ -202,7 +202,7 @@ func renderUpload(t *testing.T, pageVars PageVars) string {
 	if err != nil {
 		t.Fatalf("parsing upload.html: %v", err)
 	}
-	pageVars.BetaNav = &NavElem{}
+	pageVars.UserNav = &NavElem{}
 	var b bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&b, baseName, pageVars); err != nil {
 		t.Fatalf("rendering upload.html: %v", err)

@@ -11,7 +11,7 @@ import (
 func sealedPage(entries []SearchEntry) PageVars {
 	const id = "prod"
 	return PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 		SearchVars: SearchVars{
 			SearchRan:    true,
 			AllKeys:      []string{id},
