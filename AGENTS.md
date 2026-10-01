@@ -140,6 +140,7 @@ output, not a claim written here.
 | `product.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV; price charts and the ids they accept; chart annotations, ban-list markers among them |
 | `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
 | `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
+| `alerts_*.go` | Price alerts: the Alerts page, the ACL values and login contact it reads, and the site's wiring of `internal/alerts` (`docs/adr/0005-price-alerts.md`) |
 | `screener.go`, `popular.go`, `guide.go`, `changelog.go` | The price-movers screener; the landing page's featured searches; the guide; release notes read from Discord |
 | `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, CSV exports |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
