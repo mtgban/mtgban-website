@@ -26,6 +26,8 @@ import (
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
+	"github.com/mtgban/mtgban-website/internal/dsreload"
+	"github.com/mtgban/mtgban-website/internal/jobs"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/simplecloud"
@@ -71,6 +73,36 @@ var BuildCommit = func() string {
 	}
 	return ""
 }()
+
+// AdminVars are the PageVars fields only the admin page fills and reads.
+type AdminVars struct {
+	UsageStats *UsageDashboard
+
+	CheckpointsText    string
+	ACLText            string
+	ACLSource          string
+	AffiliatesText     string
+	AffiliatesSource   string
+	KeyOverridesText   string
+	OverrideStores     []string
+	OverrideFixStore   string
+	OverrideFixKind    string
+	OverrideWrongCard  *OverrideCard
+	OverrideCandidates []OverrideCard
+
+	Tables          [][][]string
+	Jobs            []jobs.Row
+	DatastoreReload dsreload.State
+	LastNews        time.Time
+	LastStash       time.Time
+	Uptime          string
+	DiskStatus      string
+	MemoryStatus    string
+	LatestHash      string
+
+	SelectableField bool
+	SelectableLabel string
+}
 
 func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// The dashboard asks for the workflow status once it has rendered, so a
@@ -796,6 +828,17 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 // aggregates a 30-day window, so the numbers barely move minute to minute and
 // a reload costs nothing until the copy ages out.
 const usageCacheTTL = 5 * time.Minute
+
+// UsageDashboard holds the telemetry aggregates rendered on /admin?page=usage.
+type UsageDashboard struct {
+	Since       time.Time
+	IncludeBots bool
+	Instance    string
+	TopPages    []observability.PathAgg
+	ByTier      []observability.TierAgg
+	ByDevice    []observability.DeviceAgg
+	SubViews    []observability.PathAgg
+}
 
 type usageCacheEntry struct {
 	dash    *UsageDashboard

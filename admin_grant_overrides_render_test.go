@@ -12,13 +12,15 @@ import (
 func TestAdminGrantOverridesColumnRenders(t *testing.T) {
 	pv := PageVars{
 		BetaNav: &NavElem{Short: "b"},
-		Tables: [][][]string{
-			{}, // dashboard tables 0-2, unused by this test
-			{},
-			{},
-			{ // grants table (Tables index 3)
-				{"1", "cat", "person@example.com", "Person", "Pioneer", `{"Search":{"SearchOfflineMode":"true"}}`},
-				{"2", "", "plain@example.com", "Plain", "Modern", ""},
+		AdminVars: AdminVars{
+			Tables: [][][]string{
+				{}, // dashboard tables 0-2, unused by this test
+				{},
+				{},
+				{ // grants table (Tables index 3)
+					{"1", "cat", "person@example.com", "Person", "Pioneer", `{"Search":{"SearchOfflineMode":"true"}}`},
+					{"2", "", "plain@example.com", "Plain", "Modern", ""},
+				},
 			},
 		},
 	}
