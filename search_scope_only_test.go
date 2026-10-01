@@ -221,8 +221,10 @@ func TestParseEmptyQueryIsNotACrash(t *testing.T) {
 func TestEmptyHandedScopeSearchQuotesNoQuery(t *testing.T) {
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:     &NavElem{Short: "b"},
-			SearchRan:   true,
+			BetaNav: &NavElem{Short: "b"},
+			SearchVars: SearchVars{
+				SearchRan: true,
+			},
 			SearchScope: "s:LEA",
 			InfoMessage: NoResultsMessage,
 		})

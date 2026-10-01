@@ -163,8 +163,15 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 	card := uuid2card(a, "FIXTUREA-1", false, false, false)
 
 	metadata := map[string]GenericCard{"FIXTUREA-1": card}
-	search := PageVars{SearchQuery: card.Name, SearchRan: true, CardHashes: []string{"FIXTUREA-1"},
-		AllKeys: []string{"FIXTUREA-1"}, Metadata: metadata}
+	search := PageVars{
+		SearchQuery: card.Name,
+		SearchVars: SearchVars{
+			SearchRan: true,
+			AllKeys:   []string{"FIXTUREA-1"},
+		},
+		CardHashes: []string{"FIXTUREA-1"},
+		Metadata:   metadata,
+	}
 	for _, page := range []string{"search.html", "mobile/search.html"} {
 		if out := renderSearch(t, page, search); !strings.Contains(out, `src="https://example.test/fixturea.webp"`) {
 			t.Errorf("%s: the row lost its set symbol to the datastore published after it was built", page)

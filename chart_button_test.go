@@ -11,10 +11,12 @@ import (
 // the visitors whose chart would come back empty, and hid from everyone else.
 func TestChartButtonFollowsTheChart(t *testing.T) {
 	pv := PageVars{
-		BetaNav:      &NavElem{Short: "b"},
-		AllKeys:      []string{"a", "b"},
+		BetaNav: &NavElem{Short: "b"},
+		SearchVars: SearchVars{
+			AllKeys:   []string{"a", "b"},
+			SearchRan: true,
+		},
 		SearchQuery:  "query",
-		SearchRan:    true,
 		PatreonLogin: true,
 	}
 

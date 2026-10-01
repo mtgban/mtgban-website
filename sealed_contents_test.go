@@ -237,9 +237,11 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 			BetaNav:     &NavElem{},
 			IsMobile:    mobile,
 			SearchQuery: views.Fixed,
-			SearchRan:   true,
+			SearchVars: SearchVars{
+				SearchRan: true,
+				AllKeys:   []string{"a"},
+			},
 			TotalUnique: 4,
-			AllKeys:     []string{"a"},
 			Contents:    views,
 		})
 		if !strings.Contains(out, ">Contents<") {
@@ -259,9 +261,11 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 	out := renderPage(t, "search.html", false, PageVars{
 		BetaNav:     &NavElem{},
 		SearchQuery: "lightning bolt",
-		SearchRan:   true,
+		SearchVars: SearchVars{
+			SearchRan: true,
+			AllKeys:   []string{"a"},
+		},
 		TotalUnique: 3,
-		AllKeys:     []string{"a"},
 	})
 	if strings.Contains(out, ">Contents<") {
 		t.Error("an ordinary search offers the switch")

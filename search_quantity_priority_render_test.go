@@ -19,18 +19,20 @@ func quantityPriorityPage(mobile bool) PageVars {
 		BetaNav:     &NavElem{Short: "b"},
 		IsMobile:    mobile,
 		SearchQuery: "a card",
-		SearchRan:   true,
-		AllKeys:     []string{id},
-		CondKeys:    []mtgban.Condition{"INDEX", "NM"},
-		Metadata:    map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
-		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{
-			id: {},
+		SearchVars: SearchVars{
+			SearchRan: true,
+			AllKeys:   []string{id},
+			CondKeys:  []mtgban.Condition{"INDEX", "NM"},
+			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{
+				id: {},
+			},
+			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{
+				id: {"INDEX": {
+					{ScraperName: "SYP", Shorthand: "SYP", Price: 5.00, Quantity: 12, PriceUnit: PriceUnitCount},
+				}},
+			},
 		},
-		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{
-			id: {"INDEX": {
-				{ScraperName: "SYP", Shorthand: "SYP", Price: 5.00, Quantity: 12, PriceUnit: PriceUnitCount},
-			}},
-		},
+		Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
 	}
 }
 

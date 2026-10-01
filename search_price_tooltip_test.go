@@ -20,17 +20,19 @@ func TestRetailPriceCarriesOneTooltip(t *testing.T) {
 	out := renderPage(t, "search.html", false, PageVars{
 		BetaNav:     &NavElem{Short: "b"},
 		SearchQuery: "a card",
-		SearchRan:   true,
-		AllKeys:     []string{id},
-		CondKeys:    []mtgban.Condition{"NM"},
-		Metadata:    map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
-		FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{
-			id: {"NM": {
-				{ScraperName: "TCG Direct", Shorthand: "TCGDirect", Price: 5, Credit: 4},
-				{ScraperName: "Card Kingdom", Shorthand: "CK", Price: 5, Credit: 3.85},
-			}},
+		SearchVars: SearchVars{
+			SearchRan: true,
+			AllKeys:   []string{id},
+			CondKeys:  []mtgban.Condition{"NM"},
+			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{
+				id: {"NM": {
+					{ScraperName: "TCG Direct", Shorthand: "TCGDirect", Price: 5, Credit: 4},
+					{ScraperName: "Card Kingdom", Shorthand: "CK", Price: 5, Credit: 3.85},
+				}},
+			},
+			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{id: {}},
 		},
-		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{id: {}},
+		Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
 	})
 
 	if !strings.Contains(out, `title="Price looks off: TCG Market has no price for it.

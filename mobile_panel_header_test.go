@@ -33,11 +33,13 @@ func renderMobileSearch(t *testing.T, pageVars PageVars) string {
 // whether there is a tab bar naming the panels.
 func sealedPageVars(layout string, cardIDs ...string) PageVars {
 	vars := PageVars{
-		MobileSearchLayout: layout,
-		CondKeys:           []mtgban.Condition{"INDEX", "NM"},
-		Metadata:           map[string]GenericCard{},
-		FoundSellers:       map[string]map[mtgban.Condition][]SearchEntry{},
-		FoundVendors:       map[string]map[mtgban.Condition][]SearchEntry{},
+		SearchVars: SearchVars{
+			MobileSearchLayout: layout,
+			CondKeys:           []mtgban.Condition{"INDEX", "NM"},
+			FoundSellers:       map[string]map[mtgban.Condition][]SearchEntry{},
+			FoundVendors:       map[string]map[mtgban.Condition][]SearchEntry{},
+		},
+		Metadata: map[string]GenericCard{},
 	}
 	for _, cardID := range cardIDs {
 		vars.AllKeys = append(vars.AllKeys, cardID)
