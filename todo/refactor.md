@@ -24,19 +24,19 @@ to 30.8k lines between May 17 and Sep 30.
 | #739 | search.html's and upload.html's inline scripts moved into `js/` |
 | #742 | `utils.js` loads in `<head>`, which fixed the add-to-chart modal's `sameSiteURL` error |
 | #740, #745 | This file, the AGENTS.md and SPECIFICATION.md corrections, and the page-scripts-in-`js/` convention |
+| #747 | `Config()` reads one atomic snapshot that a reload replaces whole, and `DataBucket` is set before serving starts: `-race` went from 118 reports to 0 |
+| #748 | A deploy waits for CI on the deployed commit (a manual run can skip it), queues behind a running one, and shares a lock with the self-cycle timer; a rollback can start the old instance |
 
 ## Open
 
 | Item | Type | I/R/E | Score | Effort | Evidence |
 |---|---|---|---|---|---|
 | Price API handlers thinly tested | Test | 2/4/2 | 24 | M | `PriceAPI` 25% covered, `BatchPricesAPI` 0% |
-| Deploys aren't safe to run | Infra | 2/4/2 | 24 | S-M | A tag push deploys without CI on that commit. Nothing serializes deploys, and the hourly self-cycle timer can collide with an Actions run. Rollback's `sudo systemctl start` isn't in `bootstrap.sh`'s sudoers, and `\|\| true` hides it. The 11 deploy workflows are near-copies |
 | Database code untested in CI | Test | 3/4/3 | 21 | M | No Postgres in CI; every DB test is env-gated. news.go 5%, `timeseries` 20% (the gateway imports it), `userstate` 1% |
-| main.go and `PageVars` collide | Arch | 4/1/2 | 20 | M | main.go touched by 198 of 1,261 commits since June; `main()` 238 -> 484 lines; `PageVars` has 194 fields, 140 read by one template |
+| main.go and `PageVars` collide | Arch | 4/1/2 | 20 | M | main.go touched by 198 of 1,261 commits since June. `main()` is 174 lines, from 499, with routes, crons, the scraper load, the tcgcsv mode and serving in functions of their own; `PageVars` (pages.go) has 197 fields, most read by one page, and per-page structs are next |
 | Monitoring gaps | Infra | 2/3/2 | 20 | S-M | `/healthz` checks no database; every alert goes to one Discord webhook (none set: logged only); stale-data alarms live in memory and repeat after a restart |
 | Non-Magic games untested in CI | Test | 3/3/3 | 18 | M | 8 of 9 deployments; their tests skip without the `*_PATH` datastores |
 | Giant functions keep growing | Code | 5/3/4 | 16 | L | Since May 17: `Upload` 793 -> 1,275 lines, `Search` 630 -> 1,040, `Admin` 447 -> 717 (#732 took its deploy actions), `parseSearchOptionsNG` 646 -> 816. Plan below |
-| Config reload races handlers | Arch | 2/3/3 | 15 | M | `loadVars` swaps `Config` whole while 223 unlocked `Config.X` reads may run; `DataBucket` is set after serving starts |
 
 Lower down, measured but not scored: 45 request values parsed with the
 error discarded (upload 13, search 7, news 7); 80 `window.X =` globals (8
@@ -45,7 +45,8 @@ of them `window.BAN_*` hand-offs, 5 added by #739) and 228 inline
 script left in templates (4,683 before #739), most in guide.html (499),
 mobile/search.html (446) and admin.html (305); 18 scripts (379 KB,
 unminified) on every desktop page, `guide-data.js` (125 KB) and
-`command-palette.js` (101 KB) among them.
+`command-palette.js` (101 KB) among them; the 10 deploy workflows are
+near-copies of each other.
 
 ## Plan for the giant functions
 
@@ -68,7 +69,8 @@ unminified) on every desktop page, `guide-data.js` (125 KB) and
      input loading (~170), store selection (~160), settings (~105).
    - `Admin`: the `reboot` switch becomes a table of one function per
      action.
-   - `main`: routes, cron jobs and the tcgcsv maintenance mode.
+   - `main`: done; routes, cron jobs, the scraper load, the tcgcsv
+     maintenance mode and serving are each a function.
    - `parseSearchOptionsNG` last, if at all: a flat switch whose cases
      don't interact is long, not complex.
 
