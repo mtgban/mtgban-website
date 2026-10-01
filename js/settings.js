@@ -14,7 +14,7 @@
     // Each binder is a no-op when its target element isn't in the DOM,
     // so a single iteration handles every page — no need to know which
     // page is active. The active page's HasSettings flag (set in
-    // main.go's NavElem definitions) gates the gear button's visible
+    // pages.go's NavElem definitions) gates the gear button's visible
     // enabled state; this map only describes the controls themselves.
     // Comments mark which page each grouping originates from so the
     // bindings stay easy to navigate.

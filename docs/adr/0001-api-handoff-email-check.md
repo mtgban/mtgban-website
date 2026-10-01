@@ -9,7 +9,7 @@
 
 The site has no session store. Who a reader is lives in the `MTGBAN` cookie
 (or a `?sig=`): an HMAC over the fields listed in `SignedFields`
-(`OrderNav` plus `OptionalFields` in `main.go`), written at Patreon login by
+(`OrderNav` plus `OptionalFields` in `pages.go`), written at Patreon login by
 `Auth` through `sign()`. Two properties of that cookie shape this decision:
 
 - **It is shared.** It is set for the parent domain, so every `*.mtgban.com`
