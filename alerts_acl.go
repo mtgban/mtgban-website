@@ -37,3 +37,28 @@ func aclValuesIn(table access.Table, tier string, overrides map[string]map[strin
 	applyACL(v, overrides)
 	return v
 }
+
+// aclValuesWith picks a user's grant from idx, then builds its ACL values.
+// A grant's own tier wins over the stored one, same as Auth.
+func aclValuesWith(table access.Table, idx grantIndex, userHash, tier string) url.Values {
+	grant, found := idx.find(userHash)
+	if !found {
+		return aclValuesIn(table, tier, nil)
+	}
+	base := tier
+	if grant.Tier != "" {
+		base = grant.Tier
+	}
+	return aclValuesIn(table, base, grant.Overrides)
+}
+
+// alertContactAllowedIn is alertContactAllowed's testable core.
+func alertContactAllowedIn(table access.Table, tier string, overrides map[string]map[string]string) bool {
+	return allowanceFromValues(aclValuesIn(table, tier, overrides)) > 0
+}
+
+// alertContactAllowed says whether tier, with a grant's own overrides on
+// top, grants alerts at all.
+func alertContactAllowed(tier string, overrides map[string]map[string]string) bool {
+	return alertContactAllowedIn(ACL(), tier, overrides)
+}

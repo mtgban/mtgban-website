@@ -1,0 +1,80 @@
+{{define "alerts-body"}}
+{{with .AlertsPage}}
+<div class="alerts-body" id="alerts-page" data-open-card="{{if not .Editing}}{{.FormCardID}}{{end}}" data-open-side="{{.FormSide}}" data-open-edit="{{if .Editing}}{{.Editing.ID}}{{end}}">
+{{if not .SignedIn}}
+    {{if .Unverified}}<p class="alerts-notice">Verify your Patreon email to use alerts, then sign out and back in here.</p>
+    {{else}}<p class="alerts-notice">Sign in with Patreon to set price alerts.</p>{{end}}
+{{else}}
+    {{if not .Allowed}}<p class="alerts-notice">Price alerts are not part of your tier. You can still pause or remove the alerts below.</p>{{end}}
+    {{if .Error}}<p class="alerts-notice alerts-error">{{.Error}}</p>{{end}}
+    {{if not .DiscordLinked}}
+    <p class="alerts-notice">Alerts arrive as a Discord DM. Link Discord in your Patreon settings, then sign out and back in here.{{if .InviteURL}} You also need to be in the <a href="{{.InviteURL}}">MTGBAN server</a>.{{end}}</p>
+    {{end}}
+
+    <div class="alerts-heading">
+        <h2>Your alerts</h2>
+        <span class="alerts-count">{{len .Alerts}} of {{.Allowance}}</span>
+    </div>
+    {{if not .Alerts}}
+    <p class="alerts-empty">No alerts yet. Find a card in search and press its bell.</p>
+    {{else}}
+    <div class="alerts-table-wrap">
+    <table class="table-data alerts-table">
+        <thead>
+            <tr>
+                <th>Card</th>
+                <th>Price</th>
+                <th>Cond</th>
+                <th>Stores</th>
+                <th class="num">Reference</th>
+                <th class="num">Above</th>
+                <th class="num">Below</th>
+                <th class="num">Now</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {{$allowed := .Allowed}}
+        {{range .Alerts}}
+            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}">
+                <td class="alert-card">
+                    <a href="/search?q={{.CardID}}">{{.Card.Name}}</a>
+                    <span class="alert-meta">{{.Card.Set}} #{{.Card.Number}} {{.Card.Finish}}</span>
+                    {{if .LastError}}<span class="alert-note alert-note-error">{{.LastError}}</span>
+                    {{else if eq .Status "over_allowance"}}<span class="alert-note">Parked over your allowance. It comes back at the next price update once there is room.</span>
+                    {{else if .LastEvent}}<span class="alert-note">Fired {{.LastEvent.FiredAt.Format "Jan 2, 15:04"}} at {{.LastEvent.Store}}{{if not .LastEvent.Delivered}}, not delivered{{end}}</span>{{end}}
+                </td>
+                <td class="alert-side"><span class="alert-chip alert-chip-{{.Side}}">{{if eq .Side "buylist"}}Buylist{{else}}Retail{{end}}</span></td>
+                <td class="alert-cond"><span class="alert-chip">{{.Condition}}</span></td>
+                <td class="alert-stores" data-label="Stores">
+                    {{if .Stores}}
+                        {{range $i, $s := .Stores}}{{if lt $i 3}}<span class="alert-chip">{{$s}}</span>{{end}}{{end}}
+                        {{if gt (len .Stores) 3}}<span class="alert-chip alert-chip-more" title="{{range $i, $s := .Stores}}{{if $i}}, {{end}}{{$s}}{{end}}">+{{len (slice .Stores 3)}}</span>{{end}}
+                    {{else}}<span class="alert-dim">any store</span>{{end}}
+                </td>
+                <td class="num" data-label="Reference">${{printf "%.2f" .ReferencePrice}}</td>
+                <td class="num" data-label="Above">{{if .Above.Kind}}{{if eq .Above.Kind "pct"}}+{{.Above.Value}}%{{else}}${{printf "%.2f" .Above.Value}}{{end}}{{else}}<span class="alert-dim">off</span>{{end}}</td>
+                <td class="num" data-label="Below">{{if .Below.Kind}}{{if eq .Below.Kind "pct"}}-{{.Below.Value}}%{{else}}${{printf "%.2f" .Below.Value}}{{end}}{{else}}<span class="alert-dim">off</span>{{end}}</td>
+                <td class="num" data-label="Now">
+                    {{/* mulf by 1 unwraps the *float64 so printf sees a plain float64 */}}
+                    {{if .Current}}${{printf "%.2f" (mulf .Current 1)}}<span class="alert-meta">{{.CurrentStore}}{{if .CreatedPrice}}, was ${{printf "%.2f" (mulf .CreatedPrice 1)}}{{end}}</span>
+                    {{else}}<span class="alert-dim">no offer</span>{{end}}
+                </td>
+                <td class="alert-status-cell"><span class="alert-status alert-status-{{.Status}}">{{if eq .Status "active"}}Active{{else if eq .Status "paused"}}Paused{{else if eq .Status "over_allowance"}}Parked{{else if eq .Status "undeliverable"}}Undeliverable{{else if eq .Status "unresolvable"}}Card missing{{else}}{{.Status}}{{end}}</span></td>
+                <td class="alert-actions">
+                    {{if $allowed}}<button type="button" class="settings-btn" data-action="edit">Edit</button>{{end}}
+                    {{if eq .Status "active"}}<button type="button" class="settings-btn" data-action="pause">Pause</button>
+                    {{else if and $allowed (or (eq .Status "paused") (eq .Status "undeliverable"))}}<button type="button" class="settings-btn" data-action="resume">Resume</button>{{end}}
+                    <button type="button" class="settings-btn alert-btn-danger" data-action="delete">Delete</button>
+                </td>
+            </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{end}}
+{{end}}
+</div>
+{{end}}
+{{end}}

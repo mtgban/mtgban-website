@@ -26,6 +26,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/jobs"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
@@ -343,6 +344,9 @@ type PageVars struct {
 
 	// API plans page payload (nil elsewhere)
 	API *APIPlansVars
+
+	// Alerts page payload (nil elsewhere)
+	AlertsPage *AlertsPageVars
 }
 
 type NavElem struct {
@@ -434,6 +438,7 @@ var OptionalFields = []string{
 	"APImode",
 	"SleepersCYOA",
 	"SearchOfflineMode",
+	"AlertsMax",
 }
 
 // The key matches the query parameter of the permissions defined in sign()
@@ -447,6 +452,7 @@ var OrderNav = []string{
 	"Global",
 	"Arbit",
 	"Reverse",
+	"Alerts",
 	"API",
 	"Admin",
 }
@@ -571,6 +577,16 @@ func init() {
 			Page:        "arbit.html",
 			HasSettings: true,
 		},
+		"Alerts": {
+			Name:        "Alerts",
+			Short:       "🔔",
+			Description: "Price alerts delivered to Discord",
+			Link:        "/alerts",
+			Handle:      (*site).Alerts,
+			Page:        "alerts.html",
+			// No store, no alerts: the page and its result-row links go.
+			ShouldHide: func(s *site) bool { return s.alerts.Store() == nil },
+		},
 		"API": {
 			Name:        "API",
 			Short:       "🔑",
@@ -659,6 +675,7 @@ type ConfigType struct {
 
 	Game         mtgmatcher.Game `json:"game"`
 	InstanceName string          `json:"instance_name"`
+	SiteURL      string          `json:"site_url"`
 
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
@@ -1210,7 +1227,7 @@ func applyAPIGatewayDefaults(c *APIGatewayConfig, game mtgmatcher.Game) {
 	}
 }
 
-func openDBs() (err error) {
+func (s *site) openDBs() (err error) {
 	if Config().SQLConfig == nil {
 		log.Println("no SQL configuration set, Charts won't be available")
 	} else {
@@ -1251,6 +1268,14 @@ func openDBs() (err error) {
 		UserStateDB, err = userstate.NewClient(*Config().UserStateConfig)
 		if err != nil {
 			return fmt.Errorf("error opening the user_state SQL client: %w", err)
+		}
+		// Non-fatal: a schema or privilege problem leaves the service
+		// without a store, which hides the page and no-ops the evaluator.
+		alertsDB, alertsErr := alerts.New(UserStateDB.DB())
+		if alertsErr != nil {
+			log.Println("alerts: store unavailable:", alertsErr)
+		} else {
+			s.alerts.SetStore(alertsDB)
 		}
 	}
 
@@ -1345,6 +1370,7 @@ func main() {
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	storesFlag := flag.String("stores", "", "Load only these stores' dumps, comma-separated (default: scraper_config.stores, else every store)")
 	flag.BoolVar(&SkipNewspaper, "nonews", false, "Do not load newspaper data")
+	alertsSend := flag.Bool("alerts-send", false, "Deliver alert DMs in dev mode")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
 	tcgcsvBackfill := flag.Bool("tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit (archives are withdrawn upstream: stores the current snapshot instead when the range covers it)")
@@ -1397,14 +1423,16 @@ func main() {
 	loadRarityBadges()
 
 	s := newSite()
+	s.alertsSend = *alertsSend
 
 	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
 	// web server. Needs only the config and the price DB. The same jobs run as
 	// their own process via cmd/tcgcsvd, which needs neither this binary nor its
 	// datastore; these flags stay for the deployments already driving them.
 	if *tcgcsvBackfill || *tcgcsvDaily || *tcgcsvProducts {
-		if err := openDBs(); err != nil {
-			log.Fatalln("error opening databases:", err)
+		dbErr := s.openDBs()
+		if dbErr != nil {
+			log.Fatalln("error opening databases:", dbErr)
 		}
 		tcgErr := initTCGCSVService(s)
 		if tcgErr != nil {
@@ -1452,7 +1480,8 @@ func main() {
 		log.Fatalln("error creating a Google client:", err)
 	}
 
-	err = openDBs()
+	// Before the loads start, so the alerts store is in for their pokes.
+	err = s.openDBs()
 	if err != nil {
 		log.Fatalln("error opening databases:", err)
 	}
@@ -1543,6 +1572,8 @@ func main() {
 			// backend it starts with, so it waits for the datastore: read
 			// from a bucket, it can arrive after the prices.
 			<-datastoreLoaded
+			// Alerts wait for both the datastore and the prices.
+			s.alerts.RequestEvaluate(alerts.SideRetail, alerts.SideBuylist)
 			finish := backgroundJobs.Start(jobSetAnalysis)
 			s.runSealedAnalysis()
 			finish(nil)
@@ -1644,6 +1675,9 @@ func main() {
 		log.Println("Error connecting to discord", err)
 	}
 
+	// Price alerts re-evaluate after a burst of installs settles.
+	s.startAlertEvaluator()
+
 	// Serve everything in known folders as a file
 	http.HandleFunc("/css/", ServeFile)
 	http.HandleFunc("/img/", ServeFile)
@@ -1699,9 +1733,10 @@ func main() {
 		}
 
 		// Set up the handler
-		handler := enforceSigning(s, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			nav.Handle(s, w, r)
-		}))
+		})
+		handler = enforceSigning(s, handler)
 		http.Handle(nav.Link, handler)
 
 		// Add any additional endpoints to it
@@ -1733,6 +1768,8 @@ func main() {
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(s.ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(s, http.HandlerFunc(s.BatchPricesAPI)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
+	// Its closures read the live datastore and prices per request.
+	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))
@@ -1750,7 +1787,7 @@ func main() {
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 
-	http.HandleFunc("/auth", Auth)
+	http.HandleFunc("/auth", s.Auth)
 
 	// /healthz: returns 200 only if dependencies are OK.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -1894,6 +1931,9 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	if name == "search.html" {
 		files = append(files, "templates/partials/search-landing.html")
 	}
+	if name == "alerts.html" {
+		files = append(files, "templates/partials/alert-modal.html")
+	}
 	if name == "arbit.html" {
 		files = append(files, "templates/partials/sussy-price.html")
 	}
@@ -1902,6 +1942,9 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	}
 	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" {
 		files = append(files, "templates/partials/patreon-login.html")
+	}
+	if name == "alerts.html" {
+		files = append(files, "templates/partials/alerts-body.html")
 	}
 
 	return path.Base(base), files

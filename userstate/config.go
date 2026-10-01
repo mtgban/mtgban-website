@@ -35,7 +35,8 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 		return nil, fmt.Errorf("userstate: open: %w", err)
 	}
 
-	// Small pool: user_state is low-volume, PK-only, and shares the server cap.
+	// Small pool under the server's cap, shared with alerts (its API and
+	// evaluator); the default 5 covers user_state's PK reads and both.
 	maxOpen := cfg.MaxOpenConns
 	if maxOpen <= 0 {
 		maxOpen = 5
@@ -65,6 +66,11 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	}
 
 	return &Client{db: db}, nil
+}
+
+// DB returns the underlying pool, for packages sharing it (e.g. alerts).
+func (c *Client) DB() *sql.DB {
+	return c.db
 }
 
 // Close shuts down the connection pool.

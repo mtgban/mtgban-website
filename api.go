@@ -854,8 +854,9 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var failed []string
+	var failed, loaded []string
 	for kind, list := range scrapersConfig {
+		ok := false
 		for _, shorthand := range list {
 			err := loadScraperWithRetry(DataBucket, Config().Game, name, kind, shorthand)
 			if err != nil {
@@ -863,10 +864,16 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 				failed = append(failed, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
 				continue
 			}
+			ok = true
+		}
+		if ok {
+			loaded = append(loaded, kind)
 		}
 	}
 
 	updateScraperIndexStore(name, scrapersConfig)
+	// Whatever did load is news to the alerts, failures or not.
+	s.pokeAlerts(loaded...)
 
 	// A scraper that just finished producing and still will not load is the
 	// case worth waking someone for, unlike the same absence at startup.

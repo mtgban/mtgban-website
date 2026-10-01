@@ -87,6 +87,7 @@ var mobileEnabledPages = []string{
 	"Sealed",
 	"Newspaper",
 	"Sleepers",
+	"Alerts",
 	"Changelog",
 	"Admin",
 	"Guide",

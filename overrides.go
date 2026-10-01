@@ -184,7 +184,7 @@ func currentKeyOverridesJSON() (string, error) {
 // shorthand is in the set, so freshly-saved overrides take effect immediately
 // instead of waiting for the next scheduled load. It is a no-op without a data
 // bucket (e.g. API mode), where scrapers pick up changes on their next load.
-func reloadOverriddenScrapers(shorthands map[string]struct{}) {
+func (s *site) reloadOverriddenScrapers(shorthands map[string]struct{}) {
 	if DataBucket == nil || len(shorthands) == 0 {
 		return
 	}
@@ -197,7 +197,9 @@ func reloadOverriddenScrapers(shorthands map[string]struct{}) {
 						err := loadScraperWithRetry(bucket, game, name, kind, shorthand)
 						if err != nil {
 							log.Printf("override reload %s/%s/%s: %v", name, kind, shorthand, err)
+							return
 						}
+						s.pokeAlerts(kind)
 					}(DataBucket, Config().Game, name, kind, shorthand)
 				}
 			}
