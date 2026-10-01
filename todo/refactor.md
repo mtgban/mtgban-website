@@ -26,6 +26,8 @@ to 30.8k lines between May 17 and Sep 30.
 | #740, #745 | This file, the AGENTS.md and SPECIFICATION.md corrections, and the page-scripts-in-`js/` convention |
 | #747 | `Config()` reads one atomic snapshot that a reload replaces whole, and `DataBucket` is set before serving starts: `-race` went from 118 reports to 0 |
 | #748 | A deploy waits for CI on the deployed commit (a manual run can skip it), queues behind a running one, and shares a lock with the self-cycle timer; a rollback can start the old instance |
+| #754 | `main()` from 499 lines to 174: routes, crons, the scraper load, the tcgcsv mode and serving are functions of their own, and the page registry, `PageVars`, nav and render live in pages.go |
+| #756 | The 148 `PageVars` fields one of six pages owns sit in a struct beside its handler (`UploadVars`, `SearchVars`, `AdminVars`, `NewsVars`, `ArbitVars`, `SleepVars`), embedded in `PageVars`, which keeps the 49 that pages share or a small page has one or two of |
 
 ## Open
 
@@ -33,7 +35,6 @@ to 30.8k lines between May 17 and Sep 30.
 |---|---|---|---|---|---|
 | Price API handlers thinly tested | Test | 2/4/2 | 24 | M | `PriceAPI` 25% covered, `BatchPricesAPI` 0% |
 | Database code untested in CI | Test | 3/4/3 | 21 | M | No Postgres in CI; every DB test is env-gated. news.go 5%, `timeseries` 20% (the gateway imports it), `userstate` 1% |
-| main.go and `PageVars` collide | Arch | 4/1/2 | 20 | M | main.go touched by 198 of 1,261 commits since June. `main()` is 174 lines, from 499, with routes, crons, the scraper load, the tcgcsv mode and serving in functions of their own; `PageVars` (pages.go) has 197 fields, most read by one page, and per-page structs are next |
 | Monitoring gaps | Infra | 2/3/2 | 20 | S-M | `/healthz` checks no database; every alert goes to one Discord webhook (none set: logged only); stale-data alarms live in memory and repeat after a restart |
 | Non-Magic games untested in CI | Test | 3/3/3 | 18 | M | 8 of 9 deployments; their tests skip without the `*_PATH` datastores |
 | Giant functions keep growing | Code | 5/3/4 | 16 | L | Since May 17: `Upload` 793 -> 1,275 lines, `Search` 630 -> 1,040, `Admin` 447 -> 717 (#732 took its deploy actions), `parseSearchOptionsNG` 646 -> 816. Plan below |
