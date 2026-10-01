@@ -188,11 +188,11 @@ func TestCKChanceLines(t *testing.T) {
 		want string
 	}{
 		{ckCellKey{"cohort", "nonfoil", "10-20", "wait"},
-			"Chances CK pays more\n• in a week: **52%** instead of 36%\n• in a month: **53%** instead of 45%\nMeasured on 900 nonfoils at $10-20"},
+			"|# CK pays more | This card | Typical\n| In a week | **52%** | 36%\n| In a month | **53%** | 45%\nMeasured on 900 nonfoils at $10-20"},
 		{ckCellKey{"cohort", "foil", "all", "sell"},
-			"Chances CK pays less or nothing\n• in a week: **28%** instead of 38%\n• in a month: **41%** instead of 46%\nMeasured on 900 foils"},
+			"|# CK pays less or nothing | This card | Typical\n| In a week | **28%** | 38%\n| In a month | **41%** | 46%\nMeasured on 900 foils"},
 		{ckCellKey{"exceptions", "nonfoil", "all", "newhigh"},
-			"Chances CK pays less or nothing\n• in a week: **28%** instead of 38%\n• in a month: **41%** instead of 46%\nMeasured on 900 nonfoils, RL or pre-1995"},
+			"|# CK pays less or nothing | This card | Typical\n| In a week | **28%** | 38%\n| In a month | **41%** | 46%\nMeasured on 900 nonfoils, RL or pre-1995"},
 	} {
 		if got := ckChanceLines(tc.cell, odds, typical); got != tc.want {
 			t.Errorf("%v:\n%s\nwant:\n%s", tc.cell, got, tc.want)
@@ -290,7 +290,7 @@ func TestCKViewFor(t *testing.T) {
 		State: "wait",
 		Tip: ckReasons["halved"] + "\n" +
 			ckChanceLines(ckCellKey{"cohort", "nonfoil", "all", "wait"}, ckChances{52, 28, 53, 41, 6000}, ckChances{35, 37, 44, 45, 12000}),
-		Facts: "**CK stock**: 2",
+		Facts: "|CK stock|2",
 	}
 	if got != want {
 		t.Errorf("stock halved, band too thin:\ngot  %+v\nwant %+v", got, want)
@@ -305,7 +305,7 @@ func TestCKViewFor(t *testing.T) {
 	got = ckViewFor(q, h, true, odds, false, today)
 	if got.State != "sell" ||
 		got.Tip != ckReasons["premium"]+"\n"+ckChanceLines(ckCellKey{"cohort", "nonfoil", "10-20", "sell"}, ckChances{24, 45, 34, 58, 900}, ckChances{36, 38, 45, 46, 4000}) ||
-		got.Facts != "**CK stock**: 0 - out 30+ days\n**CK retail**: 2.1x TCG Market" {
+		got.Facts != "|CK stock|0, out 30+ days\n|CK retail|2.1x TCG Market" {
 		t.Errorf("out of stock at twice TCG Market: got %+v", got)
 	}
 
@@ -342,11 +342,11 @@ func TestCKViewFor(t *testing.T) {
 	}
 	q.ID, q.Stock = "999", 2
 	got = ckViewFor(q, hist, true, odds, true, today)
-	if got != (ckView{Facts: "**CK stock**: 2", NewHighTip: ckNewHighVerdict}) {
+	if got != (ckView{Facts: "|CK stock|2", NewHighTip: ckNewHighVerdict}) {
 		t.Errorf("a product the odds do not know: got %+v", got)
 	}
 	got = ckViewFor(quote, hist, true, nil, false, today)
-	if got != (ckView{Facts: "**CK stock**: 2"}) {
+	if got != (ckView{Facts: "|CK stock|2"}) {
 		t.Errorf("no odds loaded: got %+v", got)
 	}
 }
@@ -365,21 +365,21 @@ func TestCKFacts(t *testing.T) {
 		retail    float64
 		want      string
 	}{
-		{"out for days", out, ckHistory{LastInStock: today.AddDate(0, 0, -9)}, false, ckProduct{}, 0, "**CK stock**: 0 - out 9 days"},
-		{"out since yesterday", out, ckHistory{LastInStock: today.AddDate(0, 0, -1)}, false, ckProduct{}, 0, "**CK stock**: 0 - out 1 day"},
-		{"out all month", out, ckHistory{}, false, ckProduct{}, 0, "**CK stock**: 0 - out 30+ days"},
+		{"out for days", out, ckHistory{LastInStock: today.AddDate(0, 0, -9)}, false, ckProduct{}, 0, "|CK stock|0, out 9 days"},
+		{"out since yesterday", out, ckHistory{LastInStock: today.AddDate(0, 0, -1)}, false, ckProduct{}, 0, "|CK stock|0, out 1 day"},
+		{"out all month", out, ckHistory{}, false, ckProduct{}, 0, "|CK stock|0, out 30+ days"},
 		{"in stock, a week ago", in, ckHistory{StockWeekAgo: 12, HasStockWeekAgo: true}, false, ckProduct{}, 0,
-			"**CK stock**: 3 - it was 12 a week ago"},
-		{"no history", out, ckHistory{}, true, ckProduct{}, 0, "**CK stock**: 0"},
+			"|CK stock|3, it was 12 a week ago"},
+		{"no history", out, ckHistory{}, true, ckProduct{}, 0, "|CK stock|0"},
 		{"TCG Market up", in, ckHistory{}, true, ckProduct{Market: 11.2, MarketWeekAgo: 10}, 0,
-			"**CK stock**: 3\n**TCG Market**: +12% this week"},
+			"|CK stock|3\n|TCG Market|+12% this week"},
 		{"TCG Market down", in, ckHistory{}, true, ckProduct{Market: 9, MarketWeekAgo: 10}, 0,
-			"**CK stock**: 3\n**TCG Market**: -10% this week"},
+			"|CK stock|3\n|TCG Market|-10% this week"},
 		{"TCG Market flat", in, ckHistory{}, true, ckProduct{Market: 10.04, MarketWeekAgo: 10}, 0,
-			"**CK stock**: 3\n**TCG Market**: flat this week"},
-		{"retail against TCG Market", in, ckHistory{}, true, ckProduct{Market: 10}, 14, "**CK stock**: 3\n**CK retail**: 1.4x TCG Market"},
+			"|CK stock|3\n|TCG Market|flat this week"},
+		{"retail against TCG Market", in, ckHistory{}, true, ckProduct{Market: 10}, 14, "|CK stock|3\n|CK retail|1.4x TCG Market"},
 		{"stock unknown", ckQuote{Buy: 5}, ckHistory{}, true, ckProduct{Market: 10, MarketWeekAgo: 10}, 20,
-			"**TCG Market**: flat this week\n**CK retail**: 2.0x TCG Market"},
+			"|TCG Market|flat this week\n|CK retail|2.0x TCG Market"},
 		{"nothing known", ckQuote{Buy: 5}, ckHistory{}, true, ckProduct{}, 20, ""},
 	} {
 		got := ckFacts(tc.quote, tc.hist, !tc.noHistory, tc.product, tc.retail, today)
@@ -590,7 +590,7 @@ func TestRebuildCKSignals(t *testing.T) {
 	// Without odds nothing is colored; the facts still show.
 	ckOddsPtr.Store(nil)
 	rebuildCKSignals()
-	if got := ckSignalForCard(ckTestCard("new")); got.State != "" || got.Facts != "**CK stock**: 1" {
+	if got := ckSignalForCard(ckTestCard("new")); got.State != "" || got.Facts != "|CK stock|1" {
 		t.Errorf("no odds: got %+v, want the facts only", got)
 	}
 }
@@ -648,12 +648,12 @@ func TestCKPauseFor(t *testing.T) {
 		want  string
 	}{
 		{ckPause{Paused: true, Days: 9, Back: 80, Beat: 56, Wait: true},
-			"**Wait**: CK stopped buying this card 9 days ago.\nChances CK buys it again in a month: **80%**\nand pays more than any other offer: **56%**"},
+			"**Wait**: CK stopped buying this card 9 days ago.\n|# Within a month | Chance\n| CK buys it again | **80%**\n| Paying more than any other offer | **56%**"},
 		{ckPause{Paused: true, Days: 1, Back: 93, Beat: -1},
-			"**Paused**: CK stopped buying this card yesterday.\nChances CK buys it again in a month: **93%**"},
+			"**Paused**: CK stopped buying this card yesterday.\n|# Within a month | Chance\n| CK buys it again | **93%**"},
 		{ckPause{Paused: true, Days: 0, Back: -1, Beat: -1}, "**Paused**: CK stopped buying this card today."},
 		{ckPause{Paused: true, Days: 44, Back: 50, Beat: 0},
-			"**Paused**: CK stopped buying this card 30+ days ago.\nChances CK buys it again in a month: **50%**\nand pays more than any other offer: **0%**"},
+			"**Paused**: CK stopped buying this card 30+ days ago.\n|# Within a month | Chance\n| CK buys it again | **50%**\n| Paying more than any other offer | **0%**"},
 	} {
 		if got := ckPauseTip(tc.pause); got != tc.want {
 			t.Errorf("%+v:\n%s\nwant:\n%s", tc.pause, got, tc.want)
@@ -760,14 +760,14 @@ func TestLoadScraperRebuildsCKSignals(t *testing.T) {
 	load("retail")
 	load("buylist")
 	got := ckSignalForCard(ckTestCard("a"))
-	if got.State != "sell" || got.Facts != "**CK stock**: 2" {
+	if got.State != "sell" || got.Facts != "|CK stock|2" {
 		t.Errorf("after the buylist load: got %+v, want sell for the new set", got)
 	}
 
 	dump(0, now.Add(time.Minute))
 	load("retail")
 	got = ckSignalForCard(ckTestCard("a"))
-	if got.State != "wait" || got.Facts != "**CK stock**: 0 - out 1 day" {
+	if got.State != "wait" || got.Facts != "|CK stock|0, out 1 day" {
 		t.Errorf("after the retail reload: got %+v, want a wait on the sellout", got)
 	}
 }
