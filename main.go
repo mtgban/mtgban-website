@@ -1087,6 +1087,12 @@ func main() {
 
 	s.registerRoutes()
 
+	s.serve()
+}
+
+// serve answers on the configured port until a signal asks the process to
+// stop, then shuts the server and the background work down.
+func (s *site) serve() {
 	// pprof registered itself on the default mux at import time, so its
 	// routes cannot be wrapped individually like the other pages; steer
 	// them through the standard signing middleware (plus the Admin grant)
@@ -1133,7 +1139,7 @@ func main() {
 		cancel()
 	}()
 
-	err = srv.Shutdown(ctx)
+	err := srv.Shutdown(ctx)
 	if err != nil {
 		ServerNotify("shutdown", "Server shutdown failed: "+err.Error())
 		return
