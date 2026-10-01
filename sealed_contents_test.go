@@ -234,15 +234,15 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 	}
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:     &NavElem{},
-			IsMobile:    mobile,
-			SearchQuery: views.Fixed,
+			BetaNav:  &NavElem{},
+			IsMobile: mobile,
 			SearchVars: SearchVars{
-				SearchRan: true,
-				AllKeys:   []string{"a"},
+				SearchRan:   true,
+				AllKeys:     []string{"a"},
+				SearchQuery: views.Fixed,
+				TotalUnique: 4,
+				Contents:    views,
 			},
-			TotalUnique: 4,
-			Contents:    views,
 		})
 		if !strings.Contains(out, ">Contents<") {
 			t.Errorf("mobile=%v: the switch is not labelled", mobile)
@@ -259,13 +259,13 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 
 	// Every other search is unchanged.
 	out := renderPage(t, "search.html", false, PageVars{
-		BetaNav:     &NavElem{},
-		SearchQuery: "lightning bolt",
+		BetaNav: &NavElem{},
 		SearchVars: SearchVars{
-			SearchRan: true,
-			AllKeys:   []string{"a"},
+			SearchRan:   true,
+			AllKeys:     []string{"a"},
+			SearchQuery: "lightning bolt",
+			TotalUnique: 3,
 		},
-		TotalUnique: 3,
 	})
 	if strings.Contains(out, ">Contents<") {
 		t.Error("an ordinary search offers the switch")

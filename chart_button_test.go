@@ -13,10 +13,10 @@ func TestChartButtonFollowsTheChart(t *testing.T) {
 	pv := PageVars{
 		BetaNav: &NavElem{Short: "b"},
 		SearchVars: SearchVars{
-			AllKeys:   []string{"a", "b"},
-			SearchRan: true,
+			AllKeys:     []string{"a", "b"},
+			SearchRan:   true,
+			SearchQuery: "query",
 		},
-		SearchQuery:  "query",
 		PatreonLogin: true,
 	}
 

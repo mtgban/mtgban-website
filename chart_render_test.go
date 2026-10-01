@@ -53,8 +53,8 @@ func chartPageVars() PageVars {
 					{Price: 11, Known: true},
 				},
 			}},
+			SearchQuery: "Test Card",
 		},
-		SearchQuery: "Test Card",
 		ChartIDsCSV: id,
 		Metadata:    map[string]GenericCard{id: {Name: "Test Card"}},
 		// The base template dereferences these unconditionally; a handler

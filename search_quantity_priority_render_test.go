@@ -16,9 +16,8 @@ import (
 func quantityPriorityPage(mobile bool) PageVars {
 	const id = "card"
 	return PageVars{
-		BetaNav:     &NavElem{Short: "b"},
-		IsMobile:    mobile,
-		SearchQuery: "a card",
+		BetaNav:  &NavElem{Short: "b"},
+		IsMobile: mobile,
 		SearchVars: SearchVars{
 			SearchRan: true,
 			AllKeys:   []string{id},
@@ -31,6 +30,7 @@ func quantityPriorityPage(mobile bool) PageVars {
 					{ScraperName: "SYP", Shorthand: "SYP", Price: 5.00, Quantity: 12, PriceUnit: PriceUnitCount},
 				}},
 			},
+			SearchQuery: "a card",
 		},
 		Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
 	}

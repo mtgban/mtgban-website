@@ -1118,6 +1118,9 @@ type NewsVars struct {
 	CanFilterByPercentage bool
 	FilterMinPercChange   float64
 	FilterMaxPercChange   float64
+
+	Rarities []string
+	Finishes []string
 }
 
 func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {

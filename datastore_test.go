@@ -164,10 +164,10 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 
 	metadata := map[string]GenericCard{"FIXTUREA-1": card}
 	search := PageVars{
-		SearchQuery: card.Name,
 		SearchVars: SearchVars{
-			SearchRan: true,
-			AllKeys:   []string{"FIXTUREA-1"},
+			SearchRan:   true,
+			AllKeys:     []string{"FIXTUREA-1"},
+			SearchQuery: card.Name,
 		},
 		CardHashes: []string{"FIXTUREA-1"},
 		Metadata:   metadata,

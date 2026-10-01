@@ -471,6 +471,32 @@ type SearchVars struct {
 	StocksURL         string
 	AltEtchedID       string
 	EditionFilterList []EditionEntry
+
+	SearchQuery string
+
+	// The sticky filter bar: what the searcher pinned once and does not
+	// retype, kept apart from SearchQuery so either bar can change without
+	// disturbing the other. CanScope is what draws it at all, since the
+	// navbar is shared with pages that run no search.
+	SearchScope string
+	CanScope    bool
+	// The bar holds something that parses to no filter at all, so the
+	// search passes over it whole.
+	ScopeIgnored bool
+
+	// The switch between the three readings of a sealed product's contents,
+	// nil unless the search is one of them over a product that has all three
+	Contents *ContentsViews
+
+	FlatEditions []FlatEditionEntry
+	IsMultiChart bool
+
+	EditionSort []string
+	EditionList map[string][]EditionEntry
+	IsSealed    bool
+	TotalSets   int
+	TotalCards  int
+	TotalUnique int
 }
 
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
