@@ -1,0 +1,53 @@
+name: ci-passed
+
+# Every deploy workflow calls this first: it fails unless the commit being
+# deployed passed ci.yml, waiting out a run still in progress. A manual run
+# can skip the check with skip_ci, which leaves a warning on the run.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Tag, branch or commit being deployed"
+        required: true
+        type: string
+      skip:
+        description: "Deploy without checking CI"
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  ci-passed:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Skip the CI check
+        if: inputs.skip
+        env:
+          REF: ${{ inputs.ref }}
+        run: echo "::warning::deploying $REF without checking CI"
+
+      - name: Wait for CI on the deployed commit
+        if: ${{ !inputs.skip }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ inputs.ref }}
+        run: |
+          sha=$(gh api "repos/$GH_REPO/commits/$REF" --jq .sha)
+          echo "deploying $REF at $sha"
+          # A tag pushed together with its commit can start before CI does.
+          run=""
+          for _ in $(seq 1 12); do
+            run=$(gh run list --workflow ci.yml --commit "$sha" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "$run" ] && break
+            sleep 10
+          done
+          if [ -z "$run" ]; then
+            echo "::error::CI has not run on $sha: merge it, or push it to a PR, before deploying it"
+            exit 1
+          fi
+          gh run watch "$run" --exit-status --interval 30
