@@ -7,8 +7,13 @@
 // their setup finds every title where it was.
 //
 // An element may also carry data-tip, the same text with **marks** around
-// what the tooltip sets in bold; its title stays plain, for screen readers
-// and for the browser's own tooltip.
+// what the tooltip sets in bold, and with tables: a line starting with | is a
+// row of cells split on |, and one starting with |# a header row, which
+// starts a new table. A table with a header sets its other columns as
+// numbers, one without sets its first column as labels, and the text after a
+// table is its footnote. Its title stays plain, the tables as sentences, for
+// screen readers and for the browser's own tooltip (templates.go writes
+// both).
 
 // Pixels kept between the tooltip and the viewport edge, and between the
 // tooltip and its element.
@@ -25,6 +30,37 @@ function banTooltipPlace(rect, width, height, viewportWidth) {
     left = Math.min(left, viewportWidth - BAN_TOOLTIP_MARGIN - width);
     left = Math.max(left, BAN_TOOLTIP_MARGIN);
     return { left: left, top: top, below: below };
+}
+
+// banTipBlocks splits a data-tip into its tables and the runs of lines
+// around them.
+function banTipBlocks(text) {
+    var blocks = [];
+    text.split('\n').forEach(function (line) {
+        var last = blocks[blocks.length - 1];
+        if (line.indexOf('|#') === 0) {
+            blocks.push({ table: true, header: banTipCells(line.slice(2)), rows: [] });
+        } else if (line.charAt(0) === '|') {
+            if (!last || !last.table) {
+                last = { table: true, header: null, rows: [] };
+                blocks.push(last);
+            }
+            last.rows.push(banTipCells(line.slice(1)));
+        } else {
+            if (!last || last.table) {
+                last = { table: false, lines: [] };
+                blocks.push(last);
+            }
+            last.lines.push(line);
+        }
+    });
+    return blocks;
+}
+
+function banTipCells(row) {
+    return row.split('|').map(function (cell) {
+        return cell.trim();
+    });
 }
 
 function installTitleTooltips(document, window) {
@@ -66,10 +102,9 @@ function installTitleTooltips(document, window) {
         el.removeAttribute('data-ban-title');
     }
 
-    // Writes text into the tooltip, what sits between ** marks in bold. It
-    // builds text nodes, so nothing in the text is ever read as markup.
-    function render(text) {
-        tip.textContent = '';
+    // Appends text to parent, what sits between ** marks in bold. It builds
+    // text nodes, so nothing in the text is ever read as markup.
+    function appendBold(parent, text) {
         text.split('**').forEach(function (part, i) {
             if (!part) {
                 return;
@@ -80,7 +115,57 @@ function installTitleTooltips(document, window) {
                 bold.appendChild(node);
                 node = bold;
             }
-            tip.appendChild(node);
+            parent.appendChild(node);
+        });
+    }
+
+    // A table row of cells: after a header's first column numbers, a label as
+    // a header-less table's first.
+    function tableRow(tag, cells, headed) {
+        var tr = document.createElement('tr');
+        cells.forEach(function (text, i) {
+            var cell = document.createElement(tag);
+            if (headed && i > 0) {
+                cell.className = 'tip-num';
+            } else if (!headed && i === 0) {
+                cell.className = 'tip-label';
+            }
+            appendBold(cell, text);
+            tr.appendChild(cell);
+        });
+        return tr;
+    }
+
+    // Writes text into the tooltip: its tables as tables, the lines after
+    // one as its footnote.
+    function render(text) {
+        tip.textContent = '';
+        var blocks = banTipBlocks(text);
+        if (!blocks.some(function (block) { return block.table; })) {
+            appendBold(tip, text);
+            return;
+        }
+        var afterTable = false;
+        blocks.forEach(function (block) {
+            if (!block.table) {
+                var lines = document.createElement('div');
+                if (afterTable) {
+                    lines.className = 'tip-foot';
+                }
+                appendBold(lines, block.lines.join('\n'));
+                tip.appendChild(lines);
+                return;
+            }
+            afterTable = true;
+            var table = document.createElement('table');
+            table.className = 'tip-table';
+            if (block.header) {
+                table.appendChild(tableRow('th', block.header, true));
+            }
+            block.rows.forEach(function (cells) {
+                table.appendChild(tableRow('td', cells, !!block.header));
+            });
+            tip.appendChild(table);
         });
     }
 

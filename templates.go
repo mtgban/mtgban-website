@@ -44,14 +44,163 @@ func csvWithout(csv, drop string) string {
 	return strings.Join(out, ",")
 }
 
-// plainTip is a tooltip's text without the ** marks that set its parts in
-// bold (js/tooltips.js).
-func plainTip(tip string) string {
-	return strings.ReplaceAll(tip, "**", "")
+// A tooltip's text (js/tooltips.js) marks what it sets in bold with **, and
+// may hold tables: a line starting with | is a row of cells split on |, and
+// one starting with |# is a header row, which starts a new table. A table
+// with a header sets its other columns as numbers, one without sets its
+// first column as labels, and the text after a table is its footnote.
+
+// tipBlock is one of a tooltip's tables, or a run of its lines between them.
+type tipBlock struct {
+	table  bool
+	lines  []string
+	header []string
+	rows   [][]string
 }
 
-// tipAttrs is the title, and the data-tip when it marks anything bold, of an
-// element whose tooltip is tip.
+// tipBlocks splits a tooltip into its tables and the lines around them.
+func tipBlocks(tip string) []tipBlock {
+	var blocks []tipBlock
+	for _, line := range strings.Split(tip, "\n") {
+		last := len(blocks) - 1
+		switch {
+		case strings.HasPrefix(line, "|#"):
+			blocks = append(blocks, tipBlock{table: true, header: tipCells(line[2:])})
+		case strings.HasPrefix(line, "|"):
+			if last < 0 || !blocks[last].table {
+				blocks = append(blocks, tipBlock{table: true})
+				last++
+			}
+			blocks[last].rows = append(blocks[last].rows, tipCells(line[1:]))
+		default:
+			if last < 0 || blocks[last].table {
+				blocks = append(blocks, tipBlock{})
+				last++
+			}
+			blocks[last].lines = append(blocks[last].lines, line)
+		}
+	}
+	return blocks
+}
+
+// tipCells are a row's cells, trimmed.
+func tipCells(row string) []string {
+	cells := strings.Split(row, "|")
+	for i, cell := range cells {
+		cells[i] = strings.TrimSpace(cell)
+	}
+	return cells
+}
+
+// hasTipTable tells whether a tooltip holds a table.
+func hasTipTable(tip string) bool {
+	return strings.HasPrefix(tip, "|") || strings.Contains(tip, "\n|")
+}
+
+// plainTip is a tooltip's text without the ** marks that set its parts in
+// bold, and with its tables as sentences: a header's first cell on a line of
+// its own, then each row as "Near Mint: sellers 12, copies 30".
+func plainTip(tip string) string {
+	if !hasTipTable(tip) {
+		return strings.ReplaceAll(tip, "**", "")
+	}
+	var lines []string
+	for _, block := range tipBlocks(tip) {
+		if !block.table {
+			lines = append(lines, block.lines...)
+			continue
+		}
+		if len(block.header) > 0 && block.header[0] != "" {
+			lines = append(lines, block.header[0])
+		}
+		for _, row := range block.rows {
+			lines = append(lines, plainTipRow(row, block.header))
+		}
+	}
+	return strings.ReplaceAll(strings.Join(lines, "\n"), "**", "")
+}
+
+// plainTipRow is a table row as a sentence, each cell after the first after
+// its column's header, which needs no plural that way.
+func plainTipRow(row, header []string) string {
+	if len(row) < 2 {
+		return strings.Join(row, "")
+	}
+	rest := make([]string, 0, len(row)-1)
+	for i, cell := range row[1:] {
+		if i+1 < len(header) && header[i+1] != "" {
+			cell = strings.ToLower(header[i+1]) + " " + cell
+		}
+		rest = append(rest, cell)
+	}
+	return row[0] + ": " + strings.Join(rest, ", ")
+}
+
+// tipHTML is a tooltip as escaped HTML, for the pages that show it in place
+// rather than on hover: its tables as tables, as js/tooltips.js draws them.
+func tipHTML(tip string) template.HTML {
+	if !hasTipTable(tip) {
+		return template.HTML(tipBoldHTML(tip))
+	}
+	var b strings.Builder
+	afterTable := false
+	for _, block := range tipBlocks(tip) {
+		if !block.table {
+			class := ""
+			if afterTable {
+				class = ` class="tip-foot"`
+			}
+			b.WriteString("<div" + class + ">" + tipBoldHTML(strings.Join(block.lines, "\n")) + "</div>")
+			continue
+		}
+		afterTable = true
+		b.WriteString(`<table class="tip-table">`)
+		if block.header != nil {
+			b.WriteString("<tr>")
+			for i, cell := range block.header {
+				b.WriteString("<th" + tipCellClass(i, true) + ">" + tipBoldHTML(cell) + "</th>")
+			}
+			b.WriteString("</tr>")
+		}
+		for _, row := range block.rows {
+			b.WriteString("<tr>")
+			for i, cell := range row {
+				b.WriteString("<td" + tipCellClass(i, block.header != nil) + ">" + tipBoldHTML(cell) + "</td>")
+			}
+			b.WriteString("</tr>")
+		}
+		b.WriteString("</table>")
+	}
+	return template.HTML(b.String())
+}
+
+// tipCellClass is the class of a table's column: a number after a header's
+// first column, a label as a header-less table's first one.
+func tipCellClass(column int, headed bool) string {
+	switch {
+	case headed && column > 0:
+		return ` class="tip-num"`
+	case !headed && column == 0:
+		return ` class="tip-label"`
+	}
+	return ""
+}
+
+// tipBoldHTML is text escaped, what sits between ** marks in <strong>.
+func tipBoldHTML(text string) string {
+	var b strings.Builder
+	for i, part := range strings.Split(text, "**") {
+		if i%2 == 1 {
+			b.WriteString("<strong>" + template.HTMLEscapeString(part) + "</strong>")
+			continue
+		}
+		b.WriteString(template.HTMLEscapeString(part))
+	}
+	return b.String()
+}
+
+// tipAttrs is the title, and the data-tip when it marks anything bold or
+// holds a table, of an element whose tooltip is tip.
 func tipAttrs(tip string) string {
 	plain := plainTip(tip)
 	attrs := ` title="` + template.HTMLEscapeString(plain) + `"`
@@ -419,21 +568,12 @@ var funcMap = template.FuncMap{
 		}
 		return ""
 	},
-	// plain_tip is a tooltip without its ** bold marks, for a title.
+	// plain_tip is a tooltip without its ** bold marks and with its tables
+	// as sentences, for a title.
 	"plain_tip": plainTip,
-	// tip_html writes a tooltip as HTML, its marked parts in bold, where a
-	// page shows it in full rather than on hover.
-	"tip_html": func(tip string) template.HTML {
-		var b strings.Builder
-		for i, part := range strings.Split(tip, "**") {
-			if i%2 == 1 {
-				b.WriteString("<strong>" + template.HTMLEscapeString(part) + "</strong>")
-				continue
-			}
-			b.WriteString(template.HTMLEscapeString(part))
-		}
-		return template.HTML(b.String())
-	},
+	// tip_html writes a tooltip as HTML, its marked parts in bold and its
+	// tables as tables, where a page shows it in full rather than on hover.
+	"tip_html": tipHTML,
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
 	},

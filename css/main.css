@@ -1356,6 +1356,49 @@ table.tiers td div {
 #ban-tooltip[hidden] {
     display: none;
 }
+/* A data-tip's tables: labels and headers grey, numbers right-aligned, a
+   rule between it and what comes before, its footnote grey */
+#ban-tooltip .tip-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+}
+#ban-tooltip .tip-table:not(:first-child) {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-subtle);
+}
+#ban-tooltip .tip-table tr {
+    background: none;
+}
+#ban-tooltip .tip-table th,
+#ban-tooltip .tip-table td {
+    padding: 0;
+    font-weight: 400;
+    text-align: left;
+    vertical-align: baseline;
+}
+/* The tooltip's own text faded toward its background: grey in either theme */
+#ban-tooltip .tip-table th,
+#ban-tooltip .tip-table .tip-label,
+#ban-tooltip .tip-foot {
+    color: color-mix(in srgb, var(--normaltext) 60%, var(--surface-1));
+}
+#ban-tooltip .tip-table th {
+    font-size: var(--text-xs);
+}
+#ban-tooltip .tip-table .tip-label {
+    padding-right: 12px;
+    white-space: nowrap;
+}
+#ban-tooltip .tip-table .tip-num {
+    padding-left: 12px;
+    text-align: right;
+}
+#ban-tooltip .tip-foot {
+    margin-top: 2px;
+    font-size: var(--text-xs);
+}
 
 /* ═══ Tooltip (merged from tooltip.css) ═══ */
 .tooltip {
