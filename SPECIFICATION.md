@@ -81,9 +81,10 @@ Boot sequence (`main()`):
    affiliates. `loadRarityBadges()` (no-op for the default game).
 2. `s := newSite()` (site.go) — the site the routes and jobs are bound to,
    with its palette and offline services; pure, no I/O.
-3. If any `-tcgcsv-*` job flag is set: `openDBs()`, `initTCGCSVService(s)`,
-   run the requested job, `os.Exit(0)` — the datastore and price data are
-   never loaded and `ListenAndServe` never runs.
+3. If any `-tcgcsv-*` job flag is set, `s.runTCGCSVMaintenance()`
+   (tcgcsv_service.go): `openDBs()`, `initTCGCSVService(s)`, run the
+   requested job, `os.Exit(0)` — the datastore and price data are never
+   loaded and `ListenAndServe` never runs.
 4. Otherwise: `loadKeyOverrides()`, create `LogDir`, load Google credentials,
    `openDBs()` → `PricesArchiveDB` (PostgreSQL, `timeseries` package, price
    history for charts, plus `tcg_prices`/`tcg_products` when TCGCSV

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -39,6 +41,46 @@ func initTCGCSVService(s *site) error {
 	}
 	TCGCSVService = svc
 	return nil
+}
+
+// tcgcsvMaintenance is what the -tcgcsv-* flags ask for: one ingest job.
+type tcgcsvMaintenance struct {
+	backfill, daily, products bool
+	backfillOptions           tcgcsvd.BackfillOptions
+}
+
+// runTCGCSVMaintenance runs the ingest job m names, then exits without
+// standing up the web server. It needs only the config and the price DB. The
+// same jobs run as their own process via cmd/tcgcsvd, which needs neither this
+// binary nor its datastore; these flags stay for the deployments already
+// driving them.
+func (s *site) runTCGCSVMaintenance(m tcgcsvMaintenance) {
+	dbErr := s.openDBs()
+	if dbErr != nil {
+		log.Fatalln("error opening databases:", dbErr)
+	}
+	tcgErr := initTCGCSVService(s)
+	if tcgErr != nil {
+		log.Fatalln("tcgcsv:", tcgErr)
+	}
+	// The ingest resolves a ban_id per price row, so warm the categories
+	// it is about to write. No catalog is loaded on this path and none is
+	// needed: config names every category, and there is no site here whose
+	// own game would add one.
+	warmVariantCacheIfEnabled()
+	var err error
+	switch {
+	case m.backfill:
+		err = TCGCSVService.Backfill(context.Background(), m.backfillOptions)
+	case m.daily:
+		err = TCGCSVService.IngestLatest(context.Background())
+	case m.products:
+		err = TCGCSVService.SyncProducts(context.Background())
+	}
+	if err != nil {
+		log.Fatalln("tcgcsv:", err)
+	}
+	os.Exit(0)
 }
 
 // IsTCGCSVStashing reports whether a daily TCGCSV ingest is currently running.

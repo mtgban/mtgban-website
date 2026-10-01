@@ -26,7 +26,6 @@ import (
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
-	"github.com/mtgban/mtgban-website/tcgcsvd"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 
@@ -932,13 +931,14 @@ func main() {
 	alertsSend := flag.Bool("alerts-send", false, "Deliver alert DMs in dev mode")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
-	tcgcsvBackfill := flag.Bool("tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit (archives are withdrawn upstream: stores the current snapshot instead when the range covers it)")
-	tcgcsvFrom := flag.String("tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
-	tcgcsvTo := flag.String("tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
-	tcgcsvForce := flag.Bool("tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
-	tcgcsvCategories := flag.String("tcgcsv-categories", "", "Restrict the backfill to these TCGplayer category ids, comma-separated (default: every configured game)")
-	tcgcsvDaily := flag.Bool("tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
-	tcgcsvProducts := flag.Bool("tcgcsv-products", false, "Sync the tcgcsv product catalog once, then exit")
+	var maintenance tcgcsvMaintenance
+	flag.BoolVar(&maintenance.backfill, "tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit (archives are withdrawn upstream: stores the current snapshot instead when the range covers it)")
+	flag.StringVar(&maintenance.backfillOptions.From, "tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
+	flag.StringVar(&maintenance.backfillOptions.To, "tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
+	flag.BoolVar(&maintenance.backfillOptions.Force, "tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
+	flag.StringVar(&maintenance.backfillOptions.Categories, "tcgcsv-categories", "", "Restrict the backfill to these TCGplayer category ids, comma-separated (default: every configured game)")
+	flag.BoolVar(&maintenance.daily, "tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
+	flag.BoolVar(&maintenance.products, "tcgcsv-products", false, "Sync the tcgcsv product catalog once, then exit")
 
 	flag.Parse()
 
@@ -984,39 +984,8 @@ func main() {
 	s := newSite()
 	s.alertsSend = *alertsSend
 
-	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
-	// web server. Needs only the config and the price DB. The same jobs run as
-	// their own process via cmd/tcgcsvd, which needs neither this binary nor its
-	// datastore; these flags stay for the deployments already driving them.
-	if *tcgcsvBackfill || *tcgcsvDaily || *tcgcsvProducts {
-		dbErr := s.openDBs()
-		if dbErr != nil {
-			log.Fatalln("error opening databases:", dbErr)
-		}
-		tcgErr := initTCGCSVService(s)
-		if tcgErr != nil {
-			log.Fatalln("tcgcsv:", tcgErr)
-		}
-		// The ingest resolves a ban_id per price row, so warm the categories
-		// it is about to write. No catalog is loaded on this path and none is
-		// needed: config names every category, and there is no site here whose
-		// own game would add one.
-		warmVariantCacheIfEnabled()
-		var err error
-		switch {
-		case *tcgcsvBackfill:
-			err = TCGCSVService.Backfill(context.Background(), tcgcsvd.BackfillOptions{
-				From: *tcgcsvFrom, To: *tcgcsvTo, Categories: *tcgcsvCategories, Force: *tcgcsvForce,
-			})
-		case *tcgcsvDaily:
-			err = TCGCSVService.IngestLatest(context.Background())
-		case *tcgcsvProducts:
-			err = TCGCSVService.SyncProducts(context.Background())
-		}
-		if err != nil {
-			log.Fatalln("tcgcsv:", err)
-		}
-		os.Exit(0)
+	if maintenance.backfill || maintenance.daily || maintenance.products {
+		s.runTCGCSVMaintenance(maintenance)
 	}
 
 	// Load the per-seller UUID overrides applied when scrapers (re)load.
