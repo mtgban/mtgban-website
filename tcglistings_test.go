@@ -96,17 +96,24 @@ func TestTCGListingsFor(t *testing.T) {
 		"complete": {Sellers: [5]int32{51, 1, 0, 11, 5}, Copies: [5]int32{83, 1, 0, 19, 1204}, Total: 195},
 		"single":   {Sellers: [5]int32{1}, Copies: [5]int32{1}, Total: 1},
 		"bulk":     {Sellers: [5]int32{75, 12}, Copies: [5]int32{704, 93}, Capped: true, Total: 2357},
+		"damaged":  {Sellers: [5]int32{0, 0, 0, 0, 3}, Copies: [5]int32{0, 0, 0, 0, 4}, Total: 3},
 	})
+	const head = "|# Condition | Sellers | Copies\n"
 	for _, tc := range []struct {
 		card        string
 		grade       mtgban.Condition
 		text, title string
 	}{
-		{"complete", "NM", "51/83", "195 total listings across conditions\n51 sellers / 83 copies for Near Mint\n(as of Sep 28)"},
-		{"complete", "SP", "1/1", "195 total listings across conditions\n1 seller / 1 copy for Lightly Played\n(as of Sep 28)"},
+		{"complete", "NM", "51/83", head + "| **Near Mint** | **51** | **83**\n| Lightly Played | 1 | 1\n| Heavily Played | 11 | 19\n" +
+			"195 listings across conditions · Sep 28"},
+		{"complete", "SP", "1/1", head + "| Near Mint | 51 | 83\n| **Lightly Played** | **1** | **1**\n| Heavily Played | 11 | 19\n" +
+			"195 listings across conditions · Sep 28"},
 		{"complete", "MP", "", ""},
-		{"complete", "PO", "5/1204", "195 total listings across conditions\n5 sellers / 1204 copies for Damaged\n(as of Sep 28)"},
-		{"single", "NM", "1/1", "1 total listing across conditions\n1 seller / 1 copy for Near Mint\n(as of Sep 28)"},
+		// Damaged is never a row, its own included.
+		{"complete", "PO", "5/1204", head + "| Near Mint | 51 | 83\n| Lightly Played | 1 | 1\n| Heavily Played | 11 | 19\n" +
+			"195 listings across conditions · Sep 28"},
+		{"damaged", "PO", "3/4", "3 listings across conditions · Sep 28"},
+		{"single", "NM", "1/1", head + "| **Near Mint** | **1** | **1**\n1 listing across conditions · Sep 28"},
 		{"complete", "INDEX", "", ""},
 		{"bulk", "NM", "2357*", "2357 total listings across conditions\nPer-condition counts unavailable\n(as of Sep 28)"},
 		{"bulk", "SP", "", ""},
@@ -161,7 +168,8 @@ func TestSearchSellersCarryTCGListings(t *testing.T) {
 // quantity cell, desktop and mobile, and leaves a store's own quantity alone.
 func TestSearchShowsTCGListings(t *testing.T) {
 	const cardID = "tcg-listings-card"
-	const title = "60 total listings across conditions\n51 sellers / 83 copies for Near Mint\n(as of Sep 28)"
+	const title = "|# Condition | Sellers | Copies\n| **Near Mint** | **51** | **83**\n60 listings across conditions · Sep 28"
+	const plain = "Condition\nNear Mint: sellers 51, copies 83\n60 listings across conditions · Sep 28"
 	pageVars := PageVars{
 		CondKeys: []mtgban.Condition{"NM"},
 		AllKeys:  []string{cardID},
@@ -175,12 +183,13 @@ func TestSearchShowsTCGListings(t *testing.T) {
 		}},
 		FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
 	}
-	want := `<span class="tcg-listings" title="` + title + `">51/83</span>`
-	for name, page := range map[string]string{
-		"desktop": renderDesktopSearch(t, pageVars),
-		"mobile":  renderMobileSearch(t, pageVars),
+	// Desktop hovers the table; mobile, which cannot, keeps the sentences.
+	for name, tc := range map[string]struct{ page, want string }{
+		"desktop": {renderDesktopSearch(t, pageVars), `<span class="tcg-listings" title="` + plain + `" data-tip="` + title + `">51/83</span>`},
+		"mobile":  {renderMobileSearch(t, pageVars), `<span class="tcg-listings" title="` + plain + `">51/83</span>`},
 	} {
-		if strings.Count(page, want) != 1 {
+		page := tc.page
+		if strings.Count(page, tc.want) != 1 {
 			t.Errorf("%s: want the counts once in the TCGplayer row, rendered:\n%s", name, page)
 		}
 		if strings.Count(page, `class="tcg-listings"`) != 1 {
