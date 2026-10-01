@@ -486,13 +486,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		}
 	}
 
-	userNav := NavElem{
-		Active: true,
-		Class:  "beta",
-		Short:  user,
-		Link:   "javascript:void(0)",
-	}
-	pageVars.UserNav = &userNav
+	pageVars.UserNav = &NavElem{Short: user}
 	return pageVars
 }
 

@@ -566,13 +566,6 @@ body:not([data-theme-pref])    .theme-icon-system {
 a.active:hover{
     color: var(--activetext);
 }
-a.beta {
-    color: #ffffff;
-    font-weight: bold;
-    pointer-events: none;
-    padding-left: 10px;
-}
-
 .selected {
     background-color: var(--activetext);
     color: var(--background);

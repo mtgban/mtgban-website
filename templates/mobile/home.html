@@ -36,7 +36,7 @@
 
     <div class="m-home-tools">
         {{range .Nav}}
-            {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Class "beta")}}
+            {{if and (ne .Name "Home") (ne .Name "Changelog")}}
                 <a class="m-home-tool" href="{{.Link}}">
                     <span class="m-home-tool-icon">{{.Short}}</span> {{.Name}}
                 </a>
