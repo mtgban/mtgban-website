@@ -192,13 +192,15 @@ Then `sudo nginx -t && sudo systemctl reload nginx`.
 
 ### 5. Passwordless sudo for the deploy commands
 
-`deploy.sh` needs to start/stop/enable/disable the two instances and reload
-nginx without a password. Confirm the systemctl path first (`which systemctl`,
-usually `/usr/bin/systemctl`), then:
+`deploy.sh` needs to start/restart/stop/enable/disable the two instances
+and reload nginx without a password. Confirm the systemctl path first
+(`which systemctl`, usually `/usr/bin/systemctl`), then:
 
 ```bash
 sudo tee /etc/sudoers.d/mtgban-deploy >/dev/null <<'EOF'
-koda ALL=(root) NOPASSWD: /usr/bin/systemctl restart mtgban@8081, \
+koda ALL=(root) NOPASSWD: /usr/bin/systemctl start mtgban@8081, \
+    /usr/bin/systemctl start mtgban@8082, \
+    /usr/bin/systemctl restart mtgban@8081, \
     /usr/bin/systemctl restart mtgban@8082, \
     /usr/bin/systemctl stop mtgban@8081, \
     /usr/bin/systemctl stop mtgban@8082, \

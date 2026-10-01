@@ -123,7 +123,7 @@ for ((i=0; i<READY_TIMEOUT; i++)); do
     if ! systemctl is-active --quiet "${UNIT}@${NEW}"; then
         echo "!! ${UNIT}@${NEW} died on startup — last 60 log lines:"
         journalctl -q -u "${UNIT}@${NEW}" -n 60 --no-pager
-        exit 1   # the ERR trap rolls back
+        exit 1   # the EXIT trap rolls back
     fi
     # Heartbeat: surface the instance's own progress (datastore/scraper load,
     # "healthz: not ready (uuids=… sellers=… vendors=…)") in the Action log
