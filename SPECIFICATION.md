@@ -402,9 +402,13 @@ active game has no cached newspaper UUIDs yet) and per-deployment ACL config
 narrow what actually renders for a non-Magic site. A mobile request runs the
 result through `filterNavForMobile()` (mobile.go), called from every page
 handler right after `genPageNav`, which keeps only the handful of pages that
-ship a mobile template. Every page handler receives a giant `PageVars` struct
-(pages.go) that carries nav, alerts, and all page-specific fields into the
-templates.
+ship a mobile template. Every page handler fills a `PageVars` (pages.go): the
+nav, the messages and the fields several pages share, plus the one or two of
+each small page (changelog, screener, API plans, alerts, upload handoff). The
+six pages with many fields of their own keep them in a struct beside their
+handler, embedded in `PageVars` so templates read them unchanged: `UploadVars`
+(49 fields), `SearchVars` (48), `AdminVars` (23), `NewsVars` (17), `ArbitVars`
+(6) and `SleepVars` (5).
 
 Other routes: static `/css|/js|/img` (plus `/favicon.ico`, `/robots.txt`)
 served from disk via `ServeFile` with `Cache-Control: public, max-age=86400`
