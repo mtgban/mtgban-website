@@ -10,11 +10,25 @@ on:
       ref:
         description: "Git tag/branch to deploy"
         required: true
+      skip_ci:
+        description: "Deploy without checking that CI passed"
+        type: boolean
+        default: false
 
 permissions: {}
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci-passed.yml
+    with:
+      ref: ${{ github.event.inputs.ref || github.ref_name }}
+      skip: ${{ inputs.skip_ci == true }}
+    permissions:
+      actions: read
+      contents: read
+
   deploy:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to droplet over SSH

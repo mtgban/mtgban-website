@@ -207,6 +207,11 @@ Two deploy patterns exist, chosen by how big the card pool is:
   checkout and build. Reserved for the largest card pools; a new non-Magic
   game almost certainly wants the App Platform pattern instead.
 
+Every deploy workflow first calls `.github/workflows/ci-passed.yml`, which
+fails unless `ci.yml` passed on the commit being deployed (waiting for a run
+still in progress), so a new game's workflow starts with the same `ci` job
+and the same `skip_ci` input, which lets a manual run deploy regardless.
+
 Either way, code alone doesn't finish the job: the App Platform app (or the
 droplet slot) and its secret(s) have to be provisioned by someone with
 DigitalOcean/infra access before the workflow's first real run — a step no
