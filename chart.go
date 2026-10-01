@@ -925,11 +925,19 @@ func tcgcsvOwnsTCGSeries() bool {
 // collectNonMagicSnapshot walks the served scrapers and accumulates every price
 // it can key on a ban_id. The resolver is a parameter so the whole path from a
 // served scraper to a long price row is exercisable without a warmed variant
-// cache behind it; the one caller passes cachedBanIDForCard.
+// cache behind it.
+//
+// The resolver runs only for a price the snapshot will store: the real one
+// files a variant for every card it misses, and a price declined to the
+// ingest or to a missing provider id should not file one.
 func collectNonMagicSnapshot(b *mtgmatcher.Backend, start time.Time, banIDFor func(*mtgmatcher.CardObject) int64) nonMagicSnapshot {
 	snapshot := newNonMagicSnapshot()
 	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
-		snapshot.add(banIDFor(card), config, date, price)
+		var banID int64
+		if snapshot.stores(config) {
+			banID = banIDFor(card)
+		}
+		snapshot.add(banID, config, date, price)
 	})
 	return snapshot
 }
@@ -974,8 +982,8 @@ type nonMagicSnapshot struct {
 	// those whose card names no product, finish or category to file a variant
 	// under. They are separate faults, a config mistake against a card the
 	// catalog cannot place, and a snapshot reporting one total could not tell
-	// an operator which one to go fix. TCGCSVOwned is not a fault at all, only how much of the walk
-	// another writer already covers.
+	// an operator which one to go fix. TCGCSVOwned is not a fault at all, only
+	// how much of the walk another writer already covers.
 	NoProvider, NoVariant, TCGCSVOwned int
 
 	// NewVariants counts the cache misses that came back under their derived
@@ -1008,6 +1016,12 @@ func (s *nonMagicSnapshot) refile(derived, filed map[timeseries.TCGVariant]int64
 		rows = append(rows, row)
 	}
 	s.Rows = rows
+}
+
+// stores reports whether a price from this dataset becomes a row, the
+// declines add counts coming first.
+func (s *nonMagicSnapshot) stores(config DatasetConfig) bool {
+	return config.Provider != 0 && !slices.Contains(s.tcgcsvOwns, config.Provider)
 }
 
 // add records one scraped price against the ban_id resolved for its card, or
