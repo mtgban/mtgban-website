@@ -251,13 +251,15 @@ func TestSessionStoreYieldsToTheConfig(t *testing.T) {
 func TestAdminDashboardOffersToRemoveSessionStores(t *testing.T) {
 	pv := PageVars{
 		BetaNav: &NavElem{Short: "b"},
-		Tables: [][][]string{
-			{
-				{"Card Kingdom", "CK", "cardkingdom", "2026-09-06T10:00:00Z", "12345", "👍", "✅", "", ""},
-				{"Session Store", "ZZS", "session", "2026-09-06T10:00:00Z", "3", "", "✅", "retail", ""},
-			},
-			{
-				{"Session Store", "ZZS", "session", "2026-09-06T10:00:00Z", "2", "", "✅", "buylist", ""},
+		AdminVars: AdminVars{
+			Tables: [][][]string{
+				{
+					{"Card Kingdom", "CK", "cardkingdom", "2026-09-06T10:00:00Z", "12345", "👍", "✅", "", ""},
+					{"Session Store", "ZZS", "session", "2026-09-06T10:00:00Z", "3", "", "✅", "retail", ""},
+				},
+				{
+					{"Session Store", "ZZS", "session", "2026-09-06T10:00:00Z", "2", "", "✅", "buylist", ""},
+				},
 			},
 		},
 	}

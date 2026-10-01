@@ -13,10 +13,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/mtgban-website/internal/dsreload"
-	"github.com/mtgban/mtgban-website/internal/jobs"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
-	"github.com/mtgban/mtgban-website/observability"
 )
 
 type NavElem struct {
@@ -284,21 +281,11 @@ func init() {
 	}
 }
 
-// UsageDashboard holds the telemetry aggregates rendered on /admin?page=usage.
-type UsageDashboard struct {
-	Since       time.Time
-	IncludeBots bool
-	Instance    string
-	TopPages    []observability.PathAgg
-	ByTier      []observability.TierAgg
-	ByDevice    []observability.DeviceAgg
-	SubViews    []observability.PathAgg
-}
-
 type PageVars struct {
 	Pagination
 	// Each page's own fields: only that page fills them, and only its
 	// templates read them.
+	AdminVars
 	SearchVars
 	UploadVars
 
@@ -329,7 +316,6 @@ type PageVars struct {
 	ErrorMessage   string
 	WarningMessage string
 	InfoMessage    string
-	UsageStats     *UsageDashboard
 
 	SearchQuery string
 	Metadata    map[string]GenericCard
@@ -358,18 +344,6 @@ type PageVars struct {
 	Contents *ContentsViews
 	// Which reading a product's link opens, from the reader's settings
 	SealedContents string
-
-	CheckpointsText    string
-	ACLText            string
-	ACLSource          string
-	AffiliatesText     string
-	AffiliatesSource   string
-	KeyOverridesText   string
-	OverrideStores     []string
-	OverrideFixStore   string
-	OverrideFixKind    string
-	OverrideWrongCard  *OverrideCard
-	OverrideCandidates []OverrideCard
 
 	ScraperShort string
 
@@ -417,21 +391,9 @@ type PageVars struct {
 	SleepersKeys   []string
 	SleepersColors []string
 
-	Tables          [][][]string
-	Jobs            []jobs.Row
-	LastUpdate      time.Time
-	DatastoreReload dsreload.State
-	LastNews        time.Time
-	LastStash       time.Time
-	Uptime          string
-	DiskStatus      string
-	MemoryStatus    string
-	LatestHash      string
-	Tiers           []string
-	Finishes        []string
-
-	SelectableField bool
-	SelectableLabel string
+	LastUpdate time.Time
+	Tiers      []string
+	Finishes   []string
 
 	DisableChart bool
 	ChartIDsCSV  string

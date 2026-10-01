@@ -79,7 +79,7 @@ func TestAdminUsagePanelOnlyOnItsOwnPage(t *testing.T) {
 		SubViews: []observability.PathAgg{{Path: "sleepers/gap", Hits: 405, Uniques: 19}},
 	}
 
-	onUsage := renderAdminPage(t, PageVars{Page: "usage", UsageStats: dash})
+	onUsage := renderAdminPage(t, PageVars{Page: "usage", AdminVars: AdminVars{UsageStats: dash}})
 	for _, want := range []string{"sleepers/gap", "Top pages", "sleepers sub-views", `href="/sleepers?page=gap"`} {
 		if !strings.Contains(onUsage, want) {
 			t.Errorf("the usage tab does not contain %q", want)
@@ -126,7 +126,7 @@ func TestAdminUsagePathLinks(t *testing.T) {
 		ByDevice: []observability.DeviceAgg{{Path: "search", Device: "desktop", Hits: 10, Uniques: 2}},
 		SubViews: []observability.PathAgg{{Path: "newspaper/syp", Hits: 21, Uniques: 11}},
 	}
-	html := renderAdminPage(t, PageVars{Page: "usage", UsageStats: dash})
+	html := renderAdminPage(t, PageVars{Page: "usage", AdminVars: AdminVars{UsageStats: dash}})
 	for _, want := range []string{
 		`href="/newspaper?page=syp"`,
 		`href="/search"`,
@@ -140,7 +140,7 @@ func TestAdminUsagePathLinks(t *testing.T) {
 		Instance: "magic",
 		TopPages: []observability.PathAgg{{Path: "home", Hits: 5, Uniques: 1}},
 	}
-	html = renderAdminPage(t, PageVars{Page: "usage", UsageStats: home})
+	html = renderAdminPage(t, PageVars{Page: "usage", AdminVars: AdminVars{UsageStats: home}})
 	if !strings.Contains(html, `href="/"`) {
 		t.Error("home path should link to /")
 	}
