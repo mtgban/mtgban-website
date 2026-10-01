@@ -170,7 +170,7 @@ fi
 # 4. Scoped passwordless sudoers for the deploy commands (one clean line).
 echo "==> writing sudoers -> $SUDOERS_FILE"
 cmds=""
-for verb in restart stop enable disable; do
+for verb in start restart stop enable disable; do
     for port in "${PORTS[@]}"; do
         # No .service suffix — must match exactly how deploy.sh invokes sudo.
         cmds+="${cmds:+, }$SYSTEMCTL $verb ${UNIT}@${port}"
