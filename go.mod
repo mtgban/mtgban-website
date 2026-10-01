@@ -15,8 +15,8 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/mackerelio/go-osstat v0.2.8
 	github.com/mileusna/useragent v1.3.5
-	github.com/mtgban/go-cardmarket v0.3.1
-	github.com/mtgban/go-mtgban v0.9.3
+	github.com/mtgban/go-cardmarket v0.4.0
+	github.com/mtgban/go-mtgban v0.9.4-0.20261001134352-b668d38bc20c
 	github.com/mtgban/simplecloud v0.1.1
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/oauth2 v0.37.0
