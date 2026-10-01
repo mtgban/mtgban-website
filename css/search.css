@@ -2163,9 +2163,10 @@ body.modal-embed .cp-overlay {
     }
     .qi-actions .emoji { font-size: var(--text-xl); }
 
-    /* The favorite button matches the others (its base rule is more specific
-       and lays it out for the inline icon row). */
-    .result-quick-icons .qi-actions > .fav-btn {
+    /* The favorite button and the alert link match the others (their base
+       rules are more specific and lay them out for the inline icon row). */
+    .result-quick-icons .qi-actions > .fav-btn,
+    .result-quick-icons .qi-actions > .alert-link {
         display: grid;
         grid-template-columns: 24px 1fr;
         align-items: center;
@@ -3030,7 +3031,8 @@ body.modal-embed .cp-overlay {
 
 /* === Favorite star button on desktop result rows === */
 
-.result-quick-icons .fav-btn {
+.result-quick-icons .fav-btn,
+.result-quick-icons .alert-link {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -3048,13 +3050,16 @@ body.modal-embed .cp-overlay {
    24px sideways the moment it did. The narrow layout takes both down to 20
    by setting --qi-icon-size on .qi-actions, above. */
 .result-quick-icons .fav-btn svg,
-.result-quick-icons .fav-btn i[data-lucide] {
+.result-quick-icons .fav-btn i[data-lucide],
+.result-quick-icons .alert-link svg,
+.result-quick-icons .alert-link i[data-lucide] {
     display: block;
     width: var(--qi-icon-size, 24px);
     height: var(--qi-icon-size, 24px);
 }
 
-.result-quick-icons .fav-btn:hover {
+.result-quick-icons .fav-btn:hover,
+.result-quick-icons .alert-link:hover {
     color: var(--normal);
 }
 
@@ -3063,6 +3068,15 @@ body.modal-embed .cp-overlay {
 }
 
 .result-quick-icons .fav-btn.active svg {
+    fill: var(--darkeryellow, gold);
+}
+
+/* A bell with an alert behind it fills in the same way. */
+.result-quick-icons .alert-link.active {
+    color: var(--darkeryellow, gold);
+}
+
+.result-quick-icons .alert-link.active svg {
     fill: var(--darkeryellow, gold);
 }
 

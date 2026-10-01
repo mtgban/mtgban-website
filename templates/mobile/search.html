@@ -1,4 +1,6 @@
 {{define "extra-css"}}
+    {{if .CanAlerts}}<link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">{{end}}
     <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
@@ -45,6 +47,7 @@
 {{end}}
 
 {{define "content"}}
+{{if .CanAlerts}}{{template "alert-modal" .}}{{end}}
     {{if eq .Title "Options"}}
         {{/* Redirect options page to search with settings drawer */}}
         <script>window.location.href = '/search';</script>
@@ -298,6 +301,11 @@
                 <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this); closeActionsMenus();">
                     <i data-lucide="star"></i><span>Favorite</span>
                 </button>
+                {{if $.CanAlerts}}
+                <button type="button" class="m-actions-item m-actions-alert" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); closeActionsMenus(); openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'});">
+                    <i data-lucide="bell"></i><span>Price alert</span>
+                </button>
+                {{end}}
                 {{if not $.DisableChart}}
                     <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
                         <i data-lucide="chart-line"></i><span>Price history</span>
@@ -975,6 +983,7 @@
 {{end}}
 
 {{define "extra-scripts"}}
+{{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}"></script>{{end}}
 {{if not .DisableChart}}
 <script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}"></script>
 {{end}}

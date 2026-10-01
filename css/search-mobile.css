@@ -1437,7 +1437,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     display: block;
 }
 
-.m-actions-item {
+.m-actions-item,
+.m-actions-alert {
     display: flex;
     align-items: center;
     gap: 0.7em;
@@ -1460,7 +1461,10 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 .m-actions-item i,
 .m-actions-item svg,
-.m-actions-item img {
+.m-actions-item img,
+.m-actions-alert i,
+.m-actions-alert svg,
+.m-actions-alert img {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
@@ -1470,6 +1474,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 /* Favorited state for the menu copy of the star. */
 .m-actions-fav.active { color: #f5c518; }
 .m-actions-fav.active svg { fill: #f5c518; stroke: #f5c518; }
+.m-actions-alert.active { color: #f5c518; }
+.m-actions-alert.active svg { fill: #f5c518; stroke: #f5c518; }
 
 /* Portrait: collapse the favorite + chart buttons into the actions menu so the
    card header shows just the kebab (mirrors the desktop narrow layout). In
