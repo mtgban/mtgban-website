@@ -1278,7 +1278,7 @@ window.__BAN_GUIDE = {
                 description: '<p>Options are query parameters and can be combined. Quantities and per-condition prices are only exported by some stores; buylists usually report the NM price only.</p>',
                 table: [
                     { value: 'id=tcg', short: 'Key card objects by another id system: tcg (TCGplayer product id), scryfall, mtgjson, mkm (Cardmarket), ck (Card Kingdom), or mtgban (the default). ck and mtgban list foil and regular under separate ids.' },
-                    { value: 'qty=true', short: 'Add qty, qty_foil, qty_etched, and qty_sealed to price objects. Retail: stock across all conditions. Buylist: the amount the store wants.' },
+                    { value: 'qty=true', short: 'Add qty, qty_foil, qty_etched, and qty_sealed to price objects. Retail: stock across all conditions. Buylist: the amount the store wants. TCGDirect: TCGplayer Direct\'s own stock, from a daily scrape.' },
                     { value: 'conds=true', short: 'Add a conditions dictionary with a price per condition (NM, SP, MP, HP, PO, with _foil and _etched variants). With qty=true a quantities dictionary is added too.' },
                     { value: 'vendor=CK,SCG', short: 'Limit the response to the listed store tags. With a single store, condition prices are always included.' },
                     { value: 'finish=foil', short: 'Keep one finish only: foil, nonfoil, or etched.' },
