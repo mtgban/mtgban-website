@@ -127,7 +127,8 @@ output, not a claim written here.
 
 | File | Responsibility |
 |---|---|
-| `main.go` | Startup, flags, config, routing, `NavElem` page registry, cron jobs |
+| `main.go` | Startup, flags, config, `NavElem` page registry, cron jobs |
+| `routes.go` | `registerRoutes`: static files, redirects, the `NavElem` pages and the APIs, each behind its signing middleware |
 | `pages.go` | `PageVars`, the per-request nav (`genPageNav`), the template cache and `render` |
 | `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
 | `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`), published together |

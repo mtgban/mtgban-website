@@ -374,9 +374,9 @@ advertised) unless the signature carries the `Admin` grant.
 
 ## 4. Routing & page system
 
-Routes are registered in `main()` from the declarative `NavElem` struct
-(main.go) and the `ExtraNavs` map (declared and populated by `init()` in
-main.go): each entry declares its link, name, icon,
+Routes are registered in `registerRoutes()` (routes.go) from the declarative
+`NavElem` struct (main.go) and the `ExtraNavs` map (declared and populated by
+`init()` in main.go): each entry declares its link, name, icon,
 description, handler func, template, `CanPOST`, `AlwaysOnForDev`, optional
 `ShouldHide` (a predicate that drops the entry - and, for a section like
 Newspaper, its subpages with it - when e.g. no data is loaded yet for the
@@ -388,9 +388,10 @@ in `init()`, before any `*site` exists (`DefaultNav`'s entries, Home and
 Changelog, carry no `Handle`). `ShouldHide` is
 `func(*site) bool` for the same reason (it reads the site's current datastore
 for visibility only, e.g. the Sealed sub-tab hides when the loaded backend has
-no sealed product). `main()` builds `s := newSite()` and binds it at
-registration: `nav.Handle(s, w, r)` for declarative pages, plain method values
-(`s.Search`, `s.palette.CardMeta`, `s.offline.Handle`, …) for the rest.
+no sealed product). `main()` builds `s := newSite()` and `s.registerRoutes()`
+binds it at registration: `nav.Handle(s, w, r)` for declarative pages, plain
+method values (`s.Search`, `s.palette.CardMeta`, `s.offline.Handle`, …) for
+the rest.
 `genPageNav(s, r, activeTab, sig)` builds the per-request navbar by filtering
 `OrderNav` (Search, Newspaper, Screener, Sleepers, Upload, Global, Arbit,
 Reverse, Admin) against the signature/ACL; the list itself is identical across
