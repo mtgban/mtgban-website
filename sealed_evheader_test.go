@@ -12,14 +12,14 @@ func sealedPage(entries []SearchEntry) PageVars {
 	const id = "prod"
 	return PageVars{
 		BetaNav: &NavElem{Short: "b"},
-		// Non-empty, or the page renders its landing instead of results.
-		SearchQuery: "a sealed thing",
 		SearchVars: SearchVars{
 			SearchRan:    true,
 			AllKeys:      []string{id},
 			CondKeys:     []mtgban.Condition{"INDEX"},
 			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{id: {"INDEX": entries}},
 			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
+			// Non-empty, or the page renders its landing instead of results.
+			SearchQuery: "a sealed thing",
 		},
 		Metadata: map[string]GenericCard{id: {Name: "A Sealed Thing", Sealed: true, SetCode: "TST"}},
 	}

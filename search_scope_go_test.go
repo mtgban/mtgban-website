@@ -28,7 +28,7 @@ func TestScopeGoSitsBetweenTheBoxAndClear(t *testing.T) {
 		// SearchRan is what puts the mobile page on its results surface,
 		// which draws a bar of its own - so this reaches the second copy
 		// rather than rendering the first one twice.
-		{"mobile, over results", true, PageVars{SearchQuery: "bolt", SearchVars: SearchVars{SearchRan: true}}},
+		{"mobile, over results", true, PageVars{SearchVars: SearchVars{SearchRan: true, SearchQuery: "bolt"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.pageVars.BetaNav = &NavElem{Short: "b"}
@@ -61,8 +61,10 @@ func TestScopeGoIsDrawnOnlyWithTheBar(t *testing.T) {
 // The shortcuts under the bar are finishes, which is what the label says now.
 func TestScopeChipsAreLabelledForWhatTheyAre(t *testing.T) {
 	out := renderPage(t, "search.html", false, PageVars{
-		BetaNav:  &NavElem{Short: "b"},
-		CanScope: true,
+		BetaNav: &NavElem{Short: "b"},
+		SearchVars: SearchVars{
+			CanScope: true,
+		},
 	})
 
 	if !strings.Contains(out, `<span class="nav2-scope-label">Fill</span>`) {

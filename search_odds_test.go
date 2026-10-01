@@ -211,16 +211,16 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 	}
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:     &NavElem{},
-			IsMobile:    mobile,
-			SearchQuery: views.Variable,
+			BetaNav:  &NavElem{},
+			IsMobile: mobile,
 			SearchVars: SearchVars{
-				SearchRan:  true,
-				SearchSort: "odds",
-				AllKeys:    []string{"a"},
+				SearchRan:   true,
+				SearchSort:  "odds",
+				AllKeys:     []string{"a"},
+				SearchQuery: views.Variable,
+				TotalUnique: 4,
+				Contents:    views,
 			},
-			TotalUnique: 4,
-			Contents:    views,
 		})
 		if !strings.Contains(out, `data-lucide="copy"`) {
 			t.Errorf("mobile=%v: no drop rate button", mobile)
@@ -231,15 +231,15 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 
 		views.Mode = ContentsFixed
 		out = renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:     &NavElem{},
-			IsMobile:    mobile,
-			SearchQuery: views.Fixed,
+			BetaNav:  &NavElem{},
+			IsMobile: mobile,
 			SearchVars: SearchVars{
-				SearchRan: true,
-				AllKeys:   []string{"a"},
+				SearchRan:   true,
+				AllKeys:     []string{"a"},
+				SearchQuery: views.Fixed,
+				TotalUnique: 4,
+				Contents:    views,
 			},
-			TotalUnique: 4,
-			Contents:    views,
 		})
 		if strings.Contains(out, `data-lucide="copy"`) {
 			t.Errorf("mobile=%v: the fixed reading offers a drop rate sort", mobile)

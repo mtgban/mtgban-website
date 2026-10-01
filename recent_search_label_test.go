@@ -28,10 +28,10 @@ func renderSearch(t *testing.T, template string, pageVars PageVars) string {
 
 func TestSearchSidebarResetsArtFallbackOnHover(t *testing.T) {
 	out := renderSearch(t, "search.html", PageVars{
-		SearchQuery: "Lightning Bolt",
 		SearchVars: SearchVars{
-			SearchRan: true,
-			AllKeys:   []string{"some-uuid"},
+			SearchRan:   true,
+			AllKeys:     []string{"some-uuid"},
+			SearchQuery: "Lightning Bolt",
 		},
 		CardHashes: []string{"some-uuid"},
 	})
@@ -45,9 +45,9 @@ func TestSearchSidebarResetsArtFallbackOnHover(t *testing.T) {
 func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		found := renderSearch(t, template, PageVars{
-			SearchQuery: "Lightning Bolt",
 			SearchVars: SearchVars{
-				SearchRan: true,
+				SearchRan:   true,
+				SearchQuery: "Lightning Bolt",
 			},
 			CardHashes: []string{"some-uuid"},
 		})
@@ -56,9 +56,9 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 		}
 
 		empty := renderSearch(t, template, PageVars{
-			SearchQuery: "Lightning Bolt",
 			SearchVars: SearchVars{
-				SearchRan: true,
+				SearchRan:   true,
+				SearchQuery: "Lightning Bolt",
 			},
 			InfoMessage: NoResultsMessage,
 		})
@@ -74,9 +74,9 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 func TestTheSearchPageHandsOverTheReadableQuery(t *testing.T) {
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		out := renderSearch(t, template, PageVars{
-			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
 			SearchVars: SearchVars{
-				SearchRan: true,
+				SearchRan:   true,
+				SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
 			},
 			CardHashes: []string{"some-uuid"},
 		})
@@ -103,9 +103,9 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 
 	for _, template := range []string{"search.html", "mobile/search.html"} {
 		one := renderSearch(t, template, PageVars{
-			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
 			SearchVars: SearchVars{
-				SearchRan: true,
+				SearchRan:   true,
+				SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
 			},
 			CardHashes: uuids,
 			Metadata:   map[string]GenericCard{uuids[0]: card},
@@ -115,9 +115,9 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 		}
 
 		many := renderSearch(t, template, PageVars{
-			SearchQuery: "Plaguecrafter",
 			SearchVars: SearchVars{
-				SearchRan: true,
+				SearchRan:   true,
+				SearchQuery: "Plaguecrafter",
 			},
 			CardHashes: []string{"a", "b"},
 			Metadata:   map[string]GenericCard{"a": card},
@@ -132,9 +132,9 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 // end the string it sits in.
 func TestTheReadableQueryCannotBreakOutOfItsString(t *testing.T) {
 	out := renderSearch(t, "search.html", PageVars{
-		SearchQuery: `Hero's Downfall" ; alert(1); "`,
 		SearchVars: SearchVars{
-			SearchRan: true,
+			SearchRan:   true,
+			SearchQuery: `Hero's Downfall" ; alert(1); "`,
 		},
 		CardHashes: []string{"some-uuid"},
 	})

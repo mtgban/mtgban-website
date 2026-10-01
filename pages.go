@@ -319,7 +319,6 @@ type PageVars struct {
 	WarningMessage string
 	InfoMessage    string
 
-	SearchQuery string
 	Metadata    map[string]GenericCard
 	HasSettings bool
 	ShowUpsell  bool
@@ -331,19 +330,6 @@ type PageVars struct {
 	CanShowAll       bool
 	CleanSearchQuery string
 
-	// The sticky filter bar: what the searcher pinned once and does not
-	// retype, kept apart from SearchQuery so either bar can change without
-	// disturbing the other. CanScope is what draws it at all, since the
-	// navbar is shared with pages that run no search.
-	SearchScope string
-	CanScope    bool
-	// The bar holds something that parses to no filter at all, so the
-	// search passes over it whole.
-	ScopeIgnored bool
-
-	// The switch between the three readings of a sealed product's contents,
-	// nil unless the search is one of them over a product that has all three
-	Contents *ContentsViews
 	// Which reading a product's link opens, from the reader's settings
 	SealedContents string
 
@@ -358,8 +344,6 @@ type PageVars struct {
 	Cards              []GenericCard
 	SortDir            string
 	Editions           []string
-	FlatEditions       []FlatEditionEntry
-	Rarities           []string
 	CardHashes         []string
 	EditionsMap        map[string]EditionEntry
 	EditionsCategories []string
@@ -370,19 +354,10 @@ type PageVars struct {
 
 	LastUpdate time.Time
 	Tiers      []string
-	Finishes   []string
 
 	DisableChart bool
 	ChartIDsCSV  string
-	IsMultiChart bool
 	ModalMode    bool
-
-	EditionSort []string
-	EditionList map[string][]EditionEntry
-	IsSealed    bool
-	TotalSets   int
-	TotalCards  int
-	TotalUnique int
 
 	SellerKeys []string
 	VendorKeys []string

@@ -223,9 +223,9 @@ func TestEmptyHandedScopeSearchQuotesNoQuery(t *testing.T) {
 		out := renderPage(t, "search.html", mobile, PageVars{
 			BetaNav: &NavElem{Short: "b"},
 			SearchVars: SearchVars{
-				SearchRan: true,
+				SearchRan:   true,
+				SearchScope: "s:LEA",
 			},
-			SearchScope: "s:LEA",
 			InfoMessage: NoResultsMessage,
 		})
 

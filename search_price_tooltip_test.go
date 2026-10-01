@@ -18,8 +18,7 @@ func TestRetailPriceCarriesOneTooltip(t *testing.T) {
 
 	const id = "card"
 	out := renderPage(t, "search.html", false, PageVars{
-		BetaNav:     &NavElem{Short: "b"},
-		SearchQuery: "a card",
+		BetaNav: &NavElem{Short: "b"},
 		SearchVars: SearchVars{
 			SearchRan: true,
 			AllKeys:   []string{id},
@@ -31,6 +30,7 @@ func TestRetailPriceCarriesOneTooltip(t *testing.T) {
 				}},
 			},
 			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{id: {}},
+			SearchQuery:  "a card",
 		},
 		Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST"}},
 	})
