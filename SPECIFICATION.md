@@ -122,7 +122,8 @@ Boot sequence (`main()`):
    every runtime manifest refresh funnels through, each run through
    `recovered()` (recover.go), so a refresh that panics is reported and the
    loop serves the next one.
-8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, main.go). The
+8. Cron jobs (`gopkg.in/robfig/cron.v2`, non-dev only, `s.startCrons()` in
+   jobs.go). The
    library runs each on a bare goroutine, so each is registered through
    `addJob`, which runs it under `tracked()` (recover.go): a panic is
    reported as a request's is (§2.2), the job runs again at its next time
@@ -696,7 +697,7 @@ plus a page-top banner listing every stale store, each linking to
 reading `PageVars` fields: `stale_count` counts a table's stale rows, and
 `stale_stores` lists their stores (column 2), sorted and deduplicated,
 leaving out `UNKNOWN` and `session`. Separately, an hourly cron job
-(`checkStaleness()`, registered in `main()`) compares every served
+(`checkStaleness()`, registered in `startCrons()`) compares every served
 seller's/vendor's staleness against an in-memory map and announces only
 a transition (`classifyStaleTransition`, a pure function): once going
 stale, once recovering, never on repeat. One check's transitions go out
