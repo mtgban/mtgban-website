@@ -275,7 +275,9 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 
 	// The cache holds a variant for one of the two cards, as it does for a
 	// product the tcgcsv catalog has reached and not for one it has not.
+	var resolved int
 	snapshot := collectNonMagicSnapshot(backend(), now, func(card *mtgmatcher.CardObject) int64 {
+		resolved++
 		if card.UUID == known {
 			return 555
 		}
@@ -296,6 +298,12 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 	}
 	if snapshot.TCGCSVOwned != 1 {
 		t.Errorf("TCGCSVOwned = %d, want 1 for the TCGplayer price the ingest writes", snapshot.TCGCSVOwned)
+	}
+	// The resolver files a variant on a miss, so it must not run for the
+	// TCGplayer and no-provider prices: only the two Cardmarket and the one
+	// SCG price are resolved.
+	if resolved != 3 {
+		t.Errorf("resolver ran %d times, want 3: a declined price was resolved", resolved)
 	}
 	if snapshot.NoProvider != 1 {
 		t.Errorf("NoProvider = %d, want 1 for the dataset with no provider id", snapshot.NoProvider)
