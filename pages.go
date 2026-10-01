@@ -286,13 +286,14 @@ type PageVars struct {
 	// Each page's own fields: only that page fills them, and only its
 	// templates read them.
 	AdminVars
+	ArbitVars
 	NewsVars
 	SearchVars
+	SleepVars
 	UploadVars
 
-	Nav      []NavElem
-	ExtraNav []NavElem
-	BetaNav  *NavElem
+	Nav     []NavElem
+	BetaNav *NavElem
 
 	PatreonIDs   map[string]string
 	PatreonURL   string
@@ -348,14 +349,9 @@ type PageVars struct {
 
 	ScraperShort string
 
-	Arb             []Arbitrage
-	DirectStockNote string
-	ArbitOptKeys    []string
-	ArbitOptConfig  map[string]FilterOpt
-	ArbitFilters    map[string]bool
-	SortOption      string
-	GlobalMode      bool
-	ReverseMode     bool
+	Arb         []Arbitrage
+	SortOption  string
+	ReverseMode bool
 
 	Page               string
 	Subtitle           string
@@ -371,10 +367,6 @@ type PageVars struct {
 	PickerID           string
 
 	CanFilterByPrice bool
-
-	Sleepers       map[string][]string
-	SleepersKeys   []string
-	SleepersColors []string
 
 	LastUpdate time.Time
 	Tiers      []string
@@ -392,10 +384,8 @@ type PageVars struct {
 	TotalCards  int
 	TotalUnique int
 
-	SellerKeys      []string
-	VendorKeys      []string
-	ModalSellerKeys []string
-	ModalVendorKeys []string
+	SellerKeys []string
+	VendorKeys []string
 
 	// Price-movers screener payload (nil on non-screener pages).
 	Screener *ScreenerVars

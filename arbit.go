@@ -423,6 +423,17 @@ type Arbitrage struct {
 	SussyList map[string]float64
 }
 
+// ArbitVars are the PageVars fields only the arbitrage pages (arbit, global,
+// reverse) fill and read.
+type ArbitVars struct {
+	ExtraNav        []NavElem
+	DirectStockNote string
+	ArbitOptKeys    []string
+	ArbitOptConfig  map[string]FilterOpt
+	ArbitFilters    map[string]bool
+	GlobalMode      bool
+}
+
 func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
 	arbit(s, s.backend(), w, r, false)
 }
