@@ -1532,7 +1532,6 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 
 .price-row .price-warn {
     color: var(--adanger);
-    position: relative;
     cursor: help;
 }
 .price-row .price-best {
@@ -1548,25 +1547,6 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     font-weight: 700;
     cursor: help;
 }
-.price-row .price-warn[data-tooltip]:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 6px 12px;
-    border-radius: var(--radius-sm, 6px);
-    background: var(--search-surface-1);
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    color: var(--normal);
-    font-size: var(--text-sm);
-    font-weight: 400;
-    white-space: nowrap;
-    z-index: 100;
-    pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-
 .price-row .secondary {
     font-family: var(--font-mono);
     font-size: var(--text-lg);

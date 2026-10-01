@@ -69,13 +69,13 @@ func TestReverseSussyBadge(t *testing.T) {
 	if !strings.Contains(row, "$ 23934.02") {
 		t.Fatal("the buy price is missing from the row")
 	}
-	if !strings.Contains(row, "TCG Market is $483.56") {
+	if !strings.Contains(row, "This price: $ 23934.02\nTCG Market: $ 483.56") {
 		t.Error("the suspect buy price carries no warning")
 	}
 
 	clean := page[strings.Index(page, `data-arb-id="card-a"`):]
 	clean = clean[:strings.Index(clean, "</tr>")]
-	if strings.Contains(clean, "TCG Market is") {
+	if strings.Contains(clean, "Price looks off") {
 		t.Error("a price the market backs up was flagged anyway")
 	}
 }
@@ -318,7 +318,7 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("global=%v source=FILTSHOP%s lists the row: %v, want %v", tt.global, tt.query, got, tt.want)
 		}
-		warned := strings.Contains(w.Body.String(), "TCG Market is")
+		warned := strings.Contains(w.Body.String(), "Price looks off")
 		if warned != tt.warn {
 			t.Errorf("global=%v source=FILTSHOP%s warns: %v, want %v", tt.global, tt.query, warned, tt.warn)
 		}
