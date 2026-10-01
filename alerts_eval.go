@@ -24,7 +24,7 @@ func (s *site) alertEvalDeps() alerts.EvalDeps {
 			d.Values = func(userHash, tier string) url.Values {
 				return aclValuesWith(ACL(), idx, userHash, tier)
 			}
-			d.Prices, d.SiteURL = alertVisiblePrices, alertSiteURL()
+			d.Prices = alertVisiblePrices
 			d.Resolve = func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(b, cardID) }
 			d.Game = string(Config().Game)
 			return d
@@ -36,9 +36,6 @@ func (s *site) alertEvalDeps() alerts.EvalDeps {
 func (s *site) startAlertEvaluator() {
 	if s.alerts.Store() == nil {
 		return
-	}
-	if alertSiteURL() == "" {
-		log.Println("alerts: site_url is not set, DM links are omitted")
 	}
 	s.alerts.StartEvaluator(func(fn func()) func() { return tracked(jobAlerts, fn) })
 }

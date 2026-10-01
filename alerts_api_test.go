@@ -35,8 +35,15 @@ func TestAlertsIdentityReadsSignature(t *testing.T) {
 
 	c, status, _ := alertsIdentity(alertsRequest("GET", "/api/alerts/", devSig("a@b.com", "Legacy")))
 	if status != http.StatusOK || c.UserHash != userstate.HashEmail("a@b.com") || c.Tier != "Legacy" ||
-		allowanceFromValues(c.Values) != 2 {
+		allowanceFromValues(c.Values) != 2 || c.Origin != "" {
 		t.Fatalf("identity = %d %+v", status, c)
+	}
+	r := alertsRequest("GET", "/api/alerts/", devSig("a@b.com", "Legacy"))
+	r.Host = "lorcana.mtgban.com"
+	r.Header.Set("X-Forwarded-Proto", "https")
+	c, _, _ = alertsIdentity(r)
+	if c.Origin != "https://lorcana.mtgban.com" {
+		t.Fatalf("origin = %q, want the site the request came to", c.Origin)
 	}
 
 	api := alerts.NewAPI(alerts.APIDeps{Identity: alertsIdentity, Allowance: alertAllowance})

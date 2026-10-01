@@ -33,6 +33,9 @@ type Caller struct {
 	UserHash string
 	Tier     string
 	Values   url.Values
+	// Origin is the site the request came to, empty when its host is not
+	// one the site trusts.
+	Origin string
 }
 
 // APIDeps is what the API reads; Prices and Resolve read the live data
@@ -363,7 +366,7 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 	}
 	alert := Alert{
 		UserHash: userHash, Game: a.game(), CardID: req.CardID, Side: req.Side, Condition: condition,
-		Stores: stores, Above: above, Below: below, Delivery: req.Delivery, Card: card,
+		Stores: stores, Above: above, Below: below, Delivery: req.Delivery, Card: card, Origin: c.Origin,
 	}
 	if req.ReferencePrice != nil {
 		alert.ReferencePrice = *req.ReferencePrice
@@ -487,6 +490,9 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 	}
 	if req.Delivery != "" {
 		next.Delivery = req.Delivery
+	}
+	if c.Origin != "" {
+		next.Origin = c.Origin
 	}
 	_, sealed, resolved := a.deps.Resolve(cur.CardID)
 	if resolved && sealed {

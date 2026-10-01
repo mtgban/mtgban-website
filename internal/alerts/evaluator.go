@@ -40,7 +40,6 @@ type EvalDeps struct {
 	Prices     func(cardID string, side Side, v url.Values) []StorePrice
 	Resolve    func(cardID string) (Card, bool, bool)
 	Game       string
-	SiteURL    string
 	StoreLabel func(shorthand string) string
 	Now        func() time.Time
 	Pace       time.Duration
@@ -195,7 +194,7 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		if attempts > 0 && deps.Pace > 0 {
 			time.Sleep(deps.Pace)
 		}
-		sendErr := deps.Sender.Send(a.Contact.DiscordUserID, dmEmbed(a.Alert, d, deps.SiteURL, label))
+		sendErr := deps.Sender.Send(a.Contact.DiscordUserID, dmEmbed(a.Alert, d, a.Origin, label))
 		attempts++
 		recordEvents(ctx, deps, &sum, a.ID, d, now, sendErr)
 		switch {

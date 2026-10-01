@@ -111,7 +111,7 @@ func testIdentity(r *http.Request) (Caller, int, string) {
 		v.Set("Alerts", "true")
 		v.Set("AlertsMax", "2")
 	}
-	return Caller{UserHash: testHash(email), Tier: tier, Values: v}, http.StatusOK, ""
+	return Caller{UserHash: testHash(email), Tier: tier, Values: v, Origin: r.Header.Get("X-Test-Origin")}, http.StatusOK, ""
 }
 
 func testAlertsAPI(store APIStore) *API {
@@ -385,6 +385,36 @@ func TestAlertsAPIArmsOnlyTheSidesNotYetPast(t *testing.T) {
 	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"below":{"kind":"abs","value":10}}`, sig))
 	if w.Code != http.StatusOK || !store.rows[1].BelowArmed {
 		t.Fatalf("edit = %d below armed=%v, want 200 true", w.Code, store.rows[1].BelowArmed)
+	}
+}
+
+func TestAlertsAPISavesTheOrigin(t *testing.T) {
+	store := newFakeAlertStore()
+	api := testAlertsAPI(store)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	store.contacts[hash] = Contact{UserHash: hash, DiscordUserID: "1", Tier: "Legacy"}
+	from := func(r *http.Request, origin string) *http.Request {
+		r.Header.Set("X-Test-Origin", origin)
+		return r
+	}
+
+	body := `{"card_id":"card-1","side":"buylist","condition":"NM","above":{"kind":"abs","value":15},"delivery":"discord"}`
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, from(alertsRequest("POST", "/api/alerts/", body, sig), "https://lorcana.mtgban.com"))
+	if w.Code != http.StatusCreated || store.rows[1].Origin != "https://lorcana.mtgban.com" {
+		t.Fatalf("create = %d origin=%q", w.Code, store.rows[1].Origin)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, from(alertsRequest("PATCH", "/api/alerts/1", `{"above":{"kind":"abs","value":16}}`, sig), "https://mtgban.com"))
+	if w.Code != http.StatusOK || store.rows[1].Origin != "https://mtgban.com" {
+		t.Fatalf("edit = %d origin=%q, want the site it was saved on", w.Code, store.rows[1].Origin)
+	}
+	// A request from a host the site does not trust keeps the saved one.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"above":{"kind":"abs","value":17}}`, sig))
+	if w.Code != http.StatusOK || store.rows[1].Origin != "https://mtgban.com" {
+		t.Fatalf("edit without origin = %d origin=%q", w.Code, store.rows[1].Origin)
 	}
 }
 

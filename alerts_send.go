@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"log"
-	"strings"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -39,24 +38,6 @@ func liveAlertSender(send bool) alerts.Sender {
 		return logAlertSender{}
 	}
 	return discordAlertSender{}
-}
-
-// alertSiteURL is the origin links in a DM point at; a background job has
-// no request to read a host from. Empty means links are left out.
-func alertSiteURL() string {
-	cfg := Config()
-	u := strings.TrimRight(cfg.SiteURL, "/")
-	if u != "" {
-		return u
-	}
-	if DevMode {
-		return "http://localhost:" + cfg.Port
-	}
-	if cfg.Game != "" && cfg.Game != DefaultGame {
-		// The default host is the Magic site; another game must not link there.
-		return ""
-	}
-	return DefaultExternalURL
 }
 
 // alertStoreLabel is the store name, or its shorthand when it is not loaded.

@@ -127,6 +127,9 @@ type Alert struct {
 	CreatedPrice   *float64   `json:"created_price,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+	// Origin is the site the alert was last saved on, which its DM links
+	// to; empty leaves the links out.
+	Origin string `json:"-"`
 }
 
 // State is what the evaluator writes back on a row.

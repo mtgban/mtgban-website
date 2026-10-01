@@ -679,7 +679,6 @@ type ConfigType struct {
 
 	Game         mtgmatcher.Game `json:"game"`
 	InstanceName string          `json:"instance_name"`
-	SiteURL      string          `json:"site_url"`
 
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
