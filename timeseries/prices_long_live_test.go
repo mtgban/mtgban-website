@@ -342,3 +342,106 @@ func TestMoversLongGameScopingLive(t *testing.T) {
 		t.Errorf("magic mover = %+v, want uuid %s current 10 prior 5", got, scopeSentinelUUID)
 	}
 }
+
+// Sentinels for the derived-id test. 8191 is the largest category TCGBanID
+// accepts and no TCGplayer category comes near it; 999004 is past it, so it
+// exercises the sequence fallback.
+const (
+	derivedSentinelCat      = tcgBanIDMaxCategory
+	derivedSentinelCatOver  = 999004
+	derivedSentinelProd     = 888113
+	derivedSentinelProvider = int16(997)
+)
+
+// TestEnsureTCGVariantsLive files variants against the real table: a new one
+// under its derived id, one filed under the sequence beforehand keeping that
+// id, and one the layout cannot hold falling back to the sequence. Each id has
+// to come back the same from a second call and from a cold client, and carry
+// a price through the FK.
+func TestEnsureTCGVariantsLive(t *testing.T) {
+	ctx := context.Background()
+	c, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	cleanup := func() {
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, derivedSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE tcgp_category_id IN ($1,$2)`,
+			derivedSentinelCat, derivedSentinelCatOver)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, derivedSentinelProvider)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	if _, err := c.db.ExecContext(ctx, `
+		INSERT INTO providers (id, shorthand, public_name, kind, currency)
+		VALUES ($1,'SENTINEL3','Sentinel Derived','retail','USD')
+		ON CONFLICT (id) DO NOTHING`, derivedSentinelProvider); err != nil {
+		t.Fatalf("insert sentinel provider: %v", err)
+	}
+
+	fresh := TCGVariant{CategoryID: derivedSentinelCat, ProductID: derivedSentinelProd, SubType: "Normal"}
+	legacy := TCGVariant{CategoryID: derivedSentinelCat, ProductID: derivedSentinelProd, SubType: "Cold Foil"}
+	over := TCGVariant{CategoryID: derivedSentinelCatOver, ProductID: derivedSentinelProd, SubType: "Normal"}
+
+	// A row filed under the sequence before ids were derived, as every
+	// existing non-Magic variant was.
+	var legacyID int64
+	if err := c.db.QueryRowContext(ctx, `
+		INSERT INTO variants (tcgp_category_id, tcgp_product_id, tcgp_sub_type)
+		VALUES ($1,$2,$3) RETURNING ban_id`,
+		legacy.CategoryID, legacy.ProductID, legacy.SubType).Scan(&legacyID); err != nil {
+		t.Fatalf("insert legacy variant: %v", err)
+	}
+
+	ids, err := c.EnsureTCGVariants(ctx, []TCGVariant{fresh, legacy, over})
+	if err != nil {
+		t.Fatalf("EnsureTCGVariants: %v", err)
+	}
+	want, _ := TCGBanID(fresh)
+	if ids[fresh] != want {
+		t.Errorf("fresh variant filed as %d, want its derived id %d", ids[fresh], want)
+	}
+	if ids[legacy] != legacyID {
+		t.Errorf("legacy variant came back as %d, want its sequence id %d", ids[legacy], legacyID)
+	}
+	if ids[over] == 0 || ids[over] >= 1<<tcgBanIDCategoryShift {
+		t.Errorf("out-of-range variant filed as %d, want a sequence id", ids[over])
+	}
+
+	// Again, from the cache and then from a client that never saw them.
+	again, err := c.EnsureTCGVariants(ctx, []TCGVariant{fresh, legacy, over})
+	if err != nil {
+		t.Fatalf("EnsureTCGVariants again: %v", err)
+	}
+	c2, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient (cold): %v", err)
+	}
+	t.Cleanup(func() { _ = c2.Close() })
+	cold, err := c2.EnsureTCGVariants(ctx, []TCGVariant{fresh, legacy, over})
+	if err != nil {
+		t.Fatalf("EnsureTCGVariants cold: %v", err)
+	}
+	for _, v := range []TCGVariant{fresh, legacy, over} {
+		if again[v] != ids[v] || cold[v] != ids[v] {
+			t.Errorf("%+v: first %d, again %d, cold %d", v, ids[v], again[v], cold[v])
+		}
+	}
+	if got, err := c2.ResolveTCGBanID(ctx, fresh); err != nil || got != want {
+		t.Errorf("ResolveTCGBanID(fresh) = %d, %v; want %d", got, err, want)
+	}
+
+	// The prices FK takes a row on the derived id.
+	day := time.Now().UTC()
+	if err := c.EnsurePricePartition(ctx, day); err != nil {
+		t.Fatalf("EnsurePricePartition: %v", err)
+	}
+	if n, err := c.UpsertLongPrices(ctx, []LongPrice{
+		{BanID: want, Date: day.Format("2006-01-02"), Provider: derivedSentinelProvider, Price: 1.23},
+	}, 0); err != nil || n != 1 {
+		t.Fatalf("UpsertLongPrices on the derived id = %d, %v", n, err)
+	}
+}
