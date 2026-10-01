@@ -198,30 +198,30 @@ func sample(h string) Alert {
 	}
 }
 
-func TestCreateAndUpdateWriteTheArmedState(t *testing.T) {
+func TestCreateAndUpdateWriteArmedStateAndOrigin(t *testing.T) {
 	s := testStore(t)
 	h := freshUser(t, s)
 	seedContact(t, s, h)
 	ctx := context.Background()
 
 	a := sample(h)
-	a.BelowArmed = false
+	a.BelowArmed, a.Origin = false, "https://lorcana.mtgban.com"
 	created, err := s.Create(ctx, a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !created.AboveArmed || created.BelowArmed {
-		t.Fatalf("Create armed above=%v below=%v, want true false", created.AboveArmed, created.BelowArmed)
+	if !created.AboveArmed || created.BelowArmed || created.Origin != "https://lorcana.mtgban.com" {
+		t.Fatalf("Create armed above=%v below=%v origin=%q", created.AboveArmed, created.BelowArmed, created.Origin)
 	}
 	edit := created
-	edit.AboveArmed, edit.BelowArmed = false, true
+	edit.AboveArmed, edit.BelowArmed, edit.Origin = false, true, "https://mtgban.com"
 	ok, err := s.Update(ctx, edit)
 	if err != nil || !ok {
 		t.Fatalf("Update: ok=%v err=%v", ok, err)
 	}
 	got, _, _ := s.Get(ctx, created.ID, h)
-	if got.AboveArmed || !got.BelowArmed {
-		t.Fatalf("Update armed above=%v below=%v, want false true", got.AboveArmed, got.BelowArmed)
+	if got.AboveArmed || !got.BelowArmed || got.Origin != "https://mtgban.com" {
+		t.Fatalf("Update armed above=%v below=%v origin=%q", got.AboveArmed, got.BelowArmed, got.Origin)
 	}
 }
 

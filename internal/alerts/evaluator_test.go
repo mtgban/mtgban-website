@@ -152,12 +152,14 @@ func (f *fakeEvalStore) PruneEvents(context.Context, time.Time) (int64, error) {
 }
 
 type fakeSender struct {
-	sent []string
-	err  error
+	sent   []string
+	embeds []*discordgo.MessageEmbed
+	err    error
 }
 
-func (f *fakeSender) Send(id string, _ *discordgo.MessageEmbed) error {
+func (f *fakeSender) Send(id string, embed *discordgo.MessageEmbed) error {
 	f.sent = append(f.sent, id)
+	f.embeds = append(f.embeds, embed)
 	return f.err
 }
 
@@ -166,7 +168,7 @@ var evalNow = time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
 func evalDeps(store *fakeEvalStore, sender *fakeSender, price float64) EvalDeps {
 	// A fresh prune clock, so each test starts due.
 	return EvalDeps{
-		Store: store, Sender: sender, Game: "magic", SiteURL: "https://x", Pace: 0,
+		Store: store, Sender: sender, Game: "magic", Pace: 0,
 		PruneDue:  (&Service{}).pruneDue,
 		Ready:     func() bool { return true },
 		Allowance: func(url.Values) int { return 5 },
@@ -187,7 +189,7 @@ func activeAlert() ActiveAlert {
 			ID: 7, UserHash: "u", Game: "magic", CardID: "card-1", Side: SideBuylist, Condition: "NM",
 			ReferencePrice: 10, Above: Threshold{Kind: KindAbs, Value: 12},
 			Status: StatusActive, AboveArmed: true, BelowArmed: true, Delivery: DeliveryDiscord,
-			UpdatedAt: time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC), Origin: "https://lorcana.mtgban.com",
 		},
 		Contact: Contact{UserHash: "u", DiscordUserID: "d1", Tier: "Legacy", UpdatedAt: evalNow.Add(-24 * time.Hour)},
 	}
@@ -202,6 +204,11 @@ func TestRunAlertEvaluationFiresAndRecords(t *testing.T) {
 
 	if len(sender.sent) != 1 || sender.sent[0] != "d1" {
 		t.Fatalf("sent = %v", sender.sent)
+	}
+	// The DM links to the site the alert was saved on.
+	e := sender.embeds[0]
+	if e.URL != "https://lorcana.mtgban.com/alerts" || !strings.Contains(e.Description, "https://lorcana.mtgban.com/go/b/CK/card-1") {
+		t.Fatalf("links: url=%q\n%s", e.URL, e.Description)
 	}
 	if !slices.Equal(store.claims, []int64{7}) || store.armed[7] != [2]bool{false, true} || !store.fired[7].Equal(evalNow) {
 		t.Fatalf("claim: claims=%v armed=%v fired=%v", store.claims, store.armed[7], store.fired[7])

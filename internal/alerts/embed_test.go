@@ -138,7 +138,7 @@ func TestAlertEmbedEscapesMarkdown(t *testing.T) {
 	}
 }
 
-func TestAlertEmbedOmitsLinksWithoutSiteURL(t *testing.T) {
+func TestAlertEmbedOmitsLinksWithoutOrigin(t *testing.T) {
 	a := Alert{
 		CardID: "card-1", Side: SideBuylist, Condition: "NM", ReferencePrice: 10,
 		Above: Threshold{Kind: KindAbs, Value: 12},
