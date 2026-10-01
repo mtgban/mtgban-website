@@ -299,6 +299,9 @@ type UsageDashboard struct {
 
 type PageVars struct {
 	Pagination
+	// Each page's own fields: only that page fills them, and only its
+	// templates read them.
+	UploadVars
 
 	Nav      []NavElem
 	ExtraNav []NavElem
@@ -498,82 +501,10 @@ type PageVars struct {
 	TotalCards        int
 	TotalUnique       int
 
-	// UPLOAD
-	// All the scrapers in singles/sealed mode
-	AllScraperKeys []string
-	// All the singles scrapers
-	ScraperKeys []string
-	IndexKeys   []string
-	// All the sealed scrapers
-	SealedScraperKeys []string
-	SealedIndexKeys   []string
-
-	// All the index prices that can be toggled, and the subset the user
-	// enabled (shared between Retail and Buylist, they are references)
-	IndexAllKeys         []string
-	EnabledIndexes       []string
-	SealedIndexAllKeys   []string
-	EnabledSealedIndexes []string
-
-	// Additional sources for index keys if needed
-	AltKeys          []string
-	SellerKeys       []string
-	VendorKeys       []string
-	SealedSellerKeys []string
-	SealedVendorKeys []string
-	ModalSellerKeys  []string
-	ModalVendorKeys  []string
-	UploadEntries    []UploadEntry
-
-	// UnpackSealed counts the rows holding a decklist, which is what decides
-	// whether the results offer to open them. The contents themselves are
-	// resolved when the offer is taken, not before.
-	UnpackSealed int
-
-	// UnpackedFrom counts the products this list is the contents of, and is
-	// how the results say they are that rather than an upload: the rest of
-	// what was uploaded is deliberately not here.
-	UnpackedFrom         int
-	IsBuylist            bool
-	TotalEntries         map[string]float64
-	EnabledSellers       []string
-	EnabledVendors       []string
-	EnabledSealedSellers []string
-	EnabledSealedVendors []string
-	CanBuylist           bool
-	MagicOnlyExports     bool
-	CanChangeStores      bool
-	CanUploadCustom      bool
-	CanPublishStore      bool
-	RemoteLinkURL        string
-	TotalQuantity        int
-	Optimized            map[string][]OptimizedUploadEntry
-	OptimizedKeys        []string
-	IgnorePrices         bool
-	OptimizedTotals      map[string]float64
-	HighestTotal         float64
-	MissingCounts        map[string]int
-	MissingPrices        map[string]float64
-	ResultPrices         map[string]map[string]float64
-	UploadQuery          string
-	// Original link of a remote-URL upload, so the results header can
-	// point back at the source
-	UploadSourceURL string
-	// Upload singles/sealed/not-found split
-	SinglesEntries    []UploadEntry
-	SealedEntries     []UploadEntry
-	NotFoundEntries   []UploadEntry
-	SinglesQuantity   int
-	SealedQuantity    int
-	SinglesHighest    float64
-	SealedHighest     float64
-	ShowResultTabs    bool
-	ShowAllTab        bool
-	DefaultResultView string
-
-	// One section per opened product, replacing the category split when the
-	// list was unpacked
-	UnpackedSections []UnpackedSection
+	SellerKeys      []string
+	VendorKeys      []string
+	ModalSellerKeys []string
+	ModalVendorKeys []string
 
 	// Price-movers screener payload (nil on non-screener pages).
 	Screener *ScreenerVars

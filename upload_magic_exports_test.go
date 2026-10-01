@@ -22,9 +22,11 @@ func TestMagicOnlyExportsFollowTheGame(t *testing.T) {
 	} {
 		for _, magicOnly := range []bool{true, false} {
 			out := renderUpload(t, PageVars{
-				CanBuylist:       true,
-				MagicOnlyExports: magicOnly,
-				UploadEntries:    page.entries,
+				UploadVars: UploadVars{
+					CanBuylist:       true,
+					MagicOnlyExports: magicOnly,
+					UploadEntries:    page.entries,
+				},
 			})
 
 			want := 0

@@ -18,9 +18,11 @@ func greenCells(t *testing.T, buylist bool, loaded float64, prices map[string]fl
 	}
 	const id = "card-1"
 	root := PageVars{
-		IsBuylist:    buylist,
-		Metadata:     map[string]GenericCard{id: {Name: "Test Card"}},
-		ResultPrices: map[string]map[string]float64{id + "NM": prices},
+		UploadVars: UploadVars{
+			IsBuylist:    buylist,
+			ResultPrices: map[string]map[string]float64{id + "NM": prices},
+		},
+		Metadata: map[string]GenericCard{id: {Name: "Test Card"}},
 	}
 	var b bytes.Buffer
 	err = tmpl.ExecuteTemplate(&b, "ures-results-table", map[string]any{

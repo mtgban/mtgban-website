@@ -221,8 +221,10 @@ func TestUnpackActionShipsNoList(t *testing.T) {
 	entries := []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}}
 
 	out := renderUpload(t, PageVars{
-		UploadEntries: entries,
-		UnpackSealed:  unpackableSealed(backend(), entries),
+		UploadVars: UploadVars{
+			UploadEntries: entries,
+			UnpackSealed:  unpackableSealed(backend(), entries),
+		},
 	})
 
 	if !strings.Contains(out, `onclick="runUnpack()"`) {
@@ -255,8 +257,10 @@ func TestUnpackActionAbsentWithoutSealed(t *testing.T) {
 	skipWithoutDatastore(t)
 	entries := []UploadEntry{{CardID: backend().GetUUIDs()[0], Quantity: 1, HasQuantity: true}}
 	out := renderUpload(t, PageVars{
-		UploadEntries: entries,
-		UnpackSealed:  unpackableSealed(backend(), entries),
+		UploadVars: UploadVars{
+			UploadEntries: entries,
+			UnpackSealed:  unpackableSealed(backend(), entries),
+		},
 	})
 	if strings.Contains(out, `onclick="runUnpack()"`) {
 		t.Error("an upload with no sealed rows still offered to unpack them")
@@ -507,14 +511,16 @@ func TestUnpackedResultsRenderASectionPerProduct(t *testing.T) {
 	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	pageVars := PageVars{
-		UploadEntries: entries,
-		UnpackedFrom:  1,
-		Metadata:      map[string]GenericCard{},
-		TotalEntries:  map[string]float64{"TCGLow": 999},
-		ResultPrices:  map[string]map[string]float64{},
-		MissingCounts: map[string]int{},
-		MissingPrices: map[string]float64{},
-		IndexKeys:     []string{"TCGLow"},
+		UploadVars: UploadVars{
+			UploadEntries: entries,
+			UnpackedFrom:  1,
+			TotalEntries:  map[string]float64{"TCGLow": 999},
+			ResultPrices:  map[string]map[string]float64{},
+			MissingCounts: map[string]int{},
+			MissingPrices: map[string]float64{},
+			IndexKeys:     []string{"TCGLow"},
+		},
+		Metadata: map[string]GenericCard{},
 	}
 	for _, entry := range entries {
 		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, false)
@@ -787,13 +793,15 @@ func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
 	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	pageVars := PageVars{
-		UploadEntries: entries,
-		UnpackedFrom:  1,
-		Metadata:      map[string]GenericCard{},
-		TotalEntries:  map[string]float64{},
-		ResultPrices:  map[string]map[string]float64{},
-		MissingCounts: map[string]int{},
-		MissingPrices: map[string]float64{},
+		UploadVars: UploadVars{
+			UploadEntries: entries,
+			UnpackedFrom:  1,
+			TotalEntries:  map[string]float64{},
+			ResultPrices:  map[string]map[string]float64{},
+			MissingCounts: map[string]int{},
+			MissingPrices: map[string]float64{},
+		},
+		Metadata: map[string]GenericCard{},
 	}
 	for _, entry := range entries {
 		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, false)
@@ -813,14 +821,16 @@ func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
 	// Every other list keeps the button: this is the unpacked view's rule, not
 	// a new rule for the results.
 	flat := PageVars{
-		UploadEntries:     entries[1:],
-		SinglesEntries:    entries[1:],
-		DefaultResultView: "singles",
-		Metadata:          pageVars.Metadata,
-		TotalEntries:      map[string]float64{},
-		ResultPrices:      map[string]map[string]float64{},
-		MissingCounts:     map[string]int{},
-		MissingPrices:     map[string]float64{},
+		UploadVars: UploadVars{
+			UploadEntries:     entries[1:],
+			SinglesEntries:    entries[1:],
+			DefaultResultView: "singles",
+			TotalEntries:      map[string]float64{},
+			ResultPrices:      map[string]map[string]float64{},
+			MissingCounts:     map[string]int{},
+			MissingPrices:     map[string]float64{},
+		},
+		Metadata: pageVars.Metadata,
 	}
 	if out := renderUpload(t, flat); !strings.Contains(out, "toggleRemoveRow(this)") {
 		t.Error("an ordinary result no longer offers to remove a row")
@@ -840,13 +850,15 @@ func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
 	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	pageVars := PageVars{
-		UploadEntries: entries,
-		UnpackedFrom:  1,
-		Metadata:      map[string]GenericCard{},
-		TotalEntries:  map[string]float64{},
-		ResultPrices:  map[string]map[string]float64{},
-		MissingCounts: map[string]int{},
-		MissingPrices: map[string]float64{},
+		UploadVars: UploadVars{
+			UploadEntries: entries,
+			UnpackedFrom:  1,
+			TotalEntries:  map[string]float64{},
+			ResultPrices:  map[string]map[string]float64{},
+			MissingCounts: map[string]int{},
+			MissingPrices: map[string]float64{},
+		},
+		Metadata: map[string]GenericCard{},
 	}
 	for _, entry := range entries {
 		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, false)
