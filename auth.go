@@ -51,19 +51,15 @@ type PatreonUserData struct {
 	FullName      string
 	Email         string
 	EmailVerified bool
+	DiscordID     string
+	// DiscordKnown is true when this login's Patreon answer had an opinion
+	// (linked or explicitly unlinked) on the Discord id.
+	DiscordKnown bool
 }
 
-func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
-	userData, err := client.GetUserData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve user data: %w", err)
-	}
-
-	LogPages["Admin"].Println("getUserIds:", userData)
-	if len(userData.Errors) > 0 {
-		return nil, fmt.Errorf("user data error: %q", userData.Errors)
-	}
-
+// patreonUserFromData maps a decoded Patreon identity answer to what the
+// site keeps. Pure, so it's testable without a Patreon client.
+func patreonUserFromData(userData *patreon.UserData) *PatreonUserData {
 	// Look for the membership id of the user and this account
 	membershipID := ""
 	for _, memberData := range userData.Data.Relationships.Memberships.Data {
@@ -73,13 +69,33 @@ func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 		}
 	}
 
+	discordID, discordKnown := userData.DiscordUserID()
+
 	return &PatreonUserData{
 		UserID:        userData.Data.IDV1,
 		MembershipID:  membershipID,
 		FullName:      userData.Data.Attributes.FullName,
 		Email:         strings.ToLower(userData.Data.Attributes.Email),
 		EmailVerified: userData.Data.Attributes.IsEmailVerified,
-	}, nil
+		DiscordID:     discordID,
+		DiscordKnown:  discordKnown,
+	}
+}
+
+func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
+	userData, err := client.GetUserData(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve user data: %w", err)
+	}
+
+	LogPages["Admin"].Printf("getUserIds: email=%s name=%s memberships=%d",
+		userData.Data.Attributes.Email, userData.Data.Attributes.FullName,
+		len(userData.Data.Relationships.Memberships.Data))
+	if len(userData.Errors) > 0 {
+		return nil, fmt.Errorf("user data error: %q", userData.Errors)
+	}
+
+	return patreonUserFromData(userData), nil
 }
 
 func getUserTier(ctx context.Context, client *patreon.Client, userID string) (string, error) {
@@ -206,7 +222,7 @@ func validHostname(host string) (string, bool) {
 	return host, true
 }
 
-func Auth(w http.ResponseWriter, r *http.Request) {
+func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	origin := requestOrigin(r)
 	if origin == "" {
 		http.Error(w, "invalid host", http.StatusBadRequest)
@@ -276,11 +292,21 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	LogPages["Admin"].Println(userData)
-	LogPages["Admin"].Println(tierTitle)
+	LogPages["Admin"].Printf("auth: email=%s tier=%s", userData.Email, tierTitle)
 
 	// Sign our base URL with our tier and other data
 	sig := sign(tierTitle, userData, overrides, DefaultSignatureDuration)
+
+	// Whether this tier grants alerts at all, computed once rather than
+	// re-parsing the signature just signed.
+	allowed := alertContactAllowed(tierTitle, overrides)
+
+	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	err = recordAlertContact(alertCtx, s.alertContacts(), userData, tierTitle, allowed)
+	if err != nil {
+		LogPages["Admin"].Println("recordAlertContact", err)
+	}
 
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, r, sig)

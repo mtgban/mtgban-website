@@ -1,0 +1,17 @@
+{{define "title"}}Price Alerts{{end}}
+
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+{{template "alert-modal" .}}
+<div class="alerts-page">
+    {{template "alerts-body" .}}
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}"></script>
+{{end}}

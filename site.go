@@ -13,6 +13,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
+	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
@@ -29,6 +30,11 @@ type site struct {
 	palette *palette.Service
 	offline *offlineapi.Service
 	reloads dsreload.Tracker
+
+	// alerts is the price alerts service; openDBs attaches its store.
+	alerts *alerts.Service
+	// alertsSend lets dev mode deliver real DMs (-alerts-send).
+	alertsSend bool
 
 	// fetchLastSold is how the Discord $$ lookup fetches a printing's recent
 	// sales: getLastSold, held here so a test can answer in its place.
@@ -170,6 +176,8 @@ func newSite() *site {
 		BuylistBlockList: func() []string { return Config().SearchBuylistBlockList },
 	})
 
+	s.alerts = alerts.NewService(nil, s.alertEvalDeps(), s.alertAPIDeps())
+
 	return s
 }
 
@@ -244,6 +252,7 @@ func (s *site) startDatastoreReload(path, source string) bool {
 		// asked for the refresh at all, and now does.
 		ServerNotify("reload", "Datastore reloaded from "+path)
 		s.offline.RequestRefresh()
+		s.alerts.RequestEvaluate(alerts.SideRetail, alerts.SideBuylist)
 		return nil
 	})
 }

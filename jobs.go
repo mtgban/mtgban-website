@@ -20,6 +20,7 @@ const (
 	jobTCGCSVProducts = "TCGCSV products"
 	jobCheckpoints    = "Checkpoints"
 	jobStaleness      = "Staleness check"
+	jobAlerts         = "Alert evaluation"
 )
 
 // backgroundJobs records every run of the jobs above.

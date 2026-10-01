@@ -137,6 +137,8 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		err := loadScraper(DataBucket, Config().Game, reload, r.FormValue("table"), r.FormValue("tag"))
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
+		} else {
+			s.pokeAlerts(r.FormValue("table"))
 		}
 		r.URL.RawQuery = v.Encode()
 		http.Redirect(w, r, r.URL.String(), http.StatusFound)
@@ -470,7 +472,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 			if err := saveKeyOverrides(parsed); err != nil {
 				pageVars.WarningMessage = "Key overrides save failed: " + err.Error()
 			} else {
-				reloadOverriddenScrapers(affected)
+				s.reloadOverriddenScrapers(affected)
 				pageVars.InfoMessage = "Key overrides updated"
 				// Non-blocking: flag any chained remaps that slipped in.
 				if chains := detectOverrideChains(parsed); len(chains) > 0 {

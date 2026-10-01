@@ -384,7 +384,7 @@ func TestOverrideReloadRecovers(t *testing.T) {
 	scraperIndexPtr.Store(newScraperIndex())
 	updateScraperIndexStore("cardkingdom", map[string][]string{"retail": {"CK"}})
 
-	reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
+	newSite().reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
 
 	_, _, source := panicReport(t, posts)
 	if source != "source job: override reload cardkingdom/retail/CK" {

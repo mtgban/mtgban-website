@@ -1,0 +1,82 @@
+{{/* The price alert dialog, filled by js/alerts.js from /api/alerts/options.
+     Built on the settings modal's shell and controls so it reads as the
+     same family; only the IDs differ so both can sit on one page. */}}
+{{define "alert-modal"}}
+<div class="settings-backdrop" id="alert-modal-backdrop"></div>
+<div class="settings-modal alert-modal" id="alert-modal" role="dialog" aria-modal="true" aria-labelledby="alert-modal-title">
+    <div class="settings-modal-header">
+        <h2 id="alert-modal-title">Price alert</h2>
+        <p class="alert-modal-card" id="alert-modal-card"></p>
+    </div>
+    <div class="settings-modal-body">
+        <p class="alert-modal-notice" id="alert-modal-notice" hidden></p>
+        <div class="alert-modal-existing" id="alert-modal-existing" hidden></div>
+        <form id="alert-form" novalidate>
+            <div class="settings-section expanded">
+                <div class="settings-section-header"><h3>What to watch</h3></div>
+                <div class="settings-section-body">
+                    <div class="alert-field">
+                        <span class="alert-field-label" id="alert-side-label">Price</span>
+                        <div class="settings-pills" role="radiogroup" aria-labelledby="alert-side-label" data-field="side">
+                            <button type="button" class="settings-pill" role="radio" data-value="buylist">Buylist offers</button>
+                            <button type="button" class="settings-pill" role="radio" data-value="retail">Retail prices</button>
+                        </div>
+                    </div>
+                    <div class="alert-field">
+                        <span class="alert-field-label" id="alert-cond-label">Condition</span>
+                        <div class="settings-pills" role="radiogroup" aria-labelledby="alert-cond-label" data-field="condition"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section expanded">
+                <div class="settings-section-header"><h3>Stores</h3></div>
+                <div class="settings-section-body">
+                    <p class="section-desc">Check the stores to watch. Leave them all unchecked to watch every store you can see.</p>
+                    <div class="settings-vendor-columns alert-stores" id="alert-stores"></div>
+                </div>
+            </div>
+
+            <div class="settings-section expanded">
+                <div class="settings-section-header"><h3>Thresholds</h3></div>
+                <div class="settings-section-body">
+                    <div class="alert-field">
+                        <label class="alert-field-label" for="alert-reference">Reference price</label>
+                        <input class="alert-input" id="alert-reference" name="reference_price" type="number" step="0.01" min="0.01" placeholder="best offer in your selection when you save">
+                        <div class="settings-pills alert-ref-picks" role="radiogroup" aria-label="Use a store price as the reference" data-field="reference_pick" id="alert-reference-picks"></div>
+                        <p class="alert-hint">Percentages are measured from this price. Type what you paid, or pick a store to track its price.</p>
+                    </div>
+                    <div class="alert-threshold" data-threshold="above">
+                        <span class="alert-field-label" id="alert-above-label">Tell me when it rises above</span>
+                        <div class="alert-threshold-controls">
+                            <div class="settings-pills" role="radiogroup" aria-labelledby="alert-above-label" data-field="above_kind">
+                                <button type="button" class="settings-pill" role="radio" data-value="">Off</button>
+                                <button type="button" class="settings-pill" role="radio" data-value="abs">$</button>
+                                <button type="button" class="settings-pill" role="radio" data-value="pct">%</button>
+                            </div>
+                            <input class="alert-input alert-input-short" name="above_value" type="number" step="0.01" min="0" aria-label="Above value" disabled>
+                        </div>
+                    </div>
+                    <div class="alert-threshold" data-threshold="below">
+                        <span class="alert-field-label" id="alert-below-label">Tell me when it drops below</span>
+                        <div class="alert-threshold-controls">
+                            <div class="settings-pills" role="radiogroup" aria-labelledby="alert-below-label" data-field="below_kind">
+                                <button type="button" class="settings-pill" role="radio" data-value="">Off</button>
+                                <button type="button" class="settings-pill" role="radio" data-value="abs">$</button>
+                                <button type="button" class="settings-pill" role="radio" data-value="pct">%</button>
+                            </div>
+                            <input class="alert-input alert-input-short" name="below_value" type="number" step="0.01" min="0" aria-label="Below value" disabled>
+                        </div>
+                    </div>
+                    <p class="alert-hint">Both watch the best price among your stores. A line it is already past waits for it to come back first.</p>
+                </div>
+            </div>
+            <p class="alerts-error" id="alert-form-error" hidden></p>
+        </form>
+    </div>
+    <div class="settings-modal-footer">
+        <button class="settings-btn" data-role="cancel" type="button">Cancel</button>
+        <button class="settings-btn primary" data-role="save" type="button">Create alert</button>
+    </div>
+</div>
+{{end}}
