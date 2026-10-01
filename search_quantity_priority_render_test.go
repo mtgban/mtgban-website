@@ -16,7 +16,7 @@ import (
 func quantityPriorityPage(mobile bool) PageVars {
 	const id = "card"
 	return PageVars{
-		BetaNav:  &NavElem{Short: "b"},
+		UserNav:  &NavElem{Short: "b"},
 		IsMobile: mobile,
 		SearchVars: SearchVars{
 			SearchRan: true,

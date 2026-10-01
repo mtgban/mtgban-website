@@ -23,7 +23,7 @@ func TestMobileSettingsOfferSealedContents(t *testing.T) {
 		}
 	}
 
-	page := renderPage(t, "search.html", true, PageVars{BetaNav: &NavElem{Short: "b"}, IsMobile: true})
+	page := renderPage(t, "search.html", true, PageVars{UserNav: &NavElem{Short: "b"}, IsMobile: true})
 	for _, want := range []string{
 		`getCookie('SearchSealedContents')`,
 		`setCookie('SearchSealedContents'`,

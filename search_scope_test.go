@@ -141,7 +141,7 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 		Metadata: map[string]GenericCard{},
 		// The navbar names the reader; a zero PageVars would fault on it
 		// long before reaching the suggestions this is about.
-		BetaNav: &NavElem{Short: "TEST"},
+		UserNav: &NavElem{Short: "TEST"},
 	}
 
 	// The claim the page makes about the bar has to match what the bar is

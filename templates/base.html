@@ -69,7 +69,7 @@
 window.__BAN_PALETTE = {
     nav: [{{range .Nav}}{ name:"{{.Name}}", link:"{{.Link}}", icon:"{{.Short}}" },{{end}}],
     hash: "{{.Hash}}",
-    user: "{{.BetaNav.Short}}"
+    user: "{{.UserNav.Short}}"
 };
 window.__BAN_NAV = [{{range .Nav}}{ tool:"{{slug .Name}}", icon:"{{.Short}}", name:"{{.Name}}", desc:"{{.Description}}", href:"{{.Link}}", admin:{{if eq .Name "Admin"}}true{{else}}false{{end}} },{{end}}];
 </script>

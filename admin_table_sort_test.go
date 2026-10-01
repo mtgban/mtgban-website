@@ -10,7 +10,7 @@ import (
 // column reads as a number rather than a name.
 func TestAdminScraperTablesSort(t *testing.T) {
 	pv := PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 		AdminVars: AdminVars{
 			Tables: [][][]string{
 				{{"Card Kingdom", "CK", "CK", "2026-09-06T10:00:00Z", "12345", "👍", "ok", "", ""}},

@@ -118,7 +118,7 @@ func TestInviteLinkIsOneTheSiteAccepts(t *testing.T) {
 func TestAdminOffersAnInviteLinkWithAnExpiry(t *testing.T) {
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "admin.html", mobile, PageVars{
-			BetaNav: &NavElem{Short: "b"},
+			UserNav: &NavElem{Short: "b"},
 			Tiers:   []string{"Pioneer", "Modern"},
 		})
 

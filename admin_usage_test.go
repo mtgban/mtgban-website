@@ -109,7 +109,7 @@ func renderAdminPage(t *testing.T, vars PageVars) string {
 		t.Fatalf("parsing admin.html: %v", err)
 	}
 	vars.Title = "Admin"
-	vars.BetaNav = &NavElem{}
+	vars.UserNav = &NavElem{}
 	var buf bytes.Buffer
 	err = tmpl.ExecuteTemplate(&buf, baseName, vars)
 	if err != nil {

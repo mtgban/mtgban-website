@@ -211,7 +211,7 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 	}
 	for _, mobile := range []bool{false, true} {
 		out := renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:  &NavElem{},
+			UserNav:  &NavElem{},
 			IsMobile: mobile,
 			SearchVars: SearchVars{
 				SearchRan:   true,
@@ -231,7 +231,7 @@ func TestDropRateButtonRendersOnTheVariableReading(t *testing.T) {
 
 		views.Mode = ContentsFixed
 		out = renderPage(t, "search.html", mobile, PageVars{
-			BetaNav:  &NavElem{},
+			UserNav:  &NavElem{},
 			IsMobile: mobile,
 			SearchVars: SearchVars{
 				SearchRan:   true,

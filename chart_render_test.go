@@ -59,7 +59,7 @@ func chartPageVars() PageVars {
 		Metadata:    map[string]GenericCard{id: {Name: "Test Card"}},
 		// The base template dereferences these unconditionally; a handler
 		// always fills them in before rendering.
-		BetaNav: &NavElem{Name: "Beta", Link: "/beta"},
+		UserNav: &NavElem{Name: "Beta", Link: "/beta"},
 	}
 }
 

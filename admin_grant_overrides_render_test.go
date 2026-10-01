@@ -11,7 +11,7 @@ import (
 // {{index $row 5}} doesn't run past the row and the new markup shows up.
 func TestAdminGrantOverridesColumnRenders(t *testing.T) {
 	pv := PageVars{
-		BetaNav: &NavElem{Short: "b"},
+		UserNav: &NavElem{Short: "b"},
 		AdminVars: AdminVars{
 			Tables: [][][]string{
 				{}, // dashboard tables 0-2, unused by this test

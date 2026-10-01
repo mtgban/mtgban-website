@@ -178,7 +178,7 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 		}
 	}
 
-	out := renderArbit(t, PageVars{ScraperShort: "TCGPlayer", BetaNav: &NavElem{}, Metadata: metadata,
+	out := renderArbit(t, PageVars{ScraperShort: "TCGPlayer", UserNav: &NavElem{}, Metadata: metadata,
 		Arb: []Arbitrage{{Name: "CK", Key: "CK", Arbit: []mtgban.ArbitEntry{{CardID: "FIXTUREA-1"}}}}})
 	for _, want := range []string{`data-arb-tcgid="4242"`, `1-4242||`} {
 		if !strings.Contains(out, want) {

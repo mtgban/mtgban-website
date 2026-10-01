@@ -137,7 +137,7 @@ func renderAdmin(t *testing.T, reloads *dsreload.Tracker) string {
 		t.Fatalf("parsing admin.html: %v", err)
 	}
 	var buf bytes.Buffer
-	vars := PageVars{Title: "Admin", BetaNav: &NavElem{}, LastUpdate: time.Now(), AdminVars: AdminVars{DatastoreReload: reloads.Status()}}
+	vars := PageVars{Title: "Admin", UserNav: &NavElem{}, LastUpdate: time.Now(), AdminVars: AdminVars{DatastoreReload: reloads.Status()}}
 	if err := tmpl.ExecuteTemplate(&buf, baseName, vars); err != nil {
 		t.Fatalf("rendering admin.html: %v", err)
 	}
