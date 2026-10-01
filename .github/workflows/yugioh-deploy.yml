@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to droplet over SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DROPLET_HOST_YUGIOH }}
           username: ${{ secrets.DROPLET_SSH_USER }}
