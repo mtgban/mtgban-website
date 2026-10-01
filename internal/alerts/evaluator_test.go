@@ -99,7 +99,7 @@ func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int)
 		if f.status[id] != want {
 			f.status[id] = want
 			a := f.row(id)
-			moved = append(moved, Moved{ID: id, Status: want, Card: a.Card, Origin: a.Origin})
+			moved = append(moved, Moved{ID: id, Status: want, Card: a.Card, Side: a.Side, Condition: a.Condition, Origin: a.Origin})
 		}
 	}
 	return moved, nil
@@ -372,13 +372,13 @@ func TestRunAlertEvaluationParksBeyondAllowance(t *testing.T) {
 	deps.Allowance = func(url.Values) int { return 1 }
 	runEvaluation(context.Background(), deps, buylistOnly)
 
-	// The pause notice for 7, then the firing on 8.
+	// The park notice for 7, then the firing on 8.
 	if len(sender.sent) != 2 || !slices.Equal(store.claims, []int64{8}) {
 		t.Fatalf("sent = %v claims = %v", sender.sent, store.claims)
 	}
 	notice := sender.embeds[0]
-	if notice.Title != "Price alerts paused" || !strings.Contains(notice.Description, "Your tier allows 1 alert.") ||
-		!strings.Contains(notice.Description, "Bolt LEA #161") || notice.URL != "https://lorcana.mtgban.com/alerts" {
+	if notice.Title != "Price alerts parked" || !strings.Contains(notice.Description, "Your tier allows 1 alert.") ||
+		!strings.Contains(notice.Description, "Bolt LEA #161, nonfoil, NM buylist\n") || notice.URL != "https://lorcana.mtgban.com/alerts" {
 		t.Fatalf("notice: title=%q url=%q\n%s", notice.Title, notice.URL, notice.Description)
 	}
 	if store.status[7] != StatusOverAllowance {
@@ -484,7 +484,7 @@ func TestRunAlertEvaluationParksStaleContacts(t *testing.T) {
 	if store.marked["u2"] != 5 {
 		t.Fatalf("fresh contact allowance = %d, want 5", store.marked["u2"])
 	}
-	// The stale contact hears its alerts are paused; only the fresh one fires.
+	// The stale contact hears its alerts are parked; only the fresh one fires.
 	if len(sender.sent) != 2 || sender.sent[0] != "d1" || sender.sent[1] != "d2" {
 		t.Fatalf("sent = %v, want the stale contact's notice and the fresh contact's firing", sender.sent)
 	}

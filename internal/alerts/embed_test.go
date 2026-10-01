@@ -158,16 +158,19 @@ func TestAlertEmbedOmitsLinksWithoutOrigin(t *testing.T) {
 func TestParkedEmbedListsCardsAndLinks(t *testing.T) {
 	var parked []Moved
 	for i := range 17 {
-		parked = append(parked, Moved{ID: int64(i), Card: Card{Name: "Card_" + strconv.Itoa(i), Set: "LEA", Number: "1"}, Origin: "https://mtgban.com"})
+		parked = append(parked, Moved{
+			ID: int64(i), Card: Card{Name: "Card_" + strconv.Itoa(i), Set: "LEA", Number: "1", Finish: "foil"},
+			Side: SideRetail, Condition: "NM", Origin: "https://mtgban.com",
+		})
 	}
 	e := parkedEmbed(parked, "Your tier no longer includes price alerts.")
-	if e.Title != "Price alerts paused" || e.URL != "https://mtgban.com/alerts" {
+	if e.Title != "Price alerts parked" || e.URL != "https://mtgban.com/alerts" {
 		t.Fatalf("title=%q url=%q", e.Title, e.URL)
 	}
-	if strings.Count(e.Description, " LEA #1\n") != embedMaxLines || !strings.Contains(e.Description, "and 2 more\n") {
+	if strings.Count(e.Description, " LEA #1, foil, NM retail\n") != embedMaxLines || !strings.Contains(e.Description, "and 2 more\n") {
 		t.Fatalf("card lines:\n%s", e.Description)
 	}
-	if !strings.Contains(e.Description, `Card\_0 LEA #1`) || !strings.HasPrefix(e.Description, "Your tier no longer includes price alerts.\n\n") {
+	if !strings.Contains(e.Description, `Card\_0 LEA #1, foil`) || !strings.HasPrefix(e.Description, "Your tier no longer includes price alerts.\n\n") {
 		t.Fatalf("escaping or reason:\n%s", e.Description)
 	}
 	parked[0].Origin = ""

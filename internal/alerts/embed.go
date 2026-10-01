@@ -64,6 +64,12 @@ var markdownEscaper = strings.NewReplacer(
 // escapeMarkdown keeps Discord from reading card text as formatting.
 func escapeMarkdown(s string) string { return markdownEscaper.Replace(s) }
 
+// alertLine names what an alert watches, finish, condition and side
+// included, so twins on one collector number stay apart.
+func alertLine(c Card, condition string, side Side) string {
+	return fmt.Sprintf("%s %s #%s, %s, %s %s\n", escapeMarkdown(c.Name), escapeMarkdown(c.Set), escapeMarkdown(c.Number), c.Finish, condition, side)
+}
+
 func thresholdLabel(t Threshold, reference float64, above bool) string {
 	if t.Kind == KindPct {
 		return fmt.Sprintf("%s (%.0f%% of reference)", money(t.Resolve(reference, above)), t.Value)
@@ -81,7 +87,7 @@ func dmEmbed(a Alert, d Decision, siteURL string, label func(shorthand string) s
 		kind, verb = "b", "Sell"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s %s #%s, %s, %s %s\n", escapeMarkdown(a.Card.Name), escapeMarkdown(a.Card.Set), escapeMarkdown(a.Card.Number), a.Card.Finish, a.Condition, a.Side)
+	b.WriteString(alertLine(a.Card, a.Condition, a.Side))
 	lines := func(heading string, hits []Quote) {
 		fmt.Fprintf(&b, "\n**%s**\n", heading)
 		shown := hits
@@ -140,7 +146,7 @@ func parkedEmbed(parked []Moved, reason string) *discordgo.MessageEmbed {
 		shown = shown[:embedMaxLines]
 	}
 	for _, m := range shown {
-		fmt.Fprintf(&b, "%s %s #%s\n", escapeMarkdown(m.Card.Name), escapeMarkdown(m.Card.Set), escapeMarkdown(m.Card.Number))
+		b.WriteString(alertLine(m.Card, m.Condition, m.Side))
 	}
 	more := len(parked) - len(shown)
 	if more > 0 {
@@ -159,7 +165,7 @@ func parkedEmbed(parked []Moved, reason string) *discordgo.MessageEmbed {
 		desc = truncateEmbedDescription(desc, manageLink, embedMaxDescription)
 	}
 	return &discordgo.MessageEmbed{
-		Title:       "Price alerts paused",
+		Title:       "Price alerts parked",
 		URL:         embedURL,
 		Description: desc,
 	}

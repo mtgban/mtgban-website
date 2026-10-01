@@ -372,10 +372,12 @@ func (s *Store) ListActive(ctx context.Context, game string, sides []Side) ([]Ac
 
 // Moved is an alert MarkOverAllowance parked or brought back.
 type Moved struct {
-	ID     int64
-	Status Status
-	Card   Card
-	Origin string
+	ID        int64
+	Status    Status
+	Card      Card
+	Side      Side
+	Condition string
+	Origin    string
 }
 
 // MarkOverAllowance keeps a user's newest alerts active up to the
@@ -394,9 +396,11 @@ func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, al
 			  FROM ranked r
 			 WHERE a.id = r.id
 			   AND a.status <> CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END
-			RETURNING a.id, a.status, a.card_name, a.card_set, a.card_number, a.card_finish, a.origin, r.rn
+			RETURNING a.id, a.status, a.card_name, a.card_set, a.card_number, a.card_finish,
+			          a.side, a.condition, a.origin, r.rn
 		)
-		SELECT id, status, card_name, card_set, card_number, card_finish, origin FROM moved ORDER BY rn`,
+		SELECT id, status, card_name, card_set, card_number, card_finish, side, condition, origin
+		  FROM moved ORDER BY rn`,
 		userHash, game, allowance)
 	if err != nil {
 		return nil, err
@@ -405,7 +409,8 @@ func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, al
 	var out []Moved
 	for rows.Next() {
 		var m Moved
-		err := rows.Scan(&m.ID, &m.Status, &m.Card.Name, &m.Card.Set, &m.Card.Number, &m.Card.Finish, &m.Origin)
+		err := rows.Scan(&m.ID, &m.Status, &m.Card.Name, &m.Card.Set, &m.Card.Number, &m.Card.Finish,
+			&m.Side, &m.Condition, &m.Origin)
 		if err != nil {
 			return nil, err
 		}
