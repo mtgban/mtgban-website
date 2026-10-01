@@ -50,17 +50,17 @@ func TestAdminConfigSaveGetsDefaultsAndRegistry(t *testing.T) {
 		"timeseries_config": {"datasets": [{"public_name": "TCGplayer Low", "provider": 1}]}
 	}`, aclPath, grantsPath))
 
-	if len(Config.TimeseriesConfig.Datasets) != 1 {
-		t.Fatalf("datasets %+v: the save did not take", Config.TimeseriesConfig.Datasets)
+	if len(Config().TimeseriesConfig.Datasets) != 1 {
+		t.Fatalf("datasets %+v: the save did not take", Config().TimeseriesConfig.Datasets)
 	}
 	for _, c := range []struct{ name, got, want string }{
-		{"game, which the text left out", string(Config.Game), string(DefaultGame)},
-		{"default gateway", Config.APIGateway.URL, DefaultAPIGatewayURL},
-		{"source path", Config.sourcePath, path},
-		{"the text's port", Config.Port, "9000"},
-		{"the text's datastore path", Config.DatastorePath, "saved.json.xz"},
-		{"the text's acl path", Config.ACLPath, aclPath},
-		{"the text's grants path", Config.PatreonGrantsPath, grantsPath},
+		{"game, which the text left out", string(Config().Game), string(DefaultGame)},
+		{"default gateway", Config().APIGateway.URL, DefaultAPIGatewayURL},
+		{"source path", Config().sourcePath, path},
+		{"the text's port", Config().Port, "9000"},
+		{"the text's datastore path", Config().DatastorePath, "saved.json.xz"},
+		{"the text's acl path", Config().ACLPath, aclPath},
+		{"the text's grants path", Config().PatreonGrantsPath, grantsPath},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
@@ -73,8 +73,8 @@ func TestAdminConfigSaveGetsDefaultsAndRegistry(t *testing.T) {
 	// A text with an empty game and no port gets the defaults, not "" and
 	// not the port that was live.
 	saveConfigText(`{"game": ""}`)
-	if Config.Game != DefaultGame || Config.Port != DefaultServerPort {
-		t.Errorf("game %q, port %q, want %q and %q", Config.Game, Config.Port, DefaultGame, DefaultServerPort)
+	if Config().Game != DefaultGame || Config().Port != DefaultServerPort {
+		t.Errorf("game %q, port %q, want %q and %q", Config().Game, Config().Port, DefaultGame, DefaultServerPort)
 	}
 }
 
@@ -109,7 +109,7 @@ func TestAdminConfigSaveFailingAtCloseChangesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = saveConfig(context.Background(), config)
-	if err == nil || Config.Game != "lorcana" {
-		t.Errorf("error %v, game %q: a save that failed at Close went live", err, Config.Game)
+	if err == nil || Config().Game != "lorcana" {
+		t.Errorf("error %v, game %q: a save that failed at Close went live", err, Config().Game)
 	}
 }

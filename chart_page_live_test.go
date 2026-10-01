@@ -38,7 +38,7 @@ func TestChartPageCostLive(t *testing.T) {
 	}
 
 	// Chart the providers the deployment charts, in its own order.
-	Config.TimeseriesConfig = cfg.TimeseriesConfig
+	Config().TimeseriesConfig = cfg.TimeseriesConfig
 	buildProviderRegistry()
 
 	client, err := timeseries.NewClient(*cfg.SQLConfig)

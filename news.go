@@ -236,7 +236,7 @@ type NewspaperPage struct {
 // shown reports whether the newspaper shows the page on this deployment:
 // the pages built on a buylist are Magic's alone.
 func (page NewspaperPage) shown() bool {
-	return !page.NeedsBuylist || Config.Game == DefaultGame
+	return !page.NeedsBuylist || Config().Game == DefaultGame
 }
 
 // newspaperColumnSetters maps a SQL column name (everything past the
@@ -510,9 +510,9 @@ func (s *site) cacheNewspaper() {
 
 	newspaperUUIDs := map[string]struct{}{}
 
-	game, found := gameMap[Config.Game]
+	game, found := gameMap[Config().Game]
 	if !found {
-		log.Printf("newspaper: %q is missing from gameMap, not caching", Config.Game)
+		log.Printf("newspaper: %q is missing from gameMap, not caching", Config().Game)
 		return
 	}
 

@@ -195,9 +195,9 @@ func TestScreenerResultFieldValue(t *testing.T) {
 }
 
 func TestValidMetricAndWindow(t *testing.T) {
-	prev := Config.TimeseriesConfig
-	t.Cleanup(func() { Config.TimeseriesConfig = prev })
-	Config.TimeseriesConfig = TimeseriesConfig{Datasets: []DatasetConfig{
+	prev := Config().TimeseriesConfig
+	t.Cleanup(func() { Config().TimeseriesConfig = prev })
+	Config().TimeseriesConfig = TimeseriesConfig{Datasets: []DatasetConfig{
 		{Index: 2, PublicName: "TCGplayer Low"},
 		{Index: 3, PublicName: "TCGplayer Market"},
 	}}
@@ -373,28 +373,28 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 // catalog dump the game loads at startup. Only the default game may fall back
 // to a category without one; every other game refuses to guess.
 func TestGameTCGCategory(t *testing.T) {
-	prevGame := Config.Game
+	prevGame := Config().Game
 	prevCatalog := tcgCatalogPtr.Load()
 	t.Cleanup(func() {
-		Config.Game = prevGame
+		Config().Game = prevGame
 		tcgCatalogPtr.Store(prevCatalog)
 	})
 
 	// A loaded catalog names the category, whatever the game is called.
 	tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: 71, CategoryName: "Lorcana TCG"})
-	Config.Game = "lorcana"
+	Config().Game = "lorcana"
 	if got := gameTCGCategory(); got != 71 {
 		t.Errorf("lorcana category = %d, want 71 (from the catalog)", got)
 	}
 
 	// Without one, only the default game has an answer.
 	tcgCatalogPtr.Store(nil)
-	Config.Game = DefaultGame
+	Config().Game = DefaultGame
 	if got := gameTCGCategory(); got != timeseries.CategoryMagic {
 		t.Errorf("default game category = %d, want %d", got, timeseries.CategoryMagic)
 	}
 
-	Config.Game = "unknowngame"
+	Config().Game = "unknowngame"
 	if got := gameTCGCategory(); got != -1 {
 		t.Errorf("catalog-less non-default game = %d, want -1", got)
 	}

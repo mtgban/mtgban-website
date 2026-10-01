@@ -35,7 +35,7 @@ const (
 // ckOddsPath is where the odds live: beside the datastore, like the TCGplayer
 // catalog.
 func ckOddsPath() string {
-	p := Config.DatastorePath
+	p := Config().DatastorePath
 	i := strings.LastIndex(p, "/")
 	if i < 0 {
 		return ckOddsFile

@@ -68,14 +68,14 @@ func TestNewspaperCalcDateFilterWithoutRowFilter(t *testing.T) {
 // it was, rather than panicking: the entry only names the rows to read. The
 // lookup comes before the database check, so no database is needed here.
 func TestCacheNewspaperLogsAGameMissingFromGameMap(t *testing.T) {
-	prevGame, prevSkip, prevLog := Config.Game, SkipNewspaper, log.Writer()
+	prevGame, prevSkip, prevLog := Config().Game, SkipNewspaper, log.Writer()
 	t.Cleanup(func() {
-		Config.Game, SkipNewspaper = prevGame, prevSkip
+		Config().Game, SkipNewspaper = prevGame, prevSkip
 		log.SetOutput(prevLog)
 	})
 	var logged bytes.Buffer
 	log.SetOutput(&logged)
-	Config.Game, SkipNewspaper = "nosuchgame", false
+	Config().Game, SkipNewspaper = "nosuchgame", false
 
 	newSite().cacheNewspaper()
 

@@ -178,14 +178,14 @@ func TestGetChangelogEntriesSurvivesPanickingFetch(t *testing.T) {
 }
 
 func TestGetChangelogChannelIDRequiresDiscord(t *testing.T) {
-	oldID := Config.Discord.ChangelogChannelID
+	oldID := Config().Discord.ChangelogChannelID
 	oldSession := dg
 	defer func() {
-		Config.Discord.ChangelogChannelID = oldID
+		Config().Discord.ChangelogChannelID = oldID
 		dg = oldSession
 	}()
 
-	Config.Discord.ChangelogChannelID = ""
+	Config().Discord.ChangelogChannelID = ""
 	dg = nil
 	if _, err := getChangelogChannelID(); err == nil {
 		t.Fatal("missing Discord session returned nil error")
@@ -193,14 +193,14 @@ func TestGetChangelogChannelIDRequiresDiscord(t *testing.T) {
 }
 
 func TestGetChangelogChannelIDReportsMissingChannel(t *testing.T) {
-	oldID := Config.Discord.ChangelogChannelID
+	oldID := Config().Discord.ChangelogChannelID
 	oldList := listChangelogChannelsFunc
 	defer func() {
-		Config.Discord.ChangelogChannelID = oldID
+		Config().Discord.ChangelogChannelID = oldID
 		listChangelogChannelsFunc = oldList
 	}()
 
-	Config.Discord.ChangelogChannelID = ""
+	Config().Discord.ChangelogChannelID = ""
 	listChangelogChannelsFunc = func() ([]*discordgo.Channel, error) {
 		return []*discordgo.Channel{{Name: "general"}}, nil
 	}

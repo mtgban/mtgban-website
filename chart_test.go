@@ -292,13 +292,13 @@ func TestMergeMultiCardDatasetsCardWithNoDatasetsSkipsPaletteSlot(t *testing.T) 
 // both it and the derived provider registry afterwards.
 func withDatasets(t *testing.T, datasets []DatasetConfig) {
 	t.Helper()
-	prevConfig := Config.TimeseriesConfig
+	prevConfig := Config().TimeseriesConfig
 	prevRegistry := chartProviders()
 	t.Cleanup(func() {
-		Config.TimeseriesConfig = prevConfig
+		Config().TimeseriesConfig = prevConfig
 		providerRegistry.Store(&prevRegistry)
 	})
-	Config.TimeseriesConfig = TimeseriesConfig{Datasets: datasets}
+	Config().TimeseriesConfig = TimeseriesConfig{Datasets: datasets}
 }
 
 // The config owns the whole display: which providers chart, under what name and

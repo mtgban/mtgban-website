@@ -12,10 +12,10 @@ import (
 )
 
 func TestAdminToolsLinkTheGatewayAdmin(t *testing.T) {
-	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config.APIGateway
-	t.Cleanup(func() { DevMode, SigCheck, Config.APIGateway = savedDev, savedSig, savedCfg })
+	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config().APIGateway
+	t.Cleanup(func() { DevMode, SigCheck, Config().APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config.APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
@@ -35,21 +35,7 @@ func TestAdminToolsLinkTheGatewayAdmin(t *testing.T) {
 func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
 	withSigMode(t, true, false)
 
-	apiUsersMutex.Lock()
-	if Config.APIUserSecrets == nil {
-		Config.APIUserSecrets = map[string]string{}
-	}
-	saved, had := Config.APIUserSecrets[DefaultAPIDemoUser]
-	Config.APIUserSecrets[DefaultAPIDemoUser] = goldenSecret
-	apiUsersMutex.Unlock()
-	t.Cleanup(func() {
-		apiUsersMutex.Lock()
-		delete(Config.APIUserSecrets, DefaultAPIDemoUser)
-		if had {
-			Config.APIUserSecrets[DefaultAPIDemoUser] = saved
-		}
-		apiUsersMutex.Unlock()
-	})
+	withAPIUserSecret(t, DefaultAPIDemoUser, goldenSecret)
 
 	// A blank user is the demo user, from the button and the form alike.
 	for _, reboot := range []string{"demokey", "newKey&user=&duration=30"} {
@@ -86,17 +72,7 @@ func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 	withSigMode(t, true, false)
 
 	const user = "ops@example.com"
-	apiUsersMutex.Lock()
-	if Config.APIUserSecrets == nil {
-		Config.APIUserSecrets = map[string]string{}
-	}
-	Config.APIUserSecrets[user] = goldenSecret
-	apiUsersMutex.Unlock()
-	t.Cleanup(func() {
-		apiUsersMutex.Lock()
-		delete(Config.APIUserSecrets, user)
-		apiUsersMutex.Unlock()
-	})
+	withAPIUserSecret(t, user, goldenSecret)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&reboot=newKey&user="+user+"&duration=", nil)
 	req.Host = "mtgban.com"

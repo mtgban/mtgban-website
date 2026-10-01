@@ -44,8 +44,8 @@ func loadedScript(t *testing.T, page, name string) string {
 // for CSS to select on - and it has to be on every base template, since a page
 // rendered through one that lacks it would round its cards.
 func TestBodyCarriesTheGame(t *testing.T) {
-	prev := Config.Game
-	t.Cleanup(func() { Config.Game = prev })
+	prev := Config().Game
+	t.Cleanup(func() { Config().Game = prev })
 
 	for _, page := range []struct {
 		name   string
@@ -56,7 +56,7 @@ func TestBodyCarriesTheGame(t *testing.T) {
 		{"search.html", true},  // base-mobile.html
 	} {
 		for _, game := range []mtgmatcher.Game{"yugioh", DefaultGame} {
-			Config.Game = game
+			Config().Game = game
 			rendered := renderPage(t, page.name, page.mobile, PageVars{BetaNav: &NavElem{Short: "b"}, IsMobile: page.mobile})
 
 			body := rendered[strings.Index(rendered, "<body"):]

@@ -42,8 +42,8 @@ func PatreonGrants() []PatreonGrant {
 // data, each from its own path.
 func loadCommonConfig(ctx context.Context) error {
 	err := Access.Load(ctx, access.Sources{
-		TablePath:  Config.ACLPath,
-		GrantsPath: Config.PatreonGrantsPath,
+		TablePath:  Config().ACLPath,
+		GrantsPath: Config().PatreonGrantsPath,
 	})
 	if err != nil {
 		return err
@@ -82,19 +82,19 @@ func loadAffiliates(ctx context.Context) error {
 	affiliatesMu.Lock()
 	defer affiliatesMu.Unlock()
 
-	if Config.AffiliatesPath == "" {
+	if Config().AffiliatesPath == "" {
 		return errors.New("affiliates: no path configured")
 	}
 
 	var value AffiliatesConfig
-	reader, err := openBucketPath(ctx, Config.AffiliatesPath)
+	reader, err := openBucketPath(ctx, Config().AffiliatesPath)
 	if err != nil {
-		return fmt.Errorf("affiliates %s: %w", Config.AffiliatesPath, err)
+		return fmt.Errorf("affiliates %s: %w", Config().AffiliatesPath, err)
 	}
 	defer reader.Close()
 	err = json.NewDecoder(reader).Decode(&value)
 	if err != nil {
-		return fmt.Errorf("affiliates %s: %w", Config.AffiliatesPath, err)
+		return fmt.Errorf("affiliates %s: %w", Config().AffiliatesPath, err)
 	}
 	affiliatesPtr.Store(&value)
 	return nil
@@ -106,11 +106,11 @@ func saveAffiliates(ctx context.Context, value AffiliatesConfig) error {
 	affiliatesMu.Lock()
 	defer affiliatesMu.Unlock()
 
-	if Config.AffiliatesPath == "" {
+	if Config().AffiliatesPath == "" {
 		return errors.New("affiliates: no path configured")
 	}
 
-	writer, err := openBucketWriter(ctx, Config.AffiliatesPath)
+	writer, err := openBucketWriter(ctx, Config().AffiliatesPath)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func saveGrants(ctx context.Context, grants []PatreonGrant) error {
 	if err != nil {
 		return err
 	}
-	if Config.PatreonGrantsPath != "" {
+	if Config().PatreonGrantsPath != "" {
 		notifyAccessReload(ctx, grantsReloadChannel)
 	}
 	return nil
@@ -149,7 +149,7 @@ func saveACL(ctx context.Context, table access.Table) error {
 	if err != nil {
 		return err
 	}
-	if Config.ACLPath != "" {
+	if Config().ACLPath != "" {
 		notifyAccessReload(ctx, aclReloadChannel)
 	}
 	return nil

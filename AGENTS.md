@@ -219,7 +219,11 @@ commit to this repo can complete on its own.
    so `s.datastore()`/`s.backend()` are never nil; code below an entry point
    reads the datastore only through the `b`/`ds` it was handed, never from
    the site (the nav's `ShouldHide` visibility check aside). The rules and
-   why: `docs/adr/0003-explicit-backend.md`.
+   why: `docs/adr/0003-explicit-backend.md`. The config is the same again:
+   `Config()` returns the live one from `liveConfig`, read-only; a load, an
+   editor save or a new API key builds a new value and publishes it whole
+   (`finishConfig`, `generateAPIKey`). Never write into `Config()` outside
+   tests.
 
 2. **Stateless auth.** Permissions live entirely in the signed `MTGBAN`
    cookie / `?sig=` (an HMAC-signed query string). There is no session store
@@ -246,7 +250,7 @@ commit to this repo can complete on its own.
    per-request hot reload while iterating.
 
 6. **Concurrency**: handlers run concurrently and read shared globals
-   (`Config`, DB handles, atomic snapshots). Don't add unsynchronized mutable
+   (`Config()`, DB handles, atomic snapshots). Don't add unsynchronized mutable
    package state.
 
 7. **New background work recovers its own panics.** net/http recovers a

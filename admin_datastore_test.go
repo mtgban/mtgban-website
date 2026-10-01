@@ -101,8 +101,8 @@ func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer srv.Close()
-	defer func(path string) { Config.DatastorePath = path }(Config.DatastorePath)
-	Config.DatastorePath = srv.URL + "/allprintings5.json.xz"
+	defer func(path string) { Config().DatastorePath = path }(Config().DatastorePath)
+	Config().DatastorePath = srv.URL + "/allprintings5.json.xz"
 
 	// A private site, not testSite: its reload tracker starts fresh rather
 	// than carrying state another test left running.

@@ -244,7 +244,7 @@ func banlistCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 
 	// Format launches are game-wide: every chart shows "Pioneer announced"
 	// whatever card it is drawing.
-	for _, ev := range Config.FormatEvents {
+	for _, ev := range Config().FormatEvents {
 		if ev.Date < earliestStr {
 			continue
 		}

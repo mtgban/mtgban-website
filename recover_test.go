@@ -46,9 +46,9 @@ func serverWebhook(t *testing.T) <-chan string {
 	}))
 	t.Cleanup(hook.Close)
 
-	prev := Config.Discord.ServerWebhookURL
-	Config.Discord.ServerWebhookURL = hook.URL
-	t.Cleanup(func() { Config.Discord.ServerWebhookURL = prev })
+	prev := Config().Discord.ServerWebhookURL
+	Config().Discord.ServerWebhookURL = hook.URL
+	t.Cleanup(func() { Config().Discord.ServerWebhookURL = prev })
 	return posts
 }
 

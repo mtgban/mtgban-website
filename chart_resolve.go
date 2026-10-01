@@ -211,7 +211,7 @@ func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 // that chart cards (search results) — not from uuid2card, which also feeds
 // chartless pages (upload, arbit, news, ...) at thousands of cards a request.
 func chartIDForCard(b *mtgmatcher.Backend, cardID string) string {
-	if !Config.TimeseriesConfig.LongFormReads {
+	if !Config().TimeseriesConfig.LongFormReads {
 		return cardID
 	}
 	co, err := b.GetUUID(cardID)

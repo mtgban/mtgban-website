@@ -24,10 +24,10 @@ func TestArbitBlocksCookieVendorsPerRequest(t *testing.T) {
 		t.Cleanup(func() { delete(LogPages, "Arbitrage") })
 	}
 	seedReverseScrapers(t, "card-a")
-	prev := Config.ArbitBlockVendors
-	t.Cleanup(func() { Config.ArbitBlockVendors = prev })
-	Config.ArbitBlockVendors = append(make([]string, 0, 4), "CONFIG_VENDOR")
-	array := Config.ArbitBlockVendors[:cap(Config.ArbitBlockVendors)]
+	prev := Config().ArbitBlockVendors
+	t.Cleanup(func() { Config().ArbitBlockVendors = prev })
+	Config().ArbitBlockVendors = append(make([]string, 0, 4), "CONFIG_VENDOR")
+	array := Config().ArbitBlockVendors[:cap(Config().ArbitBlockVendors)]
 
 	// The /reverse menu lists every vendor the blocklist lets through
 	reverseMenu := func(cookie string) string {

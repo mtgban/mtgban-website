@@ -24,14 +24,14 @@ var TCGCSVService *tcgcsvd.Service
 // state for a deployment that doesn't carry the non-Magic games — the caller
 // decides whether that is worth logging.
 func initTCGCSVService(s *site) error {
-	if Config.TCGCSVConfig == nil {
+	if Config().TCGCSVConfig == nil {
 		return errors.New("tcgcsv: no tcgcsv_config section")
 	}
 	if PricesArchiveDB == nil {
 		return errors.New("tcgcsv: no price database configured")
 	}
-	svc, err := tcgcsvd.New(*Config.TCGCSVConfig, PricesArchiveDB,
-		tcgcsvd.WithLongFormWrites(Config.TimeseriesConfig.LongFormWrites),
+	svc, err := tcgcsvd.New(*Config().TCGCSVConfig, PricesArchiveDB,
+		tcgcsvd.WithLongFormWrites(Config().TimeseriesConfig.LongFormWrites),
 		tcgcsvd.WithNotifier(func(kind, message string) { ServerNotify(kind, message) }),
 		tcgcsvd.WithProductReport(s.logTCGProductMatchReport))
 	if err != nil {

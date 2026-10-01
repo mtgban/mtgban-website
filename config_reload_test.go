@@ -14,16 +14,16 @@ import (
 // does, and puts back what loadVars replaces or rebuilds when the test ends.
 func withConfigFile(t *testing.T) string {
 	t.Helper()
-	saved, savedBucket, savedRegistry := Config, ConfigBucket, chartProviders()
+	saved, savedBucket, savedRegistry := Config(), ConfigBucket, chartProviders()
 	t.Cleanup(func() {
-		Config, ConfigBucket = saved, savedBucket
+		liveConfig.Store(saved)
+		ConfigBucket = savedBucket
 		providerRegistry.Store(&savedRegistry)
 	})
 	withSigMode(t, false, true)
 	t.Setenv("BAN_SECRET", "test-secret")
 
 	path := filepath.Join(t.TempDir(), "config.json")
-	Config = ConfigType{}
 	err := preloadConfig(path)
 	if err != nil {
 		t.Fatal(err)
@@ -68,31 +68,31 @@ func TestConfigReloadDropsWhatTheFileDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, found := Config.APIUserSecrets["revoked@example.com"]
-	if found || Config.APIUserSecrets["kept@example.com"] != "a" {
-		t.Errorf("api_user_secrets %v, want only the key the file still has", Config.APIUserSecrets)
+	_, found := Config().APIUserSecrets["revoked@example.com"]
+	if found || Config().APIUserSecrets["kept@example.com"] != "a" {
+		t.Errorf("api_user_secrets %v, want only the key the file still has", Config().APIUserSecrets)
 	}
-	if Config.TimeseriesConfig.Datasets != nil || len(chartProviders()) != 0 {
+	if Config().TimeseriesConfig.Datasets != nil || len(chartProviders()) != 0 {
 		t.Errorf("datasets %+v, registry %+v, want both gone with timeseries_config",
-			Config.TimeseriesConfig.Datasets, chartProviders())
+			Config().TimeseriesConfig.Datasets, chartProviders())
 	}
 
 	// What loadVars adds to the file it adds again.
 	for _, c := range []struct{ name, got, want string }{
-		{"source path", Config.sourcePath, path},
-		{"-port, over the file's port", Config.Port, "8081"},
-		{"-acl", Config.ACLPath, "flag-acl.json"},
-		{"-grants", Config.PatreonGrantsPath, "flag-grants.json"},
-		{"default datastore path", Config.DatastorePath, DefaultDatastorePath},
-		{"default gateway", Config.APIGateway.URL, DefaultAPIGatewayURL},
-		{"default discord guild", Config.Discord.GuildID, defaultDiscordGuildID},
+		{"source path", Config().sourcePath, path},
+		{"-port, over the file's port", Config().Port, "8081"},
+		{"-acl", Config().ACLPath, "flag-acl.json"},
+		{"-grants", Config().PatreonGrantsPath, "flag-grants.json"},
+		{"default datastore path", Config().DatastorePath, DefaultDatastorePath},
+		{"default gateway", Config().APIGateway.URL, DefaultAPIGatewayURL},
+		{"default discord guild", Config().Discord.GuildID, defaultDiscordGuildID},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
 		}
 	}
-	if !slices.Equal(Config.APIGateway.Games, []mtgmatcher.Game{DefaultGame, "lorcana"}) {
-		t.Errorf("gateway games %v, want the default game and this one", Config.APIGateway.Games)
+	if !slices.Equal(Config().APIGateway.Games, []mtgmatcher.Game{DefaultGame, "lorcana"}) {
+		t.Errorf("gateway games %v, want the default game and this one", Config().APIGateway.Games)
 	}
 }
 
@@ -113,8 +113,8 @@ func TestConfigReloadFailureKeepsTheConfig(t *testing.T) {
 		t.Fatal("a file with a type error reloaded")
 	}
 	want := map[string]string{"kept@example.com": "a"}
-	if Config.Game != "lorcana" || !maps.Equal(Config.APIUserSecrets, want) {
+	if Config().Game != "lorcana" || !maps.Equal(Config().APIUserSecrets, want) {
 		t.Errorf("game %q, api_user_secrets %v: the failed reload changed the live config",
-			Config.Game, Config.APIUserSecrets)
+			Config().Game, Config().APIUserSecrets)
 	}
 }

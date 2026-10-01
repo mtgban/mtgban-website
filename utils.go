@@ -398,7 +398,7 @@ var rarityBadges = map[string]rarityBadge{}
 // Magic draws keyrune glyphs instead and never asks for a badge, so it reads
 // nothing.
 func loadRarityBadges() {
-	if Config.Game == DefaultGame {
+	if Config().Game == DefaultGame {
 		return
 	}
 
@@ -415,13 +415,13 @@ func loadRarityBadges() {
 	// matches none of them.
 	var game mtgmatcher.Game
 	for _, registered := range mtgmatcher.RegisteredGames() {
-		if registered == Config.Game {
+		if registered == Config().Game {
 			game = registered
 			break
 		}
 	}
 	if game == "" {
-		log.Println("no set symbols for unregistered game:", Config.Game)
+		log.Println("no set symbols for unregistered game:", Config().Game)
 		return
 	}
 
@@ -1136,7 +1136,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 	var rarityColor template.CSS
 	keyrune, setSymbol := keyruneForCardSet(b, cardID)
 	if keyrune == "" {
-		rarityColor = colorRarityMap[Config.Game][co.Rarity]
+		rarityColor = colorRarityMap[Config().Game][co.Rarity]
 	}
 
 	var hotlistStore string
@@ -1325,38 +1325,38 @@ func ServerNotify(kind, message string, flags ...bool) {
 // serverPost sends message to the server webhook without logging it,
 // prefixed with @here when here is set.
 func serverPost(kind, message string, here bool) {
-	if Config.Discord.ServerWebhookURL == "" {
+	if Config().Discord.ServerWebhookURL == "" {
 		return
 	}
 	if here {
 		message = "@here " + message
 	}
-	go notify.Post(Config.Discord.ServerWebhookURL, kind, message, DevMode)
+	go notify.Post(Config().Discord.ServerWebhookURL, kind, message, DevMode)
 }
 
 // Only send the notification for a user action
 func UserNotify(kind, message string, flags ...bool) {
-	if Config.Discord.UserWebhookURL == "" {
+	if Config().Discord.UserWebhookURL == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 		log.Println(kind, "-", message)
 	}
-	go notify.Post(Config.Discord.UserWebhookURL, kind, message, DevMode)
+	go notify.Post(Config().Discord.UserWebhookURL, kind, message, DevMode)
 }
 
 // Only send the notification for a user action
 func APINotify(message string, flags ...bool) {
-	kind := string(Config.Game)
+	kind := string(Config().Game)
 	log.Println(kind, "-", message)
-	if Config.Discord.APIWebhookURL == "" {
+	if Config().Discord.APIWebhookURL == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify.Post(Config.Discord.APIWebhookURL, kind, message, DevMode)
+	go notify.Post(Config().Discord.APIWebhookURL, kind, message, DevMode)
 }
 
 // Read the query parameter, if present set a cookie that will be
@@ -1503,13 +1503,13 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 	var blocklistRetail, blocklistBuylist []string
 	blocklistRetailOpt := GetParamFromSig(sig, "SearchDisabled")
 	if blocklistRetailOpt == "" {
-		blocklistRetail = slices.Clip(Config.SearchRetailBlockList)
+		blocklistRetail = slices.Clip(Config().SearchRetailBlockList)
 	} else if blocklistRetailOpt != "NONE" {
 		blocklistRetail = strings.Split(blocklistRetailOpt, ",")
 	}
 	blocklistBuylistOpt := GetParamFromSig(sig, "SearchBuylistDisabled")
 	if blocklistBuylistOpt == "" {
-		blocklistBuylist = slices.Clip(Config.SearchBuylistBlockList)
+		blocklistBuylist = slices.Clip(Config().SearchBuylistBlockList)
 	} else if blocklistBuylistOpt != "NONE" {
 		blocklistBuylist = strings.Split(blocklistBuylistOpt, ",")
 	}
@@ -1672,7 +1672,7 @@ func scraperName(shorthand string) string {
 	for _, seller := range GetSellers() {
 		if shorthand == seller.Info().Shorthand {
 			name := seller.Info().Name
-			override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
+			override, found := Config().ScraperConfig.NameOverride[seller.Info().Name]
 			if found {
 				name = override
 			}
@@ -1682,7 +1682,7 @@ func scraperName(shorthand string) string {
 	for _, vendor := range GetVendors() {
 		if shorthand == vendor.Info().Shorthand {
 			name := vendor.Info().Name
-			override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
+			override, found := Config().ScraperConfig.NameOverride[vendor.Info().Name]
 			if found {
 				name = override
 			}
@@ -1691,7 +1691,7 @@ func scraperName(shorthand string) string {
 	}
 
 	// If nothing is found, check if there is a custom override for the shorthand itself
-	return Config.ScraperConfig.NameOverride[shorthand]
+	return Config().ScraperConfig.NameOverride[shorthand]
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically

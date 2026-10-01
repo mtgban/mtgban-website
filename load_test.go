@@ -310,17 +310,17 @@ func TestLoadScrapersNGFromLocalDirectory(t *testing.T) {
 
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevIdx := scraperIndexPtr.Load()
-	prevGame := Config.Game
+	prevGame := Config().Game
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
 	sellersPtr.Store(&noSellers)
 	vendorsPtr.Store(&noVendors)
-	Config.Game = "magic"
+	Config().Game = "magic"
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 		scraperIndexPtr.Store(prevIdx)
-		Config.Game = prevGame
+		Config().Game = prevGame
 	})
 
 	now := time.Now()
@@ -408,17 +408,17 @@ func TestLoadScrapersNGFromADumpsDirectory(t *testing.T) {
 
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevIdx := scraperIndexPtr.Load()
-	prevGame := Config.Game
+	prevGame := Config().Game
 	var noSellers []mtgban.Seller
 	var noVendors []mtgban.Vendor
 	sellersPtr.Store(&noSellers)
 	vendorsPtr.Store(&noVendors)
-	Config.Game = "magic"
+	Config().Game = "magic"
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 		scraperIndexPtr.Store(prevIdx)
-		Config.Game = prevGame
+		Config().Game = prevGame
 	})
 
 	now := time.Now()

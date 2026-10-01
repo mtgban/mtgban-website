@@ -223,7 +223,7 @@ func SCGRetailRedirect(ctx context.Context, b *mtgmatcher.Backend, ids, qtys, co
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("X-API-KEY", Config.API["scg_mass_entry"])
+	req.Header.Set("X-API-KEY", Config().API["scg_mass_entry"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -578,7 +578,7 @@ type OpenSearchURL struct {
 }
 
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
-	host := string(Config.Game)
+	host := string(Config().Game)
 	gameName := mtgmatcher.Title(host)
 
 	images := []OpenSearchImage{
@@ -753,7 +753,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	demoFilter := func(name string, forSeller bool) []FilterStoreElem {
 		return []FilterStoreElem{{
 			Name:          name,
-			Values:        fixupStoreCodeNG(strings.Join(Config.APIDemoStores, ",")),
+			Values:        fixupStoreCodeNG(strings.Join(Config().APIDemoStores, ",")),
 			OnlyForSeller: forSeller,
 			OnlyForVendor: !forSeller,
 		}}
@@ -842,8 +842,8 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefix := string(Config.Game) + "/" + name + "/"
-	idx, err := listDumpsWithRetry(DataBucket, Config.Game, prefix)
+	prefix := string(Config().Game) + "/" + name + "/"
+	idx, err := listDumpsWithRetry(DataBucket, Config().Game, prefix)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
@@ -857,7 +857,7 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	var failed []string
 	for kind, list := range scrapersConfig {
 		for _, shorthand := range list {
-			err := loadScraperWithRetry(DataBucket, Config.Game, name, kind, shorthand)
+			err := loadScraperWithRetry(DataBucket, Config().Game, name, kind, shorthand)
 			if err != nil {
 				log.Println(err)
 				failed = append(failed, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
@@ -899,7 +899,7 @@ func (s *site) LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 	// whatever sits in front gives up and reports a gateway error against a
 	// reload that is running perfectly well. What the load then did is on
 	// the admin page, and in the server notifications.
-	if !s.startDatastoreReload(Config.DatastorePath, "api") {
+	if !s.startDatastoreReload(Config().DatastorePath, "api") {
 		// Read after the call that queued this one, so it names the reload
 		// it waits for.
 		state := s.reloads.Status()

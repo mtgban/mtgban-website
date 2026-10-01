@@ -1138,7 +1138,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				var link string
 
-				game := cm.GameFromName(string(Config.Game))
+				game := cm.GameFromName(string(Config().Game))
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
@@ -1240,7 +1240,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
-		} else if Config.TimeseriesConfig.LongFormReads {
+		} else if Config().TimeseriesConfig.LongFormReads {
 			// Render the window the chart draws, taken from the viewer's own
 			// last choice so it is not drawn once and redrawn at theirs. A
 			// roster's select starts on "All", so absent a choice it renders
@@ -1620,7 +1620,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 					conditions = "INDEX"
 				}
 
-				icon := Config.ScraperConfig.Icons[info.Shorthand]
+				icon := Config().ScraperConfig.Icons[info.Shorthand]
 
 				// Prepare all the deets
 				res := SearchEntry{
@@ -1697,14 +1697,14 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 					conditions = "INDEX"
 				}
 
-				icon := Config.ScraperConfig.Icons[info.Shorthand]
+				icon := Config().ScraperConfig.Icons[info.Shorthand]
 
 				res := SearchEntry{
 					ScraperName:  name,
 					Shorthand:    info.Shorthand,
 					Price:        entry.BuyPrice,
 					Credit:       entry.BuyPrice * info.CreditMultiplier,
-					MarketCredit: entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
+					MarketCredit: entry.BuyPrice * info.CreditMultiplier * Config().BuylistMarketCredit[info.Shorthand],
 					Ratio:        entry.PriceRatio,
 					Quantity:     entry.Quantity,
 					URL:          entry.URL,

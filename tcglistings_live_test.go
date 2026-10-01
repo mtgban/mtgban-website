@@ -51,12 +51,12 @@ func TestTCGListingsLive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	prevDB, prevGame, prevSkip, prevListings := NewNewspaperDB, Config.Game, SkipNewspaper, tcgListingsPtr.Load()
+	prevDB, prevGame, prevSkip, prevListings := NewNewspaperDB, Config().Game, SkipNewspaper, tcgListingsPtr.Load()
 	t.Cleanup(func() {
-		NewNewspaperDB, Config.Game, SkipNewspaper = prevDB, prevGame, prevSkip
+		NewNewspaperDB, Config().Game, SkipNewspaper = prevDB, prevGame, prevSkip
 		tcgListingsPtr.Store(prevListings)
 	})
-	NewNewspaperDB, Config.Game, SkipNewspaper = db, DefaultGame, false
+	NewNewspaperDB, Config().Game, SkipNewspaper = db, DefaultGame, false
 	tcgListingsPtr.Store(nil)
 
 	start := time.Now()

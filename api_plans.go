@@ -119,7 +119,7 @@ func APIStores(w http.ResponseWriter, r *http.Request) {
 		Game    mtgmatcher.Game `json:"game"`
 		Implied []StoreFamily   `json:"implied"`
 		Stores  []StoreFamily   `json:"stores"`
-	}{Game: Config.Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}}
+	}{Game: Config().Game, Implied: []StoreFamily{}, Stores: []StoreFamily{}}
 	implied, stores := storeFamilies()
 	out.Implied = append(out.Implied, implied...)
 	out.Stores = append(out.Stores, stores...)
@@ -151,7 +151,7 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	}
 	v := &APIPlansVars{
 		Products:   apiProducts,
-		GatewayURL: Config.APIGateway.URL,
+		GatewayURL: Config().APIGateway.URL,
 		ReturnTo:   returnTo,
 		Invite:     invite,
 		Change:     change,
@@ -187,8 +187,8 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	v.HandoffOn = emailOK && apiGatewaySecret() != ""
 	v.CanTrial = v.HandoffOn && GetParamFromSig(sig, "UserTier") != ""
 	// The site's own game is preselected; the base price covers one game of the buyer's choice.
-	for _, g := range Config.APIGateway.Games {
-		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(string(g)), Checked: g == Config.Game})
+	for _, g := range Config().APIGateway.Games {
+		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(string(g)), Checked: g == Config().Game})
 	}
 	return v
 }
@@ -234,10 +234,10 @@ func storeFamilies() (implied, selectable []StoreFamily) {
 		}
 	}
 	for _, seller := range GetSellers() {
-		add(seller.Info(), Config.SearchRetailBlockList)
+		add(seller.Info(), Config().SearchRetailBlockList)
 	}
 	for _, vendor := range GetVendors() {
-		add(vendor.Info(), Config.SearchBuylistBlockList)
+		add(vendor.Info(), Config().SearchBuylistBlockList)
 	}
 	for _, f := range families {
 		slices.Sort(f.Shorthands)
@@ -253,7 +253,7 @@ func storeFamilies() (implied, selectable []StoreFamily) {
 			}
 		}
 		name := familyName(names)
-		if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
+		if override, ok := Config().ScraperConfig.NameOverride[name]; ok {
 			name = override
 		}
 		f.Name = cmp.Or(name, f.Key)

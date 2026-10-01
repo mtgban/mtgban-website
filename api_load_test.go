@@ -32,7 +32,7 @@ func withLocalDumpsBucket(t *testing.T, game mtgmatcher.Game) {
 	t.Helper()
 	t.Chdir(t.TempDir())
 
-	prevGame := Config.Game
+	prevGame := Config().Game
 	prevBucket := DataBucket
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevIdx := scraperIndexPtr.Load()
@@ -42,11 +42,11 @@ func withLocalDumpsBucket(t *testing.T, game mtgmatcher.Game) {
 	vendorsPtr.Store(&noVendors)
 	scraperIndexPtr.Store(newScraperIndex())
 
-	Config.Game = game
+	Config().Game = game
 	DataBucket = &simplecloud.FileBucket{}
 
 	t.Cleanup(func() {
-		Config.Game = prevGame
+		Config().Game = prevGame
 		DataBucket = prevBucket
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
@@ -141,10 +141,10 @@ func TestLoadFromCloudUpdatesTheIndexToWhatItJustListed(t *testing.T) {
 // names the running reload's start.
 func TestLoadDatastoreQueuesBehindTheRunningReload(t *testing.T) {
 	t.Setenv("BAN_SECRET", "test-secret")
-	savedPath := Config.DatastorePath
-	t.Cleanup(func() { Config.DatastorePath = savedPath })
+	savedPath := Config().DatastorePath
+	t.Cleanup(func() { Config().DatastorePath = savedPath })
 	// The queued load then fails fast instead of reading a real datastore.
-	Config.DatastorePath = filepath.Join(t.TempDir(), "missing.json")
+	Config().DatastorePath = filepath.Join(t.TempDir(), "missing.json")
 
 	s := newSite()
 	release := make(chan struct{})

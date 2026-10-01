@@ -33,7 +33,7 @@ func notifyAccessReload(ctx context.Context, channel string) {
 	if PricesArchiveDB == nil {
 		return
 	}
-	err := PricesArchiveDB.Notify(ctx, channel, Config.InstanceName)
+	err := PricesArchiveDB.Notify(ctx, channel, Config().InstanceName)
 	if err != nil {
 		log.Printf("access reload: notify %s failed: %v", channel, err)
 	}
@@ -56,17 +56,17 @@ func skipAccessNotification(n *pq.Notification, instanceName string) bool {
 // the peers' saves. It needs the shared database to listen on, and skips any
 // value with no path configured: there is nothing to reload.
 func startAccessReloadListener() {
-	if Config.SQLConfig == nil {
+	if Config().SQLConfig == nil {
 		return
 	}
 	reloads := map[string]func(context.Context) error{}
-	if Config.ACLPath != "" {
+	if Config().ACLPath != "" {
 		reloads[aclReloadChannel] = Access.ReloadTable
 	}
-	if Config.PatreonGrantsPath != "" {
+	if Config().PatreonGrantsPath != "" {
 		reloads[grantsReloadChannel] = Access.ReloadGrants
 	}
-	if Config.AffiliatesPath != "" {
+	if Config().AffiliatesPath != "" {
 		reloads[affiliatesReloadChannel] = loadAffiliates
 	}
 	if len(reloads) == 0 {
@@ -76,7 +76,7 @@ func startAccessReloadListener() {
 	// The listener holds its own connection outside PricesArchiveDB's pool:
 	// LISTEN is per-session, and lib/pq reconnects and re-subscribes this one
 	// on its own (backing off between the two durations below).
-	listener := pq.NewListener(Config.SQLConfig.DSN(), 10*time.Second, time.Minute,
+	listener := pq.NewListener(Config().SQLConfig.DSN(), 10*time.Second, time.Minute,
 		func(event pq.ListenerEventType, err error) {
 			if err != nil {
 				log.Println("access reload: listener:", err)
@@ -95,7 +95,7 @@ func startAccessReloadListener() {
 		for {
 			select {
 			case n := <-listener.Notify:
-				if skipAccessNotification(n, Config.InstanceName) {
+				if skipAccessNotification(n, Config().InstanceName) {
 					continue
 				}
 				if n == nil {

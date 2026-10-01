@@ -453,7 +453,7 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		// Enable any option with BetaFlag
 		anyOptionEnabled = true
 	} else if allowlistSellersOpt == "" {
-		allowlistSellers = Config.ArbitDefaultSellers
+		allowlistSellers = Config().ArbitDefaultSellers
 	} else {
 		allowlistSellers = strings.Split(allowlistSellersOpt, ",")
 	}
@@ -463,7 +463,7 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	if blocklistVendorsOpt == "" {
 		// Clipped: the cookie's vendors are appended below, and an append into
 		// the config's spare capacity would be seen by every other request
-		blocklistVendors = slices.Clip(Config.ArbitBlockVendors)
+		blocklistVendors = slices.Clip(Config().ArbitBlockVendors)
 	} else if blocklistVendorsOpt != "NONE" {
 		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
 	}
@@ -533,8 +533,8 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	allowlistSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
-			return slices.Contains(Config.GlobalAllowList, info.Shorthand) &&
-				(anyExperiment || !slices.Contains(Config.SearchRetailBlockList, info.Shorthand))
+			return slices.Contains(Config().GlobalAllowList, info.Shorthand) &&
+				(anyExperiment || !slices.Contains(Config().SearchRetailBlockList, info.Shorthand))
 		}
 		// These are hardcoded to provide a preview of the tool
 		return info.Shorthand == "TCGMarket" || info.Shorthand == "MKMTrend"
@@ -542,7 +542,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	// The "Jump to" section, the probe
 	blocklistVendors := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(Config.GlobalProbeList, info.Shorthand)
+		return !slices.Contains(Config().GlobalProbeList, info.Shorthand)
 	})
 
 	// Populate vendor keys for the settings modal (shown on every page load)
