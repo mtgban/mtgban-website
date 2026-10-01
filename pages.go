@@ -286,6 +286,7 @@ type PageVars struct {
 	// Each page's own fields: only that page fills them, and only its
 	// templates read them.
 	AdminVars
+	NewsVars
 	SearchVars
 	UploadVars
 
@@ -358,20 +359,10 @@ type PageVars struct {
 
 	Page               string
 	Subtitle           string
-	ToC                []NewspaperPage
-	Headings           []Heading
 	Cards              []GenericCard
-	Table              []NewspaperResult
-	IsOneDay           bool
-	CanSwitchDay       bool
 	SortDir            string
-	OffsetCards        int
-	FilterSet          string
 	Editions           []string
 	FlatEditions       []FlatEditionEntry
-	FilterRarity       string
-	FilterBucket       string
-	FilterFinish       string
 	Rarities           []string
 	CardHashes         []string
 	EditionsMap        map[string]EditionEntry
@@ -380,12 +371,6 @@ type PageVars struct {
 	PickerID           string
 
 	CanFilterByPrice bool
-	FilterMinPrice   float64
-	FilterMaxPrice   float64
-
-	CanFilterByPercentage bool
-	FilterMinPercChange   float64
-	FilterMaxPercChange   float64
 
 	Sleepers       map[string][]string
 	SleepersKeys   []string
