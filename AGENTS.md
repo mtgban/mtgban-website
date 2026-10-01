@@ -109,6 +109,14 @@ output, not a claim written here.
 - **No `reflect`**, tests included; CI's revive rejects the import. Compare
   with `slices`/`maps`, or a comparison written for the type:
   `docs/adr/0002-no-reflect.md` has why and how.
+- **Page scripts go in `js/`, not inline in templates.** Load a page's
+  script with a `src` tag where its code runs, and hand it template values
+  through a small `window.BAN_*` object set by an inline script just
+  before the tag (`BAN_SEARCH_RESULT`, `BAN_SEARCH_CHART` in
+  `search.html`). A file in `js/` is cached between pages, bun can test it
+  without regexing it out of a template, and CodeQL scans it, which it
+  does not do for templates. Keep inline only what has to run before
+  anything loads (the theme guard in `base.html`) or a few lines of glue.
 
 ## Where things live (root package)
 
