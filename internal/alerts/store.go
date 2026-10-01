@@ -370,26 +370,48 @@ func (s *Store) ListActive(ctx context.Context, game string, sides []Side) ([]Ac
 	return out, rows.Err()
 }
 
+// Moved is an alert MarkOverAllowance parked or brought back.
+type Moved struct {
+	ID     int64
+	Status Status
+	Card   Card
+	Origin string
+}
+
 // MarkOverAllowance keeps a user's newest alerts active up to the
 // allowance and parks the rest, restoring parked ones when room returns.
-func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, allowance int) (int64, error) {
-	res, err := s.db.ExecContext(ctx, `
+// It answers with the alerts it moved, newest first.
+func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, allowance int) ([]Moved, error) {
+	rows, err := s.db.QueryContext(ctx, `
 		WITH ranked AS (
 			SELECT id, row_number() OVER (ORDER BY created_at DESC, id DESC) AS rn
 			  FROM alerts
 			 WHERE user_hash = $1 AND game = $2 AND status IN ('active', 'over_allowance')
+		), moved AS (
+			UPDATE alerts a
+			   SET status = CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END,
+			       updated_at = now()
+			  FROM ranked r
+			 WHERE a.id = r.id
+			   AND a.status <> CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END
+			RETURNING a.id, a.status, a.card_name, a.card_set, a.card_number, a.card_finish, a.origin, r.rn
 		)
-		UPDATE alerts a
-		   SET status = CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END,
-		       updated_at = now()
-		  FROM ranked r
-		 WHERE a.id = r.id
-		   AND a.status <> CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END`,
+		SELECT id, status, card_name, card_set, card_number, card_finish, origin FROM moved ORDER BY rn`,
 		userHash, game, allowance)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return res.RowsAffected()
+	defer rows.Close()
+	var out []Moved
+	for rows.Next() {
+		var m Moved
+		err := rows.Scan(&m.ID, &m.Status, &m.Card.Name, &m.Card.Set, &m.Card.Number, &m.Card.Finish, &m.Origin)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }
 
 // PruneEvents drops firings older than before.

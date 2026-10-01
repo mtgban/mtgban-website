@@ -88,6 +88,8 @@ each for all of them.
 - An alert on a card with widely spread prices does not fire on the
   outliers. A user who wants one store's price watches that store alone.
 - A parked alert shows Parked and comes back by itself once there is room;
-  only a paused or undeliverable alert offers Resume.
+  only a paused or undeliverable alert offers Resume. The run that parks a
+  user's alerts sends them one DM saying which and why: no sign-in for a
+  month, a tier without alerts, or the allowance.
 - `AlertsMax` is a signed field name: renaming it after `acl.json` uses it
   takes another deploy of every site and an `acl.json` edit together.

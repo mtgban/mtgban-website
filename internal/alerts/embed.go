@@ -10,10 +10,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Discord embed description limits: how many per-store lines a firing side
+// Discord embed description limits: how many store or card lines a list
 // shows before summarizing the rest, and the hard cap on the whole body.
 const (
-	embedMaxStores      = 15
+	embedMaxLines       = 15
 	embedMaxDescription = 4000
 	// embedCutWindow is how far back a cut looks for a line break.
 	embedCutWindow = 200
@@ -85,8 +85,8 @@ func dmEmbed(a Alert, d Decision, siteURL string, label func(shorthand string) s
 	lines := func(heading string, hits []Quote) {
 		fmt.Fprintf(&b, "\n**%s**\n", heading)
 		shown := hits
-		if len(shown) > embedMaxStores {
-			shown = shown[:embedMaxStores]
+		if len(shown) > embedMaxLines {
+			shown = shown[:embedMaxLines]
 		}
 		for _, q := range shown {
 			if siteURL == "" {
@@ -124,6 +124,42 @@ func dmEmbed(a Alert, d Decision, siteURL string, label func(shorthand string) s
 	}
 	return &discordgo.MessageEmbed{
 		Title:       "Price alert: " + a.Card.Name,
+		URL:         embedURL,
+		Description: desc,
+	}
+}
+
+// parkedEmbed is the one DM a user gets when a run parks their alerts:
+// why, which cards, and a link to the alerts page on the site the newest
+// of them was saved on.
+func parkedEmbed(parked []Moved, reason string) *discordgo.MessageEmbed {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n\n", reason)
+	shown := parked
+	if len(shown) > embedMaxLines {
+		shown = shown[:embedMaxLines]
+	}
+	for _, m := range shown {
+		fmt.Fprintf(&b, "%s %s #%s\n", escapeMarkdown(m.Card.Name), escapeMarkdown(m.Card.Set), escapeMarkdown(m.Card.Number))
+	}
+	more := len(parked) - len(shown)
+	if more > 0 {
+		fmt.Fprintf(&b, "and %d more\n", more)
+	}
+	manageLink := ""
+	embedURL := ""
+	origin := parked[0].Origin
+	if origin != "" {
+		manageLink = fmt.Sprintf("[Manage alerts](%s/alerts)", origin)
+		embedURL = origin + "/alerts"
+		fmt.Fprintf(&b, "\n%s", manageLink)
+	}
+	desc := b.String()
+	if utf8.RuneCountInString(desc) > embedMaxDescription {
+		desc = truncateEmbedDescription(desc, manageLink, embedMaxDescription)
+	}
+	return &discordgo.MessageEmbed{
+		Title:       "Price alerts paused",
 		URL:         embedURL,
 		Description: desc,
 	}

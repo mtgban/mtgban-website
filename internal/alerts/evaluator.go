@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 const (
@@ -23,7 +25,7 @@ const (
 type EvalStore interface {
 	UsersWithAlerts(ctx context.Context, game string) ([]Contact, error)
 	ListActive(ctx context.Context, game string, sides []Side) ([]ActiveAlert, error)
-	MarkOverAllowance(ctx context.Context, userHash, game string, allowance int) (int64, error)
+	MarkOverAllowance(ctx context.Context, userHash, game string, allowance int) ([]Moved, error)
 	ClaimFire(ctx context.Context, id int64, seenUpdatedAt time.Time, wasAbove, wasBelow, nextAbove, nextBelow bool) (bool, error)
 	SetState(ctx context.Context, id int64, st State) (bool, error)
 	AddEvent(ctx context.Context, e Event) error
@@ -76,6 +78,8 @@ func (d EvalDeps) report(summary, problem string) {
 // evalSummary is what one evaluation run did, for the jobs dashboard.
 type evalSummary struct {
 	users, active, sent, skipped int
+	// notices is the parked-alerts DMs the run delivered.
+	notices int
 	// err is the first error the run logged, nil when there was none.
 	err error
 }
@@ -89,7 +93,11 @@ func (s *evalSummary) fail(deps EvalDeps, step string, err error) {
 }
 
 func (s evalSummary) String() string {
-	return fmt.Sprintf("%d users, %d active, %d sent, %d skipped", s.users, s.active, s.sent, s.skipped)
+	out := fmt.Sprintf("%d users, %d active, %d sent, %d skipped", s.users, s.active, s.sent, s.skipped)
+	if s.notices > 0 {
+		out += fmt.Sprintf(", %d pause notices", s.notices)
+	}
+	return out
 }
 
 // problem is the first error's text, "" when there was none.
@@ -111,7 +119,8 @@ func setState(ctx context.Context, deps EvalDeps, sum *evalSummary, id int64, st
 
 // runEvaluation is one pass over the game's active alerts on the sides
 // that changed: allowance, quotes, claim, send, state and events, then
-// the prune. A contact older than contactMaxAge is parked and skipped.
+// the prune. A contact older than contactMaxAge is parked and skipped, and
+// a user whose alerts this run parks is told so once.
 func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary {
 	var sum evalSummary
 	label := deps.StoreLabel
@@ -128,15 +137,41 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		return sum
 	}
 	sum.users = len(users)
+	attempts := 0
+	// send paces every DM a run sends, notices and firings alike.
+	send := func(discordUserID string, embed *discordgo.MessageEmbed) error {
+		if attempts > 0 && deps.Pace > 0 {
+			time.Sleep(deps.Pace)
+		}
+		attempts++
+		return deps.Sender.Send(discordUserID, embed)
+	}
 	for _, c := range users {
+		lapsed := now.Sub(c.UpdatedAt) > contactMaxAge
 		allowance := deps.Allowance(deps.Values(c.UserHash, c.Tier))
-		if now.Sub(c.UpdatedAt) > contactMaxAge {
+		if lapsed {
 			allowance = 0
 		}
-		_, err := deps.Store.MarkOverAllowance(ctx, c.UserHash, deps.Game, allowance)
+		moved, err := deps.Store.MarkOverAllowance(ctx, c.UserHash, deps.Game, allowance)
 		if err != nil {
 			sum.fail(deps, "allowance", err)
+			continue
 		}
+		var parked []Moved
+		for _, m := range moved {
+			if m.Status == StatusOverAllowance {
+				parked = append(parked, m)
+			}
+		}
+		if len(parked) == 0 || c.DiscordUserID == "" {
+			continue
+		}
+		err = send(c.DiscordUserID, parkedEmbed(parked, parkReason(lapsed, allowance)))
+		if err != nil {
+			sum.fail(deps, "pause notice", err)
+			continue
+		}
+		sum.notices++
 	}
 	active, err := deps.Store.ListActive(ctx, deps.Game, sides)
 	if err != nil {
@@ -145,7 +180,6 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 	}
 	sum.active = len(active)
 
-	attempts := 0
 	for _, a := range active {
 		if now.Sub(a.Contact.UpdatedAt) > contactMaxAge {
 			deps.logf("alerts: %d skipped, contact login is older than %s", a.ID, contactMaxAge)
@@ -191,11 +225,7 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 			sum.skipped++
 			continue
 		}
-		if attempts > 0 && deps.Pace > 0 {
-			time.Sleep(deps.Pace)
-		}
-		sendErr := deps.Sender.Send(a.Contact.DiscordUserID, dmEmbed(a.Alert, d, a.Origin, label))
-		attempts++
+		sendErr := send(a.Contact.DiscordUserID, dmEmbed(a.Alert, d, a.Origin, label))
 		recordEvents(ctx, deps, &sum, a.ID, d, now, sendErr)
 		switch {
 		case sendErr == nil:
@@ -216,6 +246,20 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		}
 	}
 	return sum
+}
+
+// parkReason says why a user's alerts were parked and what brings them back.
+func parkReason(lapsed bool, allowance int) string {
+	switch {
+	case lapsed:
+		return "No Patreon sign-in for over a month.\nSign in on the site and they resume at the next price update."
+	case allowance == 0:
+		return "Your tier no longer includes price alerts."
+	}
+	if allowance == 1 {
+		return "Your tier allows 1 alert.\nDelete some and these resume at the next price update."
+	}
+	return fmt.Sprintf("Your tier allows %d alerts.\nDelete some and these resume at the next price update.", allowance)
 }
 
 // recordEvents logs one event per store that crossed, with the outcome.
