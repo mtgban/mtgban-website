@@ -1095,10 +1095,10 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
-// loadVars reads the config file into a new live Config, giving up after
-// configFileTimeout, then sets the port and paths given over it and fills in
-// the defaults. Once the site serves, its caller holds configMu; startup
-// calls it before anything else runs.
+// loadVars reads the config file into a new config, giving up after
+// configFileTimeout, sets the port and paths given over it, and makes it the
+// live one through finishConfig. Once the site serves, its caller holds
+// configMu; startup calls it before anything else runs.
 func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), configFileTimeout)
 	defer cancel()
@@ -1115,12 +1115,8 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	if err != nil && !DevMode {
 		return err
 	}
-	apiUsersMutex.Lock()
-	Config = config
-	apiUsersMutex.Unlock()
-
-	applyOverrides(port, datastorePath, aclPath, grantsPath)
-	finishConfig()
+	applyOverrides(&config, port, datastorePath, aclPath, grantsPath)
+	finishConfig(config)
 	return nil
 }
 
@@ -1133,48 +1129,50 @@ func reloadConfig() error {
 	return loadVars(Config.Port, Config.DatastorePath, Config.ACLPath, Config.PatreonGrantsPath)
 }
 
-// applyOverrides sets the port and the datastore, ACL and grants paths to the
-// values given, over whatever the config file said; an empty one leaves the
-// file's. Startup passes the flags, reloadConfig the running values. It must
+// applyOverrides sets config's port and datastore, ACL and grants paths to
+// the values given, over whatever the config file said; an empty one leaves
+// the file's. Startup passes the flags, reloadConfig the running values. It must
 // follow the decode, which would otherwise clobber them (breaking blue-green
 // deploys that run instances on distinct ports).
-func applyOverrides(port, datastorePath, aclPath, grantsPath string) {
+func applyOverrides(config *ConfigType, port, datastorePath, aclPath, grantsPath string) {
 	if port != "" {
-		Config.Port = port
+		config.Port = port
 	}
 	if datastorePath != "" {
-		Config.DatastorePath = datastorePath
+		config.DatastorePath = datastorePath
 	}
 	if aclPath != "" {
-		Config.ACLPath = aclPath
+		config.ACLPath = aclPath
 	}
 	if grantsPath != "" {
-		Config.PatreonGrantsPath = grantsPath
+		config.PatreonGrantsPath = grantsPath
 	}
 }
 
-// finishConfig completes a newly loaded Config: it rebuilds the chart provider
-// registry from it, defaults what it left unset, and defaults BAN_SECRET when
-// the environment has none.
-func finishConfig() {
+// finishConfig defaults what a newly loaded config left unset and makes it
+// the live one, whole; then it rebuilds the chart provider registry from it
+// and defaults BAN_SECRET when the environment has none.
+func finishConfig(config ConfigType) {
+	if config.Port == "" {
+		log.Println("Server port not configured, listening on", DefaultServerPort)
+		config.Port = DefaultServerPort
+	}
+	if config.Game == "" {
+		log.Println("Game not configured, defaulting to", DefaultGame)
+		config.Game = DefaultGame
+	}
+	if config.DatastorePath == "" {
+		log.Println("Datastore path not configured, using", DefaultDatastorePath)
+		config.DatastorePath = DefaultDatastorePath
+	}
+	applyAPIGatewayDefaults(&config.APIGateway, config.Game)
+
+	apiUsersMutex.Lock()
+	Config = config
+	apiUsersMutex.Unlock()
+
 	// Build the game-agnostic chart provider registry from the dataset config.
 	buildProviderRegistry()
-
-	// Ensure needed defaults
-	if Config.Port == "" {
-		log.Println("Server port not configured, listening on", DefaultServerPort)
-		Config.Port = DefaultServerPort
-	}
-	if Config.Game == "" {
-		log.Println("Game not configured, defaulting to", DefaultGame)
-		Config.Game = DefaultGame
-	}
-	if Config.DatastorePath == "" {
-		log.Println("Datastore path not configured, using", DefaultDatastorePath)
-		Config.DatastorePath = DefaultDatastorePath
-	}
-
-	applyAPIGatewayDefaults(&Config.APIGateway, Config.Game)
 
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
@@ -1370,8 +1368,9 @@ func main() {
 		if DevMode {
 			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
 			// loadVars returned before applying the flags and the defaults.
-			applyOverrides(*port, *dsPath, *aclPath, *grantsPath)
-			finishConfig()
+			config := Config
+			applyOverrides(&config, *port, *dsPath, *aclPath, *grantsPath)
+			finishConfig(config)
 		} else {
 			log.Fatalln("unable to load config file:", err)
 		}
