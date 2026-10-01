@@ -345,7 +345,6 @@ type PageVars struct {
 	SortDir            string
 	Editions           []string
 	CardHashes         []string
-	EditionsMap        map[string]EditionEntry
 	EditionsCategories []string
 	EditionsByCategory map[string][]EditionEntry
 	PickerID           string
