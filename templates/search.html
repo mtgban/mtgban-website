@@ -1,4 +1,5 @@
 {{define "extra-css"}}
+    {{if .CanAlerts}}<link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">{{end}}
     <link rel="stylesheet" type="text/css" href="/css/search.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     {{if .IsSealed}}
@@ -87,6 +88,7 @@
 {{end}}
 
 {{define "content"}}
+{{if .CanAlerts}}{{template "alert-modal" .}}{{end}}
     {{/* Results whenever a search ran, which is not the same as a query
          being present: a pinned filter searches on its own. */}}
     {{if and (eq .SearchQuery "") .EditionSort}}
@@ -520,6 +522,7 @@
                                          preview is hidden; opens the card art in a lightbox. */}}
                                     <button type="button" class="qi-view-image" title="View image" onclick="showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
                                     <button class="fav-btn" data-card-id="{{$cardId}}" onclick="toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
+                                    {{if $.CanAlerts}}<button type="button" class="alert-link" data-card-id="{{$cardId}}" onclick="openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'})" title="Set a price alert"><i data-lucide="bell"></i></button>{{end}}
                                     </div>
                                 </div>
                             </div>
@@ -816,6 +819,7 @@
 {{end}}
 
 {{define "extra-scripts"}}
+{{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}"></script>{{end}}
 <script type="text/javascript" src="/js/offline/offline-images.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}"></script>
