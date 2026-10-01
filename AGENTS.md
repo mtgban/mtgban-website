@@ -175,7 +175,9 @@ newspaper stays empty and each refresh logs an error. `gameMap`'s names
 are TCGplayer's `productLineName`s, spelled exactly (Palworld's is `Palworld
 OFFICIAL CARD GAME`), because the newspaper stores `game_name` that way and
 the pages match it with `=`: keep them in step with MTGBan_Newspaper's
-`games.py`.
+`games.py`. `testdata/newspaper_games.py` is a copy of it that
+`TestGameMapMatchesNewspaperRegistry` holds `gameMap` to; refresh the copy
+when the newspaper adds a game.
 
 Rarity badges (the colour and, for a few games, a drawn shape standing in for
 Magic's keyrune glyph) are a separate system with its own recipe and its own

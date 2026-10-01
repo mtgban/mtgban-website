@@ -1,6 +1,9 @@
 package main
 
 import (
+	"maps"
+	"os"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -142,5 +145,39 @@ func TestVariantCacheScope(t *testing.T) {
 				t.Errorf("TCGCategoryIDs = %v, want %v", got.TCGCategoryIDs, tc.want.TCGCategoryIDs)
 			}
 		})
+	}
+}
+
+// newspaperGameRe reads each Game(cli_name, sitemap_slug, product_line_name)
+// out of testdata/newspaper_games.py, a copy of MTGBan_Newspaper's
+// mtgban_newspaper/games.py. Refresh the copy when the builder adds a game.
+var newspaperGameRe = regexp.MustCompile(`Game\(\s*"[^"]*",\s*"[^"]*",\s*"([^"]*)",?\s*\)`)
+
+// The newspaper files its rows under TCGplayer's productLineName and the
+// pages match it with =, so a gameMap name off by one letter's case serves
+// an empty newspaper with no error (#673). Hold both lists to the same set.
+func TestGameMapMatchesNewspaperRegistry(t *testing.T) {
+	src, err := os.ReadFile("testdata/newspaper_games.py")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registry []string
+	for _, m := range newspaperGameRe.FindAllSubmatch(src, -1) {
+		registry = append(registry, string(m[1]))
+	}
+	if len(registry) == 0 {
+		t.Fatal("no Game(...) entries parsed from testdata/newspaper_games.py")
+	}
+
+	for game, name := range gameMap {
+		if !slices.Contains(registry, name) {
+			t.Errorf("gameMap[%q] = %q, which the newspaper registry does not name", game, name)
+		}
+	}
+	names := slices.Collect(maps.Values(gameMap))
+	for _, name := range registry {
+		if !slices.Contains(names, name) {
+			t.Errorf("the newspaper registry names %q, which no gameMap entry does", name)
+		}
 	}
 }
