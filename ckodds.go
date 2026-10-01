@@ -173,14 +173,14 @@ func (o *ckOdds) chancesFor(group, finish, bucket, verdict string) (cell ckCellK
 	return ckCellKey{}, ckChances{}, ckChances{}, false
 }
 
-// ckChanceLines are the lines of a tooltip quoting a cell's chances: for a
+// ckChanceLines are the table of a tooltip quoting a cell's chances: for a
 // wait the chances CK pays more, for a sell or a new high those it pays less
-// or nothing, a week and a month on, next to the typical ones; then what they
-// were measured on.
+// or nothing, a week and a month on, next to the typical ones; then, as its
+// footnote, what they were measured on.
 func ckChanceLines(cell ckCellKey, odds, typical ckChances) string {
-	head, week, weekTypical, month, monthTypical := "Chances CK pays more", odds.WeekMore, typical.WeekMore, odds.MonthMore, typical.MonthMore
+	head, week, weekTypical, month, monthTypical := "CK pays more", odds.WeekMore, typical.WeekMore, odds.MonthMore, typical.MonthMore
 	if cell.Verdict != "wait" {
-		head, week, weekTypical, month, monthTypical = "Chances CK pays less or nothing", odds.WeekLess, typical.WeekLess, odds.MonthLess, typical.MonthLess
+		head, week, weekTypical, month, monthTypical = "CK pays less or nothing", odds.WeekLess, typical.WeekLess, odds.MonthLess, typical.MonthLess
 	}
 	measured := fmt.Sprintf("Measured on %d %ss", odds.Printings, cell.Finish)
 	if cell.Bucket != "all" {
@@ -189,9 +189,9 @@ func ckChanceLines(cell ckCellKey, odds, typical ckChances) string {
 	if cell.Group == "exceptions" {
 		measured += ", RL or pre-1995"
 	}
-	return head + "\n" +
-		fmt.Sprintf("• in a week: **%d%%** instead of %d%%\n", week, weekTypical) +
-		fmt.Sprintf("• in a month: **%d%%** instead of %d%%\n", month, monthTypical) +
+	return "|# " + head + " | This card | Typical\n" +
+		fmt.Sprintf("| In a week | **%d%%** | %d%%\n", week, weekTypical) +
+		fmt.Sprintf("| In a month | **%d%%** | %d%%\n", month, monthTypical) +
 		measured
 }
 

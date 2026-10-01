@@ -173,7 +173,7 @@ func TestBuylistCKHelpers(t *testing.T) {
 		want      string
 	}{
 		// The verdict, the facts, CK's reference prices, then the odds.
-		{"CK NM", "CK", "NM", "wait", "Wait: out\nCK stock 0\n**P90**: $ 9.00 · **90d high**: $ 12.00\nodds 1\nodds 2"},
+		{"CK NM", "CK", "NM", "wait", "Wait: out\nCK stock 0\n|P90|$ 9.00\n|90d high|$ 12.00\nodds 1\nodds 2"},
 		{"CK SP", "CK", "SP", "", ""},
 		{"other store green", "SCG", "NM", "best", "**A good price**: at or above Card Kingdom's P90 ($ 9.00)"},
 		{"other store below P90", "SCG", "NM", "", ""},
@@ -184,7 +184,7 @@ func TestBuylistCKHelpers(t *testing.T) {
 		}
 	}
 	got := title("CK", "NM", "", 9, 0, "CK stock 3", "")
-	if got != "CK stock 3\n**P90**: $ 9.00" {
+	if got != "CK stock 3\n|P90|$ 9.00" {
 		t.Errorf("buylist_title CK NM without a signal: got %q", got)
 	}
 

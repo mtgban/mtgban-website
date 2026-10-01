@@ -269,25 +269,24 @@ func ckRuleFor(q ckQuote, h ckHistory, hasHistory bool, p ckProduct, retail floa
 	return "", ""
 }
 
-// ckFacts are CK's stock and TCG Market's, one per line, e.g.
-// "**CK stock**: 0 - out 9 days", "**TCG Market**: +12% this week" and
-// "**CK retail**: 1.4x TCG Market". Unlike the rules they show whatever is
-// known.
+// ckFacts are CK's stock and TCG Market's as a tooltip's label rows, e.g.
+// "|CK stock|0, out 9 days", "|TCG Market|+12% this week" and "|CK retail|1.4x
+// TCG Market". Unlike the rules they show whatever is known.
 func ckFacts(q ckQuote, h ckHistory, hasHistory bool, p ckProduct, retail float64, today time.Time) string {
 	var lines []string
 	if q.StockKnown {
-		stock := "**CK stock**: " + strconv.Itoa(q.Stock)
+		stock := "|CK stock|" + strconv.Itoa(q.Stock)
 		switch {
 		case q.Stock == 0 && hasHistory && h.LastInStock.IsZero():
-			stock += fmt.Sprintf(" - out %d+ days", ckHistoryWindow-1)
+			stock += fmt.Sprintf(", out %d+ days", ckHistoryWindow-1)
 		case q.Stock == 0 && hasHistory:
 			days := int(today.Sub(h.LastInStock).Hours() / 24)
-			stock += " - out " + strconv.Itoa(days) + " day"
+			stock += ", out " + strconv.Itoa(days) + " day"
 			if days != 1 {
 				stock += "s"
 			}
 		case q.Stock > 0 && hasHistory && h.HasStockWeekAgo:
-			stock += fmt.Sprintf(" - it was %d a week ago", h.StockWeekAgo)
+			stock += fmt.Sprintf(", it was %d a week ago", h.StockWeekAgo)
 		}
 		lines = append(lines, stock)
 	}
@@ -297,10 +296,10 @@ func ckFacts(q ckQuote, h ckHistory, hasHistory bool, p ckProduct, retail float6
 		if change != 0 {
 			move = fmt.Sprintf("%+.0f%% this week", change)
 		}
-		lines = append(lines, "**TCG Market**: "+move)
+		lines = append(lines, "|TCG Market|"+move)
 	}
 	if p.Market > 0 && retail > 0 {
-		lines = append(lines, fmt.Sprintf("**CK retail**: %.1fx TCG Market", retail/p.Market))
+		lines = append(lines, fmt.Sprintf("|CK retail|%.1fx TCG Market", retail/p.Market))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -316,16 +315,17 @@ func joinLines(lines ...string) string {
 	return strings.Join(kept, "\n")
 }
 
-// ckReferencePrices is CK's P90 and 90-day high on one line, or "".
+// ckReferencePrices is CK's P90 and 90-day high as a tooltip's label rows,
+// or "".
 func ckReferencePrices(good, highest float64) string {
-	var parts []string
+	var rows []string
 	if good > 0 {
-		parts = append(parts, fmt.Sprintf("**P90**: $ %.2f", good))
+		rows = append(rows, fmt.Sprintf("|P90|$ %.2f", good))
 	}
 	if highest > 0 {
-		parts = append(parts, fmt.Sprintf("**90d high**: $ %.2f", highest))
+		rows = append(rows, fmt.Sprintf("|90d high|$ %.2f", highest))
 	}
-	return strings.Join(parts, " · ")
+	return strings.Join(rows, "\n")
 }
 
 // ckPause is a card CK has paused: for how many days, the chances in percent
@@ -406,12 +406,15 @@ func ckPauseTip(p ckPause) string {
 	}
 	var back, beat string
 	if p.Back >= 0 {
-		back = fmt.Sprintf("Chances CK buys it again in a month: **%d%%**", p.Back)
+		back = fmt.Sprintf("| CK buys it again | **%d%%**", p.Back)
 	}
 	if p.Beat >= 0 {
-		beat = fmt.Sprintf("and pays more than any other offer: **%d%%**", p.Beat)
+		beat = fmt.Sprintf("| Paying more than any other offer | **%d%%**", p.Beat)
 	}
-	return joinLines(verdict, back, beat)
+	if back == "" && beat == "" {
+		return verdict
+	}
+	return joinLines(verdict, "|# Within a month | Chance", back, beat)
 }
 
 // ckCashBuylist tells whether a vendor is a store's cash buylist, one a
