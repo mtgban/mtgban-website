@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/lib/pq"
 )
 
 // Provider ids in the providers lookup table (see db_migration/02_seed_providers.sql).
@@ -429,32 +431,149 @@ func (c *Client) CachedMagicBanID(v MagicVariant) (int64, bool) {
 	return 0, false
 }
 
-// ResolveTCGBanID returns the ban_id for a non-Magic variant, minting it if new.
+// A non-Magic ban_id is computed from the variant rather than drawn from the
+// identity sequence, so the snapshot and the ingest can both name a printing's
+// id before its row exists:
+//
+//	category << 40 | product << 8 | sub-type code
+//
+// The category keeps a game's ids in one block, which is what #578's
+// RANGE(ban_id) partitions want, and the identity sequence (Magic, and every
+// non-Magic variant filed before this) is ~2M, far below category 1's block at
+// 2^40. Keeping category under 2^13 keeps every id under 2^53, so one survives
+// a trip through JavaScript as a number.
+const (
+	tcgBanIDCategoryShift = 40
+	tcgBanIDProductShift  = 8
+	tcgBanIDMaxCategory   = 1<<13 - 1
+	tcgBanIDMaxProduct    = 1<<(tcgBanIDCategoryShift-tcgBanIDProductShift) - 1
+)
+
+// tcgSubTypeCodes numbers the TCGplayer sub-types for TCGBanID: the sixteen
+// mtgmatcher.Finishes names, which are every sub-type the variants table held
+// when this was written. The codes are part of every derived id, so append a
+// new name with the next free code and never renumber one.
+var tcgSubTypeCodes = map[string]int64{
+	"":                               0,
+	"Normal":                         1,
+	"Foil":                           2,
+	"Rainbow Foil":                   3,
+	"Cold Foil":                      4,
+	"Holofoil":                       5,
+	"Reverse Holofoil":               6,
+	"1st Edition":                    7,
+	"Unlimited":                      8,
+	"Limited":                        9,
+	"1st Edition Holofoil":           10,
+	"Unlimited Holofoil":             11,
+	"1st Edition Normal":             12,
+	"1st Edition Rainbow Foil":       13,
+	"1st Edition Cold Foil":          14,
+	"Unlimited Edition Normal":       15,
+	"Unlimited Edition Rainbow Foil": 16,
+}
+
+// TCGBanID is the ban_id a new non-Magic variant is filed under. ok is false
+// for a sub-type tcgSubTypeCodes has no code for, or a category or product
+// past its field; EnsureTCGVariants falls back to the identity sequence then.
+//
+// A variant filed before ids were derived keeps the sequence id it was given,
+// since every price row and every ban: link already points at it, so this
+// says what a new row will be called, not what an existing one is. Look an
+// existing one up.
+func TCGBanID(v TCGVariant) (int64, bool) {
+	code, ok := tcgSubTypeCodes[v.SubType]
+	if !ok || v.CategoryID < 1 || v.CategoryID > tcgBanIDMaxCategory ||
+		v.ProductID < 1 || v.ProductID > tcgBanIDMaxProduct {
+		return 0, false
+	}
+	return int64(v.CategoryID)<<tcgBanIDCategoryShift |
+		int64(v.ProductID)<<tcgBanIDProductShift | code, true
+}
+
+// ResolveTCGBanID returns the ban_id for a non-Magic variant, filing the
+// variant under its TCGBanID if it is new.
 func (c *Client) ResolveTCGBanID(ctx context.Context, v TCGVariant) (int64, error) {
 	if id, ok := c.variants.tcg.Load(v); ok {
 		if cached, isInt := id.(int64); isInt {
 			return cached, nil
 		}
 	}
-	var banID int64
-	err := c.db.QueryRowContext(ctx, `
-		INSERT INTO variants (tcgp_category_id, tcgp_product_id, tcgp_sub_type)
-		VALUES ($1,$2,$3)
-		ON CONFLICT (tcgp_category_id, tcgp_product_id, tcgp_sub_type)
-		    WHERE tcgp_product_id IS NOT NULL DO NOTHING
-		RETURNING ban_id`,
-		v.CategoryID, v.ProductID, v.SubType,
-	).Scan(&banID)
-	if err == sql.ErrNoRows {
-		err = c.db.QueryRowContext(ctx, `
-			SELECT ban_id FROM variants
-			 WHERE tcgp_category_id=$1 AND tcgp_product_id=$2 AND tcgp_sub_type=$3`,
-			v.CategoryID, v.ProductID, v.SubType,
-		).Scan(&banID)
-	}
+	ids, err := c.EnsureTCGVariants(ctx, []TCGVariant{v})
 	if err != nil {
-		return 0, fmt.Errorf("resolve tcg ban_id %+v: %w", v, err)
+		return 0, err
 	}
-	c.variants.tcg.Store(v, banID)
+	banID, ok := ids[v]
+	if !ok {
+		return 0, fmt.Errorf("resolve tcg ban_id %+v: no row after insert", v)
+	}
 	return banID, nil
+}
+
+// EnsureTCGVariants files every variant not already in the table and returns
+// the ban_id of each, cached or not. A new one gets its TCGBanID, or the next
+// identity value where it has none.
+//
+// The ids come back from a read by identity after the insert, never from the
+// derivation, so a variant filed under a sequence id before ids were derived
+// answers with that one. A variant whose derived id some other row holds is
+// left out of the result rather than handed that row's id.
+func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TCGVariant]int64, error) {
+	out := make(map[TCGVariant]int64, len(vs))
+	var cats, prods []int64
+	var subTypes []string
+	var derived []sql.NullInt64
+	for _, v := range vs {
+		if id, ok := c.variants.tcg.Load(v); ok {
+			if banID, isInt := id.(int64); isInt {
+				out[v] = banID
+				continue
+			}
+		}
+		banID, ok := TCGBanID(v)
+		cats = append(cats, int64(v.CategoryID))
+		prods = append(prods, int64(v.ProductID))
+		subTypes = append(subTypes, v.SubType)
+		derived = append(derived, sql.NullInt64{Int64: banID, Valid: ok})
+	}
+	if len(cats) == 0 {
+		return out, nil
+	}
+
+	// Two statements, not one with a CTE: the read has to see rows another
+	// process filed concurrently, which a SELECT sharing the INSERT's snapshot
+	// would not. A NULL derived id takes the identity default instead.
+	//
+	// ON CONFLICT names no target so a clash on either the identity key or
+	// the ban_id is a no-op; the read below sorts out which.
+	_, err := c.db.ExecContext(ctx, `
+		INSERT INTO variants (ban_id, tcgp_category_id, tcgp_product_id, tcgp_sub_type)
+		OVERRIDING SYSTEM VALUE
+		SELECT coalesce(d, nextval(pg_get_serial_sequence('variants', 'ban_id'))), c, p, s
+		  FROM unnest($1::bigint[], $2::int[], $3::int[], $4::text[]) AS t(d, c, p, s)
+		ON CONFLICT DO NOTHING`,
+		pq.Array(derived), pq.Array(cats), pq.Array(prods), pq.Array(subTypes))
+	if err != nil {
+		return nil, fmt.Errorf("file tcg variants: %w", err)
+	}
+	rows, err := c.db.QueryContext(ctx, `
+		SELECT v.ban_id, v.tcgp_category_id, v.tcgp_product_id, v.tcgp_sub_type
+		  FROM unnest($1::int[], $2::int[], $3::text[]) AS t(c, p, s)
+		  JOIN variants v ON v.tcgp_category_id = t.c AND v.tcgp_product_id = t.p
+		                 AND v.tcgp_sub_type = t.s`,
+		pq.Array(cats), pq.Array(prods), pq.Array(subTypes))
+	if err != nil {
+		return nil, fmt.Errorf("read tcg variants: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var banID int64
+		var v TCGVariant
+		if err := rows.Scan(&banID, &v.CategoryID, &v.ProductID, &v.SubType); err != nil {
+			return nil, err
+		}
+		c.variants.tcg.Store(v, banID)
+		out[v] = banID
+	}
+	return out, rows.Err()
 }

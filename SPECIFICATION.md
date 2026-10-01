@@ -585,8 +585,14 @@ twice daily, normalizing non-NM conditions up via grade multipliers
 (`defaultGradeMap`: NM 1×, SP 1.25×, MP 1.67×, HP 2.5×, PO 4×), and — when
 `LongFormWrites` is on — best-effort dual-writes the same snapshot into the
 long tables via `stashLongForm()`. That path resolves every row through
-`ResolveMagicBanID`, so today it only persists Magic printings correctly; a
-matching non-Magic write path is written but not yet merged to master.
+`ResolveMagicBanID`. A non-Magic deployment skips the wide table, which
+cannot hold its card ids, and writes the long tables whatever the flags say
+(`stashNonMagicTimeseries`). Its ban_ids are not drawn from the identity
+sequence: a new non-Magic variant is filed under `timeseries.TCGBanID`,
+`category<<40 | product<<8 | sub-type code`, by the snapshot and the tcgcsv
+ingest alike (`EnsureTCGVariants`). Variants filed before that keep their
+sequence ids, so existing `ban:<n>` links and price rows stand; Magic still
+mints from the sequence, since an mtgjson uuid does not fit in a bigint.
 Reads are already game-agnostic: `resolveChartTarget()` (chart_resolve.go)
 accepts `ban:<n>`, `tcg:<n>`, `scryfall:<uuid>`, `mtgjson:<uuid>`, or a bare
 id, and non-Magic cards chart correctly once `LongFormReads` is on. Lookback

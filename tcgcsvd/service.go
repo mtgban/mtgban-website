@@ -26,7 +26,7 @@ type Store interface {
 	GetTCGLatestDate(ctx context.Context, categoryID int) (time.Time, bool, error)
 	UpsertTCGPrices(ctx context.Context, rows []timeseries.TCGPriceRow, batchSize int) (int, error)
 	UpsertTCGProducts(ctx context.Context, products []timeseries.TCGProduct, batchSize int) (int, error)
-	ResolveTCGBanID(ctx context.Context, v timeseries.TCGVariant) (int64, error)
+	EnsureTCGVariants(ctx context.Context, vs []timeseries.TCGVariant) (map[timeseries.TCGVariant]int64, error)
 	UpsertLongPrices(ctx context.Context, rows []timeseries.LongPrice, batchSize int) (int, error)
 	TryAdvisoryLock(ctx context.Context, key int64) (acquired bool, release func(), err error)
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -803,11 +804,11 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 // TCGplayer metrics the tcgcsv ingest writes on its own, whatever else its
 // config listed. Long form keys on a ban_id, which every game has.
 //
-// A card whose product has no variant row yet is counted and skipped rather
-// than minted: the variants table names a non-Magic printing by its TCGplayer
-// sub-type, and that name comes from the tcgcsv catalog — inventing one here
-// would file a second, permanently empty variant beside the real one. The next
-// snapshot after that ingest picks the card up.
+// A card whose printing has no variant row yet gets one, under the ban_id its
+// product, finish and category compute to (timeseries.TCGBanID). The sub-type
+// is the TCGplayer name mtgmatcher.Finishes gives the card's finish, the same
+// name the tcgcsv catalog files it under, so the row is the one the ingest
+// would have filed, not a second one beside it.
 //
 // The TCGplayer series are left out when the tcgcsv ingest already covers this
 // game; see tcgcsvOwnedProviders.
@@ -820,7 +821,34 @@ func stashNonMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start t
 		return
 	}
 
-	snapshot := collectNonMagicSnapshot(b, start, cachedBanIDForCard)
+	// A miss is keyed on the id it will be filed under, and filed in one
+	// batch before the upsert, since the prices table's FK needs the row.
+	categoryID := GetTCGCategoryID()
+	missing := map[timeseries.TCGVariant]int64{}
+	snapshot := collectNonMagicSnapshot(b, start, func(co *mtgmatcher.CardObject) int64 {
+		if banID := cachedBanIDForCard(co); banID != 0 {
+			return banID
+		}
+		v, ok := tcgVariantForCard(co, categoryID)
+		if !ok {
+			return 0
+		}
+		banID, ok := timeseries.TCGBanID(v)
+		if !ok {
+			return 0
+		}
+		missing[v] = banID
+		return banID
+	})
+	if len(missing) > 0 {
+		filed, err := PricesArchiveDB.EnsureTCGVariants(ctx, slices.Collect(maps.Keys(missing)))
+		if err != nil {
+			ServerNotify("timeseries", fmt.Sprintf("snapshot aborted, could not file new variants: %s", err))
+			backgroundJobs.Report(jobStash, "", fmt.Sprintf("could not file new variants: %s", err))
+			return
+		}
+		snapshot.refile(missing, filed)
+	}
 
 	// UpsertLongPrices dedupes on (ban_id, date, provider) keeping the last
 	// write, which is the same last-wins the wide path gets from overwriting a
@@ -916,6 +944,23 @@ func newNonMagicSnapshot() nonMagicSnapshot {
 	return s
 }
 
+// tcgVariantForCard names the variant a non-Magic card's prices are filed
+// under: its TCGplayer product, in the sub-type its finish is sold as, in this
+// game's category. ok is false when any of the three is unknown, including a
+// category the catalog has not named yet.
+func tcgVariantForCard(co *mtgmatcher.CardObject, categoryID int) (timeseries.TCGVariant, bool) {
+	pid, ok := tcgProductID(co)
+	if !ok || categoryID == 0 {
+		return timeseries.TCGVariant{}, false
+	}
+	for _, finish := range mtgmatcher.Finishes {
+		if finish.Slug == co.Finish {
+			return timeseries.TCGVariant{CategoryID: categoryID, ProductID: pid, SubType: finish.TCGplayer}, true
+		}
+	}
+	return timeseries.TCGVariant{}, false
+}
+
 // nonMagicSnapshot accumulates a non-Magic snapshot's long price rows, along
 // with the two reasons a scraped price can fail to become one.
 type nonMagicSnapshot struct {
@@ -926,12 +971,43 @@ type nonMagicSnapshot struct {
 	tcgcsvOwns []int16
 
 	// NoProvider counts prices whose dataset names no provider id; NoVariant
-	// those whose card has no variant row to key on. They are separate faults —
-	// a config mistake against a product the tcgcsv ingest has not reached —
-	// and a snapshot reporting one total could not tell an operator which one to
-	// go fix. TCGCSVOwned is not a fault at all, only how much of the walk
+	// those whose card names no product, finish or category to file a variant
+	// under. They are separate faults, a config mistake against a card the
+	// catalog cannot place, and a snapshot reporting one total could not tell
+	// an operator which one to go fix. TCGCSVOwned is not a fault at all, only how much of the walk
 	// another writer already covers.
 	NoProvider, NoVariant, TCGCSVOwned int
+
+	// NewVariants counts the cache misses that came back under their derived
+	// id: the printings this snapshot filed, give or take one another writer
+	// filed since the warm.
+	NewVariants int
+}
+
+// refile points the rows keyed on a new variant's derived ban_id at the id
+// the table actually filed it under, which is the same id unless the row
+// already existed and the cache missed it. A variant the table did not file
+// drops its rows into NoVariant, since the FK would refuse them.
+func (s *nonMagicSnapshot) refile(derived, filed map[timeseries.TCGVariant]int64) {
+	actual := make(map[int64]int64, len(derived))
+	for v, banID := range derived {
+		actual[banID] = filed[v]
+		if filed[v] == banID {
+			s.NewVariants++
+		}
+	}
+	rows := s.Rows[:0]
+	for _, row := range s.Rows {
+		if banID, isNew := actual[row.BanID]; isNew {
+			if banID == 0 {
+				s.NoVariant++
+				continue
+			}
+			row.BanID = banID
+		}
+		rows = append(rows, row)
+	}
+	s.Rows = rows
 }
 
 // add records one scraped price against the ban_id resolved for its card, or
@@ -959,6 +1035,9 @@ func (s *nonMagicSnapshot) add(banID int64, config DatasetConfig, date string, p
 // skipped is the tail of the completion notice, empty when nothing was skipped.
 func (s *nonMagicSnapshot) skipped() string {
 	var out string
+	if s.NewVariants > 0 {
+		out += fmt.Sprintf(", %d new variants", s.NewVariants)
+	}
 	if s.NoVariant > 0 {
 		out += fmt.Sprintf(", %d skipped with no variant", s.NoVariant)
 	}
