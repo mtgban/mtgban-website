@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
+	"github.com/mtgban/mtgban-website/userstate"
 )
 
 const (
@@ -242,13 +244,11 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	tierTitle := ""
 	var overrides map[string]map[string]string
 	// If user is in the allowed list, load the tier from here
-	for _, grant := range PatreonGrants() {
-		if strings.ToLower(grant.Email) == userData.Email {
-			tierTitle = grant.Tier
-			overrides = grant.Overrides
-			LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
-			break
-		}
+	grant, found := indexGrants(PatreonGrants()).find(userstate.HashEmail(userData.Email))
+	if found {
+		tierTitle = grant.Tier
+		overrides = grant.Overrides
+		LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
 	}
 
 	// Else, load the tier from the API
@@ -760,9 +760,12 @@ func applyACL(v url.Values, table map[string]map[string]string) {
 	}
 }
 
-func getValuesForTier(tierTitle string) url.Values {
+// valuesForTierIn is a tier's ACL values against a given table, so callers
+// that already hold one (or a test's literal one) don't have to go through
+// ACL().
+func valuesForTierIn(table access.Table, tierTitle string) url.Values {
 	v := url.Values{}
-	tier, found := ACL()[tierTitle]
+	tier, found := table[tierTitle]
 	if !found {
 		return v
 	}
@@ -785,6 +788,11 @@ func signatureLink() string {
 	return DefaultServerURL
 }
 
+// aclValues is what a tier grants, with a grant's own overrides on top.
+func aclValues(tier string, overrides map[string]map[string]string) url.Values {
+	return aclValuesIn(ACL(), tier, overrides)
+}
+
 // sign encodes tierTitle's ACL values into a signature, with overrides -
 // a grant's own values for this one user - layered on top afterward so
 // they win over anything the tier itself set.
@@ -794,8 +802,7 @@ func signatureLink() string {
 // signatureIsValid refuses a sig whose Expires will not parse as readily as
 // one whose Expires has passed.
 func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[string]string, duration time.Duration) string {
-	v := getValuesForTier(tierTitle)
-	applyACL(v, overrides)
+	v := aclValues(tierTitle, overrides)
 	if userData != nil {
 		v.Set("UserName", userData.FullName)
 		v.Set("UserEmail", userData.Email)
