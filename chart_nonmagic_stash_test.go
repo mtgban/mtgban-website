@@ -301,3 +301,84 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 		t.Errorf("NoProvider = %d, want 1 for the dataset with no provider id", snapshot.NoProvider)
 	}
 }
+
+// Every finish mtgmatcher can hand the snapshot has a sub-type code, or that
+// finish's printings would fall back to the identity sequence.
+func TestEveryFinishHasADerivedBanID(t *testing.T) {
+	for _, finish := range mtgmatcher.Finishes {
+		if _, ok := timeseries.TCGBanID(timeseries.TCGVariant{CategoryID: 71, ProductID: 1, SubType: finish.TCGplayer}); !ok {
+			t.Errorf("finish %q (%q) has no sub-type code", finish.Slug, finish.TCGplayer)
+		}
+	}
+}
+
+// A card is filed under the TCGplayer name of its own finish, in this game's
+// category, and not at all when one of the three is unknown.
+func TestTCGVariantForCard(t *testing.T) {
+	card := func(pid, finish string) *mtgmatcher.CardObject {
+		co := &mtgmatcher.CardObject{}
+		co.Finish = finish
+		co.Identifiers = map[string]string{}
+		if pid != "" {
+			co.Identifiers["tcgplayerProductId"] = pid
+		}
+		return co
+	}
+	for _, tc := range []struct {
+		name     string
+		co       *mtgmatcher.CardObject
+		category int
+		want     timeseries.TCGVariant
+		ok       bool
+	}{
+		{"nonfoil", card("492703", "nonfoil"), 71, timeseries.TCGVariant{CategoryID: 71, ProductID: 492703, SubType: "Normal"}, true},
+		{"cold foil", card("492703", "coldfoil"), 71, timeseries.TCGVariant{CategoryID: 71, ProductID: 492703, SubType: "Cold Foil"}, true},
+		{"no product", card("", "nonfoil"), 71, timeseries.TCGVariant{}, false},
+		{"no category yet", card("492703", "nonfoil"), 0, timeseries.TCGVariant{}, false},
+		{"unknown finish", card("492703", "galaxyfoil"), 71, timeseries.TCGVariant{}, false},
+	} {
+		got, ok := tcgVariantForCard(tc.co, tc.category)
+		if got != tc.want || ok != tc.ok {
+			t.Errorf("%s: tcgVariantForCard = %+v, %v; want %+v, %v", tc.name, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+// Rows keyed on a new variant's derived id follow the id the table filed it
+// under, and drop when it filed none; rows on cached ids are left alone.
+func TestNonMagicSnapshotRefile(t *testing.T) {
+	fresh := timeseries.TCGVariant{CategoryID: 71, ProductID: 1, SubType: "Normal"}
+	stale := timeseries.TCGVariant{CategoryID: 71, ProductID: 2, SubType: "Normal"}
+	refused := timeseries.TCGVariant{CategoryID: 71, ProductID: 3, SubType: "Normal"}
+	derived := map[timeseries.TCGVariant]int64{}
+	for _, v := range []timeseries.TCGVariant{fresh, stale, refused} {
+		derived[v], _ = timeseries.TCGBanID(v)
+	}
+	filed := map[timeseries.TCGVariant]int64{
+		fresh: derived[fresh],
+		stale: 1234, // filed under the sequence before ids were derived
+	}
+
+	low := DatasetConfig{Provider: timeseries.ProviderMKMLow}
+	var s nonMagicSnapshot
+	s.add(77, low, "2026-10-01", 1)
+	s.add(derived[fresh], low, "2026-10-01", 2)
+	s.add(derived[stale], low, "2026-10-01", 3)
+	s.add(derived[refused], low, "2026-10-01", 4)
+	s.refile(derived, filed)
+
+	want := []timeseries.LongPrice{
+		{BanID: 77, Date: "2026-10-01", Provider: timeseries.ProviderMKMLow, Price: 1},
+		{BanID: derived[fresh], Date: "2026-10-01", Provider: timeseries.ProviderMKMLow, Price: 2},
+		{BanID: 1234, Date: "2026-10-01", Provider: timeseries.ProviderMKMLow, Price: 3},
+	}
+	if !slices.Equal(s.Rows, want) {
+		t.Errorf("rows = %+v, want %+v", s.Rows, want)
+	}
+	if s.NewVariants != 1 || s.NoVariant != 1 {
+		t.Errorf("NewVariants = %d, NoVariant = %d; want 1 and 1", s.NewVariants, s.NoVariant)
+	}
+	if got := s.skipped(); !strings.Contains(got, "1 new variants") {
+		t.Errorf("skipped() = %q, want it to report the new variant", got)
+	}
+}

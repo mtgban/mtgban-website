@@ -12,18 +12,28 @@ import (
 )
 
 // longForm dual-writes non-Magic price rows into the long prices table,
-// resolving each (category, product, sub-type) to a ban_id and emitting one
+// resolving each (category, product, sub-type) to a ban_id, filing the new
+// ones under timeseries.TCGBanID, and emitting one
 // LongPrice per set price column (> 0, zeros omitted like the backfill). The
 // legacy tcgplayer_nonmagic_product_prices upsert stays the source of truth
 // during the dual-write window; a long-form failure is logged, not fatal.
 func (s *Service) writeLongForm(ctx context.Context, rows []timeseries.TCGPriceRow) (int, error) {
+	variants := make([]timeseries.TCGVariant, len(rows))
+	for i, r := range rows {
+		variants[i] = timeseries.TCGVariant{CategoryID: r.CategoryID, ProductID: r.ProductID, SubType: r.SubTypeName}
+	}
+	// One batch files every new product the day brought, rather than a
+	// round-trip per row the warm cache missed.
+	banIDs, err := s.store.EnsureTCGVariants(ctx, variants)
+	if err != nil {
+		return 0, fmt.Errorf("resolve ban_ids: %w", err)
+	}
+
 	longRows := make([]timeseries.LongPrice, 0, len(rows)*3)
-	for _, r := range rows {
-		banID, err := s.store.ResolveTCGBanID(ctx, timeseries.TCGVariant{
-			CategoryID: r.CategoryID, ProductID: r.ProductID, SubType: r.SubTypeName,
-		})
-		if err != nil {
-			log.Println("tcgcsv long-form: resolve ban_id:", err)
+	for i, r := range rows {
+		banID, ok := banIDs[variants[i]]
+		if !ok {
+			log.Printf("tcgcsv long-form: no ban_id for %+v", variants[i])
 			continue
 		}
 		for _, pc := range []struct {

@@ -33,8 +33,8 @@ func (s stubStore) UpsertTCGPrices(context.Context, []timeseries.TCGPriceRow, in
 func (s stubStore) UpsertTCGProducts(context.Context, []timeseries.TCGProduct, int) (int, error) {
 	return 0, nil
 }
-func (s stubStore) ResolveTCGBanID(context.Context, timeseries.TCGVariant) (int64, error) {
-	return 0, nil
+func (s stubStore) EnsureTCGVariants(context.Context, []timeseries.TCGVariant) (map[timeseries.TCGVariant]int64, error) {
+	return nil, nil
 }
 func (s stubStore) UpsertLongPrices(context.Context, []timeseries.LongPrice, int) (int, error) {
 	return 0, nil
