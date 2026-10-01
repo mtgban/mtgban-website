@@ -721,6 +721,27 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
     white-space: pre-line;
 }
+.m-vendor-row .m-detail-note .tip-table {
+    margin-top: 0.15rem;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.m-vendor-row .m-detail-note .tip-table tr {
+    background: none;
+}
+.m-vendor-row .m-detail-note .tip-table th,
+.m-vendor-row .m-detail-note .tip-table td {
+    padding: 0;
+    font-weight: 400;
+    text-align: left;
+}
+.m-vendor-row .m-detail-note .tip-table .tip-label {
+    padding-right: 0.75rem;
+}
+.m-vendor-row .m-detail-note .tip-table .tip-num {
+    padding-left: 0.75rem;
+    text-align: right;
+}
 
 /* Locked vendor */
 .m-vendor-locked {

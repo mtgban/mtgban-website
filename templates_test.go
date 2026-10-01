@@ -250,6 +250,44 @@ func TestTipHelpers(t *testing.T) {
 	}
 }
 
+// TestTipTables checks a tooltip's tables: as sentences in its title, as
+// escaped tables where a page writes it out, a header starting a new table
+// and the text after one its footnote.
+func TestTipTables(t *testing.T) {
+	tip := "**Sell now**: CK sells it at 2x <TCG> Market.\n" +
+		"|CK stock|8, it was 8 a week ago\n" +
+		"|P90|$ 12.50\n" +
+		"|# CK pays less or nothing | This card | Typical\n" +
+		"| In a week | **31%** | 24%\n" +
+		"Measured on 1284 nonfoils"
+
+	wantPlain := "Sell now: CK sells it at 2x <TCG> Market.\n" +
+		"CK stock: 8, it was 8 a week ago\n" +
+		"P90: $ 12.50\n" +
+		"CK pays less or nothing\n" +
+		"In a week: this card 31%, typical 24%\n" +
+		"Measured on 1284 nonfoils"
+	if got := plainTip(tip); got != wantPlain {
+		t.Errorf("plainTip:\n%s\nwant:\n%s", got, wantPlain)
+	}
+	if got := tipAttrs("|CK stock|8"); got != ` title="CK stock: 8" data-tip="|CK stock|8"` {
+		t.Errorf("tipAttrs of an unmarked table: got %s, want it a data-tip too", got)
+	}
+
+	wantHTML := `<div><strong>Sell now</strong>: CK sells it at 2x &lt;TCG&gt; Market.</div>` +
+		`<table class="tip-table"><tr><td class="tip-label">CK stock</td><td>8, it was 8 a week ago</td></tr>` +
+		`<tr><td class="tip-label">P90</td><td>$ 12.50</td></tr></table>` +
+		`<table class="tip-table"><tr><th>CK pays less or nothing</th><th class="tip-num">This card</th><th class="tip-num">Typical</th></tr>` +
+		`<tr><td>In a week</td><td class="tip-num"><strong>31%</strong></td><td class="tip-num">24%</td></tr></table>` +
+		`<div class="tip-foot">Measured on 1284 nonfoils</div>`
+	if got := string(tipHTML(tip)); got != wantHTML {
+		t.Errorf("tipHTML:\n%s\nwant:\n%s", got, wantHTML)
+	}
+	if got := string(tipHTML("a | b\nnot a row")); got != "a | b\nnot a row" {
+		t.Errorf("tipHTML of a | mid-line: got %s, want the text as it was", got)
+	}
+}
+
 // TestBuylistPause executes the pause pill and its wait arrow the way search
 // calls them: on CK's last known NM offer only, the arrow when waiting pays.
 func TestBuylistPause(t *testing.T) {

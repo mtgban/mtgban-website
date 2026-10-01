@@ -374,3 +374,26 @@ test('a data-tip sets its marked parts in bold', () => {
     expect(page.shown()).toBe('Copied!');
     expect(bold()).toEqual([]);
 });
+
+test('a data-tip draws its tables, numbers after a header, labels without one, and the footnote after them', () => {
+    const page = loadPage();
+    const price = page.el({
+        title: 'Sell now: CK sells it.',
+        'data-tip': '**Sell now**: CK sells it.\n|CK stock|8, it was 8 a week ago\n|# CK pays less | This card | Typical\n| In a week | **31%** | 24%\nMeasured on 12 nonfoils',
+    }, page.body, '$ 11.00');
+    const cells = row => row.children.map(cell => [cell.tagName, cell.className || '', cell.textContent]);
+
+    page.move(page.body, price);
+    const blocks = page.tip().children;
+    expect(blocks.map(block => [block.tagName, block.className || ''])).toEqual([
+        ['DIV', ''], ['TABLE', 'tip-table'], ['TABLE', 'tip-table'], ['DIV', 'tip-foot'],
+    ]);
+    expect(blocks[0].textContent).toBe('Sell now: CK sells it.');
+    expect(cells(blocks[1].children[0])).toEqual([['TD', 'tip-label', 'CK stock'], ['TD', '', '8, it was 8 a week ago']]);
+    expect(blocks[2].children.map(cells)).toEqual([
+        [['TH', '', 'CK pays less'], ['TH', 'tip-num', 'This card'], ['TH', 'tip-num', 'Typical']],
+        [['TD', '', 'In a week'], ['TD', 'tip-num', '31%'], ['TD', 'tip-num', '24%']],
+    ]);
+    expect(blocks[2].children[1].children[1].children[0].tagName).toBe('STRONG');
+    expect(blocks[3].textContent).toBe('Measured on 12 nonfoils');
+});
