@@ -78,7 +78,7 @@ func (f *fakeEvalStore) ListActive(_ context.Context, _ string, sides []Side) ([
 
 // MarkOverAllowance keeps a user's n highest ids active and parks the rest,
 // restoring parked ones inside the allowance.
-func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int) (int64, error) {
+func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int) ([]Moved, error) {
 	f.calls++
 	f.marked[h] = n
 	var ids []int64
@@ -90,7 +90,7 @@ func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int)
 	}
 	slices.Sort(ids)
 	slices.Reverse(ids)
-	var changed int64
+	var moved []Moved
 	for i, id := range ids {
 		want := StatusActive
 		if i >= n {
@@ -98,10 +98,11 @@ func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int)
 		}
 		if f.status[id] != want {
 			f.status[id] = want
-			changed++
+			a := f.row(id)
+			moved = append(moved, Moved{ID: id, Status: want, Card: a.Card, Origin: a.Origin})
 		}
 	}
-	return changed, nil
+	return moved, nil
 }
 
 func (f *fakeEvalStore) row(id int64) ActiveAlert {
@@ -187,6 +188,7 @@ func activeAlert() ActiveAlert {
 	return ActiveAlert{
 		Alert: Alert{
 			ID: 7, UserHash: "u", Game: "magic", CardID: "card-1", Side: SideBuylist, Condition: "NM",
+			Card:           Card{Name: "Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
 			ReferencePrice: 10, Above: Threshold{Kind: KindAbs, Value: 12},
 			Status: StatusActive, AboveArmed: true, BelowArmed: true, Delivery: DeliveryDiscord,
 			UpdatedAt: time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC), Origin: "https://lorcana.mtgban.com",
@@ -370,11 +372,22 @@ func TestRunAlertEvaluationParksBeyondAllowance(t *testing.T) {
 	deps.Allowance = func(url.Values) int { return 1 }
 	runEvaluation(context.Background(), deps, buylistOnly)
 
-	if len(sender.sent) != 1 || !slices.Equal(store.claims, []int64{8}) {
+	// The pause notice for 7, then the firing on 8.
+	if len(sender.sent) != 2 || !slices.Equal(store.claims, []int64{8}) {
 		t.Fatalf("sent = %v claims = %v", sender.sent, store.claims)
+	}
+	notice := sender.embeds[0]
+	if notice.Title != "Price alerts paused" || !strings.Contains(notice.Description, "Your tier allows 1 alert.") ||
+		!strings.Contains(notice.Description, "Bolt LEA #161") || notice.URL != "https://lorcana.mtgban.com/alerts" {
+		t.Fatalf("notice: title=%q url=%q\n%s", notice.Title, notice.URL, notice.Description)
 	}
 	if store.status[7] != StatusOverAllowance {
 		t.Fatalf("alert 7 status = %s", store.status[7])
+	}
+	// The next run parks nothing new, so it says nothing again.
+	runEvaluation(context.Background(), deps, buylistOnly)
+	if len(sender.sent) != 2 {
+		t.Fatalf("second run sent = %v, want no repeat notice", sender.sent)
 	}
 	_, ok := store.states[7]
 	if ok {
@@ -471,8 +484,12 @@ func TestRunAlertEvaluationParksStaleContacts(t *testing.T) {
 	if store.marked["u2"] != 5 {
 		t.Fatalf("fresh contact allowance = %d, want 5", store.marked["u2"])
 	}
-	if len(sender.sent) != 1 || sender.sent[0] != "d2" {
-		t.Fatalf("sent = %v, want only the fresh contact", sender.sent)
+	// The stale contact hears its alerts are paused; only the fresh one fires.
+	if len(sender.sent) != 2 || sender.sent[0] != "d1" || sender.sent[1] != "d2" {
+		t.Fatalf("sent = %v, want the stale contact's notice and the fresh contact's firing", sender.sent)
+	}
+	if !strings.Contains(sender.embeds[0].Description, "No Patreon sign-in for over a month.") {
+		t.Fatalf("notice reason:\n%s", sender.embeds[0].Description)
 	}
 	if !slices.Equal(store.claims, []int64{8}) {
 		t.Fatalf("claims = %v, want only the fresh alert", store.claims)
@@ -485,6 +502,19 @@ func TestRunAlertEvaluationParksStaleContacts(t *testing.T) {
 		if e.AlertID == 7 {
 			t.Fatalf("stale alert got an event: %+v", e)
 		}
+	}
+}
+
+func TestRunAlertEvaluationNoNoticeWithoutDiscord(t *testing.T) {
+	a := activeAlert()
+	a.Contact.DiscordUserID = ""
+	store := newFakeEvalStore(a)
+	sender := &fakeSender{}
+	deps := evalDeps(store, sender, 9)
+	deps.Allowance = func(url.Values) int { return 0 }
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+	if store.status[7] != StatusOverAllowance || len(sender.sent) != 0 || sum.notices != 0 {
+		t.Fatalf("status=%s sent=%v notices=%d", store.status[7], sender.sent, sum.notices)
 	}
 }
 

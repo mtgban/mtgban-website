@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -77,8 +78,8 @@ func TestAlertEmbedLimitsStoreLines(t *testing.T) {
 	d := Decision{FireAbove: true, AboveHits: hits}
 	e := dmEmbed(a, d, "https://mtgban.com", shorthandLabel)
 	got := strings.Count(e.Description, "[Buy](")
-	if got != embedMaxStores {
-		t.Fatalf("store lines = %d, want %d", got, embedMaxStores)
+	if got != embedMaxLines {
+		t.Fatalf("store lines = %d, want %d", got, embedMaxLines)
 	}
 	if !strings.Contains(e.Description, "and 25 more stores") {
 		t.Fatalf("missing overflow line:\n%s", e.Description)
@@ -87,7 +88,7 @@ func TestAlertEmbedLimitsStoreLines(t *testing.T) {
 
 func TestAlertEmbedTruncatesLongDescription(t *testing.T) {
 	longLabel := strings.Repeat("X", 500)
-	hits := make([]Quote, embedMaxStores)
+	hits := make([]Quote, embedMaxLines)
 	for i := range hits {
 		hits[i] = Quote{Store: longLabel, Price: 10}
 	}
@@ -151,6 +152,28 @@ func TestAlertEmbedOmitsLinksWithoutOrigin(t *testing.T) {
 	}
 	if !strings.Contains(e.Description, "CK: $12.50\n") {
 		t.Fatalf("store line = \n%s", e.Description)
+	}
+}
+
+func TestParkedEmbedListsCardsAndLinks(t *testing.T) {
+	var parked []Moved
+	for i := range 17 {
+		parked = append(parked, Moved{ID: int64(i), Card: Card{Name: "Card_" + strconv.Itoa(i), Set: "LEA", Number: "1"}, Origin: "https://mtgban.com"})
+	}
+	e := parkedEmbed(parked, "Your tier no longer includes price alerts.")
+	if e.Title != "Price alerts paused" || e.URL != "https://mtgban.com/alerts" {
+		t.Fatalf("title=%q url=%q", e.Title, e.URL)
+	}
+	if strings.Count(e.Description, " LEA #1\n") != embedMaxLines || !strings.Contains(e.Description, "and 2 more\n") {
+		t.Fatalf("card lines:\n%s", e.Description)
+	}
+	if !strings.Contains(e.Description, `Card\_0 LEA #1`) || !strings.HasPrefix(e.Description, "Your tier no longer includes price alerts.\n\n") {
+		t.Fatalf("escaping or reason:\n%s", e.Description)
+	}
+	parked[0].Origin = ""
+	e = parkedEmbed(parked, "x")
+	if e.URL != "" || strings.Contains(e.Description, "Manage alerts") {
+		t.Fatalf("links left in without an origin:\n%s", e.Description)
 	}
 }
 

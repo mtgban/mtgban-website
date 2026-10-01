@@ -383,18 +383,22 @@ func TestMarkOverAllowanceKeepsTheNewest(t *testing.T) {
 		ids = append(ids, a.ID)
 		time.Sleep(5 * time.Millisecond)
 	}
-	n, err := s.MarkOverAllowance(ctx, h, "magic", 2)
-	if err != nil || n != 1 {
-		t.Fatalf("mark: n=%d err=%v", n, err)
+	moved, err := s.MarkOverAllowance(ctx, h, "magic", 2)
+	if err != nil || len(moved) != 1 || moved[0].ID != ids[0] || moved[0].Status != StatusOverAllowance || moved[0].Card.Name != "Bolt" {
+		t.Fatalf("mark: moved=%+v err=%v", moved, err)
 	}
 	oldest, _, _ := s.Get(ctx, ids[0], h)
 	newest, _, _ := s.Get(ctx, ids[2], h)
 	if oldest.Status != StatusOverAllowance || newest.Status != StatusActive {
 		t.Fatalf("oldest=%s newest=%s", oldest.Status, newest.Status)
 	}
-	n, _ = s.MarkOverAllowance(ctx, h, "magic", 5)
-	if n != 1 {
-		t.Fatalf("restore: n=%d, want 1", n)
+	moved, _ = s.MarkOverAllowance(ctx, h, "magic", 0)
+	if len(moved) != 2 || moved[0].ID != ids[2] || moved[1].ID != ids[1] {
+		t.Fatalf("park all: moved=%+v, want the two still active, newest first", moved)
+	}
+	moved, _ = s.MarkOverAllowance(ctx, h, "magic", 5)
+	if len(moved) != 3 || moved[0].Status != StatusActive {
+		t.Fatalf("restore: moved=%+v, want all three back", moved)
 	}
 	oldest, _, _ = s.Get(ctx, ids[0], h)
 	if oldest.Status != StatusActive {
