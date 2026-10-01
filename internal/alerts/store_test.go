@@ -384,7 +384,8 @@ func TestMarkOverAllowanceKeepsTheNewest(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	moved, err := s.MarkOverAllowance(ctx, h, "magic", 2)
-	if err != nil || len(moved) != 1 || moved[0].ID != ids[0] || moved[0].Status != StatusOverAllowance || moved[0].Card.Name != "Bolt" {
+	if err != nil || len(moved) != 1 || moved[0].ID != ids[0] || moved[0].Status != StatusOverAllowance ||
+		moved[0].Card.Name != "Bolt" || moved[0].Side != SideBuylist || moved[0].Condition != "NM" {
 		t.Fatalf("mark: moved=%+v err=%v", moved, err)
 	}
 	oldest, _, _ := s.Get(ctx, ids[0], h)

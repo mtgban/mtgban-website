@@ -95,7 +95,7 @@ func (s *evalSummary) fail(deps EvalDeps, step string, err error) {
 func (s evalSummary) String() string {
 	out := fmt.Sprintf("%d users, %d active, %d sent, %d skipped", s.users, s.active, s.sent, s.skipped)
 	if s.notices > 0 {
-		out += fmt.Sprintf(", %d pause notices", s.notices)
+		out += fmt.Sprintf(", %d park notices", s.notices)
 	}
 	return out
 }
@@ -168,7 +168,7 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		}
 		err = send(c.DiscordUserID, parkedEmbed(parked, parkReason(lapsed, allowance)))
 		if err != nil {
-			sum.fail(deps, "pause notice", err)
+			sum.fail(deps, "park notice", err)
 			continue
 		}
 		sum.notices++
@@ -252,14 +252,14 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 func parkReason(lapsed bool, allowance int) string {
 	switch {
 	case lapsed:
-		return "No Patreon sign-in for over a month.\nSign in on the site and they resume at the next price update."
+		return "No Patreon sign-in for over a month.\nSign in on the site and they come back at the next price update."
 	case allowance == 0:
 		return "Your tier no longer includes price alerts."
 	}
 	if allowance == 1 {
-		return "Your tier allows 1 alert.\nDelete some and these resume at the next price update."
+		return "Your tier allows 1 alert.\nDelete some and these come back at the next price update."
 	}
-	return fmt.Sprintf("Your tier allows %d alerts.\nDelete some and these resume at the next price update.", allowance)
+	return fmt.Sprintf("Your tier allows %d alerts.\nDelete some and these come back at the next price update.", allowance)
 }
 
 // recordEvents logs one event per store that crossed, with the outcome.

@@ -90,6 +90,9 @@ each for all of them.
 - A parked alert shows Parked and comes back by itself once there is room;
   only a paused or undeliverable alert offers Resume. The run that parks a
   user's alerts sends them one DM saying which and why: no sign-in for a
-  month, a tier without alerts, or the allowance.
+  month, a tier without alerts, or the allowance. It goes at most once: a
+  notice that fails to send shows as the alerts job's problem on the admin
+  dashboard and is not retried, because the next run has nothing new to
+  park.
 - `AlertsMax` is a signed field name: renaming it after `acl.json` uses it
   takes another deploy of every site and an `acl.json` edit together.
