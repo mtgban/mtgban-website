@@ -1669,9 +1669,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.OptimizedTotals = optimizedTotals
 		pageVars.HighestTotal = highestTotal
-		uploadEditions := ds.editions
-		pageVars.Editions = uploadEditions.AllEditionsKeys
-		pageVars.EditionsMap = uploadEditions.AllEditionsMap
 	}
 
 	// Logs
