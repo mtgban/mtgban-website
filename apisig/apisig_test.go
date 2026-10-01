@@ -113,7 +113,7 @@ func TestAPIFieldsAreVerified(t *testing.T) {
 	}
 }
 
-// testOptionalFields stands in for main.go's OptionalFields, which the root
+// testOptionalFields stands in for pages.go's OptionalFields, which the root
 // package's TestOptionalFieldsCoverAPIFields holds to APIFields.
 var testOptionalFields = []string{"UserName", "UserEmail", "APImode", "SearchDownloadCSV"}
 

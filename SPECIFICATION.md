@@ -377,8 +377,8 @@ advertised) unless the signature carries the `Admin` grant.
 ## 4. Routing & page system
 
 Routes are registered in `registerRoutes()` (routes.go) from the declarative
-`NavElem` struct (main.go) and the `ExtraNavs` map (declared and populated by
-`init()` in main.go): each entry declares its link, name, icon,
+`NavElem` struct (pages.go) and the `ExtraNavs` map (declared and populated
+by `init()` in pages.go): each entry declares its link, name, icon,
 description, handler func, template, `CanPOST`, `AlwaysOnForDev`, optional
 `ShouldHide` (a predicate that drops the entry - and, for a section like
 Newspaper, its subpages with it - when e.g. no data is loaded yet for the
