@@ -341,7 +341,7 @@ func TestAdminRemovesASessionStore(t *testing.T) {
 func TestUploadResultsOfferToPublishWhenGranted(t *testing.T) {
 	entries := []UploadEntry{{CardID: "uuid-a", Quantity: 1, HasQuantity: true}}
 	for _, granted := range []bool{true, false} {
-		out := renderUpload(t, PageVars{CanPublishStore: granted, UploadEntries: entries})
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{CanPublishStore: granted, UploadEntries: entries}})
 		for _, marker := range []string{"openStorePrompt()", `name="store_shorthand"`, `id="res_publishstore"`,
 			`src="/js/upload-store-prompt.js?`} {
 			if strings.Contains(out, marker) != granted {
@@ -351,13 +351,24 @@ func TestUploadResultsOfferToPublishWhenGranted(t *testing.T) {
 	}
 
 	// A list of products alone is a sealed store unless told otherwise
-	sealedOnly := renderUpload(t, PageVars{CanPublishStore: true, UploadEntries: entries,
-		SealedEntries: entries})
+	sealedOnly := renderUpload(t, PageVars{
+		UploadVars: UploadVars{
+			CanPublishStore: true,
+			UploadEntries:   entries,
+			SealedEntries:   entries,
+		},
+	})
 	if !strings.Contains(sealedOnly, `name="store_sealed" value="true" checked`) {
 		t.Error("a sealed-only list does not default to sealed mode")
 	}
-	mixed := renderUpload(t, PageVars{CanPublishStore: true, UploadEntries: entries,
-		SealedEntries: entries, SinglesEntries: entries})
+	mixed := renderUpload(t, PageVars{
+		UploadVars: UploadVars{
+			CanPublishStore: true,
+			UploadEntries:   entries,
+			SealedEntries:   entries,
+			SinglesEntries:  entries,
+		},
+	})
 	if strings.Contains(mixed, `name="store_sealed" value="true" checked`) {
 		t.Error("a mixed list defaults to sealed mode")
 	}

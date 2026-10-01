@@ -34,9 +34,11 @@ func TestModeSwitchOffersTheOtherSide(t *testing.T) {
 		{true, "Switch to Retail", "Switch to Buylist"},
 	} {
 		out := renderUpload(t, PageVars{
-			UploadEntries: []UploadEntry{{CardID: "card-1"}},
-			IsBuylist:     tc.buylist,
-			CanBuylist:    true,
+			UploadVars: UploadVars{
+				UploadEntries: []UploadEntry{{CardID: "card-1"}},
+				IsBuylist:     tc.buylist,
+				CanBuylist:    true,
+			},
 		})
 		if !strings.Contains(out, tc.offers) {
 			t.Errorf("buylist=%v: the results do not offer %q", tc.buylist, tc.offers)
@@ -65,7 +67,7 @@ func TestModeSwitchShipsNoSecondCopyOfTheList(t *testing.T) {
 	for _, card := range cards {
 		entries = append(entries, UploadEntry{CardID: card, Quantity: 1, HasQuantity: true})
 	}
-	out := renderUpload(t, PageVars{UploadEntries: entries, CanBuylist: true})
+	out := renderUpload(t, PageVars{UploadVars: UploadVars{UploadEntries: entries, CanBuylist: true}})
 
 	for _, card := range cards {
 		if strings.Count(out, card) > 1 {
@@ -79,8 +81,10 @@ func TestModeSwitchShipsNoSecondCopyOfTheList(t *testing.T) {
 // it would show rather than going quiet about it.
 func TestModeSwitchUpsellsWithoutTheGrant(t *testing.T) {
 	out := renderUpload(t, PageVars{
-		UploadEntries: []UploadEntry{{CardID: "card-1"}},
-		CanBuylist:    false,
+		UploadVars: UploadVars{
+			UploadEntries: []UploadEntry{{CardID: "card-1"}},
+			CanBuylist:    false,
+		},
 	})
 
 	if strings.Contains(out, `onclick="switchUploadMode()"`) {
@@ -273,10 +277,12 @@ func TestResultIconsDoNotWaitOnALibrary(t *testing.T) {
 		{
 			name: "the switch, and the actions beside it",
 			pageVars: PageVars{
-				UploadEntries: []UploadEntry{{CardID: "card-1"}},
-				CanBuylist:    true,
-				RemoteLinkURL: "https://docs.google.com/spreadsheets/d/abc",
-				UnpackSealed:  1,
+				UploadVars: UploadVars{
+					UploadEntries: []UploadEntry{{CardID: "card-1"}},
+					CanBuylist:    true,
+					RemoteLinkURL: "https://docs.google.com/spreadsheets/d/abc",
+					UnpackSealed:  1,
+				},
 			},
 			drawn:      []string{"arrow-left-right", "share-2", "package-open"},
 			notWaiting: []string{"arrow-left-right", "share-2", "package-open"},
@@ -284,8 +290,10 @@ func TestResultIconsDoNotWaitOnALibrary(t *testing.T) {
 		{
 			name: "the upsell that stands in the switch's place",
 			pageVars: PageVars{
-				UploadEntries: []UploadEntry{{CardID: "card-1"}},
-				CanBuylist:    false,
+				UploadVars: UploadVars{
+					UploadEntries: []UploadEntry{{CardID: "card-1"}},
+					CanBuylist:    false,
+				},
 			},
 			drawn:      []string{"lock"},
 			notWaiting: []string{"lock"},
