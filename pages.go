@@ -370,9 +370,6 @@ type PageVars struct {
 
 	// Alerts page payload (nil elsewhere)
 	AlertsPage *AlertsPageVars
-	// CanAlerts says the reader's ACL grants the Alerts page and an
-	// allowance, so result rows may offer the alert link.
-	CanAlerts bool
 }
 
 func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
@@ -477,15 +474,6 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	// template can pre-resolve the gear button's state without the
 	// inline script having to maintain a duplicate list of paths.
 	pageVars.HasSettings = pageVars.Nav[mainNavIndex].HasSettings
-
-	// CanAlerts says the reader's tier has the Alerts page and an
-	// allowance, so result rows may offer the alert link.
-	for _, n := range pageVars.Nav {
-		if n.Name == "Alerts" {
-			pageVars.CanAlerts = alertAllowance(sigParams) > 0
-			break
-		}
-	}
 
 	// Add user information if needed, or public
 	user := sigParams.Get("UserEmail")
