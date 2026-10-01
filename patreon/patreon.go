@@ -81,6 +81,11 @@ func NewPatreonClient(ctx context.Context, token string) *Client {
 	return &client
 }
 
+// SocialConnection is one linked platform, as Patreon reports it.
+type SocialConnection struct {
+	UserID string `json:"user_id"`
+}
+
 // UserData is the identity answer: the user and their memberships.
 type UserData struct {
 	Errors []struct {
@@ -92,6 +97,11 @@ type UserData struct {
 			Email           string `json:"email"`
 			IsEmailVerified bool   `json:"is_email_verified"`
 			FullName        string `json:"full_name"`
+			// SocialConnections is nil when the identity request's field
+			// list omits it; Discord is nil when no account is linked.
+			SocialConnections *struct {
+				Discord *SocialConnection `json:"discord"`
+			} `json:"social_connections"`
 		} `json:"attributes"`
 		Relationships struct {
 			Memberships struct {
@@ -125,6 +135,20 @@ func (c *Client) GetUserData(ctx context.Context) (*UserData, error) {
 	}
 
 	return &userData, nil
+}
+
+// DiscordUserID reads the linked Discord id; known is false when Patreon
+// gave no answer, true when it did, even if that answer is no link. A
+// non-object discord value fails the identity decode, and so the login.
+func (u *UserData) DiscordUserID() (id string, known bool) {
+	conns := u.Data.Attributes.SocialConnections
+	if conns == nil {
+		return "", false
+	}
+	if conns.Discord == nil {
+		return "", true
+	}
+	return conns.Discord.UserID, true
 }
 
 // MembershipData is the membership answer: the tiers a pledge entitles.
