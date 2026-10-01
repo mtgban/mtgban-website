@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -48,5 +49,23 @@ func TestTCGSKU2UUIDNoInfos(t *testing.T) {
 	infosPtr.Store(nil)
 	if got := tcgSKU2UUID("12345"); got != "" {
 		t.Errorf("tcgSKU2UUID with no infos = %q, want empty string", got)
+	}
+}
+
+func TestBlocklistsFromValues(t *testing.T) {
+	withConfigCopy(t)
+	Config().SearchRetailBlockList = []string{"TCG"}
+
+	retail, buylist := blocklistsFromValues(url.Values{})
+	if len(retail) != 1 || retail[0] != "TCG" || len(buylist) != 0 {
+		t.Fatalf("defaults: retail=%v buylist=%v", retail, buylist)
+	}
+	retail, buylist = blocklistsFromValues(url.Values{"SearchDisabled": {"NONE"}, "SearchBuylistDisabled": {"CK,SCG"}})
+	if len(retail) != 0 || len(buylist) != 2 {
+		t.Fatalf("explicit: retail=%v buylist=%v", retail, buylist)
+	}
+	r, _ := blocklistsFromValues(nil)
+	if len(r) != 1 {
+		t.Fatalf("nil values should read the defaults, got %v", r)
 	}
 }
