@@ -7,7 +7,12 @@
 {{define "sussy-price"}}
     {{if (isSussy .List .CardID)}}
         {{$susPrice := (index .List .CardID)}}
-        <span class="arb-price-warn" title="CAUTION - This price looks a bit off, {{if .Sealed}}the contents of this product have a very uneven distribution, and simulation or data may be wrong (IQR: {{printf "%.2f" $susPrice}}){{else}}TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}{{end}}">$ {{printf "%.2f" .Price}}</span>
+        {{if .Sealed}}
+        <span class="arb-price-warn" title="CAUTION - This price looks a bit off, the contents of this product have a very uneven distribution, and simulation or data may be wrong (IQR: {{printf "%.2f" $susPrice}})">$ {{printf "%.2f" .Price}}</span>
+        {{else}}
+        {{$warnTip := price_warning_tip .Price $susPrice}}
+        <span class="arb-price-warn" title="{{plain_tip $warnTip}}" data-tip="{{$warnTip}}">$ {{printf "%.2f" .Price}}</span>
+        {{end}}
     {{else}}
         $ {{printf "%.2f" .Price}}
     {{end}}

@@ -429,6 +429,8 @@ var funcMap = template.FuncMap{
 		return found
 	},
 	"invalid_direct": invalidDirect,
+	// price_warning_tip is the tooltip of a price invalid_direct flags.
+	"price_warning_tip": directPriceWarning,
 	"color2hex": func(s string) string {
 		color, found := colorValues[s]
 		if !found {

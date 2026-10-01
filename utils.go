@@ -1724,6 +1724,16 @@ func invalidDirect(id string, price float64) bool {
 	return invalidDirectIn(inv, id, price)
 }
 
+// directPriceWarning is the tooltip of a price invalidDirect flags: why it
+// looks off, then the price beside TCG Market's, market 0 for none.
+func directPriceWarning(price, market float64) string {
+	verdict, marketCell := "**Price looks off**: over twice TCG Market.", fmt.Sprintf("$ %.2f", market)
+	if market <= 0 {
+		verdict, marketCell = "**Price looks off**: TCG Market has no price for it.", "none"
+	}
+	return verdict + "\n" + fmt.Sprintf("|This price|$ %.2f\n", price) + "|TCG Market|" + marketCell
+}
+
 // invalidDirectIn is invalidDirect over an already-resolved TCGMarket
 // inventory; a nil inventory reads as no market price.
 func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool {

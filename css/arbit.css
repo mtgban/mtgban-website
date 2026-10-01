@@ -391,7 +391,7 @@
 .arb-spread-down { color: var(--adanger); font-weight: 600; }
 
 /* A price the market does not back up (invalid Direct / high sealed IQR):
-   red like the search page's price-warn, explanation on the native title */
+   red like the search page's price-warn, explanation on hover */
 .arb-price-warn { color: var(--adanger); cursor: help; }
 
 /* TCGplayer Direct's stock beside its price on Global, as of a day's scrape */
