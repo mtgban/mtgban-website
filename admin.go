@@ -1134,13 +1134,10 @@ func saveConfig(ctx context.Context, config ConfigType) error {
 		return err
 	}
 	config.sourcePath = Config.sourcePath
-	apiUsersMutex.Lock()
-	Config = config
-	apiUsersMutex.Unlock()
 	// No applyOverrides: the saved text goes live as written. With the
 	// running values, the editor would re-render the old ones and the next
 	// save would write them back to the file.
-	finishConfig()
+	finishConfig(config)
 	return nil
 }
 
