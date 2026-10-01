@@ -83,7 +83,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
         {{if not .ModalMode}}
         <div class="landing-tools">
             {{range .Nav}}
-                {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Class "beta")}}
+                {{if and (ne .Name "Home") (ne .Name "Changelog")}}
                     <a class="landing-tool" href="{{.Link}}">
                         <span class="t-icon">{{.Short}}</span> {{.Name}}
                     </a>
