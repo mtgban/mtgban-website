@@ -10,6 +10,7 @@ import (
 	"log"
 	"maps"
 	"math"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -560,32 +561,17 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.EnabledIndexes = enabledIndexKeys
 	pageVars.EnabledSealedIndexes = enabledSealedIndexKeys
 
-	// Load a list of uuids from newspaper or search
-	hashes := r.Form["hashes"]
-	hashesQtys := r.Form["hashesQtys"]
-	hashesCond := r.Form["hashesCond"]
-	hashesPrice := r.Form["hashesPrice"]
-	hashesNotes := r.Form["hashesNotes"]
-	var hashesFrom, hashesFromQtys []string
-
-	// A page of results posts its rows packed into one field instead, for the
-	// reason splitRows gives.
-	packed := r.FormValue("rows")
-	if packed != "" {
-		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes,
-			hashesFrom, hashesFromQtys = splitRows(packed)
-	}
-
-	// Load spreadsheet cloud url if present
-	remoteURL := r.FormValue("gdocURL")
-
-	// Load from the freeform text area
-	textArea := r.FormValue("textArea")
-
-	// FormFile returns the first file for the given key `cardListFile`
-	// it also returns the FileHeader so we can get the Filename,
-	// the Header and the size of the file
-	file, handler, err := r.FormFile("cardListFile")
+	in := readUploadInput(r)
+	hashes := in.hashes
+	hashesQtys := in.hashesQtys
+	hashesCond := in.hashesCond
+	hashesPrice := in.hashesPrice
+	hashesNotes := in.hashesNotes
+	hashesFrom := in.hashesFrom
+	hashesFromQtys := in.hashesFromQtys
+	remoteURL := in.remoteURL
+	textArea := in.textArea
+	file, handler, err := in.file, in.handler, in.fileErr
 	if err != nil && remoteURL == "" && textArea == "" && len(hashes) == 0 {
 		// A GET is someone arriving at the uploader, which is this page. A
 		// POST that carries nothing is a request that went wrong on the way -
@@ -1859,6 +1845,70 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 		tickedVendors:          tickedVendors,
 		tickedSealedSellers:    tickedSealedSellers,
 		tickedSealedVendors:    tickedSealedVendors,
+	}
+}
+
+// uploadInput is the list a request carries: the rows a page of results posts
+// back, a link to a spreadsheet, deck or collection, a pasted list, or a file.
+// fileErr is FormFile's, set whenever no file came.
+type uploadInput struct {
+	hashes         []string
+	hashesQtys     []string
+	hashesCond     []string
+	hashesPrice    []string
+	hashesNotes    []string
+	hashesFrom     []string
+	hashesFromQtys []string
+	remoteURL      string
+	textArea       string
+	file           multipart.File
+	handler        *multipart.FileHeader
+	fileErr        error
+}
+
+// readUploadInput reads the list a request carries. A file that came is left
+// open for the caller to close.
+func readUploadInput(r *http.Request) uploadInput {
+	// Load a list of uuids from newspaper or search
+	hashes := r.Form["hashes"]
+	hashesQtys := r.Form["hashesQtys"]
+	hashesCond := r.Form["hashesCond"]
+	hashesPrice := r.Form["hashesPrice"]
+	hashesNotes := r.Form["hashesNotes"]
+	var hashesFrom, hashesFromQtys []string
+
+	// A page of results posts its rows packed into one field instead, for the
+	// reason splitRows gives.
+	packed := r.FormValue("rows")
+	if packed != "" {
+		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes,
+			hashesFrom, hashesFromQtys = splitRows(packed)
+	}
+
+	// Load spreadsheet cloud url if present
+	remoteURL := r.FormValue("gdocURL")
+
+	// Load from the freeform text area
+	textArea := r.FormValue("textArea")
+
+	// FormFile returns the first file for the given key `cardListFile`
+	// it also returns the FileHeader so we can get the Filename,
+	// the Header and the size of the file
+	file, handler, err := r.FormFile("cardListFile")
+
+	return uploadInput{
+		hashes:         hashes,
+		hashesQtys:     hashesQtys,
+		hashesCond:     hashesCond,
+		hashesPrice:    hashesPrice,
+		hashesNotes:    hashesNotes,
+		hashesFrom:     hashesFrom,
+		hashesFromQtys: hashesFromQtys,
+		remoteURL:      remoteURL,
+		textArea:       textArea,
+		file:           file,
+		handler:        handler,
+		fileErr:        err,
 	}
 }
 
