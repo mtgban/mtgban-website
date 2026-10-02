@@ -887,15 +887,11 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			continue
 		}
 
-		cardID := uploadedData[i].CardID
+		row := newUploadRow(b, st, &uploadedData[i])
 
-		// Pick the right store list for this entry. The sealed id list was
-		// built from this same lookup, so ask the datastore directly instead
-		// of scanning the list per row.
-		co, err := b.GetUUID(cardID)
-		isSealed := err == nil && co.Sealed
+		// Pick the right store list for this entry
 		entryStores := prices.enabledStores
-		if isSealed {
+		if row.isSealed {
 			entryStores = prices.enabledSealedStores
 		}
 
@@ -903,18 +899,18 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		// An opened product is not being traded as itself, so a store not
 		// carrying it is not a gap in this list.
 		for _, shorthand := range entryStores {
-			if uploadedData[i].Unpacked {
+			if row.Unpacked {
 				break
 			}
-			_, found := prices.results[cardID][shorthand]
+			_, found := prices.results[row.CardID][shorthand]
 			if found {
 				continue
 			}
-			reference := getPrice(indexes.results[cardID]["TCGLow"], "")
+			reference := getPrice(indexes.results[row.CardID]["TCGLow"], "")
 			rows.missingCounts[shorthand]++
 			rows.missingPrices[shorthand] += reference
-			if uploadedData[i].UnpackedFrom != "" {
-				tally := rows.tallyFor(uploadedData[i].UnpackedFrom)
+			if row.UnpackedFrom != "" {
+				tally := rows.tallyFor(row.UnpackedFrom)
 				tally.Missing[shorthand]++
 				tally.MissingPrices[shorthand] += reference
 			}
@@ -924,64 +920,49 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		// every index; getPrice handles the MetadataOnly sources
 		// (TCGLow/TCGMarket/MKM*) by falling back to their flat price
 		// while still using TCGDirect's per-condition listing.
-		conds := uploadedData[i].OriginalCondition
-		if st.skipConds {
-			conds = ""
-		}
-		priceKey := cardID + string(conds)
-		for indexKey, indexResult := range indexes.results[cardID] {
-			indexPrice := getPrice(indexResult, conds)
+		for indexKey, indexResult := range indexes.results[row.CardID] {
+			indexPrice := getPrice(indexResult, row.conds)
 
-			if rows.resultPrices[priceKey] == nil {
-				rows.resultPrices[priceKey] = map[string]float64{}
+			if rows.resultPrices[row.priceKey] == nil {
+				rows.resultPrices[row.priceKey] = map[string]float64{}
 			}
-			rows.resultPrices[priceKey][indexKey] = indexPrice
+			rows.resultPrices[row.priceKey][indexKey] = indexPrice
 
-			qty := uploadedData[i].QuantityOrOne()
-			indexPrice *= float64(adjustQty(qty, st.multiplier, st.maxQty))
+			indexPrice *= float64(row.qty)
 
 			// An opened product keeps its own index prices - for a sealed
 			// product those are the expected values, which is the number its
 			// section is read against - and adds nothing to the page: the
 			// cards it became are in the list already, and counting both
 			// would count them twice.
-			if uploadedData[i].Unpacked {
-				rows.tallyFor(cardID).ProductIndex[indexKey] = indexPrice
+			if row.Unpacked {
+				rows.tallyFor(row.CardID).ProductIndex[indexKey] = indexPrice
 				continue
 			}
 
 			rows.totalEntries[indexKey] += indexPrice
-			if uploadedData[i].UnpackedFrom != "" {
-				rows.tallyFor(uploadedData[i].UnpackedFrom).Totals[indexKey] += indexPrice
+			if row.UnpackedFrom != "" {
+				rows.tallyFor(row.UnpackedFrom).Totals[indexKey] += indexPrice
 			}
 		}
 
-		// An opened product is still priced below - its section is headed by
-		// what the box is worth against what came out of it - but it counts
-		// for nothing else: not a quantity, not a store's summary, and not a
-		// row in the optimizer, which would otherwise be told to buy the box
-		// as well as its contents.
-		counts := !uploadedData[i].Unpacked
-
-		if counts {
+		if row.counts {
 			// Quantity summary
-			qty := uploadedData[i].QuantityOrOne()
-			adjusted := adjustQty(qty, st.multiplier, st.maxQty)
-			rows.totalQuantity += adjusted
-			if isSealed {
-				rows.sealedQuantity += adjusted
+			rows.totalQuantity += row.qty
+			if row.isSealed {
+				rows.sealedQuantity += row.qty
 			} else {
-				rows.singlesQuantity += adjusted
+				rows.singlesQuantity += row.qty
 			}
-			if uploadedData[i].UnpackedFrom != "" {
-				rows.tallyFor(uploadedData[i].UnpackedFrom).Quantity += adjusted
+			if row.UnpackedFrom != "" {
+				rows.tallyFor(row.UnpackedFrom).Quantity += row.qty
 			}
 		}
 
 		// Run summaries for each vendor
 		offers := map[string]float64{}
-		for shorthand, banPrice := range prices.results[cardID] {
-			price := getPrice(banPrice, conds)
+		for shorthand, banPrice := range prices.results[row.CardID] {
+			price := getPrice(banPrice, row.conds)
 
 			// Adjust for preferred price source. The custom buylist pays what
 			// the reader set it to, in credit as in cash.
@@ -995,10 +976,10 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			}
 
 			// Store computed price
-			if rows.resultPrices[priceKey] == nil {
-				rows.resultPrices[priceKey] = map[string]float64{}
+			if rows.resultPrices[row.priceKey] == nil {
+				rows.resultPrices[row.priceKey] = map[string]float64{}
 			}
-			rows.resultPrices[priceKey][shorthand] = price
+			rows.resultPrices[row.priceKey][shorthand] = price
 
 			// Skip empty results
 			if price == 0 {
@@ -1006,15 +987,14 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			}
 
 			// Adjust for quantity
-			qty := uploadedData[i].QuantityOrOne()
-			price *= float64(adjustQty(qty, st.multiplier, st.maxQty))
+			price *= float64(row.qty)
 
 			// Add to totals (unless it was an index, since it was already added)
-			_, found := indexes.results[cardID][shorthand]
-			if !found && counts {
+			_, found := indexes.results[row.CardID][shorthand]
+			if !found && row.counts {
 				rows.totalEntries[shorthand] += price
-				if uploadedData[i].UnpackedFrom != "" {
-					rows.tallyFor(uploadedData[i].UnpackedFrom).Totals[shorthand] += price
+				if row.UnpackedFrom != "" {
+					rows.tallyFor(row.UnpackedFrom).Totals[shorthand] += price
 				}
 			}
 
@@ -1024,9 +1004,9 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 
 		// What the box is worth whole, which is the number its section is read
 		// against. The cards it became are the optimizer's business; it is not.
-		if !counts {
+		if !row.counts {
 			if len(bestStores) > 0 {
-				rows.tallyFor(cardID).ProductPrice = offers[bestStores[0]]
+				rows.tallyFor(row.CardID).ProductPrice = offers[bestStores[0]]
 			}
 			continue
 		}
@@ -1034,33 +1014,24 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		for j, bestStore := range bestStores {
 			bestPrice := offers[bestStore]
 
-			qty := uploadedData[i].QuantityOrOne()
-			qty = adjustQty(qty, st.multiplier, st.maxQty)
-
-			conds := uploadedData[i].OriginalCondition
-			if st.skipConds {
-				conds = ""
-			}
-			cardID := uploadedData[i].CardID
-
 			// Load comparison price, either the loaded one or one of the alternatives
 			comparePrice := 0.0
 			if st.skipPrices {
 				var compareConds mtgban.Condition
-				prices := indexes.results[cardID][st.altPriceSource]
+				prices := indexes.results[row.CardID][st.altPriceSource]
 				if slices.Index(indexes.keys, st.altPriceSource) >= len(UploadIndexKeys) {
-					compareConds = conds
+					compareConds = row.conds
 				}
 
 				// Normally index has no conditions to check, but the price might be coming
 				// from a regular store (in which case we attempt to match it)
 				comparePrice = getPrice(prices, compareConds)
 			} else {
-				comparePrice = uploadedData[i].OriginalPrice
+				comparePrice = row.OriginalPrice
 			}
 
 			// Load the single item priceprice
-			price := rows.resultPrices[priceKey][bestStore]
+			price := rows.resultPrices[row.priceKey][bestStore]
 
 			// Skip if needed
 			if st.skipLowValueAbs && price < st.minLowVal {
@@ -1085,22 +1056,22 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 
 				if factor > 0 {
 					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+factor)
-					if qty > 1 {
-						profitability *= math.Sqrt(float64(qty))
+					if row.qty > 1 {
+						profitability *= math.Sqrt(float64(row.qty))
 					}
 				}
 			}
 
 			// Break down by store
 			rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
-				CardID:        cardID,
-				Condition:     conds,
+				CardID:        row.CardID,
+				Condition:     row.conds,
 				Price:         comparePrice,
 				CompareSource: st.altPriceSource,
 				Spread:        factor,
 				BestPrice:     price,
-				Quantity:      qty,
-				Notes:         uploadedData[i].Notes,
+				Quantity:      row.qty,
+				Notes:         row.Notes,
 				VisualPrice:   comparePrice * st.visualPerc / 100.0,
 				Profitability: profitability,
 			})
@@ -1109,13 +1080,13 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			rows.optimizedTotals[bestStore] += bestPrice
 			if j == 0 {
 				rows.highestTotal += bestPrice
-				if isSealed {
+				if row.isSealed {
 					rows.sealedHighest += bestPrice
 				} else {
 					rows.singlesHighest += bestPrice
 				}
-				if uploadedData[i].UnpackedFrom != "" {
-					rows.tallyFor(uploadedData[i].UnpackedFrom).Highest += bestPrice
+				if row.UnpackedFrom != "" {
+					rows.tallyFor(row.UnpackedFrom).Highest += bestPrice
 				}
 			}
 		}
@@ -1124,6 +1095,44 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 	}
 
 	return rows
+}
+
+// uploadRow is one matched row and what its tallies share: whether it is a
+// sealed product, the condition it is priced in, the key its prices are filed
+// under, its quantity after the multiplier and cap, and whether it counts.
+type uploadRow struct {
+	*UploadEntry
+	isSealed bool
+	conds    mtgban.Condition
+	priceKey string
+	qty      int
+	counts   bool
+}
+
+// newUploadRow reads what pricing the entry needs to know about it.
+func newUploadRow(b *mtgmatcher.Backend, st uploadSettings, entry *UploadEntry) uploadRow {
+	// The sealed id list was built from this same lookup, so ask the
+	// datastore directly instead of scanning the list per row.
+	co, err := b.GetUUID(entry.CardID)
+
+	conds := entry.OriginalCondition
+	if st.skipConds {
+		conds = ""
+	}
+
+	return uploadRow{
+		UploadEntry: entry,
+		isSealed:    err == nil && co.Sealed,
+		conds:       conds,
+		priceKey:    entry.CardID + string(conds),
+		qty:         adjustQty(entry.QuantityOrOne(), st.multiplier, st.maxQty),
+		// An opened product is still priced - its section is headed by what
+		// the box is worth against what came out of it - but it counts for
+		// nothing else: not a quantity, not a store's summary, and not a row
+		// in the optimizer, which would otherwise be told to buy the box as
+		// well as its contents.
+		counts: !entry.Unpacked,
+	}
 }
 
 // tallyFor returns the tallies of the opened product, starting them on its
