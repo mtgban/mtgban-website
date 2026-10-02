@@ -713,19 +713,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	indexes := fetchUploadIndexes(b, blMode, st, selected, ids, prices)
 
-	// Set card and sealed keys separately — the template picks per entry,
-	// with the same store/index deduplication applied above for sealed
-	for _, key := range selected.enabledIndexKeys {
-		if !blMode && slices.Contains(prices.enabledStores, key) {
-			continue
-		}
-		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
-	}
-	pageVars.ScraperKeys = prices.enabledStores
-	if len(ids.sealedProductIDs) > 0 {
-		pageVars.SealedIndexKeys = indexes.sealedKeys
-		pageVars.SealedScraperKeys = prices.enabledSealedStores
-	}
+	fillUploadKeys(&pageVars.UploadVars, blMode, selected, ids, prices, indexes)
 
 	fillUploadEntries(&pageVars.UploadVars, r, b, in, uploadName, uploadedData)
 
@@ -756,6 +744,24 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
+}
+
+// fillUploadKeys sets the stores and indexes the results have columns for,
+// for singles and for sealed products.
+func fillUploadKeys(pageVars *UploadVars, blMode bool, selected uploadStores, ids uploadIDs, prices uploadPrices, indexes uploadIndexes) {
+	// Set card and sealed keys separately — the template picks per entry,
+	// with the same store/index deduplication applied above for sealed
+	for _, key := range selected.enabledIndexKeys {
+		if !blMode && slices.Contains(prices.enabledStores, key) {
+			continue
+		}
+		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
+	}
+	pageVars.ScraperKeys = prices.enabledStores
+	if len(ids.sealedProductIDs) > 0 {
+		pageVars.SealedIndexKeys = indexes.sealedKeys
+		pageVars.SealedScraperKeys = prices.enabledSealedStores
+	}
 }
 
 // fillUploadEntries puts the rows on the page, with the line naming where they
