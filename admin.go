@@ -152,45 +152,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// -- Config: handle POST if submitted --
-	newConfig := r.FormValue("textArea")
-	if newConfig != "" {
-		var config ConfigType
-		err := json.Unmarshal([]byte(newConfig), &config)
-		if err != nil {
-			pageVars.WarningMessage = err.Error()
-		} else {
-			err = saveConfig(r.Context(), config)
-			if err != nil {
-				log.Println(err)
-				pageVars.WarningMessage = err.Error()
-			} else {
-				pageVars.InfoMessage = "Config updated"
-				// The access table, grants and affiliate data are served
-				// from their own files, not this config; reload them here
-				// in case the edit changed the paths that name them.
-				err = loadCommonConfig(r.Context())
-				if err != nil {
-					pageVars.WarningMessage = err.Error()
-				}
-			}
-		}
-	}
-
-	// -- Config: load editor text --
-	// If the POST failed, keep the submitted text so the user can fix it
-	if newConfig != "" && pageVars.WarningMessage != "" {
-		pageVars.CleanSearchQuery = newConfig
-	} else {
-		text, err := configEditorText()
-		if err != nil {
-			if pageVars.InfoMessage == "" {
-				pageVars.InfoMessage = err.Error()
-			}
-		} else {
-			pageVars.CleanSearchQuery = text
-		}
-	}
+	adminConfigEditor(r, &pageVars)
 
 	// -- Checkpoints: handle POST if submitted --
 	newCheckpoints := r.FormValue("checkpointsTextArea")
@@ -842,6 +804,51 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 		return true
 	}
 	return false
+}
+
+// adminConfigEditor saves a config posted from the dashboard's editor, then
+// fills the editor with the config as it stands, or with the posted text
+// when the save failed.
+func adminConfigEditor(r *http.Request, pageVars *PageVars) {
+	// -- Config: handle POST if submitted --
+	newConfig := r.FormValue("textArea")
+	if newConfig != "" {
+		var config ConfigType
+		err := json.Unmarshal([]byte(newConfig), &config)
+		if err != nil {
+			pageVars.WarningMessage = err.Error()
+		} else {
+			err = saveConfig(r.Context(), config)
+			if err != nil {
+				log.Println(err)
+				pageVars.WarningMessage = err.Error()
+			} else {
+				pageVars.InfoMessage = "Config updated"
+				// The access table, grants and affiliate data are served
+				// from their own files, not this config; reload them here
+				// in case the edit changed the paths that name them.
+				err = loadCommonConfig(r.Context())
+				if err != nil {
+					pageVars.WarningMessage = err.Error()
+				}
+			}
+		}
+	}
+
+	// -- Config: load editor text --
+	// If the POST failed, keep the submitted text so the user can fix it
+	if newConfig != "" && pageVars.WarningMessage != "" {
+		pageVars.CleanSearchQuery = newConfig
+	} else {
+		text, err := configEditorText()
+		if err != nil {
+			if pageVars.InfoMessage == "" {
+				pageVars.InfoMessage = err.Error()
+			}
+		} else {
+			pageVars.CleanSearchQuery = text
+		}
+	}
 }
 
 // usageCacheTTL bounds how stale the Usage tab may be. Everything behind it
