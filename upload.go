@@ -51,6 +51,10 @@ const (
 	ProfitabilityConstant = 2
 )
 
+// uploadTagName keys every price an upload looks up by its store's
+// shorthand.
+const uploadTagName = "tags"
+
 // List of ALL index prices to track
 var UploadIndexKeys = []string{
 	"TCGLow", "TCGMarket", "TCGDirect", "TCGDirectLow", "MKMLow", "MKMTrend",
@@ -689,11 +693,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	ids := splitUploadIDs(b, uploadedData, st)
 	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(ids.cardIDs), len(ids.sealedProductIDs))
 
-	tagPref := "tags"
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
-	priceSource := getUploadSetting(r, "pricesource", "UploadPriceSource")
-
 	// Search — fetch card and sealed prices separately then merge
 	var results map[string]map[string]*BanPrice
 	var credits map[string]float64
@@ -707,7 +706,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// way the sealed and index fetches below already do.
 		results = map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 {
-			results = getVendorPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
+			results = getVendorPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Build the custom buylist if requested
@@ -746,10 +745,10 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Fetch sealed vendor prices and merge
 		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, tagPref))
+			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 
-		if priceSource != "" {
+		if st.priceSource != "" {
 			credits = map[string]float64{}
 			allStores := append(enabledStores, enabledSealedStores...)
 			for _, store := range allStores {
@@ -761,12 +760,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// upload has no singles (see the comment above).
 		results = map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 {
-			results = getSellerPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
+			results = getSellerPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Fetch sealed seller prices and merge
 		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, tagPref))
+			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 		}
 	}
 
@@ -789,7 +788,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		indexResults := map[string]map[string]*BanPrice{}
 		if len(ids.cardIDs) > 0 && len(csvIndexKeys) > 0 {
-			indexResults = getSellerPrices(b, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
+			indexResults = getSellerPrices(b, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 		}
 
 		// Copy these index prices in the final results
@@ -802,7 +801,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err := SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, preferFlavor)
+		err := SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, st.preferFlavor)
 		if err != nil {
 			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
@@ -815,18 +814,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	var indexKeys []string
 	indexResults := map[string]map[string]*BanPrice{}
 
-	// Choose the alternative reference pricing source when one is not loaded in
-	altPriceSource := getUploadSetting(r, "altPrice", "UploadAltPrice")
-	if !slices.Contains(UploadIndexComparePriceList, altPriceSource) {
-		altPriceSource = UploadIndexKeys[0]
-	}
-
 	if len(ids.cardIDs) > 0 {
 		indexKeys = UploadIndexKeys
-		if !slices.Contains(indexKeys, altPriceSource) {
-			indexKeys = append(indexKeys, altPriceSource)
+		if !slices.Contains(indexKeys, st.altPriceSource) {
+			indexKeys = append(indexKeys, st.altPriceSource)
 		}
-		indexResults = getSellerPrices(b, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
+		indexResults = getSellerPrices(b, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
 	}
 
 	// An index that is also a selected store (TCGSealed) already gets its
@@ -841,7 +834,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch sealed index prices
 	if len(ids.sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, tagPref))
+		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
 	}
 
 	// Set card and sealed keys separately — the template picks per entry,
@@ -894,12 +887,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		pageVars.Metadata[data.CardID] = uuid2card(b, data.CardID, true, false, preferFlavor)
+		pageVars.Metadata[data.CardID] = uuid2card(b, data.CardID, true, false, st.preferFlavor)
 
 		// Load metadata for alternative printings (used by pick-printing picker)
 		for _, alias := range data.PossibleAliases {
 			if _, exists := pageVars.Metadata[alias]; !exists {
-				pageVars.Metadata[alias] = uuid2card(b, alias, true, false, preferFlavor)
+				pageVars.Metadata[alias] = uuid2card(b, alias, true, false, st.preferFlavor)
 			}
 		}
 	}
@@ -1037,9 +1030,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 			// Adjust for preferred price source
 			if blMode {
-				if priceSource == "credit" {
+				if st.priceSource == "credit" {
 					price *= credits[shorthand]
-				} else if priceSource == "marketCredit" {
+				} else if st.priceSource == "marketCredit" {
 					price *= credits[shorthand] * Config().BuylistMarketCredit[shorthand]
 				}
 			}
@@ -1097,8 +1090,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			comparePrice := 0.0
 			if st.skipPrices {
 				var compareConds mtgban.Condition
-				prices := indexResults[cardID][altPriceSource]
-				if slices.Index(indexKeys, altPriceSource) >= len(UploadIndexKeys) {
+				prices := indexResults[cardID][st.altPriceSource]
+				if slices.Index(indexKeys, st.altPriceSource) >= len(UploadIndexKeys) {
 					compareConds = conds
 				}
 
@@ -1146,7 +1139,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				CardID:        cardID,
 				Condition:     conds,
 				Price:         comparePrice,
-				CompareSource: altPriceSource,
+				CompareSource: st.altPriceSource,
 				Spread:        factor,
 				BestPrice:     price,
 				Quantity:      qty,
@@ -1171,7 +1164,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Avoid printing the credit conversion if the price source is already in store credit
-		pageVars.CanFilterByPrice = priceSource == ""
+		pageVars.CanFilterByPrice = st.priceSource == ""
 	}
 
 	sortResults(b, uploadedData, optimizedResults, st.sorting)
@@ -1387,6 +1380,9 @@ type uploadSettings struct {
 	multiplier       int
 	maxQty           int
 	magicOnlyExports bool
+	priceSource      string
+	altPriceSource   string
+	preferFlavor     bool
 }
 
 // readUploadSettings parses the upload page's settings from the request. The
@@ -1477,6 +1473,17 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 	// to name the cards with, so the page does not offer it.
 	magicOnlyExports := Config().Game == DefaultGame
 
+	priceSource := getUploadSetting(r, "pricesource", "UploadPriceSource")
+
+	// Choose the alternative reference pricing source when one is not loaded in
+	altPriceSource := getUploadSetting(r, "altPrice", "UploadAltPrice")
+	if !slices.Contains(UploadIndexComparePriceList, altPriceSource) {
+		altPriceSource = UploadIndexKeys[0]
+	}
+
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+
 	return uploadSettings{
 		canChangeStores:  canChangeStores,
 		canUploadCustom:  canUploadCustom,
@@ -1499,6 +1506,9 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		multiplier:       multiplier,
 		maxQty:           maxQty,
 		magicOnlyExports: magicOnlyExports,
+		priceSource:      priceSource,
+		altPriceSource:   altPriceSource,
+		preferFlavor:     preferFlavor,
 	}
 }
 
