@@ -780,6 +780,26 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CanFilterByPrice = st.priceSource == ""
 	}
 
+	fillUploadResults(&pageVars.UploadVars, b, st, ids, prices, rows, uploadedData)
+
+	// Logs
+	user := GetParamFromSig(sig, "UserEmail")
+	msgMode := "retail"
+	if blMode {
+		msgMode = "buylist"
+	}
+	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(ids.cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
+	UserNotify("upload", msg)
+	LogPages["Upload"].Println(msg)
+
+	// Touchdown!
+	render(w, "upload.html", pageVars)
+}
+
+// fillUploadResults sorts the rows and the optimizer's picks, and lays them
+// out on the page: the tabs, the opened products' sections, the totals row
+// and the optimizer's sections.
+func fillUploadResults(pageVars *UploadVars, b *mtgmatcher.Backend, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
 	sortResults(b, uploadedData, rows.optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
@@ -829,19 +849,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.OptimizedTotals = rows.optimizedTotals
 		pageVars.HighestTotal = rows.highestTotal
 	}
-
-	// Logs
-	user := GetParamFromSig(sig, "UserEmail")
-	msgMode := "retail"
-	if blMode {
-		msgMode = "buylist"
-	}
-	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(ids.cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
-	UserNotify("upload", msg)
-	LogPages["Upload"].Println(msg)
-
-	// Touchdown!
-	render(w, "upload.html", pageVars)
 }
 
 // uploadRows are what pricing an upload's rows adds up to: each row's price at
