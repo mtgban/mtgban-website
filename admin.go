@@ -156,37 +156,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminCheckpointsEditor(r, &pageVars)
 
-	// -- Access table: handle POST if submitted --
-	newACL := r.FormValue("aclTextArea")
-	if newACL != "" {
-		var parsed access.Table
-		err := json.Unmarshal([]byte(newACL), &parsed)
-		if err == nil {
-			err = validateACLTable(parsed)
-		}
-		if err == nil {
-			err = saveACL(r.Context(), parsed)
-		}
-		if err != nil {
-			pageVars.WarningMessage = "Access table not saved: " + err.Error()
-		} else {
-			pageVars.InfoMessage = "Access table updated"
-		}
-	}
-
-	// -- Access table: always load current text for the editor --
-	aclText, aclErr := json.MarshalIndent(ACL(), "", "    ")
-	if aclErr != nil {
-		if pageVars.InfoMessage == "" {
-			pageVars.InfoMessage = aclErr.Error()
-		}
-	} else {
-		pageVars.ACLText = string(aclText)
-	}
-	pageVars.ACLSource = Config().ACLPath
-	if pageVars.ACLSource == "" {
-		pageVars.ACLSource = "not configured"
-	}
+	adminACLEditor(r, &pageVars)
 
 	// -- Affiliates: handle POST if submitted --
 	newAffiliates := r.FormValue("affiliatesTextArea")
@@ -854,6 +824,43 @@ func adminCheckpointsEditor(r *http.Request, pageVars *PageVars) {
 		}
 	} else {
 		pageVars.CheckpointsText = cpText
+	}
+}
+
+// adminACLEditor saves an access table posted from the dashboard's editor,
+// then fills the editor with the table as it stands and where it is read
+// from.
+func adminACLEditor(r *http.Request, pageVars *PageVars) {
+	// -- Access table: handle POST if submitted --
+	newACL := r.FormValue("aclTextArea")
+	if newACL != "" {
+		var parsed access.Table
+		err := json.Unmarshal([]byte(newACL), &parsed)
+		if err == nil {
+			err = validateACLTable(parsed)
+		}
+		if err == nil {
+			err = saveACL(r.Context(), parsed)
+		}
+		if err != nil {
+			pageVars.WarningMessage = "Access table not saved: " + err.Error()
+		} else {
+			pageVars.InfoMessage = "Access table updated"
+		}
+	}
+
+	// -- Access table: always load current text for the editor --
+	aclText, aclErr := json.MarshalIndent(ACL(), "", "    ")
+	if aclErr != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = aclErr.Error()
+		}
+	} else {
+		pageVars.ACLText = string(aclText)
+	}
+	pageVars.ACLSource = Config().ACLPath
+	if pageVars.ACLSource == "" {
+		pageVars.ACLSource = "not configured"
 	}
 }
 
