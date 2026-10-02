@@ -552,167 +552,31 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanUploadCustom = canUploadCustom
 	pageVars.CanPublishStore = canPublishStore
 
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
-	var enabledStores []string
-	var enabledSealedStores []string
-
-	// Load all possible sellers and vendors according to user permissions.
-	// Sellers skip MetadataOnly entries (no quantity/condition data to
-	// optimize against); vendors don't apply that filter.
-	singlesSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !info.MetadataOnly && !info.SealedMode &&
-			!slices.Contains(blocklistRetail, info.Shorthand)
-	})
-	sealedSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !info.MetadataOnly && info.SealedMode &&
-			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
-	})
-	singlesVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
-		return !info.SealedMode &&
-			!slices.Contains(blocklistBuylist, info.Shorthand)
-	})
-	sealedVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
-		return info.SealedMode &&
-			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
-	})
-
-	// Set the store names for the <select> box
-	pageVars.SellerKeys = singlesSellers
-	pageVars.VendorKeys = singlesVendors
-	pageVars.SealedSellerKeys = sealedSellers
-	pageVars.SealedVendorKeys = sealedVendors
-	pageVars.AltKeys = UploadIndexComparePriceList
-
-	// Load the preferred list of enabled stores for the <select> box
-	// The first check is for when the cookie is not yet set
-	// Force stores if not allowed to change them
-	enabledSellers := readCookie(r, "enabledSellers")
-	if len(enabledSellers) == 0 || !canChangeStores {
-		pageVars.EnabledSellers = Affiliates().List
-	} else {
-		pageVars.EnabledSellers = strings.Split(enabledSellers, "|")
-	}
-
-	enabledVendors := readCookie(r, "enabledVendors")
-	if len(enabledVendors) == 0 || !canChangeStores {
-		pageVars.EnabledVendors = singlesVendors
-	} else {
-		pageVars.EnabledVendors = strings.Split(enabledVendors, "|")
-	}
-
-	enabledSealedSellers := readCookie(r, "enabledSealedSellers")
-	if len(enabledSealedSellers) == 0 || !canChangeStores {
-		pageVars.EnabledSealedSellers = sealedSellers
-	} else {
-		pageVars.EnabledSealedSellers = strings.Split(enabledSealedSellers, "|")
-	}
-
-	enabledSealedVendors := readCookie(r, "enabledSealedVendors")
-	if len(enabledSealedVendors) == 0 || !canChangeStores {
-		pageVars.EnabledSealedVendors = sealedVendors
-	} else {
-		pageVars.EnabledSealedVendors = strings.Split(enabledSealedVendors, "|")
-	}
-
-	// The sealed indexes are the sealed sellers that were made public;
-	// unlike the EV ones, TCGSealed is not MetadataOnly, since it is a
-	// store too
-	sealedIndexes := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return info.SealedMode &&
-			slices.Contains(UploadSealedIndexKeysPublic, info.Shorthand)
-	})
-
-	// Index prices are reference prices, so their selection is shared
-	// between Retail and Buylist mode, but singles and sealed keep their
-	// own list, like the stores above. The form always carries the
-	// index_pref marker, so an empty list submitted from the page means
-	// "no index at all" and not "field was never sent" (as it would for
-	// requests that skip the form, like search transfers or remote links)
-	pageVars.IndexAllKeys = UploadIndexKeysPublic
-	pageVars.SealedIndexAllKeys = sealedIndexes
-
-	enabledIndexes := UploadIndexKeysPublic
-	enabledSealedIndexes := sealedIndexes
-	if r.Form.Has("index_pref") {
-		enabledIndexes = r.Form["index_stores"]
-		enabledSealedIndexes = r.Form["sealed_index_stores"]
-		setForeverCookie(w, r, "enabledIndexes", strings.Join(enabledIndexes, "|"))
-		setForeverCookie(w, r, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
-	} else {
-		if raw := readCookie(r, "enabledIndexes"); raw != "" {
-			enabledIndexes = strings.Split(raw, "|")
-		}
-		if raw := readCookie(r, "enabledSealedIndexes"); raw != "" {
-			enabledSealedIndexes = strings.Split(raw, "|")
-		}
-	}
-
-	enabledIndexKeys := keepInOrder(UploadIndexKeysPublic, enabledIndexes)
-	enabledSealedIndexKeys := keepInOrder(sealedIndexes, enabledSealedIndexes)
-	pageVars.EnabledIndexes = enabledIndexKeys
-	pageVars.EnabledSealedIndexes = enabledSealedIndexKeys
-
 	cachedGdocURL := readCookie(r, "gdocURL")
 	pageVars.RemoteLinkURL = cachedGdocURL
 
-	// Filter out any unselected store from the full list
-	stores := r.Form["stores"]
-	sealedStores := r.Form["sealed_stores"]
-	if blMode {
-		// Override in case not allowed to change list
-		if !canChangeStores {
-			stores = singlesVendors
-			sealedStores = sealedVendors
-		}
-		for _, store := range stores {
-			if slices.Contains(singlesVendors, store) {
-				enabledStores = append(enabledStores, store)
-			}
-		}
-		for _, store := range sealedStores {
-			if slices.Contains(sealedVendors, store) {
-				enabledSealedStores = append(enabledSealedStores, store)
-			}
-		}
+	selected := selectUploadStores(w, r, blMode, st)
+	enabledStores := selected.enabledStores
+	enabledSealedStores := selected.enabledSealedStores
+	enabledIndexKeys := selected.enabledIndexKeys
+	enabledSealedIndexKeys := selected.enabledSealedIndexKeys
+	sealedSellers := selected.sealedSellers
+	sealedVendors := selected.sealedVendors
 
-	} else {
-		// Override in case not allowed to change list
-		if !canChangeStores {
-			stores = Affiliates().List
-			sealedStores = sealedSellers
-		}
-		for _, store := range stores {
-			if slices.Contains(singlesSellers, store) {
-				enabledStores = append(enabledStores, store)
-			}
-		}
-		for _, store := range sealedStores {
-			if slices.Contains(sealedSellers, store) {
-				enabledSealedStores = append(enabledSealedStores, store)
-			}
-		}
-	}
-
-	// Make sure there are some enabled stores for direct access: what the
-	// form would have sent. The defaults are filtered like any submitted
-	// list, since the affiliate list is every deployment's and names sealed
-	// stores and ones this game does not carry.
-	if len(stores) == 0 && len(enabledStores) == 0 {
-		if blMode {
-			enabledStores = keepInOrder(singlesVendors, pageVars.EnabledVendors)
-		} else {
-			enabledStores = keepInOrder(singlesSellers, pageVars.EnabledSellers)
-		}
-	}
-	// Same as above, covering requests that carry no sealed_stores field
-	// at all (hash transfers from search, gdocURL links)
-	if len(sealedStores) == 0 && len(enabledSealedStores) == 0 {
-		if blMode {
-			enabledSealedStores = keepInOrder(sealedVendors, pageVars.EnabledSealedVendors)
-		} else {
-			enabledSealedStores = keepInOrder(sealedSellers, pageVars.EnabledSealedSellers)
-		}
-	}
+	// Set the store names for the <select> box, and the ones it ticks
+	pageVars.SellerKeys = selected.singlesSellers
+	pageVars.VendorKeys = selected.singlesVendors
+	pageVars.SealedSellerKeys = sealedSellers
+	pageVars.SealedVendorKeys = sealedVendors
+	pageVars.AltKeys = UploadIndexComparePriceList
+	pageVars.EnabledSellers = selected.tickedSellers
+	pageVars.EnabledVendors = selected.tickedVendors
+	pageVars.EnabledSealedSellers = selected.tickedSealedSellers
+	pageVars.EnabledSealedVendors = selected.tickedSealedVendors
+	pageVars.IndexAllKeys = UploadIndexKeysPublic
+	pageVars.SealedIndexAllKeys = selected.sealedIndexes
+	pageVars.EnabledIndexes = enabledIndexKeys
+	pageVars.EnabledSealedIndexes = enabledSealedIndexKeys
 
 	// Load a list of uuids from newspaper or search
 	hashes := r.Form["hashes"]
@@ -1779,6 +1643,197 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		multiplier:       multiplier,
 		maxQty:           maxQty,
 		magicOnlyExports: magicOnlyExports,
+	}
+}
+
+// uploadStores are the stores and index prices an upload is priced against,
+// the store lists the page offers, and the ones it shows ticked.
+type uploadStores struct {
+	enabledStores          []string
+	enabledSealedStores    []string
+	enabledIndexKeys       []string
+	enabledSealedIndexKeys []string
+	sealedSellers          []string
+	sealedVendors          []string
+	singlesSellers         []string
+	singlesVendors         []string
+	sealedIndexes          []string
+	tickedSellers          []string
+	tickedVendors          []string
+	tickedSealedSellers    []string
+	tickedSealedVendors    []string
+}
+
+// selectUploadStores picks the stores and index prices an upload in the given
+// mode is priced against, from the form, the cookies and what the reader may
+// change, and the store lists the page offers and ticks. It writes only the
+// cookies that keep a new index choice.
+func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st uploadSettings) uploadStores {
+	sig := getSignatureFromCookies(r)
+	canChangeStores := st.canChangeStores
+
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	var enabledStores []string
+	var enabledSealedStores []string
+
+	// Load all possible sellers and vendors according to user permissions.
+	// Sellers skip MetadataOnly entries (no quantity/condition data to
+	// optimize against); vendors don't apply that filter.
+	singlesSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return !info.MetadataOnly && !info.SealedMode &&
+			!slices.Contains(blocklistRetail, info.Shorthand)
+	})
+	sealedSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return !info.MetadataOnly && info.SealedMode &&
+			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
+	})
+	singlesVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
+		return !info.SealedMode &&
+			!slices.Contains(blocklistBuylist, info.Shorthand)
+	})
+	sealedVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
+		return info.SealedMode &&
+			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
+	})
+
+	// Load the preferred list of enabled stores for the <select> box
+	// The first check is for when the cookie is not yet set
+	// Force stores if not allowed to change them
+	var tickedSellers, tickedVendors, tickedSealedSellers, tickedSealedVendors []string
+	enabledSellers := readCookie(r, "enabledSellers")
+	if len(enabledSellers) == 0 || !canChangeStores {
+		tickedSellers = Affiliates().List
+	} else {
+		tickedSellers = strings.Split(enabledSellers, "|")
+	}
+
+	enabledVendors := readCookie(r, "enabledVendors")
+	if len(enabledVendors) == 0 || !canChangeStores {
+		tickedVendors = singlesVendors
+	} else {
+		tickedVendors = strings.Split(enabledVendors, "|")
+	}
+
+	enabledSealedSellers := readCookie(r, "enabledSealedSellers")
+	if len(enabledSealedSellers) == 0 || !canChangeStores {
+		tickedSealedSellers = sealedSellers
+	} else {
+		tickedSealedSellers = strings.Split(enabledSealedSellers, "|")
+	}
+
+	enabledSealedVendors := readCookie(r, "enabledSealedVendors")
+	if len(enabledSealedVendors) == 0 || !canChangeStores {
+		tickedSealedVendors = sealedVendors
+	} else {
+		tickedSealedVendors = strings.Split(enabledSealedVendors, "|")
+	}
+
+	// The sealed indexes are the sealed sellers that were made public;
+	// unlike the EV ones, TCGSealed is not MetadataOnly, since it is a
+	// store too
+	sealedIndexes := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return info.SealedMode &&
+			slices.Contains(UploadSealedIndexKeysPublic, info.Shorthand)
+	})
+
+	// Index prices are reference prices, so their selection is shared
+	// between Retail and Buylist mode, but singles and sealed keep their
+	// own list, like the stores above. The form always carries the
+	// index_pref marker, so an empty list submitted from the page means
+	// "no index at all" and not "field was never sent" (as it would for
+	// requests that skip the form, like search transfers or remote links)
+	enabledIndexes := UploadIndexKeysPublic
+	enabledSealedIndexes := sealedIndexes
+	if r.Form.Has("index_pref") {
+		enabledIndexes = r.Form["index_stores"]
+		enabledSealedIndexes = r.Form["sealed_index_stores"]
+		setForeverCookie(w, r, "enabledIndexes", strings.Join(enabledIndexes, "|"))
+		setForeverCookie(w, r, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
+	} else {
+		if raw := readCookie(r, "enabledIndexes"); raw != "" {
+			enabledIndexes = strings.Split(raw, "|")
+		}
+		if raw := readCookie(r, "enabledSealedIndexes"); raw != "" {
+			enabledSealedIndexes = strings.Split(raw, "|")
+		}
+	}
+
+	enabledIndexKeys := keepInOrder(UploadIndexKeysPublic, enabledIndexes)
+	enabledSealedIndexKeys := keepInOrder(sealedIndexes, enabledSealedIndexes)
+
+	// Filter out any unselected store from the full list
+	stores := r.Form["stores"]
+	sealedStores := r.Form["sealed_stores"]
+	if blMode {
+		// Override in case not allowed to change list
+		if !canChangeStores {
+			stores = singlesVendors
+			sealedStores = sealedVendors
+		}
+		for _, store := range stores {
+			if slices.Contains(singlesVendors, store) {
+				enabledStores = append(enabledStores, store)
+			}
+		}
+		for _, store := range sealedStores {
+			if slices.Contains(sealedVendors, store) {
+				enabledSealedStores = append(enabledSealedStores, store)
+			}
+		}
+
+	} else {
+		// Override in case not allowed to change list
+		if !canChangeStores {
+			stores = Affiliates().List
+			sealedStores = sealedSellers
+		}
+		for _, store := range stores {
+			if slices.Contains(singlesSellers, store) {
+				enabledStores = append(enabledStores, store)
+			}
+		}
+		for _, store := range sealedStores {
+			if slices.Contains(sealedSellers, store) {
+				enabledSealedStores = append(enabledSealedStores, store)
+			}
+		}
+	}
+
+	// Make sure there are some enabled stores for direct access: what the
+	// form would have sent. The defaults are filtered like any submitted
+	// list, since the affiliate list is every deployment's and names sealed
+	// stores and ones this game does not carry.
+	if len(stores) == 0 && len(enabledStores) == 0 {
+		if blMode {
+			enabledStores = keepInOrder(singlesVendors, tickedVendors)
+		} else {
+			enabledStores = keepInOrder(singlesSellers, tickedSellers)
+		}
+	}
+	// Same as above, covering requests that carry no sealed_stores field
+	// at all (hash transfers from search, gdocURL links)
+	if len(sealedStores) == 0 && len(enabledSealedStores) == 0 {
+		if blMode {
+			enabledSealedStores = keepInOrder(sealedVendors, tickedSealedVendors)
+		} else {
+			enabledSealedStores = keepInOrder(sealedSellers, tickedSealedSellers)
+		}
+	}
+
+	return uploadStores{
+		enabledStores:          enabledStores,
+		enabledSealedStores:    enabledSealedStores,
+		enabledIndexKeys:       enabledIndexKeys,
+		enabledSealedIndexKeys: enabledSealedIndexKeys,
+		sealedSellers:          sealedSellers,
+		sealedVendors:          sealedVendors,
+		singlesSellers:         singlesSellers,
+		singlesVendors:         singlesVendors,
+		sealedIndexes:          sealedIndexes,
+		tickedSellers:          tickedSellers,
+		tickedVendors:          tickedVendors,
+		tickedSealedSellers:    tickedSealedSellers,
+		tickedSealedVendors:    tickedSealedVendors,
 	}
 }
 
