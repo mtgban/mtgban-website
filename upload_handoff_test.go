@@ -269,15 +269,15 @@ func TestUploadQuery(t *testing.T) {
 	const offers = "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles"
 
 	tests := []struct {
-		name      string
-		hashes    []string
-		textArea  string
-		handed    string
-		gdocURL   string
-		gdocName  string
-		filename  string
-		wantQuery string
-		wantLink  string
+		name       string
+		hashes     []string
+		textArea   string
+		handed     string
+		remoteURL  string
+		remoteName string
+		filename   string
+		wantQuery  string
+		wantLink   string
 	}{{
 		name:      "a handed-over list names where it was read",
 		textArea:  "a,b\n1,2\n",
@@ -309,17 +309,17 @@ func TestUploadQuery(t *testing.T) {
 	}, {
 		name:      "a paste comes before a remote document",
 		textArea:  "a,b\n1,2\n",
-		gdocURL:   "https://docs.example/doc",
+		remoteURL: "https://docs.example/doc",
 		wantQuery: "pasted text",
 	}, {
-		name:      "a named remote document names itself",
-		gdocURL:   "https://docs.example/doc",
-		gdocName:  "My Binder",
-		wantQuery: "My Binder",
-		wantLink:  "https://docs.example/doc",
+		name:       "a named remote document names itself",
+		remoteURL:  "https://docs.example/doc",
+		remoteName: "My Binder",
+		wantQuery:  "My Binder",
+		wantLink:   "https://docs.example/doc",
 	}, {
 		name:      "an unnamed one says what it is",
-		gdocURL:   "https://docs.example/doc",
+		remoteURL: "https://docs.example/doc",
 		wantQuery: "remote URL",
 		wantLink:  "https://docs.example/doc",
 	}, {
@@ -330,7 +330,7 @@ func TestUploadQuery(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			query, link := uploadQuery(tc.hashes, tc.textArea, tc.handed, tc.gdocURL, tc.gdocName, tc.filename)
+			query, link := uploadQuery(tc.hashes, tc.textArea, tc.handed, tc.remoteURL, tc.remoteName, tc.filename)
 			if query != tc.wantQuery {
 				t.Errorf("query = %q, want %q", query, tc.wantQuery)
 			}

@@ -116,7 +116,7 @@ func uploadSourceFrom(raw string) (name string, link string) {
 // what is left. It lives here rather than inline so that the choice of
 // branch is something a test can hold - a handed-over list is only told
 // from a pasted one by which of these arms it lands in.
-func uploadQuery(hashes []string, textArea, handedFrom, gdocURL, gdocName, filename string) (query string, link string) {
+func uploadQuery(hashes []string, textArea, handedFrom, remoteURL, remoteName, filename string) (query string, link string) {
 	switch {
 	case len(hashes) != 0:
 		return "hashes", ""
@@ -128,13 +128,13 @@ func uploadQuery(hashes []string, textArea, handedFrom, gdocURL, gdocName, filen
 			return name, source
 		}
 		return "pasted text", ""
-	case gdocURL != "":
+	case remoteURL != "":
 		// Show the source's own name when the loader could retrieve one,
 		// and let the results header link back to it
-		if gdocName != "" {
-			return gdocName, gdocURL
+		if remoteName != "" {
+			return remoteName, remoteURL
 		}
-		return "remote URL", gdocURL
+		return "remote URL", remoteURL
 	}
 	return filename, ""
 }
