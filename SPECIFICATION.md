@@ -583,9 +583,9 @@ touching the old tables: a 13-row `providers` lookup, a `variants` table (one
 row per printing — Magic keyed by `mtgjson_uuid`, non-Magic by TCGplayer
 product + sub-type), and a date-partitioned `prices(ban_id, date, provider,
 price)` table with one row per provider instead of a COALESCE merge.
-`Config.TimeseriesConfig.LongFormWrites`/`LongFormReads` switch each
-deployment onto it independently (writes first, then reads, per the cutover
-plan).
+Charts, buylist metrics and the screener read only the long tables;
+`Config.TimeseriesConfig.LongFormWrites` switches each deployment's writes
+onto them (per the cutover plan).
 
 `stashInTimeseries()` (cron `0 */12 * * *`, §2.1) snapshots current prices
 twice daily, normalizing non-NM conditions up via grade multipliers
@@ -602,13 +602,12 @@ sequence ids, so existing `ban:<n>` links and price rows stand; Magic still
 mints from the sequence, since an mtgjson uuid does not fit in a bigint.
 Reads are already game-agnostic: `resolveChartTarget()` (chart_resolve.go)
 accepts `ban:<n>`, `tcg:<n>`, `scryfall:<uuid>`, `mtgjson:<uuid>`, or a bare
-id, and non-Magic cards chart correctly once `LongFormReads` is on. Lookback
+id, and non-Magic cards chart correctly. Lookback
 is per-request, not a fixed per-tier table: `chartLookback()` reads days from
 the signed `SearchChartLoopback` ACL param, defaulting to 30 days when
 absent/invalid, and 3650 days in dev mode without `-sig`. `/api/chart/{id}`
-(`ChartDataAPI`) returns Chart.js-ready datasets plus checkpoint annotations,
-routed to the long-form path (any id form above) or the legacy
-mtgjson-uuid-only path depending on `LongFormReads`.
+(`ChartDataAPI`) returns Chart.js-ready datasets plus checkpoint annotations
+for any id form above.
 
 ### 5.7 BAN Price API (`api_banprice.go`, `banprice/`)
 

@@ -23,12 +23,9 @@ type TimeseriesConfig struct {
 	Datasets []DatasetConfig `json:"datasets"`
 
 	// LongFormWrites dual-writes each snapshot into the new long tables
-	// (variants + prices) alongside the legacy wide tables. LongFormReads
-	// serves charts/analytics from the long tables instead of the wide ones.
-	// The cutover is: deploy with writes on + reads off, confirm parity, then
-	// flip reads on, then (later) drop the legacy write path. See db_migration/.
+	// (variants + prices) alongside the legacy wide tables. Charts and
+	// analytics read only the long tables. See db_migration/.
 	LongFormWrites bool `json:"long_form_writes"`
-	LongFormReads  bool `json:"long_form_reads"`
 }
 
 type DatasetConfig struct {
@@ -44,9 +41,9 @@ type DatasetConfig struct {
 	OnlySealed bool   `json:"only_sealed,omitempty"`
 }
 
-// longFormActive reports whether this deployment's chart storage is the long,
-// ban_id-keyed one. The two flags are the Magic cutover, deployment by
-// deployment; a non-Magic game is not part of that cutover because it never had
+// longFormWrites reports whether this deployment's snapshot lands in the long
+// prices table. The flag is the Magic cutover, deployment by deployment; a
+// non-Magic game is not part of that cutover because it never had
 // the legacy path to cut over from — its card ids are not uuids, so the wide
 // table cannot hold a single one of its rows.
 //
@@ -54,15 +51,6 @@ type DatasetConfig struct {
 // of the site give it, so it is compared through that rather than against the
 // raw field: a config that spells out "game": "" is a Magic deployment, not a
 // game with no wide table.
-func longFormActive() bool {
-	return datastoreGame() != DefaultGame ||
-		Config().TimeseriesConfig.LongFormWrites ||
-		Config().TimeseriesConfig.LongFormReads
-}
-
-// longFormWrites reports whether this deployment's snapshot lands in the long
-// prices table. Same reasoning as longFormActive, narrowed to the write side:
-// a non-Magic game has nowhere else to put a price.
 func longFormWrites() bool {
 	return datastoreGame() != DefaultGame || Config().TimeseriesConfig.LongFormWrites
 }
@@ -219,15 +207,12 @@ func chartProviders() []providerDisplay {
 // leaves the registry empty rather than charting a display the config never
 // asked for.
 func buildProviderRegistry() {
-	longForm := longFormActive()
 	seen := map[int16]bool{}
 	registry := make([]providerDisplay, 0, len(Config().TimeseriesConfig.Datasets))
 	for _, d := range Config().TimeseriesConfig.Datasets {
 		if d.Provider == 0 {
-			if longForm {
-				log.Printf("dataset %q (index %d) has no \"provider\" id in the config: it won't chart, dual-write, or screen",
-					d.PublicName, d.Index)
-			}
+			log.Printf("dataset %q (index %d) has no \"provider\" id in the config: it won't chart, dual-write, or screen",
+				d.PublicName, d.Index)
 			continue
 		}
 		if seen[d.Provider] {
@@ -237,7 +222,7 @@ func buildProviderRegistry() {
 		seen[d.Provider] = true
 		registry = append(registry, providerDisplay{d.Provider, d.PublicName, d.Color})
 	}
-	if len(registry) == 0 && longForm {
+	if len(registry) == 0 {
 		log.Println("no chart providers configured: every timeseries_config.datasets entry needs a \"provider\" id")
 	}
 	providerRegistry.Store(&registry)
@@ -1021,14 +1006,11 @@ func variantCacheScope() timeseries.VariantScope {
 // what it loaded. Both callers log the counts: a scope that resolves to no rows
 // does not fail, it just misses on every lookup afterwards, so the count is the
 // only place a category that stopped matching shows up.
-// warmVariantCacheIfEnabled warms the cache when the long form is in use,
+// warmVariantCacheIfEnabled warms the cache when there is an archive,
 // reporting a failure rather than returning it: every caller is past the point
 // where it could do anything about one, and a cold cache costs round-trips
 // rather than answers.
 func warmVariantCacheIfEnabled() {
-	if !longFormActive() {
-		return
-	}
 	if PricesArchiveDB == nil {
 		return
 	}
