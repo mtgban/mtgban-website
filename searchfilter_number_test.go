@@ -38,6 +38,22 @@ func TestCollectorNumberPlainForm(t *testing.T) {
 			desc:  "and another number is still refused",
 			query: "cn:636", number: "635Φ", original: "635", want: false,
 		},
+		{
+			desc:  "a number written with its set code reaches that printing",
+			query: "cn:hnt222", number: "HNT222", original: "222", want: true,
+		},
+		{
+			desc:  "and not the same ordinal in another set",
+			query: "cn:hnt222", number: "MST222", original: "222", want: false,
+		},
+		{
+			desc:  "nor does a letter tail reach the printing without it",
+			query: "cn:139s", number: "139", original: "139", want: false,
+		},
+		{
+			desc:  "a lettered number still reaches the plain form the game keeps",
+			query: "cn:ogn-001", number: "OGN-001*", original: "OGN-001", want: true,
+		},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			co := &mtgmatcher.CardObject{}

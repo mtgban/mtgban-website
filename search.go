@@ -2040,12 +2040,12 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 			len(filters[i].Values) == 0 || len(filters[i].Subfilters) != 0 {
 			continue
 		}
-		var bucket map[string][]string
+		var buckets []map[string][]string
 		switch filters[i].Name {
 		case "number":
-			bucket = numbers.loose
+			buckets = append(buckets, numbers.loose, numbers.strict)
 		case "number_strict":
-			bucket = numbers.strict
+			buckets = append(buckets, numbers.strict)
 		default:
 			continue
 		}
@@ -2053,7 +2053,9 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 		// Use them verbatim, just as the scan does.
 		var uuids []string
 		for _, value := range filters[i].Values {
-			uuids = append(uuids, bucket[value]...)
+			for _, bucket := range buckets {
+				uuids = append(uuids, bucket[value]...)
+			}
 		}
 		return dedupeKeys(uuids), true
 	}

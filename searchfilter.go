@@ -277,15 +277,19 @@ func fixupRarityNG(code string) []string {
 }
 
 // fixupNumberNG spells a number query the way the card it will be compared
-// against is spelled. A loose query is reduced to the plain number by the
-// game whose datastore is loaded, which is the same reduction that game's
-// loader used to build PlainNumber, so the two cannot come to spell a
-// number differently. A strict query is compared against the number as the
-// catalog writes it and so is left as it is, padding and marks and all.
-func fixupNumberNG(b *mtgmatcher.Backend, code string, strict bool) []string {
+// against is spelled, for the filter opt names. A strict query is compared
+// against the number as the catalog writes it, padding and marks and all. A
+// loose one in digits alone is reduced to the plain number by the loaded
+// game, the reduction its loader stored as PlainNumber; one carrying letters
+// or marks names a printing and is kept as typed, so that cn:HNT222 is not
+// every set's card 222. A comparison's bound is always reduced, as it is
+// compared against the plain number.
+func fixupNumberNG(b *mtgmatcher.Backend, code, opt string) []string {
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		if !strict {
+		reduce := opt != "number_strict" &&
+			(opt != "number" || !strings.ContainsFunc(filters[i], isNotDigit))
+		if reduce {
 			// Before the case is folded, not after: the mark a number
 			// carries is spelled the way the catalog spells it.
 			filters[i] = b.PlainNumber(filters[i])
@@ -943,7 +947,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 					opt = "number_greater_than"
 					subfilters = append(subfilters, FilterElem{
 						Name:    opt,
-						Values:  fixupNumberNG(b, code, false),
+						Values:  fixupNumberNG(b, code, opt),
 						ApplyTo: applyToSets,
 					})
 					// Reset options to reuse the filter addition below
@@ -955,7 +959,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			filters = append(filters, FilterElem{
 				Name:       opt,
 				Negate:     negate,
-				Values:     fixupNumberNG(b, code, option == "cns"),
+				Values:     fixupNumberNG(b, code, opt),
 				Subfilters: subfilters,
 				ApplyTo:    applyToSets,
 			})
@@ -1378,14 +1382,10 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			if number != "" && !namesASetCode(b, tokens[1]) {
 				set, err := b.GetSet(tokens[0])
 				if err == nil {
-					// Someone writing cn: has chosen its reading, which
-					// answers with every printing filed under the plain
-					// number. Someone typing two words has chosen nothing,
-					// and means the printing they spelled - so a number
-					// saying more than a plain one is asked for exactly as
-					// typed, against the number the catalog writes. A
-					// spelling no card carries reaches nothing, which is
-					// what it should say.
+					// A number saying more than a plain one is asked for
+					// exactly as typed, against the number the catalog
+					// writes. A spelling no card carries reaches nothing,
+					// which is what it should say.
 					//
 					// What is left after ExtractNumberAny decides which of
 					// the two it is, and the token as typed is what gets
@@ -2097,7 +2097,8 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 }
 
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.PlainNumber))
+	return !slices.Contains(filters, strings.ToLower(co.PlainNumber)) &&
+		!slices.Contains(filters, strings.ToLower(co.Number))
 }
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {

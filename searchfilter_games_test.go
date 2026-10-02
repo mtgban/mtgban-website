@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -96,6 +97,78 @@ func TestShorthandTighteningReachesItsPrintingInEveryGame(t *testing.T) {
 			// gets and for the same reason. 54 of Pokemon's numbers and 88 of
 			// Palworld's can be typed that way.
 			t.Logf("%-14s %d tightened numbers checked", game, tightened)
+		})
+	}
+
+	if ran == 0 {
+		t.Skip("no non-Magic datastore paths in the environment")
+	}
+}
+
+// A lettered cn: number names a printing, in every game: it reaches the card
+// numbered that way and nothing numbered otherwise. Flesh and Blood's
+// cn:HNT222 used to be reduced to 222 and reach every set's card 222.
+func TestLetteredNumberReachesItsPrintingInEveryGame(t *testing.T) {
+	var ran int
+	for game, envVar := range gameDatastores {
+		path := os.Getenv(envVar)
+		if path == "" {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			t.Logf("%s: %v", game, err)
+			continue
+		}
+		loaded, err := mtgmatcher.Open(game, f)
+		f.Close()
+		if err != nil {
+			t.Errorf("%s: %v", game, err)
+			continue
+		}
+		ran++
+
+		t.Run(string(game), func(t *testing.T) {
+			ds := testSite.newDatastore(loaded, time.Now())
+
+			var checked int
+			for _, uuid := range ds.backend.GetUUIDs() {
+				co, err := ds.backend.GetUUID(uuid)
+				// A query ending in & * ~ or ` asks for a finish, so
+				// Riftbound's 227* is read as 227 in foil.
+				if err != nil || co.Sealed || co.Number == "" ||
+					!strings.ContainsFunc(co.Number, isNotDigit) ||
+					strings.ContainsAny(co.Number, ",: ") ||
+					strings.ContainsAny(co.Number[len(co.Number)-1:], "&*~`") {
+					continue
+				}
+				checked++
+
+				query := "cn:" + co.Number
+				keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+				if err != nil {
+					t.Errorf("%s: %q: %v", game, query, err)
+					continue
+				}
+				if !slices.Contains(keys, uuid) {
+					t.Errorf("%s: %q does not reach its printing", game, query)
+				}
+				for _, key := range keys {
+					other, err := ds.backend.GetUUID(key)
+					if err != nil {
+						continue
+					}
+					if !strings.EqualFold(other.Number, co.Number) &&
+						!strings.EqualFold(other.PlainNumber, co.Number) {
+						t.Errorf("%s: %q reached #%s", game, query, other.Number)
+						break
+					}
+				}
+				if checked >= 50 {
+					break
+				}
+			}
+			t.Logf("%-14s %d lettered numbers checked", game, checked)
 		})
 	}
 
