@@ -503,37 +503,16 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	st := readUploadSettings(r, blMode)
-	canChangeStores := st.canChangeStores
-	canUploadCustom := st.canUploadCustom
-	canPublishStore := st.canPublishStore
-	publishStore := st.publishStore
-	skipLowValue := st.skipLowValue
-	skipLowValueAbs := st.skipLowValueAbs
-	skipHighValue := st.skipHighValue
-	skipHighValueAbs := st.skipHighValueAbs
-	skipConds := st.skipConds
-	skipPrices := st.skipPrices
-	visualIndicator := st.visualIndicator
-	sorting := st.sorting
-	percSpread := st.percSpread
-	percSpreadMax := st.percSpreadMax
-	minLowVal := st.minLowVal
-	maxHighVal := st.maxHighVal
-	percMargin := st.percMargin
-	visualPerc := st.visualPerc
-	multiplier := st.multiplier
-	maxQty := st.maxQty
-	magicOnlyExports := st.magicOnlyExports
 
-	pageVars.CanFilterByPrice = visualIndicator
+	pageVars.CanFilterByPrice = st.visualIndicator
 
 	// Set flags needed to show elements on the page ui
 	pageVars.IsBuylist = blMode
 	pageVars.CanBuylist = canBuylist
-	pageVars.MagicOnlyExports = magicOnlyExports
-	pageVars.CanChangeStores = canChangeStores
-	pageVars.CanUploadCustom = canUploadCustom
-	pageVars.CanPublishStore = canPublishStore
+	pageVars.MagicOnlyExports = st.magicOnlyExports
+	pageVars.CanChangeStores = st.canChangeStores
+	pageVars.CanUploadCustom = st.canUploadCustom
+	pageVars.CanPublishStore = st.canPublishStore
 
 	cachedRemoteURL := readCookie(r, "gdocURL")
 	pageVars.RemoteLinkURL = cachedRemoteURL
@@ -541,16 +520,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	selected := selectUploadStores(w, r, blMode, st)
 	enabledStores := selected.enabledStores
 	enabledSealedStores := selected.enabledSealedStores
-	enabledIndexKeys := selected.enabledIndexKeys
-	enabledSealedIndexKeys := selected.enabledSealedIndexKeys
-	sealedSellers := selected.sealedSellers
-	sealedVendors := selected.sealedVendors
 
 	// Set the store names for the <select> box, and the ones it ticks
 	pageVars.SellerKeys = selected.singlesSellers
 	pageVars.VendorKeys = selected.singlesVendors
-	pageVars.SealedSellerKeys = sealedSellers
-	pageVars.SealedVendorKeys = sealedVendors
+	pageVars.SealedSellerKeys = selected.sealedSellers
+	pageVars.SealedVendorKeys = selected.sealedVendors
 	pageVars.AltKeys = UploadIndexComparePriceList
 	pageVars.EnabledSellers = selected.tickedSellers
 	pageVars.EnabledVendors = selected.tickedVendors
@@ -558,15 +533,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.EnabledSealedVendors = selected.tickedSealedVendors
 	pageVars.IndexAllKeys = UploadIndexKeysPublic
 	pageVars.SealedIndexAllKeys = selected.sealedIndexes
-	pageVars.EnabledIndexes = enabledIndexKeys
-	pageVars.EnabledSealedIndexes = enabledSealedIndexKeys
+	pageVars.EnabledIndexes = selected.enabledIndexKeys
+	pageVars.EnabledSealedIndexes = selected.enabledSealedIndexKeys
 
 	in := readUploadInput(r)
-	hashes := in.hashes
-	remoteURL := in.remoteURL
-	textArea := in.textArea
-	file, handler, err := in.file, in.handler, in.fileErr
-	if err != nil && remoteURL == "" && textArea == "" && len(hashes) == 0 {
+	if in.fileErr != nil && in.remoteURL == "" && in.textArea == "" && len(in.hashes) == 0 {
 		// A GET is someone arriving at the uploader, which is this page. A
 		// POST that carries nothing is a request that went wrong on the way -
 		// a body too large for the form parser, most often - and silently
@@ -581,34 +552,34 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		render(w, "upload.html", pageVars)
 		return
-	} else if err == nil {
-		defer file.Close()
+	} else if in.fileErr == nil {
+		defer in.file.Close()
 	}
 
-	if len(hashes) != 0 {
-		log.Printf("Loading from POST %d cards", len(hashes))
-		pageVars.CardHashes = hashes
-	} else if textArea != "" {
-		log.Printf("Loading freeform text area (%d bytes)", len(textArea))
-	} else if remoteURL != "" {
-		log.Printf("Loading spreadsheet: %+v", remoteURL)
+	if len(in.hashes) != 0 {
+		log.Printf("Loading from POST %d cards", len(in.hashes))
+		pageVars.CardHashes = in.hashes
+	} else if in.textArea != "" {
+		log.Printf("Loading freeform text area (%d bytes)", len(in.textArea))
+	} else if in.remoteURL != "" {
+		log.Printf("Loading spreadsheet: %+v", in.remoteURL)
 	} else {
-		log.Printf("Uploaded File: %+v", handler.Filename)
-		log.Printf("File Size: %+v bytes", handler.Size)
-		log.Printf("MIME Header: %+v", handler.Header)
+		log.Printf("Uploaded File: %+v", in.handler.Filename)
+		log.Printf("File Size: %+v bytes", in.handler.Size)
+		log.Printf("MIME Header: %+v", in.handler.Header)
 	}
 	log.Printf("Buylist mode: %+v", blMode)
 	log.Printf("Enabled stores: %+v", enabledStores)
 	if blMode {
-		log.Printf("Sealed vendors: %+v", sealedVendors)
+		log.Printf("Sealed vendors: %+v", selected.sealedVendors)
 	} else {
-		log.Printf("Sealed sellers: %+v", sealedSellers)
+		log.Printf("Sealed sellers: %+v", selected.sealedSellers)
 	}
 
 	// Reset the cookie for this preference
-	if len(hashes) == 0 && cachedRemoteURL != remoteURL {
-		setForeverCookie(w, r, "gdocURL", remoteURL)
-		pageVars.RemoteLinkURL = remoteURL
+	if len(in.hashes) == 0 && cachedRemoteURL != in.remoteURL {
+		setForeverCookie(w, r, "gdocURL", in.remoteURL)
+		pageVars.RemoteLinkURL = in.remoteURL
 	}
 
 	// Save user preferred stores in cookies and make sure the page is updated with those
@@ -624,15 +595,10 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledSealedSellers = enabledSealedStores
 	}
 
-	modes := readUploadModes(r, canBuylist, magicOnlyExports)
-	download := modes.download
-	estimate := modes.estimate
-	deckbox := modes.deckbox
-	tcgpCSV := modes.tcgpCSV
-	maxRows := modes.maxRows
+	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
 	start := time.Now()
 
-	uploadedData, uploadName, err := loadUploadEntries(r, b, in, maxRows)
+	uploadedData, uploadName, err := loadUploadEntries(r, b, in, modes.maxRows)
 	if err != nil {
 		pageVars.WarningMessage = err.Error()
 		render(w, "upload.html", pageVars)
@@ -642,8 +608,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// Warn when the input was cut at the row cap. Checked before the merge
 	// below (which can shrink the count back under the cap), unlike the old
 	// matched-singles check that missed most real truncations.
-	if len(uploadedData) >= maxRows {
-		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", maxRows)
+	if len(uploadedData) >= modes.maxRows {
+		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", modes.maxRows)
 	}
 
 	// Opening the sealed rows is asked for, not assumed: the results say what a
@@ -664,7 +630,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// itself takes, so the confirmation is shown right here rather than by
 	// redirecting there - the results below are computed the same as any
 	// other upload, just with the message added on top.
-	if publishStore {
+	if st.publishStore {
 		msg, err := publishUploadStore(r, b, blMode, uploadedData)
 		if err != nil {
 			pageVars.WarningMessage = "store not published: " + err.Error()
@@ -687,13 +653,13 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// from. The page keeps it, where it heads the section its contents fill;
 	// a file would only have it sitting beside them, counted twice by anyone
 	// adding the column up.
-	if download || estimate || deckbox || tcgpCSV {
+	if modes.download || modes.estimate || modes.deckbox || modes.tcgpCSV {
 		uploadedData = withoutOpenedProducts(uploadedData)
 	}
 
 	// Allow estimating on a separate page
-	if estimate {
-		err := redirectToCardConduit(w, r, b, uploadedData, multiplier, maxQty)
+	if modes.estimate {
+		err := redirectToCardConduit(w, r, b, uploadedData, st.multiplier, st.maxQty)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to process your list to CardConduit right now"
@@ -701,7 +667,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if deckbox && canBuylist {
+	if modes.deckbox && canBuylist {
 		err := writeDeckboxCSV(w, b, uploadedData)
 		if err != nil {
 			UserNotify("upload", err.Error())
@@ -710,8 +676,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if tcgpCSV && canBuylist {
-		err := writeTCGplayerCSV(w, b, uploadedData, multiplier, maxQty)
+	if modes.tcgpCSV && canBuylist {
+		err := writeTCGplayerCSV(w, b, uploadedData, st.multiplier, st.maxQty)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
@@ -739,7 +705,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Check if conditions should be retrieved
 		if uploadedData[i].OriginalCondition != "" {
-			if skipConds {
+			if st.skipConds {
 				uploadedData[i].IgnoredCondition = uploadedData[i].OriginalCondition
 				uploadedData[i].OriginalCondition = ""
 			} else {
@@ -776,7 +742,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
 			customBuylist = slices.Contains(customOpts, "enabled")
 		}
-		if canUploadCustom && customBuylist {
+		if st.canUploadCustom && customBuylist {
 			var rule EntryRule
 			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
 				rule.MinPrice = v
@@ -847,7 +813,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Allow downloading data as CSV
-	if download && canBuylist {
+	if modes.download && canBuylist {
 		csvName := "mtgban_prices"
 		if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
 			csvName += "_" + scope
@@ -859,7 +825,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// (skip the dump when there are no singles)
 		var csvIndexKeys []string
 		for _, key := range UploadIndexKeysCSV {
-			if slices.Contains(enabledIndexKeys, key) {
+			if slices.Contains(selected.enabledIndexKeys, key) {
 				csvIndexKeys = append(csvIndexKeys, key)
 			}
 		}
@@ -909,7 +875,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// An index that is also a selected store (TCGSealed) already gets its
 	// own column in retail mode, so drop it here to avoid listing it twice
 	var sealedIndexKeys []string
-	for _, key := range enabledSealedIndexKeys {
+	for _, key := range selected.enabledSealedIndexKeys {
 		if !blMode && slices.Contains(enabledSealedStores, key) {
 			continue
 		}
@@ -931,7 +897,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Set card and sealed keys separately — the template picks per entry,
 	// with the same store/index deduplication applied above for sealed
-	for _, key := range enabledIndexKeys {
+	for _, key := range selected.enabledIndexKeys {
 		if !blMode && slices.Contains(enabledStores, key) {
 			continue
 		}
@@ -950,11 +916,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// Read here rather than passed dereferenced: a paste reaches this line
 	// with no file behind it at all.
 	var uploadFilename string
-	if handler != nil {
-		uploadFilename = handler.Filename
+	if in.handler != nil {
+		uploadFilename = in.handler.Filename
 	}
 	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
-		hashes, textArea, r.FormValue("uploadSource"), remoteURL, uploadName, uploadFilename,
+		in.hashes, in.textArea, r.FormValue("uploadSource"), in.remoteURL, uploadName, uploadFilename,
 	)
 	pageVars.TotalEntries = map[string]float64{}
 
@@ -1062,7 +1028,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// (TCGLow/TCGMarket/MKM*) by falling back to their flat price
 		// while still using TCGDirect's per-condition listing.
 		conds := uploadedData[i].OriginalCondition
-		if skipConds {
+		if st.skipConds {
 			conds = ""
 		}
 		priceKey := cardID + string(conds)
@@ -1075,7 +1041,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			resultPrices[priceKey][indexKey] = indexPrice
 
 			qty := uploadedData[i].QuantityOrOne()
-			indexPrice *= float64(adjustQty(qty, multiplier, maxQty))
+			indexPrice *= float64(adjustQty(qty, st.multiplier, st.maxQty))
 
 			// An opened product keeps its own index prices - for a sealed
 			// product those are the expected values, which is the number its
@@ -1103,7 +1069,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		if counts {
 			// Quantity summary
 			qty := uploadedData[i].QuantityOrOne()
-			adjusted := adjustQty(qty, multiplier, maxQty)
+			adjusted := adjustQty(qty, st.multiplier, st.maxQty)
 			pageVars.TotalQuantity += adjusted
 			if isSealed {
 				pageVars.SealedQuantity += adjusted
@@ -1142,7 +1108,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 			// Adjust for quantity
 			qty := uploadedData[i].QuantityOrOne()
-			price *= float64(adjustQty(qty, multiplier, maxQty))
+			price *= float64(adjustQty(qty, st.multiplier, st.maxQty))
 
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexResults[cardID][shorthand]
@@ -1155,7 +1121,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 			offers[shorthand] = price
 		}
-		bestStores := bestOffers(offers, blMode, percMargin)
+		bestStores := bestOffers(offers, blMode, st.percMargin)
 
 		// What the box is worth whole, which is the number its section is read
 		// against. The cards it became are the optimizer's business; it is not.
@@ -1170,17 +1136,17 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			bestPrice := offers[bestStore]
 
 			qty := uploadedData[i].QuantityOrOne()
-			qty = adjustQty(qty, multiplier, maxQty)
+			qty = adjustQty(qty, st.multiplier, st.maxQty)
 
 			conds := uploadedData[i].OriginalCondition
-			if skipConds {
+			if st.skipConds {
 				conds = ""
 			}
 			cardID := uploadedData[i].CardID
 
 			// Load comparison price, either the loaded one or one of the alternatives
 			comparePrice := 0.0
-			if skipPrices {
+			if st.skipPrices {
 				var compareConds mtgban.Condition
 				prices := indexResults[cardID][altPriceSource]
 				if slices.Index(indexKeys, altPriceSource) >= len(UploadIndexKeys) {
@@ -1198,10 +1164,10 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			price := resultPrices[priceKey][bestStore]
 
 			// Skip if needed
-			if skipLowValueAbs && price < minLowVal {
+			if st.skipLowValueAbs && price < st.minLowVal {
 				continue
 			}
-			if skipHighValueAbs && maxHighVal != 0 && price >= maxHighVal {
+			if st.skipHighValueAbs && st.maxHighVal != 0 && price >= st.maxHighVal {
 				continue
 			}
 
@@ -1211,10 +1177,10 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			if comparePrice != 0 {
 				factor = price / comparePrice * 100
 
-				if skipLowValue && factor < percSpread {
+				if st.skipLowValue && factor < st.percSpread {
 					continue
 				}
-				if skipHighValue && percSpreadMax != 0 && factor >= percSpreadMax {
+				if st.skipHighValue && st.percSpreadMax != 0 && factor >= st.percSpreadMax {
 					continue
 				}
 
@@ -1236,7 +1202,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				BestPrice:     price,
 				Quantity:      qty,
 				Notes:         uploadedData[i].Notes,
-				VisualPrice:   comparePrice * visualPerc / 100.0,
+				VisualPrice:   comparePrice * st.visualPerc / 100.0,
 				Profitability: profitability,
 			})
 
@@ -1259,7 +1225,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CanFilterByPrice = priceSource == ""
 	}
 
-	sortResults(b, uploadedData, optimizedResults, sorting)
+	sortResults(b, uploadedData, optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
 	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, sealedProductIDs)
@@ -1296,7 +1262,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// When prices are ignored, the loaded price IS the alternate source, so
 		// it can be linked directly; otherwise it's the user's uploaded price
 		// and only a separate symbol should link out to the alternate source.
-		pageVars.IgnorePrices = skipPrices
+		pageVars.IgnorePrices = st.skipPrices
 		pageVars.Optimized = optimizedResults
 		// Only the stores that render a results section, in display order,
 		// so that the template can link each section to the previous/next one
@@ -1611,7 +1577,6 @@ type uploadStores struct {
 // cookies that keep a new index choice.
 func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st uploadSettings) uploadStores {
 	sig := getSignatureFromCookies(r)
-	canChangeStores := st.canChangeStores
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
@@ -1642,28 +1607,28 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 	// Force stores if not allowed to change them
 	var tickedSellers, tickedVendors, tickedSealedSellers, tickedSealedVendors []string
 	enabledSellers := readCookie(r, "enabledSellers")
-	if len(enabledSellers) == 0 || !canChangeStores {
+	if len(enabledSellers) == 0 || !st.canChangeStores {
 		tickedSellers = Affiliates().List
 	} else {
 		tickedSellers = strings.Split(enabledSellers, "|")
 	}
 
 	enabledVendors := readCookie(r, "enabledVendors")
-	if len(enabledVendors) == 0 || !canChangeStores {
+	if len(enabledVendors) == 0 || !st.canChangeStores {
 		tickedVendors = singlesVendors
 	} else {
 		tickedVendors = strings.Split(enabledVendors, "|")
 	}
 
 	enabledSealedSellers := readCookie(r, "enabledSealedSellers")
-	if len(enabledSealedSellers) == 0 || !canChangeStores {
+	if len(enabledSealedSellers) == 0 || !st.canChangeStores {
 		tickedSealedSellers = sealedSellers
 	} else {
 		tickedSealedSellers = strings.Split(enabledSealedSellers, "|")
 	}
 
 	enabledSealedVendors := readCookie(r, "enabledSealedVendors")
-	if len(enabledSealedVendors) == 0 || !canChangeStores {
+	if len(enabledSealedVendors) == 0 || !st.canChangeStores {
 		tickedSealedVendors = sealedVendors
 	} else {
 		tickedSealedVendors = strings.Split(enabledSealedVendors, "|")
@@ -1707,7 +1672,7 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 	sealedStores := r.Form["sealed_stores"]
 	if blMode {
 		// Override in case not allowed to change list
-		if !canChangeStores {
+		if !st.canChangeStores {
 			stores = singlesVendors
 			sealedStores = sealedVendors
 		}
@@ -1724,7 +1689,7 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 
 	} else {
 		// Override in case not allowed to change list
-		if !canChangeStores {
+		if !st.canChangeStores {
 			stores = Affiliates().List
 			sealedStores = sealedSellers
 		}
