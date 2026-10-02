@@ -889,32 +889,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 
 		row := newUploadRow(b, st, &uploadedData[i])
 
-		// Pick the right store list for this entry
-		entryStores := prices.enabledStores
-		if row.isSealed {
-			entryStores = prices.enabledSealedStores
-		}
-
-		// Search for any missing entries (ie cards not sold or bought by a vendor)
-		// An opened product is not being traded as itself, so a store not
-		// carrying it is not a gap in this list.
-		for _, shorthand := range entryStores {
-			if row.Unpacked {
-				break
-			}
-			_, found := prices.results[row.CardID][shorthand]
-			if found {
-				continue
-			}
-			reference := getPrice(indexes.results[row.CardID]["TCGLow"], "")
-			rows.missingCounts[shorthand]++
-			rows.missingPrices[shorthand] += reference
-			if row.UnpackedFrom != "" {
-				tally := rows.tallyFor(row.UnpackedFrom)
-				tally.Missing[shorthand]++
-				tally.MissingPrices[shorthand] += reference
-			}
-		}
+		rows.tallyMissing(row, prices, indexes)
 
 		// Summary of the index entries. We pass the row's condition to
 		// every index; getPrice handles the MetadataOnly sources
@@ -1095,6 +1070,37 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 	}
 
 	return rows
+}
+
+// tallyMissing counts, at each store the row could be priced at, whether the
+// store lacks it, adding up the row's TCG Low price where it does.
+func (rows *uploadRows) tallyMissing(row uploadRow, prices uploadPrices, indexes uploadIndexes) {
+	// Pick the right store list for this entry
+	entryStores := prices.enabledStores
+	if row.isSealed {
+		entryStores = prices.enabledSealedStores
+	}
+
+	// Search for any missing entries (ie cards not sold or bought by a vendor)
+	// An opened product is not being traded as itself, so a store not
+	// carrying it is not a gap in this list.
+	for _, shorthand := range entryStores {
+		if row.Unpacked {
+			break
+		}
+		_, found := prices.results[row.CardID][shorthand]
+		if found {
+			continue
+		}
+		reference := getPrice(indexes.results[row.CardID]["TCGLow"], "")
+		rows.missingCounts[shorthand]++
+		rows.missingPrices[shorthand] += reference
+		if row.UnpackedFrom != "" {
+			tally := rows.tallyFor(row.UnpackedFrom)
+			tally.Missing[shorthand]++
+			tally.MissingPrices[shorthand] += reference
+		}
+	}
 }
 
 // uploadRow is one matched row and what its tallies share: whether it is a
