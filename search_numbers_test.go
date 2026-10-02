@@ -26,6 +26,9 @@ func TestNumbersSnapshotMatchesScan(t *testing.T) {
 		{"cn:0042", "number"},
 		{"cn:635,635", "number"},
 		{"cn:999999999", "number"},
+		{"cn:139s", "number"},
+		{"cn:635Φ", "number"},
+		{"cn:akh-127", "number"},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
 			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
@@ -92,7 +95,7 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 	withoutNumbers := *base
 	withoutNumbers.numbers = nil
 
-	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
+	for _, query := range []string{"cn:635", "cn:635,635", "cn:999999999", "cn:139s", "cns:107★", "cn:635 -s:SLD", "-cn:635", "cn:SLD:635", "cn:1-10", "cne:^6.5$", "s:LEA cn:999999999"} {
 		t.Run(query, func(t *testing.T) {
 			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
 			want, wantErr := searchAndFilter(&withoutNumbers, config)

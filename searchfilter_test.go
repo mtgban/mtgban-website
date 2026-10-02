@@ -138,7 +138,7 @@ func TestCollectorNumberPLST(t *testing.T) {
 	if skip := applyCardFilter(backend(), "number", elem.Values, co); skip {
 		t.Error("cn:akh-127 should match a card numbered AKH-127")
 	}
-	if skip := applyCardFilter(backend(), "number", fixupNumberNG(backend(), "akh-50", false), co); !skip {
+	if skip := applyCardFilter(backend(), "number", fixupNumberNG(backend(), "akh-50", "number"), co); !skip {
 		t.Error("cn:akh-50 should not match a card numbered AKH-127")
 	}
 
@@ -380,11 +380,11 @@ func TestSetNumberShorthand(t *testing.T) {
 		}
 	})
 
-	// Only the shorthand moves. Whoever writes the operator out has picked
-	// its reading and keeps it, decorations and all.
-	t.Run("writing cn: keeps its own looser reading", func(t *testing.T) {
+	// Writing cn: out asks for a lettered number as typed, as the
+	// shorthand does.
+	t.Run("writing cn: asks for a lettered number as typed", func(t *testing.T) {
 		config := parseSearchOptionsNG(backend(), "s:spg cn:17a", nil, nil, nil)
-		checkValues(t, findFilter(config, "number"), "number", "17")
+		checkValues(t, findFilter(config, "number"), "number", "17a")
 	})
 
 	// ExtractNumberAny drops a # along with the parens and padding it
@@ -422,9 +422,9 @@ func TestSetNumberShorthand(t *testing.T) {
 	})
 }
 
-// cn strips the star/dagger/phi decorations from both sides, so plain
-// queries find decorated printings; cns keeps the query verbatim and
-// matches the full decorated number only.
+// cn compares a plain query against the plain number, so it finds the
+// decorated printings too; a decorated query names its printing either way,
+// and cns keeps even a plain query verbatim.
 func TestCollectorNumberStrict(t *testing.T) {
 	// The loaded game's rules reduce a loose number; an empty backend has none.
 	skipWithoutDatastore(t)
@@ -440,8 +440,14 @@ func TestCollectorNumberStrict(t *testing.T) {
 
 	config = parseSearchOptionsNG(backend(), "cn:107★", nil, nil, nil)
 	elem = findNumberFilter(t, config, "number")
-	if len(elem.Values) != 1 || elem.Values[0] != "107" {
-		t.Errorf("cn should strip decorations from the query, got %v", elem.Values)
+	if len(elem.Values) != 1 || elem.Values[0] != "107★" {
+		t.Errorf("cn should keep a decorated query as typed, got %v", elem.Values)
+	}
+	plain := &mtgmatcher.CardObject{}
+	plain.Number = "107"
+	plain.PlainNumber = "107"
+	if skip := applyCardFilter(backend(), "number", elem.Values, plain); !skip {
+		t.Error("cn:107★ should not match the plain printing")
 	}
 
 	config = parseSearchOptionsNG(backend(), "cns:107★", nil, nil, nil)
