@@ -297,6 +297,11 @@
                         <h4>There was a problem uploading your file: <i>{{.WarningMessage}}</i></h4>
                     </div>
                 {{end}}
+                {{if .InfoMessage}}
+                    <div class="upload-warning">
+                        <h4><i>{{.InfoMessage}}</i></h4>
+                    </div>
+                {{end}}
 
             </div><!-- /.upload-form-panel -->
 
