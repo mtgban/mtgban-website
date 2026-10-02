@@ -357,7 +357,7 @@ func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory in
 
 // buildMoverRowsQuery pairs each of this game's prices on the two anchor dates.
 //
-// Both arms are MATERIALIZED for the reason buildWideMoverRowsQuery is: left
+// Both arms are MATERIALIZED, and that is this query's performance: left
 // inlined, the planner sees a self-join on prices, underestimates how many of
 // one day's cards are still priced on the other, and picks a nested loop that
 // descends into a 42GB index once per card. cur happens to materialize anyway
