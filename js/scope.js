@@ -120,15 +120,12 @@
         }
     });
 
-    // CLEAR empties the bar, closes it, and reloads so the active search is
-    // immediately rerun without the pinned filters. Keeping the reload here
-    // also makes the visible state, hidden form field, and server-side result
-    // agree in one action.
+    // CLEAR only empties the bar and leaves it open for what comes next:
+    // GO or Enter is what runs the search without it.
     if (clear) {
         clear.addEventListener('click', function() {
             write('');
-            setOpen(false);
-            apply('');
+            box.focus();
         });
     }
 

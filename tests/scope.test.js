@@ -90,16 +90,25 @@ test('GO takes what is in the box now, not what was pinned before', () => {
 // The bar lives in the url alone. Putting the row away or clearing it leaves
 // nothing behind for the next page, or the next visit, to read back.
 test('closing and clearing the bar store nothing', () => {
-    const { nodes, navigated } = loadBar('f:nonfoil');
+    const { nodes } = loadBar('f:nonfoil');
 
     // With no setCookie in scope and document.cookie throwing, either way of
     // storing something fails the test.
     nodes['nav-pin-btn'].handlers.click();
     nodes['nav-scope-clear'].handlers.click();
 
-    const url = new URL(navigated[0]);
-    expect(url.searchParams.has('scope')).toBe(false);
-    expect(url.searchParams.get('sort')).toBe('alpha');
+    expect(nodes['nav-scopebox'].value).toBe('');
+});
+
+// CLEAR empties the bar and stops there: running the search is GO's job.
+test('CLEAR empties the bar without running the search', () => {
+    const { nodes, navigated } = loadBar('f:nonfoil');
+
+    nodes['nav-scope-clear'].handlers.click();
+
+    expect(navigated).toEqual([]);
+    expect(nodes['nav-scopebox'].value).toBe('');
+    expect(nodes['nav-scopefield'].disabled).toBe(true);
 });
 
 test('a bar with no GO button still loads', () => {
