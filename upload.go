@@ -1,12 +1,14 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -335,6 +337,33 @@ func keepInOrder(all, enabled []string) []string {
 		}
 	}
 	return out
+}
+
+// bestOffers returns the stores the optimizer keeps for a row: the one with
+// the best offer, the highest on a buylist and the lowest at retail, then,
+// best first, every other within the margin of it, where the lower of the
+// two prices is above percMargin times the higher. A tie goes to the store
+// whose shorthand sorts first, so the order of the map plays no part.
+func bestOffers(offers map[string]float64, blMode bool, percMargin float64) []string {
+	stores := slices.Sorted(maps.Keys(offers))
+	slices.SortStableFunc(stores, func(a, b string) int {
+		if blMode {
+			return cmp.Compare(offers[b], offers[a])
+		}
+		return cmp.Compare(offers[a], offers[b])
+	})
+	if len(stores) == 0 {
+		return nil
+	}
+
+	best := offers[stores[0]]
+	for n := 1; n < len(stores); n++ {
+		price := offers[stores[n]]
+		if min(price, best) <= max(price, best)*percMargin {
+			return stores[:n]
+		}
+	}
+	return stores
 }
 
 // UploadVars are the PageVars fields only the upload page fills and reads.
@@ -1362,9 +1391,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		var bestPrices []float64
-		var bestStores []string
-
 		cardID := uploadedData[i].CardID
 
 		// Pick the right store list for this entry. The sealed id list was
@@ -1463,6 +1489,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Run summaries for each vendor
+		offers := map[string]float64{}
 		for shorthand, banPrice := range results[cardID] {
 			price := getPrice(banPrice, conds)
 
@@ -1502,28 +1529,21 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Save the lowest or highest price depending on mode
-			// If price is tied, or within a set % difference, save them all
-			if len(bestPrices) == 0 || (blMode && price*percMargin > bestPrices[0]) || (!blMode && price*percMargin < bestPrices[0]) {
-				bestPrices = []float64{price}
-				bestStores = []string{shorthand}
-			} else if (blMode && price > bestPrices[0]*percMargin) || (!blMode && price < bestPrices[0]*percMargin) {
-				bestPrices = append(bestPrices, price)
-				bestStores = append(bestStores, shorthand)
-			}
+			offers[shorthand] = price
 		}
+		bestStores := bestOffers(offers, blMode, percMargin)
 
 		// What the box is worth whole, which is the number its section is read
 		// against. The cards it became are the optimizer's business; it is not.
 		if !counts {
-			if len(bestPrices) > 0 {
-				tallyFor(cardID).ProductPrice = bestPrices[0]
+			if len(bestStores) > 0 {
+				tallyFor(cardID).ProductPrice = offers[bestStores[0]]
 			}
 			continue
 		}
 
-		for j, bestPrice := range bestPrices {
-			bestStore := bestStores[j]
+		for j, bestStore := range bestStores {
+			bestPrice := offers[bestStore]
 
 			qty := 1
 			if uploadedData[i].HasQuantity {
