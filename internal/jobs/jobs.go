@@ -7,6 +7,8 @@ package jobs
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 )
@@ -15,12 +17,11 @@ import (
 // before it is late.
 const Slack = 10 * time.Minute
 
-// Tracker holds every job's record, in the order the jobs were first seen.
+// Tracker holds every job's record.
 type Tracker struct {
 	mu    sync.Mutex
 	start time.Time
 	clock func() time.Time
-	order []string
 	jobs  map[string]*record
 }
 
@@ -45,7 +46,6 @@ func (t *Tracker) get(name string) *record {
 	if !found {
 		r = &record{}
 		t.jobs[name] = r
-		t.order = append(t.order, name)
 	}
 	return r
 }
@@ -106,13 +106,14 @@ func (r Row) TookText() string {
 	return r.Took.Round(time.Second).String()
 }
 
-// Rows lists the jobs as of now, in the order they were first seen.
+// Rows lists the jobs as of now, by name: the order they are first seen in
+// depends on which goroutine runs first.
 func (t *Tracker) Rows() []Row {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	now := t.clock()
-	rows := make([]Row, 0, len(t.order))
-	for _, name := range t.order {
+	rows := make([]Row, 0, len(t.jobs))
+	for _, name := range slices.Sorted(maps.Keys(t.jobs)) {
 		r := t.jobs[name]
 		rows = append(rows, Row{
 			Name:    name,
