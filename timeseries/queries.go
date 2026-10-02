@@ -2,119 +2,10 @@ package timeseries
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 )
-
-const selectColumns = `
-	date, mtgjson_uuid, is_foil, is_etched, language, is_alt,
-	cardkingdom_buylist_price, tcgplayer_market_price,
-	tcgplayer_low_price, cardkingdom_retail_price,
-	cardmarket_low_price, cardmarket_trend_price,
-	starcitygames_buylist_price, abu_buylist_price,
-	coolstuffinc_buylist_price, tcgplayer_low_sealed_expected_value`
-
-func scanRow(scanner interface{ Scan(...any) error }) (PriceRow, error) {
-	var row PriceRow
-	var date time.Time
-	err := scanner.Scan(
-		&date, &row.MtgjsonUUID, &row.IsFoil, &row.IsEtched, &row.Language, &row.IsAlt,
-		&row.CardkingdomBuylistPrice, &row.TcgplayerMarketPrice,
-		&row.TcgplayerLowPrice, &row.CardkingdomRetailPrice,
-		&row.CardmarketLowPrice, &row.CardmarketTrendPrice,
-		&row.StarcitygamesBuylistPrice, &row.AbuBuylistPrice,
-		&row.CoolstuffincBuylistPrice, &row.TcgplayerLowSealedExpectedValue,
-	)
-	if err != nil {
-		return PriceRow{}, err
-	}
-	row.Date = date.Format("2006-01-02")
-	return row, nil
-}
-
-func scanRows(rows interface {
-	Next() bool
-	Err() error
-	Scan(...any) error
-}, scanner func(interface{ Scan(...any) error }) (PriceRow, error)) ([]PriceRow, error) {
-	var result []PriceRow
-	for rows.Next() {
-		row, err := scanner(rows)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, row)
-	}
-	return result, rows.Err()
-}
-
-// GetPriceHistory returns all price rows for a given UUID, foil status, and language,
-// ordered by date descending.
-func (c *Client) GetPriceHistory(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) ([]PriceRow, error) {
-	uuid = NormalizeUUID(uuid)
-	language = *NormalizeLanguage(&language)
-	q := `SELECT` + selectColumns + `
-		FROM product_prices
-		WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4
-		ORDER BY date DESC`
-	rows, err := c.db.QueryContext(ctx, q, uuid, isFoil, isEtched, language)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanRows(rows, scanRow)
-}
-
-// GetPriceHistorySince returns price rows for a UUID, foil status, and language
-// on or after the given date.
-func (c *Client) GetPriceHistorySince(ctx context.Context, uuid string, isFoil bool, isEtched bool, language *string, since time.Time) ([]PriceRow, error) {
-	uuid = NormalizeUUID(uuid)
-	language = NormalizeLanguage(language)
-	var q string
-	var args []any
-	if language != nil {
-		q = `SELECT` + selectColumns + `
-			FROM product_prices
-			WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4 AND date >= $5
-			ORDER BY date DESC`
-		args = []any{uuid, isFoil, isEtched, *language, since}
-	} else {
-		q = `SELECT` + selectColumns + `
-			FROM product_prices
-			WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND date >= $4
-			ORDER BY date DESC`
-		args = []any{uuid, isFoil, isEtched, since}
-	}
-	rows, err := c.db.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanRows(rows, scanRow)
-}
-
-// GetPriceHistoryFor is a convenience wrapper around GetPriceHistorySince
-// using a Lookback period instead of an explicit time.
-func (c *Client) GetPriceHistoryFor(ctx context.Context, uuid string, isFoil bool, isEtched bool, language *string, lb Lookback) ([]PriceRow, error) {
-	return c.GetPriceHistorySince(ctx, uuid, isFoil, isEtched, language, lb.Since())
-}
-
-// HGetAll returns all price rows for a card keyed by date, scoped by the
-// given Lookback window. Language may be nil to match any language.
-func (c *Client) HGetAll(ctx context.Context, cardID string, isFoil bool, isEtched bool, language *string, lb Lookback) (map[string]PriceRow, error) {
-	priceRows, err := c.GetPriceHistoryFor(ctx, cardID, isFoil, isEtched, language, lb)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[string]PriceRow, len(priceRows))
-	for _, row := range priceRows {
-		result[row.Date] = row
-	}
-	return result, nil
-}
 
 // UpsertRow inserts or updates a full price row. On conflict it merges
 // non-nil price columns with COALESCE so that a single UUID's prices can
@@ -235,27 +126,8 @@ func (c *Client) upsertBatch(ctx context.Context, batch []PriceRow) (int, error)
 	return int(n), nil
 }
 
-// GetEarliestDate returns the oldest date on record for a UUID and foil status,
-// bounded by the given Lookback window. Returns the lookback boundary if no
-// rows exist or if the earliest row is newer than the boundary.
-func (c *Client) GetEarliestDate(ctx context.Context, uuid string, isFoil bool, isEtched bool, lb Lookback) (time.Time, error) {
-	uuid = NormalizeUUID(uuid)
-	boundary := lb.Since()
-	var earliest sql.NullTime
-	err := c.db.QueryRowContext(ctx,
-		`SELECT MIN(date) FROM product_prices
-		 WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND date >= $4`,
-		uuid, isFoil, isEtched, boundary,
-	).Scan(&earliest)
-	if err != nil || !earliest.Valid || earliest.Time.IsZero() {
-		return boundary, err
-	}
-	return earliest.Time, nil
-}
-
 // AggregatePriceKey identifies a card variant in an aggregate result map.
-// Language and is_alt are intentionally omitted: we aggregate across them,
-// matching the language=nil behavior of HGetAll.
+// Language and is_alt are intentionally omitted: we aggregate across them.
 type AggregatePriceKey struct {
 	MtgjsonUUID string
 	IsFoil      bool
@@ -274,88 +146,4 @@ type AggregatePriceStats struct {
 	P90      float64
 	Count    int64
 	PriorMax float64
-}
-
-// columnForDataset returns the database column name matching a dataset config
-// index. Mirrors PriceRow.PriceForDataset; returns "" for an unknown index.
-func columnForDataset(index int) string {
-	switch index {
-	case 0:
-		return "cardkingdom_retail_price"
-	case 1:
-		return "cardkingdom_buylist_price"
-	case 2:
-		return "tcgplayer_low_price"
-	case 3:
-		return "tcgplayer_market_price"
-	case 4:
-		return "cardmarket_low_price"
-	case 5:
-		return "cardmarket_trend_price"
-	case 6:
-		return "starcitygames_buylist_price"
-	case 7:
-		return "abu_buylist_price"
-	case 8:
-		return "tcgplayer_low_sealed_expected_value"
-	case 9:
-		return "coolstuffinc_buylist_price"
-	default:
-		return ""
-	}
-}
-
-// GetAggregatePriceStats returns per-card summary statistics of the price
-// column matching datasetIndex, over rows with date >= since, with PriorMax
-// over those before cutoff. The result is keyed by (uuid, foil, etched) so
-// callers can do O(1) lookups while iterating a buylist or inventory.
-//
-// The > 0 filter excludes both NULLs and any 0 stored on a not-buying day, so
-// each card's stats reflect only days the vendor was actually buying.
-func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
-	column := columnForDataset(datasetIndex)
-	if column == "" {
-		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
-	}
-
-	// column is hard-coded in columnForDataset; safe to interpolate.
-	q := fmt.Sprintf(`
-		SELECT mtgjson_uuid, is_foil, is_etched,
-		       MAX(%[1]s)                                            AS max_price,
-		       MIN(%[1]s)                                            AS min_price,
-		       percentile_disc(0.9) WITHIN GROUP (ORDER BY %[1]s)    AS p90_price,
-		       COUNT(*)                                              AS sample_count,
-		       COALESCE(MAX(%[1]s) FILTER (WHERE date < $2), 0)      AS prior_max
-		  FROM product_prices
-		 WHERE date >= $1 AND %[1]s > 0
-		 GROUP BY mtgjson_uuid, is_foil, is_etched`, column)
-
-	rows, err := c.db.QueryContext(ctx, q, since, cutoff)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	result := make(map[AggregatePriceKey]AggregatePriceStats)
-	for rows.Next() {
-		var key AggregatePriceKey
-		var stats AggregatePriceStats
-		err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &stats.Max, &stats.Min, &stats.P90, &stats.Count, &stats.PriorMax)
-		if err != nil {
-			return nil, err
-		}
-		result[key] = stats
-	}
-	return result, rows.Err()
-}
-
-// GetLatestPrice returns the most recent price row for a UUID, foil status, and language.
-func (c *Client) GetLatestPrice(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) (PriceRow, error) {
-	uuid = NormalizeUUID(uuid)
-	language = *NormalizeLanguage(&language)
-	q := `SELECT` + selectColumns + `
-		FROM product_prices
-		WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4
-		ORDER BY date DESC LIMIT 1`
-	return scanRow(c.db.QueryRowContext(ctx, q, uuid, isFoil, isEtched, language))
 }

@@ -104,8 +104,7 @@ build that still reads it.
 
 Once reads are trusted on long form: stop writing the wide `product_prices` /
 `tcgplayer_nonmagic_product_prices`, delete `PriceForDataset` /
-`SetPriceForDataset` / `columnForDataset` and the wide `PriceRow` read methods,
-and drop the `index` field from datasets (provider fully replaces it). The old
+`SetPriceForDataset`, and drop the `index` field from datasets (provider fully replaces it). The old
 tables can then be archived/dropped when you're ready.
 
 ## 6. Validate + finalize the FK
