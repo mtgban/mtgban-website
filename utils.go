@@ -771,9 +771,14 @@ func canAccessMode(enabledModes []string, target string) bool {
 		(DevMode && !SigCheck)
 }
 
-// errorResponse writes a JSON error body with the given status code and
-// the Content-Type header set to application/json. The message is encoded
-// via json.NewEncoder so embedded quotes/backslashes are escaped properly.
+// setCSVDownloadHeaders announces the response as a CSV file to save as
+// name. An export that fails before writing it takes them back with
+// dropDownloadHeaders.
+func setCSVDownloadHeaders(w http.ResponseWriter, name string) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
+}
+
 // dropDownloadHeaders clears the headers that announce a file to save, for
 // an export that fails before writing it and answers with a page or an
 // error instead.
@@ -782,6 +787,9 @@ func dropDownloadHeaders(w http.ResponseWriter) {
 	w.Header().Del("Content-Disposition")
 }
 
+// errorResponse writes a JSON error body with the given status code and
+// the Content-Type header set to application/json. The message is encoded
+// via json.NewEncoder so embedded quotes/backslashes are escaped properly.
 func errorResponse(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
