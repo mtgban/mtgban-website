@@ -468,8 +468,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		if hashes != nil && hashTag == "SCGRetail" {
 			err := redirectToSCGMassEntry(w, r, b, hashes, hashesQtys, hashesCond)
 			if err != nil {
-				log.Println(err)
-				pageVars.ErrorMessage = "Unable to forward data to SCG: " + err.Error()
+				UserNotify("upload", err.Error())
+				pageVars.InfoMessage = "Unable to forward your list to SCG right now"
 				render(w, "upload.html", pageVars)
 			}
 			return
