@@ -1410,27 +1410,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
 		// the matcher.
 		if !isMultiChart {
-			searchID := roster.searchIDs[roster.id]
-			co, gerr := b.GetUUID(searchID)
-			if gerr == nil && !co.Sealed {
-				altID, err := b.Match(&mtgmatcher.InputCard{
-					ID:   searchID,
-					Foil: !co.Foil,
-				})
-				if err == nil && altID != searchID {
-					pageVars.Alternative = altID
-				}
-
-				altID, err = b.Match(&mtgmatcher.InputCard{
-					ID:        searchID,
-					Variation: "Etched",
-				})
-				if err == nil && altID != searchID {
-					pageVars.AltEtchedID = altID
-				}
-
-				pageVars.StocksURL = pageVars.Metadata[roster.id].StocksURL
-			}
+			fillChartSidebar(&pageVars, b, roster)
 		}
 	}
 
@@ -1473,6 +1453,32 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	render(w, "search.html", pageVars)
 	if DevMode {
 		log.Println("render took", time.Since(start))
+	}
+}
+
+// fillChartSidebar sets the single card's foil and etched switches and its
+// Stocks link, all of which a sealed product goes without.
+func fillChartSidebar(pageVars *PageVars, b *mtgmatcher.Backend, roster chartRoster) {
+	searchID := roster.searchIDs[roster.id]
+	co, gerr := b.GetUUID(searchID)
+	if gerr == nil && !co.Sealed {
+		altID, err := b.Match(&mtgmatcher.InputCard{
+			ID:   searchID,
+			Foil: !co.Foil,
+		})
+		if err == nil && altID != searchID {
+			pageVars.Alternative = altID
+		}
+
+		altID, err = b.Match(&mtgmatcher.InputCard{
+			ID:        searchID,
+			Variation: "Etched",
+		})
+		if err == nil && altID != searchID {
+			pageVars.AltEtchedID = altID
+		}
+
+		pageVars.StocksURL = pageVars.Metadata[roster.id].StocksURL
 	}
 }
 
