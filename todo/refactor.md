@@ -51,29 +51,38 @@ near-copies of each other.
 
 ## Plan for the giant functions
 
-1. **Stop the growth.** A test that walks the root package with `go/ast`
-   and fails when a function passes its recorded length (the current
-   offenders at today's size, 150 lines for everything else). A feature
-   touching `Search` first moves the part it changes into a function of
-   its own, in a commit before the feature.
-2. **A safety net per handler.** Render each page shape (search: plain
-   name, set filter, sealed, decklist, empty, error, oembed, chart;
-   upload: retail, buylist, each export, unpack) on master and on the
-   branch and diff the bytes: the throwaway probe that proves a template
-   edit inert, pointed at the handler instead.
-3. **Extract by phase, one function per PR,** biggest self-contained block
-   first, each returning its own struct embedded in `PageVars` so templates
-   keep reading `.ChartID` and the like unchanged:
-   - `Search`: the chart block (~210 lines), the INDEX-row rebuild (~145),
-     request and options parsing (~150), sorting (~90), embed/oembed (~75).
-   - `Upload`: the per-row results loop (~265), the four exports (~230),
-     input loading (~170), store selection (~160), settings (~105).
-   - `Admin`: the `reboot` switch becomes a table of one function per
-     action.
-   - `main`: done; routes, cron jobs, the scraper load, the tcgcsv
-     maintenance mode and serving are each a function.
-   - `parseSearchOptionsNG` last, if at all: a flat switch whose cases
-     don't interact is long, not complex.
+`Upload`, `Search` and `Admin` are split by moving each phase into a
+function below its handler, in three streams. Every PR branches from master,
+and a stream's next PR is cut once the one before it has merged.
+
+- **Admin:** the `reboot` switch and the `refresh`, `reload`,
+  `removestore` and `logs` actions; the config, checkpoints, access-table,
+  affiliates and key-override editors; the dashboard tables and the grant
+  forms.
+- **Search:** the chart page; INDEX rows, ordering, per-card offer sorts,
+  the embed and the notify line; the chart roster and the cookie
+  preferences; the empty-query landing and the search execution.
+- **Upload:** the settings struct and store selection; the exports; input
+  and loading; the fetches and the CSV download; the row loop; the results
+  and page scaffolding.
+
+A split is a move: the phase's lines go unchanged into a function below its
+handler, one extraction per commit, using the handler's own names so the
+moved lines are byte-identical. A move that writes cookies, files or shared
+state, ends the request or changes a slice other phases hold is named as
+such in its commit and keeps its order. The author proves each PR inert
+before opening it, and says how: every template render in the package and a
+handler-level probe compared between master and the branch, the effect of
+each admin save asserted, and a focused case for each boundary that is not a
+plain move.
+
+Sizes are reported in each PR (lines and statements before and after), not
+enforced, and nothing stops a handler from growing again. The largest
+functions are listed by the command under "Re-measuring".
+
+`parseSearchOptionsNG` stays as it is: a flat switch of independent cases is
+long, not complex. If a new filter makes it unmanageable, split the switch
+by filter family first.
 
 ## Not worth doing
 
@@ -94,4 +103,10 @@ go test -count=1 -coverprofile=c.out ./... && go tool cover -func=c.out
 govulncheck ./...                  # under the Go that go.mod names
 go list -m -u -f '{{if and .Update (not .Indirect)}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}' all
 git log --since=2026-09-30 --name-only --pretty=format: -- '*.go' ':!*_test.go' | sort | uniq -c | sort -rn | head
+
+# the largest top-level functions of the root package, in lines
+awk '/^func /{if ($0 ~ /}$/) next; name=$0; start=FNR; next}
+     /^}/{if (name != "") {print FNR-start+1, FILENAME ":" start,
+          substr(name,1,48); name=""}}' \
+    $(ls *.go | grep -v _test.go) | sort -rn | head -15
 ```
