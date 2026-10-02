@@ -465,18 +465,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		hashesCond := r.Form[hashTag+"hashesCond"]
 
 		if hashes != nil && hashTag == "SCGRetail" {
-			log.Println("Preparing a mass-entry call to SCG")
-			dataID, err := SCGRetailRedirect(r.Context(), b, hashes, hashesQtys, hashesCond)
+			err := redirectToSCGMassEntry(w, r, b, hashes, hashesQtys, hashesCond)
 			if err != nil {
 				log.Println(err)
 				pageVars.ErrorMessage = "Unable to forward data to SCG: " + err.Error()
 				render(w, "upload.html", pageVars)
-				return
 			}
-			log.Println("SCG dataId:", dataID)
-
-			url := "https://goto.starcitygames.com/c/" + Affiliates().Codes["SCG"] + `/3052179/37198/?u=https%3A%2F%2Fstarcitygames.com%2Fshop%2Fdeck-builder%2F%3Fdata%3D` + dataID
-			http.Redirect(w, r, url, http.StatusFound)
 			return
 		}
 
@@ -1492,6 +1486,21 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
+}
+
+// redirectToSCGMassEntry sends the cards to Star City Games' mass entry and
+// redirects to the deck builder holding them.
+func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, hashes, hashesQtys, hashesCond []string) error {
+	log.Println("Preparing a mass-entry call to SCG")
+	dataID, err := SCGRetailRedirect(r.Context(), b, hashes, hashesQtys, hashesCond)
+	if err != nil {
+		return err
+	}
+	log.Println("SCG dataId:", dataID)
+
+	url := "https://goto.starcitygames.com/c/" + Affiliates().Codes["SCG"] + `/3052179/37198/?u=https%3A%2F%2Fstarcitygames.com%2Fshop%2Fdeck-builder%2F%3Fdata%3D` + dataID
+	http.Redirect(w, r, url, http.StatusFound)
+	return nil
 }
 
 // writeTagCSV answers with the CSV the store hashTag names (CK, SCG or TCG)
