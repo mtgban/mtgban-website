@@ -897,47 +897,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			rows.tallyQuantity(row)
 		}
 
-		// Run summaries for each vendor
-		offers := map[string]float64{}
-		for shorthand, banPrice := range prices.results[row.CardID] {
-			price := getPrice(banPrice, row.conds)
-
-			// Adjust for preferred price source. The custom buylist pays what
-			// the reader set it to, in credit as in cash.
-			isCustom := shorthand == customStore || shorthand == customSealedStore
-			if blMode && !isCustom {
-				if st.priceSource == "credit" {
-					price *= prices.credits[shorthand]
-				} else if st.priceSource == "marketCredit" {
-					price *= prices.credits[shorthand] * Config().BuylistMarketCredit[shorthand]
-				}
-			}
-
-			// Store computed price
-			if rows.resultPrices[row.priceKey] == nil {
-				rows.resultPrices[row.priceKey] = map[string]float64{}
-			}
-			rows.resultPrices[row.priceKey][shorthand] = price
-
-			// Skip empty results
-			if price == 0 {
-				continue
-			}
-
-			// Adjust for quantity
-			price *= float64(row.qty)
-
-			// Add to totals (unless it was an index, since it was already added)
-			_, found := indexes.results[row.CardID][shorthand]
-			if !found && row.counts {
-				rows.totalEntries[shorthand] += price
-				if row.UnpackedFrom != "" {
-					rows.tallyFor(row.UnpackedFrom).Totals[shorthand] += price
-				}
-			}
-
-			offers[shorthand] = price
-		}
+		offers := rows.tallyOffers(row, blMode, st, prices, indexes)
 		bestStores := bestOffers(offers, blMode, st.percMargin)
 
 		// What the box is worth whole, which is the number its section is read
@@ -1033,6 +993,54 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 	}
 
 	return rows
+}
+
+// tallyOffers files the row's price at every store, in credit when the price
+// source asks for it, adds it by quantity to the store totals, and returns
+// the offers the best store is picked from.
+func (rows *uploadRows) tallyOffers(row uploadRow, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes) map[string]float64 {
+	// Run summaries for each vendor
+	offers := map[string]float64{}
+	for shorthand, banPrice := range prices.results[row.CardID] {
+		price := getPrice(banPrice, row.conds)
+
+		// Adjust for preferred price source. The custom buylist pays what
+		// the reader set it to, in credit as in cash.
+		isCustom := shorthand == customStore || shorthand == customSealedStore
+		if blMode && !isCustom {
+			if st.priceSource == "credit" {
+				price *= prices.credits[shorthand]
+			} else if st.priceSource == "marketCredit" {
+				price *= prices.credits[shorthand] * Config().BuylistMarketCredit[shorthand]
+			}
+		}
+
+		// Store computed price
+		if rows.resultPrices[row.priceKey] == nil {
+			rows.resultPrices[row.priceKey] = map[string]float64{}
+		}
+		rows.resultPrices[row.priceKey][shorthand] = price
+
+		// Skip empty results
+		if price == 0 {
+			continue
+		}
+
+		// Adjust for quantity
+		price *= float64(row.qty)
+
+		// Add to totals (unless it was an index, since it was already added)
+		_, found := indexes.results[row.CardID][shorthand]
+		if !found && row.counts {
+			rows.totalEntries[shorthand] += price
+			if row.UnpackedFrom != "" {
+				rows.tallyFor(row.UnpackedFrom).Totals[shorthand] += price
+			}
+		}
+
+		offers[shorthand] = price
+	}
+	return offers
 }
 
 // tallyQuantity adds the row's quantity to the totals.
