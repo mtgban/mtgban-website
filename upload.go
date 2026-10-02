@@ -466,7 +466,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				err = UUID2TCGCSV(b, csvWriter, hashes, hashesQtys, hashesCond)
 			}
 			if err != nil {
-				w.Header().Del("Content-Type")
+				dropDownloadHeaders(w)
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to download CSV right now"
 				render(w, "upload.html", pageVars)
@@ -1018,7 +1018,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		err = deckboxIDConvert(b, csvWriter, uploadedData)
 		if err != nil {
-			w.Header().Del("Content-Type")
+			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
@@ -1049,7 +1049,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		err = UUID2TCGCSV(b, csvWriter, ids, qtys, conds)
 		if err != nil {
-			w.Header().Del("Content-Type")
+			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
@@ -1218,10 +1218,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		err = SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, preferFlavor)
 		if err != nil {
-			// The page that goes out instead is a page, so it must not keep
-			// the headers that promised a file to save.
-			w.Header().Del("Content-Type")
-			w.Header().Del("Content-Disposition")
+			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
 			log.Printf("CSV export of %d entries failed: %s", len(uploadedData), err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now: " + err.Error()

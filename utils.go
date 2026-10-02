@@ -774,6 +774,14 @@ func canAccessMode(enabledModes []string, target string) bool {
 // errorResponse writes a JSON error body with the given status code and
 // the Content-Type header set to application/json. The message is encoded
 // via json.NewEncoder so embedded quotes/backslashes are escaped properly.
+// dropDownloadHeaders clears the headers that announce a file to save, for
+// an export that fails before writing it and answers with a page or an
+// error instead.
+func dropDownloadHeaders(w http.ResponseWriter) {
+	w.Header().Del("Content-Type")
+	w.Header().Del("Content-Disposition")
+}
+
 func errorResponse(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

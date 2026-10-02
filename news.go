@@ -1225,6 +1225,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", `attachment; filename="syp-buylist.csv"`)
 			if err := mtgban.WriteBuylistToCSV(b, syp, 1, w); err != nil {
+				dropDownloadHeaders(w)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 			return
