@@ -891,35 +891,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 
 		rows.tallyMissing(row, prices, indexes)
 
-		// Summary of the index entries. We pass the row's condition to
-		// every index; getPrice handles the MetadataOnly sources
-		// (TCGLow/TCGMarket/MKM*) by falling back to their flat price
-		// while still using TCGDirect's per-condition listing.
-		for indexKey, indexResult := range indexes.results[row.CardID] {
-			indexPrice := getPrice(indexResult, row.conds)
-
-			if rows.resultPrices[row.priceKey] == nil {
-				rows.resultPrices[row.priceKey] = map[string]float64{}
-			}
-			rows.resultPrices[row.priceKey][indexKey] = indexPrice
-
-			indexPrice *= float64(row.qty)
-
-			// An opened product keeps its own index prices - for a sealed
-			// product those are the expected values, which is the number its
-			// section is read against - and adds nothing to the page: the
-			// cards it became are in the list already, and counting both
-			// would count them twice.
-			if row.Unpacked {
-				rows.tallyFor(row.CardID).ProductIndex[indexKey] = indexPrice
-				continue
-			}
-
-			rows.totalEntries[indexKey] += indexPrice
-			if row.UnpackedFrom != "" {
-				rows.tallyFor(row.UnpackedFrom).Totals[indexKey] += indexPrice
-			}
-		}
+		rows.tallyIndexes(row, indexes)
 
 		if row.counts {
 			// Quantity summary
@@ -1070,6 +1042,40 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 	}
 
 	return rows
+}
+
+// tallyIndexes files the row's index prices and adds them, by quantity, to
+// the index totals. An opened product keeps them in its own tally instead.
+func (rows *uploadRows) tallyIndexes(row uploadRow, indexes uploadIndexes) {
+	// Summary of the index entries. We pass the row's condition to
+	// every index; getPrice handles the MetadataOnly sources
+	// (TCGLow/TCGMarket/MKM*) by falling back to their flat price
+	// while still using TCGDirect's per-condition listing.
+	for indexKey, indexResult := range indexes.results[row.CardID] {
+		indexPrice := getPrice(indexResult, row.conds)
+
+		if rows.resultPrices[row.priceKey] == nil {
+			rows.resultPrices[row.priceKey] = map[string]float64{}
+		}
+		rows.resultPrices[row.priceKey][indexKey] = indexPrice
+
+		indexPrice *= float64(row.qty)
+
+		// An opened product keeps its own index prices - for a sealed
+		// product those are the expected values, which is the number its
+		// section is read against - and adds nothing to the page: the
+		// cards it became are in the list already, and counting both
+		// would count them twice.
+		if row.Unpacked {
+			rows.tallyFor(row.CardID).ProductIndex[indexKey] = indexPrice
+			continue
+		}
+
+		rows.totalEntries[indexKey] += indexPrice
+		if row.UnpackedFrom != "" {
+			rows.tallyFor(row.UnpackedFrom).Totals[indexKey] += indexPrice
+		}
+	}
 }
 
 // tallyMissing counts, at each store the row could be priced at, whether the
