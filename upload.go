@@ -794,30 +794,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if tcgpCSV && canBuylist {
-		w.Header().Set("content-type", "text/csv")
-		w.Header().Set("content-disposition", "attachment; filename=\"mtgban_tcgplayer.csv\"")
-		csvWriter := csv.NewWriter(w)
-
-		var ids, qtys, conds []string
-		for i := range uploadedData {
-			if uploadedData[i].CardID == "" {
-				continue
-			}
-
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
-			qty = adjustQty(qty, multiplier, maxQty)
-
-			ids = append(ids, uploadedData[i].CardID)
-			qtys = append(qtys, fmt.Sprintf("%d", qty))
-			conds = append(conds, string(uploadedData[i].OriginalCondition))
-		}
-
-		err = UUID2TCGCSV(b, csvWriter, ids, qtys, conds)
+		err = writeTCGplayerCSV(w, b, uploadedData, multiplier, maxQty)
 		if err != nil {
-			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
@@ -1538,6 +1516,37 @@ func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData 
 	csvWriter := csv.NewWriter(w)
 
 	err := deckboxIDConvert(b, csvWriter, uploadedData)
+	if err != nil {
+		dropDownloadHeaders(w)
+	}
+	return err
+}
+
+// writeTCGplayerCSV answers with the cards as a TCGplayer import. When it
+// fails it drops the download headers, so the caller can answer with a page.
+func writeTCGplayerCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
+	w.Header().Set("content-type", "text/csv")
+	w.Header().Set("content-disposition", "attachment; filename=\"mtgban_tcgplayer.csv\"")
+	csvWriter := csv.NewWriter(w)
+
+	var ids, qtys, conds []string
+	for i := range uploadedData {
+		if uploadedData[i].CardID == "" {
+			continue
+		}
+
+		qty := 1
+		if uploadedData[i].HasQuantity {
+			qty = uploadedData[i].Quantity
+		}
+		qty = adjustQty(qty, multiplier, maxQty)
+
+		ids = append(ids, uploadedData[i].CardID)
+		qtys = append(qtys, fmt.Sprintf("%d", qty))
+		conds = append(conds, string(uploadedData[i].OriginalCondition))
+	}
+
+	err := UUID2TCGCSV(b, csvWriter, ids, qtys, conds)
 	if err != nil {
 		dropDownloadHeaders(w)
 	}
