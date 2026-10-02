@@ -522,8 +522,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.RemoteLinkURL = cachedRemoteURL
 
 	selected := selectUploadStores(w, r, blMode, st)
-	enabledStores := selected.enabledStores
-	enabledSealedStores := selected.enabledSealedStores
 
 	// Set the store names for the <select> box, and the ones it ticks
 	pageVars.SellerKeys = selected.singlesSellers
@@ -573,7 +571,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		log.Printf("MIME Header: %+v", in.handler.Header)
 	}
 	log.Printf("Buylist mode: %+v", blMode)
-	log.Printf("Enabled stores: %+v", enabledStores)
+	log.Printf("Enabled stores: %+v", selected.enabledStores)
 	if blMode {
 		log.Printf("Sealed vendors: %+v", selected.sealedVendors)
 	} else {
@@ -588,15 +586,15 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Save user preferred stores in cookies and make sure the page is updated with those
 	if blMode {
-		setForeverCookie(w, r, "enabledVendors", strings.Join(enabledStores, "|"))
-		setForeverCookie(w, r, "enabledSealedVendors", strings.Join(enabledSealedStores, "|"))
-		pageVars.EnabledVendors = enabledStores
-		pageVars.EnabledSealedVendors = enabledSealedStores
+		setForeverCookie(w, r, "enabledVendors", strings.Join(selected.enabledStores, "|"))
+		setForeverCookie(w, r, "enabledSealedVendors", strings.Join(selected.enabledSealedStores, "|"))
+		pageVars.EnabledVendors = selected.enabledStores
+		pageVars.EnabledSealedVendors = selected.enabledSealedStores
 	} else {
-		setForeverCookie(w, r, "enabledSellers", strings.Join(enabledStores, "|"))
-		setForeverCookie(w, r, "enabledSealedSellers", strings.Join(enabledSealedStores, "|"))
-		pageVars.EnabledSellers = enabledStores
-		pageVars.EnabledSealedSellers = enabledSealedStores
+		setForeverCookie(w, r, "enabledSellers", strings.Join(selected.enabledStores, "|"))
+		setForeverCookie(w, r, "enabledSealedSellers", strings.Join(selected.enabledSealedStores, "|"))
+		pageVars.EnabledSellers = selected.enabledStores
+		pageVars.EnabledSealedSellers = selected.enabledSealedStores
 	}
 
 	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
@@ -693,81 +691,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	ids := splitUploadIDs(b, uploadedData, st)
 	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(ids.cardIDs), len(ids.sealedProductIDs))
 
-	// Search — fetch card and sealed prices separately then merge
-	var results map[string]map[string]*BanPrice
-	var credits map[string]float64
-
-	if blMode {
-		// Only fetch singles prices when the upload actually has singles. A nil
-		// or empty hash list is the "dump the whole inventory" signal to
-		// getSellerPrices/getVendorPrices, so a sealed-only upload would
-		// otherwise pull every enabled singles store's full catalog — spurious
-		// empty singles columns plus a GetUUID-per-card dump. Guard it the same
-		// way the sealed and index fetches below already do.
-		results = map[string]map[string]*BanPrice{}
-		if len(ids.cardIDs) > 0 {
-			results = getVendorPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
-		}
-
-		// Build the custom buylist if requested
-		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
-		if !r.Form.Has("custombuylist") {
-			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
-			customBuylist = slices.Contains(customOpts, "enabled")
-		}
-		if st.canUploadCustom && customBuylist {
-			var rule EntryRule
-			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
-				rule.MinPrice = v
-			}
-			if v := uploadFloatSetting(r, "customrate", "UploadCustomRate"); v > 0 {
-				rule.Rate = v
-			}
-
-			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
-			if customSeller != "" {
-				ref, _ := findSellerInventory(customSeller)
-				for _, cardID := range ids.cardIDs {
-					processEntry(b, results, ref[cardID], "", cardID, "CUSTOM", false, ids.shouldCheckForConditions, false, rule)
-				}
-				enabledStores = append(enabledStores, "CUSTOM")
-			}
-
-			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
-			if customSealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-				ref, _ := findSellerInventory(customSealedSeller)
-				for _, productID := range ids.sealedProductIDs {
-					processEntry(b, results, ref[productID], "", productID, "CUSTOM_SEALED", false, false, false, rule)
-				}
-				enabledSealedStores = append(enabledSealedStores, "CUSTOM_SEALED")
-			}
-		}
-
-		// Fetch sealed vendor prices and merge
-		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
-		}
-
-		if st.priceSource != "" {
-			credits = map[string]float64{}
-			allStores := append(enabledStores, enabledSealedStores...)
-			for _, store := range allStores {
-				credits[store] = findCredit(store)
-			}
-		}
-	} else {
-		// Same guard as the buylist branch: skip the singles dump when the
-		// upload has no singles (see the comment above).
-		results = map[string]map[string]*BanPrice{}
-		if len(ids.cardIDs) > 0 {
-			results = getSellerPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
-		}
-
-		// Fetch sealed seller prices and merge
-		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
-		}
-	}
+	prices := fetchUploadPrices(r, b, blMode, st, selected, ids)
 
 	// Allow downloading data as CSV
 	if modes.download && canBuylist {
@@ -794,14 +718,14 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// Copy these index prices in the final results
 		for _, cardID := range ids.cardIDs {
 			for _, index := range csvIndexKeys {
-				if results[cardID] == nil {
-					results[cardID] = map[string]*BanPrice{}
+				if prices.results[cardID] == nil {
+					prices.results[cardID] = map[string]*BanPrice{}
 				}
-				results[cardID][index] = indexResults[cardID][index]
+				prices.results[cardID][index] = indexResults[cardID][index]
 			}
 		}
 
-		err := SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, st.preferFlavor)
+		err := SimplePrice2CSV(b, csvWriter, prices.results, uploadedData, nil, st.preferFlavor)
 		if err != nil {
 			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
@@ -826,7 +750,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// own column in retail mode, so drop it here to avoid listing it twice
 	var sealedIndexKeys []string
 	for _, key := range selected.enabledSealedIndexKeys {
-		if !blMode && slices.Contains(enabledSealedStores, key) {
+		if !blMode && slices.Contains(prices.enabledSealedStores, key) {
 			continue
 		}
 		sealedIndexKeys = append(sealedIndexKeys, key)
@@ -840,17 +764,17 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// Set card and sealed keys separately — the template picks per entry,
 	// with the same store/index deduplication applied above for sealed
 	for _, key := range selected.enabledIndexKeys {
-		if !blMode && slices.Contains(enabledStores, key) {
+		if !blMode && slices.Contains(prices.enabledStores, key) {
 			continue
 		}
 		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
 	}
-	pageVars.ScraperKeys = enabledStores
-	pageVars.AllScraperKeys = enabledStores
+	pageVars.ScraperKeys = prices.enabledStores
+	pageVars.AllScraperKeys = prices.enabledStores
 	if len(ids.sealedProductIDs) > 0 {
 		pageVars.SealedIndexKeys = sealedIndexKeys
-		pageVars.SealedScraperKeys = enabledSealedStores
-		pageVars.AllScraperKeys = append(append([]string{}, enabledStores...), enabledSealedStores...)
+		pageVars.SealedScraperKeys = prices.enabledSealedStores
+		pageVars.AllScraperKeys = append(append([]string{}, prices.enabledStores...), prices.enabledSealedStores...)
 	}
 
 	// Orders implies priority of argument search
@@ -939,9 +863,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// of scanning the list per row.
 		co, err := b.GetUUID(cardID)
 		isSealed := err == nil && co.Sealed
-		entryStores := enabledStores
+		entryStores := prices.enabledStores
 		if isSealed {
-			entryStores = enabledSealedStores
+			entryStores = prices.enabledSealedStores
 		}
 
 		// Search for any missing entries (ie cards not sold or bought by a vendor)
@@ -951,7 +875,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].Unpacked {
 				break
 			}
-			_, found := results[cardID][shorthand]
+			_, found := prices.results[cardID][shorthand]
 			if found {
 				continue
 			}
@@ -1025,15 +949,15 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Run summaries for each vendor
 		offers := map[string]float64{}
-		for shorthand, banPrice := range results[cardID] {
+		for shorthand, banPrice := range prices.results[cardID] {
 			price := getPrice(banPrice, conds)
 
 			// Adjust for preferred price source
 			if blMode {
 				if st.priceSource == "credit" {
-					price *= credits[shorthand]
+					price *= prices.credits[shorthand]
 				} else if st.priceSource == "marketCredit" {
-					price *= credits[shorthand] * Config().BuylistMarketCredit[shorthand]
+					price *= prices.credits[shorthand] * Config().BuylistMarketCredit[shorthand]
 				}
 			}
 
@@ -1191,8 +1115,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// For the totals row: show all enabled card stores (even with "-"),
 	// but only include sealed stores that actually returned prices.
-	activeTotalStores := append([]string{}, enabledStores...)
-	for _, key := range enabledSealedStores {
+	activeTotalStores := append([]string{}, prices.enabledStores...)
+	for _, key := range prices.enabledSealedStores {
 		if pageVars.TotalEntries[key] != 0 {
 			activeTotalStores = append(activeTotalStores, key)
 		}
@@ -1911,6 +1835,107 @@ func splitUploadIDs(b *mtgmatcher.Backend, uploadedData []UploadEntry, st upload
 		cardIDs:                  cardIDs,
 		sealedProductIDs:         sealedProductIDs,
 		shouldCheckForConditions: shouldCheckForConditions,
+	}
+}
+
+// uploadPrices are the prices an upload is priced at, the credit each store
+// gives, and the stores it is priced against, the custom buylist included
+// when one was built.
+type uploadPrices struct {
+	results             map[string]map[string]*BanPrice
+	credits             map[string]float64
+	enabledStores       []string
+	enabledSealedStores []string
+}
+
+// fetchUploadPrices looks up the upload's singles and sealed products in the
+// stores selected, and in the custom buylist when the settings allow one and
+// the request asks for it.
+func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs) uploadPrices {
+	enabledStores := selected.enabledStores
+	enabledSealedStores := selected.enabledSealedStores
+
+	// Search — fetch card and sealed prices separately then merge
+	var results map[string]map[string]*BanPrice
+	var credits map[string]float64
+
+	if blMode {
+		// Only fetch singles prices when the upload actually has singles. A nil
+		// or empty hash list is the "dump the whole inventory" signal to
+		// getSellerPrices/getVendorPrices, so a sealed-only upload would
+		// otherwise pull every enabled singles store's full catalog — spurious
+		// empty singles columns plus a GetUUID-per-card dump. Guard it the same
+		// way the sealed and index fetches below already do.
+		results = map[string]map[string]*BanPrice{}
+		if len(ids.cardIDs) > 0 {
+			results = getVendorPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+		}
+
+		// Build the custom buylist if requested
+		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
+		if !r.Form.Has("custombuylist") {
+			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
+			customBuylist = slices.Contains(customOpts, "enabled")
+		}
+		if st.canUploadCustom && customBuylist {
+			var rule EntryRule
+			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
+				rule.MinPrice = v
+			}
+			if v := uploadFloatSetting(r, "customrate", "UploadCustomRate"); v > 0 {
+				rule.Rate = v
+			}
+
+			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
+			if customSeller != "" {
+				ref, _ := findSellerInventory(customSeller)
+				for _, cardID := range ids.cardIDs {
+					processEntry(b, results, ref[cardID], "", cardID, "CUSTOM", false, ids.shouldCheckForConditions, false, rule)
+				}
+				enabledStores = append(enabledStores, "CUSTOM")
+			}
+
+			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
+			if customSealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+				ref, _ := findSellerInventory(customSealedSeller)
+				for _, productID := range ids.sealedProductIDs {
+					processEntry(b, results, ref[productID], "", productID, "CUSTOM_SEALED", false, false, false, rule)
+				}
+				enabledSealedStores = append(enabledSealedStores, "CUSTOM_SEALED")
+			}
+		}
+
+		// Fetch sealed vendor prices and merge
+		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+		}
+
+		if st.priceSource != "" {
+			credits = map[string]float64{}
+			allStores := append(enabledStores, enabledSealedStores...)
+			for _, store := range allStores {
+				credits[store] = findCredit(store)
+			}
+		}
+	} else {
+		// Same guard as the buylist branch: skip the singles dump when the
+		// upload has no singles (see the comment above).
+		results = map[string]map[string]*BanPrice{}
+		if len(ids.cardIDs) > 0 {
+			results = getSellerPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+		}
+
+		// Fetch sealed seller prices and merge
+		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+		}
+	}
+
+	return uploadPrices{
+		results:             results,
+		credits:             credits,
+		enabledStores:       enabledStores,
+		enabledSealedStores: enabledSealedStores,
 	}
 }
 
