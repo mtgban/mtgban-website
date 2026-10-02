@@ -413,14 +413,6 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	if Config().Game != DefaultGame {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(string(Config().Game))
-
-		// Charts for a non-Magic game are served only by the long-form read
-		// path; the legacy wide table is mtgjson-uuid keyed and has no rows for
-		// them. Until reads flip on, keep the chart UI hidden rather than show
-		// buttons that resolve to an always-empty chart.
-		if !Config().TimeseriesConfig.LongFormReads {
-			pageVars.DisableChart = true
-		}
 	}
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
