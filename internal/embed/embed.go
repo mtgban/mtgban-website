@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/unistyle"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -31,6 +32,12 @@ const (
 	// MaxPreviewCards is how many cards one preview panel lists. Distinct
 	// from MaxCustomEntries, which counts rows within a single field.
 	MaxPreviewCards = 8
+
+	// InlineRowWidth is how many characters a row of an inline field holds,
+	// name and price together, before Discord wraps the price onto a line
+	// of its own. Two inline fields share the space beside the thumbnail,
+	// and a 16-character name with a $133.82 price fills one exactly.
+	InlineRowWidth = 23
 )
 
 // Entry is the slice of one store offer an embed renders. The host picks
@@ -41,8 +48,8 @@ type Entry struct {
 	Price       float64
 	Ratio       float64
 
-	// Grade is the condition the offer is for, where it is not NM, printed
-	// beside the name.
+	// Grade is the condition the offer is for, where it is not NM: printed
+	// beside the name, and kept whole when the name is shortened to fit.
 	Grade string
 }
 
@@ -322,26 +329,52 @@ func FormatSearchResult(baseURL string, searchRes *SearchResult) (fields []Field
 // the scraper name, and the tag beside it in its own brackets, both inside a
 // single code span (see the format string in prepareCard).
 func renderedNameWidth(value FieldValue) int {
-	width := len(value.ScraperName)
+	width := utf8.RuneCountInString(value.ScraperName)
 	if value.Tag != "" {
-		width += len(value.Tag) + len(" ()")
+		width += utf8.RuneCountInString(value.Tag) + len(" ()")
 	}
 	return width
 }
 
+// tailWidth is what a row prints after its name, counted in code-span
+// characters: the price, and any emoji after it, about three apiece.
+func tailWidth(value FieldValue) int {
+	width := utf8.RuneCountInString(value.Price)
+	if value.SuffixEmoji != "" {
+		width += 1 + 3*utf8.RuneCountInString(value.SuffixEmoji)
+	}
+	return width
+}
+
+// shortenName cuts a value's scraper name with an ellipsis so the name and
+// its tag are no wider than width.
+func shortenName(value *FieldValue, width int) {
+	excess := renderedNameWidth(*value) - width
+	if excess <= 0 {
+		return
+	}
+	name := []rune(value.ScraperName)
+	keep := max(len(name)-excess-1, 1)
+	value.ScraperName = strings.TrimRight(string(name[:keep]), " ") + "…"
+}
+
 // alignValues pads every value in a field out to the widest one, so the prices
-// start in the same column. Field.Length is kept in step because it decides
-// where the value spills into a continuation field.
+// start in the same column. An inline field is first capped to what its row
+// holds, so no price wraps under its name. Field.Length is kept in step
+// because it decides where the value spills into a continuation field.
 func alignValues(field *Field) {
-	var longest int
+	var longest, tail int
 	for _, value := range field.Values {
-		if width := renderedNameWidth(value); width > longest {
-			longest = width
-		}
+		longest = max(longest, renderedNameWidth(value))
+		tail = max(tail, tailWidth(value))
+	}
+	if field.Inline {
+		longest = min(longest, InlineRowWidth-tail)
 	}
 	for i := range field.Values {
 		field.Length -= fieldValueLength(field.Values[i])
-		field.Values[i].ExtraSpaces = strings.Repeat(" ", longest-renderedNameWidth(field.Values[i]))
+		shortenName(&field.Values[i], longest)
+		field.Values[i].ExtraSpaces = strings.Repeat(" ", max(longest-renderedNameWidth(field.Values[i]), 0))
 		field.Length += fieldValueLength(field.Values[i])
 	}
 }
