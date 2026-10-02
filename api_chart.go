@@ -50,8 +50,8 @@ func chartAPIDatasets(datasets []Dataset) []ChartAPIDataset {
 }
 
 // writeChartAPIResponse sends a chart payload. An empty one is not cached for an
-// hour the way a real one is: the legacy read still reports an outage that way,
-// and a window with nothing in it yet may have prices after the next snapshot.
+// hour the way a real one is: a window with nothing in it yet may have prices
+// after the next snapshot.
 func writeChartAPIResponse(w http.ResponseWriter, resp ChartAPIResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	if len(resp.Datasets) != 0 {
@@ -76,50 +76,12 @@ func (s *site) ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Long-form reads unlock charting by any id (ban:, tcg:, scryfall:, mtgjson:,
-	// bare uuid/number) and non-Magic products. The legacy path below stays
-	// mtgjson-uuid only.
-	if Config().TimeseriesConfig.LongFormReads {
-		chartDataAPILong(ds, w, r, uuid)
-		return
-	}
-
-	co, err := ds.backend.GetUUID(uuid)
-	if err != nil {
-		errorResponse(w, http.StatusNotFound, "card not found")
-		return
-	}
-
-	// How far back a chart may reach is a paid grant, and this route is mounted
-	// under noSigning, so nothing upstream has checked the signature carrying
-	// it: read it verified or not at all. Reading the query alone also left
-	// every in-page fetch on the 30-day fallback, since the page asks for this
-	// with a cookie and no ?sig=, capping a chart it would itself have drawn
-	// in full.
-	sig := verifiedRequestSignature(r)
-
-	// Read only the window that was asked for. The axis used to be trimmed
-	// after the fact, which left the archive scanning the whole entitlement
-	// to answer a request for one month of it.
-	lb, maxDays := chartWindow(sig, chartRangeParam(r))
-
-	earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
-
-	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasets(r.Context(), ds.backend, uuid, co.Sealed, axisLabels, lb)
-
-	writeChartAPIResponse(w, ChartAPIResponse{
-		MaxLookbackDays: maxDays,
-		LoadedDays:      lb.Days(),
-		AxisLabels:      axisLabels,
-		Datasets:        chartAPIDatasets(datasets),
-		Checkpoints:     relevantCheckpoints(ds, co.Name, earliest),
-	})
+	chartDataAPILong(ds, w, r, uuid)
 }
 
 // chartDataAPILong serves the chart for any resolvable id (ban:, tcg:, scryfall:,
 // mtgjson:, or a bare uuid/number), including non-Magic products, from the long
-// tables. Reached only when long-form reads are enabled.
+// tables.
 //
 // The id may also be a comma-separated roster, which is how the page widens a
 // multi-card chart: it names the same ids the ?chart= url carries, and gets the
@@ -156,7 +118,11 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 		return
 	}
 
-	// Verified, and off the cookie the page actually sends: see ChartDataAPI.
+	// How far back a chart may reach is a paid grant, and this route is mounted
+	// under noSigning, so nothing upstream has checked the signature carrying
+	// it: read it verified or not at all. The page asks with a cookie and no
+	// ?sig=, so the query alone would cap every in-page fetch at the 30-day
+	// fallback.
 	sig := verifiedRequestSignature(r)
 	lb, maxDays := chartWindow(sig, chartRangeParam(r))
 

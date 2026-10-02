@@ -79,15 +79,6 @@ func providerForDatasetIndex(index int) (int16, bool) {
 	return 0, false
 }
 
-// earliestChartDate returns the oldest on-record date for a card (bounded by the
-// lookback), reading from the long tables or the legacy wide table per the flag.
-func earliestChartDate(ctx context.Context, uuid string, isFoil, isEtched bool, lb timeseries.Lookback) (time.Time, error) {
-	if Config().TimeseriesConfig.LongFormReads {
-		return PricesArchiveDB.GetEarliestDateLong(ctx, uuid, isFoil, isEtched, lb)
-	}
-	return PricesArchiveDB.GetEarliestDate(ctx, uuid, isFoil, isEtched, lb)
-}
-
 type Dataset struct {
 	Name   string
 	Data   []ChartPoint
@@ -193,63 +184,6 @@ func chartLookback(sig string) timeseries.Lookback {
 		days = 30
 	}
 	return timeseries.Lookback(days)
-}
-
-// getDatasets returns one Dataset per applicable config. All datasets for a
-// given card read different columns from the same (uuid, foil, etched,
-// language=nil, lookback) result set, so we fetch HGetAll exactly once and
-// fan the rows out to every per-dataset render rather than firing N
-// identical SQL queries (and discarding 15/16 of each result).
-func getDatasets(ctx context.Context, b *mtgmatcher.Backend, cardID string, sealed bool, keys []string, lb timeseries.Lookback) []Dataset {
-	if PricesArchiveDB == nil {
-		return nil
-	}
-
-	// Pre-filter applicable configs so we don't pay for a DB round-trip
-	// or a UUID lookup when nothing will render.
-	var configs []DatasetConfig
-	for _, c := range Config().TimeseriesConfig.Datasets {
-		if sealed && !c.HasSealed {
-			continue
-		}
-		if !sealed && c.OnlySealed {
-			continue
-		}
-		configs = append(configs, c)
-	}
-	if len(configs) == 0 {
-		return nil
-	}
-
-	co, err := b.GetUUID(cardID)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-
-	datasets := make([]Dataset, 0, len(configs))
-
-	if Config().TimeseriesConfig.LongFormReads {
-		results, err := PricesArchiveDB.HGetAllLong(ctx, co.UUID, co.Foil, co.Etched, lb)
-		if err != nil {
-			log.Println(err)
-			return nil
-		}
-		for _, config := range configs {
-			datasets = append(datasets, buildDatasetLong(results, keys, config))
-		}
-		return datasets
-	}
-
-	results, err := PricesArchiveDB.HGetAll(ctx, co.UUID, co.Foil, co.Etched, nil, lb)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	for _, config := range configs {
-		datasets = append(datasets, buildDataset(results, keys, config))
-	}
-	return datasets
 }
 
 // providerDisplay is one provider's chart display: its name and color.
@@ -443,8 +377,7 @@ func earliestChartedDate(results map[string]timeseries.ProviderPrices, lb timese
 
 // chartDatasetsFrom projects a fetched series onto the axis, game-agnostic: one
 // dataset per registry provider that has data, in registry order. Adding a game
-// needs no code here — its providers just show up. Long-form reads only; the
-// legacy path stays in getDatasets.
+// needs no code here — its providers just show up.
 func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []string) []Dataset {
 	// Only providers with data for this card render — that is what makes it
 	// game-agnostic and also drops sealed-vs-single applicability out of config
@@ -530,51 +463,9 @@ func buildProviderDataset(results map[string]timeseries.ProviderPrices, labels [
 	return Dataset{Name: pd.Name, Data: data, Color: pd.Color, Reference: pd.Name}
 }
 
-// buildDatasetLong is buildDataset for the long-form read: it projects one
-// provider out of the pivoted date -> (provider -> price) result. Missing dates
-// and missing providers both come out as gaps.
-func buildDatasetLong(results map[string]timeseries.ProviderPrices, labels []string, config DatasetConfig) Dataset {
-	var data []ChartPoint
-	if len(results) > 0 {
-		data = make([]ChartPoint, len(labels))
-		for i, label := range labels {
-			data[i] = priceAt(results, label, config.Provider)
-		}
-	}
-	return Dataset{
-		Name:      config.PublicName,
-		Data:      data,
-		Color:     config.Color,
-		Reference: config.PublicName,
-	}
-}
-
-// buildDataset projects a single column out of the shared HGetAll result
-// map. Missing dates and null prices both come out as gaps, so the front-end
-// chart leaves a hole rather than drawing a zero.
-func buildDataset(results map[string]timeseries.PriceRow, labels []string, config DatasetConfig) Dataset {
-	var data []ChartPoint
-	if len(results) > 0 {
-		data = make([]ChartPoint, len(labels))
-		for i, label := range labels {
-			if row, ok := results[label]; ok {
-				if price := row.PriceForDataset(config.Index); price != nil {
-					data[i] = ChartPoint{Price: *price, Known: true}
-				}
-			}
-		}
-	}
-	return Dataset{
-		Name:      config.PublicName,
-		Data:      data,
-		Color:     config.Color,
-		Reference: config.PublicName,
-	}
-}
-
 // multiCardInput is one card's contribution to a multi-card chart: the
 // display name to render in the legend, and the raw datasets returned by
-// getDatasets for that card.
+// chartDatasetsFrom for that card.
 type multiCardInput struct {
 	CardID   string
 	Name     string
@@ -584,7 +475,7 @@ type multiCardInput struct {
 // mergeMultiCardDatasets flattens per-card datasets into the (card × reference)
 // list a multi-card chart renders. Each card's datasets get a palette color
 // (round-robin, wrap-around past multiCardPalette's length) and the supplied
-// card Name, replacing whatever getDatasets put there. Datasets with no data
+// card Name, replacing whatever chartDatasetsFrom put there. Datasets with no data
 // are dropped so reference names that a card doesn't support don't pollute the
 // reference picker. The returned reference order is the first-seen order
 // across all cards — a card later in the list that introduces a new reference

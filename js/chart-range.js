@@ -60,7 +60,7 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
         })
         .then(function(data) {
             // A wider window holds the one drawn, so an empty answer is never a
-            // widening: it is how the legacy read still reports an archive error.
+            // widening.
             if (!data || !data.datasets || !data.datasets.length) throw new Error('chart range: empty payload');
             var got = data.loadedDays || ask;
             // A response narrower than what is already drawn is not a widening:
