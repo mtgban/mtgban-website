@@ -665,13 +665,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// redirecting there - the results below are computed the same as any
 	// other upload, just with the message added on top.
 	if publishStore {
-		kind := sessionstore.Retail
-		if blMode {
-			kind = sessionstore.Buylist
-		}
-		info := sessionstore.InfoFromForm(r)
-
-		report, err := Sessions.Publish(b, kind, info, uploadedData)
+		msg, err := publishUploadStore(r, b, blMode, uploadedData)
 		if err != nil {
 			pageVars.WarningMessage = "store not published: " + err.Error()
 			render(w, "upload.html", pageVars)
@@ -679,7 +673,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		user := GetParamFromSig(sig, "UserEmail")
-		msg := fmt.Sprintf("Published %s (%s) as a %s store: %s", info.Name, info.Shorthand, kind, report)
 		LogPages["Upload"].Printf("%s by %q", msg, user)
 		UserNotify("upload", user+" "+msg)
 		// The confirmation says only what happened, not what happens next -
@@ -1944,6 +1937,24 @@ func loadUploadEntries(r *http.Request, b *mtgmatcher.Backend, in uploadInput, m
 		}
 	}
 	return uploadedData, uploadName, err
+}
+
+// publishUploadStore serves the rows as a store, on the side of the book the
+// mode names, and says what it published.
+func publishUploadStore(r *http.Request, b *mtgmatcher.Backend, blMode bool, uploadedData []UploadEntry) (string, error) {
+	kind := sessionstore.Retail
+	if blMode {
+		kind = sessionstore.Buylist
+	}
+	info := sessionstore.InfoFromForm(r)
+
+	report, err := Sessions.Publish(b, kind, info, uploadedData)
+	if err != nil {
+		return "", err
+	}
+
+	msg := fmt.Sprintf("Published %s (%s) as a %s store: %s", info.Name, info.Shorthand, kind, report)
+	return msg, nil
 }
 
 func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
