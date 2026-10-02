@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
@@ -166,9 +167,9 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// against a slightly later "now" than its neighbor.
 	now := time.Now()
 
-	adminSellerTable(now, &pageVars)
+	adminScraperTable(sessionstore.Retail, now, &pageVars)
 
-	adminVendorTable(now, &pageVars)
+	adminScraperTable(sessionstore.Buylist, now, &pageVars)
 
 	adminPageTable(&pageVars)
 
@@ -655,41 +656,61 @@ func (s *site) adminKeyOverrides(r *http.Request, b *mtgmatcher.Backend, pageVar
 	}
 }
 
-// adminSellerTable appends the dashboard's retail table to the page, one row
-// per seller, with its staleness measured against now.
-func adminSellerTable(now time.Time, pageVars *PageVars) {
-	// -- Dashboard: Retail Scrapers --
-	var sellerTable [][]string
-	for _, seller := range GetSellers() {
+// adminScraperTable appends the dashboard's retail or buylist table to the
+// page, as kind (sessionstore.Retail or Buylist) says: one row per seller or
+// vendor, with its staleness measured against now.
+func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
+	// What a row shows of a seller or a vendor besides its info: when its
+	// prices were taken, and how many there are.
+	type dashScraper struct {
+		info    mtgban.ScraperInfo
+		updated *time.Time
+		entries int
+	}
+	var scrapers []dashScraper
+	affiliates := Affiliates().List
+	if kind == sessionstore.Retail {
+		for _, seller := range GetSellers() {
+			scrapers = append(scrapers, dashScraper{seller.Info(), seller.Info().InventoryTimestamp, len(seller.Inventory())})
+		}
+	} else {
+		affiliates = Affiliates().BuylistList
+		for _, vendor := range GetVendors() {
+			scrapers = append(scrapers, dashScraper{vendor.Info(), vendor.Info().BuylistTimestamp, len(vendor.Buylist())})
+		}
+	}
+
+	var table [][]string
+	for _, scraper := range scrapers {
 		key := "UNKNOWN"
-		store, found := scraperStoreOf(seller.Info().Shorthand)
+		store, found := scraperStoreOf(scraper.info.Shorthand)
 		if found {
 			key = store
 		}
 
 		lastUpdate := ""
-		if ts := seller.Info().InventoryTimestamp; !ts.IsZero() {
+		ts := scraper.updated
+		if !ts.IsZero() {
 			lastUpdate = ts.UTC().Format(time.RFC3339)
 		}
-		inv := seller.Inventory()
 
 		// A running workflow overrides this to 🔶 once the poll answers.
 		status := "✅"
-		if len(inv) == 0 {
+		if scraper.entries == 0 {
 			status = "🔴"
 		}
 
-		name := seller.Info().Name
-		if seller.Info().SealedMode {
+		name := scraper.info.Name
+		if scraper.info.SealedMode {
 			name += " 📦"
 		}
-		if seller.Info().MetadataOnly {
+		if scraper.info.MetadataOnly {
 			name += " 🎯"
 		}
 
 		ref := ""
-		if slices.Contains(Affiliates().List, seller.Info().Shorthand) ||
-			slices.Contains(Affiliates().List, key) {
+		if slices.Contains(affiliates, scraper.info.Shorthand) ||
+			slices.Contains(affiliates, key) {
 			ref = "👍"
 		}
 
@@ -697,85 +718,25 @@ func adminSellerTable(now time.Time, pageVars *PageVars) {
 		// or log it, and can be removed from here instead. One the config
 		// has since claimed is a real store, whatever the registry says.
 		session := ""
-		if key == "UNKNOWN" && Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
+		if key == "UNKNOWN" && Sessions.Is(kind, scraper.info.Shorthand) {
 			key = "session"
-			session = sessionstore.Retail
+			session = kind
 		}
 
 		row := []string{
 			name,
-			seller.Info().Shorthand,
+			scraper.info.Shorthand,
 			key,
 			lastUpdate,
-			fmt.Sprint(len(inv)),
+			fmt.Sprint(scraper.entries),
 			ref,
 			status,
 			session,
-			staleBadge(seller.Info().InventoryTimestamp, now),
+			staleBadge(scraper.updated, now),
 		}
-		sellerTable = append(sellerTable, row)
+		table = append(table, row)
 	}
-	pageVars.Tables = append(pageVars.Tables, sellerTable)
-}
-
-// adminVendorTable appends the dashboard's buylist table to the page, one row
-// per vendor, with its staleness measured against now.
-func adminVendorTable(now time.Time, pageVars *PageVars) {
-	// -- Dashboard: Buylist Scrapers --
-	var vendorTable [][]string
-	for _, vendor := range GetVendors() {
-		key := "UNKNOWN"
-		store, found := scraperStoreOf(vendor.Info().Shorthand)
-		if found {
-			key = store
-		}
-
-		lastUpdate := ""
-		if ts := vendor.Info().BuylistTimestamp; !ts.IsZero() {
-			lastUpdate = ts.UTC().Format(time.RFC3339)
-		}
-		bl := vendor.Buylist()
-
-		// A running workflow overrides this to 🔶 once the poll answers.
-		status := "✅"
-		if len(bl) == 0 {
-			status = "🔴"
-		}
-
-		name := vendor.Info().Name
-		if vendor.Info().SealedMode {
-			name += " 📦"
-		}
-		if vendor.Info().MetadataOnly {
-			name += " 🎯"
-		}
-
-		ref := ""
-		if slices.Contains(Affiliates().BuylistList, vendor.Info().Shorthand) ||
-			slices.Contains(Affiliates().BuylistList, key) {
-			ref = "👍"
-		}
-
-		session := ""
-		if key == "UNKNOWN" && Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
-			key = "session"
-			session = sessionstore.Buylist
-		}
-
-		row := []string{
-			name,
-			vendor.Info().Shorthand,
-			key,
-			lastUpdate,
-			fmt.Sprint(len(bl)),
-			ref,
-			status,
-			session,
-			staleBadge(vendor.Info().BuylistTimestamp, now),
-		}
-		vendorTable = append(vendorTable, row)
-	}
-	pageVars.Tables = append(pageVars.Tables, vendorTable)
+	pageVars.Tables = append(pageVars.Tables, table)
 }
 
 // adminPageTable appends the dashboard's table of registered pages to the page.
