@@ -563,12 +563,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	in := readUploadInput(r)
 	hashes := in.hashes
-	hashesQtys := in.hashesQtys
-	hashesCond := in.hashesCond
-	hashesPrice := in.hashesPrice
-	hashesNotes := in.hashesNotes
-	hashesFrom := in.hashesFrom
-	hashesFromQtys := in.hashesFromQtys
 	remoteURL := in.remoteURL
 	textArea := in.textArea
 	file, handler, err := in.file, in.handler, in.fileErr
@@ -637,45 +631,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	tcgpCSV := modes.tcgpCSV
 	maxRows := modes.maxRows
 	start := time.Now()
-	parser := newUploadParser(b)
 
-	// Load data
-	var uploadedData []UploadEntry
-	var uploadName string
-	if len(hashes) != 0 {
-		uploadedData, err = loadHashes(hashes, hashesQtys, hashesCond, hashesPrice,
-			hashesNotes, hashesFrom, hashesFromQtys)
-		uploadedData = restoreOpenedProducts(uploadedData)
-	} else if textArea != "" {
-		uploadedData, err = loadCsv(parser, strings.NewReader(textArea), ',', maxRows)
-	} else if handler != nil {
-		if strings.HasSuffix(handler.Filename, ".xls") {
-			uploadedData, err = loadOldXls(parser, file, maxRows)
-		} else if strings.HasSuffix(handler.Filename, ".xlsx") {
-			uploadedData, err = loadXlsx(parser, file, maxRows)
-		} else {
-			uploadedData, err = loadCsv(parser, file, ',', maxRows)
-		}
-	} else if remoteURL != "" {
-		var u *url.URL
-		u, err = url.Parse(remoteURL)
-		if err == nil {
-			switch u.Host {
-			case "store.tcgplayer.com":
-				uploadedData, uploadName, err = loadCollection(r.Context(), parser, remoteURL, maxRows)
-			case "www.moxfield.com", "moxfield.com":
-				uploadedData, uploadName, err = loadMoxfield(r.Context(), b, u.Path, maxRows)
-			case "manabox.app", "www.manabox.app":
-				uploadedData, uploadName, err = loadManabox(r.Context(), b, remoteURL, maxRows)
-			case "app.getcollectr.com":
-				uploadedData, uploadName, err = loadCollectr(r.Context(), b, remoteURL, maxRows)
-			case "docs.google.com":
-				uploadedData, uploadName, err = loadSpreadsheet(parser, u.Path, maxRows)
-			default:
-				err = errors.New("unsupported URL")
-			}
-		}
-	}
+	uploadedData, uploadName, err := loadUploadEntries(r, b, in, maxRows)
 	if err != nil {
 		pageVars.WarningMessage = err.Error()
 		render(w, "upload.html", pageVars)
@@ -1941,6 +1898,52 @@ func readUploadModes(r *http.Request, canBuylist, magicOnlyExports bool) uploadM
 		tcgpCSV:  tcgpCSV,
 		maxRows:  maxRows,
 	}
+}
+
+// loadUploadEntries reads the rows of the list the request carries, up to
+// maxRows, and the name of the deck or collection a link points at.
+func loadUploadEntries(r *http.Request, b *mtgmatcher.Backend, in uploadInput, maxRows int) ([]UploadEntry, string, error) {
+	parser := newUploadParser(b)
+
+	// Load data
+	var uploadedData []UploadEntry
+	var uploadName string
+	var err error
+	if len(in.hashes) != 0 {
+		uploadedData, err = loadHashes(in.hashes, in.hashesQtys, in.hashesCond, in.hashesPrice,
+			in.hashesNotes, in.hashesFrom, in.hashesFromQtys)
+		uploadedData = restoreOpenedProducts(uploadedData)
+	} else if in.textArea != "" {
+		uploadedData, err = loadCsv(parser, strings.NewReader(in.textArea), ',', maxRows)
+	} else if in.handler != nil {
+		if strings.HasSuffix(in.handler.Filename, ".xls") {
+			uploadedData, err = loadOldXls(parser, in.file, maxRows)
+		} else if strings.HasSuffix(in.handler.Filename, ".xlsx") {
+			uploadedData, err = loadXlsx(parser, in.file, maxRows)
+		} else {
+			uploadedData, err = loadCsv(parser, in.file, ',', maxRows)
+		}
+	} else if in.remoteURL != "" {
+		var u *url.URL
+		u, err = url.Parse(in.remoteURL)
+		if err == nil {
+			switch u.Host {
+			case "store.tcgplayer.com":
+				uploadedData, uploadName, err = loadCollection(r.Context(), parser, in.remoteURL, maxRows)
+			case "www.moxfield.com", "moxfield.com":
+				uploadedData, uploadName, err = loadMoxfield(r.Context(), b, u.Path, maxRows)
+			case "manabox.app", "www.manabox.app":
+				uploadedData, uploadName, err = loadManabox(r.Context(), b, in.remoteURL, maxRows)
+			case "app.getcollectr.com":
+				uploadedData, uploadName, err = loadCollectr(r.Context(), b, in.remoteURL, maxRows)
+			case "docs.google.com":
+				uploadedData, uploadName, err = loadSpreadsheet(parser, u.Path, maxRows)
+			default:
+				err = errors.New("unsupported URL")
+			}
+		}
+	}
+	return uploadedData, uploadName, err
 }
 
 func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
