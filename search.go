@@ -677,24 +677,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// (results query, display query, metadata aliasing).
 	chartSearchIDs := map[string]string{}
 
-	// Roster id -> chart target, resolved once per request. The results table
-	// and the chart both need this, and it is the archive round-trip that makes
-	// it worth doing once: the page used to ask for the same card twice, and a
-	// roster did so per card. Owned by this request alone, so a plain map with
-	// no locking - a nil entry is a resolution that already failed and is not
-	// retried.
-	chartTargets := map[string]*chartTarget{}
-	chartTargetFor := func(id string) *chartTarget {
-		if target, asked := chartTargets[id]; asked {
-			return target
-		}
-		target, err := resolveChartTarget(r.Context(), b, id)
-		if err != nil {
-			target = nil
-		}
-		chartTargets[id] = target
-		return target
-	}
+	chartTargets := chartTargetCache{}
 	if len(chartIDs) > 0 && !pageVars.DisableChart {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
@@ -722,7 +705,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			searchIDs := make([]string, len(chartIDs))
 			var unresolved int
 			for i, id := range chartIDs {
-				searchID, ok := chartSearchID(b, id, chartTargetFor(id))
+				searchID, ok := chartSearchID(b, id, chartTargets.target(r.Context(), b, id))
 				if !ok {
 					unresolved++
 				}
@@ -1349,11 +1332,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			// UI's identity for favorites/roster/legend); the ban_id is internal.
 			//
 			// Resolution stays here, on the request's own goroutine, because
-			// chartTargetFor owns an unlocked per-request map; only the archive
+			// chartTargets is an unlocked per-request map; only the archive
 			// reads that follow are issued together.
 			resolved := make([]chartSeries, 0, len(chartIDs))
 			for _, id := range chartIDs {
-				target := chartTargetFor(id)
+				target := chartTargets.target(r.Context(), b, id)
 				if target == nil {
 					continue
 				}
@@ -1491,6 +1474,27 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// chartTargetCache resolves roster ids to chart targets once per request. The
+// results table and the chart both need this, and it is the archive
+// round-trip that makes it worth doing once: the page used to ask for the
+// same card twice, and a roster did so per card. Owned by one request alone,
+// so a plain map with no locking - a nil entry is a resolution that already
+// failed and is not retried.
+type chartTargetCache map[string]*chartTarget
+
+// target returns the chart target of a roster id, resolving it on first ask.
+func (cache chartTargetCache) target(ctx context.Context, b *mtgmatcher.Backend, id string) *chartTarget {
+	if target, asked := cache[id]; asked {
+		return target
+	}
+	target, err := resolveChartTarget(ctx, b, id)
+	if err != nil {
+		target = nil
+	}
+	cache[id] = target
+	return target
 }
 
 // marketplaceLoaded reports whether this site serves a seller from the named
