@@ -519,89 +519,30 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		blMode = false
 	}
 
-	// Disable changing stores if not permitted
-	canChangeStores, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadChangeStoresEnabled"))
-	if DevMode && !SigCheck {
-		canChangeStores = true
-	}
+	st := readUploadSettings(r, blMode)
+	canChangeStores := st.canChangeStores
+	canUploadCustom := st.canUploadCustom
+	canPublishStore := st.canPublishStore
+	publishStore := st.publishStore
+	skipLowValue := st.skipLowValue
+	skipLowValueAbs := st.skipLowValueAbs
+	skipHighValue := st.skipHighValue
+	skipHighValueAbs := st.skipHighValueAbs
+	skipConds := st.skipConds
+	skipPrices := st.skipPrices
+	visualIndicator := st.visualIndicator
+	sorting := st.sorting
+	percSpread := st.percSpread
+	percSpreadMax := st.percSpreadMax
+	minLowVal := st.minLowVal
+	maxHighVal := st.maxHighVal
+	percMargin := st.percMargin
+	visualPerc := st.visualPerc
+	multiplier := st.multiplier
+	maxQty := st.maxQty
+	magicOnlyExports := st.magicOnlyExports
 
-	// Allow setting up a custom buylist
-	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
-	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
-
-	// Publishing the list as a store changes what every page serves until
-	// the store is removed or the server restarts, so it needs its own
-	// grant - UploadPublish - rather than riding along with any other one
-	canPublishStore, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadPublish"))
-	canPublishStore = canPublishStore || (DevMode && !SigCheck)
-	publishStore := canPublishStore && r.FormValue("publishstore") == "true"
-
-	// Enable optimizer customization
-	var skipLowValue, skipLowValueAbs, skipHighValue, skipHighValueAbs bool
-	var skipConds, skipPrices bool
-	var useMargin bool
-	var visualIndicator bool
-	if blMode {
-		skipLowValue = hasUploadOpt(r, "lowval")
-		skipLowValueAbs = hasUploadOpt(r, "lowvalabs")
-		skipHighValue = hasUploadOpt(r, "highval")
-		skipHighValueAbs = hasUploadOpt(r, "highvalabs")
-		useMargin = hasUploadOpt(r, "minmargin")
-		skipConds = hasUploadOpt(r, "nocond")
-		skipPrices = hasUploadOpt(r, "noprice")
-		visualIndicator = hasUploadOpt(r, "customperc")
-	}
-	sorting := getUploadSetting(r, "sorting", "UploadSorting")
-
-	percSpread := MinLowValueSpread
-	if v := uploadFloatSetting(r, "percspread", "UploadPercSpread"); v > 0 {
-		percSpread = v
-	}
-
-	percSpreadMax := MaxHighValueSpread
-	if v := upperBound(uploadFloatSetting(r, "percspreadmax", "UploadPercSpreadMax"), percSpread, skipLowValue); v > 0 {
-		percSpreadMax = v
-	}
-
-	minLowVal := MinLowValueAbs
-	if v := uploadFloatSetting(r, "minval", "UploadMinVal"); v > 0 {
-		minLowVal = v
-	}
-
-	maxHighVal := MaxHighValueAbs
-	if v := upperBound(uploadFloatSetting(r, "maxval", "UploadMaxVal"), minLowVal, skipLowValueAbs); v > 0 {
-		maxHighVal = v
-	}
-
-	percMargin := 1.0
-	if useMargin {
-		if v := uploadFloatSetting(r, "margin", "UploadMargin"); v >= 0 {
-			percMargin = 1 - v/100.0
-		}
-	}
-
-	visualPerc := VisualPercSpread
-	if v := uploadFloatSetting(r, "custompercmax", "UploadCustomPercMax"); v > 0 {
-		visualPerc = v
-	}
 	pageVars.CanFilterByPrice = visualIndicator
-
-	multiplier := 1
-	if v := uploadIntSetting(r, "multiplier", "UploadMultiplier"); v > 1 {
-		multiplier = v
-	}
-
-	// Cap each card's quantity to this maximum (0 = no cap)
-	maxQty := 0
-	if v := uploadIntSetting(r, "maxqty", "UploadMaxQty"); v > 0 {
-		maxQty = v
-	}
-
-	// CardConduit and Deckbox are Magic-only destinations, and each addresses
-	// a card by an identifier only Magic cards carry - a Scryfall id for the
-	// estimate, a Deckbox id for the CSV. Anywhere else the export has nothing
-	// to name the cards with, so the page does not offer it.
-	magicOnlyExports := Config().Game == DefaultGame
 
 	// Set flags needed to show elements on the page ui
 	pageVars.IsBuylist = blMode
@@ -1700,6 +1641,145 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
+}
+
+// uploadSettings are the upload page's grants and optimizer options, read once
+// from the request, its cookies and the signature.
+type uploadSettings struct {
+	canChangeStores  bool
+	canUploadCustom  bool
+	canPublishStore  bool
+	publishStore     bool
+	skipLowValue     bool
+	skipLowValueAbs  bool
+	skipHighValue    bool
+	skipHighValueAbs bool
+	skipConds        bool
+	skipPrices       bool
+	visualIndicator  bool
+	sorting          string
+	percSpread       float64
+	percSpreadMax    float64
+	minLowVal        float64
+	maxHighVal       float64
+	percMargin       float64
+	visualPerc       float64
+	multiplier       int
+	maxQty           int
+	magicOnlyExports bool
+}
+
+// readUploadSettings parses the upload page's settings from the request. The
+// optimizer options apply to buylist mode only, so it takes the mode.
+func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
+	sig := getSignatureFromCookies(r)
+
+	// Disable changing stores if not permitted
+	canChangeStores, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadChangeStoresEnabled"))
+	if DevMode && !SigCheck {
+		canChangeStores = true
+	}
+
+	// Allow setting up a custom buylist
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
+
+	// Publishing the list as a store changes what every page serves until
+	// the store is removed or the server restarts, so it needs its own
+	// grant - UploadPublish - rather than riding along with any other one
+	canPublishStore, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadPublish"))
+	canPublishStore = canPublishStore || (DevMode && !SigCheck)
+	publishStore := canPublishStore && r.FormValue("publishstore") == "true"
+
+	// Enable optimizer customization
+	var skipLowValue, skipLowValueAbs, skipHighValue, skipHighValueAbs bool
+	var skipConds, skipPrices bool
+	var useMargin bool
+	var visualIndicator bool
+	if blMode {
+		skipLowValue = hasUploadOpt(r, "lowval")
+		skipLowValueAbs = hasUploadOpt(r, "lowvalabs")
+		skipHighValue = hasUploadOpt(r, "highval")
+		skipHighValueAbs = hasUploadOpt(r, "highvalabs")
+		useMargin = hasUploadOpt(r, "minmargin")
+		skipConds = hasUploadOpt(r, "nocond")
+		skipPrices = hasUploadOpt(r, "noprice")
+		visualIndicator = hasUploadOpt(r, "customperc")
+	}
+	sorting := getUploadSetting(r, "sorting", "UploadSorting")
+
+	percSpread := MinLowValueSpread
+	if v := uploadFloatSetting(r, "percspread", "UploadPercSpread"); v > 0 {
+		percSpread = v
+	}
+
+	percSpreadMax := MaxHighValueSpread
+	if v := upperBound(uploadFloatSetting(r, "percspreadmax", "UploadPercSpreadMax"), percSpread, skipLowValue); v > 0 {
+		percSpreadMax = v
+	}
+
+	minLowVal := MinLowValueAbs
+	if v := uploadFloatSetting(r, "minval", "UploadMinVal"); v > 0 {
+		minLowVal = v
+	}
+
+	maxHighVal := MaxHighValueAbs
+	if v := upperBound(uploadFloatSetting(r, "maxval", "UploadMaxVal"), minLowVal, skipLowValueAbs); v > 0 {
+		maxHighVal = v
+	}
+
+	percMargin := 1.0
+	if useMargin {
+		if v := uploadFloatSetting(r, "margin", "UploadMargin"); v >= 0 {
+			percMargin = 1 - v/100.0
+		}
+	}
+
+	visualPerc := VisualPercSpread
+	if v := uploadFloatSetting(r, "custompercmax", "UploadCustomPercMax"); v > 0 {
+		visualPerc = v
+	}
+
+	multiplier := 1
+	if v := uploadIntSetting(r, "multiplier", "UploadMultiplier"); v > 1 {
+		multiplier = v
+	}
+
+	// Cap each card's quantity to this maximum (0 = no cap)
+	maxQty := 0
+	if v := uploadIntSetting(r, "maxqty", "UploadMaxQty"); v > 0 {
+		maxQty = v
+	}
+
+	// CardConduit and Deckbox are Magic-only destinations, and each addresses
+	// a card by an identifier only Magic cards carry - a Scryfall id for the
+	// estimate, a Deckbox id for the CSV. Anywhere else the export has nothing
+	// to name the cards with, so the page does not offer it.
+	magicOnlyExports := Config().Game == DefaultGame
+
+	return uploadSettings{
+		canChangeStores:  canChangeStores,
+		canUploadCustom:  canUploadCustom,
+		canPublishStore:  canPublishStore,
+		publishStore:     publishStore,
+		skipLowValue:     skipLowValue,
+		skipLowValueAbs:  skipLowValueAbs,
+		skipHighValue:    skipHighValue,
+		skipHighValueAbs: skipHighValueAbs,
+		skipConds:        skipConds,
+		skipPrices:       skipPrices,
+		visualIndicator:  visualIndicator,
+		sorting:          sorting,
+		percSpread:       percSpread,
+		percSpreadMax:    percSpreadMax,
+		minLowVal:        minLowVal,
+		maxHighVal:       maxHighVal,
+		percMargin:       percMargin,
+		visualPerc:       visualPerc,
+		multiplier:       multiplier,
+		maxQty:           maxQty,
+		magicOnlyExports: magicOnlyExports,
+	}
 }
 
 func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
