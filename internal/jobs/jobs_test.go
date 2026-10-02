@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -129,5 +130,20 @@ func TestAge(t *testing.T) {
 		if got := Age(d); got != want {
 			t.Errorf("Age(%v) = %q, want %q", d, got, want)
 		}
+	}
+}
+
+func TestRowsByName(t *testing.T) {
+	now := time.Now()
+	tracker := newTestTracker(now, &now)
+	tracker.Start("b")
+	tracker.Report("a", "", "")
+
+	var names []string
+	for _, row := range tracker.Rows() {
+		names = append(names, row.Name)
+	}
+	if !slices.Equal(names, []string{"a", "b"}) {
+		t.Errorf("rows %v, want them by name", names)
 	}
 }
