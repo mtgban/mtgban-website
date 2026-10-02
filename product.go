@@ -225,6 +225,37 @@ var colorValues = map[string]string{
 	"ruby":       "#FF4500",
 	"sapphire":   "#0000FF",
 	"steel":      "#A9A9A9",
+	"purple":     "#8A2BE2",
+	"yellow":     "#FFFF00",
+
+	// Riftbound's domains
+	"body":  "#FF8C00",
+	"calm":  "#32CD32",
+	"chaos": "#8A2BE2",
+	"fury":  "#FF4500",
+	"mind":  "#00BFFF",
+	"order": "#FFFF00",
+
+	// Yu-Gi-Oh's attributes, and its spells and traps
+	"dark":   "#663399",
+	"divine": "#DAA520",
+	"earth":  "#A0522D",
+	"fire":   "#FF4500",
+	"light":  "#FFFF00",
+	"water":  "#00BFFF",
+	"wind":   "#32CD32",
+	"spell":  "#1D9E74",
+	"trap":   "#BC5A84",
+
+	// Pokemon's types, beside the fire, water and colorless above
+	"darkness":  "#705848",
+	"dragon":    "#7038F8",
+	"fairy":     "#EE99AC",
+	"fighting":  "#C03028",
+	"grass":     "#78C850",
+	"lightning": "#F8D030",
+	"metal":     "#B8B8D0",
+	"psychic":   "#F85888",
 }
 
 func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
