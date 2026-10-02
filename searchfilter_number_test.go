@@ -100,3 +100,40 @@ func TestCollectorNumberStrictIsVerbatim(t *testing.T) {
 		})
 	}
 }
+
+// TestCollectorNumberWithTotal pins a number written with the set total its
+// card prints, "222/236", to cards carrying both. Pokemon and Lorcana print
+// no set code on their cards, so the total is what tells one 222 from
+// another.
+func TestCollectorNumberWithTotal(t *testing.T) {
+	skipWithoutDatastore(t)
+	for _, tt := range []struct {
+		desc, query, number, total string
+		want                       bool
+	}{
+		{"the number and total reach the card", "cn:222/236", "222", "236", true},
+		{"and so does the bare query", "222/236", "222", "236", true},
+		{"or the bare query after a name", "Mewtwo 222/236", "222", "236", true},
+		{"padding on either side is dropped", "cn:#0222/0236", "222", "236", true},
+		{"a total with letters is compared folded", "cn:TG01/tg30", "TG01", "TG30", true},
+		{"another total is refused", "222/236", "222", "214", false},
+		{"so is a card printing no total", "222/236", "222", "", false},
+		{"a number in the list without one still matches", "cn:1/102,222", "222", "214", true},
+		{"a number written with a slash matches whole", "cn:MON219/MON220", "MON219/MON220", "", true},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			co := &mtgmatcher.CardObject{}
+			co.Number = tt.number
+			co.PlainNumber = tt.number
+			co.SetTotal = tt.total
+
+			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)
+			elem := findNumberFilter(t, config, "number_total")
+			skip := applyCardFilter(backend(), "number_total", elem.Values, co)
+			if skip == tt.want {
+				t.Errorf("%s against %s/%s: matched=%v, want %v",
+					tt.query, tt.number, tt.total, !skip, tt.want)
+			}
+		})
+	}
+}

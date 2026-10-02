@@ -2042,7 +2042,7 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 		}
 		var buckets []map[string][]string
 		switch filters[i].Name {
-		case "number":
+		case "number", "number_total":
 			buckets = append(buckets, numbers.loose, numbers.strict)
 		case "number_strict":
 			buckets = append(buckets, numbers.strict)
@@ -2050,11 +2050,15 @@ func numberSeedUUIDs(numbers *numbersSnapshot, filters []FilterElem) ([]string, 
 			continue
 		}
 		// Values are already prepared by fixupNumberNG for the filter.
-		// Use them verbatim, just as the scan does.
+		// Use them verbatim, just as the scan does, and a number_total
+		// value by its number too, for the scan to check the total.
 		var uuids []string
 		for _, value := range filters[i].Values {
 			for _, bucket := range buckets {
 				uuids = append(uuids, bucket[value]...)
+				if filters[i].Name == "number_total" {
+					uuids = append(uuids, bucket[strings.Split(value, "/")[0]]...)
+				}
 			}
 		}
 		return dedupeKeys(uuids), true

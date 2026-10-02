@@ -176,3 +176,73 @@ func TestLetteredNumberReachesItsPrintingInEveryGame(t *testing.T) {
 		t.Skip("no non-Magic datastore paths in the environment")
 	}
 }
+
+// A number typed with the set total its card prints, "222/236", reaches that
+// printing and only printings carrying both, in every game whose cards print
+// a total.
+func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
+	var ran int
+	for game, envVar := range gameDatastores {
+		path := os.Getenv(envVar)
+		if path == "" {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			t.Logf("%s: %v", game, err)
+			continue
+		}
+		loaded, err := mtgmatcher.Open(game, f)
+		f.Close()
+		if err != nil {
+			t.Errorf("%s: %v", game, err)
+			continue
+		}
+		ran++
+
+		t.Run(string(game), func(t *testing.T) {
+			ds := testSite.newDatastore(loaded, time.Now())
+
+			var checked int
+			for _, uuid := range ds.backend.GetUUIDs() {
+				co, err := ds.backend.GetUUID(uuid)
+				if err != nil || co.Sealed || co.Number == "" || co.SetTotal == "" ||
+					strings.Contains(co.Number+co.SetTotal, "/") {
+					continue
+				}
+				checked++
+
+				// Bare only where it has a digit, so a word with a slash in
+				// it is still read as a name.
+				query := co.Number + "/" + co.SetTotal
+				if !strings.ContainsAny(query, "0123456789") {
+					query = "cn:" + query
+				}
+				keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+				if err != nil {
+					t.Errorf("%q: %v", query, err)
+					continue
+				}
+				if !slices.Contains(keys, uuid) {
+					t.Errorf("%q does not reach %s %s", query, co.SetCode, co.Name)
+				}
+				for _, key := range keys {
+					hit, err := ds.backend.GetUUID(key)
+					if err != nil {
+						continue
+					}
+					sameNumber := strings.EqualFold(hit.Number, co.Number) ||
+						strings.EqualFold(hit.PlainNumber, co.PlainNumber)
+					if !sameNumber || plainTotal(hit.SetTotal) != plainTotal(co.SetTotal) {
+						t.Errorf("%q reaches %s %s #%s/%s", query, hit.SetCode, hit.Name, hit.Number, hit.SetTotal)
+					}
+				}
+			}
+			t.Logf("%-14s %d numbers with a total checked", game, checked)
+		})
+	}
+
+	if ran == 0 {
+		t.Skip("no non-Magic datastore paths in the environment")
+	}
+}
