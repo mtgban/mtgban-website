@@ -154,27 +154,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminConfigEditor(r, &pageVars)
 
-	// -- Checkpoints: handle POST if submitted --
-	newCheckpoints := r.FormValue("checkpointsTextArea")
-	if newCheckpoints != "" {
-		var parsed checkpointsFile
-		if err := json.Unmarshal([]byte(newCheckpoints), &parsed); err != nil {
-			pageVars.WarningMessage = "Checkpoints JSON invalid: " + err.Error()
-		} else if err := saveCheckpoints(r.Context(), parsed.Events); err != nil {
-			pageVars.WarningMessage = "Checkpoints save failed: " + err.Error()
-		} else {
-			pageVars.InfoMessage = "Checkpoints updated"
-		}
-	}
-
-	// -- Checkpoints: always load current text for the editor --
-	if cpText, err := currentCheckpointsJSON(); err != nil {
-		if pageVars.InfoMessage == "" {
-			pageVars.InfoMessage = err.Error()
-		}
-	} else {
-		pageVars.CheckpointsText = cpText
-	}
+	adminCheckpointsEditor(r, &pageVars)
 
 	// -- Access table: handle POST if submitted --
 	newACL := r.FormValue("aclTextArea")
@@ -848,6 +828,32 @@ func adminConfigEditor(r *http.Request, pageVars *PageVars) {
 		} else {
 			pageVars.CleanSearchQuery = text
 		}
+	}
+}
+
+// adminCheckpointsEditor saves chart checkpoints posted from the dashboard's
+// editor, then fills the editor with the checkpoints as they stand.
+func adminCheckpointsEditor(r *http.Request, pageVars *PageVars) {
+	// -- Checkpoints: handle POST if submitted --
+	newCheckpoints := r.FormValue("checkpointsTextArea")
+	if newCheckpoints != "" {
+		var parsed checkpointsFile
+		if err := json.Unmarshal([]byte(newCheckpoints), &parsed); err != nil {
+			pageVars.WarningMessage = "Checkpoints JSON invalid: " + err.Error()
+		} else if err := saveCheckpoints(r.Context(), parsed.Events); err != nil {
+			pageVars.WarningMessage = "Checkpoints save failed: " + err.Error()
+		} else {
+			pageVars.InfoMessage = "Checkpoints updated"
+		}
+	}
+
+	// -- Checkpoints: always load current text for the editor --
+	if cpText, err := currentCheckpointsJSON(); err != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = err.Error()
+		}
+	} else {
+		pageVars.CheckpointsText = cpText
 	}
 }
 
