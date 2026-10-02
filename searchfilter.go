@@ -252,28 +252,26 @@ func fixupStoreCodeNG(code string) []string {
 	return filters
 }
 
-func fixupRarityNG(code string) []string {
-	code = strings.ToLower(code)
-	filters := strings.Split(code, ",")
-	for i := range filters {
-		switch filters[i] {
-		case "c":
-			filters[i] = "common"
-		case "u":
-			filters[i] = "uncommon"
-		case "r":
-			filters[i] = "rare"
-		case "m":
-			filters[i] = "mythic"
-		case "s":
-			filters[i] = "special"
-		case "t":
-			filters[i] = "token"
-		case "o":
-			filters[i] = "oversize"
+// fixupRarityNG reads the rarities a search names, separated by commas, as
+// mtgmatcher.RarityName spells them. A single letter names every rarity of
+// the game it begins, "c" common; one that begins none stays as written.
+func fixupRarityNG(b *mtgmatcher.Backend, code string) []string {
+	var names []string
+	for _, word := range strings.Split(code, ",") {
+		name := mtgmatcher.RarityName(word)
+		begun := len(names)
+		if len(name) == 1 {
+			for _, rarity := range b.Rarities {
+				if strings.HasPrefix(rarity, name) {
+					names = append(names, rarity)
+				}
+			}
+		}
+		if len(names) == begun {
+			names = append(names, name)
 		}
 	}
-	return filters
+	return names
 }
 
 // fixupNumberNG spells a number query the way the card it will be compared
@@ -1037,7 +1035,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			filters = append(filters, FilterElem{
 				Name:   opt,
 				Negate: negate,
-				Values: fixupRarityNG(code),
+				Values: fixupRarityNG(b, code),
 			})
 		case "f":
 			filters = append(filters, FilterElem{
@@ -1973,14 +1971,6 @@ var specialEditionTags = map[string]string{
 	"DRK": "abu4h",
 }
 
-var rarityMap = map[string]int{
-	"common":   0,
-	"uncommon": 1,
-	"rare":     2,
-	"mythic":   3,
-	"special":  4,
-}
-
 // applyCardFilter dispatches a card filter by name through a switch of
 // named functions rather than a map of func values: shouldSkipCardNG calls
 // this once per filter per examined uuid, and calling through an opaque
@@ -1994,13 +1984,13 @@ func applyCardFilter(b *mtgmatcher.Backend, name string, filters []string, co *m
 	case "edition":
 		return cardFilterEdition(filters, co)
 	case "rarity":
-		return cardFilterRarity(filters, co)
+		return cardFilterRarity(b, filters, co)
 	case "format":
 		return cardFilterFormat(filters, co)
 	case "rarity_greater_than":
-		return cardFilterRarityGreaterThan(filters, co)
+		return cardFilterRarityGreaterThan(b, filters, co)
 	case "rarity_less_than":
-		return cardFilterRarityLessThan(filters, co)
+		return cardFilterRarityLessThan(b, filters, co)
 	case "type":
 		return cardFilterType(filters, co)
 	case "color":
@@ -2066,8 +2056,21 @@ func cardFilterEdition(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, co.SetCode)
 }
 
-func cardFilterRarity(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, co.Rarity)
+// cardFilterRarity keeps the cards at a rarity the query names: spelled as
+// the card spells it, or at its place in the game's order, which is how
+// "superrare" finds "Super Rare".
+func cardFilterRarity(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+	rank, ranked := b.RarityRank(co.Rarity)
+	for _, name := range filters {
+		if name == co.Rarity {
+			return false
+		}
+		named, found := b.RarityRank(name)
+		if ranked && found && named == rank {
+			return false
+		}
+	}
+	return true
 }
 
 func cardFilterFormat(filters []string, co *mtgmatcher.CardObject) bool {
@@ -2081,20 +2084,27 @@ func cardFilterFormat(filters []string, co *mtgmatcher.CardObject) bool {
 	return true
 }
 
-func cardFilterRarityGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
-	rarityIndex, found := rarityMap[filters[0]]
+// cardFilterRarityGreaterThan keeps the cards rarer than the rarity named,
+// by the game's own order; a rarity the game does not rank is rarer than
+// none.
+func cardFilterRarityGreaterThan(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+	limit, found := b.RarityRank(filters[0])
 	if !found {
 		return true
 	}
-	return rarityIndex >= rarityMap[co.Rarity]
+	rank, ranked := b.RarityRank(co.Rarity)
+	return !ranked || rank >= limit
 }
 
-func cardFilterRarityLessThan(filters []string, co *mtgmatcher.CardObject) bool {
-	rarityIndex, found := rarityMap[filters[0]]
+// cardFilterRarityLessThan keeps the cards commoner than the rarity named;
+// a rarity the game does not rank is commoner than all.
+func cardFilterRarityLessThan(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardObject) bool {
+	limit, found := b.RarityRank(filters[0])
 	if !found {
 		return true
 	}
-	return rarityIndex <= rarityMap[co.Rarity]
+	rank, ranked := b.RarityRank(co.Rarity)
+	return ranked && rank <= limit
 }
 
 func cardFilterType(filters []string, co *mtgmatcher.CardObject) bool {
