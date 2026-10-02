@@ -18,7 +18,8 @@ type (
 )
 
 // searchEntries2embed converts the picked offers into the embed input shape.
-func searchEntries2embed(results []SearchEntry) []embed.Entry {
+// grades names the condition each store's offer is for, where it is not NM.
+func searchEntries2embed(results []SearchEntry, grades map[string]mtgban.Condition) []embed.Entry {
 	if results == nil {
 		return nil
 	}
@@ -30,11 +31,16 @@ func searchEntries2embed(results []SearchEntry) []embed.Entry {
 		if !entry.IsOffer() {
 			continue
 		}
+		var grade string
+		if cond := grades[entry.ScraperName]; cond != "" && cond != mtgban.NM {
+			grade = string(cond)
+		}
 		out = append(out, embed.Entry{
 			ScraperName: entry.ScraperName,
 			Shorthand:   entry.Shorthand,
 			Price:       entry.Price,
 			Ratio:       entry.Ratio,
+			Grade:       grade,
 		})
 	}
 	return out
@@ -67,6 +73,7 @@ func ProcessEmbedSearchResultsSellers(b *mtgmatcher.Backend, foundSellers map[st
 // EmbedSellerEntries picks the offers an embed shows for one named card.
 func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEntry, cardID string, index bool) []embed.Entry {
 	var results []SearchEntry
+	var founders map[string]mtgban.Condition
 
 	if index {
 		results = foundSellers[cardID]["INDEX"]
@@ -87,7 +94,7 @@ func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEnt
 			}
 		}
 	} else {
-		founders := map[string]mtgban.Condition{}
+		founders = map[string]mtgban.Condition{}
 		// Query results with the known (ordered) conditions
 		for _, cond := range mtgban.DefaultGradeTags {
 			foundResults := foundSellers[cardID][cond]
@@ -100,10 +107,6 @@ func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEnt
 					continue
 				}
 				founders[result.ScraperName] = cond
-				// If not NM, add a small tag
-				if cond != "NM" {
-					result.ScraperName += " (" + string(cond) + ")"
-				}
 				results = append(results, result)
 			}
 		}
@@ -123,7 +126,7 @@ func EmbedSellerEntries(foundSellers map[string]map[mtgban.Condition][]SearchEnt
 		}
 		results = tmp
 	}
-	return searchEntries2embed(results)
+	return searchEntries2embed(results, founders)
 }
 
 // lastSales2embed converts the scraper's sales into the embed input shape.
@@ -146,7 +149,7 @@ func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[st
 		return nil
 	}
 
-	return searchEntries2embed(foundVendors[firstEmbedCard(b, foundVendors)]["NM"])
+	return searchEntries2embed(foundVendors[firstEmbedCard(b, foundVendors)]["NM"], nil)
 }
 
 // externalURL is the origin this site is reachable at: what an oEmbed
