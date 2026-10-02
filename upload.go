@@ -728,7 +728,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Orders implies priority of argument search
-	pageVars.Metadata = map[string]GenericCard{}
 	// Read here rather than passed dereferenced: a paste reaches this line
 	// with no file behind it at all.
 	var uploadFilename string
@@ -749,25 +748,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Load up image links
-	for _, data := range uploadedData {
-		if data.MismatchError != nil {
-			continue
-		}
-
-		_, found := pageVars.Metadata[data.CardID]
-		if found {
-			continue
-		}
-		pageVars.Metadata[data.CardID] = uuid2card(b, data.CardID, true, false, st.preferFlavor)
-
-		// Load metadata for alternative printings (used by pick-printing picker)
-		for _, alias := range data.PossibleAliases {
-			if _, exists := pageVars.Metadata[alias]; !exists {
-				pageVars.Metadata[alias] = uuid2card(b, alias, true, false, st.preferFlavor)
-			}
-		}
-	}
+	pageVars.Metadata = uploadMetadata(b, st, uploadedData)
 
 	rows := priceUploadRows(b, blMode, st, prices, indexes, uploadedData)
 	pageVars.TotalEntries = rows.totalEntries
@@ -794,6 +775,34 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
+}
+
+// uploadMetadata reads what the page shows of every matched card, and of the
+// other printings the printing picker offers for it.
+func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []UploadEntry) map[string]GenericCard {
+	metadata := map[string]GenericCard{}
+
+	// Load up image links
+	for _, data := range uploadedData {
+		if data.MismatchError != nil {
+			continue
+		}
+
+		_, found := metadata[data.CardID]
+		if found {
+			continue
+		}
+		metadata[data.CardID] = uuid2card(b, data.CardID, true, false, st.preferFlavor)
+
+		// Load metadata for alternative printings (used by pick-printing picker)
+		for _, alias := range data.PossibleAliases {
+			if _, exists := metadata[alias]; !exists {
+				metadata[alias] = uuid2card(b, alias, true, false, st.preferFlavor)
+			}
+		}
+	}
+
+	return metadata
 }
 
 // fillUploadResults sorts the rows and the optimizer's picks, and lays them
