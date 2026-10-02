@@ -1581,34 +1581,10 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 	// Load the preferred list of enabled stores for the <select> box
 	// The first check is for when the cookie is not yet set
 	// Force stores if not allowed to change them
-	var tickedSellers, tickedVendors, tickedSealedSellers, tickedSealedVendors []string
-	enabledSellers := readCookie(r, "enabledSellers")
-	if len(enabledSellers) == 0 || !st.canChangeStores {
-		tickedSellers = Affiliates().List
-	} else {
-		tickedSellers = strings.Split(enabledSellers, "|")
-	}
-
-	enabledVendors := readCookie(r, "enabledVendors")
-	if len(enabledVendors) == 0 || !st.canChangeStores {
-		tickedVendors = singlesVendors
-	} else {
-		tickedVendors = strings.Split(enabledVendors, "|")
-	}
-
-	enabledSealedSellers := readCookie(r, "enabledSealedSellers")
-	if len(enabledSealedSellers) == 0 || !st.canChangeStores {
-		tickedSealedSellers = sealedSellers
-	} else {
-		tickedSealedSellers = strings.Split(enabledSealedSellers, "|")
-	}
-
-	enabledSealedVendors := readCookie(r, "enabledSealedVendors")
-	if len(enabledSealedVendors) == 0 || !st.canChangeStores {
-		tickedSealedVendors = sealedVendors
-	} else {
-		tickedSealedVendors = strings.Split(enabledSealedVendors, "|")
-	}
+	tickedSellers := tickedStores(r, "enabledSellers", Affiliates().List, st.canChangeStores)
+	tickedVendors := tickedStores(r, "enabledVendors", singlesVendors, st.canChangeStores)
+	tickedSealedSellers := tickedStores(r, "enabledSealedSellers", sealedSellers, st.canChangeStores)
+	tickedSealedVendors := tickedStores(r, "enabledSealedVendors", sealedVendors, st.canChangeStores)
 
 	// The sealed indexes are the sealed sellers that were made public;
 	// unlike the EV ones, TCGSealed is not MetadataOnly, since it is a
@@ -1717,6 +1693,16 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 		tickedSealedSellers:    tickedSealedSellers,
 		tickedSealedVendors:    tickedSealedVendors,
 	}
+}
+
+// tickedStores reads the stores the named cookie keeps ticked, or fallback
+// when it keeps none or the reader may not change stores.
+func tickedStores(r *http.Request, cookie string, fallback []string, canChangeStores bool) []string {
+	saved := readCookie(r, cookie)
+	if len(saved) == 0 || !canChangeStores {
+		return fallback
+	}
+	return strings.Split(saved, "|")
 }
 
 // uploadInput is the list a request carries: the rows a page of results posts
