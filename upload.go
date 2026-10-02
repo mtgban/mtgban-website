@@ -776,54 +776,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Allow estimating on a separate page
 	if estimate {
-		var items []cardconduit.Item
-		for i := range uploadedData {
-			if uploadedData[i].CardID == "" {
-				continue
-			}
-			co, err := b.GetUUID(uploadedData[i].CardID)
-			if err != nil {
-				continue
-			}
-			scryfallID, found := co.Identifiers["scryfallId"]
-			if !found {
-				continue
-			}
-
-			var cond string
-			if uploadedData[i].OriginalCondition != "" {
-				cond = map[mtgban.Condition]string{
-					mtgban.NM: "nm",
-					mtgban.SP: "lp",
-					mtgban.MP: "mp",
-					mtgban.HP: "hp",
-					mtgban.PO: "dmg",
-				}[uploadedData[i].OriginalCondition]
-			}
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
-			qty = adjustQty(qty, multiplier, maxQty)
-
-			items = append(items, cardconduit.Item{
-				ScryfallID: scryfallID,
-				Condition:  cond,
-				Quantity:   qty,
-				IsFoil:     co.Foil,
-				IsEtched:   co.Etched,
-			})
-		}
-
-		link, err := cardconduit.SendEstimate(r.Context(), Config().API["cardconduit"], items)
+		err := redirectToCardConduit(w, r, b, uploadedData, multiplier, maxQty)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to process your list to CardConduit right now"
 			render(w, "upload.html", pageVars)
-			return
 		}
-
-		http.Redirect(w, r, link, http.StatusFound)
 		return
 	}
 	if deckbox && canBuylist {
@@ -1524,6 +1482,57 @@ func writeTagCSV(w http.ResponseWriter, b *mtgmatcher.Backend, hashTag string, h
 		dropDownloadHeaders(w)
 	}
 	return err
+}
+
+// redirectToCardConduit sends the cards that have a Scryfall id to a
+// CardConduit estimate and redirects to it.
+func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
+	var items []cardconduit.Item
+	for i := range uploadedData {
+		if uploadedData[i].CardID == "" {
+			continue
+		}
+		co, err := b.GetUUID(uploadedData[i].CardID)
+		if err != nil {
+			continue
+		}
+		scryfallID, found := co.Identifiers["scryfallId"]
+		if !found {
+			continue
+		}
+
+		var cond string
+		if uploadedData[i].OriginalCondition != "" {
+			cond = map[mtgban.Condition]string{
+				mtgban.NM: "nm",
+				mtgban.SP: "lp",
+				mtgban.MP: "mp",
+				mtgban.HP: "hp",
+				mtgban.PO: "dmg",
+			}[uploadedData[i].OriginalCondition]
+		}
+		qty := 1
+		if uploadedData[i].HasQuantity {
+			qty = uploadedData[i].Quantity
+		}
+		qty = adjustQty(qty, multiplier, maxQty)
+
+		items = append(items, cardconduit.Item{
+			ScryfallID: scryfallID,
+			Condition:  cond,
+			Quantity:   qty,
+			IsFoil:     co.Foil,
+			IsEtched:   co.Etched,
+		})
+	}
+
+	link, err := cardconduit.SendEstimate(r.Context(), Config().API["cardconduit"], items)
+	if err != nil {
+		return err
+	}
+
+	http.Redirect(w, r, link, http.StatusFound)
+	return nil
 }
 
 // uploadSettings are the upload page's grants and optimizer options, read once
