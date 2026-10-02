@@ -293,18 +293,15 @@ func gameTCGCategory() int {
 
 // overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
-	if Config().TimeseriesConfig.LongFormReads {
-		provider, ok := providerForDatasetIndex(metric)
-		if !ok {
-			return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
-		}
-		category := gameTCGCategory()
-		if category < 0 {
-			return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config().Game)
-		}
-		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice, category)
+	provider, ok := providerForDatasetIndex(metric)
+	if !ok {
+		return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
 	}
-	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice, minPriorPrice)
+	category := gameTCGCategory()
+	if category < 0 {
+		return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config().Game)
+	}
+	return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice, category)
 }
 
 // moverCardID resolves a mover row to this game's uuid: Magic rows carry the
