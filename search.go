@@ -1319,89 +1319,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
 		} else {
-			// Render the window the chart draws, taken from the viewer's own
-			// last choice so it is not drawn once and redrawn at theirs. A
-			// roster's select starts on "All", so absent a choice it renders
-			// the lot. See docs/chart-page-loading.md.
-			lb, maxDays := chartWindow(sig, chartInitialRange(r, isMultiChart))
-			pageVars.ChartLoadedDays = lb.Days()
-
-			// Generic path: resolve every roster id to a target and chart it by
-			// whatever providers have data — one path for every game, keyed on the
-			// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
-			// UI's identity for favorites/roster/legend); the ban_id is internal.
-			//
-			// Resolution stays here, on the request's own goroutine, because
-			// roster.targets is an unlocked per-request map; only the archive
-			// reads that follow are issued together.
-			resolved := make([]chartSeries, 0, len(roster.ids))
-			for _, id := range roster.ids {
-				target := roster.targets.target(r.Context(), b, id)
-				if target == nil {
-					continue
-				}
-				resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, target: target})
-			}
-			series := fetchRosterPrices(r.Context(), resolved, lb)
-			// An empty window hides the chart and the select that could widen it,
-			// so a card whose prices all predate the window reads the ceiling. A
-			// read that failed is not an empty window, so it is not retried wider.
-			priced := slices.ContainsFunc(series, func(cs chartSeries) bool { return len(cs.Prices) > 0 })
-			if lb.Days() < maxDays && archiveAnswered(series) && !priced {
-				lb, _ = chartWindow(sig, 0)
-				pageVars.ChartLoadedDays = lb.Days()
-				series = fetchRosterPrices(r.Context(), resolved, lb)
-			}
-
-			// Read each card once and take the axis from what came back: a
-			// roster used to cost two archive round-trips per card, and
-			// against a hundred-partition prices table a round-trip is
-			// mostly planning.
-			var earliest time.Time
-			for _, cs := range series {
-				e := earliestChartedDate(cs.Prices, lb)
-				if !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
-					earliest = e
-				}
-			}
-			if len(series) == 0 || earliest.IsZero() {
-				pageVars.InfoMessage = "No chart data available"
-			} else {
-				pageVars.AxisLabels = getDateAxisValues(earliest)
-				cards := make([]multiCardInput, len(series))
-				for i, cs := range series {
-					cards[i] = multiCardInput{
-						CardID:   cs.CardID,
-						Name:     cs.Name,
-						Datasets: chartDatasetsFrom(cs.Prices, pageVars.AxisLabels),
-					}
-				}
-				if isMultiChart {
-					datasets, refs := mergeMultiCardDatasets(cards)
-					pageVars.Datasets = datasets
-					pageVars.ChartReferences = refs
-					names := make([]string, len(cards))
-					for i, card := range cards {
-						names[i] = card.Name
-					}
-					pageVars.Checkpoints = multiCardCheckpoints(ds, names, earliest)
-				} else {
-					pageVars.Datasets = cards[0].Datasets
-					pageVars.Checkpoints = relevantCheckpoints(ds, cards[0].Name, earliest)
-				}
-				// A card the archive did not answer for is missing from the chart,
-				// which says nothing about its prices: never call such a chart
-				// empty, and when the rest drew, say what was left out.
-				failed := readFailures(series)
-				switch {
-				case len(pageVars.Datasets) == 0 && failed > 0:
-					pageVars.InfoMessage = "Failed to load chart"
-				case len(pageVars.Datasets) == 0:
-					pageVars.InfoMessage = "No chart data available"
-				case failed > 0:
-					noteChartIDsDropped(&pageVars, failed, len(roster.ids), "failed to load")
-				}
-			}
+			fillLongFormChart(&pageVars, r, ds, b, roster)
 		}
 
 		// Sidebar foil/etched switch and Stocks link are inherently per-card,
@@ -1453,6 +1371,98 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	render(w, "search.html", pageVars)
 	if DevMode {
 		log.Println("render took", time.Since(start))
+	}
+}
+
+// fillLongFormChart charts the roster from the long-form price tables, over
+// the window the viewer last chose, widened to the whole history when the
+// cards have no prices inside it.
+func fillLongFormChart(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, roster chartRoster) {
+	sig := getSignatureFromCookies(r)
+	isMultiChart := len(roster.ids) > 1
+
+	// Render the window the chart draws, taken from the viewer's own
+	// last choice so it is not drawn once and redrawn at theirs. A
+	// roster's select starts on "All", so absent a choice it renders
+	// the lot. See docs/chart-page-loading.md.
+	lb, maxDays := chartWindow(sig, chartInitialRange(r, isMultiChart))
+	pageVars.ChartLoadedDays = lb.Days()
+
+	// Generic path: resolve every roster id to a target and chart it by
+	// whatever providers have data — one path for every game, keyed on the
+	// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
+	// UI's identity for favorites/roster/legend); the ban_id is internal.
+	//
+	// Resolution stays here, on the request's own goroutine, because
+	// roster.targets is an unlocked per-request map; only the archive
+	// reads that follow are issued together.
+	resolved := make([]chartSeries, 0, len(roster.ids))
+	for _, id := range roster.ids {
+		target := roster.targets.target(r.Context(), b, id)
+		if target == nil {
+			continue
+		}
+		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, target: target})
+	}
+	series := fetchRosterPrices(r.Context(), resolved, lb)
+	// An empty window hides the chart and the select that could widen it,
+	// so a card whose prices all predate the window reads the ceiling. A
+	// read that failed is not an empty window, so it is not retried wider.
+	priced := slices.ContainsFunc(series, func(cs chartSeries) bool { return len(cs.Prices) > 0 })
+	if lb.Days() < maxDays && archiveAnswered(series) && !priced {
+		lb, _ = chartWindow(sig, 0)
+		pageVars.ChartLoadedDays = lb.Days()
+		series = fetchRosterPrices(r.Context(), resolved, lb)
+	}
+
+	// Read each card once and take the axis from what came back: a
+	// roster used to cost two archive round-trips per card, and
+	// against a hundred-partition prices table a round-trip is
+	// mostly planning.
+	var earliest time.Time
+	for _, cs := range series {
+		e := earliestChartedDate(cs.Prices, lb)
+		if !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+			earliest = e
+		}
+	}
+	if len(series) == 0 || earliest.IsZero() {
+		pageVars.InfoMessage = "No chart data available"
+	} else {
+		pageVars.AxisLabels = getDateAxisValues(earliest)
+		cards := make([]multiCardInput, len(series))
+		for i, cs := range series {
+			cards[i] = multiCardInput{
+				CardID:   cs.CardID,
+				Name:     cs.Name,
+				Datasets: chartDatasetsFrom(cs.Prices, pageVars.AxisLabels),
+			}
+		}
+		if isMultiChart {
+			datasets, refs := mergeMultiCardDatasets(cards)
+			pageVars.Datasets = datasets
+			pageVars.ChartReferences = refs
+			names := make([]string, len(cards))
+			for i, card := range cards {
+				names[i] = card.Name
+			}
+			pageVars.Checkpoints = multiCardCheckpoints(ds, names, earliest)
+		} else {
+			pageVars.Datasets = cards[0].Datasets
+			pageVars.Checkpoints = relevantCheckpoints(ds, cards[0].Name, earliest)
+		}
+		// A card the archive did not answer for is missing from the chart,
+		// which says nothing about its prices: never call such a chart
+		// empty, and when the rest drew, say what was left out.
+		failed := readFailures(series)
+		switch {
+		case len(pageVars.Datasets) == 0 && failed > 0:
+			pageVars.InfoMessage = "Failed to load chart"
+		case len(pageVars.Datasets) == 0:
+			pageVars.InfoMessage = "No chart data available"
+		case failed > 0:
+			noteChartIDsDropped(pageVars, failed, len(roster.ids), "failed to load")
+		}
 	}
 }
 
