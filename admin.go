@@ -172,111 +172,11 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminPageTable(&pageVars)
 
-	// -- People: quick-add a Patreon grant --
-	// Reuses the config editor's persistence: the amended config is written
-	// to the config source and swapped in memory, so the grant survives
-	// restarts and shows in the table below immediately.
-	grantEmail := strings.ToLower(strings.TrimSpace(r.FormValue("grantEmail")))
-	if grantEmail != "" {
-		grantTier := r.FormValue("grantTier")
-		newGrant := PatreonGrant{
-			Category: strings.TrimSpace(r.FormValue("grantCategory")),
-			Email:    grantEmail,
-			Name:     strings.TrimSpace(r.FormValue("grantName")),
-			Tier:     grantTier,
-		}
+	adminGrantAdd(r, &pageVars)
 
-		var overridesErr error
-		if raw := strings.TrimSpace(r.FormValue("grantOverrides")); raw != "" {
-			overridesErr = json.Unmarshal([]byte(raw), &newGrant.Overrides)
-		}
+	adminGrantRevoke(r, &pageVars)
 
-		duplicate := false
-		for _, person := range PatreonGrants() {
-			if strings.EqualFold(person.Email, grantEmail) {
-				duplicate = true
-				break
-			}
-		}
-		_, tierExists := ACL()[grantTier]
-
-		switch {
-		case !strings.Contains(grantEmail, "@"):
-			pageVars.WarningMessage = "invalid grant email: " + grantEmail
-		case duplicate:
-			pageVars.WarningMessage = grantEmail + " already has a grant"
-		case !tierExists:
-			pageVars.WarningMessage = "unknown tier: " + grantTier
-		case overridesErr != nil:
-			pageVars.WarningMessage = "invalid overrides JSON: " + overridesErr.Error()
-		default:
-			err := saveGrants(r.Context(), append(slices.Clone(PatreonGrants()), newGrant))
-			if err != nil {
-				log.Println(err)
-				pageVars.WarningMessage = err.Error()
-			} else {
-				pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
-				LogPages["Admin"].Printf("Grant added: %+v", newGrant)
-			}
-		}
-	}
-
-	// -- People: remove a Patreon grant --
-	// Persists like the quick-add above, so the row disappears from the
-	// table rendered below and stays gone after a restart.
-	revokeEmail := strings.ToLower(strings.TrimSpace(r.FormValue("revokeEmail")))
-	if revokeEmail != "" {
-		idx := slices.IndexFunc(PatreonGrants(), func(person PatreonGrant) bool {
-			return strings.EqualFold(person.Email, revokeEmail)
-		})
-		if idx < 0 {
-			pageVars.WarningMessage = "no grant found for " + revokeEmail
-		} else {
-			grants := PatreonGrants()
-			removed := grants[idx]
-
-			err := saveGrants(r.Context(), slices.Delete(slices.Clone(grants), idx, idx+1))
-			if err != nil {
-				log.Println(err)
-				pageVars.WarningMessage = err.Error()
-			} else {
-				pageVars.InfoMessage = fmt.Sprintf("Removed %s grant from %s", removed.Tier, removed.Email)
-				LogPages["Admin"].Printf("Grant removed: %+v", removed)
-			}
-		}
-	}
-
-	// -- People: Patreon Grants --
-	var userTable [][]string
-	for i, person := range PatreonGrants() {
-		overrides := ""
-		if len(person.Overrides) > 0 {
-			if raw, err := json.Marshal(person.Overrides); err == nil {
-				overrides = string(raw)
-			}
-		}
-		row := []string{
-			fmt.Sprintf("%d", i+1),
-			person.Category,
-			person.Email,
-			person.Name,
-			person.Tier,
-			overrides,
-		}
-		userTable = append(userTable, row)
-	}
-	pageVars.Tables = append(pageVars.Tables, userTable)
-
-	// -- People: API Users --
-	var apiTable [][]string
-	for i, email := range apiUsers() {
-		row := []string{
-			fmt.Sprintf("%d", i+1),
-			email,
-		}
-		apiTable = append(apiTable, row)
-	}
-	pageVars.Tables = append(pageVars.Tables, apiTable)
+	adminPeopleTables(&pageVars)
 
 	// Pass current page to template for active tab
 	pageVars.Page = page
@@ -894,6 +794,123 @@ func adminPageTable(pageVars *PageVars) {
 		pageTable = append(pageTable, row)
 	}
 	pageVars.Tables = append(pageVars.Tables, pageTable)
+}
+
+// adminGrantAdd saves the Patreon grant the quick-add form posted, unless its
+// email, tier or overrides are invalid or the person already has one.
+func adminGrantAdd(r *http.Request, pageVars *PageVars) {
+	// -- People: quick-add a Patreon grant --
+	// Reuses the config editor's persistence: the amended config is written
+	// to the config source and swapped in memory, so the grant survives
+	// restarts and shows in the table below immediately.
+	grantEmail := strings.ToLower(strings.TrimSpace(r.FormValue("grantEmail")))
+	if grantEmail != "" {
+		grantTier := r.FormValue("grantTier")
+		newGrant := PatreonGrant{
+			Category: strings.TrimSpace(r.FormValue("grantCategory")),
+			Email:    grantEmail,
+			Name:     strings.TrimSpace(r.FormValue("grantName")),
+			Tier:     grantTier,
+		}
+
+		var overridesErr error
+		if raw := strings.TrimSpace(r.FormValue("grantOverrides")); raw != "" {
+			overridesErr = json.Unmarshal([]byte(raw), &newGrant.Overrides)
+		}
+
+		duplicate := false
+		for _, person := range PatreonGrants() {
+			if strings.EqualFold(person.Email, grantEmail) {
+				duplicate = true
+				break
+			}
+		}
+		_, tierExists := ACL()[grantTier]
+
+		switch {
+		case !strings.Contains(grantEmail, "@"):
+			pageVars.WarningMessage = "invalid grant email: " + grantEmail
+		case duplicate:
+			pageVars.WarningMessage = grantEmail + " already has a grant"
+		case !tierExists:
+			pageVars.WarningMessage = "unknown tier: " + grantTier
+		case overridesErr != nil:
+			pageVars.WarningMessage = "invalid overrides JSON: " + overridesErr.Error()
+		default:
+			err := saveGrants(r.Context(), append(slices.Clone(PatreonGrants()), newGrant))
+			if err != nil {
+				log.Println(err)
+				pageVars.WarningMessage = err.Error()
+			} else {
+				pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
+				LogPages["Admin"].Printf("Grant added: %+v", newGrant)
+			}
+		}
+	}
+}
+
+// adminGrantRevoke removes the Patreon grant of the person the request names.
+func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
+	// -- People: remove a Patreon grant --
+	// Persists like the quick-add above, so the row disappears from the
+	// table rendered below and stays gone after a restart.
+	revokeEmail := strings.ToLower(strings.TrimSpace(r.FormValue("revokeEmail")))
+	if revokeEmail != "" {
+		idx := slices.IndexFunc(PatreonGrants(), func(person PatreonGrant) bool {
+			return strings.EqualFold(person.Email, revokeEmail)
+		})
+		if idx < 0 {
+			pageVars.WarningMessage = "no grant found for " + revokeEmail
+		} else {
+			grants := PatreonGrants()
+			removed := grants[idx]
+
+			err := saveGrants(r.Context(), slices.Delete(slices.Clone(grants), idx, idx+1))
+			if err != nil {
+				log.Println(err)
+				pageVars.WarningMessage = err.Error()
+			} else {
+				pageVars.InfoMessage = fmt.Sprintf("Removed %s grant from %s", removed.Tier, removed.Email)
+				LogPages["Admin"].Printf("Grant removed: %+v", removed)
+			}
+		}
+	}
+}
+
+// adminPeopleTables appends the Patreon grants and the API users tables to the
+// page, after the grant forms have changed them.
+func adminPeopleTables(pageVars *PageVars) {
+	// -- People: Patreon Grants --
+	var userTable [][]string
+	for i, person := range PatreonGrants() {
+		overrides := ""
+		if len(person.Overrides) > 0 {
+			if raw, err := json.Marshal(person.Overrides); err == nil {
+				overrides = string(raw)
+			}
+		}
+		row := []string{
+			fmt.Sprintf("%d", i+1),
+			person.Category,
+			person.Email,
+			person.Name,
+			person.Tier,
+			overrides,
+		}
+		userTable = append(userTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, userTable)
+
+	// -- People: API Users --
+	var apiTable [][]string
+	for i, email := range apiUsers() {
+		row := []string{
+			fmt.Sprintf("%d", i+1),
+			email,
+		}
+		apiTable = append(apiTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, apiTable)
 }
 
 // usageCacheTTL bounds how stale the Usage tab may be. Everything behind it
