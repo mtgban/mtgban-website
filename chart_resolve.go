@@ -205,15 +205,12 @@ func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 }
 
 // chartIDForCard maps a card id to the id the UI hands the chart system: the
-// internal ban:<id> once long-form reads serve charts (so lookups skip the
-// canonical re-resolution), else the card id itself (legacy path). It costs a
+// internal ban:<id> when the card has one (so lookups skip the canonical
+// re-resolution), else the card id itself. It costs a
 // variant-cache lookup per call, so it is invoked only while rendering pages
 // that chart cards (search results) — not from uuid2card, which also feeds
 // chartless pages (upload, arbit, news, ...) at thousands of cards a request.
 func chartIDForCard(b *mtgmatcher.Backend, cardID string) string {
-	if !Config().TimeseriesConfig.LongFormReads {
-		return cardID
-	}
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return cardID
