@@ -56,6 +56,12 @@
                 </p>
             </div>
 
+            {{if .WarningMessage}}
+                <div class="upload-warning">
+                    <h4><i>{{.WarningMessage}}</i></h4>
+                </div>
+            {{end}}
+
             {{if .RemoteLinkURL}}
             <script>
             function copyShareLink(el) {
