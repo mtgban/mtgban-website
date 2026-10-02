@@ -55,6 +55,13 @@ const (
 // shorthand.
 const uploadTagName = "tags"
 
+// The custom buylist's stores, the reader's own offers for singles and for
+// sealed products.
+const (
+	customStore       = "CUSTOM"
+	customSealedStore = "CUSTOM_SEALED"
+)
+
 // List of ALL index prices to track
 var UploadIndexKeys = []string{
 	"TCGLow", "TCGMarket", "TCGDirect", "TCGDirectLow", "MKMLow", "MKMTrend",
@@ -897,8 +904,10 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		for shorthand, banPrice := range prices.results[cardID] {
 			price := getPrice(banPrice, conds)
 
-			// Adjust for preferred price source
-			if blMode {
+			// Adjust for preferred price source. The custom buylist pays what
+			// the reader set it to, in credit as in cash.
+			isCustom := shorthand == customStore || shorthand == customSealedStore
+			if blMode && !isCustom {
 				if st.priceSource == "credit" {
 					price *= prices.credits[shorthand]
 				} else if st.priceSource == "marketCredit" {
@@ -1835,18 +1844,18 @@ func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st u
 			if customSeller != "" {
 				ref, _ := findSellerInventory(customSeller)
 				for _, cardID := range ids.cardIDs {
-					processEntry(b, results, ref[cardID], "", cardID, "CUSTOM", false, ids.shouldCheckForConditions, false, rule)
+					processEntry(b, results, ref[cardID], "", cardID, customStore, false, ids.shouldCheckForConditions, false, rule)
 				}
-				enabledStores = append(enabledStores, "CUSTOM")
+				enabledStores = append(enabledStores, customStore)
 			}
 
 			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
 			if customSealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				ref, _ := findSellerInventory(customSealedSeller)
 				for _, productID := range ids.sealedProductIDs {
-					processEntry(b, results, ref[productID], "", productID, "CUSTOM_SEALED", false, false, false, rule)
+					processEntry(b, results, ref[productID], "", productID, customSealedStore, false, false, false, rule)
 				}
-				enabledSealedStores = append(enabledSealedStores, "CUSTOM_SEALED")
+				enabledSealedStores = append(enabledSealedStores, customSealedStore)
 			}
 		}
 
