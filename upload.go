@@ -785,13 +785,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if deckbox && canBuylist {
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_deckbox.csv\"")
-		csvWriter := csv.NewWriter(w)
-
-		err = deckboxIDConvert(b, csvWriter, uploadedData)
+		err = writeDeckboxCSV(w, b, uploadedData)
 		if err != nil {
-			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
@@ -1533,6 +1528,20 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher
 
 	http.Redirect(w, r, link, http.StatusFound)
 	return nil
+}
+
+// writeDeckboxCSV answers with the cards as a Deckbox import. When it fails
+// it drops the download headers, so the caller can answer with a page.
+func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry) error {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_deckbox.csv\"")
+	csvWriter := csv.NewWriter(w)
+
+	err := deckboxIDConvert(b, csvWriter, uploadedData)
+	if err != nil {
+		dropDownloadHeaders(w)
+	}
+	return err
 }
 
 // uploadSettings are the upload page's grants and optimizer options, read once
