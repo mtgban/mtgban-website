@@ -669,16 +669,16 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// disable the affordance at the boundary instead of dropping silently.
 	pageVars.MaxChartCards = len(multiCardPalette)
 
-	chartIDs, chartTruncated := parseChartIDs(b, chartParam)
-
-	chartID := ""
-	// Roster id -> resolved search id, computed once per request: a ban:<id>
-	// resolution costs a DB round-trip and each id is consulted three times
-	// (results query, display query, metadata aliasing).
-	chartSearchIDs := map[string]string{}
-
-	chartTargets := chartTargetCache{}
-	if len(chartIDs) > 0 && !pageVars.DisableChart {
+	roster := chartRoster{
+		// Roster id -> resolved search id, computed once per request: a ban:<id>
+		// resolution costs a DB round-trip and each id is consulted three times
+		// (results query, display query, metadata aliasing).
+		searchIDs: map[string]string{},
+		targets:   chartTargetCache{},
+	}
+	var chartTruncated bool
+	roster.ids, chartTruncated = parseChartIDs(b, chartParam)
+	if len(roster.ids) > 0 && !pageVars.DisableChart {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
 		if chartTruncated {
@@ -688,8 +688,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// Always expose the chart roster so the "add to chart" affordance on
 		// result rows can target it even when we're rendering a regular search
 		// (e.g. the user typed a query while on a chart page).
-		pageVars.ChartIDs = chartIDs
-		pageVars.ChartIDsCSV = strings.Join(chartIDs, ",")
+		pageVars.ChartIDs = roster.ids
+		pageVars.ChartIDsCSV = strings.Join(roster.ids, ",")
 
 		// Only enter chart-render mode when chart= is alone (no q=). With both
 		// present the user is searching for cards to add to the chart, so we
@@ -697,27 +697,27 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// In modal mode the iframe is the add-to-chart picker, so never render
 		// a chart inside it even when no query is set yet.
 		if query == "" && !pageVars.ModalMode {
-			chartID = chartIDs[0]
+			roster.id = roster.ids[0]
 			// Drive the results table off the same trimmed/validated IDs the
 			// chart plots (not the raw chartParam), so a URL like
 			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
 			// controls just because fixupIDs won't trim the leading space.
-			searchIDs := make([]string, len(chartIDs))
+			searchIDs := make([]string, len(roster.ids))
 			var unresolved int
-			for i, id := range chartIDs {
-				searchID, ok := chartSearchID(b, id, chartTargets.target(r.Context(), b, id))
+			for i, id := range roster.ids {
+				searchID, ok := chartSearchID(b, id, roster.targets.target(r.Context(), b, id))
 				if !ok {
 					unresolved++
 				}
 				searchIDs[i] = searchID
-				chartSearchIDs[id] = searchIDs[i]
+				roster.searchIDs[id] = searchIDs[i]
 			}
 			// An id that resolved to nothing matches no row, so the card is
 			// simply absent from the table below the chart. Say which way it
 			// went: a roster the user built by hand, or a link they were sent,
 			// otherwise comes back quietly short.
 			if unresolved > 0 {
-				noteChartIDsDropped(&pageVars, unresolved, len(chartIDs), "could not be matched to a printing")
+				noteChartIDsDropped(&pageVars, unresolved, len(roster.ids), "could not be matched to a printing")
 			}
 			query = strings.Join(searchIDs, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
@@ -727,7 +727,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		if query == "" {
 			query = chartParam
 		}
-		chartIDs = nil
+		roster.ids = nil
 	}
 
 	// If neither bar holds anything there is nothing to do
@@ -1285,8 +1285,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.AllKeys = allKeys
 
 	// CHART ALL THE THINGS
-	if chartID != "" {
-		isMultiChart := len(chartIDs) > 1
+	if roster.id != "" {
+		isMultiChart := len(roster.ids) > 1
 
 		chartEditions := ds.editions
 		pageVars.EditionSort = chartEditions.SealedEditionsSorted
@@ -1296,18 +1296,18 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
 		// non-empty and the template renders the results+chart layout rather than
 		// the empty-query editions browse.
-		cfg := parseSearchOptionsNG(b, chartSearchIDs[chartID], nil, nil, nil)
+		cfg := parseSearchOptionsNG(b, roster.searchIDs[roster.id], nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
-		pageVars.ChartID = chartID
+		pageVars.ChartID = roster.id
 		pageVars.IsMultiChart = isMultiChart
 
 		// The template keys card metadata off ChartID and the roster ids, but the
 		// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
 		// ban:<id> roster entry to its resolved card so those lookups resolve.
-		for _, id := range chartIDs {
-			sid := chartSearchIDs[id]
+		for _, id := range roster.ids {
+			sid := roster.searchIDs[id]
 			if sid == "" || sid == id {
 				continue
 			}
@@ -1332,11 +1332,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 			// UI's identity for favorites/roster/legend); the ban_id is internal.
 			//
 			// Resolution stays here, on the request's own goroutine, because
-			// chartTargets is an unlocked per-request map; only the archive
+			// roster.targets is an unlocked per-request map; only the archive
 			// reads that follow are issued together.
-			resolved := make([]chartSeries, 0, len(chartIDs))
-			for _, id := range chartIDs {
-				target := chartTargets.target(r.Context(), b, id)
+			resolved := make([]chartSeries, 0, len(roster.ids))
+			for _, id := range roster.ids {
+				target := roster.targets.target(r.Context(), b, id)
 				if target == nil {
 					continue
 				}
@@ -1399,7 +1399,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 				case len(pageVars.Datasets) == 0:
 					pageVars.InfoMessage = "No chart data available"
 				case failed > 0:
-					noteChartIDsDropped(&pageVars, failed, len(chartIDs), "failed to load")
+					noteChartIDsDropped(&pageVars, failed, len(roster.ids), "failed to load")
 				}
 			}
 		}
@@ -1410,7 +1410,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
 		// the matcher.
 		if !isMultiChart {
-			searchID := chartSearchIDs[chartID]
+			searchID := roster.searchIDs[roster.id]
 			co, gerr := b.GetUUID(searchID)
 			if gerr == nil && !co.Sealed {
 				altID, err := b.Match(&mtgmatcher.InputCard{
@@ -1429,7 +1429,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 					pageVars.AltEtchedID = altID
 				}
 
-				pageVars.StocksURL = pageVars.Metadata[chartID].StocksURL
+				pageVars.StocksURL = pageVars.Metadata[roster.id].StocksURL
 			}
 		}
 	}
@@ -1442,7 +1442,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		source = fmt.Sprintf("banbot (%s)", id)
 	} else if utm == "autocard" {
 		source = "autocard anywhere"
-	} else if chartID != "" {
+	} else if roster.id != "" {
 		source = "chart page"
 		notifyTitle = "chart"
 	} else {
@@ -1474,6 +1474,16 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// chartRoster is the cards a chart page names: the ids in its chart=
+// parameter, the one the page charts first (none when it draws no chart),
+// the search id each resolved to, and their chart targets.
+type chartRoster struct {
+	id        string
+	ids       []string
+	searchIDs map[string]string
+	targets   chartTargetCache
 }
 
 // chartTargetCache resolves roster ids to chart targets once per request. The
