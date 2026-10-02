@@ -272,8 +272,7 @@ func TestMergeMultiCardDatasetsReferenceOrderFirstSeen(t *testing.T) {
 
 func TestMergeMultiCardDatasetsCardWithNoDatasetsSkipsPaletteSlot(t *testing.T) {
 	// A card whose Datasets slice is entirely empty still consumes a palette
-	// index — this matches the original getDatasetsForMulti loop where an
-	// empty getDatasets() result still advanced i.
+	// index: a card's color is its place in the roster.
 	cards := []multiCardInput{
 		{Name: "Card A", Datasets: nil},
 		{Name: "Card B", Datasets: []Dataset{{Reference: "TCG Low", Data: dummyData()}}},

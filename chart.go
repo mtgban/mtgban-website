@@ -616,45 +616,6 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 	return datasets, refOrder
 }
 
-// getDatasetsForMulti returns one dataset per (card × reference) pair for a
-// multi-card chart, plus the list of distinct reference names that have at
-// least one non-empty dataset. UUIDs that fail to resolve are skipped so a
-// single bad input doesn't take the whole chart down.
-func getDatasetsForMulti(ctx context.Context, b *mtgmatcher.Backend, cardIDs []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
-	cards := make([]multiCardInput, 0, len(cardIDs))
-	for _, cardID := range cardIDs {
-		co, err := b.GetUUID(cardID)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		cardName := co.Name
-		if !co.Sealed {
-			cardName = fmt.Sprintf("%s (%s)", co.Name, co.SetCode)
-			// Collector number disambiguates two printings that share a
-			// set+finish (e.g. a regular and a borderless), so the legend at
-			// the top of a multi-card chart tells them apart.
-			if co.Number != "" {
-				cardName += " #" + co.Number
-			}
-			if co.Foil {
-				cardName += " Foil"
-			} else if co.Etched {
-				cardName += " Etched"
-			}
-		}
-
-		cards = append(cards, multiCardInput{
-			CardID:   cardID,
-			Name:     cardName,
-			Datasets: getDatasets(ctx, b, cardID, co.Sealed, labels, lb),
-		})
-	}
-
-	return mergeMultiCardDatasets(cards)
-}
-
 // A default scale for converting non-NM prices to NM
 var defaultGradeMap = map[mtgban.Condition]float64{
 	mtgban.NM: 1, mtgban.SP: 1.25, mtgban.MP: 1.67, mtgban.HP: 2.5, mtgban.PO: 4,
