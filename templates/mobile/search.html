@@ -278,7 +278,7 @@
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
                     {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
                     {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" onclick="event.stopPropagation()">{{index $card.PromoLabels $p}}</a>{{end}}</span>{{end}}
-                    <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
+                    <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{with $card.SetTotal}}/{{.}}{{end}}{{end}}</span>
                 </div>
                 <div class="m-card-badges">
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
