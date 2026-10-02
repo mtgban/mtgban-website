@@ -195,7 +195,7 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   for the backend alone; entry points read either once and pass `b`/`ds`
   down to what they call.
 - The config lives behind `liveConfig` (`atomic.Pointer[ConfigType]`,
-  main.go) and is read through `Config()`, never nil. A `?reboot=config`
+  main.go) and is read through `Config()`, never nil. A `?tool=config`
   reload (`reloadConfig`), a config-editor save (`saveConfig`, admin.go)
   and a new API key (`generateAPIKey`) each build a new value whole and
   publish it; nothing writes into the live one, so readers take no lock.
@@ -253,7 +253,7 @@ read, or its workflow state's names.
   `openBucketPath()`; opened through `mtgmatcher.Open(datastoreGame(), …)`
   and indexed per game — this is now a multi-game site (magic, lorcana,
   onepiece, yugioh, riftbound, fleshandblood, pokemon, gundam, palworld).
-  Reloadable from the admin panel (`?reboot=datastore`/`datastore-backup`).
+  Reloadable from the admin panel (`?tool=datastore`/`datastore-backup`).
 - **Scraper price data** (`loadScrapersNG()`, load.go): discovered, not
   configured. bantool publishes every game's dumps to the B2 bucket
   `mtgban-dumps` (`dumpsBucket`) as
@@ -664,19 +664,19 @@ Discord answers, without its URL.
 
 ### 5.9 Admin (`admin.go`)
 
-One ~710-line handler (`admin.go` is 1,184 lines total) driving nine tabs —
+One handler, `Admin`, which calls a function of its own for each action,
+tool, editor and table, driving nine tabs —
 Dashboard, Usage, People, Config, Checkpoints, Access, Affiliates, Key
 Overrides, Tools — through query-command dispatch: scraper refresh via
 GitHub Actions dispatch (`?refresh=`) or direct reload (`?reload=&table=&tag=`),
-log download or redirect to the CI log (`?logs=`), and a `?reboot=` family
-that is really a generic run-then-redirect dispatch, not all of it a literal
-reboot: `datastore`/`datastore-backup` (`s.startDatastoreReload`), `update`
-(git pull + `go build` + process exit), `build`/`code` (either step alone,
-no restart), `config` (reload config plus the ACL/grants/affiliates that
-ride beside it), `checkpoints` (chart checkpoints), `snapshot` (stash into
-timeseries), `tcgcsv` (TCGCSV price ingestion), `server` (process exit
-only), `newKey`/`demokey` (API-key generation, `&user=&duration=`), and
-`spoof` (signed tier-spoof URL for testing). Five JSON editors — config,
+log download or redirect to the CI log (`?logs=`), and the `?tool=`
+family (`adminTools`), the dashboard's server actions and admin tools:
+`datastore`/`datastore-backup` (`s.startDatastoreReload`), `config` (reload
+config plus the ACL/grants/affiliates that ride beside it), `checkpoints`
+(chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
+price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
+generation, `&user=&duration=`), and `invite` (a signed invite link for a
+tier, `&tier=&duration=`). Five JSON editors — config,
 checkpoints, ACL/access table, affiliates, key overrides — the last backed
 by a per-store UUID-remap builder reached from a "Fix" link on search
 results (`search.go`/`search.html`). A People tab adds/removes Patreon

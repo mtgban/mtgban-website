@@ -49,32 +49,32 @@
     <div class="m-admin-section">
         <h2>Server Actions</h2>
         <div class="m-admin-actions">
-            <a class="m-admin-action" href="?reboot=datastore" onclick="return confirm('Reload datastore?')">
+            <a class="m-admin-action" href="?tool=datastore" onclick="return confirm('Reload datastore?')">
                 <span class="m-act-icon">🔄</span>
                 <div class="m-act-text"><span class="m-act-title">Reload Datastore</span><span class="m-act-desc">Refresh from primary source</span></div>
             </a>
-            <a class="m-admin-action" href="?reboot=datastore-backup" onclick="return confirm('Reload backup? Updates disabled until manual reload.')">
+            <a class="m-admin-action" href="?tool=datastore-backup" onclick="return confirm('Reload backup? Updates disabled until manual reload.')">
                 <span class="m-act-icon">♻️</span>
                 <div class="m-act-text"><span class="m-act-title">Reload Backup</span><span class="m-act-desc">Use backup source</span></div>
             </a>
-            <a class="m-admin-action" href="?reboot=config" onclick="return confirm('Reload config?')">
+            <a class="m-admin-action" href="?tool=config" onclick="return confirm('Reload config?')">
                 <span class="m-act-icon">⚙️</span>
                 <span class="m-act-title">Reload Config</span>
             </a>
-            <a class="m-admin-action" href="?reboot=checkpoints" onclick="return confirm('Reload chart checkpoints?')">
+            <a class="m-admin-action" href="?tool=checkpoints" onclick="return confirm('Reload chart checkpoints?')">
                 <span class="m-act-icon">📌</span>
                 <span class="m-act-title">Reload Checkpoints</span>
             </a>
-            <a class="m-admin-action" href="?reboot=snapshot" onclick="return confirm('Take a data snapshot?')">
+            <a class="m-admin-action" href="?tool=snapshot" onclick="return confirm('Take a data snapshot?')">
                 <span class="m-act-icon">📸</span>
                 <span class="m-act-title">Take Snapshot</span>
                 {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
             </a>
-            <a class="m-admin-action" href="?reboot=tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
+            <a class="m-admin-action" href="?tool=tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
                 <span class="m-act-icon">🃏</span>
                 <span class="m-act-title">Ingest TCGCSV Prices</span>
             </a>
-            <a class="m-admin-action m-admin-danger" href="?reboot=server" onclick="return confirm('Restart server?')">
+            <a class="m-admin-action m-admin-danger" href="?tool=server" onclick="return confirm('Restart server?')">
                 <span class="m-act-icon">⚠️</span>
                 <span class="m-act-title">Restart Server</span>
                 {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
@@ -91,7 +91,7 @@
         <div class="m-admin-tool">
             <label>Create Invite Link</label>
             <form action="admin" method="GET">
-                <input type="hidden" name="reboot" value="invite"/>
+                <input type="hidden" name="tool" value="invite"/>
                 <select name="tier" onchange="if (this.form.tier.value &amp;&amp; this.form.duration.value) { this.form.submit() }">
                     <option disabled selected value="">Choose tier...</option>
                     {{range .Tiers}}
@@ -112,7 +112,7 @@
         <div class="m-admin-tool">
             <label>Generate API Key</label>
             <form>
-                <input type="hidden" name="reboot" value="newKey"/>
+                <input type="hidden" name="tool" value="newKey"/>
                 <input type="text" name="user" id="m-api-user" placeholder="User email" inputmode="email">
                 <select name="duration" onchange="if (document.getElementById('m-api-user').value !== '') { this.form.submit() }">
                     <option selected value="">Duration...</option>
@@ -129,7 +129,7 @@
         <div class="m-admin-tool">
             <label>API Demo Key</label>
             <form action="admin" method="GET">
-                <input type="hidden" name="reboot" value="demokey"/>
+                <input type="hidden" name="tool" value="demokey"/>
                 <button type="submit" class="m-admin-tool-btn">Generate Demo Key</button>
             </form>
         </div>

@@ -16,7 +16,7 @@ import (
 func inviteSig(t *testing.T, query string) url.Values {
 	t.Helper()
 
-	req := httptest.NewRequest(http.MethodGet, "/admin?reboot=invite&"+query, nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin?tool=invite&"+query, nil)
 	rec := httptest.NewRecorder()
 	testSite.Admin(rec, req)
 
@@ -95,7 +95,7 @@ func TestInviteLinkIsNeverBornExpired(t *testing.T) {
 func TestInviteLinkIsOneTheSiteAccepts(t *testing.T) {
 	signingEnabled(t, false)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin?reboot=invite&tier=Pioneer&duration=7", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin?tool=invite&tier=Pioneer&duration=7", nil)
 	rec := httptest.NewRecorder()
 	testSite.Admin(rec, req)
 
@@ -125,7 +125,7 @@ func TestAdminOffersAnInviteLinkWithAnExpiry(t *testing.T) {
 		if !strings.Contains(out, "Create Invite Link") {
 			t.Errorf("mobile=%v: the tool is not offered", mobile)
 		}
-		if !strings.Contains(out, `name="reboot" value="invite"`) {
+		if !strings.Contains(out, `name="tool" value="invite"`) {
 			t.Errorf("mobile=%v: the form asks for something else", mobile)
 		}
 		if !strings.Contains(out, `name="duration"`) {

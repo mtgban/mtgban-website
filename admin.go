@@ -198,7 +198,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.DisableChart = IsStashingInProgress()
 	pageVars.Jobs = backgroundJobs.Rows()
-	// Read last: ?reboot=datastore above may have just started one.
+	// Read last: ?tool=datastore above may have just started one.
 	pageVars.DatastoreReload = s.reloads.Status()
 
 	// Only the Usage tab reads these aggregates and each one scans a 30-day
@@ -295,20 +295,20 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 // any, and reports whether it answered with a redirect. A datastore reload
 // answers on the page instead, through its message.
 func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
-	reboot := r.FormValue("reboot")
-	doReboot := false
+	tool := r.FormValue("tool")
+	redirect := false
 	var v url.Values
-	switch reboot {
+	switch tool {
 	case "datastore", "datastore-backup":
 		dsPath := Config().DatastorePath
-		if reboot == "datastore-backup" {
+		if tool == "datastore-backup" {
 			// The backup may live somewhere else entirely, which used to mean
 			// building a second bucket by hand. The path names where it is.
 			dsPath = Config().Datastore.BackupPath
 			if dsPath == "" {
 				v = url.Values{}
 				v.Set("msg", "No BackupPath set in config")
-				doReboot = true
+				redirect = true
 			}
 		}
 		if s.startDatastoreReload(dsPath, "admin") {
@@ -320,7 +320,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 	case "config":
 		v = url.Values{}
 		v.Set("msg", "New config loaded!")
-		doReboot = true
+		redirect = true
 
 		err := reloadConfig()
 		if err != nil {
@@ -336,7 +336,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 
 	case "checkpoints":
 		v = url.Values{}
-		doReboot = true
+		redirect = true
 
 		err := reloadCheckpoints()
 		if err != nil {
@@ -348,7 +348,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 	case "snapshot":
 		v = url.Values{}
 		v.Set("msg", "Moving data to timeseries in the background...")
-		doReboot = true
+		redirect = true
 
 		if IsStashingInProgress() {
 			v.Set("msg", "Stashing is already in progress")
@@ -359,7 +359,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 	case "tcgcsv":
 		v = url.Values{}
 		v.Set("msg", "Ingesting latest TCGCSV prices in the background...")
-		doReboot = true
+		redirect = true
 
 		if IsTCGCSVStashing() {
 			v.Set("msg", "TCGCSV ingestion is already in progress")
@@ -370,7 +370,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 	case "server":
 		v = url.Values{}
 		v.Set("msg", "Restarting the server...")
-		doReboot = true
+		redirect = true
 
 		// Let the system restart the server
 		go func() {
@@ -381,7 +381,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 
 	case "newKey", "demokey":
 		v = url.Values{}
-		doReboot = true
+		redirect = true
 
 		user := r.FormValue("user")
 		if user == "" {
@@ -408,7 +408,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 
 	case "invite":
 		v = url.Values{}
-		doReboot = true
+		redirect = true
 
 		tier := r.FormValue("tier")
 
@@ -426,7 +426,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 		v.Set("msg", msg)
 		v.Set("html", "invite")
 	}
-	if doReboot {
+	if redirect {
 		r.URL.RawQuery = v.Encode()
 		http.Redirect(w, r, r.URL.String(), http.StatusFound)
 		return true

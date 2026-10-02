@@ -56,7 +56,7 @@ near-copies of each other.
 function below its handler, in three streams. Every PR branches from master,
 and a stream's next PR is cut once the one before it has merged.
 
-- **Admin:** the `reboot` switch and the `refresh`, `reload`,
+- **Admin:** the tools switch (`?tool=`) and the `refresh`, `reload`,
   `removestore` and `logs` actions; the config, checkpoints, access-table,
   affiliates and key-override editors; the dashboard tables and the grant
   forms.

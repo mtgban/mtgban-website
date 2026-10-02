@@ -437,7 +437,7 @@ func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	return nil
 }
 
-// reloadConfig reloads the config file for the admin page's ?reboot=config,
+// reloadConfig reloads the config file for the admin page's ?tool=config,
 // keeping the running port and paths. It reads them under configMu, so they
 // are the ones any save it waited on set.
 func reloadConfig() error {

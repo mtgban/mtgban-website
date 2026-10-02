@@ -38,8 +38,8 @@ func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
 	withAPIUserSecret(t, DefaultAPIDemoUser, goldenSecret)
 
 	// A blank user is the demo user, from the button and the form alike.
-	for _, reboot := range []string{"demokey", "newKey&user=&duration=30"} {
-		req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&reboot="+reboot, nil)
+	for _, tool := range []string{"demokey", "newKey&user=&duration=30"} {
+		req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&tool="+tool, nil)
 		req.Host = "mtgban.com"
 		rec := httptest.NewRecorder()
 		testSite.Admin(rec, req)
@@ -53,7 +53,7 @@ func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
 		key := loc.Query().Get("msg")
 		blob, err := base64.StdEncoding.DecodeString(key)
 		if err != nil {
-			t.Fatalf("%s did not mint a key: %q", reboot, key)
+			t.Fatalf("%s did not mint a key: %q", tool, key)
 		}
 		claims, err := url.ParseQuery(string(blob))
 		if err != nil {
@@ -74,7 +74,7 @@ func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 	const user = "ops@example.com"
 	withAPIUserSecret(t, user, goldenSecret)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&reboot=newKey&user="+user+"&duration=", nil)
+	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&tool=newKey&user="+user+"&duration=", nil)
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
 	testSite.Admin(rec, req)
