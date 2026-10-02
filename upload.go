@@ -772,15 +772,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Fetch sealed vendor prices and merge
 		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			sealedResults := getVendorPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
-			for cardID, stores := range sealedResults {
-				if results[cardID] == nil {
-					results[cardID] = map[string]*BanPrice{}
-				}
-				for store, price := range stores {
-					results[cardID][store] = price
-				}
-			}
+			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref))
 		}
 
 		if priceSource != "" {
@@ -800,15 +792,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Fetch sealed seller prices and merge
 		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			sealedResults := getSellerPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref)
-			for cardID, stores := range sealedResults {
-				if results[cardID] == nil {
-					results[cardID] = map[string]*BanPrice{}
-				}
-				for store, price := range stores {
-					results[cardID][store] = price
-				}
-			}
+			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref))
 		}
 	}
 
@@ -884,15 +868,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Fetch sealed index prices
 	if len(sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		sealedIndexResults := getSellerPrices(b, "", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref)
-		for cardID, stores := range sealedIndexResults {
-			if indexResults[cardID] == nil {
-				indexResults[cardID] = map[string]*BanPrice{}
-			}
-			for store, price := range stores {
-				indexResults[cardID][store] = price
-			}
-		}
+		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref))
 	}
 
 	// Set card and sealed keys separately — the template picks per entry,
@@ -1920,6 +1896,17 @@ func publishUploadStore(r *http.Request, b *mtgmatcher.Backend, blMode bool, upl
 
 	msg := fmt.Sprintf("Published %s (%s) as a %s store: %s", info.Name, info.Shorthand, kind, report)
 	return msg, nil
+}
+
+// mergePrices adds every price in src to dst, card by card and store by
+// store.
+func mergePrices(dst, src map[string]map[string]*BanPrice) {
+	for cardID, stores := range src {
+		if dst[cardID] == nil {
+			dst[cardID] = map[string]*BanPrice{}
+		}
+		maps.Copy(dst[cardID], stores)
+	}
 }
 
 func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
