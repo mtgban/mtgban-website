@@ -29,14 +29,14 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 			desc:       "a running reload says so and holds the action back",
 			hold:       true,
 			wantShown:  []string{"Datastore update in progress", "updating,", "Already running"},
-			wantAbsent: []string{"?reboot=datastore\""},
+			wantAbsent: []string{"?tool=datastore\""},
 		},
 		{
 			desc:       "a reload asked for meanwhile is said to follow it",
 			hold:       true,
 			queue:      true,
 			wantShown:  []string{"Datastore update in progress", "Another reload is queued to follow it."},
-			wantAbsent: []string{"?reboot=datastore\""},
+			wantAbsent: []string{"?tool=datastore\""},
 		},
 		{
 			desc:       "a failed one says why",
@@ -91,7 +91,7 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 }
 
 // The click that starts a reload is answered by a page that says it is
-// running: the handler reads the tracker after the reboot action, not
+// running: the handler reads the tracker after the datastore tool, not
 // before. The load blocks on a server that answers only once released.
 func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 	withSigMode(t, true, false)
@@ -108,7 +108,7 @@ func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 	// than carrying state another test left running.
 	s := newSite()
 	rec := httptest.NewRecorder()
-	s.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?reboot=datastore", nil))
+	s.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?tool=datastore", nil))
 	close(release)
 	waitForReload(t, &s.reloads)
 
@@ -118,7 +118,7 @@ func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 			t.Errorf("the page that started the reload does not say %q", want)
 		}
 	}
-	if strings.Contains(page, `href="?reboot=datastore"`) {
+	if strings.Contains(page, `href="?tool=datastore"`) {
 		t.Error("the page that started the reload still offers to start one")
 	}
 }

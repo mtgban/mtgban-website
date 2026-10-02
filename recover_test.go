@@ -409,7 +409,7 @@ func TestAdminSnapshotRecovers(t *testing.T) {
 	sellers := []mtgban.Seller{nil}
 	sellersPtr.Store(&sellers)
 
-	testSite.Admin(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin?reboot=snapshot", nil))
+	testSite.Admin(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin?tool=snapshot", nil))
 
 	_, _, source := panicReport(t, posts)
 	if source != "source job: "+jobStash {
