@@ -349,7 +349,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if co.Rarity != "" {
-			rarityMap[strings.ToLower(co.Rarity)] = true
+			rarityMap[mtgmatcher.RarityName(co.Rarity)] = true
 		}
 		for _, c := range co.Colors {
 			colorMap[c] = true
@@ -370,7 +370,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 	for t := range typeMap {
 		resp.Types = append(resp.Types, t)
 	}
-	sort.Strings(resp.Rarities)
+	mtgmatcher.SortByOrder(resp.Rarities, b.Rarities)
 	sort.Strings(resp.Colors)
 	sort.Strings(resp.Types)
 
