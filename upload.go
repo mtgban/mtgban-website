@@ -888,11 +888,8 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		}
 
 		row := newUploadRow(b, st, &uploadedData[i])
-
 		rows.tallyMissing(row, prices, indexes)
-
 		rows.tallyIndexes(row, indexes)
-
 		if row.counts {
 			rows.tallyQuantity(row)
 		}
@@ -909,90 +906,96 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			continue
 		}
 
-		for j, bestStore := range bestStores {
-			bestPrice := offers[bestStore]
-
-			// Load comparison price, either the loaded one or one of the alternatives
-			comparePrice := 0.0
-			if st.skipPrices {
-				var compareConds mtgban.Condition
-				prices := indexes.results[row.CardID][st.altPriceSource]
-				if slices.Index(indexes.keys, st.altPriceSource) >= len(UploadIndexKeys) {
-					compareConds = row.conds
-				}
-
-				// Normally index has no conditions to check, but the price might be coming
-				// from a regular store (in which case we attempt to match it)
-				comparePrice = getPrice(prices, compareConds)
-			} else {
-				comparePrice = row.OriginalPrice
-			}
-
-			// Load the single item priceprice
-			price := rows.resultPrices[row.priceKey][bestStore]
-
-			// Skip if needed
-			if st.skipLowValueAbs && price < st.minLowVal {
-				continue
-			}
-			if st.skipHighValueAbs && st.maxHighVal != 0 && price >= st.maxHighVal {
-				continue
-			}
-
-			var factor float64
-			var profitability float64
-			// Compute spread (and skip if needed)
-			if comparePrice != 0 {
-				factor = price / comparePrice * 100
-
-				if st.skipLowValue && factor < st.percSpread {
-					continue
-				}
-				if st.skipHighValue && st.percSpreadMax != 0 && factor >= st.percSpreadMax {
-					continue
-				}
-
-				if factor > 0 {
-					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+factor)
-					if row.qty > 1 {
-						profitability *= math.Sqrt(float64(row.qty))
-					}
-				}
-			}
-
-			// Break down by store
-			rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
-				CardID:        row.CardID,
-				Condition:     row.conds,
-				Price:         comparePrice,
-				CompareSource: st.altPriceSource,
-				Spread:        factor,
-				BestPrice:     price,
-				Quantity:      row.qty,
-				Notes:         row.Notes,
-				VisualPrice:   comparePrice * st.visualPerc / 100.0,
-				Profitability: profitability,
-			})
-
-			// Save totals
-			rows.optimizedTotals[bestStore] += bestPrice
-			if j == 0 {
-				rows.highestTotal += bestPrice
-				if row.isSealed {
-					rows.sealedHighest += bestPrice
-				} else {
-					rows.singlesHighest += bestPrice
-				}
-				if row.UnpackedFrom != "" {
-					rows.tallyFor(row.UnpackedFrom).Highest += bestPrice
-				}
-			}
-		}
-
+		rows.optimizeRow(row, offers, bestStores, st, indexes)
 		rows.anyCounted = true
 	}
 
 	return rows
+}
+
+// optimizeRow files the row under each of its best stores that the
+// optimizer's filters keep, with its spread and profitability against the
+// comparison price, and adds the best offer to the highest totals.
+func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, bestStores []string, st uploadSettings, indexes uploadIndexes) {
+	for j, bestStore := range bestStores {
+		bestPrice := offers[bestStore]
+
+		// Load comparison price, either the loaded one or one of the alternatives
+		comparePrice := 0.0
+		if st.skipPrices {
+			var compareConds mtgban.Condition
+			prices := indexes.results[row.CardID][st.altPriceSource]
+			if slices.Index(indexes.keys, st.altPriceSource) >= len(UploadIndexKeys) {
+				compareConds = row.conds
+			}
+
+			// Normally index has no conditions to check, but the price might be coming
+			// from a regular store (in which case we attempt to match it)
+			comparePrice = getPrice(prices, compareConds)
+		} else {
+			comparePrice = row.OriginalPrice
+		}
+
+		// Load the single item priceprice
+		price := rows.resultPrices[row.priceKey][bestStore]
+
+		// Skip if needed
+		if st.skipLowValueAbs && price < st.minLowVal {
+			continue
+		}
+		if st.skipHighValueAbs && st.maxHighVal != 0 && price >= st.maxHighVal {
+			continue
+		}
+
+		var factor float64
+		var profitability float64
+		// Compute spread (and skip if needed)
+		if comparePrice != 0 {
+			factor = price / comparePrice * 100
+
+			if st.skipLowValue && factor < st.percSpread {
+				continue
+			}
+			if st.skipHighValue && st.percSpreadMax != 0 && factor >= st.percSpreadMax {
+				continue
+			}
+
+			if factor > 0 {
+				profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+factor)
+				if row.qty > 1 {
+					profitability *= math.Sqrt(float64(row.qty))
+				}
+			}
+		}
+
+		// Break down by store
+		rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
+			CardID:        row.CardID,
+			Condition:     row.conds,
+			Price:         comparePrice,
+			CompareSource: st.altPriceSource,
+			Spread:        factor,
+			BestPrice:     price,
+			Quantity:      row.qty,
+			Notes:         row.Notes,
+			VisualPrice:   comparePrice * st.visualPerc / 100.0,
+			Profitability: profitability,
+		})
+
+		// Save totals
+		rows.optimizedTotals[bestStore] += bestPrice
+		if j == 0 {
+			rows.highestTotal += bestPrice
+			if row.isSealed {
+				rows.sealedHighest += bestPrice
+			} else {
+				rows.singlesHighest += bestPrice
+			}
+			if row.UnpackedFrom != "" {
+				rows.tallyFor(row.UnpackedFrom).Highest += bestPrice
+			}
+		}
+	}
 }
 
 // tallyOffers files the row's price at every store, in credit when the price
