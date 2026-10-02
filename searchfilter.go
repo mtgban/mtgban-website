@@ -450,6 +450,18 @@ func fixupColorNG(code string) []string {
 	return strings.Split(code, "")
 }
 
+// fixupColorName reads a colour the way every game but Magic publishes it,
+// by name; only the colorless and multicolor words mean what they do in
+// colorMap.
+func fixupColorName(code string) []string {
+	code = strings.ToLower(code)
+	switch code {
+	case "c", "colorless", "m", "multi", "multicolor":
+		return colorMap[code]
+	}
+	return []string{code}
+}
+
 // Validate UUIDs, convert them to mtgban format
 func fixupIDs(b *mtgmatcher.Backend, code string) []string {
 	fields := strings.Split(code, ",")
@@ -1107,10 +1119,14 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			if option == "ci" || option == "color_identity" {
 				opt = "color_identity"
 			}
+			fixup := fixupColorNG
+			if b.Game != mtgmatcher.GameMagic {
+				fixup = fixupColorName
+			}
 			filters = append(filters, FilterElem{
 				Name:   opt,
 				Negate: negate,
-				Values: fixupColorNG(code),
+				Values: fixup(code),
 			})
 		case "id":
 			filters = append(filters, FilterElem{
@@ -2132,7 +2148,9 @@ func cardFilterType(filters []string, co *mtgmatcher.CardObject) bool {
 
 func cardFilterColor(filters []string, co *mtgmatcher.CardObject) bool {
 	if len(filters) == 0 {
-		return len(co.Colors) != 0
+		// Pokemon, Palworld and Riftbound print colorless as a colour of its
+		// own, beside the cards with none.
+		return len(co.Colors) > 1 || (len(co.Colors) == 1 && co.Colors[0] != "colorless")
 	}
 	if len(filters) == 5 {
 		return len(co.Colors) <= 1
