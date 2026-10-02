@@ -534,8 +534,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanUploadCustom = canUploadCustom
 	pageVars.CanPublishStore = canPublishStore
 
-	cachedGdocURL := readCookie(r, "gdocURL")
-	pageVars.RemoteLinkURL = cachedGdocURL
+	cachedRemoteURL := readCookie(r, "gdocURL")
+	pageVars.RemoteLinkURL = cachedRemoteURL
 
 	selected := selectUploadStores(w, r, blMode, st)
 	enabledStores := selected.enabledStores
@@ -577,7 +577,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Load spreadsheet cloud url if present
-	gdocURL := r.FormValue("gdocURL")
+	remoteURL := r.FormValue("gdocURL")
 
 	// Load from the freeform text area
 	textArea := r.FormValue("textArea")
@@ -586,7 +586,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// it also returns the FileHeader so we can get the Filename,
 	// the Header and the size of the file
 	file, handler, err := r.FormFile("cardListFile")
-	if err != nil && gdocURL == "" && textArea == "" && len(hashes) == 0 {
+	if err != nil && remoteURL == "" && textArea == "" && len(hashes) == 0 {
 		// A GET is someone arriving at the uploader, which is this page. A
 		// POST that carries nothing is a request that went wrong on the way -
 		// a body too large for the form parser, most often - and silently
@@ -610,8 +610,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CardHashes = hashes
 	} else if textArea != "" {
 		log.Printf("Loading freeform text area (%d bytes)", len(textArea))
-	} else if gdocURL != "" {
-		log.Printf("Loading spreadsheet: %+v", gdocURL)
+	} else if remoteURL != "" {
+		log.Printf("Loading spreadsheet: %+v", remoteURL)
 	} else {
 		log.Printf("Uploaded File: %+v", handler.Filename)
 		log.Printf("File Size: %+v bytes", handler.Size)
@@ -626,9 +626,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reset the cookie for this preference
-	if len(hashes) == 0 && cachedGdocURL != gdocURL {
-		setForeverCookie(w, r, "gdocURL", gdocURL)
-		pageVars.RemoteLinkURL = gdocURL
+	if len(hashes) == 0 && cachedRemoteURL != remoteURL {
+		setForeverCookie(w, r, "gdocURL", remoteURL)
+		pageVars.RemoteLinkURL = remoteURL
 	}
 
 	// Save user preferred stores in cookies and make sure the page is updated with those
@@ -690,19 +690,19 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		} else {
 			uploadedData, err = loadCsv(parser, file, ',', maxRows)
 		}
-	} else if gdocURL != "" {
+	} else if remoteURL != "" {
 		var u *url.URL
-		u, err = url.Parse(gdocURL)
+		u, err = url.Parse(remoteURL)
 		if err == nil {
 			switch u.Host {
 			case "store.tcgplayer.com":
-				uploadedData, uploadName, err = loadCollection(r.Context(), parser, gdocURL, maxRows)
+				uploadedData, uploadName, err = loadCollection(r.Context(), parser, remoteURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
 				uploadedData, uploadName, err = loadMoxfield(r.Context(), b, u.Path, maxRows)
 			case "manabox.app", "www.manabox.app":
-				uploadedData, uploadName, err = loadManabox(r.Context(), b, gdocURL, maxRows)
+				uploadedData, uploadName, err = loadManabox(r.Context(), b, remoteURL, maxRows)
 			case "app.getcollectr.com":
-				uploadedData, uploadName, err = loadCollectr(r.Context(), b, gdocURL, maxRows)
+				uploadedData, uploadName, err = loadCollectr(r.Context(), b, remoteURL, maxRows)
 			case "docs.google.com":
 				uploadedData, uploadName, err = loadSpreadsheet(parser, u.Path, maxRows)
 			default:
@@ -1038,7 +1038,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		uploadFilename = handler.Filename
 	}
 	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
-		hashes, textArea, r.FormValue("uploadSource"), gdocURL, uploadName, uploadFilename,
+		hashes, textArea, r.FormValue("uploadSource"), remoteURL, uploadName, uploadFilename,
 	)
 	pageVars.TotalEntries = map[string]float64{}
 
@@ -1836,7 +1836,7 @@ func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st 
 		}
 	}
 	// Same as above, covering requests that carry no sealed_stores field
-	// at all (hash transfers from search, gdocURL links)
+	// at all (hash transfers from search, remote links)
 	if len(sealedStores) == 0 && len(enabledSealedStores) == 0 {
 		if blMode {
 			enabledSealedStores = keepInOrder(sealedVendors, tickedSealedVendors)
