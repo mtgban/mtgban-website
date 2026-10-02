@@ -219,140 +219,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.InfoMessage = logs + " not found"
 	}
 
-	reboot := r.FormValue("reboot")
-	doReboot := false
-	var v url.Values
-	switch reboot {
-	case "datastore", "datastore-backup":
-		dsPath := Config().DatastorePath
-		if reboot == "datastore-backup" {
-			// The backup may live somewhere else entirely, which used to mean
-			// building a second bucket by hand. The path names where it is.
-			dsPath = Config().Datastore.BackupPath
-			if dsPath == "" {
-				v = url.Values{}
-				v.Set("msg", "No BackupPath set in config")
-				doReboot = true
-			}
-		}
-		if s.startDatastoreReload(dsPath, "admin") {
-			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
-		} else {
-			pageVars.InfoMessage = "A datastore reload is already running, this one will start when it ends"
-		}
-
-	case "config":
-		v = url.Values{}
-		v.Set("msg", "New config loaded!")
-		doReboot = true
-
-		err := reloadConfig()
-		if err != nil {
-			v.Set("msg", "Failed to reload config: "+err.Error())
-		} else {
-			// The access table and the grants sit beside the config now, so a
-			// reload that stopped at the config would leave them as they were.
-			err = loadCommonConfig(r.Context())
-			if err != nil {
-				v.Set("msg", "Config reloaded, but: "+err.Error())
-			}
-		}
-
-	case "checkpoints":
-		v = url.Values{}
-		doReboot = true
-
-		err := reloadCheckpoints()
-		if err != nil {
-			v.Set("msg", "Failed to reload checkpoints: "+err.Error())
-		} else {
-			v.Set("msg", "Chart checkpoints reloaded")
-		}
-
-	case "snapshot":
-		v = url.Values{}
-		v.Set("msg", "Moving data to timeseries in the background...")
-		doReboot = true
-
-		if IsStashingInProgress() {
-			v.Set("msg", "Stashing is already in progress")
-		} else {
-			go tracked(jobStash, s.stashInTimeseries)()
-		}
-
-	case "tcgcsv":
-		v = url.Values{}
-		v.Set("msg", "Ingesting latest TCGCSV prices in the background...")
-		doReboot = true
-
-		if IsTCGCSVStashing() {
-			v.Set("msg", "TCGCSV ingestion is already in progress")
-		} else {
-			go tracked(jobTCGCSVPrices, stashTCGCSVPrices)()
-		}
-
-	case "server":
-		v = url.Values{}
-		v.Set("msg", "Restarting the server...")
-		doReboot = true
-
-		// Let the system restart the server
-		go func() {
-			time.Sleep(5 * time.Second)
-			log.Println("Admin requested server restart")
-			os.Exit(0)
-		}()
-
-	case "newKey", "demokey":
-		v = url.Values{}
-		doReboot = true
-
-		user := r.FormValue("user")
-		if user == "" {
-			user = DefaultAPIDemoUser
-		}
-		dur := r.FormValue("duration")
-		// A blank duration is the picker back on its placeholder, not a request for a permanent key.
-		if dur == "" {
-			dur = "30"
-		}
-		duration, err := strconv.Atoi(dur)
-		if err != nil {
-			duration = 30
-		}
-
-		key, err := generateAPIKey(r.Context(), user, time.Duration(duration)*24*time.Hour)
-		msg := key
-		if err != nil {
-			msg = "error: " + err.Error()
-		}
-
-		v.Set("msg", msg)
-		v.Set("html", "textfield")
-
-	case "invite":
-		v = url.Values{}
-		doReboot = true
-
-		tier := r.FormValue("tier")
-
-		// How long the link is good for, in days. A request that names no
-		// duration - an old bookmark, a hand-written URL - gets the length a
-		// login gets, which is what this tool handed out before it could be
-		// asked for anything else.
-		duration := DefaultSignatureDuration
-		days, err := strconv.Atoi(r.FormValue("duration"))
-		if err == nil && days > 0 {
-			duration = time.Duration(days) * 24 * time.Hour
-		}
-		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil, duration))
-
-		v.Set("msg", msg)
-		v.Set("html", "invite")
-	}
-	if doReboot {
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	if s.adminTools(w, r, &pageVars) {
 		return
 	}
 
@@ -822,6 +689,149 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render(w, "admin.html", pageVars)
+}
+
+// adminTools runs the server action or admin tool the request names, if
+// any, and reports whether it answered with a redirect. A datastore reload
+// answers on the page instead, through its message.
+func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
+	reboot := r.FormValue("reboot")
+	doReboot := false
+	var v url.Values
+	switch reboot {
+	case "datastore", "datastore-backup":
+		dsPath := Config().DatastorePath
+		if reboot == "datastore-backup" {
+			// The backup may live somewhere else entirely, which used to mean
+			// building a second bucket by hand. The path names where it is.
+			dsPath = Config().Datastore.BackupPath
+			if dsPath == "" {
+				v = url.Values{}
+				v.Set("msg", "No BackupPath set in config")
+				doReboot = true
+			}
+		}
+		if s.startDatastoreReload(dsPath, "admin") {
+			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
+		} else {
+			pageVars.InfoMessage = "A datastore reload is already running, this one will start when it ends"
+		}
+
+	case "config":
+		v = url.Values{}
+		v.Set("msg", "New config loaded!")
+		doReboot = true
+
+		err := reloadConfig()
+		if err != nil {
+			v.Set("msg", "Failed to reload config: "+err.Error())
+		} else {
+			// The access table and the grants sit beside the config now, so a
+			// reload that stopped at the config would leave them as they were.
+			err = loadCommonConfig(r.Context())
+			if err != nil {
+				v.Set("msg", "Config reloaded, but: "+err.Error())
+			}
+		}
+
+	case "checkpoints":
+		v = url.Values{}
+		doReboot = true
+
+		err := reloadCheckpoints()
+		if err != nil {
+			v.Set("msg", "Failed to reload checkpoints: "+err.Error())
+		} else {
+			v.Set("msg", "Chart checkpoints reloaded")
+		}
+
+	case "snapshot":
+		v = url.Values{}
+		v.Set("msg", "Moving data to timeseries in the background...")
+		doReboot = true
+
+		if IsStashingInProgress() {
+			v.Set("msg", "Stashing is already in progress")
+		} else {
+			go tracked(jobStash, s.stashInTimeseries)()
+		}
+
+	case "tcgcsv":
+		v = url.Values{}
+		v.Set("msg", "Ingesting latest TCGCSV prices in the background...")
+		doReboot = true
+
+		if IsTCGCSVStashing() {
+			v.Set("msg", "TCGCSV ingestion is already in progress")
+		} else {
+			go tracked(jobTCGCSVPrices, stashTCGCSVPrices)()
+		}
+
+	case "server":
+		v = url.Values{}
+		v.Set("msg", "Restarting the server...")
+		doReboot = true
+
+		// Let the system restart the server
+		go func() {
+			time.Sleep(5 * time.Second)
+			log.Println("Admin requested server restart")
+			os.Exit(0)
+		}()
+
+	case "newKey", "demokey":
+		v = url.Values{}
+		doReboot = true
+
+		user := r.FormValue("user")
+		if user == "" {
+			user = DefaultAPIDemoUser
+		}
+		dur := r.FormValue("duration")
+		// A blank duration is the picker back on its placeholder, not a request for a permanent key.
+		if dur == "" {
+			dur = "30"
+		}
+		duration, err := strconv.Atoi(dur)
+		if err != nil {
+			duration = 30
+		}
+
+		key, err := generateAPIKey(r.Context(), user, time.Duration(duration)*24*time.Hour)
+		msg := key
+		if err != nil {
+			msg = "error: " + err.Error()
+		}
+
+		v.Set("msg", msg)
+		v.Set("html", "textfield")
+
+	case "invite":
+		v = url.Values{}
+		doReboot = true
+
+		tier := r.FormValue("tier")
+
+		// How long the link is good for, in days. A request that names no
+		// duration - an old bookmark, a hand-written URL - gets the length a
+		// login gets, which is what this tool handed out before it could be
+		// asked for anything else.
+		duration := DefaultSignatureDuration
+		days, err := strconv.Atoi(r.FormValue("duration"))
+		if err == nil && days > 0 {
+			duration = time.Duration(days) * 24 * time.Hour
+		}
+		msg := absoluteURL(r, "/?sig="+sign(tier, nil, nil, duration))
+
+		v.Set("msg", msg)
+		v.Set("html", "invite")
+	}
+	if doReboot {
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return true
+	}
+	return false
 }
 
 // usageCacheTTL bounds how stale the Usage tab may be. Everything behind it
