@@ -121,6 +121,7 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 		err = UUID2TCGCSV(b, csvWriter, data.([]string), nil, nil)
 		if err != nil {
+			dropDownloadHeaders(w)
 			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -432,6 +433,7 @@ func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 		err = UUID2MKMCSV(b, csvWriter, data.([]string), nil, nil)
 		if err != nil {
+			dropDownloadHeaders(w)
 			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -812,8 +814,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 		err := BanPrice2CSV(b, w, results, allKeys)
 		if err != nil {
-			w.Header().Del("Content-Type")
-			w.Header().Del("Content-Disposition")
+			dropDownloadHeaders(w)
 			UserNotify("search", err.Error())
 			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Error"
