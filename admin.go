@@ -158,38 +158,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminACLEditor(r, &pageVars)
 
-	// -- Affiliates: handle POST if submitted --
-	newAffiliates := r.FormValue("affiliatesTextArea")
-	if newAffiliates != "" {
-		var parsed AffiliatesConfig
-		decoder := json.NewDecoder(strings.NewReader(newAffiliates))
-		// The value is a fixed three-key struct, so an unknown key is a typo
-		// that would otherwise be dropped without a word.
-		decoder.DisallowUnknownFields()
-		err := decoder.Decode(&parsed)
-		if err == nil {
-			err = saveAffiliates(r.Context(), parsed)
-		}
-		if err != nil {
-			pageVars.WarningMessage = "Affiliates not saved: " + err.Error()
-		} else {
-			pageVars.InfoMessage = "Affiliates updated"
-		}
-	}
-
-	// -- Affiliates: always load current text for the editor --
-	affiliatesText, affErr := json.MarshalIndent(Affiliates(), "", "    ")
-	if affErr != nil {
-		if pageVars.InfoMessage == "" {
-			pageVars.InfoMessage = affErr.Error()
-		}
-	} else {
-		pageVars.AffiliatesText = string(affiliatesText)
-	}
-	pageVars.AffiliatesSource = Config().AffiliatesPath
-	if pageVars.AffiliatesSource == "" {
-		pageVars.AffiliatesSource = "not configured"
-	}
+	adminAffiliatesEditor(r, &pageVars)
 
 	// -- Key overrides: handle POST if submitted --
 	newOverrides := r.FormValue("keyOverridesTextArea")
@@ -861,6 +830,44 @@ func adminACLEditor(r *http.Request, pageVars *PageVars) {
 	pageVars.ACLSource = Config().ACLPath
 	if pageVars.ACLSource == "" {
 		pageVars.ACLSource = "not configured"
+	}
+}
+
+// adminAffiliatesEditor saves affiliate codes posted from the dashboard's
+// editor, then fills the editor with the codes as they stand and where they
+// are read from.
+func adminAffiliatesEditor(r *http.Request, pageVars *PageVars) {
+	// -- Affiliates: handle POST if submitted --
+	newAffiliates := r.FormValue("affiliatesTextArea")
+	if newAffiliates != "" {
+		var parsed AffiliatesConfig
+		decoder := json.NewDecoder(strings.NewReader(newAffiliates))
+		// The value is a fixed three-key struct, so an unknown key is a typo
+		// that would otherwise be dropped without a word.
+		decoder.DisallowUnknownFields()
+		err := decoder.Decode(&parsed)
+		if err == nil {
+			err = saveAffiliates(r.Context(), parsed)
+		}
+		if err != nil {
+			pageVars.WarningMessage = "Affiliates not saved: " + err.Error()
+		} else {
+			pageVars.InfoMessage = "Affiliates updated"
+		}
+	}
+
+	// -- Affiliates: always load current text for the editor --
+	affiliatesText, affErr := json.MarshalIndent(Affiliates(), "", "    ")
+	if affErr != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = affErr.Error()
+		}
+	} else {
+		pageVars.AffiliatesText = string(affiliatesText)
+	}
+	pageVars.AffiliatesSource = Config().AffiliatesPath
+	if pageVars.AffiliatesSource == "" {
+		pageVars.AffiliatesSource = "not configured"
 	}
 }
 
