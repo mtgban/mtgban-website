@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
 // orderInBar reports where each of the three controls sits in the rendered
@@ -72,5 +74,36 @@ func TestScopeChipsAreLabelledForWhatTheyAre(t *testing.T) {
 	}
 	if strings.Contains(out, `<span class="nav2-scope-label">Common</span>`) {
 		t.Error("the chip row still carries the label that said how often they are used")
+	}
+}
+
+// An empty bar stays out of every url the page draws: no bare scope= on
+// the links, and a disabled field so the search form does not send one.
+func TestEmptyScopeStaysOutOfTheURL(t *testing.T) {
+	for _, mobile := range []bool{false, true} {
+		for _, scope := range []string{"", "f:foil"} {
+			out := renderPage(t, "search.html", mobile, PageVars{
+				UserNav:     &NavElem{Short: "b"},
+				InfoMessage: NoCardsMessage,
+				Metadata:    map[string]GenericCard{},
+				SearchVars: SearchVars{
+					CanScope:    true,
+					SearchRan:   true,
+					SearchQuery: "s:M19 bolt",
+					SearchScope: scope,
+					DidYouMean:  "Lightning Bolt",
+					AltSearches: []suggest.AltSearch{{Query: "bolt", Label: "without s:M19"}},
+				},
+			})
+
+			links := strings.Count(out, "&scope=") + strings.Count(out, "&amp;scope=") + strings.Count(out, "?scope=")
+			disabled := strings.Contains(out, `name="scope" value="" disabled`)
+			if scope == "" && (links > 0 || !disabled) {
+				t.Errorf("mobile=%v: an empty bar left %d scope links, field disabled %v", mobile, links, disabled)
+			}
+			if scope != "" && (links == 0 || disabled) {
+				t.Errorf("mobile=%v: %s left %d scope links, field disabled %v", mobile, scope, links, disabled)
+			}
+		}
 	}
 }

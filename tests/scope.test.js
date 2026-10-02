@@ -44,7 +44,8 @@ function loadBar(pinned, extra = {}, autocomplete = undefined) {
     };
     const window = {
         location: {
-            href: 'https://example.test/search?q=bolt&sort=alpha',
+            href: 'https://example.test/search?q=bolt&sort=alpha' +
+                (pinned ? '&scope=' + encodeURIComponent(pinned) : ''),
             pathname: '/search',
             assign: url => navigated.push(url),
         },
@@ -96,7 +97,9 @@ test('closing and clearing the bar store nothing', () => {
     nodes['nav-pin-btn'].handlers.click();
     nodes['nav-scope-clear'].handlers.click();
 
-    expect(new URL(navigated[0]).searchParams.get('scope')).toBe('');
+    const url = new URL(navigated[0]);
+    expect(url.searchParams.has('scope')).toBe(false);
+    expect(url.searchParams.get('sort')).toBe('alpha');
 });
 
 test('a bar with no GO button still loads', () => {
@@ -153,6 +156,20 @@ test('the search form sends what the box shows', () => {
     nodes['nav-searchform'].handlers.submit();
 
     expect(nodes['nav-scopefield'].value).toBe('r:mythic');
+    expect(nodes['nav-scopefield'].disabled).toBe(false);
+});
+
+// An empty bar sends no scope at all, rather than a bare scope=.
+test('an empty bar stays out of the search form', () => {
+    const { nodes } = loadBar('f:foil', { 'nav-searchform': element() });
+
+    nodes['nav-scopebox'].value = '  ';
+    nodes['nav-searchform'].handlers.submit();
+    expect(nodes['nav-scopefield'].disabled).toBe(true);
+
+    nodes['nav-scopebox'].value = 'f:foil';
+    nodes['nav-scopebox'].handlers.input();
+    expect(nodes['nav-scopefield'].disabled).toBe(false);
 });
 
 // The pinned bar takes the same f:, s: and is: suggestions as the main one.
