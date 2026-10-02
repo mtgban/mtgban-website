@@ -894,16 +894,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		rows.tallyIndexes(row, indexes)
 
 		if row.counts {
-			// Quantity summary
-			rows.totalQuantity += row.qty
-			if row.isSealed {
-				rows.sealedQuantity += row.qty
-			} else {
-				rows.singlesQuantity += row.qty
-			}
-			if row.UnpackedFrom != "" {
-				rows.tallyFor(row.UnpackedFrom).Quantity += row.qty
-			}
+			rows.tallyQuantity(row)
 		}
 
 		// Run summaries for each vendor
@@ -1042,6 +1033,19 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 	}
 
 	return rows
+}
+
+// tallyQuantity adds the row's quantity to the totals.
+func (rows *uploadRows) tallyQuantity(row uploadRow) {
+	rows.totalQuantity += row.qty
+	if row.isSealed {
+		rows.sealedQuantity += row.qty
+	} else {
+		rows.singlesQuantity += row.qty
+	}
+	if row.UnpackedFrom != "" {
+		rows.tallyFor(row.UnpackedFrom).Quantity += row.qty
+	}
 }
 
 // tallyIndexes files the row's index prices and adds them, by quantity, to
