@@ -120,10 +120,7 @@ func FromEntries(kind string, info mtgban.ScraperInfo, entries []docparse.Entry,
 			continue
 		}
 
-		qty := 1
-		if entry.HasQuantity {
-			qty = entry.Quantity
-		}
+		qty := entry.QuantityOrOne()
 
 		// Relaxed, so a card listed twice at the same grade and price folds
 		// into one line, as it would on any storefront. The one thing a

@@ -80,6 +80,15 @@ type Entry struct {
 	UnpackedQuantity int
 }
 
+// QuantityOrOne is the quantity the source data gave, or 1 when it gave
+// none.
+func (e Entry) QuantityOrOne() int {
+	if e.HasQuantity {
+		return e.Quantity
+	}
+	return 1
+}
+
 // Parser matches uploaded rows against the card database. The zero value is
 // usable; the optional fields hook it up to the host's services.
 type Parser struct {
@@ -190,10 +199,7 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 		sku := uploadedData[i].CardID + string(uploadedData[i].OriginalCondition) + uploadedData[i].UnpackedFrom
 
 		if duplicatedHashes[sku] {
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
+			qty := uploadedData[i].QuantityOrOne()
 
 			// Iterate on the already added cards to update the quantity
 			for j := range uploadedDataClean {

@@ -1158,10 +1158,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			resultPrices[priceKey][indexKey] = indexPrice
 
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
+			qty := uploadedData[i].QuantityOrOne()
 			indexPrice *= float64(adjustQty(qty, multiplier, maxQty))
 
 			// An opened product keeps its own index prices - for a sealed
@@ -1189,10 +1186,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 		if counts {
 			// Quantity summary
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
+			qty := uploadedData[i].QuantityOrOne()
 			adjusted := adjustQty(qty, multiplier, maxQty)
 			pageVars.TotalQuantity += adjusted
 			if isSealed {
@@ -1231,10 +1225,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Adjust for quantity
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
+			qty := uploadedData[i].QuantityOrOne()
 			price *= float64(adjustQty(qty, multiplier, maxQty))
 
 			// Add to totals (unless it was an index, since it was already added)
@@ -1262,10 +1253,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		for j, bestStore := range bestStores {
 			bestPrice := offers[bestStore]
 
-			qty := 1
-			if uploadedData[i].HasQuantity {
-				qty = uploadedData[i].Quantity
-			}
+			qty := uploadedData[i].QuantityOrOne()
 			qty = adjustQty(qty, multiplier, maxQty)
 
 			conds := uploadedData[i].OriginalCondition
@@ -1483,10 +1471,7 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher
 				mtgban.PO: "dmg",
 			}[uploadedData[i].OriginalCondition]
 		}
-		qty := 1
-		if uploadedData[i].HasQuantity {
-			qty = uploadedData[i].Quantity
-		}
+		qty := uploadedData[i].QuantityOrOne()
 		qty = adjustQty(qty, multiplier, maxQty)
 
 		items = append(items, cardconduit.Item{
@@ -1532,10 +1517,7 @@ func writeTCGplayerCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedDat
 			continue
 		}
 
-		qty := 1
-		if uploadedData[i].HasQuantity {
-			qty = uploadedData[i].Quantity
-		}
+		qty := uploadedData[i].QuantityOrOne()
 		qty = adjustQty(qty, multiplier, maxQty)
 
 		ids = append(ids, uploadedData[i].CardID)

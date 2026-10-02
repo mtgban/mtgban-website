@@ -52,10 +52,7 @@ func deckboxIDConvert(b *mtgmatcher.Backend, w *csv.Writer, uploadedData []Uploa
 			}[uploadedData[i].OriginalCondition]
 		}
 
-		qty := "1"
-		if uploadedData[i].HasQuantity {
-			qty = fmt.Sprintf("%d", uploadedData[i].Quantity)
-		}
+		qty := fmt.Sprintf("%d", uploadedData[i].QuantityOrOne())
 
 		foil := ""
 		if co.Foil || co.Etched {
