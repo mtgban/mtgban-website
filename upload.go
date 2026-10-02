@@ -481,21 +481,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if hashes != nil {
-			w.Header().Set("Content-Type", "text/csv")
-			w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_"+strings.ToLower(hashTag)+".csv\"")
-			csvWriter := csv.NewWriter(w)
-
-			var err error
-			switch hashTag {
-			case "CK":
-				err = UUID2CKCSV(csvWriter, hashes, hashesQtys)
-			case "SCG":
-				err = UUID2SCGCSV(csvWriter, hashes, hashesQtys)
-			case "TCG":
-				err = UUID2TCGCSV(b, csvWriter, hashes, hashesQtys, hashesCond)
-			}
+			err := writeTagCSV(w, b, hashTag, hashes, hashesQtys, hashesCond)
 			if err != nil {
-				dropDownloadHeaders(w)
 				UserNotify("upload", err.Error())
 				pageVars.InfoMessage = "Unable to download CSV right now"
 				render(w, "upload.html", pageVars)
@@ -1505,6 +1492,29 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
+}
+
+// writeTagCSV answers with the CSV the store hashTag names (CK, SCG or TCG)
+// imports, listing the cards hashes names. When it fails it drops the
+// download headers, so the caller can answer with a page instead.
+func writeTagCSV(w http.ResponseWriter, b *mtgmatcher.Backend, hashTag string, hashes, hashesQtys, hashesCond []string) error {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_"+strings.ToLower(hashTag)+".csv\"")
+	csvWriter := csv.NewWriter(w)
+
+	var err error
+	switch hashTag {
+	case "CK":
+		err = UUID2CKCSV(csvWriter, hashes, hashesQtys)
+	case "SCG":
+		err = UUID2SCGCSV(csvWriter, hashes, hashesQtys)
+	case "TCG":
+		err = UUID2TCGCSV(b, csvWriter, hashes, hashesQtys, hashesCond)
+	}
+	if err != nil {
+		dropDownloadHeaders(w)
+	}
+	return err
 }
 
 // uploadSettings are the upload page's grants and optimizer options, read once
