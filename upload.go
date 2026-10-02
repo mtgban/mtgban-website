@@ -740,8 +740,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
 		in.hashes, in.textArea, r.FormValue("uploadSource"), in.remoteURL, uploadName, uploadFilename,
 	)
-	pageVars.TotalEntries = map[string]float64{}
-
 	pageVars.UploadEntries = uploadedData
 
 	// Offer to open the sealed rows only when there are any left to open, and
@@ -773,6 +771,109 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	rows := priceUploadRows(b, blMode, st, prices, indexes, uploadedData)
+	pageVars.TotalEntries = rows.totalEntries
+	pageVars.TotalQuantity = rows.totalQuantity
+	pageVars.SinglesQuantity = rows.singlesQuantity
+	pageVars.SealedQuantity = rows.sealedQuantity
+
+	// Avoid printing the credit conversion if the price source is already in store credit
+	if rows.anyCounted {
+		pageVars.CanFilterByPrice = st.priceSource == ""
+	}
+
+	sortResults(b, uploadedData, rows.optimizedResults, st.sorting)
+
+	// Split sorted entries into singles, sealed, and not-found for the tabbed view
+	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, ids.sealedProductIDs)
+	pageVars.SinglesEntries = singlesEntries
+	pageVars.SealedEntries = sealedEntries
+	pageVars.NotFoundEntries = notFoundEntries
+	pageVars.SinglesHighest = rows.singlesHighest
+	pageVars.SealedHighest = rows.sealedHighest
+
+	// An unpacked list is read a box at a time rather than by category: the
+	// products are all opened ones, and the cards are all their contents.
+	pageVars.UnpackedSections = buildUnpackedSections(uploadedData, rows.tallies)
+
+	pageVars.DefaultResultView, pageVars.ShowResultTabs, pageVars.ShowAllTab = resultView(
+		len(pageVars.UnpackedSections),
+		len(singlesEntries) > 0, len(sealedEntries) > 0, len(notFoundEntries) > 0)
+
+	pageVars.MissingCounts = rows.missingCounts
+	pageVars.MissingPrices = rows.missingPrices
+	pageVars.ResultPrices = rows.resultPrices
+
+	// For the totals row: show all enabled card stores (even with "-"),
+	// but only include sealed stores that actually returned prices.
+	activeTotalStores := append([]string{}, prices.enabledStores...)
+	for _, key := range prices.enabledSealedStores {
+		if pageVars.TotalEntries[key] != 0 {
+			activeTotalStores = append(activeTotalStores, key)
+		}
+	}
+	pageVars.AllScraperKeys = activeTotalStores
+
+	// Assign the resulting optimized data to the page variables
+	if len(rows.optimizedResults) > 0 {
+		// When prices are ignored, the loaded price IS the alternate source, so
+		// it can be linked directly; otherwise it's the user's uploaded price
+		// and only a separate symbol should link out to the alternate source.
+		pageVars.IgnorePrices = st.skipPrices
+		pageVars.Optimized = rows.optimizedResults
+		// Only the stores that render a results section, in display order,
+		// so that the template can link each section to the previous/next one
+		for _, key := range activeTotalStores {
+			if len(rows.optimizedResults[key]) > 0 {
+				pageVars.OptimizedKeys = append(pageVars.OptimizedKeys, key)
+			}
+		}
+		pageVars.OptimizedTotals = rows.optimizedTotals
+		pageVars.HighestTotal = rows.highestTotal
+	}
+
+	// Logs
+	user := GetParamFromSig(sig, "UserEmail")
+	msgMode := "retail"
+	if blMode {
+		msgMode = "buylist"
+	}
+	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(ids.cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
+	UserNotify("upload", msg)
+	LogPages["Upload"].Println(msg)
+
+	// Touchdown!
+	render(w, "upload.html", pageVars)
+}
+
+// uploadRows are what pricing an upload's rows adds up to: each row's price at
+// every store and index, each store's total and the rows it lacks, the
+// optimizer's picks and totals, the quantities, and the same tallies per
+// opened product. anyCounted says whether any row counted, matched and not an
+// opened product.
+type uploadRows struct {
+	resultPrices     map[string]map[string]float64
+	totalEntries     map[string]float64
+	missingCounts    map[string]int
+	missingPrices    map[string]float64
+	optimizedResults map[string][]OptimizedUploadEntry
+	optimizedTotals  map[string]float64
+	highestTotal     float64
+	singlesHighest   float64
+	sealedHighest    float64
+	totalQuantity    int
+	singlesQuantity  int
+	sealedQuantity   int
+	tallies          map[string]*unpackedTally
+	anyCounted       bool
+}
+
+// priceUploadRows prices each matched row at the stores and indexes fetched,
+// adds up the totals, and picks the best stores for the optimizer.
+func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, uploadedData []UploadEntry) uploadRows {
+	totalEntries := map[string]float64{}
+	var totalQuantity, singlesQuantity, sealedQuantity int
+	var anyCounted bool
 	var highestTotal float64
 	var singlesHighest, sealedHighest float64
 
@@ -871,7 +972,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			pageVars.TotalEntries[indexKey] += indexPrice
+			totalEntries[indexKey] += indexPrice
 			if uploadedData[i].UnpackedFrom != "" {
 				tallyFor(uploadedData[i].UnpackedFrom).Totals[indexKey] += indexPrice
 			}
@@ -888,11 +989,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			// Quantity summary
 			qty := uploadedData[i].QuantityOrOne()
 			adjusted := adjustQty(qty, st.multiplier, st.maxQty)
-			pageVars.TotalQuantity += adjusted
+			totalQuantity += adjusted
 			if isSealed {
-				pageVars.SealedQuantity += adjusted
+				sealedQuantity += adjusted
 			} else {
-				pageVars.SinglesQuantity += adjusted
+				singlesQuantity += adjusted
 			}
 			if uploadedData[i].UnpackedFrom != "" {
 				tallyFor(uploadedData[i].UnpackedFrom).Quantity += adjusted
@@ -933,7 +1034,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexes.results[cardID][shorthand]
 			if !found && counts {
-				pageVars.TotalEntries[shorthand] += price
+				totalEntries[shorthand] += price
 				if uploadedData[i].UnpackedFrom != "" {
 					tallyFor(uploadedData[i].UnpackedFrom).Totals[shorthand] += price
 				}
@@ -1041,72 +1142,25 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Avoid printing the credit conversion if the price source is already in store credit
-		pageVars.CanFilterByPrice = st.priceSource == ""
+		anyCounted = true
 	}
 
-	sortResults(b, uploadedData, optimizedResults, st.sorting)
-
-	// Split sorted entries into singles, sealed, and not-found for the tabbed view
-	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, ids.sealedProductIDs)
-	pageVars.SinglesEntries = singlesEntries
-	pageVars.SealedEntries = sealedEntries
-	pageVars.NotFoundEntries = notFoundEntries
-	pageVars.SinglesHighest = singlesHighest
-	pageVars.SealedHighest = sealedHighest
-
-	// An unpacked list is read a box at a time rather than by category: the
-	// products are all opened ones, and the cards are all their contents.
-	pageVars.UnpackedSections = buildUnpackedSections(uploadedData, tallies)
-
-	pageVars.DefaultResultView, pageVars.ShowResultTabs, pageVars.ShowAllTab = resultView(
-		len(pageVars.UnpackedSections),
-		len(singlesEntries) > 0, len(sealedEntries) > 0, len(notFoundEntries) > 0)
-
-	pageVars.MissingCounts = missingCounts
-	pageVars.MissingPrices = missingPrices
-	pageVars.ResultPrices = resultPrices
-
-	// For the totals row: show all enabled card stores (even with "-"),
-	// but only include sealed stores that actually returned prices.
-	activeTotalStores := append([]string{}, prices.enabledStores...)
-	for _, key := range prices.enabledSealedStores {
-		if pageVars.TotalEntries[key] != 0 {
-			activeTotalStores = append(activeTotalStores, key)
-		}
+	return uploadRows{
+		resultPrices:     resultPrices,
+		totalEntries:     totalEntries,
+		missingCounts:    missingCounts,
+		missingPrices:    missingPrices,
+		optimizedResults: optimizedResults,
+		optimizedTotals:  optimizedTotals,
+		highestTotal:     highestTotal,
+		singlesHighest:   singlesHighest,
+		sealedHighest:    sealedHighest,
+		totalQuantity:    totalQuantity,
+		singlesQuantity:  singlesQuantity,
+		sealedQuantity:   sealedQuantity,
+		tallies:          tallies,
+		anyCounted:       anyCounted,
 	}
-	pageVars.AllScraperKeys = activeTotalStores
-
-	// Assign the resulting optimized data to the page variables
-	if len(optimizedResults) > 0 {
-		// When prices are ignored, the loaded price IS the alternate source, so
-		// it can be linked directly; otherwise it's the user's uploaded price
-		// and only a separate symbol should link out to the alternate source.
-		pageVars.IgnorePrices = st.skipPrices
-		pageVars.Optimized = optimizedResults
-		// Only the stores that render a results section, in display order,
-		// so that the template can link each section to the previous/next one
-		for _, key := range activeTotalStores {
-			if len(optimizedResults[key]) > 0 {
-				pageVars.OptimizedKeys = append(pageVars.OptimizedKeys, key)
-			}
-		}
-		pageVars.OptimizedTotals = optimizedTotals
-		pageVars.HighestTotal = highestTotal
-	}
-
-	// Logs
-	user := GetParamFromSig(sig, "UserEmail")
-	msgMode := "retail"
-	if blMode {
-		msgMode = "buylist"
-	}
-	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(ids.cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
-	UserNotify("upload", msg)
-	LogPages["Upload"].Println(msg)
-
-	// Touchdown!
-	render(w, "upload.html", pageVars)
 }
 
 // redirectToSCGMassEntry sends the cards to Star City Games' mass entry and
