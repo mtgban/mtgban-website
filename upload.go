@@ -456,7 +456,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	formErr := r.ParseForm()
 	r.ParseMultipartForm(MaxUploadFileSize)
 
-	// See if we need to download the ck csv only
+	// A transfer from the results posts a store's tag: answer with that
+	// store's CSV, or with SCG's mass entry
 	hashTag := r.FormValue("tag")
 	switch hashTag {
 	case "CK", "SCG", "SCGRetail", "TCG":
@@ -785,7 +786,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if deckbox && canBuylist {
-		err = writeDeckboxCSV(w, b, uploadedData)
+		err := writeDeckboxCSV(w, b, uploadedData)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
@@ -794,7 +795,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if tcgpCSV && canBuylist {
-		err = writeTCGplayerCSV(w, b, uploadedData, multiplier, maxQty)
+		err := writeTCGplayerCSV(w, b, uploadedData, multiplier, maxQty)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
