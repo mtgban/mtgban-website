@@ -166,135 +166,11 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// against a slightly later "now" than its neighbor.
 	now := time.Now()
 
-	// -- Dashboard: Retail Scrapers --
-	var sellerTable [][]string
-	for _, seller := range GetSellers() {
-		key := "UNKNOWN"
-		store, found := scraperStoreOf(seller.Info().Shorthand)
-		if found {
-			key = store
-		}
+	adminSellerTable(now, &pageVars)
 
-		lastUpdate := ""
-		if ts := seller.Info().InventoryTimestamp; !ts.IsZero() {
-			lastUpdate = ts.UTC().Format(time.RFC3339)
-		}
-		inv := seller.Inventory()
+	adminVendorTable(now, &pageVars)
 
-		// A running workflow overrides this to 🔶 once the poll answers.
-		status := "✅"
-		if len(inv) == 0 {
-			status = "🔴"
-		}
-
-		name := seller.Info().Name
-		if seller.Info().SealedMode {
-			name += " 📦"
-		}
-		if seller.Info().MetadataOnly {
-			name += " 🎯"
-		}
-
-		ref := ""
-		if slices.Contains(Affiliates().List, seller.Info().Shorthand) ||
-			slices.Contains(Affiliates().List, key) {
-			ref = "👍"
-		}
-
-		// A store published from an upload has no workflow to refresh it
-		// or log it, and can be removed from here instead. One the config
-		// has since claimed is a real store, whatever the registry says.
-		session := ""
-		if key == "UNKNOWN" && Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
-			key = "session"
-			session = sessionstore.Retail
-		}
-
-		row := []string{
-			name,
-			seller.Info().Shorthand,
-			key,
-			lastUpdate,
-			fmt.Sprint(len(inv)),
-			ref,
-			status,
-			session,
-			staleBadge(seller.Info().InventoryTimestamp, now),
-		}
-		sellerTable = append(sellerTable, row)
-	}
-	pageVars.Tables = append(pageVars.Tables, sellerTable)
-
-	// -- Dashboard: Buylist Scrapers --
-	var vendorTable [][]string
-	for _, vendor := range GetVendors() {
-		key := "UNKNOWN"
-		store, found := scraperStoreOf(vendor.Info().Shorthand)
-		if found {
-			key = store
-		}
-
-		lastUpdate := ""
-		if ts := vendor.Info().BuylistTimestamp; !ts.IsZero() {
-			lastUpdate = ts.UTC().Format(time.RFC3339)
-		}
-		bl := vendor.Buylist()
-
-		// A running workflow overrides this to 🔶 once the poll answers.
-		status := "✅"
-		if len(bl) == 0 {
-			status = "🔴"
-		}
-
-		name := vendor.Info().Name
-		if vendor.Info().SealedMode {
-			name += " 📦"
-		}
-		if vendor.Info().MetadataOnly {
-			name += " 🎯"
-		}
-
-		ref := ""
-		if slices.Contains(Affiliates().BuylistList, vendor.Info().Shorthand) ||
-			slices.Contains(Affiliates().BuylistList, key) {
-			ref = "👍"
-		}
-
-		session := ""
-		if key == "UNKNOWN" && Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
-			key = "session"
-			session = sessionstore.Buylist
-		}
-
-		row := []string{
-			name,
-			vendor.Info().Shorthand,
-			key,
-			lastUpdate,
-			fmt.Sprint(len(bl)),
-			ref,
-			status,
-			session,
-			staleBadge(vendor.Info().BuylistTimestamp, now),
-		}
-		vendorTable = append(vendorTable, row)
-	}
-	pageVars.Tables = append(pageVars.Tables, vendorTable)
-
-	// -- Dashboard: Registered Pages --
-	var pageTable [][]string
-	for _, navName := range OrderNav {
-		nav := ExtraNavs[navName]
-
-		row := []string{
-			nav.Short,
-			nav.Name,
-			nav.Link,
-			nav.Page,
-		}
-		pageTable = append(pageTable, row)
-	}
-	pageVars.Tables = append(pageVars.Tables, pageTable)
+	adminPageTable(&pageVars)
 
 	// -- People: quick-add a Patreon grant --
 	// Reuses the config editor's persistence: the amended config is written
@@ -877,6 +753,147 @@ func (s *site) adminKeyOverrides(r *http.Request, b *mtgmatcher.Backend, pageVar
 			pageVars.OverrideCandidates = candidates
 		}
 	}
+}
+
+// adminSellerTable appends the dashboard's retail table to the page, one row
+// per seller, with its staleness measured against now.
+func adminSellerTable(now time.Time, pageVars *PageVars) {
+	// -- Dashboard: Retail Scrapers --
+	var sellerTable [][]string
+	for _, seller := range GetSellers() {
+		key := "UNKNOWN"
+		store, found := scraperStoreOf(seller.Info().Shorthand)
+		if found {
+			key = store
+		}
+
+		lastUpdate := ""
+		if ts := seller.Info().InventoryTimestamp; !ts.IsZero() {
+			lastUpdate = ts.UTC().Format(time.RFC3339)
+		}
+		inv := seller.Inventory()
+
+		// A running workflow overrides this to 🔶 once the poll answers.
+		status := "✅"
+		if len(inv) == 0 {
+			status = "🔴"
+		}
+
+		name := seller.Info().Name
+		if seller.Info().SealedMode {
+			name += " 📦"
+		}
+		if seller.Info().MetadataOnly {
+			name += " 🎯"
+		}
+
+		ref := ""
+		if slices.Contains(Affiliates().List, seller.Info().Shorthand) ||
+			slices.Contains(Affiliates().List, key) {
+			ref = "👍"
+		}
+
+		// A store published from an upload has no workflow to refresh it
+		// or log it, and can be removed from here instead. One the config
+		// has since claimed is a real store, whatever the registry says.
+		session := ""
+		if key == "UNKNOWN" && Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
+			key = "session"
+			session = sessionstore.Retail
+		}
+
+		row := []string{
+			name,
+			seller.Info().Shorthand,
+			key,
+			lastUpdate,
+			fmt.Sprint(len(inv)),
+			ref,
+			status,
+			session,
+			staleBadge(seller.Info().InventoryTimestamp, now),
+		}
+		sellerTable = append(sellerTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, sellerTable)
+}
+
+// adminVendorTable appends the dashboard's buylist table to the page, one row
+// per vendor, with its staleness measured against now.
+func adminVendorTable(now time.Time, pageVars *PageVars) {
+	// -- Dashboard: Buylist Scrapers --
+	var vendorTable [][]string
+	for _, vendor := range GetVendors() {
+		key := "UNKNOWN"
+		store, found := scraperStoreOf(vendor.Info().Shorthand)
+		if found {
+			key = store
+		}
+
+		lastUpdate := ""
+		if ts := vendor.Info().BuylistTimestamp; !ts.IsZero() {
+			lastUpdate = ts.UTC().Format(time.RFC3339)
+		}
+		bl := vendor.Buylist()
+
+		// A running workflow overrides this to 🔶 once the poll answers.
+		status := "✅"
+		if len(bl) == 0 {
+			status = "🔴"
+		}
+
+		name := vendor.Info().Name
+		if vendor.Info().SealedMode {
+			name += " 📦"
+		}
+		if vendor.Info().MetadataOnly {
+			name += " 🎯"
+		}
+
+		ref := ""
+		if slices.Contains(Affiliates().BuylistList, vendor.Info().Shorthand) ||
+			slices.Contains(Affiliates().BuylistList, key) {
+			ref = "👍"
+		}
+
+		session := ""
+		if key == "UNKNOWN" && Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
+			key = "session"
+			session = sessionstore.Buylist
+		}
+
+		row := []string{
+			name,
+			vendor.Info().Shorthand,
+			key,
+			lastUpdate,
+			fmt.Sprint(len(bl)),
+			ref,
+			status,
+			session,
+			staleBadge(vendor.Info().BuylistTimestamp, now),
+		}
+		vendorTable = append(vendorTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, vendorTable)
+}
+
+// adminPageTable appends the dashboard's table of registered pages to the page.
+func adminPageTable(pageVars *PageVars) {
+	// -- Dashboard: Registered Pages --
+	var pageTable [][]string
+	for _, navName := range OrderNav {
+		nav := ExtraNavs[navName]
+
+		row := []string{
+			nav.Short,
+			nav.Name,
+			nav.Link,
+			nav.Page,
+		}
+		pageTable = append(pageTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, pageTable)
 }
 
 // usageCacheTTL bounds how stale the Usage tab may be. Everything behind it
