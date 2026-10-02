@@ -828,12 +828,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err = SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, preferFlavor)
+		err := SimplePrice2CSV(b, csvWriter, results, uploadedData, nil, preferFlavor)
 		if err != nil {
 			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
-			log.Printf("CSV export of %d entries failed: %s", len(uploadedData), err.Error())
-			pageVars.InfoMessage = "Unable to download CSV right now: " + err.Error()
+			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
 		}
 		return
