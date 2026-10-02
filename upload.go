@@ -936,8 +936,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
 			csvName += "_" + scope
 		}
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+csvName+".csv\"")
+		setCSVDownloadHeaders(w, csvName+".csv")
 		csvWriter := csv.NewWriter(w)
 
 		// Search for the csv-specific indexes that were left enabled
@@ -1439,8 +1438,7 @@ func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *mtgmatche
 // imports, listing the cards hashes names. When it fails it drops the
 // download headers, so the caller can answer with a page instead.
 func writeTagCSV(w http.ResponseWriter, b *mtgmatcher.Backend, hashTag string, hashes, hashesQtys, hashesCond []string) error {
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_"+strings.ToLower(hashTag)+".csv\"")
+	setCSVDownloadHeaders(w, "mtgban_"+strings.ToLower(hashTag)+".csv")
 	csvWriter := csv.NewWriter(w)
 
 	var err error
@@ -1512,8 +1510,7 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher
 // writeDeckboxCSV answers with the cards as a Deckbox import. When it fails
 // it drops the download headers, so the caller can answer with a page.
 func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry) error {
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_deckbox.csv\"")
+	setCSVDownloadHeaders(w, "mtgban_deckbox.csv")
 	csvWriter := csv.NewWriter(w)
 
 	err := deckboxIDConvert(b, csvWriter, uploadedData)
@@ -1526,8 +1523,7 @@ func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData 
 // writeTCGplayerCSV answers with the cards as a TCGplayer import. When it
 // fails it drops the download headers, so the caller can answer with a page.
 func writeTCGplayerCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
-	w.Header().Set("content-type", "text/csv")
-	w.Header().Set("content-disposition", "attachment; filename=\"mtgban_tcgplayer.csv\"")
+	setCSVDownloadHeaders(w, "mtgban_tcgplayer.csv")
 	csvWriter := csv.NewWriter(w)
 
 	var ids, qtys, conds []string

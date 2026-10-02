@@ -115,8 +115,7 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 
 	if useCSV {
 		co, _ := b.GetUUID(cardID)
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
+		setCSVDownloadHeaders(w, co.Name+".csv")
 
 		csvWriter := csv.NewWriter(w)
 		err = UUID2TCGCSV(b, csvWriter, data.([]string), nil, nil)
@@ -427,8 +426,7 @@ func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
 
 	if useCSV {
 		co, _ := b.GetUUID(cardID)
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
+		setCSVDownloadHeaders(w, co.Name+".csv")
 
 		csvWriter := csv.NewWriter(w)
 		err = UUID2MKMCSV(b, csvWriter, data.([]string), nil, nil)
