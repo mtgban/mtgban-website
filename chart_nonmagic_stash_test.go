@@ -13,9 +13,9 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-// withGameAndFlags points the config at one game and one pair of long-form
-// flags for the duration of a test.
-func withGameAndFlags(t *testing.T, game mtgmatcher.Game, writes, reads bool) {
+// withGameAndFlags points the config at one game and one long-form write
+// flag for the duration of a test.
+func withGameAndFlags(t *testing.T, game mtgmatcher.Game, writes bool) {
 	t.Helper()
 	prevGame := Config().Game
 	prevTS := Config().TimeseriesConfig
@@ -25,36 +25,29 @@ func withGameAndFlags(t *testing.T, game mtgmatcher.Game, writes, reads bool) {
 	})
 	Config().Game = game
 	Config().TimeseriesConfig.LongFormWrites = writes
-	Config().TimeseriesConfig.LongFormReads = reads
 }
 
-// The two flags are Magic's cutover, deployment by deployment. A non-Magic game
+// The write flag is Magic's cutover, deployment by deployment. A non-Magic game
 // is not part of it: the wide table's mtgjson_uuid is a Postgres uuid column, so
 // a game that numbers its cards has no legacy path to be cut over from, and
 // leaving its writes behind a flag is what left its charts with only the
 // datasets the tcgcsv ingest writes on its own (issue #280).
 func TestLongFormGatesForNonMagic(t *testing.T) {
 	for _, tc := range []struct {
-		game                  mtgmatcher.Game
-		writes, reads         bool
-		wantActive, wantWrite bool
+		game      mtgmatcher.Game
+		writes    bool
+		wantWrite bool
 	}{
-		{DefaultGame, false, false, false, false},
-		{DefaultGame, true, false, true, true},
-		{DefaultGame, false, true, true, false},
-		{DefaultGame, true, true, true, true},
-		{mtgmatcher.GameLorcana, false, false, true, true},
-		{mtgmatcher.GameLorcana, true, true, true, true},
-		{"pokemon", false, true, true, true},
+		{DefaultGame, false, false},
+		{DefaultGame, true, true},
+		{mtgmatcher.GameLorcana, false, true},
+		{mtgmatcher.GameLorcana, true, true},
+		{"pokemon", false, true},
 	} {
-		withGameAndFlags(t, tc.game, tc.writes, tc.reads)
-		if got := longFormActive(); got != tc.wantActive {
-			t.Errorf("longFormActive(game=%s writes=%v reads=%v) = %v, want %v",
-				tc.game, tc.writes, tc.reads, got, tc.wantActive)
-		}
+		withGameAndFlags(t, tc.game, tc.writes)
 		if got := longFormWrites(); got != tc.wantWrite {
-			t.Errorf("longFormWrites(game=%s writes=%v reads=%v) = %v, want %v",
-				tc.game, tc.writes, tc.reads, got, tc.wantWrite)
+			t.Errorf("longFormWrites(game=%s writes=%v) = %v, want %v",
+				tc.game, tc.writes, got, tc.wantWrite)
 		}
 	}
 }

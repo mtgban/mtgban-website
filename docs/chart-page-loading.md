@@ -72,6 +72,6 @@ mobile drawer does the same, with a second request to `/api/chart`.
   Small at execution (~0.7ms), mostly a planning cost the prepared
   statement already covers.
 - The legacy wide tables (`product_prices` 38GB, the non-Magic TCGplayer
-  price tables ~20GB) are a quarter of the database and still dual-written
-  while `long_form_reads` is on. They compete for that 979MB.
+  price tables ~20GB) are a quarter of the database and still dual-written,
+  though nothing reads them. They compete for that 979MB.
 - The app is in NYC1 and the databases in SFO3: `deploy/REGION-MOVE.md`.

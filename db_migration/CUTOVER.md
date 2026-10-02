@@ -33,7 +33,6 @@ The index→provider mapping (plan 17.5):
 ```jsonc
 "timeseries_config": {
     "long_form_writes": false,   // step 2 flips this on
-    "long_form_reads": false,    // step 4 flips this on
     "datasets": [
         { "public_name": "TCGplayer Low", "index": 2, "provider": 3, ... },
         { "public_name": "TCGplayer Market", "index": 3, "provider": 4, ... },
@@ -96,7 +95,10 @@ Charts (`HGetAllLong`), earliest-date, buylist metrics (`GetAggregatePriceStatsL
 and the screener (`GetMoversLong`) now serve from the long tables. Legacy writes
 continue (safety net). Watch charts / screener / buylist metrics for a day.
 
-Rollback at any point before this is trusted: set `long_form_reads: false`.
+Done everywhere: the flag and the legacy read path are gone, and the site reads
+only the long tables whatever the config says. A config may still carry
+`long_form_reads`; it is ignored, and can be dropped once no deployment runs a
+build that still reads it.
 
 ## 5. Drop the legacy write path (follow-up PR, not this branch)
 
