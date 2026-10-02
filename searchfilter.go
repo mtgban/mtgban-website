@@ -299,6 +299,50 @@ func fixupNumberNG(b *mtgmatcher.Backend, code, opt string) []string {
 	return filters
 }
 
+// fixupNumberTotal prepares a cn: list in which some numbers carry the set
+// total their card prints, "222/236". The number is prepared as cn: prepares
+// it and the total loses its padding; a value with no slash, or with two, is
+// a number alone.
+func fixupNumberTotal(b *mtgmatcher.Backend, code string) []string {
+	filters := strings.Split(code, ",")
+	for i := range filters {
+		number, total := filters[i], ""
+		if namesSetTotal(filters[i]) {
+			number, total, _ = strings.Cut(filters[i], "/")
+		}
+		if total != "" {
+			number = strings.TrimPrefix(number, "#")
+		}
+		filters[i] = fixupNumberNG(b, number, "number")[0]
+		if total != "" {
+			filters[i] += "/" + plainTotal(total)
+		}
+	}
+	return filters
+}
+
+// namesSetTotal reports whether a cn: value can be a number with the set
+// total its card prints, "222/236". Two slashes are always a number of their
+// own, the way Flesh and Blood writes a double-faced card's.
+func namesSetTotal(value string) bool {
+	return strings.Count(value, "/") == 1
+}
+
+// typesSetTotal reports whether a word in a query is a number written with
+// its set total, "222/236": a digit somewhere, so that a name with a slash
+// in it is still read as a name.
+func typesSetTotal(token string) bool {
+	number, total, _ := strings.Cut(token, "/")
+	return namesSetTotal(token) && number != "" && total != "" &&
+		strings.ContainsAny(token, "0123456789")
+}
+
+// plainTotal is a set total as cn: compares it: case folded and without
+// the zero padding, so "017" is "17" and "SV122" is "sv122".
+func plainTotal(total string) string {
+	return strings.ToLower(strings.TrimLeft(total, "0"))
+}
+
 // fixupPatternNG takes the quotes off a pattern query. Nothing else comes
 // off: every other character could be part of the pattern.
 func fixupPatternNG(code string) string {
@@ -956,10 +1000,21 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 				}
 			}
 
+			// "222/236" names the number and the set total the card's face
+			// prints beside it, which is how a game with no set code on
+			// its cards tells one 222 from another.
+			if opt == "number" && slices.ContainsFunc(strings.Split(code, ","), namesSetTotal) {
+				opt = "number_total"
+			}
+
+			values := fixupNumberNG(b, code, opt)
+			if opt == "number_total" {
+				values = fixupNumberTotal(b, code)
+			}
 			filters = append(filters, FilterElem{
 				Name:       opt,
 				Negate:     negate,
-				Values:     fixupNumberNG(b, code, opt),
+				Values:     values,
 				Subfilters: subfilters,
 				ApplyTo:    applyToSets,
 			})
@@ -1379,7 +1434,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 		tokens := strings.Fields(query)
 		if len(tokens) == 2 {
 			number := mtgmatcher.ExtractNumberAny(tokens[1])
-			if number != "" && !namesASetCode(b, tokens[1]) {
+			if (number != "" || typesSetTotal(tokens[1])) && !namesASetCode(b, tokens[1]) {
 				set, err := b.GetSet(tokens[0])
 				if err == nil {
 					// A number saying more than a plain one is asked for
@@ -1397,10 +1452,30 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 					if strings.ContainsFunc(number, isNotDigit) {
 						op, value = "cns:", tokens[1]
 					}
+					// A number given with its set total is asked for
+					// with it, which cn: reads.
+					if typesSetTotal(tokens[1]) {
+						op, value = "cn:", tokens[1]
+					}
 					extraConfig := parseSearchOptionsNG(b, "s:"+set.Code+" "+op+value, nil, nil, nil)
 					filters = append(filters, extraConfig.CardFilters...)
 					query = ""
 				}
+			}
+		}
+	}
+
+	// A bare "222/236" is the number a card prints with its set total, the
+	// way a game whose cards print no set code is looked up: cn:222/236.
+	// Written after a name, it narrows the name.
+	if config.SearchMode == "" {
+		tokens := strings.Fields(query)
+		if len(tokens) > 0 {
+			last := tokens[len(tokens)-1]
+			if typesSetTotal(last) {
+				extraConfig := parseSearchOptionsNG(b, "cn:"+last, nil, nil, nil)
+				filters = append(filters, extraConfig.CardFilters...)
+				query = strings.Join(tokens[:len(tokens)-1], " ")
 			}
 		}
 	}
@@ -1938,6 +2013,8 @@ func applyCardFilter(b *mtgmatcher.Backend, name string, filters []string, co *m
 		return cardFilterContents(filters, co)
 	case "number":
 		return cardFilterNumber(filters, co)
+	case "number_total":
+		return cardFilterNumberTotal(filters, co)
 	case "number_strict":
 		return cardFilterNumberStrict(filters, co)
 	case "number_greater_than":
@@ -2099,6 +2176,27 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, strings.ToLower(co.PlainNumber)) &&
 		!slices.Contains(filters, strings.ToLower(co.Number))
+}
+
+// cardFilterNumberTotal keeps a card whose number is in the list, as
+// cardFilterNumber reads it, or whose number and set total are, "222/236".
+// A value is compared whole first, for the numbers written with a slash.
+func cardFilterNumberTotal(filters []string, co *mtgmatcher.CardObject) bool {
+	plain := strings.ToLower(co.PlainNumber)
+	printed := strings.ToLower(co.Number)
+	for _, value := range filters {
+		if value == plain || value == printed {
+			return false
+		}
+		if !namesSetTotal(value) {
+			continue
+		}
+		number, total, _ := strings.Cut(value, "/")
+		if total == plainTotal(co.SetTotal) && (number == plain || number == printed) {
+			return false
+		}
+	}
+	return true
 }
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
