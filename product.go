@@ -916,19 +916,13 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 	// One aggregate query for the whole buylist instead of N per-card lookups.
 	// Postgres computes the stats; each reducer just selects the field it
 	// cares about.
-	var statsByCard map[timeseries.AggregatePriceKey]timeseries.AggregatePriceStats
-	source := fmt.Sprintf("dataset %d", datasetIndex)
-	if Config().TimeseriesConfig.LongFormReads {
-		provider, ok := providerForDatasetIndex(datasetIndex)
-		if !ok {
-			log.Println(store, "has no provider configured for long-form reads")
-			return nil
-		}
-		source = fmt.Sprintf("provider %d", provider)
-		statsByCard, err = PricesArchiveDB.GetAggregatePriceStatsLong(context.Background(), provider, threeMonthsAgo, today)
-	} else {
-		statsByCard, err = PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo, today)
+	provider, ok := providerForDatasetIndex(datasetIndex)
+	if !ok {
+		log.Println(store, "has no provider configured")
+		return nil
 	}
+	source := fmt.Sprintf("provider %d", provider)
+	statsByCard, err := PricesArchiveDB.GetAggregatePriceStatsLong(context.Background(), provider, threeMonthsAgo, today)
 	if err != nil {
 		log.Println(err)
 		return nil
