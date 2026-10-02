@@ -722,11 +722,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
 	}
 	pageVars.ScraperKeys = prices.enabledStores
-	pageVars.AllScraperKeys = prices.enabledStores
 	if len(ids.sealedProductIDs) > 0 {
 		pageVars.SealedIndexKeys = indexes.sealedKeys
 		pageVars.SealedScraperKeys = prices.enabledSealedStores
-		pageVars.AllScraperKeys = append(append([]string{}, prices.enabledStores...), prices.enabledSealedStores...)
 	}
 
 	// Orders implies priority of argument search
