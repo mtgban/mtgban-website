@@ -144,79 +144,8 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.SelectableLabel = "Invite link"
 	}
 
-	refresh := r.FormValue("refresh")
-	if refresh != "" {
-		v := url.Values{}
-		_, found := currentScraperIndex().byStore[refresh]
-		if !found {
-			v.Set("msg", refresh+" not found")
-		} else {
-			err := sendGithubAction(Config().Game, refresh)
-			if err != nil {
-				v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
-			} else {
-				v.Set("msg", "Scheduling a refresh for "+refresh+" in the background...")
-			}
-		}
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	if s.adminActions(w, r, &pageVars) {
 		return
-	}
-	reload := r.FormValue("reload")
-	if reload != "" {
-		v := url.Values{}
-		v.Set("msg", reload+" reloaded")
-		err := loadScraper(DataBucket, Config().Game, reload, r.FormValue("table"), r.FormValue("tag"))
-		if err != nil {
-			v.Set("msg", "reload of "+reload+" error: "+err.Error())
-		} else {
-			s.pokeAlerts(r.FormValue("table"))
-		}
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
-		return
-	}
-
-	removeStore := r.FormValue("removestore")
-	if removeStore != "" {
-		v := url.Values{}
-		v.Set("msg", removeStore+" removed")
-		err := Sessions.Remove(r.FormValue("kind"), removeStore)
-		if err != nil {
-			v.Set("msg", "remove of "+removeStore+" error: "+err.Error())
-		}
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
-		return
-	}
-
-	logs := r.FormValue("logs")
-	if logs != "" {
-		// Check among the Page loggers
-		_, found := LogPages[logs]
-		if found {
-			logfilePath := path.Join(LogDir, logs+".log")
-			LogPages["Admin"].Println("Serving", logfilePath)
-			w.Header().Set("Content-Type", "text/plain")
-			w.Header().Set("Content-Disposition", "inline; filename="+logs+".log")
-
-			if fileExists(logfilePath + ".1") {
-				http.ServeFile(w, r, logfilePath+".1")
-			}
-			http.ServeFile(w, r, logfilePath)
-			return
-		}
-
-		// If it's not a Page, look if the last listing named it as a store
-		_, found = currentScraperIndex().byStore[logs]
-		if found {
-			link := fmt.Sprintf(gaLogURL, newBantoolWorkflow(Config().Game, logs).File)
-			http.Redirect(w, r, link, http.StatusFound)
-			return
-		}
-
-		// Otherwise, 404
-		pageVars.InfoMessage = logs + " not found"
 	}
 
 	if s.adminTools(w, r, &pageVars) {
@@ -689,6 +618,87 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render(w, "admin.html", pageVars)
+}
+
+// adminActions runs the refresh, reload, removestore or logs action the
+// request names, if any, and reports whether it answered the request. A
+// logs name it does not know leaves a message for the page instead.
+func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
+	refresh := r.FormValue("refresh")
+	if refresh != "" {
+		v := url.Values{}
+		_, found := currentScraperIndex().byStore[refresh]
+		if !found {
+			v.Set("msg", refresh+" not found")
+		} else {
+			err := sendGithubAction(Config().Game, refresh)
+			if err != nil {
+				v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
+			} else {
+				v.Set("msg", "Scheduling a refresh for "+refresh+" in the background...")
+			}
+		}
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return true
+	}
+	reload := r.FormValue("reload")
+	if reload != "" {
+		v := url.Values{}
+		v.Set("msg", reload+" reloaded")
+		err := loadScraper(DataBucket, Config().Game, reload, r.FormValue("table"), r.FormValue("tag"))
+		if err != nil {
+			v.Set("msg", "reload of "+reload+" error: "+err.Error())
+		} else {
+			s.pokeAlerts(r.FormValue("table"))
+		}
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return true
+	}
+
+	removeStore := r.FormValue("removestore")
+	if removeStore != "" {
+		v := url.Values{}
+		v.Set("msg", removeStore+" removed")
+		err := Sessions.Remove(r.FormValue("kind"), removeStore)
+		if err != nil {
+			v.Set("msg", "remove of "+removeStore+" error: "+err.Error())
+		}
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return true
+	}
+
+	logs := r.FormValue("logs")
+	if logs != "" {
+		// Check among the Page loggers
+		_, found := LogPages[logs]
+		if found {
+			logfilePath := path.Join(LogDir, logs+".log")
+			LogPages["Admin"].Println("Serving", logfilePath)
+			w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("Content-Disposition", "inline; filename="+logs+".log")
+
+			if fileExists(logfilePath + ".1") {
+				http.ServeFile(w, r, logfilePath+".1")
+			}
+			http.ServeFile(w, r, logfilePath)
+			return true
+		}
+
+		// If it's not a Page, look if the last listing named it as a store
+		_, found = currentScraperIndex().byStore[logs]
+		if found {
+			link := fmt.Sprintf(gaLogURL, newBantoolWorkflow(Config().Game, logs).File)
+			http.Redirect(w, r, link, http.StatusFound)
+			return true
+		}
+
+		// Otherwise, 404
+		pageVars.InfoMessage = logs + " not found"
+	}
+	return false
 }
 
 // adminTools runs the server action or admin tool the request names, if
