@@ -871,36 +871,14 @@ type uploadRows struct {
 // priceUploadRows prices each matched row at the stores and indexes fetched,
 // adds up the totals, and picks the best stores for the optimizer.
 func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, uploadedData []UploadEntry) uploadRows {
-	totalEntries := map[string]float64{}
-	var totalQuantity, singlesQuantity, sealedQuantity int
-	var anyCounted bool
-	var highestTotal float64
-	var singlesHighest, sealedHighest float64
-
-	optimizedResults := map[string][]OptimizedUploadEntry{}
-	optimizedTotals := map[string]float64{}
-
-	missingCounts := map[string]int{}
-	missingPrices := map[string]float64{}
-	resultPrices := map[string]map[string]float64{}
-
-	// The same tallies again, but per opened product, so an unpacked list can
-	// be read a box at a time: what came out of this one, against what the box
-	// itself is worth. Keyed by the product's uuid - its own row keys on the
-	// card id, the cards it produced on the product they name.
-	tallies := map[string]*unpackedTally{}
-	tallyFor := func(product string) *unpackedTally {
-		tally := tallies[product]
-		if tally == nil {
-			tally = &unpackedTally{
-				Totals:        map[string]float64{},
-				Missing:       map[string]int{},
-				MissingPrices: map[string]float64{},
-				ProductIndex:  map[string]float64{},
-			}
-			tallies[product] = tally
-		}
-		return tally
+	rows := uploadRows{
+		resultPrices:     map[string]map[string]float64{},
+		totalEntries:     map[string]float64{},
+		missingCounts:    map[string]int{},
+		missingPrices:    map[string]float64{},
+		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedTotals:  map[string]float64{},
+		tallies:          map[string]*unpackedTally{},
 	}
 
 	for i := range uploadedData {
@@ -933,10 +911,10 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 				continue
 			}
 			reference := getPrice(indexes.results[cardID]["TCGLow"], "")
-			missingCounts[shorthand]++
-			missingPrices[shorthand] += reference
+			rows.missingCounts[shorthand]++
+			rows.missingPrices[shorthand] += reference
 			if uploadedData[i].UnpackedFrom != "" {
-				tally := tallyFor(uploadedData[i].UnpackedFrom)
+				tally := rows.tallyFor(uploadedData[i].UnpackedFrom)
 				tally.Missing[shorthand]++
 				tally.MissingPrices[shorthand] += reference
 			}
@@ -954,10 +932,10 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		for indexKey, indexResult := range indexes.results[cardID] {
 			indexPrice := getPrice(indexResult, conds)
 
-			if resultPrices[priceKey] == nil {
-				resultPrices[priceKey] = map[string]float64{}
+			if rows.resultPrices[priceKey] == nil {
+				rows.resultPrices[priceKey] = map[string]float64{}
 			}
-			resultPrices[priceKey][indexKey] = indexPrice
+			rows.resultPrices[priceKey][indexKey] = indexPrice
 
 			qty := uploadedData[i].QuantityOrOne()
 			indexPrice *= float64(adjustQty(qty, st.multiplier, st.maxQty))
@@ -968,13 +946,13 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			// cards it became are in the list already, and counting both
 			// would count them twice.
 			if uploadedData[i].Unpacked {
-				tallyFor(cardID).ProductIndex[indexKey] = indexPrice
+				rows.tallyFor(cardID).ProductIndex[indexKey] = indexPrice
 				continue
 			}
 
-			totalEntries[indexKey] += indexPrice
+			rows.totalEntries[indexKey] += indexPrice
 			if uploadedData[i].UnpackedFrom != "" {
-				tallyFor(uploadedData[i].UnpackedFrom).Totals[indexKey] += indexPrice
+				rows.tallyFor(uploadedData[i].UnpackedFrom).Totals[indexKey] += indexPrice
 			}
 		}
 
@@ -989,14 +967,14 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			// Quantity summary
 			qty := uploadedData[i].QuantityOrOne()
 			adjusted := adjustQty(qty, st.multiplier, st.maxQty)
-			totalQuantity += adjusted
+			rows.totalQuantity += adjusted
 			if isSealed {
-				sealedQuantity += adjusted
+				rows.sealedQuantity += adjusted
 			} else {
-				singlesQuantity += adjusted
+				rows.singlesQuantity += adjusted
 			}
 			if uploadedData[i].UnpackedFrom != "" {
-				tallyFor(uploadedData[i].UnpackedFrom).Quantity += adjusted
+				rows.tallyFor(uploadedData[i].UnpackedFrom).Quantity += adjusted
 			}
 		}
 
@@ -1017,10 +995,10 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			}
 
 			// Store computed price
-			if resultPrices[priceKey] == nil {
-				resultPrices[priceKey] = map[string]float64{}
+			if rows.resultPrices[priceKey] == nil {
+				rows.resultPrices[priceKey] = map[string]float64{}
 			}
-			resultPrices[priceKey][shorthand] = price
+			rows.resultPrices[priceKey][shorthand] = price
 
 			// Skip empty results
 			if price == 0 {
@@ -1034,9 +1012,9 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexes.results[cardID][shorthand]
 			if !found && counts {
-				totalEntries[shorthand] += price
+				rows.totalEntries[shorthand] += price
 				if uploadedData[i].UnpackedFrom != "" {
-					tallyFor(uploadedData[i].UnpackedFrom).Totals[shorthand] += price
+					rows.tallyFor(uploadedData[i].UnpackedFrom).Totals[shorthand] += price
 				}
 			}
 
@@ -1048,7 +1026,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		// against. The cards it became are the optimizer's business; it is not.
 		if !counts {
 			if len(bestStores) > 0 {
-				tallyFor(cardID).ProductPrice = offers[bestStores[0]]
+				rows.tallyFor(cardID).ProductPrice = offers[bestStores[0]]
 			}
 			continue
 		}
@@ -1082,7 +1060,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			}
 
 			// Load the single item priceprice
-			price := resultPrices[priceKey][bestStore]
+			price := rows.resultPrices[priceKey][bestStore]
 
 			// Skip if needed
 			if st.skipLowValueAbs && price < st.minLowVal {
@@ -1114,7 +1092,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			}
 
 			// Break down by store
-			optimizedResults[bestStore] = append(optimizedResults[bestStore], OptimizedUploadEntry{
+			rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
 				CardID:        cardID,
 				Condition:     conds,
 				Price:         comparePrice,
@@ -1128,39 +1106,43 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 			})
 
 			// Save totals
-			optimizedTotals[bestStore] += bestPrice
+			rows.optimizedTotals[bestStore] += bestPrice
 			if j == 0 {
-				highestTotal += bestPrice
+				rows.highestTotal += bestPrice
 				if isSealed {
-					sealedHighest += bestPrice
+					rows.sealedHighest += bestPrice
 				} else {
-					singlesHighest += bestPrice
+					rows.singlesHighest += bestPrice
 				}
 				if uploadedData[i].UnpackedFrom != "" {
-					tallyFor(uploadedData[i].UnpackedFrom).Highest += bestPrice
+					rows.tallyFor(uploadedData[i].UnpackedFrom).Highest += bestPrice
 				}
 			}
 		}
 
-		anyCounted = true
+		rows.anyCounted = true
 	}
 
-	return uploadRows{
-		resultPrices:     resultPrices,
-		totalEntries:     totalEntries,
-		missingCounts:    missingCounts,
-		missingPrices:    missingPrices,
-		optimizedResults: optimizedResults,
-		optimizedTotals:  optimizedTotals,
-		highestTotal:     highestTotal,
-		singlesHighest:   singlesHighest,
-		sealedHighest:    sealedHighest,
-		totalQuantity:    totalQuantity,
-		singlesQuantity:  singlesQuantity,
-		sealedQuantity:   sealedQuantity,
-		tallies:          tallies,
-		anyCounted:       anyCounted,
+	return rows
+}
+
+// tallyFor returns the tallies of the opened product, starting them on its
+// first row. They are the store and index tallies again, per product, so an
+// unpacked list can be read a box at a time: what came out of this one,
+// against what the box itself is worth. Keyed by the product's uuid - its own
+// row keys on the card id, the cards it produced on the product they name.
+func (rows *uploadRows) tallyFor(product string) *unpackedTally {
+	tally := rows.tallies[product]
+	if tally == nil {
+		tally = &unpackedTally{
+			Totals:        map[string]float64{},
+			Missing:       map[string]int{},
+			MissingPrices: map[string]float64{},
+			ProductIndex:  map[string]float64{},
+		}
+		rows.tallies[product] = tally
 	}
+	return tally
 }
 
 // redirectToSCGMassEntry sends the cards to Star City Games' mass entry and
