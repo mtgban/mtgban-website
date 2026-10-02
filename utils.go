@@ -465,6 +465,9 @@ type GenericCard struct {
 	Edition    string
 	SetCode    string
 	Number     string
+	// SetTotal is the set size printed beside Number, "236" of "222/236",
+	// where the card prints one.
+	SetTotal string
 	// PromoTypes is every promo type token co.PromoTypes carries that is not
 	// already shown some other way - not Boosterfun, not the alt-foil style
 	// that became FinishTag or a Treatments entry. A frame effect (Showcase,
@@ -723,6 +726,9 @@ func editionTitle(b *mtgmatcher.Backend, cardID string) string {
 		extra += mtgmatcher.Title(category)
 	} else {
 		extra = " #" + co.Card.Number
+		if co.SetTotal != "" {
+			extra += "/" + co.SetTotal
+		}
 	}
 
 	return fmt.Sprintf("%s -%s %s%s", edition, finish, mtgmatcher.Title(co.Card.Rarity), extra)
@@ -1177,6 +1183,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		Edition:     co.Edition,
 		SetCode:     co.Card.SetCode,
 		Number:      co.Card.Number,
+		SetTotal:    co.SetTotal,
 		PromoTypes:  promoTypes,
 		Foil:        co.Foil,
 		Etched:      co.Etched,
