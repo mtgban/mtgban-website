@@ -727,26 +727,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.SealedScraperKeys = prices.enabledSealedStores
 	}
 
-	// Orders implies priority of argument search
-	// Read here rather than passed dereferenced: a paste reaches this line
-	// with no file behind it at all.
-	var uploadFilename string
-	if in.handler != nil {
-		uploadFilename = in.handler.Filename
-	}
-	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
-		in.hashes, in.textArea, r.FormValue("uploadSource"), in.remoteURL, uploadName, uploadFilename,
-	)
-	pageVars.UploadEntries = uploadedData
-
-	// Offer to open the sealed rows only when there are any left to open, and
-	// say so when this list is already the contents of some.
-	pageVars.UnpackSealed = unpackableSealed(b, uploadedData)
-	for i := range uploadedData {
-		if uploadedData[i].Unpacked {
-			pageVars.UnpackedFrom++
-		}
-	}
+	fillUploadEntries(&pageVars.UploadVars, r, b, in, uploadName, uploadedData)
 
 	pageVars.Metadata = uploadMetadata(b, st, uploadedData)
 
@@ -775,6 +756,31 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Touchdown!
 	render(w, "upload.html", pageVars)
+}
+
+// fillUploadEntries puts the rows on the page, with the line naming where they
+// came from, and counts the products left to open and those already opened.
+func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *mtgmatcher.Backend, in uploadInput, uploadName string, uploadedData []UploadEntry) {
+	// Orders implies priority of argument search
+	// Read here rather than passed dereferenced: a paste reaches this line
+	// with no file behind it at all.
+	var uploadFilename string
+	if in.handler != nil {
+		uploadFilename = in.handler.Filename
+	}
+	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
+		in.hashes, in.textArea, r.FormValue("uploadSource"), in.remoteURL, uploadName, uploadFilename,
+	)
+	pageVars.UploadEntries = uploadedData
+
+	// Offer to open the sealed rows only when there are any left to open, and
+	// say so when this list is already the contents of some.
+	pageVars.UnpackSealed = unpackableSealed(b, uploadedData)
+	for i := range uploadedData {
+		if uploadedData[i].Unpacked {
+			pageVars.UnpackedFrom++
+		}
+	}
 }
 
 // uploadMetadata reads what the page shows of every matched card, and of the
