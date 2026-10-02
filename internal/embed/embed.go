@@ -40,6 +40,10 @@ type Entry struct {
 	Shorthand   string
 	Price       float64
 	Ratio       float64
+
+	// Grade is the condition the offer is for, where it is not NM, printed
+	// beside the name.
+	Grade string
 }
 
 // OEmbed is the oEmbed envelope Discord fetches to unfurl a link.
@@ -179,6 +183,7 @@ func FormatSearchResult(baseURL string, searchRes *SearchResult) (fields []Field
 			var value FieldValue
 
 			value.ScraperName = entry.ScraperName
+			value.Tag = entry.Grade
 			value.Price = fmt.Sprintf("$%0.2f", entry.Price)
 
 			// Build url for our redirect
