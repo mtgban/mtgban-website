@@ -386,7 +386,7 @@ func chartSearchID(b *mtgmatcher.Backend, id string, target *chartTarget) (strin
 //
 // The roster is capped at the palette size: the multi-card chart can only
 // render that many distinguishable lines, and it bounds the per-UUID DB
-// fan-out (GetEarliestDate + timeseries fetch) triggered on this public
+// fan-out (a resolution and a price read per card) triggered on this public
 // handler by a crafted many-UUID chart= URL. truncated reports whether at
 // least one otherwise-valid, distinct card was dropped for exceeding the cap,
 // so the caller can tell the user instead of silently swallowing it.
@@ -1335,7 +1335,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
-		} else if Config().TimeseriesConfig.LongFormReads {
+		} else {
 			// Render the window the chart draws, taken from the viewer's own
 			// last choice so it is not drawn once and redrawn at theirs. A
 			// roster's select starts on "All", so absent a choice it renders
@@ -1417,63 +1417,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 					pageVars.InfoMessage = "No chart data available"
 				case failed > 0:
 					noteChartIDsDropped(&pageVars, failed, len(chartIDs), "failed to load")
-				}
-			}
-		} else if !isMultiChart {
-			co, err := b.GetUUID(chartID)
-			if err != nil {
-				fmt.Println("Search: Failed to GetUUID: %w", err)
-				return
-			}
-			lb := chartLookback(sig)
-			// The legacy read has no ranged endpoint behind it, so the page
-			// renders the whole window and the front-end never widens.
-			pageVars.ChartLoadedDays = pageVars.MaxLookbackDays
-
-			earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
-
-			pageVars.AxisLabels = getDateAxisValues(earliest)
-			pageVars.Datasets = getDatasets(r.Context(), b, chartID, co.Sealed, pageVars.AxisLabels, lb)
-			pageVars.Checkpoints = relevantCheckpoints(ds, co.Name, earliest)
-			if len(pageVars.Datasets) == 0 {
-				pageVars.InfoMessage = "No chart data available"
-			}
-		} else {
-			lb := chartLookback(sig)
-			// The legacy read has no ranged endpoint behind it, so the page
-			// renders the whole window and the front-end never widens.
-			pageVars.ChartLoadedDays = pageVars.MaxLookbackDays
-
-			// Union of date ranges: pick the oldest earliest so every card's
-			// available history shows up, with NaN gaps for dates predating it.
-			var earliest time.Time
-			var chartNames []string
-			for _, id := range chartIDs {
-				co, gerr := b.GetUUID(id)
-				if gerr != nil {
-					continue
-				}
-				chartNames = append(chartNames, co.Name)
-				e, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
-				if e.IsZero() {
-					continue
-				}
-				if earliest.IsZero() || e.Before(earliest) {
-					earliest = e
-				}
-			}
-			if earliest.IsZero() {
-				pageVars.InfoMessage = "No chart data available"
-			} else {
-				pageVars.AxisLabels = getDateAxisValues(earliest)
-				datasets, refs := getDatasetsForMulti(r.Context(), b, chartIDs, pageVars.AxisLabels, lb)
-				pageVars.Datasets = datasets
-				pageVars.ChartReferences = refs
-				// Shared timeline across the roster: the union of every card's
-				// releases, reprints and bans/unbans, deduped onto one axis.
-				pageVars.Checkpoints = multiCardCheckpoints(ds, chartNames, earliest)
-				if len(datasets) == 0 {
-					pageVars.InfoMessage = "No chart data available"
 				}
 			}
 		}
