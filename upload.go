@@ -695,39 +695,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Allow downloading data as CSV
 	if modes.download && canBuylist {
-		csvName := "mtgban_prices"
-		if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
-			csvName += "_" + scope
-		}
-		setCSVDownloadHeaders(w, csvName+".csv")
-		csvWriter := csv.NewWriter(w)
-
-		// Search for the csv-specific indexes that were left enabled
-		// (skip the dump when there are no singles)
-		var csvIndexKeys []string
-		for _, key := range UploadIndexKeysCSV {
-			if slices.Contains(selected.enabledIndexKeys, key) {
-				csvIndexKeys = append(csvIndexKeys, key)
-			}
-		}
-		indexResults := map[string]map[string]*BanPrice{}
-		if len(ids.cardIDs) > 0 && len(csvIndexKeys) > 0 {
-			indexResults = getSellerPrices(b, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
-		}
-
-		// Copy these index prices in the final results
-		for _, cardID := range ids.cardIDs {
-			for _, index := range csvIndexKeys {
-				if prices.results[cardID] == nil {
-					prices.results[cardID] = map[string]*BanPrice{}
-				}
-				prices.results[cardID][index] = indexResults[cardID][index]
-			}
-		}
-
-		err := SimplePrice2CSV(b, csvWriter, prices.results, uploadedData, nil, st.preferFlavor)
+		err := writePricesCSV(w, r, b, st, selected, ids, prices, uploadedData)
 		if err != nil {
-			dropDownloadHeaders(w)
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
@@ -1937,6 +1906,47 @@ func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st u
 		enabledStores:       enabledStores,
 		enabledSealedStores: enabledSealedStores,
 	}
+}
+
+// writePricesCSV answers with the upload's prices as a CSV, adding to them in
+// place the CSV index prices the reader keeps enabled. When it fails it drops
+// the download headers, so the caller can answer with a page.
+func writePricesCSV(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices, uploadedData []UploadEntry) error {
+	csvName := "mtgban_prices"
+	if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
+		csvName += "_" + scope
+	}
+	setCSVDownloadHeaders(w, csvName+".csv")
+
+	// Search for the csv-specific indexes that were left enabled
+	// (skip the dump when there are no singles)
+	var csvIndexKeys []string
+	for _, key := range UploadIndexKeysCSV {
+		if slices.Contains(selected.enabledIndexKeys, key) {
+			csvIndexKeys = append(csvIndexKeys, key)
+		}
+	}
+	indexResults := map[string]map[string]*BanPrice{}
+	if len(ids.cardIDs) > 0 && len(csvIndexKeys) > 0 {
+		indexResults = getSellerPrices(b, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+	}
+
+	// Copy these index prices in the final results
+	for _, cardID := range ids.cardIDs {
+		for _, index := range csvIndexKeys {
+			if prices.results[cardID] == nil {
+				prices.results[cardID] = map[string]*BanPrice{}
+			}
+			prices.results[cardID][index] = indexResults[cardID][index]
+		}
+	}
+
+	csvWriter := csv.NewWriter(w)
+	err := SimplePrice2CSV(b, csvWriter, prices.results, uploadedData, nil, st.preferFlavor)
+	if err != nil {
+		dropDownloadHeaders(w)
+	}
+	return err
 }
 
 // mergePrices adds every price in src to dst, card by card and store by
