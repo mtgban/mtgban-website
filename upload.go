@@ -686,34 +686,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var shouldCheckForConditions bool
-
-	// Extract card Ids, separating sealed from singles
-	var cardIDs, sealedProductIDs []string
-	for i := range uploadedData {
-		// Filter out empty ids
-		if uploadedData[i].CardID == "" {
-			continue
-		}
-
-		co, err := b.GetUUID(uploadedData[i].CardID)
-		if err == nil && co.Sealed {
-			sealedProductIDs = append(sealedProductIDs, uploadedData[i].CardID)
-		} else {
-			cardIDs = append(cardIDs, uploadedData[i].CardID)
-		}
-
-		// Check if conditions should be retrieved
-		if uploadedData[i].OriginalCondition != "" {
-			if st.skipConds {
-				uploadedData[i].IgnoredCondition = uploadedData[i].OriginalCondition
-				uploadedData[i].OriginalCondition = ""
-			} else {
-				shouldCheckForConditions = true
-			}
-		}
-	}
-	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(cardIDs), len(sealedProductIDs))
+	ids := splitUploadIDs(b, uploadedData, st)
+	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(ids.cardIDs), len(ids.sealedProductIDs))
 
 	tagPref := "tags"
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
@@ -732,8 +706,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// empty singles columns plus a GetUUID-per-card dump. Guard it the same
 		// way the sealed and index fetches below already do.
 		results = map[string]map[string]*BanPrice{}
-		if len(cardIDs) > 0 {
-			results = getVendorPrices(b, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+		if len(ids.cardIDs) > 0 {
+			results = getVendorPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
 		}
 
 		// Build the custom buylist if requested
@@ -754,16 +728,16 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
 			if customSeller != "" {
 				ref, _ := findSellerInventory(customSeller)
-				for _, cardID := range cardIDs {
-					processEntry(b, results, ref[cardID], "", cardID, "CUSTOM", false, shouldCheckForConditions, false, rule)
+				for _, cardID := range ids.cardIDs {
+					processEntry(b, results, ref[cardID], "", cardID, "CUSTOM", false, ids.shouldCheckForConditions, false, rule)
 				}
 				enabledStores = append(enabledStores, "CUSTOM")
 			}
 
 			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
-			if customSealedSeller != "" && len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+			if customSealedSeller != "" && len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
 				ref, _ := findSellerInventory(customSealedSeller)
-				for _, productID := range sealedProductIDs {
+				for _, productID := range ids.sealedProductIDs {
 					processEntry(b, results, ref[productID], "", productID, "CUSTOM_SEALED", false, false, false, rule)
 				}
 				enabledSealedStores = append(enabledSealedStores, "CUSTOM_SEALED")
@@ -771,8 +745,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Fetch sealed vendor prices and merge
-		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref))
+		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+			mergePrices(results, getVendorPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, tagPref))
 		}
 
 		if priceSource != "" {
@@ -786,13 +760,13 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		// Same guard as the buylist branch: skip the singles dump when the
 		// upload has no singles (see the comment above).
 		results = map[string]map[string]*BanPrice{}
-		if len(cardIDs) > 0 {
-			results = getSellerPrices(b, "", enabledStores, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+		if len(ids.cardIDs) > 0 {
+			results = getSellerPrices(b, "", enabledStores, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
 		}
 
 		// Fetch sealed seller prices and merge
-		if len(sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
-			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", sealedProductIDs, "", false, false, true, tagPref))
+		if len(ids.sealedProductIDs) > 0 && len(enabledSealedStores) > 0 {
+			mergePrices(results, getSellerPrices(b, "", enabledSealedStores, "", ids.sealedProductIDs, "", false, false, true, tagPref))
 		}
 	}
 
@@ -814,12 +788,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		indexResults := map[string]map[string]*BanPrice{}
-		if len(cardIDs) > 0 && len(csvIndexKeys) > 0 {
-			indexResults = getSellerPrices(b, "", csvIndexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+		if len(ids.cardIDs) > 0 && len(csvIndexKeys) > 0 {
+			indexResults = getSellerPrices(b, "", csvIndexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
 		}
 
 		// Copy these index prices in the final results
-		for _, cardID := range cardIDs {
+		for _, cardID := range ids.cardIDs {
 			for _, index := range csvIndexKeys {
 				if results[cardID] == nil {
 					results[cardID] = map[string]*BanPrice{}
@@ -847,12 +821,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		altPriceSource = UploadIndexKeys[0]
 	}
 
-	if len(cardIDs) > 0 {
+	if len(ids.cardIDs) > 0 {
 		indexKeys = UploadIndexKeys
 		if !slices.Contains(indexKeys, altPriceSource) {
 			indexKeys = append(indexKeys, altPriceSource)
 		}
-		indexResults = getSellerPrices(b, "", indexKeys, "", cardIDs, "", false, shouldCheckForConditions, false, tagPref)
+		indexResults = getSellerPrices(b, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, tagPref)
 	}
 
 	// An index that is also a selected store (TCGSealed) already gets its
@@ -866,8 +840,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch sealed index prices
-	if len(sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", sealedProductIDs, "", false, false, true, tagPref))
+	if len(ids.sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
+		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, tagPref))
 	}
 
 	// Set card and sealed keys separately — the template picks per entry,
@@ -880,7 +854,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.ScraperKeys = enabledStores
 	pageVars.AllScraperKeys = enabledStores
-	if len(sealedProductIDs) > 0 {
+	if len(ids.sealedProductIDs) > 0 {
 		pageVars.SealedIndexKeys = sealedIndexKeys
 		pageVars.SealedScraperKeys = enabledSealedStores
 		pageVars.AllScraperKeys = append(append([]string{}, enabledStores...), enabledSealedStores...)
@@ -1203,7 +1177,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	sortResults(b, uploadedData, optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
-	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, sealedProductIDs)
+	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, ids.sealedProductIDs)
 	pageVars.SinglesEntries = singlesEntries
 	pageVars.SealedEntries = sealedEntries
 	pageVars.NotFoundEntries = notFoundEntries
@@ -1256,7 +1230,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	if blMode {
 		msgMode = "buylist"
 	}
-	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
+	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(ids.cardIDs), msgMode, pageVars.UploadQuery, time.Since(start))
 	UserNotify("upload", msg)
 	LogPages["Upload"].Println(msg)
 
@@ -1881,6 +1855,53 @@ func publishUploadStore(r *http.Request, b *mtgmatcher.Backend, blMode bool, upl
 
 	msg := fmt.Sprintf("Published %s (%s) as a %s store: %s", info.Name, info.Shorthand, kind, report)
 	return msg, nil
+}
+
+// uploadIDs are an upload's cards split into singles and sealed products, and
+// whether any row has a condition to price.
+type uploadIDs struct {
+	cardIDs                  []string
+	sealedProductIDs         []string
+	shouldCheckForConditions bool
+}
+
+// splitUploadIDs splits the rows' cards into singles and sealed products. When
+// the settings skip conditions it also moves each row's condition to
+// IgnoredCondition, in place.
+func splitUploadIDs(b *mtgmatcher.Backend, uploadedData []UploadEntry, st uploadSettings) uploadIDs {
+	var shouldCheckForConditions bool
+
+	// Extract card Ids, separating sealed from singles
+	var cardIDs, sealedProductIDs []string
+	for i := range uploadedData {
+		// Filter out empty ids
+		if uploadedData[i].CardID == "" {
+			continue
+		}
+
+		co, err := b.GetUUID(uploadedData[i].CardID)
+		if err == nil && co.Sealed {
+			sealedProductIDs = append(sealedProductIDs, uploadedData[i].CardID)
+		} else {
+			cardIDs = append(cardIDs, uploadedData[i].CardID)
+		}
+
+		// Check if conditions should be retrieved
+		if uploadedData[i].OriginalCondition != "" {
+			if st.skipConds {
+				uploadedData[i].IgnoredCondition = uploadedData[i].OriginalCondition
+				uploadedData[i].OriginalCondition = ""
+			} else {
+				shouldCheckForConditions = true
+			}
+		}
+	}
+
+	return uploadIDs{
+		cardIDs:                  cardIDs,
+		sealedProductIDs:         sealedProductIDs,
+		shouldCheckForConditions: shouldCheckForConditions,
+	}
 }
 
 // mergePrices adds every price in src to dst, card by card and store by
