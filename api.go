@@ -798,7 +798,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isCSV {
-		w.Header().Set("Content-Type", "text/csv")
+		setCSVDownloadHeaders(w, "mtgban_search.csv")
 
 		// Reuse the walked rows, keyed by BAN UUID so foil/nonfoil stay
 		// separate (CSV is never the demo mode, so the rows above carry
