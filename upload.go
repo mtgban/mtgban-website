@@ -630,32 +630,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledSealedSellers = enabledSealedStores
 	}
 
-	// Set upload limit
-	maxRows := MaxUploadEntries
-
-	// Load optional modes
-	download, _ := strconv.ParseBool(r.FormValue("download"))
-	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
-	estimate = estimate && magicOnlyExports
-	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
-	deckbox = deckbox && magicOnlyExports
-	tcgpCSV, _ := strconv.ParseBool(r.FormValue("tcgplayer_csv"))
-
-	// Increase upload limit if allowed
-	optimizerOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadOptimizer"))
-	increaseMaxRows := optimizerOpt || (DevMode && !SigCheck)
-	if increaseMaxRows {
-		maxRows = MaxUploadProEntries
-	}
-	// Allow a larger upload limit if set, if dev, or if it's an external call.
-	// UploadPublish carries no row-count privilege of its own - a store
-	// published site-wide is capped the same as any other upload unless the
-	// publisher separately holds UploadOptimizer/UploadNoLimit too.
-	noLimitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
-	if uploadNoLimit {
-		maxRows = MaxUploadTotalEntries
-	}
+	modes := readUploadModes(r, canBuylist, magicOnlyExports)
+	download := modes.download
+	estimate := modes.estimate
+	deckbox := modes.deckbox
+	tcgpCSV := modes.tcgpCSV
+	maxRows := modes.maxRows
 	start := time.Now()
 	parser := newUploadParser(b)
 
@@ -1909,6 +1889,57 @@ func readUploadInput(r *http.Request) uploadInput {
 		file:           file,
 		handler:        handler,
 		fileErr:        err,
+	}
+}
+
+// uploadModes are the exports a request asks for, and the most rows it may
+// load.
+type uploadModes struct {
+	download bool
+	estimate bool
+	deckbox  bool
+	tcgpCSV  bool
+	maxRows  int
+}
+
+// readUploadModes reads the exports a request asks for, and the row cap that
+// they and the reader's grants allow.
+func readUploadModes(r *http.Request, canBuylist, magicOnlyExports bool) uploadModes {
+	sig := getSignatureFromCookies(r)
+
+	// Set upload limit
+	maxRows := MaxUploadEntries
+
+	// Load optional modes
+	download, _ := strconv.ParseBool(r.FormValue("download"))
+	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
+	estimate = estimate && magicOnlyExports
+	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
+	deckbox = deckbox && magicOnlyExports
+	tcgpCSV, _ := strconv.ParseBool(r.FormValue("tcgplayer_csv"))
+
+	// Increase upload limit if allowed
+	optimizerOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadOptimizer"))
+	increaseMaxRows := optimizerOpt || (DevMode && !SigCheck)
+	if increaseMaxRows {
+		maxRows = MaxUploadProEntries
+	}
+	// Allow a larger upload limit if set, if dev, or if it's an external call.
+	// UploadPublish carries no row-count privilege of its own - a store
+	// published site-wide is capped the same as any other upload unless the
+	// publisher separately holds UploadOptimizer/UploadNoLimit too.
+	noLimitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
+	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
+	if uploadNoLimit {
+		maxRows = MaxUploadTotalEntries
+	}
+
+	return uploadModes{
+		download: download,
+		estimate: estimate,
+		deckbox:  deckbox,
+		tcgpCSV:  tcgpCSV,
+		maxRows:  maxRows,
 	}
 }
 
