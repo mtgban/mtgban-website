@@ -21,7 +21,7 @@
                  block implicit submission, and no submit button, does not
                  submit on Enter at all - binding the visible bar to the form
                  took Enter away from the bar above it. */}}
-            {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}">{{end}}
+            {{if .CanScope}}<input id="nav-scopefield" type="hidden" name="scope" value="{{.SearchScope}}"{{if not .SearchScope}} disabled{{end}}>{{end}}
         </form>
         {{if .CanScope}}
         <button class="nav2-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}" aria-controls="nav-scope" aria-expanded="{{if .SearchScope}}true{{else}}false{{end}}">

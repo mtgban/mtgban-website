@@ -53,7 +53,12 @@
 
     function write(value) {
         box.value = value;
-        if (field) field.value = value.trim();
+        if (field) {
+            field.value = value.trim();
+            // An empty bar stays out of the url rather than riding along
+            // as a bare scope=.
+            field.disabled = field.value === '';
+        }
         markState();
     }
 
@@ -64,7 +69,10 @@
     // event, so the field is read again from it when the form goes.
     var form = document.getElementById('nav-searchform') || document.getElementById('searchform');
     if (form && field) {
-        form.addEventListener('submit', function() { field.value = box.value.trim(); });
+        form.addEventListener('submit', function() {
+            field.value = box.value.trim();
+            field.disabled = field.value === '';
+        });
     }
 
     /* The pinned field accepts the same filter vocabulary as the primary
@@ -89,7 +97,11 @@
     // the url, and a GET form would drop all of it on the floor.
     function apply(value) {
         var url = new URL(window.location.href);
-        url.searchParams.set('scope', value);
+        if (value) {
+            url.searchParams.set('scope', value);
+        } else {
+            url.searchParams.delete('scope');
+        }
         window.location.assign(url.toString());
     }
 
