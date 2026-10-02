@@ -704,31 +704,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var indexKeys []string
-	indexResults := map[string]map[string]*BanPrice{}
-
-	if len(ids.cardIDs) > 0 {
-		indexKeys = UploadIndexKeys
-		if !slices.Contains(indexKeys, st.altPriceSource) {
-			indexKeys = append(indexKeys, st.altPriceSource)
-		}
-		indexResults = getSellerPrices(b, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
-	}
-
-	// An index that is also a selected store (TCGSealed) already gets its
-	// own column in retail mode, so drop it here to avoid listing it twice
-	var sealedIndexKeys []string
-	for _, key := range selected.enabledSealedIndexKeys {
-		if !blMode && slices.Contains(prices.enabledSealedStores, key) {
-			continue
-		}
-		sealedIndexKeys = append(sealedIndexKeys, key)
-	}
-
-	// Fetch sealed index prices
-	if len(ids.sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
-		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
-	}
+	indexes := fetchUploadIndexes(b, blMode, st, selected, ids, prices)
 
 	// Set card and sealed keys separately — the template picks per entry,
 	// with the same store/index deduplication applied above for sealed
@@ -741,7 +717,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.ScraperKeys = prices.enabledStores
 	pageVars.AllScraperKeys = prices.enabledStores
 	if len(ids.sealedProductIDs) > 0 {
-		pageVars.SealedIndexKeys = sealedIndexKeys
+		pageVars.SealedIndexKeys = indexes.sealedKeys
 		pageVars.SealedScraperKeys = prices.enabledSealedStores
 		pageVars.AllScraperKeys = append(append([]string{}, prices.enabledStores...), prices.enabledSealedStores...)
 	}
@@ -848,7 +824,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			reference := getPrice(indexResults[cardID]["TCGLow"], "")
+			reference := getPrice(indexes.results[cardID]["TCGLow"], "")
 			missingCounts[shorthand]++
 			missingPrices[shorthand] += reference
 			if uploadedData[i].UnpackedFrom != "" {
@@ -867,7 +843,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			conds = ""
 		}
 		priceKey := cardID + string(conds)
-		for indexKey, indexResult := range indexResults[cardID] {
+		for indexKey, indexResult := range indexes.results[cardID] {
 			indexPrice := getPrice(indexResult, conds)
 
 			if resultPrices[priceKey] == nil {
@@ -946,7 +922,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			price *= float64(adjustQty(qty, st.multiplier, st.maxQty))
 
 			// Add to totals (unless it was an index, since it was already added)
-			_, found := indexResults[cardID][shorthand]
+			_, found := indexes.results[cardID][shorthand]
 			if !found && counts {
 				pageVars.TotalEntries[shorthand] += price
 				if uploadedData[i].UnpackedFrom != "" {
@@ -983,8 +959,8 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 			comparePrice := 0.0
 			if st.skipPrices {
 				var compareConds mtgban.Condition
-				prices := indexResults[cardID][st.altPriceSource]
-				if slices.Index(indexKeys, st.altPriceSource) >= len(UploadIndexKeys) {
+				prices := indexes.results[cardID][st.altPriceSource]
+				if slices.Index(indexes.keys, st.altPriceSource) >= len(UploadIndexKeys) {
 					compareConds = conds
 				}
 
@@ -1947,6 +1923,51 @@ func writePricesCSV(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backen
 		dropDownloadHeaders(w)
 	}
 	return err
+}
+
+// uploadIndexes are the index stores an upload's singles and sealed products
+// are compared against, and their prices.
+type uploadIndexes struct {
+	keys       []string
+	sealedKeys []string
+	results    map[string]map[string]*BanPrice
+}
+
+// fetchUploadIndexes looks up the index prices of the upload's singles, the
+// comparison price included, and of its sealed products, leaving out in
+// retail mode a sealed index that is also a selected store.
+func fetchUploadIndexes(b *mtgmatcher.Backend, blMode bool, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices) uploadIndexes {
+	var indexKeys []string
+	indexResults := map[string]map[string]*BanPrice{}
+
+	if len(ids.cardIDs) > 0 {
+		indexKeys = UploadIndexKeys
+		if !slices.Contains(indexKeys, st.altPriceSource) {
+			indexKeys = append(indexKeys, st.altPriceSource)
+		}
+		indexResults = getSellerPrices(b, "", indexKeys, "", ids.cardIDs, "", false, ids.shouldCheckForConditions, false, uploadTagName)
+	}
+
+	// An index that is also a selected store (TCGSealed) already gets its
+	// own column in retail mode, so drop it here to avoid listing it twice
+	var sealedIndexKeys []string
+	for _, key := range selected.enabledSealedIndexKeys {
+		if !blMode && slices.Contains(prices.enabledSealedStores, key) {
+			continue
+		}
+		sealedIndexKeys = append(sealedIndexKeys, key)
+	}
+
+	// Fetch sealed index prices
+	if len(ids.sealedProductIDs) > 0 && len(sealedIndexKeys) > 0 {
+		mergePrices(indexResults, getSellerPrices(b, "", sealedIndexKeys, "", ids.sealedProductIDs, "", false, false, true, uploadTagName))
+	}
+
+	return uploadIndexes{
+		keys:       indexKeys,
+		sealedKeys: sealedIndexKeys,
+		results:    indexResults,
+	}
 }
 
 // mergePrices adds every price in src to dst, card by card and store by
