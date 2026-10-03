@@ -368,6 +368,27 @@ func TestBanPricesTakeTCGDirectStock(t *testing.T) {
 	}
 }
 
+// TestRankDirectAsOneCopy ranks a trade bought from Direct by its unit
+// profitability, whatever stock caps it, and drops one that was profitable
+// enough only on its stock.
+func TestRankDirectAsOneCopy(t *testing.T) {
+	arbit := []mtgban.ArbitEntry{
+		{CardID: "stocked", Quantity: 4, Profitability: 6},
+		{CardID: "single", Quantity: 1, Profitability: 3},
+		{CardID: "thin", Quantity: 4, Profitability: 4},
+	}
+	got := rankDirectAsOneCopy(arbit, 2.5)
+	if len(got) != 2 || got[0].CardID != "stocked" || got[1].CardID != "single" {
+		t.Fatalf("kept %+v, want stocked and single", got)
+	}
+	if got[0].Profitability != 3 || got[0].Quantity != 4 {
+		t.Errorf("stocked: profitability %v quantity %d, want 3 and the trade's 4", got[0].Profitability, got[0].Quantity)
+	}
+	if got[1].Profitability != 3 {
+		t.Errorf("single: profitability %v, want 3 untouched", got[1].Profitability)
+	}
+}
+
 // TestFullDumpTakesTCGDirectStock quotes Direct's stock in a full dump as
 // the filtered requests do.
 func TestFullDumpTakesTCGDirectStock(t *testing.T) {
