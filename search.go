@@ -926,7 +926,14 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Sort sets as requested, default to chronological
 	odds := dropOdds(b, config)
-	allKeys = orderSearchKeys(&pageVars, r, b, allKeys, odds)
+	pageVars.ReverseMode, _ = strconv.ParseBool(r.FormValue("reverse"))
+	orderSearchKeys(r, b, allKeys, odds, pageVars.SearchSort, pageVars.ReverseMode)
+
+	// If results can't fit in one page, chunk response and enable pagination
+	if len(allKeys) > MaxSearchResults {
+		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
+		allKeys, pageVars.Pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
+	}
 
 	// Load up image links and other metadata
 	for _, cardID := range allKeys {
@@ -988,12 +995,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// orderSearchKeys sorts the results as the reader asked and returns the page
-// of them to show. The sort works in place: CardHashes is the same slice, and
-// the Uploader transfer posts it in this order.
-func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, allKeys []string, odds map[string]float64) []string {
+// orderSearchKeys sorts the results by searchSort, then reverses them if
+// reverse is set. It works in place: CardHashes is the same slice, and the
+// Uploader transfer posts it in this order.
+func orderSearchKeys(r *http.Request, b *mtgmatcher.Backend, allKeys []string, odds map[string]float64, searchSort string, reverse bool) {
 	sortData := resolveSortingData(b, allKeys)
-	switch pageVars.SearchSort {
+	switch searchSort {
 	case "odds":
 		// Ascending by default, unlike every other field here: what a
 		// variable search is for is finding the card expected in the fewest
@@ -1070,21 +1077,11 @@ func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 	}
 
 	// Invert the slice if requested
-	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))
-	if reverseSort {
+	if reverse {
 		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
 			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
 		}
 	}
-	pageVars.ReverseMode = reverseSort
-
-	// If results can't fit in one page, chunk response and enable pagination
-	if len(allKeys) > MaxSearchResults {
-		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
-		allKeys, pageVars.Pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
-	}
-
-	return allKeys
 }
 
 // sortOfferRows orders each card's offers in place, condition by condition:
