@@ -1121,6 +1121,34 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Embed.BuylistLabel, pageVars.Embed.BuylistPrice = vendorReference(allKeys[0], "CK")
 	}
 
+	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
+
+	pageVars.FoundSellers = foundSellers
+	pageVars.FoundVendors = foundVendors
+	pageVars.AllKeys = allKeys
+
+	// CHART ALL THE THINGS
+	if roster.id != "" {
+		fillChartPage(&pageVars, r, ds, b, roster)
+	}
+
+	notifyFromSearch(r, query, roster, start)
+
+	if DevMode {
+		start = time.Now()
+	}
+	render(w, "search.html", pageVars)
+	if DevMode {
+		log.Println("render took", time.Since(start))
+	}
+}
+
+// rebuildIndexRows replaces each card's INDEX rows with its collapsed
+// reference rows and the fallback marketplace links, adds the average-count
+// row to its buylist, and locks the offers a logged-out reader may not see.
+func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, odds map[string]float64) {
+	sig := getSignatureFromCookies(r)
+
 	// When the user asked to drop index data (skip:index), don't synthesize the
 	// no-price TCGplayer/CardMarket fallback links below.
 	skipIndex := false
@@ -1278,25 +1306,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}
-
-	pageVars.FoundSellers = foundSellers
-	pageVars.FoundVendors = foundVendors
-	pageVars.AllKeys = allKeys
-
-	// CHART ALL THE THINGS
-	if roster.id != "" {
-		fillChartPage(&pageVars, r, ds, b, roster)
-	}
-
-	notifyFromSearch(r, query, roster, start)
-
-	if DevMode {
-		start = time.Now()
-	}
-	render(w, "search.html", pageVars)
-	if DevMode {
-		log.Println("render took", time.Since(start))
 	}
 }
 
