@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	cm "github.com/mtgban/go-cardmarket"
 
@@ -2585,6 +2586,10 @@ type SortingData struct {
 	// parent's for an edition that reprints the parent's card list.
 	groupLower string
 	reprint    bool
+
+	// The set code the card's number is written after (setCodePrefix),
+	// which the default order reads before the number.
+	numberPrefix string
 }
 
 func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
@@ -2608,7 +2613,30 @@ func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
 		editionLower: strings.ToLower(co.Edition),
 	}
 	sorting.groupLower = sorting.editionLower
+	sorting.numberPrefix = setCodePrefix(co.Number)
 	return sorting, nil
+}
+
+// setCodePrefix is the set code a collector number is written after, ""
+// for none: the part before the last dash, holding a letter, with a digit
+// after the dash. So a year, "2024-10", and a variant, "2J-b", have none.
+// No game's set code ends in three digits; "LGS360-FUN001" is a card's own
+// number with a variant behind it.
+func setCodePrefix(number string) string {
+	dash := strings.LastIndex(number, "-")
+	if dash < 0 {
+		return ""
+	}
+	prefix := number[:dash]
+	if !strings.ContainsFunc(prefix, unicode.IsLetter) ||
+		!strings.ContainsFunc(number[dash+1:], func(r rune) bool { return !isNotDigit(r) }) {
+		return ""
+	}
+	digits := len(prefix) - len(strings.TrimRightFunc(prefix, func(r rune) bool { return !isNotDigit(r) }))
+	if digits >= 3 {
+		return ""
+	}
+	return prefix
 }
 
 // fileReprintsUnderParent has the hybrid sort file every card of an
@@ -2832,6 +2860,12 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 				return sortingI.nameLower < sortingJ.nameLower
 			}
 
+			// Numbers with a set code prefix sort by prefix, after the plain
+			// ones, so a prefix's digits never interleave two prefixes.
+			c := cmpNaturally(sortingI.numberPrefix, sortingJ.numberPrefix)
+			if c != 0 {
+				return c < 0
+			}
 			return cmpNumberAndFinish(sortingI, sortingJ, true)
 			// For the special case of set promos, always keeps them after
 		} else if sortingI.parentCode == "" && sortingJ.parentCode != "" {
