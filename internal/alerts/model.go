@@ -48,13 +48,13 @@ const (
 	StatusUnresolvable  Status = "unresolvable"
 )
 
-// Delivery is the channel an alert fires on; email is reserved.
-type Delivery string
+// DeliveryChannel is the channel an alert fires on.
+type DeliveryChannel string
 
-// Delivery channels; email is reserved.
+// Delivery channels.
 const (
-	DeliveryDiscord Delivery = "discord"
-	DeliveryEmail   Delivery = "email"
+	DeliveryDiscord DeliveryChannel = "discord"
+	DeliveryEmail   DeliveryChannel = "email"
 )
 
 // Conditions is every grade an alert may compare, best first.
@@ -107,29 +107,47 @@ type Card struct {
 
 // Alert is one saved alert.
 type Alert struct {
-	ID             int64      `json:"id"`
-	UserHash       string     `json:"-"`
-	Game           string     `json:"game"`
-	CardID         string     `json:"card_id"`
-	Side           Side       `json:"side"`
-	Condition      string     `json:"condition"`
-	Stores         []string   `json:"stores"`
-	ReferencePrice float64    `json:"reference_price"`
-	Above          Threshold  `json:"above"`
-	Below          Threshold  `json:"below"`
-	Delivery       Delivery   `json:"delivery"`
-	Status         Status     `json:"status"`
-	AboveArmed     bool       `json:"above_armed"`
-	BelowArmed     bool       `json:"below_armed"`
-	LastFiredAt    *time.Time `json:"last_fired_at,omitempty"`
-	LastError      string     `json:"last_error,omitempty"`
-	Card           Card       `json:"card"`
-	CreatedPrice   *float64   `json:"created_price,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID             int64           `json:"id"`
+	UserHash       string          `json:"-"`
+	Game           string          `json:"game"`
+	CardID         string          `json:"card_id"`
+	Side           Side            `json:"side"`
+	Condition      string          `json:"condition"`
+	Stores         []string        `json:"stores"`
+	ReferencePrice float64         `json:"reference_price"`
+	Above          Threshold       `json:"above"`
+	Below          Threshold       `json:"below"`
+	Delivery       DeliveryChannel `json:"delivery"`
+	Status         Status          `json:"status"`
+	AboveArmed     bool            `json:"above_armed"`
+	BelowArmed     bool            `json:"below_armed"`
+	LastFiredAt    *time.Time      `json:"last_fired_at,omitempty"`
+	LastError      string          `json:"last_error,omitempty"`
+	Card           Card            `json:"card"`
+	CreatedPrice   *float64        `json:"created_price,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 	// Origin is the site the alert was last saved on, which its DM links
 	// to; empty leaves the links out.
 	Origin string `json:"-"`
+}
+
+// Firing is one alert crossing its line in a run, ready to deliver.
+type Firing struct {
+	Alert    Alert
+	Decision Decision
+	Origin   string
+	Contact  Contact
+}
+
+// Digest is one user's firings on one channel in a run.
+type Digest struct {
+	UserHash string
+	Contact  Contact
+	Firings  []Firing
+	Others   []Alert // the user's other active alerts, capped at 10, oldest first
+	// UnsubscribeURL is set by the email deliverer before it renders.
+	UnsubscribeURL string
 }
 
 // State is what the evaluator writes back on a row.
@@ -151,6 +169,61 @@ type Event struct {
 	Price     float64   `json:"price"`
 	Delivered bool      `json:"delivered"`
 	Error     string    `json:"error,omitempty"`
+	MessageID string    `json:"message_id,omitempty"`
+}
+
+// ChannelKind is a delivery channel an alert can be sent on.
+type ChannelKind string
+
+// Channel kinds.
+const (
+	ChannelDiscord ChannelKind = "discord"
+	ChannelEmail   ChannelKind = "email"
+)
+
+// ChannelSource is who supplied a channel's address.
+type ChannelSource string
+
+// Channel sources.
+const (
+	SourcePatreon ChannelSource = "patreon"
+	SourceUser    ChannelSource = "user"
+)
+
+// Why a channel was disabled, its disabled_reason.
+const (
+	ReasonBounced      = "bounced"
+	ReasonComplained   = "complained"
+	ReasonUnsubscribed = "unsubscribed"
+)
+
+// Why an email alert was parked for its address, its last_error.
+const (
+	ParkUnsubscribed = "email unsubscribed"
+	ParkBounced      = "email bounced"
+	ParkComplained   = "email marked as spam"
+	ParkNoAddress    = "no confirmed email address"
+)
+
+// emailParkReasons is what a working address again undoes.
+var emailParkReasons = []string{ParkUnsubscribed, ParkBounced, ParkComplained, ParkNoAddress}
+
+// Channel is one way a user can be reached, from Patreon or set by hand.
+type Channel struct {
+	UserHash       string        `json:"-"`
+	Kind           ChannelKind   `json:"kind"`
+	Address        string        `json:"address"`
+	Source         ChannelSource `json:"source"`
+	VerifiedAt     *time.Time    `json:"verified_at,omitempty"`
+	DisabledAt     *time.Time    `json:"disabled_at,omitempty"`
+	DisabledReason string        `json:"disabled_reason,omitempty"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
+}
+
+// Active reports whether the channel is verified and not disabled.
+func (c Channel) Active() bool {
+	return c.VerifiedAt != nil && c.DisabledAt == nil
 }
 
 // validate rounds Value to cents in place, then checks it.

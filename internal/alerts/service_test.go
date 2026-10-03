@@ -45,21 +45,21 @@ func TestRequestEvaluateCoalesces(t *testing.T) {
 
 func TestRunPendingWaitsUntilReady(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	sender := &fakeSender{}
-	deps := evalDeps(store, sender, 13)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
 	s := liveService(deps)
 	s.RequestEvaluate(SideBuylist)
 
 	deps.Ready = func() bool { return false }
 	s.runPending(context.Background(), deps)
-	if store.calls != 0 || len(sender.sent) != 0 {
-		t.Fatalf("not-ready run touched the store (%d calls) or sent %v", store.calls, sender.sent)
+	if store.calls != 0 || len(dd.sent) != 0 {
+		t.Fatalf("not-ready run touched the store (%d calls) or sent %v", store.calls, dd.ids())
 	}
 
 	deps.Ready = func() bool { return true }
 	s.runPending(context.Background(), deps)
-	if len(sender.sent) != 1 {
-		t.Fatalf("queued side did not survive to the ready run: sent=%v", sender.sent)
+	if len(dd.sent) != 1 {
+		t.Fatalf("queued side did not survive to the ready run: sent=%v", dd.ids())
 	}
 	got := s.takePending()
 	if len(got) != 0 {
@@ -79,8 +79,8 @@ func TestServicePrunesAtMostHourly(t *testing.T) {
 
 func TestStartEvaluatorRunsThroughTracked(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	sender := &fakeSender{}
-	deps := evalDeps(store, sender, 13)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
 	deps.Debounce = time.Millisecond
 	bound := 0
 	deps.PerRun = func(d EvalDeps) EvalDeps {
@@ -101,8 +101,8 @@ func TestStartEvaluatorRunsThroughTracked(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the loop never ran")
 	}
-	if len(sender.sent) != 1 {
-		t.Fatalf("sent = %v", sender.sent)
+	if len(dd.sent) != 1 {
+		t.Fatalf("sent = %v", dd.ids())
 	}
 	if bound != 1 {
 		t.Fatalf("PerRun bound %d times, want once per run", bound)
@@ -137,7 +137,7 @@ func TestRunPendingReports(t *testing.T) {
 	type report struct{ summary, problem string }
 	run := func(store EvalStore, price float64, ready bool, sendErr error) report {
 		var got []report
-		deps := evalDeps(newFakeEvalStore(activeAlert()), &fakeSender{err: sendErr}, price)
+		deps := evalDeps(newFakeEvalStore(activeAlert()), &fakeDeliverer{err: sendErr}, price)
 		deps.Store = store
 		deps.Ready = func() bool { return ready }
 		deps.Report = func(summary, problem string) { got = append(got, report{summary, problem}) }
@@ -191,17 +191,17 @@ func TestPendingIsSortedAndNilWhenUnavailable(t *testing.T) {
 
 func TestSetStoreBuildsTheLimiterOnce(t *testing.T) {
 	s := NewService(nil, EvalDeps{}, APIDeps{})
-	if s.api.deps.Limiter != nil {
+	if s.api.deps.Limiter != nil || s.api.deps.ConfirmLimiter != nil {
 		t.Fatal("a service with no store built a limiter")
 	}
 	s.SetStore(&Store{})
-	first := s.api.deps.Limiter
-	if first == nil {
+	first, firstConfirm := s.api.deps.Limiter, s.api.deps.ConfirmLimiter
+	if first == nil || firstConfirm == nil {
 		t.Fatal("SetStore built no limiter")
 	}
 	s.SetStore(nil)
 	s.SetStore(&Store{})
-	if s.api.deps.Limiter != first {
+	if s.api.deps.Limiter != first || s.api.deps.ConfirmLimiter != firstConfirm {
 		t.Fatal("a second SetStore built a second limiter")
 	}
 }

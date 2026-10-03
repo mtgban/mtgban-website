@@ -3,6 +3,7 @@ package alerts
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+
+	"github.com/mtgban/mtgban-website/mailer"
 )
 
 // fakeEvalStore keeps each row's status and armed flags so the guards the
@@ -28,12 +31,26 @@ type fakeEvalStore struct {
 	marked    map[string]int
 	calls     int
 	pruned    int
+	// emails is each user's active email address; Discord comes off the contact.
+	emails map[string]string
+	// chanParked is the rows parked for their channel, as last_error marks them.
+	chanParked map[int64]bool
+	allowed    map[string][]ChannelKind
+	// steps is the per-user park calls in order, "channel:u" or "allowance:u".
+	steps []string
+	// prunedChannels counts PruneUnverifiedChannels calls.
+	prunedChannels int
+	// disabledSince is what ChannelsDisabledSince reports.
+	disabledSince int
+	// disabledUntil is the upper bound ChannelsDisabledSince was last asked for.
+	disabledUntil time.Time
 }
 
 func newFakeEvalStore(rows ...ActiveAlert) *fakeEvalStore {
 	f := &fakeEvalStore{
 		rows: rows, status: map[int64]Status{}, armed: map[int64][2]bool{},
 		fired: map[int64]time.Time{}, states: map[int64]State{}, marked: map[string]int{},
+		emails: map[string]string{}, chanParked: map[int64]bool{}, allowed: map[string][]ChannelKind{},
 	}
 	for _, a := range rows {
 		f.status[a.ID] = a.Status
@@ -77,14 +94,15 @@ func (f *fakeEvalStore) ListActive(_ context.Context, _ string, sides []Side) ([
 }
 
 // MarkOverAllowance keeps a user's n highest ids active and parks the rest,
-// restoring parked ones inside the allowance.
+// restoring parked ones inside the allowance; channel-parked rows sit out.
 func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int) ([]Moved, error) {
 	f.calls++
 	f.marked[h] = n
+	f.steps = append(f.steps, "allowance:"+h)
 	var ids []int64
 	for _, a := range f.rows {
 		st := f.status[a.ID]
-		if a.UserHash == h && (st == StatusActive || st == StatusOverAllowance) {
+		if a.UserHash == h && (st == StatusActive || st == StatusOverAllowance && !f.chanParked[a.ID]) {
 			ids = append(ids, a.ID)
 		}
 	}
@@ -103,6 +121,55 @@ func (f *fakeEvalStore) MarkOverAllowance(_ context.Context, h, _ string, n int)
 		}
 	}
 	return moved, nil
+}
+
+// MarkChannelDisallowed parks rows on a channel not allowed, re-marking
+// allowance-parked ones silently, and restores rows it parked once their
+// channel is allowed again.
+func (f *fakeEvalStore) MarkChannelDisallowed(_ context.Context, h, _ string, allowed []ChannelKind) ([]Moved, error) {
+	f.calls++
+	f.allowed[h] = allowed
+	f.steps = append(f.steps, "channel:"+h)
+	var moved []Moved
+	for _, a := range f.rows {
+		if a.UserHash != h {
+			continue
+		}
+		ok := slices.Contains(allowed, ChannelKind(a.Delivery))
+		st := f.status[a.ID]
+		switch {
+		case st == StatusOverAllowance && !f.chanParked[a.ID] && !ok:
+			f.chanParked[a.ID] = true
+			continue
+		case st == StatusActive && !ok:
+			f.status[a.ID], f.chanParked[a.ID] = StatusOverAllowance, true
+		case st == StatusOverAllowance && f.chanParked[a.ID] && ok:
+			f.status[a.ID], f.chanParked[a.ID] = StatusActive, false
+		default:
+			continue
+		}
+		moved = append(moved, Moved{ID: a.ID, Status: f.status[a.ID], Card: a.Card, Side: a.Side, Condition: a.Condition, Origin: a.Origin})
+	}
+	return moved, nil
+}
+
+// channelFor answers as ChannelFor does: Discord off the contact, email
+// from emails.
+func (f *fakeEvalStore) channelFor(_ context.Context, h string, kind ChannelKind) (Channel, bool, error) {
+	addr := f.emails[h]
+	if kind == ChannelDiscord {
+		addr = ""
+		for _, a := range f.rows {
+			if a.Contact.UserHash == h {
+				addr = a.Contact.DiscordUserID
+				break
+			}
+		}
+	}
+	if addr == "" {
+		return Channel{}, false, nil
+	}
+	return Channel{UserHash: h, Kind: kind, Address: addr, Source: SourcePatreon}, true, nil
 }
 
 func (f *fakeEvalStore) row(id int64) ActiveAlert {
@@ -152,6 +219,69 @@ func (f *fakeEvalStore) PruneEvents(context.Context, time.Time) (int64, error) {
 	return 0, nil
 }
 
+func (f *fakeEvalStore) PruneUnverifiedChannels(context.Context, time.Time) (int64, error) {
+	f.calls++
+	f.prunedChannels++
+	return 0, nil
+}
+
+func (f *fakeEvalStore) ChannelsDisabledSince(_ context.Context, _, until time.Time) (int, error) {
+	f.calls++
+	f.disabledUntil = until
+	return f.disabledSince, nil
+}
+
+// fakeDeliverer records what it was handed; err, or errs per alert id,
+// is each firing's result. It takes the park notices too.
+type fakeDeliverer struct {
+	kind     ChannelKind
+	sent     []Firing
+	digests  []Digest
+	channels []Channel
+	err      error
+	errs     map[int64]error
+	notices  []*discordgo.MessageEmbed
+	noticeTo []string
+	// messageID, when set, is the provider id a successful delivery reports.
+	messageID string
+}
+
+func (f *fakeDeliverer) Kind() ChannelKind { return f.kind }
+
+func (f *fakeDeliverer) Deliver(_ context.Context, d Digest, ch Channel, _ func(string) string) []Delivery {
+	f.digests = append(f.digests, d)
+	f.channels = append(f.channels, ch)
+	var out []Delivery
+	for _, fr := range d.Firings {
+		f.sent = append(f.sent, fr)
+		err, ok := f.errs[fr.Alert.ID]
+		if !ok {
+			err = f.err
+		}
+		id := ""
+		if err == nil {
+			id = f.messageID
+		}
+		out = append(out, Delivery{AlertID: fr.Alert.ID, Err: err, MessageID: id})
+	}
+	return out
+}
+
+func (f *fakeDeliverer) notify(discordUserID string, embed *discordgo.MessageEmbed) error {
+	f.noticeTo = append(f.noticeTo, discordUserID)
+	f.notices = append(f.notices, embed)
+	return f.err
+}
+
+// ids is the alert ids of the firings delivered, in order.
+func (f *fakeDeliverer) ids() []int64 {
+	var out []int64
+	for _, fr := range f.sent {
+		out = append(out, fr.Alert.ID)
+	}
+	return out
+}
+
 type fakeSender struct {
 	sent   []string
 	embeds []*discordgo.MessageEmbed
@@ -166,10 +296,11 @@ func (f *fakeSender) Send(id string, embed *discordgo.MessageEmbed) error {
 
 var evalNow = time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
 
-func evalDeps(store *fakeEvalStore, sender *fakeSender, price float64) EvalDeps {
+func evalDeps(store *fakeEvalStore, discord *fakeDeliverer, price float64) EvalDeps {
+	discord.kind = ChannelDiscord
 	// A fresh prune clock, so each test starts due.
 	return EvalDeps{
-		Store: store, Sender: sender, Game: "magic", Pace: 0,
+		Store: store, Deliverers: []Deliverer{discord}, Game: "magic",
 		PruneDue:  (&Service{}).pruneDue,
 		Ready:     func() bool { return true },
 		Allowance: func(url.Values) int { return 5 },
@@ -181,6 +312,8 @@ func evalDeps(store *fakeEvalStore, sender *fakeSender, price float64) EvalDeps 
 		Resolve: func(cardID string) (Card, bool, bool) {
 			return Card{Name: "Bolt"}, false, cardID != "gone"
 		},
+		ChannelFor: store.channelFor,
+		Channels:   func(url.Values) []ChannelKind { return []ChannelKind{ChannelDiscord, ChannelEmail} },
 	}
 }
 
@@ -201,16 +334,16 @@ var buylistOnly = []Side{SideBuylist}
 
 func TestRunAlertEvaluationFiresAndRecords(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 
-	if len(sender.sent) != 1 || sender.sent[0] != "d1" {
-		t.Fatalf("sent = %v", sender.sent)
+	if !slices.Equal(dd.ids(), []int64{7}) || dd.channels[0].Address != "d1" {
+		t.Fatalf("sent = %v to %+v", dd.ids(), dd.channels)
 	}
-	// The DM links to the site the alert was saved on.
-	e := sender.embeds[0]
-	if e.URL != "https://lorcana.mtgban.com/alerts" || !strings.Contains(e.Description, "https://lorcana.mtgban.com/go/b/CK/card-1") {
-		t.Fatalf("links: url=%q\n%s", e.URL, e.Description)
+	// The firing carries the site the alert was saved on, for its links.
+	f := dd.sent[0]
+	if f.Origin != "https://lorcana.mtgban.com" || !f.Decision.FireAbove || f.Contact.UserHash != "u" {
+		t.Fatalf("firing = %+v", f)
 	}
 	if !slices.Equal(store.claims, []int64{7}) || store.armed[7] != [2]bool{false, true} || !store.fired[7].Equal(evalNow) {
 		t.Fatalf("claim: claims=%v armed=%v fired=%v", store.claims, store.armed[7], store.fired[7])
@@ -229,10 +362,10 @@ func TestRunAlertEvaluationFiresAndRecords(t *testing.T) {
 
 func TestRunAlertEvaluationQuietBelowThreshold(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 11), buylistOnly)
-	if len(sender.sent) != 0 || len(store.states) != 0 || len(store.claims) != 0 {
-		t.Fatalf("quiet run sent %v, wrote %v, claimed %v", sender.sent, store.states, store.claims)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 11), buylistOnly)
+	if len(dd.sent) != 0 || len(store.states) != 0 || len(store.claims) != 0 {
+		t.Fatalf("quiet run sent %v, wrote %v, claimed %v", dd.sent, store.states, store.claims)
 	}
 }
 
@@ -250,8 +383,8 @@ func TestRunAlertEvaluationMarksRefusedDM(t *testing.T) {
 	for name, restErr := range cases {
 		t.Run(name, func(t *testing.T) {
 			store := newFakeEvalStore(activeAlert())
-			sender := &fakeSender{err: restErr}
-			runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
+			dd := &fakeDeliverer{err: restErr}
+			runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 			st, ok := store.states[7]
 			if !ok || st.Status != StatusUndeliverable || st.AboveArmed || !strings.Contains(st.LastError, restErr.Message.Message) {
 				t.Fatalf("state = %+v ok=%v", st, ok)
@@ -269,10 +402,10 @@ func TestRunAlertEvaluationSkipsUnlinkedAndUnresolvable(t *testing.T) {
 	gone := activeAlert()
 	gone.ID, gone.CardID = 8, "gone"
 	store := newFakeEvalStore(unlinked, gone)
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
-	if len(sender.sent) != 0 || len(store.claims) != 0 {
-		t.Fatalf("sent to an unlinked user: %v claims=%v", sender.sent, store.claims)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
+	if len(dd.sent) != 0 || len(store.claims) != 0 {
+		t.Fatalf("sent to an unlinked user: %v claims=%v", dd.sent, store.claims)
 	}
 	if store.states[8].Status != StatusUnresolvable {
 		t.Fatalf("gone card state = %+v", store.states[8])
@@ -285,8 +418,8 @@ func TestRunAlertEvaluationSkipsUnlinkedAndUnresolvable(t *testing.T) {
 
 func TestRunAlertEvaluationRetriesOtherSendErrors(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	sender := &fakeSender{err: errors.New("dial tcp")}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
+	dd := &fakeDeliverer{err: errors.New("dial tcp")}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 
 	st := store.states[7]
 	if st.Status != StatusActive || !st.AboveArmed || !st.BelowArmed || st.LastError != "delivery failed, will retry" || st.LastFiredAt != nil {
@@ -303,10 +436,10 @@ func TestRunAlertEvaluationRetriesOtherSendErrors(t *testing.T) {
 func TestRunAlertEvaluationLostClaimSendsNothing(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
 	store.claimFail = true
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
-	if len(sender.sent) != 0 || len(store.events) != 0 || len(store.states) != 0 {
-		t.Fatalf("lost claim still acted: sent=%v events=%v states=%v", sender.sent, store.events, store.states)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
+	if len(dd.sent) != 0 || len(store.events) != 0 || len(store.states) != 0 {
+		t.Fatalf("lost claim still acted: sent=%v events=%v states=%v", dd.sent, store.events, store.states)
 	}
 }
 
@@ -331,11 +464,11 @@ func TestRunAlertEvaluationRearmsQuietly(t *testing.T) {
 	a := activeAlert()
 	a.AboveArmed = false
 	store := newFakeEvalStore(a)
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 11), buylistOnly)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 11), buylistOnly)
 
-	if len(sender.sent) != 0 {
-		t.Fatalf("sent = %v", sender.sent)
+	if len(dd.sent) != 0 {
+		t.Fatalf("sent = %v", dd.sent)
 	}
 	if len(store.states) != 1 {
 		t.Fatalf("expected exactly one state write, got %+v", store.states)
@@ -354,11 +487,11 @@ func TestRunAlertEvaluationThrottledWritesNothing(t *testing.T) {
 	fired := time.Date(2026, 9, 28, 11, 0, 0, 0, time.UTC)
 	a.LastFiredAt = &fired
 	store := newFakeEvalStore(a)
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 
-	if len(sender.sent) != 0 || len(store.states) != 0 || len(store.events) != 0 || len(store.claims) != 0 {
-		t.Fatalf("throttled run acted: sent=%v states=%+v events=%+v claims=%v", sender.sent, store.states, store.events, store.claims)
+	if len(dd.sent) != 0 || len(store.states) != 0 || len(store.events) != 0 || len(store.claims) != 0 {
+		t.Fatalf("throttled run acted: sent=%v states=%+v events=%+v claims=%v", dd.sent, store.states, store.events, store.claims)
 	}
 }
 
@@ -367,16 +500,16 @@ func TestRunAlertEvaluationParksBeyondAllowance(t *testing.T) {
 	newer := activeAlert()
 	newer.ID = 8
 	store := newFakeEvalStore(older, newer)
-	sender := &fakeSender{}
-	deps := evalDeps(store, sender, 13)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
 	deps.Allowance = func(url.Values) int { return 1 }
 	runEvaluation(context.Background(), deps, buylistOnly)
 
 	// The park notice for 7, then the firing on 8.
-	if len(sender.sent) != 2 || !slices.Equal(store.claims, []int64{8}) {
-		t.Fatalf("sent = %v claims = %v", sender.sent, store.claims)
+	if len(dd.notices) != 1 || dd.noticeTo[0] != "d1" || !slices.Equal(dd.ids(), []int64{8}) || !slices.Equal(store.claims, []int64{8}) {
+		t.Fatalf("notices = %v sent = %v claims = %v", dd.noticeTo, dd.ids(), store.claims)
 	}
-	notice := sender.embeds[0]
+	notice := dd.notices[0]
 	if notice.Title != "Price alerts parked" || !strings.Contains(notice.Description, "Your tier allows 1 alert.") ||
 		!strings.Contains(notice.Description, "Bolt LEA #161, nonfoil, NM buylist\n") || notice.URL != "https://lorcana.mtgban.com/alerts" {
 		t.Fatalf("notice: title=%q url=%q\n%s", notice.Title, notice.URL, notice.Description)
@@ -386,8 +519,8 @@ func TestRunAlertEvaluationParksBeyondAllowance(t *testing.T) {
 	}
 	// The next run parks nothing new, so it says nothing again.
 	runEvaluation(context.Background(), deps, buylistOnly)
-	if len(sender.sent) != 2 {
-		t.Fatalf("second run sent = %v, want no repeat notice", sender.sent)
+	if len(dd.notices) != 1 {
+		t.Fatalf("second run sent %d notices, want no repeat", len(dd.notices))
 	}
 	_, ok := store.states[7]
 	if ok {
@@ -404,14 +537,14 @@ func TestRunAlertEvaluationRestoresParkedUser(t *testing.T) {
 	a := activeAlert()
 	a.Status = StatusOverAllowance
 	store := newFakeEvalStore(a)
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 
 	if store.marked["u"] != 5 || store.status[7] != StatusActive {
 		t.Fatalf("parked user not restored: marked=%v status=%s", store.marked, store.status[7])
 	}
-	if len(sender.sent) != 1 || !slices.Equal(store.claims, []int64{7}) {
-		t.Fatalf("restored alert did not fire: sent=%v claims=%v", sender.sent, store.claims)
+	if len(dd.sent) != 1 || !slices.Equal(store.claims, []int64{7}) {
+		t.Fatalf("restored alert did not fire: sent=%v claims=%v", dd.sent, store.claims)
 	}
 }
 
@@ -438,8 +571,8 @@ func TestRunAlertEvaluationUsesEachUsersValues(t *testing.T) {
 	v.Contact = Contact{UserHash: "v", DiscordUserID: "d2", Tier: "Legacy", UpdatedAt: evalNow.Add(-24 * time.Hour)}
 
 	store := newFakeEvalStore(u, v)
-	sender := &fakeSender{}
-	deps := evalDeps(store, sender, 13)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
 	deps.Allowance = alertsMaxAllowance
 	deps.Values = func(userHash, _ string) url.Values {
 		if userHash == "u" {
@@ -475,8 +608,8 @@ func TestRunAlertEvaluationParksStaleContacts(t *testing.T) {
 	fresh.Contact.UpdatedAt = evalNow.Add(-10 * 24 * time.Hour)
 
 	store := newFakeEvalStore(stale, fresh)
-	sender := &fakeSender{}
-	runEvaluation(context.Background(), evalDeps(store, sender, 13), buylistOnly)
+	dd := &fakeDeliverer{}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 
 	if store.marked["u"] != 0 {
 		t.Fatalf("stale contact allowance = %d, want 0", store.marked["u"])
@@ -485,11 +618,11 @@ func TestRunAlertEvaluationParksStaleContacts(t *testing.T) {
 		t.Fatalf("fresh contact allowance = %d, want 5", store.marked["u2"])
 	}
 	// The stale contact hears its alerts are parked; only the fresh one fires.
-	if len(sender.sent) != 2 || sender.sent[0] != "d1" || sender.sent[1] != "d2" {
-		t.Fatalf("sent = %v, want the stale contact's notice and the fresh contact's firing", sender.sent)
+	if !slices.Equal(dd.noticeTo, []string{"d1"}) || !slices.Equal(dd.ids(), []int64{8}) || dd.channels[0].Address != "d2" {
+		t.Fatalf("notices to %v, sent %v to %+v: want the stale contact's notice and the fresh contact's firing", dd.noticeTo, dd.ids(), dd.channels)
 	}
-	if !strings.Contains(sender.embeds[0].Description, "No Patreon sign-in for over a month.") {
-		t.Fatalf("notice reason:\n%s", sender.embeds[0].Description)
+	if !strings.Contains(dd.notices[0].Description, "No Patreon sign-in for over a month.") {
+		t.Fatalf("notice reason:\n%s", dd.notices[0].Description)
 	}
 	if !slices.Equal(store.claims, []int64{8}) {
 		t.Fatalf("claims = %v, want only the fresh alert", store.claims)
@@ -509,12 +642,12 @@ func TestRunAlertEvaluationNoNoticeWithoutDiscord(t *testing.T) {
 	a := activeAlert()
 	a.Contact.DiscordUserID = ""
 	store := newFakeEvalStore(a)
-	sender := &fakeSender{}
-	deps := evalDeps(store, sender, 9)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 9)
 	deps.Allowance = func(url.Values) int { return 0 }
 	sum := runEvaluation(context.Background(), deps, buylistOnly)
-	if store.status[7] != StatusOverAllowance || len(sender.sent) != 0 || sum.notices != 0 {
-		t.Fatalf("status=%s sent=%v notices=%d", store.status[7], sender.sent, sum.notices)
+	if store.status[7] != StatusOverAllowance || len(dd.notices) != 0 || sum.notices != 0 || sum.skipped != 1 {
+		t.Fatalf("status=%s notices=%d/%d skipped=%d", store.status[7], len(dd.notices), sum.notices, sum.skipped)
 	}
 }
 
@@ -536,13 +669,13 @@ func TestRunAlertEvaluationStaleContactSkipsBeforeUnresolvable(t *testing.T) {
 	stale.Contact.UpdatedAt = evalNow.Add(-40 * 24 * time.Hour)
 
 	store := newFakeEvalStore(stale)
-	sender := &fakeSender{}
-	deps := evalDeps(store, sender, 13)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
 	deps.Store = noUsersStore{store}
 	runEvaluation(context.Background(), deps, buylistOnly)
 
-	if len(sender.sent) != 0 {
-		t.Fatalf("sent = %v", sender.sent)
+	if len(dd.sent) != 0 {
+		t.Fatalf("sent = %v", dd.sent)
 	}
 	if len(store.states) != 0 {
 		t.Fatalf("stale, unresolvable alert got a state write: %+v", store.states)
@@ -554,7 +687,7 @@ func TestRunAlertEvaluationStaleContactSkipsBeforeUnresolvable(t *testing.T) {
 
 func TestRunAlertEvaluationPrunesAtMostHourly(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	deps := evalDeps(store, &fakeSender{}, 11)
+	deps := evalDeps(store, &fakeDeliverer{}, 11)
 	runEvaluation(context.Background(), deps, buylistOnly)
 	runEvaluation(context.Background(), deps, buylistOnly)
 	if store.pruned != 1 {
@@ -571,14 +704,14 @@ func TestRunAlertEvaluationPrunesAtMostHourly(t *testing.T) {
 // across the line, tries the DM again.
 func TestRunAlertEvaluationRetriesOnTheNextPass(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
-	sender := &fakeSender{err: errors.New("dial tcp")}
-	deps := evalDeps(store, sender, 13)
+	dd := &fakeDeliverer{err: errors.New("dial tcp")}
+	deps := evalDeps(store, dd, 13)
 	runEvaluation(context.Background(), deps, buylistOnly)
-	sender.err = nil
+	dd.err = nil
 	runEvaluation(context.Background(), deps, buylistOnly)
 
-	if len(sender.sent) != 2 || !slices.Equal(store.claims, []int64{7, 7}) {
-		t.Fatalf("second pass did not retry: sent=%v claims=%v", sender.sent, store.claims)
+	if len(dd.sent) != 2 || !slices.Equal(store.claims, []int64{7, 7}) {
+		t.Fatalf("second pass did not retry: sent=%v claims=%v", dd.sent, store.claims)
 	}
 	st := store.states[7]
 	if st.LastError != "" || st.LastFiredAt == nil || !st.LastFiredAt.Equal(evalNow) || store.armed[7] != [2]bool{false, true} {
@@ -590,7 +723,331 @@ func TestRunAlertEvaluationRetriesOnTheNextPass(t *testing.T) {
 
 	// Delivered once, the gap now holds a third pass quiet.
 	runEvaluation(context.Background(), deps, buylistOnly)
-	if len(sender.sent) != 2 {
-		t.Fatalf("gap ignored after delivery: sent=%v", sender.sent)
+	if len(dd.sent) != 2 {
+		t.Fatalf("gap ignored after delivery: sent=%v", dd.sent)
+	}
+}
+
+// alertOn is activeAlert for user h on a delivery channel, created id
+// hours before evalNow so a lower id is newer.
+func alertOn(id int64, h string, delivery DeliveryChannel) ActiveAlert {
+	a := activeAlert()
+	a.ID, a.UserHash, a.Delivery = id, h, delivery
+	a.CreatedAt = evalNow.Add(-time.Duration(id) * time.Hour)
+	a.Contact.UserHash, a.Contact.DiscordUserID = h, "d-"+h
+	return a
+}
+
+func firingIDs(d Digest) []int64 {
+	var out []int64
+	for _, f := range d.Firings {
+		out = append(out, f.Alert.ID)
+	}
+	return out
+}
+
+// eventsFor is the events recorded for one alert.
+func eventsFor(store *fakeEvalStore, id int64) []Event {
+	var out []Event
+	for _, e := range store.events {
+		if e.AlertID == id {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestRunGroupsFiringsPerUserAndChannel(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryEmail), alertOn(2, "u1", DeliveryEmail),
+		alertOn(3, "u1", DeliveryDiscord), alertOn(4, "u2", DeliveryEmail))
+	store.emails["u1"], store.emails["u2"] = "u1@example.com", "u2@example.com"
+	dd := &fakeDeliverer{}
+	ed := &fakeDeliverer{kind: ChannelEmail}
+	deps := evalDeps(store, dd, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	if len(ed.digests) != 2 {
+		t.Fatalf("email digests = %d, want one per user", len(ed.digests))
+	}
+	u1, u2 := ed.digests[0], ed.digests[1]
+	if u1.UserHash != "u1" || !slices.Equal(firingIDs(u1), []int64{1, 2}) || ed.channels[0].Address != "u1@example.com" {
+		t.Fatalf("u1 digest = %v %v to %+v", u1.UserHash, firingIDs(u1), ed.channels[0])
+	}
+	if u2.UserHash != "u2" || !slices.Equal(firingIDs(u2), []int64{4}) || ed.channels[1].Address != "u2@example.com" {
+		t.Fatalf("u2 digest = %v %v to %+v", u2.UserHash, firingIDs(u2), ed.channels[1])
+	}
+	if len(dd.digests) != 1 || !slices.Equal(dd.ids(), []int64{3}) || dd.channels[0].Address != "d-u1" {
+		t.Fatalf("discord digests = %d, sent %v to %+v", len(dd.digests), dd.ids(), dd.channels)
+	}
+	// A firing on the other channel still counts among the user's others.
+	if len(u1.Others) != 1 || u1.Others[0].ID != 3 || len(u2.Others) != 0 {
+		t.Fatalf("others: u1=%+v u2=%+v", u1.Others, u2.Others)
+	}
+	for _, id := range []int64{1, 2, 3, 4} {
+		ev := eventsFor(store, id)
+		if len(ev) != 1 || !ev[0].Delivered {
+			t.Errorf("alert %d events = %+v", id, ev)
+		}
+		st := store.states[id]
+		if st.Status != StatusActive || st.LastFiredAt == nil || !st.LastFiredAt.Equal(evalNow) {
+			t.Errorf("alert %d state = %+v", id, st)
+		}
+	}
+	if sum.sent != 4 || sum.problem() != "" {
+		t.Fatalf("summary = %s, problem %q", sum, sum.problem())
+	}
+}
+
+func TestRunParksWhenChannelIsMissing(t *testing.T) {
+	email := alertOn(1, "u1", DeliveryEmail)
+	unlinked := alertOn(2, "u2", DeliveryDiscord)
+	unlinked.Contact.DiscordUserID = ""
+	store := newFakeEvalStore(email, unlinked)
+	dd := &fakeDeliverer{}
+	ed := &fakeDeliverer{kind: ChannelEmail}
+	deps := evalDeps(store, dd, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	if len(dd.sent) != 0 || len(ed.sent) != 0 || len(store.claims) != 0 || len(store.events) != 0 {
+		t.Fatalf("acted without a channel: discord=%v email=%v claims=%v events=%+v", dd.ids(), ed.ids(), store.claims, store.events)
+	}
+	for id, want := range map[int64]string{1: "no confirmed email address", 2: "no Discord account linked on Patreon"} {
+		st := store.states[id]
+		if st.Status != StatusUndeliverable || st.LastError != want || !st.AboveArmed || !st.BelowArmed {
+			t.Errorf("alert %d state = %+v, want undeliverable with %q", id, st, want)
+		}
+	}
+	if sum.skipped != 2 {
+		t.Fatalf("skipped = %d", sum.skipped)
+	}
+}
+
+func TestRunRecordsPermanentDeliveryAsUndeliverable(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryEmail), alertOn(2, "u1", DeliveryEmail))
+	store.emails["u1"] = "u1@example.com"
+	refused := fmt.Errorf("mailer: rcpt: %w", &mailer.SendError{Status: 550, Permanent: true, Msg: "no such user"})
+	ed := &fakeDeliverer{kind: ChannelEmail, errs: map[int64]error{1: refused}}
+	deps := evalDeps(store, &fakeDeliverer{}, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	if len(ed.digests) != 1 || !slices.Equal(firingIDs(ed.digests[0]), []int64{1, 2}) {
+		t.Fatalf("digests = %+v", ed.digests)
+	}
+	// The user sees a fixed reason; the provider's text stays in the event.
+	parked := store.states[1]
+	if parked.Status != StatusUndeliverable || parked.LastError != "this address refused our mail" || parked.LastFiredAt != nil {
+		t.Fatalf("refused alert state = %+v", parked)
+	}
+	kept := store.states[2]
+	if kept.Status != StatusActive || kept.LastError != "" || kept.LastFiredAt == nil || !kept.LastFiredAt.Equal(evalNow) {
+		t.Fatalf("delivered alert state = %+v", kept)
+	}
+	ev := eventsFor(store, 1)
+	if len(ev) != 1 || ev[0].Delivered || !strings.Contains(ev[0].Error, "no such user") {
+		t.Fatalf("refused alert events = %+v", ev)
+	}
+	ev = eventsFor(store, 2)
+	if len(ev) != 1 || !ev[0].Delivered {
+		t.Fatalf("delivered alert events = %+v", ev)
+	}
+	// A refusal parks without counting as a run problem, as a refused DM does.
+	if sum.sent != 1 || sum.problem() != "" {
+		t.Fatalf("summary = %s, problem %q", sum, sum.problem())
+	}
+}
+
+func TestRunKeepsDailyLimitedAlertsActive(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryEmail))
+	store.emails["u1"] = "u1@example.com"
+	ed := &fakeDeliverer{kind: ChannelEmail, err: fmt.Errorf("mail: %w", ErrDailyLimit)}
+	deps := evalDeps(store, &fakeDeliverer{}, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	st := store.states[1]
+	if st.Status != StatusActive || !st.AboveArmed || !st.BelowArmed || st.LastFiredAt != nil || st.LastError != "daily email limit reached, will retry" {
+		t.Fatalf("state = %+v", st)
+	}
+	ev := eventsFor(store, 1)
+	if len(ev) != 1 || ev[0].Delivered || ev[0].Error == "" {
+		t.Fatalf("events = %+v", ev)
+	}
+	if sum.skipped != 1 || sum.sent != 0 || sum.deferred != 1 || sum.problem() != "" {
+		t.Fatalf("summary = %s, problem %q", sum, sum.problem())
+	}
+	if !strings.Contains(sum.String(), "1 deferred") {
+		t.Fatalf("String omitted deferred: %s", sum)
+	}
+}
+
+// TestRunCountsMailsAndDisabledChannels covers the three admin counters
+// String adds beside the long-standing ones: a distinct message id per
+// successful send, and channels a bounce or complaint disabled since the
+// previous run, read through Since.
+func TestRunCountsMailsAndDisabledChannels(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryEmail), alertOn(2, "u1", DeliveryEmail))
+	store.emails["u1"] = "u1@example.com"
+	store.disabledSince = 2
+	ed := &fakeDeliverer{kind: ChannelEmail, messageID: "msg-1"}
+	deps := evalDeps(store, &fakeDeliverer{}, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	deps.Since = func() time.Time { return evalNow.Add(-time.Hour) }
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	// One digest covers both firings, so one provider id, not two.
+	if sum.mails != 1 || sum.sent != 2 {
+		t.Fatalf("mails = %d sent = %d, want one mail for two firings", sum.mails, sum.sent)
+	}
+	if sum.disabled != 2 || !store.disabledUntil.Equal(evalNow) || !sum.start.Equal(evalNow) {
+		t.Fatalf("disabled = %d until %s start %s, want the store's count up to this run's start", sum.disabled, store.disabledUntil, sum.start)
+	}
+	if !strings.Contains(sum.String(), "1 mails") || !strings.Contains(sum.String(), "2 channels disabled") {
+		t.Fatalf("String omitted mails or disabled: %s", sum)
+	}
+
+	// No Since, as before the service's first run completes, counts nothing.
+	store2 := newFakeEvalStore(alertOn(3, "u2", DeliveryDiscord))
+	deps2 := evalDeps(store2, &fakeDeliverer{}, 13)
+	sum2 := runEvaluation(context.Background(), deps2, buylistOnly)
+	if sum2.disabled != 0 || strings.Contains(sum2.String(), "disabled") {
+		t.Fatalf("first run counted disabled channels: %s", sum2)
+	}
+}
+
+// A tier that drops a channel parks its alerts in the same notice, once.
+func TestRunParksDisallowedChannelInNotice(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryDiscord), alertOn(2, "u1", DeliveryEmail))
+	store.emails["u1"] = "u1@example.com"
+	dd := &fakeDeliverer{}
+	ed := &fakeDeliverer{kind: ChannelEmail}
+	deps := evalDeps(store, dd, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	deps.Channels = func(url.Values) []ChannelKind { return []ChannelKind{ChannelDiscord} }
+	runEvaluation(context.Background(), deps, buylistOnly)
+
+	if store.status[2] != StatusOverAllowance || !slices.Equal(store.allowed["u1"], []ChannelKind{ChannelDiscord}) {
+		t.Fatalf("email alert status = %s, allowed = %v", store.status[2], store.allowed["u1"])
+	}
+	if len(dd.notices) != 1 || dd.noticeTo[0] != "d-u1" || strings.Count(dd.notices[0].Description, "Bolt LEA #161") != 1 ||
+		!strings.Contains(dd.notices[0].Description, "delivery channel") {
+		t.Fatalf("notices to %v:\n%v", dd.noticeTo, dd.notices)
+	}
+	if !slices.Equal(dd.ids(), []int64{1}) || len(ed.sent) != 0 {
+		t.Fatalf("discord sent %v, email sent %v", dd.ids(), ed.ids())
+	}
+	// The allowance step leaves it parked, so the next run says nothing.
+	runEvaluation(context.Background(), deps, buylistOnly)
+	if len(dd.notices) != 1 || store.status[2] != StatusOverAllowance {
+		t.Fatalf("second run: %d notices, status %s", len(dd.notices), store.status[2])
+	}
+}
+
+// A tier without Alerts has no channels either; the allowance step parks
+// with its own notice, not the channel one.
+func TestRunTierWithoutAlertsSendsTheAlertsNotice(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryDiscord), alertOn(2, "u1", DeliveryEmail))
+	store.emails["u1"] = "u1@example.com"
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
+	deps.Deliverers = append(deps.Deliverers, &fakeDeliverer{kind: ChannelEmail})
+	deps.Values = func(string, string) url.Values { return url.Values{} }
+	deps.Allowance = alertsMaxAllowance
+	deps.Channels = func(url.Values) []ChannelKind { return nil }
+	runEvaluation(context.Background(), deps, buylistOnly)
+
+	if store.status[1] != StatusOverAllowance || store.status[2] != StatusOverAllowance || slices.Contains(store.steps, "channel:u1") {
+		t.Fatalf("statuses %s %s, steps %v", store.status[1], store.status[2], store.steps)
+	}
+	if len(dd.notices) != 1 || !strings.Contains(dd.notices[0].Description, "no longer includes price alerts") ||
+		strings.Contains(dd.notices[0].Description, "delivery channel") {
+		t.Fatalf("notices %v", dd.notices)
+	}
+}
+
+// The channel step runs before the allowance step, per user, so the
+// allowance never ranks or restores a channel-parked alert.
+func TestRunParksChannelsBeforeAllowance(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryDiscord), alertOn(2, "u2", DeliveryDiscord))
+	runEvaluation(context.Background(), evalDeps(store, &fakeDeliverer{}, 11), buylistOnly)
+	want := []string{"channel:u1", "allowance:u1", "channel:u2", "allowance:u2"}
+	if !slices.Equal(store.steps, want) {
+		t.Fatalf("steps = %v, want %v", store.steps, want)
+	}
+}
+
+// An allowance-parked alert whose channel is dropped stays parked when
+// room returns, and the notice does not repeat it.
+func TestRunKeepsAllowanceParkedOffDisallowedChannel(t *testing.T) {
+	email := alertOn(2, "u1", DeliveryEmail)
+	email.Status = StatusOverAllowance
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryDiscord), email)
+	store.emails["u1"] = "u1@example.com"
+	dd := &fakeDeliverer{}
+	ed := &fakeDeliverer{kind: ChannelEmail}
+	deps := evalDeps(store, dd, 13)
+	deps.Deliverers = append(deps.Deliverers, ed)
+	deps.Channels = func(url.Values) []ChannelKind { return []ChannelKind{ChannelDiscord} }
+	runEvaluation(context.Background(), deps, buylistOnly)
+
+	if store.status[2] != StatusOverAllowance || !store.chanParked[2] || len(ed.sent) != 0 || len(dd.notices) != 0 {
+		t.Fatalf("status=%s chanParked=%v email sent=%v notices=%d", store.status[2], store.chanParked[2], ed.ids(), len(dd.notices))
+	}
+}
+
+func TestRunWithoutDelivererLeavesAlertsAlone(t *testing.T) {
+	store := newFakeEvalStore(alertOn(1, "u1", DeliveryEmail))
+	store.emails["u1"] = "u1@example.com"
+	sum := runEvaluation(context.Background(), evalDeps(store, &fakeDeliverer{}, 13), buylistOnly)
+	if len(store.claims) != 0 || len(store.states) != 0 || len(store.events) != 0 {
+		t.Fatalf("acted with no deliverer: claims=%v states=%+v events=%+v", store.claims, store.states, store.events)
+	}
+	if !strings.Contains(sum.problem(), "no email deliverer") || sum.skipped != 1 {
+		t.Fatalf("summary = %s, problem %q", sum, sum.problem())
+	}
+}
+
+func TestOthersOldestFirstCapped(t *testing.T) {
+	var active []ActiveAlert
+	for id := int64(1); id <= 14; id++ {
+		active = append(active, alertOn(id, "u1", DeliveryDiscord))
+	}
+	active = append(active, alertOn(20, "u2", DeliveryDiscord))
+	dg := &Digest{UserHash: "u1", Firings: []Firing{{Alert: active[13].Alert}}}
+	got := othersFor(active, dg, map[int64]bool{12: true})
+	var ids []int64
+	for _, a := range got {
+		ids = append(ids, a.ID)
+	}
+	// 14 fired and 12 stopped; the rest oldest (highest id) first, ten of them.
+	if !slices.Equal(ids, []int64{13, 11, 10, 9, 8, 7, 6, 5, 4, 3}) {
+		t.Fatalf("others = %v", ids)
+	}
+}
+
+// The real Discord deliverer carries the park notice and the firing on one
+// sender, to the channel's address, as the run's DMs did before.
+func TestRunDiscordDelivererSendsNoticeAndFiring(t *testing.T) {
+	older := activeAlert()
+	newer := activeAlert()
+	newer.ID = 8
+	store := newFakeEvalStore(older, newer)
+	sender := &fakeSender{}
+	deps := evalDeps(store, &fakeDeliverer{}, 13)
+	deps.Deliverers = []Deliverer{NewDiscordDeliverer(sender, 0)}
+	deps.Allowance = func(url.Values) int { return 1 }
+	runEvaluation(context.Background(), deps, buylistOnly)
+
+	if !slices.Equal(sender.sent, []string{"d1", "d1"}) {
+		t.Fatalf("sent = %v", sender.sent)
+	}
+	if sender.embeds[0].Title != "Price alerts parked" {
+		t.Fatalf("first DM = %q, want the notice", sender.embeds[0].Title)
+	}
+	e := sender.embeds[1]
+	if e.URL != "https://lorcana.mtgban.com/alerts" || !strings.Contains(e.Description, "https://lorcana.mtgban.com/go/b/CK/card-1") {
+		t.Fatalf("links: url=%q\n%s", e.URL, e.Description)
 	}
 }
