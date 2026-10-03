@@ -287,10 +287,10 @@ func TestLoadTCGListingsWaitsForADatastore(t *testing.T) {
 	}
 }
 
-// TestTCGDirectStocked gives arbitrage TCGplayer Direct's entries with
+// TestWithDirectStock gives arbitrage TCGplayer Direct's entries with
 // Direct's stock as their quantity where the listings saw some, and leaves
 // the store's own entries, which search reads, and other sellers alone.
-func TestTCGDirectStocked(t *testing.T) {
+func TestWithDirectStock(t *testing.T) {
 	setTestTCGListings(t, map[string]*tcgListings{"card": {Direct: [5]int32{7, 0, 2}}})
 	inv := mtgban.InventoryRecord{
 		"card": {
@@ -302,7 +302,7 @@ func TestTCGDirectStocked(t *testing.T) {
 	}
 	direct := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true})
 
-	stocked := tcgDirectStocked(direct)
+	stocked := withDirectStock(direct)
 	got := stocked.Inventory()
 	for _, tc := range []struct {
 		cardID    string
@@ -326,7 +326,7 @@ func TestTCGDirectStocked(t *testing.T) {
 	}
 
 	scg := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "SCG"})
-	if tcgDirectStocked(scg) != scg {
+	if withDirectStock(scg) != scg {
 		t.Error("wrapped a seller other than Direct")
 	}
 }
@@ -409,7 +409,7 @@ func TestFullDumpTakesTCGDirectStock(t *testing.T) {
 // and off other stores without quantities, and dates the stock's tooltip.
 func TestTCGDirectStockOnTheArbitPages(t *testing.T) {
 	info := mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true}
-	direct := tcgDirectStocked(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info))
+	direct := withDirectStock(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info))
 	other := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGLow", NoQuantityInventory: true})
 
 	setTestTCGListings(t, nil)

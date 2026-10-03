@@ -602,7 +602,7 @@ type scraperCompareOpts struct {
 // quantities, but for TCGplayer Direct's own stock on reverse, where its
 // copies are the table's.
 func hasNoQty(scraper mtgban.Scraper, reverseMode bool) bool {
-	_, stocked := scraper.(*stockedSeller)
+	_, stocked := scraper.(*directStockSeller)
 	if reverseMode && stocked && tcgListingsPtr.Load() != nil {
 		return false
 	}
@@ -696,7 +696,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				for _, seller := range GetSellers() {
 					if seller.Info().Shorthand == v[0] {
 						// TCGplayer Direct trades its own stock.
-						source = tcgDirectStocked(seller)
+						source = withDirectStock(seller)
 						break
 					}
 				}
@@ -881,7 +881,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				continue
 			}
 
-			scrapers = append(scrapers, tcgDirectStocked(seller))
+			scrapers = append(scrapers, withDirectStock(seller))
 		}
 	} else {
 		for _, vendor := range GetVendors() {
