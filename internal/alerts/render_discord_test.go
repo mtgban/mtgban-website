@@ -1,12 +1,14 @@
 package alerts
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bwmarrin/discordgo"
@@ -21,7 +23,7 @@ func TestAlertEmbedNamesEveryStoreWithALink(t *testing.T) {
 		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
 	}
 	d := Decision{FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 12.5}, {Store: "SCG", Price: 13}}}
-	e := dmEmbed(a, d, "https://mtgban.com", shorthandLabel)
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://mtgban.com"}, shorthandLabel)
 	if !strings.Contains(e.Title, "Lightning Bolt") {
 		t.Fatalf("title = %q", e.Title)
 	}
@@ -33,7 +35,7 @@ func TestAlertEmbedNamesEveryStoreWithALink(t *testing.T) {
 	}
 	retail := a
 	retail.Side = SideRetail
-	e = dmEmbed(retail, d, "https://x", shorthandLabel)
+	e = renderDiscord(Firing{Alert: retail, Decision: d, Origin: "https://x"}, shorthandLabel)
 	if !strings.Contains(e.Description, "/go/r/CK/card-1") {
 		t.Fatalf("retail link wrong: %s", e.Description)
 	}
@@ -52,7 +54,7 @@ func TestAlertEmbedPctThresholdBelowAndCreatedPrice(t *testing.T) {
 		FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 12.5}},
 		FireBelow: true, BelowHits: []Quote{{Store: "SCG", Price: 7.5}},
 	}
-	e := dmEmbed(a, d, "https://mtgban.com", shorthandLabel)
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://mtgban.com"}, shorthandLabel)
 	for _, want := range []string{
 		"above $12.00 (20% of reference)",
 		"below $8.00",
@@ -76,7 +78,7 @@ func TestAlertEmbedLimitsStoreLines(t *testing.T) {
 		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
 	}
 	d := Decision{FireAbove: true, AboveHits: hits}
-	e := dmEmbed(a, d, "https://mtgban.com", shorthandLabel)
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://mtgban.com"}, shorthandLabel)
 	got := strings.Count(e.Description, "[Buy](")
 	if got != embedMaxLines {
 		t.Fatalf("store lines = %d, want %d", got, embedMaxLines)
@@ -98,7 +100,7 @@ func TestAlertEmbedTruncatesLongDescription(t *testing.T) {
 		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
 	}
 	d := Decision{FireAbove: true, AboveHits: hits}
-	e := dmEmbed(a, d, "https://mtgban.com", shorthandLabel)
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://mtgban.com"}, shorthandLabel)
 	n := utf8.RuneCountInString(e.Description)
 	if n > embedMaxDescription {
 		t.Fatalf("description = %d runes, want <= %d", n, embedMaxDescription)
@@ -129,7 +131,7 @@ func TestAlertEmbedEscapesMarkdown(t *testing.T) {
 		Card:  Card{Name: "_____", Set: "U*H", Number: "[1]", Finish: "nonfoil"},
 	}
 	d := Decision{FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 13}}}
-	e := dmEmbed(a, d, "https://x", shorthandLabel)
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://x"}, shorthandLabel)
 	if !strings.HasPrefix(e.Description, `\_\_\_\_\_ U\*H #\[1\], `) {
 		t.Fatalf("card line not escaped:\n%s", e.Description)
 	}
@@ -146,7 +148,7 @@ func TestAlertEmbedOmitsLinksWithoutOrigin(t *testing.T) {
 		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
 	}
 	d := Decision{FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 12.5}}}
-	e := dmEmbed(a, d, "", shorthandLabel)
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: ""}, shorthandLabel)
 	if strings.Contains(e.Description, "](") || strings.Contains(e.Description, "Manage alerts") || e.URL != "" {
 		t.Fatalf("links left in:\n%s\nurl=%q", e.Description, e.URL)
 	}
@@ -214,5 +216,60 @@ func TestIsDMPermanent(t *testing.T) {
 		if isDMPermanent(err) {
 			t.Errorf("%s treated as permanent", name)
 		}
+	}
+}
+
+func discordDigest(ids ...int64) Digest {
+	var dg Digest
+	for _, id := range ids {
+		a := activeAlert()
+		a.ID = id
+		d := Decision{FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 13}}}
+		dg.Firings = append(dg.Firings, Firing{Alert: a.Alert, Decision: d, Origin: a.Origin, Contact: a.Contact})
+	}
+	return dg
+}
+
+func TestDiscordDelivererSendsOneDMPerFiring(t *testing.T) {
+	sender := &fakeSender{}
+	del := NewDiscordDeliverer(sender, 0)
+	if del.Kind() != ChannelDiscord {
+		t.Fatalf("kind = %s", del.Kind())
+	}
+	got := del.Deliver(context.Background(), discordDigest(7, 8), Channel{Kind: ChannelDiscord, Address: "d9"}, shorthandLabel)
+	if len(got) != 2 || got[0] != (Delivery{AlertID: 7}) || got[1] != (Delivery{AlertID: 8}) {
+		t.Fatalf("deliveries = %+v", got)
+	}
+	// Sent to the channel's address, not the contact's legacy id.
+	if len(sender.sent) != 2 || sender.sent[0] != "d9" || sender.sent[1] != "d9" {
+		t.Fatalf("sent = %v", sender.sent)
+	}
+	e := sender.embeds[0]
+	if e.URL != "https://lorcana.mtgban.com/alerts" || !strings.Contains(e.Description, "https://lorcana.mtgban.com/go/b/CK/card-1") {
+		t.Fatalf("links: url=%q\n%s", e.URL, e.Description)
+	}
+
+	refused := errors.New("dial tcp")
+	sender = &fakeSender{err: refused}
+	got = NewDiscordDeliverer(sender, 0).Deliver(context.Background(), discordDigest(7, 8), Channel{Address: "d9"}, shorthandLabel)
+	if len(got) != 2 || got[0].Err != refused || got[1].Err != refused || len(sender.sent) != 2 {
+		t.Fatalf("deliveries = %+v, sent %v", got, sender.sent)
+	}
+}
+
+func TestDiscordDelivererPacesBetweenSends(t *testing.T) {
+	const pace = 200 * time.Millisecond
+	sender := &fakeSender{}
+	del := NewDiscordDeliverer(sender, pace)
+	start := time.Now()
+	del.Deliver(context.Background(), discordDigest(7), Channel{Address: "d9"}, shorthandLabel)
+	if time.Since(start) >= pace {
+		t.Fatalf("first DM waited %s", time.Since(start))
+	}
+	// The notice after it waits, as every later DM of the run does.
+	start = time.Now()
+	err := del.(notifier).notify("d9", &discordgo.MessageEmbed{Title: "x"})
+	if err != nil || time.Since(start) < pace || len(sender.sent) != 2 {
+		t.Fatalf("second DM after %s, err %v, sent %v", time.Since(start), err, sender.sent)
 	}
 }

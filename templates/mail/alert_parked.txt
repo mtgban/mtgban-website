@@ -1,0 +1,11 @@
+Your price alerts are paused.
+
+{{range .Reasons}}{{.}}
+
+{{end}}{{range .Lines}}{{.}}
+{{end}}{{if .More}}and {{.More}} more
+{{end}}{{if .AlertsURL}}
+Review your alerts: {{.AlertsURL}}
+{{end}}{{if .UnsubscribeURL}}
+Unsubscribe from alert mail: {{.UnsubscribeURL}}
+{{end}}

@@ -1,0 +1,12 @@
+{{.Headline}}
+
+{{range .Rows}}{{.Card}} ({{.Set}} #{{.Number}}, {{.Finish}}, {{.Condition}}, {{.Side}})
+  {{.Store}}: {{.Change}}, threshold {{.Threshold}}
+  {{.Link}}
+{{end}}
+Review your alerts: {{.AlertsURL}}
+{{if .Others}}
+Your other alerts:
+{{range .Others}}  {{.}}
+{{end}}{{end}}
+Unsubscribe from alert mail: {{.UnsubscribeURL}}

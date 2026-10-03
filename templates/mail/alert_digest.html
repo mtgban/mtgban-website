@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MTGBAN price alerts</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;">
+<tr>
+<td align="center" style="padding:24px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px; max-width:100%; background-color:#ffffff;">
+<tr>
+<td style="padding:24px 24px 8px 24px;">
+<span style="font-size:20px; font-weight:bold; color:#1f2937;">MTGBAN</span>
+</td>
+</tr>
+<tr>
+<td style="padding:0 24px 20px 24px;">
+<span style="font-size:18px; color:#1f2937;">{{.Headline}}</span>
+</td>
+</tr>
+{{range .Rows}}
+<tr>
+<td style="padding:16px 24px; border-top:1px solid #f3f4f6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td width="60" valign="top" style="padding-right:12px;">
+{{if .Image}}<img src="{{.Image}}" width="60" alt="{{.Card}}" style="width:60px; max-width:60px; display:block;">{{end}}
+</td>
+<td valign="top">
+<div style="font-size:15px; color:#1f2937;">{{.Card}}</div>
+<div style="font-size:13px; color:#6b7280;">{{.Set}} #{{.Number}}, {{.Finish}}, {{.Condition}}, {{.Side}}</div>
+<div style="font-size:14px; color:#1f2937; margin-top:6px;">{{.Store}}: {{.Change}}</div>
+<div style="font-size:13px; color:#6b7280;">threshold {{.Threshold}}</div>
+<div style="font-size:13px; margin-top:6px;"><a href="{{.Link}}" style="color:#2563eb;">View this card</a></div>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+{{end}}
+<tr>
+<td align="center" style="padding:8px 24px 24px 24px;">
+<a href="{{.AlertsURL}}" style="display:inline-block; padding:12px 28px; background-color:#2563eb; color:#ffffff; font-size:14px; text-decoration:none;">Review your alerts</a>
+</td>
+</tr>
+{{if .Others}}
+<tr>
+<td style="padding:0 24px 20px 24px; border-top:1px solid #f3f4f6;">
+<div style="font-size:14px; color:#1f2937; margin:16px 0 6px 0;">Your other alerts</div>
+{{range .Others}}<div style="font-size:13px; color:#6b7280;">{{.}}</div>
+{{end}}
+</td>
+</tr>
+{{end}}
+<tr>
+<td style="padding:20px 24px 24px 24px; border-top:1px solid #f3f4f6;">
+<div style="font-size:12px; color:#6b7280;">You are receiving this because you have price alerts set on MTGBAN.</div>
+<div style="font-size:12px; color:#6b7280; margin-top:6px;"><a href="{{.UnsubscribeURL}}" style="color:#6b7280;">Unsubscribe from alert mail</a></div>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>
