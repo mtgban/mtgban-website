@@ -730,7 +730,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CanFilterByPrice = st.priceSource == ""
 	}
 
-	fillUploadResults(&pageVars.UploadVars, b, st, ids, prices, rows, uploadedData)
+	fillUploadResults(&pageVars.UploadVars, b, ds.editions.ReprintParents, st, ids, prices, rows, uploadedData)
 
 	// Logs
 	user := GetParamFromSig(sig, "UserEmail")
@@ -814,8 +814,8 @@ func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []Upl
 // fillUploadResults sorts the rows and the optimizer's picks, and lays them
 // out on the page: the tabs, the opened products' sections, the totals row
 // and the optimizer's sections.
-func fillUploadResults(pageVars *UploadVars, b *mtgmatcher.Backend, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
-	sortResults(b, uploadedData, rows.optimizedResults, st.sorting)
+func fillUploadResults(pageVars *UploadVars, b *mtgmatcher.Backend, reprintParents map[string]string, st uploadSettings, ids uploadIDs, prices uploadPrices, rows uploadRows, uploadedData []UploadEntry) {
+	sortResults(b, reprintParents, uploadedData, rows.optimizedResults, st.sorting)
 
 	// Split sorted entries into singles, sealed, and not-found for the tabbed view
 	singlesEntries, sealedEntries, notFoundEntries := docparse.PartitionEntries(uploadedData, ids.sealedProductIDs)
@@ -2081,7 +2081,7 @@ func mergePrices(dst, src map[string]map[string]*BanPrice) {
 	}
 }
 
-func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
+func sortResults(b *mtgmatcher.Backend, reprintParents map[string]string, uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string) {
 	// The card-data sorts below order both the uploaded rows and every
 	// per-store optimized list, so resolve the ids of both up front.
 	resolveUploadSortingData := func() map[string]*SortingData {
@@ -2121,6 +2121,7 @@ func sortResults(b *mtgmatcher.Backend, uploadedData []UploadEntry, optimizedRes
 		}
 	case "setalpha":
 		sortData := resolveUploadSortingData()
+		fileReprintsUnderParent(sortData, reprintParents)
 		sort.Slice(uploadedData, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[uploadedData[i].CardID], sortData[uploadedData[j].CardID])
 		})

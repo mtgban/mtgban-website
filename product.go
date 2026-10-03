@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -123,6 +124,10 @@ type editionsSnapshot struct {
 	// Editions with parent sets
 	TreeEditionsKeys []string
 	TreeEditionsMap  map[string][]EditionEntry
+
+	// The lowercased parent name of every edition reprinting its parent's
+	// card list (4BB, FBB, 4EDALT), keyed by the edition's code
+	ReprintParents map[string]string
 
 	// The number of editions, cards, and printings
 	TotalSets   int
@@ -283,6 +288,34 @@ func getAllEditions(b *mtgmatcher.Backend) ([]string, map[string]EditionEntry) {
 	})
 
 	return sortedEditions, listEditions
+}
+
+// getReprintParents finds the editions printing exactly their parent's
+// card names, another border or language of the same set.
+func getReprintParents(b *mtgmatcher.Backend) map[string]string {
+	parents := map[string]string{}
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
+		if err != nil || set.ParentCode == "" || len(set.Cards) == 0 {
+			continue
+		}
+		parent, err := b.GetSet(set.ParentCode)
+		if err != nil {
+			continue
+		}
+		if maps.Equal(cardNames(set.Cards), cardNames(parent.Cards)) {
+			parents[set.Code] = strings.ToLower(parent.Name)
+		}
+	}
+	return parents
+}
+
+func cardNames(cards []mtgmatcher.Card) map[string]bool {
+	names := make(map[string]bool, len(cards))
+	for _, card := range cards {
+		names[card.Name] = true
+	}
+	return names
 }
 
 func getTreeEditions(b *mtgmatcher.Backend) ([]string, map[string][]EditionEntry) {
@@ -1092,6 +1125,7 @@ func newEditionsSnapshot(b *mtgmatcher.Backend) *editionsSnapshot {
 	snap.AllEditionsKeys, snap.AllEditionsMap = getAllEditions(b)
 	snap.AllEditionsCategoriesSorted, snap.AllEditionsByCategory = getAllEditionsByCategory(b)
 	snap.TreeEditionsKeys, snap.TreeEditionsMap = getTreeEditions(b)
+	snap.ReprintParents = getReprintParents(b)
 
 	snap.TotalSets = len(snap.AllEditionsKeys)
 	snap.TotalUnique = len(b.GetUUIDs())
