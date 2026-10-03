@@ -48,8 +48,8 @@ func TestRarityFilterReadsEachGamesOrder(t *testing.T) {
 		[]string{"Promo", "LR+", "Legend Rare", "Rare", "Uncommon", "Common"},
 		map[string]string{"lr": "Legend Rare", "lrplus": "LR+", "rare": "Rare", "common": "Common"})
 	onepiece := rarityBackend("onepiece",
-		[]string{"PR", "SEC", "L", "SR", "R", "UC", "C"},
-		map[string]string{"sec": "SEC", "sr": "SR", "c": "C"})
+		[]string{"Promo", "Treasure Rare", "Secret Rare", "Leader", "Super Rare", "Rare", "Uncommon", "Common", "DON!!", "None"},
+		map[string]string{"sec": "secretrare", "sr": "superrare", "c": "common"})
 
 	tests := []struct {
 		b     *mtgmatcher.Backend
@@ -71,9 +71,9 @@ func TestRarityFilterReadsEachGamesOrder(t *testing.T) {
 		{gundam, "r:c", []string{"common"}},
 		{gundam, "r:l", []string{"lr", "lrplus"}},
 
-		{onepiece, "r:sr", []string{"sr"}},
+		{onepiece, "r:superrare", []string{"sr"}},
 		{onepiece, "r:c", []string{"c"}},
-		{onepiece, "r>sr", []string{"sec"}},
+		{onepiece, "r>superrare", []string{"sec"}},
 	}
 	for _, test := range tests {
 		got := rarityKept(test.b, test.query)
