@@ -603,7 +603,7 @@ type scraperCompareOpts struct {
 // copies are the table's.
 func hasNoQty(scraper mtgban.Scraper, reverseMode bool) bool {
 	_, stocked := scraper.(*directStockSeller)
-	if reverseMode && stocked && tcgListingsPtr.Load() != nil {
+	if reverseMode && stocked && tcgDirectSnapshot(time.Now()) != nil {
 		return false
 	}
 	return scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory

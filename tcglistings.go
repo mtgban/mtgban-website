@@ -326,10 +326,26 @@ func tcgListingsFor(cardID string, grade mtgban.Condition) (text, title string) 
 // entries carry no quantity of their own.
 const tcgDirectStore = "TCGDirect"
 
-// tcgDirectStock is TCGplayer Direct's own stock of a card in a grade, as of
-// the last listings load, where the scrape saw some.
-func tcgDirectStock(cardID string, grade mtgban.Condition) (int, bool) {
+// tcgDirectSnapshot is the loaded listings while Direct's stock in them is
+// current: scraped today or yesterday. Past that a stalled newspaper would
+// keep quoting and ranking stock long sold.
+func tcgDirectSnapshot(now time.Time) *tcgListingsSnapshot {
 	snap := tcgListingsPtr.Load()
+	if snap == nil {
+		return nil
+	}
+	y, m, d := snap.Date.Date()
+	scraped := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	if scraped.Before(now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -1)) {
+		return nil
+	}
+	return snap
+}
+
+// tcgDirectStock is TCGplayer Direct's own stock of a card in a grade, as of
+// the last listings load while current, where the scrape saw some.
+func tcgDirectStock(cardID string, grade mtgban.Condition) (int, bool) {
+	snap := tcgDirectSnapshot(time.Now())
 	if snap == nil {
 		return 0, false
 	}
@@ -345,9 +361,9 @@ func tcgDirectStock(cardID string, grade mtgban.Condition) (int, bool) {
 }
 
 // tcgDirectStockNote is the tooltip on Direct's stock where it is shown,
-// dating the scrape it comes from. Empty until the listings load.
+// dating the scrape it comes from. Empty while there is no current stock.
 func tcgDirectStockNote() string {
-	snap := tcgListingsPtr.Load()
+	snap := tcgDirectSnapshot(time.Now())
 	if snap == nil {
 		return ""
 	}
