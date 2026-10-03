@@ -598,8 +598,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// the reader arrived with.
 	pageVars.Embed.OEmbedURL = absoluteURL(r, "/search/oembed?format=json&url="+url.QueryEscape(pageVars.Embed.PageURL))
 	pageVars.CondKeys = AllConditions
-	pageVars.Metadata = map[string]GenericCard{}
-	pageVars.Printings = map[string]string{}
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
@@ -642,20 +640,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
 
-	// Load up image links and other metadata
-	for _, cardID := range shown.keys {
-		_, found := pageVars.Metadata[cardID]
-		if found {
-			continue
-		}
-		card := uuid2card(b, cardID, preferFlavor)
-		// Search results chart cards, so upgrade the chart handle to the cached
-		// ban:<id> here rather than inside uuid2card, which also feeds pages
-		// that never chart.
-		card.ChartID = chartIDForCard(b, cardID)
-		pageVars.Metadata[cardID] = card
-		pageVars.Printings[cardID] = cardPrintings(b, cardID)
-	}
+	pageVars.Metadata, pageVars.Printings = searchMetadata(b, shown.keys, preferFlavor)
 
 	// Optionally sort according to price
 	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
@@ -683,6 +668,31 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// searchMetadata reads what the page shows of each card on it: its details,
+// and its printings row for the sidebar. It does not use cardMetadata.add,
+// because ChartID is set before the card is stored.
+func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
+	metadata := cardMetadata{}
+	printings := map[string]string{}
+
+	// Load up image links and other metadata
+	for _, cardID := range keys {
+		_, found := metadata[cardID]
+		if found {
+			continue
+		}
+		card := uuid2card(b, cardID, preferFlavor)
+		// Search results chart cards, so upgrade the chart handle to the cached
+		// ban:<id> here rather than inside uuid2card, which also feeds pages
+		// that never chart.
+		card.ChartID = chartIDForCard(b, cardID)
+		metadata[cardID] = card
+		printings[cardID] = cardPrintings(b, cardID)
+	}
+
+	return metadata, printings
 }
 
 // SearchOEmbed answers an oEmbed consumer unfurling a search page with the
