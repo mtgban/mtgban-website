@@ -893,6 +893,9 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	// The grades the reader dropped, which TCGDirect's own below must not
+	// carry over to the scrapers after it.
+	conditions := opts.Conditions
 	for _, scraper := range scrapers {
 		if scraper.Info().Shorthand == source.Info().Shorthand {
 			continue
@@ -912,6 +915,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		}
 
 		// Set custom scraper options
+		opts.Conditions = conditions
 		if pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect" {
 			opts.Conditions = BadConditions
 		}
