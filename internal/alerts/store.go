@@ -260,8 +260,9 @@ func (s *Store) Delete(ctx context.Context, id int64, userHash string) (bool, er
 	return n > 0, nil
 }
 
-// SetState is the evaluator's write; it never touches a row the user paused.
-func (s *Store) SetState(ctx context.Context, id int64, st State) (bool, error) {
+// SetState is the evaluator's write; it never touches a row the user paused,
+// nor one edited since the run listed it at seenUpdatedAt.
+func (s *Store) SetState(ctx context.Context, id int64, seenUpdatedAt time.Time, st State) (bool, error) {
 	var fired any
 	if st.LastFiredAt != nil {
 		fired = *st.LastFiredAt
@@ -269,7 +270,7 @@ func (s *Store) SetState(ctx context.Context, id int64, st State) (bool, error) 
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE alerts SET status = $2, above_armed = $3, below_armed = $4,
 			last_fired_at = COALESCE($5, last_fired_at), last_error = $6, updated_at = now()
-		WHERE id = $1 AND status = 'active'`, id, st.Status, st.AboveArmed, st.BelowArmed, fired, st.LastError)
+		WHERE id = $1 AND status = 'active' AND updated_at = $7`, id, st.Status, st.AboveArmed, st.BelowArmed, fired, st.LastError, seenUpdatedAt)
 	if err != nil {
 		return false, err
 	}

@@ -286,7 +286,7 @@ func TestUpdateRearmsAndSetStatus(t *testing.T) {
 	// Disarm through the evaluator's write, then edit: Update writes the
 	// armed state it is handed.
 	fired := time.Now()
-	_, err = s.SetState(ctx, created.ID, State{Status: StatusActive, AboveArmed: false, BelowArmed: true, LastFiredAt: &fired})
+	_, err = s.SetState(ctx, created.ID, created.UpdatedAt, State{Status: StatusActive, AboveArmed: false, BelowArmed: true, LastFiredAt: &fired})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,9 +366,28 @@ func TestSetStateSkipsPausedRows(t *testing.T) {
 	ctx := context.Background()
 	a, _ := s.Create(ctx, sample(h))
 	_, _ = s.SetStatus(ctx, a.ID, h, StatusPaused)
-	ok, err := s.SetState(ctx, a.ID, State{Status: StatusUnresolvable})
+	paused, _, _ := s.Get(ctx, a.ID, h)
+	ok, err := s.SetState(ctx, a.ID, paused.UpdatedAt, State{Status: StatusUnresolvable})
 	if err != nil || ok {
 		t.Fatalf("SetState touched a paused row: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestSetStateSkipsRowsEditedSinceListed(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	listed, _ := s.Create(ctx, sample(h))
+	edit := listed
+	edit.Above = Threshold{Kind: KindAbs, Value: 20}
+	ok, err := s.Update(ctx, edit)
+	if err != nil || !ok {
+		t.Fatalf("Update: ok=%v err=%v", ok, err)
+	}
+	ok, err = s.SetState(ctx, listed.ID, listed.UpdatedAt, State{Status: StatusActive, AboveArmed: true, BelowArmed: true})
+	if err != nil || ok {
+		t.Fatalf("SetState overwrote an edit made after the listing: ok=%v err=%v", ok, err)
 	}
 }
 
