@@ -32,6 +32,8 @@
     <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
     <script type="text/javascript" src="/js/upload-options.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/upload-presets.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
