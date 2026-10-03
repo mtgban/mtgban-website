@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,30 @@ import (
 func ServeFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, r.URL.Path[1:])
+}
+
+// mountNav serves a page and its sub-pages on mux behind enforceSigning; a
+// NoSigning sub-page gets its own Handle unsigned, never the parent's.
+func (s *site) mountNav(mux *http.ServeMux, nav *NavElem) {
+	handler := enforceSigning(s, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nav.Handle(s, w, r)
+	}))
+	mux.Handle(nav.Link, handler)
+
+	// Add any additional endpoints to it
+	for _, subPage := range nav.SubPages {
+		if !subPage.NoSigning {
+			mux.Handle(subPage.Link, handler)
+			continue
+		}
+		if subPage.Handle == nil {
+			panic(fmt.Sprintf("nav %s: unsigned sub-page %s has no Handle of its own", nav.Name, subPage.Link))
+		}
+		handle := subPage.Handle
+		mux.Handle(subPage.Link, noSigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handle(s, w, r)
+		})))
+	}
 }
 
 // registerRoutes serves every page, redirect and API on the default mux,
@@ -73,17 +98,7 @@ func (s *site) registerRoutes() {
 			LogPages[nav.Name] = log.New(logFile, "", log.LstdFlags)
 		}
 
-		// Set up the handler
-		var handler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			nav.Handle(s, w, r)
-		})
-		handler = enforceSigning(s, handler)
-		http.Handle(nav.Link, handler)
-
-		// Add any additional endpoints to it
-		for _, subPage := range nav.SubPages {
-			http.Handle(subPage.Link, handler)
-		}
+		s.mountNav(http.DefaultServeMux, nav)
 	}
 
 	// The upload handoff sits under /upload but is its own page: the nav
@@ -115,6 +130,8 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/popular/vote", noSigning(http.HandlerFunc(s.PopularVoteAPI)))
 	// Its closures read the live datastore and prices per request.
 	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
+	// Resend's webhook: the Svix signature is the credential.
+	http.Handle("/alerts/mail-events", noSigning(http.HandlerFunc(s.AlertsMailEvents)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))

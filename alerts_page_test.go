@@ -21,7 +21,7 @@ func TestAlertsPageOffersResumeAsTheAPIAllows(t *testing.T) {
 		alerts.StatusOverAllowance: false,
 	} {
 		vars := PageVars{AlertsPage: &AlertsPageVars{
-			SignedIn: true, Allowed: true, Allowance: 5, DiscordLinked: true,
+			SignedIn: true, Allowed: true, Allowance: 5,
 			Alerts: []alerts.View{{Alert: alerts.Alert{ID: 1, CardID: "card-1", Status: status}}},
 		}}
 		var out strings.Builder

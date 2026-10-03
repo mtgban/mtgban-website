@@ -33,7 +33,7 @@ type site struct {
 
 	// alerts is the price alerts service; openDBs attaches its store.
 	alerts *alerts.Service
-	// alertsSend lets dev mode deliver real DMs (-alerts-send).
+	// alertsSend lets dev mode deliver real DMs and mail (-alerts-send).
 	alertsSend bool
 	// popularVotes records search votes; openDBs attaches the observability
 	// client, and nil means the endpoint answers 204 without recording.
@@ -44,6 +44,10 @@ type site struct {
 	// pricesLoaded is set once the startup load has published every store:
 	// it publishes them one by one, and alerts priced on part of them fire.
 	pricesLoaded atomic.Bool
+	// mailTemplates are the alert digest bodies, loaded once at startup.
+	mailTemplates alerts.MailTemplates
+	// mailEventsSecret is the decoded RESEND_WEBHOOK_SECRET, nil when unset.
+	mailEventsSecret []byte
 
 	// fetchLastSold is how the Discord $$ lookup fetches a printing's recent
 	// sales: getLastSold, held here so a test can answer in its place.

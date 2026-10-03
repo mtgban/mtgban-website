@@ -19,7 +19,16 @@ func (s *site) alertEvalDeps() alerts.EvalDeps {
 			b := s.backend()
 			// Indexed once per run rather than once per user per alert.
 			idx := indexGrants(PatreonGrants())
-			d.Sender = liveAlertSender(s.alertsSend)
+			d.Deliverers = []alerts.Deliverer{
+				alerts.NewDiscordDeliverer(liveAlertSender(s.alertsSend), alerts.DefaultSendPace),
+			}
+			// No key, no mail deliverer: the channel is hidden and its
+			// alerts parked, so nothing is left for one to fail on.
+			if alertMailConfigured() {
+				d.Deliverers = append(d.Deliverers, s.alertMailDeliverer(b))
+			}
+			d.ChannelFor = s.alerts.Store().ChannelFor
+			d.Channels = alertChannels
 			d.Ready = func() bool { return s.pricesLoaded.Load() && alertsReady(b) }
 			d.Values = func(userHash, tier string) url.Values {
 				return aclValuesWith(ACL(), idx, userHash, tier)

@@ -33,7 +33,7 @@ func (logAlertSender) Send(discordUserID string, embed *discordgo.MessageEmbed) 
 
 // liveAlertSender is the Discord sender, or the log in dev unless send
 // (-alerts-send) asks for real DMs.
-func liveAlertSender(send bool) alerts.Sender {
+func liveAlertSender(send bool) alerts.DiscordSender {
 	if DevMode && !send {
 		return logAlertSender{}
 	}

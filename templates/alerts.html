@@ -13,5 +13,11 @@
 
 {{define "extra-scripts"}}
 <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
+{{/* The links the channels box draws, handed over as values rather than
+     read back out of the DOM: a page attribute is text the script would
+     have to trust as a URL. */}}
+<script type="text/javascript">
+    window.BAN_ALERTS = {{with .AlertsPage}}{ inviteURL: {{.InviteURL}}, unsubscribeURL: {{.UnsubscribeURL}} }{{else}}{}{{end}};
+</script>
 <script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}"></script>
 {{end}}
