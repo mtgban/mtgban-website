@@ -628,12 +628,15 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.NoSort = true
 	}
 
-	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, r, ds, b, config, query, oembed, hidePromos)
+	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, r, ds, b, config, query, hidePromos)
 	if done {
 		if oembed {
 			oembedError(w, http.StatusNotFound)
 			return
 		}
+		pageVars.PopularSearches = getPopularSearches(ds)
+		pageVars.CleanSearchQuery = config.CleanQuery
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -965,9 +968,8 @@ func sortedEditionKeys(editions *editionsSnapshot, sortOpt string) []string {
 }
 
 // runSearch runs the search and collects each card's offers. When it finds
-// nothing to show it returns done, with the no-result page filled unless the
-// request is for oEmbed, and Search answers.
-func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, config SearchConfig, query string, oembed, hidePromos bool) (allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, done bool) {
+// nothing to show it returns done, with the message saying why.
+func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, config SearchConfig, query string, hidePromos bool) (allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, done bool) {
 	sig := getSignatureFromCookies(r)
 
 	// Perform search
@@ -979,13 +981,7 @@ func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher
 		// an invitation to answer a different question.
 		allKeys = searchFallback(ds, config)
 		if len(allKeys) == 0 {
-			if oembed {
-				return nil, nil, nil, true
-			}
 			pageVars.InfoMessage = NoCardsMessage
-			pageVars.PopularSearches = getPopularSearches(ds)
-			pageVars.CleanSearchQuery = config.CleanQuery
-			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
 			return nil, nil, nil, true
 		}
 	}
@@ -1011,16 +1007,10 @@ func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher
 
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
-		if oembed {
-			return nil, nil, nil, true
-		}
 		pageVars.InfoMessage = NoResultsMessage
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
 		}
-		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
 		return nil, nil, nil, true
 	}
 
