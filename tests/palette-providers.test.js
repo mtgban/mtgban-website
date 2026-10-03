@@ -83,3 +83,30 @@ test('the server answers for the sets whenever it can', async () => {
     expect(await values(providers, 's:')).toEqual(['WTR']);
     expect(opened).toEqual([]);
 });
+
+// The rarity menu is the loaded game's, rarest first, with the letter that
+// names a rarity alone beside it.
+const lorcanaRarities = [
+    { value: 'enchanted', label: 'Enchanted', count: 18 },
+    { value: 'superrare', label: 'Superrare', count: 19 },
+    { value: 'common', label: 'Common', letter: 'c', count: 72 },
+];
+
+test('the game names its rarities', async () => {
+    const { providers } = load({ '/api/palette/rarities.json': lorcanaRarities }, {}, false);
+    expect(await values(providers, 'r:')).toEqual(['enchanted', 'superrare', 'common']);
+    expect(providers.getProvider('r:').getCandidates('c')[0]).toMatchObject({ value: 'common', sublabel: 'c' });
+});
+
+test('offline, the rarities come from the catalog', async () => {
+    const { providers, opened } = load(null, { catalogRarities: lorcanaRarities }, true);
+    expect(await values(providers, 'r:')).toEqual(['enchanted', 'superrare', 'common']);
+    expect(opened).toEqual(['catalogRarities']);
+});
+
+test('a card chip narrows the rarities to the card\'s', async () => {
+    const { providers } = load({ '/api/palette/rarities.json': lorcanaRarities }, {}, false);
+    await values(providers, 'r:');
+    const narrowed = providers.getProvider('r:').getCandidates('', { cardMeta: { rarities: ['superrare'] } });
+    expect(narrowed.map(entry => entry.value)).toEqual(['superrare']);
+});

@@ -332,6 +332,30 @@
         })
         .catch(function() {});
 
+    // ── Rarities, from the loaded game ──
+    //
+    // The written table is Magic's. The game served lists its own, rarest
+    // first, so its rows replace the written ones; if the request fails the
+    // page keeps them.
+    fetch('/api/palette/rarities.json')
+        .then(function(r) { return r.ok ? r.json() : []; })
+        .then(function(rarities) {
+            if (!rarities || !rarities.length) return;
+            var section = document.getElementById('rarity');
+            var body = section && section.querySelector('.guide-table tbody');
+            if (!body) return;
+            var html = '';
+            for (var i = 0; i < rarities.length; i++) {
+                var value = rarities[i].value;
+                if (rarities[i].letter) value += ' / ' + rarities[i].letter;
+                html += '<tr><td><code>' + escapeHtml(value) + '</code></td>';
+                html += '<td>' + escapeHtml(rarities[i].label || rarities[i].value)
+                     + ' (' + rarities[i].count + ')</td></tr>';
+            }
+            body.innerHTML = html;
+        })
+        .catch(function() {});
+
     // ── Scroll spy ──
     var navLinks = sidebarNav.querySelectorAll('.guide-nav-link');
     var sectionEls = sectionsContainer.querySelectorAll('.guide-section');

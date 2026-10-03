@@ -77,7 +77,7 @@ window.__BAN_GUIDE = {
                 description: '<p>The palette supports all search syntax prefixes as guided filter builders. Type a prefix and the dropdown shows matching options.</p><p>Locking a second chip with the same prefix merges it into the first: <code>s:MKM</code> followed by <code>s:LEA</code> becomes <code>s:MKM,LEA</code>. This applies to prefixes that accept multiple values - sets, rarities, colors, types, stores, tags.</p><p><strong>Card-aware narrowing:</strong> when a card chip is present, subsequent filter dropdowns narrow their options to what exists for that card. With a "Birds of Paradise" chip, <code>s:</code> only shows sets that card was printed in, and <code>c:</code> only shows green color combinations.</p>',
                 table: [
                     { value: 's: / e:', short: 'Set / edition codes' },
-                    { value: 'r:', short: 'Rarity (mythic, rare, uncommon, common, special, token, oversize)' },
+                    { value: 'r:', short: "Rarity (the game's own, as one word or the letter it begins)" },
                     { value: 'c: / ci:', short: 'Color / color identity (WUBRG, guilds, shards, wedges, colleges)' },
                     { value: 'f:', short: 'Finish (foil, nonfoil, etched)' },
                     { value: 't:', short: 'Card type' },
@@ -478,11 +478,11 @@ window.__BAN_GUIDE = {
             category: 'Search Syntax',
             title: 'Rarity',
             icon: 'diamond',
-            summary: 'Filter by rarity (r:mythic, r:m) or use comparisons (r>=rare).',
+            summary: "Filter by the game's rarities (r:rare, r:r) or compare them by its order (r>rare).",
             snippets: ['r:mythic', 'r:m', 'r:rare', 'r>=rare', 'r<uncommon'],
             keywords: ['rarity', 'r:', 'mythic', 'rare', 'uncommon', 'common', 'special', 'token', 'oversize', 'shorthand', 'comparison'],
             content: {
-                description: 'Filter by rarity with <code>r:RARITY</code>. The first letter works as shorthand. Comparison operators <code>r&gt;RARITY</code> and <code>r&lt;RARITY</code> are also supported.',
+                description: 'Filter by rarity with <code>r:RARITY</code>, written as one word: <code>r:superrare</code> for Super Rare. A single letter stands for each of the game\'s rarities that begins with it, so <code>r:c</code> is common. <code>r&gt;RARITY</code> and <code>r&lt;RARITY</code> compare by the game\'s own order, rarest first. The table lists the rarities of the game this site serves.',
                 table: [
                     { value: 'mythic / m', short: 'Mythic rarity' },
                     { value: 'rare / r', short: 'Rare rarity' },

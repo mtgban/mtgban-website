@@ -74,21 +74,40 @@
 
     // ── Static providers ──────────────────────────────────────────
 
-    // Rarity - narrows by card's rarities when card chip present
+    // Rarity
+    //
+    // The loaded game's own rarities, rarest first, fetched the way the
+    // finishes are and offline read from the catalog. A letter shows beside
+    // the rarity it names alone. A card chip narrows them to the card's.
+    var rarityOptions = [];
+    var raritiesMerged = false;
+    var raritiesFetching = null;
+    function ensureRarities() {
+        if (raritiesMerged || raritiesFetching) return raritiesFetching;
+        raritiesFetching = fetch('/api/palette/rarities.json')
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+            .catch(function () { return offlineMeta('catalogRarities'); })
+            .then(mergeRarities, function () { mergeRarities([]); });
+        return raritiesFetching;
+    }
+    function mergeRarities(rarities) {
+        raritiesMerged = true;
+        raritiesFetching = null;
+        for (var i = 0; i < (rarities || []).length; i++) {
+            var rarity = rarities[i];
+            if (!rarity || !rarity.value) continue;
+            rarityOptions.push({ value: rarity.value, label: rarity.label || rarity.value, sublabel: rarity.letter || '' });
+        }
+        fireOnDataReady();
+    }
+
     register({
         prefix: 'r:',
         name: 'Rarities',
         icon: 'diamond',
         getCandidates: function (query, ctx) {
-            var base = [
-                { value: 'mythic', label: 'Mythic', sublabel: 'm', iconColor: '#f59e0b' },
-                { value: 'rare', label: 'Rare', sublabel: 'r', iconColor: '#d4af37' },
-                { value: 'uncommon', label: 'Uncommon', sublabel: 'u', iconColor: '#c0c0c0' },
-                { value: 'common', label: 'Common', sublabel: 'c', iconColor: '#555' },
-                { value: 'special', label: 'Special', sublabel: 's', iconColor: '#8b5cf6' },
-                { value: 'token', label: 'Token', sublabel: 't', iconColor: '#888' },
-                { value: 'oversize', label: 'Oversize', sublabel: 'o', iconColor: '#888' }
-            ];
+            ensureRarities();
+            var base = rarityOptions;
             if (ctx && ctx.cardMeta && ctx.cardMeta.rarities && ctx.cardMeta.rarities.length > 0) {
                 var allowed = {};
                 for (var i = 0; i < ctx.cardMeta.rarities.length; i++) {
