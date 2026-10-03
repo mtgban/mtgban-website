@@ -431,7 +431,6 @@ type SearchVars struct {
 
 	AllKeys        []string
 	CardQuantities map[string]int
-	SearchBest     bool
 	ListingLocked  bool
 	SearchSort     string
 	CondKeys       []mtgban.Condition
@@ -557,7 +556,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fillSearchPrefs(&pageVars, r)
+	// For open mode (Any), disable history charts and keep each card's
+	// stores in name order, whatever the listing priority cookie says
+	pageVars.DisableChart = sig == "" && SigCheck
+	pageVars.ListingLocked = pageVars.DisableChart
+	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
+	fillSearchPrefs(&pageVars.SearchVars, r)
 
 	if len(query) > MaxSearchQueryLen {
 		pageVars.ErrorMessage = TooLongMessage
@@ -654,7 +658,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Optionally sort according to price
-	if pageVars.SearchBest {
+	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
 		sortOfferRows(r, shown.keys, result)
 	}
 
@@ -811,22 +815,14 @@ func fillSearchSettings(pageVars *PageVars, r *http.Request, ds *datastore, b *m
 // fillSearchPrefs puts the reader's search preferences on the page: from
 // their cookies, and from their signature what their tier may see and
 // download.
-func fillSearchPrefs(pageVars *PageVars, r *http.Request) {
+func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	// For open mode (Any), disable history charts and keep each card's
-	// stores in name order, whatever the listing priority cookie says
-	if sig == "" && SigCheck {
-		pageVars.DisableChart = true
-		pageVars.ListingLocked = true
-	}
 	// Not only for the chart page: every mobile results page carries the
 	// chart drawer, whose range select locks what the tier does not reach.
 	pageVars.MaxLookbackDays = chartLookback(sig).Days()
 
-	pageVars.SearchBest = !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores"
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
-	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
 	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
 
