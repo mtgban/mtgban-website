@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -345,7 +344,11 @@ func tcgDirectSnapshot(now time.Time) *tcgListingsSnapshot {
 // tcgDirectStock is TCGplayer Direct's own stock of a card in a grade, as of
 // the last listings load while current, where the scrape saw some.
 func tcgDirectStock(cardID string, grade mtgban.Condition) (int, bool) {
-	snap := tcgDirectSnapshot(time.Now())
+	return directStockIn(tcgDirectSnapshot(time.Now()), cardID, grade)
+}
+
+// directStockIn is tcgDirectStock against one snapshot, nil for none.
+func directStockIn(snap *tcgListingsSnapshot, cardID string, grade mtgban.Condition) (int, bool) {
 	if snap == nil {
 		return 0, false
 	}
@@ -414,38 +417,57 @@ func rankDirectAsOneCopy(arbit []mtgban.ArbitEntry, minProfitability float64) []
 	return out
 }
 
-// directStockSeller is TCGplayer Direct quoting its own stock, for one request.
+// directStockSeller is TCGplayer Direct quoting its own stock.
 type directStockSeller struct {
 	mtgban.Seller
-	once      sync.Once
+}
+
+// directStockBuild is the stocked inventory last built, with the seller and
+// the listings it came from: arbit and reverse ask for it on every request,
+// and only a reload of either, or the stock expiring, changes it.
+type directStockBuild struct {
+	seller    mtgban.Seller
+	snap      *tcgListingsSnapshot
 	inventory mtgban.InventoryRecord
 }
 
-// Inventory copies the entries Direct has stock of, once, and shares the
-// rest with the seller's own.
+var directStockBuilt atomic.Pointer[directStockBuild]
+
+// Inventory is the seller's own with Direct's stock as the quantity where
+// the listings saw some, built once per seller and listings load.
 func (s *directStockSeller) Inventory() mtgban.InventoryRecord {
-	s.once.Do(func() {
-		base := s.Seller.Inventory()
-		s.inventory = make(mtgban.InventoryRecord, len(base))
-		for cardID, entries := range base {
-			var stocked []mtgban.InventoryEntry
-			for i, entry := range entries {
-				stock, found := tcgDirectStock(cardID, entry.Conditions)
-				if !found {
-					continue
-				}
-				if stocked == nil {
-					stocked = slices.Clone(entries)
-				}
-				stocked[i].Quantity = stock
+	snap := tcgDirectSnapshot(time.Now())
+	built := directStockBuilt.Load()
+	if built != nil && built.seller == s.Seller && built.snap == snap {
+		return built.inventory
+	}
+	inventory := stockedInventory(s.Seller.Inventory(), snap)
+	directStockBuilt.Store(&directStockBuild{seller: s.Seller, snap: snap, inventory: inventory})
+	return inventory
+}
+
+// stockedInventory copies the entries snap has Direct stock of, with it as
+// their quantity, and shares the rest with base.
+func stockedInventory(base mtgban.InventoryRecord, snap *tcgListingsSnapshot) mtgban.InventoryRecord {
+	out := make(mtgban.InventoryRecord, len(base))
+	for cardID, entries := range base {
+		var stocked []mtgban.InventoryEntry
+		for i, entry := range entries {
+			stock, found := directStockIn(snap, cardID, entry.Conditions)
+			if !found {
+				continue
 			}
 			if stocked == nil {
-				stocked = entries
+				stocked = slices.Clone(entries)
 			}
-			s.inventory[cardID] = stocked
+			stocked[i].Quantity = stock
 		}
-	})
-	return s.inventory
+		if stocked == nil {
+			stocked = entries
+		}
+		out[cardID] = stocked
+	}
+	return out
 }
 
 // plural spells a count with its noun, "1 seller" or "14 copies".
