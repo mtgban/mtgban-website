@@ -606,10 +606,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
 	}
 
-	if config.SortMode != "" {
-		pageVars.SearchSort = config.SortMode
-		pageVars.NoSort = true
-	}
+	pageVars.SearchSort = readSearchSort(r, config)
+	pageVars.NoSort = config.SortMode != ""
 
 	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, r, ds, b, config, query, hidePromos)
 	if done {
@@ -723,7 +721,6 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	// The search helpers fill a page as they go, which nothing here renders.
 	var pageVars PageVars
-	fillSearchPrefs(&pageVars, page)
 	pageVars.IsSealed = page.URL.Path == "/sealed"
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
@@ -731,9 +728,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 	}
-	if config.SortMode != "" {
-		pageVars.SearchSort = config.SortMode
-	}
+	pageVars.SearchSort = readSearchSort(page, config)
 
 	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, page, ds, b, config, query, hidePromos)
 	if done {
@@ -829,18 +824,6 @@ func fillSearchPrefs(pageVars *PageVars, r *http.Request) {
 	// chart drawer, whose range select locks what the tier does not reach.
 	pageVars.MaxLookbackDays = chartLookback(sig).Days()
 
-	// Load sort option from preferences, merge the alpha query parameter if needed
-	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
-	defaultSortOpt := r.FormValue("sort")
-	if defaultSortOpt != "" {
-		preferredSort := pageVars.SearchSort
-		pageVars.SearchSort = defaultSortOpt
-		// If a user prefers alpha sort grouped by set preserve that option
-		if preferredSort == "hybrid" && defaultSortOpt == "alpha" {
-			pageVars.SearchSort = "hybrid"
-		}
-	}
-
 	pageVars.SearchBest = !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores"
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
 	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
@@ -851,6 +834,25 @@ func fillSearchPrefs(pageVars *PageVars, r *http.Request) {
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	pageVars.CanDownloadCSV = canDownloadCSV
+}
+
+// readSearchSort is the order a search asks for: the one its own syntax
+// names, else the sort parameter, else the reader's saved default.
+func readSearchSort(r *http.Request, config SearchConfig) string {
+	if config.SortMode != "" {
+		return config.SortMode
+	}
+
+	saved := readCookie(r, "SearchDefaultSort")
+	asked := r.FormValue("sort")
+	if asked == "" {
+		return saved
+	}
+	// If a user prefers alpha sort grouped by set preserve that option
+	if saved == "hybrid" && asked == "alpha" {
+		return "hybrid"
+	}
+	return asked
 }
 
 // fillChartRoster reads the chart= roster: it puts the roster on the page for
