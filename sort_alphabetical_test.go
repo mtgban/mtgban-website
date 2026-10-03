@@ -226,3 +226,43 @@ func TestCmpNumberAndFinishReadsEachShape(t *testing.T) {
 		}
 	}
 }
+
+// TestSetCodePrefix reads a set code before the last dash only with a
+// letter in it and a digit after it.
+func TestSetCodePrefix(t *testing.T) {
+	for number, want := range map[string]string{
+		"OP01-016": "OP01", "10E-105": "10E", "LOB-EN001": "LOB", "T-001": "T", "IFIYW-1": "IFIYW",
+		"MP25-EN001": "MP25", "2024-10": "", "2J-b": "", "LGS360-FUN001": "", "1553★": "", "DON": "", "12a": "",
+	} {
+		if got := setCodePrefix(number); got != want {
+			t.Errorf("setCodePrefix(%q) = %q, want %q", number, got, want)
+		}
+	}
+}
+
+// TestPrefixedNumbersSortByPrefixFirst orders numbers with a set code
+// prefix by prefix within each release date, after the plain numbers.
+func TestPrefixedNumbersSortByPrefixFirst(t *testing.T) {
+	skipWithoutDatastore(t)
+	for _, code := range []string{"SLD", "PLST"} {
+		var keys []string
+		seen := map[string]bool{}
+		for _, card := range backend().Sets[code].Cards {
+			if !seen[card.Number] {
+				seen[card.Number] = true
+				keys = append(keys, card.UUID)
+			}
+		}
+		sortData := resolveSortingData(backend(), keys)
+		sort.Slice(keys, func(i, j int) bool { return cmpSets(sortData[keys[i]], sortData[keys[j]]) })
+		for i := 1; i < len(keys); i++ {
+			previous, current := sortData[keys[i-1]], sortData[keys[i]]
+			if !previous.releaseDate.Equal(current.releaseDate) {
+				continue
+			}
+			if cmpNaturally(previous.numberPrefix, current.numberPrefix) > 0 {
+				t.Errorf("%s: %s sorts before %s on one date", code, previous.co.Number, current.co.Number)
+			}
+		}
+	}
+}
