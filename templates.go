@@ -571,6 +571,12 @@ var funcMap = template.FuncMap{
 		}
 		return ""
 	},
+	// direct_stock is TCGplayer Direct's stock of a card in a grade, 0 where
+	// the last scrape did not see it.
+	"direct_stock": func(cardID string, grade mtgban.Condition) int {
+		stock, _ := tcgDirectStock(cardID, grade)
+		return stock
+	},
 	// plain_tip is a tooltip without its ** bold marks and with its tables
 	// as sentences, for a title.
 	"plain_tip": plainTip,

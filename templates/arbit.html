@@ -443,7 +443,7 @@
                             <td class="m">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
-                                    {{if and $.GlobalMode $.DirectStockNote (eq $scraperKey "TCGDirect")}}<span class="arb-direct-stock" title="{{$.DirectStockNote}}">{{.ReferenceEntry.Quantity}} in stock</span>{{end}}
+                                    {{if and $.GlobalMode $.DirectStockNote (eq $scraperKey "TCGDirect")}}{{with direct_stock .CardID .ReferenceEntry.Conditions}}<span class="arb-direct-stock" title="{{$.DirectStockNote}}">{{.}} in stock</span>{{end}}{{end}}
                                 {{else}}
                                     {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .BuylistEntry.BuyPrice}}
                                 {{end}}
