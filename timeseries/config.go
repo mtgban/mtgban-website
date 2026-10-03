@@ -26,13 +26,19 @@ type SQLConfig struct {
 }
 
 // DSN renders the config as a lib/pq connection string.
+//
+// binary_parameters makes lib/pq send a query's Parse, Bind and Execute in one
+// round trip. Without it the unnamed statement is parsed in one and bound in
+// the next, and PgBouncer in transaction mode (port 6432 in production) can
+// hand the second to another backend: "unnamed prepared statement does not
+// exist".
 func (c SQLConfig) DSN() string {
 	sslMode := c.SSLMode
 	if sslMode == "" {
 		sslMode = "disable"
 	}
 	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s binary_parameters=yes",
 		c.Host, c.Port, c.User, c.Password, c.DBName, sslMode,
 	)
 }
@@ -99,8 +105,8 @@ func (c *Client) providerLatestDateStmt(bounded, strict bool) *sql.Stmt {
 // built without one. It does not cover a statement the server loses later - a
 // pooler in transaction mode hands the prepare to one backend and the read to
 // another, and the read comes back "prepared statement does not exist" with no
-// second chance here. Nothing in front of this database pools that way today;
-// if that changes, this is the path that has to learn to retry.
+// second chance here. Production reaches this database through PgBouncer, so
+// these statements survive only if it tracks them (max_prepared_statements).
 func (c *Client) query(ctx context.Context, stmt *sql.Stmt, text string, args ...any) (*sql.Rows, error) {
 	if stmt != nil {
 		return stmt.QueryContext(ctx, args...)
