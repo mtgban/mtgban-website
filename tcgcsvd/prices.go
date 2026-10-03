@@ -11,12 +11,12 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-// longForm dual-writes non-Magic price rows into the long prices table,
+// writeLongForm writes non-Magic price rows into the long prices table,
 // resolving each (category, product, sub-type) to a ban_id, filing the new
 // ones under timeseries.TCGBanID, and emitting one
 // LongPrice per set price column (> 0, zeros omitted like the backfill). The
-// legacy tcgplayer_nonmagic_product_prices upsert stays the source of truth
-// during the dual-write window; a long-form failure is logged, not fatal.
+// charts read only this table, so callers write it before the legacy
+// tcgplayer_nonmagic_product_prices upsert, whose dates gate the next run.
 func (s *Service) writeLongForm(ctx context.Context, rows []timeseries.TCGPriceRow) (int, error) {
 	variants := make([]timeseries.TCGVariant, len(rows))
 	for i, r := range rows {
@@ -324,14 +324,15 @@ func (s *Service) backfillFromArchive(ctx context.Context, games []tcgcsv.GameCo
 			continue
 		}
 
+		if s.longForm {
+			_, err := s.writeLongForm(ctx, rows)
+			if err != nil {
+				return fmt.Errorf("tcgcsv backfill long-form %s: %w", dateStr, err)
+			}
+		}
 		n, err := s.store.UpsertTCGPrices(ctx, rows, 0)
 		if err != nil {
 			return fmt.Errorf("tcgcsv backfill upsert %s: %w", dateStr, err)
-		}
-		if s.longForm {
-			if _, lerr := s.writeLongForm(ctx, rows); lerr != nil {
-				log.Printf("tcgcsv backfill long-form %s: %v", dateStr, lerr)
-			}
 		}
 		totalRows += n
 		daysWithData++
@@ -515,14 +516,15 @@ func (s *Service) ingestGame(ctx context.Context, categoryID int, snapshot time.
 		return 0, nil
 	}
 
+	if s.longForm {
+		_, err := s.writeLongForm(ctx, rows)
+		if err != nil {
+			return 0, fmt.Errorf("long-form: %w", err)
+		}
+	}
 	n, err := s.store.UpsertTCGPrices(ctx, rows, 0)
 	if err != nil {
 		return 0, fmt.Errorf("upsert: %w", err)
-	}
-	if s.longForm {
-		if _, lerr := s.writeLongForm(ctx, rows); lerr != nil {
-			log.Printf("tcgcsv snapshot long-form category %d: %v", categoryID, lerr)
-		}
 	}
 	log.Printf("tcgcsv snapshot %s: category %d, %d rows (%d groups)", dateStr, categoryID, n, len(groups))
 	return n, nil
