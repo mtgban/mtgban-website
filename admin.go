@@ -309,6 +309,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 				v = url.Values{}
 				v.Set("msg", "No BackupPath set in config")
 				redirect = true
+				break
 			}
 		}
 		if s.startDatastoreReload(dsPath, "admin") {
