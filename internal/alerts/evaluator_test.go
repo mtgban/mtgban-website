@@ -125,10 +125,11 @@ func (f *fakeEvalStore) ClaimFire(_ context.Context, id int64, seen time.Time, w
 	return true, nil
 }
 
-// SetState writes only rows whose current status is active.
-func (f *fakeEvalStore) SetState(_ context.Context, id int64, st State) (bool, error) {
+// SetState writes only rows whose current status is active and updated_at
+// is as listed.
+func (f *fakeEvalStore) SetState(_ context.Context, id int64, seen time.Time, st State) (bool, error) {
 	f.calls++
-	if f.status[id] != StatusActive {
+	if f.status[id] != StatusActive || !f.row(id).UpdatedAt.Equal(seen) {
 		return false, nil
 	}
 	f.states[id] = st
