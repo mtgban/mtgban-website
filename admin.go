@@ -299,19 +299,8 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 	redirect := false
 	var v url.Values
 	switch tool {
-	case "datastore", "datastore-backup":
-		dsPath := Config().DatastorePath
-		if tool == "datastore-backup" {
-			// The backup may live somewhere else entirely, which used to mean
-			// building a second bucket by hand. The path names where it is.
-			dsPath = Config().Datastore.BackupPath
-			if dsPath == "" {
-				v = url.Values{}
-				v.Set("msg", "No BackupPath set in config")
-				redirect = true
-			}
-		}
-		if s.startDatastoreReload(dsPath, "admin") {
+	case "datastore":
+		if s.startDatastoreReload(Config().DatastorePath, "admin") {
 			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
 		} else {
 			pageVars.InfoMessage = "A datastore reload is already running, this one will start when it ends"
