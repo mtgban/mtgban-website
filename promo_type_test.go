@@ -17,7 +17,7 @@ func promoTypeCards(t *testing.T) (plain, chipped string) {
 		if err != nil || co.Sealed {
 			continue
 		}
-		card := uuid2card(backend(), uuid, false, false)
+		card := uuid2card(backend(), uuid, false)
 		if plain == "" && len(card.PromoTypes) > 0 {
 			plain = uuid
 		}
@@ -42,7 +42,7 @@ func TestPromoTypesAndTreatmentsAreDisjoint(t *testing.T) {
 		t.Skip("this datastore has no printing with a treatment chip")
 	}
 
-	card := uuid2card(backend(), chipped, false, false)
+	card := uuid2card(backend(), chipped, false)
 	for _, chip := range card.Treatments {
 		for _, p := range card.PromoTypes {
 			if p == chip {
@@ -81,7 +81,7 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 			continue
 		}
 		found = true
-		card := uuid2card(backend(), uuid, false, false)
+		card := uuid2card(backend(), uuid, false)
 		var shown bool
 		for _, p := range card.PromoTypes {
 			if p == "showcase" || p == "extendedart" || p == "borderless" {
@@ -112,7 +112,7 @@ func TestRetroFrameStaysDateGated(t *testing.T) {
 			continue // only the gated-off case is interesting here
 		}
 		found = true
-		card := uuid2card(backend(), uuid, false, false)
+		card := uuid2card(backend(), uuid, false)
 		for _, p := range card.PromoTypes {
 			if p == "retro" {
 				t.Errorf("%s (%s): \"retro\" shows despite predating PromosForEverybodyYay", co.Name, co.SetCode)

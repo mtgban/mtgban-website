@@ -25,7 +25,7 @@ func TestSearchInitialArtKeepsFirstResultMetadata(t *testing.T) {
 	page.AllKeys = []string{"first", "second"}
 	page.Metadata = map[string]GenericCard{
 		"first":  {Name: "First Product", SetCode: "ONE", Date: "2020-01-02", Sealed: true},
-		"second": {Name: "Second Product", SetCode: "TWO", Sealed: true, ImageURL: "second.jpg", Foil: true},
+		"second": {Name: "Second Product", SetCode: "TWO", Sealed: true, FullImageURL: "second.jpg", Foil: true},
 	}
 
 	out := renderPage(t, "search.html", false, page)

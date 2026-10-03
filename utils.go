@@ -482,7 +482,6 @@ type GenericCard struct {
 	// SetSymbol is the set's own published symbol image, from the same
 	// b.GetSet lookup keyruneForCardSet makes for Keyrune.
 	SetSymbol   string
-	ImageURL    string
 	Foil        bool
 	Etched      bool
 	FinishTag   string
@@ -531,6 +530,10 @@ type GenericCard struct {
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
+	// ImageURL is the card's thumbnail.
+	ImageURL string
+	// FullImageURL is its full-size image, which the search page shows.
+	FullImageURL string
 }
 
 // altFoilChipLabels overrides the default title-cased chip label for
@@ -963,7 +966,7 @@ func showVariant(b *mtgmatcher.Backend, cardID string) bool {
 	return setDate.After(magic.PromosForEverybodyYay)
 }
 
-func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, preferFlavorName bool) GenericCard {
+func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
@@ -1079,10 +1082,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, preferFlavorName
 
 	query := genQuery(co)
 
-	imgURL := co.Images["full"]
-	if useThumbs {
-		imgURL = co.Images["thumbnail"]
-	}
+	imgURL := co.Images["thumbnail"]
 	cropURL := co.Images["crop"]
 
 	var canBoosterGen bool
@@ -1220,6 +1220,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, preferFlavorName
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,
+		FullImageURL:      co.Images["full"],
 	}
 }
 

@@ -23,7 +23,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		card := uuid2card(backend(), uuid, false, false)
+		card := uuid2card(backend(), uuid, false)
 		values := append(append([]string{}, card.PromoTypes...), card.Treatments...)
 		for _, value := range values {
 			checked++
@@ -43,7 +43,7 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 		if err != nil || co.Sealed || co.FrameVersion != "1997" {
 			continue
 		}
-		card := uuid2card(backend(), uuid, false, false)
+		card := uuid2card(backend(), uuid, false)
 		for _, p := range card.PromoTypes {
 			if p == "retro" {
 				retroUUID = uuid
@@ -72,7 +72,7 @@ func TestSearchTemplatesLinkPromoTypes(t *testing.T) {
 	if chipped == "" {
 		t.Skip("this datastore has no printing with a treatment chip")
 	}
-	card := uuid2card(backend(), chipped, false, false)
+	card := uuid2card(backend(), chipped, false)
 	value := card.Treatments[0]
 	label := promoTypeLabel(backend(), value)
 	pageVars := PageVars{

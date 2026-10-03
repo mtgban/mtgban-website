@@ -90,7 +90,7 @@ func getPopularSearches(ds *datastore) []PopularSearch {
 			}
 		}
 		card, ok := firstUnusedPopularCard(candidateIDs, usedImages, func(id string) GenericCard {
-			return uuid2card(ds.backend, id, true, false)
+			return uuid2card(ds.backend, id, false)
 		})
 		if !ok {
 			continue

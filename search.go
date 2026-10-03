@@ -655,7 +655,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		card := uuid2card(b, cardID, false, preferFlavor)
+		card := uuid2card(b, cardID, preferFlavor)
 		// Search results chart cards, so upgrade the chart handle to the cached
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
@@ -1216,7 +1216,7 @@ func sortOfferRows(r *http.Request, allKeys []string, foundSellers, foundVendors
 func fillEmbed(pageVars *PageVars, b *mtgmatcher.Backend, preview *embed.OEmbed, allKeys []string) {
 	pageVars.Embed.Title = preview.Title
 	if len(allKeys) > 0 {
-		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
+		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].FullImageURL
 		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
 
 		co, err := b.GetUUID(allKeys[0])
