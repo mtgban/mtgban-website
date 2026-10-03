@@ -722,102 +722,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.NoSort = true
 	}
 
-	// Perform search
-	allKeys, err := searchAndFilter(ds, config)
-	if err != nil {
-		// No card carries the name, so read it another way before giving up.
-		// Only here: further down the results are empty because the cards that
-		// were found carry no listing, which is a fact about stock rather than
-		// an invitation to answer a different question.
-		allKeys = searchFallback(ds, config)
-		if len(allKeys) == 0 {
-			if oembed {
-				oembedError(w, http.StatusNotFound)
-				return
-			}
-			pageVars.InfoMessage = NoCardsMessage
-			pageVars.PopularSearches = getPopularSearches(ds)
-			pageVars.CleanSearchQuery = config.CleanQuery
-			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
-			render(w, "search.html", pageVars)
-			return
-		}
-	}
-
-	// Limit results to avoid hogging the website with large queries
-	if len(allKeys) > MaxSearchTotalResults {
-		pageVars.TotalCards = len(allKeys)
-		pageVars.InfoMessage = TooManyMessage
-		allKeys = allKeys[:MaxSearchTotalResults]
-	}
-
-	foundSellers, foundVendors := searchParallelNG(allKeys, config)
-
-	// Append the virtual custom buylist when enabled in the upload settings
-	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
-	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
-	if canUploadCustom && !config.SkipBuylist {
-		searchCustomBuylist(b, r, allKeys, foundVendors)
-	}
-
-	// Filter away any empty result
-	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
-
-	// Early exit if there no matches are found
-	if len(allKeys) == 0 {
-		if oembed {
-			oembedError(w, http.StatusNotFound)
-			return
-		}
-		pageVars.InfoMessage = NoResultsMessage
-		if hidePromos {
-			pageVars.InfoMessage = NoPromosMessage
-		}
-		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
-		render(w, "search.html", pageVars)
+	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, w, r, ds, b, config, query, oembed, hidePromos)
+	if done {
 		return
-	}
-
-	// Offered once the search has found cards to switch between. A product
-	// that holds nothing but other products answers with those products: rows
-	// on the page, but not cards, and reading them another way finds nothing.
-	if containsSingles(b, allKeys) {
-		pageVars.Contents = contentsViews(b, query, config)
-	}
-
-	// Only used in hashing searches, fill in data with what is available
-	if config.FullQuery != "" {
-		pageVars.SearchQuery = config.FullQuery
-	}
-
-	// Allow displaying the "search all" link only when something
-	// was searched and no options were specified for it
-	canShowAll := !pageVars.IsSealed && config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
-	pageVars.CanShowAll = canShowAll
-	pageVars.CleanSearchQuery = config.CleanQuery
-
-	// CardHashes carries the full result list (with the per-copy repeats that
-	// decklist/hashing searches produce) so transferring to the Uploader keeps
-	// the quantities. Rendering shows each unique card once, so dedupe the keys
-	// used for display — otherwise a 4-of card is drawn (and linked) 4 times.
-	// Only multi-result hashing searches can repeat a key (hashing also serves
-	// single-uuid lookups), so skip the work for everything else.
-	pageVars.CardHashes = allKeys
-	if config.SearchMode == "hashing" && len(allKeys) > 1 {
-		if uniqueKeys := dedupeKeys(allKeys); len(uniqueKeys) < len(allKeys) {
-			if pageVars.TotalCards == 0 {
-				pageVars.TotalCards = len(allKeys)
-			}
-			// Record how many copies each card had so the deduped block can show it.
-			quantities := make(map[string]int, len(uniqueKeys))
-			for _, k := range allKeys {
-				quantities[k]++
-			}
-			pageVars.CardQuantities = quantities
-			allKeys = uniqueKeys
-		}
 	}
 
 	// Save stats
@@ -1004,6 +911,113 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 	}
 
 	return roster, query
+}
+
+// runSearch runs the search and collects each card's offers. When it finds
+// nothing to show, it answers the request itself, with the no-result page or
+// the oEmbed error, and returns done.
+func runSearch(pageVars *PageVars, w http.ResponseWriter, r *http.Request, ds *datastore, b *mtgmatcher.Backend, config SearchConfig, query string, oembed, hidePromos bool) (allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, done bool) {
+	sig := getSignatureFromCookies(r)
+
+	// Perform search
+	allKeys, err := searchAndFilter(ds, config)
+	if err != nil {
+		// No card carries the name, so read it another way before giving up.
+		// Only here: further down the results are empty because the cards that
+		// were found carry no listing, which is a fact about stock rather than
+		// an invitation to answer a different question.
+		allKeys = searchFallback(ds, config)
+		if len(allKeys) == 0 {
+			if oembed {
+				oembedError(w, http.StatusNotFound)
+				return nil, nil, nil, true
+			}
+			pageVars.InfoMessage = NoCardsMessage
+			pageVars.PopularSearches = getPopularSearches(ds)
+			pageVars.CleanSearchQuery = config.CleanQuery
+			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
+			render(w, "search.html", *pageVars)
+			return nil, nil, nil, true
+		}
+	}
+
+	// Limit results to avoid hogging the website with large queries
+	if len(allKeys) > MaxSearchTotalResults {
+		pageVars.TotalCards = len(allKeys)
+		pageVars.InfoMessage = TooManyMessage
+		allKeys = allKeys[:MaxSearchTotalResults]
+	}
+
+	foundSellers, foundVendors = searchParallelNG(allKeys, config)
+
+	// Append the virtual custom buylist when enabled in the upload settings
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
+	if canUploadCustom && !config.SkipBuylist {
+		searchCustomBuylist(b, r, allKeys, foundVendors)
+	}
+
+	// Filter away any empty result
+	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
+
+	// Early exit if there no matches are found
+	if len(allKeys) == 0 {
+		if oembed {
+			oembedError(w, http.StatusNotFound)
+			return nil, nil, nil, true
+		}
+		pageVars.InfoMessage = NoResultsMessage
+		if hidePromos {
+			pageVars.InfoMessage = NoPromosMessage
+		}
+		pageVars.PopularSearches = getPopularSearches(ds)
+		pageVars.CleanSearchQuery = config.CleanQuery
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
+		render(w, "search.html", *pageVars)
+		return nil, nil, nil, true
+	}
+
+	// Offered once the search has found cards to switch between. A product
+	// that holds nothing but other products answers with those products: rows
+	// on the page, but not cards, and reading them another way finds nothing.
+	if containsSingles(b, allKeys) {
+		pageVars.Contents = contentsViews(b, query, config)
+	}
+
+	// Only used in hashing searches, fill in data with what is available
+	if config.FullQuery != "" {
+		pageVars.SearchQuery = config.FullQuery
+	}
+
+	// Allow displaying the "search all" link only when something
+	// was searched and no options were specified for it
+	canShowAll := !pageVars.IsSealed && config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
+	pageVars.CanShowAll = canShowAll
+	pageVars.CleanSearchQuery = config.CleanQuery
+
+	// CardHashes carries the full result list (with the per-copy repeats that
+	// decklist/hashing searches produce) so transferring to the Uploader keeps
+	// the quantities. Rendering shows each unique card once, so dedupe the keys
+	// used for display — otherwise a 4-of card is drawn (and linked) 4 times.
+	// Only multi-result hashing searches can repeat a key (hashing also serves
+	// single-uuid lookups), so skip the work for everything else.
+	pageVars.CardHashes = allKeys
+	if config.SearchMode == "hashing" && len(allKeys) > 1 {
+		if uniqueKeys := dedupeKeys(allKeys); len(uniqueKeys) < len(allKeys) {
+			if pageVars.TotalCards == 0 {
+				pageVars.TotalCards = len(allKeys)
+			}
+			// Record how many copies each card had so the deduped block can show it.
+			quantities := make(map[string]int, len(uniqueKeys))
+			for _, k := range allKeys {
+				quantities[k]++
+			}
+			pageVars.CardQuantities = quantities
+			allKeys = uniqueKeys
+		}
+	}
+
+	return allKeys, foundSellers, foundVendors, false
 }
 
 // orderSearchKeys sorts the results as the reader asked and returns the page
