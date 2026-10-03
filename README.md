@@ -15,3 +15,31 @@ go test ./...          # needs allprintings5.json in the repo root
 - `deploy/README.md`: how the droplets are set up and deployed.
 - `docs/`: design notes, and `docs/adr/` for the decisions behind them.
 - `todo/`: plans not yet done, `todo/refactor.md` first.
+
+## Alert mail
+
+Price alerts can deliver by email as well as Discord DM. The sender address
+is `mail.from` in the config (`ConfigType.Mail`), defaulting to `MTGBAN
+<no-reply@mtgban.com>`; a value `net/mail` cannot parse is logged and fatal
+at startup outside `-dev`.
+
+Two env vars control delivery: `RESEND_API_KEY`, the Resend API key for
+sending mail, and `RESEND_WEBHOOK_SECRET`, the `whsec_...` signing secret
+Resend gives a webhook endpoint (absent, the webhook answers every request
+503). Production needs the key, or email stays unavailable: the email
+endpoints answer 503, the channel choice hides email, and alerts that
+chose it are parked with a notice until the key is set, when the next run
+resumes them. In `-dev` an absent key prints mail to stdout instead,
+and `-alerts-send` still gates real delivery on both channels. The
+`mail.from` domain must be verified in Resend; until it is, every send
+fails and is retried. Register the webhook in Resend at
+`https://<site>/alerts/mail-events` for the `email.bounced` and
+`email.complained` events.
+
+The ACL property `AlertChannels` is a comma list of `discord`, `email`
+naming the delivery channels a tier may use; a tier with `Alerts: true` and
+no `AlertChannels` property gets `discord` only, for compatibility with a
+cookie signed before the property existed. To give a tier no channels at
+all, set `AlertChannels` to the literal string `none`, never an empty
+string: signing keeps empty values, but verification drops them, which
+breaks every signed page for that tier.
