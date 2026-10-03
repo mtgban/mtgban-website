@@ -35,6 +35,9 @@ type site struct {
 	alerts *alerts.Service
 	// alertsSend lets dev mode deliver real DMs (-alerts-send).
 	alertsSend bool
+	// pricesLoaded is set once the startup load has published every store:
+	// it publishes them one by one, and alerts priced on part of them fire.
+	pricesLoaded atomic.Bool
 
 	// fetchLastSold is how the Discord $$ lookup fetches a printing's recent
 	// sales: getLastSold, held here so a test can answer in its place.
