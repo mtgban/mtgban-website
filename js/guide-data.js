@@ -78,7 +78,7 @@ window.__BAN_GUIDE = {
                 table: [
                     { value: 's: / e:', short: 'Set / edition codes' },
                     { value: 'r:', short: "Rarity (the game's own, as one word or the letter it begins)" },
-                    { value: 'c: / ci:', short: 'Color / color identity (WUBRG, guilds, shards, wedges, colleges)' },
+                    { value: 'c: / ci:', short: "Color / color identity (the game's colors; in Magic also WUBRG and named groups)" },
                     { value: 'f:', short: 'Finish (foil, nonfoil, etched)' },
                     { value: 't:', short: 'Card type' },
                     { value: 'cond: / condr: / condb:', short: 'Condition filter (NM, SP, MP, HP, PO)' },
@@ -248,7 +248,7 @@ window.__BAN_GUIDE = {
                     { value: 'Tab on sealed result',     short: 'Lock as chip; show action menu' },
                     { value: 's:  e:', short: 'Set / edition (accepts list, narrows to card printings)' },
                     { value: 'r:', short: 'Rarity (accepts list, narrows to card rarities)' },
-                    { value: 'c:  ci:', short: 'Color / color identity (WUBRG + guild/shard/wedge/college/four-color)' },
+                    { value: 'c:  ci:', short: "Color / color identity (the game's colors; in Magic also WUBRG + named groups)" },
                     { value: 'f:', short: 'Finish (foil / nonfoil / etched)' },
                     { value: 't:', short: 'Card type' },
                     { value: 'cond:  condr:  condb:', short: 'Condition (singleton)' },
@@ -382,7 +382,7 @@ window.__BAN_GUIDE = {
             snippets: ['c:WUBRG', 'ci:esper', 'c:azorius', 'c:colorless', 'c:multicolor'],
             keywords: ['color', 'colour', 'identity', 'ci', 'c:', 'WUBRG', 'white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor', 'guild', 'shard', 'wedge', 'college', 'azorius', 'dimir', 'rakdos', 'gruul', 'selesnya', 'orzhov', 'izzet', 'golgari', 'boros', 'simic', 'bant', 'esper', 'grixis', 'jund', 'naya', 'abzan', 'jeskai', 'sultai', 'mardu', 'temur', 'silverquill', 'prismari', 'witherbloom', 'lorehold', 'quandrix', 'chaos', 'aggression', 'altruism', 'growth', 'artifice'],
             content: {
-                description: '<p>Filter by card color with <code>c:COLOR</code> or by color identity with <code>ci:COLOR</code> (alias <code>identity:</code>). Combine WUBRG letters directly (<code>c:rg</code>), or use any color name or named group below. Options with more than one accepted spelling list every alias together.</p>',
+                description: '<p>Filter by card color with <code>c:COLOR</code> or by color identity with <code>ci:COLOR</code> (alias <code>identity:</code>). Each game names its own colors (<code>c:fire</code>, <code>c:fury</code>), and <code>c:colorless</code> and <code>c:multicolor</code> work in every game. In Magic, combine WUBRG letters directly (<code>c:rg</code>), or use any color name or named group. The table lists the colors of the game this site serves; options with more than one accepted spelling list every alias together.</p>',
                 table: [
                     { value: 'white / w', short: 'White (W)' },
                     { value: 'blue / u', short: 'Blue (U)' },

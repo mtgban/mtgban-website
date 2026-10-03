@@ -470,10 +470,55 @@
         });
     }
 
+    // Magic's colours are the letters its cards carry and the groups the
+    // search expands into them, written out above. Every other game names
+    // its own, fetched from the loaded game the way the finishes are.
+    function servesMagic() {
+        var body = window.document && window.document.body;
+        var game = body && body.getAttribute('data-game');
+        return !game || game === 'magic';
+    }
+    var gameColors = [];
+    var colorsMerged = false;
+    var colorsFetching = null;
+    function ensureColors() {
+        if (colorsMerged || colorsFetching) return colorsFetching;
+        colorsFetching = fetch('/api/palette/colors.json')
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+            .then(mergeColors, function () { mergeColors([]); });
+        return colorsFetching;
+    }
+    function mergeColors(colors) {
+        colorsMerged = true;
+        colorsFetching = null;
+        for (var i = 0; i < (colors || []).length; i++) {
+            var color = colors[i];
+            if (!color || !color.value) continue;
+            gameColors.push({ value: color.value, label: color.label || color.value });
+        }
+        fireOnDataReady();
+    }
+    // A card chip keeps the colours the card carries, and colorless and
+    // multicolor whatever it carries, as Magic's menu does.
+    function narrowByCardNames(opts, cardColors) {
+        if (!cardColors || cardColors.length === 0) return opts;
+        return opts.filter(function (o) {
+            return o.value === 'colorless' || o.value === 'multicolor' || cardColors.indexOf(o.value) !== -1;
+        });
+    }
+
     var colorProvider = {
         name: 'Colors',
         icon: 'palette',
         getCandidates: function (query, ctx) {
+            if (!servesMagic()) {
+                ensureColors();
+                var named = gameColors;
+                if (ctx && ctx.cardMeta && ctx.cardMeta.colors) {
+                    named = narrowByCardNames(named, ctx.cardMeta.colors);
+                }
+                return filterEntries(named, query);
+            }
             var opts = colorOptions;
             if (ctx && ctx.cardMeta && ctx.cardMeta.colors) {
                 opts = narrowByCardColors(opts, ctx.cardMeta.colors);
