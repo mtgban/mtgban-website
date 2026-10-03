@@ -5,12 +5,13 @@ const source = readFileSync(new URL('../js/palette-providers.js', import.meta.ur
 
 // Loads the providers against a server that answers each url in `served`, or
 // cannot be reached when it is null, and a browser whose offline catalog, if
-// offline mode is on, holds `catalog`.
-function load(served, catalog, offlineOn) {
+// offline mode is on, holds `catalog`, on a page serving `game`.
+function load(served, catalog, offlineOn, game) {
     const opened = [];
     const window = {
         OfflineMode: { enabled: () => offlineOn },
         OfflineDB: { getMeta: key => { opened.push(key); return Promise.resolve(catalog[key]); } },
+        document: { body: { getAttribute: name => (name === 'data-game' ? game || '' : null) } },
     };
     const fetch = url => served === null
         ? Promise.reject(new TypeError('Failed to fetch'))
@@ -109,4 +110,34 @@ test('a card chip narrows the rarities to the card\'s', async () => {
     await values(providers, 'r:');
     const narrowed = providers.getProvider('r:').getCandidates('', { cardMeta: { rarities: ['superrare'] } });
     expect(narrowed.map(entry => entry.value)).toEqual(['superrare']);
+});
+
+// Every game but Magic names its colours, and the menu is the loaded game's;
+// Magic keeps its letters and named groups.
+const pokemonColors = [
+    { value: 'grass', label: 'Grass' },
+    { value: 'fire', label: 'Fire' },
+    { value: 'colorless', label: 'Colorless' },
+    { value: 'multicolor', label: 'Multicolor' },
+];
+
+test('the game names its colours', async () => {
+    const { providers } = load({ '/api/palette/colors.json': pokemonColors }, {}, false, 'pokemon');
+    expect(await values(providers, 'c:')).toEqual(['grass', 'fire', 'colorless', 'multicolor']);
+});
+
+test('a card chip keeps the card\'s colours and the two terms', async () => {
+    const { providers } = load({ '/api/palette/colors.json': pokemonColors }, {}, false, 'pokemon');
+    await values(providers, 'c:');
+    const narrowed = providers.getProvider('c:').getCandidates('', { cardMeta: { colors: ['fire'] } });
+    expect(narrowed.map(entry => entry.value)).toEqual(['fire', 'colorless', 'multicolor']);
+});
+
+test('Magic keeps its letters and named groups', () => {
+    for (const game of ['magic', '']) {
+        const { providers } = load({}, {}, false, game);
+        const offered = providers.getProvider('c:').getCandidates('').map(entry => entry.value);
+        expect(offered.slice(0, 5)).toEqual(['W', 'U', 'B', 'R', 'G']);
+        expect(offered).toContain('azorius');
+    }
 });

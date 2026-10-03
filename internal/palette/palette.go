@@ -67,10 +67,10 @@ type Set struct {
 	Colors   []string `json:"colors,omitempty"`
 }
 
-// Snapshot is the sets, promo, finish and rarity lists the palette serves,
-// built from one datastore alongside it.
+// Snapshot is the sets, promo, finish, rarity and colour lists the palette
+// serves, built from one datastore alongside it.
 type Snapshot struct {
-	sets, promos, finishes, rarities []byte
+	sets, promos, finishes, rarities, colors []byte
 }
 
 // NewSnapshot builds the lists from b.
@@ -80,6 +80,7 @@ func (s *Service) NewSnapshot(b *mtgmatcher.Backend) *Snapshot {
 		promos:   s.buildPromos(b),
 		finishes: s.buildFinishes(b),
 		rarities: buildRarities(b),
+		colors:   buildColors(b),
 	}
 }
 
@@ -360,6 +361,69 @@ func RarityList(b *mtgmatcher.Backend) []Rarity {
 // Rarities returns the loaded game's rarities.
 func (s *Service) Rarities(w http.ResponseWriter, r *http.Request) {
 	serveCached(w, s.snapshot().rarities)
+}
+
+// Color is one colour the loaded game prints, as the palette and the guide
+// list it: the name a c: query carries and the word a reader is shown.
+type Color struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+// buildColors is the JSON-serialized colour list, built from b.
+func buildColors(b *mtgmatcher.Backend) []byte {
+	data, err := json.Marshal(ColorList(b))
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+// ColorList is every colour b's sets list, in the game's order, colorless
+// and multicolor last. Each set lists its own in that order, so the order is
+// read off the sets, the fullest list first.
+func ColorList(b *mtgmatcher.Backend) []Color {
+	var lists [][]string
+	for _, code := range b.GetAllSets() {
+		set, err := b.GetSet(code)
+		if err != nil || set == nil || len(set.Colors) == 0 {
+			continue
+		}
+		lists = append(lists, set.Colors)
+	}
+	sort.SliceStable(lists, func(i, j int) bool {
+		return len(lists[i]) > len(lists[j])
+	})
+
+	var names []string
+	terms := map[string]bool{}
+	for _, list := range lists {
+		for _, name := range list {
+			if name == "colorless" || name == "multicolor" {
+				terms[name] = true
+				continue
+			}
+			if !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+	for _, term := range []string{"colorless", "multicolor"} {
+		if terms[term] {
+			names = append(names, term)
+		}
+	}
+
+	colors := []Color{}
+	for _, name := range names {
+		colors = append(colors, Color{Value: name, Label: mtgmatcher.Title(name)})
+	}
+	return colors
+}
+
+// Colors returns the loaded game's colours.
+func (s *Service) Colors(w http.ResponseWriter, r *http.Request) {
+	serveCached(w, s.snapshot().colors)
 }
 
 // CardMetaResponse describes one card for the frontend.

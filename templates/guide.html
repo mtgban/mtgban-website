@@ -356,6 +356,35 @@
         })
         .catch(function() {});
 
+    // ── Colors, from the loaded game ──
+    //
+    // The written table is Magic's letters and named groups, which only
+    // Magic's search reads. Every other game names its own colors, so its
+    // list replaces the rows; if the request fails the page keeps them.
+    var servedGame = document.body.getAttribute('data-game');
+    if (servedGame && servedGame !== 'magic') {
+        fetch('/api/palette/colors.json')
+            .then(function(r) { return r.ok ? r.json() : []; })
+            .then(function(colors) {
+                if (!colors || !colors.length) return;
+                var section = document.getElementById('colors');
+                var body = section && section.querySelector('.guide-table tbody');
+                if (!body) return;
+                var TERMS = {
+                    colorless: { value: 'colorless / c', short: 'No colors' },
+                    multicolor: { value: 'multicolor / multi / m', short: 'Two or more colors' }
+                };
+                var html = '';
+                for (var i = 0; i < colors.length; i++) {
+                    var row = TERMS[colors[i].value] || { value: colors[i].value, short: colors[i].label || colors[i].value };
+                    html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
+                    html += '<td>' + escapeHtml(row.short) + '</td></tr>';
+                }
+                body.innerHTML = html;
+            })
+            .catch(function() {});
+    }
+
     // ── Scroll spy ──
     var navLinks = sidebarNav.querySelectorAll('.guide-nav-link');
     var sectionEls = sectionsContainer.querySelectorAll('.guide-section');
