@@ -540,7 +540,7 @@ func UUID2MKMCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 		record = append(record, "")
 		record = append(record, "")
 		record = append(record, "")
-		record = append(record, mtgmatcher.Title(co.Rarity))
+		record = append(record, b.RarityLabel(co.Rarity))
 		record = append(record, "") //listedAt
 
 		err = w.Write(record)

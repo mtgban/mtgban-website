@@ -298,8 +298,9 @@ func (s *Service) Finishes(w http.ResponseWriter, r *http.Request) {
 }
 
 // Rarity is one rarity the loaded game prints, as the palette and the guide
-// list it: the word an r: query carries, the spelling its cards carry, the
-// letter that names it alone where one does, and how many printings wear it.
+// list it: the word an r: query carries and its cards carry, the words its
+// datastore published it as, the letter that names it alone where one does,
+// and how many printings wear it.
 type Rarity struct {
 	Value  string `json:"value"`
 	Label  string `json:"label"`
@@ -321,17 +322,12 @@ func buildRarities(b *mtgmatcher.Backend) []byte {
 // begins with it, which is when r: reads that letter as it alone.
 func RarityList(b *mtgmatcher.Backend) []Rarity {
 	counts := map[string]int{}
-	spellings := map[string]string{}
 	for _, uuid := range b.GetUUIDs() {
 		co, err := b.GetUUID(uuid)
 		if err != nil || co.Rarity == "" {
 			continue
 		}
-		value := mtgmatcher.RarityName(co.Rarity)
-		counts[value]++
-		if spellings[value] == "" {
-			spellings[value] = co.Rarity
-		}
+		counts[co.Rarity]++
 	}
 	initials := map[byte]int{}
 	for _, value := range b.Rarities {
@@ -343,13 +339,7 @@ func RarityList(b *mtgmatcher.Backend) []Rarity {
 		if counts[value] == 0 {
 			continue
 		}
-		// A spelling with capitals is the game's own ("Super Rare", "LR+");
-		// a lower-case one is a word to title.
-		label := spellings[value]
-		if label == strings.ToLower(label) {
-			label = mtgmatcher.Title(label)
-		}
-		rarity := Rarity{Value: value, Label: label, Count: counts[value]}
+		rarity := Rarity{Value: value, Label: b.RarityLabel(value), Count: counts[value]}
 		if initials[value[0]] == 1 {
 			rarity.Letter = value[:1]
 		}
@@ -379,37 +369,38 @@ func buildColors(b *mtgmatcher.Backend) []byte {
 	return data
 }
 
-// ColorList is every colour b's sets list, in the game's order, colorless
-// and multicolor last. Each set lists its own in that order, so the order is
-// read off the sets, the fullest list first.
+// ColorList is every colour b's sets list, in the game's order (b.Colors),
+// colorless and multicolor last where a set lists them.
 func ColorList(b *mtgmatcher.Backend) []Color {
-	var lists [][]string
+	listed := map[string]bool{}
 	for _, code := range b.GetAllSets() {
 		set, err := b.GetSet(code)
-		if err != nil || set == nil || len(set.Colors) == 0 {
+		if err != nil || set == nil {
 			continue
 		}
-		lists = append(lists, set.Colors)
-	}
-	sort.SliceStable(lists, func(i, j int) bool {
-		return len(lists[i]) > len(lists[j])
-	})
-
-	var names []string
-	terms := map[string]bool{}
-	for _, list := range lists {
-		for _, name := range list {
-			if name == "colorless" || name == "multicolor" {
-				terms[name] = true
-				continue
-			}
-			if !slices.Contains(names, name) {
-				names = append(names, name)
-			}
+		for _, name := range set.Colors {
+			listed[name] = true
 		}
 	}
-	for _, term := range []string{"colorless", "multicolor"} {
-		if terms[term] {
+	terms := []string{"colorless", "multicolor"}
+
+	var names []string
+	for _, name := range b.Colors {
+		if listed[name] && !slices.Contains(terms, name) {
+			names = append(names, name)
+		}
+	}
+	// A colour the order leaves out sorts after it by name, as a set lists it
+	var rest []string
+	for name := range listed {
+		if !slices.Contains(names, name) && !slices.Contains(terms, name) {
+			rest = append(rest, name)
+		}
+	}
+	sort.Strings(rest)
+	names = append(names, rest...)
+	for _, term := range terms {
+		if listed[term] {
 			names = append(names, term)
 		}
 	}
