@@ -278,3 +278,29 @@ type lockedOutStore struct{ recordingStore }
 func (s *lockedOutStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
 	return false, func() {}, nil
 }
+
+// failingVariantsStore refuses to file variants, so every long-form write fails.
+type failingVariantsStore struct{ recordingStore }
+
+func (s *failingVariantsStore) EnsureTCGVariants(context.Context, []timeseries.TCGVariant) (map[timeseries.TCGVariant]int64, error) {
+	return nil, errors.New("variants refused")
+}
+
+// The charts read only the long table, so a day it misses is a gap. A
+// failed long-form write must fail the category before the legacy upsert,
+// whose dates the freshness gate reads, or the next run skips the day.
+func TestIngestFailsBeforeTheGateOnALongFormError(t *testing.T) {
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	fake := &fakeTCGCSV{lastUpdated: today.Add(20 * time.Hour), archiveStatus: http.StatusForbidden}
+	store := &failingVariantsStore{}
+	svc, _ := fakeService(t, fake, store)
+	svc.longForm = true
+
+	err := svc.IngestLatest(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "variants refused") {
+		t.Fatalf("IngestLatest = %v, want the long-form error", err)
+	}
+	if rows := store.stored(); len(rows) != 0 {
+		t.Errorf("legacy upsert stored %d rows after the long-form write failed, want 0", len(rows))
+	}
+}
