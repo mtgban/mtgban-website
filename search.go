@@ -662,73 +662,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chartParam := r.FormValue("chart")
-	pageVars.ModalMode = r.FormValue("modal") == "1"
-
-	// The front-end enforces the same cap when batching cards, so let the JS
-	// disable the affordance at the boundary instead of dropping silently.
-	pageVars.MaxChartCards = len(multiCardPalette)
-
-	roster := chartRoster{
-		// Roster id -> resolved search id, computed once per request: a ban:<id>
-		// resolution costs a DB round-trip and each id is consulted three times
-		// (results query, display query, metadata aliasing).
-		searchIDs: map[string]string{},
-		targets:   chartTargetCache{},
-	}
-	var chartTruncated bool
-	roster.ids, chartTruncated = parseChartIDs(b, chartParam)
-	if len(roster.ids) > 0 && !pageVars.DisableChart {
-		// A crafted or over-long chart= URL that names more cards than the chart
-		// can render lands here; say so rather than silently dropping the tail.
-		if chartTruncated {
-			pageVars.InfoMessage = fmt.Sprintf("Charts show up to %d cards; the extras were left off.", len(multiCardPalette))
-		}
-
-		// Always expose the chart roster so the "add to chart" affordance on
-		// result rows can target it even when we're rendering a regular search
-		// (e.g. the user typed a query while on a chart page).
-		pageVars.ChartIDs = roster.ids
-		pageVars.ChartIDsCSV = strings.Join(roster.ids, ",")
-
-		// Only enter chart-render mode when chart= is alone (no q=). With both
-		// present the user is searching for cards to add to the chart, so we
-		// keep the chart roster as context but render the search results page.
-		// In modal mode the iframe is the add-to-chart picker, so never render
-		// a chart inside it even when no query is set yet.
-		if query == "" && !pageVars.ModalMode {
-			roster.id = roster.ids[0]
-			// Drive the results table off the same trimmed/validated IDs the
-			// chart plots (not the raw chartParam), so a URL like
-			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
-			// controls just because fixupIDs won't trim the leading space.
-			searchIDs := make([]string, len(roster.ids))
-			var unresolved int
-			for i, id := range roster.ids {
-				searchID, ok := chartSearchID(b, id, roster.targets.target(r.Context(), b, id))
-				if !ok {
-					unresolved++
-				}
-				searchIDs[i] = searchID
-				roster.searchIDs[id] = searchIDs[i]
-			}
-			// An id that resolved to nothing matches no row, so the card is
-			// simply absent from the table below the chart. Say which way it
-			// went: a roster the user built by hand, or a link they were sent,
-			// otherwise comes back quietly short.
-			if unresolved > 0 {
-				noteChartIDsDropped(&pageVars, unresolved, len(roster.ids), "could not be matched to a printing")
-			}
-			query = strings.Join(searchIDs, ",")
-			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
-		}
-	} else {
-		// Stay on the same probable query page
-		if query == "" {
-			query = chartParam
-		}
-		roster.ids = nil
-	}
+	roster, query := fillChartRoster(&pageVars, r, b, query)
 
 	// If neither bar holds anything there is nothing to do
 	if query == "" && !scopeOnly {
@@ -986,6 +920,81 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// fillChartRoster reads the chart= roster: it puts the roster on the page for
+// the add-to-chart affordance, and when chart= comes alone, it returns the
+// roster to chart and turns the query into its cards' search ids.
+func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, query string) (chartRoster, string) {
+	chartParam := r.FormValue("chart")
+	pageVars.ModalMode = r.FormValue("modal") == "1"
+
+	// The front-end enforces the same cap when batching cards, so let the JS
+	// disable the affordance at the boundary instead of dropping silently.
+	pageVars.MaxChartCards = len(multiCardPalette)
+
+	roster := chartRoster{
+		// Roster id -> resolved search id, computed once per request: a ban:<id>
+		// resolution costs a DB round-trip and each id is consulted three times
+		// (results query, display query, metadata aliasing).
+		searchIDs: map[string]string{},
+		targets:   chartTargetCache{},
+	}
+	var chartTruncated bool
+	roster.ids, chartTruncated = parseChartIDs(b, chartParam)
+	if len(roster.ids) > 0 && !pageVars.DisableChart {
+		// A crafted or over-long chart= URL that names more cards than the chart
+		// can render lands here; say so rather than silently dropping the tail.
+		if chartTruncated {
+			pageVars.InfoMessage = fmt.Sprintf("Charts show up to %d cards; the extras were left off.", len(multiCardPalette))
+		}
+
+		// Always expose the chart roster so the "add to chart" affordance on
+		// result rows can target it even when we're rendering a regular search
+		// (e.g. the user typed a query while on a chart page).
+		pageVars.ChartIDs = roster.ids
+		pageVars.ChartIDsCSV = strings.Join(roster.ids, ",")
+
+		// Only enter chart-render mode when chart= is alone (no q=). With both
+		// present the user is searching for cards to add to the chart, so we
+		// keep the chart roster as context but render the search results page.
+		// In modal mode the iframe is the add-to-chart picker, so never render
+		// a chart inside it even when no query is set yet.
+		if query == "" && !pageVars.ModalMode {
+			roster.id = roster.ids[0]
+			// Drive the results table off the same trimmed/validated IDs the
+			// chart plots (not the raw chartParam), so a URL like
+			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
+			// controls just because fixupIDs won't trim the leading space.
+			searchIDs := make([]string, len(roster.ids))
+			var unresolved int
+			for i, id := range roster.ids {
+				searchID, ok := chartSearchID(b, id, roster.targets.target(r.Context(), b, id))
+				if !ok {
+					unresolved++
+				}
+				searchIDs[i] = searchID
+				roster.searchIDs[id] = searchIDs[i]
+			}
+			// An id that resolved to nothing matches no row, so the card is
+			// simply absent from the table below the chart. Say which way it
+			// went: a roster the user built by hand, or a link they were sent,
+			// otherwise comes back quietly short.
+			if unresolved > 0 {
+				noteChartIDsDropped(pageVars, unresolved, len(roster.ids), "could not be matched to a printing")
+			}
+			query = strings.Join(searchIDs, ",")
+			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
+		}
+	} else {
+		// Stay on the same probable query page
+		if query == "" {
+			query = chartParam
+		}
+		roster.ids = nil
+	}
+
+	return roster, query
 }
 
 // orderSearchKeys sorts the results as the reader asked and returns the page
