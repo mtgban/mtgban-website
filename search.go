@@ -635,7 +635,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// If neither bar holds anything there is nothing to do
 	if query == "" && !scopeOnly {
-		renderSearchLanding(w, r, ds, pageVars, isSetsPage)
+		tmpl := fillSearchLanding(&pageVars, r, ds, isSetsPage)
+		render(w, tmpl, pageVars)
 		return
 	}
 
@@ -873,10 +874,10 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 	return roster, query
 }
 
-// renderSearchLanding renders the page for a request with nothing to search:
-// the sealed list on /sealed, the editions tree on /sets, else the search
-// landing. It takes the page by value, as Search is done with it.
-func renderSearchLanding(w http.ResponseWriter, r *http.Request, ds *datastore, pageVars PageVars, isSetsPage bool) {
+// fillSearchLanding fills the page for a request with nothing to search: the
+// sealed list on /sealed, the editions tree on /sets, else the search
+// landing. It returns the template to render it with.
+func fillSearchLanding(pageVars *PageVars, r *http.Request, ds *datastore, isSetsPage bool) string {
 	editions := ds.editions
 	// Hijack sealed list
 	if pageVars.IsSealed {
@@ -884,8 +885,7 @@ func renderSearchLanding(w http.ResponseWriter, r *http.Request, ds *datastore, 
 
 		pageVars.EditionSort = editions.SealedEditionsSorted
 		pageVars.EditionList = editions.SealedEditionsList
-		render(w, "search.html", pageVars)
-		return
+		return "search.html"
 	} else if isSetsPage {
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
 
@@ -899,11 +899,10 @@ func renderSearchLanding(w http.ResponseWriter, r *http.Request, ds *datastore, 
 		pageVars.FlatEditions = flattenEditions(sortedKeys, editions.TreeEditionsMap)
 		pageVars.SortOption = sortOpt
 
-		render(w, "sets.html", pageVars)
-		return
+		return "sets.html"
 	}
 
-	render(w, "search.html", pageVars)
+	return "search.html"
 }
 
 // sortedEditionKeys orders the editions tree for /sets: in the tree's own
