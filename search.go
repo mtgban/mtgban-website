@@ -1286,50 +1286,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if roster.id != "" {
-		isMultiChart := len(roster.ids) > 1
-
-		chartEditions := ds.editions
-		pageVars.EditionSort = chartEditions.SealedEditionsSorted
-		pageVars.EditionList = chartEditions.SealedEditionsList
-
-		// Rebuild a display query from the (first) chart card. Use the resolved
-		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
-		// non-empty and the template renders the results+chart layout rather than
-		// the empty-query editions browse.
-		cfg := parseSearchOptionsNG(b, roster.searchIDs[roster.id], nil, nil, nil)
-		pageVars.SearchQuery = cfg.FullQuery
-
-		// Retrieve data
-		pageVars.ChartID = roster.id
-		pageVars.IsMultiChart = isMultiChart
-
-		// The template keys card metadata off ChartID and the roster ids, but the
-		// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
-		// ban:<id> roster entry to its resolved card so those lookups resolve.
-		for _, id := range roster.ids {
-			sid := roster.searchIDs[id]
-			if sid == "" || sid == id {
-				continue
-			}
-			if card, ok := pageVars.Metadata[sid]; ok {
-				pageVars.Metadata[id] = card
-			}
-		}
-
-		if PricesArchiveDB == nil {
-			pageVars.InfoMessage = "No chart data available"
-		} else {
-			fillLongFormChart(&pageVars, r, ds, b, roster)
-		}
-
-		// Sidebar foil/etched switch and Stocks link are inherently per-card,
-		// and sealed products have no foil/etched variants, so leave them empty
-		// and let the sidebar's self-checks hide them. The switches key off the
-		// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
-		// the matcher.
-		if !isMultiChart {
-			fillChartSidebar(&pageVars, b, roster)
-		}
+		fillChartPage(&pageVars, r, ds, b, roster)
 	}
 
 	var source string
@@ -1371,6 +1328,56 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	render(w, "search.html", pageVars)
 	if DevMode {
 		log.Println("render took", time.Since(start))
+	}
+}
+
+// fillChartPage fills a chart page for the roster: the display query, the
+// roster's card details, the chart from the long-form price tables, and the
+// single card's sidebar.
+func fillChartPage(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, roster chartRoster) {
+	isMultiChart := len(roster.ids) > 1
+
+	chartEditions := ds.editions
+	pageVars.EditionSort = chartEditions.SealedEditionsSorted
+	pageVars.EditionList = chartEditions.SealedEditionsList
+
+	// Rebuild a display query from the (first) chart card. Use the resolved
+	// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
+	// non-empty and the template renders the results+chart layout rather than
+	// the empty-query editions browse.
+	cfg := parseSearchOptionsNG(b, roster.searchIDs[roster.id], nil, nil, nil)
+	pageVars.SearchQuery = cfg.FullQuery
+
+	// Retrieve data
+	pageVars.ChartID = roster.id
+	pageVars.IsMultiChart = isMultiChart
+
+	// The template keys card metadata off ChartID and the roster ids, but the
+	// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
+	// ban:<id> roster entry to its resolved card so those lookups resolve.
+	for _, id := range roster.ids {
+		sid := roster.searchIDs[id]
+		if sid == "" || sid == id {
+			continue
+		}
+		if card, ok := pageVars.Metadata[sid]; ok {
+			pageVars.Metadata[id] = card
+		}
+	}
+
+	if PricesArchiveDB == nil {
+		pageVars.InfoMessage = "No chart data available"
+	} else {
+		fillLongFormChart(pageVars, r, ds, b, roster)
+	}
+
+	// Sidebar foil/etched switch and Stocks link are inherently per-card,
+	// and sealed products have no foil/etched variants, so leave them empty
+	// and let the sidebar's self-checks hide them. The switches key off the
+	// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
+	// the matcher.
+	if !isMultiChart {
+		fillChartSidebar(pageVars, b, roster)
 	}
 }
 
