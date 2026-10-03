@@ -1029,12 +1029,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 		for i := range arbit {
-			cardID := arbit[i].CardID
-			_, found := pageVars.Metadata[cardID]
-			if found {
-				continue
-			}
-			pageVars.Metadata[cardID] = uuid2card(b, cardID, preferFlavor)
+			pageVars.Metadata.add(b, arbit[i].CardID, preferFlavor)
 		}
 	}
 
