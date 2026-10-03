@@ -10,12 +10,29 @@
     // INTEGER is what online's strconv.Atoi takes
     var INTEGER = /^[+-]?\d+$/;
 
-    // RARITY is online's short forms (fixupRarityNG). Any other word is a
-    // rarity as the catalog writes it, as it is online.
-    var RARITY = {
-        c: 'common', u: 'uncommon', r: 'rare', m: 'mythic',
-        s: 'special', t: 'token', o: 'oversize'
-    };
+    // rarityName spells a rarity as mtgmatcher.RarityName does, which is how
+    // online compares one: lower case, without spaces ("superrare").
+    function rarityName(rarity) {
+        return String(rarity || '').trim().toLowerCase().replace(/ /g, '');
+    }
+
+    // readRarities reads an r: list as online's fixupRarityNG does: each word
+    // as rarityName spells it, and a single letter as every rarity of the
+    // catalog's game it begins; one that begins none stays as written.
+    function readRarities(val, ladder) {
+        var out = [];
+        val.split(',').forEach(function (word) {
+            var name = rarityName(word);
+            var begun = out.length;
+            if (name.length === 1) {
+                ladder.forEach(function (value) {
+                    if (value.charAt(0) === name) out.push(value);
+                });
+            }
+            if (out.length === begun) out.push(name);
+        });
+        return out;
+    }
 
     // tokenize splits on whitespace honoring double-quoted phrases.
     function tokenize(str) {
@@ -35,8 +52,10 @@
     // parse reads a query. finishes is the catalog's finish list: a game's own
     // finish, or a short form of one, is taken where the catalog names it,
     // spelled the way it is stored. A card lists the short forms that reach
-    // it, so one is matched as itself.
-    function parse(str, finishes) {
+    // it, so one is matched as itself. rarities is the catalog's rarity list,
+    // which a single r: letter is read against.
+    function parse(str, finishes, rarities) {
+        var ladder = (rarities || []).map(function (rarity) { return rarity && rarity.value; }).filter(Boolean);
         var known = {};
         (finishes || []).forEach(function (finish) {
             if (!finish || !finish.value) return;
@@ -115,13 +134,11 @@
                 }
                 break;
             case 'r':
-                var rarities = val.toLowerCase().split(',').map(function (value) {
-                    return RARITY[value] || value;
-                });
+                var named = readRarities(val, ladder);
                 if (negate) {
-                    out.not.rarity = out.not.rarity.concat(rarities);
+                    out.not.rarity = out.not.rarity.concat(named);
                 } else {
-                    out.rarity = rarities;
+                    out.rarity = named;
                 }
                 break;
             default:
@@ -296,9 +313,10 @@
         if (parsed.set.length && parsed.set.indexOf(card.set) === -1) return false;
         if (!parsed.number.every(function (filter) { return numberMatches(card, filter); })) return false;
         if (parsed.not.set.indexOf(card.set) !== -1) return false;
-        if (parsed.not.rarity.indexOf(card.r || '') !== -1) return false;
+        var rarity = rarityName(card.r);
+        if (parsed.not.rarity.indexOf(rarity) !== -1) return false;
         if (parsed.not.finish.some(function (finish) { return hasFinish(card, finish); })) return false;
-        if (parsed.rarity.length && parsed.rarity.indexOf(card.r || '') === -1) return false;
+        if (parsed.rarity.length && parsed.rarity.indexOf(rarity) === -1) return false;
         if (!parsed.finish.every(function (slugs) {
             return slugs.some(function (finish) { return hasFinish(card, finish); });
         })) return false;

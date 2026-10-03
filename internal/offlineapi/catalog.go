@@ -122,6 +122,7 @@ type catalogFragments struct {
 	source   time.Time
 	cards    []byte
 	finishes []byte
+	rarities []byte
 	sets     []byte
 	nCards   int
 	nSets    int
@@ -191,6 +192,10 @@ func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time
 	if err != nil {
 		return nil, err
 	}
+	rawRarities, err := json.Marshal(palette.RarityList(backend))
+	if err != nil {
+		return nil, err
+	}
 	rawSets, err := json.Marshal(sets)
 	if err != nil {
 		return nil, err
@@ -200,6 +205,7 @@ func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time
 		source:   source,
 		cards:    rawCards,
 		finishes: rawFinishes,
+		rarities: rawRarities,
 		sets:     rawSets,
 		nCards:   len(cards),
 		nSets:    len(sets),
@@ -267,12 +273,13 @@ func (s *Service) refreshCatalog(backend *mtgmatcher.Backend, source time.Time) 
 
 	// The document these pieces make is what used to be marshalled whole,
 	// key order included: encoding/json sorts a map's keys, so cards,
-	// finishes, sets and stores come out in the order written here. Hashing the pieces
+	// finishes, rarities, sets and stores come out in the order written here. Hashing the pieces
 	// rather than a joined copy keeps the version the same as before for
 	// the same content, without building the whole 37MB again.
 	parts := [][]byte{
 		[]byte(`{"cards":`), frags.cards,
 		[]byte(`,"finishes":`), frags.finishes,
+		[]byte(`,"rarities":`), frags.rarities,
 		[]byte(`,"sets":`), frags.sets,
 		[]byte(`,"stores":`), rawStores,
 		[]byte(`}`),
