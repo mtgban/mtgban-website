@@ -635,52 +635,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// If neither bar holds anything there is nothing to do
 	if query == "" && !scopeOnly {
-		editions := ds.editions
-		// Hijack sealed list
-		if pageVars.IsSealed {
-			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
-
-			pageVars.EditionSort = editions.SealedEditionsSorted
-			pageVars.EditionList = editions.SealedEditionsList
-			render(w, "search.html", pageVars)
-			return
-		} else if isSetsPage {
-			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
-
-			pageVars.TotalSets = editions.TotalSets
-			pageVars.TotalCards = editions.TotalCards
-			pageVars.TotalUnique = editions.TotalUnique
-
-			sortOpt := r.FormValue("sort")
-			sortedKeys := editions.TreeEditionsKeys
-
-			if sortOpt == "name" {
-				namedSort := make([]string, len(editions.TreeEditionsKeys))
-				copy(namedSort, editions.TreeEditionsKeys)
-				sort.SliceStable(namedSort, func(i, j int) bool {
-					return strings.ToLower(editions.TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[namedSort[j]][0].Name)
-				})
-				sortedKeys = namedSort
-			} else if sortOpt == "size" {
-				sizeSort := make([]string, len(editions.TreeEditionsKeys))
-				copy(sizeSort, editions.TreeEditionsKeys)
-				sort.SliceStable(sizeSort, func(i, j int) bool {
-					if editions.TreeEditionsMap[sizeSort[i]][0].Size == editions.TreeEditionsMap[sizeSort[j]][0].Size {
-						return strings.ToLower(editions.TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[sizeSort[j]][0].Name)
-					}
-					return editions.TreeEditionsMap[sizeSort[i]][0].Size > editions.TreeEditionsMap[sizeSort[j]][0].Size
-				})
-				sortedKeys = sizeSort
-			}
-
-			pageVars.FlatEditions = flattenEditions(sortedKeys, editions.TreeEditionsMap)
-			pageVars.SortOption = sortOpt
-
-			render(w, "sets.html", pageVars)
-			return
-		}
-
-		render(w, "search.html", pageVars)
+		renderSearchLanding(w, r, ds, pageVars, isSetsPage)
 		return
 	}
 
@@ -911,6 +866,58 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 	}
 
 	return roster, query
+}
+
+// renderSearchLanding renders the page for a request with nothing to search:
+// the sealed list on /sealed, the editions tree on /sets, else the search
+// landing. It takes the page by value, as Search is done with it.
+func renderSearchLanding(w http.ResponseWriter, r *http.Request, ds *datastore, pageVars PageVars, isSetsPage bool) {
+	editions := ds.editions
+	// Hijack sealed list
+	if pageVars.IsSealed {
+		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
+
+		pageVars.EditionSort = editions.SealedEditionsSorted
+		pageVars.EditionList = editions.SealedEditionsList
+		render(w, "search.html", pageVars)
+		return
+	} else if isSetsPage {
+		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
+
+		pageVars.TotalSets = editions.TotalSets
+		pageVars.TotalCards = editions.TotalCards
+		pageVars.TotalUnique = editions.TotalUnique
+
+		sortOpt := r.FormValue("sort")
+		sortedKeys := editions.TreeEditionsKeys
+
+		if sortOpt == "name" {
+			namedSort := make([]string, len(editions.TreeEditionsKeys))
+			copy(namedSort, editions.TreeEditionsKeys)
+			sort.SliceStable(namedSort, func(i, j int) bool {
+				return strings.ToLower(editions.TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[namedSort[j]][0].Name)
+			})
+			sortedKeys = namedSort
+		} else if sortOpt == "size" {
+			sizeSort := make([]string, len(editions.TreeEditionsKeys))
+			copy(sizeSort, editions.TreeEditionsKeys)
+			sort.SliceStable(sizeSort, func(i, j int) bool {
+				if editions.TreeEditionsMap[sizeSort[i]][0].Size == editions.TreeEditionsMap[sizeSort[j]][0].Size {
+					return strings.ToLower(editions.TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[sizeSort[j]][0].Name)
+				}
+				return editions.TreeEditionsMap[sizeSort[i]][0].Size > editions.TreeEditionsMap[sizeSort[j]][0].Size
+			})
+			sortedKeys = sizeSort
+		}
+
+		pageVars.FlatEditions = flattenEditions(sortedKeys, editions.TreeEditionsMap)
+		pageVars.SortOption = sortOpt
+
+		render(w, "sets.html", pageVars)
+		return
+	}
+
+	render(w, "search.html", pageVars)
 }
 
 // runSearch runs the search and collects each card's offers. When it finds
