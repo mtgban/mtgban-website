@@ -39,7 +39,8 @@ each for all of them.
    the page and `AlertsMax` the number of alerts per game site; the
    allowance counts only when both are set. A request reads them off its
    signed values. The evaluator rebuilds the same values from the tier
-   stored at the user's last login and their live grant, and on every run
+   stored at the user's last login (none where a grant named it) and their
+   live grant, so a revoked grant takes its tier with it, and on every run
    keeps the newest alerts within the allowance active and parks the rest.
 4. **One tier per user, not per game.** The shared cookie already gives a
    user one tier on every site; a per-game tier would leave a user who only
