@@ -1092,6 +1092,34 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		w.Write(payload)
 		return
 	}
+	fillEmbed(&pageVars, b, preview, allKeys)
+
+	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
+
+	pageVars.FoundSellers = foundSellers
+	pageVars.FoundVendors = foundVendors
+	pageVars.AllKeys = allKeys
+
+	// CHART ALL THE THINGS
+	if roster.id != "" {
+		fillChartPage(&pageVars, r, ds, b, roster)
+	}
+
+	notifyFromSearch(r, query, roster, start)
+
+	if DevMode {
+		start = time.Now()
+	}
+	render(w, "search.html", pageVars)
+	if DevMode {
+		log.Println("render took", time.Since(start))
+	}
+}
+
+// fillEmbed fills the page's link preview: the title the oEmbed answer
+// carries, and the first card's image, description and a retail and a
+// buylist reference price.
+func fillEmbed(pageVars *PageVars, b *mtgmatcher.Backend, preview *embed.OEmbed, allKeys []string) {
 	pageVars.Embed.Title = preview.Title
 	if len(allKeys) > 0 {
 		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
@@ -1119,27 +1147,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		// print "N/A" under the name of a marketplace it never loaded.
 		pageVars.Embed.RetailLabel, pageVars.Embed.RetailPrice = sellerReference(allKeys[0], "TCGMarket")
 		pageVars.Embed.BuylistLabel, pageVars.Embed.BuylistPrice = vendorReference(allKeys[0], "CK")
-	}
-
-	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
-
-	pageVars.FoundSellers = foundSellers
-	pageVars.FoundVendors = foundVendors
-	pageVars.AllKeys = allKeys
-
-	// CHART ALL THE THINGS
-	if roster.id != "" {
-		fillChartPage(&pageVars, r, ds, b, roster)
-	}
-
-	notifyFromSearch(r, query, roster, start)
-
-	if DevMode {
-		start = time.Now()
-	}
-	render(w, "search.html", pageVars)
-	if DevMode {
-		log.Println("render took", time.Since(start))
 	}
 }
 
