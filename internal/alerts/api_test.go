@@ -213,6 +213,38 @@ func TestAlertsAPIPauseAndDeleteWithoutAllowance(t *testing.T) {
 	}
 }
 
+// TestAlertsAPIStatusFollowsThePage allows the moves the page offers, pause
+// on an active alert and resume on a paused or undeliverable one, and
+// refuses the rest: a parked alert resumed would be parked and DMed again.
+func TestAlertsAPIStatusFollowsThePage(t *testing.T) {
+	for _, tt := range []struct {
+		from, to Status
+		want     int
+	}{
+		{StatusActive, StatusPaused, http.StatusOK},
+		{StatusPaused, StatusActive, http.StatusOK},
+		{StatusUndeliverable, StatusActive, http.StatusOK},
+		{StatusPaused, StatusPaused, http.StatusOK},
+		{StatusOverAllowance, StatusActive, http.StatusConflict},
+		{StatusOverAllowance, StatusPaused, http.StatusConflict},
+		{StatusUnresolvable, StatusActive, http.StatusConflict},
+	} {
+		store := newFakeAlertStore()
+		api := testAlertsAPI(store)
+		hash := testHash("a@b.com")
+		store.contacts[hash] = Contact{UserHash: hash, DiscordUserID: "1", Tier: "Legacy"}
+		store.rows[1] = Alert{ID: 1, UserHash: hash, Game: "magic", CardID: "card-1", Status: tt.from}
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"status":"`+string(tt.to)+`"}`, testCaller("a@b.com", "Legacy")))
+		if w.Code != tt.want {
+			t.Errorf("%s to %s = %d %s, want %d", tt.from, tt.to, w.Code, w.Body, tt.want)
+		}
+		if tt.want == http.StatusConflict && store.rows[1].Status != tt.from {
+			t.Errorf("%s to %s: refused, yet the row is now %s", tt.from, tt.to, store.rows[1].Status)
+		}
+	}
+}
+
 func TestAlertsAPIPatchNeedsAllowanceToEditOrResume(t *testing.T) {
 	store := newFakeAlertStore()
 	api := testAlertsAPI(store)
