@@ -482,7 +482,7 @@ window.__BAN_GUIDE = {
             snippets: ['r:mythic', 'r:m', 'r:rare', 'r>=rare', 'r<uncommon'],
             keywords: ['rarity', 'r:', 'mythic', 'rare', 'uncommon', 'common', 'special', 'token', 'oversize', 'shorthand', 'comparison'],
             content: {
-                description: 'Filter by rarity with <code>r:RARITY</code>, written as one word: <code>r:superrare</code> for Super Rare. A single letter stands for each of the game\'s rarities that begins with it, so <code>r:c</code> is common. <code>r&gt;RARITY</code> and <code>r&lt;RARITY</code> compare by the game\'s own order, rarest first. The table lists the rarities of the game this site serves.',
+                description: 'Filter by rarity with <code>r:RARITY</code>, written as one word: <code>r:superrare</code> for Super Rare. A single letter stands for each of the game\'s rarities that begins with it, so <code>r:c</code> is common. <code>r&gt;RARITY</code> and <code>r&lt;RARITY</code> compare by the game\'s own order, rarest first; a letter standing for several compares as any of them, so <code>r&gt;</code> keeps what is rarer than the commonest and <code>r&lt;</code> what is commoner than the rarest. The table lists the rarities of the game this site serves.',
                 table: [
                     { value: 'mythic / m', short: 'Mythic rarity' },
                     { value: 'rare / r', short: 'Rare rarity' },

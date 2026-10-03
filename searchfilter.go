@@ -274,6 +274,29 @@ func fixupRarityNG(b *mtgmatcher.Backend, code string) []string {
 	return names
 }
 
+// rarityBound narrows the rarities a comparison names to the one bounding
+// it. Several read as any of them, as r: reads them, so r> is bounded by the
+// commonest and r< by the rarest: Lorcana's "s" is special and super rare,
+// and r>s keeps what is rarer than super rare. Names the game does not rank
+// are left as they are.
+func rarityBound(b *mtgmatcher.Backend, names []string, rarer bool) []string {
+	var bound string
+	limit := -1
+	for _, name := range names {
+		rank, ranked := b.RarityRank(name)
+		if !ranked {
+			continue
+		}
+		if limit < 0 || (rarer && rank > limit) || (!rarer && rank < limit) {
+			bound, limit = name, rank
+		}
+	}
+	if limit < 0 {
+		return names
+	}
+	return []string{bound}
+}
+
 // fixupNumberNG spells a number query the way the card it will be compared
 // against is spelled, for the filter opt names. A strict query is compared
 // against the number as the catalog writes it, padding and marks and all. A
@@ -1039,15 +1062,18 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			})
 		case "r":
 			opt := "rarity"
+			values := fixupRarityNG(b, code)
 			if operation == ">" {
 				opt = "rarity_greater_than"
+				values = rarityBound(b, values, true)
 			} else if operation == "<" {
 				opt = "rarity_less_than"
+				values = rarityBound(b, values, false)
 			}
 			filters = append(filters, FilterElem{
 				Name:   opt,
 				Negate: negate,
-				Values: fixupRarityNG(b, code),
+				Values: values,
 			})
 		case "f":
 			filters = append(filters, FilterElem{
