@@ -27,7 +27,7 @@ type EvalStore interface {
 	ListActive(ctx context.Context, game string, sides []Side) ([]ActiveAlert, error)
 	MarkOverAllowance(ctx context.Context, userHash, game string, allowance int) ([]Moved, error)
 	ClaimFire(ctx context.Context, id int64, seenUpdatedAt time.Time, wasAbove, wasBelow, nextAbove, nextBelow bool) (bool, error)
-	SetState(ctx context.Context, id int64, st State) (bool, error)
+	SetState(ctx context.Context, id int64, seenUpdatedAt time.Time, st State) (bool, error)
 	AddEvent(ctx context.Context, e Event) error
 	PruneEvents(ctx context.Context, before time.Time) (int64, error)
 }
@@ -110,8 +110,8 @@ func (s evalSummary) problem() string {
 
 // setState writes a state, logging rather than propagating the error
 // so callers stay readable one line per branch.
-func setState(ctx context.Context, deps EvalDeps, sum *evalSummary, id int64, st State) {
-	_, err := deps.Store.SetState(ctx, id, st)
+func setState(ctx context.Context, deps EvalDeps, sum *evalSummary, a ActiveAlert, st State) {
+	_, err := deps.Store.SetState(ctx, a.ID, a.UpdatedAt, st)
 	if err != nil {
 		sum.fail(deps, "state", err)
 	}
@@ -188,7 +188,7 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		}
 		_, _, found := deps.Resolve(a.CardID)
 		if !found {
-			setState(ctx, deps, &sum, a.ID, State{Status: StatusUnresolvable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "card no longer in the datastore"})
+			setState(ctx, deps, &sum, a, State{Status: StatusUnresolvable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "card no longer in the datastore"})
 			sum.skipped++
 			continue
 		}
@@ -205,12 +205,12 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		d := Evaluate(a.Alert, quotes, now, minGap)
 		if !d.FireAbove && !d.FireBelow {
 			if d.AboveArmed != a.AboveArmed || d.BelowArmed != a.BelowArmed {
-				setState(ctx, deps, &sum, a.ID, State{Status: StatusActive, AboveArmed: d.AboveArmed, BelowArmed: d.BelowArmed})
+				setState(ctx, deps, &sum, a, State{Status: StatusActive, AboveArmed: d.AboveArmed, BelowArmed: d.BelowArmed})
 			}
 			continue
 		}
 		if a.Contact.DiscordUserID == "" {
-			setState(ctx, deps, &sum, a.ID, State{Status: StatusUndeliverable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "no Discord account linked on Patreon"})
+			setState(ctx, deps, &sum, a, State{Status: StatusUndeliverable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "no Discord account linked on Patreon"})
 			sum.skipped++
 			continue
 		}
@@ -231,12 +231,12 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		case sendErr == nil:
 			sum.sent++
 			// Delivered: stamp the fire time that starts the send gap.
-			setState(ctx, deps, &sum, a.ID, State{Status: StatusActive, AboveArmed: d.AboveArmed, BelowArmed: d.BelowArmed, LastFiredAt: &now})
+			setState(ctx, deps, &sum, a, State{Status: StatusActive, AboveArmed: d.AboveArmed, BelowArmed: d.BelowArmed, LastFiredAt: &now})
 		case isDMPermanent(sendErr):
-			setState(ctx, deps, &sum, a.ID, State{Status: StatusUndeliverable, AboveArmed: d.AboveArmed, BelowArmed: d.BelowArmed, LastError: undeliverableReason(sendErr)})
+			setState(ctx, deps, &sum, a, State{Status: StatusUndeliverable, AboveArmed: d.AboveArmed, BelowArmed: d.BelowArmed, LastError: undeliverableReason(sendErr)})
 		default:
 			sum.fail(deps, fmt.Sprintf("send %d", a.ID), sendErr)
-			setState(ctx, deps, &sum, a.ID, State{Status: StatusActive, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "delivery failed, will retry"})
+			setState(ctx, deps, &sum, a, State{Status: StatusActive, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: "delivery failed, will retry"})
 		}
 	}
 	if deps.PruneDue == nil || deps.PruneDue(now) {
