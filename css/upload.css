@@ -348,10 +348,45 @@
 .upload-store-bulk-btn:hover {
     text-decoration: underline;
 }
+.upload-store-bulk-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
 .upload-store-bulk-sep {
     color: var(--text-dim);
     font-size: var(--text-2xs);
 }
+
+.upload-preset-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-wrap: wrap;
+    margin-bottom: 0.75em;
+}
+.upload-preset-label { font-size: var(--text-2xs); color: var(--text-dim); }
+.upload-preset-select, .upload-preset-name {
+    font-family: inherit;
+    font-size: var(--text-xs);
+    padding: 0.3em 0.5em;
+    max-width: 16em;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--normal);
+}
+/* Matches .upload-btn's vertical padding so the save row sits on one
+   baseline with the "Save as preset" button beside it. */
+.upload-preset-name { padding-top: 10px; padding-bottom: 10px; }
+.upload-preset-select:hover, .upload-preset-name:hover { border-color: var(--border-moderate); }
+.upload-preset-select:focus, .upload-preset-name:focus {
+    outline: none;
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 2px var(--accent-muted);
+}
+.upload-preset-note { font-size: var(--text-2xs); color: var(--ainfo); }
+.upload-preset-save { display: inline-flex; align-items: center; gap: 0.4em; margin-left: 0.5em; }
+.upload-preset-save[hidden] { display: none; }
 
 /* ── Source Selector ── */
 .upload-source-options {

@@ -31,6 +31,9 @@
 {{define "content"}}
     <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
     <script type="text/javascript" src="/js/upload-options.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/upload-presets.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
@@ -91,13 +94,21 @@
                         <p class="page-subtitle">Upload your collection and compare prices across all available stores.</p>
                     </div>
                 </div>
-                <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form">
+                <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form" data-can-change-stores="{{.CanChangeStores}}">
 
                 <!-- Card 1: Mode & Stores -->
                 <div class="card upload-card">
                     <div class="upload-card-header">
                         <span class="upload-step">1</span>
                         <h2>Select Mode &amp; Stores</h2>
+                    </div>
+
+                    <div class="upload-preset-row">
+                        <label for="preset-select" class="upload-preset-label">Preset</label>
+                        <select id="preset-select" class="upload-preset-select"></select>
+                        <button type="button" class="upload-store-bulk-btn" id="preset-rename" disabled>Rename</button>
+                        <button type="button" class="upload-store-bulk-btn" id="preset-delete" disabled>Delete</button>
+                        <span class="upload-preset-note" id="preset-note" aria-live="polite"></span>
                     </div>
 
                     <div class="upload-tabs" id="uploadTabs">
@@ -292,6 +303,12 @@
                         {{if .Optimized}}
                             <input type="button" class="upload-btn upload-btn-secondary" value="Optimizer" onclick="window.location.href = '#top';">
                         {{end}}
+                        <button type="button" class="upload-btn upload-btn-secondary" id="preset-save-toggle" aria-expanded="false">Save as preset</button>
+                        <span id="preset-save-row" class="upload-preset-save" hidden>
+                            <input type="text" id="preset-name" class="upload-preset-name" maxlength="40" placeholder="Preset name" aria-label="Preset name" autocomplete="off">
+                            <button type="button" class="upload-store-bulk-btn" id="preset-save">Save</button>
+                            <button type="button" class="upload-store-bulk-btn" id="preset-cancel">Cancel</button>
+                        </span>
                     </div>
 
                 </div>

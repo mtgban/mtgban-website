@@ -17,7 +17,8 @@
         'theme', 'chartDateRange', 'mtgban_nav_layout_v1',
         'chartReleasesLongRange', 'chartCheckpointTypes',
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
-        'mtgban_search_layout', 'mtgban_popular_collapsed'
+        'mtgban_search_layout', 'mtgban_popular_collapsed',
+        'mtgban_upload_presets'
     ];
 
     // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.
