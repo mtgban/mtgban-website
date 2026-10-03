@@ -935,9 +935,10 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 
 // optimizeRow files the row under each of its best stores that the
 // optimizer's filters keep, with its spread and profitability against the
-// comparison price, and adds the best offer to the highest totals.
+// comparison price, and adds the best offer it kept to the highest totals.
 func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, bestStores []string, st uploadSettings, indexes uploadIndexes) {
-	for j, bestStore := range bestStores {
+	counted := false
+	for _, bestStore := range bestStores {
 		bestPrice := offers[bestStore]
 
 		// Load comparison price, either the loaded one or one of the alternatives
@@ -1004,7 +1005,10 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 
 		// Save totals
 		rows.optimizedTotals[bestStore] += bestPrice
-		if j == 0 {
+		// The first store kept, which a high-value filter may have moved
+		// off the best: the row is listed there, so it counts there.
+		if !counted {
+			counted = true
 			rows.highestTotal += bestPrice
 			if row.isSealed {
 				rows.sealedHighest += bestPrice

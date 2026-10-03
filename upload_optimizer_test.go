@@ -119,3 +119,24 @@ func TestBestOffers(t *testing.T) {
 		}
 	}
 }
+
+// TestOptimizerCountsTheStoreItKept adds a row to the highest totals at the
+// store the optimizer lists it under: when the high-value filter drops the
+// best offer, that is the next one it kept.
+func TestOptimizerCountsTheStoreItKept(t *testing.T) {
+	rows := uploadRows{
+		resultPrices:     map[string]map[string]float64{"card": {"CK": 55, "SCG": 49.6}},
+		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedTotals:  map[string]float64{},
+	}
+	row := uploadRow{UploadEntry: &UploadEntry{CardID: "card"}, priceKey: "card", qty: 1}
+	st := uploadSettings{skipHighValueAbs: true, maxHighVal: 50}
+	rows.optimizeRow(row, map[string]float64{"CK": 55, "SCG": 49.6}, []string{"CK", "SCG"}, st, uploadIndexes{})
+
+	if len(rows.optimizedResults["CK"]) != 0 || len(rows.optimizedResults["SCG"]) != 1 {
+		t.Fatalf("listed under %v, want SCG alone", rows.optimizedResults)
+	}
+	if rows.highestTotal != 49.6 || rows.singlesHighest != 49.6 {
+		t.Errorf("highest %v, singles %v, want SCG's 49.6 in both", rows.highestTotal, rows.singlesHighest)
+	}
+}
