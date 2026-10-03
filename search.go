@@ -1034,45 +1034,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Optionally sort according to price
 	if pageVars.SearchBest || oembed {
-		blSortPref := readCookie(r, "SearchListingPriority")
-
-		for _, cardID := range allKeys {
-			// This skips INDEX and PO conditions
-			for _, cond := range mtgban.DefaultGradeTags {
-				_, found := foundSellers[cardID][cond]
-				if found {
-					sort.Slice(foundSellers[cardID][cond], func(i, j int) bool {
-						return foundSellers[cardID][cond][i].Price < foundSellers[cardID][cond][j].Price
-					})
-				}
-				_, found = foundVendors[cardID][cond]
-				if found {
-					switch blSortPref {
-					default:
-						sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-							if foundVendors[cardID][cond][i].Price == foundVendors[cardID][cond][j].Price {
-								if foundVendors[cardID][cond][i].Credit == foundVendors[cardID][cond][j].Credit {
-									return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
-								}
-								return foundVendors[cardID][cond][i].Credit > foundVendors[cardID][cond][j].Credit
-							}
-							return foundVendors[cardID][cond][i].Price > foundVendors[cardID][cond][j].Price
-						})
-					case "credit":
-						sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-							if foundVendors[cardID][cond][i].Credit == foundVendors[cardID][cond][j].Credit {
-								return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
-							}
-							return foundVendors[cardID][cond][i].Credit > foundVendors[cardID][cond][j].Credit
-						})
-					case "market":
-						sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-							return foundVendors[cardID][cond][i].marketValue() > foundVendors[cardID][cond][j].marketValue()
-						})
-					}
-				}
-			}
-		}
+		sortOfferRows(r, allKeys, foundSellers, foundVendors)
 	}
 
 	// Every card is quoted with its own index prices: one shared list would
@@ -1113,6 +1075,50 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	render(w, "search.html", pageVars)
 	if DevMode {
 		log.Println("render took", time.Since(start))
+	}
+}
+
+// sortOfferRows orders each card's offers in place, condition by condition:
+// retail cheapest first, buylists by the reader's listing priority.
+func sortOfferRows(r *http.Request, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+	blSortPref := readCookie(r, "SearchListingPriority")
+
+	for _, cardID := range allKeys {
+		// This skips INDEX and PO conditions
+		for _, cond := range mtgban.DefaultGradeTags {
+			_, found := foundSellers[cardID][cond]
+			if found {
+				sort.Slice(foundSellers[cardID][cond], func(i, j int) bool {
+					return foundSellers[cardID][cond][i].Price < foundSellers[cardID][cond][j].Price
+				})
+			}
+			_, found = foundVendors[cardID][cond]
+			if found {
+				switch blSortPref {
+				default:
+					sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
+						if foundVendors[cardID][cond][i].Price == foundVendors[cardID][cond][j].Price {
+							if foundVendors[cardID][cond][i].Credit == foundVendors[cardID][cond][j].Credit {
+								return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
+							}
+							return foundVendors[cardID][cond][i].Credit > foundVendors[cardID][cond][j].Credit
+						}
+						return foundVendors[cardID][cond][i].Price > foundVendors[cardID][cond][j].Price
+					})
+				case "credit":
+					sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
+						if foundVendors[cardID][cond][i].Credit == foundVendors[cardID][cond][j].Credit {
+							return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
+						}
+						return foundVendors[cardID][cond][i].Credit > foundVendors[cardID][cond][j].Credit
+					})
+				case "market":
+					sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
+						return foundVendors[cardID][cond][i].marketValue() > foundVendors[cardID][cond][j].marketValue()
+					})
+				}
+			}
+		}
 	}
 }
 
