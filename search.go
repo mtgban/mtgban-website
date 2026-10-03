@@ -541,32 +541,10 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
 	if oembed {
-		// A consumer that cannot read what we would send is told so rather
-		// than handed json it did not ask for.
-		switch format := r.FormValue("format"); format {
-		case "", "json":
-		default:
-			oembedError(w, http.StatusNotImplemented)
-			return
-		}
-
-		page := r.FormValue("url")
-		u, err := url.Parse(page)
-		if err != nil {
-			oembedError(w, http.StatusNotFound)
-			return
-		}
-		// An oEmbed provider answers for its own pages only. Any other host
-		// is a url we cannot speak for, so it gets the same answer as a page
-		// that carries no search at all.
-		if !trustedHostname(u.Host) {
-			oembedError(w, http.StatusNotFound)
-			return
-		}
-		values := u.Query()
-		query = values.Get("q")
-		if query == "" {
-			oembedError(w, http.StatusNotFound)
+		var status int
+		query, status = oembedQuery(r)
+		if status != 0 {
+			oembedError(w, status)
 			return
 		}
 	}
@@ -738,6 +716,38 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// oembedQuery reads the search an oEmbed request asks about, from the q of
+// the page url it names. For a request this provider cannot answer it returns
+// the error status to answer with instead, else 0.
+func oembedQuery(r *http.Request) (query string, status int) {
+	// A consumer that cannot read what we would send is told so rather
+	// than handed json it did not ask for.
+	switch format := r.FormValue("format"); format {
+	case "", "json":
+	default:
+		return "", http.StatusNotImplemented
+	}
+
+	page := r.FormValue("url")
+	u, err := url.Parse(page)
+	if err != nil {
+		return "", http.StatusNotFound
+	}
+	// An oEmbed provider answers for its own pages only. Any other host
+	// is a url we cannot speak for, so it gets the same answer as a page
+	// that carries no search at all.
+	if !trustedHostname(u.Host) {
+		return "", http.StatusNotFound
+	}
+	values := u.Query()
+	query = values.Get("q")
+	if query == "" {
+		return "", http.StatusNotFound
+	}
+
+	return query, 0
 }
 
 // fillSearchSettings fills the page's store lists and the options that hang
