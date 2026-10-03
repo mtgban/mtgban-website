@@ -1002,10 +1002,6 @@ func variantCacheScope() timeseries.VariantScope {
 	return scope
 }
 
-// warmVariantCache warms this process's slice of the variants table and reports
-// what it loaded. Both callers log the counts: a scope that resolves to no rows
-// does not fail, it just misses on every lookup afterwards, so the count is the
-// only place a category that stopped matching shows up.
 // warmVariantCacheIfEnabled warms the cache when there is an archive,
 // reporting a failure rather than returning it: every caller is past the point
 // where it could do anything about one, and a cold cache costs round-trips
@@ -1019,6 +1015,10 @@ func warmVariantCacheIfEnabled() {
 	}
 }
 
+// warmVariantCache warms this process's slice of the variants table and reports
+// what it loaded. Both callers log the counts: a scope that resolves to no rows
+// does not fail, it just misses on every lookup afterwards, so the count is the
+// only place a category that stopped matching shows up.
 func warmVariantCache(ctx context.Context) error {
 	counts, err := PricesArchiveDB.WarmVariantCache(ctx, variantCacheScope())
 	if err != nil {
