@@ -607,17 +607,19 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
 	start := time.Now()
 
-	uploadedData, uploadName, err := loadUploadEntries(r, b, in, modes.maxRows)
+	// One row past the cap tells a list that was cut from one that fits.
+	uploadedData, uploadName, err := loadUploadEntries(r, b, in, modes.maxRows+1)
 	if err != nil {
 		pageVars.WarningMessage = err.Error()
 		render(w, "upload.html", pageVars)
 		return
 	}
 
-	// Warn when the input was cut at the row cap. Checked before the merge
-	// below (which can shrink the count back under the cap), unlike the old
-	// matched-singles check that missed most real truncations.
-	if len(uploadedData) >= modes.maxRows {
+	// Checked before the merge below, which can shrink the count back under
+	// the cap. The rows a results page posts back are not capped: unpacking
+	// may have grown them past it.
+	if len(in.hashes) == 0 && len(uploadedData) > modes.maxRows {
+		uploadedData = uploadedData[:modes.maxRows]
 		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", modes.maxRows)
 	}
 
