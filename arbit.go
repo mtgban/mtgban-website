@@ -695,8 +695,12 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 
 				for _, seller := range GetSellers() {
 					if seller.Info().Shorthand == v[0] {
-						// TCGplayer Direct trades its own stock.
-						source = withDirectStock(seller)
+						source = seller
+						// Global prices against Direct; its stock caps no
+						// trade there.
+						if !pageVars.GlobalMode {
+							source = withDirectStock(seller)
+						}
 						break
 					}
 				}
@@ -881,7 +885,11 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				continue
 			}
 
-			scrapers = append(scrapers, withDirectStock(seller))
+			// Reverse buys Direct's own stock.
+			if pageVars.ReverseMode {
+				seller = withDirectStock(seller)
+			}
+			scrapers = append(scrapers, seller)
 		}
 	} else {
 		for _, vendor := range GetVendors() {
