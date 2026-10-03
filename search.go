@@ -509,21 +509,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
-	for _, n := range pageVars.Nav {
-		if n.Name == "Alerts" {
-			pageVars.CanAlerts = alertAllowance(parseSig(sig)) > 0
-			break
-		}
-	}
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
-
-	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
-	// store, deep-linking into the overrides builder.
-	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
-	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
+	fillSearchReader(&pageVars, r)
 
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
@@ -716,6 +702,29 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// fillSearchReader fills what the page offers this reader: the alerts link
+// when their tier has an allowance, the mobile navigation, and the admins'
+// Fix toggle.
+func fillSearchReader(pageVars *PageVars, r *http.Request) {
+	sig := getSignatureFromCookies(r)
+
+	for _, n := range pageVars.Nav {
+		if n.Name == "Alerts" {
+			pageVars.CanAlerts = alertAllowance(parseSig(sig)) > 0
+			break
+		}
+	}
+	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
+
+	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
+	// store, deep-linking into the overrides builder.
+	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
+	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
 }
 
 // oembedQuery reads the search an oEmbed request asks about, from the q of
