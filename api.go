@@ -192,6 +192,9 @@ func uuid2BuylistCSV(w *csv.Writer, ids, qtys []string, vendor string, header []
 }
 
 func SCGRetailRedirect(ctx context.Context, b *mtgmatcher.Backend, ids, qtys, conds []string) (string, error) {
+	if len(qtys) != len(ids) || len(conds) != len(ids) {
+		return "", errors.New("mismatched card, quantity and condition lists")
+	}
 	var data strings.Builder
 	for i, hash := range ids {
 		co, err := b.GetUUID(hash)
