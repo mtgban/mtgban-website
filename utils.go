@@ -123,23 +123,22 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	},
 	// One Piece prints no gem: every rarity is the same lettered box beside
 	// the card number, so there is nothing to sample and nothing to shape.
-	// The badge climbs the same ladder the other games do, and only SEC is
-	// taken from the card, whose box is a brass plate rather than the white
-	// every other tier carries.
+	// The badge climbs the same ladder the other games do, and only Secret
+	// Rare is taken from the card, whose box is a brass plate rather than the
+	// white every other tier carries.
 	//
-	// SP, TR and PR are treatments rather than tiers — a TR card's own box
-	// still reads C — so they sit off the end in the colors the other games
-	// give their treatments.
+	// Treasure Rare and Promo are treatments rather than tiers, since a
+	// Treasure Rare card's own box still reads C, so they sit off the end in
+	// the colors the other games give their treatments.
 	mtgmatcher.GameOnePiece: {
-		"C":   "var(--normal)",
-		"UC":  "#707883",
-		"R":   "#B06435",
-		"SR":  "#919495",
-		"L":   "#C63A4D",
-		"SEC": "#A88A3C",
-		"SP":  "#B45A96",
-		"TR":  "#1FA7C9",
-		"PR":  "#652978",
+		"common":       "var(--normal)",
+		"uncommon":     "#707883",
+		"rare":         "#B06435",
+		"superrare":    "#919495",
+		"leader":       "#C63A4D",
+		"secretrare":   "#A88A3C",
+		"treasurerare": "#1FA7C9",
+		"promo":        "#652978",
 	},
 	// Flesh and Blood prints its rarity as a letter in a colored glyph at the
 	// bottom left, and these are sampled from those glyphs: a blue R, a
