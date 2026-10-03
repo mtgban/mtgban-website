@@ -421,7 +421,7 @@
                         {{if not $haveFirst}}
                             {{$haveFirst = true}}
                             {{$firstImg = $card.ImageURL}}
-                            {{$firstPrint = $card.Printings}}
+                            {{$firstPrint = index $.Printings $cardId}}
                             {{$firstProduct = $card.Products}}
                             {{$firstProductCount = $card.NumProducts}}
                             {{$firstFoil = $card.Foil}}
@@ -447,7 +447,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{index $card.PromoLabels $t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseenter="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                                 onmouseenter="hoverSidebar({{$card.ImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}
                                 </a>
@@ -536,7 +536,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.ImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>

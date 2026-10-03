@@ -501,6 +501,10 @@ type SearchVars struct {
 	// CanAlerts says the reader's ACL grants the Alerts page and an
 	// allowance, so result rows may offer the alert link.
 	CanAlerts bool
+
+	// Printings is each result's printings row for the sidebar, from
+	// cardPrintings.
+	Printings map[string]string
 }
 
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
@@ -609,6 +613,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.Embed.OEmbedURL = absoluteURL(r, "/search/oembed?format=json&url="+url.QueryEscape(pageVars.Embed.PageURL))
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
+	pageVars.Printings = map[string]string{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
@@ -650,12 +655,13 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		card := uuid2card(b, cardID, false, true, preferFlavor)
+		card := uuid2card(b, cardID, false, preferFlavor)
 		// Search results chart cards, so upgrade the chart handle to the cached
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
 		card.ChartID = chartIDForCard(b, cardID)
 		pageVars.Metadata[cardID] = card
+		pageVars.Printings[cardID] = cardPrintings(b, cardID)
 	}
 
 	// Optionally sort according to price
