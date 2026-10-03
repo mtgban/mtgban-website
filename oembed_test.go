@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"html"
 	"io"
 	"log"
@@ -11,7 +13,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/embed"
 )
 
@@ -89,6 +93,80 @@ func TestOEmbedPreviewsThePageItNames(t *testing.T) {
 		}
 		if want := html.UnescapeString(m[1]); preview.Title != want {
 			t.Errorf("%s: previews %q, the page leads with %q", page, preview.Title, want)
+		}
+	}
+}
+
+// An unfurl is shown to everyone who sees the link, and the endpoint runs
+// behind noSigning: the preview quotes the stores any reader is shown,
+// whatever signature the request carries.
+func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
+	skipWithoutDatastore(t)
+	signingEnabled(t, false)
+
+	ids, _ := backend().SearchEquals("Counterspell")
+	inventory := mtgban.InventoryRecord{}
+	for _, id := range ids {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
+	}
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "SHOWNIDX", Name: "Shown Index", MetadataOnly: true}),
+		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "HIDDENIDX", Name: "Hidden Index", MetadataOnly: true}),
+	}
+	vendors := []mtgban.Vendor{}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	withConfigCopy(t)
+	Config().SearchRetailBlockList = []string{"HIDDENIDX"}
+
+	expires := time.Now().Add(time.Hour)
+	forged := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("Expires=%d&SearchDisabled=NONE", expires.Unix())))
+	signed := signedAs(t, url.Values{"UserName": {"Reader"}, "UserTier": {"Pro"}, "SearchDisabled": {"NONE"}}, expires)
+	_, ok := signatureIsValid(signed)
+	if !ok {
+		t.Fatal("refused a signature it had just written")
+	}
+
+	page := "https://mtgban.com/search?q=Counterspell"
+	oembed := func(page string) string {
+		return "/search/oembed?format=json&url=" + url.QueryEscape(page)
+	}
+	handler := noSigning(http.HandlerFunc(testSite.SearchOEmbed))
+
+	for _, probe := range []struct {
+		name   string
+		target string
+		cookie string
+	}{
+		{"no signature", oembed(page), ""},
+		{"a forged cookie", oembed(page), forged},
+		{"a forged sig", oembed(page) + "&sig=" + url.QueryEscape(forged), ""},
+		{"a forged sig in the page url", oembed(page + "&sig=" + url.QueryEscape(forged)), ""},
+		{"a cookie this host signed", oembed(page), signed},
+	} {
+		req := httptest.NewRequest(http.MethodGet, probe.target, nil)
+		if probe.cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: probe.cookie})
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		var preview embed.OEmbed
+		err := json.Unmarshal(w.Body.Bytes(), &preview)
+		if err != nil {
+			t.Fatalf("%s: answered %d, not an oEmbed: %v", probe.name, w.Code, err)
+		}
+		if !strings.Contains(preview.HTML, "Shown Index") {
+			t.Errorf("%s: preview quotes no store:\n%s", probe.name, preview.HTML)
+		}
+		if strings.Contains(preview.HTML, "Hidden Index") {
+			t.Errorf("%s: preview quotes a store the blocklist hides:\n%s", probe.name, preview.HTML)
 		}
 	}
 }
