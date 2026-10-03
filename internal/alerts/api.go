@@ -3,6 +3,7 @@ package alerts
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"mime"
 	"net/http"
@@ -448,6 +449,15 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 		}
 		if req.Status != StatusActive && req.Status != StatusPaused {
 			jsonError(w, http.StatusUnprocessableEntity, "status must be active or paused")
+			return
+		}
+		// What the page offers: pause on an active alert, resume on a paused
+		// or undeliverable one. A parked alert comes back by itself; resumed,
+		// the next run would park it again and DM about it each time.
+		pausing := req.Status == StatusPaused && cur.Status == StatusActive
+		resuming := req.Status == StatusActive && (cur.Status == StatusPaused || cur.Status == StatusUndeliverable)
+		if req.Status != cur.Status && !pausing && !resuming {
+			jsonError(w, http.StatusConflict, fmt.Sprintf("a %s alert cannot be set %s", cur.Status, req.Status))
 			return
 		}
 		ok, err := a.deps.Store.SetStatus(ctx, id, userHash, req.Status)
