@@ -973,7 +973,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	fillEmbed(&pageVars.SearchVars, b, preview, allKeys, pageVars.Metadata)
 
-	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
+	if rebuildIndexRows(r, b, config, allKeys, foundSellers, foundVendors, odds, pageVars.Metadata) {
+		pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
+	}
 
 	pageVars.FoundSellers = foundSellers
 	pageVars.FoundVendors = foundVendors
@@ -1165,7 +1167,9 @@ func fillEmbed(pageVars *SearchVars, b *mtgmatcher.Backend, preview *embed.OEmbe
 // rebuildIndexRows replaces each card's INDEX rows with its collapsed
 // reference rows and the fallback marketplace links, adds the average-count
 // row to its buylist, and locks the offers a logged-out reader may not see.
-func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, odds map[string]float64) {
+// It reports whether a product's simulated value has a high IQR, which
+// Search cautions about.
+func rebuildIndexRows(r *http.Request, b *mtgmatcher.Backend, config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, odds map[string]float64, metadata map[string]GenericCard) (highIQR bool) {
 	sig := getSignatureFromCookies(r)
 
 	// When the user asked to drop index data (skip:index), don't synthesize the
@@ -1237,16 +1241,16 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 		}
 
 		if hasEV && getTCGSimulationIQR(cardID) > IQRThreshold {
-			pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
+			highIQR = true
 		}
 
 		// If no TCG reference was present, we manually add one to get the link
-		if !hasTCG && hasTCGScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
+		if !hasTCG && hasTCGScraper && !metadata[cardID].Sealed && !skipIndex {
 			var link string
-			if pageVars.Metadata[cardID].TCGId == "" {
-				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardID].Name) + "&utm_medium=" + Affiliates().Codes["TCG"] + "&utm_source=" + Affiliates().Codes["TCG"]
+			if metadata[cardID].TCGId == "" {
+				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(metadata[cardID].Name) + "&utm_medium=" + Affiliates().Codes["TCG"] + "&utm_source=" + Affiliates().Codes["TCG"]
 			} else {
-				tcgID, _ := strconv.Atoi(pageVars.Metadata[cardID].TCGId)
+				tcgID, _ := strconv.Atoi(metadata[cardID].TCGId)
 
 				link = tcgplayer.GenerateProductURL(tcgID, "", Affiliates().Codes["TCG"], "", "", false)
 			}
@@ -1258,7 +1262,7 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 		}
 
 		// Same for CM
-		if !hasMKM && hasMKMScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
+		if !hasMKM && hasMKMScraper && !metadata[cardID].Sealed && !skipIndex {
 			co, err := b.GetUUID(cardID)
 			if err == nil {
 				var link string
@@ -1268,7 +1272,7 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
 					// name-only fallback has to carry it too.
-					link = cm.SearchURL(game, pageVars.Metadata[cardID].Name, cm.URLOption{
+					link = cm.SearchURL(game, metadata[cardID].Name, cm.URLOption{
 						Signed:    cm.None,
 						Altered:   cm.None,
 						Affiliate: Affiliates().Codes["MKM"],
@@ -1326,6 +1330,8 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 			}
 		}
 	}
+
+	return highIQR
 }
 
 // notifyFromSearch posts the search to the user webhook and logs it: what was
