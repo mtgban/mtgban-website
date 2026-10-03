@@ -618,38 +618,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For open mode (Any), disable history charts and keep each card's
-	// stores in name order, whatever the listing priority cookie says
-	if sig == "" && SigCheck {
-		pageVars.DisableChart = true
-		pageVars.ListingLocked = true
-	}
-	// Not only for the chart page: every mobile results page carries the
-	// chart drawer, whose range select locks what the tier does not reach.
-	pageVars.MaxLookbackDays = chartLookback(sig).Days()
-
-	// Load sort option from preferences, merge the alpha query parameter if needed
-	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
-	defaultSortOpt := r.FormValue("sort")
-	if defaultSortOpt != "" {
-		preferredSort := pageVars.SearchSort
-		pageVars.SearchSort = defaultSortOpt
-		// If a user prefers alpha sort grouped by set preserve that option
-		if preferredSort == "hybrid" && defaultSortOpt == "alpha" {
-			pageVars.SearchSort = "hybrid"
-		}
-	}
-
-	pageVars.SearchBest = !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores"
-	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
-	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
-	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
-	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
-
-	// Load whether a user can download CSV and validate the query parameter
-	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
-	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
-	pageVars.CanDownloadCSV = canDownloadCSV
+	fillSearchPrefs(&pageVars, r)
 
 	if len(query) > MaxSearchQueryLen {
 		if oembed {
@@ -920,6 +889,46 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// fillSearchPrefs puts the reader's search preferences on the page: from
+// their cookies, and from their signature what their tier may see and
+// download.
+func fillSearchPrefs(pageVars *PageVars, r *http.Request) {
+	sig := getSignatureFromCookies(r)
+
+	// For open mode (Any), disable history charts and keep each card's
+	// stores in name order, whatever the listing priority cookie says
+	if sig == "" && SigCheck {
+		pageVars.DisableChart = true
+		pageVars.ListingLocked = true
+	}
+	// Not only for the chart page: every mobile results page carries the
+	// chart drawer, whose range select locks what the tier does not reach.
+	pageVars.MaxLookbackDays = chartLookback(sig).Days()
+
+	// Load sort option from preferences, merge the alpha query parameter if needed
+	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
+	defaultSortOpt := r.FormValue("sort")
+	if defaultSortOpt != "" {
+		preferredSort := pageVars.SearchSort
+		pageVars.SearchSort = defaultSortOpt
+		// If a user prefers alpha sort grouped by set preserve that option
+		if preferredSort == "hybrid" && defaultSortOpt == "alpha" {
+			pageVars.SearchSort = "hybrid"
+		}
+	}
+
+	pageVars.SearchBest = !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores"
+	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
+	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
+	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
+	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
+
+	// Load whether a user can download CSV and validate the query parameter
+	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
+	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
+	pageVars.CanDownloadCSV = canDownloadCSV
 }
 
 // fillChartRoster reads the chart= roster: it puts the roster on the page for
