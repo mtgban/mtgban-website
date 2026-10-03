@@ -804,12 +804,12 @@ func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []Upl
 		if found {
 			continue
 		}
-		metadata[data.CardID] = uuid2card(b, data.CardID, true, st.preferFlavor)
+		metadata[data.CardID] = uuid2card(b, data.CardID, st.preferFlavor)
 
 		// Load metadata for alternative printings (used by pick-printing picker)
 		for _, alias := range data.PossibleAliases {
 			if _, exists := metadata[alias]; !exists {
-				metadata[alias] = uuid2card(b, alias, true, st.preferFlavor)
+				metadata[alias] = uuid2card(b, alias, st.preferFlavor)
 			}
 		}
 	}

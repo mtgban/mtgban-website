@@ -1034,7 +1034,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardID] = uuid2card(b, cardID, true, preferFlavor)
+			pageVars.Metadata[cardID] = uuid2card(b, cardID, preferFlavor)
 		}
 	}
 

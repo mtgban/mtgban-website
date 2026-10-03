@@ -186,7 +186,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 		for _, cardID := range cardIDs {
 			_, found := pageVars.Metadata[cardID]
 			if !found {
-				pageVars.Metadata[cardID] = uuid2card(b, cardID, true, preferFlavor)
+				pageVars.Metadata[cardID] = uuid2card(b, cardID, preferFlavor)
 			}
 		}
 	}

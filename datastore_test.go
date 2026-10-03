@@ -160,7 +160,7 @@ func TestCardRowKeepsItsDatastoreAcrossAReload(t *testing.T) {
 	a := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
 	a.Sets["FIXTUREA"].Symbol = "https://example.test/fixturea.webp"
 	a.UUIDs["FIXTUREA-1"].Identifiers = map[string]string{"tcgplayerProductId": "4242"}
-	card := uuid2card(a, "FIXTUREA-1", false, false)
+	card := uuid2card(a, "FIXTUREA-1", false)
 
 	metadata := map[string]GenericCard{"FIXTUREA-1": card}
 	search := PageVars{
