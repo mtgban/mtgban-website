@@ -368,6 +368,42 @@ func TestBanPricesTakeTCGDirectStock(t *testing.T) {
 	}
 }
 
+// TestFullDumpTakesTCGDirectStock quotes Direct's stock in a full dump as
+// the filtered requests do.
+func TestFullDumpTakesTCGDirectStock(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+	setTestTCGListings(t, map[string]*tcgListings{regular: {Direct: [5]int32{7, 2}}})
+	prev := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prev) })
+	inv := mtgban.InventoryRecord{
+		regular: {{Conditions: "NM", Price: 3, Quantity: 1}, {Conditions: "SP", Price: 2, Quantity: 1}},
+		foil:    {{Conditions: "NM", Price: 9, Quantity: 1}},
+	}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true})}
+	sellersPtr.Store(&sellers)
+
+	out := getSellerPrices(backend(), "", []string{tcgDirectStore}, "", nil, "", true, false, false, "")
+	for _, tc := range []struct {
+		cardID string
+		want   int
+	}{
+		{regular, 9},
+		{foil, 0},
+	} {
+		co, err := backend().GetUUID(tc.cardID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		price := out[getIDFromMode(backend(), "", co)][tcgDirectStore]
+		if price == nil {
+			t.Fatalf("%s: no Direct price", tc.cardID)
+		}
+		if got := price.Qty + price.QtyFoil; got != tc.want {
+			t.Errorf("%s: quantity %d, want %d", tc.cardID, got, tc.want)
+		}
+	}
+}
+
 // TestTCGDirectStockOnTheArbitPages shows reverse's TCGplayer Direct table
 // its quantity column once Direct's stock is loaded, keeps it off Global
 // and off other stores without quantities, and dates the stock's tooltip.
