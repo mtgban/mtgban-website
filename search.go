@@ -591,26 +591,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
-
-	// Image corpus picker: only populate for entitled users.
-	if _, ok := offlineModeAllowed(r); ok {
-		pageVars.OfflineModeAllowed = true
-		editions := ds.editions
-		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
-		pageVars.EditionsByCategory = editions.AllEditionsByCategory
-		pageVars.PickerID = "offline-img-editions-picker"
-	}
-
-	// Populate all seller/vendor keys (for settings drawer and options page)
-	for _, seller := range GetSellers() {
-		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
-	}
-	for _, vendor := range GetVendors() {
-		pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
-	}
-	pageVars.SellerKeys = sortKeysByScraperName(pageVars.SellerKeys)
-	pageVars.VendorKeys = sortKeysByScraperName(pageVars.VendorKeys)
+	fillSearchSettings(&pageVars, r, ds, b)
 
 	page := r.FormValue("page")
 	if page == "options" {
@@ -757,6 +738,32 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// fillSearchSettings fills the page's store lists and the options that hang
+// on what is loaded: whether any sealed product is, and the image corpus
+// picker for a reader entitled to it.
+func fillSearchSettings(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend) {
+	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
+
+	// Image corpus picker: only populate for entitled users.
+	if _, ok := offlineModeAllowed(r); ok {
+		pageVars.OfflineModeAllowed = true
+		editions := ds.editions
+		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
+		pageVars.EditionsByCategory = editions.AllEditionsByCategory
+		pageVars.PickerID = "offline-img-editions-picker"
+	}
+
+	// Populate all seller/vendor keys (for settings drawer and options page)
+	for _, seller := range GetSellers() {
+		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
+	}
+	for _, vendor := range GetVendors() {
+		pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
+	}
+	pageVars.SellerKeys = sortKeysByScraperName(pageVars.SellerKeys)
+	pageVars.VendorKeys = sortKeysByScraperName(pageVars.VendorKeys)
 }
 
 // fillSearchPrefs puts the reader's search preferences on the page: from
