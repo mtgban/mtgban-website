@@ -376,6 +376,13 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 	if hasPrice {
 		alert.CreatedPrice = &best
 	}
+	// Validate rounds the thresholds and tidies the stores first, so a
+	// duplicate compares as it would be saved.
+	err = alert.Validate()
+	if err != nil {
+		jsonError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
 	for _, e := range existing {
 		if sameAlert(e, alert) {
 			writeJSON(w, http.StatusConflict, struct {
@@ -384,11 +391,6 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 			}{"you already have this alert", e.ID})
 			return
 		}
-	}
-	err = alert.Validate()
-	if err != nil {
-		jsonError(w, http.StatusUnprocessableEntity, err.Error())
-		return
 	}
 	alert.AboveArmed, alert.BelowArmed = startArmed(alert, best, hasPrice)
 	created, err := a.deps.Store.Create(ctx, alert)

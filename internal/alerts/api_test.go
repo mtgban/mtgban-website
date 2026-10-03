@@ -655,6 +655,13 @@ func TestAlertsAPICreateRejectsDuplicate(t *testing.T) {
 		t.Fatalf("duplicate = %d %s", w.Code, w.Body)
 	}
 
+	// So is one that matches once rounded to cents.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", strings.Replace(body, `"value":15`, `"value":15.004`, 1), sig))
+	if w.Code != http.StatusConflict {
+		t.Fatalf("rounded duplicate = %d %s", w.Code, w.Body)
+	}
+
 	// Any one of those differing makes it a new alert.
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", strings.Replace(body, `"value":15`, `"value":16`, 1), sig))
