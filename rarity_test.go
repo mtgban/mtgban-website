@@ -47,6 +47,9 @@ func TestRarityFilterReadsEachGamesOrder(t *testing.T) {
 	gundam := rarityBackend("gundam",
 		[]string{"Promo", "LR+", "Legend Rare", "Rare", "Uncommon", "Common"},
 		map[string]string{"lr": "Legend Rare", "lrplus": "LR+", "rare": "Rare", "common": "Common"})
+	lorcana := rarityBackend("lorcana",
+		[]string{"Special", "Promo", "Quest", "Iconic", "Enchanted", "Epic", "Legendary", "Super Rare", "Rare", "Uncommon", "Common", "None"},
+		map[string]string{"sp": "special", "en": "enchanted", "ep": "epic", "sr": "superrare", "ra": "rare", "co": "common"})
 	onepiece := rarityBackend("onepiece",
 		[]string{"Promo", "Treasure Rare", "Secret Rare", "Leader", "Super Rare", "Rare", "Uncommon", "Common", "DON!!", "None"},
 		map[string]string{"sec": "secretrare", "sr": "superrare", "c": "common"})
@@ -70,6 +73,15 @@ func TestRarityFilterReadsEachGamesOrder(t *testing.T) {
 		{gundam, "-r:common", []string{"lr", "lrplus", "rare"}},
 		{gundam, "r:c", []string{"common"}},
 		{gundam, "r:l", []string{"lr", "lrplus"}},
+
+		{lorcana, "r:s", []string{"sp", "sr"}},
+		{lorcana, "r>s", []string{"en", "ep", "sp"}},
+		{lorcana, "r<s", []string{"co", "en", "ep", "ra", "sr"}},
+		{lorcana, "r>e", []string{"en", "sp"}},
+		{lorcana, "r<e", []string{"co", "ep", "ra", "sr"}},
+		{lorcana, "r>superrare", []string{"en", "ep", "sp"}},
+		{lorcana, "r>rare,special", []string{"en", "ep", "sp", "sr"}},
+		{lorcana, "-r>s", []string{"co", "ra", "sr"}},
 
 		{onepiece, "r:superrare", []string{"sr"}},
 		{onepiece, "r:c", []string{"c"}},
