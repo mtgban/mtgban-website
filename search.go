@@ -542,12 +542,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// for a query, so it keeps its own empty state either way.
 	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
 
-	if query == "" && !scopeOnly {
-		if !pageVars.IsSealed && !isSetsPage {
-			pageVars.SetKeyrunes = getSetKeyrunes(b)
-		}
-	}
-
 	fillSearchSettings(&pageVars, r, ds, b)
 
 	page := r.FormValue("page")
@@ -964,6 +958,7 @@ func fillSearchLanding(pageVars *PageVars, r *http.Request, ds *datastore, isSet
 		return "sets.html"
 	}
 
+	pageVars.SetKeyrunes = getSetKeyrunes(ds.backend)
 	return "search.html"
 }
 
