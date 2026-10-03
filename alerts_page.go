@@ -3,26 +3,32 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
 
 // AlertsPageVars is the alerts page payload.
 type AlertsPageVars struct {
-	SignedIn      bool
-	Unverified    bool
-	Allowed       bool
-	Allowance     int
-	Alerts        []alerts.View
-	DiscordLinked bool
-	InviteURL     string
-	Error         string
-	Form          *alerts.Options
-	FormSide      alerts.Side
+	SignedIn   bool
+	Unverified bool
+	Allowed    bool
+	Allowance  int
+	Alerts     []alerts.View
+	InviteURL  string
+	Error      string
+	Form       *alerts.Options
+	FormSide   alerts.Side
 	// FormCardID is the card id the create or edit form is for; the JS
 	// reads it off the form's data-card-id attribute.
 	FormCardID string
 	Editing    *alerts.View
+	// AllowedChannels is the ACL's delivery channels, comma-joined, read
+	// off #alerts-page's data-alert-channels by the page's JS.
+	AllowedChannels string
+	// UnsubscribeURL is this user's one-click email unsubscribe link,
+	// empty when not signed in.
+	UnsubscribeURL string
 }
 
 // Alerts renders the list, or the create form with ?card=, or the edit
@@ -48,15 +54,18 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	api := s.alerts.API()
 	vars.Allowance = alertAllowance(c.Values)
 	vars.Allowed = vars.Allowance > 0
+	chans := alertChannels(c.Values)
+	names := make([]string, len(chans))
+	for i, kind := range chans {
+		names[i] = string(kind)
+	}
+	vars.AllowedChannels = strings.Join(names, ",")
+	vars.UnsubscribeURL = alertUnsubscribeURL(externalURL(r), c.UserHash)
 	store := api.Store()
 	if store == nil {
 		return
 	}
 	ctx := r.Context()
-	contact, _, err := store.Contact(ctx, c.UserHash)
-	if err == nil {
-		vars.DiscordLinked = contact.DiscordUserID != ""
-	}
 
 	side := alerts.Side(r.FormValue("side"))
 	if side == "" {

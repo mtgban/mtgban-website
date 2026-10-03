@@ -300,10 +300,11 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	// Whether this tier grants alerts at all, computed once rather than
 	// re-parsing the signature just signed.
 	allowed := alertContactAllowed(tierTitle, overrides)
+	channels := alertContactChannels(tierTitle, overrides)
 
 	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	err = recordAlertContact(alertCtx, s.alertContacts(), userData, tierTitle, allowed)
+	err = recordAlertContact(alertCtx, s.alertContacts(), userData, tierTitle, allowed, channels)
 	if err != nil {
 		LogPages["Admin"].Println("recordAlertContact", err)
 	}

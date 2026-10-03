@@ -4,6 +4,7 @@ import (
 	"net/url"
 
 	"github.com/mtgban/mtgban-website/internal/access"
+	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -61,4 +62,15 @@ func alertContactAllowedIn(table access.Table, tier string, overrides map[string
 // top, grants alerts at all.
 func alertContactAllowed(tier string, overrides map[string]map[string]string) bool {
 	return alertContactAllowedIn(ACL(), tier, overrides)
+}
+
+// alertContactChannelsIn is alertContactChannels' testable core.
+func alertContactChannelsIn(table access.Table, tier string, overrides map[string]map[string]string) []alerts.ChannelKind {
+	return channelsFromValues(aclValuesIn(table, tier, overrides))
+}
+
+// alertContactChannels is the delivery channels tier, with a grant's own
+// overrides on top, allows.
+func alertContactChannels(tier string, overrides map[string]map[string]string) []alerts.ChannelKind {
+	return alertContactChannelsIn(ACL(), tier, overrides)
 }

@@ -1,15 +1,15 @@
 {{define "alerts-body"}}
 {{with .AlertsPage}}
-<div class="alerts-body" id="alerts-page" data-open-card="{{if not .Editing}}{{.FormCardID}}{{end}}" data-open-side="{{.FormSide}}" data-open-edit="{{if .Editing}}{{.Editing.ID}}{{end}}">
+<div class="alerts-body" id="alerts-page" data-open-card="{{if not .Editing}}{{.FormCardID}}{{end}}" data-open-side="{{.FormSide}}" data-open-edit="{{if .Editing}}{{.Editing.ID}}{{end}}" data-alert-channels="{{.AllowedChannels}}" data-alert-unsubscribe="{{.UnsubscribeURL}}">
 {{if not .SignedIn}}
     {{if .Unverified}}<p class="alerts-notice">Verify your Patreon email to use alerts, then sign out and back in here.</p>
     {{else}}<p class="alerts-notice">Sign in with Patreon to set price alerts.</p>{{end}}
 {{else}}
-    {{if not .Allowed}}<p class="alerts-notice">Price alerts are not part of your tier. You can still pause or remove the alerts below.</p>{{end}}
-    {{if .Error}}<p class="alerts-notice alerts-error">{{.Error}}</p>{{end}}
-    {{if not .DiscordLinked}}
-    <p class="alerts-notice">Alerts arrive as a Discord DM. Link Discord in your Patreon settings, then sign out and back in here.{{if .InviteURL}} You also need to be in the <a href="{{.InviteURL}}">MTGBAN server</a>.{{end}}</p>
+    {{if not .Allowed}}<p class="alerts-notice">Price alerts are not part of your tier. You can still pause or remove the alerts below.</p>
+    {{else}}
+    <div class="alerts-channels" id="alerts-channels" data-invite-url="{{.InviteURL}}"></div>
     {{end}}
+    {{if .Error}}<p class="alerts-notice alerts-error">{{.Error}}</p>{{end}}
 
     <div class="alerts-heading">
         <h2>Your alerts</h2>
@@ -37,7 +37,7 @@
         <tbody>
         {{$allowed := .Allowed}}
         {{range .Alerts}}
-            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}">
+            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}" data-delivery="{{.Delivery}}">
                 <td class="alert-card">
                     <a href="/search?q={{.CardID}}">{{.Card.Name}}</a>
                     <span class="alert-meta">{{.Card.Set}} #{{.Card.Number}} {{.Card.Finish}}</span>

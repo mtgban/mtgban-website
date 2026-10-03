@@ -96,6 +96,10 @@ type ConfigType struct {
 		ManifestPath string `json:"manifest_path"`
 		ImagesPath   string `json:"images_path"`
 	} `json:"offline"`
+	// Mail is the sender alert mail goes out as; the Resend key is env only.
+	Mail struct {
+		From string `json:"from"`
+	} `json:"mail"`
 	BucketKeys map[string]BucketKey `json:"bucket_keys"`
 
 	Game         mtgmatcher.Game `json:"game"`
@@ -374,6 +378,7 @@ const (
 	DefaultExternalURL   = "https://mtgban.com"
 	DefaultAPIGatewayURL = "https://api.mtgban.com"
 	DefaultDatastorePath = "AllPrintings.json.xz"
+	DefaultMailFrom      = "MTGBAN <no-reply@mtgban.com>"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
@@ -481,6 +486,9 @@ func finishConfig(config ConfigType) {
 	if config.DatastorePath == "" {
 		log.Println("Datastore path not configured, using", DefaultDatastorePath)
 		config.DatastorePath = DefaultDatastorePath
+	}
+	if config.Mail.From == "" {
+		config.Mail.From = DefaultMailFrom
 	}
 	applyAPIGatewayDefaults(&config.APIGateway, config.Game)
 
@@ -663,7 +671,7 @@ func main() {
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	storesFlag := flag.String("stores", "", "Load only these stores' dumps, comma-separated (default: scraper_config.stores, else every store)")
 	flag.BoolVar(&SkipNewspaper, "nonews", false, "Do not load newspaper data")
-	alertsSend := flag.Bool("alerts-send", false, "Deliver alert DMs in dev mode")
+	alertsSend := flag.Bool("alerts-send", false, "Deliver alert DMs and mail in dev mode")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
 	var maintenance tcgcsvMaintenance
@@ -722,6 +730,9 @@ func main() {
 	if maintenance.backfill || maintenance.daily || maintenance.products {
 		s.runTCGCSVMaintenance(maintenance)
 	}
+
+	// Before the evaluator or any route can read them.
+	s.loadAlertMail()
 
 	// Load the per-seller UUID overrides applied when scrapers (re)load.
 	err = loadKeyOverrides()

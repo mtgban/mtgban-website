@@ -50,6 +50,10 @@ type NavElem struct {
 	// Alternative endpoints connected to this handler
 	SubPages []NavElem
 
+	// A sub-page served without a signature through its own Handle, which
+	// checks a credential of its own, such as a mailed token.
+	NoSigning bool
+
 	// Condition upon which the page should not be made visible. Reads the
 	// site's current datastore for visibility only.
 	ShouldHide func(*site) bool
@@ -106,6 +110,7 @@ var OptionalFields = []string{
 	"SleepersCYOA",
 	"SearchOfflineMode",
 	"AlertsMax",
+	"AlertChannels",
 }
 
 // The key matches the query parameter of the permissions defined in sign()
@@ -253,6 +258,11 @@ func init() {
 			Page:        "alerts.html",
 			// No store, no alerts: the page and its result-row links go.
 			ShouldHide: func(s *site) bool { return s.alerts.Store() == nil },
+			// Reached from alert mail, never the navbar; the token is the credential.
+			SubPages: []NavElem{
+				{Name: "AlertsConfirm", Link: "/alerts/confirm", Handle: (*site).AlertsConfirm, NoSigning: true, ShouldHide: func(*site) bool { return true }},
+				{Name: "AlertsUnsubscribe", Link: "/alerts/unsubscribe", Handle: (*site).AlertsUnsubscribe, NoSigning: true, ShouldHide: func(*site) bool { return true }},
+			},
 		},
 		"API": {
 			Name:        "API",
@@ -369,6 +379,9 @@ type PageVars struct {
 
 	// Alerts page payload (nil elsewhere)
 	AlertsPage *AlertsPageVars
+
+	// Alert mail link pages' payload (nil elsewhere)
+	AlertsNotice *AlertsNoticeVars
 }
 
 func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {

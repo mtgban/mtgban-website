@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 
@@ -11,13 +12,22 @@ import (
 // alertAPIDeps wires the ACL, prices and the live datastore into the API;
 // the service builds the limiter when a store is attached.
 func (s *site) alertAPIDeps() alerts.APIDeps {
+	// No mailer: the email endpoints answer 503.
+	var sendConfirm func(ctx context.Context, to, link string) error
+	if alertMailConfigured() {
+		sendConfirm = s.sendAlertConfirm
+	}
 	return alerts.APIDeps{
-		Identity:   alertsIdentity,
-		Allowance:  alertAllowance,
-		Prices:     alertVisiblePrices,
-		Resolve:    func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(s.backend(), cardID) },
-		StoreLabel: alertStoreLabel,
-		Game:       func() string { return string(Config().Game) },
+		Identity:    alertsIdentity,
+		Allowance:   alertAllowance,
+		Prices:      alertVisiblePrices,
+		Resolve:     func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(s.backend(), cardID) },
+		StoreLabel:  alertStoreLabel,
+		Game:        func() string { return string(Config().Game) },
+		Channels:    alertChannels,
+		Mint:        func(t alerts.Token) string { return alerts.MintToken(alertTokenSecret(), t) },
+		SendConfirm: sendConfirm,
+		ConfirmTTL:  alertConfirmTTL,
 	}
 }
 
