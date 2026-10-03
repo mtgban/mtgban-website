@@ -1238,6 +1238,17 @@ func cardPrintings(b *mtgmatcher.Backend, cardID string) string {
 	return genCardPrintings(b, co)
 }
 
+// cardMetadata is what a page shows of each card it lists, keyed by card id.
+type cardMetadata map[string]GenericCard
+
+// add reads a card's details into m, once: a card already there is kept.
+func (m cardMetadata) add(b *mtgmatcher.Backend, cardID string, preferFlavor bool) {
+	if _, found := m[cardID]; found {
+		return
+	}
+	m[cardID] = uuid2card(b, cardID, preferFlavor)
+}
+
 func genQuery(co *mtgmatcher.CardObject) string {
 	query := co.Name
 	if !co.Sealed {

@@ -319,7 +319,7 @@ type PageVars struct {
 	WarningMessage string
 	InfoMessage    string
 
-	Metadata    map[string]GenericCard
+	Metadata    cardMetadata
 	HasSettings bool
 	ShowUpsell  bool
 

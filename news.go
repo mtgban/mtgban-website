@@ -1290,11 +1290,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		// runs to tens of thousands of cards and all the template reads are
 		// keyed by the paginated entries.
 		for _, entry := range arbit {
-			_, found := pageVars.Metadata[entry.CardID]
-			if found {
-				continue
-			}
-			pageVars.Metadata[entry.CardID] = uuid2card(b, entry.CardID, preferFlavor)
+			pageVars.Metadata.add(b, entry.CardID, preferFlavor)
 		}
 
 		// The HasNo* flags and the name were how this list asked arbit.html
