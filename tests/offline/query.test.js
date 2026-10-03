@@ -6,7 +6,11 @@ await import('../../js/offline/offline-query.js');
 
 const Q = globalThis.OfflineQuery;
 
-function p(s) { return Q.parse(s); }
+// The rarities a Magic catalog lists, rarest first, which a single r: letter
+// is read against.
+const magic = ['oversize', 'special', 'mythic', 'rare', 'uncommon', 'common', 'token'].map(value => ({value}));
+
+function p(s) { return Q.parse(s, [], magic); }
 
 test('bare words become names', () => {
     expect(p('sol ring').names).toEqual(['sol', 'ring']);
@@ -99,13 +103,23 @@ test('rarity aliases normalize', () => {
     expect(p('r:m').rarity).toEqual(['mythic']);
 });
 
-// r: reads as it does online: a comma list, each value one of its short
-// forms or a rarity as the catalog writes it.
+// r: reads as it does online: a comma list, each value a rarity spelled as
+// one lower-case word, or a letter naming each of the game's it begins.
 test('rarity lists and short forms read as online', () => {
     expect(p('r:s,t,o').rarity).toEqual(['special', 'token', 'oversize']);
     expect(p('r:rare,M').rarity).toEqual(['rare', 'mythic']);
     expect(p('r:special')).toMatchObject({rarity: ['special'], unsupported: []});
     expect(p('r:bonus')).toMatchObject({rarity: ['bonus'], unsupported: []});
+});
+
+// Every game's catalog brings its own rarities: a letter names each one it
+// begins, and a rarity is one word however a query spaces or cases it.
+test('rarity letters come from the catalog game', () => {
+    const lorcana = ['special', 'enchanted', 'superrare', 'rare', 'common'].map(value => ({value}));
+    expect(Q.parse('r:s', [], lorcana).rarity).toEqual(['special', 'superrare']);
+    expect(Q.parse('r:SuperRare,c', [], lorcana).rarity).toEqual(['superrare', 'common']);
+    expect(Q.parse('r:x', [], lorcana).rarity).toEqual(['x']);
+    expect(Q.parse('r:c').rarity).toEqual(['c']);
 });
 
 // cn:, cns: and number: take lists too, compared without case as online
@@ -144,7 +158,7 @@ test('number comparisons read as online', () => {
 // since none of one list and none of another is none of either.
 test('negated filters read as online', () => {
     const finishes = [{value: 'galaxyfoil', aliases: ['galaxy']}];
-    expect(Q.parse('bolt -s:neo,mh2 -e:lea -f:foil,galaxy -r:c', finishes)).toMatchObject({
+    expect(Q.parse('bolt -s:neo,mh2 -e:lea -f:foil,galaxy -r:c', finishes, magic)).toMatchObject({
         not: {set: ['NEO', 'MH2', 'LEA'], finish: ['foil', 'galaxy'], rarity: ['common']},
         set: [], finish: [], rarity: [], unsupported: [],
     });
@@ -292,6 +306,20 @@ test('a finish list keeps a card any of its finishes reaches', async () => {
     Q.resetCaches();
     out = await Q.execute(Q.parse('"boseiju reaches" f:nonfoil,foil'), fakeEnv());
     expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
+});
+
+// The catalog spells a card's rarity as its game does ("Super Rare"); a
+// query finds it under the one word online compares.
+test('a rarity is found however the catalog spells it', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const getCard = env.getCard;
+    env.getCard = async function (uuid) {
+        const card = await getCard(uuid);
+        return card && card.uuid === 'u-mh2-1' ? Object.assign({}, card, {r: 'Super Rare'}) : card;
+    };
+    const out = await Q.execute(Q.parse('boseiju r:superrare', [], magic), env);
+    expect(out.results.map(r => r.uuid)).toEqual(['u-mh2-1']);
 });
 
 test('rarity and number lists keep a card any value reaches', async () => {

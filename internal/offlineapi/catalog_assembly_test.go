@@ -20,6 +20,7 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 		"uuid-d": {Name: "Delta", SetCode: "AAA", Foil: true, Finishes: []string{"rainbowfoil"}},
 	}
 	finishes := []palette.Finish{{Value: "rainbowfoil", Label: "Rainbow Foil", Count: 1}}
+	rarities := []palette.Rarity{{Value: "rare", Label: "Rare", Letter: "r", Count: 1}}
 	sets := map[string]catalogSet{
 		"ZZZ": {Name: "Zed", Keyrune: "zzz", Date: "2020-01-01"},
 		"AAA": {Name: "Ay"},
@@ -30,7 +31,7 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 	}
 
 	// what the old code produced
-	whole, err := json.Marshal(map[string]any{"sets": sets, "cards": cards, "finishes": finishes, "stores": stores})
+	whole, err := json.Marshal(map[string]any{"sets": sets, "cards": cards, "finishes": finishes, "rarities": rarities, "stores": stores})
 	if err != nil {
 		t.Fatalf("marshal whole: %v", err)
 	}
@@ -44,6 +45,10 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal finishes: %v", err)
 	}
+	rawRarities, err := json.Marshal(rarities)
+	if err != nil {
+		t.Fatalf("marshal rarities: %v", err)
+	}
 	rawSets, err := json.Marshal(sets)
 	if err != nil {
 		t.Fatalf("marshal sets: %v", err)
@@ -56,6 +61,7 @@ func TestCatalogAssemblyMatchesWholeMarshal(t *testing.T) {
 	for _, part := range [][]byte{
 		[]byte(`{"cards":`), rawCards,
 		[]byte(`,"finishes":`), rawFinishes,
+		[]byte(`,"rarities":`), rawRarities,
 		[]byte(`,"sets":`), rawSets,
 		[]byte(`,"stores":`), rawStores,
 		[]byte(`}`),

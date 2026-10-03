@@ -40,8 +40,9 @@
             self.OfflineDB.getMeta('catalogSets'),
             self.OfflineDB.getMeta('catalogStores'),
             self.OfflineDB.getMeta('catalogFinishes'),
+            self.OfflineDB.getMeta('catalogRarities'),
         ]).then(function(res) {
-            return { sets: res[0] || {}, stores: res[1] || {}, finishes: res[2] || [] };
+            return { sets: res[0] || {}, stores: res[1] || {}, finishes: res[2] || [], rarities: res[3] || [] };
         });
     }
 

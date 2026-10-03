@@ -214,4 +214,5 @@ async function rebuildCatalog(catalog) {
     await self.OfflineDB.setMeta('catalogSets', catalog.sets || {});
     await self.OfflineDB.setMeta('catalogStores', catalog.stores || {});
     await self.OfflineDB.setMeta('catalogFinishes', catalog.finishes || []);
+    await self.OfflineDB.setMeta('catalogRarities', catalog.rarities || []);
 }
