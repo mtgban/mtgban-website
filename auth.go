@@ -324,6 +324,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	// Whether this tier grants alerts at all, computed once rather than
 	// re-parsing the signature just signed.
 	allowed := alertContactAllowed(tierTitle, overrides)
+	channels := alertContactChannels(tierTitle, overrides)
 
 	// A grant's tier is not stored: the evaluator reads a live grant's own,
 	// and a revoked one must not leave its tier behind until the next login.
@@ -333,7 +334,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	}
 	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	err = recordAlertContact(alertCtx, s.alertContacts(), userData, contactTier, allowed)
+	err = recordAlertContact(alertCtx, s.alertContacts(), userData, contactTier, allowed, channels)
 	if err != nil {
 		LogPages["Admin"].Println("recordAlertContact", err)
 	}

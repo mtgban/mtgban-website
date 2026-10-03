@@ -8,6 +8,19 @@
     margin: 0 auto;
     padding: 1.25em 1em 3em;
 }
+/* The confirm/unsubscribe mail links: one short column, not the list's
+   table-width page. */
+.alerts-link-page {
+    max-width: 36em;
+}
+.alerts-link-page form {
+    margin: 1em 0;
+}
+/* main.css indents h1 and p; the button and the alerts page do not. */
+.alerts-link-page h1,
+.alerts-link-page p {
+    margin-left: 0;
+}
 .alerts-heading {
     display: flex;
     align-items: baseline;
@@ -35,6 +48,90 @@
     line-height: 1.45;
 }
 .alerts-error { color: var(--adanger); }
+
+/* ── Channels box ────────────────────────────────────────── */
+.alerts-channels {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+    padding: 0.9em 1em;
+    margin: 0 0 0.75em;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
+.alerts-channel-row + .alerts-channel-row {
+    padding-top: 0.6em;
+    border-top: 1px solid var(--border-subtle);
+}
+/* A second line of the same channel sits under the first, unruled. */
+.alerts-channel-row + .alerts-channel-cont {
+    padding-top: 0;
+    border-top: 0;
+}
+.alerts-channel-tag {
+    margin-left: 0.3em;
+    padding: 0.05em 0.55em;
+    border: 1px solid var(--ainfo);
+    border-radius: 1em;
+    color: var(--ainfo);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+.alerts-channel-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6em;
+}
+.alerts-channel-label {
+    min-width: 4.5em;
+    font-weight: 600;
+    color: var(--normal);
+}
+.alerts-channel-detail {
+    color: var(--text-dim);
+    font-size: var(--text-md);
+}
+.alerts-channel-note {
+    margin: 0.3em 0 0;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+}
+.alerts-channel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin-top: 0.4em;
+}
+.alerts-channel-row .alert-field-label {
+    margin: 0.5em 0 0.25em;
+}
+.alerts-channel-row .alert-input {
+    margin-top: 0;
+    max-width: 24em;
+}
+.alerts-channel-error { margin: 0; }
+.alerts-channel-actions .settings-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.alerts-channel-unsub {
+    align-self: flex-start;
+    color: var(--ainfo);
+    font-size: var(--text-sm);
+    text-decoration: none;
+}
+.alerts-channel-unsub:hover { text-decoration: underline; }
+
+@media (max-width: 700px) {
+    .alerts-channels { padding: 0.8em 0.9em; }
+    .alerts-channel-row .alert-input { max-width: 100%; }
+    /* Each address on its own line under the Email label, one left edge. */
+    .alerts-channel-email .alerts-channel-label:empty { display: none; }
+    .alerts-channel-email .alerts-channel-detail { flex-basis: 100%; }
+}
 
 /* ── Table ───────────────────────────────────────────────── */
 .alerts-table-wrap { overflow-x: auto; }

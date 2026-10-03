@@ -1,0 +1,22 @@
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "extra-css"}}
+    {{if .IsMobile}}<link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">{{end}}
+    <link rel="stylesheet" type="text/css" href="/css/alerts.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+<div class="alerts-page alerts-link-page">
+    {{with .AlertsNotice}}
+    <h1>{{.Heading}}</h1>
+    <p>{{.Text}}</p>
+    {{if .Token}}
+    <form method="post" action="/alerts/unsubscribe">
+        <input type="hidden" name="token" value="{{.Token}}">
+        <button type="submit" class="settings-btn primary">Unsubscribe</button>
+    </form>
+    {{end}}
+    {{end}}
+    <p><a href="/alerts">Go to your alerts</a></p>
+</div>
+{{end}}

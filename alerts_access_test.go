@@ -2,9 +2,11 @@ package main
 
 import (
 	"net/url"
+	"slices"
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/access"
+	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -25,6 +27,62 @@ func TestAllowanceFromValues(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("allowance(%v) = %d, want %d", tc.v, got, tc.want)
 		}
+	}
+}
+
+func TestChannelsFromValues(t *testing.T) {
+	d, e := alerts.ChannelDiscord, alerts.ChannelEmail
+	cases := []struct {
+		name string
+		v    url.Values
+		want []alerts.ChannelKind
+	}{
+		{"no page", url.Values{"AlertChannels": {"discord,email"}}, nil},
+		{"page, no key: signed before the property", url.Values{"Alerts": {"true"}}, []alerts.ChannelKind{d}},
+		{"page, empty list", url.Values{"Alerts": {"true"}, "AlertChannels": {""}}, nil},
+		{"page, none", url.Values{"Alerts": {"true"}, "AlertChannels": {"none"}}, nil},
+		{"discord", url.Values{"Alerts": {"true"}, "AlertChannels": {"discord"}}, []alerts.ChannelKind{d}},
+		{"both, spaced and cased", url.Values{"Alerts": {"true"}, "AlertChannels": {" Email , DISCORD "}}, []alerts.ChannelKind{e, d}},
+		{"unknown dropped", url.Values{"Alerts": {"true"}, "AlertChannels": {"sms,email,,pager"}}, []alerts.ChannelKind{e}},
+		{"duplicates once", url.Values{"Alerts": {"true"}, "AlertChannels": {"email,email"}}, []alerts.ChannelKind{e}},
+		{"nil", nil, nil},
+	}
+	for _, tc := range cases {
+		got := channelsFromValues(tc.v)
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s: channels = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestAlertChannelsDevStandIn(t *testing.T) {
+	withSigMode(t, true, false)
+	got := alertChannels(nil)
+	if !slices.Equal(got, []alerts.ChannelKind{alerts.ChannelDiscord, alerts.ChannelEmail}) {
+		t.Fatalf("dev stand-in = %v", got)
+	}
+	withSigMode(t, true, true)
+	if got := alertChannels(nil); got != nil {
+		t.Fatalf("signed dev = %v, want none", got)
+	}
+}
+
+// AlertChannels must be signed, and the ACL must carry it to the values.
+func TestAlertChannelsIsAnACLProperty(t *testing.T) {
+	if !slices.Contains(OptionalFields, "AlertChannels") {
+		t.Fatal("OptionalFields lacks AlertChannels")
+	}
+	table := access.Table{"Legacy": {"Alerts": {"AlertsMax": "5", "AlertChannels": "discord,email"}}}
+	got := alertContactChannelsIn(table, "Legacy", nil)
+	if !slices.Equal(got, []alerts.ChannelKind{alerts.ChannelDiscord, alerts.ChannelEmail}) {
+		t.Fatalf("tier channels = %v", got)
+	}
+	got = alertContactChannelsIn(table, "Legacy", map[string]map[string]string{"Alerts": {"AlertChannels": "discord"}})
+	if !slices.Equal(got, []alerts.ChannelKind{alerts.ChannelDiscord}) {
+		t.Fatalf("override channels = %v", got)
+	}
+	if got := alertContactChannelsIn(table, "Pioneer", nil); got != nil {
+		t.Fatalf("tier without alerts = %v", got)
 	}
 }
 
@@ -104,5 +162,21 @@ func TestAlertContactAllowedIn(t *testing.T) {
 				t.Errorf("alertContactAllowedIn(%s) = %v, want %v", tc.tier, got, tc.want)
 			}
 		})
+	}
+}
+
+// Email is offered only while something can send it: without RESEND_API_KEY
+// the channel list drops it, so the page hides the choice and the evaluator
+// parks the alerts that made it until the key is set.
+func TestAlertChannelsHideEmailWithoutAMailer(t *testing.T) {
+	v := url.Values{"Alerts": {"true"}, "AlertChannels": {"discord,email"}}
+
+	t.Setenv("RESEND_API_KEY", "")
+	if got := alertChannels(v); !slices.Equal(got, []alerts.ChannelKind{alerts.ChannelDiscord}) {
+		t.Errorf("without a key: %v, want discord alone", got)
+	}
+	t.Setenv("RESEND_API_KEY", "re_test")
+	if got := alertChannels(v); !slices.Equal(got, []alerts.ChannelKind{alerts.ChannelDiscord, alerts.ChannelEmail}) {
+		t.Errorf("with a key: %v, want both", got)
 	}
 }
