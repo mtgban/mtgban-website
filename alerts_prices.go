@@ -10,7 +10,8 @@ import (
 )
 
 // alertStorePrices lists every non-index store outside the blocklist that
-// has an offer with quantity and a price for the card.
+// has a price for the card. Quantity is not asked: SCG and CSI publish none
+// on their buylists.
 func alertStorePrices(cardID string, side alerts.Side, blocklist []string) []alerts.StorePrice {
 	var out []alerts.StorePrice
 	add := func(info mtgban.ScraperInfo, entries []mtgban.GenericEntry) {
@@ -19,7 +20,7 @@ func alertStorePrices(cardID string, side alerts.Side, blocklist []string) []ale
 		}
 		prices := map[string]float64{}
 		for _, e := range entries {
-			if e.Qty() > 0 && e.Pricing() > 0 {
+			if e.Pricing() > 0 {
 				_, seen := prices[string(e.Condition())]
 				if !seen {
 					prices[string(e.Condition())] = e.Pricing()
