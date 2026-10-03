@@ -19,7 +19,7 @@ func alertTestStores(t *testing.T) {
 		{Conditions: "NM", BuyPrice: 12, Quantity: 4},
 		{Conditions: "SP", BuyPrice: 9, Quantity: 0},
 	}}
-	scg := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 14, Quantity: 1}}}
+	scg := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 14}}}
 	idx := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 99, Quantity: 1}}}
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
@@ -43,9 +43,9 @@ func TestAlertStorePricesSkipsIndexBlockedAndEmpty(t *testing.T) {
 	if got[0].Prices["NM"] != 12 {
 		t.Fatalf("CK NM = %v, want 12", got[0].Prices["NM"])
 	}
-	_, has := got[0].Prices["SP"]
-	if has {
-		t.Fatal("a zero-quantity offer was kept")
+	all := alertStorePrices("card-1", alerts.SideBuylist, nil)
+	if len(all) != 2 || all[1].Shorthand != "SCG" || all[1].Prices["NM"] != 14 {
+		t.Fatalf("stores = %+v, want SCG's offer, which carries no quantity", all)
 	}
 	retail := alertStorePrices("card-1", alerts.SideRetail, nil)
 	if len(retail) != 1 || retail[0].Prices["HP"] != 8 {
