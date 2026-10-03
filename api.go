@@ -18,7 +18,6 @@ import (
 	"path"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -717,29 +716,9 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// Perform search
 	allKeys, _ := searchAndFilter(ds, config)
 
-	// Sort results to match the search page order
-	sortOpt := r.FormValue("sort")
-	sortData := resolveSortingData(b, allKeys)
-	switch sortOpt {
-	case "alpha":
-		sort.Slice(allKeys, func(i, j int) bool {
-			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
-		})
-	case "number":
-		sort.Slice(allKeys, func(i, j int) bool {
-			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
-		})
-	default:
-		sort.Slice(allKeys, func(i, j int) bool {
-			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
-		})
-	}
-	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))
-	if reverseSort {
-		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
-			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
-		}
-	}
+	// Sort as the search page does. orderSearchKeys sorts allKeys in place,
+	// reverse included; the page of them it returns is the page's alone.
+	orderSearchKeys(r, ds, searchResults{keys: allKeys, odds: dropOdds(b, config)}, r.FormValue("sort"))
 
 	// Limit results to be processed
 	if len(allKeys) > MaxSearchTotalResults {

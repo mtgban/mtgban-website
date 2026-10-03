@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -127,5 +129,60 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 	testSite.SearchAPI(rec, req)
 	if !strings.Contains(rec.Body.String(), "Star City Games") {
 		t.Errorf("the search page's export lost a store: %s", rec.Body.String())
+	}
+}
+
+// TestSearchCSVKeepsThePageOrder exports in the order the page sorts by,
+// a price sort included, rather than falling back to release order.
+func TestSearchCSVKeepsThePageOrder(t *testing.T) {
+	uuids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(uuids) < 3 {
+		t.Skip("mtgmatcher data not loaded")
+	}
+	sortData := resolveSortingData(backend(), uuids)
+	sort.Slice(uuids, func(i, j int) bool { return cmpSets(sortData[uuids[i]], sortData[uuids[j]]) })
+
+	// Priced up in release order, so the retail sort runs against it.
+	price := map[string]float64{}
+	inventory := mtgban.InventoryRecord{}
+	for i, id := range uuids {
+		price[id] = float64(i + 1)
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: price[id], Quantity: 1})
+	}
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}
+	vendors := []mtgban.Vendor{}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
+	exported := func(sortMode string) []string {
+		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/Counterspell.csv?id=mtgjson&sort="+sortMode, nil)
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		rec := httptest.NewRecorder()
+		testSite.SearchAPI(rec, req)
+		var ids []string
+		for _, line := range strings.Split(rec.Body.String(), "\n")[1:] {
+			id, _, found := strings.Cut(line, ",")
+			if found {
+				ids = append(ids, id)
+			}
+		}
+		return ids
+	}
+
+	got := exported("retail")
+	if len(got) < 3 {
+		t.Fatalf("exported %d printings, want several", len(got))
+	}
+	if !sort.SliceIsSorted(got, func(i, j int) bool { return price[got[i]] > price[got[j]] }) {
+		t.Errorf("retail export is not dearest first: %v", got)
+	}
+	if slices.Equal(got, exported("")) {
+		t.Error("the retail export came out in release order")
 	}
 }
