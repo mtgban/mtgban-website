@@ -647,7 +647,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Sort sets as requested, default to chronological
 	odds := dropOdds(b, config)
-	allKeys = orderSearchKeys(&pageVars, r, b, allKeys, odds)
+	allKeys = orderSearchKeys(&pageVars, r, b, ds.editions.ReprintParents, allKeys, odds)
 
 	// Load up image links and other metadata
 	for _, cardID := range allKeys {
@@ -1070,7 +1070,7 @@ func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher
 // orderSearchKeys sorts the results as the reader asked and returns the page
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
-func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, allKeys []string, odds map[string]float64) []string {
+func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, reprintParents map[string]string, allKeys []string, odds map[string]float64) []string {
 	sortData := resolveSortingData(b, allKeys)
 	switch pageVars.SearchSort {
 	case "odds":
@@ -1100,6 +1100,7 @@ func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "hybrid":
+		fileReprintsUnderParent(sortData, reprintParents)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
@@ -2529,6 +2530,11 @@ type SortingData struct {
 	// comparisons don't re-lower them every time.
 	nameLower    string
 	editionLower string
+
+	// The edition the hybrid sort files this card under: its own, or its
+	// parent's for an edition that reprints the parent's card list.
+	groupLower string
+	reprint    bool
 }
 
 func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
@@ -2544,13 +2550,30 @@ func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SortingData{
+	sorting := &SortingData{
 		co:           co,
 		releaseDate:  releaseDate,
 		parentCode:   set.ParentCode,
 		nameLower:    strings.ToLower(co.Name),
 		editionLower: strings.ToLower(co.Edition),
-	}, nil
+	}
+	sorting.groupLower = sorting.editionLower
+	return sorting, nil
+}
+
+// fileReprintsUnderParent has the hybrid sort file every card of an
+// edition in parents (editionsSnapshot.ReprintParents) under its parent.
+func fileReprintsUnderParent(sortData map[string]*SortingData, parents map[string]string) {
+	for _, sorting := range sortData {
+		if sorting == nil {
+			continue
+		}
+		parent, found := parents[sorting.co.SetCode]
+		if found {
+			sorting.groupLower = parent
+			sorting.reprint = true
+		}
+	}
 }
 
 // resolveSortingData resolves the sorting data of every given id up
@@ -2739,6 +2762,10 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData) bool {
 
 	if cI.Name == cJ.Name {
 		if setDateI.Equal(setDateJ) {
+			// Same number in two editions is a tie the number can't break
+			if cI.Edition != cJ.Edition && cI.Card.Number == cJ.Card.Number {
+				return cmpSets(sortingI, sortingJ)
+			}
 			// We need not to strip to keep set ordered wrt Promos etc
 			return cmpNumberAndFinish(sortingI, sortingJ, false)
 		}
@@ -2750,7 +2777,8 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData) bool {
 }
 
 // cmpSetsAlphabeticalSet sorts cards by their names, keeping cards grouped
-// by edition alphabetically.
+// by edition alphabetically. An edition reprinting its parent's card list
+// sorts right after the parent, once fileReprintsUnderParent has run.
 func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData) bool {
 	if sortingI == nil || sortingJ == nil {
 		return false
@@ -2760,6 +2788,12 @@ func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData) bool {
 
 	if cI.SetCode == cJ.SetCode {
 		return cmpSetsAlphabetical(sortingI, sortingJ)
+	}
+	if sortingI.groupLower != sortingJ.groupLower {
+		return sortingI.groupLower < sortingJ.groupLower
+	}
+	if sortingI.reprint != sortingJ.reprint {
+		return sortingJ.reprint
 	}
 
 	return sortingI.editionLower < sortingJ.editionLower
