@@ -128,8 +128,10 @@ func (c *Client) Patch(ctx context.Context, emailHash, section string, payload j
 	}
 
 	if expectedVersion == 0 {
-		cols := map[string][]byte{"favorites": []byte("[]"), "recents": []byte("[]"), "preferences": []byte("{}")}
-		cols[section] = []byte(jsonOrEmpty(payload, defaultFor(section)))
+		// Strings, not []byte: with binary_parameters lib/pq sends []byte in
+		// binary format, which JSONB rejects ("unsupported jsonb version").
+		cols := map[string]string{"favorites": "[]", "recents": "[]", "preferences": "{}"}
+		cols[section] = jsonOrEmpty(payload, defaultFor(section))
 		return c.writeWithConflict(ctx, `
 			WITH ins AS (
 				INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
@@ -159,7 +161,7 @@ func (c *Client) Patch(ctx context.Context, emailHash, section string, payload j
 		SELECT FALSE AS updated, version, favorites, recents, preferences
 		  FROM user_state
 		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`, section)
-	return c.writeWithConflict(ctx, q, emailHash, []byte(jsonOrEmpty(payload, defaultFor(section))), expectedVersion)
+	return c.writeWithConflict(ctx, q, emailHash, jsonOrEmpty(payload, defaultFor(section)), expectedVersion)
 }
 
 func defaultFor(section string) string {
