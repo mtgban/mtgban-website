@@ -14,7 +14,6 @@ import (
 const (
 	defaultDebounce   = 30 * time.Second
 	defaultRunTimeout = 5 * time.Minute
-	defaultSendPace   = 250 * time.Millisecond
 )
 
 // The API's per-user request rate and burst.
@@ -33,10 +32,12 @@ type Service struct {
 	// signal wakes the loop; buffered so RequestEvaluate never blocks and
 	// bursts coalesce.
 	signal chan struct{}
-	// mu guards pending and lastPrune.
+	// mu guards pending, lastPrune and lastRun.
 	mu        sync.Mutex
 	pending   map[Side]bool
 	lastPrune time.Time
+	// lastRun is the previous run's start, zero before the first run.
+	lastRun time.Time
 }
 
 // NewService constructs a Service evaluating store's alerts with deps and
@@ -62,11 +63,11 @@ func NewService(store *Store, deps EvalDeps, apiDeps APIDeps) *Service {
 	if deps.RunTimeout == 0 {
 		deps.RunTimeout = defaultRunTimeout
 	}
-	if deps.Pace == 0 {
-		deps.Pace = defaultSendPace
-	}
 	if deps.PruneDue == nil {
 		deps.PruneDue = s.pruneDue
+	}
+	if deps.Since == nil {
+		deps.Since = s.sinceLastRun
 	}
 	s.deps = deps
 	return s
@@ -90,6 +91,9 @@ func (s *Service) SetStore(store *Store) {
 		s.deps.Store, s.api.deps.Store = store, store
 		if s.api.deps.Limiter == nil {
 			s.api.deps.Limiter = ratelimit.NewLimiter(apiRate, apiBurst)
+		}
+		if s.api.deps.ConfirmLimiter == nil {
+			s.api.deps.ConfirmLimiter = ratelimit.NewLimiter(confirmRate, confirmBurst)
 		}
 	}
 }
@@ -167,6 +171,20 @@ func (s *Service) pruneDue(now time.Time) bool {
 	return true
 }
 
+// sinceLastRun is the previous run's start, zero before the first run.
+func (s *Service) sinceLastRun() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastRun
+}
+
+// recordRun stores a run's start, for the next run's Since.
+func (s *Service) recordRun(start time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastRun = start
+}
+
 // StartEvaluator runs the debounced loop in a goroutine of its own. Each
 // run goes through tracked, which the caller supplies to record it and
 // recover a panic, so one that panics leaves the loop serving the next.
@@ -203,4 +221,5 @@ func (s *Service) runPending(ctx context.Context, deps EvalDeps) {
 	}
 	sum := runEvaluation(ctx, deps, sides)
 	deps.report(sum.String(), sum.problem())
+	s.recordRun(sum.start)
 }

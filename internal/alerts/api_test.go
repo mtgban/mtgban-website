@@ -3,23 +3,110 @@ package alerts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fakeAlertStore keeps rows in memory; ids are assigned in order.
 type fakeAlertStore struct {
 	contacts map[string]Contact
 	rows     map[int64]Alert
+	channels map[channelKey]Channel
 	nextID   int64
 }
 
+type channelKey struct {
+	userHash string
+	kind     ChannelKind
+	source   ChannelSource
+}
+
 func newFakeAlertStore() *fakeAlertStore {
-	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}}
+	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}}
+}
+
+func (f *fakeAlertStore) Channels(_ context.Context, h string) ([]Channel, error) {
+	var out []Channel
+	for k, c := range f.channels {
+		if k.userHash == h {
+			out = append(out, c)
+		}
+	}
+	slices.SortFunc(out, func(a, b Channel) int {
+		return strings.Compare(string(a.Kind)+"|"+string(a.Source), string(b.Kind)+"|"+string(b.Source))
+	})
+	return out, nil
+}
+
+// ChannelFor mirrors the store: a verified user row over an undisabled
+// patreon one, then the contact's Discord id when no Discord row exists.
+func (f *fakeAlertStore) ChannelFor(_ context.Context, h string, kind ChannelKind) (Channel, bool, error) {
+	user, ok := f.channels[channelKey{h, kind, SourceUser}]
+	if ok && user.VerifiedAt != nil && user.DisabledAt == nil {
+		return user, true, nil
+	}
+	patreon, ok := f.channels[channelKey{h, kind, SourcePatreon}]
+	if ok && patreon.DisabledAt == nil {
+		return patreon, true, nil
+	}
+	if kind != ChannelDiscord {
+		return Channel{}, false, nil
+	}
+	for k := range f.channels {
+		if k.userHash == h && k.kind == kind {
+			return Channel{}, false, nil
+		}
+	}
+	c, ok := f.contacts[h]
+	if !ok || c.DiscordUserID == "" {
+		return Channel{}, false, nil
+	}
+	at := time.Unix(1, 0)
+	return Channel{UserHash: h, Kind: ChannelDiscord, Address: c.DiscordUserID, Source: SourcePatreon, VerifiedAt: &at}, true, nil
+}
+
+// UpsertChannel mirrors the store: the same address keeps its state, a new one resets it.
+func (f *fakeAlertStore) UpsertChannel(_ context.Context, c Channel) error {
+	k := channelKey{c.UserHash, c.Kind, c.Source}
+	cur, ok := f.channels[k]
+	if ok && strings.EqualFold(cur.Address, c.Address) {
+		if c.VerifiedAt == nil {
+			c.VerifiedAt = cur.VerifiedAt
+		}
+		c.DisabledAt, c.DisabledReason = cur.DisabledAt, cur.DisabledReason
+	} else {
+		c.DisabledAt, c.DisabledReason = nil, ""
+	}
+	f.channels[k] = c
+	return nil
+}
+func (f *fakeAlertStore) ChannelByAddress(_ context.Context, kind ChannelKind, address string) ([]Channel, error) {
+	var out []Channel
+	for k, c := range f.channels {
+		if k.kind == kind && strings.EqualFold(c.Address, address) {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+func (f *fakeAlertStore) DeleteChannel(_ context.Context, h string, kind ChannelKind, source ChannelSource) error {
+	delete(f.channels, channelKey{h, kind, source})
+	return nil
+}
+func (f *fakeAlertStore) EnableChannel(_ context.Context, h string, kind ChannelKind, source ChannelSource) error {
+	k := channelKey{h, kind, source}
+	c, ok := f.channels[k]
+	if ok {
+		c.DisabledAt, c.DisabledReason = nil, ""
+		f.channels[k] = c
+	}
+	return nil
 }
 
 func (f *fakeAlertStore) Contact(_ context.Context, h string) (Contact, bool, error) {
@@ -710,6 +797,11 @@ func TestAlertsAPIUnavailable(t *testing.T) {
 	if s.API().Store() != nil {
 		t.Fatal("a nil *Store became a non-nil APIStore")
 	}
+	// NewAPI must not start a limiter janitor goroutine for an API that
+	// will only ever answer 503.
+	if s.API().deps.ConfirmLimiter != nil {
+		t.Fatal("a nil store got a confirm limiter")
+	}
 	w := httptest.NewRecorder()
 	s.API().ServeHTTP(w, alertsRequest("GET", "/api/alerts/", "", ""))
 	if w.Code != http.StatusUnauthorized {
@@ -753,5 +845,587 @@ func TestServiceSetStore(t *testing.T) {
 	var nilService *Service
 	if nilService.Store() != nil {
 		t.Fatal("nil service has a store")
+	}
+}
+
+var testTokenSecret = []byte("test-secret")
+
+const testOrigin = "https://mtgban.com"
+
+type sentConfirm struct{ to, link string }
+
+// testChannelAPI is testAlertsAPI with email allowed on Legacy and a
+// confirm mailer recording what it sends; fail makes every send fail.
+func testChannelAPI(store APIStore, sent *[]sentConfirm, fail *bool) *API {
+	api := testAlertsAPI(store)
+	api.deps.Channels = func(v url.Values) []ChannelKind {
+		if v.Get("UserTier") == "Legacy" {
+			return []ChannelKind{ChannelDiscord, ChannelEmail}
+		}
+		return []ChannelKind{ChannelDiscord}
+	}
+	api.deps.Mint = func(t Token) string { return MintToken(testTokenSecret, t) }
+	api.deps.SendConfirm = func(_ context.Context, to, link string) error {
+		if fail != nil && *fail {
+			return errors.New("mail down")
+		}
+		*sent = append(*sent, sentConfirm{to, link})
+		return nil
+	}
+	return api
+}
+
+// channelRequest is alertsRequest from the trusted test origin.
+func channelRequest(method, path, body, caller string) *http.Request {
+	r := alertsRequest(method, path, body, caller)
+	r.Header.Set("X-Test-Origin", testOrigin)
+	return r
+}
+
+func TestAlertsAPIDeliveryChannel(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	hash := testHash("a@b.com")
+	legacy, pioneer := testCaller("a@b.com", "Legacy"), testCaller("a@b.com", "Pioneer")
+	email := `{"card_id":"card-1","side":"buylist","condition":"NM","above":{"kind":"abs","value":15},"delivery":"email"}`
+
+	// No confirmed address yet.
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", email, legacy))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "confirm an email address first") {
+		t.Fatalf("no channel = %d %s", w.Code, w.Body)
+	}
+	// A pending address is not enough.
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "x@y.com", Source: SourceUser}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", email, legacy))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "confirm an email address first") {
+		t.Fatalf("pending channel = %d %s", w.Code, w.Body)
+	}
+
+	now := time.Now()
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "x@y.com", Source: SourceUser, VerifiedAt: &now}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", email, legacy))
+	if w.Code != http.StatusCreated || store.rows[1].Delivery != DeliveryEmail {
+		t.Fatalf("verified channel = %d %s", w.Code, w.Body)
+	}
+
+	// The allowance still comes first.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", strings.Replace(email, `"value":15`, `"value":16`, 1), pioneer))
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("pioneer has no allowance = %d %s", w.Code, w.Body)
+	}
+	api.deps.Channels = func(url.Values) []ChannelKind { return []ChannelKind{ChannelDiscord} }
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", strings.Replace(email, `"value":15`, `"value":16`, 1), legacy))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "channel not available on your tier") {
+		t.Fatalf("tier without email = %d %s", w.Code, w.Body)
+	}
+
+	// Discord keeps its message on create and now on patch too.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"delivery":"discord"}`, legacy))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "link Discord") {
+		t.Fatalf("patch to unlinked discord = %d %s", w.Code, w.Body)
+	}
+	store.contacts[hash] = Contact{UserHash: hash, DiscordUserID: "1", Tier: "Legacy"}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"delivery":"discord"}`, legacy))
+	if w.Code != http.StatusOK || store.rows[1].Delivery != DeliveryDiscord {
+		t.Fatalf("patch to discord = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"delivery":"email"}`, legacy))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "channel not available on your tier") {
+		t.Fatalf("patch to email without tier = %d %s", w.Code, w.Body)
+	}
+
+	// An empty delivery on create is discord.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", strings.Replace(strings.Replace(email, `,"delivery":"email"`, "", 1), `"value":15`, `"value":17`, 1), legacy))
+	if w.Code != http.StatusCreated || store.rows[2].Delivery != DeliveryDiscord {
+		t.Fatalf("default delivery = %d %s", w.Code, w.Body)
+	}
+
+	// Back on a tier with email, a patch to it needs the address active.
+	api = testChannelAPI(store, &sent, nil)
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "x@y.com", Source: SourceUser, VerifiedAt: &now, DisabledAt: &now}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/2", `{"delivery":"email"}`, legacy))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "confirm an email address first") {
+		t.Fatalf("patch to disabled email = %d %s", w.Code, w.Body)
+	}
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "x@y.com", Source: SourceUser, VerifiedAt: &now}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/2", `{"delivery":"email"}`, legacy))
+	if w.Code != http.StatusOK || store.rows[2].Delivery != DeliveryEmail {
+		t.Fatalf("patch to email = %d %s", w.Code, w.Body)
+	}
+}
+
+func TestAlertsAPISetEmail(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+
+	for _, bad := range []string{"", "nope", "a@", "Bob <bob@example.com>", "<bob@example.com>", "a@b.com\r\nBcc: c@d.com", "a|b@example.com", strings.Repeat("a", 250) + "@b.com"} {
+		body, _ := json.Marshal(map[string]string{"address": bad})
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", string(body), sig))
+		if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "enter a valid email address") {
+			t.Fatalf("address %q = %d %s", bad, w.Code, w.Body)
+		}
+	}
+	if len(store.channels) != 0 || len(sent) != 0 {
+		t.Fatalf("bad addresses stored %v sent %v", store.channels, sent)
+	}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"  Me@Example.COM "}`, sig))
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("good address = %d %s", w.Code, w.Body)
+	}
+	var got struct{ State, Address string }
+	err := json.Unmarshal(w.Body.Bytes(), &got)
+	if err != nil || got.State != "pending" || got.Address != "me@example.com" {
+		t.Fatalf("body = %s (%v)", w.Body, err)
+	}
+	if c, ok := store.contacts[hash]; !ok || c.Tier != "Legacy" {
+		t.Fatalf("no contact behind the new channel row: %+v", store.contacts)
+	}
+	row, ok := store.channels[channelKey{hash, ChannelEmail, SourceUser}]
+	if !ok || row.Address != "me@example.com" || row.VerifiedAt != nil {
+		t.Fatalf("row = %+v ok=%v", row, ok)
+	}
+	if len(sent) != 1 || sent[0].to != "me@example.com" || !strings.HasPrefix(sent[0].link, testOrigin+"/alerts/confirm?token=") {
+		t.Fatalf("sent = %+v", sent)
+	}
+	u, err := url.Parse(sent[0].link)
+	if err != nil {
+		t.Fatalf("link: %v", err)
+	}
+	tok, err := VerifyToken(testTokenSecret, u.Query().Get("token"), time.Now())
+	if err != nil || tok.Kind != TokenConfirm || tok.UserHash != hash || tok.Address != "me@example.com" {
+		t.Fatalf("token = %+v %v", tok, err)
+	}
+	if d := time.Until(tok.Expires); d < 23*time.Hour || d > 25*time.Hour {
+		t.Fatalf("token expires in %v, want about a day", d)
+	}
+
+	// Three mails an hour; the fourth is refused, resend included.
+	for i := 0; i < 2; i++ {
+		w = httptest.NewRecorder()
+		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("send %d = %d %s", i+2, w.Code, w.Body)
+		}
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "too many confirmation mails") {
+		t.Fatalf("fourth = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"other@example.com"}`, sig))
+	if w.Code != http.StatusTooManyRequests || len(sent) != 3 || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
+		t.Fatalf("fifth = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+	// Another user has a limit of their own.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"x@example.com"}`, testCaller("x@y.com", "Legacy")))
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("other user = %d %s", w.Code, w.Body)
+	}
+}
+
+func TestAlertsAPISetEmailRefusals(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	fail := false
+	api := testChannelAPI(store, &sent, &fail)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	body := `{"address":"me@example.com"}`
+
+	// A tier without email cannot ask for confirmation mails.
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, testCaller("a@b.com", "Pioneer")))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "channel not available on your tier") {
+		t.Fatalf("pioneer = %d %s", w.Code, w.Body)
+	}
+	// A link needs a trusted origin.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/channels/email", body, sig))
+	if w.Code != http.StatusBadRequest || len(store.channels) != 0 {
+		t.Fatalf("no origin = %d %s", w.Code, w.Body)
+	}
+
+	// A failed send keeps the row for a resend.
+	fail = true
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, sig))
+	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "could not send the confirmation mail") {
+		t.Fatalf("send fails = %d %s", w.Code, w.Body)
+	}
+	if store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
+		t.Fatalf("row after failed send = %+v", store.channels)
+	}
+	fail = false
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 1 || sent[0].to != "me@example.com" {
+		t.Fatalf("resend = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+
+	// Re-entering a confirmed address sends nothing.
+	now := time.Now()
+	row := store.channels[channelKey{hash, ChannelEmail, SourceUser}]
+	row.VerifiedAt = &now
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = row
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"ME@example.com"}`, sig))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"verified"`) || len(sent) != 1 {
+		t.Fatalf("same verified address = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+
+	// Nothing to resend once verified, or with no row.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "no address to confirm") {
+		t.Fatalf("resend verified = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, testCaller("x@y.com", "Legacy")))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("resend without row = %d %s", w.Code, w.Body)
+	}
+}
+
+func TestAlertsAPIConfirmNotConfigured(t *testing.T) {
+	sig := testCaller("a@b.com", "Legacy")
+	for name, unset := range map[string]func(*API){
+		"no mint": func(a *API) { a.deps.Mint = nil },
+		"no send": func(a *API) { a.deps.SendConfirm = nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := newFakeAlertStore()
+			sent := []sentConfirm{}
+			api := testChannelAPI(store, &sent, nil)
+			unset(api)
+			hash := testHash("a@b.com")
+			store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser}
+			for _, path := range []string{"/api/alerts/channels/email", "/api/alerts/channels/email/resend"} {
+				w := httptest.NewRecorder()
+				api.ServeHTTP(w, channelRequest("POST", path, `{"address":"me@example.com"}`, sig))
+				if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "email confirmation not configured") {
+					t.Fatalf("%s = %d %s", path, w.Code, w.Body)
+				}
+			}
+		})
+	}
+}
+
+func TestAlertsAPIListChannels(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+
+	list := func() []map[string]any {
+		t.Helper()
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, channelRequest("GET", "/api/alerts/channels", "", sig))
+		if w.Code != http.StatusOK {
+			t.Fatalf("list = %d %s", w.Code, w.Body)
+		}
+		var out []map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &out)
+		if err != nil || out == nil {
+			t.Fatalf("decode %s: %v", w.Body, err)
+		}
+		return out
+	}
+	if got := list(); len(got) != 0 {
+		t.Fatalf("empty = %v", got)
+	}
+
+	// The legacy Discord id shows as a verified patreon row.
+	store.contacts[hash] = Contact{UserHash: hash, DiscordUserID: "42", Tier: "Legacy"}
+	got := list()
+	if len(got) != 1 || got[0]["kind"] != "discord" || got[0]["address"] != "42" || got[0]["source"] != "patreon" || got[0]["state"] != "verified" {
+		t.Fatalf("synthesized = %v", got)
+	}
+
+	now := time.Now()
+	store.channels[channelKey{hash, ChannelDiscord, SourcePatreon}] = Channel{UserHash: hash, Kind: ChannelDiscord, Address: "42", Source: SourcePatreon, VerifiedAt: &now, DisabledAt: &now, DisabledReason: "blocked"}
+	store.channels[channelKey{hash, ChannelEmail, SourcePatreon}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "Pat@Example.com", Source: SourcePatreon, VerifiedAt: &now}
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser}
+	got = list()
+	if len(got) != 3 {
+		t.Fatalf("rows = %v", got)
+	}
+	want := []struct{ kind, source, address, state, reason string }{
+		{"discord", "patreon", "42", "disabled", "blocked"},
+		{"email", "patreon", "Pat@Example.com", "verified", ""},
+		{"email", "user", "me@example.com", "pending", ""},
+	}
+	for i, wnt := range want {
+		g := got[i]
+		if g["kind"] != wnt.kind || g["source"] != wnt.source || g["address"] != wnt.address || g["state"] != wnt.state || g["reason"] != wnt.reason {
+			t.Fatalf("row %d = %v, want %+v", i, g, wnt)
+		}
+		for _, key := range []string{"verified_at", "disabled_at"} {
+			_, ok := g[key]
+			if !ok {
+				t.Fatalf("row %d lacks %s: %v", i, key, g)
+			}
+		}
+	}
+	if got[2]["verified_at"] != nil || got[1]["disabled_at"] != nil || got[0]["disabled_at"] == nil {
+		t.Fatalf("timestamps = %v", got)
+	}
+}
+
+func TestAlertsAPIDeleteAndEnableChannel(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	now := time.Now()
+	store.channels[channelKey{hash, ChannelEmail, SourcePatreon}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &now, DisabledAt: &now, DisabledReason: "unsubscribed"}
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("DELETE", "/api/alerts/channels/email", "", sig))
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("delete = %d %s", w.Code, w.Body)
+	}
+	_, userLeft := store.channels[channelKey{hash, ChannelEmail, SourceUser}]
+	_, patreonLeft := store.channels[channelKey{hash, ChannelEmail, SourcePatreon}]
+	if userLeft || !patreonLeft {
+		t.Fatalf("after delete user=%v patreon=%v", userLeft, patreonLeft)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("DELETE", "/api/alerts/channels/email", "", sig))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("delete again = %d %s", w.Code, w.Body)
+	}
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/enable", `{"kind":"sms"}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "unknown channel") {
+		t.Fatalf("enable sms = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/enable", `{"kind":"discord"}`, sig))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("enable without patreon row = %d %s", w.Code, w.Body)
+	}
+	// A complained address is never mailed again, Enable included.
+	complained := store.channels[channelKey{hash, ChannelEmail, SourcePatreon}]
+	complained.DisabledReason = ReasonComplained
+	store.channels[channelKey{hash, ChannelEmail, SourcePatreon}] = complained
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/enable", `{"kind":"email"}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || store.channels[channelKey{hash, ChannelEmail, SourcePatreon}].DisabledAt == nil {
+		t.Fatalf("enable complained = %d %s", w.Code, w.Body)
+	}
+	complained.DisabledReason = ReasonUnsubscribed
+	store.channels[channelKey{hash, ChannelEmail, SourcePatreon}] = complained
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/enable", `{"kind":"email"}`, sig))
+	row := store.channels[channelKey{hash, ChannelEmail, SourcePatreon}]
+	if w.Code != http.StatusNoContent || row.DisabledAt != nil || row.DisabledReason != "" {
+		t.Fatalf("enable = %d %s row=%+v", w.Code, w.Body, row)
+	}
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("PATCH", "/api/alerts/channels/email", `{}`, sig))
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("patch channel = %d %s", w.Code, w.Body)
+	}
+}
+
+// A spam complaint on any user's row stops confirm mail to that address;
+// a bounce does not, and both attempts are charged to the limiter.
+func TestAlertsAPIConfirmComplainedAddress(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash, other := testHash("a@b.com"), testHash("x@y.com")
+	now := time.Now()
+	store.channels[channelKey{other, ChannelEmail, SourceUser}] = Channel{UserHash: other, Kind: ChannelEmail, Address: "Victim@example.com", Source: SourceUser, DisabledAt: &now, DisabledReason: "complained"}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"victim@example.com"}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "this address cannot receive mail from us") {
+		t.Fatalf("post complained = %d %s", w.Code, w.Body)
+	}
+	_, stored := store.channels[channelKey{hash, ChannelEmail, SourceUser}]
+	if stored || len(sent) != 0 {
+		t.Fatalf("complained address stored=%v sent=%d", stored, len(sent))
+	}
+
+	// The user's own pending row, complained after it was entered.
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "victim@example.com", Source: SourceUser, DisabledAt: &now, DisabledReason: "complained"}
+	delete(store.channels, channelKey{other, ChannelEmail, SourceUser})
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "this address cannot receive mail from us") || len(sent) != 0 {
+		t.Fatalf("resend complained = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+
+	// A bounced pending row can resend.
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, DisabledAt: &now, DisabledReason: "bounced"}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 1 || sent[0].to != "me@example.com" {
+		t.Fatalf("resend bounced = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+
+	// Two refusals and one send used the burst of three.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("fourth = %d %s", w.Code, w.Body)
+	}
+}
+
+// A verified address a bounce disabled can be confirmed again, by resend or by re-entering it.
+func TestAlertsAPIResendBouncedVerified(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	now := time.Now()
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, VerifiedAt: &now, DisabledAt: &now, DisabledReason: "bounced"}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 1 {
+		t.Fatalf("resend = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 2 {
+		t.Fatalf("re-enter = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+}
+
+// Echoing the stored delivery is not a change, so an edit passes with the channel gone.
+func TestAlertsAPIPatchUnchangedDelivery(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	store.rows[1] = Alert{ID: 1, UserHash: hash, Game: "magic", CardID: "card-1", Side: SideBuylist, Condition: "NM",
+		ReferencePrice: 12, Above: Threshold{Kind: KindAbs, Value: 15}, Delivery: DeliveryDiscord, Status: StatusActive}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"above":{"kind":"abs","value":16},"delivery":"discord"}`, sig))
+	if w.Code != http.StatusOK || store.rows[1].Above.Value != 16 {
+		t.Fatalf("unchanged delivery = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"delivery":"email"}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "confirm an email address first") {
+		t.Fatalf("switch to email = %d %s", w.Code, w.Body)
+	}
+}
+
+// A downgraded user cannot resend to a pending address.
+func TestAlertsAPIResendNeedsTier(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	hash := testHash("a@b.com")
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser}
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, testCaller("a@b.com", "Pioneer")))
+	if w.Code != http.StatusUnprocessableEntity || len(sent) != 0 {
+		t.Fatalf("downgraded resend = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+}
+
+// A patreon email row is an active channel without a user address.
+func TestAlertsAPICreateOnPatreonEmail(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	hash := testHash("a@b.com")
+	now := time.Now()
+	store.channels[channelKey{hash, ChannelEmail, SourcePatreon}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "a@b.com", Source: SourcePatreon, VerifiedAt: &now}
+	body := `{"card_id":"card-1","side":"buylist","condition":"NM","above":{"kind":"abs","value":15},"delivery":"email"}`
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("POST", "/api/alerts/", body, testCaller("a@b.com", "Legacy")))
+	if w.Code != http.StatusCreated || store.rows[1].Delivery != DeliveryEmail {
+		t.Fatalf("create on patreon email = %d %s", w.Code, w.Body)
+	}
+}
+
+// Only a bounce may be re-verified: an unsubscribed address is refused on
+// resend and on re-entering it, while a different address still goes through.
+func TestAlertsAPIUnsubscribedNotReverified(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	now := time.Now()
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, VerifiedAt: &now, DisabledAt: &now, DisabledReason: "unsubscribed"}
+	const msg = "this address unsubscribed; use Enable to turn it back on"
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), msg) || len(sent) != 0 {
+		t.Fatalf("resend unsubscribed = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"ME@example.com"}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), msg) || len(sent) != 0 {
+		t.Fatalf("re-post unsubscribed = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+	if row := store.channels[channelKey{hash, ChannelEmail, SourceUser}]; row.DisabledReason != "unsubscribed" {
+		t.Fatalf("row changed = %+v", row)
+	}
+
+	// A reason nobody planned for is refused too.
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, DisabledAt: &now, DisabledReason: "other"}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusUnprocessableEntity || len(sent) != 0 {
+		t.Fatalf("resend other reason = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"new@example.com"}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 1 || sent[0].to != "new@example.com" {
+		t.Fatalf("different address = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+}
+
+// A mint that signs nothing (no secret behind it) must not mail a dead link.
+func TestAlertsAPIConfirmRefusesAnUnsignedToken(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	api.deps.Mint = func(Token) string { return "" }
+	sig := testCaller("a@b.com", "Legacy")
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "not configured") || len(sent) != 0 {
+		t.Fatalf("= %d %s, sent %d", w.Code, w.Body, len(sent))
 	}
 }

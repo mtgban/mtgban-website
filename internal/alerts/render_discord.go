@@ -1,10 +1,12 @@
 package alerts
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bwmarrin/discordgo"
@@ -19,9 +21,51 @@ const (
 	embedCutWindow = 200
 )
 
-// Sender delivers one alert message to one Discord user.
-type Sender interface {
+// DefaultSendPace is the gap a run leaves between its DMs.
+const DefaultSendPace = 250 * time.Millisecond
+
+// DiscordSender delivers one alert message to one Discord user.
+type DiscordSender interface {
 	Send(discordUserID string, embed *discordgo.MessageEmbed) error
+}
+
+// notifier is a deliverer that also carries the park notice DM.
+type notifier interface {
+	notify(discordUserID string, embed *discordgo.MessageEmbed) error
+}
+
+// discordDeliverer sends one DM per firing, pacing every DM it sends.
+type discordDeliverer struct {
+	sender DiscordSender
+	pace   time.Duration
+	sent   bool
+}
+
+// NewDiscordDeliverer delivers through s, pace apart; build one per run,
+// so the first DM of a run goes out at once.
+func NewDiscordDeliverer(s DiscordSender, pace time.Duration) Deliverer {
+	return &discordDeliverer{sender: s, pace: pace}
+}
+
+func (d *discordDeliverer) Kind() ChannelKind { return ChannelDiscord }
+
+// Deliver DMs each firing to the channel's Discord id.
+func (d *discordDeliverer) Deliver(_ context.Context, dg Digest, ch Channel, label func(string) string) []Delivery {
+	out := make([]Delivery, 0, len(dg.Firings))
+	for _, f := range dg.Firings {
+		err := d.notify(ch.Address, renderDiscord(f, label))
+		out = append(out, Delivery{AlertID: f.Alert.ID, Err: err})
+	}
+	return out
+}
+
+// notify sends one DM, waiting pace after the one before it.
+func (d *discordDeliverer) notify(discordUserID string, embed *discordgo.MessageEmbed) error {
+	if d.sent && d.pace > 0 {
+		time.Sleep(d.pace)
+	}
+	d.sent = true
+	return d.sender.Send(discordUserID, embed)
 }
 
 // isDMPermanent is Discord blaming the recipient: DMs refused (50007) or
@@ -77,10 +121,11 @@ func thresholdLabel(t Threshold, reference float64, above bool) string {
 	return money(t.Value)
 }
 
-// dmEmbed is the DM for one firing: what crossed, at which stores, with a
-// buy or sell link for each through the site's redirect when siteURL is
-// set. label names a store from its shorthand.
-func dmEmbed(a Alert, d Decision, siteURL string, label func(shorthand string) string) *discordgo.MessageEmbed {
+// renderDiscord is the DM for one firing: what crossed, at which stores,
+// with a buy or sell link for each through the site's redirect when the
+// firing's origin is set. label names a store from its shorthand.
+func renderDiscord(f Firing, label func(shorthand string) string) *discordgo.MessageEmbed {
+	a, d, siteURL := f.Alert, f.Decision, f.Origin
 	kind := "r"
 	verb := "Buy"
 	if a.Side == SideBuylist {

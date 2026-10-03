@@ -53,4 +53,19 @@ CREATE TABLE IF NOT EXISTS alert_events (
 );
 CREATE INDEX IF NOT EXISTS alert_events_by_alert ON alert_events (alert_id, fired_at DESC);
 CREATE INDEX IF NOT EXISTS alert_events_fired_at_idx ON alert_events (fired_at);
+
+CREATE TABLE IF NOT EXISTS alert_channels (
+    user_hash        TEXT NOT NULL REFERENCES alert_contacts(user_hash) ON DELETE CASCADE,
+    kind             TEXT NOT NULL CHECK (kind IN ('discord', 'email')),
+    address          TEXT NOT NULL,
+    source           TEXT NOT NULL CHECK (source IN ('patreon', 'user')),
+    verified_at      TIMESTAMPTZ,
+    disabled_at      TIMESTAMPTZ,
+    disabled_reason  TEXT NOT NULL DEFAULT '',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_hash, kind, source)
+);
+CREATE INDEX IF NOT EXISTS alert_channels_by_address ON alert_channels (kind, lower(address));
+ALTER TABLE alert_events ADD COLUMN IF NOT EXISTS message_id TEXT NOT NULL DEFAULT '';
 `
