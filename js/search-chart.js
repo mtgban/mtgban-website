@@ -277,8 +277,9 @@ if (window.BAN_SEARCH_CHART.multi) {
             var cardId = item.getAttribute('data-card-id');
             if (cardId === lastHoverId) return;
             lastHoverId = cardId;
-            // Legend entries carry the chart id (ban:<id> when long-form reads
-            // are on); match them to the row's data-chart-id, not data-card-id.
+            // Legend entries carry the chart id (ban:<id> where the card has
+            // one, else its uuid); match them to the row's data-chart-id,
+            // not data-card-id.
             var row = document.querySelector('.result-header[data-chart-id="' + cardId + '"]');
             if (row && typeof row.onmouseenter === 'function') row.onmouseenter();
         });
