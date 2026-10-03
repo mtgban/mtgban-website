@@ -353,15 +353,15 @@ func tcgDirectStockNote() string {
 	return "Direct stock as of " + snap.Date.Format("Jan 2")
 }
 
-// tcgDirectStocked is seller with Direct's stock as the quantity of every
+// withDirectStock is seller with Direct's stock as the quantity of every
 // entry that has one, when seller is TCGplayer Direct, and seller itself
 // otherwise. Only the arbitrage pages read it: search does not show Direct's
 // stock.
-func tcgDirectStocked(seller mtgban.Seller) mtgban.Seller {
+func withDirectStock(seller mtgban.Seller) mtgban.Seller {
 	if seller.Info().Shorthand != tcgDirectStore {
 		return seller
 	}
-	return &stockedSeller{Seller: seller}
+	return &directStockSeller{Seller: seller}
 }
 
 // tcgDirectStockOnly is TCGplayer Direct's inventory with Direct's stock as
@@ -379,8 +379,8 @@ func tcgDirectStockOnly(inventory mtgban.InventoryRecord) mtgban.InventoryRecord
 	return out
 }
 
-// stockedSeller is a TCGplayer Direct seller for one request.
-type stockedSeller struct {
+// directStockSeller is TCGplayer Direct quoting its own stock, for one request.
+type directStockSeller struct {
 	mtgban.Seller
 	once      sync.Once
 	inventory mtgban.InventoryRecord
@@ -388,7 +388,7 @@ type stockedSeller struct {
 
 // Inventory copies the entries Direct has stock of, once, and shares the
 // rest with the seller's own.
-func (s *stockedSeller) Inventory() mtgban.InventoryRecord {
+func (s *directStockSeller) Inventory() mtgban.InventoryRecord {
 	s.once.Do(func() {
 		base := s.Seller.Inventory()
 		s.inventory = make(mtgban.InventoryRecord, len(base))
