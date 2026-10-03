@@ -30,8 +30,11 @@ func setTestTCGDirect(t *testing.T, cards map[string]*tcgListings) {
 
 func setTestTCGListingsOn(t *testing.T, day time.Time, cards map[string]*tcgListings) {
 	t.Helper()
-	prev := tcgListingsPtr.Load()
-	t.Cleanup(func() { tcgListingsPtr.Store(prev) })
+	prev, prevBuilt := tcgListingsPtr.Load(), directStockBuilt.Load()
+	t.Cleanup(func() {
+		tcgListingsPtr.Store(prev)
+		directStockBuilt.Store(prevBuilt)
+	})
 	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day, Cards: cards})
 }
 
@@ -340,6 +343,38 @@ func TestWithDirectStock(t *testing.T) {
 	scg := mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Shorthand: "SCG"})
 	if withDirectStock(scg) != scg {
 		t.Error("wrapped a seller other than Direct")
+	}
+}
+
+// TestDirectStockIsBuiltOncePerLoad reuses the stocked inventory across
+// requests, and builds it again once the seller or the listings reload.
+func TestDirectStockIsBuiltOncePerLoad(t *testing.T) {
+	setTestTCGDirect(t, map[string]*tcgListings{"card": {Direct: [5]int32{7}}})
+	info := mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true}
+	inv := mtgban.InventoryRecord{"card": {{Conditions: "NM", Price: 3, Quantity: 1}}}
+	direct := mtgban.NewSellerFromInventory(inv, info)
+
+	withDirectStock(direct).Inventory()
+	first := directStockBuilt.Load()
+	if q := withDirectStock(direct).Inventory()["card"][0].Quantity; q != 7 || directStockBuilt.Load() != first {
+		t.Errorf("a second request rebuilt the stock, or lost it: quantity %d", q)
+	}
+
+	setTestTCGDirect(t, map[string]*tcgListings{"card": {Direct: [5]int32{2}}})
+	if q := withDirectStock(direct).Inventory()["card"][0].Quantity; q != 2 {
+		t.Errorf("new listings: quantity %d, want 2", q)
+	}
+	relisted := directStockBuilt.Load()
+	if relisted == first {
+		t.Error("new listings did not rebuild the stock")
+	}
+
+	reloaded := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"card": {{Conditions: "NM", Price: 4, Quantity: 1}}}, info)
+	if price := withDirectStock(reloaded).Inventory()["card"][0].Price; price != 4 {
+		t.Errorf("reloaded seller: price %v, want its own 4", price)
+	}
+	if directStockBuilt.Load() == relisted {
+		t.Error("a reloaded seller did not rebuild the stock")
 	}
 }
 
