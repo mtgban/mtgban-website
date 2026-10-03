@@ -529,16 +529,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// like it is doing the work.
 	pageVars.ScopeIgnored = scope != "" && len(pinned) == 0
 
-	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
-	if oembed {
-		var status int
-		query, status = oembedQuery(r)
-		if status != 0 {
-			oembedError(w, status)
-			return
-		}
-	}
-
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
 
@@ -570,10 +560,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	fillSearchPrefs(&pageVars, r)
 
 	if len(query) > MaxSearchQueryLen {
-		if oembed {
-			oembedError(w, http.StatusNotFound)
-			return
-		}
 		pageVars.ErrorMessage = TooLongMessage
 
 		render(w, "search.html", pageVars)
@@ -599,9 +585,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := readSearchMiscOpts(r)
 	hidePromos := miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack")
-	if oembed {
-		miscSearchOpts = append(miscSearchOpts, "oembed")
-	}
 	preferFlavor := miscSearchOpts.has("preferFlavor")
 
 	// Keep track of what was searched
@@ -630,10 +613,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, r, ds, b, config, query, hidePromos)
 	if done {
-		if oembed {
-			oembedError(w, http.StatusNotFound)
-			return
-		}
 		pageVars.PopularSearches = getPopularSearches(ds)
 		pageVars.CleanSearchQuery = config.CleanQuery
 		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
@@ -668,27 +647,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Optionally sort according to price
-	if pageVars.SearchBest || oembed {
+	if pageVars.SearchBest {
 		sortOfferRows(r, allKeys, foundSellers, foundVendors)
 	}
 
-	// Every card is quoted with its own index prices: one shared list would
-	// print the first card's numbers under every other card's heading.
-	preview := embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
-		return editionTitle(b, cardID)
-	}, func(cardID string) []embed.Entry {
-		return EmbedSellerEntries(foundSellers, cardID, true)
-	})
-	if oembed {
-		payload, err := json.Marshal(preview)
-		if err != nil {
-			oembedError(w, http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(payload)
-		return
-	}
+	preview := searchPreview(r, b, allKeys, foundSellers)
 	fillEmbed(&pageVars, b, preview, allKeys)
 
 	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
@@ -713,6 +676,93 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SearchOEmbed answers an oEmbed consumer unfurling a search page with the
+// preview of that page's search, in json.
+func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
+	ds := s.datastore()
+	b := ds.backend
+
+	// A consumer that cannot read what we would send is told so rather
+	// than handed json it did not ask for.
+	switch r.FormValue("format") {
+	case "", "json":
+	default:
+		oembedError(w, http.StatusNotImplemented)
+		return
+	}
+
+	// An oEmbed provider answers for its own pages only. Any other host
+	// is a url we cannot speak for, so it gets the same answer as a page
+	// that carries no search at all.
+	u, err := url.Parse(r.FormValue("url"))
+	if err != nil || !trustedHostname(u.Host) {
+		oembedError(w, http.StatusNotFound)
+		return
+	}
+
+	// The search runs on the request a reader with the consumer's cookies
+	// would send for the page, so it reads the page's own query, sort,
+	// order, page of results and pinned bar as the page does.
+	page := r.Clone(r.Context())
+	page.URL = u
+	page.Form = u.Query()
+
+	query := strings.TrimSpace(page.FormValue("q"))
+	if query == "" || len(query) > MaxSearchQueryLen {
+		oembedError(w, http.StatusNotFound)
+		return
+	}
+
+	sig := getSignatureFromCookies(page)
+	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(page, sig)
+
+	miscSearchOpts := readSearchMiscOpts(page)
+	hidePromos := miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack")
+	miscSearchOpts = append(miscSearchOpts, "oembed")
+
+	// The search helpers fill a page as they go, which nothing here renders.
+	var pageVars PageVars
+	fillSearchPrefs(&pageVars, page)
+	pageVars.IsSealed = page.URL.Path == "/sealed"
+
+	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(page.FormValue("scope"))))
+	if pageVars.IsSealed {
+		config.SearchMode = "sealed"
+	}
+	if config.SortMode != "" {
+		pageVars.SearchSort = config.SortMode
+	}
+
+	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, page, ds, b, config, query, hidePromos)
+	if done {
+		oembedError(w, http.StatusNotFound)
+		return
+	}
+	allKeys = orderSearchKeys(&pageVars, page, b, ds.editions.ReprintParents, allKeys, dropOdds(b, config))
+	sortOfferRows(page, allKeys, foundSellers, foundVendors)
+
+	payload, err := json.Marshal(searchPreview(page, b, allKeys, foundSellers))
+	if err != nil {
+		oembedError(w, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(payload)
+}
+
+// searchPreview is the preview of a search's first cards, with their
+// cheapest offers.
+func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, foundSellers map[string]map[mtgban.Condition][]SearchEntry) *embed.OEmbed {
+	// Every card is quoted with its own index prices: one shared list would
+	// print the first card's numbers under every other card's heading.
+	return embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
+		return editionTitle(b, cardID)
+	}, func(cardID string) []embed.Entry {
+		return EmbedSellerEntries(foundSellers, cardID, true)
+	})
+}
+
 // fillSearchReader fills what the page offers this reader: the alerts link
 // when their tier has an allowance, the mobile navigation, and the admins'
 // Fix toggle.
@@ -734,38 +784,6 @@ func fillSearchReader(pageVars *PageVars, r *http.Request) {
 	// store, deep-linking into the overrides builder.
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
 	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
-}
-
-// oembedQuery reads the search an oEmbed request asks about, from the q of
-// the page url it names. For a request this provider cannot answer it returns
-// the error status to answer with instead, else 0.
-func oembedQuery(r *http.Request) (query string, status int) {
-	// A consumer that cannot read what we would send is told so rather
-	// than handed json it did not ask for.
-	switch format := r.FormValue("format"); format {
-	case "", "json":
-	default:
-		return "", http.StatusNotImplemented
-	}
-
-	page := r.FormValue("url")
-	u, err := url.Parse(page)
-	if err != nil {
-		return "", http.StatusNotFound
-	}
-	// An oEmbed provider answers for its own pages only. Any other host
-	// is a url we cannot speak for, so it gets the same answer as a page
-	// that carries no search at all.
-	if !trustedHostname(u.Host) {
-		return "", http.StatusNotFound
-	}
-	values := u.Query()
-	query = values.Get("q")
-	if query == "" {
-		return "", http.StatusNotFound
-	}
-
-	return query, 0
 }
 
 // fillSearchSettings fills the page's store lists and the options that hang

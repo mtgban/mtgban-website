@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"html"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -13,18 +16,11 @@ import (
 )
 
 // The endpoint is declared as application/json+oembed, so every answer it
-// gives has to be one - the search handler's own error paths render a whole
-// html page, which a consumer asking for json cannot read.
+// gives has to be one, errors included: a consumer asking for json cannot
+// read an html page.
 func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 	skipWithoutDatastore(t)
 	withSigMode(t, true, false)
-	if LogPages == nil {
-		LogPages = map[string]*log.Logger{}
-	}
-	if LogPages["Search"] == nil {
-		LogPages["Search"] = log.New(io.Discard, "", 0)
-		defer delete(LogPages, "Search")
-	}
 
 	for _, probe := range []struct {
 		name   string
@@ -37,7 +33,7 @@ func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 		{"a card we do carry", "/search/oembed?format=json&url=https%3A%2F%2Fmtgban.com%2Fsearch%3Fq%3DCounterspell", http.StatusOK},
 	} {
 		w := httptest.NewRecorder()
-		testSite.Search(w, httptest.NewRequest(http.MethodGet, probe.url, nil))
+		testSite.SearchOEmbed(w, httptest.NewRequest(http.MethodGet, probe.url, nil))
 		res := w.Result()
 		body, _ := io.ReadAll(res.Body)
 
@@ -53,6 +49,46 @@ func TestOEmbedAlwaysAnswersInJSON(t *testing.T) {
 				head = head[:60]
 			}
 			t.Errorf("%s: body is not json: %q", probe.name, head)
+		}
+	}
+}
+
+// The unfurl is the page it names: the first card it previews is the one the
+// page leads with, in the page's own sort, order, page of results and pinned
+// bar.
+func TestOEmbedPreviewsThePageItNames(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+
+	ogTitle := regexp.MustCompile(`<meta property="og:title" content="([^"]*)"`)
+	for _, page := range []string{
+		"/search?q=s%3AM10&reverse=true",
+		"/search?q=s%3AM10&sort=alpha",
+		"/search?q=s%3AM10&p=2",
+		"/search?q=s%3AM10&scope=r%3Acommon",
+	} {
+		w := httptest.NewRecorder()
+		testSite.Search(w, httptest.NewRequest(http.MethodGet, page, nil))
+		m := ogTitle.FindStringSubmatch(w.Body.String())
+		if m == nil {
+			t.Fatalf("%s: the page has no og:title", page)
+		}
+
+		w = httptest.NewRecorder()
+		testSite.SearchOEmbed(w, httptest.NewRequest(http.MethodGet, "/search/oembed?url="+url.QueryEscape("https://mtgban.com"+page), nil))
+		var preview embed.OEmbed
+		if err := json.Unmarshal(w.Body.Bytes(), &preview); err != nil {
+			t.Fatalf("%s: %v", page, err)
+		}
+		if want := html.UnescapeString(m[1]); preview.Title != want {
+			t.Errorf("%s: previews %q, the page leads with %q", page, preview.Title, want)
 		}
 	}
 }
