@@ -713,8 +713,9 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sig := getSignatureFromCookies(page)
-	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(page, sig)
+	// An unfurl is shown to everyone who sees the link, and noSigning
+	// checked no signature: quote the stores any reader is shown.
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists("")
 
 	miscSearchOpts := readSearchMiscOpts(page)
 	hidePromos := miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack")
