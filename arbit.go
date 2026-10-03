@@ -938,6 +938,13 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		} else {
 			arbit = mtgban.Arbit(b, opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
 		}
+		seller := source
+		if pageVars.ReverseMode {
+			seller = scraper
+		}
+		if !pageVars.GlobalMode && seller.Info().Shorthand == tcgDirectStore {
+			arbit = rankDirectAsOneCopy(arbit, opts.MinProfitability)
+		}
 		if len(arbit) == 0 {
 			continue
 		}

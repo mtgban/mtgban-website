@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -375,6 +376,24 @@ func tcgDirectStockOnly(inventory mtgban.InventoryRecord) mtgban.InventoryRecord
 			stocked[i].Quantity, _ = tcgDirectStock(cardID, stocked[i].Conditions)
 		}
 		out[cardID] = stocked
+	}
+	return out
+}
+
+// rankDirectAsOneCopy takes back the sqrt(quantity) profitability go-mtgban
+// gives a trade, for trades bought from TCGplayer Direct, and drops those that
+// cleared minProfitability on it alone. Direct's stock caps the trade but
+// ranks it no higher, so a card the scrape did not see ranks as one it did.
+func rankDirectAsOneCopy(arbit []mtgban.ArbitEntry, minProfitability float64) []mtgban.ArbitEntry {
+	out := arbit[:0]
+	for _, res := range arbit {
+		if res.Quantity > 1 {
+			res.Profitability /= math.Sqrt(float64(res.Quantity))
+		}
+		if res.Profitability < minProfitability {
+			continue
+		}
+		out = append(out, res)
 	}
 	return out
 }
