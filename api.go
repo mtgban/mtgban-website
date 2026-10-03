@@ -701,7 +701,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 		tagName = "names"
 	}
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	miscSearchOpts := readSearchMiscOpts(r)
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	// The export links carry the sticky bar as its own parameter rather
 	// than spliced into the path, so the csv holds the rows the page did.

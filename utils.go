@@ -1444,6 +1444,20 @@ func readCookie(r *http.Request, cookieName string) string {
 	return cookie.Value
 }
 
+// searchMiscOpts are the reader's miscellaneous search options, from the
+// SearchMiscOpts cookie.
+type searchMiscOpts []string
+
+// readSearchMiscOpts reads the reader's miscellaneous search options.
+func readSearchMiscOpts(r *http.Request) searchMiscOpts {
+	return strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+}
+
+// has reports whether the reader turned opt on.
+func (o searchMiscOpts) has(opt string) bool {
+	return slices.Contains(o, opt)
+}
+
 // There is no forever in cookies, so pick a really large interval
 func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)

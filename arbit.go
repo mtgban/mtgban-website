@@ -859,8 +859,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		opts.ProfitabilityConstant = ProfConstGlobal
 	}
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
 	// The sealed rows here carry the same link into a product's contents as
 	// the search results do, so they follow the same setting.
