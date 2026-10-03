@@ -523,7 +523,7 @@ func TestUnpackedResultsRenderASectionPerProduct(t *testing.T) {
 		Metadata: map[string]GenericCard{},
 	}
 	for _, entry := range entries {
-		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, false)
+		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false)
 	}
 	pageVars.SealedIndexKeys = []string{"TCGLowEV"}
 	pageVars.UnpackedSections = []UnpackedSection{{
@@ -804,7 +804,7 @@ func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
 		Metadata: map[string]GenericCard{},
 	}
 	for _, entry := range entries {
-		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, false)
+		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false)
 	}
 	pageVars.UnpackedSections = []UnpackedSection{{
 		Product:  entries[0],
@@ -861,7 +861,7 @@ func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
 		Metadata: map[string]GenericCard{},
 	}
 	for _, entry := range entries {
-		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false, false)
+		pageVars.Metadata[entry.CardID] = uuid2card(backend(), entry.CardID, true, false)
 	}
 	pageVars.UnpackedSections = []UnpackedSection{{
 		Product:  entries[0],

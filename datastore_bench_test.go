@@ -62,7 +62,7 @@ func BenchmarkUUID2Card(b *testing.B) {
 	uuids := benchCards(b, 10000)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		uuid2card(backend(), uuids[i%len(uuids)], false, false, false)
+		uuid2card(backend(), uuids[i%len(uuids)], false, false)
 	}
 }
 

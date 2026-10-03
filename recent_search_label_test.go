@@ -96,7 +96,7 @@ func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
 	if err != nil || len(uuids) != 1 {
 		t.Skipf("expected one printing, got %d (%v)", len(uuids), err)
 	}
-	card := uuid2card(backend(), uuids[0], false, true, false)
+	card := uuid2card(backend(), uuids[0], false, false)
 	if card.SearchURL == "" {
 		t.Fatal("the printing carries no SearchURL to hand over")
 	}

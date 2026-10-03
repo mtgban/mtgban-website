@@ -1294,7 +1294,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			pageVars.Metadata[entry.CardID] = uuid2card(b, entry.CardID, true, false, preferFlavor)
+			pageVars.Metadata[entry.CardID] = uuid2card(b, entry.CardID, true, preferFlavor)
 		}
 
 		// The HasNo* flags and the name were how this list asked arbit.html
@@ -1440,7 +1440,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
-		c := uuid2card(b, result.UUID, true, false, preferFlavor)
+		c := uuid2card(b, result.UUID, true, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result.UUID)
 	}

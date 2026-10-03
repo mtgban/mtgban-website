@@ -501,7 +501,6 @@ type GenericCard struct {
 	SypList     bool
 	Stocks      bool
 	StocksURL   string
-	Printings   string
 	Products    string
 	NumProducts int
 	TCGId       string
@@ -964,7 +963,7 @@ func showVariant(b *mtgmatcher.Backend, cardID string) bool {
 	return setDate.After(magic.PromosForEverybodyYay)
 }
 
-func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
+func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, preferFlavorName bool) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
@@ -1086,15 +1085,6 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 	}
 	cropURL := co.Images["crop"]
 
-	printings := ""
-	if genPrints {
-		if co.Sealed {
-			printings = genSealedPrintings(co)
-		} else {
-			printings = genCardPrintings(b, co)
-		}
-	}
-
 	var canBoosterGen bool
 	var hasDecklist bool
 	path := "search"
@@ -1200,7 +1190,6 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		SypList:     sypList,
 		Stocks:      stocks,
 		StocksURL:   stocksURL,
-		Printings:   printings,
 		Products:    products,
 		NumProducts: numProducts,
 		TCGId:       tcgID,
@@ -1232,6 +1221,20 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, useThumbs, genPrints, prefe
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,
 	}
+}
+
+// cardPrintings is a card's printings row for the search sidebar: a symbol
+// for each set the card was printed in. For a sealed product it is the set's
+// value panel instead.
+func cardPrintings(b *mtgmatcher.Backend, cardID string) string {
+	co, err := b.GetUUID(cardID)
+	if err != nil {
+		return ""
+	}
+	if co.Sealed {
+		return genSealedPrintings(co)
+	}
+	return genCardPrintings(b, co)
 }
 
 func genQuery(co *mtgmatcher.CardObject) string {
