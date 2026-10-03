@@ -795,6 +795,8 @@ func main() {
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
+		// No startup load to wait for: stores arrive one by one, if ever.
+		s.pricesLoaded.Store(true)
 	} else {
 		stores := splitStores(*storesFlag)
 		if len(stores) == 0 {

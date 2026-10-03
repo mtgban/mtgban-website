@@ -334,6 +334,7 @@ func (s *site) startScraperLoad(dumpsDir string, stores []string, datastoreLoade
 		// from a bucket, it can arrive after the prices.
 		<-datastoreLoaded
 		// Alerts wait for both the datastore and the prices.
+		s.pricesLoaded.Store(true)
 		s.alerts.RequestEvaluate(alerts.SideRetail, alerts.SideBuylist)
 		finish := backgroundJobs.Start(jobSetAnalysis)
 		s.runSealedAnalysis()
