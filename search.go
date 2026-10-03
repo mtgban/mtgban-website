@@ -584,7 +584,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	miscSearchOpts := readSearchMiscOpts(r)
-	hidePromos := miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack")
 	preferFlavor := miscSearchOpts.has("preferFlavor")
 
 	// Keep track of what was searched
@@ -606,28 +605,32 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
 	}
 
+	pageVars.CleanSearchQuery = config.CleanQuery
 	pageVars.SearchSort = readSearchSort(r, config)
 	pageVars.NoSort = config.SortMode != ""
 
-	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, r, ds, b, config, query, hidePromos)
-	if done {
+	result := runSearch(r, ds, config)
+	if result.message != "" {
+		pageVars.InfoMessage = result.message
+	}
+	if len(result.keys) == 0 {
 		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.CleanSearchQuery = config.CleanQuery
 		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
+	pageVars.CardHashes = result.hashes
 
-	// Save stats
-	pageVars.TotalUnique = len(allKeys)
+	// Allow displaying the "search all" link only when something
+	// was searched and no options were specified for it
+	pageVars.CanShowAll = !pageVars.IsSealed && config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
 
 	if pageVars.IsMobile && !pageVars.IsSealed {
-		pageVars.EditionFilterList = editionsForSearch(ds, allKeys)
+		pageVars.EditionFilterList = editionsForSearch(ds, result.keys)
 	}
 
 	// Sort sets as requested, default to chronological
-	odds := dropOdds(b, config)
-	allKeys = orderSearchKeys(&pageVars, r, b, ds.editions.ReprintParents, allKeys, odds)
+	allKeys := orderSearchKeys(&pageVars, r, b, ds.editions.ReprintParents, result.keys, result.odds)
 
 	// Load up image links and other metadata
 	for _, cardID := range allKeys {
@@ -646,17 +649,15 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Optionally sort according to price
 	if pageVars.SearchBest {
-		sortOfferRows(r, allKeys, foundSellers, foundVendors)
+		sortOfferRows(r, allKeys, result)
 	}
 
-	preview := searchPreview(r, b, allKeys, foundSellers)
+	preview := searchPreview(r, b, allKeys, result)
 	fillEmbed(&pageVars, b, preview, allKeys)
 
-	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
+	rebuildIndexRows(&pageVars, r, b, config, allKeys, result)
 
-	pageVars.FoundSellers = foundSellers
-	pageVars.FoundVendors = foundVendors
-	pageVars.AllKeys = allKeys
+	fillSearchResults(&pageVars.SearchVars, b, query, config, result, allKeys)
 
 	// CHART ALL THE THINGS
 	if roster.id != "" {
@@ -715,30 +716,27 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	// checked no signature: quote the stores any reader is shown.
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists("")
 
-	miscSearchOpts := readSearchMiscOpts(page)
-	hidePromos := miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack")
-	miscSearchOpts = append(miscSearchOpts, "oembed")
+	miscSearchOpts := append(readSearchMiscOpts(page), "oembed")
 
 	// The search helpers fill a page as they go, which nothing here renders.
 	var pageVars PageVars
-	pageVars.IsSealed = page.URL.Path == "/sealed"
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(page.FormValue("scope"))))
-	if pageVars.IsSealed {
+	if page.URL.Path == "/sealed" {
 		config.SearchMode = "sealed"
 	}
 	pageVars.SearchSort = readSearchSort(page, config)
 
-	allKeys, foundSellers, foundVendors, done := runSearch(&pageVars, page, ds, b, config, query, hidePromos)
-	if done {
+	result := runSearch(page, ds, config)
+	if len(result.keys) == 0 {
 		oembedError(w, http.StatusNotFound)
 		return
 	}
-	allKeys = orderSearchKeys(&pageVars, page, b, ds.editions.ReprintParents, allKeys, dropOdds(b, config))
-	sortOfferRows(page, allKeys, foundSellers, foundVendors)
+	allKeys := orderSearchKeys(&pageVars, page, b, ds.editions.ReprintParents, result.keys, result.odds)
+	sortOfferRows(page, allKeys, result)
 
-	payload, err := json.Marshal(searchPreview(page, b, allKeys, foundSellers))
+	payload, err := json.Marshal(searchPreview(page, b, allKeys, result))
 	if err != nil {
 		oembedError(w, http.StatusInternalServerError)
 		return
@@ -749,13 +747,13 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 // searchPreview is the preview of a search's first cards, with their
 // cheapest offers.
-func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, foundSellers map[string]map[mtgban.Condition][]SearchEntry) *embed.OEmbed {
+func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, result searchResults) *embed.OEmbed {
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
 	return embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
 		return editionTitle(b, cardID)
 	}, func(cardID string) []embed.Entry {
-		return EmbedSellerEntries(foundSellers, cardID, true)
+		return EmbedSellerEntries(result.sellers, cardID, true)
 	})
 }
 
@@ -988,10 +986,29 @@ func sortedEditionKeys(editions *editionsSnapshot, sortOpt string) []string {
 	return sortedKeys
 }
 
-// runSearch runs the search and collects each card's offers. When it finds
-// nothing to show it returns done, with the message saying why.
-func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, config SearchConfig, query string, hidePromos bool) (allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, done bool) {
+// searchResults are the cards a search found and what each is offered at.
+// hashes lists every card found, a decklist's repeats included, and keys each
+// card once; the two share an array unless a repeat was folded, so ordering
+// keys in place orders hashes with it. total is how many cards matched when
+// that is not len(keys), copies counts the repeats of a folded card, and
+// message says why the search shows none of them, or not all.
+type searchResults struct {
+	keys    []string
+	hashes  []string
+	copies  map[string]int
+	total   int
+	sellers map[string]map[mtgban.Condition][]SearchEntry
+	vendors map[string]map[mtgban.Condition][]SearchEntry
+	odds    map[string]float64
+	message string
+}
+
+// runSearch runs the search and collects each card's offers.
+func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResults {
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
+
+	var result searchResults
 
 	// Perform search
 	allKeys, err := searchAndFilter(ds, config)
@@ -1002,43 +1019,75 @@ func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher
 		// an invitation to answer a different question.
 		allKeys = searchFallback(ds, config)
 		if len(allKeys) == 0 {
-			pageVars.InfoMessage = NoCardsMessage
-			return nil, nil, nil, true
+			result.message = NoCardsMessage
+			return result
 		}
 	}
 
 	// Limit results to avoid hogging the website with large queries
 	if len(allKeys) > MaxSearchTotalResults {
-		pageVars.TotalCards = len(allKeys)
-		pageVars.InfoMessage = TooManyMessage
+		result.total = len(allKeys)
+		result.message = TooManyMessage
 		allKeys = allKeys[:MaxSearchTotalResults]
 	}
 
-	foundSellers, foundVendors = searchParallelNG(allKeys, config)
+	result.sellers, result.vendors = searchParallelNG(allKeys, config)
 
 	// Append the virtual custom buylist when enabled in the upload settings
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
 	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
 	if canUploadCustom && !config.SkipBuylist {
-		searchCustomBuylist(b, r, allKeys, foundVendors)
+		searchCustomBuylist(b, r, allKeys, result.vendors)
 	}
 
 	// Filter away any empty result
-	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
+	allKeys = PostSearchFilter(config, allKeys, result.sellers, result.vendors)
 
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
-		pageVars.InfoMessage = NoResultsMessage
-		if hidePromos {
-			pageVars.InfoMessage = NoPromosMessage
+		result.message = NoResultsMessage
+		miscSearchOpts := readSearchMiscOpts(r)
+		if miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack") {
+			result.message = NoPromosMessage
 		}
-		return nil, nil, nil, true
+		return result
 	}
 
+	// hashes carries the full result list (with the per-copy repeats that
+	// decklist/hashing searches produce) so transferring to the Uploader keeps
+	// the quantities. Rendering shows each unique card once, so dedupe the keys
+	// used for display — otherwise a 4-of card is drawn (and linked) 4 times.
+	// Only multi-result hashing searches can repeat a key (hashing also serves
+	// single-uuid lookups), so skip the work for everything else.
+	result.hashes = allKeys
+	result.keys = allKeys
+	if config.SearchMode == "hashing" && len(allKeys) > 1 {
+		if uniqueKeys := dedupeKeys(allKeys); len(uniqueKeys) < len(allKeys) {
+			if result.total == 0 {
+				result.total = len(allKeys)
+			}
+			// Record how many copies each card had so the deduped block can show it.
+			result.copies = make(map[string]int, len(uniqueKeys))
+			for _, k := range allKeys {
+				result.copies[k]++
+			}
+			result.keys = uniqueKeys
+		}
+	}
+
+	result.odds = dropOdds(b, config)
+
+	return result
+}
+
+// fillSearchResults puts the cards found on the page: the page of them with
+// their offers, how many there are, and the contents switch for a sealed
+// product that has one.
+func fillSearchResults(pageVars *SearchVars, b *mtgmatcher.Backend, query string, config SearchConfig, result searchResults, keys []string) {
 	// Offered once the search has found cards to switch between. A product
 	// that holds nothing but other products answers with those products: rows
 	// on the page, but not cards, and reading them another way finds nothing.
-	if containsSingles(b, allKeys) {
+	if containsSingles(b, result.keys) {
 		pageVars.Contents = contentsViews(b, query, config)
 	}
 
@@ -1047,35 +1096,12 @@ func runSearch(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher
 		pageVars.SearchQuery = config.FullQuery
 	}
 
-	// Allow displaying the "search all" link only when something
-	// was searched and no options were specified for it
-	canShowAll := !pageVars.IsSealed && config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
-	pageVars.CanShowAll = canShowAll
-	pageVars.CleanSearchQuery = config.CleanQuery
-
-	// CardHashes carries the full result list (with the per-copy repeats that
-	// decklist/hashing searches produce) so transferring to the Uploader keeps
-	// the quantities. Rendering shows each unique card once, so dedupe the keys
-	// used for display — otherwise a 4-of card is drawn (and linked) 4 times.
-	// Only multi-result hashing searches can repeat a key (hashing also serves
-	// single-uuid lookups), so skip the work for everything else.
-	pageVars.CardHashes = allKeys
-	if config.SearchMode == "hashing" && len(allKeys) > 1 {
-		if uniqueKeys := dedupeKeys(allKeys); len(uniqueKeys) < len(allKeys) {
-			if pageVars.TotalCards == 0 {
-				pageVars.TotalCards = len(allKeys)
-			}
-			// Record how many copies each card had so the deduped block can show it.
-			quantities := make(map[string]int, len(uniqueKeys))
-			for _, k := range allKeys {
-				quantities[k]++
-			}
-			pageVars.CardQuantities = quantities
-			allKeys = uniqueKeys
-		}
-	}
-
-	return allKeys, foundSellers, foundVendors, false
+	pageVars.TotalUnique = len(result.keys)
+	pageVars.TotalCards = result.total
+	pageVars.CardQuantities = result.copies
+	pageVars.AllKeys = keys
+	pageVars.FoundSellers = result.sellers
+	pageVars.FoundVendors = result.vendors
 }
 
 // orderSearchKeys sorts the results as the reader asked and returns the page
@@ -1180,41 +1206,41 @@ func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 
 // sortOfferRows orders each card's offers in place, condition by condition:
 // retail cheapest first, buylists by the reader's listing priority.
-func sortOfferRows(r *http.Request, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry) {
+func sortOfferRows(r *http.Request, allKeys []string, result searchResults) {
 	blSortPref := readCookie(r, "SearchListingPriority")
 
 	for _, cardID := range allKeys {
 		// This skips INDEX and PO conditions
 		for _, cond := range mtgban.DefaultGradeTags {
-			_, found := foundSellers[cardID][cond]
+			_, found := result.sellers[cardID][cond]
 			if found {
-				sort.Slice(foundSellers[cardID][cond], func(i, j int) bool {
-					return foundSellers[cardID][cond][i].Price < foundSellers[cardID][cond][j].Price
+				sort.Slice(result.sellers[cardID][cond], func(i, j int) bool {
+					return result.sellers[cardID][cond][i].Price < result.sellers[cardID][cond][j].Price
 				})
 			}
-			_, found = foundVendors[cardID][cond]
+			_, found = result.vendors[cardID][cond]
 			if found {
 				switch blSortPref {
 				default:
-					sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-						if foundVendors[cardID][cond][i].Price == foundVendors[cardID][cond][j].Price {
-							if foundVendors[cardID][cond][i].Credit == foundVendors[cardID][cond][j].Credit {
-								return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
+					sort.Slice(result.vendors[cardID][cond], func(i, j int) bool {
+						if result.vendors[cardID][cond][i].Price == result.vendors[cardID][cond][j].Price {
+							if result.vendors[cardID][cond][i].Credit == result.vendors[cardID][cond][j].Credit {
+								return result.vendors[cardID][cond][i].MarketCredit > result.vendors[cardID][cond][j].MarketCredit
 							}
-							return foundVendors[cardID][cond][i].Credit > foundVendors[cardID][cond][j].Credit
+							return result.vendors[cardID][cond][i].Credit > result.vendors[cardID][cond][j].Credit
 						}
-						return foundVendors[cardID][cond][i].Price > foundVendors[cardID][cond][j].Price
+						return result.vendors[cardID][cond][i].Price > result.vendors[cardID][cond][j].Price
 					})
 				case "credit":
-					sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-						if foundVendors[cardID][cond][i].Credit == foundVendors[cardID][cond][j].Credit {
-							return foundVendors[cardID][cond][i].MarketCredit > foundVendors[cardID][cond][j].MarketCredit
+					sort.Slice(result.vendors[cardID][cond], func(i, j int) bool {
+						if result.vendors[cardID][cond][i].Credit == result.vendors[cardID][cond][j].Credit {
+							return result.vendors[cardID][cond][i].MarketCredit > result.vendors[cardID][cond][j].MarketCredit
 						}
-						return foundVendors[cardID][cond][i].Credit > foundVendors[cardID][cond][j].Credit
+						return result.vendors[cardID][cond][i].Credit > result.vendors[cardID][cond][j].Credit
 					})
 				case "market":
-					sort.Slice(foundVendors[cardID][cond], func(i, j int) bool {
-						return foundVendors[cardID][cond][i].marketValue() > foundVendors[cardID][cond][j].marketValue()
+					sort.Slice(result.vendors[cardID][cond], func(i, j int) bool {
+						return result.vendors[cardID][cond][i].marketValue() > result.vendors[cardID][cond][j].marketValue()
 					})
 				}
 			}
@@ -1259,7 +1285,7 @@ func fillEmbed(pageVars *PageVars, b *mtgmatcher.Backend, preview *embed.OEmbed,
 // rebuildIndexRows replaces each card's INDEX rows with its collapsed
 // reference rows and the fallback marketplace links, adds the average-count
 // row to its buylist, and locks the offers a logged-out reader may not see.
-func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry, odds map[string]float64) {
+func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, config SearchConfig, allKeys []string, result searchResults) {
 	sig := getSignatureFromCookies(r)
 
 	// When the user asked to drop index data (skip:index), don't synthesize the
@@ -1283,7 +1309,7 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 	// each known source directly and pass the rest through, then sort the
 	// resulting reference rows alphabetically by store name.
 	for _, cardID := range allKeys {
-		indexArray := foundSellers[cardID]["INDEX"]
+		indexArray := result.sellers[cardID]["INDEX"]
 		evShorts := scraperStoreConfig()["sealed_ev"]["retail"]
 
 		tcgRow, hasTCG := collapseIndex(indexArray, "TCGLow", "TCGMarket", "", "", "TCG (Low / Market)")
@@ -1312,11 +1338,12 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 		// reads as such rather than as a percentage past what one can mean.
 		// "(est.)" says the number is read off that count, not off a shelf,
 		// the same qualifier an estimated buylist quote already wears.
-		if count, found := odds[cardID]; found {
-			if foundVendors[cardID] == nil {
-				foundVendors[cardID] = map[mtgban.Condition][]SearchEntry{}
+		count, ok := result.odds[cardID]
+		if ok {
+			if result.vendors[cardID] == nil {
+				result.vendors[cardID] = map[mtgban.Condition][]SearchEntry{}
 			}
-			foundVendors[cardID]["INDEX"] = append(foundVendors[cardID]["INDEX"], SearchEntry{
+			result.vendors[cardID]["INDEX"] = append(result.vendors[cardID]["INDEX"], SearchEntry{
 				ScraperName: "Avg Copies (est.)",
 				// A real shorthand, so it reads as its own scraper rather
 				// than an empty one: buylist_badge compares Shorthand
@@ -1396,13 +1423,13 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 		})
 
 		// In case there are no results at all
-		if foundSellers[cardID] == nil {
-			foundSellers[cardID] = map[mtgban.Condition][]SearchEntry{}
+		if result.sellers[cardID] == nil {
+			result.sellers[cardID] = map[mtgban.Condition][]SearchEntry{}
 		}
-		foundSellers[cardID]["INDEX"] = tmp
+		result.sellers[cardID]["INDEX"] = tmp
 
 		if sig == "" && SigCheck {
-			for j, foundSet := range []map[string]map[mtgban.Condition][]SearchEntry{foundSellers, foundVendors} {
+			for j, foundSet := range []map[string]map[mtgban.Condition][]SearchEntry{result.sellers, result.vendors} {
 				for cond := range foundSet[cardID] {
 					// Index/reference prices stay visible to everyone.
 					if cond == "INDEX" {
