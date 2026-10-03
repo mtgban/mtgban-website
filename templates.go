@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/observability"
 )
@@ -407,7 +408,7 @@ var funcMap = template.FuncMap{
 	// rarity_badge hands the set-symbol block the drawing for one rarity,
 	// already sized for the code it has to hold.
 	"rarity_badge": func(rarity, code string) rarityBadge {
-		badge, found := rarityBadges[rarity]
+		badge, found := rarityBadges[mtgmatcher.RarityName(rarity)]
 		if !found {
 			badge = rarityBadges[""]
 		}

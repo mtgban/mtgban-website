@@ -8,12 +8,13 @@ the card's set code cut out of the fill in the page's own background colour.
 
 The pieces, and where each lives:
 
-- `colorRarityMap` (`utils.go`) — one hex (or `var(--normal)`) per rarity
-  string, keyed exactly as the game's datastore spells it. `co.Rarity` reaches
-  this map verbatim, with no normalising in between, so the keys have to be a
-  byte-for-byte match — case included.
-- `img/setsymbol/<game>/*.svg` (optional) — one outline per rarity, loaded at
-  startup by `loadRarityBadges`. A game with no directory here — or no file
+- `colorRarityMap` (`utils.go`) — one hex (or `var(--normal)`) per rarity,
+  keyed by its `mtgmatcher.RarityName` (`superrare` for "Super Rare"), the
+  spelling a card carries its rarity in. The lookup folds `co.Rarity` the
+  same way.
+- `img/setsymbol/<game>/*.svg` (optional) — one outline per rarity, named by
+  its `RarityName` (`superrare.svg`), loaded at startup by
+  `loadRarityBadges`. A game with no directory here — or no file
   for a given rarity — draws `img/setsymbol/default.svg`, a plain circle.
 - `templates/partials/set-symbol.html` — the block that actually paints:
   a published symbol image where one exists, falling back to the keyrune
@@ -29,14 +30,12 @@ The pieces, and where each lives:
 
 ## Adding a game
 
-1. **Get the exact rarity vocabulary.** If go-mtgban's
-   `mtgmatcher/<game>/<game>.go` defines a `<game>RarityMap` (most do — it is
-   what sorts a set's rarity list commonest-first), its keys are the literal
-   strings `colorRarityMap` must use, and its values are the climb order for
-   step 3. Cross-check against the real datastore JSON (paths in
-   go-mtgban's `.env`): count cards per rarity, and confirm nothing in the
-   ranking map is actually empty and nothing the datastore carries is
-   missing from it.
+1. **Get the exact rarity vocabulary.** The game's datastore lists its
+   rarities, rarest first, under `data.properties.rarity`; each one's
+   `mtgmatcher.RarityName` is the key `colorRarityMap` must use, and the list
+   is the climb order for step 3. Cross-check against the real datastore
+   JSON (paths in go-mtgban's `.env`): count cards per rarity, and confirm
+   nothing in the list is actually empty.
 
 2. **Look at real cards.** Pull one sample image per rarity from the
    datastore's own image URLs — prefer a recent, canonical printing — and
@@ -53,7 +52,7 @@ The pieces, and where each lives:
    every parallel print regardless of tier. Sampling those would collide two
    real rarities onto one hex. Place them instead: climb the same swatch
    bank every other game already uses (see each entry's comment in
-   `colorRarityMap`), in the order the game's own `<game>RarityMap` ranks
+   `colorRarityMap`), in the order the datastore's rarity list ranks
    them. Reusing a hex across games is fine and expected — the bank is
    shared by design.
 
@@ -125,8 +124,8 @@ The pieces, and where each lives:
 | Yu-Gi-Oh | default circle | placed ladder; 35 rarity names group into ~10 tiers by the tier their name claims | added |
 | Flesh and Blood | default circle, except Fabled (diamond) and Gold (triangle) | sampled per glyph where the card prints one; placed for the four tiers that print none | added |
 | Pokemon | default circle — the card does print real per-rarity shapes (circle / diamond / star / ★★ / ★★★), not drawn here yet | 4 tiers sampled from their tinted stars; rest placed, grouped by family | added |
-| Gundam | default circle — the printed banner differentiates black/silver/gold by parallel run only, not by rarity | placed ladder, in `gundamRarityMap`'s rank order | added |
-| Palworld | default circle — the one coloured mark is a foil watermark, not a rarity signal | placed ladder, in `palworldRarityMap`'s rank order; trial-deck rarities run beside their booster counterparts as their own adjacent step, not sharing its colour | added |
+| Gundam | default circle — the printed banner differentiates black/silver/gold by parallel run only, not by rarity | placed ladder, in the datastore's rarity order | added |
+| Palworld | default circle — the one coloured mark is a foil watermark, not a rarity signal | placed ladder, in the datastore's rarity order; trial-deck rarities run beside their booster counterparts as their own adjacent step, not sharing its colour | added |
 
 ## Other things worth knowing
 

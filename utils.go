@@ -152,18 +152,18 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// game, and the rest take neighbouring tiers' colors. The 139 cards with
 	// no rarity are left out and draw no badge.
 	mtgmatcher.GameFleshAndBlood: {
-		"Common":       "var(--normal)",
-		"Basic":        "#707883",
-		"Token":        "#919495",
-		"Rare":         "#156FA6",
-		"Super Rare":   "#1FA7C9",
-		"Majestic":     "#821A1E",
-		"Legendary":    "#937131",
-		"Fabled":       "#8F6330",
-		"Marvel":       "#7B5BC0",
-		"Gold":         "#E0B84A",
-		"Pirate Booty": "#D4B055",
-		"Promo":        "#298233",
+		"common":      "var(--normal)",
+		"basic":       "#707883",
+		"token":       "#919495",
+		"rare":        "#156FA6",
+		"superrare":   "#1FA7C9",
+		"majestic":    "#821A1E",
+		"legendary":   "#937131",
+		"fabled":      "#8F6330",
+		"marvel":      "#7B5BC0",
+		"gold":        "#E0B84A",
+		"piratebooty": "#D4B055",
+		"promo":       "#298233",
 	},
 	// Yu-Gi-Oh marks no rarity on the card at all: it is a finish, the name
 	// foiled silver or gold and the art holographic, so there is nothing to
@@ -173,50 +173,50 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// is a secret rare, a Duel Terminal Normal Parallel Rare is a rare — and
 	// each group climbs the ladder the other games already use.
 	mtgmatcher.GameYuGiOh: {
-		"Common":                          "var(--normal)",
-		"Duel Terminal Technology Common": "var(--normal)",
+		"common":                       "var(--normal)",
+		"duelterminaltechnologycommon": "var(--normal)",
 
-		"Duel Terminal Normal Parallel Rare": "#707883",
-		"Duel Terminal Rare Parallel Rare":   "#707883",
-		"Mosaic Rare":                        "#707883",
-		"Parallel Rare":                      "#707883",
-		"Rare":                               "#707883",
-		"Shatterfoil Rare":                   "#707883",
-		"Starfoil Rare":                      "#707883",
+		"duelterminalnormalparallelrare": "#707883",
+		"duelterminalrareparallelrare":   "#707883",
+		"mosaicrare":                     "#707883",
+		"parallelrare":                   "#707883",
+		"rare":                           "#707883",
+		"shatterfoilrare":                "#707883",
+		"starfoilrare":                   "#707883",
 
-		"Duel Terminal Super Parallel Rare": "#919495",
-		"Platinum Rare":                     "#919495",
-		"Super Rare":                        "#919495",
+		"duelterminalsuperparallelrare": "#919495",
+		"platinumrare":                  "#919495",
+		"superrare":                     "#919495",
 
-		"Duel Terminal Technology Ultra Rare": "#B06435",
-		"Duel Terminal Ultra Parallel Rare":   "#B06435",
-		"Emblazoned Ultra Rare":               "#B06435",
-		"Ultra Pharaoh’s Rare":                "#B06435",
-		"Ultra Rare":                          "#B06435",
+		"duelterminaltechnologyultrarare": "#B06435",
+		"duelterminalultraparallelrare":   "#B06435",
+		"emblazonedultrarare":             "#B06435",
+		"ultrapharaoh'srare":              "#B06435",
+		"ultrarare":                       "#B06435",
 
-		"Prismatic Ultimate Rare": "#C63A4D",
-		"Ultimate Rare":           "#C63A4D",
+		"prismaticultimaterare": "#C63A4D",
+		"ultimaterare":          "#C63A4D",
 
-		"10000 Secret Rare":           "#1FA7C9",
-		"Emblazoned Secret Rare":      "#1FA7C9",
-		"Gold Secret Rare":            "#1FA7C9",
-		"Platinum Secret Rare":        "#1FA7C9",
-		"Prismatic Secret Rare":       "#1FA7C9",
-		"Quarter Century Secret Rare": "#1FA7C9",
-		"Secret Pharaoh’s Rare":       "#1FA7C9",
-		"Secret Rare":                 "#1FA7C9",
+		"10000secretrare":          "#1FA7C9",
+		"emblazonedsecretrare":     "#1FA7C9",
+		"goldsecretrare":           "#1FA7C9",
+		"platinumsecretrare":       "#1FA7C9",
+		"prismaticsecretrare":      "#1FA7C9",
+		"quartercenturysecretrare": "#1FA7C9",
+		"secretpharaoh'srare":      "#1FA7C9",
+		"secretrare":               "#1FA7C9",
 
-		"Collector's Rare":           "#B45A96",
-		"Prismatic Collector's Rare": "#B45A96",
+		"collector'srare":          "#B45A96",
+		"prismaticcollector'srare": "#B45A96",
 
-		"Ghost Rare":      "#6F75AA",
-		"Ghost/Gold Rare": "#6F75AA",
-		"Starlight Rare":  "#6F75AA",
+		"ghostrare":      "#6F75AA",
+		"ghost/goldrare": "#6F75AA",
+		"starlightrare":  "#6F75AA",
 
-		"Gold Rare":         "#BA9900",
-		"Premium Gold Rare": "#BA9900",
+		"goldrare":        "#BA9900",
+		"premiumgoldrare": "#BA9900",
 
-		"Promo": "#652978",
+		"promo": "#652978",
 	},
 	// Pokemon marks rarity with a symbol after the collector number, and it
 	// is the clearest shape language of any of these games: a filled circle
@@ -232,45 +232,45 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// badge; code cards, which are filler rather than a tier, take a grey
 	// darker than common's.
 	mtgmatcher.GamePokemon: {
-		"Common": "var(--normal)",
+		"common": "var(--normal)",
 
-		"Uncommon": "#707883",
+		"uncommon": "#707883",
 
-		"Code Card": "#4B5158",
+		"codecard": "#4B5158",
 
-		"Classic Collection": "#919495",
-		"Rare":               "#919495",
+		"classiccollection": "#919495",
+		"rare":              "#919495",
 
-		"Amazing Rare": "#B06435",
-		"Holo Rare":    "#B06435",
-		"Rare Ace":     "#B06435",
-		"Rare BREAK":   "#B06435",
+		"amazingrare": "#B06435",
+		"holorare":    "#B06435",
+		"rareace":     "#B06435",
+		"rarebreak":   "#B06435",
 
-		"Double Rare":      "#C63A4D",
-		"Mega Attack Rare": "#C63A4D",
-		"Radiant Rare":     "#C63A4D",
+		"doublerare":     "#C63A4D",
+		"megaattackrare": "#C63A4D",
+		"radiantrare":    "#C63A4D",
 
-		"Prism Rare":       "#B45A96",
-		"Shiny Ultra Rare": "#B45A96",
-		"Ultra Rare":       "#B45A96",
+		"prismrare":      "#B45A96",
+		"shinyultrarare": "#B45A96",
+		"ultrarare":      "#B45A96",
 
-		"Shiny Holo Rare": "#1FA7C9",
-		"Shiny Rare":      "#1FA7C9",
+		"shinyholorare": "#1FA7C9",
+		"shinyrare":     "#1FA7C9",
 
-		"Illustration Rare":         "#CDB55E",
-		"Special Illustration Rare": "#CDB55E",
+		"illustrationrare":        "#CDB55E",
+		"specialillustrationrare": "#CDB55E",
 
-		"Hyper Rare":      "#E0B84A",
-		"Mega Hyper Rare": "#E0B84A",
-		"Rainbow Rare":    "#E0B84A",
+		"hyperrare":     "#E0B84A",
+		"megahyperrare": "#E0B84A",
+		"rainbowrare":   "#E0B84A",
 
-		"Black White Rare": "#6F75AA",
-		"Futuristic Rare":  "#6F75AA",
-		"Secret Rare":      "#6F75AA",
+		"blackwhiterare": "#6F75AA",
+		"futuristicrare": "#6F75AA",
+		"secretrare":     "#6F75AA",
 
-		"ACE SPEC Rare": "#B65B92",
+		"acespecrare": "#B65B92",
 
-		"Promo": "#652978",
+		"promo": "#652978",
 	},
 	// Gundam prints its rarity as a two-or-three-letter code in a banner
 	// beside the card number, and the banner itself carries a signal: a
@@ -281,19 +281,19 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// only that some are the same treatment as others.
 	//
 	// So this climbs the placed ladder the other games use, in the order
-	// gundamRarityMap already ranks them.
+	// the datastore ranks them.
 	mtgmatcher.GameGundam: {
-		"Common":      "var(--normal)",
-		"C+":          "#919495",
-		"C++":         "#A88A3C",
-		"Uncommon":    "#187870",
-		"U+":          "#1FA7C9",
-		"Rare":        "#156FA6",
-		"R+":          "#6F75AA",
-		"Legend Rare": "#CDB55E",
-		"LR+":         "#B66204",
-		"LR++":        "#E0B84A",
-		"Promo":       "#652978",
+		"common":     "var(--normal)",
+		"c+":         "#919495",
+		"c++":        "#A88A3C",
+		"uncommon":   "#187870",
+		"u+":         "#1FA7C9",
+		"rare":       "#156FA6",
+		"r+":         "#6F75AA",
+		"legendrare": "#CDB55E",
+		"lr+":        "#B66204",
+		"lr++":       "#E0B84A",
+		"promo":      "#652978",
 	},
 	// Palworld prints its rarity the same way: a code in angle brackets
 	// beside the number ("<C>", "<SR>"), plain text with no colour of its
@@ -302,25 +302,25 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// regardless of which of the fourteen rarities it is - a foil watermark,
 	// not a rarity signal.
 	//
-	// So this climbs the placed ladder too, in the order palworldRarityMap
-	// already ranks them: the trial-deck rarities run beside their booster
+	// So this climbs the placed ladder too, in the order the datastore
+	// ranks them: the trial-deck rarities run beside their booster
 	// counterparts rather than under them, so each lands its own adjacent
 	// step rather than sharing its counterpart's colour.
 	mtgmatcher.GamePalworld: {
-		"Trial Deck":                 "var(--normal)",
-		"Common":                     "#707883",
-		"Uncommon":                   "#919495",
-		"Trial Deck Rare":            "#187870",
-		"Rare":                       "#1FA7C9",
-		"Double Rare":                "#156FA6",
-		"Super Rare":                 "#6F75AA",
-		"Trial Deck Super Deck Rare": "#B45A96",
-		"Over Super Rare":            "#BF287F",
-		"Super Parallel":             "#B06435",
-		"Trial Deck Super Parallel":  "#B66204",
-		"Super Special Parallel":     "#CDB55E",
-		"Super Special Soul":         "#E0B84A",
-		"Promo":                      "#652978",
+		"trialdeck":              "var(--normal)",
+		"common":                 "#707883",
+		"uncommon":               "#919495",
+		"trialdeckrare":          "#187870",
+		"rare":                   "#1FA7C9",
+		"doublerare":             "#156FA6",
+		"superrare":              "#6F75AA",
+		"trialdecksuperrare":     "#B45A96",
+		"oversuperrare":          "#BF287F",
+		"superparallel":          "#B06435",
+		"trialdecksuperparallel": "#B66204",
+		"superspecialparallel":   "#CDB55E",
+		"superspecialsoul":       "#E0B84A",
+		"promo":                  "#652978",
 	},
 }
 
@@ -1147,7 +1147,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 	var rarityColor template.CSS
 	keyrune, setSymbol := keyruneForCardSet(b, cardID)
 	if keyrune == "" {
-		rarityColor = colorRarityMap[Config().Game][co.Rarity]
+		rarityColor = colorRarityMap[Config().Game][mtgmatcher.RarityName(co.Rarity)]
 	}
 
 	var hotlistStore string
