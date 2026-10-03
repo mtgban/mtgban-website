@@ -147,7 +147,8 @@ Boot sequence (`main()`):
      and TCGplayer Direct's own stock per grade (`direct_inventory`, the
      same on every listing of a grade), which the arbitrage, Global and
      reverse pages (with a tooltip dating it) and the price API's `qty`
-     quote as TCGDirect's quantity, but not search,
+     quote as TCGDirect's quantity, but not search, until the day after
+     its scrape ends,
      once the newspaper finishes a scrape, and retries a scrape day whose
      load failed every 6 hours; every datastore load also runs it, which
      queries only if no day is loaded yet

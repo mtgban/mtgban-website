@@ -18,9 +18,21 @@ import (
 // restoring whatever was loaded when the test ends.
 func setTestTCGListings(t *testing.T, cards map[string]*tcgListings) {
 	t.Helper()
+	setTestTCGListingsOn(t, time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC), cards)
+}
+
+// setTestTCGDirect files cards as counts scraped today, so Direct's stock in
+// them is current.
+func setTestTCGDirect(t *testing.T, cards map[string]*tcgListings) {
+	t.Helper()
+	setTestTCGListingsOn(t, time.Now().UTC().Truncate(24*time.Hour), cards)
+}
+
+func setTestTCGListingsOn(t *testing.T, day time.Time, cards map[string]*tcgListings) {
+	t.Helper()
 	prev := tcgListingsPtr.Load()
 	t.Cleanup(func() { tcgListingsPtr.Store(prev) })
-	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC), Cards: cards})
+	tcgListingsPtr.Store(&tcgListingsSnapshot{Date: day, Cards: cards})
 }
 
 // TestBuildTCGListings groups the rows by printing, keeps the grades
@@ -291,7 +303,7 @@ func TestLoadTCGListingsWaitsForADatastore(t *testing.T) {
 // Direct's stock as their quantity where the listings saw some, and leaves
 // the store's own entries, which search reads, and other sellers alone.
 func TestWithDirectStock(t *testing.T) {
-	setTestTCGListings(t, map[string]*tcgListings{"card": {Direct: [5]int32{7, 0, 2}}})
+	setTestTCGDirect(t, map[string]*tcgListings{"card": {Direct: [5]int32{7, 0, 2}}})
 	inv := mtgban.InventoryRecord{
 		"card": {
 			{Conditions: "NM", Price: 3, Quantity: 1},
@@ -336,7 +348,7 @@ func TestWithDirectStock(t *testing.T) {
 // not, as for any store without quantities.
 func TestBanPricesTakeTCGDirectStock(t *testing.T) {
 	regular, foil, _ := parityCards(t)
-	setTestTCGListings(t, map[string]*tcgListings{regular: {Direct: [5]int32{7, 2}}})
+	setTestTCGDirect(t, map[string]*tcgListings{regular: {Direct: [5]int32{7, 2}}})
 
 	found := map[string]map[mtgban.Condition][]SearchEntry{
 		regular: {
@@ -393,7 +405,7 @@ func TestRankDirectAsOneCopy(t *testing.T) {
 // the filtered requests do.
 func TestFullDumpTakesTCGDirectStock(t *testing.T) {
 	regular, foil, _ := parityCards(t)
-	setTestTCGListings(t, map[string]*tcgListings{regular: {Direct: [5]int32{7, 2}}})
+	setTestTCGDirect(t, map[string]*tcgListings{regular: {Direct: [5]int32{7, 2}}})
 	prev := sellersPtr.Load()
 	t.Cleanup(func() { sellersPtr.Store(prev) })
 	inv := mtgban.InventoryRecord{
@@ -433,13 +445,13 @@ func TestTCGDirectStockOnTheArbitPages(t *testing.T) {
 	direct := withDirectStock(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, info))
 	other := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGLow", NoQuantityInventory: true})
 
-	setTestTCGListings(t, nil)
+	setTestTCGDirect(t, nil)
 	tcgListingsPtr.Store(nil)
 	if !hasNoQty(direct, true) || tcgDirectStockNote() != "" {
 		t.Error("before the listings load: Direct has a quantity column or a note")
 	}
 
-	setTestTCGListings(t, map[string]*tcgListings{})
+	setTestTCGDirect(t, map[string]*tcgListings{})
 	for _, tc := range []struct {
 		name    string
 		scraper mtgban.Scraper
@@ -454,7 +466,34 @@ func TestTCGDirectStockOnTheArbitPages(t *testing.T) {
 			t.Errorf("%s: hasNoQty %v, want %v", tc.name, got, tc.want)
 		}
 	}
-	if note := tcgDirectStockNote(); note != "Direct stock as of Sep 28" {
-		t.Errorf("note: got %q", note)
+	want := "Direct stock as of " + time.Now().UTC().Format("Jan 2")
+	if note := tcgDirectStockNote(); note != want {
+		t.Errorf("note: got %q, want %q", note, want)
+	}
+}
+
+// TestTCGDirectStockLastsADay keeps Direct's stock through the day after its
+// scrape and drops it after, as if never loaded.
+func TestTCGDirectStockLastsADay(t *testing.T) {
+	now := time.Date(2026, 10, 3, 23, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		day     time.Time
+		current bool
+	}{
+		{time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC), true},
+		{time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC), true},
+		{time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), false},
+	} {
+		setTestTCGListingsOn(t, tc.day, map[string]*tcgListings{"card": {Direct: [5]int32{7}}})
+		if got := tcgDirectSnapshot(now) != nil; got != tc.current {
+			t.Errorf("scraped %s: current %v, want %v", tc.day.Format(time.DateOnly), got, tc.current)
+		}
+	}
+
+	setTestTCGListingsOn(t, time.Now().UTC().AddDate(0, 0, -2), map[string]*tcgListings{"card": {Direct: [5]int32{7}}})
+	_, found := tcgDirectStock("card", "NM")
+	direct := withDirectStock(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true}))
+	if found || tcgDirectStockNote() != "" || !hasNoQty(direct, true) {
+		t.Error("stock scraped two days ago is still quoted, dated or given a column")
 	}
 }
