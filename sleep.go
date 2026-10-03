@@ -177,9 +177,9 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
-	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
+	miscSearchOpts := readSearchMiscOpts(r)
+	preferFlavor := miscSearchOpts.has("preferFlavor")
+	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
 	pageVars.Metadata = map[string]GenericCard{}
 	for _, cardIDs := range sleepers {

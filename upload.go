@@ -1451,8 +1451,7 @@ func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
 		altPriceSource = UploadIndexKeys[0]
 	}
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
 	return uploadSettings{
 		canChangeStores:  canChangeStores,

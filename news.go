@@ -1182,8 +1182,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	maxPercChange, _ := strconv.ParseFloat(r.FormValue("max_change"), 64)
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
 	newspaperPages := GetNewspaperPages()
 	for _, newspage := range newspaperPages {

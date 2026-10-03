@@ -597,12 +597,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	hidePromos := slices.Contains(miscSearchOpts, "hidePromos") || slices.Contains(miscSearchOpts, "hidePrelPack")
+	miscSearchOpts := readSearchMiscOpts(r)
+	hidePromos := miscSearchOpts.has("hidePromos") || miscSearchOpts.has("hidePrelPack")
 	if oembed {
 		miscSearchOpts = append(miscSearchOpts, "oembed")
 	}
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	preferFlavor := miscSearchOpts.has("preferFlavor")
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
@@ -614,7 +614,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.Printings = map[string]string{}
-	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
+	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)

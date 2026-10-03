@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -522,8 +520,7 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 		minPct = 20
 	}
 
-	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
 	sv := &ScreenerVars{
 		Metrics:       screenerMetricList(),
