@@ -791,8 +791,8 @@ func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *mtgmatcher.Back
 
 // uploadMetadata reads what the page shows of every matched card, and of the
 // other printings the printing picker offers for it.
-func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []UploadEntry) map[string]GenericCard {
-	metadata := map[string]GenericCard{}
+func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []UploadEntry) cardMetadata {
+	metadata := cardMetadata{}
 
 	// Load up image links
 	for _, data := range uploadedData {
@@ -800,17 +800,11 @@ func uploadMetadata(b *mtgmatcher.Backend, st uploadSettings, uploadedData []Upl
 			continue
 		}
 
-		_, found := metadata[data.CardID]
-		if found {
-			continue
-		}
-		metadata[data.CardID] = uuid2card(b, data.CardID, st.preferFlavor)
+		metadata.add(b, data.CardID, st.preferFlavor)
 
 		// Load metadata for alternative printings (used by pick-printing picker)
 		for _, alias := range data.PossibleAliases {
-			if _, exists := metadata[alias]; !exists {
-				metadata[alias] = uuid2card(b, alias, st.preferFlavor)
-			}
+			metadata.add(b, alias, st.preferFlavor)
 		}
 	}
 
