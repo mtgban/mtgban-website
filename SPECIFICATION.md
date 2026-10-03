@@ -253,7 +253,7 @@ read, or its workflow state's names.
   `openBucketPath()`; opened through `mtgmatcher.Open(datastoreGame(), …)`
   and indexed per game — this is now a multi-game site (magic, lorcana,
   onepiece, yugioh, riftbound, fleshandblood, pokemon, gundam, palworld).
-  Reloadable from the admin panel (`?tool=datastore`/`datastore-backup`).
+  Reloadable from the admin panel (`?tool=datastore`).
 - **Scraper price data** (`loadScrapersNG()`, load.go): discovered, not
   configured. bantool publishes every game's dumps to the B2 bucket
   `mtgban-dumps` (`dumpsBucket`) as
@@ -670,7 +670,7 @@ Overrides, Tools — through query-command dispatch: scraper refresh via
 GitHub Actions dispatch (`?refresh=`) or direct reload (`?reload=&table=&tag=`),
 log download or redirect to the CI log (`?logs=`), and the `?tool=`
 family (`adminTools`), the dashboard's server actions and admin tools:
-`datastore`/`datastore-backup` (`s.startDatastoreReload`), `config` (reload
+`datastore` (`s.startDatastoreReload`), `config` (reload
 config plus the ACL/grants/affiliates that ride beside it), `checkpoints`
 (chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
 price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
