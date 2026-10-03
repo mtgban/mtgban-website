@@ -63,6 +63,10 @@ type SearchConfig struct {
 
 	// Skip buylist searches entirely
 	SkipBuylist bool
+
+	// Append the reader's custom buylist, set by a handler that has checked
+	// the reader's signature
+	CustomBuylist bool
 }
 
 type FilterElem struct {

@@ -171,6 +171,82 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 	}
 }
 
+// The custom buylist is the reader's own, priced off a store they pick: it
+// belongs on their search page, never in an unfurl everyone sees, whatever
+// signature comes with the request.
+func TestOEmbedLeavesOutTheCustomBuylist(t *testing.T) {
+	skipWithoutDatastore(t)
+	signingEnabled(t, true)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+
+	// One store stocks Counterspell and the blocklist hides it, so in a
+	// search that skips cards nobody offers, only a custom buylist priced
+	// off that store keeps the card.
+	ids, _ := backend().SearchEquals("Counterspell")
+	inventory := mtgban.InventoryRecord{}
+	for _, id := range ids {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1})
+	}
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "HIDDENSTORE", Name: "Hidden Store"}),
+	}
+	vendors := []mtgban.Vendor{}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	withConfigCopy(t)
+	Config().SearchRetailBlockList = []string{"HIDDENSTORE"}
+
+	expires := time.Now().Add(time.Hour)
+	signed := signedAs(t, url.Values{"UserName": {"Reader"}, "UserTier": {"Pro"}, "UploadCustom": {"true"}}, expires)
+	forged := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("Expires=%d&UploadCustom=true", expires.Unix())))
+	withCookies := func(req *http.Request, sig string) *http.Request {
+		for name, value := range map[string]string{
+			"MTGBAN":            sig,
+			"SearchMiscOpts":    "skipEmpty",
+			"UploadCustomOpts":  "enabled",
+			"UploadCustomRate":  "0.5",
+			"UploadCustomBuyer": "HIDDENSTORE",
+		} {
+			req.AddCookie(&http.Cookie{Name: name, Value: value})
+		}
+		return req
+	}
+
+	w := httptest.NewRecorder()
+	testSite.Search(w, withCookies(httptest.NewRequest(http.MethodGet, "/search?q=Counterspell", nil), signed))
+	if !strings.Contains(w.Body.String(), "Custom Buylist") {
+		t.Fatal("the reader's own page shows no custom buylist")
+	}
+
+	target := "/search/oembed?format=json&url=" + url.QueryEscape("https://mtgban.com/search?q=Counterspell")
+	handler := noSigning(http.HandlerFunc(testSite.SearchOEmbed))
+	for _, probe := range []struct {
+		name   string
+		cookie string
+	}{
+		{"a cookie this host signed", signed},
+		{"a forged cookie", forged},
+	} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, withCookies(httptest.NewRequest(http.MethodGet, target, nil), probe.cookie))
+		if w.Code != http.StatusNotFound {
+			t.Errorf("%s: answered %d with a card only the custom buylist keeps:\n%s", probe.name, w.Code, w.Body.String())
+		}
+	}
+}
+
 // A preview lists several printings, each under its own heading. Handing them
 // all one price list quotes the first card's numbers under every other card's
 // name - a Tempest common priced as a 30th Anniversary one.

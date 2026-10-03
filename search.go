@@ -605,6 +605,10 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
 	}
 
+	// Only a reader whose signature was checked gets the custom buylist
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	config.CustomBuylist = canUploadCustom || (DevMode && !SigCheck)
+
 	pageVars.CleanSearchQuery = config.CleanQuery
 	pageVars.SearchSort = readSearchSort(r, config)
 	pageVars.NoSort = config.SortMode != ""
@@ -1004,7 +1008,6 @@ type searchResults struct {
 // runSearch runs the search and collects each card's offers.
 func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResults {
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
 
 	var result searchResults
 
@@ -1032,9 +1035,7 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 	result.sellers, result.vendors = searchParallelNG(allKeys, config)
 
 	// Append the virtual custom buylist when enabled in the upload settings
-	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
-	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
-	if canUploadCustom && !config.SkipBuylist {
+	if config.CustomBuylist && !config.SkipBuylist {
 		searchCustomBuylist(b, r, allKeys, result.vendors)
 	}
 
