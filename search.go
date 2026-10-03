@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -2706,32 +2707,84 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 		}
 	}
 
-	// If both are foil or both are non-foil, check their number
-	cInum, errI := strconv.Atoi(numI)
-	cJnum, errJ := strconv.Atoi(numJ)
-	if errI == nil && errJ == nil {
-		return cInum < cJnum
-	}
-
-	// If conversion fails for any reson, try again using the numerical value of the card only
+	// Every number is read one way, so a sort sees one order: comparing
+	// plain numbers by value and the rest as strings put 800, 1553 and
+	// 1553★ in a loop. Stripped, only the value of the digits counts first.
 	if strip {
-		numI = mtgmatcher.ExtractNumberValue(cI.Card.Number)
-		numJ = mtgmatcher.ExtractNumberValue(cJ.Card.Number)
-		cInum, errI = strconv.Atoi(numI)
-		cJnum, errJ = strconv.Atoi(numJ)
-		if errI == nil && errJ == nil && cInum != cJnum {
-			return cInum < cJnum
+		valI, hasI := digitsValue(numI)
+		valJ, hasJ := digitsValue(numJ)
+		if hasI != hasJ {
+			return hasI
 		}
+		if valI != valJ {
+			return valI < valJ
+		}
+	} else if c := cmpNaturally(numI, numJ); c != 0 {
+		return c < 0
 	}
 
 	// At this point, numbers look pretty similar, check for languages
 	if cI.Card.Language != cJ.Card.Language {
 		return cI.Card.Language < cJ.Card.Language
 	}
+	return cmpNaturally(numI, numJ) < 0
+}
 
-	// If either one is not a number (due to extra letters) just
-	// do a normal string comparison
-	return cI.Card.Number < cJ.Card.Number
+// cmpNaturally orders collector numbers as a reader does: runs of digits by
+// their value and everything else as written, so 800 < 1553 < 1553★ and
+// 12 < A-5. Readings that tie fall back to the strings, keeping it total.
+func cmpNaturally(a, b string) int {
+	i, j := 0, 0
+	for i < len(a) && j < len(b) {
+		if !isDigit(a[i]) || !isDigit(b[j]) {
+			if a[i] != b[j] {
+				return cmp.Compare(a[i], b[j])
+			}
+			i++
+			j++
+			continue
+		}
+		startI, startJ := i, j
+		for i < len(a) && isDigit(a[i]) {
+			i++
+		}
+		for j < len(b) && isDigit(b[j]) {
+			j++
+		}
+		runI := strings.TrimLeft(a[startI:i], "0")
+		runJ := strings.TrimLeft(b[startJ:j], "0")
+		if len(runI) != len(runJ) {
+			return cmp.Compare(len(runI), len(runJ))
+		}
+		c := strings.Compare(runI, runJ)
+		if c != 0 {
+			return c
+		}
+	}
+	c := cmp.Compare(len(a)-i, len(b)-j)
+	if c != 0 {
+		return c
+	}
+	return strings.Compare(a, b)
+}
+
+// digitsValue is the value of a number's first run of digits, and whether
+// it has one.
+func digitsValue(number string) (int, bool) {
+	start := strings.IndexFunc(number, func(r rune) bool { return !isNotDigit(r) })
+	if start < 0 {
+		return 0, false
+	}
+	end := start
+	for end < len(number) && isDigit(number[end]) {
+		end++
+	}
+	value, err := strconv.Atoi(number[start:end])
+	return value, err == nil
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }
 
 // Sort cards grouping them by edition, and then by their collector number

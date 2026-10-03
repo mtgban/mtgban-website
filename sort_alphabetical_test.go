@@ -5,6 +5,8 @@ import (
 	"slices"
 	"sort"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestAlphabeticalSortUsesEnglishNames is the SOA case from the site: a
@@ -147,6 +149,80 @@ func TestAlphabeticalSortBreaksSameDateTies(t *testing.T) {
 		sort.Slice(shuffled, less(shuffled))
 		if !slices.Equal(keys, shuffled) {
 			t.Fatal("order depends on the input order")
+		}
+	}
+}
+
+// TestNumberOrderIsOneOrder sorts Secret Lair's printings, whose numbers mix
+// plain digits with marked ones (1553, 1553★, 800), into one order whatever
+// order they arrive in, stripped or not: a comparison that reads some
+// numbers by value and others as strings loops, and the sort then depends
+// on its input.
+func TestNumberOrderIsOneOrder(t *testing.T) {
+	skipWithoutDatastore(t)
+	set, err := backend().GetSet("SLD")
+	if err != nil {
+		t.Skip("no Secret Lair in this datastore")
+	}
+	var keys []string
+	for _, card := range set.Cards {
+		keys = append(keys, card.UUID)
+	}
+	sortData := resolveSortingData(backend(), keys)
+
+	rng := rand.New(rand.NewPCG(3, 4))
+	for _, strip := range []bool{false, true} {
+		var first []string
+		for range 10 {
+			rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
+			sorted := slices.Clone(keys)
+			sort.SliceStable(sorted, func(i, j int) bool {
+				return cmpNumberAndFinish(sortData[sorted[i]], sortData[sorted[j]], strip)
+			})
+			if first == nil {
+				first = sorted
+				continue
+			}
+			if !slices.Equal(first, sorted) {
+				t.Fatalf("strip %v: the order depends on the input", strip)
+			}
+		}
+	}
+
+	for _, tc := range []struct{ a, b string }{
+		{"800", "1553"}, {"1553", "1553★"}, {"800", "1553★"}, {"12", "A-5"}, {"9", "12a"},
+	} {
+		if cmpNaturally(tc.a, tc.b) >= 0 || cmpNaturally(tc.b, tc.a) <= 0 {
+			t.Errorf("%s should come before %s", tc.a, tc.b)
+		}
+	}
+}
+
+// TestCmpNumberAndFinishReadsEachShape pins both readings on the shapes a set
+// may or may not hold: stripped, the digits' value first, a number without
+// digits last and an equal value read on as written; unstripped, the number
+// as a reader goes through it.
+func TestCmpNumberAndFinishReadsEachShape(t *testing.T) {
+	numbered := func(number string) *SortingData {
+		return &SortingData{co: &mtgmatcher.CardObject{Card: mtgmatcher.Card{Number: number}}}
+	}
+	for _, tc := range []struct {
+		first, second string
+		strip         bool
+	}{
+		{"800", "1553", true},
+		{"1553", "1553★", true},
+		{"12a", "12b", true},
+		{"A-5", "12", true},
+		{"999", "S", true},
+		{"800", "1553", false},
+		{"1553", "1553★", false},
+		{"12", "A-5", false},
+		{"9", "12a", false},
+	} {
+		a, b := numbered(tc.first), numbered(tc.second)
+		if !cmpNumberAndFinish(a, b, tc.strip) || cmpNumberAndFinish(b, a, tc.strip) {
+			t.Errorf("strip %v: %s should come before %s", tc.strip, tc.first, tc.second)
 		}
 	}
 }
