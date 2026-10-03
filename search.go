@@ -889,26 +889,7 @@ func renderSearchLanding(w http.ResponseWriter, r *http.Request, ds *datastore, 
 		pageVars.TotalUnique = editions.TotalUnique
 
 		sortOpt := r.FormValue("sort")
-		sortedKeys := editions.TreeEditionsKeys
-
-		if sortOpt == "name" {
-			namedSort := make([]string, len(editions.TreeEditionsKeys))
-			copy(namedSort, editions.TreeEditionsKeys)
-			sort.SliceStable(namedSort, func(i, j int) bool {
-				return strings.ToLower(editions.TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[namedSort[j]][0].Name)
-			})
-			sortedKeys = namedSort
-		} else if sortOpt == "size" {
-			sizeSort := make([]string, len(editions.TreeEditionsKeys))
-			copy(sizeSort, editions.TreeEditionsKeys)
-			sort.SliceStable(sizeSort, func(i, j int) bool {
-				if editions.TreeEditionsMap[sizeSort[i]][0].Size == editions.TreeEditionsMap[sizeSort[j]][0].Size {
-					return strings.ToLower(editions.TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[sizeSort[j]][0].Name)
-				}
-				return editions.TreeEditionsMap[sizeSort[i]][0].Size > editions.TreeEditionsMap[sizeSort[j]][0].Size
-			})
-			sortedKeys = sizeSort
-		}
+		sortedKeys := sortedEditionKeys(editions, sortOpt)
 
 		pageVars.FlatEditions = flattenEditions(sortedKeys, editions.TreeEditionsMap)
 		pageVars.SortOption = sortOpt
@@ -918,6 +899,33 @@ func renderSearchLanding(w http.ResponseWriter, r *http.Request, ds *datastore, 
 	}
 
 	render(w, "search.html", pageVars)
+}
+
+// sortedEditionKeys orders the editions tree for /sets: in the tree's own
+// order, or by name or by size as sortOpt asks.
+func sortedEditionKeys(editions *editionsSnapshot, sortOpt string) []string {
+	sortedKeys := editions.TreeEditionsKeys
+
+	if sortOpt == "name" {
+		namedSort := make([]string, len(editions.TreeEditionsKeys))
+		copy(namedSort, editions.TreeEditionsKeys)
+		sort.SliceStable(namedSort, func(i, j int) bool {
+			return strings.ToLower(editions.TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[namedSort[j]][0].Name)
+		})
+		sortedKeys = namedSort
+	} else if sortOpt == "size" {
+		sizeSort := make([]string, len(editions.TreeEditionsKeys))
+		copy(sizeSort, editions.TreeEditionsKeys)
+		sort.SliceStable(sizeSort, func(i, j int) bool {
+			if editions.TreeEditionsMap[sizeSort[i]][0].Size == editions.TreeEditionsMap[sizeSort[j]][0].Size {
+				return strings.ToLower(editions.TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[sizeSort[j]][0].Name)
+			}
+			return editions.TreeEditionsMap[sizeSort[i]][0].Size > editions.TreeEditionsMap[sizeSort[j]][0].Size
+		})
+		sortedKeys = sizeSort
+	}
+
+	return sortedKeys
 }
 
 // runSearch runs the search and collects each card's offers. When it finds
