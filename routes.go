@@ -97,7 +97,7 @@ func (s *site) registerRoutes() {
 	// and it checks the signature itself before it agrees to receive any.
 	http.Handle("/upload/handoff", noSigning(http.HandlerFunc(s.UploadHandoff)))
 
-	http.Handle("/search/oembed", noSigning(http.HandlerFunc(s.Search)))
+	http.Handle("/search/oembed", noSigning(http.HandlerFunc(s.SearchOEmbed)))
 	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(s.PriceAPI)))
 	http.Handle("/api/tcgplayer/", enforceSigning(s, http.HandlerFunc(s.TCGHandler)))
