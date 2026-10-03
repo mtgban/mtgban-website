@@ -1,7 +1,7 @@
 # Why the API gateway imports this module
 
 The API gateway (`github.com/mtgban/api-gatewahy`, api.mtgban.com) requires
-this module by commit and imports six of its packages. That looks backwards,
+this module by commit and imports seven of its packages. That looks backwards,
 since the website is otherwise the top of the dependency tree, and moving the
 shared packages into the gateway has come up. This file says why they stay
 here and what changing one of them takes.
@@ -16,6 +16,7 @@ here and what changing one of them takes.
 | `observability` | owns the `events` table the admin Usage tab reads | records every API call into it |
 | `ratelimit` | per-IP API limits, per-user page limits | per-key and per-IP limits |
 | `timeseries` | the price-history client | `SQLConfig` and `OpenDB` for its own Postgres pools |
+| `mailer` | sends the price-alert mail (Resend over HTTP, or SMTP) | sends sign-in links, key and trial notices over SMTP |
 
 The first three are the contracts. They import only the standard library, and
 golden tests freeze their bytes. The site is the server for the price API the
@@ -34,8 +35,8 @@ would pin the other.
 ## Why they aren't split into their own module
 
 It would save nothing. Rebuilding the gateway against a copy of this module
-cut down to the six packages changed none of its dependency versions (checked
-2026-09-24 at `987f4c3b`). The six need only `lib/pq`, `mileusna/useragent`
+cut down to the seven packages changed none of its dependency versions (checked
+2026-09-24 at `987f4c3b`). The seven need only `lib/pq`, `mileusna/useragent`
 and `x/time`; the rest of this module's requirements enter the gateway's
 module graph, but none of them are compiled. A split would also have to take
 all six to remove the dependency, and a nested module falls outside the

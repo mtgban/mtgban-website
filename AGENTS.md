@@ -307,9 +307,9 @@ stale the moment an item lands.
   `docs/search-column-layout.md` has the reasoning, and
   `tests/offline/search-sticky-offsets.test.js` pins the parts a browserless
   test can reach.
-- The API gateway (`mtgban/api-gatewahy`) imports six packages from this
+- The API gateway (`mtgban/api-gatewahy`) imports seven packages from this
   module: `apisig`, `apihandoff`, `apiproductlist`, `observability`,
-  `ratelimit` and `timeseries`. A change to any of them is a change to the
+  `ratelimit`, `timeseries` and `mailer`. A change to any of them is a change to the
   gateway too; `docs/api-gateway-dependency.md` has why the dependency points
   this way and which side deploys first.
 - `embed.go` is Discord **embed** formatting, not Go `//go:embed` asset
