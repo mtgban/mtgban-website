@@ -1289,6 +1289,22 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		fillChartPage(&pageVars, r, ds, b, roster)
 	}
 
+	notifyFromSearch(r, query, roster, start)
+
+	if DevMode {
+		start = time.Now()
+	}
+	render(w, "search.html", pageVars)
+	if DevMode {
+		log.Println("render took", time.Since(start))
+	}
+}
+
+// notifyFromSearch posts the search to the user webhook and logs it: what was
+// searched, where the request came from, who asked and how long it took.
+func notifyFromSearch(r *http.Request, query string, roster chartRoster, start time.Time) {
+	sig := getSignatureFromCookies(r)
+
 	var source string
 	notifyTitle := "search"
 	utm := r.FormValue("utm_source")
@@ -1321,14 +1337,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, user, time.Since(start))
 	UserNotify(notifyTitle, msg)
 	LogPages["Search"].Println(msg)
-
-	if DevMode {
-		start = time.Now()
-	}
-	render(w, "search.html", pageVars)
-	if DevMode {
-		log.Println("render took", time.Since(start))
-	}
 }
 
 // fillChartPage fills a chart page for the roster: the display query, the
