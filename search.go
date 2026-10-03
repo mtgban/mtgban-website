@@ -926,6 +926,72 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Sort sets as requested, default to chronological
 	odds := dropOdds(b, config)
+	allKeys = orderSearchKeys(&pageVars, r, b, allKeys, odds)
+
+	// Load up image links and other metadata
+	for _, cardID := range allKeys {
+		_, found := pageVars.Metadata[cardID]
+		if found {
+			continue
+		}
+		card := uuid2card(b, cardID, false, true, preferFlavor)
+		// Search results chart cards, so upgrade the chart handle to the cached
+		// ban:<id> here rather than inside uuid2card, which also feeds pages
+		// that never chart.
+		card.ChartID = chartIDForCard(b, cardID)
+		pageVars.Metadata[cardID] = card
+	}
+
+	// Optionally sort according to price
+	if pageVars.SearchBest || oembed {
+		sortOfferRows(r, allKeys, foundSellers, foundVendors)
+	}
+
+	// Every card is quoted with its own index prices: one shared list would
+	// print the first card's numbers under every other card's heading.
+	preview := embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
+		return editionTitle(b, cardID)
+	}, func(cardID string) []embed.Entry {
+		return EmbedSellerEntries(foundSellers, cardID, true)
+	})
+	if oembed {
+		payload, err := json.Marshal(preview)
+		if err != nil {
+			oembedError(w, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(payload)
+		return
+	}
+	fillEmbed(&pageVars, b, preview, allKeys)
+
+	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
+
+	pageVars.FoundSellers = foundSellers
+	pageVars.FoundVendors = foundVendors
+	pageVars.AllKeys = allKeys
+
+	// CHART ALL THE THINGS
+	if roster.id != "" {
+		fillChartPage(&pageVars, r, ds, b, roster)
+	}
+
+	notifyFromSearch(r, query, roster, start)
+
+	if DevMode {
+		start = time.Now()
+	}
+	render(w, "search.html", pageVars)
+	if DevMode {
+		log.Println("render took", time.Since(start))
+	}
+}
+
+// orderSearchKeys sorts the results as the reader asked and returns the page
+// of them to show. The sort works in place: CardHashes is the same slice, and
+// the Uploader transfer posts it in this order.
+func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, allKeys []string, odds map[string]float64) []string {
 	sortData := resolveSortingData(b, allKeys)
 	switch pageVars.SearchSort {
 	case "odds":
@@ -1018,64 +1084,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		allKeys, pageVars.Pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
 	}
 
-	// Load up image links and other metadata
-	for _, cardID := range allKeys {
-		_, found := pageVars.Metadata[cardID]
-		if found {
-			continue
-		}
-		card := uuid2card(b, cardID, false, true, preferFlavor)
-		// Search results chart cards, so upgrade the chart handle to the cached
-		// ban:<id> here rather than inside uuid2card, which also feeds pages
-		// that never chart.
-		card.ChartID = chartIDForCard(b, cardID)
-		pageVars.Metadata[cardID] = card
-	}
-
-	// Optionally sort according to price
-	if pageVars.SearchBest || oembed {
-		sortOfferRows(r, allKeys, foundSellers, foundVendors)
-	}
-
-	// Every card is quoted with its own index prices: one shared list would
-	// print the first card's numbers under every other card's heading.
-	preview := embed.Generate(b, externalURL(r), allKeys, func(cardID string) string {
-		return editionTitle(b, cardID)
-	}, func(cardID string) []embed.Entry {
-		return EmbedSellerEntries(foundSellers, cardID, true)
-	})
-	if oembed {
-		payload, err := json.Marshal(preview)
-		if err != nil {
-			oembedError(w, http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(payload)
-		return
-	}
-	fillEmbed(&pageVars, b, preview, allKeys)
-
-	rebuildIndexRows(&pageVars, r, b, config, allKeys, foundSellers, foundVendors, odds)
-
-	pageVars.FoundSellers = foundSellers
-	pageVars.FoundVendors = foundVendors
-	pageVars.AllKeys = allKeys
-
-	// CHART ALL THE THINGS
-	if roster.id != "" {
-		fillChartPage(&pageVars, r, ds, b, roster)
-	}
-
-	notifyFromSearch(r, query, roster, start)
-
-	if DevMode {
-		start = time.Now()
-	}
-	render(w, "search.html", pageVars)
-	if DevMode {
-		log.Println("render took", time.Since(start))
-	}
+	return allKeys
 }
 
 // sortOfferRows orders each card's offers in place, condition by condition:
