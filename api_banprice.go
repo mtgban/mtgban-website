@@ -670,6 +670,12 @@ func getSellerPrices(b *mtgmatcher.Backend, mode string, enabledStores []string,
 		shouldQty := qty && !seller.Info().MetadataOnly && !seller.Info().NoQuantityInventory
 		shouldBaseCond := !seller.Info().MetadataOnly && !seller.Info().SealedMode
 
+		// TCGplayer Direct's own stock, as the filtered requests quote it.
+		if qty && seller.Info().Shorthand == tcgDirectStore {
+			inventory = tcgDirectStockOnly(inventory)
+			shouldQty = true
+		}
+
 		rule := EntryRule{
 			Finish: finishFilter,
 		}

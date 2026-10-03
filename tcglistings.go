@@ -364,6 +364,21 @@ func tcgDirectStocked(seller mtgban.Seller) mtgban.Seller {
 	return &stockedSeller{Seller: seller}
 }
 
+// tcgDirectStockOnly is TCGplayer Direct's inventory with Direct's stock as
+// each entry's quantity, 0 where the last scrape did not see it, for the
+// price API's full dumps.
+func tcgDirectStockOnly(inventory mtgban.InventoryRecord) mtgban.InventoryRecord {
+	out := make(mtgban.InventoryRecord, len(inventory))
+	for cardID, entries := range inventory {
+		stocked := slices.Clone(entries)
+		for i := range stocked {
+			stocked[i].Quantity, _ = tcgDirectStock(cardID, stocked[i].Conditions)
+		}
+		out[cardID] = stocked
+	}
+	return out
+}
+
 // stockedSeller is a TCGplayer Direct seller for one request.
 type stockedSeller struct {
 	mtgban.Seller
