@@ -517,7 +517,8 @@ func (c *Client) ResolveTCGBanID(ctx context.Context, v TCGVariant) (int64, erro
 // The ids come back from a read by identity after the insert, never from the
 // derivation, so a variant filed under a sequence id before ids were derived
 // answers with that one. A variant whose derived id some other row holds is
-// left out of the result rather than handed that row's id.
+// left out of the result rather than handed that row's id. A read-only
+// client files nothing and answers the variants already there.
 func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TCGVariant]int64, error) {
 	out := make(map[TCGVariant]int64, len(vs))
 	var cats, prods []int64
@@ -546,15 +547,17 @@ func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TC
 	//
 	// ON CONFLICT names no target so a clash on either the identity key or
 	// the ban_id is a no-op; the read below sorts out which.
-	_, err := c.db.ExecContext(ctx, `
-		INSERT INTO variants (ban_id, tcgp_category_id, tcgp_product_id, tcgp_sub_type)
-		OVERRIDING SYSTEM VALUE
-		SELECT coalesce(d, nextval(pg_get_serial_sequence('variants', 'ban_id'))), c, p, s
-		  FROM unnest($1::bigint[], $2::int[], $3::int[], $4::text[]) AS t(d, c, p, s)
-		ON CONFLICT DO NOTHING`,
-		pq.Array(derived), pq.Array(cats), pq.Array(prods), pq.Array(subTypes))
-	if err != nil {
-		return nil, fmt.Errorf("file tcg variants: %w", err)
+	if !c.readOnly {
+		_, err := c.db.ExecContext(ctx, `
+			INSERT INTO variants (ban_id, tcgp_category_id, tcgp_product_id, tcgp_sub_type)
+			OVERRIDING SYSTEM VALUE
+			SELECT coalesce(d, nextval(pg_get_serial_sequence('variants', 'ban_id'))), c, p, s
+			  FROM unnest($1::bigint[], $2::int[], $3::int[], $4::text[]) AS t(d, c, p, s)
+			ON CONFLICT DO NOTHING`,
+			pq.Array(derived), pq.Array(cats), pq.Array(prods), pq.Array(subTypes))
+		if err != nil {
+			return nil, fmt.Errorf("file tcg variants: %w", err)
+		}
 	}
 	rows, err := c.db.QueryContext(ctx, `
 		SELECT v.ban_id, v.tcgp_category_id, v.tcgp_product_id, v.tcgp_sub_type
