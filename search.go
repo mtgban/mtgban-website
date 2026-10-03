@@ -630,10 +630,12 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort sets as requested, default to chronological
-	allKeys := orderSearchKeys(&pageVars, r, b, ds.editions.ReprintParents, result.keys, result.odds)
+	shown := orderSearchKeys(r, ds, result, pageVars.SearchSort)
+	pageVars.ReverseMode = shown.reversed
+	pageVars.Pagination = shown.pagination
 
 	// Load up image links and other metadata
-	for _, cardID := range allKeys {
+	for _, cardID := range shown.keys {
 		_, found := pageVars.Metadata[cardID]
 		if found {
 			continue
@@ -649,15 +651,15 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Optionally sort according to price
 	if pageVars.SearchBest {
-		sortOfferRows(r, allKeys, result)
+		sortOfferRows(r, shown.keys, result)
 	}
 
-	preview := searchPreview(r, b, allKeys, result)
-	fillEmbed(&pageVars, b, preview, allKeys)
+	preview := searchPreview(r, b, shown.keys, result)
+	fillEmbed(&pageVars, b, preview, shown.keys)
 
-	rebuildIndexRows(&pageVars, r, b, config, allKeys, result)
+	rebuildIndexRows(&pageVars, r, b, config, shown.keys, result)
 
-	fillSearchResults(&pageVars.SearchVars, b, query, config, result, allKeys)
+	fillSearchResults(&pageVars.SearchVars, b, query, config, result, shown.keys)
 
 	// CHART ALL THE THINGS
 	if roster.id != "" {
@@ -718,25 +720,21 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := append(readSearchMiscOpts(page), "oembed")
 
-	// The search helpers fill a page as they go, which nothing here renders.
-	var pageVars PageVars
-
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(page.FormValue("scope"))))
 	if page.URL.Path == "/sealed" {
 		config.SearchMode = "sealed"
 	}
-	pageVars.SearchSort = readSearchSort(page, config)
 
 	result := runSearch(page, ds, config)
 	if len(result.keys) == 0 {
 		oembedError(w, http.StatusNotFound)
 		return
 	}
-	allKeys := orderSearchKeys(&pageVars, page, b, ds.editions.ReprintParents, result.keys, result.odds)
-	sortOfferRows(page, allKeys, result)
+	keys := orderSearchKeys(page, ds, result, readSearchSort(page, config)).keys
+	sortOfferRows(page, keys, result)
 
-	payload, err := json.Marshal(searchPreview(page, b, allKeys, result))
+	payload, err := json.Marshal(searchPreview(page, b, keys, result))
 	if err != nil {
 		oembedError(w, http.StatusInternalServerError)
 		return
@@ -1104,12 +1102,22 @@ func fillSearchResults(pageVars *SearchVars, b *mtgmatcher.Backend, query string
 	pageVars.FoundVendors = result.vendors
 }
 
+// searchPage is the page of results to show: its cards in the order asked
+// for, whether that order is reversed, and where the page sits among the rest.
+type searchPage struct {
+	keys       []string
+	reversed   bool
+	pagination Pagination
+}
+
 // orderSearchKeys sorts the results as the reader asked and returns the page
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
-func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, reprintParents map[string]string, allKeys []string, odds map[string]float64) []string {
+func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortMode string) searchPage {
+	b := ds.backend
+	allKeys := result.keys
 	sortData := resolveSortingData(b, allKeys)
-	switch pageVars.SearchSort {
+	switch sortMode {
 	case "odds":
 		// Ascending by default, unlike every other field here: what a
 		// variable search is for is finding the card expected in the fewest
@@ -1122,8 +1130,8 @@ func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 		// regardless of direction, ranked among itself by the fallback the
 		// other fields use.
 		sort.Slice(allKeys, func(i, j int) bool {
-			oddsI, hasI := odds[allKeys[i]]
-			oddsJ, hasJ := odds[allKeys[j]]
+			oddsI, hasI := result.odds[allKeys[i]]
+			oddsJ, hasJ := result.odds[allKeys[j]]
 			if hasI != hasJ {
 				return hasI
 			}
@@ -1137,7 +1145,7 @@ func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	case "hybrid":
-		fileReprintsUnderParent(sortData, reprintParents)
+		fileReprintsUnderParent(sortData, ds.editions.ReprintParents)
 		sort.Slice(allKeys, func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
@@ -1187,21 +1195,22 @@ func orderSearchKeys(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 	}
 
 	// Invert the slice if requested
-	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))
-	if reverseSort {
+	var shown searchPage
+	shown.reversed, _ = strconv.ParseBool(r.FormValue("reverse"))
+	if shown.reversed {
 		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
 			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
 		}
 	}
-	pageVars.ReverseMode = reverseSort
 
 	// If results can't fit in one page, chunk response and enable pagination
+	shown.keys = allKeys
 	if len(allKeys) > MaxSearchResults {
 		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
-		allKeys, pageVars.Pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
+		shown.keys, shown.pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
 	}
 
-	return allKeys
+	return shown
 }
 
 // sortOfferRows orders each card's offers in place, condition by condition:
