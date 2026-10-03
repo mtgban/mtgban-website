@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 
@@ -66,10 +67,10 @@ type Set struct {
 	Colors   []string `json:"colors,omitempty"`
 }
 
-// Snapshot is the sets, promo and finish lists the palette serves, built
-// from one datastore alongside it.
+// Snapshot is the sets, promo, finish and rarity lists the palette serves,
+// built from one datastore alongside it.
 type Snapshot struct {
-	sets, promos, finishes []byte
+	sets, promos, finishes, rarities []byte
 }
 
 // NewSnapshot builds the lists from b.
@@ -78,6 +79,7 @@ func (s *Service) NewSnapshot(b *mtgmatcher.Backend) *Snapshot {
 		sets:     s.buildSets(b),
 		promos:   s.buildPromos(b),
 		finishes: s.buildFinishes(b),
+		rarities: buildRarities(b),
 	}
 }
 
@@ -96,20 +98,13 @@ func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
 			Released: set.ReleaseDate,
 			Keyrune:  strings.ToLower(set.KeyruneCode),
 		}
-		var rarities []string
+		// In the game's order, as the set lists them
 		if len(set.Rarities) > 1 {
-			rarities = make([]string, len(set.Rarities))
-			copy(rarities, set.Rarities)
-			sort.Strings(rarities)
+			entry.Rarities = slices.Clone(set.Rarities)
 		}
-		entry.Rarities = rarities
-		var colors []string
 		if len(set.Colors) > 1 {
-			colors = make([]string, len(set.Colors))
-			copy(colors, set.Colors)
-			sort.Strings(colors)
+			entry.Colors = slices.Clone(set.Colors)
 		}
-		entry.Colors = colors
 		sets = append(sets, entry)
 	}
 	sort.Slice(sets, func(i, j int) bool {
@@ -299,6 +294,72 @@ func (s *Service) FinishList(b *mtgmatcher.Backend) []Finish {
 // Finishes returns the loaded game's finishes.
 func (s *Service) Finishes(w http.ResponseWriter, r *http.Request) {
 	serveCached(w, s.snapshot().finishes)
+}
+
+// Rarity is one rarity the loaded game prints, as the palette and the guide
+// list it: the word an r: query carries, the spelling its cards carry, the
+// letter that names it alone where one does, and how many printings wear it.
+type Rarity struct {
+	Value  string `json:"value"`
+	Label  string `json:"label"`
+	Letter string `json:"letter,omitempty"`
+	Count  int    `json:"count"`
+}
+
+// buildRarities is the JSON-serialized rarity list, built from b.
+func buildRarities(b *mtgmatcher.Backend) []byte {
+	data, err := json.Marshal(RarityList(b))
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+// RarityList is every rarity b's printings carry, in the game's order,
+// rarest first. A rarity has a letter where no other rarity of the game
+// begins with it, which is when r: reads that letter as it alone.
+func RarityList(b *mtgmatcher.Backend) []Rarity {
+	counts := map[string]int{}
+	spellings := map[string]string{}
+	for _, uuid := range b.GetUUIDs() {
+		co, err := b.GetUUID(uuid)
+		if err != nil || co.Rarity == "" {
+			continue
+		}
+		value := mtgmatcher.RarityName(co.Rarity)
+		counts[value]++
+		if spellings[value] == "" {
+			spellings[value] = co.Rarity
+		}
+	}
+	initials := map[byte]int{}
+	for _, value := range b.Rarities {
+		initials[value[0]]++
+	}
+
+	rarities := []Rarity{}
+	for _, value := range b.Rarities {
+		if counts[value] == 0 {
+			continue
+		}
+		// A spelling with capitals is the game's own ("Super Rare", "LR+");
+		// a lower-case one is a word to title.
+		label := spellings[value]
+		if label == strings.ToLower(label) {
+			label = mtgmatcher.Title(label)
+		}
+		rarity := Rarity{Value: value, Label: label, Count: counts[value]}
+		if initials[value[0]] == 1 {
+			rarity.Letter = value[:1]
+		}
+		rarities = append(rarities, rarity)
+	}
+	return rarities
+}
+
+// Rarities returns the loaded game's rarities.
+func (s *Service) Rarities(w http.ResponseWriter, r *http.Request) {
+	serveCached(w, s.snapshot().rarities)
 }
 
 // CardMetaResponse describes one card for the frontend.

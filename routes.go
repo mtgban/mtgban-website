@@ -123,6 +123,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/api-plans/stores.json", noSigning(http.HandlerFunc(APIStores)))
 	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(s.palette.Promos)))
 	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(s.palette.Finishes)))
+	http.Handle("/api/palette/rarities.json", noSigning(http.HandlerFunc(s.palette.Rarities)))
 	http.Handle("/api/offline/", noSigning(http.HandlerFunc(s.offline.Handle)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
