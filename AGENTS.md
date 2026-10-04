@@ -147,6 +147,7 @@ output, not a claim written here.
 | `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
 | `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
 | `alerts_*.go` | Price alerts: the Alerts page, the ACL values and login contact it reads, and the site's wiring of `internal/alerts` (`docs/adr/0005-price-alerts.md`) |
+| `settings_modal.go` | The settings modal's body: the tabs a reader's nav earns, each tab's lists from the handlers' shared functions, served by `/api/settings/modal` and rendered from `templates/settings/` |
 | `screener.go`, `popular.go`, `guide.go`, `changelog.go` | The price-movers screener; the landing page's featured searches; the guide; release notes read from Discord |
 | `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, CSV exports |
 | `admin.go`, `discord.go` | Admin panel + commands; Discord bot |
@@ -264,7 +265,8 @@ commit to this repo can complete on its own.
 
 5. **Templates**: production pre-parses every page in `buildTemplateCache()`;
    a new template/partial must be wired into the cache. Use `-dev` for
-   per-request hot reload while iterating.
+   per-request hot reload while iterating. The settings modal body is its
+   own set, parsed by `settingsBodyFiles()` into the same cache.
 
 6. **Concurrency**: handlers run concurrently and read shared globals
    (`Config()`, DB handles, atomic snapshots). Don't add unsynchronized mutable
