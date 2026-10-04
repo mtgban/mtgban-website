@@ -202,73 +202,71 @@
          PEOPLE
          ═══════════════════════ -->
     <div class="admin-panel{{if eq .Page "people"}} active{{end}}" id="panel-people">
-        <div class="people-grid">
-            {{if gt (len .Tables) 3}}
-            <div class="admin-section">
-                <div class="admin-section-header">
-                    <h2>Patreon Grants</h2>
-                    <span class="count">{{len (index .Tables 3)}} users</span>
-                </div>
-                <form method="POST" action="admin?page=people" class="admin-grant-form">
-                    <input type="email" name="grantEmail" placeholder="email" required>
-                    <input type="text" name="grantName" placeholder="name">
-                    <input type="text" name="grantCategory" placeholder="category">
-                    <select name="grantTier">
-                        {{range .Tiers}}
-                            <option value="{{.}}">{{.}}</option>
-                        {{end}}
-                    </select>
-                    <input type="text" name="grantOverrides" placeholder='overrides, e.g. {"Search":{"SearchOfflineMode":"true"}}' class="admin-grant-overrides">
-                    <input type="submit" value="Add Grant">
-                </form>
-                <div class="admin-table-wrap">
-                <table class="table-data admin-table">
-                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th>Overrides</th><th></th></tr></thead>
-                    <tbody>
-                    {{range $row := index .Tables 3}}
-                        <tr>
-                            <td class="admin-mono">{{index $row 0}}</td>
-                            <td>{{index $row 1}}</td>
-                            <td class="admin-mono">{{index $row 2}}</td>
-                            <td>{{index $row 3}}</td>
-                            <td>{{index $row 4}}</td>
-                            <td class="admin-mono">{{index $row 5}}</td>
-                            <td class="admin-grant-remove-cell">
-                                <form method="POST" action="admin?page=people" onsubmit="return confirm('Remove the {{index $row 4}} grant for {{index $row 2}}?')">
-                                    <input type="hidden" name="revokeEmail" value="{{index $row 2}}">
-                                    <button type="submit" class="admin-grant-remove" title="Remove grant for {{index $row 2}}">✕</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {{end}}
-                    </tbody>
-                </table>
-                </div>
+        {{if gt (len .Tables) 3}}
+        <div class="admin-section">
+            <div class="admin-section-header">
+                <h2>Patreon Grants</h2>
+                <span class="count">{{len (index .Tables 3)}} users</span>
             </div>
-            {{end}}
-
-            {{if gt (len .Tables) 4}}
-            <div class="admin-section">
-                <div class="admin-section-header">
-                    <h2>API Users</h2>
-                    <span class="count">{{len (index .Tables 4)}} keys</span>
-                </div>
-                <div class="admin-table-wrap">
-                <table class="table-data admin-table">
-                    <thead><tr><th>#</th><th>Email</th></tr></thead>
-                    <tbody>
-                    {{range $row := index .Tables 4}}
-                        <tr>
-                            <td class="admin-mono">{{index $row 0}}</td>
-                            <td class="admin-mono">{{index $row 1}}</td>
-                        </tr>
+            <form method="POST" action="admin?page=people" class="admin-grant-form">
+                <input type="email" name="grantEmail" placeholder="email" required>
+                <input type="text" name="grantName" placeholder="name">
+                <input type="text" name="grantCategory" placeholder="category">
+                <select name="grantTier">
+                    {{range .Tiers}}
+                        <option value="{{.}}">{{.}}</option>
                     {{end}}
-                    </tbody>
-                </table>
-                </div>
+                </select>
+                <input type="text" name="grantOverrides" placeholder='overrides, e.g. {"Search":{"SearchOfflineMode":"true"}}' class="admin-grant-overrides">
+                <input type="submit" value="Add Grant">
+            </form>
+            <div class="admin-table-wrap">
+            <table class="table-data admin-table">
+                <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th>Overrides</th><th></th></tr></thead>
+                <tbody>
+                {{range $row := index .Tables 3}}
+                    <tr>
+                        <td class="admin-mono">{{index $row 0}}</td>
+                        <td>{{index $row 1}}</td>
+                        <td class="admin-mono">{{index $row 2}}</td>
+                        <td>{{index $row 3}}</td>
+                        <td>{{index $row 4}}</td>
+                        <td class="admin-mono">{{index $row 5}}</td>
+                        <td class="admin-grant-remove-cell">
+                            <form method="POST" action="admin?page=people" onsubmit="return confirm('Remove the {{index $row 4}} grant for {{index $row 2}}?')">
+                                <input type="hidden" name="revokeEmail" value="{{index $row 2}}">
+                                <button type="submit" class="admin-grant-remove" title="Remove grant for {{index $row 2}}">✕</button>
+                            </form>
+                        </td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
             </div>
-            {{end}}
         </div>
+        {{end}}
+
+        {{if gt (len .Tables) 4}}
+        <div class="admin-section admin-api-users">
+            <div class="admin-section-header">
+                <h2>API Users</h2>
+                <span class="count">{{len (index .Tables 4)}} keys</span>
+            </div>
+            <div class="admin-table-wrap">
+            <table class="table-data admin-table">
+                <thead><tr><th>#</th><th>Email</th></tr></thead>
+                <tbody>
+                {{range $row := index .Tables 4}}
+                    <tr>
+                        <td class="admin-mono">{{index $row 0}}</td>
+                        <td class="admin-mono">{{index $row 1}}</td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        {{end}}
     </div>
 
     <!-- CodeMirror — shared by Config and Checkpoints editors -->
