@@ -188,12 +188,19 @@
         buildEstimateText: buildEstimateText,
         buildStorageText: buildStorageText,
         buildDoneMessage: buildDoneMessage,
+        init: init,
     };
 
-    document.addEventListener('DOMContentLoaded', function () {
-        root = $('offline-img-editions-picker');
-        if (!root || !window.EditionsPicker || !window.OfflineImages || !window.OfflineDB) return;
+    // The document and gear listeners outlast a replaced body; add them once
+    var listening = false;
+    function init() {
+        var picker = $('offline-img-editions-picker');
+        if (!picker || !window.EditionsPicker || !window.OfflineImages || !window.OfflineDB) return;
         if (!(window.OfflineMode && window.OfflineMode.available && window.OfflineMode.available())) return;
+        // Keyed on the element, so a Retry's fresh body is wired again
+        if (picker.dataset.wired) return;
+        picker.dataset.wired = '1';
+        root = picker;
         estimateEl = $('offline-img-estimate');
         storageEl = $('offline-img-storage');
         syncBtn = $('offline-img-sync-btn');
@@ -212,18 +219,27 @@
             labelEl.textContent = 'Pausing after the current edition...';
             window.OfflineMode.cancelSync();
         });
-        document.addEventListener('offline:sync-message', onSyncMessage);
-
-        var gear = $('nav-settings-btn');
-        if (gear) {
-            gear.addEventListener('click', function () {
-                if (syncing) return;
-                loadSelection();
-                fetchManifest();
-                renderEstimates();
-                renderStorage();
-            });
+        if (!listening) {
+            listening = true;
+            document.addEventListener('offline:sync-message', onSyncMessage);
+            var gear = $('nav-settings-btn');
+            if (gear) {
+                gear.addEventListener('click', function () {
+                    if (syncing) return;
+                    loadSelection();
+                    fetchManifest();
+                    renderEstimates();
+                    renderStorage();
+                });
+            }
         }
         renderStorage();
-    });
+
+        // The body arrives when the modal opens, so do what the gear's
+        // click did on the first open
+        loadSelection();
+        fetchManifest();
+        renderEstimates();
+    }
+    document.addEventListener('DOMContentLoaded', init);
 })();

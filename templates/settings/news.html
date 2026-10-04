@@ -1,0 +1,12 @@
+{{define "settings-tab-news"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Editions</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked editions will be <strong>hidden</strong> from all newspaper pages.</p>
+        {{template "editions-picker" (dict "PickerID" "news-editions-picker" "EditionsCategories" .EditionsCategories "EditionsByCategory" .EditionsByCategory)}}
+    </div>
+</section>
+{{end}}

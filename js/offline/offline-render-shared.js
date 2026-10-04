@@ -133,7 +133,7 @@
             var set = ctx.sets[code];
             html += '<div class="offline-notice offline-notice-missing">' +
                 escapeHtml(set && set.n ? set.n : code) + ' is not synced offline. ' +
-                '<a href="/search?settings=1">Choose synced editions in Settings</a> (requires connectivity).' +
+                '<a href="/search?settings=offline">Choose synced editions in Settings</a> (requires connectivity).' +
                 '</div>';
         });
         if (exec.truncated) {

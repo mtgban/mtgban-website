@@ -610,18 +610,3 @@ document.addEventListener('click', function(e) {
 </script>
 {{end}}
 
-{{define "settings-content"}}
-{{$cookieName := "ArbitVendorsList"}}
-{{if .ReverseMode}}{{$cookieName = "ReverseVendorsList"}}{{end}}
-{{if .GlobalMode}}{{$cookieName = "GlobalVendorsList"}}{{end}}
-<section class="settings-section expanded">
-    <div class="settings-section-header" data-role="section-toggle">        <h3>Vendors</h3>
-
-        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
-    </div>
-    <div class="settings-section-body">
-        <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
-        {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-arbit-vendors" "CookieName" $cookieName)}}
-    </div>
-</section>
-{{end}}

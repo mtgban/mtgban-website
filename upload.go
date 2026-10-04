@@ -396,8 +396,7 @@ type UploadVars struct {
 	SealedIndexAllKeys   []string
 	EnabledSealedIndexes []string
 
-	// Additional sources for index keys if needed
-	AltKeys          []string
+	// The sealed stores the store picker offers, and the parsed upload rows
 	SealedSellerKeys []string
 	SealedVendorKeys []string
 	UploadEntries    []UploadEntry
@@ -420,7 +419,6 @@ type UploadVars struct {
 	CanBuylist           bool
 	MagicOnlyExports     bool
 	CanChangeStores      bool
-	CanUploadCustom      bool
 	CanPublishStore      bool
 	RemoteLinkURL        string
 	TotalQuantity        int
@@ -522,7 +520,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanBuylist = canBuylist
 	pageVars.MagicOnlyExports = st.magicOnlyExports
 	pageVars.CanChangeStores = st.canChangeStores
-	pageVars.CanUploadCustom = st.canUploadCustom
 	pageVars.CanPublishStore = st.canPublishStore
 
 	cachedRemoteURL := readCookie(r, "gdocURL")
@@ -535,7 +532,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.VendorKeys = selected.singlesVendors
 	pageVars.SealedSellerKeys = selected.sealedSellers
 	pageVars.SealedVendorKeys = selected.sealedVendors
-	pageVars.AltKeys = UploadIndexComparePriceList
 	pageVars.EnabledSellers = selected.tickedSellers
 	pageVars.EnabledVendors = selected.tickedVendors
 	pageVars.EnabledSealedSellers = selected.tickedSealedSellers

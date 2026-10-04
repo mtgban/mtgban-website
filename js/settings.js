@@ -13,9 +13,9 @@
     // Flat catalog of every settings binding the page might wire up.
     // Each binder is a no-op when its target element isn't in the DOM,
     // so a single iteration handles every page — no need to know which
-    // page is active. The active page's HasSettings flag (set in
-    // pages.go's NavElem definitions) gates the gear button's visible
-    // enabled state; this map only describes the controls themselves.
+    // page is active.
+    // The body is fetched when the modal opens, so autoWire runs then, not
+    // at load; the gear is live on every desktop page.
     // Comments mark which page each grouping originates from so the
     // bindings stay easy to navigate.
     const BINDINGS = {
@@ -70,10 +70,13 @@
             'opt-customminprice': 'UploadCustomMinPrice',
             'opt-customrate': 'UploadCustomRate',
         },
-        // arbit — cookie name varies by route (ArbitVendorsList /
-        // GlobalVendorsList / ReverseVendorsList) and is read from the
-        // container's data-cookie attribute.
-        dynamicLists: ['settings-arbit-vendors'],
+        // arbit: one grid per route, each on its own cookie read from the
+        // grid's data-cookie attribute
+        dynamicLists: [
+            'settings-arbit-vendors-arbit',
+            'settings-arbit-vendors-global',
+            'settings-arbit-vendors-reverse',
+        ],
         editions: {
             // sleep
             'sleep-editions-picker': 'SleepersEditionList',
@@ -253,6 +256,8 @@
 
     // ─── Walk the config and wire everything present in the DOM ──
     function autoWire() {
+        // A Retry wires a fresh body; the old one's bindings must go
+        bindings.length = 0;
         Object.entries(BINDINGS.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
         (BINDINGS.cookieLists || []).forEach(bindListByCookie);
         Object.entries(BINDINGS.pills || {}).forEach(function (e) {
@@ -284,6 +289,11 @@
     let baseline = null;
     let modalEl = null;
     let backdropEl = null;
+    let shell = null;
+    // 'empty' until the body is fetched, then 'loading', 'ready' or 'error'
+    let bodyState = 'empty';
+    // A tab asked for while the body was still loading
+    let pendingHint = null;
 
     function ensureEls() {
         if (modalEl && backdropEl) return true;
@@ -296,27 +306,114 @@
         if (!modalEl) return;
         const saveBtn = modalEl.querySelector('.settings-btn.primary[data-role="save"]');
         if (!saveBtn) return;
-        const dirty = serializeAll() !== baseline;
+        const dirty = bodyState === 'ready' && serializeAll() !== baseline;
         saveBtn.disabled = !dirty;
         modalEl.dataset.dirty = dirty ? '1' : '0';
     }
 
     function isDirty() { return modalEl && modalEl.dataset.dirty === '1'; }
 
-    function openSettings() {
-        if (!ensureEls() || !hasBindings()) return;
+    function bindSectionToggles(root) {
+        root.querySelectorAll('.settings-section-header[data-role="section-toggle"]').forEach(function (h) {
+            h.addEventListener('click', function (e) {
+                if (e.target.closest('.settings-crumb')) return;
+                h.parentElement.classList.toggle('expanded');
+            });
+        });
+    }
+
+    function hints(tabHint) {
+        const page = window.BAN_SETTINGS || {};
+        return {
+            queryTab: tabHint || null,
+            pageTab: page.tab || null,
+            scope: page.scope || null,
+        };
+    }
+
+    // Wire a freshly injected body; safe to run again after a Retry.
+    function wire(body, tabHint) {
+        autoWire();
+        if (window.OfflineMode && window.OfflineMode.initSettingsUI) window.OfflineMode.initSettingsUI();
+        if (window.OfflineImagesUI && window.OfflineImagesUI.init) window.OfflineImagesUI.init();
+        bindSectionToggles(body);
+        if (window.SettingsShell) {
+            shell = window.SettingsShell.bind(modalEl, hints(tabHint));
+            if (shell) shell.hideEmptyTabs();
+        }
+        if (window.lucide && lucide.createIcons) lucide.createIcons({ root: modalEl });
+    }
+
+    // Fetch the body once per page load and wire everything in it.
+    function loadBody(tabHint) {
+        const body = modalEl.querySelector('.settings-modal-body');
+        bodyState = 'loading';
+        body.innerHTML = '<p class="settings-loading" data-role="loading">Loading settings</p>';
+
+        function fail(message, err) {
+            bodyState = 'error';
+            body.innerHTML = '<p class="settings-error">' + message +
+                '<button type="button" class="settings-btn" data-role="retry">Retry</button></p>';
+            // The latest tab asked for wins, and is used up by this load
+            body.querySelector('[data-role="retry"]').addEventListener('click', function () {
+                const hint = pendingHint || tabHint;
+                pendingHint = null;
+                loadBody(hint).then(afterLoad);
+            });
+            if (window.console) console.error('settings: ' + message, err);
+        }
+
+        return fetch('/api/settings/modal', { credentials: 'same-origin' })
+            .then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.text();
+            })
+            .then(function (html) {
+                body.innerHTML = html;
+                try {
+                    wire(body, tabHint);
+                } catch (err) {
+                    fail('Settings could not be set up.', err);
+                    return;
+                }
+                bodyState = 'ready';
+            }, function (err) {
+                fail('Could not load settings.', err);
+            });
+    }
+
+    function afterLoad() {
+        if (bodyState !== 'ready') return;
+        if (pendingHint && shell) {
+            shell.show(window.SettingsShell.pickTab(shell.tabs(), [pendingHint]));
+        }
+        pendingHint = null;
         loadAll();
         baseline = serializeAll();
         modalEl.dataset.dirty = '0';
         updateDirtyUI();
+    }
+
+    function openSettings(tabHint) {
+        if (!ensureEls()) return;
         backdropEl.classList.add('open');
         modalEl.classList.add('open');
         document.body.classList.add('settings-open');
-        const body = modalEl.querySelector('.settings-modal-body');
-        if (body) {
-            body.setAttribute('tabindex', '-1');
-            body.focus({ preventScroll: true });
+        if (bodyState === 'empty' || bodyState === 'error') {
+            // A hint left from a failed load must not beat this one
+            pendingHint = null;
+            loadBody(tabHint).then(afterLoad);
+        } else if (bodyState === 'loading') {
+            pendingHint = tabHint || pendingHint;
+        } else if (bodyState === 'ready') {
+            // A search left typed in the box would hide the tab asked for
+            const search = modalEl.querySelector('#settings-search');
+            if (shell && search && search.value) { search.value = ''; shell.applySearch(''); }
+            if (shell && tabHint) shell.show(window.SettingsShell.pickTab(shell.tabs(), [tabHint]));
+            afterLoad();
         }
+        const search = modalEl.querySelector('#settings-search');
+        if (search) search.focus({ preventScroll: true });
         if (window.lucide && lucide.createIcons) {
             lucide.createIcons({ root: modalEl });
         }
@@ -324,6 +421,8 @@
 
     function closeModal() {
         if (!ensureEls()) return;
+        // Focus left in the search box would swallow the next Ctrl+,
+        if (document.activeElement && modalEl.contains(document.activeElement)) document.activeElement.blur();
         modalEl.classList.remove('open', 'confirm-open');
         backdropEl.classList.remove('open');
         document.body.classList.remove('settings-open');
@@ -393,7 +492,7 @@
         if ((e.ctrlKey || e.metaKey) && e.key === ',') {
             const tag = (document.activeElement && document.activeElement.tagName) || '';
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-            if (!hasBindings()) return;
+            if (!ensureEls()) return;
             e.preventDefault();
             openSettings();
         }
@@ -418,11 +517,6 @@
         modalEl.querySelectorAll('[data-role="confirm-keep"]').forEach(function (el) {
             el.addEventListener('click', confirmKeepEditing);
         });
-        modalEl.querySelectorAll('.settings-section-header[data-role="section-toggle"]').forEach(function (h) {
-            h.addEventListener('click', function () {
-                h.parentElement.classList.toggle('expanded');
-            });
-        });
         const body = modalEl.querySelector('.settings-modal-body');
         if (body) {
             body.addEventListener('change', updateDirtyUI);
@@ -430,28 +524,21 @@
         }
     }
 
-    function enableNavButton() {
-        const navBtn = document.getElementById('nav-settings-btn');
-        if (navBtn) {
-            navBtn.classList.remove('is-disabled');
-            navBtn.removeAttribute('aria-disabled');
-            navBtn.removeAttribute('tabindex');
-            navBtn.title = 'Settings (Ctrl+,)';
-        }
+    // ?settings=1 opens the page's tab; ?settings=<tab> opens that one.
+    function openFromQuery() {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('settings') === '1') {
-            params.delete('settings');
-            const q = params.toString();
-            const cleaned = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
-            window.history.replaceState(null, '', cleaned);
-            setTimeout(openSettings, 0);
-        }
+        if (!params.has('settings')) return;
+        const tab = window.SettingsShell ? window.SettingsShell.tabFromQuery(window.location.search) : null;
+        params.delete('settings');
+        const q = params.toString();
+        const cleaned = window.location.pathname + (q ? '?' + q : '') + window.location.hash;
+        window.history.replaceState(null, '', cleaned);
+        setTimeout(function () { openSettings(tab); }, 0);
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         bindModalChrome();
-        autoWire();
-        if (hasBindings()) enableNavButton();
+        if (ensureEls()) openFromQuery();
         consumeSavedToast();
     });
     document.addEventListener('keydown', onKeydown);

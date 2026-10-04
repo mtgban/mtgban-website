@@ -238,7 +238,7 @@ test('notices: missing set shows set name and link', () => {
     const html = R.noticesHTML({results: [], unsupported: [], missingSets: ['NEO'], truncated: false}, CTX);
     expect(html).toContain('Kamigawa: Neon Dynasty');
     expect(html).toContain('not synced');
-    expect(html).toContain('/search?settings=1');
+    expect(html).toContain('/search?settings=offline');
 });
 
 test('notices: empty results shows offline-empty', () => {

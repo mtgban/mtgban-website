@@ -19,10 +19,12 @@ var storeNameCell = regexp.MustCompile(`class="store-name[^"]*"[^>]*>([^<]+)<`)
 
 // Only a signed-in user may reorder each card's stores: logged out, they are
 // listed by name whatever the listing priority cookie asks for, and the
-// settings show the pills locked rather than bound to that cookie.
+// server-side modal data (the settings body's own render pins the markup
+// in TestSettingsBodyDrawsListingLocked) marks the pills locked rather than
+// bound to that cookie.
 func TestListingPriorityNeedsASignature(t *testing.T) {
 	skipWithoutDatastore(t)
-	withSigMode(t, true, true)
+	signingEnabled(t, true)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -73,7 +75,7 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 		locked  bool
 	}{
 		{"logged out", "", []string{"Alpha Seller", "Beta Seller"}, []string{"Alpha Vendor", "Beta Vendor"}, true},
-		{"signed in", testSig(nil), []string{"Beta Seller", "Alpha Seller"}, []string{"Beta Vendor", "Alpha Vendor"}, false},
+		{"signed in", grantSig(t), []string{"Beta Seller", "Alpha Seller"}, []string{"Beta Vendor", "Alpha Vendor"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil)
@@ -102,11 +104,8 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 				t.Errorf("buylist rows %q, want %q", gotVendors, tc.vendors)
 			}
 
-			if locked := strings.Contains(page, "settings-pills-locked"); locked != tc.locked {
-				t.Errorf("listing pills locked = %v, want %v", locked, tc.locked)
-			}
-			if bound := strings.Contains(page, `id="settings-search-listing"`); bound == tc.locked {
-				t.Errorf("listing pills bound to the cookie = %v, want %v", bound, !tc.locked)
+			if v := settingsModalData(testSite, req); v.ListingLocked != tc.locked {
+				t.Errorf("ListingLocked = %v, want %v", v.ListingLocked, tc.locked)
 			}
 		})
 	}

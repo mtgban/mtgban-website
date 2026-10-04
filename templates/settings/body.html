@@ -1,0 +1,30 @@
+{{/* The settings modal body: a rail of tabs and one pane per tab. Fetched
+     by js/settings.js from /api/settings/modal; js/settings-shell.js
+     wires the rail. */}}
+{{if not .Tabs}}
+<p class="settings-empty">No settings are available for this account.</p>
+{{else}}
+<div class="settings-tabs">
+    <nav class="settings-rail" role="tablist" aria-label="Settings sections">
+        {{range .Tabs}}
+        {{if eq . "offline"}}<div class="settings-rail-gap"></div>{{end}}
+        <button type="button" class="settings-rail-tab" role="tab" data-tab="{{.}}" aria-selected="false">
+            <span class="settings-rail-label">{{index $.TabNames .}}</span>
+            <span class="settings-rail-count" hidden></span>
+        </button>
+        {{end}}
+    </nav>
+    <div class="settings-panes">
+        {{range .Tabs}}
+        <section class="settings-pane" role="tabpanel" data-tab="{{.}}" hidden>
+            {{if eq . "search"}}{{template "settings-tab-search" $}}{{end}}
+            {{if eq . "upload"}}{{template "settings-tab-upload" $}}{{end}}
+            {{if eq . "arbit"}}{{template "settings-tab-arbit" $}}{{end}}
+            {{if eq . "news"}}{{template "settings-tab-news" $}}{{end}}
+            {{if eq . "sleep"}}{{template "settings-tab-sleep" $}}{{end}}
+            {{if eq . "offline"}}{{template "settings-tab-offline" $}}{{end}}
+        </section>
+        {{end}}
+    </div>
+</div>
+{{end}}

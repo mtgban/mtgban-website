@@ -544,7 +544,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// for a query, so it keeps its own empty state either way.
 	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
 
-	fillSearchSettings(&pageVars, r, ds, b)
+	fillSearchSettings(&pageVars, r, b)
 
 	page := r.FormValue("page")
 	if page == "options" {
@@ -792,19 +792,14 @@ func fillSearchReader(pageVars *PageVars, r *http.Request) {
 	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
 }
 
-// fillSearchSettings fills the page's store lists and the options that hang
-// on what is loaded: whether any sealed product is, and the image corpus
-// picker for a reader entitled to it.
-func fillSearchSettings(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend) {
+// fillSearchSettings fills the page's store keys, whether any sealed
+// product is loaded, and whether the reader may use offline mode.
+func fillSearchSettings(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend) {
 	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
 
-	// Image corpus picker: only populate for entitled users.
+	// Offline mode: only for entitled readers
 	if _, ok := offlineModeAllowed(r); ok {
 		pageVars.OfflineModeAllowed = true
-		editions := ds.editions
-		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
-		pageVars.EditionsByCategory = editions.AllEditionsByCategory
-		pageVars.PickerID = "offline-img-editions-picker"
 	}
 
 	pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()

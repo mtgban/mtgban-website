@@ -317,13 +317,18 @@ func TestUnpackSealedLeavesAListWithNothingToOpen(t *testing.T) {
 
 // The setting is where the choice lives now, and it has to reach the upload:
 // the toggle writes the cookie, and the form reads it back as the field the
-// handler looks for.
+// handler looks for. The toggle itself lives in the settings modal body,
+// not the upload page's own markup.
 func TestUnpackIsOfferedInTheSettings(t *testing.T) {
-	out := renderUpload(t, PageVars{})
+	signingEnabled(t, true)
+	keepScrapers(t)
 
-	if !strings.Contains(out, `data-misc="unpack"`) {
+	body := fetchSettingsModal(t, grantSig(t, "Upload"))
+	if !strings.Contains(body, `data-misc="unpack"`) {
 		t.Fatal("the settings offer no way to unpack a list on upload")
 	}
+
+	out := renderUpload(t, PageVars{})
 	script := loadedScript(t, out, "upload-options.js")
 	if !strings.Contains(script, `opts.indexOf('unpack') >= 0`) {
 		t.Error("the setting is never read back into the upload form")
