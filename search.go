@@ -807,15 +807,7 @@ func fillSearchSettings(pageVars *PageVars, r *http.Request, ds *datastore, b *m
 		pageVars.PickerID = "offline-img-editions-picker"
 	}
 
-	// Populate all seller/vendor keys (for settings drawer and options page)
-	for _, seller := range GetSellers() {
-		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
-	}
-	for _, vendor := range GetVendors() {
-		pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
-	}
-	pageVars.SellerKeys = sortKeysByScraperName(pageVars.SellerKeys)
-	pageVars.VendorKeys = sortKeysByScraperName(pageVars.VendorKeys)
+	pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
 }
 
 // fillSearchPrefs puts the reader's search preferences on the page: from

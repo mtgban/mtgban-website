@@ -469,28 +469,10 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		allowlistSellers = strings.Split(allowlistSellersOpt, ",")
 	}
 
-	var blocklistVendors []string
-	blocklistVendorsOpt := GetParamFromSig(sig, "ArbitDisabledVendors")
-	if blocklistVendorsOpt == "" {
-		// Clipped: the cookie's vendors are appended below, and an append into
-		// the config's spare capacity would be seen by every other request
-		blocklistVendors = slices.Clip(Config().ArbitBlockVendors)
-	} else if blocklistVendorsOpt != "NONE" {
-		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
-	}
+	blocklistVendors := arbitBlockedVendors(sig)
 
-	// Populate vendor keys for the settings modal (shown on every page load).
-	// In reverse mode the "vendor" column is actually a seller; same blocklist.
-	notBlocked := func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(blocklistVendors, info.Shorthand)
-	}
-	var vendorKeys []string
-	if reverse {
-		vendorKeys = filterSellers(notBlocked)
-	} else {
-		vendorKeys = filterVendors(notBlocked)
-	}
-	pageVars.VendorKeys = sortKeysByScraperName(vendorKeys)
+	// Vendor keys for the settings modal; same blocklist in reverse mode
+	pageVars.VendorKeys = arbitVendorKeys(blocklistVendors, reverse)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
@@ -552,14 +534,10 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// The "Jump to" section, the probe
-	blocklistVendors := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(Config().GlobalProbeList, info.Shorthand)
-	})
+	blocklistVendors := globalProbeBlocklist()
 
-	// Populate vendor keys for the settings modal (shown on every page load)
-	pageVars.VendorKeys = sortKeysByScraperName(filterVendors(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(blocklistVendors, info.Shorthand)
-	}))
+	// Vendor keys for the settings modal
+	pageVars.VendorKeys = globalVendorKeys(blocklistVendors)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)

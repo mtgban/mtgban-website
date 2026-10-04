@@ -80,25 +80,11 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	// Load the defaul blocklist (same as Search)
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	blocklistRetail, blocklistBuylist := sleepBlocklists(sig)
 
-	// Expand with any custom list if necessary
-	if Config().SleepersBlockList != nil {
-		blocklistRetail = append(blocklistRetail, Config().SleepersBlockList...)
-		blocklistBuylist = append(blocklistBuylist, Config().SleepersBlockList...)
-	}
-
-	// Built before merging the user's cookie hide-list so hidden vendors still
-	// appear in the picker (rendered as pre-checked by js/settings.js bindList).
-	pageVars.ModalSellerKeys = filterSellers(func(info mtgban.ScraperInfo) bool {
-		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
-			!slices.Contains(blocklistRetail, info.Shorthand)
-	})
-	pageVars.ModalVendorKeys = filterVendors(func(info mtgban.ScraperInfo) bool {
-		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
-			!slices.Contains(blocklistBuylist, info.Shorthand)
-	})
+	// Built before the reader's hide cookie is merged, so a hidden store
+	// still shows in the picker, ticked
+	pageVars.ModalSellerKeys, pageVars.ModalVendorKeys = sleepModalKeys(blocklistRetail, blocklistBuylist)
 
 	skipSellersOpt := readCookie(r, "SleepersSellersList")
 	if skipSellersOpt != "" {

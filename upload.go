@@ -1510,29 +1510,10 @@ type uploadStores struct {
 func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st uploadSettings) uploadStores {
 	sig := getSignatureFromCookies(r)
 
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
 	var enabledSealedStores []string
 
-	// Load all possible sellers and vendors according to user permissions.
-	// Sellers skip MetadataOnly entries (no quantity/condition data to
-	// optimize against); vendors don't apply that filter.
-	singlesSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !info.MetadataOnly && !info.SealedMode &&
-			!slices.Contains(blocklistRetail, info.Shorthand)
-	})
-	sealedSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !info.MetadataOnly && info.SealedMode &&
-			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
-	})
-	singlesVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
-		return !info.SealedMode &&
-			!slices.Contains(blocklistBuylist, info.Shorthand)
-	})
-	sealedVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
-		return info.SealedMode &&
-			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
-	})
+	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists(sig)
 
 	// Load the preferred list of enabled stores for the <select> box
 	// The first check is for when the cookie is not yet set
