@@ -128,3 +128,36 @@ func uploadSettingsKeys(r *http.Request) uploadModalKeys {
 		CanUploadCustom:  st.canUploadCustom,
 	}
 }
+
+// settingsTabOrder is the rail, top to bottom.
+var settingsTabOrder = []string{"search", "upload", "arbit", "news", "sleep", "offline"}
+
+var settingsTabNames = map[string]string{
+	"search":  "Search",
+	"upload":  "Upload",
+	"arbit":   "Arbitrage",
+	"news":    "Newspaper",
+	"sleep":   "Sleepers",
+	"offline": "Offline",
+}
+
+// settingsTabs is the rail for a reader whose navbar is nav: one tab per
+// SettingsTab it carries, plus Offline with the grant, in rail order.
+func settingsTabs(nav []NavElem, offlineAllowed bool) []string {
+	have := map[string]bool{}
+	for _, elem := range nav {
+		if elem.SettingsTab != "" {
+			have[elem.SettingsTab] = true
+		}
+	}
+	if offlineAllowed {
+		have["offline"] = true
+	}
+	var tabs []string
+	for _, tab := range settingsTabOrder {
+		if have[tab] {
+			tabs = append(tabs, tab)
+		}
+	}
+	return tabs
+}

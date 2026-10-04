@@ -54,11 +54,9 @@ type NavElem struct {
 	// site's current datastore for visibility only.
 	ShouldHide func(*site) bool
 
-	// True for pages whose settings modal has bindings (mirrors
-	// PAGE_BINDINGS in js/settings.js). Used by the navbar inline
-	// script to pre-resolve the gear button's enabled state so it
-	// doesn't transition from is-disabled → enabled at load time.
-	HasSettings bool
+	// The settings modal tab this page opens on: search, upload, arbit,
+	// news or sleep. Empty for a page with no settings of its own.
+	SettingsTab string
 }
 
 var DefaultNav = []NavElem{
@@ -139,7 +137,7 @@ func init() {
 			Link:        "/search",
 			Handle:      (*site).Search,
 			Page:        "search.html",
-			HasSettings: true,
+			SettingsTab: "search",
 			SubPages: []NavElem{
 				{
 					Name:        "Sets",
@@ -152,7 +150,7 @@ func init() {
 					Short:       "🧱",
 					Description: "Sealed product search",
 					Link:        "/sealed",
-					HasSettings: true,
+					SettingsTab: "search",
 					ShouldHide: func(s *site) bool {
 						return len(s.backend().GetSealedUUIDs()) == 0
 					},
@@ -166,7 +164,7 @@ func init() {
 			Link:        "/newspaper",
 			Handle:      (*site).Newspaper,
 			Page:        "news.html",
-			HasSettings: true,
+			SettingsTab: "news",
 			// Every page of it is built from the cached uuids, so with none
 			// the section is a stack of empty tables. A game with no
 			// newspaper data, or one whose database was never configured,
@@ -182,7 +180,7 @@ func init() {
 					Short:       "📋",
 					Description: "Cards TCGplayer wants now",
 					Link:        "/newspaper?page=syp",
-					HasSettings: true,
+					SettingsTab: "news",
 					ShouldHide: func(*site) bool {
 						_, err := findVendorBuylist("SYP")
 						return err != nil
@@ -205,7 +203,7 @@ func init() {
 			Link:        "/sleepers",
 			Handle:      (*site).Sleepers,
 			Page:        "sleep.html",
-			HasSettings: true,
+			SettingsTab: "sleep",
 		},
 		"Upload": {
 			Name:        "Upload",
@@ -214,7 +212,7 @@ func init() {
 			Link:        "/upload",
 			Handle:      (*site).Upload,
 			Page:        "upload.html",
-			HasSettings: true,
+			SettingsTab: "upload",
 			CanPOST:     true,
 		},
 		"Global": {
@@ -224,7 +222,7 @@ func init() {
 			Link:        "/global",
 			Handle:      (*site).Global,
 			Page:        "arbit.html",
-			HasSettings: true,
+			SettingsTab: "arbit",
 		},
 		"Arbit": {
 			Name:        "Arbitrage",
@@ -233,7 +231,7 @@ func init() {
 			Link:        "/arbit",
 			Handle:      (*site).Arbit,
 			Page:        "arbit.html",
-			HasSettings: true,
+			SettingsTab: "arbit",
 		},
 		"Reverse": {
 			Name:        "Reverse",
@@ -242,7 +240,7 @@ func init() {
 			Link:        "/reverse",
 			Handle:      (*site).Reverse,
 			Page:        "arbit.html",
-			HasSettings: true,
+			SettingsTab: "arbit",
 		},
 		"Alerts": {
 			Name:        "Alerts",
@@ -319,9 +317,13 @@ type PageVars struct {
 	WarningMessage string
 	InfoMessage    string
 
-	Metadata    cardMetadata
-	HasSettings bool
-	ShowUpsell  bool
+	Metadata   cardMetadata
+	ShowUpsell bool
+
+	// SettingsTab is the modal tab the gear opens on this page, and
+	// SettingsScope the arbitrage route it shows, if any
+	SettingsTab   string
+	SettingsScope string
 
 	PopularSearches []PopularSearch
 	Changelog       []changelogGroup
@@ -461,10 +463,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	}
 	pageVars.Nav[mainNavIndex].Active = true
 	pageVars.Nav[mainNavIndex].Class = "active"
-	// Surface the active page's HasSettings on PageVars so the navbar
-	// template can pre-resolve the gear button's state without the
-	// inline script having to maintain a duplicate list of paths.
-	pageVars.HasSettings = pageVars.Nav[mainNavIndex].HasSettings
+	pageVars.SettingsTab = pageVars.Nav[mainNavIndex].SettingsTab
 
 	// Add user information if needed, or public
 	user := sigParams.Get("UserEmail")

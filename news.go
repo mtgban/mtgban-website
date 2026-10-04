@@ -1206,11 +1206,8 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = "TCGplayer Store-Your-Products List"
 		pageVars.ScraperShort = "SYP"
 		pageVars.Metadata = map[string]GenericCard{}
-		// The gear reads the section's flag, and Newspaper has settings even
-		// though this page of it does not. Left alone it renders live and
-		// answers a click with nothing, since the panel it opens is never
-		// built here.
-		pageVars.HasSettings = false
+		// This page of the section builds no settings panel of its own
+		pageVars.SettingsTab = ""
 
 		syp, err := findVendorBuylist("SYP")
 		if err != nil {
