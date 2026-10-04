@@ -1,0 +1,25 @@
+{{define "settings-tab-arbit"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Vendors</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
+        {{/* One grid per route the reader has, each on its own cookie; the
+             pills only choose which grid shows. */}}
+        {{if gt (len .ArbitRoutes) 1}}
+        <div class="settings-pills settings-scope" data-role="arbit-scope">
+            {{range .ArbitRoutes}}
+            <button type="button" class="settings-pill" data-scope="{{.Scope}}">{{.Name}}</button>
+            {{end}}
+        </div>
+        {{end}}
+        {{range .ArbitRoutes}}
+        <div class="settings-scope-pane" data-scope="{{.Scope}}" hidden>
+            {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" (print "settings-arbit-vendors-" .Scope) "CookieName" .Cookie)}}
+        </div>
+        {{end}}
+    </div>
+</section>
+{{end}}

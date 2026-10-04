@@ -381,6 +381,8 @@
     function initSettingsUI() {
         var section = document.getElementById('settings-offline-section');
         if (!section || !available()) return;
+        if (section.dataset.wired) return;
+        section.dataset.wired = '1';
         section.style.display = '';
         var toggle = document.getElementById('settings-offline-toggle');
         var usage = document.getElementById('settings-offline-usage');
@@ -441,7 +443,8 @@
         cancelSync: cancelSync,
         releaseUnloadGuard: releaseUnloadGuard,
         status: status,
-        syncStatusText: syncStatusText
+        syncStatusText: syncStatusText,
+        initSettingsUI: initSettingsUI,
     };
 
     if (available() && enabled() && supported()) {

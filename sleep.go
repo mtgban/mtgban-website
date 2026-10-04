@@ -62,11 +62,9 @@ var sleepersLanguages = []string{
 
 // SleepVars are the PageVars fields only the sleepers page fills and reads.
 type SleepVars struct {
-	Sleepers        map[string][]string
-	SleepersKeys    []string
-	SleepersColors  []string
-	ModalSellerKeys []string
-	ModalVendorKeys []string
+	Sleepers       map[string][]string
+	SleepersKeys   []string
+	SleepersColors []string
 }
 
 func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
@@ -81,10 +79,6 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	blocklistRetail, blocklistBuylist := sleepBlocklists(sig)
-
-	// Built before the reader's hide cookie is merged, so a hidden store
-	// still shows in the picker, ticked
-	pageVars.ModalSellerKeys, pageVars.ModalVendorKeys = sleepModalKeys(blocklistRetail, blocklistBuylist)
 
 	skipSellersOpt := readCookie(r, "SleepersSellersList")
 	if skipSellersOpt != "" {
@@ -107,11 +101,6 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
-
-	editions := ds.editions
-	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
-	pageVars.EditionsByCategory = editions.AllEditionsByCategory
-	pageVars.PickerID = "sleep-editions-picker"
 
 	var tiers map[string]int
 

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
 // searchSettingsKeys lists every loaded seller and vendor, in display order.
@@ -115,17 +119,17 @@ type uploadModalKeys struct {
 	CanUploadCustom  bool
 }
 
-// uploadSettingsKeys reads the Upload tab's data the way the Upload page
-// does, without writing any cookie.
-func uploadSettingsKeys(r *http.Request) uploadModalKeys {
-	sig := getSignatureFromCookies(r)
-	st := readUploadSettings(r, false)
+// uploadSettingsKeys reads the Upload tab's data for a verified sig, with
+// the custom buylist gate readUploadSettings applies.
+func uploadSettingsKeys(sig string) uploadModalKeys {
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
 	singlesSellers, sealedSellers, _, _ := uploadStoreLists(sig)
 	return uploadModalKeys{
 		AltKeys:          UploadIndexComparePriceList,
 		SellerKeys:       singlesSellers,
 		SealedSellerKeys: sealedSellers,
-		CanUploadCustom:  st.canUploadCustom,
+		CanUploadCustom:  canUploadCustom,
 	}
 }
 
@@ -160,4 +164,155 @@ func settingsTabs(nav []NavElem, offlineAllowed bool) []string {
 		}
 	}
 	return tabs
+}
+
+// arbitSettingsRoute is one vendor grid on the Arbitrage tab: the route
+// it belongs to, the cookie it writes, and the stores it offers.
+type arbitSettingsRoute struct {
+	Name       string // Arbitrage, Global, Reverse
+	Scope      string // arbit, global, reverse
+	Cookie     string
+	VendorKeys []string
+}
+
+// settingsModalVars is everything the modal body renders from.
+type settingsModalVars struct {
+	Hash     string
+	Tabs     []string
+	TabNames map[string]string
+
+	// search
+	SellerKeys    []string
+	VendorKeys    []string
+	ListingLocked bool
+
+	// upload
+	UploadAltKeys          []string
+	UploadSellerKeys       []string
+	UploadSealedSellerKeys []string
+	CanUploadCustom        bool
+
+	// arbit, in rail order, only the routes the reader has
+	ArbitRoutes []arbitSettingsRoute
+
+	// sleep
+	SleepSellerKeys []string
+	SleepVendorKeys []string
+
+	// news, sleep and offline images share one editions list
+	EditionsCategories []string
+	EditionsByCategory map[string][]EditionEntry
+	OfflineModeAllowed bool
+}
+
+// settingsBodyKey is the body's entry in TemplateCache.
+const settingsBodyKey = "settings/body.html"
+
+// settingsBodyFiles is the body's template set: the rail, one file per
+// tab, and the partials the tabs call.
+func settingsBodyFiles() (baseName string, files []string) {
+	return "body.html", []string{
+		"templates/settings/body.html",
+		"templates/settings/search.html",
+		"templates/settings/upload.html",
+		"templates/settings/arbit.html",
+		"templates/settings/news.html",
+		"templates/settings/sleep.html",
+		"templates/settings/offline.html",
+		"templates/partials/settings-stores-grouped.html",
+		"templates/partials/editions-picker.html",
+		"templates/partials/set-symbol.html",
+	}
+}
+
+// settingsModalData builds the body for the reader behind r: the tabs
+// their navbar earns, and each tab's lists from the code its page runs.
+func settingsModalData(s *site, r *http.Request) settingsModalVars {
+	ds := s.datastore()
+	// Behind noSigning, so only a sig this host wrote earns tabs
+	sig := verifiedSignature(r)
+	nav := genPageNav(s, r, "", sig).Nav
+	_, offlineAllowed := offlineModeAllowed(r)
+
+	v := settingsModalVars{
+		Hash:               BuildCommit,
+		Tabs:               settingsTabs(nav, offlineAllowed),
+		TabNames:           settingsTabNames,
+		ListingLocked:      sig == "" && SigCheck,
+		OfflineModeAllowed: offlineAllowed,
+		EditionsCategories: ds.editions.AllEditionsCategoriesSorted,
+		EditionsByCategory: ds.editions.AllEditionsByCategory,
+	}
+	v.SellerKeys, v.VendorKeys = searchSettingsKeys()
+
+	up := uploadSettingsKeys(sig)
+	v.UploadAltKeys = up.AltKeys
+	v.UploadSellerKeys = up.SellerKeys
+	v.UploadSealedSellerKeys = up.SealedSellerKeys
+	v.CanUploadCustom = up.CanUploadCustom
+
+	v.ArbitRoutes = arbitSettingsRoutes(nav, sig)
+
+	retail, buylist := sleepBlocklists(sig)
+	v.SleepSellerKeys, v.SleepVendorKeys = sleepModalKeys(retail, buylist)
+
+	return v
+}
+
+// arbitSettingsRoutes is one grid per arbitrage route in nav, in the
+// order the tab shows them.
+func arbitSettingsRoutes(nav []NavElem, sig string) []arbitSettingsRoute {
+	has := map[string]bool{}
+	for _, elem := range nav {
+		has[elem.Name] = true
+	}
+	var routes []arbitSettingsRoute
+	if has["Arbitrage"] {
+		routes = append(routes, arbitSettingsRoute{
+			Name: "Arbitrage", Scope: "arbit", Cookie: "ArbitVendorsList",
+			VendorKeys: arbitVendorKeys(arbitBlockedVendors(sig), false),
+		})
+	}
+	if has["Global"] {
+		routes = append(routes, arbitSettingsRoute{
+			Name: "Global", Scope: "global", Cookie: "GlobalVendorsList",
+			VendorKeys: globalVendorKeys(globalProbeBlocklist()),
+		})
+	}
+	if has["Reverse"] {
+		routes = append(routes, arbitSettingsRoute{
+			Name: "Reverse", Scope: "reverse", Cookie: "ReverseVendorsList",
+			VendorKeys: arbitVendorKeys(arbitBlockedVendors(sig), true),
+		})
+	}
+	return routes
+}
+
+// SettingsModal serves the settings modal's body for the reader behind
+// the request. The body varies by tier, so it is never cached.
+func (s *site) SettingsModal(w http.ResponseWriter, r *http.Request) {
+	v := settingsModalData(s, r)
+
+	baseName, files := settingsBodyFiles()
+	t := TemplateCache[settingsBodyKey]
+	if DevMode || t == nil {
+		var err error
+		t, err = tmplparse.ParseFiles(baseName, files, funcMap)
+		if err != nil {
+			log.Print("settings body parsing error: ", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Rendered whole first, so an error is a 500 and not half a body
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, baseName, v); err != nil {
+		log.Print("settings body executing error: ", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Write(buf.Bytes())
 }

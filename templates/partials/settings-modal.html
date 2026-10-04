@@ -3,9 +3,14 @@
 <div class="settings-modal" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
     <div class="settings-modal-header">
         <h2 id="settings-modal-title">Settings</h2>
+        <label class="settings-search" for="settings-search">
+            <i data-lucide="search"></i>
+            <input type="search" id="settings-search" placeholder="Search settings" autocomplete="off" aria-label="Search settings">
+            <span id="settings-search-count" class="settings-search-count" aria-live="polite"></span>
+        </label>
     </div>
     <div class="settings-modal-body">
-        {{template "settings-content" .}}
+        <p class="settings-loading" data-role="loading">Loading settings</p>
     </div>
     <div class="settings-modal-footer">
         <button class="settings-btn" data-role="cancel" type="button">Cancel</button>

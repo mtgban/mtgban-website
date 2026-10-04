@@ -458,6 +458,10 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	}
 	pageVars := genPageNav(s, r, pageName, sig)
 	pageVars.ReverseMode = reverse
+	pageVars.SettingsScope = "arbit"
+	if reverse {
+		pageVars.SettingsScope = "reverse"
+	}
 
 	var anyOptionEnabled bool
 
@@ -477,9 +481,6 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	}
 
 	blocklistVendors := arbitBlockedVendors(sig)
-
-	// Vendor keys for the settings modal; same blocklist in reverse mode
-	pageVars.VendorKeys = arbitVendorKeys(blocklistVendors, reverse)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
@@ -515,6 +516,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(s, r, "Global", sig)
 	pageVars.GlobalMode = true
+	pageVars.SettingsScope = "global"
 
 	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
 	anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)
@@ -542,9 +544,6 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	// The "Jump to" section, the probe
 	blocklistVendors := globalProbeBlocklist()
-
-	// Vendor keys for the settings modal
-	pageVars.VendorKeys = globalVendorKeys(blocklistVendors)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)

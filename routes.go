@@ -106,6 +106,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/search/", enforceSigning(s, http.HandlerFunc(s.SearchAPI)))
 	http.Handle("/api/mtgmatcher/raw/", enforceSigning(s, http.HandlerFunc(s.RawCardAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(s.SuggestAPI)))
+	http.Handle("/api/settings/modal", noSigning(http.HandlerFunc(s.SettingsModal)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(s.ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(s, http.HandlerFunc(s.BatchPricesAPI)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))

@@ -1134,11 +1134,6 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	editions := ds.editions
-	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
-	pageVars.EditionsByCategory = editions.AllEditionsByCategory
-	pageVars.PickerID = "news-editions-picker"
-
 	// Check if any DB connection was made
 	if NewNewspaperDB == nil {
 		pageVars.Title = "This feature is not enabled"
@@ -1206,8 +1201,6 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = "TCGplayer Store-Your-Products List"
 		pageVars.ScraperShort = "SYP"
 		pageVars.Metadata = map[string]GenericCard{}
-		// This page of the section builds no settings panel of its own
-		pageVars.SettingsTab = ""
 
 		syp, err := findVendorBuylist("SYP")
 		if err != nil {

@@ -48,8 +48,7 @@ func TestCardArtPlaceholderSurvivesSrc(t *testing.T) {
 //
 // Reachability is the same rule the renderer follows, walking out from the base
 // the page is built on. A block the base never invokes is never resolved, so a
-// reference inside one is not a broken page: arbit.html defines a settings block
-// that only the desktop settings modal calls, and rendering it on mobile is fine.
+// reference inside one is not a broken page.
 func TestTemplatesResolveEveryReference(t *testing.T) {
 	saved := DevMode
 	DevMode = false

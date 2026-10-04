@@ -341,15 +341,12 @@ type PageVars struct {
 	SortOption  string
 	ReverseMode bool
 
-	Page               string
-	Subtitle           string
-	Cards              []GenericCard
-	SortDir            string
-	Editions           []string
-	CardHashes         []string
-	EditionsCategories []string
-	EditionsByCategory map[string][]EditionEntry
-	PickerID           string
+	Page       string
+	Subtitle   string
+	Cards      []GenericCard
+	SortDir    string
+	Editions   []string
+	CardHashes []string
 
 	CanFilterByPrice bool
 
@@ -525,28 +522,11 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	// built from its own base, so the block cannot live in one of them.
 	files = append(files, "templates/partials/set-symbol.html")
 
-	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
+	// Every desktop page carries the settings modal's shell; its body is
+	// fetched from /api/settings/modal on open
 	if !isMobile {
-		switch name {
-		case "search.html":
-			files = append(files,
-				"templates/partials/settings-modal.html",
-				"templates/partials/settings-stores-grouped.html",
-				"templates/partials/editions-picker.html",
-			)
-		case "arbit.html":
-			files = append(files,
-				"templates/partials/settings-modal.html",
-				"templates/partials/settings-stores-grouped.html",
-			)
-		case "upload.html":
-			files = append(files, "templates/partials/settings-modal.html")
-		case "sleep.html", "news.html":
-			files = append(files,
-				"templates/partials/settings-modal.html",
-				"templates/partials/editions-picker.html",
-			)
-		case "admin.html":
+		files = append(files, "templates/partials/settings-modal.html")
+		if name == "admin.html" {
 			files = append(files, "templates/partials/admin-usage.html")
 		}
 	}
@@ -600,6 +580,14 @@ func buildTemplateCache() (map[string]*template.Template, error) {
 			cache[key] = t
 		}
 	}
+
+	baseName, files := settingsBodyFiles()
+	t, err := tmplparse.ParseFiles(baseName, files, funcMap)
+	if err != nil {
+		return nil, fmt.Errorf("parsing settings body: %w", err)
+	}
+	cache[settingsBodyKey] = t
+
 	return cache, nil
 }
 
