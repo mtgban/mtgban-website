@@ -189,7 +189,7 @@ async function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
     var providerMode = false;
-    const arr = await fetchNames(sealed);
+    const arr = (await fetchNames(sealed)) || [];
     /* Folded once, here, rather than per keystroke: the singles list is 37,000
      * names, and every one of them used to be normalized again on every letter
      * typed. */
