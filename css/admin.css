@@ -645,26 +645,16 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
 }
 
 /* ── People Tab ── */
-.people-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-}
-/* A grid item's default min-width is its content's min-content size, not
-   its track's. The grants table never wraps a cell (white-space: nowrap,
-   for a clean copy-paste of an email or a UUID), so its min-content width
-   is its full unwrapped row - often wider than half the page - and without
-   this, the browser grows the column to fit it instead of the 1fr split,
-   pushing API Users into whatever sliver is left. min-width: 0 lets the
-   column shrink to its actual track size and hands the overflow to
-   admin-table-wrap's own horizontal scrollbar instead. */
-.people-grid > .admin-section {
-    min-width: 0;
+/* Grants take the full width; the API users list is two short columns, so
+   it stays as wide as its content. */
+.admin-api-users {
+    width: fit-content;
+    max-width: 100%;
 }
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
-    .tools-grid, .people-grid, .admin-usage-grid { grid-template-columns: 1fr; }
+    .tools-grid, .admin-usage-grid { grid-template-columns: 1fr; }
     .admin-status-bar { gap: 10px; }
 }
 @media (max-width: 640px) {
