@@ -10,12 +10,17 @@ const FinishSealed = "sealed"
 var Grades = []string{"NM", "SP", "MP", "HP", "PO"}
 
 // Entry is one grade of one finish at one store. Grade is empty for an
-// index price and for sealed product, which are not graded. Qty is empty
-// where the store reports none; on a buylist that means no limit.
+// index price and for sealed product, which are not graded. Qty is the
+// copies the store's own listings in the grade hold, Price being the best of
+// their prices; on a buylist, the copies it buys. Available is every copy of
+// the grade on sale there at any price, where a source counts them. An empty
+// Qty or Available is unknown, not zero, and an empty Qty on a buylist is
+// no limit.
 type Entry struct {
-	Grade string  `json:"grade,omitempty"`
-	Price float64 `json:"price"`
-	Qty   int     `json:"qty,omitempty"`
+	Grade     string  `json:"grade,omitempty"`
+	Price     float64 `json:"price"`
+	Qty       int     `json:"qty,omitempty"`
+	Available int     `json:"available,omitempty"`
 }
 
 // V2 is the price map of the v2 API: card id, then finish, then store, then
@@ -24,7 +29,7 @@ type V2 map[string]map[string]map[string][]Entry
 
 // Add files e under id, finish and store. An entry of the same grade
 // already filed there keeps the better of the two prices, the higher when
-// buying and the lower otherwise, and the sum of their quantities.
+// buying and the lower otherwise, and the sums of their Qty and Available.
 func (v V2) Add(id, finish, store string, e Entry, buying bool) {
 	finishes := v[id]
 	if finishes == nil {
@@ -50,6 +55,7 @@ func (v V2) Add(id, finish, store string, e Entry, buying bool) {
 				entries[i].Price = e.Price
 			}
 			entries[i].Qty += e.Qty
+			entries[i].Available += e.Available
 			return
 		}
 		if slices.Index(Grades, entries[i].Grade) > rank {

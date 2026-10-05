@@ -32,8 +32,11 @@ func v2Backend() *mtgmatcher.Backend {
 	}
 }
 
-// seedV2Scrapers publishes a graded store, an index, TCGplayer Direct, a
-// sealed store, a graded buyer, a want-count index buyer and an index buyer.
+// seedV2Scrapers publishes a graded store, an index, TCGplayer and its Direct
+// (two Direct listings in one grade, its stock covering both), a store that
+// counts its copies but keeps no quantities, a sealed store, a graded buyer,
+// a want-count index buyer and an index buyer. The listings scrape was capped
+// on the coldfoil.
 func seedV2Scrapers(t *testing.T) {
 	t.Helper()
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
@@ -41,10 +44,13 @@ func seedV2Scrapers(t *testing.T) {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 	})
-	setTestTCGDirect(t, map[string]*tcgListings{"lor-1": {Direct: [5]int32{7}}})
+	setTestTCGDirect(t, map[string]*tcgListings{
+		"lor-1": {Direct: [5]int32{7}, Copies: [5]int32{20, 5}},
+		"lor-2": {Copies: [5]int32{3}, Capped: true},
+	})
 
 	ct := mtgban.InventoryRecord{}
-	ct.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1, Quantity: 3, SellerName: "a"})
+	ct.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1, Quantity: 3, Available: 10, SellerName: "a"})
 	ct.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1.5, Quantity: 2, SellerName: "b"})
 	ct.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.8, Quantity: 1})
 	ct.Add("lor-3", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.9, Quantity: 1})
@@ -57,6 +63,17 @@ func seedV2Scrapers(t *testing.T) {
 
 	direct := mtgban.InventoryRecord{}
 	direct.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2})
+	direct.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2.5, SellerName: "other"})
+
+	tcg := mtgban.InventoryRecord{}
+	tcg.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1.3})
+	tcg.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 1})
+	tcg.Add("lor-2", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 40})
+
+	mp := mtgban.InventoryRecord{}
+	mp.Add("lor-1", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1.05, Available: 8})
+	mp.Add("lor-3", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.95, Available: 4})
+	mp.Add("lor-3", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.7})
 
 	sealed := mtgban.InventoryRecord{}
 	sealed.Add("box", &mtgban.InventoryEntry{Price: 99, Quantity: 5})
@@ -65,6 +82,8 @@ func seedV2Scrapers(t *testing.T) {
 		mtgban.NewSellerFromInventory(ct, mtgban.ScraperInfo{Name: "Card Trader", Shorthand: "CT"}),
 		mtgban.NewSellerFromInventory(trend, mtgban.ScraperInfo{Name: "Cardmarket Trend", Shorthand: "MKMTrend", MetadataOnly: true}),
 		mtgban.NewSellerFromInventory(direct, mtgban.ScraperInfo{Name: "TCGplayer Direct", Shorthand: tcgDirectStore, NoQuantityInventory: true}),
+		mtgban.NewSellerFromInventory(tcg, mtgban.ScraperInfo{Name: "TCGplayer", Shorthand: tcgListingsStore, NoQuantityInventory: true}),
+		mtgban.NewSellerFromInventory(mp, mtgban.ScraperInfo{Name: "Mana Pool", Shorthand: "MP", NoQuantityInventory: true}),
 		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Name: "Card Trader Sealed", Shorthand: "CTSealed", SealedMode: true}),
 	}
 	sellersPtr.Store(&sellers)
@@ -104,14 +123,16 @@ func TestPriceAPIv2Prices(t *testing.T) {
 	seedV2Scrapers(t)
 	b := v2Backend()
 	cards := []string{"lor-1", "lor-2", "lor-3"}
-	stores := []string{"CT", "MKMTrend", tcgDirectStore, "CTSealed", "CK", "SYP", "IDXV"}
+	stores := []string{"CT", "MKMTrend", "MP", tcgDirectStore, tcgListingsStore, "CTSealed", "CK", "SYP", "IDXV"}
 
 	wantRetail := `{"600001":{` +
-		`"coldfoil":{"CT":[{"grade":"SP","price":38,"qty":1}],"MKMTrend":[{"price":35}]},` +
+		`"coldfoil":{"CT":[{"grade":"SP","price":38,"qty":1}],"MKMTrend":[{"price":35}],"TCGPlayer":[{"grade":"NM","price":40}]},` +
 		`"nonfoil":{` +
-		`"CT":[{"grade":"NM","price":0.9,"qty":6},{"grade":"SP","price":0.8,"qty":1},{"grade":"MP","price":0.5,"qty":4}],` +
+		`"CT":[{"grade":"NM","price":0.9,"qty":6,"available":10},{"grade":"SP","price":0.8,"qty":1},{"grade":"MP","price":0.5,"qty":4}],` +
 		`"MKMTrend":[{"price":1.1}],` +
-		`"TCGDirect":[{"grade":"NM","price":2,"qty":7}]}}}`
+		`"MP":[{"grade":"NM","price":0.95,"available":12},{"grade":"SP","price":0.7}],` +
+		`"TCGDirect":[{"grade":"NM","price":2,"available":7}],` +
+		`"TCGPlayer":[{"grade":"NM","price":1.3,"available":20},{"grade":"SP","price":1,"available":5}]}}}`
 	wantBuylist := `{"600001":{"nonfoil":{` +
 		`"CK":[{"grade":"NM","price":0.6,"qty":5},{"grade":"SP","price":0.4,"qty":2}],` +
 		`"IDXV":[{"price":0.3}],` +
@@ -166,7 +187,7 @@ func TestPriceAPIv2Route(t *testing.T) {
 		t.Errorf("v2 meta %+v, error %q", v2.Meta, v2.Error)
 	}
 	grades := v2.Retail["600001"]["nonfoil"]["CT"]
-	if len(grades) != 3 || grades[0] != (banprice.Entry{Grade: "NM", Price: 0.9, Qty: 6}) {
+	if len(grades) != 3 || grades[0] != (banprice.Entry{Grade: "NM", Price: 0.9, Qty: 6, Available: 10}) {
 		t.Errorf("v2 CT nonfoil = %+v", grades)
 	}
 

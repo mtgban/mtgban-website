@@ -9,10 +9,9 @@ import (
 	"github.com/mtgban/mtgban-website/banprice"
 )
 
-// The v2 price maps are built straight from the records, not from v1's, so
-// a store's every grade is kept. They follow v1 in what they read: the
-// same stores, filters and id modes, and filtered requests walk the search
-// rows while full dumps scan the records.
+// The v2 price maps are built straight from the stores' records, not from
+// v1's, so a store's every grade is kept. They follow v1 in what they read:
+// the same stores, filters and id modes.
 
 // v2Finish is the finish a card's prices are filed under in v2.
 func v2Finish(co *mtgmatcher.CardObject) string {
@@ -22,16 +21,21 @@ func v2Finish(co *mtgmatcher.CardObject) string {
 	return co.Finish
 }
 
-func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, tagName string) banprice.V2 {
-	if filterByEdition != "" || filterByHash != nil {
-		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
-		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
-		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
-		return v2PricesFromRows(b, cardIDs, searchSellersNG(cardIDs, config), mode, tagName, false)
+// v2Cards is the cards a filtered request asks for, kept to its finish and
+// to singles or sealed, and whether the request is filtered at all.
+func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
+	if filterByEdition == "" && filterByHash == nil {
+		return nil, false
 	}
+	uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
+	config := apiSearchConfig(b, uuids, nil, filterByFinish, sealed)
+	return filterUUIDs(b, config.UUIDs, config.CardFilters), true
+}
 
+func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, tagName string) banprice.V2 {
+	cardIDs, filtered := v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
 	var finishFilter []string
-	if filterByFinish != "" {
+	if filterByFinish != "" && !filtered {
 		finishFilter = fixupFinishNG(filterByFinish)
 	}
 
@@ -42,34 +46,34 @@ func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 			continue
 		}
 
-		inventory := seller.Inventory()
 		withQty := !info.MetadataOnly && !info.NoQuantityInventory
-		if info.Shorthand == tcgDirectStore {
-			inventory = tcgDirectStockOnly(inventory)
-			withQty = true
-		}
+		stock := v2Stock(info.Shorthand)
 
 		tag := info.Shorthand
 		if tagName == "names" {
 			tag = info.Name
 		}
-		for cardID, entries := range inventory {
-			addV2Entries(b, out, entries, mode, cardID, tag, finishFilter, withQty, !info.MetadataOnly, false)
+		inventory := seller.Inventory()
+		if !filtered {
+			for cardID, entries := range inventory {
+				addV2Entries(b, out, entries, mode, cardID, tag, finishFilter, withQty, !info.MetadataOnly, false, stock)
+			}
+			continue
+		}
+		for _, cardID := range cardIDs {
+			entries, found := inventory[cardID]
+			if found {
+				addV2Entries(b, out, entries, mode, cardID, tag, nil, withQty, !info.MetadataOnly, false, stock)
+			}
 		}
 	}
 	return out
 }
 
 func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, tagName string) banprice.V2 {
-	if filterByEdition != "" || filterByHash != nil {
-		uuids := resolveEditionFilter(b, filterByEdition, filterByHash, sealed)
-		config := apiSearchConfig(b, uuids, enabledStores, filterByFinish, sealed)
-		cardIDs := filterUUIDs(b, config.UUIDs, config.CardFilters)
-		return v2PricesFromRows(b, cardIDs, searchVendorsNG(cardIDs, config), mode, tagName, true)
-	}
-
+	cardIDs, filtered := v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
 	var finishFilter []string
-	if filterByFinish != "" {
+	if filterByFinish != "" && !filtered {
 		finishFilter = fixupFinishNG(filterByFinish)
 	}
 
@@ -88,15 +92,39 @@ func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 			tag = info.Name
 		}
 		buylist := vendor.Buylist()
-		for cardID, entries := range buylist {
-			addV2Entries(b, out, entries, mode, cardID, tag, finishFilter, withQty, !info.MetadataOnly, true)
+		if !filtered {
+			for cardID, entries := range buylist {
+				addV2Entries(b, out, entries, mode, cardID, tag, finishFilter, withQty, !info.MetadataOnly, true, nil)
+			}
+			continue
+		}
+		for _, cardID := range cardIDs {
+			entries, found := buylist[cardID]
+			if found {
+				addV2Entries(b, out, entries, mode, cardID, tag, nil, withQty, !info.MetadataOnly, true, nil)
+			}
 		}
 	}
 	return out
 }
 
-// addV2Entries files every priced entry a store has for one card.
-func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2, entries []T, idMode, cardID, store string, finishFilter []string, withQty, graded, buying bool) {
+// v2Stock is where a store with no quantities of its own reads its
+// Available from: TCGplayer Direct its own stock, and TCGplayer its
+// listings' copies.
+func v2Stock(store string) func(cardID string, grade mtgban.Condition) (int, bool) {
+	switch store {
+	case tcgDirectStore:
+		return tcgDirectStock
+	case tcgListingsStore:
+		return tcgListingsCopies
+	}
+	return nil
+}
+
+// addV2Entries files every priced entry a store has for one card. Its
+// Available is read from stock where that is not nil, once per grade since
+// the stock covers every entry of it, and otherwise from the entry.
+func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2, entries []T, idMode, cardID, store string, finishFilter []string, withQty, graded, buying bool, stock func(string, mtgban.Condition) (int, bool)) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return
@@ -110,6 +138,7 @@ func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2,
 	}
 
 	finish := v2Finish(co)
+	var stocked mtgban.Condition
 	for i := range entries {
 		price := entries[i].Pricing()
 		if price == 0 {
@@ -122,65 +151,13 @@ func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2,
 		if withQty {
 			entry.Qty = entries[i].Qty()
 		}
+		inv, isInventory := any(entries[i]).(mtgban.InventoryEntry)
+		if stock != nil && entries[i].Condition() != stocked {
+			stocked = entries[i].Condition()
+			entry.Available, _ = stock(cardID, stocked)
+		} else if stock == nil && isInventory {
+			entry.Available = inv.Available
+		}
 		out.Add(id, finish, store, entry, buying)
 	}
-}
-
-// v2PricesFromRows files the search walk's rows as addV2Entries files the
-// records: INDEX rows are an index store's, and carry no grade.
-func v2PricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, vendorSide bool) banprice.V2 {
-	names, metadata := apiStoreInfo(vendorSide)
-
-	out := banprice.V2{}
-	for _, cardID := range cardIDs {
-		buckets := found[cardID]
-		if len(buckets) == 0 {
-			continue
-		}
-		co, err := b.GetUUID(cardID)
-		if err != nil {
-			continue
-		}
-		id := getIDFromMode(b, idMode, co)
-		if id == "" {
-			continue
-		}
-
-		finish := v2Finish(co)
-		for _, cond := range AllConditions {
-			for _, row := range buckets[cond] {
-				if row.Price == 0 {
-					continue
-				}
-				entry := banprice.Entry{Price: row.Price}
-				if cond != "INDEX" && !co.Sealed {
-					entry.Grade = string(cond)
-				}
-
-				if vendorSide {
-					if !metadata[row.Shorthand] || row.PriceUnit == PriceUnitCount {
-						entry.Qty = row.Quantity
-					}
-				} else {
-					quantity, noQuantity := row.Quantity, row.NoQuantity
-					if row.Shorthand == tcgDirectStore {
-						stock, found := tcgDirectStock(cardID, cond)
-						if found {
-							quantity, noQuantity = stock, false
-						}
-					}
-					if !noQuantity {
-						entry.Qty = quantity
-					}
-				}
-
-				tag := row.Shorthand
-				if tagName == "names" && names[row.Shorthand] != "" {
-					tag = names[row.Shorthand]
-				}
-				out.Add(id, finish, tag, entry, vendorSide)
-			}
-		}
-	}
-	return out
 }

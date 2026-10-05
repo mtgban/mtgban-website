@@ -363,6 +363,25 @@ func directStockIn(snap *tcgListingsSnapshot, cardID string, grade mtgban.Condit
 	return int(counts.Direct[i]), true
 }
 
+// tcgListingsCopies is the copies of a card in a grade listed on TCGplayer,
+// as of the last listings load while current, where the scrape saw them
+// all: a capped printing's grades are short, though its total is not.
+func tcgListingsCopies(cardID string, grade mtgban.Condition) (int, bool) {
+	snap := tcgDirectSnapshot(time.Now())
+	if snap == nil {
+		return 0, false
+	}
+	counts, found := snap.Cards[cardID]
+	if !found || counts.Capped {
+		return 0, false
+	}
+	i, found := tcgGradeBySite[grade]
+	if !found || counts.Copies[i] == 0 {
+		return 0, false
+	}
+	return int(counts.Copies[i]), true
+}
+
 // tcgDirectStockNote is the tooltip on Direct's stock where it is shown,
 // dating the scrape it comes from. Empty while there is no current stock.
 func tcgDirectStockNote() string {
