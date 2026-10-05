@@ -235,7 +235,7 @@ func TestASupersededBuildIsNotPublished(t *testing.T) {
 
 	// The first upload finishes its walk and tries to install what it
 	// built, which describes inventories no longer live.
-	p.publish(older, map[string]string{"900001": "uuid-before"})
+	p.publish(older, index{ids: map[string]string{"900001": "uuid-before"}})
 
 	if p.cached.Load().builtFrom.Value() != newer {
 		t.Error("a superseded build installed itself over the newer index")
@@ -257,7 +257,7 @@ func TestASupersededIndexIsNeverServed(t *testing.T) {
 	p.cached.Store(&built{
 		builtFrom: weak.Make(&older),
 		shelves:   weakShelves(shelvesOf(older)),
-		ids:       map[string]string{"900001": "uuid-before"},
+		index:     index{ids: map[string]string{"900001": "uuid-before"}},
 	})
 
 	if got := p.Resolve("900001"); got != "uuid-after" {
@@ -376,5 +376,78 @@ func TestAReplacedShelfIsNotKeptAlive(t *testing.T) {
 		live.publish(shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"}), store)
 	}) {
 		t.Error("the replaced shelf is still alive: the index is holding it")
+	}
+}
+
+func TestProductID(t *testing.T) {
+	p, live := newParser()
+	live.publish(
+		shelf("MKMTrend", map[string]string{
+			"uuid-aaa":   "265854",
+			"uuid-bbb":   "300001",
+			"uuid-ccc":   "300001",
+			"uuid-ddd":   "400001",
+			"uuid-etc_e": "400009",
+		}),
+		shelf("MKMLow", map[string]string{
+			// The index the shelves are read first from wins.
+			"uuid-aaa": "999999",
+			// A uuid only the other index prices.
+			"uuid-low": "600001",
+		}),
+		shelf("MKMSealed", map[string]string{
+			"uuid-box": "500001",
+		}),
+	)
+
+	for _, tc := range []struct {
+		name string
+		uuid string
+		own  string
+		want string
+	}{
+		{"priced on the shelves", "uuid-aaa", "", "265854"},
+		{"the shelves over the datastore", "uuid-aaa", "111111", "265854"},
+		{"priced by the second index only", "uuid-low", "", "600001"},
+		{"a sealed product", "uuid-box", "", "500001"},
+		{"one product priced onto two printings", "uuid-ccc", "", "300001"},
+		{"not priced, datastore id unclaimed", "uuid-zzz", "700001", "700001"},
+		{"not priced, datastore id is another card's", "uuid-zzz", "265854", ""},
+		{"not priced, datastore id names several cards", "uuid-zzz", "300001", ""},
+		{"a finish not priced, datastore id is its printing's", "uuid-ddd_f", "400001", "400001"},
+		{"a finish not priced, no datastore id", "uuid-ddd_f", "", "400001"},
+		{"a finish not priced, datastore id unclaimed", "uuid-ddd_e", "700002", "700002"},
+		{"a finish priced as itself", "uuid-etc_e", "", "400009"},
+		{"neither priced nor in the datastore", "uuid-zzz", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := p.ProductID(tc.uuid, tc.own); got != tc.want {
+				t.Errorf("ProductID(%q, %q) = %q, want %q", tc.uuid, tc.own, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestProductIDWithNothingPublished(t *testing.T) {
+	// No Cardmarket shelves at all leaves the datastore as the only answer.
+	p, _ := newParser()
+	if got := p.ProductID("uuid-aaa", "265854"); got != "265854" {
+		t.Errorf("with no sellers = %q, want 265854", got)
+	}
+	if got := (&Parser{}).ProductID("uuid-aaa", ""); got != "" {
+		t.Errorf("with no source = %q, want empty string", got)
+	}
+}
+
+func TestShelvesAreReadInOrder(t *testing.T) {
+	// The snapshot lists sellers in whatever order they were loaded; which
+	// index answers first must not follow it.
+	p, live := newParser()
+	live.publish(
+		shelf("MKMLow", map[string]string{"uuid-aaa": "999999"}),
+		shelf("MKMTrend", map[string]string{"uuid-aaa": "265854"}),
+	)
+	if got := p.ProductID("uuid-aaa", ""); got != "265854" {
+		t.Errorf("ProductID = %q, want the Trend shelf's 265854", got)
 	}
 }

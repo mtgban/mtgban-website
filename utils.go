@@ -915,7 +915,8 @@ func tcgSKU2UUID(sku string) string {
 	return entries[0].OriginalID
 }
 
-// mkmIDs resolves a Cardmarket product id to the card it names.
+// mkmIDs resolves a Cardmarket product id to the card it names, and a card
+// to the product the Cardmarket shelves price it under.
 //
 // The snapshot is handed over rather than reached for: that package holds
 // the resolving, this one holds the sellers.

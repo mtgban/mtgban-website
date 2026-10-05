@@ -1,4 +1,5 @@
-// Package mkmidparser resolves a Cardmarket product id to the card it names.
+// Package mkmidparser resolves a Cardmarket product id to the card it names,
+// and a card to the Cardmarket product it is priced under.
 //
 // The Cardmarket scrapers publish inventories keyed by uuid, with the
 // product each entry priced carried alongside it. Nothing had ever needed
@@ -8,11 +9,13 @@
 // column on every row.
 //
 // This is that walk, done once and kept, for as long as the shelves it was
-// built from are the ones still published.
+// built from are the ones still published. The same walk reads the shelves
+// the way they were written as well, for the price API's Cardmarket ids:
+// the datastore carries a Cardmarket id for only a fraction of most games'
+// cards, while the shelves name the product for every card they price.
 package mkmidparser
 
 import (
-	"slices"
 	"strings"
 	"sync/atomic"
 	"weak"
@@ -66,17 +69,28 @@ type built struct {
 	// themselves would keep the replaced ones alive until the next upload.
 	shelves []weak.Pointer[mtgban.BaseSeller]
 
-	ids map[string]string
+	index
 }
 
-// shelvesOf picks the Cardmarket shelves out of a sellers snapshot.
+// index is what one walk of the shelves learns, read in both directions.
+type index struct {
+	// Product id to the base uuid it names, "" when it names several.
+	ids map[string]string
+
+	// Uuid to the product id the shelves price it under.
+	products map[string]string
+}
+
+// shelvesOf picks the Cardmarket shelves out of a sellers snapshot, in
+// shelfNames order, so which shelf answers first does not depend on the
+// order the snapshot happens to list them in.
 func shelvesOf(sellers []mtgban.Seller) []mtgban.Seller {
 	var shelves []mtgban.Seller
-	for _, seller := range sellers {
-		if slices.ContainsFunc(shelfNames, func(shelf string) bool {
-			return strings.EqualFold(seller.Info().Shorthand, shelf)
-		}) {
-			shelves = append(shelves, seller)
+	for _, name := range shelfNames {
+		for _, seller := range sellers {
+			if strings.EqualFold(seller.Info().Shorthand, name) {
+				shelves = append(shelves, seller)
+			}
 		}
 	}
 	return shelves
@@ -134,7 +148,7 @@ func sameShelves(was []weak.Pointer[mtgban.BaseSeller], now []mtgban.Seller) boo
 // The check narrows the window rather than closing it: the snapshot can
 // still move between the load here and the store below. What makes that
 // harmless is the same key check on the read, not this.
-func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
+func (p *Parser) publish(snapshot *[]mtgban.Seller, idx index) {
 	if p.Sellers() != snapshot {
 		return
 	}
@@ -144,11 +158,11 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
 	p.cached.Store(&built{
 		builtFrom: weak.Make(snapshot),
 		shelves:   weakShelves(shelvesOf(*snapshot)),
-		ids:       ids,
+		index:     idx,
 	})
 }
 
-// ids answers with the index for the sellers currently published,
+// current answers with the index for the sellers currently published,
 // building it if what is cached was built from an older snapshot.
 //
 // Nothing here is ordered against anything else, and it does not need to
@@ -160,18 +174,18 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, ids map[string]string) {
 //
 // The alternative was a lock held across the build, which buys a walk
 // saved and every other upload waiting behind it.
-func (p *Parser) ids() map[string]string {
+func (p *Parser) current() index {
 	if p.Sellers == nil {
-		return nil
+		return index{}
 	}
 	snapshot := p.Sellers()
 	if snapshot == nil {
-		return nil
+		return index{}
 	}
 
 	cached := p.cached.Load()
 	if cached != nil && cached.builtFrom.Value() == snapshot {
-		return cached.ids
+		return cached.index
 	}
 
 	// The snapshot moved. Whether that matters is a different question:
@@ -182,21 +196,21 @@ func (p *Parser) ids() map[string]string {
 	if cached != nil && sameShelves(cached.shelves, shelves) {
 		// Re-keyed to the snapshot in hand so the rows after this one ask
 		// the cheap question again instead of this one.
-		p.publish(snapshot, cached.ids)
-		return cached.ids
+		p.publish(snapshot, cached.index)
+		return cached.index
 	}
 
 	// Built from the shelves that were loaded, not from whatever the
 	// source answers by the time the walk reaches them: the key has to
 	// name what the index actually describes.
-	ids := build(shelves)
-	p.publish(snapshot, ids)
+	idx := build(shelves)
+	p.publish(snapshot, idx)
 
 	// Answered from what was asked about, whether or not it was published.
 	// A caller that started under an older snapshot finishes under it,
 	// which is steadier than changing its mind about the inventories half
 	// way down a list.
-	return ids
+	return idx
 }
 
 // build walks the Cardmarket shelves once and records, for each
@@ -211,8 +225,13 @@ func (p *Parser) ids() map[string]string {
 // uuid is the answer - the finish is re-resolved from the flag, not from
 // which shelf was read first. Only a disagreement about the card itself -
 // 1,525 ids, where the base uuids differ - names nothing.
-func build(shelves []mtgban.Seller) map[string]string {
+//
+// The other direction needs no such care: each index prices a uuid from
+// one product, so a uuid has one product per shelf, and the first shelf in
+// shelfNames order to price it is the answer.
+func build(shelves []mtgban.Seller) index {
 	ids := map[string]string{}
+	products := map[string]string{}
 
 	for _, seller := range shelves {
 
@@ -221,6 +240,9 @@ func build(shelves []mtgban.Seller) map[string]string {
 			for _, entry := range entries {
 				if entry.OriginalID == "" {
 					continue
+				}
+				if _, seen := products[uuid]; !seen {
+					products[uuid] = entry.OriginalID
 				}
 				found, seen := ids[entry.OriginalID]
 				if !seen {
@@ -237,7 +259,7 @@ func build(shelves []mtgban.Seller) map[string]string {
 		}
 	}
 
-	return ids
+	return index{ids: ids, products: products}
 }
 
 // Resolve answers with the card a Cardmarket product id names, or "" if
@@ -250,7 +272,37 @@ func (p *Parser) Resolve(mkmID string) string {
 	if mkmID == "" {
 		return ""
 	}
-	return p.ids()[mkmID]
+	return p.current().ids[mkmID]
+}
+
+// ProductID answers with the Cardmarket product a card is priced under, or
+// "" if there is none to give.
+//
+// The shelves are the authority: they are what the site prices from, and
+// they name a product for every card they price. own is the id the
+// datastore files the card under, which is complete for Magic and sparse
+// for most other games, and it answers only for a card the shelves do not
+// price - and only while the shelves price no other card under it, or the
+// card's prices would merge into another card's.
+//
+// A finish the shelves do not price on its own, a foil with no foil
+// trend, is sold as its printing's product, so that answers last.
+func (p *Parser) ProductID(uuid, own string) string {
+	idx := p.current()
+	if id := idx.products[uuid]; id != "" {
+		return id
+	}
+	base := baseUUID(uuid)
+	if own != "" {
+		named, priced := idx.ids[own]
+		if !priced || named == base {
+			return own
+		}
+	}
+	if base != uuid {
+		return idx.products[base]
+	}
+	return ""
 }
 
 // baseUUID drops the suffix the datastore files a non-default finish under,

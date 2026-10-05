@@ -391,7 +391,7 @@ func getIDFromMode(b *mtgmatcher.Backend, mode string, co *mtgmatcher.CardObject
 		}
 		return fmt.Sprintf("%s|%s|%s", co.Name, co.SetCode, co.Number)
 	case "mkm":
-		return co.Identifiers["mcmId"]
+		return mkmIDs.ProductID(co.UUID, co.Identifiers["mcmId"])
 	case "ck":
 		if co.Etched {
 			id, found := co.Identifiers["cardKingdomEtchedId"]
