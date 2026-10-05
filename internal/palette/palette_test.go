@@ -36,21 +36,23 @@ func TestRarityListFollowsTheGame(t *testing.T) {
 	}
 }
 
-// TestColorListFollowsTheSets pins the colour list: every colour a set lists,
-// in the order the sets list them, colorless and multicolor last.
-func TestColorListFollowsTheSets(t *testing.T) {
+// TestColorListFollowsTheGame pins the colour list: the colours the sets
+// list, in the game's order rather than the sets', any the order leaves out
+// after it by name, and colorless and multicolor last.
+func TestColorListFollowsTheGame(t *testing.T) {
 	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{
-		"AAA": {Code: "AAA", Colors: []string{"fury", "mind", "colorless"}},
-		"BBB": {Code: "BBB", Colors: []string{"fury", "calm", "mind", "order", "multicolor"}},
+		"AAA": {Code: "AAA", Colors: []string{"mind", "fury", "colorless"}},
+		"BBB": {Code: "BBB", Colors: []string{"order", "calm", "fury", "spirit", "multicolor"}},
 		"CCC": {Code: "CCC"},
 	}}
 	b.AllSets = []string{"AAA", "BBB", "CCC"}
+	b.Colors = []string{"fury", "calm", "mind", "body", "chaos", "order", "colorless"}
 
 	var got []string
 	for _, color := range ColorList(b) {
 		got = append(got, color.Value+"="+color.Label)
 	}
-	want := []string{"fury=Fury", "calm=Calm", "mind=Mind", "order=Order", "colorless=Colorless", "multicolor=Multicolor"}
+	want := []string{"fury=Fury", "calm=Calm", "mind=Mind", "order=Order", "spirit=Spirit", "colorless=Colorless", "multicolor=Multicolor"}
 	if !slices.Equal(got, want) {
 		t.Errorf("ColorList = %v, want %v", got, want)
 	}

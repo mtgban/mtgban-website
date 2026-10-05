@@ -379,37 +379,38 @@ func buildColors(b *mtgmatcher.Backend) []byte {
 	return data
 }
 
-// ColorList is every colour b's sets list, in the game's order, colorless
-// and multicolor last. Each set lists its own in that order, so the order is
-// read off the sets, the fullest list first.
+// ColorList is every colour b's sets list, in the game's order (b.Colors),
+// colorless and multicolor last where a set lists them.
 func ColorList(b *mtgmatcher.Backend) []Color {
-	var lists [][]string
+	listed := map[string]bool{}
 	for _, code := range b.GetAllSets() {
 		set, err := b.GetSet(code)
-		if err != nil || set == nil || len(set.Colors) == 0 {
+		if err != nil || set == nil {
 			continue
 		}
-		lists = append(lists, set.Colors)
-	}
-	sort.SliceStable(lists, func(i, j int) bool {
-		return len(lists[i]) > len(lists[j])
-	})
-
-	var names []string
-	terms := map[string]bool{}
-	for _, list := range lists {
-		for _, name := range list {
-			if name == "colorless" || name == "multicolor" {
-				terms[name] = true
-				continue
-			}
-			if !slices.Contains(names, name) {
-				names = append(names, name)
-			}
+		for _, name := range set.Colors {
+			listed[name] = true
 		}
 	}
-	for _, term := range []string{"colorless", "multicolor"} {
-		if terms[term] {
+	terms := []string{"colorless", "multicolor"}
+
+	var names []string
+	for _, name := range b.Colors {
+		if listed[name] && !slices.Contains(terms, name) {
+			names = append(names, name)
+		}
+	}
+	// A colour the order leaves out sorts after it by name, as a set lists it
+	var rest []string
+	for name := range listed {
+		if !slices.Contains(names, name) && !slices.Contains(terms, name) {
+			rest = append(rest, name)
+		}
+	}
+	sort.Strings(rest)
+	names = append(names, rest...)
+	for _, term := range terms {
+		if listed[term] {
 			names = append(names, term)
 		}
 	}
