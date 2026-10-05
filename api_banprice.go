@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	APIVersion = "1"
+	APIVersion   = "1"
+	APIVersionV2 = "2"
 )
 
 // The price API wire types live in the banprice package, importable by
@@ -34,13 +35,16 @@ type (
 
 var conditionTags = banprice.ConditionTags
 
+// PriceAPIMeta describes a price API response, in every version.
+type PriceAPIMeta struct {
+	Date    time.Time `json:"date"`
+	Version string    `json:"version"`
+	BaseURL string    `json:"base_url"`
+}
+
 type PriceAPIOutput struct {
-	Error string `json:"error,omitempty"`
-	Meta  struct {
-		Date    time.Time `json:"date"`
-		Version string    `json:"version"`
-		BaseURL string    `json:"base_url"`
-	} `json:"meta"`
+	Error string       `json:"error,omitempty"`
+	Meta  PriceAPIMeta `json:"meta"`
 
 	// uuid > store > price {regular/foil/etched}
 	Retail  map[string]map[string]*BanPrice `json:"retail,omitempty"`
@@ -87,15 +91,37 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 	return !info.SealedMode && (info.CountryFlag == "" || info.MetadataOnly)
 }
 
+// PriceAPIOutputV2 is the v2 response: the meta of v1, and the prices
+// keyed by card id, finish and store (banprice.V2).
+type PriceAPIOutputV2 struct {
+	Error   string       `json:"error,omitempty"`
+	Meta    PriceAPIMeta `json:"meta"`
+	Retail  banprice.V2  `json:"retail,omitempty"`
+	Buylist banprice.V2  `json:"buylist,omitempty"`
+}
+
+// PriceAPI serves /api/mtgban/, the v1 price API.
 func (s *site) PriceAPI(w http.ResponseWriter, r *http.Request) {
+	s.priceAPI(w, r, "/api/mtgban/", APIVersion)
+}
+
+// PriceAPIv2 serves /api/v2/: the endpoints and options of v1, with every
+// price a store has for a card as a list of grades under its finish. qty and
+// conds do not apply, since the list always carries both, and CSV output is
+// v1's.
+func (s *site) PriceAPIv2(w http.ResponseWriter, r *http.Request) {
+	s.priceAPI(w, r, "/api/v2/", APIVersionV2)
+}
+
+func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version string) {
 	b := s.backend()
 	sig := r.FormValue("sig")
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()
-	out.Meta.Version = APIVersion
+	out.Meta.Version = version
 	out.Meta.BaseURL = absoluteURL(r, "/go/")
 
-	urlPath := strings.TrimPrefix(r.URL.Path, "/api/mtgban/")
+	urlPath := strings.TrimPrefix(r.URL.Path, prefix)
 
 	if !strings.HasSuffix(urlPath, ".json") && !strings.HasSuffix(urlPath, ".csv") {
 		out.Error = "Not found"
@@ -315,13 +341,25 @@ func (s *site) PriceAPI(w http.ResponseWriter, r *http.Request) {
 		dumpType += "sealed"
 	}
 
+	// v2 serves v1's CSV, which already has one row per uuid with its finish
+	isV2 := version == APIVersionV2 && strings.HasSuffix(urlPath, ".json")
+	outV2 := PriceAPIOutputV2{Meta: out.Meta}
+
 	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
 		dumpType += "retail"
-		out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		if isV2 {
+			outV2.Retail = getSellerPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed, tagName)
+		} else {
+			out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		}
 	}
 	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
-		out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		if isV2 {
+			outV2.Buylist = getVendorPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed, tagName)
+		} else {
+			out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+		}
 	}
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -329,10 +367,10 @@ func (s *site) PriceAPI(w http.ResponseWriter, r *http.Request) {
 		user = "anonymous"
 	}
 	msg := fmt.Sprintf("[%v] %s (%s / %s) requested a '%s' API dump ('%s','%q','%s')", time.Since(start), user, r.Header.Get("X-Forwarded-For"), r.RemoteAddr, dumpType, filterByEdition, filterByHash, filterByFinish)
-	if qty {
+	if qty && !isV2 {
 		msg += " with quantities"
 	}
-	if conds {
+	if conds && !isV2 {
 		msg += " with conditions"
 	}
 	if strings.HasSuffix(urlPath, ".json") {
@@ -340,14 +378,21 @@ func (s *site) PriceAPI(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(urlPath, ".csv") {
 		msg += " in csv"
 	}
+	if version != APIVersion {
+		msg += " (v" + version + ")"
+	}
 	APINotify(msg)
 
-	if out.Retail == nil && out.Buylist == nil {
+	if out.Retail == nil && out.Buylist == nil && outV2.Retail == nil && outV2.Buylist == nil {
 		out.Error = "Not found"
 		json.NewEncoder(w).Encode(&out)
 		return
 	}
 
+	if isV2 {
+		json.NewEncoder(w).Encode(&outV2)
+		return
+	}
 	if strings.HasSuffix(urlPath, ".json") {
 		json.NewEncoder(w).Encode(&out)
 		return
@@ -460,6 +505,30 @@ func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filte
 	return config
 }
 
+// apiStoreInfo is each store's name and whether it is an index, by
+// shorthand, for one side. Rows carry neither MetadataOnly (the vendor qty
+// rule needs it: sealed metadata vendors keep their grade bucket, so INDEX
+// membership is not a reliable proxy) nor the raw scraper name
+// (SearchEntry.ScraperName has NameOverride applied).
+func apiStoreInfo(vendorSide bool) (names map[string]string, metadata map[string]bool) {
+	names = map[string]string{}
+	metadata = map[string]bool{}
+	add := func(info mtgban.ScraperInfo) {
+		names[info.Shorthand] = info.Name
+		metadata[info.Shorthand] = info.MetadataOnly
+	}
+	if vendorSide {
+		for _, vendor := range GetVendors() {
+			add(vendor.Info())
+		}
+	} else {
+		for _, seller := range GetSellers() {
+			add(seller.Info())
+		}
+	}
+	return names, metadata
+}
+
 // banPricesFromRows aggregates the search walk's per-condition rows into the
 // BanPrice map the price API serves, mirroring the direct processEntry scan:
 // rows preserve record order (best grade first, then price), so the first
@@ -468,25 +537,7 @@ func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filte
 // grade exactly like the entry loop. INDEX rows are metadata prices whose
 // underlying grade is always NM.
 func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
-	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
-	// metadata vendors keep their grade bucket, so INDEX membership is not
-	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
-	// has NameOverride applied), so look up the side's info once.
-	var names map[string]string
-	var indexStores map[string]bool
-	if vendorSide {
-		indexStores = map[string]bool{}
-		names = map[string]string{}
-		for _, vendor := range GetVendors() {
-			indexStores[vendor.Info().Shorthand] = vendor.Info().MetadataOnly
-			names[vendor.Info().Shorthand] = vendor.Info().Name
-		}
-	} else {
-		names = map[string]string{}
-		for _, seller := range GetSellers() {
-			names[seller.Info().Shorthand] = seller.Info().Name
-		}
-	}
+	names, indexStores := apiStoreInfo(vendorSide)
 
 	out := map[string]map[string]*BanPrice{}
 	for _, cardID := range cardIDs {
