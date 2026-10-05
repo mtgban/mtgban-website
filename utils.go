@@ -131,7 +131,9 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	//
 	// Treasure Rare and Promo are treatments rather than tiers, since a
 	// Treasure Rare card's own box still reads C, so they sit off the end in
-	// the colors the other games give their treatments.
+	// the colors the other games give their treatments. DON!! cards are a
+	// resource rather than a tier, and take the grey darker than common's
+	// that Pokemon's code cards do.
 	mtgmatcher.GameOnePiece: {
 		"common":       "var(--normal)",
 		"uncommon":     "#707883",
@@ -141,6 +143,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 		"secretrare":   "#A88A3C",
 		"treasurerare": "#1FA7C9",
 		"promo":        "#652978",
+		"don!!":        "#4B5158",
 	},
 	// Flesh and Blood prints its rarity as a letter in a colored glyph at the
 	// bottom left, and these are sampled from those glyphs: a blue R, a
@@ -169,11 +172,13 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	},
 	// Yu-Gi-Oh marks no rarity on the card at all: it is a finish, the name
 	// foiled silver or gold and the art holographic, so there is nothing to
-	// sample and no shape to cut. What it does have is 35 rarities, most of
+	// sample and no shape to cut. What it does have is 36 rarities, most of
 	// them a treatment of another one, which no palette could tell apart by
 	// hue. They group by the tier their name claims — a Prismatic Secret Rare
 	// is a secret rare, a Duel Terminal Normal Parallel Rare is a rare — and
-	// each group climbs the ladder the other games already use.
+	// each group climbs the ladder the other games already use. Grand Master
+	// Rare claims no tier, and sits with the ghost and starlight rares it is
+	// ordered beside.
 	mtgmatcher.GameYuGiOh: {
 		"common":                       "var(--normal)",
 		"duelterminaltechnologycommon": "var(--normal)",
@@ -211,9 +216,10 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 		"collector'srare":          "#B45A96",
 		"prismaticcollector'srare": "#B45A96",
 
-		"ghostrare":      "#6F75AA",
-		"ghost/goldrare": "#6F75AA",
-		"starlightrare":  "#6F75AA",
+		"ghostrare":       "#6F75AA",
+		"ghost/goldrare":  "#6F75AA",
+		"grandmasterrare": "#6F75AA",
+		"starlightrare":   "#6F75AA",
 
 		"goldrare":        "#BA9900",
 		"premiumgoldrare": "#BA9900",
@@ -230,7 +236,9 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// So the four that are coloured are taken from the card and the rest are
 	// placed on the ladder the other games use, grouped the way Yu-Gi-Oh's
 	// are: a shiny holo rare is a shiny rare, a mega hyper rare is a hyper
-	// rare. The 197 cards marked None or Unconfirmed are left out and draw no
+	// rare. RGB Rare sits with the other novelty rares, Black White and
+	// Futuristic, and Pikachu Rare with the Holo Rare it is ordered just
+	// above. The cards marked None or Unconfirmed are left out and draw no
 	// badge; code cards, which are filler rather than a tier, take a grey
 	// darker than common's.
 	mtgmatcher.GamePokemon: {
@@ -245,6 +253,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 
 		"amazingrare": "#B06435",
 		"holorare":    "#B06435",
+		"pikachurare": "#B06435",
 		"rareace":     "#B06435",
 		"rarebreak":   "#B06435",
 
@@ -268,6 +277,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 
 		"blackwhiterare": "#6F75AA",
 		"futuristicrare": "#6F75AA",
+		"rgbrare":        "#6F75AA",
 		"secretrare":     "#6F75AA",
 
 		"acespecrare": "#B65B92",
@@ -279,11 +289,12 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// plain rarity's banner is black, its "+" parallel run's is silver, and
 	// its "++" run's is gold. But that same black, that same silver and that
 	// same gold sit under Common and under Legend Rare alike, so there is
-	// nothing there to sample that would tell the eleven rarities apart -
+	// nothing there to sample that would tell the twelve rarities apart -
 	// only that some are the same treatment as others.
 	//
 	// So this climbs the placed ladder the other games use, in the order
-	// the datastore ranks them.
+	// the datastore ranks them. P +, the promo's own parallel run, takes the
+	// promo's purple.
 	mtgmatcher.GameGundam: {
 		"common":     "var(--normal)",
 		"c+":         "#919495",
@@ -296,6 +307,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 		"lr+":        "#B66204",
 		"lr++":       "#E0B84A",
 		"promo":      "#652978",
+		"p+":         "#652978",
 	},
 	// Palworld prints its rarity the same way: a code in angle brackets
 	// beside the number ("<C>", "<SR>"), plain text with no colour of its
