@@ -732,7 +732,7 @@ func editionTitle(b *mtgmatcher.Backend, cardID string) string {
 		}
 	}
 
-	return fmt.Sprintf("%s -%s %s%s", edition, finish, mtgmatcher.Title(co.Card.Rarity), extra)
+	return fmt.Sprintf("%s -%s %s%s", edition, finish, b.RarityLabel(co.Card.Rarity), extra)
 }
 
 const (

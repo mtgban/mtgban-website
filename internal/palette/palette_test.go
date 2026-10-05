@@ -8,16 +8,16 @@ import (
 )
 
 // TestRarityListFollowsTheGame pins the rarity list: the game's order, only
-// what a printing carries, each labelled as its cards spell it, and a letter
-// only where it names that rarity alone.
+// what a printing carries, each labelled as its datastore published it, and
+// a letter only where it names that rarity alone.
 func TestRarityListFollowsTheGame(t *testing.T) {
-	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{}}
+	b := mtgmatcher.NewBackend()
 	for uuid, rarity := range map[string]string{
 		"a": "Super Rare", "b": "Super Rare", "c": "special", "d": "Legend Rare", "e": "Common",
 	} {
 		co := &mtgmatcher.CardObject{}
 		co.UUID = uuid
-		co.Rarity = rarity
+		co.Rarity = b.AddRarity(rarity)
 		b.UUIDs[uuid] = co
 		b.AllUUIDs = append(b.AllUUIDs, uuid)
 	}
