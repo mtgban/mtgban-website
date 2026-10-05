@@ -505,30 +505,6 @@ func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filte
 	return config
 }
 
-// apiStoreInfo is each store's name and whether it is an index, by
-// shorthand, for one side. Rows carry neither MetadataOnly (the vendor qty
-// rule needs it: sealed metadata vendors keep their grade bucket, so INDEX
-// membership is not a reliable proxy) nor the raw scraper name
-// (SearchEntry.ScraperName has NameOverride applied).
-func apiStoreInfo(vendorSide bool) (names map[string]string, metadata map[string]bool) {
-	names = map[string]string{}
-	metadata = map[string]bool{}
-	add := func(info mtgban.ScraperInfo) {
-		names[info.Shorthand] = info.Name
-		metadata[info.Shorthand] = info.MetadataOnly
-	}
-	if vendorSide {
-		for _, vendor := range GetVendors() {
-			add(vendor.Info())
-		}
-	} else {
-		for _, seller := range GetSellers() {
-			add(seller.Info())
-		}
-	}
-	return names, metadata
-}
-
 // banPricesFromRows aggregates the search walk's per-condition rows into the
 // BanPrice map the price API serves, mirroring the direct processEntry scan:
 // rows preserve record order (best grade first, then price), so the first
@@ -537,7 +513,25 @@ func apiStoreInfo(vendorSide bool) (names map[string]string, metadata map[string
 // grade exactly like the entry loop. INDEX rows are metadata prices whose
 // underlying grade is always NM.
 func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
-	names, indexStores := apiStoreInfo(vendorSide)
+	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
+	// metadata vendors keep their grade bucket, so INDEX membership is not
+	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
+	// has NameOverride applied), so look up the side's info once.
+	var names map[string]string
+	var indexStores map[string]bool
+	if vendorSide {
+		indexStores = map[string]bool{}
+		names = map[string]string{}
+		for _, vendor := range GetVendors() {
+			indexStores[vendor.Info().Shorthand] = vendor.Info().MetadataOnly
+			names[vendor.Info().Shorthand] = vendor.Info().Name
+		}
+	} else {
+		names = map[string]string{}
+		for _, seller := range GetSellers() {
+			names[seller.Info().Shorthand] = seller.Info().Name
+		}
+	}
 
 	out := map[string]map[string]*BanPrice{}
 	for _, cardID := range cardIDs {

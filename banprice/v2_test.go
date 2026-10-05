@@ -8,9 +8,9 @@ import (
 func TestV2Add(t *testing.T) {
 	v := V2{}
 	v.Add("600001", "nonfoil", "CT", Entry{Grade: "SP", Price: 0.8, Qty: 1}, false)
-	v.Add("600001", "nonfoil", "CT", Entry{Grade: "NM", Price: 1.5, Qty: 2}, false)
+	v.Add("600001", "nonfoil", "CT", Entry{Grade: "NM", Price: 1.5, Qty: 2, Available: 4}, false)
 	v.Add("600001", "nonfoil", "CT", Entry{Grade: "PO", Price: 0.2, Qty: 1}, false)
-	v.Add("600001", "nonfoil", "CT", Entry{Grade: "NM", Price: 1, Qty: 3}, false)
+	v.Add("600001", "nonfoil", "CT", Entry{Grade: "NM", Price: 1, Qty: 3, Available: 9}, false)
 	v.Add("600001", "nonfoil", "CT", Entry{Grade: "MP", Price: 0.5}, false)
 	v.Add("600001", "nonfoil", "MKMTrend", Entry{Price: 1.2}, false)
 	v.Add("600001", "nonfoil", "MKMTrend", Entry{Price: 1.1}, false)
@@ -25,7 +25,7 @@ func TestV2Add(t *testing.T) {
 	want := `{"600001":{` +
 		`"coldfoil":{"CK":[{"grade":"NM","price":22,"qty":5}]},` +
 		`"nonfoil":{` +
-		`"CT":[{"grade":"NM","price":1,"qty":5},{"grade":"SP","price":0.8,"qty":1},{"grade":"MP","price":0.5},{"grade":"PO","price":0.2,"qty":1}],` +
+		`"CT":[{"grade":"NM","price":1,"qty":5,"available":13},{"grade":"SP","price":0.8,"qty":1},{"grade":"MP","price":0.5},{"grade":"PO","price":0.2,"qty":1}],` +
 		`"MKMTrend":[{"price":1.1}]}},` +
 		`"box":{"sealed":{"CT":[{"price":99,"qty":5}]}}}`
 	if string(wire) != want {
