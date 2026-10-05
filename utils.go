@@ -89,9 +89,9 @@ func cookiePath(r *http.Request, cookieName string, global bool) string {
 // keeps the slate it always had, which reads against either page and is the
 // value Riftbound gives the tier too.
 //
-// Illumineer's Quest and promo cards are "special", which carries the gold
-// Lorcana emblem rather than a rarity gem; the invented purple stays, since
-// the emblem's gold is legendary's.
+// Special, promo and Illumineer's Quest cards carry the gold Lorcana emblem
+// rather than a rarity gem. The emblem's gold is legendary's, so the three
+// share an invented purple.
 var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	mtgmatcher.GameLorcana: {
 		"common":    "var(--normal)",
@@ -103,6 +103,8 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 		"enchanted": "#1FA7C9",
 		"iconic":    "#B45A96",
 		"special":   "#652978",
+		"promo":     "#652978",
+		"quest":     "#652978",
 	},
 	// Riftbound prints its rarity as a gem under the text box, and these are
 	// sampled from those gems: a teal pyramid, a magenta octahedron, an amber
