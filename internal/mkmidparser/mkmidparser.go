@@ -281,26 +281,32 @@ func (p *Parser) Resolve(mkmID string) string {
 // The shelves are the authority: they are what the site prices from, and
 // they name a product for every card they price. own is the id the
 // datastore files the card under, which is complete for Magic and sparse
-// for most other games, and it answers only for a card the shelves do not
-// price - and only while the shelves price no other card under it, or the
-// card's prices would merge into another card's.
+// for most other games, and it answers for a card the shelves do not
+// price, or price under a product they also price another card under.
+//
+// Whatever answers has to name this card and no other, or the card's
+// prices would merge into another card's under the one id: a product the
+// shelves price onto several printings names none of them, from the
+// shelves or from the datastore.
 //
 // A finish the shelves do not price on its own, a foil with no foil
 // trend, is sold as its printing's product, so that answers last.
 func (p *Parser) ProductID(uuid, own string) string {
 	idx := p.current()
-	if id := idx.products[uuid]; id != "" {
-		return id
-	}
 	base := baseUUID(uuid)
-	if own != "" {
-		named, priced := idx.ids[own]
-		if !priced || named == base {
-			return own
+
+	namesThisCard := func(id string) bool {
+		if id == "" {
+			return false
 		}
+		named, priced := idx.ids[id]
+		return !priced || named == base
 	}
-	if base != uuid {
-		return idx.products[base]
+
+	for _, id := range []string{idx.products[uuid], own, idx.products[base]} {
+		if namesThisCard(id) {
+			return id
+		}
 	}
 	return ""
 }
