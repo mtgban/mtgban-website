@@ -610,14 +610,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 					continue
 				}
 
-				// TCGplayer Direct's own stock, where the listings saw some.
 				quantity, noQuantity := row.Quantity, row.NoQuantity
-				if !vendorSide && row.Shorthand == tcgDirectStore {
-					stock, found := tcgDirectStock(cardID, cond)
-					if found {
-						quantity, noQuantity = stock, false
-					}
-				}
 
 				shouldQty := qty && !noQuantity
 				if vendorSide {
@@ -714,12 +707,6 @@ func getSellerPrices(b *mtgmatcher.Backend, mode string, enabledStores []string,
 		// and of course any seller without quantity information
 		shouldQty := qty && !seller.Info().MetadataOnly && !seller.Info().NoQuantityInventory
 		shouldBaseCond := !seller.Info().MetadataOnly && !seller.Info().SealedMode
-
-		// TCGplayer Direct's own stock, as the filtered requests quote it.
-		if qty && seller.Info().Shorthand == tcgDirectStore {
-			inventory = tcgDirectStockOnly(inventory)
-			shouldQty = true
-		}
 
 		rule := EntryRule{
 			Finish: finishFilter,

@@ -143,12 +143,12 @@ Boot sequence (`main()`):
      scraper goroutine `startScraperLoad()` starts also runs it once the
      prices are in, on a goroutine of its own under `tracked()`
    - `50 * * * *` — `s.loadTCGListings()` (tcglistings.go): reloads
-     TCGplayer's sellers and copies per grade, for search's TCGplayer rows,
-     and TCGplayer Direct's own stock per grade (`direct_inventory`, the
-     same on every listing of a grade), which the arbitrage, Global and
-     reverse pages (with a tooltip dating it) and the price API's `qty`
-     quote as TCGDirect's quantity, but not search, until the day after
-     its scrape ends,
+     TCGplayer's sellers and copies per grade, for search's TCGplayer rows
+     and the v2 price API's `available`, and TCGplayer Direct's own stock
+     per grade (`direct_inventory`, the same on every listing of a grade),
+     which the arbitrage, Global and reverse pages (with a tooltip dating
+     it) quote as TCGDirect's quantity and the v2 price API as its
+     `available`, but not search, until the day after its scrape ends,
      once the newspaper finishes a scrape, and retries a scrape day whose
      load failed every 6 hours; every datastore load also runs it, which
      queries only if no day is loaded yet
