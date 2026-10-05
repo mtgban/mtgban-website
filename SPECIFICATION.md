@@ -633,6 +633,16 @@ demo access). Other user APIs: `/api/tcgplayer/{lastsold,directqty,decklist}`,
 `/api/palette/*` (public metadata for the command palette), and
 `/api/mtgban/search/` (shares `SearchAPI` with `/api/search/`).
 
+`/api/v2/` (version "2", `PriceAPIv2`, `api_banprice_v2.go`) serves the same
+endpoints, options and access as v1, and v1's CSV. Its JSON prices are
+`{id: {finish: {store: [{grade, price, qty}]}}}` (`banprice.V2`): the finish
+is the card's `FinishSlug` (`sealed` for sealed product), and a store's list
+has one entry per grade, best first, holding its best price at that grade
+(lowest retail, highest buylist) and the quantity summed, across every uuid
+the id covers. `grade` is absent for an index store and for sealed, `qty`
+where the store reports none (no limit, on a buylist). `qty` and `conds` do
+not apply: the list always carries both.
+
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 
 `discordgo` session with Guilds + GuildMessages intents. Commands: `!card` /
