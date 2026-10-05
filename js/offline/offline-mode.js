@@ -164,15 +164,17 @@
     var syncWorker = null;
     var syncing = false;
 
-    // Warn on navigation while a sync is running so in-flight work isn't silently dropped.
+    // Warn on navigation while an asked-for sync is running, so it isn't silently dropped.
     function onBeforeUnload(e) {
         e.preventDefault();
         e.returnValue = '';
     }
 
-    function setSyncing(v) {
+    // guard is for a sync someone is watching; the page-load one resumes on
+    // the next page, so it never stands between the user and a link.
+    function setSyncing(v, guard) {
         syncing = v;
-        if (v) window.addEventListener('beforeunload', onBeforeUnload);
+        if (v && guard) window.addEventListener('beforeunload', onBeforeUnload);
         else window.removeEventListener('beforeunload', onBeforeUnload);
     }
 
@@ -237,7 +239,7 @@
     function sync(opts) {
         if (syncing || !enabled()) return;
         var withImages = !!(opts && opts.images);
-        setSyncing(true);
+        setSyncing(true, withImages);
         setSyncStatus('syncing: starting');
         Promise.all([
             OfflineDB.getMeta('storesSel'),
