@@ -503,7 +503,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 			continue
 		}
 
-		finish := apiFinish(co)
+		finish := apiFinish(co, id)
 
 		// Per-store output for this card; nil marks a store dropped for a
 		// zero base price. Different uuids can share an output id (a name
@@ -749,7 +749,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		return
 	}
 
-	finish := apiFinish(co)
+	finish := apiFinish(co, id)
 	price.Set(finish, basePrice)
 	for i := range entries {
 		if entries[i].Pricing() == 0 {
@@ -775,21 +775,30 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 }
 
 // apiFinish names the finish a card's prices are filed under in a price
-// object, so the finishes of one printing keep a price each under an id
-// they share. The finish a bare flag answers with stays regular or foil,
+// object keyed by id.
+//
+// An id that is the card's own uuid holds no other card, so the card goes
+// in the slot its flags name - regular, foil or etched - as it always has:
+// that is what the default mode, the offline payloads and the upload read.
+//
+// An id spanning several uuids (a TCGplayer or Cardmarket product, a name)
+// can hold every finish of a printing, so each keeps a field of its own.
+// The finish a bare flag answers with still stays regular or foil,
 // whatever the game calls it - Gundam's foil is its holofoil, and a
 // Pokemon card sold in runs is regular in its unlimited one - so only the
-// finishes past those two take fields of their own. A finish the price
-// object has no field for falls back to the card's flags.
-func apiFinish(co *mtgmatcher.CardObject) string {
-	switch co.UUID {
-	case co.FoilUUIDs[banprice.FinishNonfoil]:
-		return banprice.FinishNonfoil
-	case co.FoilUUIDs[banprice.FinishFoil]:
-		return banprice.FinishFoil
-	}
-	if banprice.Serves(co.Finish) {
-		return co.Finish
+// finishes past those two take the extra fields. A finish the price object
+// has no field for falls back to the card's flags.
+func apiFinish(co *mtgmatcher.CardObject, id string) string {
+	if id != co.UUID {
+		switch co.UUID {
+		case co.FoilUUIDs[banprice.FinishNonfoil]:
+			return banprice.FinishNonfoil
+		case co.FoilUUIDs[banprice.FinishFoil]:
+			return banprice.FinishFoil
+		}
+		if banprice.Serves(co.Finish) {
+			return co.Finish
+		}
 	}
 	switch {
 	case co.Etched:

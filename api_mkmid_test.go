@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -166,9 +167,43 @@ func TestAPIFinish(t *testing.T) {
 		{"no finish at all", card("y", "", false, false, nil), "nonfoil"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := apiFinish(tc.co); got != tc.want {
+			if got := apiFinish(tc.co, "product-id"); got != tc.want {
 				t.Errorf("apiFinish(%s) = %q, want %q", tc.co.UUID, got, tc.want)
 			}
 		})
+	}
+
+	// Keyed by its own uuid a card shares its id with nothing, so it keeps
+	// the slot its flags name, as every uuid-keyed reader expects.
+	for _, tc := range []struct {
+		co   *mtgmatcher.CardObject
+		want string
+	}{
+		{card("p-1", "1stedition", false, false, pokemon), "nonfoil"},
+		{card("p-3", "1steditionholofoil", true, false, pokemon), "foil"},
+		{card("m_e", "etched", false, true, magic), "etched"},
+	} {
+		if got := apiFinish(tc.co, tc.co.UUID); got != tc.want {
+			t.Errorf("apiFinish(%s) by its uuid = %q, want %q", tc.co.UUID, got, tc.want)
+		}
+	}
+}
+
+// TestOfflinePayloadKeepsEveryFinish: the offline payload is keyed by uuid
+// and carries the regular, foil and etched slots only, so a finish past
+// those - a reverse holofoil beside a printing's holofoil - has to arrive
+// in the slot its flag names rather than in a field the payload drops.
+func TestOfflinePayloadKeepsEveryFinish(t *testing.T) {
+	b := finishBackend(map[string]string{"nonfoil": "pk-a", "reverseholofoil": "pk-c"})
+	setMKMShelf(t, nil)
+
+	out := map[string]map[string]*BanPrice{}
+	entries := []mtgban.InventoryEntry{{Conditions: mtgban.NM, Price: 4.5, Quantity: 3}}
+	processEntry(b, out, entries, "", "pk-c", "TCGPlayer", true, true, true)
+
+	payload := banprice2offline("SV1", time.Now(), out, nil)
+	got := payload.Retail["pk-c"]["TCGPlayer"]
+	if got == nil || got.Foil != 4.5 || got.QtyFoil != 3 || got.Conditions["NM_foil"] != 4.5 {
+		t.Errorf("offline entry = %+v, want foil 4.5, qty_foil 3 and NM_foil 4.5", got)
 	}
 }
