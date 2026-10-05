@@ -3,31 +3,161 @@
 // endpoint has always served.
 package banprice
 
+//go:generate go run gen.go
+
+// The finishes every game shares. Magic sells only these; the datastore
+// games sell the rest of Finishes too.
+const (
+	FinishNonfoil = "nonfoil"
+	FinishFoil    = "foil"
+	FinishEtched  = "etched"
+)
+
+// Finishes are every finish a price object files a price under, spelled as
+// mtgmatcher.FinishSlug spells them: the three Magic sells, then the ones
+// MoreFinishes carries. A card sold in several of them under one id - a
+// TCGplayer or Cardmarket product holds every finish of its printing -
+// keeps a price for each instead of one finish overwriting another.
+var Finishes = append([]string{FinishNonfoil, FinishFoil, FinishEtched}, extraFinishes...)
+
+// Grades are the conditions a per-grade price is filed under, best first.
+var Grades = []string{"NM", "SP", "MP", "HP", "PO"}
+
 // ConditionTags is every grade+finish combination the price maps can carry.
 // The vocabulary is closed: mtgban validates entry conditions against
-// FullGradeTags on Add, and the finish suffixes are fixed at aggregation
-// time. Ordered by grade, best first, then base/foil/etched within a grade.
-var ConditionTags = []string{
-	"NM", "NM_foil", "NM_etched",
-	"SP", "SP_foil", "SP_etched",
-	"MP", "MP_foil", "MP_etched",
-	"HP", "HP_foil", "HP_etched",
-	"PO", "PO_foil", "PO_etched",
+// FullGradeTags on Add, and the finishes are Finishes. Ordered by grade,
+// best first, then by finish in Finishes order within a grade.
+var ConditionTags = func() []string {
+	tags := make([]string, 0, len(Grades)*len(Finishes))
+	for _, grade := range Grades {
+		for _, finish := range Finishes {
+			tags = append(tags, ConditionTag(grade, finish))
+		}
+	}
+	return tags
+}()
+
+var (
+	servedFinishes = setOf(Finishes)
+	servedTags     = setOf(ConditionTags)
+)
+
+func setOf(names []string) map[string]bool {
+	set := make(map[string]bool, len(names))
+	for _, name := range names {
+		set[name] = true
+	}
+	return set
+}
+
+// Serves reports whether the finish has a field of its own.
+func Serves(finish string) bool {
+	return servedFinishes[finish]
+}
+
+// ConditionTag is the key a finish's price at a grade is filed under: the
+// grade alone for nonfoil, and the grade and the finish otherwise, as in
+// "NM_foil" and "SP_coldfoil".
+func ConditionTag(grade, finish string) string {
+	if finish == FinishNonfoil || finish == "" {
+		return grade
+	}
+	return grade + "_" + finish
 }
 
 // Price is the per-(id, store) aggregation the price API serves.
 type Price struct {
-	Regular    float64     `json:"regular,omitempty"`
-	Foil       float64     `json:"foil,omitempty"`
-	Etched     float64     `json:"etched,omitempty"`
-	Sealed     float64     `json:"sealed,omitempty"`
-	Cond       string      `json:"cond,omitempty"`
-	Qty        int         `json:"qty,omitempty"`
-	QtyFoil    int         `json:"qty_foil,omitempty"`
-	QtyEtched  int         `json:"qty_etched,omitempty"`
-	QtySealed  int         `json:"qty_sealed,omitempty"`
+	Regular   float64 `json:"regular,omitempty"`
+	Foil      float64 `json:"foil,omitempty"`
+	Etched    float64 `json:"etched,omitempty"`
+	Sealed    float64 `json:"sealed,omitempty"`
+	Cond      string  `json:"cond,omitempty"`
+	Qty       int     `json:"qty,omitempty"`
+	QtyFoil   int     `json:"qty_foil,omitempty"`
+	QtyEtched int     `json:"qty_etched,omitempty"`
+	QtySealed int     `json:"qty_sealed,omitempty"`
+
+	// The finishes past the three above, nil until one is set. Its fields
+	// are promoted, so read them only once it is known to be there, or
+	// through Get and GetQty.
+	*MoreFinishes
+
 	Conditions *Conditions `json:"conditions,omitempty"`
 	Quantities *Quantities `json:"quantities,omitempty"`
+}
+
+func (p *Price) price(finish string, alloc bool) *float64 {
+	switch finish {
+	case FinishNonfoil:
+		return &p.Regular
+	case FinishFoil:
+		return &p.Foil
+	case FinishEtched:
+		return &p.Etched
+	}
+	if p.MoreFinishes == nil {
+		if !alloc || !Serves(finish) {
+			return nil
+		}
+		p.MoreFinishes = &MoreFinishes{}
+	}
+	return p.MoreFinishes.price(finish)
+}
+
+func (p *Price) qty(finish string, alloc bool) *int {
+	switch finish {
+	case FinishNonfoil:
+		return &p.Qty
+	case FinishFoil:
+		return &p.QtyFoil
+	case FinishEtched:
+		return &p.QtyEtched
+	}
+	if p.MoreFinishes == nil {
+		if !alloc || !Serves(finish) {
+			return nil
+		}
+		p.MoreFinishes = &MoreFinishes{}
+	}
+	return p.MoreFinishes.qty(finish)
+}
+
+// Set stores the price of a finish, ignoring one Finishes does not name.
+func (p *Price) Set(finish string, price float64) {
+	if ref := p.price(finish, true); ref != nil {
+		*ref = price
+	}
+}
+
+// Get returns the price of a finish, 0 when unset or on a nil receiver.
+func (p *Price) Get(finish string) float64 {
+	if p == nil {
+		return 0
+	}
+	if ref := p.price(finish, false); ref != nil {
+		return *ref
+	}
+	return 0
+}
+
+// AddQty adds to the quantity of a finish, ignoring one Finishes does not
+// name.
+func (p *Price) AddQty(finish string, qty int) {
+	if ref := p.qty(finish, true); ref != nil {
+		*ref += qty
+	}
+}
+
+// GetQty returns the quantity of a finish, 0 when unset or on a nil
+// receiver.
+func (p *Price) GetQty(finish string) int {
+	if p == nil {
+		return 0
+	}
+	if ref := p.qty(finish, false); ref != nil {
+		return *ref
+	}
+	return 0
 }
 
 // Conditions holds per-grade prices as flat fields instead of a map: the
@@ -52,9 +182,13 @@ type Conditions struct {
 	PO       float64 `json:"PO,omitempty"`
 	POFoil   float64 `json:"PO_foil,omitempty"`
 	POEtched float64 `json:"PO_etched,omitempty"`
+
+	// The grades of the finishes past the three above, nil until one is
+	// set, as Price.MoreFinishes is.
+	*MoreConditions
 }
 
-func (c *Conditions) ref(tag string) *float64 {
+func (c *Conditions) ref(tag string, alloc bool) *float64 {
 	switch tag {
 	case "NM":
 		return &c.NM
@@ -87,12 +221,18 @@ func (c *Conditions) ref(tag string) *float64 {
 	case "PO_etched":
 		return &c.POEtched
 	}
-	return nil
+	if c.MoreConditions == nil {
+		if !alloc || !servedTags[tag] {
+			return nil
+		}
+		c.MoreConditions = &MoreConditions{}
+	}
+	return c.MoreConditions.ref(tag)
 }
 
 // Set stores the price for tag, ignoring unknown tags.
 func (c *Conditions) Set(tag string, price float64) {
-	if p := c.ref(tag); p != nil {
+	if p := c.ref(tag, true); p != nil {
 		*p = price
 	}
 }
@@ -102,7 +242,7 @@ func (c *Conditions) Get(tag string) float64 {
 	if c == nil {
 		return 0
 	}
-	if p := c.ref(tag); p != nil {
+	if p := c.ref(tag, false); p != nil {
 		return *p
 	}
 	return 0
@@ -125,9 +265,11 @@ type Quantities struct {
 	PO       int `json:"PO,omitempty"`
 	POFoil   int `json:"PO_foil,omitempty"`
 	POEtched int `json:"PO_etched,omitempty"`
+
+	*MoreQuantities
 }
 
-func (q *Quantities) ref(tag string) *int {
+func (q *Quantities) ref(tag string, alloc bool) *int {
 	switch tag {
 	case "NM":
 		return &q.NM
@@ -160,12 +302,18 @@ func (q *Quantities) ref(tag string) *int {
 	case "PO_etched":
 		return &q.POEtched
 	}
-	return nil
+	if q.MoreQuantities == nil {
+		if !alloc || !servedTags[tag] {
+			return nil
+		}
+		q.MoreQuantities = &MoreQuantities{}
+	}
+	return q.MoreQuantities.ref(tag)
 }
 
 // Set stores the quantity for tag, ignoring unknown tags.
 func (q *Quantities) Set(tag string, qty int) {
-	if p := q.ref(tag); p != nil {
+	if p := q.ref(tag, true); p != nil {
 		*p = qty
 	}
 }
@@ -175,7 +323,7 @@ func (q *Quantities) Get(tag string) int {
 	if q == nil {
 		return 0
 	}
-	if p := q.ref(tag); p != nil {
+	if p := q.ref(tag, false); p != nil {
 		return *p
 	}
 	return 0

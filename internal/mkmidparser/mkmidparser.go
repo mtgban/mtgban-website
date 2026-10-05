@@ -13,14 +13,21 @@
 // the way they were written as well, for the price API's Cardmarket ids:
 // the datastore carries a Cardmarket id for only a fraction of most games'
 // cards, while the shelves name the product for every card they price.
+//
+// A product is a printing, sold in every finish it has: Magic's nonfoil
+// and foil, Lorcana's cold foil, Pokemon's 1st Edition holofoil. Each
+// finish is a uuid of its own, and which printing a uuid is a finish of is
+// the backend's to say (mtgmatcher.PrintingKey), for every game alike.
 package mkmidparser
 
 import (
+	"slices"
 	"strings"
 	"sync/atomic"
 	"weak"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // Parser answers the id-to-card question, holding the index it answers
@@ -49,12 +56,13 @@ var shelfNames = []string{"MKMTrend", "MKMLow", "MKMSealed"}
 // built is the reverse of what those shelves publish - their entries
 // carry the product they priced, and this is that read the other way round.
 //
-// It carries the sellers snapshot it was built from, because that is what
-// says whether it is still true. The inventories are replaced by
-// updateSellers, which does not touch the datastore stamp, so an index
-// keyed on that would go on describing the previous snapshot after a
-// scrapers-only refresh - and would say so silently, by resolving ids to
-// cards that had moved.
+// It carries the sellers snapshot and the backend it was built from,
+// because those are what say whether it is still true: the shelves name
+// the products, and the backend says which printing each uuid is. The
+// inventories are replaced by updateSellers, which does not touch the
+// datastore stamp, so an index keyed on that would go on describing the
+// previous snapshot after a scrapers-only refresh - and would say so
+// silently, by resolving ids to cards that had moved.
 type built struct {
 	// The snapshot this was last matched against, which is the cheap
 	// question: if the sellers have not been republished at all, nothing
@@ -69,16 +77,23 @@ type built struct {
 	// themselves would keep the replaced ones alive until the next upload.
 	shelves []weak.Pointer[mtgban.BaseSeller]
 
+	// The backend the printings were read from. A datastore reload can
+	// move a uuid to another printing without any seller moving.
+	backend weak.Pointer[mtgmatcher.Backend]
+
 	index
 }
 
 // index is what one walk of the shelves learns, read in both directions.
 type index struct {
-	// Product id to the base uuid it names, "" when it names several.
+	// Product id to the printing it names (mtgmatcher.PrintingKey), ""
+	// when it names several.
 	ids map[string]string
 
-	// Uuid to the product id the shelves price it under.
-	products map[string]string
+	// Uuid to the product id the shelves price it under, where that
+	// product names its printing and no other: ProductID's whole answer
+	// for nearly every card, settled once here rather than per call.
+	answers map[string]string
 }
 
 // shelvesOf picks the Cardmarket shelves out of a sellers snapshot, in
@@ -148,7 +163,7 @@ func sameShelves(was []weak.Pointer[mtgban.BaseSeller], now []mtgban.Seller) boo
 // The check narrows the window rather than closing it: the snapshot can
 // still move between the load here and the store below. What makes that
 // harmless is the same key check on the read, not this.
-func (p *Parser) publish(snapshot *[]mtgban.Seller, idx index) {
+func (p *Parser) publish(snapshot *[]mtgban.Seller, b *mtgmatcher.Backend, idx index) {
 	if p.Sellers() != snapshot {
 		return
 	}
@@ -158,12 +173,14 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, idx index) {
 	p.cached.Store(&built{
 		builtFrom: weak.Make(snapshot),
 		shelves:   weakShelves(shelvesOf(*snapshot)),
+		backend:   weak.Make(b),
 		index:     idx,
 	})
 }
 
 // current answers with the index for the sellers currently published,
-// building it if what is cached was built from an older snapshot.
+// read against b, building it if what is cached was built from an older
+// snapshot or another backend.
 //
 // Nothing here is ordered against anything else, and it does not need to
 // be: what makes an answer correct is that its key matches the snapshot
@@ -174,8 +191,8 @@ func (p *Parser) publish(snapshot *[]mtgban.Seller, idx index) {
 //
 // The alternative was a lock held across the build, which buys a walk
 // saved and every other upload waiting behind it.
-func (p *Parser) current() index {
-	if p.Sellers == nil {
+func (p *Parser) current(b *mtgmatcher.Backend) index {
+	if p.Sellers == nil || b == nil {
 		return index{}
 	}
 	snapshot := p.Sellers()
@@ -184,6 +201,9 @@ func (p *Parser) current() index {
 	}
 
 	cached := p.cached.Load()
+	if cached != nil && cached.backend.Value() != b {
+		cached = nil
+	}
 	if cached != nil && cached.builtFrom.Value() == snapshot {
 		return cached.index
 	}
@@ -196,15 +216,15 @@ func (p *Parser) current() index {
 	if cached != nil && sameShelves(cached.shelves, shelves) {
 		// Re-keyed to the snapshot in hand so the rows after this one ask
 		// the cheap question again instead of this one.
-		p.publish(snapshot, cached.index)
+		p.publish(snapshot, b, cached.index)
 		return cached.index
 	}
 
 	// Built from the shelves that were loaded, not from whatever the
 	// source answers by the time the walk reaches them: the key has to
 	// name what the index actually describes.
-	idx := build(shelves)
-	p.publish(snapshot, idx)
+	idx := build(b, shelves)
+	p.publish(snapshot, b, idx)
 
 	// Answered from what was asked about, whether or not it was published.
 	// A caller that started under an older snapshot finishes under it,
@@ -214,29 +234,34 @@ func (p *Parser) current() index {
 }
 
 // build walks the Cardmarket shelves once and records, for each
-// product id they price, the card it names.
+// product id they price, the printing it names, and for each uuid they
+// price, the product.
 //
 // One product is routinely several uuids, and which ones decides whether
 // the id names a card at all. Cardmarket sells a printing's finishes as one
-// product, so the foil and the plain entry answer to the same id and differ
-// only by the suffix the datastore files a finish under: half of the
-// 103,611 ids on the Magic shelves are shared that way, and the upload's
-// own foil column says which finish is meant. Those agree, and the base
-// uuid is the answer - the finish is re-resolved from the flag, not from
-// which shelf was read first. Only a disagreement about the card itself -
-// 1,525 ids, where the base uuids differ - names nothing.
+// product, so the foil and the plain entry answer to the same id: half of
+// the 103,611 ids on the Magic shelves are shared that way, and the
+// upload's own foil column says which finish is meant. Those agree on the
+// printing, and the printing is the answer - the finish is re-resolved
+// from the flag, not from which shelf was read first. Only a disagreement
+// about the printing itself - 1,525 ids on Magic's - names nothing.
 //
 // The other direction needs no such care: each index prices a uuid from
 // one product, so a uuid has one product per shelf, and the first shelf in
 // shelfNames order to price it is the answer.
-func build(shelves []mtgban.Seller) index {
+func build(b *mtgmatcher.Backend, shelves []mtgban.Seller) index {
 	ids := map[string]string{}
 	products := map[string]string{}
+	printings := map[string]string{}
 
 	for _, seller := range shelves {
 
 		for uuid, entries := range seller.Inventory() {
-			base := baseUUID(uuid)
+			printing, seen := printings[uuid]
+			if !seen {
+				printing = printingOf(b, uuid)
+				printings[uuid] = printing
+			}
 			for _, entry := range entries {
 				if entry.OriginalID == "" {
 					continue
@@ -246,78 +271,130 @@ func build(shelves []mtgban.Seller) index {
 				}
 				found, seen := ids[entry.OriginalID]
 				if !seen {
-					ids[entry.OriginalID] = base
+					ids[entry.OriginalID] = printing
 					continue
 				}
-				if found != base {
-					// Names nothing, and stays that way: "" is not a base
-					// uuid, so a later shelf agreeing with either of them
-					// cannot talk it back round.
+				if found != printing {
+					// Names nothing, and stays that way: "" is not a
+					// printing, so a later shelf agreeing with either of
+					// them cannot talk it back round.
 					ids[entry.OriginalID] = ""
 				}
 			}
 		}
 	}
 
-	return index{ids: ids, products: products}
+	answers := make(map[string]string, len(products))
+	for uuid, id := range products {
+		if ids[id] == printings[uuid] {
+			answers[uuid] = id
+		}
+	}
+
+	return index{ids: ids, answers: answers}
+}
+
+// printingOf names the printing a uuid is one finish of. A uuid the backend
+// does not know is a printing of its own.
+func printingOf(b *mtgmatcher.Backend, uuid string) string {
+	co, err := b.GetUUID(uuid)
+	if err != nil {
+		return uuid
+	}
+	return mtgmatcher.PrintingKey(co.Card)
 }
 
 // Resolve answers with the card a Cardmarket product id names, or "" if
-// the id is unknown, and "" as well if it names more than one card.
+// the id is unknown, and "" as well if it names more than one printing.
 //
-// An id the shelves do not price is unknown, and one they disagree about
-// names more than one card, which is the same answer: the row falls back
-// to its name and edition.
-func (p *Parser) Resolve(mkmID string) string {
+// The card is the printing's plainest finish, which is the one a row with
+// no finish of its own asks about; a row that names one is re-resolved to
+// it from this uuid. An id the shelves do not price is unknown, and one
+// they disagree about names more than one card, which is the same answer:
+// the row falls back to its name and edition.
+func (p *Parser) Resolve(b *mtgmatcher.Backend, mkmID string) string {
 	if mkmID == "" {
 		return ""
 	}
-	return p.current().ids[mkmID]
+	printing := p.current(b).ids[mkmID]
+	if printing == "" {
+		return ""
+	}
+	co, err := b.GetUUID(printing)
+	if err != nil {
+		return printing
+	}
+	for _, foil := range []bool{false, true} {
+		if uuid, found := mtgmatcher.DefaultPrinting(co.FoilUUIDs, foil); found {
+			return uuid
+		}
+	}
+	return printing
 }
 
 // ProductID answers with the Cardmarket product a card is priced under, or
 // "" if there is none to give.
 //
 // The shelves are the authority: they are what the site prices from, and
-// they name a product for every card they price. own is the id the
-// datastore files the card under, which is complete for Magic and sparse
-// for most other games, and it answers for a card the shelves do not
-// price, or price under a product they also price another card under.
+// they name a product for every card they price. The datastore's own
+// Cardmarket id, which is complete for Magic and sparse for most other
+// games, answers for a card the shelves do not price, or price under a
+// product they also price another card under.
 //
-// Whatever answers has to name this card and no other, or the card's
-// prices would merge into another card's under the one id: a product the
-// shelves price onto several printings names none of them, from the
-// shelves or from the datastore.
+// Whatever answers has to name this card's printing and no other, or the
+// card's prices would merge into another card's under the one id: a
+// product the shelves price onto several printings names none of them,
+// from the shelves or from the datastore.
 //
-// A finish the shelves do not price on its own, a foil with no foil
-// trend, is sold as its printing's product, so that answers last.
-func (p *Parser) ProductID(uuid, own string) string {
-	idx := p.current()
-	base := baseUUID(uuid)
+// A finish the shelves do not price on its own, a foil with no foil trend,
+// is sold as its printing's product, so a sibling the shelves do price
+// answers last: the plainest nonfoil, the plainest foil, then the rest by
+// name.
+func (p *Parser) ProductID(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
+	idx := p.current(b)
+	if id := idx.answers[co.UUID]; id != "" {
+		return id
+	}
 
+	printing := mtgmatcher.PrintingKey(co.Card)
 	namesThisCard := func(id string) bool {
 		if id == "" {
 			return false
 		}
 		named, priced := idx.ids[id]
-		return !priced || named == base
+		return !priced || named == printing
 	}
 
-	for _, id := range []string{idx.products[uuid], own, idx.products[base]} {
-		if namesThisCard(id) {
+	if id := co.Identifiers["mcmId"]; namesThisCard(id) {
+		return id
+	}
+	// A sibling's answer names this printing too, being the same one.
+	for _, sibling := range siblings(co) {
+		if id := idx.answers[sibling]; id != "" {
 			return id
 		}
 	}
 	return ""
 }
 
-// baseUUID drops the suffix the datastore files a non-default finish under,
-// so two finishes of one printing are recognised as the one card they are.
-func baseUUID(uuid string) string {
-	for _, suffix := range []string{"_f", "_e"} {
-		if strings.HasSuffix(uuid, suffix) {
-			return strings.TrimSuffix(uuid, suffix)
+// siblings are the uuids of the card's printing in the order ProductID
+// asks the shelves about them.
+func siblings(co *mtgmatcher.CardObject) []string {
+	var out []string
+	for _, foil := range []bool{false, true} {
+		if uuid, found := mtgmatcher.DefaultPrinting(co.FoilUUIDs, foil); found {
+			out = append(out, uuid)
 		}
 	}
-	return uuid
+	finishes := make([]string, 0, len(co.FoilUUIDs))
+	for finish := range co.FoilUUIDs {
+		finishes = append(finishes, finish)
+	}
+	slices.Sort(finishes)
+	for _, finish := range finishes {
+		if uuid := co.FoilUUIDs[finish]; !slices.Contains(out, uuid) {
+			out = append(out, uuid)
+		}
+	}
+	return out
 }

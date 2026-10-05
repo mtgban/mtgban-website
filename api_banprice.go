@@ -391,7 +391,7 @@ func getIDFromMode(b *mtgmatcher.Backend, mode string, co *mtgmatcher.CardObject
 		}
 		return fmt.Sprintf("%s|%s|%s", co.Name, co.SetCode, co.Number)
 	case "mkm":
-		return mkmIDs.ProductID(co.UUID, co.Identifiers["mcmId"])
+		return mkmIDs.ProductID(b, co)
 	case "ck":
 		if co.Etched {
 			id, found := co.Identifiers["cardKingdomEtchedId"]
@@ -503,12 +503,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 			continue
 		}
 
-		suffix := ""
-		if co.Etched {
-			suffix = "_etched"
-		} else if co.Foil {
-			suffix = "_foil"
-		}
+		finish := apiFinish(co)
 
 		// Per-store output for this card; nil marks a store dropped for a
 		// zero base price. Different uuids can share an output id (a name
@@ -550,12 +545,8 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 
 					if co.Sealed {
 						price.Sealed = row.Price
-					} else if co.Etched {
-						price.Etched = row.Price
-					} else if co.Foil {
-						price.Foil = row.Price
 					} else {
-						price.Regular = row.Price
+						price.Set(finish, row.Price)
 					}
 					if cond != "INDEX" && !co.Sealed {
 						price.Cond = string(cond)
@@ -585,21 +576,17 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 				if shouldQty {
 					if co.Sealed {
 						price.QtySealed += quantity
-					} else if co.Etched {
-						price.QtyEtched += quantity
-					} else if co.Foil {
-						price.QtyFoil += quantity
 					} else {
-						price.Qty += quantity
+						price.AddQty(finish, quantity)
 					}
 				}
 
 				if conds && !co.Sealed {
-					condTag := string(cond)
-					if condTag == "INDEX" {
-						condTag = "NM"
+					grade := string(cond)
+					if grade == "INDEX" {
+						grade = "NM"
 					}
-					condTag += suffix
+					condTag := banprice.ConditionTag(grade, finish)
 					if price.Conditions == nil {
 						price.Conditions = &BanConditions{}
 					}
@@ -748,101 +735,69 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		out[id][scraperTag].Cond = string(entries[base].Condition())
 	}
 
+	price := out[id][scraperTag]
 	if co.Sealed {
-		out[id][scraperTag].Sealed = basePrice
+		price.Sealed = basePrice
 		if qty {
 			for i := range entries {
 				if entries[i].Pricing() == 0 {
 					continue
 				}
-				out[id][scraperTag].QtySealed += entries[i].Qty()
+				price.QtySealed += entries[i].Qty()
 			}
 		}
-	} else if co.Etched {
-		out[id][scraperTag].Etched = basePrice
+		return
+	}
+
+	finish := apiFinish(co)
+	price.Set(finish, basePrice)
+	for i := range entries {
+		if entries[i].Pricing() == 0 {
+			continue
+		}
 		if qty {
-			for i := range entries {
-				if entries[i].Pricing() == 0 {
-					continue
-				}
-				out[id][scraperTag].QtyEtched += entries[i].Qty()
-			}
+			price.AddQty(finish, entries[i].Qty())
 		}
 		if conds {
-			for i := range entries {
-				if entries[i].Pricing() == 0 {
-					continue
-				}
-				condTag := string(entries[i].Condition()) + "_etched"
-				if out[id][scraperTag].Conditions == nil {
-					out[id][scraperTag].Conditions = &BanConditions{}
-				}
-				out[id][scraperTag].Conditions.Set(condTag, entries[i].Pricing()*rate)
-				if qty && entries[i].Qty() > 0 {
-					if out[id][scraperTag].Quantities == nil {
-						out[id][scraperTag].Quantities = &BanQuantities{}
-					}
-					out[id][scraperTag].Quantities.Set(condTag, entries[i].Qty())
-				}
+			condTag := banprice.ConditionTag(string(entries[i].Condition()), finish)
+			if price.Conditions == nil {
+				price.Conditions = &BanConditions{}
 			}
-		}
-	} else if co.Foil {
-		out[id][scraperTag].Foil = basePrice
-		if qty {
-			for i := range entries {
-				if entries[i].Pricing() == 0 {
-					continue
+			price.Conditions.Set(condTag, entries[i].Pricing()*rate)
+			if qty && entries[i].Qty() > 0 {
+				if price.Quantities == nil {
+					price.Quantities = &BanQuantities{}
 				}
-				out[id][scraperTag].QtyFoil += entries[i].Qty()
-			}
-		}
-		if conds {
-			for i := range entries {
-				if entries[i].Pricing() == 0 {
-					continue
-				}
-				condTag := string(entries[i].Condition()) + "_foil"
-				if out[id][scraperTag].Conditions == nil {
-					out[id][scraperTag].Conditions = &BanConditions{}
-				}
-				out[id][scraperTag].Conditions.Set(condTag, entries[i].Pricing()*rate)
-				if qty && entries[i].Qty() > 0 {
-					if out[id][scraperTag].Quantities == nil {
-						out[id][scraperTag].Quantities = &BanQuantities{}
-					}
-					out[id][scraperTag].Quantities.Set(condTag, entries[i].Qty())
-				}
-			}
-		}
-	} else {
-		out[id][scraperTag].Regular = basePrice
-		if qty {
-			for i := range entries {
-				if entries[i].Pricing() == 0 {
-					continue
-				}
-				out[id][scraperTag].Qty += entries[i].Qty()
-			}
-		}
-		if conds {
-			for i := range entries {
-				if entries[i].Pricing() == 0 {
-					continue
-				}
-				condTag := string(entries[i].Condition())
-				if out[id][scraperTag].Conditions == nil {
-					out[id][scraperTag].Conditions = &BanConditions{}
-				}
-				out[id][scraperTag].Conditions.Set(condTag, entries[i].Pricing()*rate)
-				if qty && entries[i].Qty() > 0 {
-					if out[id][scraperTag].Quantities == nil {
-						out[id][scraperTag].Quantities = &BanQuantities{}
-					}
-					out[id][scraperTag].Quantities.Set(condTag, entries[i].Qty())
-				}
+				price.Quantities.Set(condTag, entries[i].Qty())
 			}
 		}
 	}
+}
+
+// apiFinish names the finish a card's prices are filed under in a price
+// object, so the finishes of one printing keep a price each under an id
+// they share. The finish a bare flag answers with stays regular or foil,
+// whatever the game calls it - Gundam's foil is its holofoil, and a
+// Pokemon card sold in runs is regular in its unlimited one - so only the
+// finishes past those two take fields of their own. A finish the price
+// object has no field for falls back to the card's flags.
+func apiFinish(co *mtgmatcher.CardObject) string {
+	switch co.UUID {
+	case co.FoilUUIDs[banprice.FinishNonfoil]:
+		return banprice.FinishNonfoil
+	case co.FoilUUIDs[banprice.FinishFoil]:
+		return banprice.FinishFoil
+	}
+	if banprice.Serves(co.Finish) {
+		return co.Finish
+	}
+	switch {
+	case co.Etched:
+		return banprice.FinishEtched
+	case co.Foil:
+		return banprice.FinishFoil
+	}
+	return banprice.FinishNonfoil
 }
 
 func getVendorPrices(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {

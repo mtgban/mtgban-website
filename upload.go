@@ -28,6 +28,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/banprice"
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
@@ -110,7 +111,7 @@ func newUploadParser(b *mtgmatcher.Backend) *docparse.Parser {
 		},
 		TCGSkuToUUID:      tcgSKU2UUID,
 		TCGSkuToCondition: tcgSKU2Condition,
-		MKMIDToUUID:       mkmIDs.Resolve,
+		MKMIDToUUID:       func(id string) string { return mkmIDs.Resolve(b, id) },
 		PreferredPrinting: func(x, y string) bool { return sortSets(b, x, y) },
 	}
 }
@@ -2178,22 +2179,16 @@ func getPrice(banPrice *BanPrice, conds mtgban.Condition) float64 {
 		return banPrice.Sealed
 	}
 
-	// Grab the correct Price
+	// Grab the correct Price: a uuid is one finish, so whichever finish
+	// carries a price is the one asked about
 	if conds == "" {
-		price = banPrice.Regular
-		if price == 0 {
-			price = banPrice.Foil
-			if price == 0 {
-				price = banPrice.Etched
-			}
-		}
+		price = anyFinishPrice(banPrice)
 	} else {
 		grade := string(conds)
-		price = banPrice.Conditions.Get(grade)
-		if price == 0 {
-			price = banPrice.Conditions.Get(grade + "_foil")
-			if price == 0 {
-				price = banPrice.Conditions.Get(grade + "_etched")
+		for _, finish := range banprice.Finishes {
+			price = banPrice.Conditions.Get(banprice.ConditionTag(grade, finish))
+			if price != 0 {
+				break
 			}
 		}
 		// A source with no grades of its own carries one price, filed under
@@ -2210,17 +2205,22 @@ func getPrice(banPrice *BanPrice, conds mtgban.Condition) float64 {
 		// conditions are requested at all, an index included, so testing it
 		// for nil never fired for the sources this fallback is here for.
 		if price == 0 && banPrice.Cond == "" {
-			price = banPrice.Regular
-			if price == 0 {
-				price = banPrice.Foil
-				if price == 0 {
-					price = banPrice.Etched
-				}
-			}
+			price = anyFinishPrice(banPrice)
 		}
 	}
 
 	return price
+}
+
+// anyFinishPrice is the first price filed under any finish, in Finishes
+// order.
+func anyFinishPrice(banPrice *BanPrice) float64 {
+	for _, finish := range banprice.Finishes {
+		if price := banPrice.Get(finish); price != 0 {
+			return price
+		}
+	}
+	return 0
 }
 
 // Apply multiplier and max cap to a quantity

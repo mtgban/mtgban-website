@@ -10,6 +10,7 @@ import (
 	"weak"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // shelves stands in for the site's sellers snapshot: a pointer that can be
@@ -42,14 +43,68 @@ func shelf(shorthand string, byUUID map[string]string) mtgban.Seller {
 	})
 }
 
-func TestResolve(t *testing.T) {
-	p, live := newParser()
-	live.publish(
+// noCards knows no card, so every uuid is a printing of its own: all the
+// tests about refreshing need, since they price one uuid per product.
+var noCards = &mtgmatcher.Backend{}
+
+// cards files printings in a backend, each given as the uuid of every
+// finish it is sold in, keyed by the finish's name, and each finish a card
+// of its own sharing that map - the way every loader files them.
+func cards(printings ...map[string]string) *mtgmatcher.Backend {
+	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{}}
+	for _, finishes := range printings {
+		for finish, uuid := range finishes {
+			b.UUIDs[uuid] = &mtgmatcher.CardObject{
+				Card: mtgmatcher.Card{
+					UUID:        uuid,
+					FoilUUIDs:   finishes,
+					Finish:      finish,
+					Identifiers: map[string]string{},
+				},
+				Foil: mtgmatcher.IsFoilFinish(finish),
+			}
+		}
+	}
+	return b
+}
+
+// printings are the cards the Resolve and ProductID tests price, one of
+// each shape a product takes.
+var printings = cards(
+	map[string]string{"nonfoil": "uuid-aaa"},
+	// Two printings Cardmarket shelves under one product.
+	map[string]string{"nonfoil": "uuid-bbb"},
+	map[string]string{"nonfoil": "uuid-ccc"},
+	// Magic spells a printing's finishes as suffixes of one uuid.
+	map[string]string{"nonfoil": "uuid-ddd", "foil": "uuid-ddd_f"},
+	map[string]string{"nonfoil": "uuid-eee", "etched": "uuid-eee_e"},
+	map[string]string{"nonfoil": "uuid-etc", "etched": "uuid-etc_e"},
+	// A suffix is only a spelling: this foil is filed as a card of its
+	// own, a finish twin, and is not the printing its name suggests.
+	map[string]string{"nonfoil": "uuid-twn"},
+	map[string]string{"foil": "uuid-twn_f"},
+	// The datastore games spell every finish's uuid as they please, and
+	// sell more finishes than three.
+	map[string]string{"nonfoil": "lor-1", "foil": "lor-2", "coldfoil": "lor-3"},
+	map[string]string{"foil": "lor-f", "coldfoil": "lor-c"},
+	map[string]string{"1stedition": "pk-1", "unlimited": "pk-2"},
+	map[string]string{"nonfoil": "uuid-low"},
+	map[string]string{"nonfoil": "uuid-zzz"},
+)
+
+// pricedShelves price the printings above.
+func pricedShelves() []mtgban.Seller {
+	return []mtgban.Seller{
 		shelf("MKMTrend", map[string]string{
-			"uuid-aaa": "265854",
-			"uuid-bbb": "300001",
-			"uuid-ddd": "400001",
-			"uuid-eee": "400002",
+			"uuid-aaa":   "265854",
+			"uuid-bbb":   "300001",
+			"uuid-ddd":   "400001",
+			"uuid-eee":   "400002",
+			"uuid-etc_e": "400009",
+			"uuid-twn":   "400010",
+			"lor-1":      "600001",
+			"lor-f":      "600002",
+			"pk-1":       "700001",
 		}),
 		shelf("MKMLow", map[string]string{
 			// The same card priced by the other index: an agreement, not
@@ -62,16 +117,26 @@ func TestResolve(t *testing.T) {
 			// printing's finishes as one product, which is half the Magic
 			// shelves, and the upload's foil column says which is meant.
 			"uuid-ddd_f": "400001",
-			// Etched is filed under its own suffix too, and is the same
-			// card for the same reason.
+			// Etched is the same printing for the same reason.
 			"uuid-eee_e": "400002",
+			"uuid-twn_f": "400010",
+			// However many finishes, and however their uuids are spelled.
+			"lor-3":    "600001",
+			"lor-c":    "600002",
+			"pk-2":     "700001",
+			"uuid-low": "600009",
 		}),
 		shelf("MKMSealed", map[string]string{
 			// Published by the sealed scraper rather than either singles
 			// index, which is why all three are read.
 			"uuid-box": "500001",
 		}),
-	)
+	}
+}
+
+func TestResolve(t *testing.T) {
+	p, live := newParser()
+	live.publish(pricedShelves()...)
 
 	for _, tc := range []struct {
 		name  string
@@ -81,13 +146,17 @@ func TestResolve(t *testing.T) {
 		{"a product one printing answers to", "265854", "uuid-aaa"},
 		{"a product two printings answer to", "300001", ""},
 		{"a product's two finishes", "400001", "uuid-ddd"},
-		{"a product's etched twin", "400002", "uuid-eee"},
+		{"a product's etched finish", "400002", "uuid-eee"},
+		{"a foil filed as a card of its own", "400010", ""},
+		{"a product's three finishes", "600001", "lor-1"},
+		{"a printing sold in foils only", "600002", "lor-f"},
+		{"a printing sold in print runs", "700001", "pk-2"},
 		{"a sealed product", "500001", "uuid-box"},
 		{"unknown product", "999999", ""},
 		{"empty id", "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := p.Resolve(tc.mkmID); got != tc.want {
+			if got := p.Resolve(printings, tc.mkmID); got != tc.want {
 				t.Errorf("Resolve(%q) = %q, want %q", tc.mkmID, got, tc.want)
 			}
 		})
@@ -99,11 +168,26 @@ func TestResolveWithNothingPublished(t *testing.T) {
 	// and a Parser nobody wired has no source at all. Both answer nothing
 	// rather than failing.
 	p, _ := newParser()
-	if got := p.Resolve("265854"); got != "" {
+	if got := p.Resolve(printings, "265854"); got != "" {
 		t.Errorf("with no sellers = %q, want empty string", got)
 	}
-	if got := (&Parser{}).Resolve("265854"); got != "" {
+	if got := (&Parser{}).Resolve(printings, "265854"); got != "" {
 		t.Errorf("with no source = %q, want empty string", got)
+	}
+}
+
+func TestIndexFollowsTheBackend(t *testing.T) {
+	// A datastore reload can move a uuid to another printing with every
+	// seller left as it was, and the index has to follow it.
+	p, live := newParser()
+	live.publish(shelf("MKMTrend", map[string]string{"x-1": "800001", "x-2": "800001"}))
+
+	if got := p.Resolve(noCards, "800001"); got != "" {
+		t.Fatalf("two printings = %q, want empty string", got)
+	}
+	reloaded := cards(map[string]string{"nonfoil": "x-1", "foil": "x-2"})
+	if got := p.Resolve(reloaded, "800001"); got != "x-1" {
+		t.Errorf("after the reload made them one printing = %q, want x-1", got)
 	}
 }
 
@@ -114,12 +198,12 @@ func TestIndexFollowsTheShelves(t *testing.T) {
 	p, live := newParser()
 
 	live.publish(shelf("MKMTrend", map[string]string{"uuid-before": "700001"}))
-	if got := p.Resolve("700001"); got != "uuid-before" {
+	if got := p.Resolve(noCards, "700001"); got != "uuid-before" {
 		t.Fatalf("before the refresh = %q, want uuid-before", got)
 	}
 
 	live.publish(shelf("MKMTrend", map[string]string{"uuid-after": "700001"}))
-	if got := p.Resolve("700001"); got != "uuid-after" {
+	if got := p.Resolve(noCards, "700001"); got != "uuid-after" {
 		t.Errorf("after the refresh = %q, want uuid-after", got)
 	}
 }
@@ -160,7 +244,7 @@ func TestIndexIsPublishedWithoutALock(t *testing.T) {
 		go func() {
 			defer readers.Done()
 			for i := 0; i < 2000; i++ {
-				switch got := p.Resolve("900001"); got {
+				switch got := p.Resolve(noCards, "900001"); got {
 				case "uuid-before", "uuid-after":
 				default:
 					t.Errorf("resolved to %q, which is neither snapshot", got)
@@ -193,7 +277,7 @@ func TestTheWalkHappensOnce(t *testing.T) {
 	live.publish(shelf("MKMTrend", byUUID))
 
 	first := time.Now()
-	if got := p.Resolve("800000"); got != "uuid-000000" {
+	if got := p.Resolve(noCards, "800000"); got != "uuid-000000" {
 		t.Fatalf("first lookup = %q, want uuid-000000", got)
 	}
 	walk := time.Since(first)
@@ -201,7 +285,7 @@ func TestTheWalkHappensOnce(t *testing.T) {
 	rest := time.Now()
 	for i := 0; i < rows; i++ {
 		id := fmt.Sprintf("%d", 800000+i)
-		if got := p.Resolve(id); got != fmt.Sprintf("uuid-%06d", i) {
+		if got := p.Resolve(noCards, id); got != fmt.Sprintf("uuid-%06d", i) {
 			t.Fatalf("lookup %s = %q", id, got)
 		}
 	}
@@ -224,23 +308,23 @@ func TestASupersededBuildIsNotPublished(t *testing.T) {
 	p, live := newParser()
 
 	older := live.publish(shelf("MKMTrend", map[string]string{"uuid-before": "900001"}))
-	if got := p.Resolve("900001"); got != "uuid-before" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-before" {
 		t.Fatalf("before the refresh = %q, want uuid-before", got)
 	}
 
 	newer := live.publish(shelf("MKMTrend", map[string]string{"uuid-after": "900001"}))
-	if got := p.Resolve("900001"); got != "uuid-after" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-after" {
 		t.Fatalf("after the refresh = %q, want uuid-after", got)
 	}
 
 	// The first upload finishes its walk and tries to install what it
 	// built, which describes inventories no longer live.
-	p.publish(older, index{ids: map[string]string{"900001": "uuid-before"}})
+	p.publish(older, noCards, index{ids: map[string]string{"900001": "uuid-before"}})
 
 	if p.cached.Load().builtFrom.Value() != newer {
 		t.Error("a superseded build installed itself over the newer index")
 	}
-	if got := p.Resolve("900001"); got != "uuid-after" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-after" {
 		t.Errorf("resolved to %q after a late publish, want uuid-after", got)
 	}
 }
@@ -257,10 +341,11 @@ func TestASupersededIndexIsNeverServed(t *testing.T) {
 	p.cached.Store(&built{
 		builtFrom: weak.Make(&older),
 		shelves:   weakShelves(shelvesOf(older)),
+		backend:   weak.Make(noCards),
 		index:     index{ids: map[string]string{"900001": "uuid-before"}},
 	})
 
-	if got := p.Resolve("900001"); got != "uuid-after" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-after" {
 		t.Errorf("served a superseded index: %q, want uuid-after", got)
 	}
 }
@@ -283,7 +368,7 @@ func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
 
 	mkm := shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"})
 	live.publish(mkm, elsewhere("CK"))
-	if got := p.Resolve("900001"); got != "uuid-mkm" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-mkm" {
 		t.Fatalf("first resolve = %q, want uuid-mkm", got)
 	}
 
@@ -294,7 +379,7 @@ func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
 	// Cardkingdom refreshes: a new snapshot, the Cardmarket shelf copied
 	// across untouched.
 	after := live.publish(mkm, elsewhere("CK"))
-	if got := p.Resolve("900001"); got != "uuid-mkm" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-mkm" {
 		t.Errorf("after an unrelated refresh = %q, want uuid-mkm", got)
 	}
 	if p.cached.Load().ids["sentinel"] != "kept" {
@@ -306,7 +391,7 @@ func TestAnUnrelatedSellerRefreshKeepsTheIndex(t *testing.T) {
 
 	// A Cardmarket shelf moving is the case that must rebuild.
 	live.publish(shelf("MKMTrend", map[string]string{"uuid-moved": "900001"}), elsewhere("CK"))
-	if got := p.Resolve("900001"); got != "uuid-moved" {
+	if got := p.Resolve(noCards, "900001"); got != "uuid-moved" {
 		t.Errorf("after the shelf moved = %q, want uuid-moved", got)
 	}
 	if p.cached.Load().ids["sentinel"] == "kept" {
@@ -342,7 +427,7 @@ func TestAReplacedSellerIsNotKeptAlive(t *testing.T) {
 	mkm := shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"})
 	store := elsewhere("CK")
 	live.publish(mkm, store)
-	got := p.Resolve("900001")
+	got := p.Resolve(noCards, "900001")
 	if got != "uuid-mkm" {
 		t.Fatalf("resolve = %q, want uuid-mkm", got)
 	}
@@ -365,7 +450,7 @@ func TestAReplacedShelfIsNotKeptAlive(t *testing.T) {
 	mkm := shelf("MKMTrend", map[string]string{"uuid-mkm": "900001"})
 	store := elsewhere("CK")
 	live.publish(mkm, store)
-	got := p.Resolve("900001")
+	got := p.Resolve(noCards, "900001")
 	if got != "uuid-mkm" {
 		t.Fatalf("resolve = %q, want uuid-mkm", got)
 	}
@@ -381,24 +466,7 @@ func TestAReplacedShelfIsNotKeptAlive(t *testing.T) {
 
 func TestProductID(t *testing.T) {
 	p, live := newParser()
-	live.publish(
-		shelf("MKMTrend", map[string]string{
-			"uuid-aaa":   "265854",
-			"uuid-bbb":   "300001",
-			"uuid-ccc":   "300001",
-			"uuid-ddd":   "400001",
-			"uuid-etc_e": "400009",
-		}),
-		shelf("MKMLow", map[string]string{
-			// The index the shelves are read first from wins.
-			"uuid-aaa": "999999",
-			// A uuid only the other index prices.
-			"uuid-low": "600001",
-		}),
-		shelf("MKMSealed", map[string]string{
-			"uuid-box": "500001",
-		}),
-	)
+	live.publish(pricedShelves()...)
 
 	for _, tc := range []struct {
 		name string
@@ -408,35 +476,55 @@ func TestProductID(t *testing.T) {
 	}{
 		{"priced on the shelves", "uuid-aaa", "", "265854"},
 		{"the shelves over the datastore", "uuid-aaa", "111111", "265854"},
-		{"priced by the second index only", "uuid-low", "", "600001"},
+		{"priced by the second index only", "uuid-low", "", "600009"},
 		{"a sealed product", "uuid-box", "", "500001"},
 		{"one product priced onto two printings", "uuid-ccc", "", ""},
 		{"one product priced onto two printings, datastore id", "uuid-ccc", "300003", "300003"},
 		{"one product priced onto two printings, datastore agrees", "uuid-bbb", "300001", ""},
-		{"not priced, datastore id unclaimed", "uuid-zzz", "700001", "700001"},
+		{"not priced, datastore id unclaimed", "uuid-zzz", "700009", "700009"},
 		{"not priced, datastore id is another card's", "uuid-zzz", "265854", ""},
 		{"not priced, datastore id names several cards", "uuid-zzz", "300001", ""},
 		{"a finish not priced, datastore id is its printing's", "uuid-ddd_f", "400001", "400001"},
-		{"a finish not priced, no datastore id", "uuid-ddd_f", "", "400001"},
-		{"a finish not priced, datastore id unclaimed", "uuid-ddd_e", "700002", "700002"},
+		{"a finish priced, not its printing's other", "uuid-ddd_f", "", "400001"},
 		{"a finish priced as itself", "uuid-etc_e", "", "400009"},
+		{"a finish not priced, its printing's etched is", "uuid-etc", "", "400009"},
+		{"a foil filed as a card of its own", "uuid-twn_f", "", ""},
+		{"a datastore game's unpriced foil", "lor-2", "", "600001"},
+		{"a datastore game's cold foil", "lor-3", "", "600001"},
+		{"a print run", "pk-1", "", "700001"},
 		{"neither priced nor in the datastore", "uuid-zzz", "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := p.ProductID(tc.uuid, tc.own); got != tc.want {
+			co := card(tc.uuid, tc.own)
+			if got := p.ProductID(printings, co); got != tc.want {
 				t.Errorf("ProductID(%q, %q) = %q, want %q", tc.uuid, tc.own, got, tc.want)
 			}
 		})
 	}
 }
 
+// card is the printing a uuid names, with the datastore's Cardmarket id
+// given as own: a sealed product where printings has no such card.
+func card(uuid, own string) *mtgmatcher.CardObject {
+	co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid}, Sealed: true}
+	if found, ok := printings.UUIDs[uuid]; ok {
+		copied := *found
+		co = &copied
+	}
+	co.Identifiers = map[string]string{}
+	if own != "" {
+		co.Identifiers["mcmId"] = own
+	}
+	return co
+}
+
 func TestProductIDWithNothingPublished(t *testing.T) {
 	// No Cardmarket shelves at all leaves the datastore as the only answer.
 	p, _ := newParser()
-	if got := p.ProductID("uuid-aaa", "265854"); got != "265854" {
+	if got := p.ProductID(printings, card("uuid-aaa", "265854")); got != "265854" {
 		t.Errorf("with no sellers = %q, want 265854", got)
 	}
-	if got := (&Parser{}).ProductID("uuid-aaa", ""); got != "" {
+	if got := (&Parser{}).ProductID(printings, card("uuid-aaa", "")); got != "" {
 		t.Errorf("with no source = %q, want empty string", got)
 	}
 }
@@ -449,7 +537,7 @@ func TestShelvesAreReadInOrder(t *testing.T) {
 		shelf("MKMLow", map[string]string{"uuid-aaa": "999999"}),
 		shelf("MKMTrend", map[string]string{"uuid-aaa": "265854"}),
 	)
-	if got := p.ProductID("uuid-aaa", ""); got != "265854" {
+	if got := p.ProductID(noCards, card("uuid-aaa", "")); got != "265854" {
 		t.Errorf("ProductID = %q, want the Trend shelf's 265854", got)
 	}
 }
