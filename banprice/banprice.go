@@ -20,16 +20,18 @@ const (
 // keeps a price for each instead of one finish overwriting another.
 var Finishes = append([]string{FinishNonfoil, FinishFoil, FinishEtched}, extraFinishes...)
 
-// Grades are the conditions a per-grade price is filed under, best first.
-var Grades = []string{"NM", "SP", "MP", "HP", "PO"}
+// grades are the conditions a per-grade price is filed under, best first.
+// Unexported: the v2 API (#832) exports banprice.Grades itself, and the
+// two must land in either order.
+var grades = []string{"NM", "SP", "MP", "HP", "PO"}
 
 // ConditionTags is every grade+finish combination the price maps can carry.
 // The vocabulary is closed: mtgban validates entry conditions against
 // FullGradeTags on Add, and the finishes are Finishes. Ordered by grade,
 // best first, then by finish in Finishes order within a grade.
 var ConditionTags = func() []string {
-	tags := make([]string, 0, len(Grades)*len(Finishes))
-	for _, grade := range Grades {
+	tags := make([]string, 0, len(grades)*len(Finishes))
+	for _, grade := range grades {
 		for _, finish := range Finishes {
 			tags = append(tags, ConditionTag(grade, finish))
 		}
