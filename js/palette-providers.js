@@ -447,11 +447,16 @@
         { value: 'artifice', label: 'Artifice', sublabel: 'WUBR', group: 'Four-Color', colors: 'WUBR' }
     ];
 
+    // A Magic card names its colours ("white"); the options above are the
+    // letters a query writes them as.
+    var colorLetters = { white: 'W', blue: 'U', black: 'B', red: 'R', green: 'G' };
+
     function narrowByCardColors(opts, cardColors) {
         if (!cardColors || cardColors.length === 0) return opts;
         var allowed = {};
         for (var i = 0; i < cardColors.length; i++) {
-            allowed[cardColors[i].toUpperCase()] = true;
+            var letter = colorLetters[cardColors[i]];
+            if (letter) allowed[letter] = true;
         }
         return opts.filter(function (o) {
             if (o.group === 'Primary') {

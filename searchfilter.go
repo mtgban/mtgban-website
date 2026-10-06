@@ -424,44 +424,50 @@ func parseDate(code string) (time.Time, error) {
 var colorMap = map[string][]string{
 	"c":           {},
 	"colorless":   {},
-	"white":       {"W"},
-	"blue":        {"U"},
-	"black":       {"B"},
-	"red":         {"R"},
-	"green":       {"G"},
-	"azorius":     {"W", "U"},
-	"dimir":       {"U", "B"},
-	"rakdos":      {"B", "R"},
-	"gruul":       {"R", "G"},
-	"selesnya":    {"G", "W"},
-	"orzhov":      {"W", "B"},
-	"izzet":       {"U", "R"},
-	"golgari":     {"B", "G"},
-	"boros":       {"R", "W"},
-	"simic":       {"G", "U"},
-	"bant":        {"G", "W", "U"},
-	"esper":       {"W", "U", "B"},
-	"grixis":      {"U", "B", "R"},
-	"jund":        {"B", "G", "R"},
-	"naya":        {"R", "G", "W"},
-	"abzan":       {"W", "B", "G"},
-	"jeskai":      {"U", "R", "W"},
-	"sultai":      {"B", "G", "U"},
-	"mardu":       {"R", "W", "B"},
-	"temur":       {"G", "U", "R"},
-	"lorehold":    {"R", "W"},
-	"prismari":    {"U", "R"},
-	"quandrix":    {"G", "U"},
-	"silverquill": {"W", "B"},
-	"witherbloom": {"B", "G"},
-	"chaos":       {"B", "G", "R", "U"},
-	"aggression":  {"B", "G", "R", "W"},
-	"altruism":    {"G", "R", "U", "W"},
-	"growth":      {"B", "G", "U", "W"},
-	"artifice":    {"B", "R", "U", "W"},
-	"m":           {"W", "U", "B", "R", "G"},
-	"multi":       {"W", "U", "B", "R", "G"},
-	"multicolor":  {"W", "U", "B", "R", "G"},
+	"white":       {"white"},
+	"blue":        {"blue"},
+	"black":       {"black"},
+	"red":         {"red"},
+	"green":       {"green"},
+	"azorius":     {"white", "blue"},
+	"dimir":       {"blue", "black"},
+	"rakdos":      {"black", "red"},
+	"gruul":       {"red", "green"},
+	"selesnya":    {"green", "white"},
+	"orzhov":      {"white", "black"},
+	"izzet":       {"blue", "red"},
+	"golgari":     {"black", "green"},
+	"boros":       {"red", "white"},
+	"simic":       {"green", "blue"},
+	"bant":        {"green", "white", "blue"},
+	"esper":       {"white", "blue", "black"},
+	"grixis":      {"blue", "black", "red"},
+	"jund":        {"black", "green", "red"},
+	"naya":        {"red", "green", "white"},
+	"abzan":       {"white", "black", "green"},
+	"jeskai":      {"blue", "red", "white"},
+	"sultai":      {"black", "green", "blue"},
+	"mardu":       {"red", "white", "black"},
+	"temur":       {"green", "blue", "red"},
+	"lorehold":    {"red", "white"},
+	"prismari":    {"blue", "red"},
+	"quandrix":    {"green", "blue"},
+	"silverquill": {"white", "black"},
+	"witherbloom": {"black", "green"},
+	"chaos":       {"black", "green", "red", "blue"},
+	"aggression":  {"black", "green", "red", "white"},
+	"altruism":    {"green", "red", "blue", "white"},
+	"growth":      {"black", "green", "blue", "white"},
+	"artifice":    {"black", "red", "blue", "white"},
+	"m":           {"white", "blue", "black", "red", "green"},
+	"multi":       {"white", "blue", "black", "red", "green"},
+	"multicolor":  {"white", "blue", "black", "red", "green"},
+}
+
+// colorLetters are the letters a Magic query may write its colours as,
+// "c:wu" for white and blue.
+var colorLetters = map[string]string{
+	"w": "white", "u": "blue", "b": "black", "r": "red", "g": "green",
 }
 
 func fixupColorNG(code string) []string {
@@ -474,7 +480,13 @@ func fixupColorNG(code string) []string {
 	if found {
 		return []string{code}
 	}
-	return strings.Split(code, "")
+	letters := strings.Split(code, "")
+	for i, letter := range letters {
+		if name, found := colorLetters[letter]; found {
+			letters[i] = name
+		}
+	}
+	return letters
 }
 
 // fixupColorName reads a colour the way every game but Magic publishes it,
@@ -2186,7 +2198,7 @@ func cardFilterColor(filters []string, co *mtgmatcher.CardObject) bool {
 		return len(co.Colors) <= 1
 	}
 	for _, value := range filters {
-		if !slices.Contains(co.Colors, strings.ToUpper(value)) && !slices.Contains(co.Colors, strings.ToLower(value)) {
+		if !slices.Contains(co.Colors, value) {
 			return true
 		}
 	}
