@@ -94,7 +94,44 @@ positional fields. Keying entries by their condition, measured apart, saves
 
 ## After
 
-To be measured on the live site once deployed.
+Measured on 2026-10-06 after the deploy, the same way. Editions did not
+move; the full dumps did:
+
+| Full dump | First byte, before | After | Total, before | After |
+|---|---|---|---|---|
+| v2 retail | 8.0-8.2 s | 1.16-1.19 s | 10.5-10.8 s | 5.06-5.15 s |
+| v2 buylist | 3.17 s | 0.77-0.80 s | 5.16 s | 2.32-2.48 s |
+| v1 retail, unchanged | 6.4-6.5 s | 6.3-9.1 s | 8.2-8.6 s | 8.6-11.3 s |
+| v1 buylist, unchanged | | 2.0-2.1 s | | 3.0-3.1 s |
+
+v2 now finishes before v1 while sending twice the bytes: 189.9 MB raw and
+26.4 MB gzipped for retail, the stores' data having grown since the
+morning.
+
+The request is still bound by the server's work, not by sending: stack
+samples a second apart find the handler walking every time. A CPU profile
+of one v2 full retail dump, 4.64 s in all:
+
+| Where | CPU |
+|---|---|
+| A store's entries for one card (`v2Store.file`) | 2.70 s |
+| Of which looking the card up in the store's record | 1.61 s |
+| Writing the cards (`banprice.Writer`) | 0.96 s |
+| Collecting the ids the stores price | 0.56 s |
+| Merging conditions (`banprice.Merge`) | 0.42 s |
+
+The lookups are one per card per store: 25 retail stores make about 4 M of
+them for the 2.2 M that find something. Recording which stores price a card
+while collecting the ids leaves only those, and measured locally, on the
+same rebuilt data, it takes 2-7% off a full retail dump and 19% off a full
+buylist. Not worth it for now.
+
+A line profile of the same step locally puts more in the entries themselves
+than in the lookups: the step is generic over inventory and buylist
+entries, whose methods take the entry by value, so `Pricing`, `Qty`,
+`Condition` and the type check copy the whole entry each time, about 7 s
+across the profiled runs against 4.5 s of lookups. Reading the fields
+directly is where to look next, if v2 needs to be faster again.
 
 ## Prices as strings
 
