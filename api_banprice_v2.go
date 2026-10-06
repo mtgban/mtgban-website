@@ -15,7 +15,7 @@ import (
 )
 
 // The v2 price maps are built straight from the stores' records, not from
-// v1's, so a store's every grade is kept. They follow v1 in what they read:
+// v1's, so every condition a store prices is kept. They follow v1 in what they read:
 // the same stores, filters and id modes.
 
 // v2Finish is the finish a card's prices are filed under in v2.
@@ -115,7 +115,7 @@ func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 // v2Stock is where a store with no quantities of its own reads its
 // Available from: TCGplayer Direct its own stock, and TCGplayer its
 // listings' copies.
-func v2Stock(store string) func(cardID string, grade mtgban.Condition) (int, bool) {
+func v2Stock(store string) func(cardID string, condition mtgban.Condition) (int, bool) {
 	switch store {
 	case tcgDirectStore:
 		return tcgDirectStock
@@ -126,9 +126,9 @@ func v2Stock(store string) func(cardID string, grade mtgban.Condition) (int, boo
 }
 
 // addV2Entries files every priced entry a store has for one card. Its
-// Available is read from stock where that is not nil, once per grade since
+// Available is read from stock where that is not nil, once per condition since
 // the stock covers every entry of it, and otherwise from the entry.
-func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2, entries []T, idMode, cardID, store string, finishFilter []string, withQty, graded, buying bool, stock func(string, mtgban.Condition) (int, bool)) {
+func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2, entries []T, idMode, cardID, store string, finishFilter []string, withQty, withCondition, buying bool, stock func(string, mtgban.Condition) (int, bool)) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return
@@ -149,8 +149,8 @@ func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2,
 			continue
 		}
 		entry := banprice.Entry{Price: price}
-		if graded && !co.Sealed {
-			entry.Grade = string(entries[i].Condition())
+		if withCondition && !co.Sealed {
+			entry.Condition = string(entries[i].Condition())
 		}
 		if withQty {
 			entry.Qty = entries[i].Qty()
