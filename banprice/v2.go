@@ -30,22 +30,11 @@ type Entry struct {
 // that store's prices, one per condition, best condition first.
 type V2 map[string]map[string]map[string][]Entry
 
-// Add files e under id, finish and store. An entry of the same condition
-// already filed there keeps the better of the two prices, the higher when
-// buying and the lower otherwise, and the sums of their Qty and Available.
-func (v V2) Add(id, finish, store string, e Entry, buying bool) {
-	finishes := v[id]
-	if finishes == nil {
-		finishes = map[string]map[string][]Entry{}
-		v[id] = finishes
-	}
-	stores := finishes[finish]
-	if stores == nil {
-		stores = map[string][]Entry{}
-		finishes[finish] = stores
-	}
-
-	entries := stores[store]
+// Merge files e into a store's entries and answers them, for the caller to
+// store back. An entry of the same condition already there keeps the better
+// of the two prices, the higher when buying and the lower otherwise, and
+// the sums of their Qty and Available.
+func Merge(entries []Entry, e Entry, buying bool) []Entry {
 	rank := slices.Index(ConditionOrder, e.Condition)
 	i := 0
 	for ; i < len(entries); i++ {
@@ -59,13 +48,13 @@ func (v V2) Add(id, finish, store string, e Entry, buying bool) {
 			}
 			entries[i].Qty += e.Qty
 			entries[i].Available += e.Available
-			return
+			return entries
 		}
 		if slices.Index(ConditionOrder, entries[i].Condition) > rank {
 			break
 		}
 	}
-	stores[store] = slices.Insert(entries, i, e)
+	return slices.Insert(entries, i, e)
 }
 
 // Finish is one finish a v2 response keys prices by, as finishes.json lists

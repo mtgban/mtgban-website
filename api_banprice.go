@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"path"
@@ -91,13 +93,45 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 	return !info.SealedMode && (info.CountryFlag == "" || info.MetadataOnly)
 }
 
-// PriceAPIOutputV2 is the v2 response: the meta of v1, and the prices
-// keyed by card id, finish and store (banprice.V2).
-type PriceAPIOutputV2 struct {
-	Error   string       `json:"error,omitempty"`
-	Meta    PriceAPIMeta `json:"meta"`
-	Retail  banprice.V2  `json:"retail,omitempty"`
-	Buylist banprice.V2  `json:"buylist,omitempty"`
+// writeV2Response writes a v2 response, as json.Encoder would encode its
+// meta and its retail and buylist maps: the sections are walked card by card
+// as they are written, and one with no card is left out.
+func writeV2Response(w io.Writer, b *mtgmatcher.Backend, meta PriceAPIMeta, retail, buylist *v2Section) error {
+	head, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	bw := bufio.NewWriterSize(w, 64<<10)
+	_, err = bw.WriteString(`{"meta":`)
+	if err != nil {
+		return err
+	}
+	_, err = bw.Write(head)
+	if err != nil {
+		return err
+	}
+	for _, section := range []struct {
+		name string
+		v2   *v2Section
+	}{{"retail", retail}, {"buylist", buylist}} {
+		if section.v2 == nil {
+			continue
+		}
+		cw := banprice.NewWriter(bw, `,"`+section.name+`":`)
+		err = section.v2.walk(b, cw.Card)
+		if err != nil {
+			return err
+		}
+		err = cw.Close()
+		if err != nil {
+			return err
+		}
+	}
+	_, err = bw.WriteString("}\n")
+	if err != nil {
+		return err
+	}
+	return bw.Flush()
 }
 
 // PriceAPI serves /api/mtgban/, the v1 price API.
@@ -370,12 +404,12 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 
 	// v2 serves v1's CSV, which already has one row per uuid with its finish
 	isV2 := version == APIVersionV2 && strings.HasSuffix(urlPath, ".json")
-	outV2 := PriceAPIOutputV2{Meta: out.Meta}
+	var retailV2, buylistV2 *v2Section
 
 	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
-			outV2.Retail = getSellerPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
+			retailV2 = sellerSectionV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
 			out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
@@ -383,7 +417,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
-			outV2.Buylist = getVendorPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
+			buylistV2 = vendorSectionV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
 			out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
@@ -393,7 +427,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if sig == "" && user == "" {
 		user = "anonymous"
 	}
-	msg := fmt.Sprintf("[%v] %s (%s / %s) requested a '%s' API dump ('%s','%q','%s')", time.Since(start), user, r.Header.Get("X-Forwarded-For"), r.RemoteAddr, dumpType, filterByEdition, filterByHash, filterByFinish)
+	msg := fmt.Sprintf("%s (%s / %s) requested a '%s' API dump ('%s','%q','%s')", user, r.Header.Get("X-Forwarded-For"), r.RemoteAddr, dumpType, filterByEdition, filterByHash, filterByFinish)
 	if qty && !isV2 {
 		msg += " with quantities"
 	}
@@ -408,18 +442,24 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if version != APIVersion {
 		msg += " (v" + version + ")"
 	}
-	APINotify(msg)
 
-	if out.Retail == nil && out.Buylist == nil && outV2.Retail == nil && outV2.Buylist == nil {
+	if out.Retail == nil && out.Buylist == nil && retailV2 == nil && buylistV2 == nil {
+		APINotify(fmt.Sprintf("[%v] %s", time.Since(start), msg))
 		out.Error = "Not found"
 		json.NewEncoder(w).Encode(&out)
 		return
 	}
 
+	// v2 builds its prices as it writes them, so it is timed once written
 	if isV2 {
-		json.NewEncoder(w).Encode(&outV2)
+		err := writeV2Response(w, b, out.Meta, retailV2, buylistV2)
+		if err != nil {
+			log.Println("API v2 write:", err)
+		}
+		APINotify(fmt.Sprintf("[%v] %s", time.Since(start), msg))
 		return
 	}
+	APINotify(fmt.Sprintf("[%v] %s", time.Since(start), msg))
 	if strings.HasSuffix(urlPath, ".json") {
 		json.NewEncoder(w).Encode(&out)
 		return
