@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -120,7 +121,8 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 			entries := record[cardID]
 			var stocked mtgban.Condition
 			for i := range entries {
-				price := entries[i].Pricing()
+				// To the cent, dropping the offers too small to make one
+				price := math.Round(entries[i].Pricing()*100) / 100
 				if price == 0 {
 					continue
 				}

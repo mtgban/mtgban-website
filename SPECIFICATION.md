@@ -639,7 +639,8 @@ endpoints, options and access as v1, and v1's CSV. Its JSON prices are
 (`banprice.V2`): the finish is the card's `FinishSlug` (`sealed` for sealed
 product), and a store's list has one entry per condition, best first
 (`banprice.ConditionOrder`), holding its best price in that condition
-(lowest retail, highest buylist), across every uuid the id covers. `qty` is
+(lowest retail, highest buylist), across every uuid the id covers, rounded
+to the cent; a price that rounds to nothing is left out. `qty` is
 the copies the store's own listings in the condition hold, summed (on a
 buylist, the copies it buys); `available` is every copy in the condition
 on sale there at any price, from the entry's `Available` where the scraper
