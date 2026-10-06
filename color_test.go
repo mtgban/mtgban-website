@@ -36,13 +36,13 @@ func keptBy(b *mtgmatcher.Backend, query string) []string {
 	return kept
 }
 
-// Magic reads c: as its letters and named groups; every other game reads it
-// as the colour names it publishes, with colorless and multicolor meaning
-// the same everywhere.
+// Magic reads c: as its colour names, the letters for them and its named
+// groups; every other game reads it as the colour names it publishes, with
+// colorless and multicolor meaning the same everywhere.
 func TestColorFilterReadsEachGamesNames(t *testing.T) {
 	magic := colorBackend(mtgmatcher.GameMagic, map[string][]string{
-		"bolt":        {"R"},
-		"detain":      {"W", "U"},
+		"bolt":        {"red"},
+		"detain":      {"white", "blue"},
 		"ornithopter": nil,
 	})
 	gundam := colorBackend("gundam", map[string][]string{
@@ -124,6 +124,39 @@ func TestIdentityIsAColorIdentityAlias(t *testing.T) {
 		}
 		if !slices.Contains(names, "color_identity") {
 			t.Errorf("%s filters on %v, want color_identity", query, names)
+		}
+	}
+}
+
+// ci: keeps the Magic cards whose colour identity the query's colours cover,
+// read from the names the cards carry.
+func TestColorIdentityReadsNames(t *testing.T) {
+	b := &mtgmatcher.Backend{Game: mtgmatcher.GameMagic, UUIDs: map[string]*mtgmatcher.CardObject{}}
+	for uuid, identity := range map[string][]string{
+		"bolt":   {"red"},
+		"detain": {"white", "blue"},
+		"sol":    nil,
+	} {
+		co := &mtgmatcher.CardObject{}
+		co.UUID = uuid
+		co.ColorIdentity = identity
+		b.UUIDs[uuid] = co
+		b.AllUUIDs = append(b.AllUUIDs, uuid)
+	}
+	slices.Sort(b.AllUUIDs)
+
+	for _, test := range []struct {
+		query string
+		want  []string
+	}{
+		{"ci:wu", []string{"detain", "sol"}},
+		{"ci:azorius", []string{"detain", "sol"}},
+		{"ci:r", []string{"bolt", "sol"}},
+		{"ci:c", []string{"sol"}},
+	} {
+		got := keptBy(b, test.query)
+		if !slices.Equal(got, test.want) {
+			t.Errorf("%q kept %v, want %v", test.query, got, test.want)
 		}
 	}
 }

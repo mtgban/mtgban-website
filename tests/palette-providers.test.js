@@ -152,6 +152,12 @@ test('a card chip keeps the card\'s colours and the two terms', async () => {
     expect(narrowed.map(entry => entry.value)).toEqual(['fire', 'colorless', 'multicolor']);
 });
 
+test('a Magic card chip reads the colour names the card carries', () => {
+    const { providers } = load({}, {}, false, 'magic');
+    const narrowed = providers.getProvider('c:').getCandidates('', { cardMeta: { colors: ['blue', 'white'] } });
+    expect(narrowed.map(entry => entry.value)).toEqual(['W', 'U', 'C', 'M', 'azorius']);
+});
+
 test('Magic keeps its letters and named groups', () => {
     for (const game of ['magic', '']) {
         const { providers } = load({}, {}, false, game);
