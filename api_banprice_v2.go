@@ -31,6 +31,44 @@ func v2Finish(co *mtgmatcher.CardObject) string {
 // for a request for MTGBAN ids.
 var v2IDModes = []string{"mtgban", "tcg", "scryfall", "mtgjson", "mkm", "ck", "name"}
 
+// v2CardmarketShelves are the Cardmarket shelves v2 reads a card's product
+// off, in the order they answer. Low and Trend name the same product for a
+// card they both price, and Low prices a few more.
+func v2CardmarketShelves(sealed bool) []string {
+	if sealed {
+		return []string{"MKMSealed"}
+	}
+	return []string{"MKMLow", "MKMTrend"}
+}
+
+// v2Keyer is how a request keys its cards: by mode, as v1 does, but for
+// Cardmarket by the product the shelves price a card under, where they price
+// it, since the datastore's Cardmarket ids are incomplete. The shelves come
+// from the one sellers snapshot handed in, so one response keys every card
+// from the same shelves.
+func v2Keyer(b *mtgmatcher.Backend, mode string, sealed bool, sellers []mtgban.Seller) func(*mtgmatcher.CardObject) string {
+	if mode != "mkm" {
+		return func(co *mtgmatcher.CardObject) string { return getIDFromMode(b, mode, co) }
+	}
+	var shelves []mtgban.InventoryRecord
+	for _, name := range v2CardmarketShelves(sealed) {
+		for _, seller := range sellers {
+			if strings.EqualFold(seller.Info().Shorthand, name) {
+				shelves = append(shelves, seller.Inventory())
+			}
+		}
+	}
+	return func(co *mtgmatcher.CardObject) string {
+		for _, shelf := range shelves {
+			entries := shelf[co.UUID]
+			if len(entries) > 0 && entries[0].OriginalID != "" {
+				return entries[0].OriginalID
+			}
+		}
+		return getIDFromMode(b, mode, co)
+	}
+}
+
 // v2Cards is the cards a filtered request asks for, kept to its finish and
 // to singles or sealed, and whether the request is filtered at all.
 func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
@@ -44,13 +82,15 @@ func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []strin
 
 func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
 	cardIDs, filtered := v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
+	sellers := GetSellers()
+	keyOf := v2Keyer(b, mode, sealed, sellers)
 	var finishFilter []string
 	if filterByFinish != "" && !filtered {
 		finishFilter = fixupFinishNG(filterByFinish)
 	}
 
 	out := banprice.V2{}
-	for _, seller := range GetSellers() {
+	for _, seller := range sellers {
 		info := seller.Info()
 		if info.SealedMode != sealed || !slices.Contains(enabledStores, info.Shorthand) {
 			continue
@@ -63,14 +103,14 @@ func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 		inventory := seller.Inventory()
 		if !filtered {
 			for cardID, entries := range inventory {
-				addV2Entries(b, out, entries, mode, cardID, tag, finishFilter, withQty, !info.MetadataOnly, false, stock)
+				addV2Entries(b, out, entries, keyOf, cardID, tag, finishFilter, withQty, !info.MetadataOnly, false, stock)
 			}
 			continue
 		}
 		for _, cardID := range cardIDs {
 			entries, found := inventory[cardID]
 			if found {
-				addV2Entries(b, out, entries, mode, cardID, tag, nil, withQty, !info.MetadataOnly, false, stock)
+				addV2Entries(b, out, entries, keyOf, cardID, tag, nil, withQty, !info.MetadataOnly, false, stock)
 			}
 		}
 	}
@@ -79,6 +119,7 @@ func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 
 func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
 	cardIDs, filtered := v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
+	keyOf := v2Keyer(b, mode, sealed, GetSellers())
 	var finishFilter []string
 	if filterByFinish != "" && !filtered {
 		finishFilter = fixupFinishNG(filterByFinish)
@@ -98,14 +139,14 @@ func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 		buylist := vendor.Buylist()
 		if !filtered {
 			for cardID, entries := range buylist {
-				addV2Entries(b, out, entries, mode, cardID, tag, finishFilter, withQty, !info.MetadataOnly, true, nil)
+				addV2Entries(b, out, entries, keyOf, cardID, tag, finishFilter, withQty, !info.MetadataOnly, true, nil)
 			}
 			continue
 		}
 		for _, cardID := range cardIDs {
 			entries, found := buylist[cardID]
 			if found {
-				addV2Entries(b, out, entries, mode, cardID, tag, nil, withQty, !info.MetadataOnly, true, nil)
+				addV2Entries(b, out, entries, keyOf, cardID, tag, nil, withQty, !info.MetadataOnly, true, nil)
 			}
 		}
 	}
@@ -128,12 +169,12 @@ func v2Stock(store string) func(cardID string, condition mtgban.Condition) (int,
 // addV2Entries files every priced entry a store has for one card. Its
 // Available is read from stock where that is not nil, once per condition since
 // the stock covers every entry of it, and otherwise from the entry.
-func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2, entries []T, idMode, cardID, store string, finishFilter []string, withQty, withCondition, buying bool, stock func(string, mtgban.Condition) (int, bool)) {
+func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2, entries []T, keyOf func(*mtgmatcher.CardObject) string, cardID, store string, finishFilter []string, withQty, withCondition, buying bool, stock func(string, mtgban.Condition) (int, bool)) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return
 	}
-	id := getIDFromMode(b, idMode, co)
+	id := keyOf(co)
 	if id == "" {
 		return
 	}

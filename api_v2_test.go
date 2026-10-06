@@ -381,3 +381,101 @@ func TestPriceAPIv2EveryEndpoint(t *testing.T) {
 		}
 	}
 }
+
+// TestPriceAPIv2CardmarketIDs keys v2's id=mkm on the product the Cardmarket
+// shelves price a card under, over the datastore's id, which answers only
+// for a card the shelves do not price: Low first, then Trend, for singles,
+// and Sealed for sealed product, on retail and buylist alike. v1 keeps the
+// datastore's.
+func TestPriceAPIv2CardmarketIDs(t *testing.T) {
+	card := func(uuid, mcmID string, sealed bool) *mtgmatcher.CardObject {
+		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Identifiers: map[string]string{}}, Sealed: sealed}
+		if mcmID != "" {
+			co.Identifiers["mcmId"] = mcmID
+		}
+		co.Finish = "nonfoil"
+		return co
+	}
+	b := &mtgmatcher.Backend{
+		AllUUIDs: []string{"unlisted", "moved", "unpriced", "trend-only", "box"},
+		UUIDs: map[string]*mtgmatcher.CardObject{
+			"unlisted":   card("unlisted", "", false),
+			"moved":      card("moved", "600001", false),
+			"unpriced":   card("unpriced", "620000", false),
+			"trend-only": card("trend-only", "", false),
+			"box":        card("box", "", true),
+		},
+	}
+
+	singles := []string{"unlisted", "moved", "unpriced", "trend-only"}
+
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	low := mtgban.InventoryRecord{}
+	low.Add("unlisted", &mtgban.InventoryEntry{Price: 1, OriginalID: "700001"})
+	low.Add("moved", &mtgban.InventoryEntry{Price: 2, OriginalID: "610000"})
+	trend := mtgban.InventoryRecord{}
+	trend.Add("unlisted", &mtgban.InventoryEntry{Price: 1, OriginalID: "700001"})
+	trend.Add("trend-only", &mtgban.InventoryEntry{Price: 3, OriginalID: "710000"})
+	// A single the sealed shelf names is not keyed from it.
+	sealedShelf := mtgban.InventoryRecord{}
+	sealedShelf.Add("box", &mtgban.InventoryEntry{Price: 90, OriginalID: "500001"})
+	sealedShelf.Add("unpriced", &mtgban.InventoryEntry{Price: 9, OriginalID: "999999"})
+	ct, cts := mtgban.InventoryRecord{}, mtgban.InventoryRecord{}
+	for _, uuid := range b.AllUUIDs {
+		record := ct
+		if b.UUIDs[uuid].Sealed {
+			record = cts
+		}
+		record.Add(uuid, &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 5})
+	}
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(trend, mtgban.ScraperInfo{Name: "Cardmarket Trend", Shorthand: "MKMTrend", MetadataOnly: true}),
+		mtgban.NewSellerFromInventory(low, mtgban.ScraperInfo{Name: "Cardmarket Low", Shorthand: "MKMLow", MetadataOnly: true}),
+		mtgban.NewSellerFromInventory(sealedShelf, mtgban.ScraperInfo{Name: "Cardmarket Sealed", Shorthand: "MKMSealed", SealedMode: true}),
+		mtgban.NewSellerFromInventory(ct, mtgban.ScraperInfo{Name: "Card Trader", Shorthand: "CT"}),
+		mtgban.NewSellerFromInventory(cts, mtgban.ScraperInfo{Name: "Card Trader Sealed", Shorthand: "CTSealed", SealedMode: true}),
+	}
+	sellersPtr.Store(&sellers)
+	prevVendors := vendorsPtr.Load()
+	t.Cleanup(func() { vendorsPtr.Store(prevVendors) })
+	ck := mtgban.BuylistRecord{}
+	for _, uuid := range singles {
+		ck.Add(uuid, &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1})
+	}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"})}
+	vendorsPtr.Store(&vendors)
+
+	ids := func(prices map[string]map[string]map[string][]banprice.Entry) []string {
+		var out []string
+		for id := range prices {
+			out = append(out, id)
+		}
+		slices.Sort(out)
+		return out
+	}
+	want := []string{"610000", "620000", "700001", "710000"}
+	for _, cards := range [][]string{nil, singles} {
+		got := ids(getSellerPricesV2(b, "mkm", []string{"CT"}, "", cards, "", false))
+		if !slices.Equal(got, want) {
+			t.Errorf("v2 ids for %v = %v, want %v", cards, got, want)
+		}
+		got = ids(getVendorPricesV2(b, "mkm", []string{"CK"}, "", cards, "", false))
+		if !slices.Equal(got, want) {
+			t.Errorf("v2 buylist ids for %v = %v, want %v", cards, got, want)
+		}
+	}
+	got := ids(getSellerPricesV2(b, "mkm", []string{"CTSealed"}, "", nil, "", true))
+	if !slices.Equal(got, []string{"500001"}) {
+		t.Errorf("v2 sealed ids = %v, want the sealed shelf's", got)
+	}
+
+	var v1 []string
+	for id := range getSellerPrices(b, "mkm", []string{"CT"}, "", nil, "", false, false, false, "") {
+		v1 = append(v1, id)
+	}
+	slices.Sort(v1)
+	if !slices.Equal(v1, []string{"600001", "620000"}) {
+		t.Errorf("v1 ids = %v, want the datastore's", v1)
+	}
+}
