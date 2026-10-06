@@ -36,9 +36,9 @@ func v2Backend() *mtgmatcher.Backend {
 	}
 }
 
-// seedV2Scrapers publishes a graded store, an index, TCGplayer and its Direct
-// (two Direct listings in one grade, its stock covering both), a store that
-// counts its copies but keeps no quantities, a sealed store, a graded buyer,
+// seedV2Scrapers publishes a store pricing by condition, an index, TCGplayer and its Direct
+// (two Direct listings in one condition, its stock covering both), a store that
+// counts its copies but keeps no quantities, a sealed store, a buyer by condition,
 // a want-count index buyer and an index buyer. The listings scrape was capped
 // on the coldfoil.
 func seedV2Scrapers(t *testing.T) {
@@ -120,8 +120,8 @@ func wireOf(t *testing.T, v any) string {
 	return string(wire)
 }
 
-// TestPriceAPIv2Prices files every grade a store has under the product's
-// finish, merging the two nonfoil uuids grade by grade, and gives the same
+// TestPriceAPIv2Prices files every condition a store prices under the product's
+// finish, merging the two nonfoil uuids condition by condition, and gives the same
 // answer from a full dump and from a request for the cards.
 func TestPriceAPIv2Prices(t *testing.T) {
 	seedV2Scrapers(t)
@@ -130,15 +130,15 @@ func TestPriceAPIv2Prices(t *testing.T) {
 	stores := []string{"CT", "MKMTrend", "MP", tcgDirectStore, tcgListingsStore, "CTSealed", "CK", "SYP", "IDXV"}
 
 	wantRetail := `{"600001":{` +
-		`"coldfoil":{"CT":[{"grade":"SP","price":38,"qty":1}],"MKMTrend":[{"price":35}],"TCGPlayer":[{"grade":"NM","price":40}]},` +
+		`"coldfoil":{"CT":[{"condition":"SP","price":38,"qty":1}],"MKMTrend":[{"price":35}],"TCGPlayer":[{"condition":"NM","price":40}]},` +
 		`"nonfoil":{` +
-		`"CT":[{"grade":"NM","price":0.9,"qty":6,"available":10},{"grade":"SP","price":0.8,"qty":1},{"grade":"MP","price":0.5,"qty":4}],` +
+		`"CT":[{"condition":"NM","price":0.9,"qty":6,"available":10},{"condition":"SP","price":0.8,"qty":1},{"condition":"MP","price":0.5,"qty":4}],` +
 		`"MKMTrend":[{"price":1.1}],` +
-		`"MP":[{"grade":"NM","price":0.95,"available":12},{"grade":"SP","price":0.7}],` +
-		`"TCGDirect":[{"grade":"NM","price":2,"available":7}],` +
-		`"TCGPlayer":[{"grade":"NM","price":1.3,"available":20},{"grade":"SP","price":1,"available":5}]}}}`
+		`"MP":[{"condition":"NM","price":0.95,"available":12},{"condition":"SP","price":0.7}],` +
+		`"TCGDirect":[{"condition":"NM","price":2,"available":7}],` +
+		`"TCGPlayer":[{"condition":"NM","price":1.3,"available":20},{"condition":"SP","price":1,"available":5}]}}}`
 	wantBuylist := `{"600001":{"nonfoil":{` +
-		`"CK":[{"grade":"NM","price":0.6,"qty":5},{"grade":"SP","price":0.4,"qty":2}],` +
+		`"CK":[{"condition":"NM","price":0.6,"qty":5},{"condition":"SP","price":0.4,"qty":2}],` +
 		`"IDXV":[{"price":0.3}],` +
 		`"SYP":[{"price":0.7,"qty":12}]}}}`
 
@@ -193,9 +193,9 @@ func TestPriceAPIv2Route(t *testing.T) {
 	if v2.Meta.Version != APIVersionV2 || v2.Error != "" {
 		t.Errorf("v2 meta %+v, error %q", v2.Meta, v2.Error)
 	}
-	grades := v2.Retail["600001"]["nonfoil"]["CT"]
-	if len(grades) != 3 || grades[0] != (banprice.Entry{Grade: "NM", Price: 0.9, Qty: 6, Available: 10}) {
-		t.Errorf("v2 CT nonfoil = %+v", grades)
+	entries := v2.Retail["600001"]["nonfoil"]["CT"]
+	if len(entries) != 3 || entries[0] != (banprice.Entry{Condition: "NM", Price: 0.9, Qty: 6, Available: 10}) {
+		t.Errorf("v2 CT nonfoil = %+v", entries)
 	}
 
 	var v1 PriceAPIOutput

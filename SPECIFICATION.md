@@ -635,28 +635,29 @@ demo access). Other user APIs: `/api/tcgplayer/{lastsold,directqty,decklist}`,
 
 `/api/v2/` (version "2", `PriceAPIv2`, `api_banprice_v2.go`) serves the same
 endpoints, options and access as v1, and v1's CSV. Its JSON prices are
-`{id: {finish: {store: [{grade, price, qty, available}]}}}` (`banprice.V2`):
-the finish is the card's `FinishSlug` (`sealed` for sealed product), and a
-store's list has one entry per grade, best first, holding its best price at
-that grade (lowest retail, highest buylist), across every uuid the id
-covers. `qty` is the copies the store's own listings in the grade hold,
-summed (on a buylist, the copies it buys); `available` is every copy of the
-grade on sale there at any price, from the entry's `Available` where the
-scraper counts them (Mana Pool does, keeping no quantities of its own),
-TCGplayer Direct's stock, or TCGplayer's listed copies, the last two from
-the newspaper scrape while it is a day old at most and TCGplayer's none for
-a printing the scrape capped. An absent `qty` or `available` is unknown,
-never zero, and an absent `qty` on a buylist is no limit. `grade` is absent
-for an index store and for sealed. A printing's whole stock is the sum of
-`available` over its grades, where every grade has one. `qty` and `conds`
-do not apply as options: the list always carries both. v2's
-`stores.json` lists the caller's stores as objects, sellers and vendors
-apart (`banprice.Stores`): shorthand, name, country, and whether a store is
-sealed, an index (its prices carry no grade) or carries `qty`, a vendor's
-credit multiplier, and when its prices were collected. `finishes.json`
-(v2 only) lists the finish keys the game's prices use with a label and a
-count, commonest first; `filter=singles|sealed` narrows both. v2's JSON
-takes no `tag`: its prices are keyed by store shorthand, which
+`{id: {finish: {store: [{condition, price, qty, available}]}}}`
+(`banprice.V2`): the finish is the card's `FinishSlug` (`sealed` for sealed
+product), and a store's list has one entry per condition, best first
+(`banprice.ConditionOrder`), holding its best price in that condition
+(lowest retail, highest buylist), across every uuid the id covers. `qty` is
+the copies the store's own listings in the condition hold, summed (on a
+buylist, the copies it buys); `available` is every copy in the condition
+on sale there at any price, from the entry's `Available` where the scraper
+counts them (Mana Pool does, keeping no quantities of its own), TCGplayer
+Direct's stock, or TCGplayer's listed copies, the last two from the
+newspaper scrape while it is a day old at most and TCGplayer's none for a
+printing the scrape capped. An absent `qty` or `available` is unknown,
+never zero, and an absent `qty` on a buylist is no limit. `condition` is
+absent for an index store and for sealed. A printing's whole stock is the
+sum of `available` over its conditions, where every condition has one.
+`qty` and `conds` do not apply as options: the list always carries both.
+v2's `stores.json` lists the caller's stores as objects, sellers and
+vendors apart (`banprice.Stores`): shorthand, name, country, and whether a
+store is sealed, an index (its prices carry no condition) or carries `qty`,
+a vendor's credit multiplier, and when its prices were collected.
+`finishes.json` (v2 only) lists the finish keys the game's prices use with
+a label and a count, commonest first; `filter=singles|sealed` narrows both.
+v2's JSON takes no `tag`: its prices are keyed by store shorthand, which
 `stores.json` maps to each store's display name. Its `.csv` prices are
 v1's CSV and still honor `tag=names`. An `id` outside `mtgban`, `tcg`,
 `scryfall`, `mtgjson`, `mkm`, `ck` and `name` is refused with an error,

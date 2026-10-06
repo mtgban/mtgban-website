@@ -9,28 +9,28 @@ import (
 // no finish of its own.
 const FinishSealed = "sealed"
 
-// Grades are the grades an Entry can carry, best first.
-var Grades = []string{"NM", "SP", "MP", "HP", "PO"}
+// ConditionOrder are the conditions an Entry can carry, best first.
+var ConditionOrder = []string{"NM", "SP", "MP", "HP", "PO"}
 
-// Entry is one grade of one finish at one store. Grade is empty for an
-// index price and for sealed product, which are not graded. Qty is the
-// copies the store's own listings in the grade hold, Price being the best of
-// their prices; on a buylist, the copies it buys. Available is every copy of
-// the grade on sale there at any price, where a source counts them. An empty
-// Qty or Available is unknown, not zero, and an empty Qty on a buylist is
-// no limit.
+// Entry is one condition of one finish at one store. Condition is empty for
+// an index price and for sealed product, which carry none. Qty is the
+// copies the store's own listings in the condition hold, Price being the
+// best of their prices; on a buylist, the copies it buys. Available is
+// every copy in the condition on sale there at any price, where a source
+// counts them. An empty Qty or Available is unknown, not zero, and an empty
+// Qty on a buylist is no limit.
 type Entry struct {
-	Grade     string  `json:"grade,omitempty"`
+	Condition string  `json:"condition,omitempty"`
 	Price     float64 `json:"price"`
 	Qty       int     `json:"qty,omitempty"`
 	Available int     `json:"available,omitempty"`
 }
 
 // V2 is the price map of the v2 API: card id, then finish, then store, then
-// that store's prices, one per grade, best grade first.
+// that store's prices, one per condition, best condition first.
 type V2 map[string]map[string]map[string][]Entry
 
-// Add files e under id, finish and store. An entry of the same grade
+// Add files e under id, finish and store. An entry of the same condition
 // already filed there keeps the better of the two prices, the higher when
 // buying and the lower otherwise, and the sums of their Qty and Available.
 func (v V2) Add(id, finish, store string, e Entry, buying bool) {
@@ -46,10 +46,10 @@ func (v V2) Add(id, finish, store string, e Entry, buying bool) {
 	}
 
 	entries := stores[store]
-	rank := slices.Index(Grades, e.Grade)
+	rank := slices.Index(ConditionOrder, e.Condition)
 	i := 0
 	for ; i < len(entries); i++ {
-		if entries[i].Grade == e.Grade {
+		if entries[i].Condition == e.Condition {
 			better := e.Price < entries[i].Price
 			if buying {
 				better = e.Price > entries[i].Price
@@ -61,7 +61,7 @@ func (v V2) Add(id, finish, store string, e Entry, buying bool) {
 			entries[i].Available += e.Available
 			return
 		}
-		if slices.Index(Grades, entries[i].Grade) > rank {
+		if slices.Index(ConditionOrder, entries[i].Condition) > rank {
 			break
 		}
 	}
@@ -84,7 +84,7 @@ type Store struct {
 	Sealed    bool   `json:"sealed,omitempty"`
 
 	// Index marks a store whose prices index a market rather than list its
-	// own stock, which v2 gives no grade.
+	// own stock, which v2 gives no condition.
 	Index bool `json:"index,omitempty"`
 
 	// Quantities marks a store whose prices carry a qty.
