@@ -203,6 +203,7 @@ func (s *site) newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastor
 		names:    suggest.NewNames(b.Names(mtgmatcher.NameFormCanonical, false), b.Names(mtgmatcher.NameFormCanonical, true)),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
+		finishes: v2FinishList(b),
 		loadedAt: loadedAt,
 	}
 }

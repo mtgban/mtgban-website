@@ -649,7 +649,18 @@ a printing the scrape capped. An absent `qty` or `available` is unknown,
 never zero, and an absent `qty` on a buylist is no limit. `grade` is absent
 for an index store and for sealed. A printing's whole stock is the sum of
 `available` over its grades, where every grade has one. `qty` and `conds`
-do not apply as options: the list always carries both.
+do not apply as options: the list always carries both. v2's
+`stores.json` lists the caller's stores as objects, sellers and vendors
+apart (`banprice.Stores`): shorthand, name, country, and whether a store is
+sealed, an index (its prices carry no grade) or carries `qty`, a vendor's
+credit multiplier, and when its prices were collected. `finishes.json`
+(v2 only) lists the finish keys the game's prices use with a label and a
+count, commonest first; `filter=singles|sealed` narrows both. v2's JSON
+takes no `tag`: its prices are keyed by store shorthand, which
+`stores.json` maps to each store's display name. Its `.csv` prices are
+v1's CSV and still honor `tag=names`. An `id` outside `mtgban`, `tcg`,
+`scryfall`, `mtgjson`, `mkm`, `ck` and `name` is refused with an error,
+where v1 falls back to `mtgban`.
 
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 

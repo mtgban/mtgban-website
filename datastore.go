@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/banprice"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
@@ -21,5 +22,6 @@ type datastore struct {
 	names    *suggest.Names
 	editions *editionsSnapshot
 	palette  *palette.Snapshot
+	finishes []banprice.Finish
 	loadedAt time.Time
 }

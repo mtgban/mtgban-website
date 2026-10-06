@@ -107,8 +107,10 @@ func (s *site) PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 // PriceAPIv2 serves /api/v2/: the endpoints and options of v1, with every
 // price a store has for a card as a list of grades under its finish. qty and
-// conds do not apply, since the list always carries both, and CSV output is
-// v1's.
+// conds do not apply, since the list always carries both, nor does tag:
+// prices are keyed by store shorthand, which stores.json describes. The
+// prices' CSV output is v1's, and finishes.json lists the finishes prices
+// are keyed by.
 func (s *site) PriceAPIv2(w http.ResponseWriter, r *http.Request) {
 	s.priceAPI(w, r, "/api/v2/", APIVersionV2)
 }
@@ -173,6 +175,17 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		return
 	}
 
+	// Endpoint for retrieving the finishes v2 keys prices by
+	if version == APIVersionV2 && strings.HasPrefix(urlPath, "finishes") {
+		finishes := filterV2Finishes(s.datastore().finishes, r.FormValue("filter"))
+		if strings.HasSuffix(urlPath, ".json") {
+			json.NewEncoder(w).Encode(&finishes)
+		} else {
+			writeV2FinishesCSV(w, finishes)
+		}
+		return
+	}
+
 	storesOpt := GetParamFromSig(sig, "API")
 	if DevMode && !SigCheck && storesOpt == "" {
 		storesOpt = "DEV_ACCESS"
@@ -189,7 +202,16 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 
 	enabledStores := apiEnabledStores(storesOpt)
 
-	// Endpoint for retrieving the stores shorthands
+	// Endpoint for retrieving the stores shorthands, and in v2 what each is
+	if version == APIVersionV2 && strings.HasPrefix(urlPath, "stores") {
+		stores := v2StoreList(enabledStores, r.FormValue("filter"))
+		if strings.HasSuffix(urlPath, ".json") {
+			json.NewEncoder(w).Encode(&stores)
+		} else {
+			writeV2StoresCSV(w, stores)
+		}
+		return
+	}
 	if strings.HasPrefix(urlPath, "stores") {
 		output := enabledStores
 		filter := r.FormValue("filter")
@@ -245,6 +267,11 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 
 	enabledModes := strings.Split(GetParamFromSig(sig, "APImode"), ",")
 	idOpt := r.FormValue("id")
+	if version == APIVersionV2 && idOpt != "" && !slices.Contains(v2IDModes, idOpt) {
+		out.Error = fmt.Sprintf("unknown id %q, use one of %s", idOpt, strings.Join(v2IDModes, ", "))
+		json.NewEncoder(w).Encode(&out)
+		return
+	}
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
 	filterByFinish := r.FormValue("finish")
@@ -348,7 +375,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
-			outV2.Retail = getSellerPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed, tagName)
+			outV2.Retail = getSellerPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
 			out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
@@ -356,7 +383,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
-			outV2.Buylist = getVendorPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed, tagName)
+			outV2.Buylist = getVendorPricesV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
 			out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}

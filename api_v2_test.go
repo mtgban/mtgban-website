@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -22,7 +25,8 @@ func v2Backend() *mtgmatcher.Backend {
 	}
 	box := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: "box", Identifiers: map[string]string{"mcmId": "700"}}, Sealed: true}
 	return &mtgmatcher.Backend{
-		AllUUIDs: []string{"lor-1", "lor-2", "lor-3", "box"},
+		AllUUIDs:       []string{"lor-1", "lor-2", "lor-3"},
+		AllSealedUUIDs: []string{"box"},
 		UUIDs: map[string]*mtgmatcher.CardObject{
 			"lor-1": card("lor-1", "nonfoil"),
 			"lor-2": card("lor-2", "coldfoil"),
@@ -100,7 +104,7 @@ func seedV2Scrapers(t *testing.T) {
 	idx.Add("lor-1", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 0.3, Quantity: 2})
 
 	vendors := []mtgban.Vendor{
-		mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"}),
+		mtgban.NewVendorFromBuylist(ck, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK", CreditMultiplier: 1.3}),
 		mtgban.NewVendorFromBuylist(syp, mtgban.ScraperInfo{Name: "TCG SYP", Shorthand: "SYP", MetadataOnly: true, QuantityPriority: true}),
 		mtgban.NewVendorFromBuylist(idx, mtgban.ScraperInfo{Name: "Index Buyer", Shorthand: "IDXV", MetadataOnly: true}),
 	}
@@ -145,18 +149,18 @@ func TestPriceAPIv2Prices(t *testing.T) {
 		{"full dump", nil},
 		{"filtered", cards},
 	} {
-		retail := getSellerPricesV2(b, "mkm", stores, "", tc.cards, "", false, "")
+		retail := getSellerPricesV2(b, "mkm", stores, "", tc.cards, "", false)
 		if got := wireOf(t, retail); got != wantRetail {
 			t.Errorf("%s retail =\n%s\nwant\n%s", tc.name, got, wantRetail)
 		}
-		buylist := getVendorPricesV2(b, "mkm", stores, "", tc.cards, "", false, "")
+		buylist := getVendorPricesV2(b, "mkm", stores, "", tc.cards, "", false)
 		if got := wireOf(t, buylist); got != wantBuylist {
 			t.Errorf("%s buylist =\n%s\nwant\n%s", tc.name, got, wantBuylist)
 		}
 	}
 
-	sealed := getSellerPricesV2(b, "mkm", stores, "", nil, "", true, "names")
-	want := `{"700":{"sealed":{"Card Trader Sealed":[{"price":99,"qty":5}]}}}`
+	sealed := getSellerPricesV2(b, "mkm", stores, "", nil, "", true)
+	want := `{"700":{"sealed":{"CTSealed":[{"price":99,"qty":5}]}}}`
 	if got := wireOf(t, sealed); got != want {
 		t.Errorf("sealed =\n%s\nwant\n%s", got, want)
 	}
@@ -167,6 +171,9 @@ func TestPriceAPIv2Prices(t *testing.T) {
 func TestPriceAPIv2Route(t *testing.T) {
 	withSigMode(t, true, false)
 	seedV2Scrapers(t)
+	prevOverrides := Config().ScraperConfig.NameOverride
+	t.Cleanup(func() { Config().ScraperConfig.NameOverride = prevOverrides })
+	Config().ScraperConfig.NameOverride = map[string]string{"Card Trader": "CardTrader"}
 
 	s := newSite()
 	s.ds.Store(&datastore{backend: v2Backend()})
@@ -197,9 +204,180 @@ func TestPriceAPIv2Route(t *testing.T) {
 		t.Errorf("v1 = %+v", v1)
 	}
 
-	var stores []string
+	var stores banprice.Stores
 	get(s.PriceAPIv2, "/api/v2/stores.json", &stores)
-	if len(stores) == 0 {
-		t.Error("v2 lists no stores")
+	sellers := map[string]banprice.Store{}
+	for _, store := range stores.Sellers {
+		sellers[store.Shorthand] = store
+	}
+	vendors := map[string]banprice.Store{}
+	for _, store := range stores.Vendors {
+		vendors[store.Shorthand] = store
+	}
+	for _, tc := range []struct {
+		name string
+		got  banprice.Store
+		want banprice.Store
+	}{
+		{"CT", sellers["CT"], banprice.Store{Shorthand: "CT", Name: "CardTrader", Quantities: true}},
+		{"MKMTrend", sellers["MKMTrend"], banprice.Store{Shorthand: "MKMTrend", Name: "Cardmarket Trend", Index: true}},
+		{"TCGDirect", sellers[tcgDirectStore], banprice.Store{Shorthand: tcgDirectStore, Name: "TCGplayer Direct"}},
+		{"CTSealed", sellers["CTSealed"], banprice.Store{Shorthand: "CTSealed", Name: "Card Trader Sealed", Sealed: true, Quantities: true}},
+		{"CK", vendors["CK"], banprice.Store{Shorthand: "CK", Name: "Card Kingdom", Quantities: true, CreditMultiplier: 1.3}},
+		{"SYP", vendors["SYP"], banprice.Store{Shorthand: "SYP", Name: "TCG SYP", Index: true, Quantities: true}},
+		{"IDXV", vendors["IDXV"], banprice.Store{Shorthand: "IDXV", Name: "Index Buyer", Index: true}},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("v2 stores.json %s = %+v, want %+v", tc.name, tc.got, tc.want)
+		}
+	}
+
+	// An id system v2 does not know is refused, where v1 falls back to mtgban
+	var unknown PriceAPIOutputV2
+	get(s.PriceAPIv2, "/api/v2/retail.json?id=tcgplayer", &unknown)
+	if !strings.Contains(unknown.Error, `unknown id "tcgplayer"`) || unknown.Retail != nil {
+		t.Errorf("v2 id=tcgplayer: error %q, %d cards", unknown.Error, len(unknown.Retail))
+	}
+	var fallback PriceAPIOutput
+	get(s.PriceAPI, "/api/mtgban/retail.json?id=tcgplayer", &fallback)
+	if fallback.Error != "" || len(fallback.Retail) == 0 {
+		t.Errorf("v1 id=tcgplayer: error %q, %d cards", fallback.Error, len(fallback.Retail))
+	}
+
+	// v2 keys prices by shorthand whatever tag asks for
+	var named PriceAPIOutputV2
+	get(s.PriceAPIv2, "/api/v2/retail.json?id=mkm&tag=names", &named)
+	if named.Retail["600001"]["nonfoil"]["CT"] == nil {
+		t.Errorf("tag=names keys %v, want CT among them", named.Retail["600001"]["nonfoil"])
+	}
+
+	stores = banprice.Stores{}
+	get(s.PriceAPIv2, "/api/v2/stores.json?filter=sealed", &stores)
+	if len(stores.Sellers) != 1 || stores.Sellers[0].Shorthand != "CTSealed" || len(stores.Vendors) != 0 {
+		t.Errorf("v2 stores.json?filter=sealed = %+v", stores)
+	}
+}
+
+// TestPriceAPIv2Finishes lists the finishes v2 keys the game's prices by,
+// commonest first, as JSON and CSV.
+func TestPriceAPIv2Finishes(t *testing.T) {
+	withSigMode(t, true, false)
+	s := newSite()
+	s.ds.Store(s.newDatastore(v2Backend(), time.Now()))
+
+	get := func(url string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		s.PriceAPIv2(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		return rec.Body.String()
+	}
+	for _, tc := range []struct{ url, want string }{
+		{"/api/v2/finishes.json", `[{"value":"nonfoil","label":"Non-foil","count":2},{"value":"coldfoil","label":"Cold Foil","count":1},{"value":"sealed","label":"Sealed","count":1}]` + "\n"},
+		{"/api/v2/finishes.json?filter=singles", `[{"value":"nonfoil","label":"Non-foil","count":2},{"value":"coldfoil","label":"Cold Foil","count":1}]` + "\n"},
+		{"/api/v2/finishes.json?filter=sealed", `[{"value":"sealed","label":"Sealed","count":1}]` + "\n"},
+		{"/api/v2/finishes.csv", "Value,Label,Count\nnonfoil,Non-foil,2\ncoldfoil,Cold Foil,1\nsealed,Sealed,1\n"},
+	} {
+		got := get(tc.url)
+		if got != tc.want {
+			t.Errorf("%s =\n%s\nwant\n%s", tc.url, got, tc.want)
+		}
+	}
+
+	// Before the first load there are no finishes, still an array
+	empty := newSite()
+	rec := httptest.NewRecorder()
+	empty.PriceAPIv2(rec, httptest.NewRequest(http.MethodGet, "/api/v2/finishes.json", nil))
+	if rec.Body.String() != "[]\n" {
+		t.Errorf("finishes.json before a load = %q, want []", rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	s.PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/finishes.json", nil))
+	if strings.HasPrefix(rec.Body.String(), "[") {
+		t.Errorf("v1 serves finishes.json: %s", rec.Body.String())
+	}
+}
+
+// TestPriceAPIv2EveryEndpoint calls every v2 endpoint against the datastore:
+// each answers as version 2, the prices ones with the seeded stores' prices.
+func TestPriceAPIv2EveryEndpoint(t *testing.T) {
+	regular, foil, sealed := parityCards(t)
+	seedParityScrapers(t, regular, foil)
+	withSigMode(t, true, false)
+
+	co, err := backend().GetUUID(regular)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealedCo, err := backend().GetUUID(sealed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	call := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		testSite.PriceAPIv2(rec, httptest.NewRequest(http.MethodGet, "/api/v2/"+path, nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s: status %d", path, rec.Code)
+		}
+		return rec
+	}
+
+	for _, tc := range []struct {
+		path    string
+		retail  bool
+		buylist bool
+	}{
+		{"retail.json", true, false},
+		{"buylist.json", false, true},
+		{"all.json", true, true},
+		{"retail/" + co.SetCode + ".json", true, false},
+		{"buylist/" + co.SetCode + ".json", false, true},
+		{"all/" + co.SetCode + ".json", true, true},
+		{"retail/" + regular + ".json", true, false},
+		{"buylist/" + regular + ".json", false, true},
+		{"sealed/" + sealedCo.SetCode + ".json", false, false},
+	} {
+		var out PriceAPIOutputV2
+		rec := call(tc.path)
+		err := json.Unmarshal(rec.Body.Bytes(), &out)
+		if err != nil || out.Error != "" || out.Meta.Version != APIVersionV2 {
+			t.Errorf("%s: version %q error %q (%v)", tc.path, out.Meta.Version, out.Error, err)
+			continue
+		}
+		if tc.retail && out.Retail[regular]["nonfoil"]["PARITYA"] == nil {
+			t.Errorf("%s: no retail price for the seeded card", tc.path)
+		}
+		if tc.buylist && out.Buylist[regular]["nonfoil"]["PARITYV"] == nil {
+			t.Errorf("%s: no buylist price for the seeded card", tc.path)
+		}
+	}
+
+	csvBody := call("retail/" + co.SetCode + ".csv").Body.String()
+	if strings.HasPrefix(csvBody, "{") || !strings.Contains(csvBody, ",") {
+		t.Errorf("retail csv: %.200s", csvBody)
+	}
+
+	var sets []string
+	err = json.Unmarshal(call("sets.json").Body.Bytes(), &sets)
+	if err != nil || !slices.Contains(sets, co.SetCode) {
+		t.Errorf("sets.json: %v, %d sets", err, len(sets))
+	}
+	var stores banprice.Stores
+	err = json.Unmarshal(call("stores.json").Body.Bytes(), &stores)
+	if err != nil || len(stores.Sellers) == 0 || len(stores.Vendors) == 0 {
+		t.Errorf("stores.json: %v, %+v", err, stores)
+	}
+	var finishes []banprice.Finish
+	err = json.Unmarshal(call("finishes.json").Body.Bytes(), &finishes)
+	if err != nil || !slices.ContainsFunc(finishes, func(f banprice.Finish) bool { return f.Value == co.Finish }) {
+		t.Errorf("finishes.json: %v, %+v", err, finishes)
+	}
+	for _, path := range []string{"sets.csv", "stores.csv", "finishes.csv"} {
+		body := call(path).Body.String()
+		if strings.HasPrefix(body, "{") || strings.HasPrefix(body, "[") {
+			t.Errorf("%s is not CSV: %.200s", path, body)
+		}
 	}
 }
