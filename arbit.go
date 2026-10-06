@@ -138,10 +138,7 @@ var FilterOptConfig = map[string]FilterOpt{
 		NoSealed: true,
 	},
 	"nocomm": {
-		Title: "only Rare/Mythic",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.Rarities = UCRarity
-		},
+		Title:    "only Rare/Mythic",
 		NoSealed: true,
 	},
 	"nononrl": {
@@ -309,7 +306,17 @@ var FilterOptConfig = map[string]FilterOpt{
 }
 
 var BadConditions = []mtgban.Condition{mtgban.MP, mtgban.HP, mtgban.PO}
-var UCRarity = []string{"uncommon", "common"}
+
+// raritiesBelow lists the rarities b's game ranks commoner than the one
+// named, by the game's own order: below rare, Magic's are uncommon, common
+// and token.
+func raritiesBelow(b *mtgmatcher.Backend, rarity string) []string {
+	rank, found := b.RarityRank(rarity)
+	if !found {
+		return nil
+	}
+	return b.Rarities[rank+1:]
+}
 
 var ABU4H = []string{
 	"Limited Edition Alpha",
@@ -828,11 +835,14 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		}
 		applied[key] = true
 		// Options the page acts on itself, by choosing what to compare
-		// rather than by narrowing what a comparison keeps
+		// or by reading the game being compared
 		if config.Func == nil {
 			continue
 		}
 		FilterOptConfig[key].Func(opts)
+	}
+	if applied["nocomm"] {
+		opts.Rarities = raritiesBelow(b, "rare")
 	}
 
 	// Customize opts for Globals
