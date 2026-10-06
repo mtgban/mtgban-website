@@ -404,10 +404,10 @@ var gameMap = map[mtgmatcher.Game]string{
 var gameBadgeMap = map[mtgmatcher.Game]string{
 	mtgmatcher.GameLorcana:       "Lorcana",
 	mtgmatcher.GameOnePiece:      "One Piece",
-	mtgmatcher.GameYuGiOh:        "YuGiOh",
+	mtgmatcher.GameYuGiOh:        "Yu-Gi-Oh!",
 	mtgmatcher.GameRiftbound:     "Riftbound",
 	mtgmatcher.GameFleshAndBlood: "Flesh and Blood",
-	mtgmatcher.GamePokemon:       "Pokemon",
+	mtgmatcher.GamePokemon:       "Pokémon",
 	mtgmatcher.GameGundam:        "Gundam",
 	mtgmatcher.GamePalworld:      "Palworld",
 }
