@@ -1,6 +1,9 @@
 package banprice
 
-import "slices"
+import (
+	"slices"
+	"time"
+)
 
 // FinishSealed is the finish a sealed product is filed under in V2, having
 // no finish of its own.
@@ -63,4 +66,41 @@ func (v V2) Add(id, finish, store string, e Entry, buying bool) {
 		}
 	}
 	stores[store] = slices.Insert(entries, i, e)
+}
+
+// Finish is one finish a v2 response keys prices by, as finishes.json lists
+// it: the key, its display name, and how many cards or products carry it.
+type Finish struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+	Count int    `json:"count"`
+}
+
+// Store is one store a v2 response keys prices by, as stores.json lists it.
+type Store struct {
+	Shorthand string `json:"shorthand"`
+	Name      string `json:"name"`
+	Country   string `json:"country,omitempty"`
+	Sealed    bool   `json:"sealed,omitempty"`
+
+	// Index marks a store whose prices index a market rather than list its
+	// own stock, which v2 gives no grade.
+	Index bool `json:"index,omitempty"`
+
+	// Quantities marks a store whose prices carry a qty.
+	Quantities bool `json:"quantities,omitempty"`
+
+	// CreditMultiplier is what a vendor's store credit is worth against its
+	// cash price: 1.3 pays 30% more in credit. Absent where it pays none.
+	CreditMultiplier float64 `json:"credit_multiplier,omitempty"`
+
+	// Updated is when the store's prices were last collected.
+	Updated *time.Time `json:"updated,omitempty"`
+}
+
+// Stores is v2's stores.json: the stores a caller can read prices from,
+// sellers and vendors apart, each sorted by shorthand.
+type Stores struct {
+	Sellers []Store `json:"sellers"`
+	Vendors []Store `json:"vendors"`
 }

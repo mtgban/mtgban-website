@@ -1,7 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
+	"net/http"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -21,6 +26,11 @@ func v2Finish(co *mtgmatcher.CardObject) string {
 	return co.Finish
 }
 
+// v2IDModes are the id systems v2 keys cards by. v1 reads any other value
+// as the default, mtgban; v2 refuses it, so a misspelt one is not mistaken
+// for a request for MTGBAN ids.
+var v2IDModes = []string{"mtgban", "tcg", "scryfall", "mtgjson", "mkm", "ck", "name"}
+
 // v2Cards is the cards a filtered request asks for, kept to its finish and
 // to singles or sealed, and whether the request is filtered at all.
 func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) ([]string, bool) {
@@ -32,7 +42,7 @@ func v2Cards(b *mtgmatcher.Backend, filterByEdition string, filterByHash []strin
 	return filterUUIDs(b, config.UUIDs, config.CardFilters), true
 }
 
-func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, tagName string) banprice.V2 {
+func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
 	cardIDs, filtered := v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
 	var finishFilter []string
 	if filterByFinish != "" && !filtered {
@@ -50,9 +60,6 @@ func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 		stock := v2Stock(info.Shorthand)
 
 		tag := info.Shorthand
-		if tagName == "names" {
-			tag = info.Name
-		}
 		inventory := seller.Inventory()
 		if !filtered {
 			for cardID, entries := range inventory {
@@ -70,7 +77,7 @@ func getSellerPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 	return out
 }
 
-func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, tagName string) banprice.V2 {
+func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
 	cardIDs, filtered := v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)
 	var finishFilter []string
 	if filterByFinish != "" && !filtered {
@@ -88,9 +95,6 @@ func getVendorPricesV2(b *mtgmatcher.Backend, mode string, enabledStores []strin
 		withQty := !info.MetadataOnly || info.QuantityPriority
 
 		tag := info.Shorthand
-		if tagName == "names" {
-			tag = info.Name
-		}
 		buylist := vendor.Buylist()
 		if !filtered {
 			for cardID, entries := range buylist {
@@ -160,4 +164,150 @@ func addV2Entries[T mtgban.GenericEntry](b *mtgmatcher.Backend, out banprice.V2,
 		}
 		out.Add(id, finish, store, entry, buying)
 	}
+}
+
+// v2FinishList is every finish v2 keys the game's prices by, commonest
+// first: the singles' finishes, and sealed. It walks the whole catalog, so
+// newDatastore builds it once per load.
+func v2FinishList(b *mtgmatcher.Backend) []banprice.Finish {
+	counts := map[string]int{}
+	for _, uuid := range b.GetUUIDs() {
+		co, err := b.GetUUID(uuid)
+		if err != nil || co.Sealed || co.Finish == "" {
+			continue
+		}
+		counts[co.Finish]++
+	}
+	if len(b.GetSealedUUIDs()) > 0 {
+		counts[banprice.FinishSealed] = len(b.GetSealedUUIDs())
+	}
+
+	out := make([]banprice.Finish, 0, len(counts))
+	for value, count := range counts {
+		label := "Sealed"
+		if value != banprice.FinishSealed {
+			label = finishListLabel(b, value)
+		}
+		out = append(out, banprice.Finish{Value: value, Label: label, Count: count})
+	}
+	slices.SortFunc(out, func(a, b banprice.Finish) int {
+		if a.Count != b.Count {
+			return b.Count - a.Count
+		}
+		return strings.Compare(a.Value, b.Value)
+	})
+	return out
+}
+
+// v2StoreName is the name v2's stores.json shows a store by: the site's
+// display name. v2's prices are keyed by shorthand alone.
+func v2StoreName(info mtgban.ScraperInfo) string {
+	override, found := Config().ScraperConfig.NameOverride[info.Name]
+	if found {
+		return override
+	}
+	return info.Name
+}
+
+// filterV2Finishes keeps the singles' finishes for filter=singles, sealed
+// for filter=sealed, and every finish otherwise, in a list never nil, so
+// that before the first load too it encodes as an empty array.
+func filterV2Finishes(finishes []banprice.Finish, filter string) []banprice.Finish {
+	out := []banprice.Finish{}
+	for _, finish := range finishes {
+		sealed := finish.Value == banprice.FinishSealed
+		if filter == "singles" && sealed || filter == "sealed" && !sealed {
+			continue
+		}
+		out = append(out, finish)
+	}
+	return out
+}
+
+// v2StoreList is the stores among enabledStores, as stores.json lists them.
+// filter=singles or filter=sealed keeps one kind of store. qty is listed as
+// v2's prices carry it.
+func v2StoreList(enabledStores []string, filter string) banprice.Stores {
+	keep := func(info mtgban.ScraperInfo) bool {
+		if filter == "singles" && info.SealedMode || filter == "sealed" && !info.SealedMode {
+			return false
+		}
+		return slices.Contains(enabledStores, info.Shorthand)
+	}
+	store := func(info mtgban.ScraperInfo) banprice.Store {
+		return banprice.Store{
+			Shorthand: info.Shorthand,
+			Name:      v2StoreName(info),
+			Country:   info.CountryFlag,
+			Sealed:    info.SealedMode,
+			Index:     info.MetadataOnly,
+		}
+	}
+
+	out := banprice.Stores{Sellers: []banprice.Store{}, Vendors: []banprice.Store{}}
+	seen := map[string]bool{}
+	for _, seller := range GetSellers() {
+		info := seller.Info()
+		if !keep(info) || seen[info.Shorthand] {
+			continue
+		}
+		seen[info.Shorthand] = true
+		entry := store(info)
+		entry.Quantities = !info.MetadataOnly && !info.NoQuantityInventory
+		entry.Updated = info.InventoryTimestamp
+		out.Sellers = append(out.Sellers, entry)
+	}
+	seen = map[string]bool{}
+	for _, vendor := range GetVendors() {
+		info := vendor.Info()
+		if !keep(info) || seen[info.Shorthand] {
+			continue
+		}
+		seen[info.Shorthand] = true
+		entry := store(info)
+		entry.Quantities = !info.MetadataOnly || info.QuantityPriority
+		entry.CreditMultiplier = info.CreditMultiplier
+		entry.Updated = info.BuylistTimestamp
+		out.Vendors = append(out.Vendors, entry)
+	}
+	byShorthand := func(a, b banprice.Store) int { return strings.Compare(a.Shorthand, b.Shorthand) }
+	slices.SortFunc(out.Sellers, byShorthand)
+	slices.SortFunc(out.Vendors, byShorthand)
+	return out
+}
+
+// writeV2FinishesCSV writes the finish list one finish a row.
+func writeV2FinishesCSV(w http.ResponseWriter, finishes []banprice.Finish) {
+	w.Header().Set("Content-Type", "text/csv")
+	csvWriter := csv.NewWriter(w)
+	csvWriter.Write([]string{"Value", "Label", "Count"})
+	for _, finish := range finishes {
+		csvWriter.Write([]string{finish.Value, finish.Label, strconv.Itoa(finish.Count)})
+	}
+	csvWriter.Flush()
+}
+
+// writeV2StoresCSV writes the store list one store a row, sellers first.
+func writeV2StoresCSV(w http.ResponseWriter, stores banprice.Stores) {
+	w.Header().Set("Content-Type", "text/csv")
+	csvWriter := csv.NewWriter(w)
+	csvWriter.Write([]string{"Kind", "Shorthand", "Name", "Country", "Sealed", "Index", "Quantities", "Credit Multiplier", "Updated"})
+	for _, side := range []struct {
+		kind   string
+		stores []banprice.Store
+	}{{"seller", stores.Sellers}, {"vendor", stores.Vendors}} {
+		for _, store := range side.stores {
+			credit, updated := "", ""
+			if store.CreditMultiplier != 0 {
+				credit = strconv.FormatFloat(store.CreditMultiplier, 'f', -1, 64)
+			}
+			if store.Updated != nil {
+				updated = store.Updated.UTC().Format(time.RFC3339)
+			}
+			csvWriter.Write([]string{side.kind, store.Shorthand, store.Name, store.Country,
+				strconv.FormatBool(store.Sealed), strconv.FormatBool(store.Index), strconv.FormatBool(store.Quantities),
+				credit, updated})
+		}
+	}
+	csvWriter.Flush()
 }
