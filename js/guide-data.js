@@ -1108,7 +1108,7 @@ window.__BAN_GUIDE = {
                     { value: 'only NM/SP',         short: 'Hide MP/HP/PO conditions' },
                     { value: 'only non-Foil',      short: 'Hide foils' },
                     { value: 'only Foil',          short: 'Hide non-foils' },
-                    { value: 'only Rare/Mythic',   short: 'Hide commons and uncommons' },
+                    { value: 'only Rare/Mythic',   short: 'Hide what the game ranks below rare' },
                     { value: 'only Bucks+',        short: 'Hide low-dollar results' },
                     { value: 'only Yield+',        short: 'Minimum profit threshold' },
                     { value: 'only Difference+',   short: 'Minimum price difference' },
