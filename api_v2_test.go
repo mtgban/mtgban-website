@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -149,17 +151,17 @@ func TestPriceAPIv2Prices(t *testing.T) {
 		{"full dump", nil},
 		{"filtered", cards},
 	} {
-		retail := getSellerPricesV2(b, "mkm", stores, "", tc.cards, "", false)
+		retail := sellerPricesV2(t, b, "mkm", stores, "", tc.cards, "", false)
 		if got := wireOf(t, retail); got != wantRetail {
 			t.Errorf("%s retail =\n%s\nwant\n%s", tc.name, got, wantRetail)
 		}
-		buylist := getVendorPricesV2(b, "mkm", stores, "", tc.cards, "", false)
+		buylist := vendorPricesV2(t, b, "mkm", stores, "", tc.cards, "", false)
 		if got := wireOf(t, buylist); got != wantBuylist {
 			t.Errorf("%s buylist =\n%s\nwant\n%s", tc.name, got, wantBuylist)
 		}
 	}
 
-	sealed := getSellerPricesV2(b, "mkm", stores, "", nil, "", true)
+	sealed := sellerPricesV2(t, b, "mkm", stores, "", nil, "", true)
 	want := `{"700":{"sealed":{"CTSealed":[{"price":99,"qty":5}]}}}`
 	if got := wireOf(t, sealed); got != want {
 		t.Errorf("sealed =\n%s\nwant\n%s", got, want)
@@ -456,16 +458,16 @@ func TestPriceAPIv2CardmarketIDs(t *testing.T) {
 	}
 	want := []string{"610000", "620000", "700001", "710000"}
 	for _, cards := range [][]string{nil, singles} {
-		got := ids(getSellerPricesV2(b, "mkm", []string{"CT"}, "", cards, "", false))
+		got := ids(sellerPricesV2(t, b, "mkm", []string{"CT"}, "", cards, "", false))
 		if !slices.Equal(got, want) {
 			t.Errorf("v2 ids for %v = %v, want %v", cards, got, want)
 		}
-		got = ids(getVendorPricesV2(b, "mkm", []string{"CK"}, "", cards, "", false))
+		got = ids(vendorPricesV2(t, b, "mkm", []string{"CK"}, "", cards, "", false))
 		if !slices.Equal(got, want) {
 			t.Errorf("v2 buylist ids for %v = %v, want %v", cards, got, want)
 		}
 	}
-	got := ids(getSellerPricesV2(b, "mkm", []string{"CTSealed"}, "", nil, "", true))
+	got := ids(sellerPricesV2(t, b, "mkm", []string{"CTSealed"}, "", nil, "", true))
 	if !slices.Equal(got, []string{"500001"}) {
 		t.Errorf("v2 sealed ids = %v, want the sealed shelf's", got)
 	}
@@ -477,5 +479,95 @@ func TestPriceAPIv2CardmarketIDs(t *testing.T) {
 	slices.Sort(v1)
 	if !slices.Equal(v1, []string{"600001", "620000"}) {
 		t.Errorf("v1 ids = %v, want the datastore's", v1)
+	}
+}
+
+// PriceAPIOutputV2 is a v2 response as a client decodes it.
+type PriceAPIOutputV2 struct {
+	Error   string       `json:"error,omitempty"`
+	Meta    PriceAPIMeta `json:"meta"`
+	Retail  banprice.V2  `json:"retail,omitempty"`
+	Buylist banprice.V2  `json:"buylist,omitempty"`
+}
+
+// collectV2 gathers a section's walk into one map.
+func collectV2(t testing.TB, b *mtgmatcher.Backend, section *v2Section) banprice.V2 {
+	t.Helper()
+	out := banprice.V2{}
+	err := section.walk(b, func(id string, finishes map[string]map[string][]banprice.Entry) error {
+		out[id] = map[string]map[string][]banprice.Entry{}
+		for finish, stores := range finishes {
+			out[id][finish] = maps.Clone(stores)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func sellerPricesV2(t testing.TB, b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
+	return collectV2(t, b, sellerSectionV2(b, mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
+}
+
+func vendorPricesV2(t testing.TB, b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) banprice.V2 {
+	return collectV2(t, b, vendorSectionV2(b, mode, enabledStores, filterByEdition, filterByHash, filterByFinish, sealed))
+}
+
+// TestWriteV2Response pins the streamed response to the bytes json.Encoder
+// writes for the same prices, a section with no card left out included.
+func TestWriteV2Response(t *testing.T) {
+	card := func(uuid string) *mtgmatcher.CardObject {
+		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid}}
+		co.Finish = "nonfoil"
+		return co
+	}
+	b := &mtgmatcher.Backend{
+		AllUUIDs: []string{"a&b", "c"},
+		UUIDs:    map[string]*mtgmatcher.CardObject{"a&b": card("a&b"), "c": card("c")},
+	}
+	ck := mtgban.InventoryRecord{}
+	ck.Add("a&b", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1.5, Quantity: 2})
+	ck.Add("c", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 26.572020469894643, Quantity: 1})
+	trend := mtgban.InventoryRecord{}
+	trend.Add("c", &mtgban.InventoryEntry{Price: 1e-7})
+	section := func(records ...mtgban.InventoryRecord) *v2Section {
+		s := &v2Section{keyOf: func(co *mtgmatcher.CardObject) string { return co.UUID }}
+		for i, record := range records {
+			s.stores = append(s.stores, newV2Store([]string{"CK", "MKMTrend"}[i], record, true, i == 0, false, nil))
+		}
+		return s
+	}
+	meta := PriceAPIMeta{
+		Date:    time.Date(2026, 10, 6, 13, 16, 3, 607275860, time.FixedZone("", -4*3600)),
+		Version: APIVersionV2,
+		BaseURL: "https://mtgban.com/go/?a=1&b=<2>",
+	}
+	for i, sections := range [][2]*v2Section{
+		{nil, nil},
+		{section(ck, trend), nil},
+		{section(), section(ck)},
+		{section(ck, trend), section(ck)},
+	} {
+		want := PriceAPIOutputV2{Meta: meta}
+		if sections[0] != nil {
+			want.Retail = collectV2(t, b, sections[0])
+		}
+		if sections[1] != nil {
+			want.Buylist = collectV2(t, b, sections[1])
+		}
+		var wantJSON, got bytes.Buffer
+		err := json.NewEncoder(&wantJSON).Encode(&want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = writeV2Response(&got, b, meta, sections[0], sections[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.String() != wantJSON.String() {
+			t.Errorf("case %d:\n got %s\nwant %s", i, got.String(), wantJSON.String())
+		}
 	}
 }
