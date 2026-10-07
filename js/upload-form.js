@@ -16,12 +16,28 @@ function enabledButtons() {
 // Buylist mode). The other tab's box carries .upload-store-hidden,
 // so :not(.upload-store-hidden) targets just the visible one and
 // leaves the hidden tab's selections untouched.
+// dispatchFormChange tells upload-presets.js something changed, since the
+// callers below set state directly and never fire a native change event.
+// storesChanged marks a change that came from the store grids themselves
+// (Select all / Clear / only / exclude), so upload-presets.js knows to
+// persist it; a plain tab switch does not, so it stays just a re-render.
+function dispatchFormChange(storesChanged) {
+    var form = document.getElementById('upload_form');
+    if (!form) return;
+    if (storesChanged) {
+        form.dispatchEvent(new CustomEvent('change', { bubbles: true, detail: { stores: true } }));
+    } else {
+        form.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
 window.setVisibleStores = function(checked) {
     var box = document.querySelector('.upload-store-grid:not(.upload-store-hidden)');
     if (!box) return;
     box.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
         if (!cb.disabled) cb.checked = checked;
     });
+    dispatchFormChange(true);
 };
 
 // "only" affordance on each store: check this store, uncheck the
@@ -64,6 +80,7 @@ document.addEventListener('click', function(e) {
     }
     // Flip the affordance to the inverse action for the next click.
     if (isExclude) { toOnly(); } else { toExclude(); }
+    dispatchFormChange(true);
 
     // Reset to plain "only" once the pointer leaves the row. Guard
     // against binding more than one pending reset during ping-pong.
@@ -75,6 +92,23 @@ document.addEventListener('click', function(e) {
         }, { once: true });
     }
 });
+
+// Re-ticks a store grid from its persisted cookie after reloadSelect rebuilds
+// it from the page-load snapshot (window.BAN_UPLOAD_FORM), which otherwise
+// shows stale ticks once a preset or a prior mode switch changed the cookie.
+// An empty or missing cookie means defaults, so the server-rendered ticks
+// are left alone.
+function retickFromCookie(boxId, cookieName) {
+    if (typeof getCookie !== 'function') return;
+    var raw = getCookie(cookieName);
+    if (!raw) return;
+    var want = raw.split('|').filter(Boolean);
+    var box = document.getElementById(boxId);
+    if (!box) return;
+    box.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        if (!cb.disabled) cb.checked = want.indexOf(cb.value) >= 0;
+    });
+}
 
 window.reloadSelect = function(mode) {
     localStorage.setItem("uploadMode", mode);
@@ -92,6 +126,7 @@ window.reloadSelect = function(mode) {
             var btn = document.getElementById(element);
             if (btn) { btn.style.display = "inline"; }
         });
+        retickFromCookie('singlesBox', mode == "buylist" ? 'enabledVendors' : 'enabledSellers');
     }
     var sealedBox = document.getElementById('sealedBox');
     if (sealedBox) {
@@ -102,6 +137,8 @@ window.reloadSelect = function(mode) {
         }
         if (!sealedBox.querySelector('input')) {
             sealedBox.innerHTML = "<span class='upload-mode-hint'>No sealed stores available for this mode.</span>";
+        } else {
+            retickFromCookie('sealedBox', mode == "buylist" ? 'enabledSealedVendors' : 'enabledSealedSellers');
         }
     }
 };
@@ -121,6 +158,7 @@ window.selectTab = function(tab) {
     if (sealedIndexRow) sealedIndexRow.classList.toggle('upload-store-hidden', !isSealed);
     if (sealedNote) sealedNote.classList.toggle('upload-store-hidden', !isSealed);
     try { localStorage.setItem('uploadTab', tab); } catch(e) {}
+    dispatchFormChange();
 };
 
 // A file dropped anywhere on the page is picked up, not just over
@@ -305,6 +343,7 @@ window.onload = (event) => {
 
     var savedTab = localStorage.getItem("uploadTab");
     selectTab(savedTab === "sealed" ? "sealed" : "singles");
+    if (window.UploadPresets) window.UploadPresets.mount(document);
 
     var gdocInput = document.getElementById('gdocURL');
     if (gdocInput) {
