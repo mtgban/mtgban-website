@@ -255,7 +255,7 @@
             '<a class="result-set-link" href="' + setQuery + '">' + icon + '</a>' +
             '<div class="result-card-info">' +
             '<div class="result-card-name-row">' +
-            '<a class="result-card-name" href="' + nameQuery + '" title="' + escapeHtml(card.n) + '">' + escapeHtml(card.n) + '</a>' +
+            '<a class="result-card-name" href="' + nameQuery + '">' + escapeHtml(card.n) + '</a>' +
             '<div class="result-badges">' + badge + '</div>' +
             '</div>' +
             '<span class="result-set-title"><a href="' + setQuery + '">' + escapeHtml(titleLine(card, set)) + '</a>' + productsLink + '</span>' +
