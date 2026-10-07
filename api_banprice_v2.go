@@ -185,6 +185,66 @@ func vendorSectionV2(b *mtgmatcher.Backend, mode string, enabledStores []string,
 	return section
 }
 
+// searchSectionV2 is a section over the cards a search found, deduplicated,
+// keyed off the sellers snapshot handed in.
+func searchSectionV2(b *mtgmatcher.Backend, mode string, cardIDs []string, sealed bool, sellers []mtgban.Seller) *v2Section {
+	return &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers), cardIDs: dedupeKeys(cardIDs), filtered: true}
+}
+
+// sellerSearchV2 is the retail section of a v2 search: the cards it found,
+// with every entry the search's store, condition and price filters keep.
+func sellerSearchV2(b *mtgmatcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
+	sellers := GetSellers()
+	section := searchSectionV2(b, mode, cardIDs, sealed, sellers)
+	for _, seller := range sellers {
+		if shouldSkipStoreNG(seller, config.StoreFilters) {
+			continue
+		}
+		info := seller.Info()
+		inventory := seller.Inventory()
+		found := map[string][]mtgban.InventoryEntry{}
+		for _, cardID := range section.cardIDs {
+			for _, entry := range inventory[cardID] {
+				if sellerEntryFound(info, cardID, entry, config) {
+					found[cardID] = append(found[cardID], entry)
+				}
+			}
+		}
+		if len(found) == 0 {
+			continue
+		}
+		withQty := !info.MetadataOnly && !info.NoQuantityInventory
+		section.stores = append(section.stores, newV2Store(info.Shorthand, found, withQty, !info.MetadataOnly, false, v2Stock(info.Shorthand)))
+	}
+	return section
+}
+
+// vendorSearchV2 is the buylist section of a v2 search.
+func vendorSearchV2(b *mtgmatcher.Backend, mode string, cardIDs []string, config SearchConfig, sealed bool) *v2Section {
+	section := searchSectionV2(b, mode, cardIDs, sealed, GetSellers())
+	for _, vendor := range GetVendors() {
+		if shouldSkipStoreNG(vendor, config.StoreFilters) {
+			continue
+		}
+		info := vendor.Info()
+		buylist := vendor.Buylist()
+		found := map[string][]mtgban.BuylistEntry{}
+		for _, cardID := range section.cardIDs {
+			for _, entry := range buylist[cardID] {
+				if vendorEntryFound(info, cardID, entry, config) {
+					found[cardID] = append(found[cardID], entry)
+				}
+			}
+		}
+		if len(found) == 0 {
+			continue
+		}
+		withQty := !info.MetadataOnly || info.QuantityPriority
+		section.stores = append(section.stores, newV2Store(info.Shorthand, found, withQty, !info.MetadataOnly, true, nil))
+	}
+	return section
+}
+
 func newV2Section(b *mtgmatcher.Backend, mode, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool, sellers []mtgban.Seller) *v2Section {
 	section := &v2Section{keyOf: v2Keyer(b, mode, sealed, sellers)}
 	section.cardIDs, section.filtered = v2Cards(b, filterByEdition, filterByHash, filterByFinish, sealed)

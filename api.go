@@ -648,9 +648,13 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	isJSON := strings.HasSuffix(r.URL.Path, ".json")
 	isCSV := strings.HasSuffix(r.URL.Path, ".csv")
+	// v2 serves v1's CSV, as its price API does
+	isV2 := strings.HasPrefix(r.URL.Path, "/api/v2/search/")
+	isAPI := isV2 || strings.HasPrefix(r.URL.Path, "/api/mtgban/search/")
+	isV2JSON := isV2 && isJSON
 
 	// Only allow JSON from a different (protected) endpoint
-	if isJSON && !strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
+	if isJSON && !isAPI {
 		pageVars := genPageNav(s, r, "Error", sig)
 		pageVars.Title = "Unauthorized"
 		pageVars.ErrorMessage = "Invalid endpoint for JSON"
@@ -695,7 +699,14 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 		enabledModes[0] = "all"
 	}
 	idOpt := r.FormValue("id")
-	if idOpt == "" {
+	if isV2JSON && idOpt != "" && !slices.Contains(v2IDModes, idOpt) {
+		out.Meta.Version = APIVersionV2
+		out.Error = fmt.Sprintf("unknown id %q, use one of %s", idOpt, strings.Join(v2IDModes, ", "))
+		json.NewEncoder(w).Encode(&out)
+		return
+	}
+	explicitID := idOpt != ""
+	if !explicitID {
 		idOpt = "scryfall"
 	}
 	tagName := r.FormValue("tag")
@@ -710,7 +721,10 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(r.FormValue("scope"))))
 	if isSealed {
 		config.SearchMode = "sealed"
-		idOpt = "mtgjson"
+		// v2 keeps an id the request asks for
+		if !isV2JSON || !explicitID {
+			idOpt = "mtgjson"
+		}
 	}
 
 	// Perform search
@@ -745,7 +759,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// is one more store filter, so the query's own still narrow within it.
 	// A site login signs API=true for the API page, which names no store.
 	storesOpt := GetParamFromSig(sig, "API")
-	if storesOpt != "" && storesOpt != "true" && strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
+	if storesOpt != "" && storesOpt != "true" && isAPI {
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
 			Name:   "store",
 			Values: fixupStoreCodeNG(strings.Join(apiEnabledStores(storesOpt), ",")),
@@ -756,21 +770,40 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// every filter the query carries (stores, conditions, prices) shapes
 	// the output instead of only the card-level ones
 	var foundSellers, foundVendors map[string]map[mtgban.Condition][]SearchEntry
+	var retailV2, buylistV2 *v2Section
 	if isRetail && canRetail {
 		cfg := config
 		if demoStores {
 			cfg.StoreFilters = demoFilter("seller", true)
 		}
-		foundSellers = searchSellersNG(allKeys, cfg)
-		out.Retail = banPricesFromRows(b, allKeys, foundSellers, idOpt, tagName, true, true, false)
+		if isV2JSON {
+			retailV2 = sellerSearchV2(b, idOpt, allKeys, cfg, isSealed)
+		} else {
+			foundSellers = searchSellersNG(allKeys, cfg)
+			out.Retail = banPricesFromRows(b, allKeys, foundSellers, idOpt, tagName, true, true, false)
+		}
 	}
 	if isBuylist && canBuylist {
 		cfg := config
 		if demoStores {
 			cfg.StoreFilters = demoFilter("vendor", false)
 		}
-		foundVendors = searchVendorsNG(allKeys, cfg)
-		out.Buylist = banPricesFromRows(b, allKeys, foundVendors, idOpt, tagName, true, true, true)
+		if isV2JSON {
+			buylistV2 = vendorSearchV2(b, idOpt, allKeys, cfg, isSealed)
+		} else {
+			foundVendors = searchVendorsNG(allKeys, cfg)
+			out.Buylist = banPricesFromRows(b, allKeys, foundVendors, idOpt, tagName, true, true, true)
+		}
+	}
+
+	if isV2JSON {
+		out.Meta.Version = APIVersionV2
+		w.Header().Set("Content-Type", "application/json")
+		err := writeV2Response(w, b, out.Meta, retailV2, buylistV2)
+		if err != nil {
+			log.Println("API v2 search write:", err)
+		}
+		return
 	}
 
 	if isJSON {
