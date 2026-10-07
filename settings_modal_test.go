@@ -73,7 +73,7 @@ func TestArbitBlockedVendorsReadsTheGrant(t *testing.T) {
 	}
 }
 
-// A tab exists only for a page in the reader's nav, in rail order, and the
+// A tab exists only for a page in the reader's nav, in nav order, and the
 // Offline tab only with the grant the Search section checked.
 func TestSettingsTabsFollowTheNav(t *testing.T) {
 	nav := func(names ...string) []NavElem {
@@ -94,9 +94,9 @@ func TestSettingsTabsFollowTheNav(t *testing.T) {
 		{"search only", nav("Search"), false, []string{"search"}},
 		{"global only", nav("Global"), false, []string{"global"}},
 		{"each arbitrage route its own tab", nav("Global", "Arbit", "Reverse"), false,
-			[]string{"arbit", "global", "reverse"}},
-		{"rail order, not nav order", nav("Sleepers", "Newspaper", "Upload", "Search"), true,
-			[]string{"search", "upload", "news", "sleep", "offline"}},
+			[]string{"global", "arbit", "reverse"}},
+		{"nav order, offline last", nav("Sleepers", "Newspaper", "Upload", "Search"), true,
+			[]string{"sleep", "news", "upload", "search", "offline"}},
 		{"pages without settings add nothing", nav("Screener", "Alerts", "Search"), false, []string{"search"}},
 	}
 	for _, c := range cases {
@@ -183,9 +183,9 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 		sig := grantSig(t, "Search", "Upload", "Arbit", "Global", "Reverse",
 			"Newspaper", "Sleepers", "SearchOfflineMode", "UploadCustom")
 		body := fetchSettingsModal(t, sig)
-		want := []string{"search", "upload", "arbit", "global", "reverse", "sleep", "offline"}
+		want := []string{"search", "sleep", "upload", "global", "arbit", "reverse", "offline"}
 		if len(GetNewspaperUUIDs()) > 0 {
-			want = []string{"search", "upload", "arbit", "global", "reverse", "news", "sleep", "offline"}
+			want = []string{"search", "news", "sleep", "upload", "global", "arbit", "reverse", "offline"}
 		}
 		if got := paneTabs(body); !slices.Equal(got, want) {
 			t.Errorf("panes = %v, want %v", got, want)

@@ -133,9 +133,6 @@ func uploadSettingsKeys(sig string) uploadModalKeys {
 	}
 }
 
-// settingsTabOrder is the rail, top to bottom.
-var settingsTabOrder = []string{"search", "upload", "arbit", "global", "reverse", "news", "sleep", "offline"}
-
 var settingsTabNames = map[string]string{
 	"search":  "Search",
 	"upload":  "Upload",
@@ -148,22 +145,16 @@ var settingsTabNames = map[string]string{
 }
 
 // settingsTabs is the rail for a reader whose navbar is nav: one tab per
-// SettingsTab it carries, plus Offline with the grant, in rail order.
+// SettingsTab it carries, in nav order, then Offline with the grant.
 func settingsTabs(nav []NavElem, offlineAllowed bool) []string {
-	have := map[string]bool{}
+	var tabs []string
 	for _, elem := range nav {
-		if elem.SettingsTab != "" {
-			have[elem.SettingsTab] = true
+		if elem.SettingsTab != "" && !slices.Contains(tabs, elem.SettingsTab) {
+			tabs = append(tabs, elem.SettingsTab)
 		}
 	}
 	if offlineAllowed {
-		have["offline"] = true
-	}
-	var tabs []string
-	for _, tab := range settingsTabOrder {
-		if have[tab] {
-			tabs = append(tabs, tab)
-		}
+		tabs = append(tabs, "offline")
 	}
 	return tabs
 }
