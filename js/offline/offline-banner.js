@@ -12,7 +12,6 @@
     var root = document.getElementById('offline-banner');
     if (!root || !window.OfflineAge) return;
     var ageEl = document.getElementById('offline-banner-age');
-    var refreshEl = document.getElementById('offline-results-refresh');
     var authEl = document.getElementById('offline-banner-auth');
     var backEl = document.getElementById('offline-banner-back');
     // The settings modal's body is fetched from /api/settings/modal, so it is
@@ -50,14 +49,8 @@
     function renderAge() {
         getLastSync().then(function (lastSync) {
             var now = Date.now();
-            var stale = OfflineAge.isStale(lastSync, now);
-            ageEl.textContent = 'Offline data: ' + OfflineAge.formatAge(lastSync, now) + (stale ? ' (stale)' : '');
-            if (refreshEl) {
-                refreshEl.textContent = lastSync
-                    ? 'Offline prices last refreshed ' + new Date(lastSync).toLocaleString() + '.'
-                    : 'Offline prices have not been refreshed on this device yet.';
-            }
-            root.classList.toggle('offline-banner-stale', stale);
+            ageEl.textContent = OfflineAge.refreshText(lastSync, now);
+            root.classList.toggle('offline-banner-stale', OfflineAge.isStale(lastSync, now));
         });
     }
 
