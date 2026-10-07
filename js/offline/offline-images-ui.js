@@ -7,6 +7,9 @@
     var imagesMap = null;
     var syncing = false;
     var pauseRequested = false;
+    // Set by a click in the picker, cleared by a sync that got everything:
+    // until then there is nothing new to download
+    var touched = false;
     var syncSelectedCount = 0;
 
     function $(id) { return document.getElementById(id); }
@@ -79,7 +82,7 @@
             root.querySelectorAll('.editions-group').forEach(function (group) {
                 groupSizeSpan(group).textContent = '';
             });
-            syncBtn.disabled = syncing || selectedCodes().length === 0;
+            paintSyncBtn(selectedCodes());
             return;
         }
         root.querySelectorAll('.editions-group').forEach(function (group) {
@@ -92,7 +95,11 @@
         });
         var codes = selectedCodes();
         estimateEl.textContent = buildEstimateText(imagesMap, codes);
-        syncBtn.disabled = syncing || codes.length === 0;
+        paintSyncBtn(codes);
+    }
+
+    function paintSyncBtn(codes) {
+        syncBtn.disabled = syncing || !touched || codes.length === 0;
     }
 
     function imgStates() {
@@ -142,6 +149,7 @@
             syncing = false;
             labelEl.textContent = 'Image sync failed: ' + (err && err.message || err);
             pauseBtn.hidden = true;
+            renderEstimates();
         });
     }
 
@@ -157,6 +165,8 @@
             syncing = false;
             pauseBtn.hidden = true;
             labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount, msg.imgFailed || 0);
+            // A pause or a failed image leaves work for the button to resume
+            if (!pauseRequested && !msg.imgFailed) touched = false;
             pauseRequested = false;
             renderEstimates();
         } else if (msg.type === 'error' && syncing) {
@@ -198,7 +208,10 @@
 
         window.EditionsPicker.init(root);
         loadSelection();
-        root.addEventListener('change', renderEstimates);
+        root.addEventListener('change', function () {
+            touched = true;
+            renderEstimates();
+        });
         syncBtn.addEventListener('click', startSync);
         pauseBtn.addEventListener('click', function () {
             pauseRequested = true;
