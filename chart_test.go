@@ -215,6 +215,32 @@ func TestMergeMultiCardDatasetsFiltersEmptyData(t *testing.T) {
 	}
 }
 
+// A roster that resolved only one card is still drawn as a roster: its lines
+// keep the card's id and their reference, which the page's legend keys on.
+func TestPlotSeriesDrawsALoneRosterCardAsARoster(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "TCG Low", Provider: timeseries.ProviderTCGLow, Color: "red"},
+	})
+	buildProviderRegistry()
+
+	day := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	series := []chartSeries{{
+		CardID: "ban:1",
+		Name:   "Card A",
+		Prices: map[string]timeseries.ProviderPrices{day: {timeseries.ProviderTCGLow: 1}},
+	}}
+	plot := plotSeries(testSite.datastore(), series, timeseries.Lookback(30), true)
+	if len(plot.datasets) != 1 {
+		t.Fatalf("got %d datasets, want 1", len(plot.datasets))
+	}
+	if got := plot.datasets[0]; got.CardID != "ban:1" || got.Reference != "TCG Low" || got.Name != "Card A" {
+		t.Errorf("dataset = %q / %q / %q, want ban:1 / TCG Low / Card A", got.CardID, got.Reference, got.Name)
+	}
+	if !slices.Equal(plot.references, []string{"TCG Low"}) {
+		t.Errorf("references = %v, want [TCG Low]", plot.references)
+	}
+}
+
 func TestMergeMultiCardDatasetsPaletteRoundRobin(t *testing.T) {
 	// One card per palette slot + two extras to force the wrap.
 	n := len(multiCardPalette) + 2

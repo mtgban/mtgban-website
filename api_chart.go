@@ -130,16 +130,9 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 		return
 	}
 
-	plot := plotSeries(ds, series, lb, len(series) > 1)
-
-	// A roster whose other ids failed to resolve still reaches a caller
-	// that keys its lines by card, so the lone series keeps its identity
-	// rather than arriving with an empty cardId.
-	if len(series) == 1 && len(ids) > 1 {
-		for i := range plot.datasets {
-			plot.datasets[i].CardID = series[0].CardID
-		}
-	}
+	// A roster is drawn as one whether or not its every id resolved, as the
+	// page that asks for the wider window drew it.
+	plot := plotSeries(ds, series, lb, len(ids) > 1)
 
 	writeChartAPIResponse(w, ChartAPIResponse{
 		MaxLookbackDays: maxDays,
