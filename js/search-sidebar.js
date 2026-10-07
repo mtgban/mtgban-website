@@ -357,3 +357,18 @@ function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasW
         productCountSpan.textContent = productsCount > 0 ? productsCount : '';
     }
 }
+
+// The sort row's chart and random links that do not fit wrap onto a line
+// search.css clips away. Make those inert as well, so a clipped link also
+// leaves the tab order and the accessibility tree.
+function markClippedSortExtras(extras) {
+    const line = extras.getBoundingClientRect();
+    extras.querySelectorAll('a').forEach(function(a) {
+        a.inert = a.getBoundingClientRect().top >= line.bottom;
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const extras = document.querySelector('.search-sort-extras');
+    if (!extras) return;
+    new ResizeObserver(function() { markClippedSortExtras(extras); }).observe(extras);
+});

@@ -119,7 +119,7 @@
             <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
             <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
         {{end}}
-        <span class="search-sort-actions">
+        <span class="search-sort-actions search-sort-extras">
             {{if and (not .DisableChart) (gt (len .AllKeys) 1) (not .ChartID) (not .ModalMode)}}
             <a class="search-sort-settings" href="/search?chart={{first_csv .AllKeys .MaxChartCards}}" title="Chart the top {{.MaxChartCards}} results"><i data-lucide="chart-line"></i></a>
             {{end}}

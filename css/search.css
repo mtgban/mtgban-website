@@ -233,6 +233,23 @@ body:has(.search-layout) {
     align-items: center;
     gap: 2px;
 }
+/* The chart and random links take what the sort pills leave on their line.
+   One that no longer fits wraps to a second line, which the fixed height
+   clips away (and search-sidebar.js makes inert), so they drop out rather
+   than crowd the pills. The empty ::before lets the first of them wrap too.
+   hidden is the fallback for Safari before 16, which has no clip. */
+.search-sort-extras {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    height: 24px;
+    overflow: hidden;
+    overflow: clip;
+}
+/* Full height, or the first line is 0px tall and a wrapped link sits 2px
+   down, nearly all of it still showing. */
+.search-sort-extras::before { content: ""; height: 100%; }
 .search-sort-settings {
     display: inline-flex;
     align-items: center;
