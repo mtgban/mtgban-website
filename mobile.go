@@ -104,3 +104,12 @@ func filterNavForMobile(nav []NavElem) []NavElem {
 	}
 	return filtered
 }
+
+// fillMobileNav marks the page for a reader the mobile templates serve and
+// trims its navigation to the pages that have one.
+func fillMobileNav(pageVars *PageVars, r *http.Request) {
+	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
+}

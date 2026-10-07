@@ -781,10 +781,7 @@ func fillSearchReader(pageVars *PageVars, r *http.Request) {
 			break
 		}
 	}
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(pageVars, r)
 
 	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
 	// store, deep-linking into the overrides builder.

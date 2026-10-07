@@ -88,10 +88,7 @@ func (s *site) APIPlans(w http.ResponseWriter, r *http.Request) {
 	// The page may be served without enforceSigning, so only a verified signature names the reader.
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "API", sig)
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 	pageVars.API = apiPlansVars(r, sig)
 	render(w, "api-plans.html", pageVars)
 }

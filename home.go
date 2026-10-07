@@ -28,10 +28,7 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(s, r, "Home", sig)
 	pageVars.ErrorMessage = message
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 
 	pageVars.PopularSearches = getPopularSearches(ds)
 

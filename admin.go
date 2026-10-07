@@ -120,10 +120,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	page := r.FormValue("page")
 	pageVars := genPageNav(s, r, "Admin", sig)
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 
 	pageVars.LastUpdate = ds.loadedAt
 	pageVars.LastNews = GetLastNewspaperUpdate()

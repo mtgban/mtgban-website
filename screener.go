@@ -461,10 +461,7 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(s, r, "Screener", sig)
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 	pageVars.Title = "Price Movers Screener"
 
 	if PricesArchiveDB == nil {

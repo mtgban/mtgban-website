@@ -1129,10 +1129,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(s, r, "Newspaper", sig)
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 
 	// Check if any DB connection was made
 	if NewNewspaperDB == nil {

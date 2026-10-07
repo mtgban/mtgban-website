@@ -190,10 +190,7 @@ func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 	// The middleware used to count this page; it no longer sees it.
 	recordPageHit(r)
 
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 
 	render(w, "upload_handoff.html", pageVars)
 }

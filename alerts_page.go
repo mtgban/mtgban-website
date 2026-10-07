@@ -31,10 +31,7 @@ type AlertsPageVars struct {
 func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 	pageVars := genPageNav(s, r, "Alerts", sig)
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
+	fillMobileNav(&pageVars, r)
 	vars := &AlertsPageVars{InviteURL: Config().Discord.InviteURL}
 	pageVars.AlertsPage = vars
 	defer render(w, "alerts.html", pageVars)
