@@ -114,12 +114,26 @@ func (s *Service) refreshManifest() {
 		return
 	}
 
-	err := s.manifestStore.Save(context.Background(), next)
-	if err != nil {
-		log.Println("offline: manifest save failed:", err)
+	if !s.saveManifest(next) {
 		return
 	}
 	log.Printf("offline: manifest refreshed in %v, %d/%d sets changed", time.Since(start), changed, len(next.Sets))
+}
+
+// saveManifest publishes next, writing it to the bucket unless the service
+// is read-only. False means the save failed and next was not published.
+func (s *Service) saveManifest(next manifestFile) bool {
+	if s.deps.ManifestReadOnly {
+		s.manifestStore.Set(next)
+		log.Println("offline: manifest kept in memory, not saved (read-only)")
+		return true
+	}
+	err := s.manifestStore.Save(context.Background(), next)
+	if err != nil {
+		log.Println("offline: manifest save failed:", err)
+		return false
+	}
+	return true
 }
 
 // serveManifest returns per-set version strings for sync diffing.

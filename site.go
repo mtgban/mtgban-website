@@ -171,6 +171,7 @@ func newSite() *site {
 		Game: func() mtgmatcher.Game { return Config().Game },
 
 		ManifestPathConfigured: func() bool { return Config().Offline.ManifestPath != "" },
+		ManifestReadOnly:       DevMode,
 		ImagesPathConfigured:   func() bool { return Config().Offline.ImagesPath != "" },
 
 		WatermarkSecret: func() []byte { return []byte(os.Getenv("BAN_SECRET")) },
