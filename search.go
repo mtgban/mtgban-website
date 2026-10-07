@@ -772,18 +772,14 @@ func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, res
 }
 
 // fillSearchReader fills what the page offers this reader: the alerts link
-// when the navbar offers alerts and their tier has an allowance, the mobile
-// navigation, and the admins' Fix toggle.
+// when the navbar offers alerts and their tier has an allowance, and the
+// admins' Fix toggle.
 func fillSearchReader(s *site, pageVars *PageVars, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	sigParams := parseSig(sig)
 	if navOffers(s, sigParams, "Alerts") {
 		pageVars.CanAlerts = alertAllowance(sigParams) > 0
-	}
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
 	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
