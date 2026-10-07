@@ -49,6 +49,17 @@ test('syncStatusText prefers last sync date even while a later sync is running',
         .toBe('last sync ' + new Date(iso).toLocaleString());
 });
 
+// --- Finished-sync status line ---
+
+test('doneStatusText reads the first sync as setup, later ones as updates', () => {
+    const first = { lastSync: null };
+    const later = { lastSync: '2026-07-11T12:00:00Z' };
+    expect(OfflineMode.doneStatusText({ changedSets: 42 }, first, true)).toBe('Ready offline - sync images to display pictures while offline');
+    expect(OfflineMode.doneStatusText({ changedSets: 42 }, first, false)).toBe('Ready offline');
+    expect(OfflineMode.doneStatusText({ changedSets: 0 }, later, true)).toBe('Up to date');
+    expect(OfflineMode.doneStatusText({ changedSets: 1 }, later, true)).toBe('Updated 1 set');
+});
+
 // --- Leave-site guard ---
 
 // Runs one sync and reports whether it left a beforeunload listener behind.
