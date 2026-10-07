@@ -3,7 +3,7 @@
     'use strict';
 
     var PREF_KEY = 'offline_img_editions';
-    var root, estimateEl, storageEl, syncBtn, pauseBtn, progressEl, fillEl, labelEl;
+    var root, estimateEl, syncBtn, pauseBtn, progressEl, fillEl, labelEl;
     var imagesMap = null;
     var syncing = false;
     var pauseRequested = false;
@@ -25,9 +25,6 @@
             : 'No editions selected: no images will be downloaded.';
         if (est.missing.length) text += ' (' + est.missing.length + ' without images yet)';
         return text;
-    }
-    function buildStorageText(usage, quota) {
-        return 'Storage: ' + fmt(usage || 0) + ' used of ' + fmt(quota || 0);
     }
     function buildDoneMessage(paused, missingCount, selectedCount, failedCount) {
         if (paused) return 'Paused. Sync Images Now resumes where it left off.';
@@ -98,13 +95,6 @@
         syncBtn.disabled = syncing || codes.length === 0;
     }
 
-    function renderStorage() {
-        if (!(navigator.storage && navigator.storage.estimate)) return;
-        navigator.storage.estimate().then(function (est) {
-            storageEl.textContent = buildStorageText(est.usage, est.quota);
-        });
-    }
-
     function imgStates() {
         return window.OfflineDB.getAllRows('imgstate').then(function (rows) {
             var map = {};
@@ -169,7 +159,6 @@
             labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount, msg.imgFailed || 0);
             pauseRequested = false;
             renderEstimates();
-            renderStorage();
         } else if (msg.type === 'error' && syncing) {
             syncing = false;
             pauseBtn.hidden = true;
@@ -177,7 +166,7 @@
             labelEl.textContent = 'Sync stopped: ' + msg.message +
                 (msg.stage ? ' (' + msg.stage + ')' : '');
             renderEstimates();
-            renderStorage();
+            window.OfflineMode.refreshUsage();
         }
     }
 
@@ -186,7 +175,6 @@
         progressPct: progressPct,
         quotaExceeded: quotaExceeded,
         buildEstimateText: buildEstimateText,
-        buildStorageText: buildStorageText,
         buildDoneMessage: buildDoneMessage,
         init: init,
     };
@@ -202,7 +190,6 @@
         picker.dataset.wired = '1';
         root = picker;
         estimateEl = $('offline-img-estimate');
-        storageEl = $('offline-img-storage');
         syncBtn = $('offline-img-sync-btn');
         pauseBtn = $('offline-img-pause-btn');
         progressEl = $('offline-img-progress');
@@ -229,12 +216,10 @@
                     loadSelection();
                     fetchManifest();
                     renderEstimates();
-                    renderStorage();
+                    window.OfflineMode.refreshUsage();
                 });
             }
         }
-        renderStorage();
-
         // The body arrives when the modal opens, so do what the gear's
         // click did on the first open
         loadSelection();

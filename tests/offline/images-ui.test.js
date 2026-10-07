@@ -88,13 +88,6 @@ test('progressPct returns 100 when total is zero', () => {
     expect(UI.progressPct(0, 0)).toBe(100);
 });
 
-// --- Storage label assembly ---
-
-test('buildStorageText formats storage estimate', () => {
-    expect(UI.buildStorageText(50000000, 1000000000)).toBe('Storage: 50 MB used of 1 GB');
-    expect(UI.buildStorageText(0, 0)).toBe('Storage: 0 B used of 0 B');
-});
-
 // --- Quota preflight math (mirrors startSync logic) ---
 
 test('quotaExceeded returns true when not enough free space', () => {

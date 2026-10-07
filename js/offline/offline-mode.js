@@ -67,7 +67,10 @@
             OfflineDB.getMeta('imgCount').then(function(n) { state.imgCount = n || 0; })
         ];
         if (navigator.storage && navigator.storage.estimate) {
-            ops.push(navigator.storage.estimate().then(function(est) { state.bytes = est.usage || 0; }));
+            ops.push(navigator.storage.estimate().then(function(est) {
+                state.bytes = est.usage || 0;
+                state.quota = est.quota || 0;
+            }));
         }
         return Promise.all(ops).catch(function() {});
     }
@@ -307,7 +310,14 @@
         if (!usage) return;
         if (!enabled()) { usage.textContent = ''; return; }
         var s = status();
-        usage.textContent = 'Using ' + fmtBytes(s.bytes) + ', ' + syncStatusText(s);
+        var of = s.quota ? ' of ' + fmtBytes(s.quota) : '';
+        usage.textContent = 'Using ' + fmtBytes(s.bytes) + of + ', ' + syncStatusText(s);
+    }
+
+    // Re-measures and repaints the usage line, for the modal reopening or a
+    // sync that ended without a done message.
+    function refreshUsage() {
+        return refreshStatus().then(paintUsage);
     }
 
     // Inline lucide cloud-off; conveys offline data at a glance.
@@ -480,6 +490,7 @@
         status: status,
         syncStatusText: syncStatusText,
         doneStatusText: doneStatusText,
+        refreshUsage: refreshUsage,
         initSettingsUI: initSettingsUI,
     };
 
