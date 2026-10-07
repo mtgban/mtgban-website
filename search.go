@@ -1440,23 +1440,36 @@ func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher
 		result.sellers[cardID]["INDEX"] = tmp
 
 		if pageVars.ListingLocked {
-			for j, foundSet := range []map[string]map[mtgban.Condition][]SearchEntry{result.sellers, result.vendors} {
-				for cond := range foundSet[cardID] {
-					// Index/reference prices stay visible to everyone.
-					if cond == "INDEX" {
-						continue
-					}
-					entries := foundSet[cardID][cond]
-					for i := range entries {
-						if j == 0 && !slices.Contains(Affiliates().List, entries[i].Shorthand) {
-							entries[i].Locked = true
-						} else if j == 1 && !slices.Contains(Affiliates().BuylistList, entries[i].Shorthand) {
-							entries[i].Locked = true
-						}
-					}
-				}
-			}
+			hide := Config().SearchHideNonAffiliates
+			gateNonAffiliates(result.sellers[cardID], Affiliates().List, hide)
+			gateNonAffiliates(result.vendors[cardID], Affiliates().BuylistList, hide)
 		}
+	}
+}
+
+// gateNonAffiliates locks, in one card's offers for a logged-out reader,
+// every entry whose store is not in affiliates; with hide, it removes them
+// instead, and a condition left with none. Index/reference prices stay
+// visible to everyone.
+func gateNonAffiliates(conds map[mtgban.Condition][]SearchEntry, affiliates []string, hide bool) {
+	for cond, entries := range conds {
+		if cond == "INDEX" {
+			continue
+		}
+		if !hide {
+			for i := range entries {
+				entries[i].Locked = !slices.Contains(affiliates, entries[i].Shorthand)
+			}
+			continue
+		}
+		entries = slices.DeleteFunc(entries, func(entry SearchEntry) bool {
+			return !slices.Contains(affiliates, entry.Shorthand)
+		})
+		if len(entries) == 0 {
+			delete(conds, cond)
+			continue
+		}
+		conds[cond] = entries
 	}
 }
 

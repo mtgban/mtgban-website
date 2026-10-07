@@ -124,6 +124,10 @@ type ConfigType struct {
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
+	// SearchHideNonAffiliates leaves the stores that are not affiliates out
+	// of a logged-out search, rather than listing them locked.
+	SearchHideNonAffiliates bool `json:"search_hide_non_affiliates"`
+
 	// ACL and the Patreon grants each live in their own file; a path may be
 	// shared between deployments or belong to one, which is a choice about
 	// the data, not the code. AffiliatesPath does the same for the
