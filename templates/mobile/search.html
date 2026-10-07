@@ -552,6 +552,8 @@
                                 {{$pauseNote := and (eq $entry.Shorthand "CKBLLast") (eq $conditions "NM") $card.CKPauseTip}}
                                 {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM")) $ckNote $pauseNote}}
                                 {{$mState := buylist_state $entry.Shorthand $conditions $entry.IsOffer $entry.Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
+                                {{/* A price that looks off is never one to take. */}}
+                                {{if and (eq $entry.Shorthand "TCGDirectNet") (invalid_direct $cardId $entry.Price)}}{{$mState = ""}}{{end}}
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
