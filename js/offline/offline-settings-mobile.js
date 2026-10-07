@@ -74,7 +74,7 @@
             if (m.type === 'progress') {
                 paintStatus('Syncing: ' + m.stage + ' ' + m.done + '/' + m.total);
             } else if (m.type === 'done') {
-                paintStatus('Synced, ' + m.changedSets + ' sets updated');
+                paintStatus(OfflineMode.doneStatusText(m, OfflineMode.status()));
                 paintUsage();
             } else if (m.type === 'error') {
                 paintStatus('Sync error: ' + m.message);

@@ -714,6 +714,18 @@ body.settings-open {
 .offline-img-progress-label { font-size: 0.85em; opacity: 0.8; }
 .offline-img-storage { font-size: 0.85em; opacity: 0.7; margin-top: 0.5em; }
 
+/* A status line, not prose: set apart from the descriptions around it */
+.offline-sync-status {
+    margin: 0.5em 0;
+    padding: 0.35em 0.7em;
+    border-left: 3px solid var(--settings-blue);
+    border-radius: var(--radius-sm, 0.4em);
+    background: color-mix(in srgb, var(--settings-blue) 10%, transparent);
+    font-size: 0.85em;
+    font-variant-numeric: tabular-nums;
+}
+.offline-sync-status:empty { display: none; }
+
 .offline-auth-notice {
     margin: 0.5em 0;
     padding: 0.5em 0.8em;

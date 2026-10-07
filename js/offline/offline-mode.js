@@ -207,9 +207,20 @@
         syncWorker.onerror = function(e) {
             setSyncing(false);
             syncWorker = null;
-            setSyncStatus('sync failed: ' + (e.message || 'worker error'));
+            setSyncStatus('Sync failed: ' + (e.message || 'worker error'));
         };
         return syncWorker;
+    }
+
+    // What a finished sync says. Read before lastSync is written, so the
+    // first sync on this device (or after a wipe) reads as the setup it is;
+    // imageHint is for a page that offers the image sync.
+    function doneStatusText(m, s, imageHint) {
+        if (!s.lastSync) {
+            return imageHint ? 'Ready offline - sync images to display pictures while offline' : 'Ready offline';
+        }
+        var n = m.changedSets || 0;
+        return n ? 'Updated ' + n + (n === 1 ? ' set' : ' sets') : 'Up to date';
     }
 
     function onSyncMessage(ev) {
@@ -219,22 +230,23 @@
             if (m.stage !== 'manifest' && state.authLapsed) setAuthLapsed(false);
             var label = m.stage + ' ' + m.done + '/' + m.total;
             if (m.code) label += ' (' + m.code + ')';
-            setSyncStatus('syncing: ' + label);
+            setSyncStatus('Syncing: ' + label);
         } else if (m.type === 'done') {
             setSyncing(false);
             state.bytes = m.bytes || 0;
+            var done = doneStatusText(m, state, true);
             OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
                 updateAuthNotice();
-                setSyncStatus('synced, ' + m.changedSets + ' sets updated');
+                setSyncStatus(done);
                 paintUsage();
             });
         } else if (m.type === 'error') {
             setSyncing(false);
             if (m.message === 'forbidden') {
                 setAuthLapsed(true);
-                setSyncStatus('sync stopped: offline access expired');
+                setSyncStatus('Sync stopped: offline access expired');
             } else {
-                setSyncStatus('sync error at ' + m.stage + ': ' + m.message);
+                setSyncStatus('Sync error at ' + m.stage + ': ' + m.message);
             }
         }
     }
@@ -246,7 +258,7 @@
         if (syncing || !enabled()) return;
         var withImages = !!(opts && opts.images);
         setSyncing(true, withImages);
-        setSyncStatus('syncing: starting');
+        setSyncStatus('Syncing: starting');
         Promise.all([
             OfflineDB.getMeta('storesSel'),
             OfflineDB.getMeta('editionsSel'),
@@ -261,7 +273,7 @@
             });
         }).catch(function(err) {
             setSyncing(false);
-            setSyncStatus('sync error: ' + err);
+            setSyncStatus('Sync error: ' + err);
         });
     }
 
@@ -353,7 +365,7 @@
     // per-edition rows, so those are dropped here to give the diff work to do.
     function forceResync() {
         if (syncing || !enabled()) return Promise.resolve();
-        setSyncStatus('syncing: starting');
+        setSyncStatus('Syncing: starting');
         return OfflineDB.getAllRows('imgstate').then(function (rows) {
             return Promise.all(rows.map(function (r) {
                 return OfflineDB.deleteRow('imgstate', r.code);
@@ -372,13 +384,13 @@
             syncWorker = null;
         }
         setSyncing(false);
-        setSyncStatus('deleting offline data...');
+        setSyncStatus('Deleting offline data...');
         return cleanupLocal().then(function () {
             state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
-            setSyncStatus('offline data deleted');
+            setSyncStatus('Offline data deleted');
             paintUsage();
         }).catch(function (err) {
-            setSyncStatus('delete failed: ' + (err && err.message || err));
+            setSyncStatus('Delete failed: ' + (err && err.message || err));
             throw err;
         });
     }
@@ -420,7 +432,7 @@
                 var btn = document.getElementById('nav-offline-toggle');
                 if (btn) btn.remove();
             }).catch(function (err) {
-                setSyncStatus('offline mode: ' + (err && err.message || err));
+                setSyncStatus('Offline mode: ' + (err && err.message || err));
             }).then(function () {
                 toggle.disabled = false;
                 paint();
@@ -462,6 +474,7 @@
         releaseUnloadGuard: releaseUnloadGuard,
         status: status,
         syncStatusText: syncStatusText,
+        doneStatusText: doneStatusText,
         initSettingsUI: initSettingsUI,
     };
 
