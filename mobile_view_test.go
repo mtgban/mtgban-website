@@ -1,11 +1,16 @@
 package main
 
 import (
+	"html/template"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
 
@@ -76,5 +81,72 @@ func TestSearchOffersAlertsOnAPhone(t *testing.T) {
 	fillSearchReader(s, &pageVars.SearchVars, req)
 	if !pageVars.CanAlerts {
 		t.Error("a phone whose navbar leaves Alerts out gets no alerts link")
+	}
+}
+
+// A phone's settings drawer lists the stores to sort by. The desktop page
+// leaves them to its settings modal, which asks for its own.
+func TestMobileSearchListsTheStores(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+	publishStores(t,
+		[]mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})},
+		[]mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"})})
+
+	req := httptest.NewRequest(http.MethodGet, "/search?q=Counterspell", nil)
+	req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
+	w := httptest.NewRecorder()
+	testSite.Search(w, req)
+	for _, store := range []string{"TCGMarket", "CK"} {
+		if !strings.Contains(w.Body.String(), `<option value="`+store+`">`) {
+			t.Errorf("the phone's settings drawer does not list %s", store)
+		}
+	}
+}
+
+// The desktop search page builds no store lists: its settings modal asks for
+// its own. A stub stands in for the page's template to print what it was given.
+func TestSearchListsTheStoresOnlyForAPhone(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, false, false)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+	publishStores(t,
+		[]mtgban.Seller{mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})},
+		[]mtgban.Vendor{mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"})})
+	prevCache := TemplateCache
+	t.Cleanup(func() { TemplateCache = prevCache })
+	stub := template.Must(template.New("search.html").Parse(`{{len .SellerKeys}} {{len .VendorKeys}}`))
+	TemplateCache = map[string]*template.Template{"search.html": stub, "mobile/search.html": stub}
+
+	for _, c := range []struct {
+		reader string
+		mobile bool
+		want   string
+	}{
+		{"a desktop", false, "0 0"},
+		{"a phone", true, "1 1"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/search?q=Counterspell", nil)
+		if c.mobile {
+			req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
+		}
+		w := httptest.NewRecorder()
+		testSite.Search(w, req)
+		if got := w.Body.String(); got != c.want {
+			t.Errorf("%s: the page got %q store keys, want %q", c.reader, got, c.want)
+		}
 	}
 }
