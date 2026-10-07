@@ -432,9 +432,8 @@
                             {{$firstName = $card.Name}}
                         {{end}}
 
-                            <div class="result-header-cover" style="z-index: {{$i}}"></div>
+                            <div class="result-header-cover"></div>
                             <div class="result-header{{if eq $i 0}} result-first{{end}}"
-                                 style="z-index: {{inc $i 100}}"
                                  data-card-id="{{$cardId}}"
                                  data-chart-id="{{$card.ChartID}}"
                                  data-card-name="{{$card.Name}}"

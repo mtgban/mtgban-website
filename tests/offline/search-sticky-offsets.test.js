@@ -336,3 +336,39 @@ test('the editions panel is placed by the script, since the stylesheet stopped p
     // top - the bug this rule exists to prevent.
     expect(sidebarSrc).toContain('filter.focus({ preventScroll: true })');
 });
+
+// The body of the first `@media (max-width: 900px)` block, braces matched.
+function phoneBlock() {
+    const start = css.indexOf('@media (max-width: 900px) {');
+    expect(start, 'expected a @media (max-width: 900px) block').toBeGreaterThan(0);
+    let depth = 0;
+    for (let i = css.indexOf('{', start); i < css.length; i++) {
+        if (css[i] === '{') depth++;
+        else if (css[i] === '}' && --depth === 0) return css.slice(start, i);
+    }
+    throw new Error('unterminated @media (max-width: 900px) block');
+}
+
+test('result headers stack under the phone sort bar', () => {
+    // Headers pin inside the sticky sort bar's band below 900px, so the bar
+    // has to outrank all of them, the one holding an open menu included.
+    const z = selector => Number(declaration(selector, 'z-index'));
+    const sidebar = phoneBlock().match(/\.search-sidebar\s*\{[^}]*z-index:\s*(\d+)/);
+    expect(sidebar, 'expected .search-sidebar to set a z-index below 900px').toBeTruthy();
+    expect(z('.result-header-cover')).toBeLessThan(z('.result-header'));
+    expect(z('.result-header')).toBeLessThan(z('.result-header:has(.qi-open)'));
+    expect(z('.result-header:has(.qi-open)')).toBeLessThan(Number(sidebar[1]));
+});
+
+test('headers and covers take their z-index from the stylesheet alone', () => {
+    // An inline per-card value (once 100 + the card's index) climbs past
+    // the sort bar's on a long page, whatever the stylesheet says.
+    for (const file of ['templates/search.html', 'js/offline/offline-render.js']) {
+        const src = fs.readFileSync(path.join(__dirname, '../..', file), 'utf8');
+        const start = src.indexOf('class="result-header-cover"');
+        const end = src.indexOf('class="result-set-link"', start);
+        expect(start, `expected the cover markup in ${file}`).toBeGreaterThan(0);
+        expect(end, `expected the header markup in ${file}`).toBeGreaterThan(start);
+        expect(src.slice(start, end), `inline z-index on a header or cover in ${file}`).not.toContain('z-index');
+    }
+});
