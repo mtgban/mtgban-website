@@ -593,12 +593,12 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := ACL()["Any"]
 		if checkNoAuth {
-			for _, nav := range ExtraNavs {
+			for key, nav := range ExtraNavs {
 				if nav.Link == r.URL.Path || slices.ContainsFunc(nav.SubPages, func(p NavElem) bool {
 					// Check prefix because Link may contain query params
 					return strings.HasPrefix(p.Link, r.URL.Path)
 				}) {
-					_, noAuth := ACL()["Any"][nav.Name]
+					_, noAuth := ACL()["Any"][key]
 					if noAuth {
 						recordPageHit(r)
 						noSigning(next).ServeHTTP(w, r)
