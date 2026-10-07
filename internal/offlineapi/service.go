@@ -73,6 +73,11 @@ type Deps struct {
 	ManifestPathConfigured func() bool
 	ImagesPathConfigured   func() bool
 
+	// ManifestReadOnly keeps refreshed manifests in memory and never writes
+	// them to ManifestBucket. Set for -dev, which may read a deployment's
+	// manifest but must not replace it with one built from local prices.
+	ManifestReadOnly bool
+
 	WatermarkSecret func() []byte
 
 	RetailBlockList  func() []string

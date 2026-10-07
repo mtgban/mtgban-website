@@ -74,6 +74,36 @@ func TestRefreshDoesNotSaveAnEmptyManifest(t *testing.T) {
 	}
 }
 
+// A read-only service (the site under -dev) publishes a refreshed manifest
+// in memory and leaves the bucket's copy alone.
+func TestReadOnlyManifestIsNotWritten(t *testing.T) {
+	s, dir := newTestService(t)
+	s.deps.ManifestReadOnly = true
+	t.Cleanup(func() { s.manifestStore.Set(manifestFile{}) })
+
+	next := manifestFile{Sets: map[string]setVersion{
+		"NEO": {Fingerprint: "abc123", Version: "2026-08-26T14:20:01Z"},
+	}}
+	if !s.saveManifest(next) {
+		t.Fatal("saveManifest reported a failure")
+	}
+	if got := s.manifestStore.Get(); got.Sets["NEO"].Version != "2026-08-26T14:20:01Z" {
+		t.Errorf("manifest = %+v, want the new one published", got.Sets)
+	}
+	_, err := os.Stat(filepath.Join(dir, "offline-manifest.json"))
+	if !os.IsNotExist(err) {
+		t.Errorf("manifest file stat = %v, want it never written", err)
+	}
+
+	s.deps.ManifestReadOnly = false
+	if !s.saveManifest(next) {
+		t.Fatal("saveManifest reported a failure")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "offline-manifest.json")); err != nil {
+		t.Errorf("a writable service did not write the manifest: %v", err)
+	}
+}
+
 // emptySeller is a scraper that has loaded but holds no prices yet.
 type emptySeller struct{}
 
