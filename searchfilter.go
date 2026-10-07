@@ -2496,10 +2496,6 @@ func cardFilterIs(b *mtgmatcher.Backend, filters []string, co *mtgmatcher.CardOb
 			if co.FrameVersion == "future" {
 				return false
 			}
-		case "retro", "old":
-			if co.FrameVersion == "1993" || co.FrameVersion == "1997" {
-				return false
-			}
 		case "reskin":
 			if co.FlavorName != "" {
 				return false

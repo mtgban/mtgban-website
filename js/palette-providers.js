@@ -298,7 +298,6 @@
         { value: 'showcase', label: 'Showcase', sublabel: 'sc', group: 'Frame' },
         { value: 'borderless', label: 'Borderless', sublabel: 'bd', group: 'Frame' },
         { value: 'reskin', label: 'Reskin', group: 'Frame' },
-        { value: 'retro', label: 'Retro frame', sublabel: 'old', group: 'Frame' },
         { value: 'future', label: 'Future frame', group: 'Frame' },
         { value: 'japanese', label: 'Japanese', sublabel: 'jp', group: 'Language' },
         { value: 'phyrexian', label: 'Phyrexian', sublabel: 'ph', group: 'Language' },
