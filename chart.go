@@ -382,6 +382,58 @@ func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []st
 	return datasets
 }
 
+// chartPlot is what a chart draws from its series: the date axis, the
+// datasets projected onto it, the references a roster's lines are grouped by,
+// and the checkpoints inside it. It is empty, with a nil axis, when there is
+// no series to start an axis from.
+type chartPlot struct {
+	axis        []string
+	datasets    []Dataset
+	references  []string
+	checkpoints []ChartCheckpoint
+}
+
+// plotSeries draws series, fetched over lb, as one chart, for the page and the
+// API alike. multi says it is a roster's: the lines are keyed by card and
+// reference, and the checkpoints are the roster's together.
+func plotSeries(ds *datastore, series []chartSeries, lb timeseries.Lookback, multi bool) chartPlot {
+	// The axis starts at the oldest date the fetched series hold, so it
+	// needs no query of its own.
+	var earliest time.Time
+	for _, cs := range series {
+		e := earliestChartedDate(cs.Prices, lb)
+		if !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+			earliest = e
+		}
+	}
+	if earliest.IsZero() {
+		return chartPlot{}
+	}
+
+	plot := chartPlot{axis: getDateAxisValues(earliest)}
+	cards := make([]multiCardInput, len(series))
+	for i, cs := range series {
+		cards[i] = multiCardInput{
+			CardID:   cs.CardID,
+			Name:     cs.Name,
+			Datasets: chartDatasetsFrom(cs.Prices, plot.axis),
+		}
+	}
+	if multi {
+		plot.datasets, plot.references = mergeMultiCardDatasets(cards)
+		names := make([]string, len(cards))
+		for i, card := range cards {
+			names[i] = card.Name
+		}
+		plot.checkpoints = multiCardCheckpoints(ds, names, earliest)
+	} else {
+		plot.datasets = cards[0].Datasets
+		// Checkpoints match set releases by card name; a non-Magic name matches none.
+		plot.checkpoints = relevantCheckpoints(ds, cards[0].Name, earliest)
+	}
+	return plot
+}
+
 // ChartPoint is one plotted value, or a gap. Gaps outnumber prices on a long
 // chart, so the encoding is over half the payload: null is four bytes and is
 // Chart.js's own gap value, where the old "Number.NaN" string cost thirteen.
