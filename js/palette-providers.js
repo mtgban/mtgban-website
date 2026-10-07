@@ -571,7 +571,7 @@
         return Promise.resolve(offlineMeta('catalogSets')).then(function (catalog) {
             var sets = Object.keys(catalog || {}).map(function (code) {
                 var set = catalog[code];
-                return { code: code, name: set.n, keyrune: set.k, released: set.d };
+                return { code: code, name: set.n, keyrune: set.k, released: set.d, mark: set.m };
             });
             sets.sort(function (a, b) {
                 var da = a.released || '';
@@ -598,7 +598,8 @@
                     value: s.code,
                     label: s.name,
                     sublabel: s.code + (s.released ? ' \xb7 ' + s.released.substring(0, 4) : ''),
-                    keyrune: s.keyrune || ''
+                    keyrune: s.keyrune || '',
+                    mark: s.mark || ''
                 });
             }
             if (ctx && ctx.cardMeta && ctx.cardMeta.printings) {

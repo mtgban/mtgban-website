@@ -85,6 +85,25 @@ test('the server answers for the sets whenever it can', async () => {
     expect(opened).toEqual([]);
 });
 
+test('a set carries the mark the server gives its symbol', async () => {
+    const served = { '/api/palette/sets.json': [
+        { code: 'THB', name: 'Theros Beyond Death', keyrune: 'thb' },
+        { code: 'PTHB', name: 'Theros Beyond Death Promos', keyrune: 'thb', mark: '★' },
+    ] };
+    const { providers } = load(served, {}, false);
+    await values(providers, 's:');
+    const marks = {};
+    for (const c of providers.getProvider('s:').getCandidates('')) marks[c.value] = c.mark;
+    expect(marks).toEqual({ THB: '', PTHB: '★' });
+});
+
+test("offline, a set carries the catalog's mark", async () => {
+    const sets = { FBB: { n: 'Foreign Black Border', k: '3ed', d: '1994-04-01', m: 'BB' } };
+    const { providers } = load(null, { catalogSets: sets }, true);
+    await values(providers, 's:');
+    expect(providers.getProvider('s:').getCandidates('')[0].mark).toBe('BB');
+});
+
 // The rarity menu is the loaded game's, rarest first, with the letter that
 // names a rarity alone beside it.
 const lorcanaRarities = [
