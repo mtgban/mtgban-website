@@ -87,6 +87,21 @@ func TestAnyTierPageIsInNavForEveryone(t *testing.T) {
 	}
 }
 
+// A page open to everyone names no user in the navbar, found in the ACL by
+// its registry key as navOffers and the signing gate find it.
+func TestAnyTierPageNamesNoUser(t *testing.T) {
+	anyTierNav(t, "")
+	for _, c := range []struct{ page, user string }{
+		{"Open (Beta)", ""},
+		{"Gated", "Anonymous"},
+	} {
+		got := genPageNav(testSite, nil, c.page, "").UserNav.Short
+		if got != c.user {
+			t.Errorf("%s: user %q, want %q", c.page, got, c.user)
+		}
+	}
+}
+
 // The navbar offers no page the registry lacks, such as a misspelt name,
 // even on a development build, which offers every page it has.
 func TestNavOffersNoUnknownPage(t *testing.T) {

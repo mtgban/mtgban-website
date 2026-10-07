@@ -448,7 +448,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		if !showPatreonLogin {
 			user = "Anonymous"
 		}
-		_, noAuth := ACL()["Any"][pageVars.Nav[mainNavIndex].Name]
+		_, noAuth := ACL()["Any"][navKey(activeTab)]
 		if noAuth {
 			user = ""
 		}
@@ -456,6 +456,22 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 	pageVars.UserNav = &NavElem{Short: user}
 	return pageVars
+}
+
+// navKey returns the registry key of the page named name, the key the ACL
+// and the signature know it by; a subpage answers with its section's key.
+func navKey(name string) string {
+	for key, nav := range ExtraNavs {
+		if nav.Name == name {
+			return key
+		}
+		for _, subPage := range nav.SubPages {
+			if subPage.Name == name {
+				return key
+			}
+		}
+	}
+	return ""
 }
 
 // navOffers reports whether the navbar offers the page feat to the reader
