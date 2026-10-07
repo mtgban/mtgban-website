@@ -48,6 +48,10 @@ type NavElem struct {
 	// Allow to receive POST requests
 	CanPOST bool
 
+	// Keep the desktop layout on a phone: the page has no mobile template,
+	// and its tables need the width.
+	DesktopOnly bool
+
 	// Alternative endpoints connected to this handler
 	SubPages []NavElem
 
@@ -215,6 +219,7 @@ func init() {
 			Page:        "upload.html",
 			SettingsTab: "upload",
 			CanPOST:     true,
+			DesktopOnly: true,
 		},
 		"Global": {
 			Name:        "Global",
@@ -224,6 +229,7 @@ func init() {
 			Handle:      (*site).Global,
 			Page:        "arbit.html",
 			SettingsTab: "global",
+			DesktopOnly: true,
 		},
 		"Arbit": {
 			Name:        "Arbitrage",
@@ -233,6 +239,7 @@ func init() {
 			Handle:      (*site).Arbit,
 			Page:        "arbit.html",
 			SettingsTab: "arbit",
+			DesktopOnly: true,
 		},
 		"Reverse": {
 			Name:        "Reverse",
@@ -242,6 +249,7 @@ func init() {
 			Handle:      (*site).Reverse,
 			Page:        "arbit.html",
 			SettingsTab: "reverse",
+			DesktopOnly: true,
 		},
 		"Alerts": {
 			Name:        "Alerts",
@@ -455,7 +463,28 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	}
 
 	pageVars.UserNav = &NavElem{Short: user}
+
+	// A phone gets the mobile layout, and a navbar of the pages that have
+	// one, unless the page is desktop only. A request for no page keeps
+	// every entry: the settings modal reads the nav alone, and opens on
+	// desktop-only pages too. Without a request there is no phone to ask.
+	if r != nil && activeTab != "" && !desktopOnly(activeTab) {
+		pageVars.IsMobile = isMobileRequest(r)
+		if pageVars.IsMobile {
+			pageVars.Nav = filterNavForMobile(pageVars.Nav)
+		}
+	}
+
 	return pageVars
+}
+
+// desktopOnly reports whether the page named activeTab keeps its desktop
+// layout on a phone. It reads the page registry, not the reader's navbar,
+// so a page the reader may not open, answered with its BANned notice,
+// keeps the desktop layout too.
+func desktopOnly(activeTab string) bool {
+	nav, found := ExtraNavs[navKey(activeTab)]
+	return found && nav.DesktopOnly
 }
 
 // navKey returns the registry key of the page named name, the key the ACL
