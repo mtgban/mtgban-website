@@ -61,6 +61,11 @@ test('keyrune icon when set.k present', () => {
     expect(html).toContain('class="ss ss-neo ss-rare ss-fw"');
 });
 
+test('a set with a mark draws it on its keyrune icon', () => {
+    const ctx = Object.assign({}, CTX, {sets: {NEO: {n: 'Kamigawa: Neon Dynasty Promos', k: 'neo', m: '★'}}});
+    expect(R.buildHTML([result()], ctx)).toContain('class="ss ss-neo ss-rare ss-fw" data-mark="★"');
+});
+
 test('set-code span fallback when no keyrune', () => {
     const ctx = Object.assign({}, CTX, {sets: {}});
     const html = R.buildHTML([result()], ctx);

@@ -4,7 +4,7 @@
 
     var S = root.OfflineRenderShared;
     var CONDITIONS = S.CONDITIONS, INDEX_PAIRS = S.INDEX_PAIRS;
-    var money = S.money, keyruneClasses = S.keyruneClasses, finishPrice = S.finishPrice,
+    var money = S.money, keyruneClasses = S.keyruneClasses, markAttr = S.markAttr, finishPrice = S.finishPrice,
         condPrices = S.condPrices, storeName = S.storeName, isIndex = S.isIndex,
         rowComparator = S.rowComparator, refRetail = S.refRetail, noticesHTML = S.noticesHTML;
 
@@ -28,7 +28,7 @@
         var card = res.card;
         var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.webp' : '';
         var icon = res._setKey
-            ? '<i class="ss ss-' + escapeHtml(res._setKey) + keyruneClasses(card) + ' ss-fw"></i>'
+            ? '<i class="ss ss-' + escapeHtml(res._setKey) + keyruneClasses(card) + ' ss-fw"' + res._setMark + '></i>'
             : '<span>' + escapeHtml(card.set) + '</span>';
         var finish = '';
         if (card.e) finish = '<span class="m-badge etched">Etched</span>';
@@ -244,6 +244,7 @@
         var card = res.card;
         var set = ctx.sets[card.set] || {};
         res._setKey = set.k || '';
+        res._setMark = markAttr(set);
         var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.webp' : '';
         var sData = condGroupsForSellers(res, ctx);
         var bData = condGroupsForBuyers(res, ctx);
