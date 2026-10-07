@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -82,5 +83,14 @@ func TestAnyTierPageIsInNavForEveryone(t *testing.T) {
 	}
 	if strings.Contains(joined, "OpenSub") || strings.Contains(joined, "Gated") {
 		t.Errorf("nav %s shows a hidden sub-page or a gated page to an anonymous reader", joined)
+	}
+}
+
+// The navbar offers no page the registry lacks, such as a misspelt name,
+// even on a development build, which offers every page it has.
+func TestNavOffersNoUnknownPage(t *testing.T) {
+	withSigMode(t, true, false)
+	if navOffers(testSite, url.Values{}, "NoSuchPage") {
+		t.Error("the navbar offers a page the registry lacks")
 	}
 }
