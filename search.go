@@ -547,7 +547,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
 
 	fillSearchSettings(&pageVars.SearchVars, r, b)
-	pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
+	// Only the mobile page lists the stores in its own settings drawer; the
+	// desktop modal asks /api/settings/modal for them when it opens.
+	if pageVars.IsMobile {
+		pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
+	}
 
 	page := r.FormValue("page")
 	if page == "options" {
