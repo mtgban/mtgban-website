@@ -295,9 +295,9 @@ const utilsSrc = fs.readFileSync(path.join(__dirname, '../../utils.go'), 'utf8')
 test('there is always an overflow panel for the truncation note to move into', () => {
     // genCardPrintings emits the note only when it has stopped early, and by
     // then it has drawn exactly MaxRuneSymbols symbols. collapsePrintings
-    // builds the panel only when it finds MORE than PRINTINGS_THRESHOLD of
-    // them. The note is therefore orphaned - rendered under the symbol row
-    // with no panel to receive it - as soon as the two are equal.
+    // builds the panel only when it finds at least PRINTINGS_THRESHOLD +
+    // PRINTINGS_MIN_OVERFLOW of them. The note is therefore orphaned -
+    // rendered under the symbol row with no panel to receive it - below that.
     //
     // It degrades gently: the note is styled to stand on its own line either
     // way, so what a reader sees is the pre-panel appearance rather than a
@@ -305,13 +305,16 @@ test('there is always an overflow panel for the truncation note to move into', (
     // that state silently, since nothing else connects them.
     const cap = utilsSrc.match(/MaxRuneSymbols\s*=\s*(\d+)/);
     const threshold = sidebarSrc.match(/PRINTINGS_THRESHOLD\s*=\s*(\d+)/);
+    const minOverflow = sidebarSrc.match(/PRINTINGS_MIN_OVERFLOW\s*=\s*(\d+)/);
     expect(cap, 'expected MaxRuneSymbols in utils.go').toBeTruthy();
     expect(threshold, 'expected PRINTINGS_THRESHOLD in js/search-sidebar.js').toBeTruthy();
+    expect(minOverflow, 'expected PRINTINGS_MIN_OVERFLOW in js/search-sidebar.js').toBeTruthy();
+    const needed = Number(threshold[1]) + Number(minOverflow[1]);
     expect(
         Number(cap[1]),
         `MaxRuneSymbols (${cap[1]}) draws ${cap[1]} symbols before the note, `
-        + `which is not more than PRINTINGS_THRESHOLD (${threshold[1]}), so no panel is built for it`,
-    ).toBeGreaterThan(Number(threshold[1]));
+        + `fewer than the ${needed} the panel needs, so no panel is built for it`,
+    ).toBeGreaterThanOrEqual(needed);
 });
 
 test('the editions panel is placed by the script, since the stylesheet stopped placing it', () => {

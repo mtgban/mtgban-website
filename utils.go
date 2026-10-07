@@ -1288,7 +1288,7 @@ func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
 	// than the "stop after drawing 57" its name claims, and the row came out
 	// short by however many were skipped. It also decided how many symbols
 	// the overflow panel would be built from, which is the number the script
-	// compares against PRINTINGS_THRESHOLD.
+	// compares against PRINTINGS_THRESHOLD + PRINTINGS_MIN_OVERFLOW.
 	var drawn int
 	for _, setCode := range co.Printings {
 		set, err := b.GetSet(setCode)

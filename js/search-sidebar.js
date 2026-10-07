@@ -1,4 +1,7 @@
 const PRINTINGS_THRESHOLD = 6;
+// The panel needs at least this many editions to hold: a "+1"
+// button would open a whole panel to show one symbol.
+const PRINTINGS_MIN_OVERFLOW = 2;
 
 // The two ways out of the overflow panel that are not the
 // button itself. Both hooked up once: collapsePrintings runs
@@ -174,7 +177,7 @@ function collapsePrintings() {
     container.querySelectorAll('a.sidebar-printings-hidden').forEach(a => a.classList.remove('sidebar-printings-hidden'));
 
     const links = Array.from(container.querySelectorAll('a.printing-symbol'));
-    if (links.length <= PRINTINGS_THRESHOLD) return;
+    if (links.length < PRINTINGS_THRESHOLD + PRINTINGS_MIN_OVERFLOW) return;
 
     const overflow = links.slice(PRINTINGS_THRESHOLD);
     overflow.forEach(a => a.classList.add('sidebar-printings-hidden'));
