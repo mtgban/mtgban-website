@@ -516,7 +516,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
-	fillSearchReader(s, &pageVars.SearchVars, r)
+	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, r)
 
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
@@ -797,21 +797,21 @@ func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, res
 	})
 }
 
-// fillSearchReader fills what the page offers this reader: the alerts link
-// when the navbar offers alerts and their tier has an allowance, and the
-// admins' Fix toggle.
-func fillSearchReader(s *site, pageVars *SearchVars, r *http.Request) {
+// searchReader is what the page offers this reader: the alerts link when the
+// navbar offers alerts and their tier has an allowance, and the admins' Fix
+// toggle.
+func searchReader(s *site, r *http.Request) (canAlerts, canFix bool) {
 	sig := getSignatureFromCookies(r)
 
 	sigParams := parseSig(sig)
 	if navOffers(s, sigParams, "Alerts") {
-		pageVars.CanAlerts = alertAllowance(sigParams) > 0
+		canAlerts = alertAllowance(sigParams) > 0
 	}
 
 	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
 	// store, deep-linking into the overrides builder.
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
-	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
+	return canAlerts, canAdmin || (DevMode && !SigCheck)
 }
 
 // fillSearchSettings fills whether any sealed product is loaded, and whether
