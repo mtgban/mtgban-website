@@ -103,3 +103,18 @@ func TestScreenerDefersTheColdBuild(t *testing.T) {
 		t.Error("a warm page asks for rows it already has")
 	}
 }
+
+// The screener's navbar marks the screener as the page open, not Home: the
+// page names itself as its registry entry is named.
+func TestScreenerMarksItsOwnTab(t *testing.T) {
+	withSigMode(t, true, false)
+	rec := httptest.NewRecorder()
+	testSite.Screener(rec, httptest.NewRequest(http.MethodGet, "/screener", nil))
+	body := rec.Body.String()
+	if !strings.Contains(body, `class="active" href="/screener"`) {
+		t.Error("the screener's navbar does not mark the screener")
+	}
+	if strings.Contains(body, `class="active" href="/"`) {
+		t.Error("the screener's navbar marks Home")
+	}
+}
