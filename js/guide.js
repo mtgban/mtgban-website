@@ -1,0 +1,564 @@
+/* Guide page: builds the sections from guide-data.js and wires the sidebar, filter and tabs. */
+(function() {
+    var data = window.__BAN_GUIDE;
+    if (!data || !data.sections) return;
+
+    var allSections = data.sections;
+    var sidebarNav = document.getElementById('guide-sidebar-nav');
+    var sectionsContainer = document.getElementById('guide-sections');
+
+    var TAB_BY_CATEGORY = {
+        'Overview':        'overview',
+        'Command Palette': 'palette',
+        'Search Syntax':   'syntax',
+        'API':             'api',
+        'Tools':           'overview',
+        'Tips & Tricks':   'overview'
+    };
+    var DEFAULT_TAB = 'overview';
+    var VALID_TABS = ['overview', 'palette', 'syntax', 'api', 'faq'];
+
+    // Build nav permission lookup from palette data
+    var navNames = {};
+    var palette = window.__BAN_PALETTE || {};
+    var navItems = palette.nav || [];
+    for (var n = 0; n < navItems.length; n++) {
+        navNames[navItems[n].name] = true;
+    }
+
+    // Filter sections by auth
+    var sections = [];
+    for (var i = 0; i < allSections.length; i++) {
+        var s = allSections[i];
+        //if (s.requiresNav && !navNames[s.requiresNav]) continue;
+        sections.push(s);
+    }
+
+    // Group sections by category in order
+    var categories = [];
+    var categoryMap = {};
+    for (var i = 0; i < sections.length; i++) {
+        var sec = sections[i];
+        if (!categoryMap[sec.category]) {
+            categoryMap[sec.category] = [];
+            categories.push(sec.category);
+        }
+        categoryMap[sec.category].push(sec);
+    }
+
+    // ── Build sidebar nav ──
+    for (var c = 0; c < categories.length; c++) {
+        var catName = categories[c];
+        var catTab = TAB_BY_CATEGORY[catName] || DEFAULT_TAB;
+        var catHeader = document.createElement('div');
+        catHeader.className = 'guide-nav-category';
+        catHeader.setAttribute('data-category', catName);
+        catHeader.setAttribute('data-tab', catTab);
+        catHeader.textContent = catName;
+        sidebarNav.appendChild(catHeader);
+
+        var catSections = categoryMap[catName];
+        for (var s = 0; s < catSections.length; s++) {
+            var item = catSections[s];
+            var link = document.createElement('a');
+            link.className = 'guide-nav-link';
+            link.href = '#' + item.id;
+            link.setAttribute('data-section', item.id);
+            link.setAttribute('data-category', catName);
+            link.setAttribute('data-tab', catTab);
+            link.innerHTML = '<i data-lucide="' + escapeAttr(item.icon) + '"></i>' +
+                '<span>' + escapeHtml(item.title) + '</span>';
+            sidebarNav.appendChild(link);
+        }
+    }
+
+    // Plain-text export of one category, for pasting into an AI agent.
+    function categoryText(catName) {
+        var NL = String.fromCharCode(10);
+        var out = ['# MTGBAN ' + catName + ' guide', 'Source: ' + window.location.origin + '/guide#' + (TAB_BY_CATEGORY[catName] || DEFAULT_TAB), ''];
+        var secs = document.querySelectorAll('.guide-section[data-category="' + catName + '"]');
+        for (var i = 0; i < secs.length; i++) {
+            var s = secs[i];
+            out.push('## ' + s.getAttribute('data-title'), '');
+            var desc = s.querySelector('.guide-section-desc');
+            if (desc) out.push(linkedText(desc), '');
+            var rows = s.querySelectorAll('.guide-table tbody tr');
+            for (var r = 0; r < rows.length; r++) {
+                var cells = rows[r].querySelectorAll('td');
+                out.push('- ' + '`' + cells[0].textContent + '`' + ': ' + cells[1].textContent);
+            }
+            if (rows.length) out.push('');
+            var exs = s.querySelectorAll('.guide-example');
+            if (exs.length) out.push('Examples:');
+            for (var e = 0; e < exs.length; e++) {
+                out.push('- ' + '`' + exs[e].querySelector('.guide-example-query').textContent + '`' + ': ' + exs[e].querySelector('.guide-example-desc').textContent);
+            }
+            if (exs.length) out.push('');
+        }
+        return out.join(NL);
+    }
+    // ── Build main content ──
+    for (var c = 0; c < categories.length; c++) {
+        var catName = categories[c];
+        var catTab = TAB_BY_CATEGORY[catName] || DEFAULT_TAB;
+
+        var divider = document.createElement('div');
+        divider.className = 'guide-category-divider';
+        divider.setAttribute('data-category', catName);
+        divider.setAttribute('data-tab', catTab);
+        var h2 = document.createElement('h2');
+        h2.textContent = catName;
+        divider.appendChild(h2);
+        if (catName === 'API') {
+            var copyTab = document.createElement('button');
+            copyTab.type = 'button';
+            copyTab.className = 'guide-copy-tab';
+            copyTab.title = 'Copy this tab as plain text';
+            copyTab.innerHTML = '<i data-lucide="copy"></i> Copy as text';
+            copyTab.onclick = function () { copySnippet(copyTab, categoryText('API')); };
+            divider.appendChild(copyTab);
+        }
+        sectionsContainer.appendChild(divider);
+
+        var catSections = categoryMap[catName];
+        for (var s = 0; s < catSections.length; s++) {
+            var item = catSections[s];
+            var section = document.createElement('section');
+            section.className = 'guide-section';
+            section.id = item.id;
+            section.setAttribute('data-category', catName);
+            section.setAttribute('data-tab', catTab);
+            section.setAttribute('data-title', item.title);
+            section.setAttribute('data-summary', item.summary || '');
+            section.setAttribute('data-keywords', (item.keywords || []).join(' '));
+
+            var html = '';
+
+            // Header
+            html += '<div class="guide-section-header">';
+            html += '<i data-lucide="' + escapeAttr(item.icon) + '"></i>';
+            html += '<h3>' + escapeHtml(item.title) + '</h3>';
+            html += '</div>';
+
+            // Description (contains HTML - render as innerHTML)
+            if (item.content && item.content.description) {
+                html += '<div class="guide-section-desc">' + item.content.description + '</div>';
+            }
+
+            // Table
+            if (item.content && item.content.table && item.content.table.length > 0) {
+                html += '<table class="guide-table">';
+                html += '<thead><tr><th>Option</th><th>Description</th></tr></thead>';
+                html += '<tbody>';
+                for (var t = 0; t < item.content.table.length; t++) {
+                    var row = item.content.table[t];
+                    html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
+                    html += '<td>' + escapeHtml(row.short) + '</td></tr>';
+                }
+                html += '</tbody></table>';
+            }
+
+            // Examples
+            if (item.content && item.content.examples && item.content.examples.length > 0) {
+                html += '<h4 class="guide-examples-heading">Examples</h4>';
+                html += '<div class="guide-examples">';
+                for (var e = 0; e < item.content.examples.length; e++) {
+                    var ex = item.content.examples[e];
+                    html += '<div class="guide-example">';
+                    if (ex.palette) {
+                        // Palette-only recipe: render as plain code, not a search link, no copy.
+                        html += '<span class="guide-example-query guide-example-palette">' + escapeHtml(ex.query) + '</span>';
+                        html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
+                    } else {
+                        html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '">' + escapeHtml(ex.query) + '</a>';
+                        html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
+                        html += '<button class="guide-example-copy" onclick="copySnippet(this, \'' + escapeJs(ex.query) + '\')" title="Copy to clipboard">';
+                        html += '<i data-lucide="copy"></i>';
+                        html += '</button>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
+            // Live store-shorthand reference, injected from the registered scrapers.
+            if (item.id === 'stores') {
+                html += buildStoresTable(window.__BAN_STORES);
+            }
+
+            section.innerHTML = html;
+            // Copy button on every code block.
+            var pres = section.querySelectorAll('pre');
+            for (var pi = 0; pi < pres.length; pi++) {
+                (function (pre) {
+                    var wrap = document.createElement('div');
+                    wrap.className = 'guide-pre';
+                    pre.parentNode.insertBefore(wrap, pre);
+                    wrap.appendChild(pre);
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'guide-example-copy guide-pre-copy';
+                    btn.title = 'Copy to clipboard';
+                    btn.innerHTML = '<i data-lucide="copy"></i>';
+                    btn.onclick = function () { copySnippet(btn, pre.textContent); };
+                    wrap.appendChild(btn);
+                })(pres[pi]);
+            }
+            sectionsContainer.appendChild(section);
+        }
+    }
+
+    // ── Promo types, from the loaded game ──
+    //
+    // The table above lists the predicates the search implements itself, and
+    // describes them. The promo types are the datastore's, and every game
+    // declares its own - 129 in Magic, 464 in One Piece - so they are asked
+    // for rather than written down. If the request fails the page keeps the
+    // table it rendered.
+    var MAX_PROMOS_LISTED = 50;
+    fetch('/api/palette/promos.json')
+        .then(function(r) { return r.ok ? r.json() : []; })
+        .then(function(promos) {
+            if (!promos || !promos.length) return;
+            var section = document.getElementById('promos');
+            if (!section) return;
+
+            var offered = {};
+            for (var o = 0; o < promos.length; o++) {
+                offered[promos[o].value] = true;
+                var alias = promos[o].aliases || [];
+                for (var a = 0; a < alias.length; a++) offered[alias[a]] = true;
+            }
+
+            // The written table describes the predicates the search
+            // implements itself, which every game has, plus promo types that
+            // only Magic has. Drop the rows naming a type the loaded game
+            // does not declare, so the guide stops describing another game.
+            var PREDICATES = { promo: true, altfoil: true };
+            var described = {};
+            var staticRows = section.querySelectorAll('.guide-table tbody tr');
+            for (var i = 0; i < staticRows.length; i++) {
+                var code = staticRows[i].querySelector('code');
+                if (!code) continue;
+                var listed = code.textContent.split('/');
+                var keep = false;
+                for (var j = 0; j < listed.length; j++) {
+                    var name = listed[j].trim();
+                    if (PREDICATES[name] || offered[name]) keep = true;
+                }
+                if (!keep) {
+                    staticRows[i].parentNode.removeChild(staticRows[i]);
+                    continue;
+                }
+                for (var k2 = 0; k2 < listed.length; k2++) {
+                    described[listed[k2].trim()] = true;
+                }
+            }
+
+            var rows = [];
+            for (var k = 0; k < promos.length && rows.length < MAX_PROMOS_LISTED; k++) {
+                if (described[promos[k].value]) continue;
+                rows.push(promos[k]);
+            }
+            if (!rows.length) return;
+
+            var html = '<h4 class="guide-examples-heading">Promo types in this game</h4>';
+            html += '<p>' + promos.length + ' in total, commonest first';
+            if (promos.length > rows.length + Object.keys(described).length) {
+                html += ' - type in the palette to reach the rest';
+            }
+            html += '.</p>';
+            html += '<table class="guide-table">';
+            html += '<thead><tr><th>Option</th><th>Description</th></tr></thead><tbody>';
+            for (var m = 0; m < rows.length; m++) {
+                var value = rows[m].value;
+                if (rows[m].aliases && rows[m].aliases.length) {
+                    value += ' / ' + rows[m].aliases.join(' / ');
+                }
+                html += '<tr><td><code>' + escapeHtml(value) + '</code></td>';
+                html += '<td>' + escapeHtml(rows[m].label || rows[m].value)
+                     + ' (' + rows[m].count + ')</td></tr>';
+            }
+            html += '</tbody></table>';
+
+            var block = document.createElement('div');
+            block.innerHTML = html;
+            section.appendChild(block);
+        })
+        .catch(function() {});
+
+    // ── Rarities, from the loaded game ──
+    //
+    // The written table is Magic's. The game served lists its own, rarest
+    // first, so its rows replace the written ones; if the request fails the
+    // page keeps them.
+    fetch('/api/palette/rarities.json')
+        .then(function(r) { return r.ok ? r.json() : []; })
+        .then(function(rarities) {
+            if (!rarities || !rarities.length) return;
+            var section = document.getElementById('rarity');
+            var body = section && section.querySelector('.guide-table tbody');
+            if (!body) return;
+            var html = '';
+            for (var i = 0; i < rarities.length; i++) {
+                var value = rarities[i].value;
+                if (rarities[i].letter) value += ' / ' + rarities[i].letter;
+                html += '<tr><td><code>' + escapeHtml(value) + '</code></td>';
+                html += '<td>' + escapeHtml(rarities[i].label || rarities[i].value)
+                     + ' (' + rarities[i].count + ')</td></tr>';
+            }
+            body.innerHTML = html;
+        })
+        .catch(function() {});
+
+    // ── Colors, from the loaded game ──
+    //
+    // The written table is Magic's letters and named groups, which only
+    // Magic's search reads. Every other game names its own colors, so its
+    // list replaces the rows; if the request fails the page keeps them.
+    var servedGame = document.body.getAttribute('data-game');
+    if (servedGame && servedGame !== 'magic') {
+        fetch('/api/palette/colors.json')
+            .then(function(r) { return r.ok ? r.json() : []; })
+            .then(function(colors) {
+                if (!colors || !colors.length) return;
+                var section = document.getElementById('colors');
+                var body = section && section.querySelector('.guide-table tbody');
+                if (!body) return;
+                var TERMS = {
+                    colorless: { value: 'colorless / c', short: 'No colors' },
+                    multicolor: { value: 'multicolor / multi / m', short: 'Two or more colors' }
+                };
+                var html = '';
+                for (var i = 0; i < colors.length; i++) {
+                    var row = TERMS[colors[i].value] || { value: colors[i].value, short: colors[i].label || colors[i].value };
+                    html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
+                    html += '<td>' + escapeHtml(row.short) + '</td></tr>';
+                }
+                body.innerHTML = html;
+            })
+            .catch(function() {});
+    }
+
+    // ── Scroll spy ──
+    var navLinks = sidebarNav.querySelectorAll('.guide-nav-link');
+    var sectionEls = sectionsContainer.querySelectorAll('.guide-section');
+    var observer = new IntersectionObserver(function(entries) {
+        for (var i = 0; i < entries.length; i++) {
+            if (entries[i].isIntersecting) {
+                var id = entries[i].target.id;
+                for (var j = 0; j < navLinks.length; j++) {
+                    if (navLinks[j].getAttribute('data-section') === id) {
+                        navLinks[j].classList.add('active');
+                    } else {
+                        navLinks[j].classList.remove('active');
+                    }
+                }
+            }
+        }
+    }, { rootMargin: '-20% 0px -70% 0px' });
+
+    for (var i = 0; i < sectionEls.length; i++) {
+        observer.observe(sectionEls[i]);
+    }
+
+    // ── Filter ──
+    var filterInput = document.getElementById('guide-filter');
+    filterInput.addEventListener('input', function() {
+        var query = this.value.toLowerCase().trim();
+        var visibleCategories = {};
+
+        for (var i = 0; i < sectionEls.length; i++) {
+            var el = sectionEls[i];
+            var title = (el.getAttribute('data-title') || '').toLowerCase();
+            var summary = (el.getAttribute('data-summary') || '').toLowerCase();
+            var keywords = (el.getAttribute('data-keywords') || '').toLowerCase();
+            var cat = el.getAttribute('data-category');
+
+            var match = !query || title.indexOf(query) !== -1 ||
+                summary.indexOf(query) !== -1 || keywords.indexOf(query) !== -1;
+
+            if (match) {
+                el.classList.remove('hidden-by-filter');
+                visibleCategories[cat] = true;
+            } else {
+                el.classList.add('hidden-by-filter');
+            }
+        }
+
+        // Update sidebar links
+        for (var i = 0; i < navLinks.length; i++) {
+            var secId = navLinks[i].getAttribute('data-section');
+            var secEl = document.getElementById(secId);
+            if (secEl && secEl.classList.contains('hidden-by-filter')) {
+                navLinks[i].classList.add('hidden-by-filter');
+            } else {
+                navLinks[i].classList.remove('hidden-by-filter');
+            }
+        }
+
+        // Update category headers (sidebar + main)
+        var catHeaders = sidebarNav.querySelectorAll('.guide-nav-category');
+        for (var i = 0; i < catHeaders.length; i++) {
+            var cat = catHeaders[i].getAttribute('data-category');
+            if (visibleCategories[cat]) {
+                catHeaders[i].classList.remove('hidden-by-filter');
+            } else {
+                catHeaders[i].classList.add('hidden-by-filter');
+            }
+        }
+
+        var catDividers = sectionsContainer.querySelectorAll('.guide-category-divider');
+        for (var i = 0; i < catDividers.length; i++) {
+            var cat = catDividers[i].getAttribute('data-category');
+            if (visibleCategories[cat]) {
+                catDividers[i].classList.remove('hidden-by-filter');
+            } else {
+                catDividers[i].classList.add('hidden-by-filter');
+            }
+        }
+    });
+
+    // ── Tabs ──
+    var tabButtons = document.querySelectorAll('.guide-tab');
+    var faqPane = document.getElementById('faq');
+
+    var tabRoots = [sectionsContainer, faqPane, sidebarNav];
+
+    function setActiveTab(tab) {
+        if (VALID_TABS.indexOf(tab) === -1) tab = DEFAULT_TAB;
+        tabRoots.forEach(function (root) {
+            if (!root) return;
+            if (root.dataset && root.dataset.tab) {
+                root.classList.toggle('tab-hidden', root.dataset.tab !== tab);
+            }
+            root.querySelectorAll('[data-tab]').forEach(function (el) {
+                el.classList.toggle('tab-hidden', el.dataset.tab !== tab);
+            });
+        });
+        tabButtons.forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+        document.body.dataset.guideTab = tab;
+    }
+
+    function tabForHash(hash) {
+        if (!hash) return null;
+        if (VALID_TABS.indexOf(hash) !== -1) return hash;
+        var el = document.getElementById(hash);
+        if (el && el.dataset && el.dataset.tab) return el.dataset.tab;
+        return null;
+    }
+
+    function initialTab() {
+        var params = new URLSearchParams(window.location.search);
+        var qTab = params.get('tab');
+        if (qTab && VALID_TABS.indexOf(qTab) !== -1) return qTab;
+        var hashTab = tabForHash((window.location.hash || '').substring(1));
+        if (hashTab) return hashTab;
+        return DEFAULT_TAB;
+    }
+
+    setActiveTab(initialTab());
+
+    tabButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            setActiveTab(btn.dataset.tab);
+            // Reset filter input + clear filter classes when switching tabs
+            if (filterInput && filterInput.value) {
+                filterInput.value = '';
+                filterInput.dispatchEvent(new Event('input'));
+            }
+        });
+    });
+
+    window.addEventListener('hashchange', function () {
+        var hashTab = tabForHash((window.location.hash || '').substring(1));
+        if (hashTab) setActiveTab(hashTab);
+    });
+
+    // ── Anchor scroll ──
+    if (window.location.hash) {
+        var target = document.getElementById(window.location.hash.substring(1));
+        if (target && !target.classList.contains('tab-hidden')) {
+            setTimeout(function() {
+                target.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    }
+
+    // ── Helpers ──
+    // An element's innerText, with each link's address after its text.
+    function linkedText(el) {
+        var added = [];
+        var links = el.querySelectorAll('a[href]');
+        for (var i = 0; i < links.length; i++) {
+            added.push(links[i].appendChild(document.createTextNode(' (' + links[i].href + ')')));
+        }
+        var text = el.innerText.trim();
+        for (var j = 0; j < added.length; j++) {
+            added[j].parentNode.removeChild(added[j]);
+        }
+        return text;
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function escapeJs(str) {
+        return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    // Render the live store-shorthand reference from the registered scrapers.
+    function buildStoresTable(stores) {
+        if (!stores || !stores.length) return '';
+        var html = '<h4 class="guide-examples-heading">All store shorthands</h4>';
+        html += '<div class="guide-section-desc"><p>Every shorthand below is valid after ' +
+            '<code>store:</code>, <code>seller:</code>, and <code>vendor:</code> (the full store name in quotes works too). ' +
+            'This list is generated live from the stores BAN currently tracks. Which stores return data depends on ' +
+            'your membership tier, but the syntax is always accepted.</p></div>';
+        html += '<table class="guide-table"><thead><tr><th>Store</th><th>Shorthand</th><th>Available for</th></tr></thead><tbody>';
+        for (var i = 0; i < stores.length; i++) {
+            var s = stores[i];
+            var roles = [];
+            if (s.retail) roles.push('retail');
+            if (s.buylist) roles.push('buylist');
+            if (s.index) roles.push('index');
+            if (s.sealed) roles.push('sealed');
+            html += '<tr><td>' + escapeHtml(s.name) + '</td>' +
+                '<td><code>' + escapeHtml(s.code) + '</code></td>' +
+                '<td>' + escapeHtml(roles.join(', ')) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        return html;
+    }
+})();
+
+function copySnippet(btn, text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
+    var toast = document.getElementById('cp-toast');
+    if (toast) {
+        toast.textContent = 'Copied!';
+        toast.classList.add('show');
+        setTimeout(function() {
+            toast.classList.remove('show');
+        }, 1500);
+    }
+}
