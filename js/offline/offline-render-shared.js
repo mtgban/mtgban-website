@@ -36,6 +36,12 @@
         return out;
     }
 
+    // markAttr is the catalog set's mark (palette.SetMark), drawn in its
+    // symbol's corner.
+    function markAttr(set) {
+        return set.m ? ' data-mark="' + escapeHtml(set.m) + '"' : '';
+    }
+
     // finishPrice picks the finish-level price matching the card flags.
     function finishPrice(entry, card) {
         if (card.s && entry.sealed > 0) return entry.sealed;
@@ -150,6 +156,7 @@
         INDEX_PAIRS: INDEX_PAIRS,
         money: money,
         keyruneClasses: keyruneClasses,
+        markAttr: markAttr,
         finishPrice: finishPrice,
         condPrices: condPrices,
         storeName: storeName,

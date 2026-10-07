@@ -99,6 +99,7 @@ type catalogSet struct {
 	Name    string `json:"n"`
 	Keyrune string `json:"k,omitempty"`
 	Date    string `json:"d,omitempty"`
+	Mark    string `json:"m,omitempty"`
 }
 
 type catalogStore struct {
@@ -176,6 +177,7 @@ func (s *Service) buildCatalogFragments(backend *mtgmatcher.Backend, source time
 			Name:    set.Name,
 			Keyrune: strings.ToLower(set.KeyruneCode),
 			Date:    set.ReleaseDate,
+			Mark:    palette.SetMark(code, set.Name),
 		}
 	}
 

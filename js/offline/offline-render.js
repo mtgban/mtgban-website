@@ -4,7 +4,7 @@
 
     var S = root.OfflineRenderShared;
     var CONDITIONS = S.CONDITIONS, INDEX_PAIRS = S.INDEX_PAIRS;
-    var money = S.money, keyruneClasses = S.keyruneClasses, finishPrice = S.finishPrice,
+    var money = S.money, keyruneClasses = S.keyruneClasses, markAttr = S.markAttr, finishPrice = S.finishPrice,
         condPrices = S.condPrices, storeName = S.storeName, isIndex = S.isIndex,
         rowComparator = S.rowComparator, refRetail = S.refRetail, noticesHTML = S.noticesHTML;
 
@@ -219,7 +219,7 @@
 
         var icon;
         if (set.k) {
-            icon = '<i class="ss ss-' + escapeHtml(set.k) + keyruneClasses(card) + ' ss-2x ss-fw result-set-icon"></i>';
+            icon = '<i class="ss ss-' + escapeHtml(set.k) + keyruneClasses(card) + ' ss-2x ss-fw result-set-icon"' + markAttr(set) + '></i>';
         } else {
             icon = '<span>' + escapeHtml(card.set) + '</span>';
         }

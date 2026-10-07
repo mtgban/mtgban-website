@@ -194,6 +194,12 @@ test('sealed product renders Purchase from / Sell to', () => {
     expect(html).toContain('<div class="price-cond-header">Sell to</div>');
 });
 
+test('a set with a mark draws it on its keyrune icon', () => {
+    const ctx = Object.assign({}, CTX, {sets: {NEO: {n: 'Kamigawa: Neon Dynasty Promos', k: 'neo', m: '★'}}});
+    expect(R.buildHTML([result()], ctx)).toContain('class="ss ss-neo ss-rare ss-2x ss-fw result-set-icon" data-mark="★"');
+    expect(R.buildHTML([result()], CTX)).not.toContain('data-mark="');
+});
+
 test('unknown keyrune falls back to the set code', () => {
     const r = result();
     const ctx = Object.assign({}, CTX, {sets: {}});
