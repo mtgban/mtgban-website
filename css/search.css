@@ -2095,7 +2095,13 @@ body.modal-embed .cp-overlay {
         flex-direction: column;
         align-items: stretch;
         gap: 0;
+        /* As wide as its longest label, up to the results column; past
+           that the label wraps rather than pushing the menu (icons first)
+           off the left edge. */
+        width: max-content;
         min-width: 210px;
+        max-width: calc(100cqw - 16px);
+        box-sizing: border-box;
         padding: 4px;
         background: var(--search-surface-1);
         border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
@@ -2104,6 +2110,11 @@ body.modal-embed .cp-overlay {
         z-index: 30;
     }
     .result-quick-icons.qi-open .qi-actions { display: flex; }
+    /* Each result header is stacked over the one before it (an inline
+       100 + its index), so the next one would paint over the open menu.
+       200 beats them all only while a page holds at most MaxSearchResults
+       (100) cards: raising that cap means raising this. */
+    .result-header:has(.qi-open) { z-index: 200 !important; }
 
     /* This breakpoint still has the sidebar preview, so keep the image button
        out of the dropdown (the grid rule below would otherwise reveal it). */
@@ -2161,7 +2172,7 @@ body.modal-embed .cp-overlay {
         justify-self: start;
         font-size: var(--text-md);
         color: var(--normal);
-        white-space: nowrap;
+        text-align: left;
     }
 }
 
