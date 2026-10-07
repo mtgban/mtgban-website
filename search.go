@@ -649,7 +649,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	preview := searchPreview(r, b, shown.keys, result)
-	fillEmbed(&pageVars, b, preview, shown.keys)
+	fillEmbed(&pageVars.SearchVars, pageVars.Metadata, b, preview, shown.keys)
 
 	rebuildIndexRows(&pageVars, r, b, config, shown.keys, result)
 
@@ -1266,10 +1266,10 @@ func sortOfferRows(r *http.Request, allKeys []string, result searchResults) {
 // fillEmbed fills the page's link preview: the title the oEmbed answer
 // carries, and the first card's image, description and a retail and a
 // buylist reference price.
-func fillEmbed(pageVars *PageVars, b *mtgmatcher.Backend, preview *embed.OEmbed, allKeys []string) {
+func fillEmbed(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher.Backend, preview *embed.OEmbed, allKeys []string) {
 	pageVars.Embed.Title = preview.Title
 	if len(allKeys) > 0 {
-		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].FullImageURL
+		pageVars.Embed.ImageURL = metadata[allKeys[0]].FullImageURL
 		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
 
 		co, err := b.GetUUID(allKeys[0])
