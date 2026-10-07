@@ -70,12 +70,12 @@
             'opt-customminprice': 'UploadCustomMinPrice',
             'opt-customrate': 'UploadCustomRate',
         },
-        // arbit: one grid per route, each on its own cookie read from the
-        // grid's data-cookie attribute
+        // arbit, global, reverse: each grid's cookie is read from its
+        // data-cookie attribute
         dynamicLists: [
-            'settings-arbit-vendors-arbit',
-            'settings-arbit-vendors-global',
-            'settings-arbit-vendors-reverse',
+            'settings-arbit-vendors',
+            'settings-global-vendors',
+            'settings-reverse-vendors',
         ],
         editions: {
             // sleep
@@ -327,7 +327,6 @@
         return {
             queryTab: tabHint || null,
             pageTab: page.tab || null,
-            scope: page.scope || null,
         };
     }
 

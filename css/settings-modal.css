@@ -864,11 +864,6 @@ body.settings-open {
     padding: 0 0.0625em;
 }
 
-/* ── Arbitrage scope ─────────────────────────────────────── */
-.settings-scope { margin-bottom: 0.75em; }
-/* .settings-pills' display:flex would override [hidden] while searching */
-.settings-scope[hidden] { display: none; }
-
 /* ── Phone width: the rail becomes a strip above the panes ─ */
 @media (max-width: 720px) {
     .settings-tabs { flex-direction: column; }

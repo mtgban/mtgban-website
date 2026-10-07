@@ -114,8 +114,6 @@
         var searching = false;
         var saved = [];
         var hiddenTabs = {};
-        // Re-applies the arbit scope picked before a search showed every pane
-        var scopePicks = [];
 
         function buttons() { return Array.prototype.slice.call(rail.querySelectorAll('[data-tab]')); }
         function tabs() {
@@ -184,7 +182,6 @@
                 var c = e.el.querySelector('.settings-crumb');
                 if (c) c.hidden = true;
             });
-            scopePicks.forEach(function (restore) { restore(); });
             buttons().forEach(function (b) {
                 b.classList.remove('nomatch');
                 var n = b.querySelector('.settings-rail-count');
@@ -215,9 +212,6 @@
                 e.el.hidden = !hit;
                 if (hit) {
                     e.el.classList.add('expanded');
-                    // A match may sit in a scope the pills are hiding
-                    e.el.querySelectorAll('.settings-scope-pane').forEach(function (p) { p.hidden = false; });
-                    e.el.querySelectorAll('[data-role="arbit-scope"]').forEach(function (p) { p.hidden = true; });
                     clearHighlight(e.el);
                     highlight(e.el, q);
                     crumb(e);
@@ -262,37 +256,6 @@
             });
             input.dataset.bound = '1';
         }
-
-        // Arbitrage: the scope pills pick which route's grid shows
-        body.querySelectorAll('[data-role="arbit-scope"]').forEach(function (pills) {
-            var section = pills.closest('.settings-section-body');
-            var picked = null;
-            function pick(scope) {
-                picked = scope;
-                pills.querySelectorAll('.settings-pill').forEach(function (p) {
-                    p.classList.toggle('active', p.dataset.scope === scope);
-                });
-                section.querySelectorAll('.settings-scope-pane').forEach(function (pane) {
-                    pane.hidden = pane.dataset.scope !== scope;
-                });
-            }
-            pills.addEventListener('click', function (e) {
-                var p = e.target.closest('.settings-pill');
-                if (p) pick(p.dataset.scope);
-            });
-            var scopes = Array.prototype.map.call(pills.querySelectorAll('.settings-pill'), function (p) { return p.dataset.scope; });
-            pick(pickTab(scopes, [opts.scope]));
-            scopePicks.push(function () {
-                pills.hidden = false;
-                pick(picked);
-            });
-        });
-        // A single route has no pills: show its pane
-        body.querySelectorAll('.settings-section-body').forEach(function (section) {
-            if (section.querySelector('[data-role="arbit-scope"]')) return;
-            var only = section.querySelector('.settings-scope-pane');
-            if (only) only.hidden = false;
-        });
 
         // Before picking, so a hint naming a hidden tab falls through
         hideEmptyTabs();

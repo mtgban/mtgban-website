@@ -458,10 +458,6 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	}
 	pageVars := genPageNav(s, r, pageName, sig)
 	pageVars.ReverseMode = reverse
-	pageVars.SettingsScope = "arbit"
-	if reverse {
-		pageVars.SettingsScope = "reverse"
-	}
 
 	var anyOptionEnabled bool
 
@@ -516,7 +512,6 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(s, r, "Global", sig)
 	pageVars.GlobalMode = true
-	pageVars.SettingsScope = "global"
 
 	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
 	anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)

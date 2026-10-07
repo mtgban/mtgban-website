@@ -16,7 +16,7 @@ const entries = [
     { tab: 'search', title: 'Stores', text: 'stores check stores you want to hide card kingdom tcgplayer' },
     { tab: 'search', title: 'Result Sorting', text: 'result sorting chronological best retail best buylist' },
     { tab: 'upload', title: 'Optimizer Filters', text: 'optimizer filters hide low spread offers' },
-    { tab: 'arbit', title: 'Vendors', text: 'vendors checked vendors will be hidden card kingdom' },
+    { tab: 'global', title: 'Vendors', text: 'vendors checked vendors will be hidden card kingdom' },
 ];
 
 test('an empty query matches every section', () => {
@@ -27,12 +27,12 @@ test('an empty query matches every section', () => {
 test('a query matches title, description and labels, case-insensitively', () => {
     expect(Shell.filterEntries(entries, 'SORT').map(e => e.title)).toEqual(['Result Sorting']);
     expect(Shell.filterEntries(entries, 'hide').map(e => e.title)).toEqual(['Stores', 'Optimizer Filters']);
-    expect(Shell.filterEntries(entries, 'card kingdom').map(e => e.tab)).toEqual(['search', 'arbit']);
+    expect(Shell.filterEntries(entries, 'card kingdom').map(e => e.tab)).toEqual(['search', 'global']);
     expect(Shell.filterEntries(entries, 'zzz')).toEqual([]);
 });
 
 test('countByTab counts matches per tab', () => {
-    expect(Shell.countByTab(Shell.filterEntries(entries, 'hid'))).toEqual({ search: 1, upload: 1, arbit: 1 });
+    expect(Shell.countByTab(Shell.filterEntries(entries, 'hid'))).toEqual({ search: 1, upload: 1, global: 1 });
     expect(Shell.countByTab([])).toEqual({});
 });
 
