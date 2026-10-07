@@ -233,7 +233,8 @@ func TestPlotSeriesDrawsALoneRosterCardAsARoster(t *testing.T) {
 	if len(plot.datasets) != 1 {
 		t.Fatalf("got %d datasets, want 1", len(plot.datasets))
 	}
-	if got := plot.datasets[0]; got.CardID != "ban:1" || got.Reference != "TCG Low" || got.Name != "Card A" {
+	got := plot.datasets[0]
+	if got.CardID != "ban:1" || got.Reference != "TCG Low" || got.Name != "Card A" {
 		t.Errorf("dataset = %q / %q / %q, want ban:1 / TCG Low / Card A", got.CardID, got.Reference, got.Name)
 	}
 	if !slices.Equal(plot.references, []string{"TCG Low"}) {
