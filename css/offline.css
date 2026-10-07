@@ -1,5 +1,11 @@
 /* Offline search shell chrome. Result markup is styled by search.css. */
 
+/* The banner starts on the navbar line, as the search page's results do:
+   the page's top slack is for pages with nothing pinned under the nav. */
+.offline-shell {
+    margin-top: calc(-1 * var(--content-padding-slack));
+}
+
 /* The shared .search-layout tucks under the online navbar with a -40px margin;
    on the offline page the banner sits above it, so cancel the pull to avoid overlap. */
 .offline-shell .search-layout {
@@ -47,6 +53,11 @@
     background: var(--lightblack, #161616);
     color: var(--darkgrey, #dddddd);
     border-bottom: 1px solid var(--verydarkgrey, #393939);
+}
+/* Desktop: text and button line up with the search columns below, the
+   same centring .search-layout uses, never closer to the edge than the gutter */
+.offline-shell .offline-banner {
+    padding-inline: max(var(--page-gutter, 3vw), calc(50% - var(--page-max-width) / 2));
 }
 .light-theme .offline-banner {
     background: var(--lightgrey, #eaeaea);
