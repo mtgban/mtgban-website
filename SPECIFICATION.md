@@ -459,7 +459,8 @@ override; phone UA detection via `mileusna/useragent`).
 - **Results**: `map[cardUUID]map[condition][]SearchEntry`; INDEX
   pseudo-conditions merge TCG Low/Market and MKM Low/Trend pairs into
   single rows with a `Secondary` price. Without a signature, non-affiliate
-  entries are `Locked` (link disabled) against `Affiliates().List` /
+  entries are `Locked` (link disabled), or left out under
+  `search_hide_non_affiliates`, against `Affiliates().List` /
   `Affiliates().BuylistList` (common.go) — there is no longer a
   `Config.AffiliatesList` field; affiliates now live behind that accessor
   as a split retail/buylist list. `SearchEntry.PriceUnit` (search.go)
