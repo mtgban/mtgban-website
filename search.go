@@ -569,9 +569,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	roster, query := fillChartRoster(&pageVars, r, b, query)
+	landing := query == "" && !scopeOnly
+	pageVars.Title = searchTitle(pageVars.Title, roster.id != "", pageVars.IsSealed, isSetsPage && landing)
 
 	// If neither bar holds anything there is nothing to do
-	if query == "" && !scopeOnly {
+	if landing {
 		tmpl := fillSearchLanding(&pageVars, r, ds, isSetsPage)
 		render(w, tmpl, pageVars)
 		return
@@ -602,7 +604,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
-		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
 	}
 
 	// Only a reader whose signature was checked gets the custom buylist
@@ -666,6 +667,20 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// searchTitle names the page for what it shows: a chart, the sealed products,
+// the editions tree, or a search. A chart of sealed products is a chart.
+func searchTitle(title string, charting, sealed, editions bool) string {
+	switch {
+	case charting:
+		return strings.Replace(title, "Search", "Chart", 1)
+	case sealed:
+		return strings.Replace(title, "Search", "Sealed Search", 1)
+	case editions:
+		return strings.Replace(title, "Search", "Editions", 1)
+	}
+	return title
 }
 
 // searchMetadata reads what the page shows of each card on it: its details,
@@ -902,7 +917,6 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 				noteChartIDsDropped(pageVars, unresolved, len(roster.ids), "could not be matched to a printing")
 			}
 			query = strings.Join(searchIDs, ",")
-			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
 		}
 	} else {
 		// Stay on the same probable query page
@@ -922,14 +936,10 @@ func fillSearchLanding(pageVars *PageVars, r *http.Request, ds *datastore, isSet
 	editions := ds.editions
 	// Hijack sealed list
 	if pageVars.IsSealed {
-		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
-
 		pageVars.EditionSort = editions.SealedEditionsSorted
 		pageVars.EditionList = editions.SealedEditionsList
 		return "search.html"
 	} else if isSetsPage {
-		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
-
 		pageVars.TotalSets = editions.TotalSets
 		pageVars.TotalCards = editions.TotalCards
 		pageVars.TotalUnique = editions.TotalUnique
