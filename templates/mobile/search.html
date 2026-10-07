@@ -626,7 +626,7 @@
             {{if .SearchQuery}}
                 <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
             {{else}}
-                <p class="m-no-results-msg">{{.InfoMessage}}</p>
+                <p class="m-no-results-msg">{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</p>
             {{end}}
             {{if and .SearchScope (not .ScopeIgnored)}}
                 <p class="m-no-results-hint">Pinned filters are narrowing this search:</p>

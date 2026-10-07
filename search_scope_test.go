@@ -125,9 +125,9 @@ func TestSearchScopeRendersInSuggestions(t *testing.T) {
 	}
 
 	pageVars := PageVars{
-		Title:       "BAN Search",
-		InfoMessage: NoCardsMessage,
+		Title: "BAN Search",
 		SearchVars: SearchVars{
+			Notices:    []string{NoCardsMessage},
 			SearchRan:  true,
 			DidYouMean: "Fountain of Renewal",
 			AltSearches: []suggest.AltSearch{
