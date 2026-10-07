@@ -333,6 +333,7 @@ var funcMap = template.FuncMap{
 	"has_prefix": func(s, p string) bool {
 		return strings.HasPrefix(s, p)
 	},
+	"set_mark": palette.SetMark,
 	"contains": func(s, p string) bool {
 		return strings.Contains(s, p)
 	},

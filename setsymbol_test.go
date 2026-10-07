@@ -95,12 +95,39 @@ func TestSetSymbolImages(t *testing.T) {
 		{"symbol's fallback badges too, where a bare set would", "SVI", "", sviSymbol, `<span hidden> <svg`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			arg := map[string]any{"Keyrune": tc.keyrune, "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Symbol": tc.symbol, "Size": 20, "Class": "x"}
+			arg := map[string]any{"Keyrune": tc.keyrune, "Edition": "", "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Symbol": tc.symbol, "Size": 20, "Class": "x"}
 			var b bytes.Buffer
 			if err := tmpl.ExecuteTemplate(&b, "set-symbol", arg); err != nil {
 				t.Fatal(err)
 			}
 			got := strings.Join(strings.Fields(b.String()), " ")
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("%q missing %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSetSymbolMark(t *testing.T) {
+	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, funcMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ code, edition, want string }{
+		{"PTHB", "Theros Beyond Death Promos", `data-mark="★"`},
+		{"FBB", "Foreign Black Border", `data-mark="BB"`},
+		{"THB", "Theros Beyond Death", ""},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			arg := map[string]any{"Keyrune": "ss-thb", "Edition": tc.edition, "Code": tc.code, "Rarity": "", "Color": "var(--normal)", "Foil": false, "Symbol": "", "Size": 20, "Class": ""}
+			var b bytes.Buffer
+			if err := tmpl.ExecuteTemplate(&b, "set-symbol", arg); err != nil {
+				t.Fatal(err)
+			}
+			got := b.String()
+			if tc.want == "" && strings.Contains(got, "data-mark") {
+				t.Errorf("%q has a mark, want none", got)
+			}
 			if !strings.Contains(got, tc.want) {
 				t.Errorf("%q missing %q", got, tc.want)
 			}

@@ -139,7 +139,7 @@
             <div class="m-sealed-grid">
                 {{range $editionList}}
                     <a class="m-sealed-edition" href="/sealed?q=s:{{.Code}}">
-                        {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}} {{.Name}}
+                        {{template "set-symbol" dict "Keyrune" .Keyrune "Edition" .Name "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}} {{.Name}}
                     </a>
                 {{end}}
             </div>
@@ -272,7 +272,7 @@
                  data-setcode="{{$card.SetCode}}"
                  onclick="showCardDrawer({{$card.FullImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">
                 <div class="m-card-icon">
-                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}}
+                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}}
                 </div>
                 <div class="m-card-info">
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
@@ -707,7 +707,7 @@
             <li data-value="" data-name="All Sets" onclick="selectSet(event)">All Sets</li>
             {{range .EditionFilterList}}
             <li data-value="{{.Code}}" data-name="{{.Name}}" onclick="selectSet(event)">
-                {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}}
+                {{template "set-symbol" dict "Keyrune" .Keyrune "Edition" .Name "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}}
                 <span>{{.Name}}</span>
             </li>
             {{end}}

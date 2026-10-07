@@ -23,6 +23,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
+	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
 // externalUUID resolves an outside identifier without knowing which id space
@@ -1292,7 +1293,11 @@ func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
                         <text font-size="%.1f" font-family="monospace" font-weight="bold" x="50%%" y="50%%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">%s</text>
                     </svg>`, fontSize, setCode)
 		} else {
-			fmt.Fprintf(&sb, `<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
+			mark := palette.SetMark(setCode, set.Name)
+			if mark != "" {
+				mark = ` data-mark="` + mark + `"`
+			}
+			fmt.Fprintf(&sb, `<i class="ss ss-%s ss-2x"%s></i>`, keyruneCode, mark)
 		}
 		sb.WriteString(`</a>`)
 
