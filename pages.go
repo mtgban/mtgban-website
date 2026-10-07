@@ -540,7 +540,13 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 		files = append(files, "templates/partials/sussy-price.html")
 	}
 	if name == "guide.html" {
-		files = append(files, "templates/partials/guide-faq.html")
+		files = append(files,
+			"templates/partials/guide-overview.html",
+			"templates/partials/guide-palette.html",
+			"templates/partials/guide-syntax.html",
+			"templates/partials/guide-api.html",
+			"templates/partials/guide-faq.html",
+		)
 	}
 	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" {
 		files = append(files, "templates/partials/patreon-login.html")

@@ -1,0 +1,102 @@
+{{define "guide-syntax-content"}}
+<template data-section="basic-syntax">
+<p>Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.</p>
+<p>Human-readable tags are also supported - for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).</p>
+<p>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:</p>
+</template>
+
+<template data-section="editions">
+<p>Filter cards by edition using the Scryfall notation <code>s:CODE</code> or the full edition name in quotes: <code>s:"Aether Revolt"</code>.</p>
+<p>Regular expressions are supported with <code>se:REGEXP</code>. For compatibility, <code>e:CODE</code> (exact match) and <code>ee:REGEXP</code> (regexp) are also accepted.</p>
+</template>
+
+<template data-section="collector-numbers">
+<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p>
+<p>A plain <code>cn:</code> number ignores the ★/†/φ decorations, so <code>cn:107</code> also finds a card numbered 107★. A number with letters or marks, like <code>cn:107★</code> or <code>cn:HNT222</code>, finds the printing numbered that way. Use the strict form <code>cns:NUMBER</code> to match even a plain number exactly as printed.</p>
+<p>Regular expressions are supported via <code>cne:REGEXP</code>.</p>
+<p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p>
+<p>Where a card prints its set size beside its number, as Pokémon and Lorcana do, add it after a slash: <code>cn:222/236</code>, or just search <code>222/236</code>.</p>
+</template>
+
+<template data-section="finish">
+<p>Filter by finish with <code>f:VALUE</code> using the values below, or append a suffix character directly to any search term.</p>
+</template>
+
+<template data-section="colors">
+<p>Filter by card color with <code>c:COLOR</code> or by color identity with <code>ci:COLOR</code> (alias <code>identity:</code>). Each game names its own colors (<code>c:fire</code>, <code>c:fury</code>), and <code>c:colorless</code> and <code>c:multicolor</code> work in every game. In Magic, combine WUBRG letters directly (<code>c:rg</code>), or use any color name or named group. The table lists the colors of the game this site serves; options with more than one accepted spelling list every alias together.</p>
+</template>
+
+<template data-section="format">
+Filter to cards that are legal (or restricted) in a given format with <code>format:NAME</code> (alias <code>legal:NAME</code>). Banned and not-legal cards are excluded; negate with <code>-format:NAME</code>. Combine formats with commas to match any of them.
+</template>
+
+<template data-section="rarity">
+Filter by rarity with <code>r:RARITY</code>, written as one word: <code>r:superrare</code> for Super Rare. A single letter stands for each of the game's rarities that begins with it, so <code>r:c</code> is common. <code>r&gt;RARITY</code> and <code>r&lt;RARITY</code> compare by the game's own order, rarest first; a letter standing for several compares as any of them, so <code>r&gt;</code> keeps what is rarer than the commonest and <code>r&lt;</code> what is commoner than the rarest. The table lists the rarities of the game this site serves.
+</template>
+
+<template data-section="conditions">
+Filter by condition with <code>cond:COND</code>. Use <code>condr:</code> to apply the filter to retail prices only, or <code>condb:</code> for buylist prices only. Comparison operators are supported.
+</template>
+
+<template data-section="types">
+Filter by card type with <code>t:VALUE</code>, accepting any valid supertype, type, or subtype. The same option also works for sealed products - you can search by category (booster, box, deck) or subtype (draft, collector, intro), or any fragment of the product name.
+</template>
+
+<template data-section="dates">
+Filter by release date with <code>date:VALUE</code>, <code>date&gt;VALUE</code>, or <code>date&lt;VALUE</code>. Use <code>year:VALUE</code> for year-only filtering. The value formats accepted are:
+</template>
+
+<template data-section="properties">
+<p>Filter by card properties with <code>is:VALUE</code> or exclude with <code>not:VALUE</code> (equivalent to <code>-is:VALUE</code>). Options with more than one accepted spelling list every alias together.</p>
+</template>
+
+<template data-section="promos">
+<p>Filter promo cards and special foil treatments with <code>is:VALUE</code>. Use <code>is:promo</code> to match any promo type, or one of the specific tags below for targeted filtering. Options with more than one accepted spelling list every alias together.</p>
+<p><code>is:altfoil</code> is a convenience union that matches <em>any</em> special foil treatment (surge, ripple, galaxy, etc.). The list tracks the live card data, so newer treatments work as soon as the data includes them even if not listed here.</p>
+</template>
+
+<template data-section="lands">
+Filter by well-known land cycles and set groupings using <code>is:VALUE</code>:
+</template>
+
+<template data-section="prices">
+<p>Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store's price - <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.</p>
+<p>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.</p>
+<p><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).</p>
+</template>
+
+<template data-section="quantities">
+<p>Filter results by the quantity a store has in stock (or a buylist wants) with <code>qty&gt;VALUE</code> and <code>qty&lt;VALUE</code>. Comparisons are strict, so <code>qty&gt;3</code> means four or more copies.</p>
+<p>Stores that don't report quantities (index price sources and some retailers) are excluded from quantity-filtered results, and cards left with no matching offers are dropped.</p>
+<p><code>quantity</code> works as a long-form alias.</p>
+</template>
+
+<template data-section="stores">
+<p>Filter by seller or vendor with <code>store:shorthand</code>, <code>seller:shorthand</code> (retail), or <code>vendor:shorthand</code> (buylist). You can pass either a store's full name in quotes or its shorthand. These drop results where the store is absent. To show only that store, use <code>store:only:shorthand</code>. The complete, always-current list of every store shorthand is shown at the bottom of this section.</p>
+<p>The <code>skip:</code> filter hides entire result categories. Note: store filters leave index results visible - use <code>skip:index</code> to hide them.</p>
+</template>
+
+<template data-section="modes">
+<p>Change search matching behavior with <code>sm:VALUE</code>. The default mode is <code>exact</code> - only cards with that precise name are returned.</p>
+<p>In <code>scryfall</code> mode, the query is forwarded to Scryfall. BAN card filters are disabled to avoid conflicts, but store and price filters still apply.</p>
+</template>
+
+<template data-section="sealed-contents">
+<p>A sealed product's name resolves the same way for three filters, each reading its contents differently: <code>contents:"NAME"</code> lists everything the product can hold, guaranteed cards and random draws together; <code>decklist:"NAME"</code> lists only what it always holds (empty for a product that is pure boosters); <code>variable:"NAME"</code> lists only what it draws at random - the guaranteed cards taken back out. A product with both a fixed part and a random part shows a three-pill switch on the results page to jump between all three; naming more than one product in a query pools their contents but drops the switch, since it no longer names one product to read.</p>
+<p>Under <code>variable:</code> alone, each card also carries an <strong>Avg Copies (est.)</strong> row: how many copies of that card you would get, on average, opening the product once. It is a count, not a chance - a card only one slot in the product can hold reads as a share below 1 (0.4 is roughly two packs in five), but a common card drawn from more than one slot in the same product adds up across those slots and can read well above 1 (a common land can average several copies in a full booster case). A fourth sort button next to the switch, shaped like a copy icon, orders results by this count, longest shot first by default. The row itself does not depend on that button showing: a product with nothing guaranteed at all has no three-way switch to offer (there is only one reading of it), but its cards still carry Avg Copies under a plain <code>variable:</code> search.</p>
+</template>
+
+<template data-section="sorting">
+Change the sort order of results with <code>sort:VALUE</code>. Note: when a sort is set via query, the sort UI dropdown is disabled. A seventh order, by a card's Avg Copies count, exists only under a <code>variable:</code> search - see "A Product's Contents" - and is reached by clicking its own button on the results page rather than typing <code>sort:</code>.
+</template>
+
+<template data-section="lists">
+Check if a card belongs to a curated list using <code>on:VALUE</code>:
+</template>
+
+<template data-section="names">
+<p>Filter by card name to include or exclude specific cards from a query using <code>name:NAME</code>. Enclose names with spaces in quotes or parentheses. Prefix with <code>-</code> to exclude.</p>
+<p>Regular expressions are supported with <code>namee:REGEXP</code>.</p>
+<p>Filter by internal card ID with <code>id:VALUE</code>, supporting MTGBAN, MTGJSON, Scryfall, and TCGplayer product IDs.</p>
+</template>
+{{end}}

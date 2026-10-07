@@ -1,0 +1,134 @@
+{{define "guide-palette-content"}}
+<template data-section="palette">
+<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p>
+<p><strong>Modes</strong> (typed as prefixes into the palette input):</p>
+<ul>
+    <li><code>?</code> - inline syntax help</li>
+    <li><code>&gt;</code> - navigate to a page or page view</li>
+    <li><code>saved:</code> - recall a saved search command</li>
+    <li><code>$</code> - sealed product mode (search + actions on a picked product)</li>
+    <li><code>+</code> - upload mode (URL, file picker, or current results) - when permitted</li>
+</ul>
+<p>Press <kbd>Shift+Delete</kbd> on a highlighted recent search or saved command to remove it instantly.</p>
+<p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>
+</template>
+
+<template data-section="filter-builder">
+<p>The palette supports all search syntax prefixes as guided filter builders. Type a prefix and the dropdown shows matching options.</p>
+<p>Locking a second chip with the same prefix merges it into the first: <code>s:MKM</code> followed by <code>s:LEA</code> becomes <code>s:MKM,LEA</code>. This applies to prefixes that accept multiple values - sets, rarities, colors, types, stores, tags.</p>
+<p><strong>Card-aware narrowing:</strong> when a card chip is present, subsequent filter dropdowns narrow their options to what exists for that card. With a "Birds of Paradise" chip, <code>s:</code> only shows sets that card was printed in, and <code>c:</code> only shows green color combinations.</p>
+</template>
+
+<template data-section="nav-sub-views">
+<p>The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip - the dropdown then shows that page's specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).</p>
+<p>For Arbitrage pages, you can lock multiple filter chips in sequence - each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page's base URL.</p>
+</template>
+
+<template data-section="saved-commands">
+<p>Any search query can be saved as a named command. Press <kbd>Ctrl+S</kbd> / <kbd>Cmd+S</kbd> while the palette is open, or select <strong>Save Current Search</strong> from the palette on a search results page. You'll be prompted to name the command.</p>
+<p>Saved commands appear in the palette default view and can be filtered with the <code>saved:</code> prefix.</p>
+<p><strong>Editing:</strong> <kbd>Enter</kbd> runs a saved command directly. <kbd>Shift+Enter</kbd> restores its chips into the palette input so you can modify and re-run.</p>
+<p><strong>Deleting:</strong> highlight a saved command and press <kbd>Shift+Delete</kbd> to remove it instantly (no confirmation). You can also hover and click the trash icon for a confirmed deletion.</p>
+</template>
+
+<template data-section="sealed-mode">
+<p>Type <code>$</code> as the first character to enter <strong>Sealed mode</strong>. The autocomplete dropdown switches to the sealed-product dataset (booster boxes, bundles, packs, decks, cases, displays). Matching is <strong>prefix-only on the full product name</strong> - type the start of the actual name (e.g. <code>$Modern Horizons 3</code>), not a set code (<code>$MH3</code> will not match).</p>
+<p>For any highlighted product the palette offers three actions:</p>
+<ul>
+    <li><kbd>Enter</kbd> - search the sealed page for that product (price grid).</li>
+    <li><kbd>Shift+Enter</kbd> - <strong>View Contents</strong> - displays the cards inside the product.</li>
+    <li><kbd>Ctrl+Enter</kbd> - <strong>Pack Pull</strong> - simulates opening the product (when supported by the data).</li>
+</ul>
+<p><strong>Tab</strong> locks the highlighted product as a chip; the dropdown then morphs into a 3-row action menu where the same actions are reachable via arrow keys + Enter for users who prefer the menu over the modifier keys. Pack Pull is hidden if the product has no picks data.</p>
+<p>If your typed query matches no products, <kbd>Enter</kbd> falls back to a generic <code>/sealed?q=&lt;text&gt;</code> search.</p>
+</template>
+
+<template data-section="upload-mode">
+<p>Type <code>+</code> as the first character to enter <strong>Upload mode</strong> (available when your tier includes the Uploader). The dropdown adapts to what is available:</p>
+<ul>
+    <li><strong>Pasted URL</strong> - any input matching a supported collection, deck tracker, or spreadsheet host shows an "Upload from..." row identifying the source.</li>
+    <li><strong>Browse for file...</strong> - always present; opens the native file picker for CSV / XLS / XLSX.</li>
+    <li><strong>Send N results to Uploader</strong> - shown on any page with row hashes (search and contents results); posts the visible hashes to the Uploader.</li>
+</ul>
+<p>All paths submit to <code>/upload</code> as a POST. Your saved upload preferences (mode, store list, optimizer settings) ride along automatically as cookies, so the result page reflects whatever you last configured at <code>/upload</code>.</p>
+<p>Unsupported URL hosts render an error row that ignores Enter; pick one of the supported sources or use the file picker.</p>
+</template>
+
+<template data-section="palette-walkthroughs">
+<p>End-to-end keystroke sequences. Follow along in a live palette to build muscle memory.</p>
+<div class="guide-walkthrough">
+    <h4>1. Find all foil printings of a card</h4>
+    <ol>
+        <li><kbd>Ctrl+K</kbd> to open the palette.</li>
+        <li>Type <code>Birds of Paradise</code>. The card name appears in the dropdown.</li>
+        <li><kbd>Tab</kbd> - Birds of Paradise becomes a chip.</li>
+        <li>Type <code>f:foil</code>. The Finish dropdown appears with foil highlighted.</li>
+        <li><kbd>Tab</kbd> - <code>f:foil</code> becomes a chip.</li>
+        <li><kbd>Enter</kbd> - navigates to search with the composed query.</li>
+    </ol>
+</div>
+<div class="guide-walkthrough">
+    <h4>2. Jump to Arbitrage with profit filters</h4>
+    <ol>
+        <li><kbd>Ctrl+K</kbd>.</li>
+        <li>Type <code>&gt;arb</code>. Arbitrage appears.</li>
+        <li><kbd>Tab</kbd> - Arbitrage chip locks; the dropdown now shows filter presets and sort options.</li>
+        <li>Type <code>yield</code> to narrow to "only Yield+".</li>
+        <li><kbd>Tab</kbd> - filter chip added.</li>
+        <li>Type <code>bucks</code>, <kbd>Tab</kbd> - second filter added.</li>
+        <li>Type <code>sort</code>, <kbd>Tab</kbd> on "Spread %" - sort chip added.</li>
+        <li><kbd>Enter</kbd> - navigates to <code>/arbit?nolow=true&amp;nopenny=true&amp;sort=spread</code>.</li>
+    </ol>
+</div>
+<div class="guide-walkthrough">
+    <h4>3. Save a complex query for later</h4>
+    <ol>
+        <li>Build a query with chips: a card plus filters (as in walkthrough 1).</li>
+        <li>Press <kbd>Ctrl+S</kbd> while the palette is open.</li>
+        <li>Enter a short name and <kbd>Enter</kbd> - the command is saved.</li>
+        <li>Later, open the palette and type <code>saved:</code> to find your command.</li>
+        <li><kbd>Enter</kbd> runs it; <kbd>Shift+Enter</kbd> restores its chips for editing.</li>
+    </ol>
+</div>
+<div class="guide-walkthrough">
+    <h4>4. Narrow a search with card-aware filters</h4>
+    <ol>
+        <li><kbd>Ctrl+K</kbd>.</li>
+        <li>Type <code>Lightning Bolt</code>, <kbd>Tab</kbd> - Lightning Bolt chip locks.</li>
+        <li>Type <code>s:</code> - the sets dropdown shows only sets Lightning Bolt has been printed in.</li>
+        <li>Type <code>Alpha</code>, <kbd>Tab</kbd> - picks Limited Edition Alpha, chip locks as <code>s:Alpha</code>.</li>
+        <li>Type <code>f:foil</code>, <kbd>Tab</kbd>, <kbd>Enter</kbd> - composes the final query.</li>
+    </ol>
+</div>
+<div class="guide-walkthrough">
+    <h4>5. Look up syntax while building a query</h4>
+    <ol>
+        <li>In any context, type <code>?</code> followed by a keyword - e.g. <code>?rarity</code> or <code>? foil</code>.</li>
+        <li>The dropdown shows a syntax snippet - <kbd>Enter</kbd> copies it to your clipboard.</li>
+        <li><kbd>Shift+Enter</kbd> jumps to the full section of this guide.</li>
+    </ol>
+</div>
+<div class="guide-walkthrough">
+    <h4>6. Browse the contents of a booster box</h4>
+    <ol>
+        <li><kbd>Ctrl+K</kbd> to open the palette.</li>
+        <li>Type <code>$bundle lci</code>. Sealed product matches appear under a "Sealed" header.</li>
+        <li>Arrow to the desired product.</li>
+        <li><kbd>Shift+Enter</kbd> - navigates to <code>/sealed?q=contents:Bundle...</code> showing the cards inside.</li>
+    </ol>
+</div>
+<div class="guide-walkthrough">
+    <h4>7. Push a search result set to Upload</h4>
+    <ol>
+        <li>On any search results page (e.g. <code>/search?q=lightning bolt</code>), <kbd>Ctrl+K</kbd>.</li>
+        <li>Type <code>+</code>. The dropdown shows "Send N results to Uploader" alongside file picker and URL options.</li>
+        <li>Arrow to the "Send N results" row.</li>
+        <li><kbd>Enter</kbd> - the page POSTs to <code>/upload</code> with the row hashes; you land on the upload results page using your saved store and mode preferences.</li>
+    </ol>
+</div>
+</template>
+
+<template data-section="palette-cheatsheet">
+<strong>Opening / closing</strong>
+</template>
+{{end}}
