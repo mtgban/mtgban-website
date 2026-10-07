@@ -13,7 +13,7 @@ var isCaseNames = []string{
 	"foil", "nonfoil", "reserved", "token", "oversize", "oversized", "funny",
 	"wcd", "gold", "fullart", "fa", "promo", "gamechanger", "gc",
 	"extendedart", "ea", "showcase", "sc", "sh", "borderless", "bd", "bl",
-	"future", "retro", "old", "reskin", "japanese", "jpn", "jp", "ja",
+	"future", "reskin", "japanese", "jpn", "jp", "ja",
 	"phyrexian", "ph", "commander", "productless", "ampersand", "p9", "altfoil",
 }
 

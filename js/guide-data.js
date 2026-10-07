@@ -581,7 +581,7 @@ window.__BAN_GUIDE = {
             icon: 'tag',
             summary: 'Filter by frame, language, or game properties (is:reserved, is:ea, not:foil).',
             snippets: ['is:reserved', 'is:extendedart', 'is:showcase', 'is:borderless', 'not:foil', 'is:ea', 'is:sc'],
-            keywords: ['properties', 'is:', 'not:', 'reserved', 'token', 'oversize', 'fullart', 'extendedart', 'extended art', 'showcase', 'reskin', 'borderless', 'gold', 'retro', 'future', 'altfoil', 'japanese', 'phyrexian', 'wcd', 'commander', 'funny', 'gamechanger', 'ea', 'sc', 'bd', 'gc', 'jp', 'jpn', 'ph'],
+            keywords: ['properties', 'is:', 'not:', 'reserved', 'token', 'oversize', 'fullart', 'extendedart', 'extended art', 'showcase', 'reskin', 'borderless', 'gold', 'future', 'altfoil', 'japanese', 'phyrexian', 'wcd', 'commander', 'funny', 'gamechanger', 'ea', 'sc', 'bd', 'gc', 'jp', 'jpn', 'ph'],
             content: {
                 description: '<p>Filter by card properties with <code>is:VALUE</code> or exclude with <code>not:VALUE</code> (equivalent to <code>-is:VALUE</code>). Options with more than one accepted spelling list every alias together.</p>',
                 table: [
@@ -600,7 +600,6 @@ window.__BAN_GUIDE = {
                     { value: 'showcase / sc / sh', short: 'Showcase frame' },
                     { value: 'borderless / bd / bl', short: 'Borderless frame' },
                     { value: 'reskin', short: 'Reskinned card (has a flavor name)' },
-                    { value: 'retro / old', short: 'Retro frame (1993 or 1997)' },
                     { value: 'future', short: 'Future frame' },
                     { value: 'foil', short: 'Foil (includes etched)' },
                     { value: 'nonfoil', short: 'Non-foil' },
@@ -625,7 +624,7 @@ window.__BAN_GUIDE = {
             icon: 'gift',
             summary: 'Filter promos and special foil treatments: is:promo, is:prerelease, is:buyabox, is:surge, is:serialized.',
             snippets: ['is:promo', 'is:prerelease', 'is:buyabox', 'is:serialized', 'is:altfoil', 'is:surge'],
-            keywords: ['promo', 'prerelease', 'buyabox', 'buy a box', 'serialized', 'variant', 'stamped', 'convention', 'fnm', 'wpn', 'gameday', 'judge', 'arena', 'release', 'bundle', 'altfoil', 'foil', 'surge', 'galaxy', 'ripple', 'rainbow', 'halo', 'mana', 'neon', 'gilded', 'textured', 'oilslick', 'confetti', 'fracture', 'embossed', 'godzilla', 'dracula', 'concept', 'poster', 'glossy', 'storechampionship', 'draftweekend', 'intropack', 'starterdeck'],
+            keywords: ['promo', 'prerelease', 'buyabox', 'buy a box', 'serialized', 'variant', 'retro', 'retroframe', 'stamped', 'convention', 'fnm', 'wpn', 'gameday', 'judge', 'arena', 'release', 'bundle', 'altfoil', 'foil', 'surge', 'galaxy', 'ripple', 'rainbow', 'halo', 'mana', 'neon', 'gilded', 'textured', 'oilslick', 'confetti', 'fracture', 'embossed', 'godzilla', 'dracula', 'concept', 'poster', 'glossy', 'storechampionship', 'draftweekend', 'intropack', 'starterdeck'],
             content: {
                 description: '<p>Filter promo cards and special foil treatments with <code>is:VALUE</code>. Use <code>is:promo</code> to match any promo type, or one of the specific tags below for targeted filtering. Options with more than one accepted spelling list every alias together.</p><p><code>is:altfoil</code> is a convenience union that matches <em>any</em> special foil treatment (surge, ripple, galaxy, etc.). The list tracks the live card data, so newer treatments work as soon as the data includes them even if not listed here.</p>',
                 table: [
