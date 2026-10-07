@@ -124,27 +124,38 @@ async function runSync(msg) {
             return fullResync || have[code] !== manifest.sets[code];
         }).sort();
 
-        var state = { done: 0, bytes: 0, idx: 0 };
-        var errored = false;
+        var state = { done: 0, failed: 0, bytes: 0, idx: 0 };
+        var forbiddenErr = null;
         var pump = async function() {
             for (;;) {
-                if (cancelled || errored) return;
+                if (cancelled || forbiddenErr) return;
                 var i = state.idx++;
                 if (i >= changed.length) return;
                 var code = changed[i];
                 try {
                     state.bytes += await syncSet(code, manifest.sets[code], stores, key);
+                    state.done++;
                 } catch (e) {
-                    errored = true;
-                    throw e;
+                    // Lapsed access fails every set alike; anything else costs
+                    // only this one, which keeps its old version and retries
+                    // on the next sync
+                    if (e && e.message === 'forbidden') {
+                        forbiddenErr = e;
+                        return;
+                    }
+                    state.failed++;
+                    // A full resync leaves the failed set's row stamped with
+                    // this version, which the next sync would skip: drop it
+                    if (fullResync) {
+                        try { await self.OfflineDB.deleteRow('sets', code); } catch (e2) {}
+                    }
                 }
-                if (errored) return;
-                state.done++;
-                post({ type: 'progress', stage: 'prices', done: state.done, total: changed.length, code: code });
+                post({ type: 'progress', stage: 'prices', done: state.done + state.failed, total: changed.length, code: code });
             }
         };
         // Two lanes: modest parallelism without hammering the server.
         await Promise.all([pump(), pump()]);
+        if (forbiddenErr) throw forbiddenErr;
 
         if (!cancelled) {
             // Edition-filtered runs must not record storesKey as fully resynced.
@@ -166,7 +177,7 @@ async function runSync(msg) {
             post({ type: 'error', stage: 'images', message: err.message });
             return;
         }
-        post({ type: 'done', changedSets: state.done, bytes: state.bytes, imgMissing: imgMissing, imgFailed: imgFailed });
+        post({ type: 'done', changedSets: state.done, failedSets: state.failed, bytes: state.bytes, imgMissing: imgMissing, imgFailed: imgFailed });
     } catch (err) {
         if (err && err.message === 'forbidden') await self.OfflineDB.setMeta('authLapsed', true);
         post({ type: 'error', stage: (err && err.stage) || stage, message: (err && err.message) || String(err) });
