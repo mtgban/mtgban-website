@@ -1,4 +1,5 @@
-/* Guide page: builds the sections from guide-data.js and wires the sidebar, filter and tabs. */
+/* Guide page: builds the sections from guide-data.js and the page's
+   description templates, and wires the sidebar, filter and tabs. */
 (function() {
     var data = window.__BAN_GUIDE;
     if (!data || !data.sections) return;
@@ -98,6 +99,12 @@
         return out.join(NL);
     }
     // ── Build main content ──
+    // Each section's description is a <template data-section> the page
+    // renders from templates/partials/guide-*.html.
+    var descriptions = {};
+    document.querySelectorAll('template[data-section]').forEach(function (t) {
+        descriptions[t.dataset.section] = t;
+    });
     for (var c = 0; c < categories.length; c++) {
         var catName = categories[c];
         var catTab = TAB_BY_CATEGORY[catName] || DEFAULT_TAB;
@@ -140,9 +147,10 @@
             html += '<h3>' + escapeHtml(item.title) + '</h3>';
             html += '</div>';
 
-            // Description (contains HTML - render as innerHTML)
-            if (item.content && item.content.description) {
-                html += '<div class="guide-section-desc">' + item.content.description + '</div>';
+            // Description, filled in from its template below
+            var desc = descriptions[item.id];
+            if (desc) {
+                html += '<div class="guide-section-desc"></div>';
             }
 
             // Table
@@ -187,6 +195,9 @@
             }
 
             section.innerHTML = html;
+            if (desc) {
+                section.querySelector('.guide-section-desc').appendChild(desc.content.cloneNode(true));
+            }
             // Copy button on every code block.
             var pres = section.querySelectorAll('pre');
             for (var pi = 0; pi < pres.length; pi++) {

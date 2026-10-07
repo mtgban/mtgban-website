@@ -12,7 +12,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['welcome', 'intro', 'overview', 'start', 'getting started', 'about', 'mtgban', 'ban'],
             content: {
-                description: '<p>MTG<span class="ban">BAN</span> aggregates retail and buylist prices for Magic: The Gathering singles and sealed products across dozens of vendors. Everything on the site is built around two things: a flexible search syntax, and a keyboard-driven command palette that composes that syntax for you.</p><p>The three things you can reach from anywhere:</p><ul><li><strong>Search</strong> - find prices for a card or sealed product, filter by set, rarity, finish, condition, store, region, or price thresholds. Results split into retail and buylist, with condition breakdowns and index references from aggregators like TCGplayer.</li><li><strong>The Command Palette</strong> - <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> from any page (or <kbd>/</kbd> when no input is focused) opens a single surface for searching cards, composing filter queries with guided chips, jumping to pages, recalling saved commands, browsing sealed products, and uploading collections.</li><li><strong>Tools</strong> - Newspaper for daily market movement, Sleepers for undervalued cards, Arbitrage for retail/buylist gaps, and Upload &amp; Optimize for splitting a collection across buylists.</li></ul><p>The rest of this guide is organized by tab:</p><ul><li><strong>Overview</strong> (you are here) - the palette at a glance, then a tour of the tools available on your account, then power-user tips.</li><li><strong>Command Palette</strong> - chips, modes, multi-stage navigation, saved commands, walkthroughs, and the full keyboard cheatsheet.</li><li><strong>Syntax</strong> - reference for every search prefix.</li><li><strong>API</strong> - keys, endpoints, query options, and the response format of the price data API.</li><li><strong>F.A.Q.</strong> - common questions.</li></ul>',
                 table: [],
                 examples: []
             }
@@ -27,7 +26,6 @@ window.__BAN_GUIDE = {
             snippets: ['Ctrl+K', '>', '?', '*', '<', '$', '+'],
             keywords: ['palette', 'modes', 'shortcuts', 'overview', 'pages', 'help', 'saved', 'recent', 'sealed', 'upload', 'tiles'],
             content: {
-                description: '<p>Press <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> from any page (or <kbd>/</kbd> when no input is focused) to open the palette. The default view shows six shortcut tiles, each backed by a single-character prefix you can type directly into the input. Type a card name with no prefix to search; everything else is one keystroke away.</p><p>The palette also supports guided filter chips - type a prefix like <code>s:</code> or <code>r:</code> and the dropdown shows matching options. <kbd>Tab</kbd> locks the highlighted option as a chip; chain chips to compose complex queries. When a card chip is locked first, subsequent filter dropdowns narrow to what exists for that card. For the full reference, see the <strong>Command Palette</strong> tab.</p>',
                 table: [
                     { value: '>',  short: 'Pages - navigate to a page or a specific sub-view (Newspaper Archive, Sleepers Bulk, Arbitrage with filter presets, etc.)' },
                     { value: '?',  short: 'Help & syntax - look up a syntax prefix; Enter copies the snippet, Shift+Enter opens the guide section' },
@@ -56,7 +54,6 @@ window.__BAN_GUIDE = {
             snippets: ['Ctrl+K', 'Cmd+K', '?', '>'],
             keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes', 'chips', 'filter builder'],
             content: {
-                description: '<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p><p><strong>Modes</strong> (typed as prefixes into the palette input):</p><ul><li><code>?</code> - inline syntax help</li><li><code>&gt;</code> - navigate to a page or page view</li><li><code>saved:</code> - recall a saved search command</li><li><code>$</code> - sealed product mode (search + actions on a picked product)</li><li><code>+</code> - upload mode (URL, file picker, or current results) - when permitted</li></ul><p>Press <kbd>Shift+Delete</kbd> on a highlighted recent search or saved command to remove it instantly.</p><p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>',
                 table: [],
                 examples: [
                     { query: '? rarity', desc: 'Look up rarity syntax' },
@@ -74,7 +71,6 @@ window.__BAN_GUIDE = {
             snippets: ['Tab to lock', 's:', 'r:', 'c:', 'f:'],
             keywords: ['filter', 'chip', 'builder', 'tab', 'autocomplete', 'narrow', 'guided', 'compose'],
             content: {
-                description: '<p>The palette supports all search syntax prefixes as guided filter builders. Type a prefix and the dropdown shows matching options.</p><p>Locking a second chip with the same prefix merges it into the first: <code>s:MKM</code> followed by <code>s:LEA</code> becomes <code>s:MKM,LEA</code>. This applies to prefixes that accept multiple values - sets, rarities, colors, types, stores, tags.</p><p><strong>Card-aware narrowing:</strong> when a card chip is present, subsequent filter dropdowns narrow their options to what exists for that card. With a "Birds of Paradise" chip, <code>s:</code> only shows sets that card was printed in, and <code>c:</code> only shows green color combinations.</p>',
                 table: [
                     { value: 's: / e:', short: 'Set / edition codes' },
                     { value: 'r:', short: "Rarity (the game's own, as one word or the letter it begins)" },
@@ -107,7 +103,6 @@ window.__BAN_GUIDE = {
             snippets: ['>newspaper', '>arbit', '>sleepers'],
             keywords: ['navigate', 'sub-view', 'multi-stage', 'newspaper view', 'sleepers mode', 'arbit filter'],
             content: {
-                description: '<p>The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip - the dropdown then shows that page\'s specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).</p><p>For Arbitrage pages, you can lock multiple filter chips in sequence - each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page\'s base URL.</p>',
                 table: [
                     { value: '>newspaper + Tab', short: 'Shows all Newspaper views' },
                     { value: '>sleepers + Tab', short: 'Shows the 5 analysis modes' },
@@ -130,7 +125,6 @@ window.__BAN_GUIDE = {
             snippets: ['saved:'],
             keywords: ['saved', 'bookmark', 'favorite', 'command', 'recall', 'reuse', 'store', 'manage', 'delete', 'edit'],
             content: {
-                description: '<p>Any search query can be saved as a named command. Press <kbd>Ctrl+S</kbd> / <kbd>Cmd+S</kbd> while the palette is open, or select <strong>Save Current Search</strong> from the palette on a search results page. You\'ll be prompted to name the command.</p><p>Saved commands appear in the palette default view and can be filtered with the <code>saved:</code> prefix.</p><p><strong>Editing:</strong> <kbd>Enter</kbd> runs a saved command directly. <kbd>Shift+Enter</kbd> restores its chips into the palette input so you can modify and re-run.</p><p><strong>Deleting:</strong> highlight a saved command and press <kbd>Shift+Delete</kbd> to remove it instantly (no confirmation). You can also hover and click the trash icon for a confirmed deletion.</p>',
                 table: [
                     { value: 'Save Current Search', short: 'Palette command (appears on search results pages)' },
                     { value: 'Ctrl+S / Cmd+S', short: 'Save the current page search as a command (while palette is open)' },
@@ -155,7 +149,6 @@ window.__BAN_GUIDE = {
             snippets: ['$', '$Booster Box', 'Shift+Enter contents', 'Ctrl+Enter unpack'],
             keywords: ['sealed', 'product', 'booster', 'pack', 'contents', 'unpack', 'pack pull', 'sealed mode', 'box', 'bundle'],
             content: {
-                description: '<p>Type <code>$</code> as the first character to enter <strong>Sealed mode</strong>. The autocomplete dropdown switches to the sealed-product dataset (booster boxes, bundles, packs, decks, cases, displays). Matching is <strong>prefix-only on the full product name</strong> - type the start of the actual name (e.g. <code>$Modern Horizons 3</code>), not a set code (<code>$MH3</code> will not match).</p><p>For any highlighted product the palette offers three actions:</p><ul><li><kbd>Enter</kbd> - search the sealed page for that product (price grid).</li><li><kbd>Shift+Enter</kbd> - <strong>View Contents</strong> - displays the cards inside the product.</li><li><kbd>Ctrl+Enter</kbd> - <strong>Pack Pull</strong> - simulates opening the product (when supported by the data).</li></ul><p><strong>Tab</strong> locks the highlighted product as a chip; the dropdown then morphs into a 3-row action menu where the same actions are reachable via arrow keys + Enter for users who prefer the menu over the modifier keys. Pack Pull is hidden if the product has no picks data.</p><p>If your typed query matches no products, <kbd>Enter</kbd> falls back to a generic <code>/sealed?q=&lt;text&gt;</code> search.</p>',
                 table: [
                     { value: '$',                  short: 'Enter sealed mode (autocomplete switches to sealed products)' },
                     { value: 'Enter',              short: 'Search prices for the highlighted product' },
@@ -183,7 +176,6 @@ window.__BAN_GUIDE = {
             keywords: ['upload', 'uploader', 'url', 'file', 'csv', 'xls', 'xlsx', 'sheets', 'tcgplayer', 'send', 'hashes', 'collection'],
             requiresNav: 'Upload',
             content: {
-                description: '<p>Type <code>+</code> as the first character to enter <strong>Upload mode</strong> (available when your tier includes the Uploader). The dropdown adapts to what is available:</p><ul><li><strong>Pasted URL</strong> - any input matching a supported collection, deck tracker, or spreadsheet host shows an "Upload from..." row identifying the source.</li><li><strong>Browse for file...</strong> - always present; opens the native file picker for CSV / XLS / XLSX.</li><li><strong>Send N results to Uploader</strong> - shown on any page with row hashes (search and contents results); posts the visible hashes to the Uploader.</li></ul><p>All paths submit to <code>/upload</code> as a POST. Your saved upload preferences (mode, store list, optimizer settings) ride along automatically as cookies, so the result page reflects whatever you last configured at <code>/upload</code>.</p><p>Unsupported URL hosts render an error row that ignores Enter; pick one of the supported sources or use the file picker.</p>',
                 table: [
                     { value: '+',                                    short: 'Enter upload mode (when tier permits)' },
                     { value: '+<URL>',                               short: 'Submit a Sheets or tracker URL' },
@@ -208,7 +200,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['walkthrough', 'tutorial', 'example', 'workflow', 'how to', 'scenario', 'step by step'],
             content: {
-                description: '<p>End-to-end keystroke sequences. Follow along in a live palette to build muscle memory.</p><div class="guide-walkthrough"><h4>1. Find all foil printings of a card</h4><ol><li><kbd>Ctrl+K</kbd> to open the palette.</li><li>Type <code>Birds of Paradise</code>. The card name appears in the dropdown.</li><li><kbd>Tab</kbd> - Birds of Paradise becomes a chip.</li><li>Type <code>f:foil</code>. The Finish dropdown appears with foil highlighted.</li><li><kbd>Tab</kbd> - <code>f:foil</code> becomes a chip.</li><li><kbd>Enter</kbd> - navigates to search with the composed query.</li></ol></div><div class="guide-walkthrough"><h4>2. Jump to Arbitrage with profit filters</h4><ol><li><kbd>Ctrl+K</kbd>.</li><li>Type <code>&gt;arb</code>. Arbitrage appears.</li><li><kbd>Tab</kbd> - Arbitrage chip locks; the dropdown now shows filter presets and sort options.</li><li>Type <code>yield</code> to narrow to "only Yield+".</li><li><kbd>Tab</kbd> - filter chip added.</li><li>Type <code>bucks</code>, <kbd>Tab</kbd> - second filter added.</li><li>Type <code>sort</code>, <kbd>Tab</kbd> on "Spread %" - sort chip added.</li><li><kbd>Enter</kbd> - navigates to <code>/arbit?nolow=true&amp;nopenny=true&amp;sort=spread</code>.</li></ol></div><div class="guide-walkthrough"><h4>3. Save a complex query for later</h4><ol><li>Build a query with chips: a card plus filters (as in walkthrough 1).</li><li>Press <kbd>Ctrl+S</kbd> while the palette is open.</li><li>Enter a short name and <kbd>Enter</kbd> - the command is saved.</li><li>Later, open the palette and type <code>saved:</code> to find your command.</li><li><kbd>Enter</kbd> runs it; <kbd>Shift+Enter</kbd> restores its chips for editing.</li></ol></div><div class="guide-walkthrough"><h4>4. Narrow a search with card-aware filters</h4><ol><li><kbd>Ctrl+K</kbd>.</li><li>Type <code>Lightning Bolt</code>, <kbd>Tab</kbd> - Lightning Bolt chip locks.</li><li>Type <code>s:</code> - the sets dropdown shows only sets Lightning Bolt has been printed in.</li><li>Type <code>Alpha</code>, <kbd>Tab</kbd> - picks Limited Edition Alpha, chip locks as <code>s:Alpha</code>.</li><li>Type <code>f:foil</code>, <kbd>Tab</kbd>, <kbd>Enter</kbd> - composes the final query.</li></ol></div><div class="guide-walkthrough"><h4>5. Look up syntax while building a query</h4><ol><li>In any context, type <code>?</code> followed by a keyword - e.g. <code>?rarity</code> or <code>? foil</code>.</li><li>The dropdown shows a syntax snippet - <kbd>Enter</kbd> copies it to your clipboard.</li><li><kbd>Shift+Enter</kbd> jumps to the full section of this guide.</li></ol></div><div class="guide-walkthrough"><h4>6. Browse the contents of a booster box</h4><ol><li><kbd>Ctrl+K</kbd> to open the palette.</li><li>Type <code>$bundle lci</code>. Sealed product matches appear under a "Sealed" header.</li><li>Arrow to the desired product.</li><li><kbd>Shift+Enter</kbd> - navigates to <code>/sealed?q=contents:Bundle...</code> showing the cards inside.</li></ol></div><div class="guide-walkthrough"><h4>7. Push a search result set to Upload</h4><ol><li>On any search results page (e.g. <code>/search?q=lightning bolt</code>), <kbd>Ctrl+K</kbd>.</li><li>Type <code>+</code>. The dropdown shows "Send N results to Uploader" alongside file picker and URL options.</li><li>Arrow to the "Send N results" row.</li><li><kbd>Enter</kbd> - the page POSTs to <code>/upload</code> with the row hashes; you land on the upload results page using your saved store and mode preferences.</li></ol></div>',
                 table: [],
                 examples: []
             }
@@ -223,7 +214,6 @@ window.__BAN_GUIDE = {
             snippets: ['Ctrl+K', '?', '>', 'saved:', 'Tab'],
             keywords: ['cheatsheet', 'reference', 'shortcuts', 'keys', 'prefixes', 'all', 'list'],
             content: {
-                description: '<strong>Opening / closing</strong>',
                 table: [
                     { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette from anywhere' },
                     { value: '/', short: 'Open when no input is focused' },
@@ -274,7 +264,6 @@ window.__BAN_GUIDE = {
             snippets: ['name|set|number|finish', 'Sol Ring*', 'Sheoldred (Showcase)', 'r:rare,mythic'],
             keywords: ['basic', 'name', 'pricefall', 'notation', 'suffix', 'foil', 'nonfoil', 'etched', 'altfoil', 'finish', 'comma', 'multiple', 'syntax', 'search'],
             content: {
-                description: '<p>Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.</p><p>Human-readable tags are also supported - for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).</p><p>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:</p>',
                 table: [
                     { value: '&', short: 'Non-foil only' },
                     { value: '*', short: 'Foil only' },
@@ -299,7 +288,6 @@ window.__BAN_GUIDE = {
             snippets: ['s:CODE', 's:"Set Name"', 'se:REGEXP', 'e:CODE'],
             keywords: ['edition', 'set', 'expansion', 'code', 'name', 'scryfall', 'e:', 's:', 'se:', 'regex', 'regexp', 'filter'],
             content: {
-                description: '<p>Filter cards by edition using the Scryfall notation <code>s:CODE</code> or the full edition name in quotes: <code>s:"Aether Revolt"</code>.</p><p>Regular expressions are supported with <code>se:REGEXP</code>. For compatibility, <code>e:CODE</code> (exact match) and <code>ee:REGEXP</code> (regexp) are also accepted.</p>',
                 table: [
                     { value: 's:CODE', short: 'Set by code (e.g. s:MKM)' },
                     { value: 's:"Name"', short: 'Set by full name' },
@@ -324,7 +312,6 @@ window.__BAN_GUIDE = {
             snippets: ['cn:123', 'cn:1-50', 'cn>300', 'cn:CODE:42', 'cns:107★', 'cne:REGEXP'],
             keywords: ['collector', 'number', 'cn', 'cns', 'cne', 'range', 'comparison', 'regex', 'regexp', '#', 'card number', 'strict', 'star', 'total', 'set size'],
             content: {
-                description: '<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p><p>A plain <code>cn:</code> number ignores the ★/†/φ decorations, so <code>cn:107</code> also finds a card numbered 107★. A number with letters or marks, like <code>cn:107★</code> or <code>cn:HNT222</code>, finds the printing numbered that way. Use the strict form <code>cns:NUMBER</code> to match even a plain number exactly as printed.</p><p>Regular expressions are supported via <code>cne:REGEXP</code>.</p><p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p><p>Where a card prints its set size beside its number, as Pokémon and Lorcana do, add it after a slash: <code>cn:222/236</code>, or just search <code>222/236</code>.</p>',
                 table: [
                     { value: 'cn:NUMBER', short: 'Exact collector number' },
                     { value: 'cn:N-N', short: 'Range of collector numbers' },
@@ -353,7 +340,6 @@ window.__BAN_GUIDE = {
             snippets: ['f:foil', 'f:etched', 'f:nonfoil', 'is:altfoil', 'Lightning Bolt*'],
             keywords: ['finish', 'foil', 'etched', 'nonfoil', 'altfoil', 'surge', 'ripple', 'galaxy', 'treatment', 'f:', 'is:altfoil'],
             content: {
-                description: '<p>Filter by finish with <code>f:VALUE</code> using the values below, or append a suffix character directly to any search term.</p>',
                 table: [
                     { value: 'foil / f', short: 'Foil' },
                     { value: 'nonfoil / nf', short: 'Non-foil' },
@@ -382,7 +368,6 @@ window.__BAN_GUIDE = {
             snippets: ['c:WUBRG', 'ci:esper', 'c:azorius', 'c:colorless', 'c:multicolor'],
             keywords: ['color', 'colour', 'identity', 'ci', 'c:', 'WUBRG', 'white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor', 'guild', 'shard', 'wedge', 'college', 'azorius', 'dimir', 'rakdos', 'gruul', 'selesnya', 'orzhov', 'izzet', 'golgari', 'boros', 'simic', 'bant', 'esper', 'grixis', 'jund', 'naya', 'abzan', 'jeskai', 'sultai', 'mardu', 'temur', 'silverquill', 'prismari', 'witherbloom', 'lorehold', 'quandrix', 'chaos', 'aggression', 'altruism', 'growth', 'artifice'],
             content: {
-                description: '<p>Filter by card color with <code>c:COLOR</code> or by color identity with <code>ci:COLOR</code> (alias <code>identity:</code>). Each game names its own colors (<code>c:fire</code>, <code>c:fury</code>), and <code>c:colorless</code> and <code>c:multicolor</code> work in every game. In Magic, combine WUBRG letters directly (<code>c:rg</code>), or use any color name or named group. The table lists the colors of the game this site serves; options with more than one accepted spelling list every alias together.</p>',
                 table: [
                     { value: 'white / w', short: 'White (W)' },
                     { value: 'blue / u', short: 'Blue (U)' },
@@ -440,7 +425,6 @@ window.__BAN_GUIDE = {
             snippets: ['format:standard', 'format:modern', 'format:commander'],
             keywords: ['format', 'legal', 'legality', 'banned', 'restricted', 'standard', 'pioneer', 'modern', 'legacy', 'vintage', 'pauper', 'commander', 'edh', 'brawl', 'oathbreaker', 'pdh'],
             content: {
-                description: 'Filter to cards that are legal (or restricted) in a given format with <code>format:NAME</code> (alias <code>legal:NAME</code>). Banned and not-legal cards are excluded; negate with <code>-format:NAME</code>. Combine formats with commas to match any of them.',
                 table: [
                     { value: 'standard', short: 'Standard' },
                     { value: 'pioneer', short: 'Pioneer' },
@@ -482,7 +466,6 @@ window.__BAN_GUIDE = {
             snippets: ['r:mythic', 'r:m', 'r:rare', 'r>=rare', 'r<uncommon'],
             keywords: ['rarity', 'r:', 'mythic', 'rare', 'uncommon', 'common', 'special', 'token', 'oversize', 'shorthand', 'comparison'],
             content: {
-                description: 'Filter by rarity with <code>r:RARITY</code>, written as one word: <code>r:superrare</code> for Super Rare. A single letter stands for each of the game\'s rarities that begins with it, so <code>r:c</code> is common. <code>r&gt;RARITY</code> and <code>r&lt;RARITY</code> compare by the game\'s own order, rarest first; a letter standing for several compares as any of them, so <code>r&gt;</code> keeps what is rarer than the commonest and <code>r&lt;</code> what is commoner than the rarest. The table lists the rarities of the game this site serves.',
                 table: [
                     { value: 'mythic / m', short: 'Mythic rarity' },
                     { value: 'rare / r', short: 'Rare rarity' },
@@ -510,7 +493,6 @@ window.__BAN_GUIDE = {
             snippets: ['cond:NM', 'cond:SP', 'condr:MP', 'condb:NM', 'cond>SP'],
             keywords: ['condition', 'cond', 'NM', 'SP', 'MP', 'HP', 'PO', 'near mint', 'slightly played', 'moderately played', 'heavily played', 'poor', 'retail', 'buylist', 'condr', 'condb'],
             content: {
-                description: 'Filter by condition with <code>cond:COND</code>. Use <code>condr:</code> to apply the filter to retail prices only, or <code>condb:</code> for buylist prices only. Comparison operators are supported.',
                 table: [
                     { value: 'NM', short: 'Near Mint' },
                     { value: 'SP', short: 'Slightly Played' },
@@ -536,7 +518,6 @@ window.__BAN_GUIDE = {
             snippets: ['t:creature', 't:legendary', 't:goblin', 't:booster', 't:planeswalker'],
             keywords: ['type', 'supertype', 'subtype', 'creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'planeswalker', 'land', 'legendary', 'goblin', 'elf', 'wizard', 'booster', 'box', 'deck', 'sealed', 'product', 'redemption'],
             content: {
-                description: 'Filter by card type with <code>t:VALUE</code>, accepting any valid supertype, type, or subtype. The same option also works for sealed products - you can search by category (booster, box, deck) or subtype (draft, collector, intro), or any fragment of the product name.',
                 table: [],
                 examples: [
                     { query: 't:creature', desc: 'All creatures' },
@@ -557,7 +538,6 @@ window.__BAN_GUIDE = {
             snippets: ['date:2024', 'date>2023-01-01', 'year<2004', 'date:now', 'date:MKM'],
             keywords: ['date', 'year', 'release', 'when', 'old', 'new', 'vintage', 'modern', 'today', 'now', 'iso', 'format'],
             content: {
-                description: 'Filter by release date with <code>date:VALUE</code>, <code>date&gt;VALUE</code>, or <code>date&lt;VALUE</code>. Use <code>year:VALUE</code> for year-only filtering. The value formats accepted are:',
                 table: [
                     { value: 'YYYY-MM-DD', short: 'ISO date format' },
                     { value: 'YYYY-MM', short: 'Year and month' },
@@ -583,7 +563,6 @@ window.__BAN_GUIDE = {
             snippets: ['is:reserved', 'is:extendedart', 'is:showcase', 'is:borderless', 'not:foil', 'is:ea', 'is:sc'],
             keywords: ['properties', 'is:', 'not:', 'reserved', 'token', 'oversize', 'fullart', 'extendedart', 'extended art', 'showcase', 'reskin', 'borderless', 'gold', 'future', 'altfoil', 'japanese', 'phyrexian', 'wcd', 'commander', 'funny', 'gamechanger', 'ea', 'sc', 'bd', 'gc', 'jp', 'jpn', 'ph'],
             content: {
-                description: '<p>Filter by card properties with <code>is:VALUE</code> or exclude with <code>not:VALUE</code> (equivalent to <code>-is:VALUE</code>). Options with more than one accepted spelling list every alias together.</p>',
                 table: [
                     { value: 'reserved', short: 'On the Reserved List' },
                     { value: 'token', short: 'Token card' },
@@ -626,7 +605,6 @@ window.__BAN_GUIDE = {
             snippets: ['is:promo', 'is:prerelease', 'is:buyabox', 'is:serialized', 'is:altfoil', 'is:surge'],
             keywords: ['promo', 'prerelease', 'buyabox', 'buy a box', 'serialized', 'variant', 'retro', 'retroframe', 'stamped', 'convention', 'fnm', 'wpn', 'gameday', 'judge', 'arena', 'release', 'bundle', 'altfoil', 'foil', 'surge', 'galaxy', 'ripple', 'rainbow', 'halo', 'mana', 'neon', 'gilded', 'textured', 'oilslick', 'confetti', 'fracture', 'embossed', 'godzilla', 'dracula', 'concept', 'poster', 'glossy', 'storechampionship', 'draftweekend', 'intropack', 'starterdeck'],
             content: {
-                description: '<p>Filter promo cards and special foil treatments with <code>is:VALUE</code>. Use <code>is:promo</code> to match any promo type, or one of the specific tags below for targeted filtering. Options with more than one accepted spelling list every alias together.</p><p><code>is:altfoil</code> is a convenience union that matches <em>any</em> special foil treatment (surge, ripple, galaxy, etc.). The list tracks the live card data, so newer treatments work as soon as the data includes them even if not listed here.</p>',
                 table: [
                     { value: 'promo', short: 'Any promo (matches every type below)' },
                     { value: 'altfoil', short: 'Any special foil treatment (union of the foil tags)' },
@@ -696,7 +674,6 @@ window.__BAN_GUIDE = {
             snippets: ['is:fetchland', 'is:dual', 'is:shockland', 'is:power9', 'is:abu4h'],
             keywords: ['land', 'cycle', 'fetchland', 'fetch', 'dual', 'shockland', 'shock', 'painland', 'pain', 'checkland', 'check', 'fastland', 'fast', 'filterland', 'surveilland', 'vergeland', 'triome', 'power9', 'p9', 'abu4h', 'alpha', 'beta', 'unlimited'],
             content: {
-                description: 'Filter by well-known land cycles and set groupings using <code>is:VALUE</code>:',
                 table: [
                     { value: 'is:dual', short: 'Original dual lands' },
                     { value: 'is:fetchland', short: 'Fetch lands' },
@@ -729,7 +706,6 @@ window.__BAN_GUIDE = {
             snippets: ['price>10', 'price<5', 'buy_price>5', 'ratio>50', 'price>TCGLow', 'arb_price', 'rev_price'],
             keywords: ['price', 'buy_price', 'arb_price', 'rev_price', 'ratio', 'cost', 'value', 'retail', 'buylist', 'TCGLow', 'filter', 'comparison', 'desirability'],
             content: {
-                description: '<p>Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store\'s price - <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.</p><p>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.</p><p><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).</p>',
                 table: [
                     { value: 'price', short: 'Retail price filter' },
                     { value: 'buy_price', short: 'Buylist price filter' },
@@ -755,7 +731,6 @@ window.__BAN_GUIDE = {
             snippets: ['qty>4', 'qty<2'],
             keywords: ['quantity', 'qty', 'stock', 'copies', 'available', 'playset', 'inventory'],
             content: {
-                description: '<p>Filter results by the quantity a store has in stock (or a buylist wants) with <code>qty&gt;VALUE</code> and <code>qty&lt;VALUE</code>. Comparisons are strict, so <code>qty&gt;3</code> means four or more copies.</p><p>Stores that don\'t report quantities (index price sources and some retailers) are excluded from quantity-filtered results, and cards left with no matching offers are dropped.</p><p><code>quantity</code> works as a long-form alias.</p>',
                 table: [
                     { value: 'qty>N', short: 'More than N copies in stock' },
                     { value: 'qty<N', short: 'Fewer than N copies in stock' }
@@ -776,7 +751,6 @@ window.__BAN_GUIDE = {
             snippets: ['store:TCG', 'store:only:CK', 'vendor:CK', 'seller:SCG', 'region:eu', 'skip:index', 'skip:retail'],
             keywords: ['store', 'vendor', 'seller', 'region', 'skip', 'only', 'CK', 'TCG', 'SCG', 'MKM', 'us', 'eu', 'jp', 'index', 'retail', 'buylist', 'empty', 'filter'],
             content: {
-                description: '<p>Filter by seller or vendor with <code>store:shorthand</code>, <code>seller:shorthand</code> (retail), or <code>vendor:shorthand</code> (buylist). You can pass either a store\'s full name in quotes or its shorthand. These drop results where the store is absent. To show only that store, use <code>store:only:shorthand</code>. The complete, always-current list of every store shorthand is shown at the bottom of this section.</p><p>The <code>skip:</code> filter hides entire result categories. Note: store filters leave index results visible - use <code>skip:index</code> to hide them.</p>',
                 table: [
                     { value: 'store:X', short: 'Include results from store X' },
                     { value: 'store:only:X', short: 'Show only results from store X' },
@@ -809,7 +783,6 @@ window.__BAN_GUIDE = {
             snippets: ['sm:exact', 'sm:prefix', 'sm:any', 'sm:regexp', 'sm:scryfall'],
             keywords: ['mode', 'sm:', 'exact', 'prefix', 'any', 'regexp', 'regex', 'scryfall', 'match', 'contains', 'starts', 'pattern', 'forward'],
             content: {
-                description: '<p>Change search matching behavior with <code>sm:VALUE</code>. The default mode is <code>exact</code> - only cards with that precise name are returned.</p><p>In <code>scryfall</code> mode, the query is forwarded to Scryfall. BAN card filters are disabled to avoid conflicts, but store and price filters still apply.</p>',
                 table: [
                     { value: 'exact', short: 'Exact name match (default)' },
                     { value: 'prefix', short: 'Names starting with search term' },
@@ -836,7 +809,6 @@ window.__BAN_GUIDE = {
             snippets: ['contents:"Bundle"', 'decklist:"Bundle"', 'variable:"Bundle"'],
             keywords: ['contents', 'decklist', 'variable', 'sealed', 'guaranteed', 'random', 'drop rate', 'avg copies', 'expected', 'pull rate', 'odds', 'probability'],
             content: {
-                description: '<p>A sealed product\'s name resolves the same way for three filters, each reading its contents differently: <code>contents:"NAME"</code> lists everything the product can hold, guaranteed cards and random draws together; <code>decklist:"NAME"</code> lists only what it always holds (empty for a product that is pure boosters); <code>variable:"NAME"</code> lists only what it draws at random - the guaranteed cards taken back out. A product with both a fixed part and a random part shows a three-pill switch on the results page to jump between all three; naming more than one product in a query pools their contents but drops the switch, since it no longer names one product to read.</p><p>Under <code>variable:</code> alone, each card also carries an <strong>Avg Copies (est.)</strong> row: how many copies of that card you would get, on average, opening the product once. It is a count, not a chance - a card only one slot in the product can hold reads as a share below 1 (0.4 is roughly two packs in five), but a common card drawn from more than one slot in the same product adds up across those slots and can read well above 1 (a common land can average several copies in a full booster case). A fourth sort button next to the switch, shaped like a copy icon, orders results by this count, longest shot first by default. The row itself does not depend on that button showing: a product with nothing guaranteed at all has no three-way switch to offer (there is only one reading of it), but its cards still carry Avg Copies under a plain <code>variable:</code> search.</p>',
                 examples: [
                     { query: 'contents:"Welcome Deck 2024 Black Deck"', desc: 'Everything the deck can hold' },
                     { query: 'decklist:"Welcome Deck 2024 Black Deck"', desc: 'Only its 30 guaranteed spells' },
@@ -854,7 +826,6 @@ window.__BAN_GUIDE = {
             snippets: ['sort:chrono', 'sort:retail', 'sort:buylist', 'sort:alpha', 'sort:number', 'sort:hybrid'],
             keywords: ['sort', 'order', 'chrono', 'hybrid', 'alpha', 'alphabetical', 'number', 'retail', 'buylist', 'price', 'date', 'print', 'collector'],
             content: {
-                description: 'Change the sort order of results with <code>sort:VALUE</code>. Note: when a sort is set via query, the sort UI dropdown is disabled. A seventh order, by a card\'s Avg Copies count, exists only under a <code>variable:</code> search - see "A Product\'s Contents" - and is reached by clicking its own button on the results page rather than typing <code>sort:</code>.',
                 table: [
                     { value: 'chrono', short: 'By print date (default)' },
                     { value: 'hybrid', short: 'Alphabetical with sets grouped' },
@@ -880,7 +851,6 @@ window.__BAN_GUIDE = {
             snippets: ['on:hotlist', 'on:newhigh', 'on:cksell', 'on:ckwait', 'on:tcgsyp', 'on:newspaper', 'on:mtgstocks'],
             keywords: ['list', 'on:', 'hotlist', 'newhigh', 'new high', 'cksell', 'ckwait', 'wait', 'sell now', 'card kingdom', 'tcgsyp', 'syp', 'newspaper', 'mtgstocks', 'stocks', 'spike', 'hot', 'curated', 'special', 'TCGplayer'],
             content: {
-                description: 'Check if a card belongs to a curated list using <code>on:VALUE</code>:',
                 table: [
                     { value: 'hotlist', short: 'Highest buylist prices over 3 months (the 90d high and New high pills)' },
                     { value: 'newhigh', short: 'Card Kingdom just beat every buylist price of the last 3 months (the New high pill)' },
@@ -910,7 +880,6 @@ window.__BAN_GUIDE = {
             snippets: ['name:"Lightning Bolt"', '-name:"Sol Ring"', 'namee:^The', 'id:12345'],
             keywords: ['name', 'namee', 'id', 'include', 'exclude', 'filter', 'specific', 'regex', 'regexp', 'MTGBAN', 'MTGJSON', 'scryfall', 'TCGplayer', 'product ID'],
             content: {
-                description: '<p>Filter by card name to include or exclude specific cards from a query using <code>name:NAME</code>. Enclose names with spaces in quotes or parentheses. Prefix with <code>-</code> to exclude.</p><p>Regular expressions are supported with <code>namee:REGEXP</code>.</p><p>Filter by internal card ID with <code>id:VALUE</code>, supporting MTGBAN, MTGJSON, Scryfall, and TCGplayer product IDs.</p>',
                 table: [
                     { value: 'name:"X"', short: 'Include only cards named X' },
                     { value: '-name:"X"', short: 'Exclude cards named X' },
@@ -936,7 +905,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['search', 'price', 'retail', 'buylist', 'chart', 'history', 'affiliate', 'store', 'sealed', 'product', 'condition', 'index', 'reprint', 'finder'],
             content: {
-                description: '<p>The main search page is the entry point for finding prices across every tracked store and vendor. It handles both single cards and sealed products, and accepts the full filter syntax documented in the Syntax tab.</p><p><strong>Results layout:</strong> retail prices and buylist offers are split into separate tables. Each card has condition breakdowns (NM/SP/MP/HP/PO), and index prices from aggregators like TCGplayer Market, TCG Low, and Card Kingdom appear alongside individual vendor prices for reference.</p><p><strong>Per-card actions:</strong></p><ul><li><strong>📊 chart icon</strong> - opens historical price data from major vendors</li><li><strong>📖 book icon</strong> - opens the reprint finder, listing every product containing any reprint of that card</li><li><strong>Buy links</strong> - vendor affiliate links that support BAN at no extra cost</li></ul><p>The command palette\'s default behavior (type a card name, press Enter) lands you here.</p>',
                 table: [],
                 examples: [
                     { query: 'Lightning Bolt s:lea', desc: 'Alpha Lightning Bolt prices' },
@@ -956,7 +924,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['sealed', 'product', 'booster', 'bundle', 'box', 'deck', 'commander deck', 'expansion', 'reprint', 'draft', 'core set', 'boxed set', 'commander supplement', 'from the vault', 'starter', 'browse', 'category', 'surprise me'],
             content: {
-                description: '<p>The Sealed page is a structured directory of every sealed product BAN tracks. The left sidebar groups products by category; the main area shows the selected category as a clickable grid with set symbols for orientation.</p><p>Three ways to find a product:</p><ul><li><strong>Browse by category</strong> - pick a category in the sidebar (Commander Decks, Expansions, Boxed Sets, etc.)</li><li><strong>Search</strong> - type into the product search input to filter by name across all categories</li><li><strong>Surprise Me</strong> - opens a random product</li></ul><p>Clicking a product takes you to its price grid (every vendor selling it, plus index references). From the command palette, <code>$&lt;product name&gt;</code> reaches the same destination and adds two shortcuts the page itself doesn\'t expose: <kbd>Shift+Enter</kbd> for the product\'s contents, <kbd>Ctrl+Enter</kbd> for a pack-pull simulation.</p>',
                 table: [
                     { value: 'Commander Decks',       short: 'Preconstructed Commander products by set' },
                     { value: 'Expansions',            short: 'Standard-legal set boosters, bundles, and cases' },
@@ -990,7 +957,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['newspaper', 'spike', 'score', 'buylist', 'change', 'trend', 'seller', 'count', 'SYP', 'archive', 'daily', 'movement', 'price change', 'vendor', 'listings', 'supply', 'demand', 'edition'],
             content: {
-                description: '<p>The Newspaper is BAN\'s daily snapshot of meaningful market movement. Each issue is an "edition" - the Early Edition is the in-progress view of the current day, with the previous full day available on a delay.</p><p><strong>Six metric cards make up an issue:</strong></p><p><strong>Spike scores</strong> - cards whose prices have jumped recently:</p><ul><li><em>Top Singles by Combined Spike Score</em> - blends TCGplayer sales velocity with Card Kingdom buylist movement. The strongest signal of "something is happening" because two independent data sources agree.</li><li><em>Top Singles by Spike Score</em> - TCGplayer-only sales-velocity spikes. Useful for catching moves before they propagate.</li></ul><p><strong>Vendor listings (supply signals)</strong> - tracks how many sellers have a card in stock:</p><ul><li><em>Greatest Increase</em> - stock is piling up faster than it sells. <strong>Avoid these</strong> as buys.</li><li><em>Greatest Decrease</em> - stock is drying up. <strong>Seek these out</strong> as buys.</li></ul><p><strong>Buylist offers (demand signals)</strong> - tracks what vendors are willing to pay:</p><ul><li><em>Greatest Increase</em> - higher offers indicate higher sales rates for the vendor. Can be fleeting; not a sole-source signal unless you\'re dropshipping.</li><li><em>Greatest Decrease</em> - declining offers indicate the vendor is moving fewer copies. Same caveat applies.</li></ul><p>The <strong>Archive</strong> view (palette: <code>&gt;newspaper + Tab + Archive</code>) browses historical issues by date.</p>',
                 table: [
                     { value: 'Early Edition',                           short: 'In-progress view of today\'s data' },
                     { value: 'Standard Edition',                        short: 'Previous full day' },
@@ -1020,7 +986,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['screener', 'movers', 'price change', 'percent', 'threshold', 'gainers', 'losers', 'trending', 'filter', 'tcglow', 'tcg low', 'window', 'floor', 'was', 'now', 'up', 'down', 'sealed', 'edition', 'per page'],
             content: {
-                description: '<p>The Screener finds cards whose price has moved by a threshold you choose. Where the Newspaper is a fixed daily snapshot, every filter here is editable - so you can ask arbitrary questions like "TCGplayer Low $50 or more, up 20% or more over the last 30 days."</p><p><strong>How it works:</strong> pick a price <strong>metric</strong> and a <strong>window</strong>, choose whether you want cards moving <strong>up</strong>, <strong>down</strong>, or <strong>either</strong>, then set your floors and percent threshold. Results are every card matching all of it, sortable by current price, prior price, percent change, or dollar change.</p><p><strong>Two price floors:</strong> <em>Now $</em> filters on the current price; <em>Was $</em> filters on the price at the start of the window. They combine, so you can screen for cards that <em>were</em> $100+ and have since moved, regardless of where they sit now.</p><p>The <strong>Type</strong> toggle switches between singles, sealed products, or both. The <strong>Editions</strong> dropdown narrows to specific sets (checkboxes populated from the current results). Set <strong>Per page</strong> and press <strong>Apply</strong>; <strong>Reset</strong> returns everything to defaults.</p>',
                 table: [
                     { value: 'Metric',                short: 'Which price to track (TCG Low/Market, CK/SCG/ABU/CSI buylist, Cardmarket, Sealed EV)' },
                     { value: 'Window',                short: 'Lookback period: 1, 7, 14, 30, or 90 days' },
@@ -1049,7 +1014,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['sleepers', 'bulk', 'reprint', 'mismatch', 'gap', 'hotlist', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
             content: {
-                description: '<p>Sleepers surfaces cards where market pricing hasn\'t kept pace with demand, scarcity, or cross-market differences. Every result is tiered <strong>S through F</strong> - higher tiers mean stronger signals.</p><p><strong>Four analysis modes</strong> (each is its own page; palette: <code>&gt;sleepers + Tab + &lt;mode&gt;</code>):</p><ul><li><strong>Bulk Me Up</strong> - cards deviating from their set\'s average over the last 5 years; unexpected gems hiding in bulk</li><li><strong>Long Time No Reprint</strong> - no reprint in 2+ years; excludes bulk, Reserved List, and non-tournament cards</li><li><strong>Market Mismatch</strong> - buylist exceeds market price, or card is priced below TCG Low; direct arbitrage signal</li><li><strong>Hotlist</strong> - most buylist growth over the past 3 months; emerging trends before they fully break</li></ul><p><strong>Ocean Gap</strong> (BETA) is a fifth, distinct tool on the same page: it compares two sellers head-to-head and surfaces cards where one is cheaper than the other. Preset pairings between common reference indexes are one click each; custom pairings (pick any reference, any target) require a higher tier.</p>',
                 table: [
                     { value: 'Bulk Me Up',              short: 'Cards deviating from their set\'s 5-year average' },
                     { value: 'Long Time No Reprint',    short: 'No reprint in 2+ years (excludes bulk / RL / non-tournament)' },
@@ -1076,7 +1040,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet'],
             content: {
-                description: '<p>Upload &amp; Compare matches your collection against every active vendor and reports prices side-by-side. The page is a three-step flow.</p><p><strong>Step 1 - Mode &amp; Stores.</strong> Toggle between <strong>Retail</strong> (cheapest places to buy) and <strong>Buylist</strong> (best places to sell), then pick which vendors to include - Card Kingdom, Star City Games, Strike Zone, TCG Direct (net), TCGplayer SYP, and others depending on your tier. Your selection persists as a cookie, so the palette\'s upload mode (<code>+</code>) uses the same set.</p><p><strong>Step 2 - Load data.</strong> Three input paths:</p><ul><li><strong>Local CSV/XLS</strong> - drop or browse for a file (max 5MB)</li><li><strong>Remote URL</strong> - Google Sheets (must be publicly accessible), or collection and deck tracker URLs</li><li><strong>Paste Text</strong> - any tab/comma-separated text, or a plain card-name decklist</li></ul><p><strong>Step 3 - Process.</strong> <em>Upload</em> runs the match and produces an in-browser results page. From there, <em>Get CSV</em> downloads the full results, and three export buttons format the data for specific destinations: <em>CardConduit</em> (estimate), <em>Deckbox CSV</em>, and <em>TCGplayer CSV</em>.</p><p><strong>Format detection.</strong> Exports from TCGplayer, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card-name lists also work - the most recent printing is used for ambiguous names. To pin a specific printing of a multi-printing card, include the collector number or variant.</p><p><strong>Sheet quirks:</strong> Excel sheets must contain <code>mtgban</code> somewhere in the sheet name (BAN uses this to find the right tab in multi-sheet workbooks). A Google Sheets URL is remembered as a preference and reused on the next visit.</p><p><strong>Limits:</strong> 350 entries per upload (1000 with Optimizer tier). Rows with quantity 0 are skipped; identical entries with matching condition are merged.</p>',
                 table: [
                     { value: 'CSV / TSV',                              short: 'Comma or tab separated with sensible headers' },
                     { value: 'Excel (.xls, .xlsx)',                    short: 'Sheet name must contain "mtgban"' },
@@ -1102,7 +1065,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['global', 'arbitrage', 'index', 'reference', 'card kingdom', 'star city games', 'tcg market', 'CT zero', 'TCG direct', 'TCG low', 'EV', 'sealed', 'spread', 'profit', 'difference', 'yield', 'bucks', 'SYP', 'stocks', 'legit', 'cross-store', 'stable', 'decklist'],
             content: {
-                description: '<p>Global is a cross-store arbitrage tool that picks one store as a reference (the <em>index</em>) and surfaces cards where other markets are charging more. Unlike per-card Search, Global operates at the index level: every result is a comparison between the chosen index and one or more target stores.</p><p><strong>Pick an index:</strong></p><ul><li><strong>Singles</strong> - Card Kingdom, Star City Games, TCG Market</li><li><strong>Sealed</strong> - CT Zero EV Sealed, TCG Direct (net) EV Sealed, TCG Low EV Sealed (EV = expected value of pack contents)</li></ul><p>The results page shows each card with the index price, the target store\'s price, the dollar profit, the dollar difference, and a spread percentage. Direct Buy links go to both the source (the cheap index) and the target.</p><p><strong>Filter presets</strong> - toggle one or more to narrow results. The palette\'s <code>&gt;global + Tab</code> menu exposes the same set:</p>',
                 table: [
                     { value: 'only NM/SP',         short: 'Hide MP/HP/PO conditions' },
                     { value: 'only non-Foil',      short: 'Hide foils' },
@@ -1135,7 +1097,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'condition', 'foil', 'rarity', 'filter', 'admin'],
             content: {
-                description: '<p>Arbitrage identifies cards where a meaningful gap exists between a vendor\'s retail price and another vendor\'s buylist offer - i.e. potential flip opportunities. The same filter preset set used by Global applies here (Yield+, Bucks+, Difference+, etc.), and the <code>&gt;arbit + Tab</code> palette menu composes filter URLs directly.</p><p>See also the <strong>Reverse</strong> page (buylists paying more than retail) and the <strong>Global</strong> page (cross-store comparison at the index level), which are part of the same toolkit.</p>',
                 table: [],
                 examples: [
                     { query: '>arbit + Tab + "Yield+" + Tab + "Bucks+"', desc: 'Compose an Arbitrage URL with profit filters', palette: true }
@@ -1153,7 +1114,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['reverse', 'arbitrage', 'arb', 'buylist', 'retail', 'inverted', 'flip', 'admin', 'difference', 'profit'],
             content: {
-                description: '<p>Reverse is the inverted complement to <strong>Arbitrage</strong>: it surfaces cards where a buylist is paying <em>more</em> than another vendor is selling for retail. These are the most direct flip signals on the site - if a buylist is over retail elsewhere and the source has stock, the gap is real.</p><p>The same filter presets apply (Yield+, Bucks+, Difference+, etc.) and the palette\'s <code>&gt;reverse + Tab</code> menu builds filtered URLs.</p>',
                 table: [],
                 examples: [
                     { query: '>reverse + Tab + "Yield+"', desc: 'Reverse arbitrage results with yield filter', palette: true }
@@ -1171,7 +1131,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['tips', 'tricks', 'reading', 'prices', 'refresh', 'timing', 'condition', 'buylist', 'ratio', 'trade credit', 'tooltip', 'index', 'NM', 'sealed', 'interpret'],
             content: {
-                description: '<p>A few things to know when looking at price data:</p><p><strong>Price refresh:</strong> Data is updated periodically throughout the day. The exact delay is randomized to prevent sniping.</p><p><strong>Conditions:</strong> Inventory prices reflect stated conditions (accuracy depends on the provider). Buylist prices are always NM. Sealed products are always in sealed/unopened condition. The Index condition is for trend data only - no quantities are tracked.</p><p><strong>Buylist ratios:</strong> The percentage shown on buylist results reflects vendor desirability - higher means they want it more. Only shown when the vendor also has retail stock at matching conditions.</p><p><strong>Trade credit:</strong> Hover over a buylist price to see the corresponding trade credit value, if available.</p>',
                 table: [],
                 examples: [
                     { query: 'ratio>50 r:rare', desc: 'High-demand rares on buylists' },
@@ -1189,7 +1148,6 @@ window.__BAN_GUIDE = {
             snippets: ['on:cksell', 'on:ckwait', 'on:hotlist', 'on:newhigh'],
             keywords: ['card kingdom', 'ck', 'signal', 'sell now', 'wait', 'green', 'amber', 'arrow', 'good', 'stock', 'sold out', 'tcg market', 'reprint', 'new set', 'new high', '90d high', 'pill', 'hotlist', 'newhigh', 'cksell', 'ckwait', 'paused', 'last known'],
             content: {
-                description: '<p>Card Kingdom pays one of a short list of prices for each retail price, and moves up and down that list with how many copies it needs; its retail price carries the moves that last. BAN reads CK\'s list every day and marks CK\'s offer:</p><ul><li><strong>Green</strong> - sell now. CK is more likely to cut its offer than raise it: the card\'s set came out about a month ago, the card was just reprinted in a Modern Horizons, Commander or Masters set, or CK sells it well above TCG Market.</li><li><strong>Amber ↑</strong> - wait. CK is more likely to raise its offer: CK\'s stock halved since yesterday, CK just sold out, or TCG Market jumped this week. A wait wins over a sell now.</li><li><strong>No color</strong> - none of these.</li><li><strong>Paused</strong> - CK isn\'t buying the card. Its last known offer says for how long (<em>Paused 11d</em>); hover it for the chances CK buys it again within a month. An amber ↑ there means CK is more likely than not to come back within a month paying more than the best other cash offer.</li></ul><p>Hover CK\'s price (on mobile, open the offer) for why it is colored, CK\'s stock and TCG Market\'s week, and the chances CK pays more, or less or nothing, a week and a month later, next to the chances on any card. They are measured every day, on cards of the same finish and price range. The <em>90d high</em> pill marks CK paying its highest price of the last 90 days; <em>New high</em> marks a price above all of them. The colors and pills apply when CK pays $3 or more; other stores\' offers only show whether they reach CK\'s usual high (<em>Good</em>). A color whose chances were not measured is left off.</p>',
                 table: [
                     { value: 'on:cksell', short: "CK's offer is worth taking now (green)" },
                     { value: 'on:ckwait', short: 'CK is likely to pay more soon (amber ↑)' },
@@ -1212,7 +1170,6 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['tips', 'tricks', 'power user', 'history', 'chart', 'historical', 'reprint', 'finder', 'flavor name', 'feedback', 'discord', '📊', '📖', 'icon'],
             content: {
-                description: '<p>A handful of features that are easy to miss:</p><p><strong>Historical data:</strong> Click the 📊 chart icon on any card to view price history from major vendors.</p><p><strong>Reprint finder:</strong> Click 📖 on a card to see every product containing any reprint of that card. Source products are also accessible via "Found in * products" links.</p><p><strong>Flavor names:</strong> Searching a flavor name returns only those specific art versions (unless disabled in preferences). This does not work for complex multi-filter queries.</p><p><strong>Feedback:</strong> Report issues in the #feedback channel on the BAN Discord with a URL or screenshot. Some errors originate from upstream providers.</p>',
                 table: [],
                 examples: [
                     { query: 'is:reserved price>50', desc: 'Expensive reserved list cards' }
@@ -1230,7 +1187,6 @@ window.__BAN_GUIDE = {
             snippets: ['Authorization: Bearer ban_live_...', 'https://api.mtgban.com/v1/{game}/', 'https://api.mtgban.com/v2/{game}/'],
             keywords: ['api', 'key', 'token', 'bearer', 'gateway', 'authentication', 'auth', 'plans', 'account', 'price api', 'json', 'curl'],
             content: {
-                description: '<p>The price API returns the same retail and buylist data the site is built on, as JSON or CSV. Access is sold per package on the <a href="/api-plans">plans page</a>. Keys are created on the <a href="https://api.mtgban.com/account">account page</a> and shown once; create another if you lose one.</p><p>Every request goes through the gateway at <code>https://api.mtgban.com/v1/{game}/&hellip;</code>, where <code>{game}</code> is one of the games on your plan, such as <code>magic</code> or <code>pokemon</code>. <code>https://api.mtgban.com/v1/games.json</code> lists the games the gateway serves. One key covers every game on the plan.</p><p>The same key works on version 2 at <code>https://api.mtgban.com/v2/{game}/&hellip;</code>, which lists each store\'s price per finish and per condition; see Response Format.</p><p>Send the key as a bearer token. A <code>key</code> query parameter is also accepted for spreadsheet tools that cannot set headers, but it ends up in logs and browser history, so prefer the header.</p><p>A key starts with <code>ban_live_</code> when the account has a paid plan and <code>ban_demo_</code> for a trial or access arranged with us. Both work the same way; the prefix only says which kind of access minted it.</p><pre><code>curl -H "Authorization: Bearer ban_live_..." \\\n  https://api.mtgban.com/v1/magic/retail/ZEN.json</code></pre><p>Responses are gzip-compressed JSON over HTTPS only. Links issued before the gateway with a <code>sig</code> parameter keep working directly on the game sites.</p>',
                 table: [],
                 examples: []
             }
@@ -1245,7 +1201,6 @@ window.__BAN_GUIDE = {
             snippets: ['retail/ZEN.json', 'buylist/10E.csv', 'sealed/ROE.json', 'sets.json', 'stores.json'],
             keywords: ['api', 'endpoint', 'retail', 'buylist', 'sealed', 'sets', 'stores', 'edition', 'snapshot', 'single card', 'csv', 'search'],
             content: {
-                description: '<p>Paths are relative to <code>https://api.mtgban.com/v1/{game}/</code>. Only <code>GET</code> is accepted. Every endpoint returns JSON; replace <code>.json</code> with <code>.csv</code> for a human-readable CSV that leaves out the fields a flat file cannot hold, except on <code>all/{SET}</code> and the unfiltered full snapshot. Editions use <a href="https://scryfall.com/sets" target="_blank" rel="noopener">Scryfall set codes</a>.</p><p>Version 2, under <code>https://api.mtgban.com/v2/{game}/</code>, serves the same endpoints. Its search keys cards as the version 1 search does, by Scryfall id and MTGJSON id for sealed products, unless <code>id</code> says otherwise, and stores by tag as its other endpoints do. Its price CSV, search included, is the version 1 CSV. Its <code>stores.json</code> describes each store rather than listing tags, and it adds <code>finishes.json</code>; see Response Format.</p>',
                 table: [
                     { value: 'sets.json', short: 'Set codes with data. filter=sealed or filter=singles narrows the list.' },
                     { value: 'stores.json', short: 'Store tags used as keys in price objects, in a stable order. filter=sealed or filter=singles narrows it; tag=names returns full store names instead.' },
@@ -1275,7 +1230,6 @@ window.__BAN_GUIDE = {
             snippets: ['id=tcg', 'qty=true', 'conds=true', 'vendor=CK', 'finish=foil', 'tag=names'],
             keywords: ['api', 'query', 'parameter', 'option', 'id', 'tcg', 'scryfall', 'mtgjson', 'quantity', 'qty', 'conditions', 'conds', 'vendor', 'finish', 'tag', 'filter', 'scope'],
             content: {
-                description: '<p>Options are query parameters and can be combined. Quantities and per-condition prices are only exported by some stores; buylists usually report the NM price only.</p><p>Version 2 takes the same options except <code>qty</code> and <code>conds</code>: its responses always carry every condition and every quantity a store reports. Nor does it take <code>tag</code>: version 2 keys prices by store tag, and its <code>stores.json</code> gives each store\'s name. An <code>id</code> it does not know is an error, where version 1 falls back to MTGBAN ids.</p>',
                 table: [
                     { value: 'id=tcg', short: 'Key card objects by another id system: tcg (TCGplayer product id), scryfall, mtgjson, mkm (Cardmarket), ck (Card Kingdom), or mtgban (the default). ck and mtgban list foil and regular under separate ids.' },
                     { value: 'qty=true', short: 'Add qty, qty_foil, qty_etched, and qty_sealed to price objects. Retail: stock across all conditions. Buylist: the amount the store wants.' },
@@ -1303,7 +1257,6 @@ window.__BAN_GUIDE = {
             snippets: ['meta.base_url', 'retail.{id}.{store}.regular', 'conditions.NM', 'retail.{id}.{finish}.{store}[0].price'],
             keywords: ['api', 'response', 'json', 'format', 'schema', 'meta', 'regular', 'foil', 'etched', 'cond', 'conditions', 'quantities', 'redirect', 'base_url', 'openapi', 'v2', 'finish', 'condition', 'available'],
             content: {
-                description: '<p>A response has an <code>error</code> string, a <code>meta</code> object with the request <code>date</code>, the API <code>version</code>, and a <code>base_url</code>, then <code>retail</code> and <code>buylist</code> dictionaries. Each is keyed by card id, then by store tag, and holds a price object. Prices are USD floats and are the best available price at that store; <code>cond</code> is the condition of that price. Missing stores, cards, and prices are simply absent. Always check <code>error</code>, since a request can succeed with a message in it.</p><pre><code>{\n  "error": "",\n  "meta": { "date": "...", "version": "...", "base_url": "https://www.mtgban.com/go/" },\n  "retail": {\n    "&lt;card id&gt;": {\n      "CK":  { "regular": 12.99, "foil": 39.99, "cond": "NM" },\n      "SCG": { "regular": 11.50, "qty": 4,\n               "conditions": { "NM": 11.50, "SP": 9.75 },\n               "quantities": { "NM": 3, "SP": 1 } }\n    }\n  },\n  "buylist": {}\n}</code></pre><p>Price objects carry <code>regular</code>, <code>foil</code>, and <code>etched</code> as the card and the id system allow, or <code>sealed</code> for a sealed product, plus the optional <code>qty</code>, <code>conditions</code>, and <code>quantities</code> fields described under Query Options.</p><p><strong>Store redirect:</strong> <code>base_url</code> + store tag + card id opens that store&rsquo;s page for the card, for example <code>https://www.mtgban.com/go/CK/7da23b15-dfb8-4267-9b33-d7a4c035c434</code>. Any of the supported id systems works. The redirect is free to use.</p><p><strong>Version 2</strong> keys each card by finish, then by store tag, and lists that store\'s prices one per condition, best condition first, so the first entry is the store\'s best price for the finish. The finish is the one the card is sold in: <code>nonfoil</code>, <code>foil</code>, <code>etched</code>, a game\'s own such as <code>coldfoil</code> or <code>reverseholofoil</code>, or <code>sealed</code> for a sealed product. With an id system that groups several printings under one id, such as <code>tcg</code> or <code>mkm</code>, a condition holds the best price and the summed quantities of all of them.</p><pre><code>{\n  "meta": { "date": "...", "version": "2", "base_url": "https://www.mtgban.com/go/" },\n  "retail": {\n    "&lt;card id&gt;": {\n      "nonfoil": {\n        "CK":        [ { "condition": "NM", "price": 12.99, "qty": 6 },\n                       { "condition": "SP", "price": 10.50, "qty": 2 } ],\n        "TCGPlayer": [ { "condition": "NM", "price": 11.80, "available": 20 } ],\n        "TCGLow":    [ { "price": 11.25 } ]\n      },\n      "foil": {\n        "CK": [ { "condition": "NM", "price": 39.99, "qty": 1 } ]\n      }\n    }\n  },\n  "buylist": {}\n}</code></pre><ul><li><code>price</code> is the store\'s best price in that condition, to the cent: the lowest for retail, the highest offer for buylist.</li><li><code>qty</code> is the copies the store\'s own listings in that condition hold, or on a buylist the copies the store buys.</li><li><code>available</code> is every copy in that condition on sale at the store at any price, where it is counted: TCGplayer\'s listed copies and TCGplayer Direct\'s own stock, from a daily scrape, and the copies some stores report beside their price.</li><li><code>condition</code> is one of <code>NM</code> (Near Mint), <code>SP</code> (Slightly Played), <code>MP</code> (Moderately Played), <code>HP</code> (Heavily Played) and <code>PO</code> (Poor), best first, the order a store\'s list follows; TCGplayer calls SP Lightly Played and PO Damaged. Each store\'s own scale is read into these five. <code>condition</code> is absent for an index price, such as TCGLow, and for sealed products.</li></ul><p>A missing <code>qty</code> or <code>available</code> means the store does not say, never zero; a missing <code>qty</code> on a buylist means no limit. Where every condition carries <code>available</code>, their sum is the store\'s whole stock of the printing.</p><p>Version 2\'s <code>stores.json</code> describes the stores your key can read, sellers and vendors apart: <code>index</code> marks a store whose prices index a market, which carry no <code>condition</code>; <code>quantities</code> a store whose prices carry <code>qty</code>; <code>credit_multiplier</code> what a vendor\'s store credit is worth against its cash price, 1.3 for 30% more; and <code>updated</code> when its prices were collected.</p><pre><code>{\n  "sellers": [\n    { "shorthand": "CT", "name": "Card Trader", "country": "EU",\n      "quantities": true, "updated": "..." },\n    { "shorthand": "TCGLow", "name": "TCG Low", "index": true, "updated": "..." }\n  ],\n  "vendors": [\n    { "shorthand": "CK", "name": "Card Kingdom", "quantities": true,\n      "credit_multiplier": 1.3, "updated": "..." }\n  ]\n}</code></pre><p>Version 2\'s <code>finishes.json</code> lists the finishes its prices are keyed by for the game, commonest first, with a display name and how many cards (or, for <code>sealed</code>, products) carry each. <code>filter=singles</code> or <code>filter=sealed</code> narrows both lists.</p><pre><code>[\n  { "value": "nonfoil", "label": "Non-foil", "count": 91234 },\n  { "value": "foil", "label": "Foil", "count": 60310 },\n  { "value": "sealed", "label": "Sealed", "count": 12011 }\n]</code></pre><p>Both versions are written out as <a href="#api-openapi">OpenAPI specifications</a> at the end of this tab.</p>',
                 table: [],
                 examples: []
             }
@@ -1318,7 +1271,6 @@ window.__BAN_GUIDE = {
             snippets: ['401', '403', '429', 'RateLimit-Limit'],
             keywords: ['api', 'error', 'status', 'code', '401', '403', '429', '502', 'rate limit', 'throttle', 'retry', 'unauthorized', 'forbidden'],
             content: {
-                description: '<p>Errors are JSON with an <code>error</code> message and, where it applies, the <code>game</code>: <code>{"error": "plan does not include game", "game": "pokemon"}</code>.</p><p>Each key may make 10 requests per second with a short burst allowance. The <code>RateLimit-Limit</code> header carries the limit; a 429 carries <code>Retry-After</code>. Successful responses include <code>X-MTGBAN-Game</code> and <code>X-MTGBAN-Account</code> headers.</p>',
                 table: [
                     { value: '200', short: 'Success. Still check the error field in the JSON.' },
                     { value: '401', short: 'Missing, malformed, revoked, or unknown key, or a suspended account.' },
@@ -1343,7 +1295,6 @@ window.__BAN_GUIDE = {
             snippets: ['openapi: 3.0.0'],
             keywords: ['api', 'openapi', 'swagger', 'spec', 'specification', 'schema', 'yaml', 'client', 'codegen', 'v1', 'v2'],
             content: {
-                description: '<p>The same endpoints, options, and response shapes as OpenAPI 3 documents, one per version: <a href="/openapi/v1.yaml">version 1</a> and <a href="/openapi/v2.yaml">version 2</a>. Open one in an editor such as Swagger Editor, or point a client generator at its address.</p>',
                 table: [],
                 examples: []
             }

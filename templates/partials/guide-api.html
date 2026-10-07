@@ -1,0 +1,94 @@
+{{define "guide-api-content"}}
+<template data-section="api-getting-started">
+<p>The price API returns the same retail and buylist data the site is built on, as JSON or CSV. Access is sold per package on the <a href="/api-plans">plans page</a>. Keys are created on the <a href="https://api.mtgban.com/account">account page</a> and shown once; create another if you lose one.</p>
+<p>Every request goes through the gateway at <code>https://api.mtgban.com/v1/{game}/&hellip;</code>, where <code>{game}</code> is one of the games on your plan, such as <code>magic</code> or <code>pokemon</code>. <code>https://api.mtgban.com/v1/games.json</code> lists the games the gateway serves. One key covers every game on the plan.</p>
+<p>The same key works on version 2 at <code>https://api.mtgban.com/v2/{game}/&hellip;</code>, which lists each store's price per finish and per condition; see Response Format.</p>
+<p>Send the key as a bearer token. A <code>key</code> query parameter is also accepted for spreadsheet tools that cannot set headers, but it ends up in logs and browser history, so prefer the header.</p>
+<p>A key starts with <code>ban_live_</code> when the account has a paid plan and <code>ban_demo_</code> for a trial or access arranged with us. Both work the same way; the prefix only says which kind of access minted it.</p>
+<pre><code>curl -H "Authorization: Bearer ban_live_..." \
+  https://api.mtgban.com/v1/magic/retail/ZEN.json</code></pre>
+<p>Responses are gzip-compressed JSON over HTTPS only. Links issued before the gateway with a <code>sig</code> parameter keep working directly on the game sites.</p>
+</template>
+
+<template data-section="api-endpoints">
+<p>Paths are relative to <code>https://api.mtgban.com/v1/{game}/</code>. Only <code>GET</code> is accepted. Every endpoint returns JSON; replace <code>.json</code> with <code>.csv</code> for a human-readable CSV that leaves out the fields a flat file cannot hold, except on <code>all/{SET}</code> and the unfiltered full snapshot. Editions use <a href="https://scryfall.com/sets" target="_blank" rel="noopener">Scryfall set codes</a>.</p>
+<p>Version 2, under <code>https://api.mtgban.com/v2/{game}/</code>, serves the same endpoints. Its search keys cards as the version 1 search does, by Scryfall id and MTGJSON id for sealed products, unless <code>id</code> says otherwise, and stores by tag as its other endpoints do. Its price CSV, search included, is the version 1 CSV. Its <code>stores.json</code> describes each store rather than listing tags, and it adds <code>finishes.json</code>; see Response Format.</p>
+</template>
+
+<template data-section="api-options">
+<p>Options are query parameters and can be combined. Quantities and per-condition prices are only exported by some stores; buylists usually report the NM price only.</p>
+<p>Version 2 takes the same options except <code>qty</code> and <code>conds</code>: its responses always carry every condition and every quantity a store reports. Nor does it take <code>tag</code>: version 2 keys prices by store tag, and its <code>stores.json</code> gives each store's name. An <code>id</code> it does not know is an error, where version 1 falls back to MTGBAN ids.</p>
+</template>
+
+<template data-section="api-response">
+<p>A response has an <code>error</code> string, a <code>meta</code> object with the request <code>date</code>, the API <code>version</code>, and a <code>base_url</code>, then <code>retail</code> and <code>buylist</code> dictionaries. Each is keyed by card id, then by store tag, and holds a price object. Prices are USD floats and are the best available price at that store; <code>cond</code> is the condition of that price. Missing stores, cards, and prices are simply absent. Always check <code>error</code>, since a request can succeed with a message in it.</p>
+<pre><code>{
+  "error": "",
+  "meta": { "date": "...", "version": "...", "base_url": "https://www.mtgban.com/go/" },
+  "retail": {
+    "&lt;card id&gt;": {
+      "CK":  { "regular": 12.99, "foil": 39.99, "cond": "NM" },
+      "SCG": { "regular": 11.50, "qty": 4,
+               "conditions": { "NM": 11.50, "SP": 9.75 },
+               "quantities": { "NM": 3, "SP": 1 } }
+    }
+  },
+  "buylist": {}
+}</code></pre>
+<p>Price objects carry <code>regular</code>, <code>foil</code>, and <code>etched</code> as the card and the id system allow, or <code>sealed</code> for a sealed product, plus the optional <code>qty</code>, <code>conditions</code>, and <code>quantities</code> fields described under Query Options.</p>
+<p><strong>Store redirect:</strong> <code>base_url</code> + store tag + card id opens that store&rsquo;s page for the card, for example <code>https://www.mtgban.com/go/CK/7da23b15-dfb8-4267-9b33-d7a4c035c434</code>. Any of the supported id systems works. The redirect is free to use.</p>
+<p><strong>Version 2</strong> keys each card by finish, then by store tag, and lists that store's prices one per condition, best condition first, so the first entry is the store's best price for the finish. The finish is the one the card is sold in: <code>nonfoil</code>, <code>foil</code>, <code>etched</code>, a game's own such as <code>coldfoil</code> or <code>reverseholofoil</code>, or <code>sealed</code> for a sealed product. With an id system that groups several printings under one id, such as <code>tcg</code> or <code>mkm</code>, a condition holds the best price and the summed quantities of all of them.</p>
+<pre><code>{
+  "meta": { "date": "...", "version": "2", "base_url": "https://www.mtgban.com/go/" },
+  "retail": {
+    "&lt;card id&gt;": {
+      "nonfoil": {
+        "CK":        [ { "condition": "NM", "price": 12.99, "qty": 6 },
+                       { "condition": "SP", "price": 10.50, "qty": 2 } ],
+        "TCGPlayer": [ { "condition": "NM", "price": 11.80, "available": 20 } ],
+        "TCGLow":    [ { "price": 11.25 } ]
+      },
+      "foil": {
+        "CK": [ { "condition": "NM", "price": 39.99, "qty": 1 } ]
+      }
+    }
+  },
+  "buylist": {}
+}</code></pre>
+<ul>
+    <li><code>price</code> is the store's best price in that condition, to the cent: the lowest for retail, the highest offer for buylist.</li>
+    <li><code>qty</code> is the copies the store's own listings in that condition hold, or on a buylist the copies the store buys.</li>
+    <li><code>available</code> is every copy in that condition on sale at the store at any price, where it is counted: TCGplayer's listed copies and TCGplayer Direct's own stock, from a daily scrape, and the copies some stores report beside their price.</li>
+    <li><code>condition</code> is one of <code>NM</code> (Near Mint), <code>SP</code> (Slightly Played), <code>MP</code> (Moderately Played), <code>HP</code> (Heavily Played) and <code>PO</code> (Poor), best first, the order a store's list follows; TCGplayer calls SP Lightly Played and PO Damaged. Each store's own scale is read into these five. <code>condition</code> is absent for an index price, such as TCGLow, and for sealed products.</li>
+</ul>
+<p>A missing <code>qty</code> or <code>available</code> means the store does not say, never zero; a missing <code>qty</code> on a buylist means no limit. Where every condition carries <code>available</code>, their sum is the store's whole stock of the printing.</p>
+<p>Version 2's <code>stores.json</code> describes the stores your key can read, sellers and vendors apart: <code>index</code> marks a store whose prices index a market, which carry no <code>condition</code>; <code>quantities</code> a store whose prices carry <code>qty</code>; <code>credit_multiplier</code> what a vendor's store credit is worth against its cash price, 1.3 for 30% more; and <code>updated</code> when its prices were collected.</p>
+<pre><code>{
+  "sellers": [
+    { "shorthand": "CT", "name": "Card Trader", "country": "EU",
+      "quantities": true, "updated": "..." },
+    { "shorthand": "TCGLow", "name": "TCG Low", "index": true, "updated": "..." }
+  ],
+  "vendors": [
+    { "shorthand": "CK", "name": "Card Kingdom", "quantities": true,
+      "credit_multiplier": 1.3, "updated": "..." }
+  ]
+}</code></pre>
+<p>Version 2's <code>finishes.json</code> lists the finishes its prices are keyed by for the game, commonest first, with a display name and how many cards (or, for <code>sealed</code>, products) carry each. <code>filter=singles</code> or <code>filter=sealed</code> narrows both lists.</p>
+<pre><code>[
+  { "value": "nonfoil", "label": "Non-foil", "count": 91234 },
+  { "value": "foil", "label": "Foil", "count": 60310 },
+  { "value": "sealed", "label": "Sealed", "count": 12011 }
+]</code></pre>
+<p>Both versions are written out as <a href="#api-openapi">OpenAPI specifications</a> at the end of this tab.</p>
+</template>
+
+<template data-section="api-errors">
+<p>Errors are JSON with an <code>error</code> message and, where it applies, the <code>game</code>: <code>{"error": "plan does not include game", "game": "pokemon"}</code>.</p>
+<p>Each key may make 10 requests per second with a short burst allowance. The <code>RateLimit-Limit</code> header carries the limit; a 429 carries <code>Retry-After</code>. Successful responses include <code>X-MTGBAN-Game</code> and <code>X-MTGBAN-Account</code> headers.</p>
+</template>
+
+<template data-section="api-openapi">
+<p>The same endpoints, options, and response shapes as OpenAPI 3 documents, one per version: <a href="/openapi/v1.yaml">version 1</a> and <a href="/openapi/v2.yaml">version 2</a>. Open one in an editor such as Swagger Editor, or point a client generator at its address.</p>
+</template>
+{{end}}
