@@ -581,7 +581,11 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// If neither bar holds anything there is nothing to do
 	if landing {
-		tmpl := fillSearchLanding(&pageVars, r, ds, isSetsPage)
+		sortOpt := r.FormValue("sort")
+		if isSetsPage {
+			pageVars.SortOption = sortOpt
+		}
+		tmpl := fillSearchLanding(&pageVars.SearchVars, ds, isSetsPage, sortOpt)
 		render(w, tmpl, pageVars)
 		return
 	}
@@ -935,9 +939,9 @@ func fillChartRoster(pageVars *SearchVars, r *http.Request, b *mtgmatcher.Backen
 }
 
 // fillSearchLanding fills the page for a request with nothing to search: the
-// sealed list on /sealed, the editions tree on /sets, else the search
-// landing. It returns the template to render it with.
-func fillSearchLanding(pageVars *PageVars, r *http.Request, ds *datastore, isSetsPage bool) string {
+// sealed list on /sealed, the editions tree on /sets in sortOpt's order, else
+// the search landing. It returns the template to render it with.
+func fillSearchLanding(pageVars *SearchVars, ds *datastore, isSetsPage bool, sortOpt string) string {
 	editions := ds.editions
 	// Hijack sealed list
 	if pageVars.IsSealed {
@@ -949,11 +953,9 @@ func fillSearchLanding(pageVars *PageVars, r *http.Request, ds *datastore, isSet
 		pageVars.TotalCards = editions.TotalCards
 		pageVars.TotalUnique = editions.TotalUnique
 
-		sortOpt := r.FormValue("sort")
 		sortedKeys := sortedEditionKeys(editions, sortOpt)
 
 		pageVars.FlatEditions = flattenEditions(sortedKeys, editions.TreeEditionsMap)
-		pageVars.SortOption = sortOpt
 
 		return "sets.html"
 	}
