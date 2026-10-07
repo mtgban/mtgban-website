@@ -546,7 +546,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// for a query, so it keeps its own empty state either way.
 	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
 
-	fillSearchSettings(&pageVars, r, b)
+	fillSearchSettings(&pageVars.SearchVars, r, b)
+	pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
 
 	page := r.FormValue("page")
 	if page == "options" {
@@ -805,17 +806,15 @@ func fillSearchReader(s *site, pageVars *SearchVars, r *http.Request) {
 	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
 }
 
-// fillSearchSettings fills the page's store keys, whether any sealed
-// product is loaded, and whether the reader may use offline mode.
-func fillSearchSettings(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend) {
+// fillSearchSettings fills whether any sealed product is loaded, and whether
+// the reader may use offline mode.
+func fillSearchSettings(pageVars *SearchVars, r *http.Request, b *mtgmatcher.Backend) {
 	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
 
 	// Offline mode: only for entitled readers
 	if _, ok := offlineModeAllowed(r); ok {
 		pageVars.OfflineModeAllowed = true
 	}
-
-	pageVars.SellerKeys, pageVars.VendorKeys = searchSettingsKeys()
 }
 
 // fillSearchPrefs puts the reader's search preferences on the page: from
