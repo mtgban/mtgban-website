@@ -45,11 +45,11 @@ to 30.8k lines between May 17 and Sep 30.
 Lower down, measured but not scored: 45 request values parsed with the
 error discarded (upload 13, search 7, news 7); 80 `window.X =` globals (8
 of them `window.BAN_*` hand-offs, 5 added by #739) and 228 inline
-`onclick`/`onchange` handlers; 107 inline `style=`; 2,429 lines of inline
-script left in templates (4,683 before #739), most in guide.html (499),
-mobile/search.html (446) and admin.html (305); 18 scripts (379 KB,
-unminified) on every desktop page, `guide-data.js` (125 KB) and
-`command-palette.js` (101 KB) among them; the 10 deploy workflows are
+`onclick`/`onchange` handlers; 107 inline `style=`; 1,919 lines of inline
+script left in templates (4,683 before #739), most in mobile/search.html
+(445), admin.html (305) and offline.html (182); 21 scripts (385 KB,
+unminified) on every desktop page, `command-palette.js` (101 KB) and
+`guide-data.js` (80 KB) among them; the 10 deploy workflows are
 near-copies of each other.
 
 ## Plan for the giant functions
