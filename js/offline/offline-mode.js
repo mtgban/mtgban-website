@@ -216,11 +216,16 @@
     // first sync on this device (or after a wipe) reads as the setup it is;
     // imageHint is for a page that offers the image sync.
     function doneStatusText(m, s, imageHint) {
+        var text;
         if (!s.lastSync) {
-            return imageHint ? 'Ready offline - sync images to display pictures while offline' : 'Ready offline';
+            text = imageHint ? 'Ready offline - sync images to display pictures while offline' : 'Ready offline';
+        } else {
+            var n = m.changedSets || 0;
+            text = n ? 'Updated ' + n + (n === 1 ? ' set' : ' sets') : 'Up to date';
         }
-        var n = m.changedSets || 0;
-        return n ? 'Updated ' + n + (n === 1 ? ' set' : ' sets') : 'Up to date';
+        var failed = m.failedSets || 0;
+        if (failed) text += ' (' + failed + (failed === 1 ? ' set' : ' sets') + ' failed, retried on the next sync)';
+        return text;
     }
 
     function onSyncMessage(ev) {

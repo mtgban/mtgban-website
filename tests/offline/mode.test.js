@@ -58,6 +58,8 @@ test('doneStatusText reads the first sync as setup, later ones as updates', () =
     expect(OfflineMode.doneStatusText({ changedSets: 42 }, first, false)).toBe('Ready offline');
     expect(OfflineMode.doneStatusText({ changedSets: 0 }, later, true)).toBe('Up to date');
     expect(OfflineMode.doneStatusText({ changedSets: 1 }, later, true)).toBe('Updated 1 set');
+    expect(OfflineMode.doneStatusText({ changedSets: 912, failedSets: 4 }, later, true))
+        .toBe('Updated 912 sets (4 sets failed, retried on the next sync)');
 });
 
 // --- Leave-site guard ---
