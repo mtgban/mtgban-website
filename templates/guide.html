@@ -126,7 +126,7 @@
             var s = secs[i];
             out.push('## ' + s.getAttribute('data-title'), '');
             var desc = s.querySelector('.guide-section-desc');
-            if (desc) out.push(desc.innerText.trim(), '');
+            if (desc) out.push(linkedText(desc), '');
             var rows = s.querySelectorAll('.guide-table tbody tr');
             for (var r = 0; r < rows.length; r++) {
                 var cells = rows[r].querySelectorAll('td');
@@ -533,6 +533,20 @@
     }
 
     // ── Helpers ──
+    // An element's innerText, with each link's address after its text.
+    function linkedText(el) {
+        var added = [];
+        var links = el.querySelectorAll('a[href]');
+        for (var i = 0; i < links.length; i++) {
+            added.push(links[i].appendChild(document.createTextNode(' (' + links[i].href + ')')));
+        }
+        var text = el.innerText.trim();
+        for (var j = 0; j < added.length; j++) {
+            added[j].parentNode.removeChild(added[j]);
+        }
+        return text;
+    }
+
     function escapeHtml(str) {
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(str));

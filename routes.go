@@ -22,6 +22,7 @@ func (s *site) registerRoutes() {
 	http.HandleFunc("/css/", ServeFile)
 	http.HandleFunc("/img/", ServeFile)
 	http.HandleFunc("/js/", ServeFile)
+	http.HandleFunc("/openapi/", ServeFile)
 	http.HandleFunc("/favicon.ico", ServeFile)
 	http.HandleFunc("/robots.txt", ServeFile)
 	// Dedicated handler: the service worker must revalidate on every deploy

@@ -1,0 +1,220 @@
+openapi: 3.0.0
+info:
+  title: BAN Price API
+  version: 1.0.0
+  description: Retail and buylist prices for singles and sealed products across many stores.
+
+servers:
+  - url: https://api.mtgban.com/v1/{game}
+    variables:
+      game:
+        default: magic
+        description: A game on your plan, as listed by https://api.mtgban.com/v1/games.json
+
+security:
+  - bearer: []
+  - keyQuery: []
+
+paths:
+  /sets.json:
+    get:
+      summary: Set codes with data
+      parameters:
+        - $ref: "#/components/parameters/filter"
+      responses:
+        "200":
+          description: Array of set codes
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /stores.json:
+    get:
+      summary: Store tags used as keys in price objects
+      parameters:
+        - $ref: "#/components/parameters/filter"
+        - $ref: "#/components/parameters/tag"
+      responses:
+        "200":
+          description: Array of store tags, or names with tag=names
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /{mode}/{setOrId}.json:
+    get:
+      summary: Prices for one edition or one card
+      description: >-
+        setOrId is a set code for an edition snapshot, or a card id
+        (MTGBAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
+        Replace .json with .csv for CSV.
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema: { type: string, enum: [retail, buylist, all, sealed] }
+        - name: setOrId
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/qty"
+        - $ref: "#/components/parameters/conds"
+        - $ref: "#/components/parameters/vendor"
+        - $ref: "#/components/parameters/finish"
+        - $ref: "#/components/parameters/tag"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /search/{mode}/{query}.json:
+    get:
+      summary: Prices for every card matching a search
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema: { type: string, enum: [retail, buylist] }
+        - name: query
+          in: path
+          required: true
+          description: Search text in the site syntax
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/tag"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /search/{mode}/sealed/{query}.json:
+    get:
+      summary: Prices for every sealed product matching a search
+      description: Products are keyed by MTGJSON id.
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema: { type: string, enum: [retail, buylist] }
+        - name: query
+          in: path
+          required: true
+          description: Search text in the site syntax
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/tag"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: Authorization Bearer ban_live_... or ban_demo_...
+    keyQuery:
+      type: apiKey
+      in: query
+      name: key
+      description: For tools that cannot set headers; the key lands in logs
+
+  parameters:
+    id:
+      name: id
+      in: query
+      description: Id system for card keys
+      schema: { type: string, enum: [mtgban, tcg, scryfall, mtgjson, mkm, ck] }
+    qty:
+      name: qty
+      in: query
+      schema: { type: boolean }
+    conds:
+      name: conds
+      in: query
+      schema: { type: boolean }
+    vendor:
+      name: vendor
+      in: query
+      description: Comma-separated store tags
+      schema: { type: string }
+    finish:
+      name: finish
+      in: query
+      schema: { type: string, enum: [foil, nonfoil, etched] }
+    tag:
+      name: tag
+      in: query
+      schema: { type: string, enum: [tags, names] }
+    filter:
+      name: filter
+      in: query
+      schema: { type: string, enum: [sealed, singles] }
+
+  responses:
+    Prices:
+      description: Price snapshot
+      headers:
+        RateLimit-Limit: { schema: { type: integer } }
+        X-MTGBAN-Game: { schema: { type: string } }
+        X-MTGBAN-Account: { schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/PriceResponse" }
+    Error:
+      description: >-
+        401 bad key, 403 plan lacks the game or mode, 404 unknown path,
+        405 not GET, 429 rate limited (Retry-After),
+        502/503/504 upstream or database trouble
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    PriceResponse:
+      type: object
+      properties:
+        error: { type: string }
+        meta:
+          type: object
+          properties:
+            date: { type: string, format: date-time }
+            version: { type: string }
+            base_url: { type: string, description: "Prefix for store redirects: base_url + tag + id" }
+        retail: { $ref: "#/components/schemas/CardMap" }
+        buylist: { $ref: "#/components/schemas/CardMap" }
+    CardMap:
+      type: object
+      description: Card id, then store tag, then price
+      additionalProperties:
+        type: object
+        additionalProperties: { $ref: "#/components/schemas/Price" }
+    Price:
+      type: object
+      properties:
+        regular: { type: number, format: float }
+        foil: { type: number, format: float }
+        etched: { type: number, format: float }
+        sealed: { type: number, format: float }
+        cond: { type: string, enum: [NM, SP, MP, HP, PO] }
+        qty: { type: integer }
+        qty_foil: { type: integer }
+        qty_etched: { type: integer }
+        qty_sealed: { type: integer }
+        conditions:
+          type: object
+          additionalProperties: { type: number, format: float }
+        quantities:
+          type: object
+          additionalProperties: { type: integer }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        game: { type: string }

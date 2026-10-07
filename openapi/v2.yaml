@@ -1,0 +1,259 @@
+openapi: 3.0.0
+info:
+  title: BAN Price API
+  version: 2.0.0
+  description: >-
+    Retail and buylist prices for singles and sealed products across many
+    stores, by finish and by condition.
+
+servers:
+  - url: https://api.mtgban.com/v2/{game}
+    variables:
+      game:
+        default: magic
+        description: A game on your plan, as listed by https://api.mtgban.com/v2/games.json
+
+security:
+  - bearer: []
+  - keyQuery: []
+
+paths:
+  /sets.json:
+    get:
+      summary: Set codes with data
+      parameters:
+        - $ref: "#/components/parameters/filter"
+      responses:
+        "200":
+          description: Array of set codes
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /stores.json:
+    get:
+      summary: The stores the key can read, and what each one is
+      parameters:
+        - $ref: "#/components/parameters/filter"
+      responses:
+        "200":
+          description: Sellers and vendors, each sorted by shorthand
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stores" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /finishes.json:
+    get:
+      summary: The finishes prices are keyed by, commonest first
+      parameters:
+        - $ref: "#/components/parameters/filter"
+      responses:
+        "200":
+          description: Finish keys with a display name and a count
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Finish" } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /{mode}/{setOrId}.json:
+    get:
+      summary: Prices for one edition or one card
+      description: >-
+        setOrId is a set code for an edition snapshot, or a card id
+        (MTGBAN, MTGJSON, Scryfall, or TCGplayer) for a single card.
+        Replace .json with .csv for the version 1 CSV.
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema: { type: string, enum: [retail, buylist, all, sealed] }
+        - name: setOrId
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/vendor"
+        - $ref: "#/components/parameters/finish"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /search/{mode}/{query}.json:
+    get:
+      summary: Prices for every card matching a search
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema: { type: string, enum: [retail, buylist] }
+        - name: query
+          in: path
+          required: true
+          description: Search text in the site syntax
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /search/{mode}/sealed/{query}.json:
+    get:
+      summary: Prices for every sealed product matching a search
+      parameters:
+        - name: mode
+          in: path
+          required: true
+          schema: { type: string, enum: [retail, buylist] }
+        - name: query
+          in: path
+          required: true
+          description: Search text in the site syntax
+          schema: { type: string }
+        - name: scope
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/id"
+      responses:
+        "200": { $ref: "#/components/responses/Prices" }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: Authorization Bearer ban_live_... or ban_demo_...
+    keyQuery:
+      type: apiKey
+      in: query
+      name: key
+      description: For tools that cannot set headers; the key lands in logs
+
+  parameters:
+    id:
+      name: id
+      in: query
+      description: Id system for card keys
+      schema: { type: string, enum: [mtgban, tcg, scryfall, mtgjson, mkm, ck] }
+    vendor:
+      name: vendor
+      in: query
+      description: Comma-separated store tags
+      schema: { type: string }
+    finish:
+      name: finish
+      in: query
+      description: Comma-separated finishes, spelled as the finish keys
+      schema: { type: string }
+    filter:
+      name: filter
+      in: query
+      schema: { type: string, enum: [sealed, singles] }
+
+  responses:
+    Prices:
+      description: Price snapshot
+      headers:
+        RateLimit-Limit: { schema: { type: integer } }
+        X-MTGBAN-Game: { schema: { type: string } }
+        X-MTGBAN-Account: { schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/PriceResponse" }
+    Error:
+      description: >-
+        401 bad key, 403 plan lacks the game or mode, 404 unknown path,
+        405 not GET, 429 rate limited (Retry-After),
+        502/503/504 upstream or database trouble
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    PriceResponse:
+      type: object
+      properties:
+        error: { type: string }
+        meta:
+          type: object
+          properties:
+            date: { type: string, format: date-time }
+            version: { type: string }
+            base_url: { type: string, description: "Prefix for store redirects: base_url + tag + id" }
+        retail: { $ref: "#/components/schemas/CardMap" }
+        buylist: { $ref: "#/components/schemas/CardMap" }
+    CardMap:
+      type: object
+      description: Card id, then finish, then store tag, then that store's conditions
+      additionalProperties:
+        type: object
+        description: >-
+          Finish: nonfoil, foil, etched, a game's own such as coldfoil,
+          or sealed
+        additionalProperties:
+          type: object
+          additionalProperties:
+            type: array
+            description: One entry per condition, best condition first
+            items: { $ref: "#/components/schemas/Entry" }
+    Entry:
+      type: object
+      required: [price]
+      properties:
+        condition:
+          type: string
+          enum: [NM, SP, MP, HP, PO]
+          description: >-
+            Near Mint, Slightly Played, Moderately Played, Heavily Played
+            or Poor, best first; absent for an index price and for sealed
+            products
+        price:
+          type: number
+          format: float
+          description: Best price in the condition, lowest retail or highest buylist, to the cent
+        qty:
+          type: integer
+          description: >-
+            Copies the store's own listings hold, or the copies a buylist
+            buys; absent is unknown, or no limit on a buylist
+        available:
+          type: integer
+          description: >-
+            Every copy in the condition on sale at the store at any price,
+            where it is counted; absent is unknown
+    Stores:
+      type: object
+      properties:
+        sellers: { type: array, items: { $ref: "#/components/schemas/Store" } }
+        vendors: { type: array, items: { $ref: "#/components/schemas/Store" } }
+    Store:
+      type: object
+      required: [shorthand, name]
+      properties:
+        shorthand: { type: string, description: The store's key in price lists }
+        name: { type: string, description: The store's display name }
+        country: { type: string }
+        sealed: { type: boolean, description: The store prices sealed products }
+        index: { type: boolean, description: The store's prices index a market and carry no condition }
+        quantities: { type: boolean, description: The store's prices carry qty }
+        credit_multiplier:
+          type: number
+          format: float
+          description: A vendor's store credit against its cash price, 1.3 for 30% more
+        updated: { type: string, format: date-time, description: When the store's prices were collected }
+    Finish:
+      type: object
+      properties:
+        value: { type: string, description: The finish key in price lists }
+        label: { type: string }
+        count: { type: integer, description: "Cards in the finish, or products for sealed" }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        game: { type: string }
