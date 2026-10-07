@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -417,26 +418,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 	// Enable buttons according to the enabled features
 	for _, feat := range OrderNav {
-		_, noAuth := ACL()["Any"][feat]
-		validSig := expires > time.Now().Unix()
-		devMode := DevMode && !SigCheck
-		alwaysOnDev := DevMode && ExtraNavs[feat].AlwaysOnForDev
-		if !validSig && !devMode && !noAuth {
-			continue
-		}
-
-		allowed := devMode || noAuth || alwaysOnDev
-		if !allowed {
-			allowed, _ = strconv.ParseBool(sigParams.Get(feat))
-		}
-
-		if !allowed {
-			continue
-		}
-
-		// A hidden section takes its subpages with it: they are reached
-		// through it, and half a section is worse than none.
-		if ExtraNavs[feat].ShouldHide != nil && ExtraNavs[feat].ShouldHide(s) {
+		if !navOffers(s, sigParams, feat) {
 			continue
 		}
 
@@ -474,6 +456,39 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 
 	pageVars.UserNav = &NavElem{Short: user}
 	return pageVars
+}
+
+// navOffers reports whether the navbar offers the page feat to the reader
+// signed with sigParams: an open page, a development build, or a grant on a
+// signature that has not expired, and never a page the site hides or the
+// registry lacks.
+func navOffers(s *site, sigParams url.Values, feat string) bool {
+	nav, found := ExtraNavs[feat]
+	if !found {
+		return false
+	}
+
+	expires, _ := strconv.ParseInt(sigParams.Get("Expires"), 10, 64)
+	_, noAuth := ACL()["Any"][feat]
+	validSig := expires > time.Now().Unix()
+	devMode := DevMode && !SigCheck
+	alwaysOnDev := DevMode && nav.AlwaysOnForDev
+	if !validSig && !devMode && !noAuth {
+		return false
+	}
+
+	allowed := devMode || noAuth || alwaysOnDev
+	if !allowed {
+		allowed, _ = strconv.ParseBool(sigParams.Get(feat))
+	}
+
+	if !allowed {
+		return false
+	}
+
+	// A hidden section takes its subpages with it: they are reached
+	// through it, and half a section is worse than none.
+	return nav.ShouldHide == nil || !nav.ShouldHide(s)
 }
 
 // TemplateCache holds pre-parsed templates keyed by their base name.

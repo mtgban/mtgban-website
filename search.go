@@ -516,7 +516,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
-	fillSearchReader(&pageVars, r)
+	fillSearchReader(s, &pageVars, r)
 
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 
@@ -772,16 +772,14 @@ func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, res
 }
 
 // fillSearchReader fills what the page offers this reader: the alerts link
-// when their tier has an allowance, the mobile navigation, and the admins'
-// Fix toggle.
-func fillSearchReader(pageVars *PageVars, r *http.Request) {
+// when the navbar offers alerts and their tier has an allowance, the mobile
+// navigation, and the admins' Fix toggle.
+func fillSearchReader(s *site, pageVars *PageVars, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
-	for _, n := range pageVars.Nav {
-		if n.Name == "Alerts" {
-			pageVars.CanAlerts = alertAllowance(parseSig(sig)) > 0
-			break
-		}
+	sigParams := parseSig(sig)
+	if navOffers(s, sigParams, "Alerts") {
+		pageVars.CanAlerts = alertAllowance(sigParams) > 0
 	}
 	pageVars.IsMobile = isMobileRequest(r)
 	if pageVars.IsMobile {
