@@ -65,3 +65,44 @@ func TestDirectPriceWarning(t *testing.T) {
 		}
 	}
 }
+
+// A buylist offer that looks off stays red, though it reaches the P90 that
+// turns any other offer green.
+func TestBuylistPriceThatLooksOffIsNotBest(t *testing.T) {
+	prev := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prev) })
+	var none []mtgban.Seller
+	sellersPtr.Store(&none)
+
+	const id = "card"
+	pv := PageVars{
+		UserNav: &NavElem{Short: "b"},
+		SearchVars: SearchVars{
+			SearchRan:    true,
+			AllKeys:      []string{id},
+			CondKeys:     []mtgban.Condition{"NM"},
+			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{id: {}},
+			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{
+				id: {"NM": {
+					{ScraperName: "TCG Direct", Shorthand: "TCGDirectNet", Price: 5},
+					{ScraperName: "ABU Games", Shorthand: "ABU", Price: 5},
+				}},
+			},
+			SearchQuery: "a card",
+		},
+		Metadata: map[string]GenericCard{id: {Name: "A Card", SetCode: "TST", GoodBuylist: 4}},
+	}
+
+	out := renderPage(t, "search.html", false, pv)
+	if strings.Count(out, `class="price price-warn"`) != 1 {
+		t.Error("the Direct offer is not flagged on its own")
+	}
+	if strings.Count(out, "price-best") != 1 {
+		t.Error("want only the offer that looks fine green")
+	}
+
+	pv.IsMobile = true
+	if n := strings.Count(renderPage(t, "search.html", true, pv), "m-price-best"); n != 1 {
+		t.Errorf("mobile: %d offers green, want only the one that looks fine", n)
+	}
+}

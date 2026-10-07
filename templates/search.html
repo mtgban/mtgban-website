@@ -719,6 +719,8 @@
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
                                                 {{$blState := buylist_state .Shorthand $conditions .IsOffer .Price $card.GoodBuylist $card.CKSignal $card.CKPauseWait}}
+                                                {{/* A price that looks off is never one to take. */}}
+                                                {{if $blPriceWarn}}{{$blState = ""}}{{end}}
                                                 {{$blTitle := buylist_title .Shorthand $conditions $blState $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}
                                                 {{/* A card CK has paused shows its pill in the ratio/credit column,
                                                      with no data for that column's script to write over it. */}}
