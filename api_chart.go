@@ -98,16 +98,9 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 	// resolution can reach the variants table, and a roster naming the same
 	// card twice should only ask once.
 	resolved := make([]chartSeries, 0, len(ids))
-	seen := map[string]*chartTarget{}
+	targets := chartTargetCache{}
 	for _, id := range ids {
-		target, asked := seen[id]
-		if !asked {
-			var err error
-			if target, err = resolveChartTarget(r.Context(), ds.backend, id); err != nil {
-				target = nil
-			}
-			seen[id] = target
-		}
+		target := targets.target(r.Context(), ds.backend, id)
 		if target == nil {
 			continue
 		}
