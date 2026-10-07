@@ -19,7 +19,9 @@
         <section class="settings-pane" role="tabpanel" data-tab="{{.}}" hidden>
             {{if eq . "search"}}{{template "settings-tab-search" $}}{{end}}
             {{if eq . "upload"}}{{template "settings-tab-upload" $}}{{end}}
-            {{if eq . "arbit"}}{{template "settings-tab-arbit" $}}{{end}}
+            {{if eq . "arbit"}}{{template "settings-tab-vendors" (dict "Keys" $.ArbitVendorKeys "GridId" "settings-arbit-vendors" "CookieName" "ArbitVendorsList")}}{{end}}
+            {{if eq . "global"}}{{template "settings-tab-vendors" (dict "Keys" $.GlobalVendorKeys "GridId" "settings-global-vendors" "CookieName" "GlobalVendorsList")}}{{end}}
+            {{if eq . "reverse"}}{{template "settings-tab-vendors" (dict "Keys" $.ReverseVendorKeys "GridId" "settings-reverse-vendors" "CookieName" "ReverseVendorsList")}}{{end}}
             {{if eq . "news"}}{{template "settings-tab-news" $}}{{end}}
             {{if eq . "sleep"}}{{template "settings-tab-sleep" $}}{{end}}
             {{if eq . "offline"}}{{template "settings-tab-offline" $}}{{end}}

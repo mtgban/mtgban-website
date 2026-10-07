@@ -134,12 +134,14 @@ func uploadSettingsKeys(sig string) uploadModalKeys {
 }
 
 // settingsTabOrder is the rail, top to bottom.
-var settingsTabOrder = []string{"search", "upload", "arbit", "news", "sleep", "offline"}
+var settingsTabOrder = []string{"search", "upload", "arbit", "global", "reverse", "news", "sleep", "offline"}
 
 var settingsTabNames = map[string]string{
 	"search":  "Search",
 	"upload":  "Upload",
 	"arbit":   "Arbitrage",
+	"global":  "Global",
+	"reverse": "Reverse",
 	"news":    "Newspaper",
 	"sleep":   "Sleepers",
 	"offline": "Offline",
@@ -166,15 +168,6 @@ func settingsTabs(nav []NavElem, offlineAllowed bool) []string {
 	return tabs
 }
 
-// arbitSettingsRoute is one vendor grid on the Arbitrage tab: the route
-// it belongs to, the cookie it writes, and the stores it offers.
-type arbitSettingsRoute struct {
-	Name       string // Arbitrage, Global, Reverse
-	Scope      string // arbit, global, reverse
-	Cookie     string
-	VendorKeys []string
-}
-
 // settingsModalVars is everything the modal body renders from.
 type settingsModalVars struct {
 	Hash     string
@@ -192,8 +185,10 @@ type settingsModalVars struct {
 	UploadSealedSellerKeys []string
 	CanUploadCustom        bool
 
-	// arbit, in rail order, only the routes the reader has
-	ArbitRoutes []arbitSettingsRoute
+	// arbit, global, reverse
+	ArbitVendorKeys   []string
+	GlobalVendorKeys  []string
+	ReverseVendorKeys []string
 
 	// sleep
 	SleepSellerKeys []string
@@ -251,41 +246,14 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	v.UploadSealedSellerKeys = up.SealedSellerKeys
 	v.CanUploadCustom = up.CanUploadCustom
 
-	v.ArbitRoutes = arbitSettingsRoutes(nav, sig)
+	v.ArbitVendorKeys = arbitVendorKeys(arbitBlockedVendors(sig), false)
+	v.GlobalVendorKeys = globalVendorKeys(globalProbeBlocklist())
+	v.ReverseVendorKeys = arbitVendorKeys(arbitBlockedVendors(sig), true)
 
 	retail, buylist := sleepBlocklists(sig)
 	v.SleepSellerKeys, v.SleepVendorKeys = sleepModalKeys(retail, buylist)
 
 	return v
-}
-
-// arbitSettingsRoutes is one grid per arbitrage route in nav, in the
-// order the tab shows them.
-func arbitSettingsRoutes(nav []NavElem, sig string) []arbitSettingsRoute {
-	has := map[string]bool{}
-	for _, elem := range nav {
-		has[elem.Name] = true
-	}
-	var routes []arbitSettingsRoute
-	if has["Arbitrage"] {
-		routes = append(routes, arbitSettingsRoute{
-			Name: "Arbitrage", Scope: "arbit", Cookie: "ArbitVendorsList",
-			VendorKeys: arbitVendorKeys(arbitBlockedVendors(sig), false),
-		})
-	}
-	if has["Global"] {
-		routes = append(routes, arbitSettingsRoute{
-			Name: "Global", Scope: "global", Cookie: "GlobalVendorsList",
-			VendorKeys: globalVendorKeys(globalProbeBlocklist()),
-		})
-	}
-	if has["Reverse"] {
-		routes = append(routes, arbitSettingsRoute{
-			Name: "Reverse", Scope: "reverse", Cookie: "ReverseVendorsList",
-			VendorKeys: arbitVendorKeys(arbitBlockedVendors(sig), true),
-		})
-	}
-	return routes
 }
 
 // SettingsModal serves the settings modal's body for the reader behind

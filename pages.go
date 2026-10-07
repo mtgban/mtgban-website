@@ -55,7 +55,7 @@ type NavElem struct {
 	ShouldHide func(*site) bool
 
 	// The settings modal tab this page opens on: search, upload, arbit,
-	// news or sleep. Empty for a page with no settings of its own.
+	// global, reverse, news or sleep. Empty for a page with no settings of its own.
 	SettingsTab string
 }
 
@@ -222,7 +222,7 @@ func init() {
 			Link:        "/global",
 			Handle:      (*site).Global,
 			Page:        "arbit.html",
-			SettingsTab: "arbit",
+			SettingsTab: "global",
 		},
 		"Arbit": {
 			Name:        "Arbitrage",
@@ -240,7 +240,7 @@ func init() {
 			Link:        "/reverse",
 			Handle:      (*site).Reverse,
 			Page:        "arbit.html",
-			SettingsTab: "arbit",
+			SettingsTab: "reverse",
 		},
 		"Alerts": {
 			Name:        "Alerts",
@@ -320,10 +320,8 @@ type PageVars struct {
 	Metadata   cardMetadata
 	ShowUpsell bool
 
-	// SettingsTab is the modal tab the gear opens on this page, and
-	// SettingsScope the arbitrage route it shows, if any
-	SettingsTab   string
-	SettingsScope string
+	// SettingsTab is the modal tab the gear opens on this page
+	SettingsTab string
 
 	PopularSearches []PopularSearch
 	Changelog       []changelogGroup

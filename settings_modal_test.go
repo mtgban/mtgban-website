@@ -92,8 +92,9 @@ func TestSettingsTabsFollowTheNav(t *testing.T) {
 		{"nothing", nil, false, nil},
 		{"offline alone", nil, true, []string{"offline"}},
 		{"search only", nav("Search"), false, []string{"search"}},
-		{"global only", nav("Global"), false, []string{"arbit"}},
-		{"three arbit routes make one tab", nav("Global", "Arbit", "Reverse"), false, []string{"arbit"}},
+		{"global only", nav("Global"), false, []string{"global"}},
+		{"each arbitrage route its own tab", nav("Global", "Arbit", "Reverse"), false,
+			[]string{"arbit", "global", "reverse"}},
 		{"rail order, not nav order", nav("Sleepers", "Newspaper", "Upload", "Search"), true,
 			[]string{"search", "upload", "news", "sleep", "offline"}},
 		{"pages without settings add nothing", nav("Screener", "Alerts", "Search"), false, []string{"search"}},
@@ -159,7 +160,7 @@ func fetchSettingsModal(t *testing.T, sig string) string {
 
 // The panes follow the sig the way the navbar does: nothing without one
 // when the ACL grants Any nothing, every page's tab with every grant, and
-// one arbit route for a reader with Global alone. The stores are emptied,
+// Global's tab for a reader with Global alone. The stores are emptied,
 // so the grids render no rows; the panes and gates are what is checked.
 func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 	signingEnabled(t, true)
@@ -182,9 +183,9 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 		sig := grantSig(t, "Search", "Upload", "Arbit", "Global", "Reverse",
 			"Newspaper", "Sleepers", "SearchOfflineMode", "UploadCustom")
 		body := fetchSettingsModal(t, sig)
-		want := []string{"search", "upload", "arbit", "sleep", "offline"}
+		want := []string{"search", "upload", "arbit", "global", "reverse", "sleep", "offline"}
 		if len(GetNewspaperUUIDs()) > 0 {
-			want = []string{"search", "upload", "arbit", "news", "sleep", "offline"}
+			want = []string{"search", "upload", "arbit", "global", "reverse", "news", "sleep", "offline"}
 		}
 		if got := paneTabs(body); !slices.Equal(got, want) {
 			t.Errorf("panes = %v, want %v", got, want)
@@ -194,10 +195,6 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 			`id="opt-customseller"`,        // the custom rule's controls
 			`id="offline-img-editions-picker"`,
 			`id="sleep-editions-picker"`,
-			`data-role="arbit-scope"`,
-			`data-scope="arbit"`,
-			`data-scope="global"`,
-			`data-scope="reverse"`,
 		} {
 			if !strings.Contains(body, id) {
 				t.Errorf("body lacks %s", id)
@@ -207,17 +204,8 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 
 	t.Run("global alone", func(t *testing.T) {
 		body := fetchSettingsModal(t, grantSig(t, "Global"))
-		if got := paneTabs(body); !slices.Equal(got, []string{"arbit"}) {
-			t.Errorf("panes = %v, want [arbit]", got)
-		}
-		if strings.Contains(body, `data-role="arbit-scope"`) {
-			t.Error("one route still shows scope pills")
-		}
-		if !strings.Contains(body, `class="settings-scope-pane" data-scope="global"`) {
-			t.Error("body lacks the Global pane")
-		}
-		if strings.Contains(body, `data-scope="arbit"`) || strings.Contains(body, `data-scope="reverse"`) {
-			t.Error("body has a route the reader lacks")
+		if got := paneTabs(body); !slices.Equal(got, []string{"global"}) {
+			t.Errorf("panes = %v, want [global]", got)
 		}
 	})
 
