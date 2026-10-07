@@ -484,12 +484,10 @@ type GenericCard struct {
 	// PromoTypes is every promo type token co.PromoTypes carries that is not
 	// already shown some other way - not Boosterfun, not the alt-foil style
 	// that became FinishTag or a Treatments entry. A frame effect (Showcase,
-	// Extended Art, Borderless) is a printing's own promo type the same as
-	// Prerelease or Bundle, so it needs no field of its own and arrives here
-	// like any other. The one exception is the pre-8th-edition border, which
-	// carries no promo type in the datastore; "retro" is added for it by
-	// hand, since is:retro is a real filter despite that. Spelled for
-	// display via PromoLabels, keyed by the token itself.
+	// Extended Art, Borderless, Retro Frame) is a printing's own promo type
+	// the same as Prerelease or Bundle, so it needs no field of its own and
+	// arrives here like any other. Spelled for display via PromoLabels,
+	// keyed by the token itself.
 	PromoTypes []string
 	Keyrune    string
 	// SetSymbol is the set's own published symbol image, from the same
@@ -971,14 +969,6 @@ var allLanguageFlags = map[string]string{
 	"Spanish":             "🇪🇸",
 }
 
-func showVariant(b *mtgmatcher.Backend, cardID string) bool {
-	setDate, err := b.CardReleaseDate(cardID)
-	if err != nil {
-		return false
-	}
-	return setDate.After(magic.PromosForEverybodyYay)
-}
-
 func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
@@ -1057,17 +1047,6 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 		}
 
 		promoTypes = append(promoTypes, promoType)
-	}
-
-	// Retro frame (the pre-8th-edition border) is the one exception: unlike
-	// the three above, co.FrameVersion carries no promo type of its own in
-	// the datastore, so nothing in the loop above ever adds it - it is
-	// added by hand instead, and only for a card new enough that the site
-	// would have said so: showVariant gates it because is:retro still needs
-	// to find a modern reprint that chose the old border, not the decades
-	// of original printings that predate the site saying anything at all.
-	if showVariant(b, cardID) && co.FrameVersion == "1997" {
-		promoTypes = append(promoTypes, "retro")
 	}
 
 	// Spelled once here rather than by the template at render time, so a
