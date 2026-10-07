@@ -364,7 +364,7 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 | `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email; POST only when `NavElem.CanPOST` |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/v2/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET` |
 
-Static assets (`/css/`, `/js/`, `/img/`) go through none of these three —
+Static assets (`/css/`, `/js/`, `/img/`, `/openapi/`) go through none of these three —
 they're registered directly on `ServeFile` with no wrapper.
 
 `/api/load/datastore` instead uses its own HMAC-SHA256 scheme (`verify()` in
@@ -412,7 +412,7 @@ handler, embedded in `PageVars` so templates read them unchanged: `UploadVars`
 (49 fields), `SearchVars` (48), `AdminVars` (23), `NewsVars` (17), `ArbitVars`
 (6) and `SleepVars` (5).
 
-Other routes: static `/css|/js|/img` (plus `/favicon.ico`, `/robots.txt`)
+Other routes: static `/css|/js|/img|/openapi` (plus `/favicon.ico`, `/robots.txt`)
 served from disk via `ServeFile` with `Cache-Control: public, max-age=86400`
 plus `?hash=<git commit>` cache-busting baked into template asset URLs;
 `/go/{r|i|b}/{store}/{hash}` affiliate redirects, or the 2-segment
