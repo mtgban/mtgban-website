@@ -3,6 +3,14 @@
     --radius-lg: 14px;
 }
 
+/* Nothing on these pages is meant to be scrolled to sideways, so a stray
+   overflow is clipped rather than letting a phone pan the whole page.
+   hidden is the fallback for Safari before 16, which has no clip. */
+html {
+    overflow-x: hidden;
+    overflow-x: clip;
+}
+
 /* Keep search content at the original (pre-bump) font scale,
    without affecting the navbar which uses the global scale */
 .search-layout,
