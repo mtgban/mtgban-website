@@ -167,7 +167,7 @@
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';
-            searches.forEach(function(s) {
+            searches.forEach(function(s, i) {
                 // Prefer the art crop, but keep older/crop-less entries from
                 // falling back to the oversized thumbnail row. The first
                 // result image is still useful background art for searches
@@ -179,7 +179,9 @@
                 var backgroundSrc = cropSrc || (!s.cw ? imageSrc : '');
                 var backgroundClass = backgroundSrc ? ' has-background' + (cropSrc ? '' : ' has-image') : '';
                 var token = parseSetToken(s.q);
-                html += '<a class="landing-item landing-item-recent' + backgroundClass + '"' + (backgroundSrc ? ' style="background-image:url(&quot;' + escapeAttr(backgroundSrc) + '&quot;)"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
+                var next = searches[i + 1];
+                var lastPinned = s.pinned && next && !next.pinned ? ' landing-item-last-pinned' : '';
+                html += '<a class="landing-item landing-item-recent' + backgroundClass + lastPinned + '"' + (backgroundSrc ? ' style="background-image:url(&quot;' + escapeAttr(backgroundSrc) + '&quot;)"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
                 if (!backgroundSrc) {
                     html += '<div class="landing-item-thumb">';
                     if (token.keyrune) {

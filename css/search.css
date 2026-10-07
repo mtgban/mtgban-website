@@ -2504,6 +2504,10 @@ body.modal-embed .cp-overlay {
 .landing-pane-recent .landing-item:has(.landing-item-pin.pinned):not(.has-background) {
     background-color: var(--surface-3);
 }
+/* Line between the pinned searches and the rest */
+.landing-pane-recent .landing-item.landing-item-last-pinned {
+    border-bottom: 1px solid var(--greytext);
+}
 
 /* Favorites pane: 2-column grid of card-style tiles */
 .landing-pane-favorites .landing-pane-body {
