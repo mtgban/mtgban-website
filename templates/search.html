@@ -453,7 +453,7 @@
                                 </a>
                                 <div class="result-card-info">
                                     <div class="result-card-name-row">
-                                        <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" title="{{$card.Name}}">{{$card.Name}}</a>
+                                        <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
                                         <div class="result-badges">
                                             {{$qty := index $.CardQuantities $cardId}}{{if gt $qty 1}}<span class="result-badge qty" title="{{$qty}} copies in this list">{{$qty}}x copies</span>{{end}}
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
