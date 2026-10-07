@@ -115,7 +115,7 @@ test('buildDoneMessage reports plain finish when nothing is missing', () => {
 });
 
 test('buildDoneMessage reports all-missing outcome when every selected edition lacks images', () => {
-    expect(UI.buildDoneMessage(false, 3, 3)).toBe('0 of 3 selected editions have images yet.');
+    expect(UI.buildDoneMessage(false, 3, 3)).toBe('Ready');
 });
 
 test('buildDoneMessage appends missing count when some but not all editions lack images', () => {
@@ -124,12 +124,12 @@ test('buildDoneMessage appends missing count when some but not all editions lack
 
 test('buildDoneMessage reports images that failed and will be retried', () => {
     expect(UI.buildDoneMessage(false, 0, 5, 7)).toBe(
-        'Image sync finished. (7 images failed and retry on the next sync)'
+        'Image sync finished. (7 editions failed and retry on the next sync)'
     );
 });
 
 test('buildDoneMessage reports missing editions and failed images together', () => {
     expect(UI.buildDoneMessage(false, 2, 5, 7)).toBe(
-        'Image sync finished. (2 editions have no images yet; 7 images failed and retry on the next sync)'
+        'Image sync finished. (2 editions have no images yet; 7 editions failed and retry on the next sync)'
     );
 });
