@@ -252,7 +252,9 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 }
 
 // TestSearchCSVKeepsThePageOrder exports in the order the page sorts by,
-// a price sort included, rather than falling back to release order.
+// a price sort included, rather than falling back to release order. It
+// reads the sort as the page does: the query's own sort:, else the sort
+// parameter, else the reader's saved default.
 func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 	uuids, err := backend().SearchEquals("Counterspell")
 	if err != nil || len(uuids) < 3 {
@@ -271,9 +273,12 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
 
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
-	exported := func(sortMode string) []string {
-		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/Counterspell.csv?id=mtgjson&sort="+sortMode, nil)
+	exported := func(query, sortMode, saved string) []string {
+		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(query)+".csv?id=mtgjson&sort="+sortMode, nil)
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		if saved != "" {
+			req.AddCookie(&http.Cookie{Name: "SearchDefaultSort", Value: saved})
+		}
 		rec := httptest.NewRecorder()
 		testSite.SearchAPI(rec, req)
 		var ids []string
@@ -286,14 +291,28 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 		return ids
 	}
 
-	got := exported("retail")
-	if len(got) < 3 {
-		t.Fatalf("exported %d printings, want several", len(got))
+	released := exported("Counterspell", "", "")
+	for _, c := range []struct {
+		name               string
+		query, sort, saved string
+	}{
+		{"the sort parameter", "Counterspell", "retail", ""},
+		{"the query's own sort", "Counterspell sort:retail", "", ""},
+		{"the query's sort over the parameter", "Counterspell sort:retail", "chrono", ""},
+		{"the saved default", "Counterspell", "", "retail"},
+	} {
+		got := exported(c.query, c.sort, c.saved)
+		if len(got) < 3 {
+			t.Fatalf("%s: exported %d printings, want several", c.name, len(got))
+		}
+		if !sort.SliceIsSorted(got, func(i, j int) bool { return price[got[i]] > price[got[j]] }) {
+			t.Errorf("%s: the export is not dearest first: %v", c.name, got)
+		}
+		if slices.Equal(got, released) {
+			t.Errorf("%s: the export came out in release order", c.name)
+		}
 	}
-	if !sort.SliceIsSorted(got, func(i, j int) bool { return price[got[i]] > price[got[j]] }) {
-		t.Errorf("retail export is not dearest first: %v", got)
-	}
-	if slices.Equal(got, exported("")) {
-		t.Error("the retail export came out in release order")
+	if got := exported("Counterspell", "chrono", "retail"); !slices.Equal(got, released) {
+		t.Errorf("the sort parameter did not win over the saved default: %v", got)
 	}
 }
