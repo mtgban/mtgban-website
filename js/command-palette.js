@@ -1107,7 +1107,8 @@
         };
         if (candidate.keyrune) {
             var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
-            item.iconHtml = '<i class="ss ss-' + kr + '"></i>';
+            var mark = candidate.mark ? ' data-mark="' + escapeHtml(candidate.mark) + '"' : '';
+            item.iconHtml = '<i class="ss ss-' + kr + '"' + mark + '></i>';
         }
         if (candidate.iconColor) item.iconStyle = 'color: ' + candidate.iconColor;
         return item;

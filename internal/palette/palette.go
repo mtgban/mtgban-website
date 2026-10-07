@@ -63,6 +63,7 @@ type Set struct {
 	Name     string   `json:"name"`
 	Released string   `json:"released,omitempty"`
 	Keyrune  string   `json:"keyrune,omitempty"`
+	Mark     string   `json:"mark,omitempty"`
 	Rarities []string `json:"rarities,omitempty"`
 	Colors   []string `json:"colors,omitempty"`
 }
@@ -98,6 +99,7 @@ func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
 			Name:     set.Name,
 			Released: set.ReleaseDate,
 			Keyrune:  strings.ToLower(set.KeyruneCode),
+			Mark:     SetMark(set.Code, set.Name),
 		}
 		// In the game's order, as the set lists them
 		if len(set.Rarities) > 1 {

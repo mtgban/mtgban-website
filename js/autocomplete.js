@@ -307,7 +307,8 @@ async function autocomplete(form, inp, sealed) {
         var iconInner = '';
         if (candidate.keyrune) {
             var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
-            iconInner = '<i class="ss ss-fw ss-' + kr + '"></i>';
+            var mark = candidate.mark ? ' data-mark="' + escapeHtml(candidate.mark) + '"' : '';
+            iconInner = '<i class="ss ss-fw ss-' + kr + '"' + mark + '></i>';
         } else if (candidate.iconColor) {
             /* Whitelist CSS color chars; HTML-escaping alone does not stop CSS injection. */
             var safeColor = /^[a-zA-Z0-9#(),%. +-]+$/.test(candidate.iconColor) ? candidate.iconColor : '';
