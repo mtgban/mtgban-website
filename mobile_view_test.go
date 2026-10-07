@@ -145,7 +145,8 @@ func TestSearchListsTheStoresOnlyForAPhone(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		testSite.Search(w, req)
-		if got := w.Body.String(); got != c.want {
+		got := w.Body.String()
+		if got != c.want {
 			t.Errorf("%s: the page got %q store keys, want %q", c.reader, got, c.want)
 		}
 	}

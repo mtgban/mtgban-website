@@ -1530,7 +1530,8 @@ func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request,
 		if sid == "" || sid == id {
 			continue
 		}
-		if card, ok := metadata[sid]; ok {
+		card, found := metadata[sid]
+		if found {
 			metadata[id] = card
 		}
 	}

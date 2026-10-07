@@ -312,7 +312,8 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 			t.Errorf("%s: the export came out in release order", c.name)
 		}
 	}
-	if got := exported("Counterspell", "chrono", "retail"); !slices.Equal(got, released) {
+	got := exported("Counterspell", "chrono", "retail")
+	if !slices.Equal(got, released) {
 		t.Errorf("the sort parameter did not win over the saved default: %v", got)
 	}
 }
