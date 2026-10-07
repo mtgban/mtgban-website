@@ -1798,6 +1798,25 @@ func passthroughIndex(entries []SearchEntry, consumed []string) []SearchEntry {
 	return out
 }
 
+// sellerEntryFound reports whether a seller's entry for a card passes a
+// search's condition and price filters. An index's entries carry no
+// condition, so only its price is filtered.
+func sellerEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.InventoryEntry, config SearchConfig) bool {
+	if !info.MetadataOnly && shouldSkipEntryNG(entry, config.EntryFilters) {
+		return false
+	}
+	return !shouldSkipPriceNG(cardID, entry, config.PriceFilters, info.Shorthand)
+}
+
+// vendorEntryFound reports whether a vendor's entry for a card passes a
+// search's condition and price filters.
+func vendorEntryFound(info mtgban.ScraperInfo, cardID string, entry mtgban.BuylistEntry, config SearchConfig) bool {
+	if shouldSkipEntryNG(entry, config.EntryFilters) {
+		return false
+	}
+	return !shouldSkipPriceNG(cardID, entry, config.PriceFilters, info.Shorthand)
+}
+
 func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[string]map[mtgban.Condition][]SearchEntry) {
 	// Allocate memory
 	foundSellers = map[string]map[mtgban.Condition][]SearchEntry{}
@@ -1807,13 +1826,9 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 	// the same rows once more
 	cardIDs = dedupeKeys(cardIDs)
 
-	storeFilters := config.StoreFilters
-	priceFilters := config.PriceFilters
-	entryFilters := config.EntryFilters
-
 	// Search sellers
 	for _, seller := range GetSellers() {
-		if shouldSkipStoreNG(seller, storeFilters) {
+		if shouldSkipStoreNG(seller, config.StoreFilters) {
 			continue
 		}
 
@@ -1833,13 +1848,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 
 			// Loop thorugh available conditions
 			for _, entry := range entries {
-				// Skip cards that have not the desired condition
-				if !info.MetadataOnly && shouldSkipEntryNG(entry, entryFilters) {
-					continue
-				}
-
-				// Skip cards that don't match desired pricing
-				if shouldSkipPriceNG(cardID, entry, priceFilters, info.Shorthand) {
+				if !sellerEntryFound(info, cardID, entry, config) {
 					continue
 				}
 
@@ -1892,12 +1901,8 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 
 	cardIDs = dedupeKeys(cardIDs)
 
-	storeFilters := config.StoreFilters
-	priceFilters := config.PriceFilters
-	entryFilters := config.EntryFilters
-
 	for _, vendor := range GetVendors() {
-		if shouldSkipStoreNG(vendor, storeFilters) {
+		if shouldSkipStoreNG(vendor, config.StoreFilters) {
 			continue
 		}
 
@@ -1915,11 +1920,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 			}
 
 			for _, entry := range entries {
-				if shouldSkipEntryNG(entry, entryFilters) {
-					continue
-				}
-
-				if shouldSkipPriceNG(cardID, entry, priceFilters, info.Shorthand) {
+				if !vendorEntryFound(info, cardID, entry, config) {
 					continue
 				}
 
