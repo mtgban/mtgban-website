@@ -546,7 +546,8 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// for a query, so it keeps its own empty state either way.
 	scopeOnly := query == "" && len(pinned) > 0 && !isSetsPage
 
-	fillSearchSettings(&pageVars.SearchVars, r, b)
+	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
+	_, pageVars.OfflineModeAllowed = offlineModeAllowed(r)
 	// Only the mobile page lists the stores in its own settings drawer; the
 	// desktop modal asks /api/settings/modal for them when it opens.
 	if pageVars.IsMobile {
@@ -812,17 +813,6 @@ func searchReader(s *site, r *http.Request) (canAlerts, canFix bool) {
 	// store, deep-linking into the overrides builder.
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
 	return canAlerts, canAdmin || (DevMode && !SigCheck)
-}
-
-// fillSearchSettings fills whether any sealed product is loaded, and whether
-// the reader may use offline mode.
-func fillSearchSettings(pageVars *SearchVars, r *http.Request, b *mtgmatcher.Backend) {
-	pageVars.HasAvailable = len(b.GetSealedUUIDs()) > 0
-
-	// Offline mode: only for entitled readers
-	if _, ok := offlineModeAllowed(r); ok {
-		pageVars.OfflineModeAllowed = true
-	}
 }
 
 // fillSearchPrefs puts the reader's search preferences on the page: from
