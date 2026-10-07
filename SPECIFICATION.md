@@ -673,6 +673,16 @@ under a product the datastore's `mcmId` does not name and do not price
 the other. A response takes the shelves once, so its cards all come from
 one snapshot.
 
+`/api/v2/search/` is v1's search (`SearchAPI`) answered in v2's shape: the
+same query, scope, key store scope and sort pick the cards, and each store's
+entries for them that the query's store, condition and price filters keep
+(`sellerEntryFound`, `vendorEntryFound`, shared with the search page) are
+filed as the v2 price API files them (`sellerSearchV2`, `vendorSearchV2`).
+Its JSON keys cards as v1's search does, by `scryfall` and by `mtgjson`
+for sealed, but takes the `id` a request asks for, sealed included, and
+refuses one v2 does not know. Stores are keyed by shorthand, as in all of
+v2. Its `.csv` is v1's search CSV.
+
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 
 `discordgo` session with Guilds + GuildMessages intents. Commands: `!card` /
