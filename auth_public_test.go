@@ -15,7 +15,8 @@ import (
 
 // anyTierNav installs one page granted to the ACL "Any" tier (with a
 // sub-page) and one gated page, and returns the handler enforceSigning
-// wraps, whose body carries marker.
+// wraps, whose body carries marker. The ACL knows the open page by its
+// registry key, which its name does not match, as with the Screener.
 func anyTierNav(t *testing.T, marker string) http.Handler {
 	t.Helper()
 	savedNavs, savedOrder := ExtraNavs, OrderNav
@@ -27,7 +28,7 @@ func anyTierNav(t *testing.T, marker string) http.Handler {
 	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 	withSigMode(t, true, true)
 	ExtraNavs = map[string]*NavElem{
-		"Open": {Name: "Open", Link: "/open", Page: "home.html", SubPages: []NavElem{
+		"Open": {Name: "Open (Beta)", Link: "/open", Page: "home.html", SubPages: []NavElem{
 			{Name: "OpenSub", Link: "/open-sub", ShouldHide: func(*site) bool { return true }},
 		}},
 		"Gated": {Name: "Gated", Link: "/gated", Page: "home.html"},
