@@ -17,7 +17,8 @@
         'theme', 'chartDateRange', 'mtgban_nav_layout_v1',
         'chartReleasesLongRange', 'chartCheckpointTypes',
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
-        'mtgban_search_layout', 'mtgban_popular_collapsed'
+        'mtgban_search_layout', 'mtgban_popular_collapsed',
+        'mtgban_upload_presets'
     ];
 
     // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.
@@ -161,6 +162,7 @@
     function rerender() {
         if (typeof window.renderFavorites === 'function') window.renderFavorites();
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
+        if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
         // Synced favorites arrive price-less; backfill (self-gating).
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
