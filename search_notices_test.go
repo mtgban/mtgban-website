@@ -134,3 +134,21 @@ func TestSealedCautionShowsOnce(t *testing.T) {
 		t.Error("the caution does not follow the cap note")
 	}
 }
+
+// A roster's dropped cards are counted in the notice, or named as one.
+func TestChartIDsDroppedNotice(t *testing.T) {
+	for _, c := range []struct {
+		dropped, total int
+		why, want      string
+	}{
+		{1, 3, "failed to load", "One of the charted cards failed to load and was left out."},
+		{2, 3, "failed to load", "2 of the 3 charted cards failed to load and were left out."},
+		{1, 2, "could not be matched to a printing", "One of the charted cards could not be matched to a printing and was left out."},
+		{10, 10, "could not be matched to a printing", "10 of the 10 charted cards could not be matched to a printing and were left out."},
+	} {
+		got := chartIDsDroppedNotice(c.dropped, c.total, c.why)
+		if got != c.want {
+			t.Errorf("%d of %d %s: %q, want %q", c.dropped, c.total, c.why, got, c.want)
+		}
+	}
+}

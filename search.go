@@ -324,14 +324,13 @@ func magicFinishSearchID(b *mtgmatcher.Backend, uuid string, foil, etched bool) 
 	return uuid
 }
 
-// noteChartIDsDropped tells the reader that part of the roster was left out of
-// the chart and why, in a notice of its own.
-func noteChartIDsDropped(pageVars *SearchVars, dropped, total int, why string) {
-	notice := fmt.Sprintf("%d of the %d charted cards %s and were left out.", dropped, total, why)
+// chartIDsDroppedNotice tells the reader that part of the roster was left out
+// of the chart and why.
+func chartIDsDroppedNotice(dropped, total int, why string) string {
 	if dropped == 1 {
-		notice = "One of the charted cards " + why + " and was left out."
+		return "One of the charted cards " + why + " and was left out."
 	}
-	pageVars.Notices = append(pageVars.Notices, notice)
+	return fmt.Sprintf("%d of the %d charted cards %s and were left out.", dropped, total, why)
 }
 
 // chartSearchID names the results-table row for a roster id. The resolved
@@ -913,7 +912,7 @@ func fillChartRoster(pageVars *SearchVars, r *http.Request, b *mtgmatcher.Backen
 			// went: a roster the user built by hand, or a link they were sent,
 			// otherwise comes back quietly short.
 			if unresolved > 0 {
-				noteChartIDsDropped(pageVars, unresolved, len(roster.ids), "could not be matched to a printing")
+				pageVars.Notices = append(pageVars.Notices, chartIDsDroppedNotice(unresolved, len(roster.ids), "could not be matched to a printing"))
 			}
 			query = strings.Join(searchIDs, ",")
 		}
@@ -1612,7 +1611,7 @@ func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, ros
 		case len(pageVars.Datasets) == 0:
 			pageVars.Notices = append(pageVars.Notices, "No chart data available")
 		case failed > 0:
-			noteChartIDsDropped(pageVars, failed, len(roster.ids), "failed to load")
+			pageVars.Notices = append(pageVars.Notices, chartIDsDroppedNotice(failed, len(roster.ids), "failed to load"))
 		}
 	}
 }
