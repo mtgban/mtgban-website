@@ -121,6 +121,31 @@ func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
 	return data
 }
 
+// setMarks is the variant printings of an older set, which share its keyrune
+// glyph. The list is closed, as none of these lines prints new sets.
+var setMarks = map[string]string{
+	"4BB":    "BB",
+	"BCHR":   "BB",
+	"FBB":    "BB",
+	"DRKITA": "ITA",
+	"LEGITA": "ITA",
+	"4EDALT": "ALT",
+}
+
+// SetMark is the mark a set's symbol carries in its corner, by the set's code
+// and name, or "" for none: setMarks, or a star for a promo set, which mostly
+// shares its parent's glyph too.
+func SetMark(code, name string) string {
+	mark := setMarks[code]
+	if mark != "" {
+		return mark
+	}
+	if strings.HasSuffix(name, " Promos") {
+		return "★"
+	}
+	return ""
+}
+
 // Promo is a promo type as the palette and the guide offer it: the token an
 // "is:" query carries, the words a reader is shown, and how much of the game
 // wears it.

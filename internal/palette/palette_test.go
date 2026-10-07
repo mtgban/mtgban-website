@@ -57,3 +57,20 @@ func TestColorListFollowsTheGame(t *testing.T) {
 		t.Errorf("ColorList = %v, want %v", got, want)
 	}
 }
+
+func TestSetMark(t *testing.T) {
+	for _, tc := range []struct{ code, name, want string }{
+		{"PTHB", "Theros Beyond Death Promos", "★"},
+		{"THB", "Theros Beyond Death", ""},
+		{"FBB", "Foreign Black Border", "BB"},
+		{"4BB", "Fourth Edition Foreign Black Border", "BB"},
+		{"LEGITA", "Legends Italian", "ITA"},
+		{"4EDALT", "Alternate Fourth Edition", "ALT"},
+		{"PROMOS", "Promos of Theros", ""},
+	} {
+		got := SetMark(tc.code, tc.name)
+		if got != tc.want {
+			t.Errorf("SetMark(%q, %q) = %q, want %q", tc.code, tc.name, got, tc.want)
+		}
+	}
+}
