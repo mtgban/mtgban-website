@@ -331,11 +331,11 @@ func noteChartIDsDropped(pageVars *PageVars, dropped, total int, why string) {
 	if dropped == 1 {
 		notice = "One of the charted cards " + why + " and was left out."
 	}
-	if pageVars.InfoMessage == "" {
-		pageVars.InfoMessage = notice
+	if len(pageVars.Notices) == 0 {
+		pageVars.Notices = []string{notice}
 		return
 	}
-	pageVars.InfoMessage += " " + notice
+	pageVars.Notices[0] += " " + notice
 }
 
 // chartSearchID names the results-table row for a roster id. The resolved
@@ -506,6 +506,11 @@ type SearchVars struct {
 	// Printings is each result's printings row for the sidebar, from
 	// cardPrintings.
 	Printings map[string]string
+
+	// Notices are what the page tells the reader about this request: why a
+	// search shows few or no cards, what a chart left out, a caution about
+	// the figures.
+	Notices []string
 }
 
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
@@ -613,7 +618,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	result := runSearch(r, ds, config)
 	if result.message != "" {
-		pageVars.InfoMessage = result.message
+		pageVars.Notices = []string{result.message}
 	}
 	if len(result.keys) == 0 {
 		pageVars.PopularSearches = getPopularSearches(ds)
@@ -868,7 +873,7 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
 		if chartTruncated {
-			pageVars.InfoMessage = fmt.Sprintf("Charts show up to %d cards; the extras were left off.", len(multiCardPalette))
+			pageVars.Notices = []string{fmt.Sprintf("Charts show up to %d cards; the extras were left off.", len(multiCardPalette))}
 		}
 
 		// Always expose the chart roster so the "add to chart" affordance on
@@ -1358,7 +1363,7 @@ func rebuildIndexRows(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend
 		}
 
 		if hasEV && getTCGSimulationIQR(cardID) > IQRThreshold {
-			pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
+			pageVars.Notices = []string{"CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"}
 		}
 
 		// If no TCG reference was present, we manually add one to get the link
@@ -1523,7 +1528,7 @@ func fillChartPage(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmat
 	}
 
 	if PricesArchiveDB == nil {
-		pageVars.InfoMessage = "No chart data available"
+		pageVars.Notices = []string{"No chart data available"}
 	} else {
 		fillLongFormChart(pageVars, r, ds, b, roster)
 	}
@@ -1591,7 +1596,7 @@ func fillLongFormChart(pageVars *PageVars, r *http.Request, ds *datastore, b *mt
 		}
 	}
 	if len(series) == 0 || earliest.IsZero() {
-		pageVars.InfoMessage = "No chart data available"
+		pageVars.Notices = []string{"No chart data available"}
 	} else {
 		pageVars.AxisLabels = getDateAxisValues(earliest)
 		cards := make([]multiCardInput, len(series))
@@ -1621,9 +1626,9 @@ func fillLongFormChart(pageVars *PageVars, r *http.Request, ds *datastore, b *mt
 		failed := readFailures(series)
 		switch {
 		case len(pageVars.Datasets) == 0 && failed > 0:
-			pageVars.InfoMessage = "Failed to load chart"
+			pageVars.Notices = []string{"Failed to load chart"}
 		case len(pageVars.Datasets) == 0:
-			pageVars.InfoMessage = "No chart data available"
+			pageVars.Notices = []string{"No chart data available"}
 		case failed > 0:
 			noteChartIDsDropped(pageVars, failed, len(roster.ids), "failed to load")
 		}

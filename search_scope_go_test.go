@@ -83,10 +83,10 @@ func TestEmptyScopeStaysOutOfTheURL(t *testing.T) {
 	for _, mobile := range []bool{false, true} {
 		for _, scope := range []string{"", "f:foil"} {
 			out := renderPage(t, "search.html", mobile, PageVars{
-				UserNav:     &NavElem{Short: "b"},
-				InfoMessage: NoCardsMessage,
-				Metadata:    map[string]GenericCard{},
+				UserNav:  &NavElem{Short: "b"},
+				Metadata: map[string]GenericCard{},
 				SearchVars: SearchVars{
+					Notices:     []string{NoCardsMessage},
 					CanScope:    true,
 					SearchRan:   true,
 					SearchQuery: "s:M19 bolt",

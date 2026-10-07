@@ -194,7 +194,7 @@
 {{define "search-results"}}
     {{if not .AllKeys}}
         <div class="page-standard" style="padding-top: 2em;">
-            <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
+            <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</em></p>
             {{/* Set apart from the "without s:sos" suggestions below: those
                  drop a term the searcher just typed and can see, this one
                  drops the bar they pinned and may have stopped noticing.
@@ -770,10 +770,10 @@
                         </div>
                     {{end}}
 
-                    {{if ne .InfoMessage ""}}
+                    {{if .Notices}}
                         <div class="search-info-message">
                             <br>
-                            <h4 class="indent"><i>{{.InfoMessage}}</i></h4>
+                            <h4 class="indent"><i>{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</i></h4>
                         </div>
                     {{end}}
                 </div>{{/* Close .search-results */}}

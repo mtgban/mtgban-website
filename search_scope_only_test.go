@@ -223,10 +223,10 @@ func TestEmptyHandedScopeSearchQuotesNoQuery(t *testing.T) {
 		out := renderPage(t, "search.html", mobile, PageVars{
 			UserNav: &NavElem{Short: "b"},
 			SearchVars: SearchVars{
+				Notices:     []string{NoResultsMessage},
 				SearchRan:   true,
 				SearchScope: "s:LEA",
 			},
-			InfoMessage: NoResultsMessage,
 		})
 
 		// The empty query, quoted: "No results for &ldquo;&rdquo;." Matching

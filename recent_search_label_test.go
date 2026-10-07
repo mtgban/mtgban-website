@@ -57,10 +57,10 @@ func TestTheSearchPageSaysWhetherItFoundAnything(t *testing.T) {
 
 		empty := renderSearch(t, template, PageVars{
 			SearchVars: SearchVars{
+				Notices:     []string{NoResultsMessage},
 				SearchRan:   true,
 				SearchQuery: "Lightning Bolt",
 			},
-			InfoMessage: NoResultsMessage,
 		})
 		if !strings.Contains(empty, "found: false") {
 			t.Errorf("%s: a page with no results does not report found: false", template)
