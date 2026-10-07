@@ -32,11 +32,11 @@
     function buildDoneMessage(paused, missingCount, selectedCount, failedCount) {
         if (paused) return 'Paused. Sync Images Now resumes where it left off.';
         if (selectedCount > 0 && missingCount === selectedCount) {
-            return '0 of ' + selectedCount + ' selected editions have images yet.';
+            return 'Ready';
         }
         var notes = [];
         if (missingCount > 0) notes.push(missingCount + ' editions have no images yet');
-        if (failedCount > 0) notes.push(failedCount + ' images failed and retry on the next sync');
+        if (failedCount > 0) notes.push(failedCount + (failedCount === 1 ? ' edition' : ' editions') + ' failed and retry on the next sync');
         if (!notes.length) return 'Image sync finished.';
         return 'Image sync finished. (' + notes.join('; ') + ')';
     }
