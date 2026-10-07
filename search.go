@@ -326,7 +326,7 @@ func magicFinishSearchID(b *mtgmatcher.Backend, uuid string, foil, etched bool) 
 
 // noteChartIDsDropped tells the reader that part of the roster was left out of
 // the chart and why, in a notice of its own.
-func noteChartIDsDropped(pageVars *PageVars, dropped, total int, why string) {
+func noteChartIDsDropped(pageVars *SearchVars, dropped, total int, why string) {
 	notice := fmt.Sprintf("%d of the %d charted cards %s and were left out.", dropped, total, why)
 	if dropped == 1 {
 		notice = "One of the charted cards " + why + " and was left out."
@@ -568,7 +568,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roster, query := fillChartRoster(&pageVars, r, b, query)
+	roster, query := fillChartRoster(&pageVars.SearchVars, r, b, query, pageVars.DisableChart)
+	pageVars.ModalMode = roster.modal
+	pageVars.ChartIDsCSV = strings.Join(roster.ids, ",")
 	landing := query == "" && !scopeOnly
 	pageVars.Title = searchTitle(pageVars.Title, roster.id != "", pageVars.IsSealed, isSetsPage && landing)
 
@@ -857,16 +859,17 @@ func readSearchSort(r *http.Request, config SearchConfig) string {
 
 // fillChartRoster reads the chart= roster: it puts the roster on the page for
 // the add-to-chart affordance, and when chart= comes alone, it returns the
-// roster to chart and turns the query into its cards' search ids.
-func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend, query string) (chartRoster, string) {
+// roster to chart and turns the query into its cards' search ids. A reader
+// the charts are locked to gets no roster.
+func fillChartRoster(pageVars *SearchVars, r *http.Request, b *mtgmatcher.Backend, query string, locked bool) (chartRoster, string) {
 	chartParam := r.FormValue("chart")
-	pageVars.ModalMode = r.FormValue("modal") == "1"
 
 	// The front-end enforces the same cap when batching cards, so let the JS
 	// disable the affordance at the boundary instead of dropping silently.
 	pageVars.MaxChartCards = len(multiCardPalette)
 
 	roster := chartRoster{
+		modal: r.FormValue("modal") == "1",
 		// Roster id -> resolved search id, computed once per request: a ban:<id>
 		// resolution costs a DB round-trip and each id is consulted three times
 		// (results query, display query, metadata aliasing).
@@ -875,7 +878,7 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 	}
 	var chartTruncated bool
 	roster.ids, chartTruncated = parseChartIDs(b, chartParam)
-	if len(roster.ids) > 0 && !pageVars.DisableChart {
+	if len(roster.ids) > 0 && !locked {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
 		if chartTruncated {
@@ -886,14 +889,13 @@ func fillChartRoster(pageVars *PageVars, r *http.Request, b *mtgmatcher.Backend,
 		// result rows can target it even when we're rendering a regular search
 		// (e.g. the user typed a query while on a chart page).
 		pageVars.ChartIDs = roster.ids
-		pageVars.ChartIDsCSV = strings.Join(roster.ids, ",")
 
 		// Only enter chart-render mode when chart= is alone (no q=). With both
 		// present the user is searching for cards to add to the chart, so we
 		// keep the chart roster as context but render the search results page.
 		// In modal mode the iframe is the add-to-chart picker, so never render
 		// a chart inside it even when no query is set yet.
-		if query == "" && !pageVars.ModalMode {
+		if query == "" && !roster.modal {
 			roster.id = roster.ids[0]
 			// Drive the results table off the same trimmed/validated IDs the
 			// chart plots (not the raw chartParam), so a URL like
@@ -1640,7 +1642,7 @@ func fillLongFormChart(pageVars *PageVars, r *http.Request, ds *datastore, b *mt
 		case len(pageVars.Datasets) == 0:
 			pageVars.Notices = append(pageVars.Notices, "No chart data available")
 		case failed > 0:
-			noteChartIDsDropped(pageVars, failed, len(roster.ids), "failed to load")
+			noteChartIDsDropped(&pageVars.SearchVars, failed, len(roster.ids), "failed to load")
 		}
 	}
 }
@@ -1673,8 +1675,10 @@ func fillChartSidebar(pageVars *PageVars, b *mtgmatcher.Backend, roster chartRos
 
 // chartRoster is the cards a chart page names: the ids in its chart=
 // parameter, the one the page charts first (none when it draws no chart),
-// the search id each resolved to, and their chart targets.
+// the search id each resolved to, and their chart targets. modal says the
+// page is the add-to-chart picker, which never draws a chart.
 type chartRoster struct {
+	modal     bool
 	id        string
 	ids       []string
 	searchIDs map[string]string
