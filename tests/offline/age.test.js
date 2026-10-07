@@ -12,34 +12,21 @@ const DAY = 24 * HOUR;
 
 function ago(ms) { return new Date(NOW - ms).toISOString(); }
 
-test('missing or invalid lastSync reads as never synced', () => {
-    expect(OfflineAge.formatAge(null, NOW)).toBe('never synced');
-    expect(OfflineAge.formatAge(undefined, NOW)).toBe('never synced');
-    expect(OfflineAge.formatAge('', NOW)).toBe('never synced');
-    expect(OfflineAge.formatAge('not a date', NOW)).toBe('never synced');
+test('refreshText says when prices were last refreshed', () => {
+    const at = (ms) => new Date(NOW - ms).toLocaleString();
+    expect(OfflineAge.refreshText(ago(5 * MIN), NOW)).toBe('Offline prices last refreshed at ' + at(5 * MIN) + '.');
+    expect(OfflineAge.refreshText(ago(3 * DAY), NOW)).toBe('Offline prices last refreshed at ' + at(3 * DAY) + '.');
 });
 
-test('fresh and future timestamps read as just now', () => {
-    expect(OfflineAge.formatAge(ago(0), NOW)).toBe('just now');
-    expect(OfflineAge.formatAge(ago(45 * 1000), NOW)).toBe('just now');
-    expect(OfflineAge.formatAge(ago(-5 * MIN), NOW)).toBe('just now');
+test('refreshText marks prices older than three days stale', () => {
+    const at = new Date(NOW - 4 * DAY).toLocaleString();
+    expect(OfflineAge.refreshText(ago(4 * DAY), NOW)).toBe('Offline prices last refreshed at ' + at + ' (stale).');
 });
 
-test('minute granularity under an hour', () => {
-    expect(OfflineAge.formatAge(ago(90 * 1000), NOW)).toBe('1 minute ago');
-    expect(OfflineAge.formatAge(ago(5 * MIN), NOW)).toBe('5 minutes ago');
-    expect(OfflineAge.formatAge(ago(59 * MIN), NOW)).toBe('59 minutes ago');
-});
-
-test('hour granularity under a day', () => {
-    expect(OfflineAge.formatAge(ago(HOUR), NOW)).toBe('1 hour ago');
-    expect(OfflineAge.formatAge(ago(3 * HOUR + 20 * MIN), NOW)).toBe('3 hours ago');
-    expect(OfflineAge.formatAge(ago(23 * HOUR), NOW)).toBe('23 hours ago');
-});
-
-test('day granularity beyond that', () => {
-    expect(OfflineAge.formatAge(ago(DAY), NOW)).toBe('1 day ago');
-    expect(OfflineAge.formatAge(ago(4 * DAY + HOUR), NOW)).toBe('4 days ago');
+test('refreshText reads missing or invalid lastSync as never refreshed', () => {
+    for (const v of [null, undefined, '', 'not a date']) {
+        expect(OfflineAge.refreshText(v, NOW)).toBe('Offline prices have not been refreshed on this device yet.');
+    }
 });
 
 test('staleness is strictly over three days, unknown counts as stale', () => {
