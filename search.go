@@ -1101,8 +1101,23 @@ type searchPage struct {
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
 func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortMode string) searchPage {
+	var shown searchPage
+	shown.reversed = sortSearchKeys(r, ds, result.keys, result.odds, sortMode)
+
+	// If results can't fit in one page, chunk response and enable pagination
+	shown.keys = result.keys
+	if len(shown.keys) > MaxSearchResults {
+		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
+		shown.keys, shown.pagination = Paginate(result.keys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
+	}
+
+	return shown
+}
+
+// sortSearchKeys orders keys in place as the reader asked, odds being what a
+// variable search's cards are expected at, and says whether it reversed them.
+func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[string]float64, sortMode string) bool {
 	b := ds.backend
-	allKeys := result.keys
 	sortData := resolveSortingData(b, allKeys)
 	switch sortMode {
 	case "odds":
@@ -1117,8 +1132,8 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 		// regardless of direction, ranked among itself by the fallback the
 		// other fields use.
 		sort.Slice(allKeys, func(i, j int) bool {
-			oddsI, hasI := result.odds[allKeys[i]]
-			oddsJ, hasJ := result.odds[allKeys[j]]
+			oddsI, hasI := odds[allKeys[i]]
+			oddsJ, hasJ := odds[allKeys[j]]
 			if hasI != hasJ {
 				return hasI
 			}
@@ -1182,22 +1197,14 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 	}
 
 	// Invert the slice if requested
-	var shown searchPage
-	shown.reversed, _ = strconv.ParseBool(r.FormValue("reverse"))
-	if shown.reversed {
+	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
+	if reversed {
 		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
 			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
 		}
 	}
 
-	// If results can't fit in one page, chunk response and enable pagination
-	shown.keys = allKeys
-	if len(allKeys) > MaxSearchResults {
-		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
-		shown.keys, shown.pagination = Paginate(allKeys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
-	}
-
-	return shown
+	return reversed
 }
 
 // sortOfferRows orders each card's offers in place, condition by condition:
