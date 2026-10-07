@@ -731,7 +731,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	allKeys, _ := searchAndFilter(ds, config)
 
 	// Sort as the search page does, reverse included
-	sortSearchKeys(r, ds, allKeys, dropOdds(b, config), r.FormValue("sort"))
+	sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
 
 	// Limit results to be processed
 	if len(allKeys) > MaxSearchTotalResults {
