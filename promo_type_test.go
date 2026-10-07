@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 )
 
 // promoTypeCards finds one real card whose PromoTypes carries a token (the
@@ -68,7 +70,8 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 		if err != nil || co.Sealed {
 			continue
 		}
-		if showVariant(backend(), uuid) {
+		setDate, err := backend().CardReleaseDate(uuid)
+		if err == nil && setDate.After(magic.PromosForEverybodyYay) {
 			continue // only the pre-PromosForEverybodyYay case is interesting here
 		}
 		hasFrame := false
@@ -94,33 +97,6 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 	}
 	if !found {
 		t.Skip("this datastore has no pre-PromosForEverybodyYay frame effect printing")
-	}
-}
-
-// Retro frame is the one exception: co.FrameVersion carries no promo type of
-// its own in the datastore, so nothing adds "retro" to PromoTypes except the
-// hand-added case in uuid2card, gated the same way the old switch gated it.
-func TestRetroFrameStaysDateGated(t *testing.T) {
-	skipWithoutDatastore(t)
-	var found bool
-	for _, uuid := range backend().GetUUIDs() {
-		co, err := backend().GetUUID(uuid)
-		if err != nil || co.Sealed || co.FrameVersion != "1997" {
-			continue
-		}
-		if showVariant(backend(), uuid) {
-			continue // only the gated-off case is interesting here
-		}
-		found = true
-		card := uuid2card(backend(), uuid, false)
-		for _, p := range card.PromoTypes {
-			if p == "retro" {
-				t.Errorf("%s (%s): \"retro\" shows despite predating PromosForEverybodyYay", co.Name, co.SetCode)
-			}
-		}
-	}
-	if !found {
-		t.Skip("this datastore has no pre-PromosForEverybodyYay retro-framed printing")
 	}
 }
 

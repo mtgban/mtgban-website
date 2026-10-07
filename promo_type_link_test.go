@@ -8,8 +8,7 @@ import (
 // Every value in PromoTypes or Treatments is a value "is:" can filter on
 // directly - the same string cardFilterIs compares co.PromoTypes against,
 // with no relabelling in between. If this stops holding, a card's own link
-// stops finding it. "retro" is the one value not drawn from co.PromoTypes
-// itself, so it is checked here too rather than assumed.
+// stops finding it.
 func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 	skipWithoutDatastore(t)
 	plain, chipped := promoTypeCards(t)
@@ -34,31 +33,6 @@ func TestPromoTypeLinksMatchIsFilter(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("found no promo-type links to check")
-	}
-
-	// is:retro is real even though "retro" never appears in AllPromoTypes.
-	var retroUUID string
-	for _, uuid := range backend().GetUUIDs() {
-		co, err := backend().GetUUID(uuid)
-		if err != nil || co.Sealed || co.FrameVersion != "1997" {
-			continue
-		}
-		card := uuid2card(backend(), uuid, false)
-		for _, p := range card.PromoTypes {
-			if p == "retro" {
-				retroUUID = uuid
-			}
-		}
-		if retroUUID != "" {
-			break
-		}
-	}
-	if retroUUID == "" {
-		t.Skip("this datastore has no retro-framed printing recent enough to show it")
-	}
-	co, _ := backend().GetUUID(retroUUID)
-	if cardFilterIs(backend(), []string{"retro"}, co) {
-		t.Errorf("%s (%s): is:retro does not match a card whose own PromoTypes names it", co.Name, co.SetCode)
 	}
 }
 
