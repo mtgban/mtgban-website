@@ -657,7 +657,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if roster.id != "" {
-		fillChartPage(&pageVars, r, ds, b, roster)
+		fillChartPage(&pageVars.SearchVars, pageVars.Metadata, r, ds, roster)
 	}
 
 	notifyFromSearch(r, query, roster, start)
@@ -1507,8 +1507,10 @@ func notifyFromSearch(r *http.Request, query string, roster chartRoster, start t
 
 // fillChartPage fills a chart page for the roster: the display query, the
 // roster's card details, the chart from the long-form price tables, and the
-// single card's sidebar.
-func fillChartPage(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, roster chartRoster) {
+// single card's sidebar. It adds the roster's ban ids to metadata, which
+// holds the results by their matcher ids.
+func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request, ds *datastore, roster chartRoster) {
+	b := ds.backend
 	isMultiChart := len(roster.ids) > 1
 
 	chartEditions := ds.editions
@@ -1534,15 +1536,15 @@ func fillChartPage(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmat
 		if sid == "" || sid == id {
 			continue
 		}
-		if card, ok := pageVars.Metadata[sid]; ok {
-			pageVars.Metadata[id] = card
+		if card, ok := metadata[sid]; ok {
+			metadata[id] = card
 		}
 	}
 
 	if PricesArchiveDB == nil {
 		pageVars.Notices = append(pageVars.Notices, "No chart data available")
 	} else {
-		fillLongFormChart(pageVars, r, ds, b, roster)
+		fillLongFormChart(pageVars, r, ds, roster)
 	}
 
 	// Sidebar foil/etched switch and Stocks link are inherently per-card,
@@ -1551,14 +1553,15 @@ func fillChartPage(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmat
 	// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
 	// the matcher.
 	if !isMultiChart {
-		fillChartSidebar(pageVars, b, roster)
+		fillChartSidebar(pageVars, metadata, b, roster)
 	}
 }
 
 // fillLongFormChart charts the roster from the long-form price tables, over
 // the window the viewer last chose, widened to the whole history when the
 // cards have no prices inside it.
-func fillLongFormChart(pageVars *PageVars, r *http.Request, ds *datastore, b *mtgmatcher.Backend, roster chartRoster) {
+func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, roster chartRoster) {
+	b := ds.backend
 	sig := getSignatureFromCookies(r)
 	isMultiChart := len(roster.ids) > 1
 
@@ -1642,14 +1645,14 @@ func fillLongFormChart(pageVars *PageVars, r *http.Request, ds *datastore, b *mt
 		case len(pageVars.Datasets) == 0:
 			pageVars.Notices = append(pageVars.Notices, "No chart data available")
 		case failed > 0:
-			noteChartIDsDropped(&pageVars.SearchVars, failed, len(roster.ids), "failed to load")
+			noteChartIDsDropped(pageVars, failed, len(roster.ids), "failed to load")
 		}
 	}
 }
 
 // fillChartSidebar sets the single card's foil and etched switches and its
 // Stocks link, all of which a sealed product goes without.
-func fillChartSidebar(pageVars *PageVars, b *mtgmatcher.Backend, roster chartRoster) {
+func fillChartSidebar(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher.Backend, roster chartRoster) {
 	searchID := roster.searchIDs[roster.id]
 	co, gerr := b.GetUUID(searchID)
 	if gerr == nil && !co.Sealed {
@@ -1669,7 +1672,7 @@ func fillChartSidebar(pageVars *PageVars, b *mtgmatcher.Backend, roster chartRos
 			pageVars.AltEtchedID = altID
 		}
 
-		pageVars.StocksURL = pageVars.Metadata[roster.id].StocksURL
+		pageVars.StocksURL = metadata[roster.id].StocksURL
 	}
 }
 
