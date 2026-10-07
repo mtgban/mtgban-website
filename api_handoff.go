@@ -70,10 +70,6 @@ func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose, path 
 	}
 	if msg != "" {
 		pageVars := genPageNav(s, r, "API", sig)
-		pageVars.IsMobile = isMobileRequest(r)
-		if pageVars.IsMobile {
-			pageVars.Nav = filterNavForMobile(pageVars.Nav)
-		}
 		pageVars.ErrorMessage = msg
 		if login {
 			// The home page carries the Patreon button, which comes back here.

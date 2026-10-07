@@ -21,9 +21,5 @@ func (s *site) OfflinePage(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 	pageVars := genPageNav(s, r, "Offline", sig)
 	pageVars.SettingsTab = "offline"
-	pageVars.IsMobile = isMobileRequest(r)
-	if pageVars.IsMobile {
-		pageVars.Nav = filterNavForMobile(pageVars.Nav)
-	}
 	render(w, "offline.html", pageVars)
 }
