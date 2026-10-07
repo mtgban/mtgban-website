@@ -45,8 +45,9 @@
     // Called by the onclick in the HTML template.
     function handleToggle(el) {
         if (!window.OfflineMode) return;
-        el.classList.add('m-toggle-busy');
         var enabling = !OfflineMode.enabled();
+        if (!enabling && !OfflineMode.confirmDisable()) return;
+        el.classList.add('m-toggle-busy');
         var op = enabling ? OfflineMode.enable() : OfflineMode.disable();
         paintStatus(enabling ? 'Enabling...' : 'Disabling...');
         op.then(function () {
