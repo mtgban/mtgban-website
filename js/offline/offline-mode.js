@@ -142,6 +142,12 @@
         });
     }
 
+    // Turning offline mode off deletes what Delete Offline Data does, so it
+    // asks the same way first.
+    function confirmDisable() {
+        return window.confirm('Turn off offline mode and delete all offline data on this device? Prices, cards and card images will have to be downloaded again.');
+    }
+
     function disable() {
         if (syncWorker) {
             syncWorker.terminate();
@@ -388,27 +394,38 @@
         var usage = document.getElementById('settings-offline-usage');
         if (!toggle || !usage) return;
 
+        var controls = document.getElementById('settings-offline-controls');
+
         function paint() {
             toggle.checked = enabled();
+            if (controls) controls.hidden = !enabled();
             if (!enabled()) { paintUsage(); return; }
             refreshStatus().then(paintUsage);
         }
 
-        // The toggle stages like every other setting instead of applying on
-        // change, so Save is what turns offline mode on or off. Save reloads,
-        // and that reload is what puts the cloud button in the navbar.
-        if (window.Settings && window.Settings.register) {
-            window.Settings.register({
-                load: paint,
-                serialize: function () { return 'offline_mode=' + toggle.checked; },
-                save: function () {
-                    if (toggle.checked === enabled()) return;
-                    return (toggle.checked ? enable() : disable()).catch(function (err) {
-                        console.warn('offline mode:', err && err.message);
-                    });
-                },
+        // Applies on change, like the rest of this tab; the navbar's cloud
+        // button follows it without a reload
+        toggle.addEventListener('change', function () {
+            if (!toggle.checked && !confirmDisable()) {
+                toggle.checked = true;
+                return;
+            }
+            toggle.disabled = true;
+            var op = toggle.checked ? enable() : disable();
+            op.then(function () {
+                if (enabled()) {
+                    initNavToggle();
+                    return;
+                }
+                var btn = document.getElementById('nav-offline-toggle');
+                if (btn) btn.remove();
+            }).catch(function (err) {
+                setSyncStatus('offline mode: ' + (err && err.message || err));
+            }).then(function () {
+                toggle.disabled = false;
+                paint();
             });
-        }
+        });
         var resyncBtn = document.getElementById('offline-resync-btn');
         if (resyncBtn) {
             resyncBtn.addEventListener('click', function () {
@@ -437,6 +454,7 @@
         enabled: enabled,
         enable: enable,
         disable: disable,
+        confirmDisable: confirmDisable,
         sync: sync,
         forceResync: forceResync,
         wipeLocal: wipeLocal,

@@ -10,13 +10,15 @@
             Offline mode is not part of your current subscription. Your saved
             prices stay browsable, but syncing is paused until access is restored.
         </p>
-        <p class="section-desc">Keep card prices available when the site is unreachable. Data syncs in the background while you browse; applies immediately, no Save needed.</p>
+        <p class="section-desc">Keep card prices available when the site is unreachable. Data syncs in the background while you browse.</p>
         <label class="settings-toggle">
             <input type="checkbox" id="settings-offline-toggle">
             <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
             <span>Enable offline mode</span>
         </label>
         <div id="offlineSyncStatus" class="offline-sync-status" aria-live="polite"></div>
+        {{/* Only does anything with offline mode on */}}
+        <div id="settings-offline-controls" hidden>
         <p class="section-desc" id="settings-offline-usage"></p>
         <div class="offline-maintenance">
             <button type="button" class="settings-btn" id="offline-resync-btn">Force Resync</button>
@@ -42,6 +44,7 @@
             <div class="offline-img-storage" id="offline-img-storage"></div>
         </div>
         {{end}}
+        </div>
         </div>
     </div>
 </section>
