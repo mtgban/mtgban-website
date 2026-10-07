@@ -1599,42 +1599,14 @@ func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, ros
 		series = fetchRosterPrices(r.Context(), resolved, lb)
 	}
 
-	// Read each card once and take the axis from what came back: a
-	// roster used to cost two archive round-trips per card, and
-	// against a hundred-partition prices table a round-trip is
-	// mostly planning.
-	var earliest time.Time
-	for _, cs := range series {
-		e := earliestChartedDate(cs.Prices, lb)
-		if !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
-			earliest = e
-		}
-	}
-	if len(series) == 0 || earliest.IsZero() {
+	plot := plotSeries(ds, series, lb, isMultiChart)
+	if plot.axis == nil {
 		pageVars.Notices = append(pageVars.Notices, "No chart data available")
 	} else {
-		pageVars.AxisLabels = getDateAxisValues(earliest)
-		cards := make([]multiCardInput, len(series))
-		for i, cs := range series {
-			cards[i] = multiCardInput{
-				CardID:   cs.CardID,
-				Name:     cs.Name,
-				Datasets: chartDatasetsFrom(cs.Prices, pageVars.AxisLabels),
-			}
-		}
-		if isMultiChart {
-			datasets, refs := mergeMultiCardDatasets(cards)
-			pageVars.Datasets = datasets
-			pageVars.ChartReferences = refs
-			names := make([]string, len(cards))
-			for i, card := range cards {
-				names[i] = card.Name
-			}
-			pageVars.Checkpoints = multiCardCheckpoints(ds, names, earliest)
-		} else {
-			pageVars.Datasets = cards[0].Datasets
-			pageVars.Checkpoints = relevantCheckpoints(ds, cards[0].Name, earliest)
-		}
+		pageVars.AxisLabels = plot.axis
+		pageVars.Datasets = plot.datasets
+		pageVars.ChartReferences = plot.references
+		pageVars.Checkpoints = plot.checkpoints
 		// A card the archive did not answer for is missing from the chart,
 		// which says nothing about its prices: never call such a chart
 		// empty, and when the rest drew, say what was left out.

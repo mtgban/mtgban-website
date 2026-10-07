@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type ChartAPIResponse struct {
@@ -131,55 +130,23 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 		return
 	}
 
-	var earliest time.Time
-	for _, s := range series {
-		if e := earliestChartedDate(s.Prices, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
-			earliest = e
-		}
-	}
-	axisLabels := getDateAxisValues(earliest)
+	plot := plotSeries(ds, series, lb, len(series) > 1)
 
-	cards := make([]multiCardInput, len(series))
-	for i, s := range series {
-		cards[i] = multiCardInput{
-			CardID:   s.CardID,
-			Name:     s.Name,
-			Datasets: chartDatasetsFrom(s.Prices, axisLabels),
+	// A roster whose other ids failed to resolve still reaches a caller
+	// that keys its lines by card, so the lone series keeps its identity
+	// rather than arriving with an empty cardId.
+	if len(series) == 1 && len(ids) > 1 {
+		for i := range plot.datasets {
+			plot.datasets[i].CardID = series[0].CardID
 		}
-	}
-
-	var datasets []Dataset
-	var references []string
-	if len(cards) > 1 {
-		datasets, references = mergeMultiCardDatasets(cards)
-	} else {
-		datasets = cards[0].Datasets
-		// A roster whose other ids failed to resolve still reaches a caller
-		// that keys its lines by card, so the lone series keeps its identity
-		// rather than arriving with an empty cardId.
-		if len(ids) > 1 {
-			for i := range datasets {
-				datasets[i].CardID = cards[0].CardID
-			}
-		}
-	}
-
-	// Checkpoints match set releases by card name; a non-Magic name matches none.
-	checkpoints := relevantCheckpoints(ds, series[0].Name, earliest)
-	if len(series) > 1 {
-		names := make([]string, len(series))
-		for i, s := range series {
-			names[i] = s.Name
-		}
-		checkpoints = multiCardCheckpoints(ds, names, earliest)
 	}
 
 	writeChartAPIResponse(w, ChartAPIResponse{
 		MaxLookbackDays: maxDays,
 		LoadedDays:      lb.Days(),
-		AxisLabels:      axisLabels,
-		Datasets:        chartAPIDatasets(datasets),
-		References:      references,
-		Checkpoints:     checkpoints,
+		AxisLabels:      plot.axis,
+		Datasets:        chartAPIDatasets(plot.datasets),
+		References:      plot.references,
+		Checkpoints:     plot.checkpoints,
 	})
 }
