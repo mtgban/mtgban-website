@@ -1120,7 +1120,10 @@ body.modal-embed .search-sidebar {
     border-radius: 0;
     position: sticky;
     top: calc(var(--nav-height, 48px) + var(--result-cover-height, 21px));
-    z-index: 2;
+    /* All headers share this z-index and all covers the one below, so a
+       later card paints over an earlier one by page order alone. Both stay
+       under the phone sort bar (150) and the nav (200). */
+    z-index: 101;
 }
 .result-header.result-first {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -1132,7 +1135,7 @@ body.modal-embed .search-sidebar {
 .result-header-cover {
     position: sticky;
     top: var(--nav-height, 48px);
-    z-index: 2;
+    z-index: 100;
     height: var(--result-cover-height, 21px);
     margin-bottom: calc(-1 * var(--result-cover-height, 21px));
     background: var(--background);
@@ -2135,11 +2138,9 @@ body.modal-embed .cp-overlay {
         z-index: 30;
     }
     .result-quick-icons.qi-open .qi-actions { display: flex; }
-    /* Each result header is stacked over the one before it (an inline
-       100 + its index), so the next one would paint over the open menu.
-       200 beats them all only while a page holds at most MaxSearchResults
-       (100) cards: raising that cap means raising this. */
-    .result-header:has(.qi-open) { z-index: 200 !important; }
+    /* A later header paints over an earlier one, so the next card's would
+       cover the open menu; lift the header holding it one above the rest. */
+    .result-header:has(.qi-open) { z-index: 102; }
 
     /* This breakpoint still has the sidebar preview, so keep the image button
        out of the dropdown (the grid rule below would otherwise reveal it). */

@@ -242,9 +242,8 @@
                 'Found in ' + n + ' product' + (n > 1 ? 's' : '') + '</a>';
         }
 
-        return '<div class="result-header-cover" style="z-index: ' + i + '"></div>' +
+        return '<div class="result-header-cover"></div>' +
             '<div class="result-header' + (i === 0 ? ' result-first' : '') + '"' +
-            ' style="z-index: ' + (i + 100) + '"' +
             ' data-card-id="' + escapeHtml(res.uuid) + '"' +
             ' data-card-name="' + escapeHtml(card.n) + '"' +
             ' data-set-code="' + escapeHtml(card.set) + '"' +
