@@ -13,8 +13,12 @@ import (
 // SQLConfig names the database and how hard to lean on it, as the
 // config file spells it.
 type SQLConfig struct {
-	Host                   string `json:"host"`
-	Port                   int    `json:"port"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
+	// DirectPort is Postgres's own port where Port is a transaction-mode
+	// pooler's: LISTEN and advisory locks need one session throughout, which
+	// the pooler does not keep. Zero means Port.
+	DirectPort             int    `json:"direct_port"`
 	User                   string `json:"user"`
 	Password               string `json:"password"`
 	DBName                 string `json:"dbname"`
@@ -33,13 +37,26 @@ type SQLConfig struct {
 // hand the second to another backend: "unnamed prepared statement does not
 // exist".
 func (c SQLConfig) DSN() string {
+	return c.dsn(c.Port)
+}
+
+// SessionDSN is the connection string for what needs one Postgres session
+// throughout (LISTEN, advisory locks): DirectPort's, or DSN's without one.
+func (c SQLConfig) SessionDSN() string {
+	if c.DirectPort == 0 {
+		return c.DSN()
+	}
+	return c.dsn(c.DirectPort)
+}
+
+func (c SQLConfig) dsn(port int) string {
 	sslMode := c.SSLMode
 	if sslMode == "" {
 		sslMode = "disable"
 	}
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s binary_parameters=yes",
-		c.Host, c.Port, c.User, c.Password, c.DBName, sslMode,
+		c.Host, port, c.User, c.Password, c.DBName, sslMode,
 	)
 }
 
@@ -47,6 +64,10 @@ func (c SQLConfig) DSN() string {
 type Client struct {
 	db       *sql.DB
 	readOnly bool
+	// sessionDB reaches Postgres past the pooler db goes through, for the
+	// advisory locks; nil without a direct_port. It keeps no idle connection,
+	// so closing one always ends its session, and any lock left on it.
+	sessionDB *sql.DB
 
 	// variants caches variant identity -> ban_id for the long-form (variants +
 	// prices) write path. Warm it once with WarmVariantCache; misses mint.
@@ -171,6 +192,15 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	}
 
 	c := &Client{db: db, readOnly: cfg.ReadOnly}
+	if cfg.DirectPort != 0 {
+		// sql.Open only validates the DSN; the first lock dials
+		c.sessionDB, err = sql.Open("postgres", cfg.SessionDSN())
+		if err != nil {
+			db.Close()
+			return nil, fmt.Errorf("timeseries: open session: %w", err)
+		}
+		c.sessionDB.SetMaxIdleConns(0)
+	}
 	// Best effort: a read whose statement did not prepare still runs, it just
 	// pays for its plan every time.
 	c.stmtHGetAllLong, _ = db.Prepare(hgetAllLongQuery)
@@ -190,13 +220,19 @@ func (c *Client) ReadOnly() bool { return c.readOnly }
 
 // TryAdvisoryLock attempts to acquire the session-level Postgres advisory lock
 // for key without blocking. On success it pins a dedicated connection for the
-// lock's lifetime and returns a release func that unlocks and returns the
-// connection to the pool; the caller must invoke it. When another session
-// already holds the lock, acquired is false and release is a no-op. Use it to
-// make a job single-flight across processes (e.g. so N server instances don't
-// all run the same crawl at once).
+// lock's lifetime and returns a release func that unlocks and closes it: on
+// the session pool (direct_port) that ends the session, elsewhere it goes back
+// to the shared pool. The caller must invoke it. When another session already
+// holds the lock, acquired is false and release is a no-op. Use it to make a
+// job single-flight across processes (e.g. so N server instances don't all
+// run the same crawl at once).
 func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool, release func(), err error) {
-	conn, err := c.db.Conn(ctx)
+	db := c.db
+	if c.sessionDB != nil {
+		// Past the pooler, which would hand the unlock to another backend.
+		db = c.sessionDB
+	}
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return false, nil, err
 	}
@@ -210,8 +246,8 @@ func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool,
 		return false, func() {}, nil
 	}
 	return true, func() {
-		// Unlock on the same pinned connection (session locks are per-connection),
-		// then return it to the pool. Closing the connection would release the
+		// Unlock on the same pinned connection (session locks are
+		// per-connection), then close it. Ending the session releases the
 		// lock regardless, so the unlock is best-effort.
 		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", key)
 		conn.Close()
@@ -226,6 +262,9 @@ func (c *Client) Close() error {
 		if stmt != nil {
 			stmt.Close()
 		}
+	}
+	if c.sessionDB != nil {
+		c.sessionDB.Close()
 	}
 	if c.db != nil {
 		return c.db.Close()

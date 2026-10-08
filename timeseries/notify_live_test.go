@@ -24,7 +24,7 @@ func TestNotifyLive(t *testing.T) {
 	t.Cleanup(func() { _ = c.Close() })
 
 	const channel = "timeseries_notify_live_test"
-	listener := pq.NewListener(cfg.DSN(), 10*time.Second, time.Minute, nil)
+	listener := pq.NewListener(cfg.SessionDSN(), 10*time.Second, time.Minute, nil)
 	t.Cleanup(func() { _ = listener.Close() })
 	err = listener.Listen(channel)
 	if err != nil {

@@ -18,6 +18,9 @@ tcgcsv.com at once; a run that loses the lock says so and exits 0. The backfill'
 archive walk stays outside the lock on purpose — it is operator-driven and can
 run for hours, and holding the lock that long would starve the daily pull — but
 its snapshot fallback takes it, being the same full crawl the daily job makes.
+The lock needs one Postgres session throughout, which PgBouncer in transaction
+mode does not keep: where `sql_config` points at one, set its `direct_port` to
+Postgres's own port, in this binary's config and the website's alike.
 
 ```
 go install github.com/mtgban/mtgban-website/cmd/tcgcsvd@latest
