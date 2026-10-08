@@ -463,7 +463,7 @@ window.__BAN_GUIDE = {
             title: 'Rarity',
             icon: 'diamond',
             summary: "Filter by the game's rarities (r:rare, r:r) or compare them by its order (r>rare).",
-            snippets: ['r:mythic', 'r:m', 'r:rare', 'r>=rare', 'r<uncommon'],
+            snippets: ['r:mythic', 'r:m', 'r:rare', 'r>uncommon', 'r<uncommon'],
             keywords: ['rarity', 'r:', 'mythic', 'rare', 'uncommon', 'common', 'special', 'token', 'oversize', 'shorthand', 'comparison'],
             content: {
                 table: [
@@ -478,7 +478,7 @@ window.__BAN_GUIDE = {
                 examples: [
                     { query: 'r:mythic', desc: 'Mythic rares only' },
                     { query: 'r:m', desc: 'Same using shorthand' },
-                    { query: 'r>=rare', desc: 'Rare and mythic' },
+                    { query: 'r>uncommon', desc: 'Rare and mythic' },
                     { query: 'r:rare,mythic s:MKM', desc: 'Rares and mythics from MKM' }
                 ]
             }
