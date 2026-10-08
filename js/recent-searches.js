@@ -276,6 +276,23 @@
         });
     }
 
+    // A typed search that found something is also one vote for the landing
+    // page's popular strip, for signed-in readers only. The server resolves
+    // the query itself; the page sends nothing but the text.
+    function sendPopularVote(q) {
+        if (window.location.pathname === '/sealed') return;
+        if (!/(?:^|;\s*)MTGBAN=/.test(document.cookie || '')) return;
+        var nav = window.navigator;
+        if (!nav || typeof nav.sendBeacon !== 'function') return;
+        var body = new URLSearchParams();
+        body.set('q', q);
+        try {
+            nav.sendBeacon('/api/popular/vote', body);
+        } catch (e) {
+            // A blocked beacon costs nothing; the search itself already ran.
+        }
+    }
+
     // The other half of hookFormSubmit: this page is the answer to whatever
     // was submitted last. Keep the search only when it found something, and
     // label it with the readable query the server rebuilt - a uuid search
@@ -299,6 +316,7 @@
 
         var answer = window.BAN_SEARCH_RESULT || {};
         if (!answer.found) return;
+        sendPopularVote(q);
         var href = answer.url;
         // A multi-result sealed search has no per-card canonical URL, but its
         // route still matters when the landing page later refreshes its art.

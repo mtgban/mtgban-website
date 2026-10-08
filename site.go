@@ -35,6 +35,9 @@ type site struct {
 	alerts *alerts.Service
 	// alertsSend lets dev mode deliver real DMs (-alerts-send).
 	alertsSend bool
+	// popularVotes records search votes; openDBs attaches the observability
+	// client, and nil means the endpoint answers 204 without recording.
+	popularVotes popularVoteStore
 	// pricesLoaded is set once the startup load has published every store:
 	// it publishes them one by one, and alerts priced on part of them fire.
 	pricesLoaded atomic.Bool

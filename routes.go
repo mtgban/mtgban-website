@@ -112,6 +112,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(s.ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(s, http.HandlerFunc(s.BatchPricesAPI)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
+	http.Handle("/api/popular/vote", noSigning(http.HandlerFunc(s.PopularVoteAPI)))
 	// Its closures read the live datastore and prices per request.
 	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
