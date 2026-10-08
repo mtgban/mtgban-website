@@ -65,7 +65,7 @@
                 <td class="alert-actions">
                     {{if $allowed}}<button type="button" class="settings-btn" data-action="edit">Edit</button>{{end}}
                     {{if eq .Status "active"}}<button type="button" class="settings-btn" data-action="pause">Pause</button>
-                    {{else if and $allowed (or (eq .Status "paused") (eq .Status "undeliverable"))}}<button type="button" class="settings-btn" data-action="resume">Resume</button>{{end}}
+                    {{else if and $allowed (or (eq .Status "paused") (eq .Status "undeliverable") (eq .Status "unresolvable"))}}<button type="button" class="settings-btn" data-action="resume">Resume</button>{{end}}
                     <button type="button" class="settings-btn alert-btn-danger" data-action="delete">Delete</button>
                 </td>
             </tr>

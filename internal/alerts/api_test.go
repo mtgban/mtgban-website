@@ -227,7 +227,8 @@ func TestAlertsAPIStatusFollowsThePage(t *testing.T) {
 		{StatusPaused, StatusPaused, http.StatusOK},
 		{StatusOverAllowance, StatusActive, http.StatusConflict},
 		{StatusOverAllowance, StatusPaused, http.StatusConflict},
-		{StatusUnresolvable, StatusActive, http.StatusConflict},
+		{StatusUnresolvable, StatusActive, http.StatusOK},
+		{StatusUnresolvable, StatusPaused, http.StatusConflict},
 	} {
 		store := newFakeAlertStore()
 		api := testAlertsAPI(store)

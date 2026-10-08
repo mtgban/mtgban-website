@@ -451,11 +451,13 @@ func (a *API) patch(w http.ResponseWriter, r *http.Request, c Caller, id int64) 
 			jsonError(w, http.StatusUnprocessableEntity, "status must be active or paused")
 			return
 		}
-		// What the page offers: pause on an active alert, resume on a paused
-		// or undeliverable one. A parked alert comes back by itself; resumed,
-		// the next run would park it again and DM about it each time.
+		// What the page offers: pause on an active alert, resume on a paused,
+		// undeliverable or unresolvable one. An alert over its allowance comes
+		// back by itself; resumed, the next run would park it again and DM
+		// about it each time. An unresolvable one is parked again silently.
 		pausing := req.Status == StatusPaused && cur.Status == StatusActive
-		resuming := req.Status == StatusActive && (cur.Status == StatusPaused || cur.Status == StatusUndeliverable)
+		resuming := req.Status == StatusActive &&
+			(cur.Status == StatusPaused || cur.Status == StatusUndeliverable || cur.Status == StatusUnresolvable)
 		if req.Status != cur.Status && !pausing && !resuming {
 			jsonError(w, http.StatusConflict, fmt.Sprintf("a %s alert cannot be set %s", cur.Status, req.Status))
 			return
