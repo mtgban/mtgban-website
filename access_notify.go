@@ -76,7 +76,7 @@ func startAccessReloadListener() {
 	// The listener holds its own connection outside PricesArchiveDB's pool:
 	// LISTEN is per-session, and lib/pq reconnects and re-subscribes this one
 	// on its own (backing off between the two durations below).
-	listener := pq.NewListener(Config().SQLConfig.DSN(), 10*time.Second, time.Minute,
+	listener := pq.NewListener(Config().SQLConfig.SessionDSN(), 10*time.Second, time.Minute,
 		func(event pq.ListenerEventType, err error) {
 			if err != nil {
 				log.Println("access reload: listener:", err)
