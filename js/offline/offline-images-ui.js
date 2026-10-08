@@ -161,7 +161,7 @@
             fillEl.style.width = pct + '%';
             labelEl.textContent = msg.done + ' / ' + msg.total + ' editions (' +
                 fmt(msg.bytes || 0) + ') ' + (msg.code || '');
-        } else if (msg.type === 'done' && syncing) {
+        } else if (msg.type === 'done' && syncing && msg.images) {
             syncing = false;
             pauseBtn.hidden = true;
             labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount, msg.imgFailed || 0);
