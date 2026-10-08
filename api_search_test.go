@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -272,21 +273,49 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 	}
 	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
 
+	// The csv prints a printing's scryfall id, which its finishes and
+	// languages share, so a row maps back by every identity column it has.
+	byRow := map[string]string{}
+	for _, id := range uuids {
+		co, err := backend().GetUUID(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		finish := "nonfoil"
+		if co.Etched {
+			finish = "etched"
+		} else if co.Foil {
+			finish = "foil"
+		}
+		row := strings.Join([]string{co.Identifiers["scryfallId"], co.Name, co.SetCode, co.Edition, co.Number, finish}, ",")
+		if _, dup := byRow[row]; dup {
+			t.Fatalf("%s does not map back from its csv row %s", id, row)
+		}
+		byRow[row] = id
+	}
+
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query, sortMode, saved string) []string {
-		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(query)+".csv?id=mtgjson&sort="+sortMode, nil)
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(query)+".csv?sort="+sortMode, nil)
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 		if saved != "" {
 			req.AddCookie(&http.Cookie{Name: "SearchDefaultSort", Value: saved})
 		}
 		rec := httptest.NewRecorder()
 		testSite.SearchAPI(rec, req)
+		rows, err := csv.NewReader(strings.NewReader(rec.Body.String())).ReadAll()
+		if err != nil || len(rows) == 0 {
+			t.Fatalf("%q: unreadable csv, err %v: %s", query, err, rec.Body.String())
+		}
+		finish := slices.Index(rows[0], "Finish")
 		var ids []string
-		for _, line := range strings.Split(rec.Body.String(), "\n")[1:] {
-			id, _, found := strings.Cut(line, ",")
-			if found {
-				ids = append(ids, id)
+		for _, row := range rows[1:] {
+			id, found := byRow[strings.Join(row[:finish+1], ",")]
+			if !found {
+				t.Fatalf("%q: row %v names no priced printing", query, row[:finish+1])
 			}
+			ids = append(ids, id)
 		}
 		return ids
 	}
@@ -315,5 +344,82 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 	got := exported("Counterspell", "chrono", "retail")
 	if !slices.Equal(got, released) {
 		t.Errorf("the sort parameter did not win over the saved default: %v", got)
+	}
+}
+
+// The page's export links ask for both groups. sealed=all puts the cards
+// first and sealed=first the products; without it the plain path answers
+// with cards alone, as every other caller expects.
+func TestSearchAPIExportsBothGroupsOnRequest(t *testing.T) {
+	skipWithoutDatastore(t)
+
+	var card, product string
+	productNames := map[string]bool{}
+	for _, key := range unifiedSearch(t, "onslaught") {
+		co, err := backend().GetUUID(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if co.Sealed {
+			productNames[co.Name] = true
+			if product == "" {
+				product = key
+			}
+		} else if card == "" {
+			card = key
+		}
+	}
+	if card == "" || product == "" {
+		t.Skip("onslaught reaches no card and product here")
+	}
+	registerTestSeller(t, "TESTCSV", []string{card, product})
+
+	// Each row's id and whether it is a product, read from its name since
+	// a foil product's Finish column says foil.
+	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
+	exported := func(params string) (ids []string, sealed []bool) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/onslaught.csv"+params, nil)
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		rec := httptest.NewRecorder()
+		testSite.SearchAPI(rec, req)
+		rows, err := csv.NewReader(strings.NewReader(rec.Body.String())).ReadAll()
+		if err != nil || len(rows) < 2 {
+			t.Fatalf("%q: %d rows, err %v: %s", params, len(rows), err, rec.Body.String())
+		}
+		name := slices.Index(rows[0], "Card Name")
+		for _, row := range rows[1:] {
+			ids = append(ids, row[0])
+			sealed = append(sealed, productNames[row[name]])
+		}
+		return ids, sealed
+	}
+
+	if _, sealed := exported(""); slices.Contains(sealed, true) || !slices.Contains(sealed, false) {
+		t.Errorf("the plain path: want card rows and no product row, got %v", sealed)
+	}
+	for _, c := range []struct {
+		params      string
+		sealedFirst bool
+	}{
+		{"?sealed=all", false},
+		{"?sealed=first", true},
+	} {
+		ids, sealed := exported(c.params)
+		if !slices.Contains(sealed, true) || !slices.Contains(sealed, false) {
+			t.Errorf("%s: want card and product rows, got %v", c.params, sealed)
+			continue
+		}
+		if sealed[0] != c.sealedFirst {
+			t.Errorf("%s: the first row is sealed=%v, want %v", c.params, sealed[0], c.sealedFirst)
+		}
+		if lead := slices.Index(sealed, !c.sealedFirst); slices.Contains(sealed[lead:], c.sealedFirst) {
+			t.Errorf("%s: the groups interleave: %v", c.params, sealed)
+		}
+		for i := range ids {
+			if sealed[i] && ids[i] == "" {
+				t.Errorf("%s: product row %d has no id", c.params, i)
+			}
+		}
 	}
 }
