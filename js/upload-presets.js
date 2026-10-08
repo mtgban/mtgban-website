@@ -124,20 +124,38 @@
     }
 
     var KEY = 'mtgban_upload_presets';
+    // CAP bounds what this device adds; a merge with another device's list
+    // keeps every preset, so more can be listed than may be added.
     var CAP = 10;
+    // A deleted preset stays behind as {id, del, savedAt} for this long, so
+    // the delete syncs to other devices rather than the preset coming back.
+    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-    function readAll() {
+    function byName(a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; }
+
+    function readRaw() {
         try {
             var raw = localStorage.getItem(KEY);
             var list = raw ? JSON.parse(raw) : [];
-            return Array.isArray(list) ? list.filter(function (p) { return p && p.id && p.name && p.opts; }) : [];
+            return Array.isArray(list) ? list.filter(function (p) { return p && p.id; }) : [];
         } catch (e) { return []; }
     }
+    function readAll() {
+        return readRaw().filter(function (p) { return !p.del && p.name && p.opts; });
+    }
+    // tombstones keeps the unexpired deletes of ids not live in list.
+    function tombstones(list) {
+        var live = {}, now = Date.now();
+        list.forEach(function (p) { live[p.id] = true; });
+        return readRaw().filter(function (p) { return p.del && !live[p.id] && now - (p.savedAt || 0) <= TOMB_TTL_MS; });
+    }
     // A full or missing store drops the write, as list-storage.js does.
-    function writeAll(list) {
-        list.sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; });
+    function writeAll(list, deleted) {
+        list.sort(byName);
+        var tombs = tombstones(list);
+        if (deleted) tombs.push({ id: deleted, del: true, savedAt: Date.now() });
         try {
-            localStorage.setItem(KEY, JSON.stringify(list));
+            localStorage.setItem(KEY, JSON.stringify(list.concat(tombs)));
             return true;
         } catch (e) {
             return false;
@@ -146,7 +164,7 @@
     function newId() { return 'p_' + Math.random().toString(36).slice(2, 10); }
 
     var store = {
-        list: function () { return readAll().sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; }); },
+        list: function () { return readAll().sort(byName); },
         newId: newId,
         save: function (p) {
             var list = readAll();
@@ -162,12 +180,12 @@
         // rename and remove return 'missing' for an id that is gone, else whether storage took the write.
         rename: function (id, name) {
             var list = readAll(), hit = false;
-            list.forEach(function (p) { if (p.id === id) { p.name = String(name); hit = true; } });
+            list.forEach(function (p) { if (p.id === id) { p.name = String(name); p.savedAt = Date.now(); hit = true; } });
             return hit ? writeAll(list) : 'missing';
         },
         remove: function (id) {
             var list = readAll(), next = list.filter(function (p) { return p.id !== id; });
-            return next.length !== list.length ? writeAll(next) : 'missing';
+            return next.length !== list.length ? writeAll(next, id) : 'missing';
         },
     };
 
