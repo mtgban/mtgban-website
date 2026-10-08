@@ -3,16 +3,16 @@ package main
 import "net/http"
 
 // offlineModeAllowed authenticates the caller and checks the SearchOfflineMode
-// ACL flag baked into their signed cookie.
+// ACL flag, both off the one signature it checked.
 func offlineModeAllowed(r *http.Request) (string, bool) {
 	if DevMode && !SigCheck {
 		return "dev@localhost", true
 	}
-	email := signedUserEmail(r)
+	sig := verifiedRequestSignature(r)
+	email := GetParamFromSig(sig, "UserEmail")
 	if email == "" {
 		return "", false
 	}
-	sig := getSignatureFromCookies(r)
 	return email, GetParamFromSig(sig, "SearchOfflineMode") == "true"
 }
 
