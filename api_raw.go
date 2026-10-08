@@ -14,7 +14,7 @@ import (
 // number decorations - beside the Fix links that correct its matches, so it
 // is gated like them: admins, or a sigless dev build.
 func (s *site) RawCardAPI(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedRequestSignature(r)
 	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
 	if !canAdmin && !(DevMode && !SigCheck) {
 		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
