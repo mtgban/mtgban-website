@@ -54,7 +54,8 @@ func chartAPIDatasets(datasets []Dataset) []ChartAPIDataset {
 func writeChartAPIResponse(w http.ResponseWriter, resp ChartAPIResponse) {
 	w.Header().Set("Content-Type", "application/json")
 	if len(resp.Datasets) != 0 {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		// private: how much history it holds depends on the reader's tier
+		w.Header().Set("Cache-Control", "private, max-age=3600")
 	} else {
 		w.Header().Set("Cache-Control", "no-store")
 	}
