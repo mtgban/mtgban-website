@@ -340,7 +340,10 @@ signature checks (`enforceAPISigning`) look up a per-user secret in
 `Config.APIUserSecrets` first, falling back to `BAN_SECRET` — page
 signatures always use `BAN_SECRET` only. It is stored in the `MTGBAN`
 cookie (31 days, shared across `*.mtgban.com`, **not** HttpOnly) and/or
-passed as `?sig=`. `GetParamFromSig()` extracts individual grants.
+passed as `?sig=`. `GetParamFromSig()` extracts individual grants, read off
+`verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
+first); `enforceSigning` hands the handler the `?sig=` it checked as the
+cookie.
 
 ### 3.3 ACL / tiers
 

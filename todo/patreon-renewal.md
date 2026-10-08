@@ -25,7 +25,7 @@ making. Every failure mode degrades to exactly today's behavior.
   cookie `MTGBAN` carrying it lives **31 days**, `Domain=mtgban.com` (all
   subdomains → all deployments share one cookie).
 - On sig expiry `enforceSigning` renders "You've been logged out" with the
-  Patreon button; `getSignatureFromCookies` treats an expired sig as
+  Patreon button; `unverifiedSignature` treats an expired sig as
   anonymous. Re-login is a full OAuth redirect (Patreon has no silent
   re-auth; the consent screen is user-visible).
 

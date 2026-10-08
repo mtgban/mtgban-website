@@ -89,7 +89,7 @@ func TestEnforceSigningHandsOnTheSignatureItChecked(t *testing.T) {
 	query := sign()
 	var seen string
 	plain := enforceSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = getSignatureFromCookies(r)
+		seen = unverifiedSignature(r)
 	}))
 	serve(plain, "/api/prices/", query, forge("SearchDisabled", "NONE"))
 	if seen != query {
