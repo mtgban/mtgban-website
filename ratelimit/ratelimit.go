@@ -1,4 +1,4 @@
-// Package ratelimit throttles requests per visitor IP.
+// Package ratelimit throttles requests per key (a visitor IP, an email).
 package ratelimit
 
 import (
@@ -18,7 +18,8 @@ type visitor struct {
 	lastSeen atomic.Int64 // unix nanos of the last Allow
 }
 
-// Limiter rate-limits by visitor IP, forgetting a visitor who stays away.
+// Limiter rate-limits per key (a visitor IP, an email), forgetting a key
+// that stays away.
 type Limiter struct {
 	sync.RWMutex
 
@@ -40,20 +41,20 @@ func NewLimiter(r rate.Limit, burst int) *Limiter {
 	return l
 }
 
-// Allow checks if the given key has not exceeded the rate limit.
-func (l *Limiter) Allow(ip string) bool {
+// Allow reports whether key, a visitor IP or an email, is within its rate.
+func (l *Limiter) Allow(key string) bool {
 	l.RLock()
-	v, exists := l.visitors[ip]
+	v, exists := l.visitors[key]
 	l.RUnlock()
 
 	if !exists {
 		l.Lock()
 		// Re-check under the write lock in case another goroutine created it.
-		if existing, ok := l.visitors[ip]; ok {
+		if existing, ok := l.visitors[key]; ok {
 			v = existing
 		} else {
 			v = &visitor{Limiter: rate.NewLimiter(l.rate, l.burst)}
-			l.visitors[ip] = v
+			l.visitors[key] = v
 		}
 		l.Unlock()
 	}
