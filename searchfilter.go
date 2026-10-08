@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"sort"
@@ -2770,8 +2771,14 @@ func applyPriceFilter(name string, filters []float64, refPrice float64) bool {
 	panic(name + " option not found")
 }
 
+// unpriced reports whether p is no price at all: zero, or a NaN or an
+// infinity, which no JSON response can carry.
+func unpriced(p float64) bool {
+	return p == 0 || math.IsNaN(p) || math.IsInf(p, 0)
+}
+
 func shouldSkipPriceNG(cardID string, entry mtgban.GenericEntry, filters []*FilterPriceElem, shorthand string) bool {
-	if entry.Pricing() == 0 {
+	if unpriced(entry.Pricing()) {
 		return true
 	}
 
