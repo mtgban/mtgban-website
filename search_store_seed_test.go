@@ -336,3 +336,34 @@ func TestStoreQueryUnionsACommaJoinedList(t *testing.T) {
 		t.Errorf("vendor:STOREA,STOREB found %d cards, want the union %d (%d + %d)", len(results), want, len(uuidsA), len(uuidsB))
 	}
 }
+
+// Under the union a store: query keeps the products the store carries;
+// without it the seed stays cards only, as every other caller expects.
+func TestPlainStoreQueryKeepsProductsUnderTheUnion(t *testing.T) {
+	skipWithoutDatastore(t)
+
+	cards := somePlainCardUUIDs(t, 3)
+	products := backend().GetSealedUUIDs()
+	if len(cards) < 3 || len(products) < 2 {
+		t.Skip("datastore doesn't hold enough cards and products for this test")
+	}
+	registerTestSeller(t, "TESTBOTH", append(slices.Clone(cards), products[:2]...))
+
+	config := parseSearchOptionsNG(backend(), "store:TESTBOTH", nil, nil, nil)
+	keys, err := searchAndFilter(currentDatastore(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if singles, sealed := splitSealed(t, keys); singles != 3 || sealed != 0 {
+		t.Errorf("cards only: found %d cards and %d products, want 3 and 0", singles, sealed)
+	}
+
+	config.IncludeSealed = true
+	keys, err = searchAndFilter(currentDatastore(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if singles, sealed := splitSealed(t, keys); singles != 3 || sealed != 2 {
+		t.Errorf("union: found %d cards and %d products, want 3 and 2", singles, sealed)
+	}
+}

@@ -719,6 +719,16 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// The export links carry the sticky bar as its own parameter rather
 	// than spliced into the path, so the csv holds the rows the page did.
 	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(r.FormValue("scope"))))
+	// The page's CSV links ask for what the page showed: sealed=all is
+	// both groups with the cards first, sealed=first both with the
+	// products first. Only the exports read it; the JSON answers as before.
+	switch pools := r.FormValue("sealed"); {
+	case isCSV && pools == "all":
+		config.IncludeSealed = true
+	case isCSV && pools == "first":
+		config.IncludeSealed = true
+		config.SealedFirst = true
+	}
 	if isSealed {
 		config.SearchMode = "sealed"
 		// v2 keeps an id the request asks for
@@ -732,6 +742,11 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Sort as the search page does, reverse included
 	sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
+	// Only the page's csv links ask for the grouping; a JSON request can
+	// set IncludeSealed via contents:/variable:/container: with no grouping meant.
+	if isCSV && config.IncludeSealed {
+		groupSealed(b, allKeys, config.SealedFirst)
+	}
 
 	// Limit results to be processed
 	if len(allKeys) > MaxSearchTotalResults {

@@ -191,7 +191,7 @@ test('the bar is handed the shared autocomplete', () => {
     expect(bound).toHaveLength(1);
     expect(bound[0].form).toBe(nodes['nav-searchform']);
     expect(bound[0].box).toBe(nodes['nav-scopebox']);
-    expect(bound[0].sealed).toBe('false');
+    expect(bound[0].sealed).toBe('all');
 });
 
 // While the pointer is over the box, js/tooltips.js holds its title in

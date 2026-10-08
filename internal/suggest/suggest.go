@@ -23,10 +23,29 @@ var sealedTypeKeywords = []string{
 	"tournament", "spellbook",
 }
 
-// Closest returns the canonical card (or sealed product) name in b closest
-// to query, used to power "did you mean..." suggestions.
-func Closest(b *mtgmatcher.Backend, query string, sealed bool) string {
-	return fuzzy.Closest(query, b.Names(mtgmatcher.NameFormCanonical, sealed))
+// Pool is which names a suggestion may come from.
+type Pool int
+
+const (
+	// PoolSingles is card names alone.
+	PoolSingles Pool = iota
+	// PoolSealed is sealed product names alone.
+	PoolSealed
+	// PoolBoth is cards and products together.
+	PoolBoth
+)
+
+// Closest returns the canonical card or sealed product name in b closest
+// to query, from the names pool allows.
+func Closest(b *mtgmatcher.Backend, query string, pool Pool) string {
+	var names []string
+	if pool != PoolSealed {
+		names = append(names, b.Names(mtgmatcher.NameFormCanonical, false)...)
+	}
+	if pool != PoolSingles {
+		names = append(names, b.Names(mtgmatcher.NameFormCanonical, true)...)
+	}
+	return fuzzy.Closest(query, names)
 }
 
 // AltSearch is a suggested query offered when a search yields no results,
@@ -49,8 +68,8 @@ type Params struct {
 	SearchMode string
 	// AppliedFilters lists the filter tokens found in RawQuery.
 	AppliedFilters []string
-	// Sealed is true when the search ran against sealed products.
-	Sealed bool
+	// Pool is which names the search ran against.
+	Pool Pool
 }
 
 // collapseSpaces trims and squeezes runs of whitespace into single spaces.
@@ -166,14 +185,15 @@ func Build(p Params) (string, []AltSearch) {
 
 	var didYouMean string
 	if p.CleanQuery != "" {
-		didYouMean = Closest(p.Backend, p.CleanQuery, p.Sealed)
+		didYouMean = Closest(p.Backend, p.CleanQuery, p.Pool)
 	}
 
 	alts := relaxedSearches(p.RawQuery, p.CleanQuery, p.AppliedFilters)
 
-	// For a free-text sealed search (no filters typed) that found nothing,
-	// offer a decomposed set + product-type query as the first suggestion.
-	if p.Sealed && len(p.AppliedFilters) == 0 {
+	// For a free-text search that takes products (no filters typed) that
+	// found nothing, offer a decomposed set + product-type query as the
+	// first suggestion.
+	if p.Pool != PoolSingles && len(p.AppliedFilters) == 0 {
 		s := sealedQuerySuggestion(p.Backend, p.RawQuery)
 		if s != nil {
 			alts = append([]AltSearch{*s}, alts...)

@@ -278,9 +278,9 @@
                         <div class="sidebar-actions-compact">
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Export</span>
-                                <a class="sidebar-action success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
-                                <a class="sidebar-action warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
-                                <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
+                                <a class="sidebar-action success" href="/api/search/retail/{{.SearchQuery}}.csv?sort={{.SearchSort}}&sealed={{if .IsSealed}}first{{else}}all{{end}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices.csv">Retail</a>
+                                <a class="sidebar-action warning" href="/api/search/buylist/{{.SearchQuery}}.csv?sort={{.SearchSort}}&sealed={{if .IsSealed}}first{{else}}all{{end}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices.csv">Buylist</a>
+                                <a class="sidebar-action default" href="/api/search/list/{{.SearchQuery}}.csv?sort={{.SearchSort}}&sealed={{if .IsSealed}}first{{else}}all{{end}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist.csv">List</a>
                             </div>
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Upload</span>
@@ -432,8 +432,9 @@
                             {{$firstName = $card.Name}}
                         {{end}}
 
+                            {{with index $.GroupHeaders $cardId}}<div class="result-group-header">{{.}}</div>{{end}}
                             <div class="result-header-cover"></div>
-                            <div class="result-header{{if eq $i 0}} result-first{{end}}"
+                            <div class="result-header{{if or (eq $i 0) (index $.GroupHeaders $cardId)}} result-first{{end}}"
                                  data-card-id="{{$cardId}}"
                                  data-chart-id="{{$card.ChartID}}"
                                  data-card-name="{{$card.Name}}"
@@ -535,7 +536,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                            <div class="result-body{{if or (eq $i (dec (len $.AllKeys) 1)) (index $.GroupEnds $cardId)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>

@@ -2,6 +2,7 @@ package suggest
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"testing"
 )
@@ -26,6 +27,24 @@ func TestFold(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("fold(%q) = %q, want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+// A name both lists carry is listed once, in its card place; the inputs
+// are not written to.
+func TestMergeNamesListsASharedNameOnce(t *testing.T) {
+	singles := []string{"Onslaught", "Visions"}
+	sealed := []string{"Onslaught Booster Box", "Visions", "Alliances Booster Pack"}
+	got := MergeNames(singles, sealed)
+	want := []string{"Onslaught", "Visions", "Onslaught Booster Box", "Alliances Booster Pack"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if !slices.Equal(singles, []string{"Onslaught", "Visions"}) || len(sealed) != 3 {
+		t.Error("an input was written to")
+	}
+	if got := MergeNames(nil, nil); len(got) != 0 {
+		t.Errorf("two empty lists merged to %v", got)
 	}
 }
 
@@ -121,6 +140,20 @@ func TestMatchesOfferANameFoundTwiceOnlyOnce(t *testing.T) {
 	}
 }
 
+// Both lists at once: a prefix that reaches a card and a product offers
+// both, cards first, and a name in both lists is offered once.
+func TestMatchesBothOffersCardsThenProducts(t *testing.T) {
+	snap := NewNames(
+		[]string{"Onslaught", "Onslaught Charm"},
+		[]string{"Onslaught Booster Box", "Onslaught Charm"},
+	)
+	got := snap.MatchesBoth(Fold("onslaught"))
+	want := []string{"Onslaught", "Onslaught Charm", "Onslaught Booster Box"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestMatchesCapTheAnswer(t *testing.T) {
 	names := make([]string, maxSuggestions+5)
 	for i := range names {
@@ -130,5 +163,20 @@ func TestMatchesCapTheAnswer(t *testing.T) {
 	matches := snap.Matches(Fold("same prefix"), false)
 	if len(matches) != maxSuggestions {
 		t.Errorf("got %d matches, want the %d cap", len(matches), maxSuggestions)
+	}
+}
+
+// The merged list is built with the snapshot, so a request pays nothing,
+// and a snapshot that is not built yet answers nil rather than panicking.
+func TestMergedIsBuiltWithTheSnapshot(t *testing.T) {
+	singles := []string{"Onslaught", "Visions"}
+	sealed := []string{"Onslaught Booster Box", "Visions"}
+	snap := NewNames(singles, sealed)
+	if got, want := snap.Merged(), MergeNames(singles, sealed); !slices.Equal(got, want) {
+		t.Errorf("Merged() = %v, want %v", got, want)
+	}
+	var none *Names
+	if got := none.Merged(); got != nil {
+		t.Errorf("a nil snapshot merged to %v", got)
 	}
 }

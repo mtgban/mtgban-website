@@ -1129,6 +1129,21 @@ body.modal-embed .search-sidebar {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow: calc(-1 * var(--radius-lg, 12px)) 0 0 var(--background), var(--radius-lg, 12px) 0 0 var(--background);
 }
+/* Where the cards end and the sealed products begin, or the other way
+   round: a label between two result cards, never sticky. */
+.result-group-header {
+    padding: 1.25em 0.25em 0.5em;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+/* When it opens the column, its own top padding would stack on the
+   column's padding-top, same double gap the blurb rule above removes. */
+.search-results > .result-group-header:first-child {
+    padding-top: 0;
+}
 .result-body.result-last-body {
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }

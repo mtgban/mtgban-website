@@ -27,6 +27,14 @@ type SearchConfig struct {
 	// Only for SearchMode == "hashing"
 	UUIDs []string
 
+	// IncludeSealed widens a card search to sealed products as well: the
+	// sealed ladder runs beside the card mode and the two are unioned.
+	IncludeSealed bool
+
+	// SealedFirst puts the sealed products ahead of the cards wherever the
+	// result is ordered or cut, as the sealed route asks.
+	SealedFirst bool
+
 	// Name of the card being searched (may be blank)
 	CleanQuery string
 
@@ -1183,7 +1191,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 				Values: fixupPicks(b, code),
 			})
 		case "contents":
-			config.SearchMode = "mixed"
+			config.IncludeSealed = true
 			uuids := fixupContents(b, code)
 			// Everything the product can hold. Remembered so the page can
 			// offer the other two readings; a negated query asks for none of
@@ -1202,7 +1210,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 		// list is built for it - the two filters compose, and the second one
 		// is the decklist the case above searches for on its own.
 		case "variable":
-			config.SearchMode = "mixed"
+			config.IncludeSealed = true
 			uuids := fixupContents(b, code)
 			// Everything the product can hold goes in first, whatever comes
 			// of the rest: a product with nothing guaranteed has nothing to
@@ -1248,14 +1256,10 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			})
 		case "container":
 			// Without this, a standalone container: query left CleanQuery
-			// empty and SearchMode unset, so searchAndFilter fell to its
-			// default card-name search - which never seeds a sealed
-			// product as a candidate at all, regardless of what the
-			// idlookup filter below asks for. mixed is what contents: and
-			// variable: already use for the same reason: it unions cards
-			// and sealed products into the candidate pool the filter then
-			// narrows down.
-			config.SearchMode = "mixed"
+			// empty and the search seeded from cards alone, so no product
+			// was ever a candidate for the idlookup filter below. The flag
+			// puts both pools in the candidate set the filter narrows.
+			config.IncludeSealed = true
 			filters = append(filters, FilterElem{
 				Name:   "idlookup",
 				Negate: negate,
@@ -1484,7 +1488,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 	// too, until go-mtgban v0.8.4 made it pure - namesASetCode asks that
 	// question here now, of the datastore this process holds.
 	// The shorthand is meaningful only for singles: sealed products have
-	// no collector numbers, and the sealed handler assigns its SearchMode
+	// no collector numbers, and the API's sealed paths assign their SearchMode
 	// after this parse, so such queries cannot be told apart here
 	if config.SearchMode == "" {
 		tokens := strings.Fields(query)

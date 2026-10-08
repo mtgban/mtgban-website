@@ -81,7 +81,7 @@
     if (typeof autocomplete === 'function' && !box._scopeAutocompleteBound) {
         if (form) {
             box._scopeAutocompleteBound = true;
-            autocomplete(form, box, location.pathname.indexOf('/sealed') === 0 ? 'true' : 'false');
+            autocomplete(form, box, 'all');
         }
     }
 
