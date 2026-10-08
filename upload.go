@@ -454,7 +454,7 @@ type UploadVars struct {
 func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Upload", sig)
 
@@ -1358,7 +1358,7 @@ type uploadSettings struct {
 // readUploadSettings parses the upload page's settings from the request. The
 // optimizer options apply to buylist mode only, so it takes the mode.
 func readUploadSettings(r *http.Request, blMode bool) uploadSettings {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	// Disable changing stores if not permitted
 	canChangeStores, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadChangeStoresEnabled"))
@@ -1504,7 +1504,7 @@ type uploadStores struct {
 // change, and the store lists the page offers and ticks. It writes only the
 // cookies that keep a new index choice.
 func selectUploadStores(w http.ResponseWriter, r *http.Request, blMode bool, st uploadSettings) uploadStores {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	var enabledStores []string
 	var enabledSealedStores []string
@@ -1715,7 +1715,7 @@ type uploadModes struct {
 // readUploadModes reads the exports a request asks for, and the row cap that
 // they and the reader's grants allow.
 func readUploadModes(r *http.Request, canBuylist, magicOnlyExports bool) uploadModes {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	// Set upload limit
 	maxRows := MaxUploadEntries

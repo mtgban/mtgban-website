@@ -117,7 +117,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	ds := s.datastore()
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	page := r.FormValue("page")
 	pageVars := genPageNav(s, r, "Admin", sig)

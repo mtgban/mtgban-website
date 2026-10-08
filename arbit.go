@@ -450,7 +450,7 @@ func (s *site) Reverse(w http.ResponseWriter, r *http.Request) {
 }
 
 func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, reverse bool) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageName := "Arbitrage"
 	if reverse {
@@ -508,7 +508,7 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 }
 
 func (s *site) Global(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Global", sig)
 	pageVars.GlobalMode = true

@@ -70,7 +70,7 @@ type SleepVars struct {
 func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Sleepers", sig)
 
