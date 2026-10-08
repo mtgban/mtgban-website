@@ -468,19 +468,32 @@ func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
-// the Admin grant. It performs no validation of its own: it must sit
-// behind enforceSigning, which authenticates the signature before any of
-// its parameters can be trusted. Non-admins get a plain 404 so the
-// endpoint's existence is not advertised.
+// the Admin grant, reading it off the signature enforceSigning checks, and
+// checking it again itself. Non-admins get a plain 404 so the endpoint's
+// existence is not advertised.
 func adminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		canDo, _ := strconv.ParseBool(GetParamFromSig(getSignatureFromCookies(r), "Admin"))
+		canDo, _ := strconv.ParseBool(GetParamFromSig(verifiedRequestSignature(r), "Admin"))
 		if !canDo && !(DevMode && !SigCheck) {
 			http.NotFound(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// withSignatureCookie is r carrying sig as its MTGBAN cookie, in place of
+// any the request came with.
+func withSignatureCookie(r *http.Request, sig string) *http.Request {
+	out := r.Clone(r.Context())
+	out.Header.Del("Cookie")
+	for _, c := range r.Cookies() {
+		if c.Name != "MTGBAN" {
+			out.AddCookie(c)
+		}
+	}
+	out.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+	return out
 }
 
 // noSigning runs the handler it wraps without checking a signature; it only
@@ -613,6 +626,9 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 		if querySig != "" {
 			sig = querySig
 			putSignatureInCookies(w, r, querySig)
+			// Handlers read the cookie first: give them the signature checked
+			// here, not one the request carried beside it.
+			r = withSignatureCookie(r, querySig)
 		}
 
 		switch r.Method {
