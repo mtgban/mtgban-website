@@ -130,7 +130,7 @@ components:
       name: id
       in: query
       description: Id system for card keys
-      schema: { type: string, enum: [mtgban, tcg, scryfall, mtgjson, mkm, ck] }
+      schema: { type: string, enum: [mtgban, tcg, scryfall, mtgjson, mkm, ck, name] }
     qty:
       name: qty
       in: query
