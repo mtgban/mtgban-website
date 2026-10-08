@@ -740,6 +740,10 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	canRetail := canAccessMode(enabledModes, "retail")
 	canBuylist := canAccessMode(enabledModes, "buylist")
+	// A key sold without sealed reads none, as on the price API
+	if isSealed && !canAccessMode(enabledModes, "sealed") {
+		canRetail, canBuylist = false, false
+	}
 
 	// The demo (sig-less) JSON endpoint sees only the demo stores; per the
 	// storeEligible precedence an explicit store list is the entire policy,

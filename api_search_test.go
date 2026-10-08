@@ -106,11 +106,12 @@ func TestSearchAPIv2(t *testing.T) {
 	mux.Handle("/api/v2/search/", enforceAPISigning(http.HandlerFunc(testSite.SearchAPI)))
 	mux.Handle("/api/v2/", enforceAPISigning(http.HandlerFunc(testSite.PriceAPIv2)))
 	requests := 0
-	get := func(scope, target string) PriceAPIOutputV2 {
+	// getAs asks with a key sold modes, get with one sold every mode.
+	getAs := func(modes, scope, target string) PriceAPIOutputV2 {
 		t.Helper()
 		key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
 			API:     scope,
-			Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"plan@example.com"}},
+			Fields:  url.Values{"APImode": {modes}, "UserEmail": {"plan@example.com"}},
 			Expires: time.Now().Add(time.Hour).Unix(),
 		})
 		sep := "?"
@@ -129,6 +130,10 @@ func TestSearchAPIv2(t *testing.T) {
 			t.Fatalf("%s: %v\n%s", target, err, rec.Body.String())
 		}
 		return out
+	}
+	get := func(scope, target string) PriceAPIOutputV2 {
+		t.Helper()
+		return getAs("all", scope, target)
 	}
 	search := func(scope, mode, query string) PriceAPIOutputV2 {
 		return get(scope, "/api/v2/search/"+mode+"/"+url.PathEscape(query)+".json")
@@ -167,6 +172,12 @@ func TestSearchAPIv2(t *testing.T) {
 		if got[want]["sealed"]["CKSealed"] == nil {
 			t.Errorf("sealed search id=%q keys %v, want %q", mode, slices.Collect(maps.Keys(got)), want)
 		}
+	}
+
+	// A key sold no sealed mode reads no sealed prices, as on the price API
+	noSealed := getAs("retail,buylist", "ALL_ACCESS", "/api/v2/search/retail/sealed/"+url.PathEscape(box.Name)+".json")
+	if len(noSealed.Retail) > 0 || len(noSealed.Buylist) > 0 {
+		t.Errorf("a key without sealed read %d sealed products", len(noSealed.Retail)+len(noSealed.Buylist))
 	}
 
 	unknown := get("ALL_ACCESS", "/api/v2/search/retail/"+url.PathEscape(name)+".json?id=tcgplayer")
