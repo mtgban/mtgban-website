@@ -186,3 +186,20 @@ func TestOnlyACheckedSignatureIsKeptAsTheCookie(t *testing.T) {
 		}
 	}
 }
+
+// An unconfirmed email is flagged inside the signature: the pricing page and
+// alerts read the flag, and deleting it breaks the HMAC like any other edit.
+func TestTheUnconfirmedFlagIsSigned(t *testing.T) {
+	signingEnabled(t, true)
+	flagged := sign("Legacy", &PatreonUserData{Email: "victim@example.com", FullName: "Mallory"}, nil, DefaultSignatureDuration)
+	v := parseSig(flagged)
+	if v.Get("UserEmailUnverified") != "true" {
+		t.Fatal("an unconfirmed email was not flagged")
+	}
+	v.Del("UserEmailUnverified")
+	_, flaggedOK := signatureIsValid(flagged)
+	_, strippedOK := signatureIsValid(base64.StdEncoding.EncodeToString([]byte(v.Encode())))
+	if !flaggedOK || strippedOK {
+		t.Errorf("flagged signature verifies: %v, with the flag deleted: %v", flaggedOK, strippedOK)
+	}
+}

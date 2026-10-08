@@ -230,8 +230,18 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A handoff to the API gateway rather than a site login: it signs in
+	// nobody here, and the token it mints is the gateway's. One that fails
+	// before Patreon names the reader ends on the API page, as one that
+	// fails after does.
+	handoff, isHandoff := parseHandoffState(r.FormValue("state"))
+
 	code := r.FormValue("code")
 	if code == "" {
+		if isHandoff {
+			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			return
+		}
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -243,6 +253,10 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	tokens, err := patreon.GetAuthToken(r.Context(), clientID, secret, origin, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
+		if isHandoff {
+			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			return
+		}
 		http.Redirect(w, r, "/?errmsg=TokenNotFound", http.StatusFound)
 		return
 	}
@@ -254,6 +268,10 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	userData, err := getUserIDs(r.Context(), client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
+		if isHandoff {
+			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			return
+		}
 		http.Redirect(w, r, "/?errmsg=UserNotFound", http.StatusFound)
 		return
 	}
@@ -284,6 +302,11 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 		case "VINTAGE", "VINTAGE (Early Adopters)", "TYPE ONE":
 			tierTitle = "Vintage"
 		}
+	}
+
+	if isHandoff {
+		s.finishAPIHandoff(w, r, handoff, userData, tierTitle)
+		return
 	}
 
 	// Handle error
