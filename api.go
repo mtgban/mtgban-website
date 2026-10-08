@@ -727,15 +727,14 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Perform search
-	allKeys, _ := searchAndFilter(ds, config)
-
-	// Sort as the search page does, reverse included
-	sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
-
-	// Limit results to be processed
-	if len(allKeys) > MaxSearchTotalResults {
-		allKeys = allKeys[:MaxSearchTotalResults]
+	// Perform search; the download runs the page's own further down
+	var allKeys []string
+	if !isCSV {
+		allKeys, _ = searchAndFilter(ds, config)
+		sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
+		if len(allKeys) > MaxSearchTotalResults {
+			allKeys = allKeys[:MaxSearchTotalResults]
+		}
 	}
 
 	canRetail := canAccessMode(enabledModes, "retail")
@@ -767,6 +766,11 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 			Name:   "store",
 			Values: fixupStoreCodeNG(strings.Join(apiEnabledStores(storesOpt), ",")),
 		})
+	}
+
+	if isCSV {
+		writeSearchCSV(w, r, s, ds, config, sig, isRetail && canRetail, isBuylist && canBuylist, tagName)
+		return
 	}
 
 	// Retrieve prices through the same gathering the search page uses, so
@@ -815,30 +819,32 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isCSV {
-		setCSVDownloadHeaders(w, "mtgban_search.csv")
+}
 
-		// Reuse the walked rows, keyed by BAN UUID so foil/nonfoil stay
-		// separate (CSV is never the demo mode, so the rows above carry
-		// the full store policy)
-		var results map[string]map[string]*BanPrice
-		if isRetail && canRetail {
-			results = banPricesFromRows(b, allKeys, foundSellers, "", tagName, true, true, false)
-		} else if isBuylist && canBuylist {
-			results = banPricesFromRows(b, allKeys, foundVendors, "", tagName, true, true, true)
-		}
+// writeSearchCSV downloads the search as the page lists it: the same cut,
+// post filters and order, with the offers the page shows, keyed by BAN UUID
+// so foil and nonfoil stay separate. CSV is never the demo mode.
+func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datastore, config SearchConfig, sig string, retail, buylist bool, tagName string) {
+	b := ds.backend
+	result := runSearch(r, ds, config)
+	sortSearchKeys(r, ds, result.keys, result.odds, readSearchSort(r, config))
 
-		err := BanPrice2CSV(b, w, results, allKeys)
-		if err != nil {
-			dropDownloadHeaders(w)
-			UserNotify("search", err.Error())
-			pageVars := genPageNav(s, r, "Error", sig)
-			pageVars.Title = "Error"
-			pageVars.InfoMessage = "Unable to download CSV right now"
-			render(w, "home.html", pageVars)
-			return
-		}
-		return
+	setCSVDownloadHeaders(w, "mtgban_search.csv")
+	var results map[string]map[string]*BanPrice
+	if retail {
+		results = banPricesFromRows(b, result.keys, result.sellers, "", tagName, true, true, false)
+	} else if buylist {
+		results = banPricesFromRows(b, result.keys, result.vendors, "", tagName, true, true, true)
+	}
+
+	err := BanPrice2CSV(b, w, results, result.keys)
+	if err != nil {
+		dropDownloadHeaders(w)
+		UserNotify("search", err.Error())
+		pageVars := genPageNav(s, r, "Error", sig)
+		pageVars.Title = "Error"
+		pageVars.InfoMessage = "Unable to download CSV right now"
+		render(w, "home.html", pageVars)
 	}
 }
 

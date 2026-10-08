@@ -330,3 +330,41 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 		t.Errorf("the sort parameter did not win over the saved default: %v", got)
 	}
 }
+
+// The download lists the cards the page lists: a query that hides cards
+// with no offers (skip:empty) leaves them out of the file too.
+func TestSearchCSVListsWhatThePageLists(t *testing.T) {
+	uuids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(uuids) < 4 {
+		t.Skip("mtgmatcher data not loaded")
+	}
+	signingEnabled(t, false)
+	inventory := mtgban.InventoryRecord{}
+	priced := uuids[:len(uuids)/2]
+	for _, id := range priced {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
+	}
+	publishStores(t, []mtgban.Seller{mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"})}, []mtgban.Vendor{})
+
+	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
+	exported := func(query string) []string {
+		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(query)+".csv?id=mtgjson", nil)
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		rec := httptest.NewRecorder()
+		testSite.SearchAPI(rec, req)
+		var ids []string
+		for _, line := range strings.Split(rec.Body.String(), "\n")[1:] {
+			id, _, found := strings.Cut(line, ",")
+			if found {
+				ids = append(ids, id)
+			}
+		}
+		return ids
+	}
+	if got := exported("Counterspell"); len(got) != len(uuids) {
+		t.Errorf("Counterspell: %d rows, want every one of %d printings", len(got), len(uuids))
+	}
+	if got := exported("Counterspell skip:empty"); len(got) != len(priced) {
+		t.Errorf("Counterspell skip:empty: %d rows, want the %d with offers", len(got), len(priced))
+	}
+}
