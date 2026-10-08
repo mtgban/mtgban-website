@@ -29,7 +29,7 @@ type AlertsPageVars struct {
 // form with ?edit=. enforceSigning has already let the reader in; what
 // they may do follows the ACL values their signature carries.
 func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Alerts", sig)
 	vars := &AlertsPageVars{InviteURL: Config().Discord.InviteURL}
 	pageVars.AlertsPage = vars

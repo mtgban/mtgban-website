@@ -471,7 +471,7 @@ func testSig(params map[string]string) string {
 // path works without a prebuilt TemplateCache, which no test populates.
 func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 	keepScrapers(t)
-	withSigMode(t, true, true)
+	signingEnabled(t, true)
 	if LogPages == nil {
 		LogPages = map[string]*log.Logger{}
 	}
@@ -494,7 +494,11 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 		return rec
 	}
 
-	rec := post(testSig(map[string]string{"Admin": "true"}), "ZZG1")
+	grant := func(name string) string {
+		fields := url.Values{"UserEmail": {"admin@example.com"}, "UserTier": {"Test"}, name: {"true"}}
+		return signedAs(t, fields, time.Now().Add(time.Hour))
+	}
+	rec := post(grant("Admin"), "ZZG1")
 	if strings.Contains(rec.Body.String(), "Published") {
 		t.Error("Admin alone published a store")
 	}
@@ -503,7 +507,15 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 		t.Error("Admin alone published a store")
 	}
 
-	rec = post(testSig(map[string]string{"UploadPublish": "true"}), "ZZG2")
+	forged := url.Values{"UserEmail": {"admin@example.com"}, "UserTier": {"Test"}, "UploadPublish": {"true"},
+		"Expires": {"9999999999"}, "Signature": {"forged"}}
+	post(base64.StdEncoding.EncodeToString([]byte(forged.Encode())), "ZZG3")
+	_, err = findSellerInventory("ZZG3")
+	if err == nil {
+		t.Error("a forged UploadPublish published a store")
+	}
+
+	rec = post(grant("UploadPublish"), "ZZG2")
 	if !strings.Contains(rec.Body.String(), "Published") {
 		t.Fatal("the page does not show a publish confirmation")
 	}

@@ -1126,7 +1126,7 @@ type NewsVars struct {
 func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Newspaper", sig)
 

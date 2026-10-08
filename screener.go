@@ -458,7 +458,7 @@ func atoiDefault(s string, def int) int {
 
 func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, ExtraNavs["Screener"].Name, sig)
 	pageVars.Title = "Price Movers Screener"
