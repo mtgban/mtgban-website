@@ -249,6 +249,20 @@ func getChangelogChannelID() (string, error) {
 	return "", fmt.Errorf("discord channel %q was not found", defaultChangelogChannelName)
 }
 
+// inChangelogChannel reports whether channelID is the one the changelog page
+// reads: the configured id, or else the channel the bot's state names as it.
+func inChangelogChannel(session *discordgo.Session, channelID string) bool {
+	id := Config().Discord.ChangelogChannelID
+	if id != "" {
+		return channelID == id
+	}
+	if session == nil || session.State == nil {
+		return false
+	}
+	channel, err := session.State.Channel(channelID)
+	return err == nil && channel.Name == defaultChangelogChannelName
+}
+
 func listChangelogChannels() ([]*discordgo.Channel, error) {
 	if dg == nil {
 		return nil, errors.New("discord session is not available")

@@ -696,6 +696,12 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 		return
 	}
 
+	// The changelog page publishes that channel: any reply there would go
+	// out beside the announcement it answered
+	if inChangelogChannel(session, m.ChannelID) {
+		return
+	}
+
 	// Parse message, look for bot command
 	if !strings.HasPrefix(m.Content, "!") &&
 		!strings.HasPrefix(m.Content, "?") &&
