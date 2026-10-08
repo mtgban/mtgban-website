@@ -496,13 +496,15 @@ func withSignatureCookie(r *http.Request, sig string) *http.Request {
 }
 
 // noSigning runs the handler it wraps without checking a signature; it only
-// keeps the one an invite link carries in ?sig= as the cookie.
+// keeps the one an invite link carries in ?sig= as the cookie, once that
+// checks out.
 func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
 		querySig := r.FormValue("sig")
-		if querySig != "" {
+		_, signed := signatureIsValid(querySig)
+		if signed {
 			putSignatureInCookies(w, r, querySig)
 		}
 
@@ -624,7 +626,11 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 		querySig := r.FormValue("sig")
 		if querySig != "" {
 			sig = querySig
-			putSignatureInCookies(w, r, querySig)
+			// Kept only once it checks out; one that does not is refused below
+			_, signed := signatureIsValid(querySig)
+			if signed {
+				putSignatureInCookies(w, r, querySig)
+			}
 			// Handlers read the cookie first: give them the signature checked
 			// here, not one the request carried beside it.
 			r = withSignatureCookie(r, querySig)
