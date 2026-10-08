@@ -53,6 +53,7 @@ func TestPatternWithBracketsMatches(t *testing.T) {
 	co.Number = "635"
 	co.Name = "Toxin Sliver"
 	co.Edition = "Secret Lair Drop"
+	co.SetCode = "SLD"
 
 	for _, tt := range []struct {
 		query, filter string
@@ -67,6 +68,9 @@ func TestPatternWithBracketsMatches(t *testing.T) {
 		{`namee:^(Toxin)`, "name_regexp", true},
 		{`namee:"^Toxin"`, "name_regexp", true},
 		{`ee:(Secret|Special)`, "edition_regexp", true},
+		{`se:^SLD$`, "edition_regexp", true},
+		{`se:^sld$`, "edition_regexp", false},
+		{`se:^SLX$`, "edition_regexp", false},
 	} {
 		t.Run(tt.query, func(t *testing.T) {
 			config := parseSearchOptionsNG(backend(), tt.query, nil, nil, nil)

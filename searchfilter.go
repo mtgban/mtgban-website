@@ -2104,7 +2104,7 @@ func cardFilterRegexp(name string, re *regexp.Regexp, co *mtgmatcher.CardObject)
 	case "name_regexp":
 		return !re.MatchString(co.Name) && !re.MatchString(co.FlavorName)
 	case "edition_regexp":
-		return !re.MatchString(co.Edition)
+		return !re.MatchString(co.Edition) && !re.MatchString(co.SetCode)
 	case "number_regexp":
 		return !re.MatchString(co.Number)
 	}
