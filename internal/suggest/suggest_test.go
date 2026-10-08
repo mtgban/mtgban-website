@@ -54,3 +54,16 @@ func TestRelaxedSearches(t *testing.T) {
 		}
 	}
 }
+
+// The sealed set-name rewrite reads free text alone: over both pools a
+// query that already carries a filter is left as it is.
+func TestBuildSkipsTheSealedRewriteOnAFilteredQuery(t *testing.T) {
+	// A nil backend: Closest is skipped by an empty clean query, and the
+	// rewrite is skipped by the filters, so this checks the switch alone.
+	_, alts := Build(Params{RawQuery: "lost caverns booster s:lci", AppliedFilters: []string{"s:lci"}, Pool: PoolBoth})
+	for _, alt := range alts {
+		if alt.Query == "s:lci t:booster" {
+			t.Error("the set-name rewrite ran over a filtered query")
+		}
+	}
+}

@@ -319,7 +319,7 @@
     }
     // On /offline the offline shell owns the navbar box with local suggestions.
     if (location.pathname !== '/offline' && !preferOffline) {
-        autocomplete(form, input, sealed ? 'true' : 'false');
+        autocomplete(form, input, 'all');
     }
 
     // Keep the search bar focused on every page load so typing starts a

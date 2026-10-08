@@ -31,6 +31,19 @@ type Names struct {
 	// Closing the spaces on both sides gives them one.
 	singlesSquashed []nameEntry
 	sealedSquashed  []nameEntry
+
+	// Both canonical lists as one, built once per datastore for the box
+	// that searches cards and products alike.
+	merged []string
+}
+
+// Merged returns both canonical lists as one, cards first, or nil when no
+// snapshot is built.
+func (n *Names) Merged() []string {
+	if n == nil {
+		return nil
+	}
+	return n.merged
 }
 
 // squash closes up the spaces in an already-folded name, so that where one
@@ -83,6 +96,7 @@ func NewNames(singles, sealed []string) *Names {
 		singlesSquashed: bySquashed,
 		sealed:          sealedByFold,
 		sealedSquashed:  sealedBySquashed,
+		merged:          MergeNames(singles, sealed),
 	}
 }
 
@@ -133,6 +147,46 @@ func (n *Names) Matches(folded string, sealed bool) []string {
 	seen := make(map[string]bool, maxSuggestions)
 	out := appendPrefixMatches(nil, byFold, folded, seen, func(e nameEntry) string { return e.folded })
 	return appendPrefixMatches(out, bySquashed, squash(folded), seen, func(e nameEntry) string { return e.squashed })
+}
+
+// MatchesBoth is Matches over both lists, cards first: a prefix typed into
+// a box that searches cards and products alike. A name both lists carry
+// is offered once, in its card place.
+func (n *Names) MatchesBoth(folded string) []string {
+	out := n.Matches(folded, false)
+	seen := make(map[string]bool, len(out))
+	for _, name := range out {
+		seen[name] = true
+	}
+	for _, name := range n.Matches(folded, true) {
+		if len(out) >= maxSuggestions {
+			break
+		}
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	return out
+}
+
+// MergeNames is both canonical lists as one, cards first and then the
+// products whose name no card carries. The result is a new slice; the
+// inputs are left as they are.
+func MergeNames(singles, sealed []string) []string {
+	out := make([]string, 0, len(singles)+len(sealed))
+	out = append(out, singles...)
+	seen := make(map[string]bool, len(singles))
+	for _, name := range singles {
+		seen[name] = true
+	}
+	for _, name := range sealed {
+		if !seen[name] {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // appendPrefixMatches collects the names whose key starts with prefix, from

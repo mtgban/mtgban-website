@@ -89,7 +89,7 @@
     <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
     {{end}}
     <script type="text/javascript">
-        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "all");
     </script>
 
     {{/* Toast notification */}}
@@ -116,13 +116,13 @@
         </div>
     </div>
     <script type="text/javascript">
-        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "all");
         // Init navbar search for landscape mode
         (function() {
             var navBox = document.getElementById("navsearchbox");
             var navForm = document.getElementById("navsearchform");
             if (navBox && navForm) {
-                autocomplete(navForm, navBox, "true");
+                autocomplete(navForm, navBox, "all");
             }
         })();
     </script>
@@ -201,14 +201,14 @@
     <div class="m-toast" id="m-fav-toast"></div>
 
     <script type="text/javascript">
-        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "all");
         // Init navbar search for landscape mode
         (function() {
             var navBox = document.getElementById("navsearchbox");
             var navForm = document.getElementById("navsearchform");
             if (navBox && navForm) {
                 navBox.value = {{.SearchQuery | printf "%q"}};
-                autocomplete(navForm, navBox, {{if .IsSealed}}"true"{{else}}"false"{{end}});
+                autocomplete(navForm, navBox, "all");
             }
         })();
     </script>

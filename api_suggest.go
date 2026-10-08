@@ -12,11 +12,19 @@ import (
 )
 
 func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
+	// sealed picks the name list: cards (the default), products, or with
+	// "all" both, cards first, for a box that searches the two together.
+	both := r.FormValue("sealed") == "all"
 	sealed, _ := strconv.ParseBool(r.FormValue("sealed"))
 	ds := s.datastore()
 
 	if r.FormValue("all") == "true" {
 		AllNames := ds.backend.Names(mtgmatcher.NameFormCanonical, sealed)
+		if both {
+			// Merged once with the names snapshot; nil until it is built,
+			// which the empty-pool check below answers with no-store.
+			AllNames = ds.names.Merged()
+		}
 		// An empty pool means the datastore isn't (fully) loaded; make sure
 		// no cache holds on to the degraded answer
 		if len(AllNames) == 0 {
@@ -56,7 +64,11 @@ func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	var suggestions []string
 	var results []string
 	var links []string
-	for _, name := range ds.names.Matches(prefix, sealed) {
+	matches := ds.names.Matches(prefix, sealed)
+	if both {
+		matches = ds.names.MatchesBoth(prefix)
+	}
+	for _, name := range matches {
 		suggestions = append(suggestions, name)
 		printings, _ := ds.backend.Printings4Card(name)
 		results = append(results, embed.PrintingsLine(printings))

@@ -227,14 +227,22 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 }
 
 // searchSuggestions adapts a parsed search that found nothing into the
-// suggest package's inputs.
-func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
+// suggest package's inputs. The page searches cards and products together,
+// so a did-you-mean may be either.
+func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConfig) (string, []suggest.AltSearch) {
+	pool := suggest.PoolSingles
+	switch {
+	case config.SearchMode == "sealed":
+		pool = suggest.PoolSealed
+	case config.IncludeSealed:
+		pool = suggest.PoolBoth
+	}
 	return suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
 		CleanQuery:     config.CleanQuery,
 		SearchMode:     config.SearchMode,
 		AppliedFilters: config.AppliedFilters,
-		Sealed:         sealed,
+		Pool:           pool,
 		Backend:        b,
 	})
 }
@@ -650,7 +658,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(result.keys) == 0 {
 		pageVars.PopularSearches = getPopularSearches(ds)
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(b, query, config)
 		render(w, "search.html", pageVars)
 		return
 	}
