@@ -512,7 +512,7 @@ type SearchVars struct {
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	pageVars := genPageNav(s, r, "Search", sig)
 	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, r)
@@ -801,7 +801,7 @@ func searchPreview(r *http.Request, b *mtgmatcher.Backend, allKeys []string, res
 // navbar offers alerts and their tier has an allowance, and the admins' Fix
 // toggle.
 func searchReader(s *site, r *http.Request) (canAlerts, canFix bool) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	sigParams := parseSig(sig)
 	if navOffers(s, sigParams, "Alerts") {
@@ -818,7 +818,7 @@ func searchReader(s *site, r *http.Request) (canAlerts, canFix bool) {
 // their cookies, and from their signature what their tier may see and
 // download.
 func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	// Not only for the chart page: every mobile results page carries the
 	// chart drawer, whose range select locks what the tier does not reach.
@@ -1476,7 +1476,7 @@ func gateNonAffiliates(conds map[mtgban.Condition][]SearchEntry, affiliates []st
 // notifyFromSearch posts the search to the user webhook and logs it: what was
 // searched, where the request came from, who asked and how long it took.
 func notifyFromSearch(r *http.Request, query string, roster chartRoster, start time.Time) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 
 	var source string
 	notifyTitle := "search"
@@ -1570,7 +1570,7 @@ func fillChartPage(pageVars *SearchVars, metadata cardMetadata, r *http.Request,
 // cards have no prices inside it.
 func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, roster chartRoster) {
 	b := ds.backend
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 	isMultiChart := len(roster.ids) > 1
 
 	// Render the window the chart draws, taken from the viewer's own
