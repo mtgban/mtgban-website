@@ -165,19 +165,23 @@ async function runSync(msg) {
         }
         var imgMissing = [];
         var imgFailed = 0;
-        try {
-            var imgResult = await runImagesStage(manifest, msg.imgEditions, function() { return cancelled; });
-            state.bytes += imgResult.bytes;
-            imgMissing = imgResult.missing;
-            imgFailed = imgResult.failed;
-        } catch (err) {
-            if (err && err.message === 'forbidden') {
-                try { await self.OfflineDB.setMeta('authLapsed', true); } catch (e) {}
+        // A sync that did not ask for images leaves the downloaded ones be:
+        // its empty selection would read as every edition deselected.
+        if (msg.images) {
+            try {
+                var imgResult = await runImagesStage(manifest, msg.imgEditions, function() { return cancelled; });
+                state.bytes += imgResult.bytes;
+                imgMissing = imgResult.missing;
+                imgFailed = imgResult.failed;
+            } catch (err) {
+                if (err && err.message === 'forbidden') {
+                    try { await self.OfflineDB.setMeta('authLapsed', true); } catch (e) {}
+                }
+                post({ type: 'error', stage: 'images', message: err.message });
+                return;
             }
-            post({ type: 'error', stage: 'images', message: err.message });
-            return;
         }
-        post({ type: 'done', changedSets: state.done, failedSets: state.failed, bytes: state.bytes, imgMissing: imgMissing, imgFailed: imgFailed });
+        post({ type: 'done', images: !!msg.images, changedSets: state.done, failedSets: state.failed, bytes: state.bytes, imgMissing: imgMissing, imgFailed: imgFailed });
     } catch (err) {
         if (err && err.message === 'forbidden') await self.OfflineDB.setMeta('authLapsed', true);
         post({ type: 'error', stage: (err && err.stage) || stage, message: (err && err.message) || String(err) });
