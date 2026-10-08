@@ -353,7 +353,11 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 	return apisig.Sign(key, data)
 }
 
-func getSignatureFromCookies(r *http.Request) string {
+// unverifiedSignature is the request's signature, the MTGBAN cookie or else
+// ?sig=, checked for nothing but its expiry. It is what the checks below
+// start from; anything that acts on a grant reads verifiedSignature or
+// verifiedRequestSignature instead.
+func unverifiedSignature(r *http.Request) string {
 	sig := readCookie(r, "MTGBAN")
 
 	querySig := r.FormValue("sig")
@@ -418,27 +422,16 @@ func signatureIsValid(sig string) (url.Values, bool) {
 	return v, true
 }
 
-// signedUserEmail returns the UserEmail from a validly-signed, unexpired
-// cookie/sig, else "". Deciding whether to believe it is signatureIsValid's
-// job; what this adds is which signature to ask about, and that it will
-// answer for a request of any method.
+// signedUserEmail returns the UserEmail off verifiedRequestSignature, else "".
 func signedUserEmail(r *http.Request) string {
-	sig := getSignatureFromCookies(r)
-	if querySig := r.FormValue("sig"); querySig != "" {
-		sig = querySig
-	}
-	v, ok := signatureIsValid(sig)
-	if !ok {
-		return ""
-	}
-	return v.Get("UserEmail")
+	return GetParamFromSig(verifiedRequestSignature(r), "UserEmail")
 }
 
 // verifiedSignature is the cookie signature when signatureIsValid accepts
 // it, else "". Handlers reached through an ACL "Any" entry skip
 // enforceSigning, so they call this before trusting who the reader is.
 func verifiedSignature(r *http.Request) string {
-	sig := getSignatureFromCookies(r)
+	sig := unverifiedSignature(r)
 	if _, ok := signatureIsValid(sig); !ok {
 		return ""
 	}
@@ -451,7 +444,7 @@ func verifiedSignature(r *http.Request) string {
 // Whichever one it reads, it hands back only a signature signatureIsValid
 // accepts, so a caller behind noSigning can read a grant off it.
 func verifiedRequestSignature(r *http.Request) string {
-	sig := getSignatureFromCookies(r)
+	sig := unverifiedSignature(r)
 	if querySig := r.FormValue("sig"); querySig != "" {
 		sig = querySig
 	}
@@ -621,7 +614,7 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 			}
 		}
 
-		sig := getSignatureFromCookies(r)
+		sig := unverifiedSignature(r)
 		querySig := r.FormValue("sig")
 		if querySig != "" {
 			sig = querySig

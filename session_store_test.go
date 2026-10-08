@@ -452,9 +452,8 @@ func TestUploadPublishesAStoreWhenGranted(t *testing.T) {
 
 // testSig builds a cookie value GetParamFromSig can read: a base64 query
 // string carrying the given params plus a future Expires, the one field
-// getSignatureFromCookies checks before handing the sig back. No HMAC is
-// needed here - that check belongs to enforceSigning, which these handler
-// tests call the page's own function under rather than through.
+// unverifiedSignature checks before handing the sig back. It carries no
+// HMAC, so it stands for a forged cookie wherever a handler checks one.
 func testSig(params map[string]string) string {
 	v := url.Values{}
 	for key, val := range params {

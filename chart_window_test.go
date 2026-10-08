@@ -66,7 +66,7 @@ func TestChartLookbackIgnoresAnUnsignedGrant(t *testing.T) {
 
 	// The premise: this forgery does buy ten years if it is read unverified,
 	// which is what both the query form and the cookie form used to do.
-	if _, maxDays := chartWindow(getSignatureFromCookies(httptest.NewRequest(
+	if _, maxDays := chartWindow(unverifiedSignature(httptest.NewRequest(
 		"GET", "/api/chart/ban:1?sig="+url.QueryEscape(forged), nil)), 0); maxDays != 3650 {
 		t.Fatalf("the forged signature is not actually a forgery worth testing: it bought %d days unverified", maxDays)
 	}
