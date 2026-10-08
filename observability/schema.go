@@ -17,6 +17,17 @@ var schemaStatements = []string{
 	`ALTER TABLE events ADD COLUMN IF NOT EXISTS instance text`,
 	`CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts)`,
 	`CREATE INDEX IF NOT EXISTS idx_events_path_ts ON events (path, ts)`,
+	`CREATE TABLE IF NOT EXISTS search_votes (
+    instance  text        NOT NULL,
+    key       text        NOT NULL,
+    user_hash text        NOT NULL,
+    day       date        NOT NULL,
+    query     text        NOT NULL,
+    ts        timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (instance, key, user_hash, day)
+)`,
+	`CREATE INDEX IF NOT EXISTS idx_search_votes_instance_day ON search_votes (instance, day)`,
+	`CREATE INDEX IF NOT EXISTS idx_search_votes_user_day ON search_votes (instance, user_hash, day)`,
 }
 
 // ensureSchema applies each statement in order. Idempotent (IF NOT EXISTS).
