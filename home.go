@@ -9,7 +9,7 @@ import (
 // Handler for / renders the home.html page
 func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 	errmsg := r.FormValue("errmsg")
 	message := ""
 

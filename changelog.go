@@ -120,7 +120,7 @@ var (
 // truth; this process-local cache keeps page views from turning into a Discord
 // API request for every visitor.
 func (s *site) Changelog(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Changelog", sig)
 
 	entries, err := getChangelogEntries()
