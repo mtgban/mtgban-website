@@ -154,3 +154,35 @@ func TestEnforceSigningTellsExpiredFromForged(t *testing.T) {
 		}
 	}
 }
+
+// A ?sig= is kept as the cookie only once it checks out, by either wrapper:
+// a forged one is refused or ignored, and has no business in the browser.
+func TestOnlyACheckedSignatureIsKeptAsTheCookie(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
+
+	valid := signedAs(t, url.Values{"UserEmail": {"sub@example.com"}, "UserTier": {"Test"}}, time.Now().Add(time.Hour))
+	v := parseSig(valid)
+	v.Set("Signature", "AAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	forged := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+
+	nothing := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	for name, wrapper := range map[string]http.Handler{
+		"noSigning":      noSigning(nothing),
+		"enforceSigning": enforceSigning(testSite, nothing),
+	} {
+		for sig, want := range map[string]bool{valid: true, forged: false} {
+			rec := httptest.NewRecorder()
+			wrapper.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/limited?sig="+url.QueryEscape(sig), nil))
+			kept := false
+			for _, c := range rec.Result().Cookies() {
+				kept = kept || c.Name == "MTGBAN"
+			}
+			if kept != want {
+				t.Errorf("%s: kept the cookie %v for a signature that checks out %v", name, kept, want)
+			}
+		}
+	}
+}
