@@ -123,7 +123,7 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 			for i := range entries {
 				// To the cent, dropping the offers too small to make one
 				price := math.Round(entries[i].Pricing()*100) / 100
-				if price == 0 {
+				if unpriced(price) {
 					continue
 				}
 				entry := banprice.Entry{Price: price}

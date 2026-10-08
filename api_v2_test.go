@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"maps"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -659,5 +660,33 @@ func TestPriceAPISealedIgnoresFinish(t *testing.T) {
 	}
 	if got := retail(s.PriceAPIv2, "/api/v2/retail.json?vendor=CT&finish=sealed"); got != "" && got != "null" && got != "{}" {
 		t.Errorf("v2 singles, finish=sealed: retail %s, want nothing", got)
+	}
+}
+
+// A NaN or infinite price is no price: v1 and v2 leave it out rather than
+// fail to encode the response around it.
+func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
+	co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: "lor-1", Identifiers: map[string]string{"mcmId": "600001"}}}
+	co.Finish = "nonfoil"
+	record := map[string][]mtgban.InventoryEntry{"lor-1": {
+		{Conditions: "NM", Price: math.NaN(), Quantity: 1},
+		{Conditions: "SP", Price: math.Inf(1), Quantity: 1},
+		{Conditions: "MP", Price: 0.5, Quantity: 2},
+	}}
+
+	v2 := newV2Store("CT", record, true, true, false, nil).file(nil, "lor-1", co)
+	if len(v2) != 1 || v2[0].Condition != "MP" {
+		t.Errorf("v2 entries %+v, want MP's alone", v2)
+	}
+
+	b := &mtgmatcher.Backend{AllUUIDs: []string{"lor-1"}, UUIDs: map[string]*mtgmatcher.CardObject{"lor-1": co}}
+	out := map[string]map[string]*BanPrice{}
+	processEntry(b, out, record["lor-1"], "mtgban", "lor-1", "CT", true, true, true)
+	wire, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("v1 does not encode: %v", err)
+	}
+	if !strings.Contains(string(wire), `"regular":0.5`) {
+		t.Errorf("v1 = %s, want MP's 0.5 as the price", wire)
 	}
 }

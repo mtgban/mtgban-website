@@ -809,14 +809,15 @@ type EntryRule struct {
 }
 
 func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
-	// Zero-priced listings are ignored throughout, matching the search walk
-	// the filtered endpoints ride (shouldSkipPriceNG drops them before they
-	// become rows): the base price is the first nonzero entry, and zero
-	// entries contribute neither conditions nor quantities. Records sort by
-	// grade then price, so the base stays the best grade's cheapest listing.
+	// Unpriced listings (zero, or a NaN) are ignored throughout, matching the
+	// search walk the filtered endpoints ride (shouldSkipPriceNG drops them
+	// before they become rows): the base price is the first priced entry, and
+	// unpriced entries contribute neither conditions nor quantities. Records
+	// sort by grade then price, so the base stays the best grade's cheapest
+	// listing.
 	base := -1
 	for i := range entries {
-		if entries[i].Pricing() != 0 {
+		if !unpriced(entries[i].Pricing()) {
 			base = i
 			break
 		}
@@ -864,7 +865,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		out[id][scraperTag].Sealed = basePrice
 		if qty {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				out[id][scraperTag].QtySealed += entries[i].Qty()
@@ -874,7 +875,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		out[id][scraperTag].Etched = basePrice
 		if qty {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				out[id][scraperTag].QtyEtched += entries[i].Qty()
@@ -882,7 +883,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		}
 		if conds {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				condTag := string(entries[i].Condition()) + "_etched"
@@ -902,7 +903,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		out[id][scraperTag].Foil = basePrice
 		if qty {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				out[id][scraperTag].QtyFoil += entries[i].Qty()
@@ -910,7 +911,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		}
 		if conds {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				condTag := string(entries[i].Condition()) + "_foil"
@@ -930,7 +931,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		out[id][scraperTag].Regular = basePrice
 		if qty {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				out[id][scraperTag].Qty += entries[i].Qty()
@@ -938,7 +939,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		}
 		if conds {
 			for i := range entries {
-				if entries[i].Pricing() == 0 {
+				if unpriced(entries[i].Pricing()) {
 					continue
 				}
 				condTag := string(entries[i].Condition())
