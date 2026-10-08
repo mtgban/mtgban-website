@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -376,6 +377,31 @@ func TestDirectStockIsBuiltOncePerLoad(t *testing.T) {
 	if directStockBuilt.Load() == relisted {
 		t.Error("a reloaded seller did not rebuild the stock")
 	}
+}
+
+// TestDirectStockBuildsOncePerRequestAcrossReload pins that a request still
+// holding the seller from before a reload builds its stock once, not once
+// per card while a newer request keeps replacing the shared build.
+func TestDirectStockBuildsOncePerRequestAcrossReload(t *testing.T) {
+	setTestTCGDirect(t, map[string]*tcgListings{"card": {Direct: [5]int32{7}}})
+	info := mtgban.ScraperInfo{Shorthand: tcgDirectStore, NoQuantityInventory: true}
+	inv := mtgban.InventoryRecord{"card": {{Conditions: "NM", Price: 3, Quantity: 1}}}
+	before := withDirectStock(mtgban.NewSellerFromInventory(inv, info))
+	after := withDirectStock(mtgban.NewSellerFromInventory(inv, info))
+
+	first := before.Inventory()
+	after.Inventory()
+	for range 3 {
+		if got := before.Inventory(); !sameInventory(got, first) {
+			t.Fatal("the older request rebuilt its stock after a newer one replaced the shared build")
+		}
+		after.Inventory()
+	}
+}
+
+// sameInventory says whether a and b are the same map, not equal copies.
+func sameInventory(a, b mtgban.InventoryRecord) bool {
+	return fmt.Sprintf("%p", a) == fmt.Sprintf("%p", b)
 }
 
 // TestRankDirectAsOneCopy ranks a trade bought from Direct by its unit

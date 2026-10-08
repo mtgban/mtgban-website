@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -421,9 +422,13 @@ func rankDirectAsOneCopy(arbit []mtgban.ArbitEntry, minProfitability float64) []
 	return out
 }
 
-// directStockSeller is TCGplayer Direct quoting its own stock.
+// directStockSeller is TCGplayer Direct quoting its own stock, for one
+// request: arbit asks for the inventory once per card, so the request
+// settles on one build however the shared one below moves meanwhile.
 type directStockSeller struct {
 	mtgban.Seller
+	once      sync.Once
+	inventory mtgban.InventoryRecord
 }
 
 // directStockBuild is the stocked inventory last built, with the seller and
@@ -438,15 +443,25 @@ type directStockBuild struct {
 var directStockBuilt atomic.Pointer[directStockBuild]
 
 // Inventory is the seller's own with Direct's stock as the quantity where
-// the listings saw some, built once per seller and listings load.
+// the listings saw some, built once per request, from the shared build when
+// it is current.
 func (s *directStockSeller) Inventory() mtgban.InventoryRecord {
+	s.once.Do(func() {
+		s.inventory = directStockFor(s.Seller)
+	})
+	return s.inventory
+}
+
+// directStockFor is seller's stocked inventory, the shared build when it
+// is of this seller and the current listings, else a new one stored there.
+func directStockFor(seller mtgban.Seller) mtgban.InventoryRecord {
 	snap := tcgDirectSnapshot(time.Now())
 	built := directStockBuilt.Load()
-	if built != nil && built.seller == s.Seller && built.snap == snap {
+	if built != nil && built.seller == seller && built.snap == snap {
 		return built.inventory
 	}
-	inventory := stockedInventory(s.Seller.Inventory(), snap)
-	directStockBuilt.Store(&directStockBuild{seller: s.Seller, snap: snap, inventory: inventory})
+	inventory := stockedInventory(seller.Inventory(), snap)
+	directStockBuilt.Store(&directStockBuild{seller: seller, snap: snap, inventory: inventory})
 	return inventory
 }
 
