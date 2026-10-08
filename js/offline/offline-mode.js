@@ -275,6 +275,7 @@
             ensureWorker().postMessage({
                 type: 'sync',
                 full: !!(opts && opts.full),
+                images: withImages,
                 stores: sel[0] || [],
                 editions: sel[1] || [],
                 imgEditions: sel[2] || [],
