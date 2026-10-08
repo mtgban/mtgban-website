@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 	"slices"
 	"sort"
@@ -8,6 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/observability"
 )
 
 // PopularSearch is a resolved featured tile shown on the landing page: a
@@ -30,6 +35,7 @@ type PopularSearchEntry struct {
 }
 
 // The ranking's budgets. Not config: no deployment needs them to differ.
+// A window of N days is N calendar dates, today included.
 const (
 	popularDailyBudget   = 30
 	popularMinUsers      = 3
@@ -182,23 +188,9 @@ func curatedPopularSearches(ds *datastore) []PopularSearch {
 	var out []PopularSearch
 	usedImages := make(map[string]struct{})
 	for _, q := range cfg {
-		config := parseSearchOptionsNG(ds.backend, q.Query, nil, nil, nil)
-		uuids, err := searchAndFilter(ds, config)
-		if err != nil || len(uuids) == 0 {
+		uuids := popularTopCards(ds, q.Query)
+		if len(uuids) == 0 {
 			continue
-		}
-		// searchAndFilter doesn't apply sort:retail (that needs live
-		// prices), so sort here and take the top-retail card as the tile.
-		if config.SortMode == "retail" {
-			sortData := resolveSortingData(ds.backend, uuids)
-			prices := resolveBestPrices(uuids, defaultSellerPriorityOpt, price4seller)
-			sort.Slice(uuids, func(i, j int) bool {
-				priceI, priceJ := prices[uuids[i]], prices[uuids[j]]
-				if priceI == priceJ {
-					return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
-				}
-				return priceI > priceJ
-			})
 		}
 		candidateIDs := uuids
 		// An explicit Card (name or query) overrides which card supplies the
@@ -251,4 +243,128 @@ func firstUnusedPopularCard(ids []string, usedImages map[string]struct{}, resolv
 		return card, true
 	}
 	return GenericCard{}, false
+}
+
+// popularTopCards runs a tile's query and orders the results the way the
+// tile wants them: searchAndFilter leaves sort:retail to the caller, since
+// that needs live prices.
+func popularTopCards(ds *datastore, query string) []string {
+	config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
+	uuids, err := searchAndFilter(ds, config)
+	if err != nil || len(uuids) == 0 {
+		return nil
+	}
+	if config.SortMode == "retail" {
+		sortData := resolveSortingData(ds.backend, uuids)
+		prices := resolveBestPrices(uuids, defaultSellerPriorityOpt, price4seller)
+		sort.Slice(uuids, func(i, j int) bool {
+			priceI, priceJ := prices[uuids[i]], prices[uuids[j]]
+			if priceI == priceJ {
+				return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
+			}
+			return priceI > priceJ
+		})
+	}
+	return uuids
+}
+
+// popularRankQuery turns a vote key into the query that picks its tile's
+// art, the query its tile links to, and its label. Empty for a key it
+// does not know.
+func popularRankQuery(b *mtgmatcher.Backend, rank observability.SearchRank) (searchQuery, linkQuery, label string) {
+	switch {
+	case strings.HasPrefix(rank.Key, "card:"):
+		name := strings.TrimPrefix(rank.Key, "card:")
+		return name, name, name
+	case strings.HasPrefix(rank.Key, "set:"):
+		code := strings.TrimPrefix(rank.Key, "set:")
+		label = code
+		if set, err := b.GetSet(code); err == nil && set.Name != "" {
+			label = set.Name
+		}
+		return "s:" + code + " sort:retail", "s:" + code, label
+	}
+	return "", "", ""
+}
+
+// resolvePopularRanks turns a ranking into tiles, in rank order, skipping
+// a key that no longer resolves and never showing the same art twice.
+func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []PopularTile {
+	var out []PopularTile
+	usedImages := make(map[string]struct{})
+	for _, rank := range ranks {
+		searchQuery, linkQuery, label := popularRankQuery(ds.backend, rank)
+		if searchQuery == "" {
+			continue
+		}
+		card, ok := firstUnusedPopularCard(popularTopCards(ds, searchQuery), usedImages, func(id string) GenericCard {
+			return uuid2card(ds.backend, id, false)
+		})
+		if !ok {
+			continue
+		}
+		usedImages[card.ImageURL] = struct{}{}
+		out = append(out, PopularTile{
+			PopularSearch: PopularSearch{
+				Label:    label,
+				ImageURL: card.ImageURL,
+				URL:      "/search?q=" + url.QueryEscape(linkQuery),
+			},
+			Key:         rank.Key,
+			Query:       rank.Query,
+			Users:       rank.Users,
+			RecentUsers: rank.RecentUsers,
+		})
+	}
+	return out
+}
+
+// popularRankStore is where the job reads votes; *observability.Client is one.
+type popularRankStore interface {
+	TopSearches(ctx context.Context, instance string, since, recentSince time.Time, minUsers, limit int) ([]observability.SearchRank, error)
+	PruneSearchVotes(ctx context.Context, instance string, before time.Time) (int64, error)
+}
+
+var popularRefreshing atomic.Bool
+
+// refreshPopularSearches ranks the window's votes for this deployment
+// instance, resolves the tiles and publishes them. An error keeps the last
+// ranking.
+func (s *site) refreshPopularSearches() {
+	store := s.popularRanks
+	if store == nil {
+		return
+	}
+	ds := s.datastore()
+	if len(ds.backend.GetUUIDs()) == 0 {
+		// No datastore yet: its load runs this once it is in.
+		return
+	}
+	if !popularRefreshing.CompareAndSwap(false, true) {
+		return
+	}
+	defer popularRefreshing.Store(false)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	now := time.Now().UTC()
+	if _, err := store.PruneSearchVotes(ctx, observabilityInstance, now.AddDate(0, 0, -popularRetentionDays)); err != nil {
+		backgroundJobs.Report(jobPopular, "", "prune: "+err.Error())
+		return
+	}
+	since := now.AddDate(0, 0, -(popularWindowDays - 1))
+	recentSince := now.AddDate(0, 0, -(popularRecentDays - 1))
+	ranks, err := store.TopSearches(ctx, observabilityInstance, since, recentSince, popularMinUsers, popularLimit)
+	if err != nil {
+		backgroundJobs.Report(jobPopular, "", "rank: "+err.Error())
+		return
+	}
+	tiles := resolvePopularRanks(ds, ranks)
+	popularOrganicPtr.Store(&popularOrganic{At: now, Tiles: tiles})
+	if len(ranks) > 0 && len(tiles) == 0 {
+		backgroundJobs.Report(jobPopular, "", fmt.Sprintf("none of %d ranked keys resolved", len(ranks)))
+		return
+	}
+	backgroundJobs.Report(jobPopular, fmt.Sprintf("%d tiles from %d ranked keys", len(tiles), len(ranks)), "")
 }

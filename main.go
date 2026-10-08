@@ -587,6 +587,7 @@ func (s *site) openDBs() (err error) {
 		ObservabilityDB = obsDB
 		ObservabilityRecorder = observability.NewRecorder(obsDB)
 		s.popularVotes = obsDB
+		s.popularRanks = obsDB
 		log.Println("observability telemetry enabled")
 	}
 

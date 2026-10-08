@@ -1,6 +1,15 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/observability"
+)
 
 func TestFirstUnusedPopularCardSkipsDuplicateAndMissingArt(t *testing.T) {
 	resolved := map[string]GenericCard{
@@ -136,5 +145,169 @@ func TestMergePopular(t *testing.T) {
 	organic := []PopularSearch{tile("o1"), tile("o2"), tile("o3")}
 	if got := mergePopular(organic, curated, 2); !same(urls(got), []string{"o1", "o2", "o3"}) {
 		t.Fatalf("above floor: %v", urls(got))
+	}
+}
+
+func TestPopularRankQuery(t *testing.T) {
+	empty := &mtgmatcher.Backend{}
+	search, link, label := popularRankQuery(empty, observability.SearchRank{Key: "card:Black Lotus"})
+	if search != "Black Lotus" || link != "Black Lotus" || label != "Black Lotus" {
+		t.Fatalf("card: %q %q %q", search, link, label)
+	}
+	// An unknown set keeps its code as the label.
+	search, link, label = popularRankQuery(empty, observability.SearchRank{Key: "set:ZZZ"})
+	if search != "s:ZZZ sort:retail" || link != "s:ZZZ" || label != "ZZZ" {
+		t.Fatalf("set: %q %q %q", search, link, label)
+	}
+	if search, _, _ = popularRankQuery(empty, observability.SearchRank{Key: "weird:x"}); search != "" {
+		t.Fatalf("unknown key resolved to %q", search)
+	}
+}
+
+func TestPopularRankQueryNamesTheSet(t *testing.T) {
+	skipWithoutDatastore(t)
+	_, _, label := popularRankQuery(backend(), observability.SearchRank{Key: "set:LEA"})
+	if label != "Limited Edition Alpha" {
+		t.Fatalf("label = %q", label)
+	}
+}
+
+// fakeRankStore serves a fixed ranking and records what the job asked for.
+type fakeRankStore struct {
+	ranks                   []observability.SearchRank
+	err                     error
+	instance, pruneInstance string
+	since, recentSince      time.Time
+	pruneBefore             time.Time
+}
+
+func (f *fakeRankStore) TopSearches(_ context.Context, instance string, since, recentSince time.Time, _, _ int) ([]observability.SearchRank, error) {
+	f.instance, f.since, f.recentSince = instance, since, recentSince
+	return f.ranks, f.err
+}
+
+func (f *fakeRankStore) PruneSearchVotes(_ context.Context, instance string, before time.Time) (int64, error) {
+	f.pruneInstance, f.pruneBefore = instance, before
+	return 0, nil
+}
+
+// rankSite is a site on the real datastore whose job reads store; the
+// published ranking is cleared after the test.
+func rankSite(t *testing.T, store *fakeRankStore) *site {
+	t.Helper()
+	skipWithoutDatastore(t)
+	t.Cleanup(func() { popularOrganicPtr.Store(nil) })
+	prevInstance := observabilityInstance
+	observabilityInstance = "test-instance"
+	t.Cleanup(func() { observabilityInstance = prevInstance })
+	s := newSite()
+	s.ds.Store(currentDatastore())
+	s.popularRanks = store
+	return s
+}
+
+func popularJobProblem(t *testing.T) string {
+	t.Helper()
+	for _, row := range backgroundJobs.Rows() {
+		if row.Name == jobPopular {
+			return row.Problem
+		}
+	}
+	t.Fatal("no popular searches job row")
+	return ""
+}
+
+func TestRefreshPopularSearchesPublishesInRankOrder(t *testing.T) {
+	store := &fakeRankStore{ranks: []observability.SearchRank{
+		{Key: "card:Black Lotus", Users: 5},
+		{Key: "card:Lightning Bolt", Users: 4},
+	}}
+	s := rankSite(t, store)
+	s.refreshPopularSearches()
+
+	snap := popularOrganicSnapshot()
+	if snap == nil || len(snap.Tiles) != 2 {
+		t.Fatalf("snapshot = %+v, want two tiles", snap)
+	}
+	for i, want := range []PopularSearch{
+		{Label: "Black Lotus", URL: "/search?q=Black+Lotus"},
+		{Label: "Lightning Bolt", URL: "/search?q=Lightning+Bolt"},
+	} {
+		got := snap.Tiles[i]
+		if got.Label != want.Label || got.URL != want.URL || got.ImageURL == "" {
+			t.Errorf("tile %d = %+v, want %q at %q with art", i, got.PopularSearch, want.Label, want.URL)
+		}
+	}
+	if store.instance != observabilityInstance || store.pruneInstance != observabilityInstance {
+		t.Errorf("instance = %q, prune instance = %q, want %q", store.instance, store.pruneInstance, observabilityInstance)
+	}
+}
+
+func TestRefreshPopularSearchesWindowsCountToday(t *testing.T) {
+	store := &fakeRankStore{}
+	s := rankSite(t, store)
+	s.refreshPopularSearches()
+
+	today := time.Now().UTC()
+	day := func(tm time.Time) string { return tm.UTC().Format("2006-01-02") }
+	// A window of N days is N dates, today included.
+	if got, want := day(store.since), day(today.AddDate(0, 0, -(popularWindowDays-1))); got != want {
+		t.Errorf("since = %s, want %s", got, want)
+	}
+	if got, want := day(store.recentSince), day(today.AddDate(0, 0, -(popularRecentDays-1))); got != want {
+		t.Errorf("recentSince = %s, want %s", got, want)
+	}
+	if got, want := day(store.pruneBefore), day(today.AddDate(0, 0, -popularRetentionDays)); got != want {
+		t.Errorf("prune before = %s, want %s", got, want)
+	}
+}
+
+func TestRefreshPopularSearchesSkipsUnresolvedKeys(t *testing.T) {
+	store := &fakeRankStore{ranks: []observability.SearchRank{
+		{Key: "weird:x"},
+		{Key: "card:zzzz no such card zzzz"},
+		{Key: "card:Black Lotus"},
+	}}
+	s := rankSite(t, store)
+	s.refreshPopularSearches()
+
+	snap := popularOrganicSnapshot()
+	if snap == nil || len(snap.Tiles) != 1 || snap.Tiles[0].Key != "card:Black Lotus" {
+		t.Fatalf("snapshot = %+v, want only card:Black Lotus", snap)
+	}
+}
+
+func TestRefreshPopularSearchesKeepsTheRankingOnError(t *testing.T) {
+	store := &fakeRankStore{ranks: []observability.SearchRank{{Key: "card:Black Lotus"}}}
+	s := rankSite(t, store)
+	s.refreshPopularSearches()
+	before := popularOrganicSnapshot()
+	if before == nil {
+		t.Fatal("no ranking published")
+	}
+
+	store.err = errors.New("db down")
+	s.refreshPopularSearches()
+	if after := popularOrganicSnapshot(); after != before {
+		t.Fatalf("snapshot replaced on error: %p, was %p", after, before)
+	}
+	if p := popularJobProblem(t); !strings.Contains(p, "db down") {
+		t.Errorf("problem = %q, want the store error", p)
+	}
+}
+
+func TestRefreshPopularSearchesReportsNothingResolved(t *testing.T) {
+	store := &fakeRankStore{ranks: []observability.SearchRank{
+		{Key: "weird:x"},
+		{Key: "card:zzzz no such card zzzz"},
+	}}
+	s := rankSite(t, store)
+	s.refreshPopularSearches()
+
+	if snap := popularOrganicSnapshot(); snap == nil || len(snap.Tiles) != 0 {
+		t.Fatalf("snapshot = %+v, want an empty ranking", snap)
+	}
+	if p := popularJobProblem(t); p != "none of 2 ranked keys resolved" {
+		t.Errorf("problem = %q", p)
 	}
 }
