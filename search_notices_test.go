@@ -54,6 +54,7 @@ func TestSearchPageShowsEveryNotice(t *testing.T) {
 	}{
 		{"a capped roster and a search that finds nothing", "/search?q=zzzqx&chart=" + eleven, false, []string{capped, NoCardsMessage}},
 		{"a capped roster and a search that finds too much", "/search?q=" + url.QueryEscape("t:creature") + "&chart=" + eleven, false, []string{capped, TooManyMessage}},
+		{"on a phone, a capped roster and a search that finds too much", "/search?q=" + url.QueryEscape("t:creature") + "&chart=" + eleven, true, []string{capped, TooManyMessage}},
 		{"a capped roster, an unmatched card and no chart data", "/search?chart=" + strings.Join(ids[:9], ",") + "," + unmatched + "," + strings.Join(ids[9:], ","), false, []string{capped, dropped, "No chart data available"}},
 		{"a capped roster in the chart picker with a pinned bar that finds nothing", "/search?modal=1&scope=" + url.QueryEscape("s:LEA cn:99999") + "&chart=" + eleven, true, []string{capped, NoResultsMessage}},
 	} {
