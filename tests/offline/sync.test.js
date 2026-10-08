@@ -57,3 +57,17 @@ test('an image sync with nothing selected releases the images', async () => {
     expect(Object.keys(w.imgstate)).toEqual([]);
     expect(w.posts.at(-1)).toMatchObject({ type: 'done', images: true });
 });
+
+test('a full resync that loses the network keeps the old prices, unstamped', async () => {
+    const w = loadWorker({ pricesFail: true });
+    await w.runSync({ type: 'sync', full: true, stores: [], editions: [], imgEditions: [] });
+    expect(w.sets.NEO).toMatchObject({ version: null, blob: 'neo' });
+    expect(w.sets.DMU).toMatchObject({ version: null, blob: 'dmu' });
+    expect(w.posts.at(-1)).toMatchObject({ type: 'done', failedSets: 2 });
+});
+
+test('a failed set goes when a new key cannot decrypt it', async () => {
+    const w = loadWorker({ pricesFail: true, aesKey: null });
+    await w.runSync({ type: 'sync', stores: [], editions: [], imgEditions: [] });
+    expect(w.sets).toEqual({});
+});

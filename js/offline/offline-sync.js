@@ -91,10 +91,12 @@ async function runSync(msg) {
         // msg.full is the settings "force resync" button: take everything the
         // manifest lists rather than only what changed since last time.
         var fullResync = !!msg.full;
+        var newKey = false;
         var key = await self.OfflineDB.getMeta('aesKey');
         if (!key) {
             key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
             await self.OfflineDB.setMeta('aesKey', key);
+            newKey = true;
             fullResync = true; // Regenerated key cannot decrypt existing blobs.
         }
 
@@ -144,10 +146,11 @@ async function runSync(msg) {
                         return;
                     }
                     state.failed++;
-                    // A full resync leaves the failed set's row stamped with
-                    // this version, which the next sync would skip: drop it
+                    // A full resync can leave the failed set's row stamped with
+                    // this version, which the next sync would skip: unstamp it,
+                    // keeping its prices for offline use unless the key is new
                     if (fullResync) {
-                        try { await self.OfflineDB.deleteRow('sets', code); } catch (e2) {}
+                        try { await unstampSet(code, newKey); } catch (e2) {}
                     }
                 }
                 post({ type: 'progress', stage: 'prices', done: state.done + state.failed, total: changed.length, code: code });
@@ -186,6 +189,19 @@ async function runSync(msg) {
         if (err && err.message === 'forbidden') await self.OfflineDB.setMeta('authLapsed', true);
         post({ type: 'error', stage: (err && err.stage) || stage, message: (err && err.message) || String(err) });
     }
+}
+
+// unstampSet makes the next sync fetch a set again: its row loses its version,
+// or goes whole when a new key cannot decrypt it. A kept row has the prices of
+// the stores it was last fetched for, until that next sync replaces them.
+async function unstampSet(code, newKey) {
+    var row = newKey ? null : await self.OfflineDB.getSet(code);
+    if (!row) {
+        await self.OfflineDB.deleteRow('sets', code);
+        return;
+    }
+    row.version = null;
+    await self.OfflineDB.putSet(row);
 }
 
 // Download, re-gzip, encrypt, and store one set payload; returns stored bytes.
