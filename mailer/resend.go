@@ -3,6 +3,8 @@ package mailer
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,8 +50,13 @@ func (r *Resend) Send(ctx context.Context, m Message) (string, error) {
 	if wait == 0 {
 		wait = time.Second
 	}
+	// One key for both attempts: Resend sends a retried request once, where
+	// the first was accepted and only its answer was lost to a 5xx.
+	key := make([]byte, 16)
+	_, _ = rand.Read(key)
+	idempotencyKey := hex.EncodeToString(key)
 	for attempt := 0; ; attempt++ {
-		id, err := r.post(ctx, body)
+		id, err := r.post(ctx, body, idempotencyKey)
 		var se *SendError
 		retry := errors.As(err, &se) && (se.Status == 429 || se.Status >= 500) && attempt == 0
 		if err == nil || !retry {
@@ -63,7 +70,7 @@ func (r *Resend) Send(ctx context.Context, m Message) (string, error) {
 	}
 }
 
-func (r *Resend) post(ctx context.Context, body []byte) (string, error) {
+func (r *Resend) post(ctx context.Context, body []byte, idempotencyKey string) (string, error) {
 	endpoint := r.Endpoint
 	if endpoint == "" {
 		endpoint = resendEndpoint
@@ -78,6 +85,7 @@ func (r *Resend) post(ctx context.Context, body []byte) (string, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+r.Key)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", idempotencyKey)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("mailer: resend: %w", err)
