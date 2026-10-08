@@ -173,3 +173,41 @@ func TestIntegrationPruneSearchVotes(t *testing.T) {
 		t.Fatalf("other instance's rows after prune = %d, want 1", other)
 	}
 }
+
+// The window's totals count what the ranking saw: every vote, each user
+// and each key once, from the window start on.
+func TestIntegrationSearchVoteTotalsCountTheWindow(t *testing.T) {
+	c := voteClient(t)
+	ctx := context.Background()
+	today := time.Now().UTC()
+	old := today.AddDate(0, 0, -10)
+	a, b := HashVisitor("a@b.com"), HashVisitor("c@d.com")
+	for _, v := range []struct {
+		key, user string
+		day       time.Time
+	}{
+		{"card:Black Lotus", a, today},
+		{"card:Black Lotus", b, today},
+		{"set:LEA", a, today},
+		{"card:Mox Pearl", a, old},
+	} {
+		if err := c.RecordSearchVote(ctx, testInstance, v.key, v.user, v.day, v.key, 30); err != nil {
+			t.Fatalf("record: %v", err)
+		}
+	}
+
+	got, err := c.SearchVoteTotals(ctx, testInstance, today.AddDate(0, 0, -6))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (SearchVoteTotals{Votes: 3, Users: 2, Keys: 2}); got != want {
+		t.Errorf("last 7 days: %+v, want %+v", got, want)
+	}
+	got, err = c.SearchVoteTotals(ctx, testInstance, old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (SearchVoteTotals{Votes: 4, Users: 2, Keys: 3}); got != want {
+		t.Errorf("since the old vote: %+v, want %+v", got, want)
+	}
+}
