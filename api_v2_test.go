@@ -571,3 +571,50 @@ func TestWriteV2Response(t *testing.T) {
 		}
 	}
 }
+
+// TestPriceAPIDemoRefusesFullDumps pins that a request with no signature
+// gets no full dump, whatever the path adds to the endpoint's name, and
+// still gets the sealed dump and a single card.
+func TestPriceAPIDemoRefusesFullDumps(t *testing.T) {
+	withSigMode(t, false, true)
+	seedV2Scrapers(t)
+	prevDemo := Config().APIDemoStores
+	t.Cleanup(func() { Config().APIDemoStores = prevDemo })
+	Config().APIDemoStores = []string{"CT", "CK", "CTSealed"}
+
+	s := newSite()
+	s.ds.Store(&datastore{backend: v2Backend()})
+
+	for path, served := range map[string]bool{
+		"all": false, "retail": false, "buylist": false,
+		"allx": false, "retailz": false, "buylist_": false,
+		"sealed": true, "retail/lor-1": true,
+	} {
+		for _, tc := range []struct {
+			url     string
+			handler http.HandlerFunc
+		}{
+			{"/api/mtgban/" + path + ".json", s.PriceAPI},
+			{"/api/v2/" + path + ".json", s.PriceAPIv2},
+		} {
+			rec := httptest.NewRecorder()
+			tc.handler(rec, httptest.NewRequest(http.MethodGet, tc.url, nil))
+			// v1 and v2 shape their prices differently: read only what is there
+			var out struct {
+				Error   string          `json:"error"`
+				Retail  json.RawMessage `json:"retail"`
+				Buylist json.RawMessage `json:"buylist"`
+			}
+			err := json.Unmarshal(rec.Body.Bytes(), &out)
+			if err != nil {
+				t.Fatalf("%s: %v\n%s", tc.url, err, rec.Body.String())
+			}
+			if served && (out.Error != "" || len(out.Retail) == 0) {
+				t.Errorf("%s with no signature: error %q, no retail", tc.url, out.Error)
+			}
+			if !served && (out.Error == "" || len(out.Retail) > 0 || len(out.Buylist) > 0) {
+				t.Errorf("%s with no signature: error %q, %d retail, %d buylist", tc.url, out.Error, len(out.Retail), len(out.Buylist))
+			}
+		}
+	}
+}

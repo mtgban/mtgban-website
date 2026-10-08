@@ -164,6 +164,9 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		json.NewEncoder(w).Encode(&out)
 		return
 	}
+	// kind is the endpoint the path names, ahead of any set or id under it.
+	kind, _, _ := strings.Cut(strings.TrimSuffix(strings.TrimSuffix(urlPath, ".json"), ".csv"), "/")
+	isFullDump := !strings.Contains(urlPath, "/")
 
 	// Endpoint for retrieving the set codes
 	if strings.HasPrefix(urlPath, "sets") {
@@ -227,7 +230,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if sig == "" && storesOpt == "" {
 		storesOpt = strings.Join(Config().APIDemoStores, ",")
 		// Disable a few endpoints for this specific mode
-		if strings.Contains(urlPath, "all.") || strings.Contains(urlPath, "retail.") || strings.Contains(urlPath, "buylist.") {
+		if isFullDump && (kind == "all" || kind == "retail" || kind == "buylist") {
 			out.Error = "Invalid endpoint or missing signature"
 			json.NewEncoder(w).Encode(&out)
 			return
@@ -296,6 +299,12 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 			}
 			csvWriter.Flush()
 		}
+		return
+	}
+
+	if kind != "retail" && kind != "buylist" && kind != "all" && kind != "sealed" {
+		out.Error = "Not found"
+		json.NewEncoder(w).Encode(&out)
 		return
 	}
 
@@ -375,7 +384,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	}
 
 	// Only filtered output can have csv encoding, and only for retail or buylist requests
-	checkCSVoutput := (filterByEdition == "" && filterByHash == nil && filterByFinish == "") || strings.HasPrefix(urlPath, "all")
+	checkCSVoutput := (filterByEdition == "" && filterByHash == nil && filterByFinish == "") || kind == "all"
 	if strings.HasSuffix(urlPath, ".csv") && checkCSVoutput {
 		out.Error = "Invalid request"
 		json.NewEncoder(w).Encode(&out)
@@ -397,7 +406,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	canRetail := canAccessMode(enabledModes, "retail")
 	canBuylist := canAccessMode(enabledModes, "buylist")
 	canSealed := canAccessMode(enabledModes, "sealed")
-	isSealed := strings.HasPrefix(urlPath, "sealed") && canSealed
+	isSealed := kind == "sealed" && canSealed
 	if isSealed {
 		dumpType += "sealed"
 	}
@@ -406,7 +415,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	isV2 := version == APIVersionV2 && strings.HasSuffix(urlPath, ".json")
 	var retailV2, buylistV2 *v2Section
 
-	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
+	if ((kind == "retail" || kind == "all") && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
 			retailV2 = sellerSectionV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
@@ -414,7 +423,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 			out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
-	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
+	if ((kind == "buylist" || kind == "all") && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
 			buylistV2 = vendorSectionV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
