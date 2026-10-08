@@ -1235,7 +1235,7 @@ window.__BAN_GUIDE = {
                     { value: 'qty=true', short: 'Add qty, qty_foil, qty_etched, and qty_sealed to price objects. Retail: stock across all conditions. Buylist: the amount the store wants.' },
                     { value: 'conds=true', short: 'Add a conditions dictionary with a price per condition (NM, SP, MP, HP, PO, with _foil and _etched variants). With qty=true a quantities dictionary is added too.' },
                     { value: 'vendor=CK,SCG', short: 'Limit the response to the listed store tags. With a single store, condition prices are always included.' },
-                    { value: 'finish=foil', short: 'Keep one finish only: foil, nonfoil, or etched.' },
+                    { value: 'finish=foil', short: 'Keep one finish only: foil, nonfoil, or etched. Singles only.' },
                     { value: 'tag=names', short: 'Use full store names as keys instead of tags. stores.json?tag=names gives the mapping.' },
                     { value: 'filter=sealed', short: 'On sets.json and stores.json, keep only entries with sealed data; filter=singles keeps singles.' },
                     { value: 'scope=', short: 'On search endpoints, the same scope filters as the search page.' }
