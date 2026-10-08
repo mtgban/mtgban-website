@@ -28,10 +28,13 @@ func recordPageHit(r *http.Request) {
 	if !recordablePath(r.URL.Path) {
 		return
 	}
-	sig := getSignatureFromCookies(r)
-	if qs := r.FormValue("sig"); qs != "" {
-		sig = qs
-	}
+	ObservabilityRecorder.Record(pageHitEvent(r))
+}
+
+// pageHitEvent is the telemetry event for r, labelled off its checked
+// signature.
+func pageHitEvent(r *http.Request) observability.Event {
+	sig := verifiedRequestSignature(r)
 	device := "desktop"
 	if isMobileRequest(r) {
 		device = "mobile"
@@ -40,12 +43,12 @@ func recordPageHit(r *http.Request) {
 	if tier == "" {
 		tier = "Any"
 	}
-	ObservabilityRecorder.Record(observability.Event{
+	return observability.Event{
 		Path:     observability.NormalizePath(strings.Trim(r.URL.Path, "/"), r.FormValue("page")),
 		Tier:     tier,
 		Device:   device,
 		Visitor:  observability.HashVisitor(GetParamFromSig(sig, "UserEmail")),
 		IsBot:    observability.IsBot(r.UserAgent()),
 		Instance: observabilityInstance,
-	})
+	}
 }

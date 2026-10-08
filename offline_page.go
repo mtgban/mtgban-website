@@ -18,7 +18,7 @@ func offlineModeAllowed(r *http.Request) (string, bool) {
 
 // OfflinePage renders the offline search shell.
 func (s *site) OfflinePage(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Offline", sig)
 	pageVars.SettingsTab = "offline"
 	render(w, "offline.html", pageVars)

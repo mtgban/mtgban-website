@@ -8,7 +8,7 @@ import (
 )
 
 func (s *site) Guide(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Guide", sig)
 	render(w, "guide.html", pageVars)
 }

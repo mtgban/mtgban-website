@@ -129,3 +129,36 @@ func TestEnforceSigningHandsOnTheSignatureItChecked(t *testing.T) {
 		t.Errorf("a forged ArbitEnabled=ALL beside a valid ?sig=: status %d, seller listed %v", rec.Code, strings.Contains(rec.Body.String(), seller))
 	}
 }
+
+// The open pages draw the navbar off a checked signature too: a forged
+// cookie claiming Arbit does not put Arbitrage in it.
+func TestOpenPagesDrawTheNavFromACheckedSignature(t *testing.T) {
+	signingEnabled(t, true)
+	fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}, "Arbit": {"true"}}
+	signed := signedAs(t, fields, time.Now().Add(time.Hour))
+	fields.Set("Signature", "forged")
+	forged := base64.StdEncoding.EncodeToString([]byte(fields.Encode()))
+
+	const link = `href="/arbit"`
+	for path, handler := range map[string]http.HandlerFunc{
+		"/":          testSite.Home,
+		"/guide":     testSite.Guide,
+		"/changelog": testSite.Changelog,
+		"/privacy":   testSite.Privacy,
+		"/offline":   testSite.OfflinePage,
+	} {
+		page := func(sig string) *httptest.ResponseRecorder {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+			rec := httptest.NewRecorder()
+			handler(rec, req)
+			return rec
+		}
+		if rec := page(signed); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), link) {
+			t.Fatalf("%s, a signed Arbit grant: status %d, Arbitrage in the nav %v", path, rec.Code, strings.Contains(rec.Body.String(), link))
+		}
+		if rec := page(forged); rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), link) {
+			t.Errorf("%s, a forged Arbit grant: status %d, Arbitrage in the nav %v", path, rec.Code, strings.Contains(rec.Body.String(), link))
+		}
+	}
+}

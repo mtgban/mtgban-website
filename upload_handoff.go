@@ -152,17 +152,16 @@ func uploadQuery(hashes []string, textArea, handedFrom, remoteURL, remoteName, f
 // than at the far end is the difference between reading somebody's whole
 // shelf and then being told no, and being told no before the walk starts.
 func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	// The grant is only worth reading off a signature this host wrote,
+	// since the whole of it travels in a cookie the reader holds.
+	sig := verifiedSignature(r)
+	signed := sig != ""
 
 	pageVars := genPageNav(s, r, "Upload", sig)
 	pageVars.Title = "Receiving a card list"
 	pageVars.HandoffOrigins = HandoffOrigins
 
-	// The grant is only worth reading off a signature this host wrote,
-	// since the whole of it travels in a cookie the reader holds.
-	params, signed := signatureIsValid(sig)
-	canUpload, _ := strconv.ParseBool(params.Get("Upload"))
-	canUpload = canUpload && signed
+	canUpload, _ := strconv.ParseBool(GetParamFromSig(sig, "Upload"))
 	if DevMode && !SigCheck {
 		canUpload = true
 	}
