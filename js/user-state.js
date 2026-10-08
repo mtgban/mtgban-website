@@ -11,6 +11,7 @@
     // Keys that map to dedicated server columns.
     var FAVORITES_KEY = 'mtgban_favorites';
     var RECENTS_KEY = 'mtgban_recent_searches';
+    var PRESETS_KEY = 'mtgban_upload_presets';
     // Keys bundled into the preferences object.
     var PREF_KEYS = [
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
@@ -387,12 +388,39 @@
         return canon(a) === canon(b);
     }
 
-    // Preferences: last-write-wins per key (local wins on first merge).
+    // Preferences: last-write-wins per key (local wins on first merge), but
+    // the upload presets, a list of their own, merge preset by preset.
     function mergePrefs(localPrefs, serverPrefs) {
         var out = {};
         Object.keys(serverPrefs || {}).forEach(function(k) { out[k] = serverPrefs[k]; });
         Object.keys(localPrefs || {}).forEach(function(k) { out[k] = localPrefs[k]; });
+        if (localPrefs && serverPrefs && PRESETS_KEY in localPrefs && PRESETS_KEY in serverPrefs) {
+            out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
+        }
         return out;
+    }
+
+    // Merge two preset lists by id: the newer save or delete (savedAt) wins,
+    // ties keep the local copy. Live presets by name, then the deletes.
+    function mergePresets(local, server) {
+        function parse(s) {
+            try { var l = JSON.parse(s); return Array.isArray(l) ? l : []; } catch (e) { return []; }
+        }
+        var byId = {};
+        var order = [];
+        parse(local).concat(parse(server)).forEach(function(p) {
+            if (!p || !p.id) return;
+            var cur = byId[p.id];
+            if (!cur) order.push(p.id);
+            if (!cur || (p.savedAt || 0) > (cur.savedAt || 0)) byId[p.id] = p;
+        });
+        var merged = order.map(function(id) { return byId[id]; });
+        var live = merged.filter(function(p) { return !p.del; });
+        live.sort(function(a, b) {
+            var x = String(a.name).toLowerCase(), y = String(b.name).toLowerCase();
+            return x < y ? -1 : x > y ? 1 : 0;
+        });
+        return JSON.stringify(live.concat(merged.filter(function(p) { return p.del; })));
     }
 
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }

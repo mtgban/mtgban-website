@@ -573,3 +573,47 @@ test('a new preset with stores saves next to a preset without store lists', () =
     expect(note.textContent).toBe('Saved CK too');
     expect(P.store.list().map(p => p.name)).toEqual(['CK too', 'X']);
 });
+
+test('a deleted preset leaves a tombstone that is not listed or counted', () => {
+    const { P, localStorage } = loadPresets();
+    const ids = [];
+    for (let i = 0; i < 10; i++) ids.push(P.store.save({ name: 'p' + i, opts: { margin: String(i) } }).preset.id);
+    expect(P.store.remove(ids[0])).toBe(true);
+    expect(P.store.list().map((p) => p.id)).not.toContain(ids[0]);
+    expect(JSON.parse(localStorage.getItem('mtgban_upload_presets')).find((p) => p.id === ids[0]).del).toBe(true);
+    expect(P.store.save({ name: 'p10', opts: { margin: '10' } }).ok).toBe(true);
+    expect(P.store.remove(ids[0])).toBe('missing');
+});
+
+test('a rename counts as a newer save', () => {
+    const { P, localStorage } = loadPresets();
+    const r = P.store.save({ name: 'a', opts: {} });
+    localStorage.setItem('mtgban_upload_presets', JSON.stringify([{ ...r.preset, savedAt: 0 }]));
+    P.store.rename(r.preset.id, 'b');
+    expect(P.store.list()[0].savedAt).toBeGreaterThan(0);
+});
+
+test('a tombstone outlives other writes for 30 days, then goes', () => {
+    const realNow = Date.now;
+    const day = 24 * 60 * 60 * 1000;
+    let now = 1e12;
+    Date.now = () => now;
+    try {
+        const { P, localStorage } = loadPresets();
+        const gone = P.store.save({ name: 'gone', opts: {} }).preset.id;
+        const kept = P.store.save({ name: 'kept', opts: {} }).preset.id;
+        P.store.remove(gone);
+        const tomb = () => JSON.parse(localStorage.getItem('mtgban_upload_presets')).find((p) => p.id === gone);
+
+        now += 29 * day;
+        P.store.rename(kept, 'still kept');
+        P.store.save({ name: 'new', opts: { margin: '1' } });
+        expect(tomb()).toMatchObject({ del: true });
+
+        now += 2 * day;
+        P.store.rename(kept, 'kept again');
+        expect(tomb()).toBeUndefined();
+    } finally {
+        Date.now = realNow;
+    }
+});
