@@ -109,3 +109,27 @@ func TestResendFromEnv(t *testing.T) {
 		t.Fatalf("%+v %v", r, err)
 	}
 }
+
+// A retry carries the first attempt's Idempotency-Key, so a send Resend
+// accepted before answering 500 does not go out twice.
+func TestResendRetriesUnderOneIdempotencyKey(t *testing.T) {
+	var keys []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		keys = append(keys, r.Header.Get("Idempotency-Key"))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"message":"internal"}`))
+	}))
+	defer srv.Close()
+	r := &Resend{Key: "re_test", From: "a@b.c", Endpoint: srv.URL + "/emails", Client: srv.Client(), retryWait: time.Millisecond}
+	_, err := r.Send(context.Background(), Message{To: "d@e.f", Subject: "s", Text: "t"})
+	if err == nil || len(keys) != 2 {
+		t.Fatalf("err %v, %d attempts", err, len(keys))
+	}
+	if keys[0] == "" || keys[0] != keys[1] {
+		t.Errorf("idempotency keys %q, want one non-empty key on both attempts", keys)
+	}
+	_, _ = r.Send(context.Background(), Message{To: "d@e.f", Subject: "s", Text: "t"})
+	if len(keys) != 4 || keys[2] == keys[0] {
+		t.Errorf("a second Send reused the first one's key: %q", keys)
+	}
+}
