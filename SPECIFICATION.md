@@ -343,9 +343,9 @@ cookie (31 days, shared across `*.mtgban.com`, **not** HttpOnly) and/or
 passed as `?sig=`. `GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the
-cookie. The API handoff (`/api-login`, `/api-trial`) is the exception: there
-a signature is a person, and a request carrying a `?sig=` hands over nobody
-(ADR-0001).
+cookie. The API handoff (`/api-login`, `/api-trial`) reads no signature at
+all: it asks Patreon who the reader is and mints the gateway token from the
+answer, finishing in `Auth` only for the browser that started it (ADR-0006).
 
 ### 3.3 ACL / tiers
 
