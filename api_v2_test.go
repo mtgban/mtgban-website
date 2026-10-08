@@ -627,3 +627,37 @@ func TestPriceAPIDemoRefusesFullDumps(t *testing.T) {
 		}
 	}
 }
+
+// finish= is a single's finish: a sealed request, v1 or v2, ignores it and
+// lists every product, and a singles one asked for sealed finds none.
+func TestPriceAPISealedIgnoresFinish(t *testing.T) {
+	withSigMode(t, true, false)
+	seedV2Scrapers(t)
+	s := newSite()
+	s.ds.Store(&datastore{backend: v2Backend()})
+
+	retail := func(handler http.HandlerFunc, url string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		handler(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		var out struct {
+			Retail json.RawMessage `json:"retail"`
+		}
+		err := json.Unmarshal(rec.Body.Bytes(), &out)
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", url, err, rec.Body.String())
+		}
+		return string(out.Retail)
+	}
+	for _, finish := range []string{"", "sealed", "foil", "nonfoil", "etched,coldfoil"} {
+		if got := retail(s.PriceAPIv2, "/api/v2/sealed.json?vendor=CTSealed&finish="+finish); !strings.Contains(got, "CTSealed") {
+			t.Errorf("v2 sealed, finish=%q: retail %s, want the box", finish, got)
+		}
+		if got := retail(s.PriceAPI, "/api/mtgban/sealed.json?vendor=CTSealed&finish="+finish); !strings.Contains(got, "CTSealed") {
+			t.Errorf("v1 sealed, finish=%q: retail %s, want the box", finish, got)
+		}
+	}
+	if got := retail(s.PriceAPIv2, "/api/v2/retail.json?vendor=CT&finish=sealed"); got != "" && got != "null" && got != "{}" {
+		t.Errorf("v2 singles, finish=sealed: retail %s, want nothing", got)
+	}
+}

@@ -148,7 +148,9 @@ components:
     finish:
       name: finish
       in: query
-      description: Comma-separated finishes, spelled as the finish keys
+      description: >-
+        Comma-separated finishes, spelled as the finish keys. Singles only:
+        a sealed request ignores it
       schema: { type: string }
     filter:
       name: filter

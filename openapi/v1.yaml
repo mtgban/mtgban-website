@@ -147,6 +147,7 @@ components:
     finish:
       name: finish
       in: query
+      description: Singles only; a sealed request ignores it
       schema: { type: string, enum: [foil, nonfoil, etched] }
     tag:
       name: tag

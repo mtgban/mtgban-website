@@ -318,6 +318,10 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
 	filterByFinish := r.FormValue("finish")
+	// A finish is a single's; a sealed request lists every product
+	if kind == "sealed" {
+		filterByFinish = ""
+	}
 	tagName := r.FormValue("tag")
 	if sig == "" {
 		enabledModes = []string{"all"}
