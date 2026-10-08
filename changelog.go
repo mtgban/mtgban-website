@@ -156,6 +156,13 @@ func getChangelogEntries() ([]changelogEntry, error) {
 			return nil, err
 		}
 		if cachedChangelog.refreshing {
+			// Somebody is already asking Discord: answer with what is held,
+			// and wait only when there is nothing to answer with.
+			if len(cachedChangelog.entries) > 0 {
+				entries := cloneChangelogEntries(cachedChangelog.entries)
+				changelogCacheMu.Unlock()
+				return entries, nil
+			}
 			done := cachedChangelog.refreshDone
 			changelogCacheMu.Unlock()
 			<-done
