@@ -2699,29 +2699,17 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 	numI := cI.Card.Number
 	numJ := cJ.Card.Number
 
-	// If their number is the same, check for foiling status
+	// If their number is the same, nonfoil, foil, then etched, and within a
+	// finish by promo types, whatever their count: one key, so one order
 	if numI == numJ {
-		// Compare promo types first, they are presorted anyway
-		if len(cI.PromoTypes) == len(cJ.PromoTypes) {
-			for e, promoTypeI := range cI.PromoTypes {
-				promoTypeJ := cJ.PromoTypes[e]
-				if promoTypeI != promoTypeJ {
-					return promoTypeI < promoTypeJ
-				}
-			}
+		finishI, finishJ := finishOrder(cI), finishOrder(cJ)
+		if finishI != finishJ {
+			return finishI < finishJ
 		}
-		if cI.Etched || cJ.Etched {
-			if cI.Etched && !cJ.Etched {
-				return false
-			} else if !cI.Etched && cJ.Etched {
-				return true
-			}
-		} else if cI.Foil || cJ.Foil {
-			if cI.Foil && !cJ.Foil {
-				return false
-			} else if !cI.Foil && cJ.Foil {
-				return true
-			}
+		// They are presorted anyway
+		promos := slices.Compare(cI.PromoTypes, cJ.PromoTypes)
+		if promos != 0 {
+			return promos < 0
 		}
 	}
 
@@ -2745,7 +2733,28 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 	if cI.Card.Language != cJ.Card.Language {
 		return cI.Card.Language < cJ.Card.Language
 	}
-	return cmpNaturally(numI, numJ) < 0
+	natural := cmpNaturally(numI, numJ)
+	if natural != 0 {
+		return natural < 0
+	}
+	// Two finishes the flags above read alike (holofoil, reverse holofoil),
+	// then the uuid, so no two printings tie and the order is total.
+	if cI.Finish != cJ.Finish {
+		return cI.Finish < cJ.Finish
+	}
+	return cI.UUID < cJ.UUID
+}
+
+// finishOrder ranks a printing's finish for the number sort: nonfoil,
+// foil, then etched.
+func finishOrder(co *mtgmatcher.CardObject) int {
+	switch {
+	case co.Etched:
+		return 2
+	case co.Foil:
+		return 1
+	}
+	return 0
 }
 
 // cmpNaturally orders collector numbers as a reader does: runs of digits by

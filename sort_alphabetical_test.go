@@ -266,3 +266,36 @@ func TestPrefixedNumbersSortByPrefixFirst(t *testing.T) {
 		}
 	}
 }
+
+// Printings sharing a number order one way whatever their promo types:
+// three that differ in promos and finish, and two that differ only in a
+// finish the flags read alike, form a strict order, never a loop or a tie.
+func TestNumberOrderIsTotalWithinANumber(t *testing.T) {
+	printing := func(uuid, finish string, foil, etched bool, promos ...string) *SortingData {
+		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Number: "1", PromoTypes: promos}, Foil: foil, Etched: etched}
+		co.Finish = finish
+		return &SortingData{co: co}
+	}
+	all := []*SortingData{
+		printing("x", "foil", true, false),
+		printing("y", "etched", false, true, "a"),
+		printing("z", "nonfoil", false, false, "b"),
+		printing("h", "holofoil", true, false, "a"),
+		printing("r", "reverseHolofoil", true, false, "a"),
+	}
+	for _, strip := range []bool{false, true} {
+		less := func(a, b *SortingData) bool { return cmpNumberAndFinish(a, b, strip) }
+		for _, a := range all {
+			for _, b := range all {
+				if a != b && less(a, b) == less(b, a) {
+					t.Errorf("strip %v: %s and %s tie or loop", strip, a.co.UUID, b.co.UUID)
+				}
+				for _, c := range all {
+					if less(a, b) && less(b, c) && !less(a, c) {
+						t.Errorf("strip %v: %s < %s < %s but not %s < %s", strip, a.co.UUID, b.co.UUID, c.co.UUID, a.co.UUID, c.co.UUID)
+					}
+				}
+			}
+		}
+	}
+}
