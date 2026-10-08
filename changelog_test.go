@@ -494,3 +494,39 @@ func TestIsChangelogImage(t *testing.T) {
 		t.Fatal("text attachment was classified as an image")
 	}
 }
+
+// The bot answers no store link in the channel the changelog page publishes,
+// named by the config or, without one, by the channel's name.
+func TestInChangelogChannel(t *testing.T) {
+	oldID := Config().Discord.ChangelogChannelID
+	t.Cleanup(func() { Config().Discord.ChangelogChannelID = oldID })
+
+	state := discordgo.NewState()
+	guild := &discordgo.Guild{ID: "guild"}
+	err := state.GuildAdd(guild)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, channel := range []*discordgo.Channel{
+		{ID: "news", GuildID: "guild", Name: defaultChangelogChannelName},
+		{ID: "chat", GuildID: "guild", Name: "general"},
+	} {
+		err = state.ChannelAdd(channel)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := &discordgo.Session{State: state}
+
+	Config().Discord.ChangelogChannelID = ""
+	if !inChangelogChannel(session, "news") || inChangelogChannel(session, "chat") || inChangelogChannel(session, "unknown") {
+		t.Error("by name: only the changelog channel should match")
+	}
+	if inChangelogChannel(nil, "news") {
+		t.Error("by name with no session: nothing to read the name from, so no match")
+	}
+	Config().Discord.ChangelogChannelID = "chat"
+	if !inChangelogChannel(session, "chat") || inChangelogChannel(session, "news") {
+		t.Error("by id: the configured channel wins over the name")
+	}
+}

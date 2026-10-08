@@ -483,6 +483,42 @@ func TestBanSearchLinkFindsItsPrinting(t *testing.T) {
 	}
 }
 
+// Nothing posted in the changelog channel gets a reply, which the changelog
+// page would otherwise publish beside the announcement: not a store link,
+// not a bot command. The same messages anywhere else do.
+func TestBotAnswersNothingInTheChangelogChannel(t *testing.T) {
+	s := lastSoldSite(t, nil)
+	oldGuild, oldChannel := Config().Discord.GuildID, Config().Discord.ChangelogChannelID
+	t.Cleanup(func() { Config().Discord.GuildID, Config().Discord.ChangelogChannelID = oldGuild, oldChannel })
+	Config().Discord.GuildID = "guild"
+	Config().Discord.ChangelogChannelID = "news"
+
+	for _, content := range []string{
+		"https://www.cardkingdom.com/mtg/fixture-edition-alpha/fixture-card-alpha",
+		"!Fixture Card Alpha",
+	} {
+		discord := &fakeDiscord{}
+		session := fakeSession(t, discord)
+		post := func(channel string) {
+			s.messageCreate(session, &discordgo.MessageCreate{Message: &discordgo.Message{
+				Content:   content,
+				Author:    &discordgo.User{},
+				ChannelID: channel,
+				GuildID:   "guild",
+			}})
+		}
+		post("chat")
+		answered := len(discord.sent)
+		if answered == 0 {
+			t.Fatalf("%q in chat got no reply", content)
+		}
+		post("news")
+		if len(discord.sent) != answered {
+			t.Errorf("%q in the changelog channel was answered: %v", content, describe(discord.sent[answered:]))
+		}
+	}
+}
+
 // A trigger is matched against the link's host in any case it is written.
 func TestOnStoreReadsTheTriggerDomainInAnyCase(t *testing.T) {
 	u, err := url.Parse("https://www.tcgplayer.com/product/1435/magic-product")
