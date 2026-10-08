@@ -106,8 +106,11 @@ func (s *SMTP) Send(ctx context.Context, m Message) (string, error) {
 			return "", fmt.Errorf("mailer: auth: %w", err)
 		}
 	}
-	if err := c.Mail(from.Address); err != nil {
-		return "", fmt.Errorf("mailer: mail from: %w", smtpError(err))
+	// A refused sender is this site's problem, never the recipient's: it stays
+	// transient however permanent the server's code.
+	err = c.Mail(from.Address)
+	if err != nil {
+		return "", fmt.Errorf("mailer: mail from: %w", err)
 	}
 	if err := c.Rcpt(rcpt.Address); err != nil {
 		return "", fmt.Errorf("mailer: rcpt: %w", smtpError(err))

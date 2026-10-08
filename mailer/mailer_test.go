@@ -114,8 +114,8 @@ func testCert(t *testing.T) (tls.Certificate, *x509.CertPool) {
 
 // serveOneSMTP speaks just enough SMTP on conn, for Send to complete, and
 // sends the DATA body on msgs; starttls offers and honors STARTTLS, and
-// quitReply answers QUIT.
-func serveOneSMTP(t *testing.T, conn net.Conn, cert tls.Certificate, starttls bool, quitReply string, msgs chan<- string) {
+// replies answers QUIT, and MAIL FROM where it names one in place of 250.
+func serveOneSMTP(t *testing.T, conn net.Conn, cert tls.Certificate, starttls bool, replies map[string]string, msgs chan<- string) {
 	t.Helper()
 	tp := textproto.NewConn(conn)
 	defer tp.Close()
@@ -145,7 +145,11 @@ func serveOneSMTP(t *testing.T, conn net.Conn, cert tls.Certificate, starttls bo
 		case strings.HasPrefix(upper, "AUTH"):
 			_ = tp.PrintfLine("235 authenticated")
 		case strings.HasPrefix(upper, "MAIL FROM"):
-			_ = tp.PrintfLine("250 OK")
+			reply := replies["MAIL FROM"]
+			if reply == "" {
+				reply = "250 OK"
+			}
+			_ = tp.PrintfLine("%s", reply)
 		case strings.HasPrefix(upper, "RCPT TO"):
 			_ = tp.PrintfLine("250 OK")
 		case upper == "DATA":
@@ -165,7 +169,7 @@ func serveOneSMTP(t *testing.T, conn net.Conn, cert tls.Certificate, starttls bo
 			msgs <- body.String()
 			_ = tp.PrintfLine("250 queued")
 		case upper == "QUIT":
-			_ = tp.PrintfLine("%s", quitReply)
+			_ = tp.PrintfLine("%s", replies["QUIT"])
 			return
 		default:
 			_ = tp.PrintfLine("500 unrecognized")
@@ -200,7 +204,7 @@ func TestSendImplicitTLS(t *testing.T) {
 			return
 		}
 		defer conn.Close()
-		serveOneSMTP(t, conn, cert, false, "221 bye", msgs)
+		serveOneSMTP(t, conn, cert, false, map[string]string{"QUIT": "221 bye"}, msgs)
 	}()
 	host, port := hostPort(t, ln.Addr())
 	s := &SMTP{Host: host, Port: port, ImplicitTLS: true, RootCAs: pool, User: "u", Pass: "p", From: "MTGBAN <no-reply@mtgban.com>"}
@@ -241,7 +245,7 @@ func TestSendSTARTTLS(t *testing.T) {
 			return
 		}
 		defer conn.Close()
-		serveOneSMTP(t, conn, cert, true, "221 bye", msgs)
+		serveOneSMTP(t, conn, cert, true, map[string]string{"QUIT": "221 bye"}, msgs)
 	}()
 	host, port := hostPort(t, ln.Addr())
 	s := &SMTP{Host: host, Port: port, RootCAs: pool, User: "u", Pass: "p", From: "MTGBAN <no-reply@mtgban.com>"}
@@ -282,7 +286,7 @@ func TestSendSucceedsWhenQuitFailsAfterData(t *testing.T) {
 			return
 		}
 		defer conn.Close()
-		serveOneSMTP(t, conn, cert, false, "421 closing", msgs)
+		serveOneSMTP(t, conn, cert, false, map[string]string{"QUIT": "421 closing"}, msgs)
 	}()
 	host, port := hostPort(t, ln.Addr())
 	s := &SMTP{Host: host, Port: port, ImplicitTLS: true, RootCAs: pool, From: "MTGBAN <no-reply@mtgban.com>"}
@@ -389,5 +393,32 @@ func TestPermanentSendError(t *testing.T) {
 	}
 	if got := perm.Error(); !strings.Contains(got, "550") || !strings.Contains(got, "no such user") {
 		t.Errorf("message %q", got)
+	}
+}
+
+// A server refusing our sender says nothing about the recipient: the error
+// stays transient, so a caller does not park the address for it.
+func TestSendKeepsASenderRefusalTransient(t *testing.T) {
+	cert, pool := testCert(t)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		serveOneSMTP(t, conn, cert, true, map[string]string{"QUIT": "221 bye", "MAIL FROM": "530 authentication required"}, make(chan string, 1))
+	}()
+	host, port := hostPort(t, ln.Addr())
+	s := &SMTP{Host: host, Port: port, RootCAs: pool, From: "MTGBAN <no-reply@mtgban.com>"}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = s.Send(ctx, Message{To: "ann@example.com", Subject: "s", Text: "t"})
+	if err == nil || PermanentSendError(err) {
+		t.Fatalf("err %v, permanent %v; want a transient error", err, PermanentSendError(err))
 	}
 }
