@@ -101,15 +101,17 @@ func (r *Resend) post(ctx context.Context, body []byte) (string, error) {
 	return "", &SendError{Status: resp.StatusCode, Permanent: permanentStatus(resp.StatusCode, e.Message), Msg: e.Message}
 }
 
-// permanentStatus keeps the site's own config errors (auth, domain, from) transient.
+// permanentStatus is true for the refusals about the message itself: a 400,
+// or a 422 naming the recipient. The rest (auth, domain, from, a wrong
+// endpoint, rate limits) are the site's own to fix, and stay transient.
 func permanentStatus(status int, msg string) bool {
-	switch {
-	case status == 401 || status == 403 || status == 429:
-		return false
-	case status == 422:
+	switch status {
+	case 400:
+		return true
+	case 422:
 		return namesRecipient(msg)
 	}
-	return status >= 400 && status < 500
+	return false
 }
 
 // namesRecipient reports whether a validation message is about the to field.
