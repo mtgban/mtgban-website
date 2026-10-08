@@ -432,8 +432,9 @@
                             {{$firstName = $card.Name}}
                         {{end}}
 
+                            {{with index $.GroupHeaders $cardId}}<div class="result-group-header">{{.}}</div>{{end}}
                             <div class="result-header-cover"></div>
-                            <div class="result-header{{if eq $i 0}} result-first{{end}}"
+                            <div class="result-header{{if or (eq $i 0) (index $.GroupHeaders $cardId)}} result-first{{end}}"
                                  data-card-id="{{$cardId}}"
                                  data-chart-id="{{$card.ChartID}}"
                                  data-card-name="{{$card.Name}}"
@@ -535,7 +536,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                            <div class="result-body{{if or (eq $i (dec (len $.AllKeys) 1)) (index $.GroupEnds $cardId)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>

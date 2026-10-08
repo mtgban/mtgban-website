@@ -255,6 +255,7 @@
     {{/* Results */}}
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
+        {{with index $.GroupHeaders $cardId}}<div class="m-group-header">{{.}}</div>{{end}}
         <div class="m-card{{if $card.Sealed}} m-sealed{{end}}{{if and $expanded $defaultBuyers}} m-buyers-first{{end}}"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
             {{/* Card header - tap to show image drawer */}}
             <div class="m-card-header"

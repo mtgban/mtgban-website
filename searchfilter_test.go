@@ -281,6 +281,22 @@ func TestSetNumberShorthand(t *testing.T) {
 		}
 	})
 
+	// These take sealed products in without setting a mode, so the
+	// shorthand still reads what follows them.
+	t.Run("product filters keep the shorthand", func(t *testing.T) {
+		for _, opt := range []string{"contents", "variable", "container"} {
+			config := parseSearchOptionsNG(backend(), opt+`:"No Such Product" neo 234`, nil, nil, nil)
+			if !config.IncludeSealed {
+				t.Errorf("%s: IncludeSealed not set", opt)
+			}
+			checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+			checkValues(t, findFilter(config, "number"), "number", "234")
+			if config.CleanQuery != "" {
+				t.Errorf("%s: CleanQuery = %q, want empty", opt, config.CleanQuery)
+			}
+		}
+	})
+
 	// A number saying more than the plain one behind it is asked for as
 	// written. cn: reads a number down to that plain one and answers with
 	// every printing filed under it, which is the right reading for whoever

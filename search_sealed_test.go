@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// sealedSearch runs a query the way the sealed tab does, fallback and all.
+// sealedSearch runs a query the way the API's sealed paths do, fallback and all.
 func sealedSearch(t *testing.T, query string) []string {
 	t.Helper()
 	config := parseSearchOptionsNG(backend(), query, nil, nil, nil)

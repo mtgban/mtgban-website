@@ -490,6 +490,13 @@ type SearchVars struct {
 	EditionSort []string
 	EditionList map[string][]EditionEntry
 	IsSealed    bool
+
+	// GroupHeaders names the row each group of results starts at, "Singles
+	// (N)" or "Sealed products (N)", when the result holds both.
+	GroupHeaders map[string]string
+	// GroupEnds marks the row a group ends at before the next one starts.
+	GroupEnds map[string]bool
+
 	TotalSets   int
 	TotalCards  int
 	TotalUnique int
@@ -507,6 +514,20 @@ type SearchVars struct {
 	// chart left out, a caution about the figures. Each is a sentence of its
 	// own, and none replaces another.
 	Notices []string
+}
+
+// routeSealed reports whether the request came in on the sealed route,
+// which decides what leads the page, not what the search finds.
+func routeSealed(path string) bool {
+	return path == "/sealed"
+}
+
+// applyRouteSearch widens a page search to sealed products and records
+// which group the route leads with. The page handlers alone call it; the
+// API and the Discord bot keep asking for cards or products on their own.
+func applyRouteSearch(config *SearchConfig, path string) {
+	config.IncludeSealed = true
+	config.SealedFirst = routeSealed(path)
 }
 
 func (s *site) Search(w http.ResponseWriter, r *http.Request) {
@@ -531,7 +552,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// like it is doing the work.
 	pageVars.ScopeIgnored = scope != "" && len(pinned) == 0
 
-	pageVars.IsSealed = r.URL.Path == "/sealed"
+	pageVars.IsSealed = routeSealed(r.URL.Path)
 	isSetsPage := r.URL.Path == "/sets"
 
 	// A pinned filter names a set of cards the same way a query does, so a
@@ -613,9 +634,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
-	if pageVars.IsSealed {
-		config.SearchMode = "sealed"
-	}
+	applyRouteSearch(&config, r.URL.Path)
 
 	// Only a reader whose signature was checked gets the custom buylist
 	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
@@ -639,16 +658,17 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Allow displaying the "search all" link only when something
 	// was searched and no options were specified for it
-	pageVars.CanShowAll = !pageVars.IsSealed && config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
+	pageVars.CanShowAll = config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
 
-	if pageVars.IsMobile && !pageVars.IsSealed {
+	if pageVars.IsMobile {
 		pageVars.EditionFilterList = editionsForSearch(ds, result.keys)
 	}
 
 	// Sort sets as requested, default to chronological
-	shown := orderSearchKeys(r, ds, result, pageVars.SearchSort)
+	shown := orderSearchKeys(r, ds, result, pageVars.SearchSort, pageVars.IsSealed)
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
+	pageVars.GroupHeaders, pageVars.GroupEnds = groupHeaders(shown.isSealed, shown.keys, shown.singles, shown.sealed)
 
 	pageVars.Metadata, pageVars.Printings = searchMetadata(b, shown.keys, preferFlavor)
 
@@ -764,16 +784,14 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(page.FormValue("scope"))))
-	if page.URL.Path == "/sealed" {
-		config.SearchMode = "sealed"
-	}
+	applyRouteSearch(&config, page.URL.Path)
 
 	result := runSearch(page, ds, config)
 	if len(result.keys) == 0 {
 		oembedError(w, http.StatusNotFound)
 		return
 	}
-	keys := orderSearchKeys(page, ds, result, readSearchSort(page, config)).keys
+	keys := orderSearchKeys(page, ds, result, readSearchSort(page, config), routeSealed(page.URL.Path)).keys
 	sortOfferRows(page, keys, result)
 
 	payload, err := json.Marshal(searchPreview(page, b, keys, result))
@@ -1017,8 +1035,10 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 		}
 	}
 
-	// Limit results to avoid hogging the website with large queries
+	// Limit results to avoid hogging the website with large queries. The
+	// route's lead group goes first so the cut never takes it whole.
 	if len(allKeys) > MaxSearchTotalResults {
+		groupSealed(b, allKeys, config.SealedFirst)
 		result.total = len(allKeys)
 		result.message = TooManyMessage
 		allKeys = allKeys[:MaxSearchTotalResults]
@@ -1096,19 +1116,25 @@ func fillSearchResults(pageVars *SearchVars, b *mtgmatcher.Backend, query string
 }
 
 // searchPage is the page of results to show: its cards in the order asked
-// for, whether that order is reversed, and where the page sits among the rest.
+// for, whether that order is reversed, how many rows each group holds and
+// which rows are products, and where the page sits among the rest.
 type searchPage struct {
 	keys       []string
 	reversed   bool
+	singles    int
+	sealed     int
+	isSealed   map[string]bool
 	pagination Pagination
 }
 
-// orderSearchKeys sorts the results as the reader asked and returns the page
-// of them to show. The sort works in place: CardHashes is the same slice, and
-// the Uploader transfer posts it in this order.
-func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortMode string) searchPage {
+// orderSearchKeys sorts the results as the reader asked, groups cards and
+// products with the asked-for group first, and returns the page of them to
+// show. The sort works in place: CardHashes is the same slice, and the
+// Uploader transfer posts it in this order.
+func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortMode string, sealedFirst bool) searchPage {
 	var shown searchPage
 	shown.reversed = sortSearchKeys(r, ds, result.keys, result.odds, sortMode)
+	shown.singles, shown.sealed, shown.isSealed = groupSealed(ds.backend, result.keys, sealedFirst)
 
 	// If results can't fit in one page, chunk response and enable pagination
 	shown.keys = result.keys
@@ -1118,6 +1144,62 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 	}
 
 	return shown
+}
+
+// sealedKeys marks the keys that are sealed products, looked up once so
+// the grouping and the headers read the same answer.
+func sealedKeys(b *mtgmatcher.Backend, keys []string) map[string]bool {
+	isSealed := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		if co, err := b.GetUUID(key); err == nil && co.Sealed {
+			isSealed[key] = true
+		}
+	}
+	return isSealed
+}
+
+// groupSealed partitions keys in place on each row's own sealed flag, the
+// asked-for group first and the order inside each group kept, counts the
+// two groups and returns the flags it read.
+func groupSealed(b *mtgmatcher.Backend, keys []string, sealedFirst bool) (singles, sealed int, isSealed map[string]bool) {
+	isSealed = sealedKeys(b, keys)
+	for _, key := range keys {
+		if isSealed[key] {
+			sealed++
+		} else {
+			singles++
+		}
+	}
+	sort.SliceStable(keys, func(i, j int) bool {
+		si, sj := isSealed[keys[i]], isSealed[keys[j]]
+		return si != sj && si == sealedFirst
+	})
+	return singles, sealed, isSealed
+}
+
+// groupHeaders names the row each group starts at on this page, its first
+// row included, with the group's whole count, and the row each ends at
+// before another starts. One group alone draws neither.
+func groupHeaders(isSealed map[string]bool, page []string, singles, sealed int) (headers map[string]string, ends map[string]bool) {
+	headers, ends = map[string]string{}, map[string]bool{}
+	if singles == 0 || sealed == 0 {
+		return headers, ends
+	}
+	for i, key := range page {
+		cur := isSealed[key]
+		if i > 0 && cur == isSealed[page[i-1]] {
+			continue
+		}
+		if i > 0 {
+			ends[page[i-1]] = true
+		}
+		if cur {
+			headers[key] = fmt.Sprintf("Sealed products (%d)", sealed)
+		} else {
+			headers[key] = fmt.Sprintf("Singles (%d)", singles)
+		}
+	}
+	return headers, ends
 }
 
 // sortSearchKeys orders keys in place as the reader asked, odds being what a
@@ -2238,14 +2320,13 @@ func storeSeedUUIDs(b *mtgmatcher.Backend, config SearchConfig) ([]string, bool)
 		return nil, false
 	}
 
-	// Callers only reach this for card-scoped modes (see searchAndFilter),
-	// so a sealed listing - most stores carry only one or the other, but
-	// nothing here can assume that of an arbitrary shorthand - is dropped
-	// rather than handed to a mode that otherwise never returns one.
+	// A sealed listing is dropped for a card-scoped search - most stores
+	// carry only one or the other, but nothing here can assume that of an
+	// arbitrary shorthand - and kept when the search takes products too.
 	var uuids []string
 	addCard := func(cardID string) {
 		co, err := b.GetUUID(cardID)
-		if err != nil || co.Sealed {
+		if err != nil || (co.Sealed && !config.IncludeSealed) {
 			return
 		}
 		uuids = append(uuids, cardID)
@@ -2279,127 +2360,168 @@ func storeSeedUUIDs(b *mtgmatcher.Backend, config SearchConfig) ([]string, bool)
 	return dedupeKeys(uuids), true
 }
 
-func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
+// modeTakesSealed reports whether a card search in mode is one the sealed
+// ladder can sit beside. Products only, a uuid list and a query handed to
+// scryfall whole each name their own results.
+func modeTakesSealed(mode string) bool {
+	switch mode {
+	case "sealed", "hashing", "scryfall":
+		return false
+	}
+	return true
+}
+
+// searchSealedUUIDs is the sealed ladder: the products named exactly, else
+// the products whose name contains the query. exact stops at the first.
+func searchSealedUUIDs(b *mtgmatcher.Backend, query string, exact bool) ([]string, error) {
+	uuids, err := b.SearchSealedEquals(query)
+	if err != nil && !exact {
+		uuids, err = b.SearchSealedContains(query)
+	}
+	return uuids, err
+}
+
+// seedUUIDs answers a query with no text from the filters alone: an edition
+// names its set buckets, a number or a store its own exact result set. It
+// reports false when nothing seeded and the mode switch takes the whole pool.
+//
+// A seed that finds nothing has still answered. Reading that as "did not
+// seed" sent the search back to the whole pool to rediscover the same
+// emptiness.
+func seedUUIDs(ds *datastore, config SearchConfig) ([]string, bool) {
+	if config.CleanQuery != "" {
+		return nil, false
+	}
+	filters := config.CardFilters
+
+	if codes, ok := editionSeedCodes(filters); ok {
+		var uuids []string
+		seeded := false
+		for _, code := range codes {
+			switch config.SearchMode {
+			case "", "prefix", "any":
+				uuids = append(uuids, ds.backend.GetUUIDsInSet(code)...)
+				if config.IncludeSealed {
+					uuids = append(uuids, ds.backend.GetSealedUUIDsInSet(code)...)
+				}
+				seeded = true
+			case "sealed":
+				uuids = append(uuids, ds.backend.GetSealedUUIDsInSet(code)...)
+				seeded = true
+			}
+		}
+		if seeded {
+			return uuids, true
+		}
+	}
+
+	// A number bounds the set the same way an edition does, and the
+	// numbers snapshot holds cards alone, so the sealed modes keep to
+	// the set index above.
+	switch config.SearchMode {
+	case "", "prefix", "any":
+		if uuids, ok := numberSeedUUIDs(ds.numbers, filters); ok {
+			return uuids, true
+		}
+	}
+
+	// A plain store:/seller:/vendor: query names its own exact result
+	// set the same way, kept to the card modes: a store's inventory can
+	// hold sealed products and cards both, and only these modes mean
+	// "cards, not sealed product listings" on their own.
+	switch config.SearchMode {
+	case "", "prefix", "any":
+		if uuids, ok := storeSeedUUIDs(ds.backend, config); ok {
+			return uuids, true
+		}
+	}
+
+	return nil, false
+}
+
+// searchCardUUIDs runs the card ladder for config.SearchMode: the
+// candidates the query reaches before the filters, or an error when it
+// reaches none. The "sealed" mode runs the sealed ladder instead.
+func searchCardUUIDs(ds *datastore, config SearchConfig) ([]string, error) {
+	b := ds.backend
 	query := config.CleanQuery
 	filters := config.CardFilters
 
 	var uuids []string
-	var seeded bool
 	var err error
-
-	// With no text to search, the mode switch below degrades to seeding
-	// from the whole uuid pool. A positive edition filter names its exact
-	// result set, so seed from the set index instead: s:EXP,INV becomes
-	// the union of two set buckets. Only the modes whose empty-query
-	// fallback is the full pool are eligible, and the seeded uuids flow
-	// into the same filtering loop as every other search.
-	//
-	// A seed that finds nothing has still answered. Reading that as "did
-	// not seed" sent the search back to the whole pool to rediscover the
-	// same emptiness.
-	if query == "" {
-		if codes, ok := editionSeedCodes(filters); ok {
-			for _, code := range codes {
-				switch config.SearchMode {
-				case "", "prefix", "any":
-					uuids = append(uuids, ds.backend.GetUUIDsInSet(code)...)
-					seeded = true
-				case "sealed":
-					uuids = append(uuids, ds.backend.GetSealedUUIDsInSet(code)...)
-					seeded = true
-				}
+	switch config.SearchMode {
+	case "exact":
+		uuids, err = b.SearchEquals(query)
+	case "any":
+		uuids, err = b.SearchContains(query)
+	case "prefix":
+		uuids, err = b.SearchHasPrefix(query)
+	case "hashing":
+		uuids = config.UUIDs
+	case "regexp":
+		uuids, err = b.SearchRegexp(query)
+	case "sealed":
+		// attemptMatch reads the query as a card name, which is no answer
+		// here: what is asked is which product carries the name, and none
+		// is a better answer than a card nobody asked for.
+		return searchSealedUUIDs(b, query, false)
+	case "scryfall":
+		uuids, err = searchScryfall(b, query)
+	default:
+		uuids, err = b.SearchEquals(query)
+		// An exact name match can be a red herring: "serra" names a
+		// Vanguard card, so "s:leb serra" would stop at it and then
+		// filter it out, finding nothing. When the filters reject every
+		// exact match, widen to the prefix pool - exactly what the
+		// query would have used had the exact name not existed.
+		if err == nil && len(filters) != 0 {
+			if len(filterUUIDs(b, uuids, filters)) != 0 {
+				return uuids, nil
+			}
+			if moreUUIDs, moreErr := b.SearchHasPrefix(query); moreErr == nil {
+				uuids = moreUUIDs
 			}
 		}
-		// A number bounds the set the same way an edition does, and the
-		// numbers snapshot holds cards alone, so the sealed modes keep to
-		// the set index above.
-		if !seeded {
-			switch config.SearchMode {
-			case "", "prefix", "any":
-				uuids, seeded = numberSeedUUIDs(ds.numbers, filters)
-			}
-		}
-		// A plain store:/seller:/vendor: query names its own exact result
-		// set the same way. Kept to the same modes as the number seed above:
-		// a store's inventory can hold sealed products and cards both (a
-		// store dealing in both normally registers as two scrapers, one per
-		// SealedMode, but nothing here can assume that of an arbitrary
-		// shorthand), and only these modes already mean "cards, not sealed
-		// product listings" on their own - seeding them here keeps that
-		// scoping rather than handing the sealed page a card row or a
-		// regular search a sealed one.
-		if !seeded {
-			switch config.SearchMode {
-			case "", "prefix", "any":
-				uuids, seeded = storeSeedUUIDs(ds.backend, config)
+		if err != nil {
+			uuids, err = b.SearchHasPrefix(query)
+			if err != nil {
+				uuids, err = b.SearchRegexp(query)
 			}
 		}
 	}
+	if err != nil {
+		uuids, err = attemptMatch(b, query)
+	}
+	return uuids, err
+}
 
+// searchAndFilter finds a search's uuids and keeps those its card filters
+// accept. With IncludeSealed the products join the cards, the fallback
+// filling the card side when it alone fails; neither side found is an error.
+func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
+	uuids, seeded := seedUUIDs(ds, config)
 	if !seeded {
-		switch config.SearchMode {
-		case "exact":
-			uuids, err = ds.backend.SearchEquals(query)
-		case "any":
-			uuids, err = ds.backend.SearchContains(query)
-		case "prefix":
-			uuids, err = ds.backend.SearchHasPrefix(query)
-		case "hashing":
-			uuids = config.UUIDs
-		case "regexp":
-			uuids, err = ds.backend.SearchRegexp(query)
-		case "sealed":
-			uuids, err = ds.backend.SearchSealedEquals(query)
-			if err != nil {
-				uuids, err = ds.backend.SearchSealedContains(query)
-			}
-		case "scryfall":
-			uuids, err = searchScryfall(ds.backend, query)
-		case "mixed":
-			uuids, err = ds.backend.SearchSealedEquals(query)
-			if err != nil {
-				uuids, err = ds.backend.SearchSealedContains(query)
-			}
-			moreUUIDs, _ := ds.backend.SearchEquals(query)
-			uuids = append(uuids, moreUUIDs...)
-		default:
-			uuids, err = ds.backend.SearchEquals(query)
-			// An exact name match can be a red herring: "serra" names a
-			// Vanguard card, so "s:leb serra" would stop at it and then
-			// filter it out, finding nothing. When the filters reject every
-			// exact match, widen to the prefix pool - exactly what the
-			// query would have used had the exact name not existed. The
-			// surviving exact matches return directly so the filters run
-			// once either way.
-			if err == nil && len(filters) != 0 {
-				selected := filterUUIDs(ds.backend, uuids, filters)
-				if len(selected) != 0 {
-					return selected, nil
-				}
-				moreUUIDs, moreErr := ds.backend.SearchHasPrefix(query)
-				if moreErr == nil {
-					uuids = moreUUIDs
-				}
-			}
-			if err != nil {
-				uuids, err = ds.backend.SearchHasPrefix(query)
+		var err error
+		uuids, err = searchCardUUIDs(ds, config)
+		if config.IncludeSealed && modeTakesSealed(config.SearchMode) {
+			products, perr := searchSealedUUIDs(ds.backend, config.CleanQuery, config.SearchMode == "exact")
+			if perr == nil {
+				// The name reached products but no card: read it the other
+				// ways first, as a set or a treatment, so "kaldheim" still
+				// answers with the set's cards beside its boxes.
 				if err != nil {
-					uuids, err = ds.backend.SearchRegexp(query)
+					uuids = searchFallback(ds, config)
 				}
+				uuids = dedupeKeys(append(uuids, products...))
+				err = nil
 			}
-		}
-		// attemptMatch reads the query as a card name, which is no answer on
-		// the sealed tab: what is asked there is which product carries the
-		// name, and none is a better answer than a card nobody asked for.
-		if err != nil && config.SearchMode != "sealed" {
-			uuids, err = attemptMatch(ds.backend, query)
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return filterUUIDs(ds.backend, uuids, filters), nil
+	return filterUUIDs(ds.backend, uuids, config.CardFilters), nil
 }
 
 // filterUUIDs returns the uuids that pass every card filter.
