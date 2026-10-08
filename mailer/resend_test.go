@@ -80,6 +80,8 @@ func TestResendKeepsConfigErrorsTransient(t *testing.T) {
 		{403, `{"message":"The mtgban.com domain is not verified."}`, false},
 		{422, `{"message":"Invalid ` + "`from`" + ` field. The email address needs to follow the format."}`, false},
 		{400, `{"message":"bad request"}`, true},
+		{404, `{"message":"Not Found"}`, false},
+		{405, `{"message":"Method Not Allowed"}`, false},
 	}
 	for _, c := range cases {
 		var calls []map[string]any
