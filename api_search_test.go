@@ -180,9 +180,11 @@ func TestSearchAPIv2(t *testing.T) {
 		t.Errorf("a key without sealed read %d sealed products", len(noSealed.Retail)+len(noSealed.Buylist))
 	}
 
-	unknown := get("ALL_ACCESS", "/api/v2/search/retail/"+url.PathEscape(name)+".json?id=tcgplayer")
-	if !strings.Contains(unknown.Error, `unknown id "tcgplayer"`) || unknown.Retail != nil {
-		t.Errorf("id=tcgplayer: error %q, %d cards", unknown.Error, len(unknown.Retail))
+	for _, id := range []string{"tcgplayer", "mtgban"} {
+		unknown := get("ALL_ACCESS", "/api/v2/search/retail/"+url.PathEscape(name)+".json?id="+id)
+		if !strings.Contains(unknown.Error, `unknown id "`+id+`"`) || unknown.Retail != nil {
+			t.Errorf("id=%s: error %q, %d cards", id, unknown.Error, len(unknown.Retail))
+		}
 	}
 }
 

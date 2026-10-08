@@ -23,7 +23,16 @@ func TestOpenAPIListsEveryIDMode(t *testing.T) {
 		}
 		listed := strings.Split(strings.ReplaceAll(string(m[1]), " ", ""), ",")
 		slices.Sort(listed)
-		want := slices.Sorted(slices.Values(v2IDModes))
+		want := slices.Clone(v2IDModes)
+		if path == "openapi/v1.yaml" {
+			// v1 spells MTGBAN ids mtgban
+			i := slices.Index(want, "ban")
+			if i < 0 {
+				t.Fatalf("v2IDModes has no ban: %v", v2IDModes)
+			}
+			want[i] = "mtgban"
+		}
+		slices.Sort(want)
 		if !slices.Equal(listed, want) {
 			t.Errorf("%s lists %v, the API takes %v", path, listed, want)
 		}

@@ -27,10 +27,10 @@ func v2Finish(co *mtgmatcher.CardObject) string {
 	return co.Finish
 }
 
-// v2IDModes are the id systems v2 keys cards by. v1 reads any other value
-// as the default, mtgban; v2 refuses it, so a misspelt one is not mistaken
-// for a request for MTGBAN ids.
-var v2IDModes = []string{"mtgban", "tcg", "scryfall", "mtgjson", "mkm", "ck", "name"}
+// v2IDModes are the id systems v2 keys cards by, MTGBAN ids spelt ban. v1
+// reads any other value as the default, MTGBAN ids; v2 refuses it, so a
+// misspelt one is not mistaken for a request for them.
+var v2IDModes = []string{"ban", "tcg", "scryfall", "mtgjson", "mkm", "ck", "name"}
 
 // v2CardmarketShelves are the Cardmarket shelves v2 reads a card's product
 // off, in the order they answer. Low and Trend name the same product for a

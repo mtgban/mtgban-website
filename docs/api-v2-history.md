@@ -15,7 +15,7 @@ the end.
   the printing comes back in one response.
 - `range=<days>` asks for the most recent days, up to the plan's lookback
   (below). Without it, the whole lookback.
-- `id=` takes the v2 id modes (`mtgban`, `tcg`, `scryfall`, `mtgjson`,
+- `id=` takes the v2 id modes (`ban`, `tcg`, `scryfall`, `mtgjson`,
   `mkm`, `ck`, `name`) and refuses any other, as the v2 price API does. It
   defaults to `scryfall` for singles and `mtgjson` for sealed, as v2 search
   does, so a printing's finishes sit under one id.

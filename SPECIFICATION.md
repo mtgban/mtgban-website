@@ -664,13 +664,14 @@ a vendor's credit multiplier, and when its prices were collected.
 a label and a count, commonest first; `filter=singles|sealed` narrows both.
 v2's JSON takes no `tag`: its prices are keyed by store shorthand, which
 `stores.json` maps to each store's display name. Its `.csv` prices are
-v1's CSV and still honor `tag=names`. An `id` outside `mtgban`, `tcg`,
-`scryfall`, `mtgjson`, `mkm`, `ck` and `name` is refused with an error,
-where v1 falls back to `mtgban`. With `id=mkm`, a card is keyed by the
-product the Cardmarket shelves price it under, read off its first entry
-(MKMLow, then MKMTrend, for singles, and MKMSealed for sealed product),
-and by the datastore's `mcmId` only where they do not price it: the
-datastore names a Cardmarket id for few non-Magic cards. A printing's
+v1's CSV and still honor `tag=names`. v2 spells MTGBAN ids `ban`, where
+v1 spells them `mtgban`. An `id` outside `ban`, `tcg`, `scryfall`,
+`mtgjson`, `mkm`, `ck` and `name` is refused with an error, `mtgban`
+included, where v1 falls back to MTGBAN ids. With `id=mkm`, a card is
+keyed by the product the Cardmarket shelves price it under, read off its
+first entry (MKMLow, then MKMTrend, for singles, and MKMSealed for sealed
+product), and by the datastore's `mcmId` only where they do not price it:
+the datastore names a Cardmarket id for few non-Magic cards. A printing's
 finishes can then sit under two ids, where the shelves price one finish
 under a product the datastore's `mcmId` does not name and do not price
 the other. A response takes the shelves once, so its cards all come from

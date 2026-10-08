@@ -234,11 +234,20 @@ func TestPriceAPIv2Route(t *testing.T) {
 		}
 	}
 
-	// An id system v2 does not know is refused, where v1 falls back to mtgban
-	var unknown PriceAPIOutputV2
-	get(s.PriceAPIv2, "/api/v2/retail.json?id=tcgplayer", &unknown)
-	if !strings.Contains(unknown.Error, `unknown id "tcgplayer"`) || unknown.Retail != nil {
-		t.Errorf("v2 id=tcgplayer: error %q, %d cards", unknown.Error, len(unknown.Retail))
+	// An id system v2 does not know is refused, v1's spelling of MTGBAN ids
+	// included, where v1 falls back to MTGBAN ids
+	for _, id := range []string{"tcgplayer", "mtgban"} {
+		var unknown PriceAPIOutputV2
+		get(s.PriceAPIv2, "/api/v2/retail.json?id="+id, &unknown)
+		if !strings.Contains(unknown.Error, `unknown id "`+id+`"`) || unknown.Retail != nil {
+			t.Errorf("v2 id=%s: error %q, %d cards", id, unknown.Error, len(unknown.Retail))
+		}
+	}
+	var ban, unset PriceAPIOutputV2
+	get(s.PriceAPIv2, "/api/v2/retail.json?id=ban", &ban)
+	get(s.PriceAPIv2, "/api/v2/retail.json", &unset)
+	if ban.Error != "" || ban.Retail["lor-1"] == nil || wireOf(t, ban.Retail) != wireOf(t, unset.Retail) {
+		t.Errorf("v2 id=ban: error %q, keys %v", ban.Error, slices.Collect(maps.Keys(ban.Retail)))
 	}
 	var fallback PriceAPIOutput
 	get(s.PriceAPI, "/api/mtgban/retail.json?id=tcgplayer", &fallback)
