@@ -10,6 +10,7 @@ function loadOfflineMode(cookie = '', win = {}, globals = {}) {
         cookie,
         readyState: 'complete',
         addEventListener: () => {},
+        dispatchEvent: () => {},
         getElementById: () => null,
     };
     const names = Object.keys(globals);
@@ -90,4 +91,61 @@ test('the page-load sync does not ask before leaving the page', async () => {
 
 test('an image sync asks before leaving the page', async () => {
     expect(await guardedDuring({ images: true })).toBe(true);
+});
+
+// --- Image sync asked for mid-refresh ---
+
+// Sync Images Now pressed while the page-load refresh runs used to be dropped,
+// and the refresh's done then read as the image sync finishing.
+test('an image sync asked for during a price refresh runs after it', async () => {
+    const posted = [];
+    const listeners = new Set();
+    let worker;
+    const anyDB = new Proxy({}, { get: () => () => Promise.resolve([]) });
+    const win = {
+        addEventListener: (type, fn) => { if (type === 'beforeunload') listeners.add(fn); },
+        removeEventListener: (type, fn) => { if (type === 'beforeunload') listeners.delete(fn); },
+    };
+    const OfflineMode = loadOfflineMode('', win, {
+        localStorage: { getItem: (k) => (k === 'offline_mode' ? 'true' : null) },
+        OfflineDB: anyDB,
+        Worker: class { constructor() { worker = this; } postMessage(m) { posted.push(m); } },
+        CustomEvent: class { constructor(type, init) { this.detail = init && init.detail; } },
+    });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    OfflineMode.sync();
+    await settle();
+    OfflineMode.sync({ images: true });
+    await settle();
+    expect(posted.map((m) => m.images)).toEqual([false]);
+
+    worker.onmessage({ data: { type: 'done', images: false } });
+    expect(listeners.size).toBe(1); // still asks before leaving until it starts
+    await settle();
+    expect(posted.map((m) => m.images)).toEqual([false, true]);
+});
+
+// Pause before the queued image sync starts drops it, tells the images panel,
+// and leaves the price refresh it waited on alone.
+test('a pause drops an image sync still queued behind a price refresh', async () => {
+    const posted = [];
+    const events = [];
+    let worker;
+    const anyDB = new Proxy({}, { get: () => () => Promise.resolve([]) });
+    const OfflineMode = loadOfflineMode('', { addEventListener: () => {}, removeEventListener: () => {} }, {
+        localStorage: { getItem: (k) => (k === 'offline_mode' ? 'true' : null) },
+        OfflineDB: anyDB,
+        Worker: class { constructor() { worker = this; } postMessage(m) { posted.push(m); } },
+        CustomEvent: class { constructor(type, init) { this.detail = init && init.detail; events.push(this.detail); } },
+    });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+    OfflineMode.sync();
+    await settle();
+    OfflineMode.sync({ images: true });
+    OfflineMode.cancelSync();
+    expect(events).toContainEqual({ type: 'done', images: true });
+
+    worker.onmessage({ data: { type: 'done', images: false } });
+    await settle();
+    expect(posted.map((m) => m.type + ':' + m.images)).toEqual(['sync:false']);
 });

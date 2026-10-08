@@ -172,6 +172,7 @@
     // --- price sync worker plumbing ---
     var syncWorker = null;
     var syncing = false;
+    var pendingImages = false;
 
     // Warn on navigation while an asked-for sync is running, so it isn't silently dropped.
     function onBeforeUnload(e) {
@@ -241,15 +242,23 @@
             setSyncStatus('Syncing: ' + label);
         } else if (m.type === 'done') {
             setSyncing(false);
+            // A queued image sync keeps the page asking before it is left
+            if (pendingImages) window.addEventListener('beforeunload', onBeforeUnload);
             state.bytes = m.bytes || 0;
             var done = doneStatusText(m, state, true);
             OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
                 updateAuthNotice();
                 setSyncStatus(done);
                 paintUsage();
+            }).catch(function() {}).then(function() {
+                if (pendingImages) {
+                    pendingImages = false;
+                    sync({ images: true });
+                }
             });
         } else if (m.type === 'error') {
             setSyncing(false);
+            pendingImages = false;
             if (m.message === 'forbidden') {
                 setAuthLapsed(true);
                 setSyncStatus('Sync stopped: offline access expired');
@@ -263,8 +272,16 @@
     // enough to refresh on any page load; images are a whole corpus, so they
     // only move when someone asks for them and can watch it happen.
     function sync(opts) {
-        if (syncing || !enabled()) return;
+        if (!enabled()) return;
         var withImages = !!(opts && opts.images);
+        // An image sync asked for during a price refresh runs after it.
+        if (syncing) {
+            if (withImages) {
+                pendingImages = true;
+                setSyncing(true, true);
+            }
+            return;
+        }
         setSyncing(true, withImages);
         setSyncStatus('Syncing: starting');
         Promise.all([
@@ -286,7 +303,15 @@
         });
     }
 
+    // A pause while the image sync still waits on a price refresh drops it,
+    // and leaves the refresh to finish.
     function cancelSync() {
+        if (pendingImages) {
+            pendingImages = false;
+            releaseUnloadGuard();
+            document.dispatchEvent(new CustomEvent('offline:sync-message', { detail: { type: 'done', images: true } }));
+            return;
+        }
         if (syncWorker) syncWorker.postMessage({ type: 'cancel' });
     }
 
