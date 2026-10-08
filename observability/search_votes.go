@@ -71,6 +71,24 @@ LIMIT $5`
 	return out, rows.Err()
 }
 
+// SearchVoteTotals is what one instance's votes add up to since a day:
+// every vote, each user once and each key once.
+type SearchVoteTotals struct {
+	Votes int
+	Users int
+	Keys  int
+}
+
+// SearchVoteTotals totals one instance's votes from the window start on.
+func (c *Client) SearchVoteTotals(ctx context.Context, instance string, since time.Time) (SearchVoteTotals, error) {
+	const q = `SELECT count(*), count(DISTINCT user_hash), count(DISTINCT key)
+FROM search_votes
+WHERE instance = $1 AND day >= $2::date`
+	var t SearchVoteTotals
+	err := c.db.QueryRowContext(ctx, q, instance, sqlDate(since)).Scan(&t.Votes, &t.Users, &t.Keys)
+	return t, err
+}
+
 // PruneSearchVotes deletes one instance's votes from days before the cutoff.
 func (c *Client) PruneSearchVotes(ctx context.Context, instance string, before time.Time) (int64, error) {
 	res, err := c.db.ExecContext(ctx, `DELETE FROM search_votes WHERE instance = $1 AND day < $2::date`, instance, sqlDate(before))
