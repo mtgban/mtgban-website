@@ -319,9 +319,11 @@ func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []Popu
 	return out
 }
 
-// popularRankStore is where the job reads votes; *observability.Client is one.
+// popularRankStore is where the job and the admin Searches tab read votes;
+// *observability.Client is one.
 type popularRankStore interface {
 	TopSearches(ctx context.Context, instance string, since, recentSince time.Time, minUsers, limit int) ([]observability.SearchRank, error)
+	SearchVoteTotals(ctx context.Context, instance string, since time.Time) (observability.SearchVoteTotals, error)
 	PruneSearchVotes(ctx context.Context, instance string, before time.Time) (int64, error)
 }
 

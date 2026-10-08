@@ -77,7 +77,8 @@ var BuildCommit = func() string {
 
 // AdminVars are the PageVars fields only the admin page fills and reads.
 type AdminVars struct {
-	UsageStats *UsageDashboard
+	UsageStats  *UsageDashboard
+	SearchStats *SearchesDashboard
 
 	CheckpointsText    string
 	ACLText            string
@@ -201,6 +202,10 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// window, so leave them alone unless that is the tab being rendered.
 	if ObservabilityDB != nil && page == "usage" {
 		pageVars.UsageStats = loadUsageDashboard(r.Context(), r.FormValue("bots") == "1")
+	}
+	// The Searches tab reads the vote ranking the same way.
+	if s.popularRanks != nil && page == "searches" {
+		pageVars.SearchStats = loadSearchesDashboard(r.Context(), ds, s.popularRanks, searchesWindow(r.FormValue("window")))
 	}
 
 	render(w, "admin.html", pageVars)

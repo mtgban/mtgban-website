@@ -1,0 +1,58 @@
+{{define "admin-searches"}}
+{{if .SearchStats}}
+<div class="admin-usage-bar">
+    <span class="admin-usage-range">{{.SearchStats.Instance}} &middot; last {{.SearchStats.Window}} days, since {{.SearchStats.Since.Format "2006-01-02"}} &middot; {{.SearchStats.Totals.Votes}} votes from {{.SearchStats.Totals.Users}} users over {{.SearchStats.Totals.Keys}} keys</span>
+    <div class="admin-usage-toggle">
+        {{range .SearchStats.Windows}}
+        <a href="?page=searches&amp;window={{.}}"{{if eq . $.SearchStats.Window}} class="active"{{end}}>{{.}} days</a>
+        {{end}}
+    </div>
+</div>
+
+{{if .SearchStats.Failed}}
+<div class="admin-msg">The vote store did not answer; what is below may be missing a part.</div>
+{{end}}
+
+<div class="admin-usage-grid">
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Most searched</h2>
+        <span class="count">{{len .SearchStats.Rows}} of {{.SearchStats.Totals.Keys}} keys{{if .SearchStats.Dropped}}, {{.SearchStats.Dropped}} unresolved{{end}}</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th class="num">#</th><th>Kind</th><th>Name</th><th>As typed</th><th class="num">Users</th><th class="num">Last 7 days</th></tr></thead>
+        <tbody>
+        {{range .SearchStats.Rows}}
+            <tr><td class="num admin-mono">{{.Rank}}</td><td>{{.Kind}}</td><td><a href="{{.URL}}">{{.Label}}</a></td><td class="admin-mono">{{.Query}}</td><td class="num admin-mono">{{.Users}}</td><td class="num admin-mono">{{.RecentUsers}}</td></tr>
+        {{else}}
+            <tr><td colspan="6" class="admin-usage-empty">{{if $.SearchStats.Failed}}Nothing to show{{else}}No votes in this window yet{{end}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>On the carousel now</h2>
+        <span class="count">{{if .SearchStats.RankedAt.IsZero}}no ranking published yet{{else}}{{len .SearchStats.Carousel}} tiles, ranked {{.SearchStats.RankedAt.Format "2006-01-02 15:04"}} UTC{{end}}</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th class="num">#</th><th>Tile</th><th>As typed</th><th class="num">Users</th><th class="num">Last 7 days</th></tr></thead>
+        <tbody>
+        {{range $i, $t := .SearchStats.Carousel}}
+            <tr><td class="num admin-mono">{{inc $i 1}}</td><td><a href="{{$t.URL}}">{{$t.Label}}</a></td><td class="admin-mono">{{$t.Query}}</td><td class="num admin-mono">{{$t.Users}}</td><td class="num admin-mono">{{$t.RecentUsers}}</td></tr>
+        {{else}}
+            <tr><td colspan="5" class="admin-usage-empty">The carousel is showing the curated list</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+</div>
+{{else}}
+<div class="admin-msg">Search votes are not enabled: the observability database is not configured.</div>
+{{end}}
+{{end}}

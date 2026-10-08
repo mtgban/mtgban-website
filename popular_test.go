@@ -179,11 +179,23 @@ type fakeRankStore struct {
 	instance, pruneInstance string
 	since, recentSince      time.Time
 	pruneBefore             time.Time
+
+	// What the Searches tab asked for and is told.
+	minUsers, limit    int
+	calls, totalsCalls int
+	totals             observability.SearchVoteTotals
 }
 
-func (f *fakeRankStore) TopSearches(_ context.Context, instance string, since, recentSince time.Time, _, _ int) ([]observability.SearchRank, error) {
+func (f *fakeRankStore) TopSearches(_ context.Context, instance string, since, recentSince time.Time, minUsers, limit int) ([]observability.SearchRank, error) {
 	f.instance, f.since, f.recentSince = instance, since, recentSince
+	f.minUsers, f.limit = minUsers, limit
+	f.calls++
 	return f.ranks, f.err
+}
+
+func (f *fakeRankStore) SearchVoteTotals(_ context.Context, _ string, _ time.Time) (observability.SearchVoteTotals, error) {
+	f.totalsCalls++
+	return f.totals, f.err
 }
 
 func (f *fakeRankStore) PruneSearchVotes(_ context.Context, instance string, before time.Time) (int64, error) {

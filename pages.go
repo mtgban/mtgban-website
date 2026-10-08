@@ -585,7 +585,7 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	if !isMobile {
 		files = append(files, "templates/partials/settings-modal.html")
 		if name == "admin.html" {
-			files = append(files, "templates/partials/admin-usage.html")
+			files = append(files, "templates/partials/admin-usage.html", "templates/partials/admin-searches.html")
 		}
 	}
 
