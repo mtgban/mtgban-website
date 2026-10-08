@@ -38,8 +38,8 @@ type site struct {
 	// popularVotes records search votes; openDBs attaches the observability
 	// client, and nil means the endpoint answers 204 without recording.
 	popularVotes popularVoteStore
-	// popularRanks is where the hourly ranking reads votes, attached with
-	// popularVotes; nil means the job does nothing.
+	// popularRanks is where the hourly ranking and the admin Searches tab
+	// read votes, attached with popularVotes; nil means neither has any.
 	popularRanks popularRankStore
 	// pricesLoaded is set once the startup load has published every store:
 	// it publishes them one by one, and alerts priced on part of them fire.
