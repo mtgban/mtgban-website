@@ -23,6 +23,7 @@ const (
 	jobCheckpoints    = "Checkpoints"
 	jobStaleness      = "Staleness check"
 	jobAlerts         = "Alert evaluation"
+	jobPopular        = "Popular searches"
 )
 
 // backgroundJobs records every run of the jobs above.
@@ -104,6 +105,12 @@ func (s *site) startCrons() {
 	// Reload TCGplayer's sellers and copies per grade once the newspaper
 	// finishes a scrape; until then that is one MAX(calc_date).
 	addJob("50 * * * *", jobTCGListings, s.loadTCGListings)
+
+	// Rank the month's typed searches for the landing strip; only where the
+	// observability database holds the votes.
+	if ObservabilityDB != nil {
+		addJob("20 * * * *", jobPopular, s.refreshPopularSearches)
+	}
 
 	// Backstop refresh; reloads normally drive this via RequestRefresh.
 	c.AddFunc("20 */12 * * *", recovered("cron RequestRefresh", s.offline.RequestRefresh))

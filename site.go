@@ -38,6 +38,9 @@ type site struct {
 	// popularVotes records search votes; openDBs attaches the observability
 	// client, and nil means the endpoint answers 204 without recording.
 	popularVotes popularVoteStore
+	// popularRanks is where the hourly ranking reads votes, attached with
+	// popularVotes; nil means the job does nothing.
+	popularRanks popularRankStore
 	// pricesLoaded is set once the startup load has published every store:
 	// it publishes them one by one, and alerts priced on part of them fire.
 	pricesLoaded atomic.Bool
@@ -239,6 +242,11 @@ func (s *site) loadDatastore(path string) error {
 	go tracked(jobNewspaper, s.cacheNewspaper)()
 	// TCGplayer's listing counts wait for a datastore to match them to.
 	go tracked(jobTCGListings, s.loadTCGListings)()
+	// The landing strip's ranking resolves its tiles against the datastore,
+	// only where the observability database holds the votes.
+	if ObservabilityDB != nil {
+		go tracked(jobPopular, s.refreshPopularSearches)()
+	}
 
 	return nil
 }
