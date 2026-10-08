@@ -668,6 +668,12 @@
     </div>
     {{end}}
 
+    {{/* What the search left out or warns about, below the results as on
+         desktop; with no results they read in the empty state above */}}
+    {{if and .AllKeys .Notices}}
+    <p class="m-search-notices">{{range $i, $n := .Notices}}{{if $i}}<br>{{end}}{{$n}}{{end}}</p>
+    {{end}}
+
     {{/* Filter overlay sheet */}}
     <div class="m-filter-overlay" id="m-filter-overlay" onclick="this.classList.remove('open'); document.getElementById('m-filter-sheet').classList.remove('open');"></div>
     <div class="m-filter-sheet" id="m-filter-sheet">
