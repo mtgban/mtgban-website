@@ -17,7 +17,7 @@
 
 <template data-section="api-options">
 <p>Options are query parameters and can be combined. Quantities and per-condition prices are only exported by some stores; buylists usually report the NM price only.</p>
-<p>Version 2 takes the same options except <code>qty</code> and <code>conds</code>: its responses always carry every condition and every quantity a store reports. Nor does it take <code>tag</code>: version 2 keys prices by store tag, and its <code>stores.json</code> gives each store's name. An <code>id</code> it does not know is an error, where version 1 falls back to MTGBAN ids.</p>
+<p>Version 2 takes the same options except <code>qty</code> and <code>conds</code>: its responses always carry every condition and every quantity a store reports. Nor does it take <code>tag</code>: version 2 keys prices by store tag, and its <code>stores.json</code> gives each store's name. It spells MTGBAN ids <code>id=ban</code>, where version 1 spells them <code>mtgban</code>. An <code>id</code> it does not know is an error, <code>mtgban</code> included, where version 1 falls back to MTGBAN ids.</p>
 </template>
 
 <template data-section="api-response">
