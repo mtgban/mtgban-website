@@ -111,11 +111,9 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 		return
 	}
 
-	// How far back a chart may reach is a paid grant, and this route is mounted
-	// under noSigning, so nothing upstream has checked the signature carrying
-	// it: read it verified or not at all. The page asks with a cookie and no
-	// ?sig=, so the query alone would cap every in-page fetch at the 30-day
-	// fallback.
+	// How far back a chart may reach is a paid grant, and the grant is in the
+	// cookie: the page asks with one and no ?sig=, so reading the query alone
+	// would cap every in-page fetch at the 30-day fallback.
 	sig := verifiedRequestSignature(r)
 	lb, maxDays := chartWindow(sig, chartRangeParam(r))
 
