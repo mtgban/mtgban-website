@@ -10,7 +10,8 @@ import (
 )
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
-// one item id per condition, and a store the bookmarklet does not fill.
+// one item id per condition, CSI's buylist and sealed buylist, and a store
+// the bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -26,6 +27,12 @@ func stubCartStores(t *testing.T) {
 	// ABU stocks this one only as SP, which a row with no condition was
 	// priced at
 	inventory.Add("card-d", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 1, InstanceID: "402"})
+	// CSI buys NM only and derives the other grades, all on the one row
+	csi := mtgban.BuylistRecord{}
+	csi.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "601"})
+	csi.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.8, InstanceID: "601"})
+	csiSealed := mtgban.BuylistRecord{}
+	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	t.Cleanup(func() {
@@ -35,6 +42,8 @@ func stubCartStores(t *testing.T) {
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Shorthand: "ABUGames"}),
 		mtgban.NewVendorFromBuylist(mkm, mtgban.ScraperInfo{Shorthand: "MKM"}),
+		mtgban.NewVendorFromBuylist(csi, mtgban.ScraperInfo{Shorthand: "CSI"}),
+		mtgban.NewVendorFromBuylist(csiSealed, mtgban.ScraperInfo{Shorthand: "CSISealed"}),
 	}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
@@ -55,6 +64,7 @@ func TestCartRows(t *testing.T) {
 		{CardID: "card-b", Condition: mtgban.MP, Quantity: 1},
 		{CardID: "card-d", Quantity: 1},
 		{CardID: "card-e", Quantity: 1},
+		{CardID: "box-a", Quantity: 1},
 	}
 
 	for _, tc := range []struct {
@@ -66,6 +76,9 @@ func TestCartRows(t *testing.T) {
 		{"ABUGames", true, "101:4,201:4"},
 		// A store row keeps its condition, or the one it was priced at
 		{"ABUScans", false, "301:3,402:1"},
+		{"CSI", true, "601:4"},
+		// Sealed product carries no grade
+		{"CSISealed", true, "701:1"},
 	} {
 		got := cartRows(tc.key, tc.buylist, entries)
 		if got != tc.want {
@@ -76,6 +89,10 @@ func TestCartRows(t *testing.T) {
 	got := cartLoadFor("MKM", true, entries)
 	if got.Link != "" {
 		t.Errorf("a store the bookmarklet does not fill got a button: %+v", got)
+	}
+	got = cartLoadFor("CSI", false, entries)
+	if got.Link != "" {
+		t.Errorf("CSI's retail side, which has its own import, got a button: %+v", got)
 	}
 }
 
@@ -93,6 +110,7 @@ func TestCartLoadButtons(t *testing.T) {
 	}{
 		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2" target="_blank" rel="noopener" data-store="ABU"`},
 		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2" target="_blank" rel="noopener" data-store="ABU"`},
+		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2" target="_blank" rel="noopener" data-store="CSI"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -114,7 +132,7 @@ func TestCartLoadButtons(t *testing.T) {
 		}
 	}
 
-	for _, key := range []string{"MKM"} {
+	for _, key := range []string{"MKM", "CSI"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
 			OptimizedKeys:   []string{key},

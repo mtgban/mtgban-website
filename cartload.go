@@ -14,9 +14,11 @@ import (
 
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
 // keyed by the prefix their splits' shorthands share, with the page each
-// side's button opens. An empty page gets no button.
+// side's button opens. An empty page gets no button: CSI's retail side has
+// its own deck builder import on the upload page.
 var cartStores = []cartStore{
 	{"ABU", "ABU", "https://abugames.com/cartview/buylist", "https://abugames.com/cartview/shop"},
+	{"CSI", "CSI", "https://www.coolstuffinc.com/buylist_cart.php", ""},
 }
 
 type cartStore struct {
@@ -87,10 +89,15 @@ func cartRows(key string, buylist bool, entries []OptimizedUploadEntry) string {
 		if err != nil {
 			return ""
 		}
-		// Sold as NM whatever the row says: the store grades what arrives
+		// Sold as NM whatever the row says: the store grades what arrives.
+		// Sealed product carries no grade at all.
 		lookup = func(cardID string, _ mtgban.Condition) string {
 			entries := bl[cardID]
-			i := pricedEntry(entries, mtgban.NM)
+			grade := mtgban.NM
+			if len(entries) > 0 && entries[0].Conditions == "" {
+				grade = ""
+			}
+			i := pricedEntry(entries, grade)
 			if i < 0 {
 				return ""
 			}
