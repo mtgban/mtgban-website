@@ -60,13 +60,13 @@ function fakeCSI({cart = {}, unknown = []} = {}) {
 }
 
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
     if (hash && version !== null) {
         hash += '&v=' + version;
     }
-    const location = {hostname: host, pathname: path, hash, reload: () => { page.reloaded = true; }};
+    const location = {hostname: host, pathname: path, search, hash, reload: () => { page.reloaded = true; }};
     page.location = location;
     const storage = {isLoggedIn: loggedIn ? 'true' : 'false', 'accessToken-ABU': 'abc'};
     const localStorage = {getItem: (key) => storage[key] ?? null};
@@ -77,8 +77,10 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', hash = ''
         querySelector: (selector) => (loginLink && selector === 'a[href$="/login"]' ? {} : null),
     };
     const history = {replaceState: (state, title, url) => { page.url = url; }};
-    const script = new Function('location', 'localStorage', 'fetch', 'alert', 'document', 'history', 'return ' + source);
-    await script(location, localStorage, abu.fetch, (text) => alerts.push(text), document, history);
+    // A wait the loader asks for passes at once
+    const setTimeout = (resolve) => resolve();
+    const script = new Function('location', 'localStorage', 'fetch', 'alert', 'document', 'history', 'setTimeout', 'return ' + source);
+    await script(location, localStorage, abu.fetch, (text) => alerts.push(text), document, history, setTimeout);
     return {alerts, page, posts: abu.posts};
 }
 
@@ -301,5 +303,211 @@ describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
         const {alerts, posts} = await run({...mintPage, hash: '#ban=1:1', abu: fakeMint(), loginLink: true});
         expect(alerts[0]).toContain('Log in to MTG Mint Card first');
         expect(posts).toHaveLength(0);
+    });
+});
+
+// Import ids exported from Strike Zone's cart for these plain codes
+const szIDs = {
+    'USCIDU-637-F-19290-285-OVN-RMS': '637-C-30571-106',
+    'USCIDU-637-F-19290-299-ORM-TTK': '637-C-30571-110',
+    'USCIDU-637-F-978240-993-XAK-QHC': '637-C-181059-106',
+    'USCIDU-637-F-977135-992-VIA-YUS': '637-C-180944-105',
+};
+const ankh = 'USCIDU-637-F-19290-285-OVN-RMS';
+const ankhHP = 'USCIDU-637-F-19290-299-ORM-TTK';
+const awbo = 'USCIDU-637-F-978240-993-XAK-QHC';
+const elesh = 'USCIDU-637-F-977135-992-VIA-YUS';
+
+const szExportIDs = Object.fromEntries(Object.entries(szIDs).map(([id, code]) => [code, id]));
+
+// fakeSZ stands in for Strike Zone's cart: its rows are B- for a card sold to
+// the store and S- for one bought from it, the CSV export lists every row
+// (a buylist one named "Sell to us - ...") or answers an empty cart with its
+// page, Sell to Us and Add to Cart links add one copy of a card listed, the
+// cart form and the CSV import (Buy # or Sell #) set a row's quantity up to
+// what Strike Zone wants or has, the import does nothing to a cart with no
+// row, and the cart pages answer "too many requests" once the call limit is
+// reached.
+function fakeSZ({cart = {}, unknown = [], limit = {}, throttleAt = [], exportPage = null} = {}) {
+    const lines = {...cart};
+    const posts = [];
+    let calls = 0;
+    const keep = (row, qty) => {
+        lines[row] = Math.min(qty, limit[row.slice(2)] ?? Infinity);
+    };
+    const fetch = async (url, opts = {}) => {
+        calls++;
+        if (throttleAt.includes(calls)) {
+            return {ok: true, status: 200, text: async () => 'Error: 8134 - too many requests'};
+        }
+        if (opts.body instanceof FormData) {
+            const csv = await opts.body.get('FILE').text();
+            const rows = csv.trim().split('\r\n').slice(1).map((line) => line.split(','));
+            posts.push({url, tool: opts.body.get('TOOL_SELECT'), rows: rows.map((r) => [r[0], r[3], r[5]])});
+            if (Object.keys(lines).length > 0) {
+                for (const [id, , , buy, , sell] of rows) {
+                    const code = szIDs[id];
+                    if (code && !unknown.includes(code)) {
+                        if (buy !== 'NC') {
+                            keep('B-' + code, +buy);
+                        }
+                        if (sell !== 'NC') {
+                            keep('S-' + code, +sell);
+                        }
+                    }
+                }
+            }
+            return {ok: true, status: 200, text: async () => ''};
+        }
+        if (opts.body instanceof URLSearchParams && opts.body.get('TOOL_SELECT') === 'XC') {
+            if (exportPage !== null) {
+                return {ok: true, status: 200, text: async () => exportPage};
+            }
+            const rows = Object.keys(lines);
+            if (rows.length === 0) {
+                return {ok: true, status: 200, text: async () => '<html>You have no items in your cart.</html>'};
+            }
+            const csv = rows.map((row) => {
+                const name = (row.startsWith('B-') ? 'Sell to us - ' : '') + 'Magic the Gathering - Card, With Comma';
+                return `${szExportIDs[row.slice(2)] ?? row.slice(2)},${name},Strike Zone Online,NC,1.00,${lines[row]},2.00`;
+            });
+            return {ok: true, status: 200, text: async () => ['#Usc Id,Inventory Name,Store Name,Buy #,Buy $,Sell #,Sell $', ...csv].join('\r\n') + '\r\n'};
+        }
+        if (opts.method === 'POST') {
+            const rows = [];
+            for (let i = 0; opts.body.has(String(i)); i++) {
+                rows.push({id: opts.body.get(String(i)), qty: +opts.body.get(i + 'Q')});
+            }
+            posts.push({url, cmd: opts.body.get('CMD'), rows});
+            for (const row of rows) {
+                if (row.id in lines) {
+                    keep(row.id, row.qty);
+                }
+            }
+            return {ok: true, status: 200, text: async () => ''};
+        }
+        const link = /[?&](Buy|Add)=([\w-]+)/.exec(url);
+        if (link) {
+            posts.push({url, link: link[1], code: link[2]});
+            if (!unknown.includes(link[2])) {
+                const row = (link[1] === 'Buy' ? 'B-' : 'S-') + link[2];
+                keep(row, (lines[row] || 0) + 1);
+            }
+            return {ok: true, status: 200, text: async () => ''};
+        }
+        throw new Error('unexpected call ' + url);
+    };
+    return {fetch, posts, lines};
+}
+
+describe('ban-to-cart bookmarklet on Strike Zone', () => {
+    const szPage = {host: 'shop.strikezoneonline.com', path: '/TUser', search: '?MC=CUVC&MF=B&BUID=637'};
+    const step = (p) => p.tool ?? p.cmd ?? p.link + ' ' + p.code;
+
+    test('a buylist goes up as one CSV import under Buy #', async () => {
+        const sz = fakeSZ({cart: {'B-637-C-30571-110': 1}, limit: {'637-C-181059-106': 4}});
+        const {alerts, page, posts} = await run({...szPage,
+            hash: `#ban=${ankh}%3a2%2c${awbo}%3a9%2c${elesh}%3a1%2c${ankhHP}%3a3`, abu: sz});
+        expect(posts.map(step)).toEqual(['CI']);
+        expect(posts[0].rows).toEqual([[ankh, '2', 'NC'], [awbo, '9', 'NC'], [elesh, '1', 'NC'], [ankhHP, '3', 'NC']]);
+        expect(sz.lines).toEqual({
+            'B-637-C-30571-106': 2, 'B-637-C-181059-106': 4, 'B-637-C-180944-105': 1, 'B-637-C-30571-110': 3,
+        });
+        expect(alerts[0]).toBe('Loaded 4 cards into your Strike Zone cart.');
+        expect(page.url).toBe('/TUser?MC=CUVC&MF=B&BUID=637');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('a store list goes up under Sell #, and only store rows count as loaded', async () => {
+        const sz = fakeSZ({cart: {'B-637-C-181059-106': 1}, limit: {'637-C-30571-106': 1}});
+        const {alerts, posts} = await run({...szPage, hash: `#ban=${ankh}:3,${awbo}:2&side=retail`, abu: sz});
+        expect(posts.map(step)).toEqual(['CI']);
+        expect(posts[0].rows).toEqual([[ankh, 'NC', '3'], [awbo, 'NC', '2']]);
+        expect(sz.lines).toEqual({'B-637-C-181059-106': 1, 'S-637-C-30571-106': 1, 'S-637-C-181059-106': 2});
+        expect(alerts[0]).toBe('Loaded 2 cards into your Strike Zone cart.');
+    });
+
+    test('an empty cart gets one card through its link before the import', async () => {
+        const sz = fakeSZ();
+        const {alerts, posts} = await run({...szPage, hash: `#ban=${ankh}:2,${awbo}:1`, abu: sz});
+        expect(posts.map(step)).toEqual(['Buy 637-C-30571-106', 'CI']);
+        expect(sz.lines).toEqual({'B-637-C-30571-106': 2, 'B-637-C-181059-106': 1});
+        expect(alerts[0]).toBe('Loaded 2 cards into your Strike Zone cart.');
+
+        const store = fakeSZ();
+        await run({...szPage, hash: `#ban=${ankh}:1&side=retail`, abu: store});
+        expect(store.posts.map(step)).toEqual(['Add 637-C-30571-106', 'CI']);
+    });
+
+    test('an empty cart is filled from the next card when Strike Zone skips the first', async () => {
+        const sz = fakeSZ({unknown: ['637-C-30571-106']});
+        const {alerts, posts} = await run({...szPage, hash: `#ban=${ankh}:2,${awbo}:1,${elesh}:1`, abu: sz});
+        expect(posts.map(step)).toEqual(['Buy 637-C-30571-106', 'Buy 637-C-181059-106', 'CI']);
+        expect(sz.lines).toEqual({'B-637-C-181059-106': 1, 'B-637-C-180944-105': 1});
+        expect(alerts[0]).toBe('Loaded 2 cards into your Strike Zone cart. 1 were not taken by Strike Zone.');
+    });
+
+    test('no import goes up when Strike Zone takes none of the cards', async () => {
+        const sz = fakeSZ({unknown: ['637-C-30571-106', '637-C-181059-106']});
+        const {alerts, posts} = await run({...szPage, hash: `#ban=${ankh}:1,${awbo}:1`, abu: sz});
+        expect(posts.map(step)).toEqual(['Buy 637-C-30571-106', 'Buy 637-C-181059-106']);
+        expect(alerts[0]).toBe('Loaded 0 cards into your Strike Zone cart. 2 were not taken by Strike Zone.');
+    });
+
+    test('a plain code goes through its link, quantities through the cart form', async () => {
+        const sz = fakeSZ({cart: {'B-637-C-7-106': 2}});
+        const {alerts, posts} = await run({...szPage, hash: '#ban=637-C-1-106%3a1%2c637-C-2-105%3a3%2c637-C-7-106%3a1', abu: sz});
+        expect(posts.map(step)).toEqual(['Buy 637-C-1-106', 'Buy 637-C-2-105', 'Update']);
+        expect(posts[0].url).toBe('/TUser?MC=CUVC&Buy=637-C-1-106&MF=B&BUID=637');
+        expect(posts[2].rows).toEqual([{id: 'B-637-C-2-105', qty: 3}, {id: 'B-637-C-7-106', qty: 1}]);
+        expect(sz.lines).toEqual({'B-637-C-1-106': 1, 'B-637-C-2-105': 3, 'B-637-C-7-106': 1});
+        expect(alerts[0]).toBe('Loaded 3 cards into your Strike Zone cart.');
+
+        const store = fakeSZ();
+        await run({...szPage, hash: '#ban=637-C-1-106:2&side=retail', abu: store});
+        expect(store.posts.map(step)).toEqual(['Add 637-C-1-106', 'Update']);
+        expect(store.lines).toEqual({'S-637-C-1-106': 2});
+    });
+
+    test('an id Strike Zone does not list is reported, and quantities stop at what it wants', async () => {
+        const sz = fakeSZ({cart: {'B-637-C-30571-110': 1}, unknown: ['637-C-181059-106'], limit: {'637-C-30571-106': 2}});
+        const {alerts} = await run({...szPage, hash: `#ban=${ankh}:5,${awbo}:1`, abu: sz});
+        expect(sz.lines).toEqual({'B-637-C-30571-110': 1, 'B-637-C-30571-106': 2});
+        expect(alerts[0]).toBe('Loaded 1 cards into your Strike Zone cart. 1 were not taken by Strike Zone.');
+    });
+
+    test('the cart is read through its export, past the 800 rows its page lists', async () => {
+        const cart = {};
+        for (let i = 0; i < 900; i++) {
+            cart[`B-637-C-${50000 + i}-106`] = 1;
+        }
+        cart['B-637-C-181059-106'] = 1;
+        const sz = fakeSZ({cart});
+        const {alerts, posts} = await run({...szPage, hash: `#ban=${awbo}:3,${ankh}:1`, abu: sz});
+        expect(posts.map(step)).toEqual(['CI']);
+        expect(sz.lines['B-637-C-181059-106']).toBe(3);
+        expect(alerts[0]).toBe('Loaded 2 cards into your Strike Zone cart.');
+    });
+
+    test('an export that is neither a list nor the empty cart stops the load', async () => {
+        const sz = fakeSZ({exportPage: '<html>Something went wrong</html>'});
+        const {alerts, posts} = await run({...szPage, hash: `#ban=${ankh}:1`, abu: sz});
+        expect(posts).toHaveLength(0);
+        expect(alerts[0]).toBe("Strike Zone's cart could not be read.");
+    });
+
+    test('only rows on the link\'s side count as loaded', async () => {
+        const sz = fakeSZ({cart: {'S-637-C-30571-106': 1}});
+        const {alerts} = await run({...szPage, hash: `#ban=${ankh}:1`, abu: sz});
+        expect(sz.lines).toEqual({'S-637-C-30571-106': 1, 'B-637-C-30571-106': 1});
+        expect(alerts[0]).toBe('Loaded 1 cards into your Strike Zone cart.');
+    });
+
+    test('a "too many requests" answer is waited out and the call made again', async () => {
+        // the cart read, then the first link is turned away once
+        const sz = fakeSZ({throttleAt: [2]});
+        const {alerts} = await run({...szPage, hash: '#ban=637-C-1-106:1,637-C-2-106:1', abu: sz});
+        expect(sz.lines).toEqual({'B-637-C-1-106': 1, 'B-637-C-2-106': 1});
+        expect(alerts[0]).toBe('Loaded 2 cards into your Strike Zone cart.');
     });
 });

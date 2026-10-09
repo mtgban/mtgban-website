@@ -14,7 +14,13 @@
         store = scgStore();
     } else if (location.hostname === "www.mtgmintcard.com") {
         store = mintStore();
+    } else if (location.hostname === "shop.strikezoneonline.com") {
+        store = szStore();
     }
+    // A store whose cart names a row other than the link does maps it
+    var key = (store && store.key) || function (id) {
+        return id;
+    };
     if (!store || !match) {
         alert("Drag this link to your bookmarks bar. Then click it after the store's page loads.");
         return;
@@ -72,7 +78,7 @@
         var rows = [];
         var noRoom = 0;
         ids.forEach(function (id) {
-            if (present.indexOf(id) >= 0) {
+            if (present.indexOf(key(id)) >= 0) {
                 rows.push(id);
             } else if (room > 0) {
                 rows.push(id);
@@ -89,7 +95,7 @@
             while (chunk.length > 0) {
                 banner.textContent = "BAN: loading cards into your " + store.name + " cart, " +
                     done + " of " + rows.length + " done";
-                if (await store.send(chunk, quantities)) {
+                if (await store.send(chunk, quantities, present)) {
                     done += chunk.length;
                     break;
                 }
@@ -100,7 +106,7 @@
                 var now = await store.cartIDs();
                 var bad = -1;
                 for (var j = 0; j < chunk.length && bad < 0; j++) {
-                    if (now.indexOf(chunk[j]) < 0 && !(await store.send([chunk[j]], quantities))) {
+                    if (now.indexOf(key(chunk[j])) < 0 && !(await store.send([chunk[j]], quantities))) {
                         bad = j;
                     }
                 }
@@ -115,7 +121,7 @@
 
         var after = await store.cartIDs();
         var loaded = rows.filter(function (id) {
-            return after.indexOf(id) >= 0;
+            return after.indexOf(key(id)) >= 0;
         }).length;
         var message = "Loaded " + loaded + " cards into your " + store.name + " cart.";
         if (unknown > 0) {
@@ -128,7 +134,7 @@
             message += " " + noRoom + " did not fit: " + store.name + "'s cart holds " + store.maxLines + " lines.";
         }
         alert(message);
-        history.replaceState(null, "", location.pathname);
+        history.replaceState(null, "", location.pathname + location.search);
         location.reload();
     } catch (err) {
         banner.remove();
@@ -314,5 +320,152 @@
                 return true;
             }
         };
+    }
+
+    // szStore loads Strike Zone's cart, kept by its cookies: the buylist, or
+    // the store when the link says side=retail. Its CSV import takes the whole
+    // list at once, keyed by the id go-mtgban computes for each row; a plain
+    // 637-C code goes through its Sell to Us or Add to Cart link, one copy per
+    // call, and the cart form.
+    function szStore() {
+        var retail = /[#&]side=retail(&|$)/.test(location.hash);
+        var line = retail ? "S-" : "B-";
+        // Whether the cart holds a row on either side, as last read
+        var filled = false;
+        // Strike Zone answers "too many requests" to the cart pages after
+        // about 100 calls, for some minutes, so a long list waits it out
+        async function call(url, opts) {
+            for (;;) {
+                var resp = await fetch(url, opts);
+                if (!resp.ok) {
+                    throw new Error("Strike Zone refused the list (" + resp.status + ").");
+                }
+                var page = await resp.text();
+                if (!/too many requests/i.test(page)) {
+                    return page;
+                }
+                for (var wait = 300; wait > 0; wait--) {
+                    banner.textContent = "BAN: Strike Zone pauses its cart after about 100 cards. " +
+                        "Keep this tab open, continuing in " + wait + " s.";
+                    await new Promise(function (resolve) {
+                        setTimeout(resolve, 1000);
+                    });
+                }
+            }
+        }
+        function add(code) {
+            return call("/TUser?MC=CUVC&" + (retail ? "Add=" : "Buy=") + code + "&MF=B&BUID=637");
+        }
+        // The cart page lists only its first 800 rows, so the cart is read
+        // through its CSV export, where a buylist row's name starts "Sell to
+        // us - "; an empty cart answers with its page instead
+        async function readCart() {
+            var page = await call("/TUser?MC=CUVC&MF=B", {
+                method: "POST",
+                body: new URLSearchParams({BUID: "637", STORE_ID: "637", CMD: "Tools ...", TOOL_SELECT: "XC", ACT: "Export"})
+            });
+            var found = [];
+            filled = false;
+            if (page.indexOf("#Usc Id,") !== 0) {
+                if (!/no items in your cart/i.test(page)) {
+                    throw new Error("Strike Zone's cart could not be read.");
+                }
+                return found;
+            }
+            page.split(/\r?\n/).slice(1).forEach(function (row) {
+                var fields = row.split(",");
+                if (!fields[0]) {
+                    return;
+                }
+                filled = true;
+                if ((fields[1].indexOf("Sell to us - ") === 0) !== retail) {
+                    found.push(szCode(fields[0]));
+                }
+            });
+            return found;
+        }
+        return {
+            name: "Strike Zone",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            // Imports of 1,000 and 3,000 rows load whole too, in 7 and 44 s;
+            // 300 keeps the banner moving every few seconds
+            chunkSize: 300,
+            // The cart names a row by its plain code
+            key: szCode,
+            cartIDs: readCart,
+            // Both ways set a quantity, trimmed to what Strike Zone wants or
+            // has, and skip an id it does not list
+            send: async function (chunk, qty, present) {
+                var csv = "#Usc Id,Inventory Name,Store Name,Buy #,Buy $,Sell #,Sell $\r\n";
+                var imported = [];
+                var linked = false;
+                var update = new URLSearchParams({BUID: "637", STORE_ID: "637", CMD: "Update"});
+                var rows = 0;
+                for (var i = 0; i < chunk.length; i++) {
+                    var id = chunk[i];
+                    var code = szCode(id);
+                    if (code !== id) {
+                        csv += id + ",x,Strike Zone Online," +
+                            (retail ? "NC,0," + qty[id] : qty[id] + ",0,NC") + ",0\r\n";
+                        imported.push(code);
+                        continue;
+                    }
+                    if (present.indexOf(code) < 0) {
+                        await add(code);
+                        linked = true;
+                    }
+                    if (present.indexOf(code) >= 0 || qty[id] !== 1) {
+                        update.append(String(rows), line + code);
+                        update.append(rows + "Q", String(qty[id]));
+                        rows++;
+                    }
+                }
+                if (rows > 0) {
+                    await call("/TUser?MC=CUVC&MF=B", {method: "POST", body: update});
+                }
+                if (imported.length > 0) {
+                    // The import does nothing to a cart with no row yet, and
+                    // Strike Zone skips a card it no longer lists, so cards go
+                    // in through their links until one stays
+                    if (!filled && linked) {
+                        await readCart();
+                    }
+                    for (var j = 0; !filled && j < imported.length; j++) {
+                        await add(imported[j]);
+                        await readCart();
+                    }
+                    if (!filled) {
+                        return true;
+                    }
+                    var form = new FormData();
+                    form.append("BUID", "637");
+                    form.append("STORE_ID", "637");
+                    form.append("CMD", "Tools ...");
+                    form.append("TOOL_SELECT", "CI");
+                    form.append("ACT", "Do import");
+                    form.append("FILE", new Blob([csv], {type: "text/csv"}), "ban_prices.csv");
+                    await call("/TUser?MC=CUVC&MF=B", {method: "POST", body: form});
+                }
+                return true;
+            }
+        };
+    }
+
+    // szCode is the plain 637-C code a Strike Zone import id was computed
+    // from, by undoing the shift of its digits, or id itself when it is not
+    // one. docs/store-carts.md has how the id is built.
+    function szCode(id) {
+        var m = /^USCIDU-637-F-(\d{5,6})-(\d{3})-[A-Z]{3}-[A-Z]{3}$/.exec(id);
+        if (!m) {
+            return id;
+        }
+        var shifts = [8, 9, 7, 2, 9, 1, 8, 9, 7];
+        var digits = (m[1] + m[2]).split("").map(function (d, i) {
+            return (Number(d) + 10 - shifts[i]) % 10;
+        }).join("");
+        return "637-C-" + digits.slice(0, m[1].length) + "-" + digits.slice(m[1].length);
     }
 })();

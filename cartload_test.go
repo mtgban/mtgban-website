@@ -11,7 +11,8 @@ import (
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
 // one item id per condition, CSI's buylist and sealed buylist, SCG's and
-// Mint's buylists, and a store the bookmarklet does not fill.
+// Mint's buylists, both sides of Strike Zone, and a store the bookmarklet
+// does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -39,6 +40,13 @@ func stubCartStores(t *testing.T) {
 	mint := mtgban.BuylistRecord{}
 	mint.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "8137"})
 	mint.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.5, InstanceID: "8137"})
+	// Strike Zone lists each grade as its own row, under the id its cart's
+	// import takes, one id for buying and selling
+	sz := mtgban.BuylistRecord{}
+	sz.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
+	sz.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.MP, BuyPrice: 0.5, InstanceID: "USCIDU-637-F-978240-997-XAK-ZZZ"})
+	szStock := mtgban.InventoryRecord{}
+	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 
@@ -54,9 +62,11 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewVendorFromBuylist(csi, mtgban.ScraperInfo{Shorthand: "CSI"}),
 		mtgban.NewVendorFromBuylist(csiSealed, mtgban.ScraperInfo{Shorthand: "CSISealed"}),
 		mtgban.NewVendorFromBuylist(mint, mtgban.ScraperInfo{Shorthand: "MMC"}),
+		mtgban.NewVendorFromBuylist(sz, mtgban.ScraperInfo{Shorthand: "SZ"}),
 	}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
+		mtgban.NewSellerFromInventory(szStock, mtgban.ScraperInfo{Shorthand: "SZ"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -91,6 +101,8 @@ func TestCartRows(t *testing.T) {
 		{"CSISealed", true, "701:1"},
 		{"SCG", true, "SGL-A1:4"},
 		{"MMC", true, "8137:4"},
+		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
+		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
 	} {
 		got := cartRows(tc.key, tc.buylist, entries)
 		if got != tc.want {
@@ -129,10 +141,12 @@ func TestCartLoadButtons(t *testing.T) {
 		link    string
 	}{
 		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU"`},
-		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU"`},
+		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="ABU"`},
 		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI"`},
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
+		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
+		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -175,7 +189,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1},
 		Quantity:       2,
 	}}
-	buy := `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU" data-buylist="false"`
+	buy := `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="ABU" data-buylist="false"`
 	sell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-buylist="true"`
 
 	for _, tc := range []struct {
