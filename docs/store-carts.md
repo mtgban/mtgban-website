@@ -4,11 +4,13 @@ Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
 buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
 and both calls take a list. MTG Mint Card has the same kind of call, one
-card at a time. Star City Games and Strike Zone have a CSV import, but no
-way to hand it a list from another site. The upload page reaches all five
-through one bookmarklet, BAN-to-Cart, run on the store's page. ABU was
-measured against a real account on 2026-10-07, CSI and Strike Zone against
-a guest cart, and SCG and Mint against a real account on 2026-10-09.
+card at a time, and Hareruya both: a form that takes a whole store list,
+and one call per card for its buylist. Star City Games and Strike Zone have
+a CSV import, but no way to hand it a list from another site. The upload
+page reaches all six through one bookmarklet, BAN-to-Cart, run on the
+store's page. ABU was measured against a real account on 2026-10-07, CSI,
+Strike Zone and Hareruya against a guest cart, and SCG and Mint against a
+real account on 2026-10-09.
 
 ## ABU: the calls
 
@@ -162,10 +164,10 @@ The `#Usc Id` is what the cart's "Export to CSV" writes, and no page
 publishes it. go-mtgban's `strikezone` scraper computes it from the code
 each row's "Sell to Us" or "Add to Cart" link carries,
 `637-C-<item>-<variant>`, and stores it as `InstanceID`, one id for both
-sides; its README has how. The bookmarklet only undoes the first step, a shift of the
-item and variant digits by `8 9 7 2 9 1 8 9 7` (mod 10), to find the row's
-plain code in the cart (`szCode`). A code of a shape go-mtgban cannot
-compute the id for stays plain, and goes through its link.
+sides; its README has how. The bookmarklet only undoes the first step, a
+shift of the item and variant digits by `8 9 7 2 9 1 8 9 7` (mod 10), to
+find the row's plain code in the cart (`szCode`). A code of a shape
+go-mtgban cannot compute the id for stays plain, and goes through its link.
 
 The links add one copy of a card per `GET`, and the cart page's form sets
 quantities, but cannot add a row:
@@ -193,6 +195,46 @@ buylist pages the scraper reads.
 | one card per link | 100 calls in 11.7 s, until the limit |
 | the form, quantity 0 | row removed |
 
+## Hareruya: the forms
+
+Hareruya keeps two carts on one site, a store cart and a buylist
+("purchase") cart, both kept by its session cookie, guests included, and
+both keyed by a `product_class_id`. A store lot sells each condition under
+its own class (Lightning Bolt [4ED], product 3833: NM 27947, SP 27948, MP
+27949, HP 27950), and the buylist buys a card under one class whatever its
+grade. go-mtgban's `hareruya` scraper stores the class each row's cart
+button adds as `InstanceID`.
+
+| | Store | Buylist |
+|---|---|---|
+| Cart page | `/en/cart` | `/ja/purchase/cart` |
+| Add one card | `POST /en/cart/add` | `POST /ja/purchase/add` |
+| Set quantities | `POST /en/cart/update` | `POST /ja/purchase/update` |
+| Most of one card | the stock | 20; more answers 400 `overlimit` |
+
+```
+POST /en/cart/add          product_class_id=27947&quantity=2
+POST /en/cart/update       qty[27947]=1&qty[27948]=2&qty[436375]=1
+```
+
+- An add takes one class (two answer 500) and adds to the quantity
+  already in the cart. A class the store does not sell or buy, or a
+  quantity of 0, is skipped quietly. The store's add answers with the whole
+  cart as JSON.
+- The store's update form sets each quantity it names, trimmed to the
+  stock, adds a class not yet in the cart, and removes one set to 0, so
+  one request takes a whole list. The buylist's form sets and removes, but
+  adds nothing, so new cards go through its add. Its page carries a CSRF
+  token for the form, which the form does not need.
+
+| Sent | Result |
+|---|---|
+| the store form, 600 classes from the published dump | 7.4 s, 596 loaded, 4 sold since |
+| the store form, 200 classes | 2.9 s, 197 loaded, 3 sold since |
+| the store form, above the stock | trimmed to the stock |
+| the buylist add, 100 cards one after another | 30 s, all 100, no limit met |
+| the buylist add, above 20 | 400 `overlimit` |
+
 ## SCG: the CSV import
 
 SCG's sell site, `https://sellyourcards.starcitygames.com`, adds one card
@@ -218,12 +260,12 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's and Strike Zone's buylist and store
-splits, and CSI's, SCG's and Mint's buylist splits. CSI's and SCG's store
-sides already have their own imports. The arbit, reverse and global pages
-give each section the same buttons: "Load at" for the store it buys from
-and "Load buylist at" for the store it sells to, each row in the condition
-the store sells it in (`cartLoadForArbit`).
+the store's cart can take it: ABU's, Strike Zone's and Hareruya's buylist
+and store splits, and CSI's, SCG's and Mint's buylist splits. CSI's and
+SCG's store sides already have their own imports. The arbit, reverse and
+global pages give each section the same buttons: "Load at" for the store it
+buys from and "Load buylist at" for the store it sells to, each row in the
+condition the store sells it in (`cartLoadForArbit`).
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
@@ -266,7 +308,7 @@ from the page's host. It first checks it is the loader the site expects:
 onto every link (`&v=`), so a bookmark saved before the file last changed
 says it is out of date and asks to be dragged again, and touches no cart.
 On SCG it then uploads the list as one CSV and opens SCG's review of it.
-On ABU, CSI, Mint and Strike Zone it:
+On ABU, CSI, Mint, Strike Zone and Hareruya it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
@@ -274,7 +316,7 @@ On ABU, CSI, Mint and Strike Zone it:
    does only for a guest, since a sell order needs an account;
 2. reads the cart and stops at ABU's caps, 750 buylist lines or 1,000
    store lines, counting what is already there, and says what was left
-   out; CSI, Mint and Strike Zone have no cap;
+   out; the other stores have no cap;
 3. sends the rows in chunks with a progress banner: 300 for ABU's
    buylist, 50 for ABU's store so each request finishes in under a
    minute, 100 for CSI, and one at a time for Mint, about a second each;
@@ -283,7 +325,11 @@ On ABU, CSI, Mint and Strike Zone it:
    stays when the cart is empty, since Strike Zone skips a card it no
    longer lists, with a plain code through its link and the cart form, and
    a "too many requests" answer waited out for 5 minutes before the call
-   is made again;
+   is made again; on Hareruya, 500 per store form, and on its buylist, one
+   add per card the cart page does not list, at most 20 of it, then one
+   form per 50 cards setting every quantity, so a card the page left out
+   still ends at the list's; it stops before sending anything when the
+   link's `side=retail` and the cart page disagree;
 4. on ABU's 422, reads the cart back and tries each row missing from it
    alone until ABU refuses one, the id it does not know, then resends the
    rest; ABU's store also leaves out rows it has none of, so the first
@@ -313,3 +359,6 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
   holds lengthen it.
 - Strike Zone codes with an item of other than five or six digits, which
   go through their links.
+- Whether Hareruya's guest carts follow the user at login, and whether its
+  cart pages list every row past the 597 measured; the loader sets every
+  quantity through the forms, so a row a page leaves out is not doubled.

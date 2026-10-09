@@ -27,6 +27,7 @@ var cartStores = []cartStore{
 	{"SCG", "SCG", "https://sellyourcards.starcitygames.com/mtg/uploads", ""},
 	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", ""},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
+	{"HA", "Hareruya", "https://www.hareruyamtg.com/ja/purchase/cart", "https://www.hareruyamtg.com/en/cart"},
 }
 
 type cartStore struct {

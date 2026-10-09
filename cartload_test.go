@@ -11,8 +11,8 @@ import (
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
 // one item id per condition, CSI's buylist and sealed buylist, SCG's and
-// Mint's buylists, both sides of Strike Zone, and a store the bookmarklet
-// does not fill.
+// Mint's buylists, both sides of Strike Zone and Hareruya, and a store the
+// bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -45,6 +45,14 @@ func stubCartStores(t *testing.T) {
 	sz := mtgban.BuylistRecord{}
 	sz.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
 	sz.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.MP, BuyPrice: 0.5, InstanceID: "USCIDU-637-F-978240-997-XAK-ZZZ"})
+	// Hareruya sells each condition of a lot under its own class, and buys a
+	// card under one class whatever its grade
+	ha := mtgban.BuylistRecord{}
+	ha.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "356866"})
+	ha.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.8, InstanceID: "356866"})
+	haStock := mtgban.InventoryRecord{}
+	haStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "27947"})
+	haStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 1.5, InstanceID: "27948"})
 	szStock := mtgban.InventoryRecord{}
 	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
 	csiSealed := mtgban.BuylistRecord{}
@@ -63,10 +71,12 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewVendorFromBuylist(csiSealed, mtgban.ScraperInfo{Shorthand: "CSISealed"}),
 		mtgban.NewVendorFromBuylist(mint, mtgban.ScraperInfo{Shorthand: "MMC"}),
 		mtgban.NewVendorFromBuylist(sz, mtgban.ScraperInfo{Shorthand: "SZ"}),
+		mtgban.NewVendorFromBuylist(ha, mtgban.ScraperInfo{Shorthand: "HA"}),
 	}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
 		mtgban.NewSellerFromInventory(szStock, mtgban.ScraperInfo{Shorthand: "SZ"}),
+		mtgban.NewSellerFromInventory(haStock, mtgban.ScraperInfo{Shorthand: "HA"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -103,6 +113,9 @@ func TestCartRows(t *testing.T) {
 		{"MMC", true, "8137:4"},
 		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
 		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
+		// Each condition its own class in the store, one class on the buylist
+		{"HA", false, "27947:3,27948:1"},
+		{"HA", true, "356866:4"},
 	} {
 		got := cartRows(tc.key, tc.buylist, entries)
 		if got != tc.want {
@@ -147,6 +160,8 @@ func TestCartLoadButtons(t *testing.T) {
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
+		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
+		{"HA", false, `href="https://www.hareruyamtg.com/en/cart#ban=27947:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
