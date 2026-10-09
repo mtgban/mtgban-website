@@ -1697,6 +1697,17 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
     text-decoration-color: currentColor;
 }
 
+/* -- ABU loader steps, shown by the ABU buttons -- */
+.abu-prompt-steps {
+    margin: 0 0 16px;
+    padding-left: 20px;
+    font-size: var(--text-md);
+    color: var(--normal);
+    line-height: 1.6;
+}
+.abu-prompt-steps li { margin-bottom: 8px; }
+.abu-prompt-steps .opt-btn { display: inline-block; padding: 2px 10px; cursor: grab; }
+
 /* -- Publish-as-store prompt (gated by the UploadPublish grant) -- */
 .store-prompt {
     width: 420px;
