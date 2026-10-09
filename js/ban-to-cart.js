@@ -9,6 +9,8 @@
         store = abuStore();
     } else if (location.hostname === "www.coolstuffinc.com") {
         store = csiStore();
+    } else if (location.hostname === "sellyourcards.starcitygames.com") {
+        store = scgStore();
     }
     if (!store || !match) {
         alert("Drag this link to your bookmarks bar. Then click it after the store's page loads.");
@@ -25,7 +27,7 @@
     decodeURIComponent(match[1]).split(",").forEach(function (pair) {
         var parts = pair.split(":");
         var qty = parseInt(parts[1], 10);
-        if (!/^\d+$/.test(parts[0]) || !(qty > 0)) {
+        if (!/^[\w-]+$/.test(parts[0]) || !(qty > 0)) {
             return;
         }
         if (!(parts[0] in quantities)) {
@@ -39,6 +41,19 @@
     banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;padding:12px;" +
         "background:#1f2937;color:#fff;font:16px sans-serif;text-align:center";
     document.body.appendChild(banner);
+
+    // A store that matches the list itself takes it whole and shows its own
+    // review of it
+    if (store.upload) {
+        banner.textContent = "BAN: handing your list to " + store.name;
+        try {
+            await store.upload(ids, quantities);
+        } catch (err) {
+            banner.remove();
+            alert(err.message);
+        }
+        return;
+    }
 
     try {
         // A card already in the cart adds no line
@@ -159,6 +174,53 @@
                     throw new Error("ABU refused the list (" + resp.status + ").");
                 }
                 return resp.ok;
+            }
+        };
+    }
+
+    // scgStore hands SCG the list as one CSV, the import its sell site offers,
+    // and opens SCG's review of it, where the user adds the matches to the
+    // cart. SCG matches a row on its SKU alone.
+    function scgStore() {
+        return {
+            name: "SCG",
+            loggedIn: function () {
+                return true;
+            },
+            upload: async function (rows, qty) {
+                var csv = "quantity,productid\n" + rows.map(function (id) {
+                    return qty[id] + "," + id;
+                }).join("\n") + "\n";
+                var form = new FormData();
+                form.append("file", new Blob([csv], {type: "text/csv"}), "ban_prices.csv");
+                form.append("fileFormatId", "1");
+                form.append("invalidFinishAction", "use_default");
+                form.append("invalidFinishDefault", "N");
+                form.append("invalidLanguageAction", "use_default");
+                form.append("invalidLanguageDefault", "en");
+                form.append("invalidQuantityAction", "skip_row");
+                form.append("invalidQuantityDefault", "");
+                form.append("manualColumnAssignments", "{}");
+                var token = /(?:^|; )XSRF-TOKEN=([^;]*)/.exec(document.cookie);
+                var resp = await fetch("/api/CSV2/upload", {
+                    method: "POST",
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-XSRF-TOKEN": token ? decodeURIComponent(token[1]) : ""
+                    },
+                    body: form
+                });
+                if (resp.status === 401) {
+                    throw new Error("Log in to SCG first, then click the BAN-to-Cart bookmark again.");
+                }
+                var body = await resp.json().catch(function () {
+                    return {};
+                });
+                if (!resp.ok || !body.fileId) {
+                    throw new Error("SCG refused the list (" + (body.errorMessage || resp.status) + ").");
+                }
+                location.href = "/mtg/uploads/" + body.fileId;
             }
         };
     }
