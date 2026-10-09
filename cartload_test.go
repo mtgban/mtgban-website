@@ -10,8 +10,8 @@ import (
 )
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
-// one item id per condition, CSI's buylist and sealed buylist, SCG's
-// buylist, and a store the bookmarklet does not fill.
+// one item id per condition, CSI's buylist and sealed buylist, SCG's and
+// Mint's buylists, and a store the bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -35,6 +35,10 @@ func stubCartStores(t *testing.T) {
 	scg := mtgban.BuylistRecord{}
 	scg.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "SGL-A1"})
 	scg.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.8, InstanceID: "SGL-A2"})
+	// Mint's grades are derived from its one row too
+	mint := mtgban.BuylistRecord{}
+	mint.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "8137"})
+	mint.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.5, InstanceID: "8137"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 
@@ -49,6 +53,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewVendorFromBuylist(scg, mtgban.ScraperInfo{Shorthand: "SCG"}),
 		mtgban.NewVendorFromBuylist(csi, mtgban.ScraperInfo{Shorthand: "CSI"}),
 		mtgban.NewVendorFromBuylist(csiSealed, mtgban.ScraperInfo{Shorthand: "CSISealed"}),
+		mtgban.NewVendorFromBuylist(mint, mtgban.ScraperInfo{Shorthand: "MMC"}),
 	}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
@@ -85,6 +90,7 @@ func TestCartRows(t *testing.T) {
 		// Sealed product carries no grade
 		{"CSISealed", true, "701:1"},
 		{"SCG", true, "SGL-A1:4"},
+		{"MMC", true, "8137:4"},
 	} {
 		got := cartRows(tc.key, tc.buylist, entries)
 		if got != tc.want {
@@ -99,6 +105,10 @@ func TestCartRows(t *testing.T) {
 	got = cartLoadFor("SCGRetail", false, entries)
 	if got.Link != "" {
 		t.Errorf("SCG's retail side, which has its own import, got a button: %+v", got)
+	}
+	got = cartLoadFor("MMC", false, entries)
+	if got.Link != "" {
+		t.Errorf("Mint's store side, which is not filled, got a button: %+v", got)
 	}
 	got = cartLoadFor("CSI", false, entries)
 	if got.Link != "" {
@@ -122,6 +132,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU"`},
 		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI"`},
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
+		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,

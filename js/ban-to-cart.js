@@ -12,6 +12,8 @@
         store = csiStore();
     } else if (location.hostname === "sellyourcards.starcitygames.com") {
         store = scgStore();
+    } else if (location.hostname === "www.mtgmintcard.com") {
+        store = mintStore();
     }
     if (!store || !match) {
         alert("Drag this link to your bookmarks bar. Then click it after the store's page loads.");
@@ -268,6 +270,46 @@
                 });
                 if (!resp.ok) {
                     throw new Error("CSI refused the list (" + resp.status + ").");
+                }
+                return true;
+            }
+        };
+    }
+
+    // mintStore loads Mint's buylist cart, kept by its session cookie, one
+    // card per call: the call its cart page's quantity picker makes, which
+    // sets the quantity and quietly skips an id Mint does not buy.
+    function mintStore() {
+        return {
+            name: "MTG Mint Card",
+            // The header links to the login page only for a guest
+            loggedIn: function () {
+                return !document.querySelector('a[href$="/login"]');
+            },
+            maxLines: 0,
+            chunkSize: 1,
+            cartIDs: async function () {
+                var resp = await fetch("/buylist-cart");
+                if (!resp.ok) {
+                    throw new Error("MTG Mint Card could not read your buylist cart (" + resp.status + ").");
+                }
+                var page = await resp.text();
+                var found = [];
+                var re = /name="multiple_quantity_(\d+)"/g;
+                var m;
+                while ((m = re.exec(page)) !== null) {
+                    found.push(m[1]);
+                }
+                return found;
+            },
+            send: async function (chunk, qty) {
+                for (var i = 0; i < chunk.length; i++) {
+                    var resp = await fetch("/ajax_index.php?ajax_main_page=ajax_buylist_cart_detail" +
+                        "&action=update_buy_list_product&buylist_cart_product_id=" + chunk[i] +
+                        "&buylist_cart_product_qty=" + qty[chunk[i]]);
+                    if (!resp.ok) {
+                        throw new Error("MTG Mint Card refused the list (" + resp.status + ").");
+                    }
                 }
                 return true;
             }
