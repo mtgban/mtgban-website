@@ -16,6 +16,8 @@
         store = mintStore();
     } else if (location.hostname === "shop.strikezoneonline.com") {
         store = szStore();
+    } else if (location.hostname === "www.hareruyamtg.com") {
+        store = haStore();
     }
     // A store whose cart names a row other than the link does maps it
     var key = (store && store.key) || function (id) {
@@ -467,5 +469,69 @@
             return (Number(d) + 10 - shifts[i]) % 10;
         }).join("");
         return "637-C-" + digits.slice(0, m[1].length) + "-" + digits.slice(m[1].length);
+    }
+
+    // haStore loads Hareruya's store cart, or its buylist cart on that cart's
+    // page, kept by its session cookie and keyed by the product class
+    // go-mtgban stores for each row. The store cart's form takes the whole
+    // list at once, setting each quantity up to the stock; the buylist
+    // cart adds one card per call, at most 20 of it, and only its form sets
+    // a quantity, so it follows the adds.
+    function haStore() {
+        var buylist = location.pathname.indexOf("/purchase/cart") >= 0;
+        var retail = /[#&]side=retail(&|$)/.test(location.hash);
+        var cartPage = buylist ? "/ja/purchase/cart" : "/en/cart";
+        async function post(url, body) {
+            var resp = await fetch(url, {method: "POST", body: body});
+            if (!resp.ok) {
+                throw new Error("Hareruya refused the list (" + resp.status + ").");
+            }
+        }
+        function most(n) {
+            return buylist ? Math.min(n, 20) : n;
+        }
+        return {
+            name: "Hareruya",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            // A store form of 600 cards took 7 s; a buylist add takes 0.3 s
+            chunkSize: buylist ? 50 : 500,
+            cartIDs: async function () {
+                // A store list on the buylist cart, or the other way round,
+                // would put one side's classes into the other's cart
+                if (retail === buylist) {
+                    throw new Error("This is not the Hareruya cart the list is for. Go back to BAN and press its button again.");
+                }
+                var resp = await fetch(cartPage);
+                if (!resp.ok) {
+                    throw new Error("Hareruya could not read your cart (" + resp.status + ").");
+                }
+                var page = await resp.text();
+                var found = [];
+                var re = /name="qty\[(\d+)\]"/g;
+                var m;
+                while ((m = re.exec(page)) !== null) {
+                    found.push(m[1]);
+                }
+                return found;
+            },
+            // Hareruya skips a class it does not sell or buy. A buylist card
+            // the cart page did not list is added on top of what is there,
+            // and the form then sets it like the rest.
+            send: async function (chunk, qty, present) {
+                var update = new URLSearchParams();
+                for (var i = 0; i < chunk.length; i++) {
+                    var id = chunk[i];
+                    if (buylist && present.indexOf(id) < 0) {
+                        await post("/ja/purchase/add", new URLSearchParams({product_class_id: id, quantity: String(most(qty[id]))}));
+                    }
+                    update.append("qty[" + id + "]", String(most(qty[id])));
+                }
+                await post(buylist ? "/ja/purchase/update" : "/en/cart/update", update);
+                return true;
+            }
+        };
     }
 })();

@@ -511,3 +511,102 @@ describe('ban-to-cart bookmarklet on Strike Zone', () => {
         expect(alerts[0]).toBe('Loaded 2 cards into your Strike Zone cart.');
     });
 });
+
+// fakeHA stands in for Hareruya's two carts: each page names a quantity field
+// per row, the store form sets or adds any row up to the stock, and the
+// buylist adds one card per call (at most 20, as Hareruya refuses more) and
+// its form sets only a row already in the cart. Either skips a class it
+// does not sell or buy.
+function fakeHA({cart = {}, unknown = [], stock = {}, pageLists = Infinity} = {}) {
+    const lines = {...cart};
+    const posts = [];
+    const keep = (id, qty) => {
+        if (qty === 0) {
+            delete lines[id];
+        } else {
+            lines[id] = Math.min(qty, stock[id] ?? Infinity);
+        }
+    };
+    const fetch = async (url, opts = {}) => {
+        if (!opts.method) {
+            const fields = Object.entries(lines).slice(0, pageLists).map(([id, q]) => `<input type="text" name="qty[${id}]" value="${q}">`);
+            return {ok: true, status: 200, text: async () => '<form>' + fields.join('') + '</form>'};
+        }
+        if (url.endsWith('/add')) {
+            const id = opts.body.get('product_class_id');
+            const qty = +opts.body.get('quantity');
+            posts.push({url, id, qty});
+            if (qty > 20) {
+                return {ok: false, status: 400};
+            }
+            if (!unknown.includes(id)) {
+                keep(id, (lines[id] || 0) + qty);
+            }
+            return {ok: true, status: 200};
+        }
+        const rows = [...opts.body.entries()].map(([k, v]) => [/^qty\[(\d+)\]$/.exec(k)[1], +v]);
+        posts.push({url, rows});
+        for (const [id, qty] of rows) {
+            if (!unknown.includes(id) && (url === '/en/cart/update' || id in lines)) {
+                keep(id, qty);
+            }
+        }
+        return {ok: true, status: 200};
+    };
+    return {fetch, posts, lines};
+}
+
+describe('ban-to-cart bookmarklet on Hareruya', () => {
+    const store = {host: 'www.hareruyamtg.com', path: '/en/cart'};
+    const buy = {host: 'www.hareruyamtg.com', path: '/ja/purchase/cart'};
+
+    test('a store list goes up as one form, setting each quantity up to the stock', async () => {
+        const ha = fakeHA({cart: {27947: 3}, unknown: ['999'], stock: {27948: 1}});
+        const {alerts, page, posts} = await run({...store, hash: '#ban=27947%3a1%2c27948%3a5%2c436375%3a2%2c999%3a1&side=retail', abu: ha});
+        expect(posts).toEqual([{url: '/en/cart/update', rows: [['27947', 1], ['27948', 5], ['436375', 2], ['999', 1]]}]);
+        expect(ha.lines).toEqual({27947: 1, 27948: 1, 436375: 2});
+        expect(alerts[0]).toBe('Loaded 3 cards into your Hareruya cart. 1 were not taken by Hareruya.');
+        expect(page.url).toBe('/en/cart');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('a long store list goes up 500 cards to a form', async () => {
+        const {posts} = await run({...store, hash: '#ban=' + list(1100) + '&side=retail', abu: fakeHA()});
+        expect(posts.map((p) => p.rows.length)).toEqual([500, 500, 100]);
+    });
+
+    test('a buylist adds each new card, then sets every quantity', async () => {
+        const ha = fakeHA({cart: {356866: 4}});
+        const {alerts, posts} = await run({...buy, hash: '#ban=356866%3a1%2c360683%3a2%2c436375%3a1', abu: ha});
+        expect(posts).toEqual([
+            {url: '/ja/purchase/add', id: '360683', qty: 2},
+            {url: '/ja/purchase/add', id: '436375', qty: 1},
+            {url: '/ja/purchase/update', rows: [['356866', 1], ['360683', 2], ['436375', 1]]},
+        ]);
+        expect(ha.lines).toEqual({356866: 1, 360683: 2, 436375: 1});
+        expect(alerts[0]).toBe('Loaded 3 cards into your Hareruya cart.');
+    });
+
+    test('a buylist card the cart page does not list still ends at the list\'s quantity', async () => {
+        // the page lists only its first row, so 360683 looks new and is added
+        // on top of the 5 already there
+        const ha = fakeHA({cart: {356866: 1, 360683: 5}, pageLists: 1});
+        await run({...buy, hash: '#ban=360683:2', abu: ha});
+        expect(ha.lines).toEqual({356866: 1, 360683: 2});
+    });
+
+    test('a list on the other side\'s cart is refused before anything is sent', async () => {
+        for (const [where, hash] of [[buy, '#ban=27947:1&side=retail'], [store, '#ban=356866:1']]) {
+            const ha = fakeHA();
+            const {alerts, posts} = await run({...where, hash, abu: ha});
+            expect(posts).toHaveLength(0);
+            expect(alerts[0]).toContain('not the Hareruya cart the list is for');
+        }
+    });
+
+    test('a buylist quantity stops at the 20 Hareruya takes of one card', async () => {
+        const ha = fakeHA({cart: {356866: 1}});
+        await run({...buy, hash: '#ban=356866:30,360683:25', abu: ha});
+        expect(ha.lines).toEqual({356866: 20, 360683: 20});
+    });
+});
