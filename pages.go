@@ -612,6 +612,9 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	if name == "arbit.html" {
 		files = append(files, "templates/partials/sussy-price.html")
 	}
+	if name == "upload.html" {
+		files = append(files, "templates/partials/cart-prompt.html")
+	}
 	if name == "guide.html" {
 		files = append(files,
 			"templates/partials/guide-overview.html",

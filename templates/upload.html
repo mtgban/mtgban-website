@@ -985,10 +985,11 @@
                             </form>
                         {{end}}
 
-                        {{$abuRows := abu_cart $scraperKey $.IsBuylist $entries}}
-                        {{if $abuRows}}
-                            <a class="opt-btn load" href="https://abugames.com/cartview/{{if $.IsBuylist}}buylist{{else}}shop{{end}}#mtgban={{$abuRows}}" target="_blank" rel="noopener" onclick="return openABUPrompt(this)">Load {{if $.IsBuylist}}buylist {{end}}at ABU</a>
-                            <a class="opt-btn csv" href="#" onclick="return showABUPrompt(this.previousElementSibling)" title="How Load at ABU works, and the BAN-to-ABU bookmark">?</a>
+                        {{$cart := cart_load $scraperKey $.IsBuylist $entries}}
+                        {{if $cart.Link}}
+                            <span class="cart-load">
+                                <a class="opt-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-buylist="{{$.IsBuylist}}" onclick="return openCartPrompt(this)">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
+                            </span>
                         {{end}}
 
                         {{if and $.IsBuylist (or (eq $scraperKey "CK") (eq $scraperKey "SCG"))}}
@@ -1096,32 +1097,8 @@
         </div>
     </div>
 
-    {{$hasABU := false}}
-    {{range .OptimizedKeys}}{{if has_prefix . "ABU"}}{{$hasABU = true}}{{end}}{{end}}
-    {{if $hasABU}}
-    {{/* What the ABU buttons show before opening ABU: the loader to drag, and
-         when to click it. js/abu-cart.js is the loader, docs/abu-carts.md
-         the API it calls. */}}
-    <div id="abu-overlay" class="printing-overlay" onclick="if(event.target===this)closeABUPrompt()">
-        <div class="printing-picker store-prompt">
-            <div class="printing-picker-header">
-                <span class="printing-picker-title">Load your {{if .IsBuylist}}buylist{{else}}cards{{end}} at ABU</span>
-                <button type="button" class="printing-picker-close" onclick="closeABUPrompt()">&times;</button>
-            </div>
-            <ol class="abu-prompt-steps">
-                <li>Drag <a class="opt-btn load" href="{{abu_bookmarklet}}">BAN-to-ABU</a> to your bookmarks bar. You only need to do this once.</li>
-                <li>Press Open @ ABU. Your ABU {{if .IsBuylist}}buylist {{end}}cart opens in a new tab.</li>
-                <li>Click the BAN-to-ABU bookmark after the page on ABU loads. Log in to ABU first if you aren't.</li>
-            </ol>
-            {{if .IsBuylist}}<p class="store-prompt-note">Every card goes in as NM, so ABU's cart quotes NM prices. ABU pays for the grade it gives the cards on arrival.</p>{{end}}
-            <label class="store-prompt-check"><input type="checkbox" id="abu-prompt-skip"> Don't show this again</label>
-            <div class="store-prompt-actions">
-                <button type="button" class="upload-btn upload-btn-secondary" onclick="closeABUPrompt()">Cancel</button>
-                <button type="button" class="upload-btn upload-btn-primary" onclick="openABU()">Open @ ABU</button>
-            </div>
-        </div>
-    </div>
-    <script type="text/javascript" src="/js/abu-prompt.js?hash={{.Hash}}"></script>
+    {{if cart_stores_in .OptimizedKeys .IsBuylist}}
+    {{template "cart-prompt" .}}
     {{end}}
 
     {{if .CanPublishStore}}

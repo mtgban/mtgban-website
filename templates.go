@@ -426,8 +426,9 @@ var funcMap = template.FuncMap{
 		}
 		return entries[0].OriginalID
 	},
-	"abu_cart":        abuCartRows,
-	"abu_bookmarklet": abuBookmarklet,
+	"cart_load":        cartLoadFor,
+	"cart_stores_in":   cartStoresIn,
+	"cart_bookmarklet": cartBookmarklet,
 	"isSussy": func(m map[string]float64, s string) bool {
 		_, found := m[s]
 		return found

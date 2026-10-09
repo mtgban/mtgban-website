@@ -9,9 +9,9 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// stubABU stands in ABU's buylist and one of its store splits, with one item
-// id per condition, and SCG holding ids of its own.
-func stubABU(t *testing.T) {
+// stubCartStores stands in ABU's buylist and one of its store splits, with
+// one item id per condition, and a store the bookmarklet does not fill.
+func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
 	buylist.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "101"})
@@ -19,8 +19,8 @@ func stubABU(t *testing.T) {
 	buylist.Add("card-b", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "201"})
 	// ABU prices this one's NM row at $0, which the scraper drops
 	buylist.Add("card-e", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 1, InstanceID: "501"})
-	scg := mtgban.BuylistRecord{}
-	scg.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "999"})
+	mkm := mtgban.BuylistRecord{}
+	mkm.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "999"})
 	inventory := mtgban.InventoryRecord{}
 	inventory.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1, InstanceID: "301"})
 	// ABU stocks this one only as SP, which a row with no condition was
@@ -34,7 +34,7 @@ func stubABU(t *testing.T) {
 	})
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Shorthand: "ABUGames"}),
-		mtgban.NewVendorFromBuylist(scg, mtgban.ScraperInfo{Shorthand: "SCG"}),
+		mtgban.NewVendorFromBuylist(mkm, mtgban.ScraperInfo{Shorthand: "MKM"}),
 	}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
@@ -43,8 +43,8 @@ func stubABU(t *testing.T) {
 	sellersPtr.Store(&sellers)
 }
 
-func TestABUCartRows(t *testing.T) {
-	stubABU(t)
+func TestCartRows(t *testing.T) {
+	stubCartStores(t)
 
 	entries := []OptimizedUploadEntry{
 		{CardID: "card-a", Quantity: 2},
@@ -57,31 +57,33 @@ func TestABUCartRows(t *testing.T) {
 		{CardID: "card-e", Quantity: 1},
 	}
 
-	// Every buylist row goes in as NM, and a card with no NM id stays out
-	got := abuCartRows("ABUGames", true, entries)
-	want := "101:4,201:4"
-	if got != want {
-		t.Errorf("buylist rows = %q, want %q", got, want)
+	for _, tc := range []struct {
+		key     string
+		buylist bool
+		want    string
+	}{
+		// Every buylist row goes in as NM, and a card with no NM id stays out
+		{"ABUGames", true, "101:4,201:4"},
+		// A store row keeps its condition, or the one it was priced at
+		{"ABUScans", false, "301:3,402:1"},
+	} {
+		got := cartRows(tc.key, tc.buylist, entries)
+		if got != tc.want {
+			t.Errorf("%s rows = %q, want %q", tc.key, got, tc.want)
+		}
 	}
 
-	// A store row keeps its condition, or the one it was priced at
-	got = abuCartRows("ABUScans", false, entries)
-	want = "301:3,402:1"
-	if got != want {
-		t.Errorf("store rows = %q, want %q", got, want)
-	}
-
-	got = abuCartRows("SCG", true, entries)
-	if got != "" {
-		t.Errorf("a store that is not ABU got rows %q", got)
+	got := cartLoadFor("MKM", true, entries)
+	if got.Link != "" {
+		t.Errorf("a store the bookmarklet does not fill got a button: %+v", got)
 	}
 }
 
-// The page's ABU button opens the cart the split is for, with its rows in
-// the fragment, percent-encoded by html/template, through the panel holding
-// the loader, whose link survives html/template.
-func TestABULoadButtons(t *testing.T) {
-	stubABU(t)
+// A split's button opens the store cart it is for, with its rows in the
+// fragment, through the panel holding the loader, whose link survives
+// html/template.
+func TestCartLoadButtons(t *testing.T) {
+	stubCartStores(t)
 	entries := []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}}
 
 	for _, tc := range []struct {
@@ -89,8 +91,8 @@ func TestABULoadButtons(t *testing.T) {
 		buylist bool
 		link    string
 	}{
-		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#mtgban=101%3a2"`},
-		{"ABUScans", false, `href="https://abugames.com/cartview/shop#mtgban=301%3a2"`},
+		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2" target="_blank" rel="noopener" data-store="ABU"`},
+		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2" target="_blank" rel="noopener" data-store="ABU"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -101,35 +103,36 @@ func TestABULoadButtons(t *testing.T) {
 		if !strings.Contains(out, tc.link) {
 			t.Errorf("%s: no button with %s", tc.key, tc.link)
 		}
-		if !strings.Contains(out, `onclick="return openABUPrompt(this)"`) {
+		if !strings.Contains(out, `onclick="return openCartPrompt(this)"`) {
 			t.Errorf("%s: the button skips the panel", tc.key)
 		}
-		if !strings.Contains(out, `onclick="return showABUPrompt(this.previousElementSibling)"`) {
+		if !strings.Contains(out, `onclick="return showCartPrompt(this.nextElementSibling)"`) {
 			t.Errorf("%s: no way back to the panel", tc.key)
 		}
-		if !strings.Contains(out, `id="abu-overlay"`) || !strings.Contains(out, `href="javascript:void%20`) {
+		if !strings.Contains(out, `id="cart-overlay"`) || !strings.Contains(out, `href="javascript:void%20`) {
 			t.Errorf("%s: no panel with the loader to drag", tc.key)
 		}
 	}
 
-	out := renderUpload(t, PageVars{UploadVars: UploadVars{
-		IsBuylist:       true,
-		Optimized:       map[string][]OptimizedUploadEntry{"SCG": entries},
-		OptimizedKeys:   []string{"SCG"},
-		OptimizedTotals: map[string]float64{"SCG": 1},
-	}})
-	if strings.Contains(out, `id="abu-overlay"`) {
-		t.Error("a page with no ABU split carries the ABU panel")
+	for _, key := range []string{"MKM"} {
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{
+			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
+			OptimizedKeys:   []string{key},
+			OptimizedTotals: map[string]float64{key: 1},
+		}})
+		if strings.Contains(out, `id="cart-overlay"`) {
+			t.Errorf("a retail page with only a %s split carries the cart panel", key)
+		}
 	}
 }
 
-func TestABUBookmarklet(t *testing.T) {
-	source, err := os.ReadFile("js/abu-cart.js")
+func TestCartBookmarklet(t *testing.T) {
+	source, err := os.ReadFile("js/ban-to-cart.js")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	link := string(abuBookmarklet())
+	link := string(cartBookmarklet())
 	code, found := strings.CutPrefix(link, "javascript:void%20")
 	if !found {
 		t.Fatalf("bookmarklet does not discard its result: %.40q", link)
@@ -139,6 +142,6 @@ func TestABUBookmarklet(t *testing.T) {
 		t.Fatal(err)
 	}
 	if decoded != strings.TrimSpace(string(source)) {
-		t.Error("bookmarklet does not decode back to js/abu-cart.js")
+		t.Error("bookmarklet does not decode back to js/ban-to-cart.js")
 	}
 }
