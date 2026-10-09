@@ -1301,6 +1301,9 @@
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     margin-bottom: 24px;
+    /* Land #opt-* jumps below the fixed navbar, where the sticky headers
+       sit in flow instead of stacking over the first rows */
+    scroll-margin-top: var(--nav-height);
 }
 .opt-store-header {
     display: flex;
