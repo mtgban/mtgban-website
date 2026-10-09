@@ -14,11 +14,13 @@ import (
 
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
 // keyed by the prefix their splits' shorthands share, with the page each
-// side's button opens. An empty page gets no button: CSI's retail side has
-// its own deck builder import on the upload page.
+// side's button opens. An empty page gets no button: CSI's and SCG's retail
+// sides have their own imports on the upload page. SCG's page is its CSV
+// uploads, where the bookmarklet hands SCG the list to match.
 var cartStores = []cartStore{
 	{"ABU", "ABU", "https://abugames.com/cartview/buylist", "https://abugames.com/cartview/shop"},
 	{"CSI", "CSI", "https://www.coolstuffinc.com/buylist_cart.php", ""},
+	{"SCG", "SCG", "https://sellyourcards.starcitygames.com/mtg/uploads", ""},
 }
 
 type cartStore struct {

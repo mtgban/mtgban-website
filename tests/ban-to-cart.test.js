@@ -59,15 +59,17 @@ function fakeCSI({cart = {}, unknown = []} = {}) {
 }
 
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', loggedIn = true, abu = fakeABU()} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', loggedIn = true, abu = fakeABU(), cookie = ''} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
     const location = {hostname: host, pathname: path, hash, reload: () => { page.reloaded = true; }};
+    page.location = location;
     const storage = {isLoggedIn: loggedIn ? 'true' : 'false', 'accessToken-ABU': 'abc'};
     const localStorage = {getItem: (key) => storage[key] ?? null};
     const document = {
         createElement: () => ({style: {}, remove() {}}),
         body: {appendChild() {}},
+        cookie,
     };
     const history = {replaceState: (state, title, url) => { page.url = url; }};
     const script = new Function('location', 'localStorage', 'fetch', 'alert', 'document', 'history', 'return ' + source);
@@ -108,7 +110,7 @@ describe('ban-to-cart bookmarklet on ABU', () => {
     });
 
     test('repeated ids add up and malformed pairs are dropped', async () => {
-        const {posts} = await run({hash: '#ban=11:2,12:1,11:3,x:1,13:0,14'});
+        const {posts} = await run({hash: '#ban=11:2,12:1,11:3,x/y:1,13:0,14'});
         expect(posts[0].rows).toEqual([{item_id: '11', quantity: 5}, {item_id: '12', quantity: 1}]);
     });
 
@@ -190,5 +192,43 @@ describe('ban-to-cart bookmarklet on CSI', () => {
         const csi = fakeCSI({cart: {7: 2}});
         await run({...csiPage, hash: '#ban=7:1', abu: csi});
         expect(csi.lines).toEqual({7: 3});
+    });
+});
+
+// fakeSCG stands in for SCG's CSV import: it answers an upload with the file
+// id SCG's review page is keyed by, or 401 to a visitor not logged in.
+function fakeSCG({status = 200} = {}) {
+    const uploads = [];
+    const fetch = async (url, opts = {}) => {
+        uploads.push({url, headers: opts.headers, form: opts.body});
+        if (status !== 200) {
+            return {ok: false, status, json: async () => ({})};
+        }
+        return {ok: true, status, json: async () => ({fileId: 7151})};
+    };
+    return {fetch, uploads, posts: uploads};
+}
+
+describe('ban-to-cart bookmarklet on SCG', () => {
+    const scgPage = {host: 'sellyourcards.starcitygames.com', path: '/mtg/uploads'};
+
+    test('the list goes up as one CSV of SKUs and SCG\'s review opens', async () => {
+        const scg = fakeSCG();
+        const {alerts, page} = await run({...scgPage, hash: '#ban=SGL-A1%3a2%2cSGL-B1%3a1',
+            abu: scg, cookie: 'other=1; XSRF-TOKEN=abc%3D%3D'});
+        expect(scg.uploads).toHaveLength(1);
+        const up = scg.uploads[0];
+        expect(up.url).toBe('/api/CSV2/upload');
+        expect(up.headers['X-XSRF-TOKEN']).toBe('abc==');
+        expect(up.form.get('fileFormatId')).toBe('1');
+        expect(await up.form.get('file').text()).toBe('quantity,productid\n2,SGL-A1\n1,SGL-B1\n');
+        expect(page.location.href).toBe('/mtg/uploads/7151');
+        expect(alerts).toHaveLength(0);
+    });
+
+    test('a visitor not logged in is told to log in', async () => {
+        const {alerts, page} = await run({...scgPage, hash: '#ban=SGL-A1:1', abu: fakeSCG({status: 401})});
+        expect(alerts[0]).toContain('Log in to SCG first');
+        expect(page.location.href).toBeUndefined();
     });
 });

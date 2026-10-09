@@ -10,8 +10,8 @@ import (
 )
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
-// one item id per condition, CSI's buylist and sealed buylist, and a store
-// the bookmarklet does not fill.
+// one item id per condition, CSI's buylist and sealed buylist, SCG's
+// buylist, and a store the bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -31,6 +31,10 @@ func stubCartStores(t *testing.T) {
 	csi := mtgban.BuylistRecord{}
 	csi.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "601"})
 	csi.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.8, InstanceID: "601"})
+	// SCG's ids are SKUs, one per condition
+	scg := mtgban.BuylistRecord{}
+	scg.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "SGL-A1"})
+	scg.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.8, InstanceID: "SGL-A2"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 
@@ -42,6 +46,7 @@ func stubCartStores(t *testing.T) {
 	vendors := []mtgban.Vendor{
 		mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{Shorthand: "ABUGames"}),
 		mtgban.NewVendorFromBuylist(mkm, mtgban.ScraperInfo{Shorthand: "MKM"}),
+		mtgban.NewVendorFromBuylist(scg, mtgban.ScraperInfo{Shorthand: "SCG"}),
 		mtgban.NewVendorFromBuylist(csi, mtgban.ScraperInfo{Shorthand: "CSI"}),
 		mtgban.NewVendorFromBuylist(csiSealed, mtgban.ScraperInfo{Shorthand: "CSISealed"}),
 	}
@@ -79,6 +84,7 @@ func TestCartRows(t *testing.T) {
 		{"CSI", true, "601:4"},
 		// Sealed product carries no grade
 		{"CSISealed", true, "701:1"},
+		{"SCG", true, "SGL-A1:4"},
 	} {
 		got := cartRows(tc.key, tc.buylist, entries)
 		if got != tc.want {
@@ -89,6 +95,10 @@ func TestCartRows(t *testing.T) {
 	got := cartLoadFor("MKM", true, entries)
 	if got.Link != "" {
 		t.Errorf("a store the bookmarklet does not fill got a button: %+v", got)
+	}
+	got = cartLoadFor("SCGRetail", false, entries)
+	if got.Link != "" {
+		t.Errorf("SCG's retail side, which has its own import, got a button: %+v", got)
 	}
 	got = cartLoadFor("CSI", false, entries)
 	if got.Link != "" {
@@ -111,6 +121,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2" target="_blank" rel="noopener" data-store="ABU"`},
 		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2" target="_blank" rel="noopener" data-store="ABU"`},
 		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2" target="_blank" rel="noopener" data-store="CSI"`},
+		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2" target="_blank" rel="noopener" data-store="SCG"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
