@@ -60,7 +60,7 @@ function fakeCSI({cart = {}, unknown = []} = {}) {
 }
 
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = ''} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
     if (hash && version !== null) {
@@ -74,6 +74,7 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', hash = ''
         createElement: () => ({style: {}, remove() {}}),
         body: {appendChild() {}},
         cookie,
+        querySelector: (selector) => (loginLink && selector === 'a[href$="/login"]' ? {} : null),
     };
     const history = {replaceState: (state, title, url) => { page.url = url; }};
     const script = new Function('location', 'localStorage', 'fetch', 'alert', 'document', 'history', 'return ' + source);
@@ -242,5 +243,63 @@ describe('ban-to-cart bookmarklet on SCG', () => {
         const {alerts, page} = await run({...scgPage, hash: '#ban=SGL-A1:1', abu: fakeSCG({status: 401})});
         expect(alerts[0]).toContain('Log in to SCG first');
         expect(page.location.href).toBeUndefined();
+    });
+});
+
+// fakeMint stands in for Mint's buylist cart: the cart page names a quantity
+// picker per row, and the picker's call sets a row's quantity and skips an
+// id Mint does not buy, as Mint does.
+function fakeMint({cart = {}, unknown = []} = {}) {
+    const lines = {...cart};
+    const posts = [];
+    const fetch = async (url) => {
+        if (url === '/buylist-cart') {
+            const fields = Object.keys(lines).map((id) => `<select name="multiple_quantity_${id}"></select>`);
+            return {ok: true, status: 200, text: async () => fields.join('')};
+        }
+        const query = new URLSearchParams(url.split('?')[1]);
+        const id = query.get('buylist_cart_product_id');
+        posts.push({url, action: query.get('action'), id, qty: +query.get('buylist_cart_product_qty')});
+        if (!unknown.includes(id)) {
+            lines[id] = +query.get('buylist_cart_product_qty');
+        }
+        return {ok: true, status: 200};
+    };
+    return {fetch, posts, lines};
+}
+
+describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
+    const mintPage = {host: 'www.mtgmintcard.com', path: '/buylist-cart'};
+
+    test('each row goes to the cart page\'s quantity call on its own', async () => {
+        const mint = fakeMint();
+        const {alerts, page, posts} = await run({...mintPage, hash: '#ban=8137:1,20452:2', abu: mint});
+        expect(posts.map((p) => [p.action, p.id, p.qty])).toEqual([
+            ['update_buy_list_product', '8137', 1],
+            ['update_buy_list_product', '20452', 2],
+        ]);
+        expect(posts[0].url.startsWith('/ajax_index.php?ajax_main_page=ajax_buylist_cart_detail&')).toBe(true);
+        expect(alerts[0]).toBe('Loaded 2 cards into your MTG Mint Card cart.');
+        expect(page.url).toBe('/buylist-cart');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('a card already in the cart takes the list\'s quantity', async () => {
+        const mint = fakeMint({cart: {7: 2}});
+        await run({...mintPage, hash: '#ban=7:1', abu: mint});
+        expect(mint.lines).toEqual({7: 1});
+    });
+
+    test('an id Mint does not buy is reported', async () => {
+        const mint = fakeMint({unknown: ['2']});
+        const {alerts} = await run({...mintPage, hash: '#ban=1:1,2:1,3:1', abu: mint});
+        expect(mint.lines).toEqual({1: 1, 3: 1});
+        expect(alerts[0]).toBe('Loaded 2 cards into your MTG Mint Card cart. 1 were not taken by MTG Mint Card.');
+    });
+
+    test('a guest is told to log in and nothing is sent', async () => {
+        const {alerts, posts} = await run({...mintPage, hash: '#ban=1:1', abu: fakeMint(), loginLink: true});
+        expect(alerts[0]).toContain('Log in to MTG Mint Card first');
+        expect(posts).toHaveLength(0);
     });
 });

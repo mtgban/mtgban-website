@@ -3,11 +3,12 @@
 Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
 buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
-and both calls take a list. Star City Games has a CSV import on its sell
-site, but no way to hand it a list from another site. The upload page
-reaches all three through one bookmarklet, BAN-to-Cart, run on the store's
-page. ABU was measured against a real account on 2026-10-07, CSI against a
-guest cart and SCG against a real account on 2026-10-09.
+and both calls take a list. MTG Mint Card has the same kind of call, one
+card at a time. Star City Games has a CSV import on its sell site, but no
+way to hand it a list from another site. The upload page reaches all four
+through one bookmarklet, BAN-to-Cart, run on the store's page. ABU was
+measured against a real account on 2026-10-07, CSI against a guest cart,
+and SCG and Mint against a real account on 2026-10-09.
 
 ## ABU: the calls
 
@@ -100,6 +101,36 @@ ajaxdata=uid_3813340qty_1||uid_3813344qty_2||
 | an id CSI does not buy | skipped quietly, rest of the list kept |
 | more than CSI wants | trimmed to CSI's own limit |
 
+## Mint: the call
+
+Mint's buylist cart page sets a row's quantity with a `GET`, and the same
+call adds a card not yet in the cart:
+
+```
+https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_buylist_cart_detail
+    &action=update_buy_list_product&buylist_cart_product_id=8137&buylist_cart_product_qty=2
+```
+
+- The id is Mint's `products_id`, one printing and finish, which its feed
+  carries as `Id` and go-mtgban's `mintcard` scraper stores as
+  `InstanceID`. Mint's feed prices no foil on the buylist, though its
+  buylist page buys foils, so those cannot be loaded.
+- The cart is kept by Mint's `zenid` session cookie, guests included, so
+  only a page on mtgmintcard.com can reach it.
+- The call takes one id: given two, Mint keeps the last. The Sell buttons'
+  own call (`ajax_buylist_cart`, `action=sell_now`) takes one id as well,
+  and adds to a row's quantity instead of setting it.
+- The cart page is `/buylist-cart`, with one `multiple_quantity_<id>`
+  picker per row, which is how the bookmarklet reads the cart back.
+
+| Sent | Result |
+|---|---|
+| one row per call | 10 calls in 10.4 s |
+| a card already in the cart | quantity replaced |
+| more than Mint wants | trimmed to Mint's own limit |
+| an id Mint does not buy, or a store-only id | skipped quietly, 200 |
+| quantity 0 | row removed |
+
 ## SCG: the CSV import
 
 SCG's sell site, `https://sellyourcards.starcitygames.com`, adds one card
@@ -125,9 +156,9 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's buylist and store splits, and CSI's
-and SCG's buylist splits. CSI's and SCG's store sides already have their
-own imports. The
+the store's cart can take it: ABU's buylist and store splits, and CSI's,
+SCG's and Mint's buylist splits. CSI's and SCG's store sides already have
+their own imports. The
 arbit, reverse and global pages give each section the same buttons: "Load
 at" for the store it buys from and "Load buylist at" for the store it sells
 to, each row in the condition the store sells it in
@@ -173,16 +204,18 @@ from the page's host. It first checks it is the loader the site expects:
 onto every link (`&v=`), so a bookmark saved before the file last changed
 says it is out of date and asks to be dragged again, and touches no cart.
 On SCG it then uploads the list as one CSV and opens SCG's review of it.
-On ABU and CSI it:
+On ABU, CSI and Mint it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
+   on Mint, stops while the page links to Mint's login page, which it
+   does only for a guest, since a sell order needs an account;
 2. reads the cart and stops at ABU's caps, 750 buylist lines or 1,000
    store lines, counting what is already there, and says what was left
-   out; CSI has no cap;
+   out; CSI and Mint have no cap;
 3. sends the rows in chunks with a progress banner: 300 for ABU's
    buylist, 50 for ABU's store so each request finishes in under a
-   minute, 100 for CSI;
+   minute, 100 for CSI, and one at a time for Mint, about a second each;
 4. on ABU's 422, reads the cart back and tries each row missing from it
    alone until ABU refuses one, the id it does not know, then resends the
    rest; ABU's store also leaves out rows it has none of, so the first
@@ -191,7 +224,8 @@ On ABU and CSI it:
    out, and what did not fit, then clears the fragment and reloads the
    page.
 
-ABU's token, and CSI's and SCG's cookies, never leave the store's site.
+ABU's token, and CSI's, SCG's and Mint's cookies, never leave the store's
+site.
 Pasting an ABU token into mtgban would work too, since ABU's CORS is open,
 but it would put a year-long credential in our page. Logging in to a
 store through mtgban is not an option: we would be handling people's
