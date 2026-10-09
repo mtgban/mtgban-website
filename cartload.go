@@ -1,0 +1,159 @@
+package main
+
+import (
+	"html/template"
+	"log"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/mtgban/go-mtgban/mtgban"
+)
+
+// cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
+// keyed by the prefix their splits' shorthands share, with the page each
+// side's button opens. An empty page gets no button.
+var cartStores = []cartStore{
+	{"ABU", "ABU", "https://abugames.com/cartview/buylist", "https://abugames.com/cartview/shop"},
+}
+
+type cartStore struct {
+	prefix  string
+	name    string
+	buylist string
+	retail  string
+}
+
+// page is the cart page a split's button opens on the side buylist says.
+func (cs cartStore) page(buylist bool) string {
+	if buylist {
+		return cs.buylist
+	}
+	return cs.retail
+}
+
+// cartLoad is what a split's "Load at" button needs: the store's name, and
+// its cart page with the split's rows in the fragment.
+type cartLoad struct {
+	Store string
+	Link  string
+}
+
+// cartLoadFor builds the button for a store split, or nothing for a store the
+// bookmarklet does not fill or a split with no row it can load. See
+// docs/store-carts.md.
+func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartLoad {
+	for _, cs := range cartStores {
+		if !strings.HasPrefix(key, cs.prefix) {
+			continue
+		}
+		page := cs.page(buylist)
+		if page == "" {
+			return cartLoad{}
+		}
+		rows := cartRows(key, buylist, entries)
+		if rows == "" {
+			return cartLoad{}
+		}
+		return cartLoad{Store: cs.name, Link: page + "#ban=" + rows}
+	}
+	return cartLoad{}
+}
+
+// cartStoresIn answers whether any of the splits keys names is one a store
+// cart button can open, on the side buylist says.
+func cartStoresIn(keys []string, buylist bool) bool {
+	for _, key := range keys {
+		for _, cs := range cartStores {
+			if strings.HasPrefix(key, cs.prefix) && cs.page(buylist) != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// cartRows lists a store split's cards the way js/ban-to-cart.js reads them
+// from the fragment of the cart page: "id:qty" pairs joined by commas, one
+// per store item id, with the quantities of rows sharing an id added up. A
+// buylist row goes in as NM, a store row in the condition it was priced at.
+// A card the store lists no id for is left out.
+func cartRows(key string, buylist bool, entries []OptimizedUploadEntry) string {
+	var lookup func(cardID string, cond mtgban.Condition) string
+	if buylist {
+		bl, err := findVendorBuylist(key)
+		if err != nil {
+			return ""
+		}
+		// Sold as NM whatever the row says: the store grades what arrives
+		lookup = func(cardID string, _ mtgban.Condition) string {
+			entries := bl[cardID]
+			i := pricedEntry(entries, mtgban.NM)
+			if i < 0 {
+				return ""
+			}
+			return entries[i].InstanceID
+		}
+	} else {
+		inv, err := findSellerInventory(key)
+		if err != nil {
+			return ""
+		}
+		lookup = func(cardID string, cond mtgban.Condition) string {
+			entries := inv[cardID]
+			i := pricedEntry(entries, cond)
+			if i < 0 {
+				return ""
+			}
+			return entries[i].InstanceID
+		}
+	}
+
+	var ids []string
+	quantities := map[string]int{}
+	for _, entry := range entries {
+		id := lookup(entry.CardID, entry.Condition)
+		if id == "" {
+			continue
+		}
+		if _, found := quantities[id]; !found {
+			ids = append(ids, id)
+		}
+		quantities[id] += entry.Quantity
+	}
+
+	pairs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		pairs = append(pairs, id+":"+strconv.Itoa(quantities[id]))
+	}
+	return strings.Join(pairs, ",")
+}
+
+// pricedEntry is the index of the entry the optimizer priced a row from: the
+// one in the row's condition, or for a row naming none the first priced
+// entry, as processEntry picks its base. -1 when there is none.
+func pricedEntry[T mtgban.GenericEntry](entries []T, cond mtgban.Condition) int {
+	for i := range entries {
+		if cond == "" && entries[i].Pricing() != 0 {
+			return i
+		}
+		if cond != "" && entries[i].Condition() == cond {
+			return i
+		}
+	}
+	return -1
+}
+
+// cartBookmarklet is js/ban-to-cart.js as a link a user drags to their
+// bookmarks bar, read once.
+var cartBookmarklet = sync.OnceValue(func() template.URL {
+	source, err := os.ReadFile("js/ban-to-cart.js")
+	if err != nil {
+		log.Println("cart bookmarklet:", err)
+		return ""
+	}
+	// void keeps the browser from replacing the page with the script's result
+	return template.URL("javascript:void%20" + url.PathEscape(strings.TrimSpace(string(source))))
+})

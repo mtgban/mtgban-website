@@ -1,0 +1,27 @@
+{{define "cart-prompt"}}
+{{/* What a store cart button shows before opening the store: the loader to
+     drag, and when to click it. js/ban-to-cart.js is the loader,
+     docs/store-carts.md the carts it fills. The store's name, and whether
+     it is a buylist, are filled in from the button pressed. */}}
+<link rel="stylesheet" type="text/css" href="/css/cart-prompt.css?hash={{.Hash}}">
+<div id="cart-overlay" class="cart-overlay" onclick="if(event.target===this)closeCartPrompt()">
+    <div class="cart-panel">
+        <div class="cart-panel-header">
+            <span class="cart-panel-title">Load your <span class="cart-prompt-buylist">buylist</span><span class="cart-prompt-retail">cards</span> at <span class="cart-prompt-store"></span></span>
+            <button type="button" class="cart-panel-close" onclick="closeCartPrompt()">&times;</button>
+        </div>
+        <ol class="cart-panel-steps">
+            <li>Drag <a class="cart-loader" href="{{cart_bookmarklet}}">BAN-to-Cart</a> to your bookmarks bar. You only need to do this once, and it works for every store with this button.</li>
+            <li>Press Continue @ <span class="cart-prompt-store"></span>. Your <span class="cart-prompt-store"></span> <span class="cart-prompt-buylist">buylist </span>cart opens in a new tab.</li>
+            <li>Click the BAN-to-Cart bookmark after the page on <span class="cart-prompt-store"></span> loads. Log in to <span class="cart-prompt-store"></span> first if you aren't.</li>
+        </ol>
+        <p class="cart-panel-note cart-prompt-buylist">Every card goes in as NM, so the cart quotes NM prices. <span class="cart-prompt-store"></span> pays for the grade it gives the cards on arrival.</p>
+        <label class="cart-panel-check"><input type="checkbox" id="cart-prompt-skip"> Don't show this again</label>
+        <div class="cart-panel-actions">
+            <button type="button" class="cart-btn cart-btn-secondary" onclick="closeCartPrompt()">Cancel</button>
+            <button type="button" class="cart-btn cart-btn-primary" onclick="openCartStore()">Continue @ <span class="cart-prompt-store"></span></button>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" src="/js/cart-prompt.js?hash={{.Hash}}"></script>
+{{end}}
