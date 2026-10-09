@@ -66,6 +66,20 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 	return cartLoad{}
 }
 
+// cartLoadForArbit is cartLoadFor over an arbit section's rows, each in the
+// condition the store sells it in.
+func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) cartLoad {
+	rows := make([]OptimizedUploadEntry, 0, len(entries))
+	for _, entry := range entries {
+		rows = append(rows, OptimizedUploadEntry{
+			CardID:    entry.CardID,
+			Condition: entry.InventoryEntry.Conditions,
+			Quantity:  max(entry.Quantity, 1),
+		})
+	}
+	return cartLoadFor(key, buylist, rows)
+}
+
 // cartStoresIn answers whether any of the splits keys names is one a store
 // cart button can open, on the side buylist says.
 func cartStoresIn(keys []string, buylist bool) bool {

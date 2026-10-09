@@ -155,6 +155,50 @@ func TestCartLoadButtons(t *testing.T) {
 	}
 }
 
+// An arbit section gets the buy side's store cart and the sell side's buylist
+// cart, whichever way round the page reads, and one panel for both.
+func TestCartLoadArbitButtons(t *testing.T) {
+	stubCartStores(t)
+	rows := []mtgban.ArbitEntry{{
+		CardID:         "card-a",
+		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1},
+		Quantity:       2,
+	}}
+	buy := `href="https://abugames.com/cartview/shop#ban=301:2" target="_blank" rel="noopener" data-store="ABU" data-buylist="false"`
+	sell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2" target="_blank" rel="noopener" data-store="CSI" data-buylist="true"`
+
+	for _, tc := range []struct {
+		name    string
+		short   string
+		key     string
+		reverse bool
+	}{
+		{"arbit", "ABUScans", "CSI", false},
+		{"reverse", "CSI", "ABUScans", true},
+	} {
+		page := renderArbit(t, PageVars{
+			ScraperShort: tc.short,
+			ReverseMode:  tc.reverse,
+			UserNav:      &NavElem{Short: "beta"},
+			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: rows}},
+		})
+		if !strings.Contains(page, buy) {
+			t.Errorf("%s: no store cart button with %s", tc.name, buy)
+		}
+		if !strings.Contains(page, sell) {
+			t.Errorf("%s: no buylist cart button with %s", tc.name, sell)
+		}
+		if strings.Count(page, `id="cart-overlay"`) != 1 {
+			t.Errorf("%s: want the panel once", tc.name)
+		}
+	}
+
+	page := renderArbit(t, reversePageVars())
+	if strings.Contains(page, `id="cart-overlay"`) {
+		t.Error("a page with no cart store carries the cart panel")
+	}
+}
+
 func TestCartBookmarklet(t *testing.T) {
 	source, err := os.ReadFile("js/ban-to-cart.js")
 	if err != nil {
