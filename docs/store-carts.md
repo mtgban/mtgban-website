@@ -1,13 +1,15 @@
-# Loading a list into ABU's carts
+# Loading a list into a store's cart
 
-ABU Games has no decklist or CSV import, for its buylist or its store, and
-no partner import like Card Kingdom's `sellcart/partner_import`. What it
-does have is the cart API its own site calls, and both carts take a list.
-This note is what the upload page needs to offer "Load at ABU" and "Load
-buylist at ABU" next to the existing buttons, measured against a real
-account on 2026-10-07.
+Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
+buylist, and neither has a partner import like Card Kingdom's
+`sellcart/partner_import`. Both have the cart call their own pages make,
+and both calls take a list. Star City Games has a CSV import on its sell
+site, but no way to hand it a list from another site. The upload page
+reaches all three through one bookmarklet, BAN-to-Cart, run on the store's
+page. ABU was measured against a real account on 2026-10-07, CSI against a
+guest cart and SCG against a real account on 2026-10-09.
 
-## The calls
+## ABU: the calls
 
 Both carts work the same way: a `POST` with the user's own token as
 `Authorization: Bearer <token>` and a JSON array body.
@@ -44,10 +46,9 @@ All paths are on `https://api.abugames.com`, and the cart pages on
 - A guest's store cart does not follow the user when they log in: rows
   loaded before logging in are gone afterwards. The user logs in first.
 - CORS allows any origin for `POST` with `authorization` and
-  `content-type`, so a browser can make these calls from any page.
+  `content-type`, but the token sits in `localStorage` on abugames.com,
+  where no mtgban page can read it. It lasts a year.
 - Both carts expire after 60 minutes of inactivity.
-
-## What the server does with a list
 
 | Sent | Buylist | Store |
 |---|---|---|
@@ -66,81 +67,143 @@ does not say which id failed: its message is literally
 The store side checks stock row by row, at about a second a row, so a
 1,000-line list takes over a quarter of an hour.
 
-Quantity limits are ABU's to enforce, so the site sends what the user
-asked for. The store enforces them itself; the buylist leaves them to
-checkout. Our scraper only lists buylist rows with a buy quantity and
-price above 0, so a row ABU stopped buying only reaches the cart when it
-filled up after the last scrape.
+## CSI: the call
+
+CSI's sell list page adds a row with a form `POST` to
+`https://www.coolstuffinc.com/ajax_buylist.php`, and the same call takes
+many rows at once:
+
+```
+ajaxtype=addtocart
+ajaxdata=uid_3813340qty_1||uid_3813344qty_2||
+```
+
+- `uid` is the sell list row's `PPQID`, one printing and finish. CSI buys
+  NM only: its Magic sell list holds "Near Mint" and "Foil Near Mint"
+  rows, plus sealed "New" rows. go-mtgban's `coolstuffinc` scraper stores
+  the `PPQID` as `InstanceID` on every buylist entry (`CSI`,
+  `CSISealed`), the graded entries it derives from a row included.
+- The cart is the browser's, kept by CSI's cookies, guests included. No
+  token is involved, but the cookies carry no SameSite attribute and the
+  call sends no CORS headers, so only a page on coolstuffinc.com can
+  reach the cart.
+- The cart page is `/buylist_cart.php`, and keeps a `#` fragment even
+  with an empty cart. Its form names one field per row, `bl_q[<PPQID>]`,
+  which is how the bookmarklet reads the cart back.
+  `/buylist_cart.php?pa=clean` empties it.
+- A sell order needs $10 or more in the cart before CSI takes it.
+
+| Sent | Result |
+|---|---|
+| many rows in one request | 300 rows in 11 s |
+| a card already in the cart | quantity added to |
+| an id CSI does not buy | skipped quietly, rest of the list kept |
+| more than CSI wants | trimmed to CSI's own limit |
+
+## SCG: the CSV import
+
+SCG's sell site, `https://sellyourcards.starcitygames.com`, adds one card
+per call (`POST /api/cartAddNamedItem`, keyed by `bc_variant_id`) and
+answers 500 unless the call carries the card's prices. The CSV import its
+uploads page offers takes the whole list and prices it itself:
+
+- `POST /api/CSV2/upload`, multipart: the file, `fileFormatId=1` ("Star
+  City Games Export"), and the defaults for rows it cannot read, the same
+  fields the site's own form sends. The answer names a `fileId`.
+- SCG matches a row on its SKU alone, so a file of `quantity,productid`
+  is enough. The SKU names the condition, and is the `InstanceID`
+  go-mtgban's `starcitygames` scraper stores on every buylist entry.
+- `/mtg/uploads/<fileId>` is SCG's review of the file: the rows it matched,
+  split into its sell list and bulk list, and the rows it could not match,
+  for the user to fix. Its own "Add to Sell Cart" button fills the cart.
+  An upload stays in the user's upload history for 5 days; nothing deletes
+  it sooner.
+- The site needs a login, and its calls carry the session cookie and the
+  `XSRF-TOKEN` cookie back as an `X-XSRF-TOKEN` header. An upload without
+  a login answers 401.
 
 ## What the site does
 
-Each ABU split the upload optimizer lists, buylist or store, gets a "Load
-at ABU" button.
+Each store split the upload optimizer lists gets a "Load at" button where
+the store's cart can take it: ABU's buylist and store splits, and CSI's
+and SCG's buylist splits. CSI's and SCG's store sides already have their
+own imports. The
+arbit, reverse and global pages give each section the same buttons: "Load
+at" for the store it buys from and "Load buylist at" for the store it sells
+to, each row in the condition the store sells it in
+(`cartLoadForArbit`).
 
-- `abuCartRows` (`abucart.go`, the `abu_cart` template function) turns the
-  split into `item_id:quantity` pairs. ABU gives each condition of a card
-  its own id, so the id is the condition.
-  - A buylist row always goes in as NM, and ABU grades what arrives. ABU's
-    cart therefore quotes NM prices, and reads higher than the split's
-    total when the list has played cards; the panel below says so.
-    ABU lists an NM row for every card, but prices a few at $0, which the
-    scraper drops, so those cards are left out: on 2026-10-08, 24 of the
-    123,818 cards ABU buys. 22 paid $0.01 to $0.03 played; the two Secret
-    Lair 1480 Swamps paid about $1, which looks like a pricing slip at ABU.
+- `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
+  the button, and `cartRows` turns the split into `item_id:quantity`
+  pairs. Each id names one condition.
+  - A buylist row always goes in as NM, and the store grades what
+    arrives, so the cart quotes NM prices and reads higher than the
+    split's total when the list has played cards; the panel says so.
+    Sealed product carries no grade and goes in as listed. ABU lists an
+    NM row for every card but prices a few at $0, which the scraper
+    drops, so those cards are left out: on 2026-10-08, 24 of the 123,818
+    cards ABU buys. 22 paid $0.01 to $0.03 played; the two Secret Lair
+    1480 Swamps paid about $1, which looks like a pricing slip at ABU.
   - A store row uses the entry the optimizer priced it from: the one in
-    the row's condition, or ABU's first priced entry when the row names
-    none.
-  - A card ABU has no entry for is left out, as `uuid2BuylistCSV` does for
-    CK and SCG. Rows sharing an id are merged by adding their quantities,
-    since the server would keep only the first. Sealed entries carry no
-    id, so sealed product gets no button.
-- The button opens the matching cart page with the pairs in the fragment,
-  `https://abugames.com/cartview/buylist#mtgban=<id>:<qty>,...`, which
-  html/template percent-encodes. The fragment survives ABU's router and
-  never reaches ABU's or our servers.
-- Pressing the button first shows a panel (`js/abu-prompt.js`) holding
-  the loader to drag to the bookmarks bar: `js/abu-cart.js` as a
-  `javascript:` link (`abu_bookmarklet`). It says to click the bookmark
-  after the page on ABU loads, since nothing on ABU's page can. Its
-  Open @ ABU button continues to ABU, and "Don't show this again", kept
-  in `localStorage`, lets later presses go straight there. The "?" beside
-  the button always shows the panel, so the loader can be had again.
+    the row's condition, or the store's first priced entry when the row
+    names none.
+  - A card the store has no entry for is left out, as `uuid2BuylistCSV`
+    does for CK and SCG. Rows sharing an id are merged by adding their
+    quantities, since ABU would keep only the first.
+- The button opens the store's cart page, SCG's uploads page for SCG, with
+  the pairs in the fragment,
+  `https://abugames.com/cartview/buylist#ban=<id>:<qty>,...`. The
+  fragment survives all three stores' pages and never reaches their
+  servers or ours.
+- Pressing the button first shows a panel (`js/cart-prompt.js`, from the
+  `cart-prompt` partial both pages share), named for the store and side
+  pressed, holding the loader to drag to the bookmarks bar:
+  `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`). It
+  says to click the bookmark after the store's page loads, since nothing
+  on that page can. Its Continue @ store button continues to the store, and
+  "Don't show this again", kept in `localStorage`, lets later presses go
+  straight there. The "?" beside the button always shows the panel, so
+  the loader can be had again.
 
-## Getting the token
+## The bookmarklet
 
-The token is the hard part. mtgban has no ABU token of its own and needs
-none: each call carries the token ABU issued the user when they logged in
-on abugames.com. ABU keeps it in `localStorage` under `accessToken-ABU`
-there, where no mtgban page can read it. It lasts a year.
+Clicked on the page a button opened, `js/ban-to-cart.js` picks the store
+from the page's host. It first checks it is the loader the site expects:
+`cartLoader` stamps the start of the file's hash into the bookmarklet and
+onto every link (`&v=`), so a bookmark saved before the file last changed
+says it is out of date and asks to be dragged again, and touches no cart.
+On SCG it then uploads the list as one CSV and opens SCG's review of it.
+On ABU and CSI it:
 
-The bookmarklet keeps the token where it is. Clicked on the cart page the
-button opened, `js/abu-cart.js` runs on abugames.com and:
+1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
+   guest's buylist cart fails and a guest's store cart is lost at login;
+2. reads the cart and stops at ABU's caps, 750 buylist lines or 1,000
+   store lines, counting what is already there, and says what was left
+   out; CSI has no cap;
+3. sends the rows in chunks with a progress banner: 300 for ABU's
+   buylist, 50 for ABU's store so each request finishes in under a
+   minute, 100 for CSI;
+4. on ABU's 422, reads the cart back and tries each row missing from it
+   alone until ABU refuses one, the id it does not know, then resends the
+   rest; ABU's store also leaves out rows it has none of, so the first
+   missing row is not always the unknown one;
+5. reads the cart once more and reports what loaded, what the store left
+   out, and what did not fit, then clears the fragment and reloads the
+   page.
 
-1. stops unless ABU's own `isLoggedIn` flag is set, since a guest's
-   buylist cart fails and a guest's store cart is lost at login;
-2. reads the cart and stops at its cap, 750 buylist lines or 1,000 store
-   lines, counting what is already there, and says what was left out;
-3. sends the rows in chunks, 300 for the buylist and 50 for the store so
-   each request finishes in under a minute, with a progress banner;
-4. on a 422, reads the cart back and tries each row missing from it alone
-   until ABU refuses one, the id it does not know, then resends the rest;
-   the store also leaves out rows it has none of, so the first missing row
-   is not always the unknown one;
-5. reads the cart once more and reports what loaded, what ABU left out,
-   and what did not fit, then clears the fragment and reloads the page.
-
-**Pasting the token** into mtgban also works, since CORS is open, but the
-user has to dig it out of the browser's developer tools, and a year-long
-credential would then sit in our page. If it is ever offered, it stays in
-the user's browser and is never sent to our server.
-
-Logging in to ABU through mtgban is not an option: we would be handling
-people's ABU passwords.
+ABU's token, and CSI's and SCG's cookies, never leave the store's site.
+Pasting an ABU token into mtgban would work too, since ABU's CORS is open,
+but it would put a year-long credential in our page. Logging in to a
+store through mtgban is not an option: we would be handling people's
+passwords. Nor can mtgban post to SCG itself: SCG's session cookie is
+`SameSite=Lax`, its CORS answers `*`, which a browser refuses to send
+cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
 
 ## Not tested
 
-- What an expired token returns, presumably the same 401.
-- What buylist checkout does with rows above ABU's buy limit or rows it
-  stopped buying.
-- Store lists above 1,000 lines, and bundles, which ABU's site sends to
-  `/cart/group` and `/cart/set` instead.
+- What an expired ABU token returns, presumably the same 401.
+- What ABU's buylist checkout does with rows above its buy limit or rows
+  it stopped buying.
+- ABU store lists above 1,000 lines, and bundles, which ABU's site sends
+  to `/cart/group` and `/cart/set` instead.
+- Whether a CSI guest's sell cart follows the user when they log in.
