@@ -7,6 +7,8 @@
     var store = null;
     if (location.hostname === "abugames.com") {
         store = abuStore();
+    } else if (location.hostname === "www.coolstuffinc.com") {
+        store = csiStore();
     }
     if (!store || !match) {
         alert("Drag this link to your bookmarks bar. Then click it after the store's page loads.");
@@ -157,6 +159,47 @@
                     throw new Error("ABU refused the list (" + resp.status + ").");
                 }
                 return resp.ok;
+            }
+        };
+    }
+
+    // csiStore loads CSI's sell cart, kept by the browser's cookies, the way
+    // its sell list page adds a row. CSI skips an id it does not buy and adds
+    // to a card already in the cart.
+    function csiStore() {
+        return {
+            name: "CSI",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            chunkSize: 100,
+            cartIDs: async function () {
+                var resp = await fetch("/buylist_cart.php");
+                if (!resp.ok) {
+                    throw new Error("CSI could not read your sell cart (" + resp.status + ").");
+                }
+                var page = await resp.text();
+                var found = [];
+                var re = /name="bl_q\[(\d+)\]"/g;
+                var m;
+                while ((m = re.exec(page)) !== null) {
+                    found.push(m[1]);
+                }
+                return found;
+            },
+            send: async function (chunk, qty) {
+                var resp = await fetch("/ajax_buylist.php", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"},
+                    body: "ajaxtype=addtocart&ajaxdata=" + encodeURIComponent(chunk.map(function (id) {
+                        return "uid_" + id + "qty_" + qty[id] + "||";
+                    }).join(""))
+                });
+                if (!resp.ok) {
+                    throw new Error("CSI refused the list (" + resp.status + ").");
+                }
+                return true;
             }
         };
     }

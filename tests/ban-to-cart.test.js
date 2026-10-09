@@ -34,6 +34,30 @@ function fakeABU({cart = [], unknown = [], outOfStock = [], readStatus = 200, em
     return {fetch, posts, lines};
 }
 
+// fakeCSI stands in for CSI's sell cart: the cart page lists a quantity
+// field per row, and the sell list's add skips an id CSI does not buy and
+// adds to a row already in the cart, as CSI does.
+function fakeCSI({cart = {}, unknown = []} = {}) {
+    const lines = {...cart};
+    const posts = [];
+    const fetch = async (url, opts = {}) => {
+        if (!opts.method) {
+            const fields = Object.entries(lines).map(([id, q]) => `<input name="bl_q[${id}]" value="${q}">`);
+            return {ok: true, status: 200, text: async () => '<form>' + fields.join('') + '</form>'};
+        }
+        const body = new URLSearchParams(opts.body);
+        const rows = [...body.get('ajaxdata').matchAll(/uid_(\d+)qty_(\d+)\|\|/g)].map((m) => ({id: m[1], qty: +m[2]}));
+        posts.push({url, type: body.get('ajaxtype'), rows});
+        for (const row of rows) {
+            if (!unknown.includes(row.id)) {
+                lines[row.id] = (lines[row.id] || 0) + row.qty;
+            }
+        }
+        return {ok: true, status: 200};
+    };
+    return {fetch, posts, lines};
+}
+
 // run executes the bookmarklet on a stand-in store page.
 async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', loggedIn = true, abu = fakeABU()} = {}) {
     const alerts = [];
@@ -130,5 +154,41 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(alerts[0]).toContain('logged you out');
         expect(posts).toHaveLength(0);
         expect(page.reloaded).toBe(false);
+    });
+});
+
+describe('ban-to-cart bookmarklet on CSI', () => {
+    const csiPage = {host: 'www.coolstuffinc.com', path: '/buylist_cart.php'};
+
+    test('rows go to the sell list\'s add in chunks of 100, CSI\'s way', async () => {
+        const csi = fakeCSI();
+        const {alerts, page, posts} = await run({...csiPage, hash: '#ban=' + list(230), abu: csi});
+        expect(posts.map((p) => p.rows.length)).toEqual([100, 100, 30]);
+        expect(posts[0].url).toBe('/ajax_buylist.php');
+        expect(posts[0].type).toBe('addtocart');
+        expect(posts[0].rows[0]).toEqual({id: '1000', qty: 1});
+        expect(alerts[0]).toBe('Loaded 230 cards into your CSI cart.');
+        expect(page.url).toBe('/buylist_cart.php');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('no ABU login is asked for', async () => {
+        const {alerts, posts} = await run({...csiPage, hash: '#ban=1:1', loggedIn: false, abu: fakeCSI()});
+        expect(posts).toHaveLength(1);
+        expect(alerts[0]).toBe('Loaded 1 cards into your CSI cart.');
+    });
+
+    test('an id CSI does not buy is reported, the rest load in one pass', async () => {
+        const csi = fakeCSI({unknown: ['2']});
+        const {alerts, posts} = await run({...csiPage, hash: '#ban=1:1,2:1,3:2', abu: csi});
+        expect(posts).toHaveLength(1);
+        expect(csi.lines).toEqual({1: 1, 3: 2});
+        expect(alerts[0]).toBe('Loaded 2 cards into your CSI cart. 1 were not taken by CSI.');
+    });
+
+    test('a card already in the cart is added to', async () => {
+        const csi = fakeCSI({cart: {7: 2}});
+        await run({...csiPage, hash: '#ban=7:1', abu: csi});
+        expect(csi.lines).toEqual({7: 3});
     });
 });
