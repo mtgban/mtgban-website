@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"html/template"
 	"log"
 	"net/url"
@@ -61,7 +63,7 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 		if rows == "" {
 			return cartLoad{}
 		}
-		return cartLoad{Store: cs.name, Link: page + "#ban=" + rows}
+		return cartLoad{Store: cs.name, Link: page + "#ban=" + rows + "&v=" + cartVersion()}
 	}
 	return cartLoad{}
 }
@@ -169,14 +171,32 @@ func pricedEntry[T mtgban.GenericEntry](entries []T, cond mtgban.Condition) int 
 	return -1
 }
 
-// cartBookmarklet is js/ban-to-cart.js as a link a user drags to their
-// bookmarks bar, read once.
-var cartBookmarklet = sync.OnceValue(func() template.URL {
+// cartLoader is js/ban-to-cart.js as a link a user drags to their bookmarks
+// bar, read once, and the version stamped into it: the start of the file's
+// hash, which every cart link carries too, so a bookmark saved from an older
+// file can tell it is out of date.
+var cartLoader = sync.OnceValues(func() (template.URL, string) {
 	source, err := os.ReadFile("js/ban-to-cart.js")
 	if err != nil {
 		log.Println("cart bookmarklet:", err)
-		return ""
+		return "", ""
 	}
+	sum := sha256.Sum256(source)
+	version := hex.EncodeToString(sum[:4])
+	code := strings.Replace(strings.TrimSpace(string(source)), cartVersionMark, version, 1)
 	// void keeps the browser from replacing the page with the script's result
-	return template.URL("javascript:void%20" + url.PathEscape(strings.TrimSpace(string(source))))
+	return template.URL("javascript:void%20" + url.PathEscape(code)), version
 })
+
+// cartVersionMark is where js/ban-to-cart.js takes its version.
+const cartVersionMark = "__BAN_VERSION__"
+
+func cartBookmarklet() template.URL {
+	link, _ := cartLoader()
+	return link
+}
+
+func cartVersion() string {
+	_, version := cartLoader()
+	return version
+}

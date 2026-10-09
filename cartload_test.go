@@ -118,10 +118,10 @@ func TestCartLoadButtons(t *testing.T) {
 		buylist bool
 		link    string
 	}{
-		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2" target="_blank" rel="noopener" data-store="ABU"`},
-		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2" target="_blank" rel="noopener" data-store="ABU"`},
-		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2" target="_blank" rel="noopener" data-store="CSI"`},
-		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2" target="_blank" rel="noopener" data-store="SCG"`},
+		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU"`},
+		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU"`},
+		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI"`},
+		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -164,8 +164,8 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1},
 		Quantity:       2,
 	}}
-	buy := `href="https://abugames.com/cartview/shop#ban=301:2" target="_blank" rel="noopener" data-store="ABU" data-buylist="false"`
-	sell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2" target="_blank" rel="noopener" data-store="CSI" data-buylist="true"`
+	buy := `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU" data-buylist="false"`
+	sell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-buylist="true"`
 
 	for _, tc := range []struct {
 		name    string
@@ -214,7 +214,15 @@ func TestCartBookmarklet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if decoded != strings.TrimSpace(string(source)) {
-		t.Error("bookmarklet does not decode back to js/ban-to-cart.js")
+	version := cartVersion()
+	if len(version) != 8 {
+		t.Fatalf("version %q is not a short hash", version)
+	}
+	want := strings.Replace(strings.TrimSpace(string(source)), cartVersionMark, version, 1)
+	if decoded != want {
+		t.Error("bookmarklet does not decode back to js/ban-to-cart.js with its version stamped in")
+	}
+	if strings.Contains(decoded, cartVersionMark) {
+		t.Error("the version mark survived into the bookmarklet")
 	}
 }

@@ -4,6 +4,7 @@
     // from the page's #ban= fragment, and loads it into the cart of the
     // user on that store. docs/store-carts.md has what each store accepts.
     var match = /[#&]ban=([^&]*)/.exec(location.hash);
+    var version = /[#&]v=([^&]*)/.exec(location.hash);
     var store = null;
     if (location.hostname === "abugames.com") {
         store = abuStore();
@@ -14,6 +15,13 @@
     }
     if (!store || !match) {
         alert("Drag this link to your bookmarks bar. Then click it after the store's page loads.");
+        return;
+    }
+    // The site stamps this copy and every link with the loader's version, and
+    // an older copy must not touch a cart
+    if (!version || version[1] !== "__BAN_VERSION__") {
+        alert("Your BAN-to-Cart bookmark is out of date. Go back to BAN, press the ? next to the Load button, " +
+            "and drag BAN-to-Cart to your bookmarks bar again, replacing the old one.");
         return;
     }
     if (!store.loggedIn()) {
