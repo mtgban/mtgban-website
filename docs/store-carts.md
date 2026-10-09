@@ -4,11 +4,11 @@ Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
 buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
 and both calls take a list. MTG Mint Card has the same kind of call, one
-card at a time. Star City Games has a CSV import on its sell site, but no
-way to hand it a list from another site. The upload page reaches all four
+card at a time. Star City Games and Strike Zone have a CSV import, but no
+way to hand it a list from another site. The upload page reaches all five
 through one bookmarklet, BAN-to-Cart, run on the store's page. ABU was
-measured against a real account on 2026-10-07, CSI against a guest cart,
-and SCG and Mint against a real account on 2026-10-09.
+measured against a real account on 2026-10-07, CSI and Strike Zone against
+a guest cart, and SCG and Mint against a real account on 2026-10-09.
 
 ## ABU: the calls
 
@@ -131,6 +131,68 @@ https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_buylist_cart_deta
 | an id Mint does not buy, or a store-only id | skipped quietly, 200 |
 | quantity 0 | row removed |
 
+## Strike Zone: the CSV import
+
+Strike Zone buys and sells through one cart, whose Tools menu has a CSV
+import that takes a whole list in one upload:
+
+```
+POST /TUser?MC=CUVC&MF=B   (multipart)
+BUID=637  STORE_ID=637  CMD=Tools ...  TOOL_SELECT=CI  ACT=Do import  FILE=<csv>
+
+#Usc Id,Inventory Name,Store Name,Buy #,Buy $,Sell #,Sell $
+USCIDU-637-F-19290-285-OVN-RMS,x,Strike Zone Online,2,0,NC,0
+```
+
+- `Buy #` is the quantity sold to Strike Zone, `Sell #` the quantity bought
+  from it; the other columns are ignored. The cart lists the first kind of
+  row as `B-637-C-…` and the second as `S-637-C-…`.
+- The import sets a card's quantity, trims it to the buylist's "Need" or to
+  the stock, ignores a quantity of 0, and does nothing to a cart with no row
+  yet, on either side. Uploads of 300, 1,000 and 3,000 rows took 2, 7 and
+  44 s, and each loaded whole.
+- The cart page lists only the first 800 rows, with no way to page on, so
+  the bookmarklet reads the cart through "Export to CSV", which lists every
+  row by its import id; a buylist row's name starts "Sell to us - ". An
+  empty cart's export answers with the cart page instead.
+- The cart is kept by Strike Zone's cookies, guests included, and the site
+  is plain HTTP.
+
+The `#Usc Id` is what the cart's "Export to CSV" writes, and no page
+publishes it. go-mtgban's `strikezone` scraper computes it from the code
+each row's "Sell to Us" or "Add to Cart" link carries,
+`637-C-<item>-<variant>`, and stores it as `InstanceID`, one id for both
+sides; its README has how. The bookmarklet only undoes the first step, a shift of the
+item and variant digits by `8 9 7 2 9 1 8 9 7` (mod 10), to find the row's
+plain code in the cart (`szCode`). A code of a shape go-mtgban cannot
+compute the id for stays plain, and goes through its link.
+
+The links add one copy of a card per `GET`, and the cart page's form sets
+quantities, but cannot add a row:
+
+```
+http://shop.strikezoneonline.com/TUser?MC=CUVC&Buy=637-C-181059-106&MF=B&BUID=637
+http://shop.strikezoneonline.com/TUser?MC=CUVC&Add=637-C-181059-106&MF=B&BUID=637
+
+POST /TUser?MC=CUVC&MF=B
+BUID=637&STORE_ID=637&0=B-637-C-181059-106&0Q=3&CMD=Update
+```
+
+The cart pages answer "Error: 8134 - too many requests", with a 200, once an
+IP has made about 100 calls to them, at full speed and at one a second
+alike, for 5 to 10 minutes. It applies only to the cart pages, not the
+buylist pages the scraper reads.
+
+| Sent | Result |
+|---|---|
+| the import, 40 buylist cards from an empty cart | 4 requests, 0.5 s, all 40 loaded |
+| the import, 1,000 rows in one upload | 7 s, all 1,000 in the export, 800 on the page |
+| the import, above what Strike Zone wants or has | trimmed to its "Need" or stock |
+| the import, into a cart holding only the other side's rows | loaded |
+| an id or code Strike Zone does not list | skipped quietly |
+| one card per link | 100 calls in 11.7 s, until the limit |
+| the form, quantity 0 | row removed |
+
 ## SCG: the CSV import
 
 SCG's sell site, `https://sellyourcards.starcitygames.com`, adds one card
@@ -156,13 +218,12 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's buylist and store splits, and CSI's,
-SCG's and Mint's buylist splits. CSI's and SCG's store sides already have
-their own imports. The
-arbit, reverse and global pages give each section the same buttons: "Load
-at" for the store it buys from and "Load buylist at" for the store it sells
-to, each row in the condition the store sells it in
-(`cartLoadForArbit`).
+the store's cart can take it: ABU's and Strike Zone's buylist and store
+splits, and CSI's, SCG's and Mint's buylist splits. CSI's and SCG's store
+sides already have their own imports. The arbit, reverse and global pages
+give each section the same buttons: "Load at" for the store it buys from
+and "Load buylist at" for the store it sells to, each row in the condition
+the store sells it in (`cartLoadForArbit`).
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
@@ -183,9 +244,10 @@ to, each row in the condition the store sells it in
     quantities, since ABU would keep only the first.
 - The button opens the store's cart page, SCG's uploads page for SCG, with
   the pairs in the fragment,
-  `https://abugames.com/cartview/buylist#ban=<id>:<qty>,...`. The
-  fragment survives all three stores' pages and never reaches their
-  servers or ours.
+  `https://abugames.com/cartview/buylist#ban=<id>:<qty>,...&v=<version>`,
+  and `&side=retail` on a store split's link, since Strike Zone's two sides
+  share one cart page. The fragment survives every store's page and never
+  reaches their servers or ours.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
   `cart-prompt` partial both pages share), named for the store and side
   pressed, holding the loader to drag to the bookmarks bar:
@@ -204,7 +266,7 @@ from the page's host. It first checks it is the loader the site expects:
 onto every link (`&v=`), so a bookmark saved before the file last changed
 says it is out of date and asks to be dragged again, and touches no cart.
 On SCG it then uploads the list as one CSV and opens SCG's review of it.
-On ABU, CSI and Mint it:
+On ABU, CSI, Mint and Strike Zone it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
@@ -212,10 +274,16 @@ On ABU, CSI and Mint it:
    does only for a guest, since a sell order needs an account;
 2. reads the cart and stops at ABU's caps, 750 buylist lines or 1,000
    store lines, counting what is already there, and says what was left
-   out; CSI and Mint have no cap;
+   out; CSI, Mint and Strike Zone have no cap;
 3. sends the rows in chunks with a progress banner: 300 for ABU's
    buylist, 50 for ABU's store so each request finishes in under a
    minute, 100 for CSI, and one at a time for Mint, about a second each;
+   on Strike Zone, 300 per CSV import, under `Buy #` or, for a link that
+   says `side=retail`, `Sell #`, after cards through their links until one
+   stays when the cart is empty, since Strike Zone skips a card it no
+   longer lists, with a plain code through its link and the cart form, and
+   a "too many requests" answer waited out for 5 minutes before the call
+   is made again;
 4. on ABU's 422, reads the cart back and tries each row missing from it
    alone until ABU refuses one, the id it does not know, then resends the
    rest; ABU's store also leaves out rows it has none of, so the first
@@ -224,8 +292,7 @@ On ABU, CSI and Mint it:
    out, and what did not fit, then clears the fragment and reloads the
    page.
 
-ABU's token, and CSI's, SCG's and Mint's cookies, never leave the store's
-site.
+ABU's token, and the other stores' cookies, never leave the store's site.
 Pasting an ABU token into mtgban would work too, since ABU's CORS is open,
 but it would put a year-long credential in our page. Logging in to a
 store through mtgban is not an option: we would be handling people's
@@ -240,4 +307,9 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
   it stopped buying.
 - ABU store lists above 1,000 lines, and bundles, which ABU's site sends
   to `/cart/group` and `/cart/set` instead.
-- Whether a CSI guest's sell cart follows the user when they log in.
+- Whether a CSI guest's sell cart follows the user when they log in, and
+  the same for Strike Zone.
+- How long Strike Zone's call limit lasts, and whether calls made while it
+  holds lengthen it.
+- Strike Zone codes with an item of other than five or six digits, which
+  go through their links.
