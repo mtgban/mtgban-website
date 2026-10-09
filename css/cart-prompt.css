@@ -1,9 +1,10 @@
-/* The store cart buttons and the BAN-to-Cart panel they open
-   (templates/partials/cart-prompt.html). */
+/* The store cart buttons and the BAN-to-Cart panel they open, on the
+   upload and arbit pages alike (templates/partials/cart-prompt.html). */
 /* The pair renders like the buttons beside it inside their forms, spaced
    like the header's other buttons */
 .cart-load { display: inline; white-space: nowrap; line-height: normal; }
 .opt-header-actions .cart-help { margin-right: 6px; }
+.arb-load-btns .cart-help { margin-right: 4px; }
 .cart-overlay {
     display: none;
     position: fixed;
