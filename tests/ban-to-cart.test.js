@@ -1,7 +1,8 @@
 import { test, expect, describe } from 'bun:test';
 import { readFileSync } from 'fs';
 
-const source = readFileSync(new URL('../js/ban-to-cart.js', import.meta.url), 'utf8');
+// The site stamps the version in; these run a copy stamped "test"
+const source = readFileSync(new URL('../js/ban-to-cart.js', import.meta.url), 'utf8').replace('__BAN_VERSION__', 'test');
 
 // fakeABU stands in for ABU's cart API: it keeps the cart's lines, answers a
 // row ABU does not know with 422 and keeps the rows before it, and skips a
@@ -59,9 +60,12 @@ function fakeCSI({cart = {}, unknown = []} = {}) {
 }
 
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', loggedIn = true, abu = fakeABU(), cookie = ''} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = ''} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
+    if (hash && version !== null) {
+        hash += '&v=' + version;
+    }
     const location = {hostname: host, pathname: path, hash, reload: () => { page.reloaded = true; }};
     page.location = location;
     const storage = {isLoggedIn: loggedIn ? 'true' : 'false', 'accessToken-ABU': 'abc'};
@@ -86,6 +90,14 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         const {alerts, posts} = await run({host: 'www.mtgban.com', hash: '#ban=1:1'});
         expect(alerts[0]).toContain('bookmarks bar');
         expect(posts).toHaveLength(0);
+    });
+
+    test('a bookmark older than the link is told to update and sends nothing', async () => {
+        for (const version of ['0badc0de', null]) {
+            const {alerts, posts} = await run({hash: '#ban=1:1', version});
+            expect(alerts[0]).toContain('out of date');
+            expect(posts).toHaveLength(0);
+        }
     });
 
     test('a guest is told to log in and nothing is sent', async () => {
