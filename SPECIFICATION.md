@@ -365,7 +365,7 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 
 | Wrapper | Used for | Behavior |
 |---|---|---|
-| `noSigning` | Home, Guide, Privacy, Offline page, suggest/chart/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
+| `noSigning` | Home, Guide, Privacy, Offline page, suggest/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
 | `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email, or per invite signature once checked; POST only when `NavElem.CanPOST` |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/v2/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET` |
 
