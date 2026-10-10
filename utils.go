@@ -23,7 +23,6 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
-	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
 // externalUUID resolves an outside identifier without knowing which id space
@@ -1259,6 +1258,12 @@ func genQuery(co *mtgmatcher.CardObject) string {
 }
 
 func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
+	symbol, err := setSymbolTemplate()
+	if err != nil {
+		log.Print("printings set symbol parsing error: ", err)
+		return ""
+	}
+
 	var sb strings.Builder
 	// Hack to generate HTML in the template
 	//
@@ -1277,28 +1282,26 @@ func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
 		}
 		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
 
-		keyruneCode := strings.ToLower(set.KeyruneCode)
-		if keyruneCode == "" {
-			// Monospace advances about 0.6em a character and the circle is
-			// 30px across, so three characters is all 16px holds. A One Piece
-			// code like ST-01 is five, and at a fixed size it ran off both
-			// sides of the badge.
-			fontSize := 16.0
-			if len(setCode) > 3 {
-				fontSize = 16.0 * 3 / float64(len(setCode))
-			}
-			fmt.Fprintf(&sb, `
-                    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-                        <circle r="15" cx="16" cy="16" fill="var(--normal)"/>
-                        <text font-size="%.1f" font-family="monospace" font-weight="bold" x="50%%" y="50%%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">%s</text>
-                    </svg>`, fontSize, setCode)
-		} else {
-			mark := palette.SetMark(setCode, set.Name)
-			if mark != "" {
-				mark = ` data-mark="` + mark + `"`
-			}
-			fmt.Fprintf(&sb, `<i class="ss ss-%s ss-2x"%s></i>`, keyruneCode, mark)
+		// Trimmed, since the strip is inline text and the partial's own
+		// whitespace would space out glyphs that sit flush.
+		var icon strings.Builder
+		err = symbol.ExecuteTemplate(&icon, "set-symbol", map[string]any{
+			"Keyrune": keyruneClass(set.KeyruneCode),
+			"Edition": set.Name,
+			"Title":   set.Name,
+			"Code":    setCode,
+			"Rarity":  "",
+			"Color":   "var(--normal)",
+			"Foil":    false,
+			"Symbol":  set.Symbol,
+			"Size":    32,
+			"Class":   "",
+		})
+		if err != nil {
+			log.Print("printings set symbol executing error: ", err)
+			return ""
 		}
+		sb.WriteString(strings.TrimSpace(icon.String()))
 		sb.WriteString(`</a>`)
 
 		drawn++
