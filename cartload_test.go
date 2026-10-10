@@ -67,6 +67,10 @@ func stubCartStores(t *testing.T) {
 	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
+	// CSI's store cart takes a product id and the row id of its condition
+	csiStock := mtgban.InventoryRecord{}
+	csiStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 4.49, OriginalID: "434190", InstanceID: "10753983"})
+	csiStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 3.49, OriginalID: "434190", InstanceID: "10753984"})
 
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	t.Cleanup(func() {
@@ -90,6 +94,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(ckStock, mtgban.ScraperInfo{Shorthand: "CK"}),
 		mtgban.NewSellerFromInventory(ckSealed, mtgban.ScraperInfo{Shorthand: "CKSealed"}),
 		mtgban.NewSellerFromInventory(ckGraded, mtgban.ScraperInfo{Shorthand: "CKGraded"}),
+		mtgban.NewSellerFromInventory(csiStock, mtgban.ScraperInfo{Shorthand: "CSI"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -120,6 +125,7 @@ func TestCartRows(t *testing.T) {
 		// A store row keeps its condition, or the one it was priced at
 		{"ABUScans", false, "301:3,402:1"},
 		{"CSI", true, "601:4"},
+		{"CSI", false, "434190-10753983:3,434190-10753984:1"},
 		// Sealed product carries no grade
 		{"CSISealed", true, "701:1"},
 		{"SCG", true, "SGL-A1:4"},
@@ -159,10 +165,6 @@ func TestCartRows(t *testing.T) {
 	if got.Link != "" {
 		t.Errorf("Mint's store side, which is not filled, got a button: %+v", got)
 	}
-	got = cartLoadFor("CSI", false, entries)
-	if got.Link != "" {
-		t.Errorf("CSI's retail side, which has its own import, got a button: %+v", got)
-	}
 }
 
 // A split's button opens the store cart it is for, with its rows in the
@@ -180,6 +182,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"ABUGames", true, `href="https://abugames.com/cartview/buylist#ban=101:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU"`},
 		{"ABUScans", false, `href="https://abugames.com/cartview/shop#ban=301:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="ABU"`},
 		{"CSI", true, `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI"`},
+		{"CSI", false, `href="https://www.coolstuffinc.com/main_view_cart.php#ban=434190-10753983:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="CSI"`},
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
@@ -208,7 +211,7 @@ func TestCartLoadButtons(t *testing.T) {
 		}
 	}
 
-	for _, key := range []string{"MKM", "CSI", "CKGraded", "CKSealed"} {
+	for _, key := range []string{"MKM", "SCG", "CKGraded", "CKSealed"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
 			OptimizedKeys:   []string{key},

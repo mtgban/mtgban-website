@@ -104,6 +104,38 @@ ajaxdata=uid_3813340qty_1||uid_3813344qty_2||
 | an id CSI does not buy | skipped quietly, rest of the list kept |
 | more than CSI wants | trimmed to CSI's own limit |
 
+### CSI's store cart
+
+CSI's store adds rows to its cart in one call, keyed by product and row:
+each offer row of a product, one per condition and finish, carries its row
+id on its Add to Cart button (`data-atc="atc[434190][10753983]"`).
+
+```
+POST /ajax_cart_qty_add.php   atc[434190][10753983]=1&atc[434190][10753986]=2&referrer=
+GET  /main_view_cart.php      cartQty[<row id>] per row
+GET  /main_view_cart.php?action=delete-<row id>
+```
+
+- go-mtgban's `coolstuffinc` scraper stores the product id as
+  `OriginalID` and the row id as `InstanceID`, and `csiCartID` names a row
+  `<product id>-<row id>`. The row id decides what lands; the product id
+  only has to be non-zero.
+- The add takes many rows at once, adds to a row already in the cart, trims
+  to the stock and skips a row CSI does not sell. So the bookmarklet adds
+  the difference for a row already there, and deletes and adds again a row
+  the list wants fewer of.
+- go-mtgban folds two offers of one card in the same grade and at the same
+  price into one entry, keeping the first row's id, so such an entry's
+  stock could span two rows and a large quantity come up short. No such
+  entry was among 3,944 offers of five etched-heavy sets on 2026-10-10.
+
+| Sent | Result |
+|---|---|
+| one add of 40 rows | 3.6 s, all 40 |
+| a row already in the cart | added to |
+| above the stock | trimmed to it |
+| a delete | 0.34 s |
+
 ## Mint: the call
 
 Mint's buylist cart page sets a row's quantity with a `GET`, and the same
@@ -292,13 +324,14 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's, Strike Zone's and Hareruya's buylist
-and store splits, CSI's, SCG's and Mint's buylist splits, and Card
-Kingdom's store splits, beside its deck builder button. CSI's and SCG's
-store sides and CK's buylist already have their own imports. The arbit,
-reverse and global pages give each section the same buttons: "Load at" for
-the store it buys from and "Load buylist at" for the store it sells to,
-each row in the condition the store sells it in (`cartLoadForArbit`).
+the store's cart can take it: ABU's, CSI's, Strike Zone's and Hareruya's
+buylist and store splits, SCG's and Mint's buylist splits, and Card
+Kingdom's store splits. CSI's and CK's store buttons sit beside their deck
+builder buttons, which post only names. SCG's store side and CK's buylist
+already have their own imports. The arbit, reverse and global pages give
+each section the same buttons: "Load at" for the store it buys from and
+"Load buylist at" for the store it sells to, each row in the condition the
+store sells it in (`cartLoadForArbit`).
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`

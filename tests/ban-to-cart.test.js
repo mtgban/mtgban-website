@@ -672,3 +672,73 @@ describe('ban-to-cart bookmarklet on Card Kingdom', () => {
         expect(alerts[0]).toBe('Loaded 25 cards into your Card Kingdom cart.');
     });
 });
+
+// fakeCSIShop stands in for CSI's store cart: the cart page names a quantity
+// field per row id, a GET deletes a row, and the add takes many
+// atc[<product>][<row>] pairs, adding to a row already there up to the
+// stock and skipping a row CSI does not sell.
+function fakeCSIShop({cart = {}, unknown = [], stock = {}} = {}) {
+    const lines = {...cart};
+    const posts = [];
+    const fetch = async (url, opts = {}) => {
+        const del = /action=delete-(\d+)/.exec(url);
+        if (del) {
+            posts.push({delete: del[1]});
+            delete lines[del[1]];
+            return {ok: true, status: 200, text: async () => ''};
+        }
+        if (!opts.method) {
+            const fields = Object.entries(lines).map(([row, q]) => `<input type="text" name="cartQty[${row}]" value="${q}">`);
+            return {ok: true, status: 200, text: async () => '<form>' + fields.join('') + '</form>'};
+        }
+        const rows = [...decodeURIComponent(opts.body).matchAll(/atc\[(\d+)\]\[(\d+)\]=(\d+)/g)].map((m) => [m[1], m[2], +m[3]]);
+        posts.push({add: rows});
+        for (const [, row, q] of rows) {
+            if (!unknown.includes(row)) {
+                lines[row] = Math.min((lines[row] || 0) + q, stock[row] ?? Infinity);
+            }
+        }
+        return {ok: true, status: 200, json: async () => ({})};
+    };
+    return {fetch, posts, lines};
+}
+
+describe('ban-to-cart bookmarklet on CSI\'s store', () => {
+    const shop = {host: 'www.coolstuffinc.com', path: '/main_view_cart.php'};
+
+    test('new rows go up as one add, by product and row id', async () => {
+        const fake = fakeCSIShop();
+        const {alerts, page, posts} = await run({...shop, hash: '#ban=434190-10753983%3a1%2c434190-10753986%3a2&side=retail', abu: fake});
+        expect(posts).toEqual([{add: [['434190', '10753983', 1], ['434190', '10753986', 2]]}]);
+        expect(fake.lines).toEqual({10753983: 1, 10753986: 2});
+        expect(alerts[0]).toBe('Loaded 2 cards into your CSI cart.');
+        expect(page.url).toBe('/main_view_cart.php');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('a row already in the cart ends at the list\'s quantity', async () => {
+        const fake = fakeCSIShop({cart: {10753983: 1, 10753986: 5}});
+        const {posts} = await run({...shop, hash: '#ban=434190-10753983:3,434190-10753986:2&side=retail', abu: fake});
+        expect(posts).toEqual([{delete: '10753986'}, {add: [['434190', '10753983', 2], ['434190', '10753986', 2]]}]);
+        expect(fake.lines).toEqual({10753983: 3, 10753986: 2});
+    });
+
+    test('a quantity stops at the stock, and a row CSI does not sell is reported', async () => {
+        const fake = fakeCSIShop({stock: {10753983: 1}, unknown: ['999']});
+        const {alerts} = await run({...shop, hash: '#ban=434190-10753983:4,1-999:1&side=retail', abu: fake});
+        expect(fake.lines).toEqual({10753983: 1});
+        expect(alerts[0]).toBe('Loaded 1 cards into your CSI cart. 1 were not taken by CSI.');
+    });
+
+    test('a list on the other side\'s cart is refused before anything is sent', async () => {
+        const store = fakeCSIShop();
+        const onShop = await run({...shop, hash: '#ban=601:1', abu: store});
+        expect(store.posts).toHaveLength(0);
+        expect(onShop.alerts[0]).toContain('the list is for its sell cart');
+
+        const sell = fakeCSI();
+        const onSell = await run({host: 'www.coolstuffinc.com', path: '/buylist_cart.php', hash: '#ban=434190-10753983:1&side=retail', abu: sell});
+        expect(sell.posts).toHaveLength(0);
+        expect(onSell.alerts[0]).toContain('the list is for its store');
+    });
+});
