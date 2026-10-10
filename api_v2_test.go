@@ -693,6 +693,34 @@ func TestPriceAPIVendorFilterIgnoresCase(t *testing.T) {
 	}
 }
 
+// Printings that share an id, here one Cardmarket id, keep the best of their
+// prices in v1 (the lowest offer, the highest buy) and that price's grade, on
+// both paths and whatever order the records are read in.
+func TestV1SharedIDKeepsTheBestPrice(t *testing.T) {
+	withSigMode(t, true, false)
+	seedV2Scrapers(t)
+	b := v2Backend()
+
+	for _, tc := range []struct {
+		name string
+		hash []string
+	}{{"funnel path", []string{"lor-3", "lor-1", "lor-2"}}, {"full dump path", nil}} {
+		t.Run(tc.name, func(t *testing.T) {
+			sell := getSellerPrices(b, "mkm", []string{"CT"}, "", tc.hash, "", false, false, false, "")["600001"]["CT"]
+			buy := getVendorPrices(b, "mkm", []string{"CK"}, "", tc.hash, "", false, false, false, "")["600001"]["CK"]
+			if sell == nil || buy == nil {
+				t.Fatalf("store missing: retail %v, buylist %v", sell, buy)
+			}
+			if sell.Regular != 0.9 || sell.Cond != "NM" {
+				t.Errorf("retail = %v %s, want lor-3's NM 0.9 over lor-1's 1 and lor-2's 38", sell.Regular, sell.Cond)
+			}
+			if buy.Regular != 0.6 || buy.Cond != "NM" {
+				t.Errorf("buylist = %v %s, want lor-3's NM 0.6 over lor-1's 0.5", buy.Regular, buy.Cond)
+			}
+		})
+	}
+}
+
 // A NaN or infinite price is no price: v1 and v2 leave it out rather than
 // fail to encode the response around it.
 func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
