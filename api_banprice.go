@@ -589,9 +589,9 @@ func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filte
 // BanPrice map the price API serves, mirroring the direct processEntry scan:
 // rows preserve record order (best grade first, then price), so the first
 // row seen per store is the record's best entry and keys the base price; a
-// zero base price drops the store; Conditions are last-write-wins within a
-// grade exactly like the entry loop. INDEX rows are metadata prices whose
-// underlying grade is always NM.
+// zero base price drops the store; each grade keeps its best price and its
+// total copies, through setGrade like the entry loop. INDEX rows are
+// metadata prices whose underlying grade is always NM.
 func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
@@ -718,16 +718,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 						condTag = "NM"
 					}
 					condTag += suffix
-					if price.Conditions == nil {
-						price.Conditions = &BanConditions{}
-					}
-					price.Conditions.Set(condTag, row.Price)
-					if shouldQty && quantity > 0 {
-						if price.Quantities == nil {
-							price.Quantities = &BanQuantities{}
-						}
-						price.Quantities.Set(condTag, quantity)
-					}
+					setGrade(price, condTag, row.Price, quantity, vendorSide, shouldQty)
 				}
 			}
 		}
@@ -825,6 +816,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 	if base == -1 {
 		return
 	}
+	_, buy := any(entries).([]mtgban.BuylistEntry)
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return
@@ -887,16 +879,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 					continue
 				}
 				condTag := string(entries[i].Condition()) + "_etched"
-				if out[id][scraperTag].Conditions == nil {
-					out[id][scraperTag].Conditions = &BanConditions{}
-				}
-				out[id][scraperTag].Conditions.Set(condTag, entries[i].Pricing()*rate)
-				if qty && entries[i].Qty() > 0 {
-					if out[id][scraperTag].Quantities == nil {
-						out[id][scraperTag].Quantities = &BanQuantities{}
-					}
-					out[id][scraperTag].Quantities.Set(condTag, entries[i].Qty())
-				}
+				setGrade(out[id][scraperTag], condTag, entries[i].Pricing()*rate, entries[i].Qty(), buy, qty)
 			}
 		}
 	} else if co.Foil {
@@ -915,16 +898,7 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 					continue
 				}
 				condTag := string(entries[i].Condition()) + "_foil"
-				if out[id][scraperTag].Conditions == nil {
-					out[id][scraperTag].Conditions = &BanConditions{}
-				}
-				out[id][scraperTag].Conditions.Set(condTag, entries[i].Pricing()*rate)
-				if qty && entries[i].Qty() > 0 {
-					if out[id][scraperTag].Quantities == nil {
-						out[id][scraperTag].Quantities = &BanQuantities{}
-					}
-					out[id][scraperTag].Quantities.Set(condTag, entries[i].Qty())
-				}
+				setGrade(out[id][scraperTag], condTag, entries[i].Pricing()*rate, entries[i].Qty(), buy, qty)
 			}
 		}
 	} else {
@@ -943,18 +917,27 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 					continue
 				}
 				condTag := string(entries[i].Condition())
-				if out[id][scraperTag].Conditions == nil {
-					out[id][scraperTag].Conditions = &BanConditions{}
-				}
-				out[id][scraperTag].Conditions.Set(condTag, entries[i].Pricing()*rate)
-				if qty && entries[i].Qty() > 0 {
-					if out[id][scraperTag].Quantities == nil {
-						out[id][scraperTag].Quantities = &BanQuantities{}
-					}
-					out[id][scraperTag].Quantities.Set(condTag, entries[i].Qty())
-				}
+				setGrade(out[id][scraperTag], condTag, entries[i].Pricing()*rate, entries[i].Qty(), buy, qty)
 			}
 		}
+	}
+}
+
+// setGrade files one listing under its grade, which keeps the best price
+// (the lowest offer, the highest buy) and the sum of the copies, as v2 does.
+func setGrade(price *BanPrice, condTag string, value float64, quantity int, buy, withQty bool) {
+	if price.Conditions == nil {
+		price.Conditions = &BanConditions{}
+	}
+	best := price.Conditions.Get(condTag)
+	if best == 0 || (buy && value > best) || (!buy && value < best) {
+		price.Conditions.Set(condTag, value)
+	}
+	if withQty && quantity > 0 {
+		if price.Quantities == nil {
+			price.Quantities = &BanQuantities{}
+		}
+		price.Quantities.Set(condTag, price.Quantities.Get(condTag)+quantity)
 	}
 }
 

@@ -434,6 +434,79 @@ func TestZeroPricedListings(t *testing.T) {
 	})
 }
 
+// A grade with several listings keeps its best price (the lowest offer, the
+// highest buy) and the sum of its copies, on both API paths and under every
+// finish, as v2 does.
+func TestGradesKeepTheBestPriceAndTheTotal(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+	var etched string
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
+		if err == nil && co.Etched {
+			etched = uuid
+			break
+		}
+	}
+	if etched == "" {
+		t.Skip("no etched printing in this datastore")
+	}
+	cards := []struct{ id, suffix string }{{regular, ""}, {foil, "_foil"}, {etched, "_etched"}}
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+
+	inv := mtgban.InventoryRecord{}
+	bl := mtgban.BuylistRecord{}
+	var ids []string
+	for _, card := range cards {
+		ids = append(ids, card.id)
+		inv.Add(card.id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 3, SellerName: "a"})
+		inv.Add(card.id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1.5, Quantity: 2, SellerName: "b"})
+		inv.Add(card.id, &mtgban.InventoryEntry{Conditions: "SP", Price: 0.8, Quantity: 1, SellerName: "c"})
+		bl.Add(card.id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 0.5, Quantity: 4, VendorName: "a"})
+		bl.Add(card.id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 0.6, Quantity: 1, VendorName: "b"})
+	}
+	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Grade Store", Shorthand: "GRADEA"})}
+	vendors := []mtgban.Vendor{mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: "Grade Buyer", Shorthand: "GRADEV"})}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	for _, tc := range []struct {
+		name string
+		hash []string
+	}{{"funnel path", ids}, {"full dump path", nil}} {
+		t.Run(tc.name, func(t *testing.T) {
+			retail := getSellerPrices(backend(), "", []string{"GRADEA"}, "", tc.hash, "", true, true, false, "")
+			buylist := getVendorPrices(backend(), "", []string{"GRADEV"}, "", tc.hash, "", true, true, false, "")
+			for _, card := range cards {
+				sell, buy := retail[card.id]["GRADEA"], buylist[card.id]["GRADEV"]
+				if sell == nil || buy == nil {
+					t.Fatalf("%s: store missing: retail %v, buylist %v", card.id, sell, buy)
+				}
+				nm, sp := "NM"+card.suffix, "SP"+card.suffix
+				if got := sell.Conditions.Get(nm); got != 1 {
+					t.Errorf("retail conditions[%s] = %v, want 1, the cheaper NM listing", nm, got)
+				}
+				if got := sell.Quantities.Get(nm); got != 5 {
+					t.Errorf("retail quantities[%s] = %v, want 5, both NM listings", nm, got)
+				}
+				if got := sell.Conditions.Get(sp); got != 0.8 {
+					t.Errorf("retail conditions[%s] = %v, want 0.8", sp, got)
+				}
+				if got := buy.Conditions.Get(nm); got != 0.6 {
+					t.Errorf("buylist conditions[%s] = %v, want 0.6, the higher NM offer", nm, got)
+				}
+				if got := buy.Quantities.Get(nm); got != 5 {
+					t.Errorf("buylist quantities[%s] = %v, want 5, both NM offers", nm, got)
+				}
+			}
+		})
+	}
+}
+
 // TestStoreEligible pins the precedence rule behind divergence #2 of the
 // plan: an explicit allowlist is the entire store policy and bypasses
 // blocklists; without one, blocklists exclude.
