@@ -27,7 +27,7 @@ window.__BAN_GUIDE = {
             keywords: ['palette', 'modes', 'shortcuts', 'overview', 'pages', 'help', 'saved', 'recent', 'sealed', 'upload', 'tiles'],
             content: {
                 table: [
-                    { value: '>',  short: 'Pages - navigate to a page or a specific sub-view (Newspaper Archive, Sleepers Bulk, Arbitrage with filter presets, etc.)' },
+                    { value: '>',  short: 'Pages - navigate to a page or a specific sub-view (Newspaper Archive, Sleepers Bulk, Arbitrage sorted by spread, etc.)' },
                     { value: '?',  short: 'Help & syntax - look up a syntax prefix; Enter copies the snippet, Shift+Enter opens the guide section' },
                     { value: '*',  short: 'Saved - browse and run your saved searches; Shift+Enter restores chips for editing' },
                     { value: '<',  short: 'Recent - recall your recent searches' },
@@ -37,7 +37,7 @@ window.__BAN_GUIDE = {
                 examples: [
                     { query: 'Lightning Bolt', desc: 'Just type a card name - Enter to search' },
                     { query: 'Birds of Paradise + Tab + s: + Tab', desc: 'Lock the card as a chip; the set dropdown narrows to its printings', palette: true },
-                    { query: '>arbit + Tab + "Yield+" + Tab', desc: 'Compose an Arbitrage URL with filter presets', palette: true },
+                    { query: '>arbit + Tab + "Spread" + Enter', desc: 'Open Arbitrage sorted by spread, with your filters', palette: true },
                     { query: '? rarity', desc: 'Inline syntax help - Enter copies the snippet', palette: true },
                     { query: '$Modern Horizons 3 Bundle + Shift+Enter', desc: 'Jump straight to the contents of a sealed product', palette: true },
                     { query: '+https://docs.google.com/spreadsheets/d/...', desc: 'Submit a Google Sheets collection to the Uploader', palette: true }
@@ -106,12 +106,12 @@ window.__BAN_GUIDE = {
                 table: [
                     { value: '>newspaper + Tab', short: 'Shows all Newspaper views' },
                     { value: '>sleepers + Tab', short: 'Shows the 5 analysis modes' },
-                    { value: '>arbit + Tab', short: 'Shows sort options + filter presets' },
+                    { value: '>arbit + Tab', short: 'Shows sort options' },
                     { value: 'Enter on parent chip only', short: 'Navigates to base URL' }
                 ],
                 examples: [
                     { query: '>newspaper + Tab + "Archive"', desc: 'Goes to /newspaper?page=old' },
-                    { query: '>arbit + Tab + "Yield+" + Tab + "Bucks+" + Enter', desc: '/arbit?nolow=true&nopenny=true' }
+                    { query: '>arbit + Tab + "Spread" + Enter', desc: '/arbit?sort=spread' }
                 ]
             }
         },
@@ -1082,7 +1082,7 @@ window.__BAN_GUIDE = {
                 ],
                 examples: [
                     { query: '>global + Tab + "Card Kingdom"', desc: 'Open Global with Card Kingdom as the index', palette: true },
-                    { query: '>global + Tab + "Yield+" + Tab + "Bucks+"', desc: 'Compose a filtered Global URL', palette: true }
+                    { query: '>global + Tab + "Spread" + Enter', desc: 'Open Global sorted by spread, with your filters', palette: true }
                 ]
             }
         },
@@ -1099,7 +1099,7 @@ window.__BAN_GUIDE = {
             content: {
                 table: [],
                 examples: [
-                    { query: '>arbit + Tab + "Yield+" + Tab + "Bucks+"', desc: 'Compose an Arbitrage URL with profit filters', palette: true }
+                    { query: '>arbit + Tab + "Profitability" + Enter', desc: 'Open Arbitrage sorted by profitability', palette: true }
                 ]
             }
         },
@@ -1116,7 +1116,7 @@ window.__BAN_GUIDE = {
             content: {
                 table: [],
                 examples: [
-                    { query: '>reverse + Tab + "Yield+"', desc: 'Reverse arbitrage results with yield filter', palette: true }
+                    { query: '>reverse + Tab + "Spread" + Enter', desc: 'Reverse arbitrage sorted by spread', palette: true }
                 ]
             }
         },

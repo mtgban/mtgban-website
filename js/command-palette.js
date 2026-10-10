@@ -311,15 +311,11 @@
         return !!NAV_NAMES[section.requiresNav];
     }
 
-    // For arbit/reverse/global, distinguishes whether a sub-view value goes in
-    // ?sort= (singleton) or ?key=true (filter, multi).
-    function isArbitSortValue(key, value) {
-        var targets = (window.__BAN_PALETTE_TARGETS || {})[key];
-        if (!targets || !targets.sorts) return false;
-        for (var i = 0; i < targets.sorts.length; i++) {
-            if (targets.sorts[i].value === value) return true;
-        }
-        return false;
+    // The query key a parent's sub-view goes in: newspaper and sleepers
+    // pick a page, and the arbitrage pages a sort, their filters being the
+    // page's own filter bar.
+    function subViewParam(key) {
+        return (key === 'newspaper' || key === 'sleepers') ? 'page' : 'sort';
     }
 
     // Returns a navigation URL if the chip set is a "nav composition" (one parent
@@ -363,27 +359,7 @@
     function composeSubViewURL(parentChip, entry) {
         var key  = NAV_PARENTS[parentChip.navName];
         var base = (parentChip.navLink || '').split('?')[0];
-        var params = [];
-
-        if (key === 'newspaper' || key === 'sleepers') {
-            params.push('page=' + encodeURIComponent(entry.value));
-        } else {
-            if (isArbitSortValue(key, entry.value)) {
-                params.push('sort=' + encodeURIComponent(entry.value));
-            } else {
-                params.push(encodeURIComponent(entry.value) + '=true');
-            }
-            // Merge prior nav-sub chips for the same parent.
-            if (chips) {
-                var list = chips.all();
-                for (var i = 0; i < list.length; i++) {
-                    if (list[i].type === 'nav-sub' && list[i]._parentKey === key && list[i]._urlParam) {
-                        params.push(list[i]._urlParam);
-                    }
-                }
-            }
-        }
-        return base + (params.length ? '?' + params.join('&') : '');
+        return base + '?' + subViewParam(key) + '=' + encodeURIComponent(entry.value);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -602,30 +578,13 @@
 
     function lockSubViewChip(item) {
         var pKey = NAV_PARENTS[item._parentChip.navName];
-        var urlParam, isSingleton = false;
+        var urlParam = subViewParam(pKey) + '=' + encodeURIComponent(item._subView.value);
 
-        if (pKey === 'newspaper' || pKey === 'sleepers') {
-            urlParam = 'page=' + encodeURIComponent(item._subView.value);
-            isSingleton = true;
-        } else if (isArbitSortValue(pKey, item._subView.value)) {
-            urlParam = 'sort=' + encodeURIComponent(item._subView.value);
-            isSingleton = true;
-        } else {
-            urlParam = encodeURIComponent(item._subView.value) + '=true';
-        }
-
-        // Replace any existing chip that conflicts (same singleton kind, or duplicate filter).
+        // A parent takes one sub-view: the new one replaces the old.
         var existing = chips.all();
         for (var i = existing.length - 1; i >= 0; i--) {
             var ec = existing[i];
-            if (ec.type !== 'nav-sub' || ec._parentKey !== pKey) continue;
-            if (isSingleton) {
-                var ecPrefix  = ec._urlParam ? ec._urlParam.split('=')[0] : '';
-                var newPrefix = urlParam.split('=')[0];
-                if (ecPrefix === newPrefix) chips.remove(i);
-            } else if (ec._urlParam === urlParam) {
-                chips.remove(i);
-            }
+            if (ec.type === 'nav-sub' && ec._parentKey === pKey) chips.remove(i);
         }
 
         addChipSilent({
@@ -1196,9 +1155,8 @@
                 pushEntries(targets, parentChip.navName + ' Views');
             }
         } else {
-            // Arbit/Reverse/Global shape: { filters: [...], sorts: [...] }
-            pushEntries(targets.sorts,   parentChip.navName + ' \u00b7 Sort');
-            pushEntries(targets.filters, parentChip.navName + ' \u00b7 Filters');
+            // Arbit/Reverse/Global shape: { sorts: [...] }
+            pushEntries(targets.sorts, parentChip.navName + ' \u00b7 Sort');
         }
 
         if (items.length === 0) {
@@ -1492,14 +1450,7 @@
 
         'nav-sub': {
             render: rowHTML,
-            footer: function (item) {
-                var pKey = item._parentChip && NAV_PARENTS[item._parentChip.navName];
-                var isSingleton = pKey === 'newspaper' || pKey === 'sleepers';
-                var isSort      = pKey && isArbitSortValue(pKey, item._subView.value);
-                return (pKey && !isSingleton && !isSort)
-                    ? { action: 'Open', tab: 'Add filter' }
-                    : { action: 'Open' };
-            },
+            footer: function () { return { action: 'Open' }; },
             onEnter: function (item) {
                 window.location.href = composeSubViewURL(item._parentChip, item._subView);
             },
