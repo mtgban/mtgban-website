@@ -3,14 +3,15 @@
 Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
 buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
-and both calls take a list. MTG Mint Card has the same kind of call, one
-card at a time, and Hareruya both: a form that takes a whole store list,
-and one call per card for its buylist. Star City Games and Strike Zone have
-a CSV import, but no way to hand it a list from another site. The upload
-page reaches all six through one bookmarklet, BAN-to-Cart, run on the
-store's page. ABU was measured against a real account on 2026-10-07, CSI,
-Strike Zone and Hareruya against a guest cart, and SCG and Mint against a
-real account on 2026-10-09.
+and both calls take a list. MTG Mint Card and Card Kingdom's store have the
+same kind of call, one card at a time, and Hareruya both: a form that takes
+a whole store list, and one call per card for its buylist. Star City Games
+and Strike Zone have a CSV import, but no way to hand it a list from
+another site. The upload page reaches all seven through one bookmarklet,
+BAN-to-Cart, run on the store's page. ABU was measured against a real
+account on 2026-10-07, CSI, Strike Zone and Hareruya against a guest cart
+and SCG and Mint against a real account on 2026-10-09, and Card Kingdom
+against a guest cart on 2026-10-10.
 
 ## ABU: the calls
 
@@ -235,6 +236,37 @@ POST /en/cart/update       qty[27947]=1&qty[27948]=2&qty[436375]=1
 | the buylist add, 100 cards one after another | 30 s, all 100, no limit met |
 | the buylist add, above 20 | 400 `overlimit` |
 
+## Card Kingdom: the store cart
+
+Card Kingdom's buylist already takes a whole list through
+`sellcart/partner_import`. Its store has no such import: its deck builder
+(`/builder`, where the upload page's other CK button posts the names) is a
+search, and the user picks each printing there. The store cart's own add
+call takes one card, by product id and grade:
+
+```
+POST /api/cart/add   {"product_id": 10190, "style": "EX", "quantity": 2}
+GET  /api/cart       {"lineitems": [{"product_id": 10190, "style": "EX", "qty": 2}, ...]}
+```
+
+- The product id is the printing's CK id, which go-mtgban's `cardkingdom`
+  scraper stores as `OriginalID`. The style is CK's name for the grade: NM,
+  EX, VG or G for our NM, SP, MP and HP. `ckCartID` builds a row as
+  `<product id>-<style>`, for the `CK` split alone: sealed rows carry no CK
+  id, and a graded slab's add was never measured, so `CKSealed` and
+  `CKGraded` splits get no button.
+- An add sets the quantity, and 0 removes the row. Above the stock it
+  answers 400 `MaxQuantityExceeded` with how many there are, and the
+  bookmarklet sends the card again at that. A product it does not have
+  answers 200 with a message.
+- The cart is kept by CK's cookies, guests included. No token is needed.
+
+| Sent | Result |
+|---|---|
+| 30 cards from the published dump, across the four grades | 38 s, all 30 at the asked quantity |
+| an add | 0.4 to 2.5 s |
+| two cards in one body | 422 |
+
 ## SCG: the CSV import
 
 SCG's sell site, `https://sellyourcards.starcitygames.com`, adds one card
@@ -261,11 +293,12 @@ uploads page offers takes the whole list and prices it itself:
 
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, Strike Zone's and Hareruya's buylist
-and store splits, and CSI's, SCG's and Mint's buylist splits. CSI's and
-SCG's store sides already have their own imports. The arbit, reverse and
-global pages give each section the same buttons: "Load at" for the store it
-buys from and "Load buylist at" for the store it sells to, each row in the
-condition the store sells it in (`cartLoadForArbit`).
+and store splits, CSI's, SCG's and Mint's buylist splits, and Card
+Kingdom's store splits, beside its deck builder button. CSI's and SCG's
+store sides and CK's buylist already have their own imports. The arbit,
+reverse and global pages give each section the same buttons: "Load at" for
+the store it buys from and "Load buylist at" for the store it sells to,
+each row in the condition the store sells it in (`cartLoadForArbit`).
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
@@ -308,7 +341,7 @@ from the page's host. It first checks it is the loader the site expects:
 onto every link (`&v=`), so a bookmark saved before the file last changed
 says it is out of date and asks to be dragged again, and touches no cart.
 On SCG it then uploads the list as one CSV and opens SCG's review of it.
-On ABU, CSI, Mint, Strike Zone and Hareruya it:
+On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
@@ -329,7 +362,8 @@ On ABU, CSI, Mint, Strike Zone and Hareruya it:
    add per card the cart page does not list, at most 20 of it, then one
    form per 50 cards setting every quantity, so a card the page left out
    still ends at the list's; it stops before sending anything when the
-   link's `side=retail` and the cart page disagree;
+   link's `side=retail` and the cart page disagree; on Card Kingdom, one
+   add per card, 10 to a chunk, again at the stock where CK has fewer;
 4. on ABU's 422, reads the cart back and tries each row missing from it
    alone until ABU refuses one, the id it does not know, then resends the
    rest; ABU's store also leaves out rows it has none of, so the first
