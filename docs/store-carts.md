@@ -270,6 +270,8 @@ POST /en/cart/update       qty[27947]=1&qty[27948]=2&qty[436375]=1
 
 ## Card Kingdom: the store cart
 
+The site shows no button for this cart for now; see "What the site does".
+
 Card Kingdom's buylist already takes a whole list through
 `sellcart/partner_import`. Its store has no such import: its deck builder
 (`/builder`, where the upload page's other CK button posts the names) is a
@@ -325,10 +327,11 @@ uploads page offers takes the whole list and prices it itself:
 
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, CSI's, Strike Zone's and Hareruya's
-buylist and store splits, SCG's and Mint's buylist splits, and Card
-Kingdom's store splits. CSI's and CK's store buttons sit beside their deck
-builder buttons, which post only names. SCG's store side and CK's buylist
-already have their own imports. The arbit, reverse and global pages give
+buylist and store splits, and SCG's and Mint's buylist splits. CSI's store
+button sits beside its deck builder button, which posts only names. SCG's
+store side and CK's buylist already have their own imports. Card Kingdom's
+store split gets no button for now, though the bookmarklet still fills its
+cart: a load logged a signed-in user out, and the cause is not known yet. The arbit, reverse and global pages give
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
 store sells it in (`cartLoadForArbit`).

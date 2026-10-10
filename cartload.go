@@ -30,7 +30,9 @@ var cartStores = []cartStore{
 	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", ""},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
 	{"HA", "Hareruya", "https://www.hareruyamtg.com/ja/purchase/cart", "https://www.hareruyamtg.com/en/cart"},
-	{"CK", "Card Kingdom", "", "https://www.cardkingdom.com/cart"},
+	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
+	// button until a load that logs a signed-in user out is explained
+	{"CK", "Card Kingdom", "", ""},
 }
 
 // cartRetailIDs name a store row the way a store's cart takes it, for a store
