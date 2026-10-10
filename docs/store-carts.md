@@ -411,6 +411,11 @@ On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
    out, and what did not fit, then clears the fragment and reloads the
    page.
 
+From the banner until the report, and on SCG until the review opens, the
+page asks before it is left (`beforeunload`), since leaving stops the load
+with the cart half filled. Browsers ask only on a page the user has clicked
+or typed in, so the banner also says to keep the tab open.
+
 ABU's token, and the other stores' cookies, never leave the store's site.
 Pasting an ABU token into mtgban would work too, since ABU's CORS is open,
 but it would put a year-long credential in our page. Logging in to a
