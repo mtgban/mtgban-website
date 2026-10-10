@@ -18,14 +18,14 @@ import (
 
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
 // keyed by the prefix their splits' shorthands share, with the page each
-// side's button opens. An empty page gets no button: CSI's and SCG's retail
-// sides and CK's buylist have their own imports on the upload page, and
-// Mint's store cart is not filled. SCG's page is its CSV uploads, where the
-// bookmarklet hands SCG the list to match. Strike Zone buys and sells
-// through one cart page, so a retail link also says side=retail.
+// side's button opens. An empty page gets no button: SCG's retail side and
+// CK's buylist have their own imports on the upload page, and Mint's store
+// cart is not filled. SCG's page is its CSV uploads, where the bookmarklet
+// hands SCG the list to match. Strike Zone buys and sells through one cart
+// page, so a retail link also says side=retail.
 var cartStores = []cartStore{
 	{"ABU", "ABU", "https://abugames.com/cartview/buylist", "https://abugames.com/cartview/shop"},
-	{"CSI", "CSI", "https://www.coolstuffinc.com/buylist_cart.php", ""},
+	{"CSI", "CSI", "https://www.coolstuffinc.com/buylist_cart.php", "https://www.coolstuffinc.com/main_view_cart.php"},
 	{"SCG", "SCG", "https://sellyourcards.starcitygames.com/mtg/uploads", ""},
 	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", ""},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
@@ -37,7 +37,17 @@ var cartStores = []cartStore{
 // whose cart is not keyed by the entry's InstanceID, on the split named
 // exactly by its prefix.
 var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
-	"CK": ckCartID,
+	"CK":  ckCartID,
+	"CSI": csiCartID,
+}
+
+// csiCartID names a CSI store row as <product id>-<row id>, the pair its
+// cart's add takes.
+func csiCartID(entry mtgban.InventoryEntry) string {
+	if entry.OriginalID == "" || entry.InstanceID == "" {
+		return ""
+	}
+	return entry.OriginalID + "-" + entry.InstanceID
 }
 
 // cartAffiliates are how a store's own links from us credit our partner

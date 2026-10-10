@@ -9,7 +9,7 @@
     if (location.hostname === "abugames.com") {
         store = abuStore();
     } else if (location.hostname === "www.coolstuffinc.com") {
-        store = csiStore();
+        store = location.pathname.indexOf("/main_view_cart.php") === 0 ? csiShop() : csiStore();
     } else if (location.hostname === "sellyourcards.starcitygames.com") {
         store = scgStore();
     } else if (location.hostname === "www.mtgmintcard.com") {
@@ -257,6 +257,9 @@
             maxLines: 0,
             chunkSize: 100,
             cartIDs: async function () {
+                if (/[#&]side=retail(&|$)/.test(location.hash)) {
+                    throw new Error("This is CSI's sell cart, but the list is for its store. Go back to BAN and press its button again.");
+                }
                 var resp = await fetch("/buylist_cart.php");
                 if (!resp.ok) {
                     throw new Error("CSI could not read your sell cart (" + resp.status + ").");
@@ -280,6 +283,77 @@
                 });
                 if (!resp.ok) {
                     throw new Error("CSI refused the list (" + resp.status + ").");
+                }
+                return true;
+            }
+        };
+    }
+
+    // csiShop loads CSI's store cart, kept by the browser's cookies, keyed by
+    // <product id>-<row id>, one row per condition and finish. Its add takes
+    // many rows at once but adds to a row already in the cart, so such a row
+    // gets the difference, or is deleted and added again when the list asks
+    // for fewer. CSI trims a quantity to its stock and skips a row it does
+    // not sell.
+    function csiShop() {
+        var held = {};
+        return {
+            name: "CSI",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            // One add of 40 rows took 3.6 s
+            chunkSize: 100,
+            // The cart names a row by its row id alone
+            key: function (id) {
+                return id.split("-")[1];
+            },
+            cartIDs: async function () {
+                if (!/[#&]side=retail(&|$)/.test(location.hash)) {
+                    throw new Error("This is CSI's store cart, but the list is for its sell cart. Go back to BAN and press its button again.");
+                }
+                var resp = await fetch("/main_view_cart.php");
+                if (!resp.ok) {
+                    throw new Error("CSI could not read your cart (" + resp.status + ").");
+                }
+                var page = await resp.text();
+                held = {};
+                var re = /name="cartQty\[(\d+)\]"[^>]*value="(\d+)"/g;
+                var m;
+                while ((m = re.exec(page)) !== null) {
+                    held[m[1]] = Number(m[2]);
+                }
+                return Object.keys(held);
+            },
+            send: async function (chunk, qty) {
+                var add = [];
+                for (var i = 0; i < chunk.length; i++) {
+                    var parts = chunk[i].split("-");
+                    var want = qty[chunk[i]];
+                    var have = held[parts[1]] || 0;
+                    if (want < have) {
+                        var resp = await fetch("/main_view_cart.php?action=delete-" + parts[1]);
+                        if (!resp.ok) {
+                            throw new Error("CSI refused the list (" + resp.status + ").");
+                        }
+                        have = 0;
+                    }
+                    if (want > have) {
+                        add.push("atc[" + parts[0] + "][" + parts[1] + "]=" + (want - have));
+                    }
+                }
+                if (add.length > 0) {
+                    var sent = await fetch("/ajax_cart_qty_add.php", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"},
+                        body: add.map(function (pair) {
+                            return pair.replace(/\[/g, "%5B").replace(/\]/g, "%5D");
+                        }).join("&") + "&referrer="
+                    });
+                    if (!sent.ok) {
+                        throw new Error("CSI refused the list (" + sent.status + ").");
+                    }
                 }
                 return true;
             }
