@@ -53,6 +53,16 @@ func stubCartStores(t *testing.T) {
 	haStock := mtgban.InventoryRecord{}
 	haStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "27947"})
 	haStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 1.5, InstanceID: "27948"})
+	// Card Kingdom's cart takes its product id and its own grade names
+	ckStock := mtgban.InventoryRecord{}
+	ckStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 3.49, OriginalID: "10190", InstanceID: "4ED-123"})
+	ckStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 2.79, OriginalID: "10190", InstanceID: "4ED-123"})
+	ckSealed := mtgban.InventoryRecord{}
+	ckSealed.Add("box-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100})
+	// A graded slab's listing has a product id, but its cart add was never
+	// measured
+	ckGraded := mtgban.InventoryRecord{}
+	ckGraded.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 50, OriginalID: "555001"})
 	szStock := mtgban.InventoryRecord{}
 	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
 	csiSealed := mtgban.BuylistRecord{}
@@ -77,6 +87,9 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
 		mtgban.NewSellerFromInventory(szStock, mtgban.ScraperInfo{Shorthand: "SZ"}),
 		mtgban.NewSellerFromInventory(haStock, mtgban.ScraperInfo{Shorthand: "HA"}),
+		mtgban.NewSellerFromInventory(ckStock, mtgban.ScraperInfo{Shorthand: "CK"}),
+		mtgban.NewSellerFromInventory(ckSealed, mtgban.ScraperInfo{Shorthand: "CKSealed"}),
+		mtgban.NewSellerFromInventory(ckGraded, mtgban.ScraperInfo{Shorthand: "CKGraded"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -116,6 +129,10 @@ func TestCartRows(t *testing.T) {
 		// Each condition its own class in the store, one class on the buylist
 		{"HA", false, "27947:3,27948:1"},
 		{"HA", true, "356866:4"},
+		{"CK", false, "10190-NM:3,10190-EX:1"},
+		// Only CK's own split, not its sealed or graded ones
+		{"CKSealed", false, ""},
+		{"CKGraded", false, ""},
 	} {
 		got := cartRows(cartItems(tc.key, tc.buylist, entries), entries)
 		if got != tc.want {
@@ -169,6 +186,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
 		{"HA", false, `href="https://www.hareruyamtg.com/en/cart#ban=27947:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya"`},
+		{"CK", false, `href="https://www.cardkingdom.com/cart#ban=10190-NM:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Card Kingdom"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -190,7 +208,7 @@ func TestCartLoadButtons(t *testing.T) {
 		}
 	}
 
-	for _, key := range []string{"MKM", "CSI"} {
+	for _, key := range []string{"MKM", "CSI", "CKGraded", "CKSealed"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
 			OptimizedKeys:   []string{key},

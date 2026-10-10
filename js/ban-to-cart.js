@@ -18,6 +18,8 @@
         store = szStore();
     } else if (location.hostname === "www.hareruyamtg.com") {
         store = haStore();
+    } else if (location.hostname === "www.cardkingdom.com") {
+        store = ckStore();
     }
     // A store whose cart names a row other than the link does maps it
     var key = (store && store.key) || function (id) {
@@ -530,6 +532,60 @@
                     update.append("qty[" + id + "]", String(most(qty[id])));
                 }
                 await post(buylist ? "/ja/purchase/update" : "/en/cart/update", update);
+                return true;
+            }
+        };
+    }
+
+    // ckStore loads Card Kingdom's store cart, kept by its cookies, one card
+    // per call keyed by <product id>-<style>, setting each quantity. Above
+    // the stock CK answers with how many it has, and the card goes again at
+    // that.
+    function ckStore() {
+        async function add(id, qty) {
+            var parts = id.split("-");
+            var resp = await fetch("/api/cart/add", {
+                method: "POST",
+                headers: {"Content-Type": "application/json;charset=UTF-8", Accept: "application/json;charset=UTF-8"},
+                body: JSON.stringify({product_id: Number(parts[0]), style: parts[1], quantity: qty})
+            });
+            if (resp.status === 400) {
+                var body = await resp.json().catch(function () {
+                    return {};
+                });
+                if (body.exception === "MaxQuantityExceeded" && body.available > 0 && body.available < qty) {
+                    await add(id, body.available);
+                }
+                return;
+            }
+            if (!resp.ok) {
+                throw new Error("Card Kingdom refused the list (" + resp.status + ").");
+            }
+        }
+        return {
+            name: "Card Kingdom",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            // An add takes 0.4 to 2.5 s
+            chunkSize: 10,
+            cartIDs: async function () {
+                var resp = await fetch("/api/cart?v=" + Date.now());
+                if (!resp.ok) {
+                    throw new Error("Card Kingdom could not read your cart (" + resp.status + ").");
+                }
+                var body = await resp.json();
+                return ((body.cart || body).lineitems || []).map(function (line) {
+                    return line.product_id + "-" + line.style;
+                });
+            },
+            // CK answers a product it does not have with a message, and the
+            // card is reported as not taken
+            send: async function (chunk, qty) {
+                for (var i = 0; i < chunk.length; i++) {
+                    await add(chunk[i], qty[chunk[i]]);
+                }
                 return true;
             }
         };

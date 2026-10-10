@@ -17,10 +17,10 @@ import (
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
 // keyed by the prefix their splits' shorthands share, with the page each
 // side's button opens. An empty page gets no button: CSI's and SCG's retail
-// sides have their own imports on the upload page, and Mint's store cart is
-// not filled. SCG's page is its CSV uploads, where the bookmarklet hands SCG
-// the list to match. Strike Zone buys and sells through one cart page, so a
-// retail link also says side=retail.
+// sides and CK's buylist have their own imports on the upload page, and
+// Mint's store cart is not filled. SCG's page is its CSV uploads, where the
+// bookmarklet hands SCG the list to match. Strike Zone buys and sells
+// through one cart page, so a retail link also says side=retail.
 var cartStores = []cartStore{
 	{"ABU", "ABU", "https://abugames.com/cartview/buylist", "https://abugames.com/cartview/shop"},
 	{"CSI", "CSI", "https://www.coolstuffinc.com/buylist_cart.php", ""},
@@ -28,6 +28,32 @@ var cartStores = []cartStore{
 	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", ""},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
 	{"HA", "Hareruya", "https://www.hareruyamtg.com/ja/purchase/cart", "https://www.hareruyamtg.com/en/cart"},
+	{"CK", "Card Kingdom", "", "https://www.cardkingdom.com/cart"},
+}
+
+// cartRetailIDs name a store row the way a store's cart takes it, for a store
+// whose cart is not keyed by the entry's InstanceID, on the split named
+// exactly by its prefix.
+var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
+	"CK": ckCartID,
+}
+
+// ckStyles are Card Kingdom's names for the grades its store cart sells.
+var ckStyles = map[mtgban.Condition]string{
+	mtgban.NM: "NM",
+	mtgban.SP: "EX",
+	mtgban.MP: "VG",
+	mtgban.HP: "G",
+}
+
+// ckCartID names a Card Kingdom row by the product id and style its cart's
+// add call takes, as <product id>-<style>.
+func ckCartID(entry mtgban.InventoryEntry) string {
+	style := ckStyles[entry.Conditions]
+	if entry.OriginalID == "" || style == "" {
+		return ""
+	}
+	return entry.OriginalID + "-" + style
 }
 
 type cartStore struct {
@@ -100,12 +126,23 @@ func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) car
 func cartStoresIn(keys []string, buylist bool) bool {
 	for _, key := range keys {
 		for _, cs := range cartStores {
-			if strings.HasPrefix(key, cs.prefix) && cs.page(buylist) != "" {
+			if cartTakes(cs, key, buylist) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// cartTakes reports whether a store's cart takes key's split on the side
+// buylist says. A store whose rows go by its own ids (cartRetailIDs) was
+// measured on its own split alone, not its graded or sealed ones.
+func cartTakes(cs cartStore, key string, buylist bool) bool {
+	if !strings.HasPrefix(key, cs.prefix) || cs.page(buylist) == "" {
+		return false
+	}
+	_, own := cartRetailIDs[cs.prefix]
+	return buylist || !own || key == cs.prefix
 }
 
 // cartItems is the store item id of each of a split's rows, empty for a card
@@ -137,13 +174,27 @@ func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []strin
 		if err != nil {
 			return nil
 		}
+		name := func(entry mtgban.InventoryEntry) string {
+			return entry.InstanceID
+		}
+		for _, cs := range cartStores {
+			named, found := cartRetailIDs[cs.prefix]
+			if !found || !strings.HasPrefix(key, cs.prefix) {
+				continue
+			}
+			if !cartTakes(cs, key, false) {
+				return nil
+			}
+			name = named
+			break
+		}
 		lookup = func(cardID string, cond mtgban.Condition) string {
 			entries := inv[cardID]
 			i := pricedEntry(entries, cond)
 			if i < 0 {
 				return ""
 			}
-			return entries[i].InstanceID
+			return name(entries[i])
 		}
 	}
 
