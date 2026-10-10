@@ -261,6 +261,17 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		}
 	}
 
+	// Buying comes first, then selling, CK's own buylist import included
+	ck := renderArbit(t, PageVars{
+		ScraperShort: "ABUScans",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CK", Arbit: rows}},
+	})
+	at, ckAt := strings.Index(ck, buy), strings.Index(ck, ">Load buylist at CK<")
+	if at < 0 || ckAt < 0 || at > ckAt {
+		t.Errorf("want Load at ABU before Load buylist at CK, at %d and %d", at, ckAt)
+	}
+
 	page := renderArbit(t, reversePageVars())
 	if strings.Contains(page, `id="cart-overlay"`) {
 		t.Error("a page with no cart store carries the cart panel")
