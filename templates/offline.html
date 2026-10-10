@@ -173,6 +173,7 @@
             wrapper.setAttribute('data-foil', (ok && isFoil) ? 'true' : 'false');
             wrapper.setAttribute('data-etched', (ok && isEtched) ? 'true' : 'false');
             wrapper.setAttribute('data-set', setCode || '');
+            wrapper.toggleAttribute('data-sealed', sealedMode);
         }
     }
 
