@@ -430,6 +430,7 @@ type SearchVars struct {
 	CardQuantities map[string]int
 	ListingLocked  bool
 	SearchSort     string
+	AlphaSort      string
 	CondKeys       []mtgban.Condition
 	FoundSellers   map[string]map[mtgban.Condition][]SearchEntry
 	FoundVendors   map[string]map[mtgban.Condition][]SearchEntry
@@ -828,6 +829,13 @@ func fillSearchPrefs(pageVars *SearchVars, r *http.Request) {
 	pageVars.DefaultView = mtgban.Condition(readCookie(r, "SearchDefaultView"))
 	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
 
+	// The Alphabetical button asks for the sort grouped by set where that is
+	// the reader's saved default, and for plain alpha otherwise
+	pageVars.AlphaSort = "alpha"
+	if readCookie(r, "SearchDefaultSort") == "hybrid" {
+		pageVars.AlphaSort = "hybrid"
+	}
+
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
@@ -841,14 +849,9 @@ func readSearchSort(r *http.Request, config SearchConfig) string {
 		return config.SortMode
 	}
 
-	saved := readCookie(r, "SearchDefaultSort")
 	asked := r.FormValue("sort")
 	if asked == "" {
-		return saved
-	}
-	// If a user prefers alpha sort grouped by set preserve that option
-	if saved == "hybrid" && asked == "alpha" {
-		return "hybrid"
+		return readCookie(r, "SearchDefaultSort")
 	}
 	return asked
 }
