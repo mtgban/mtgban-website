@@ -426,6 +426,7 @@ type UploadVars struct {
 	OptimizedKeys        []string
 	IgnorePrices         bool
 	OptimizedTotals      map[string]float64
+	OptimizedQuantities  map[string]int
 	HighestTotal         float64
 	MissingCounts        map[string]int
 	MissingPrices        map[string]float64
@@ -858,6 +859,7 @@ func fillUploadResults(pageVars *UploadVars, b *mtgmatcher.Backend, reprintParen
 			}
 		}
 		pageVars.OptimizedTotals = rows.optimizedTotals
+		pageVars.OptimizedQuantities = rows.optimizedQtys
 		pageVars.HighestTotal = rows.highestTotal
 	}
 }
@@ -874,6 +876,7 @@ type uploadRows struct {
 	missingPrices    map[string]float64
 	optimizedResults map[string][]OptimizedUploadEntry
 	optimizedTotals  map[string]float64
+	optimizedQtys    map[string]int
 	highestTotal     float64
 	singlesHighest   float64
 	sealedHighest    float64
@@ -894,6 +897,7 @@ func priceUploadRows(b *mtgmatcher.Backend, blMode bool, st uploadSettings, pric
 		missingPrices:    map[string]float64{},
 		optimizedResults: map[string][]OptimizedUploadEntry{},
 		optimizedTotals:  map[string]float64{},
+		optimizedQtys:    map[string]int{},
 		tallies:          map[string]*unpackedTally{},
 	}
 
@@ -1001,6 +1005,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 
 		// Save totals
 		rows.optimizedTotals[bestStore] += bestPrice
+		rows.optimizedQtys[bestStore] += row.qty
 		// The first store kept, which a high-value filter may have moved
 		// off the best: the row is listed there, so it counts there.
 		if !counted {
