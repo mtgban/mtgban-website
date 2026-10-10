@@ -677,17 +677,12 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 					}
 					prices[row.Shorthand] = price
 
-					if co.Sealed {
-						price.Sealed = row.Price
-					} else if co.Etched {
-						price.Etched = row.Price
-					} else if co.Foil {
-						price.Foil = row.Price
-					} else {
-						price.Regular = row.Price
-					}
-					if cond != "INDEX" && !co.Sealed {
-						price.Cond = string(cond)
+					field := finishPrice(price, co)
+					if betterPrice(*field, row.Price, vendorSide) {
+						*field = row.Price
+						if cond != "INDEX" && !co.Sealed {
+							price.Cond = string(cond)
+						}
 					}
 				}
 				if price == nil {
@@ -853,12 +848,16 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 		out[id][scraperTag] = &BanPrice{}
 	}
 
-	if shouldBaseCond {
-		out[id][scraperTag].Cond = string(entries[base].Condition())
+	// Printings sharing an output id keep the best of their prices
+	field := finishPrice(out[id][scraperTag], co)
+	if betterPrice(*field, basePrice, buy) {
+		*field = basePrice
+		if shouldBaseCond {
+			out[id][scraperTag].Cond = string(entries[base].Condition())
+		}
 	}
 
 	if co.Sealed {
-		out[id][scraperTag].Sealed = basePrice
 		if qty {
 			for i := range entries {
 				if unpriced(entries[i].Pricing()) {
@@ -868,7 +867,6 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 			}
 		}
 	} else if co.Etched {
-		out[id][scraperTag].Etched = basePrice
 		if qty {
 			for i := range entries {
 				if unpriced(entries[i].Pricing()) {
@@ -887,7 +885,6 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 			}
 		}
 	} else if co.Foil {
-		out[id][scraperTag].Foil = basePrice
 		if qty {
 			for i := range entries {
 				if unpriced(entries[i].Pricing()) {
@@ -906,7 +903,6 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 			}
 		}
 	} else {
-		out[id][scraperTag].Regular = basePrice
 		if qty {
 			for i := range entries {
 				if unpriced(entries[i].Pricing()) {
@@ -927,14 +923,32 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 	}
 }
 
+// betterPrice reports whether value beats current, which is unset at zero:
+// a lower offer, or a higher buy.
+func betterPrice(current, value float64, buy bool) bool {
+	return current == 0 || (buy && value > current) || (!buy && value < current)
+}
+
+// finishPrice is the field of price that co's finish fills.
+func finishPrice(price *BanPrice, co *mtgmatcher.CardObject) *float64 {
+	switch {
+	case co.Sealed:
+		return &price.Sealed
+	case co.Etched:
+		return &price.Etched
+	case co.Foil:
+		return &price.Foil
+	}
+	return &price.Regular
+}
+
 // setGrade files one listing under its grade, which keeps the best price
 // (the lowest offer, the highest buy) and the sum of the copies, as v2 does.
 func setGrade(price *BanPrice, condTag string, value float64, quantity int, buy, withQty bool) {
 	if price.Conditions == nil {
 		price.Conditions = &BanConditions{}
 	}
-	best := price.Conditions.Get(condTag)
-	if best == 0 || (buy && value > best) || (!buy && value < best) {
+	if betterPrice(price.Conditions.Get(condTag), value, buy) {
 		price.Conditions.Set(condTag, value)
 	}
 	if withQty && quantity > 0 {
