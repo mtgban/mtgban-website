@@ -514,6 +514,14 @@ type arbitBar struct {
 type arbitPickGroup struct {
 	Key, Label string
 	Choices    []arbitChoice
+
+	// Disabled is a picker the source does not apply, shown greyed so the
+	// bar keeps its shape. A disabled box posts nothing, so the reader's
+	// selection rides along as Carry (where Carried) to reach a source that
+	// does apply it.
+	Disabled bool
+	Carried  bool
+	Carry    string
 }
 
 type arbitChoice struct {
@@ -537,6 +545,15 @@ type arbitField struct {
 type arbitToggle struct {
 	Key, Title string
 	Checked    bool
+
+	// Disabled is an option this page offers for the other kind of source,
+	// greyed here, its setting riding along as Carry where the reader set it.
+	// Hidden is one offered for sealed sources alone (Decklists, Stable),
+	// which takes the place of the singles' options rather than sitting
+	// greyed beside them: only its Carry is rendered.
+	Disabled bool
+	Hidden   bool
+	Carry    string
 }
 
 // values lists the limits in one order, for comparing two sets of them.
@@ -593,19 +610,17 @@ func (st arbitState) field(key string, fallback, floor float64) arbitField {
 func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Backend, sourceShort string) arbitBar {
 	bar := arbitBar{Sort: st.Sort, Set: st.changed(m)}
 
-	bar.Condition = arbitPickGroup{Key: "cond", Label: "Condition"}
-	bar.Finish = arbitPickGroup{Key: "finish", Label: "Finish"}
-	bar.Rarity = arbitPickGroup{Key: "rarity", Label: "Rarity"}
-	if !m.Sealed {
-		for _, grade := range arbitConditions {
-			bar.Condition.Choices = append(bar.Condition.Choices, st.Conditions.choice(grade, grade))
-		}
-		for _, f := range offer.Finishes {
-			bar.Finish.Choices = append(bar.Finish.Choices, st.Finishes.choice(f.Value, f.Label))
-		}
-		for _, r := range offer.Rarities {
-			bar.Rarity.Choices = append(bar.Rarity.Choices, st.Rarities.choice(r, b.RarityLabel(r)))
-		}
+	bar.Condition = st.Conditions.group("cond", "Condition", m.Sealed)
+	for _, grade := range arbitConditions {
+		bar.Condition.Choices = append(bar.Condition.Choices, st.Conditions.choice(grade, grade))
+	}
+	bar.Finish = st.Finishes.group("finish", "Finish", m.Sealed)
+	for _, f := range offer.Finishes {
+		bar.Finish.Choices = append(bar.Finish.Choices, st.Finishes.choice(f.Value, f.Label))
+	}
+	bar.Rarity = st.Rarities.group("rarity", "Rarity", m.Sealed)
+	for _, r := range offer.Rarities {
+		bar.Rarity.Choices = append(bar.Rarity.Choices, st.Rarities.choice(r, b.RarityLabel(r)))
 	}
 
 	sell, buy := "Sell", "Buy"
@@ -627,14 +642,36 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Bac
 	}
 	bar.Profit = arbitRange{Label: "Profit", Low: st.field("minprof", l.MinProf, none)}
 
+	// The options this page offers for either kind of source, those for the
+	// other kind greyed, but for the sealed-only ones on a singles source
 	applied := st.applied(m)
 	var shown []string
 	for _, key := range FilterOptKeys {
-		if !FilterOptConfig[key].Shown(m.Global, m.Reverse, m.Sealed) {
+		cfg := FilterOptConfig[key]
+		if !cfg.Shown(m.Global, m.Reverse, true) && !cfg.Shown(m.Global, m.Reverse, false) {
 			continue
 		}
-		shown = append(shown, key)
-		bar.Toggles = append(bar.Toggles, arbitToggle{Key: key, Title: FilterOptConfig[key].Title, Checked: applied[key]})
+		toggle := arbitToggle{Key: key, Title: cfg.Title, Checked: applied[key]}
+		if !cfg.Shown(m.Global, m.Reverse, m.Sealed) {
+			toggle.Disabled = true
+			toggle.Hidden = cfg.SealedOnly
+			// What rides along to the other kind of source, as it will apply
+			// there: the reader's setting, else that source's default
+			on, set := st.Toggles[key]
+			if !set {
+				on = arbitMode{Global: m.Global, Reverse: m.Reverse, Sealed: !m.Sealed}.toggleDefault(key)
+			}
+			toggle.Checked = on
+			if set {
+				toggle.Carry = "0"
+				if on {
+					toggle.Carry = "1"
+				}
+			}
+		} else {
+			shown = append(shown, key)
+		}
+		bar.Toggles = append(bar.Toggles, toggle)
 	}
 	bar.TogglesOn = strings.Join(shown, ",")
 	bar.Ignored, bar.Defaults = m.presetNorms()
@@ -670,6 +707,16 @@ func (m arbitMode) presetNorms() ([]string, map[string]string) {
 		}
 	}
 	return ignored, defaults
+}
+
+// group is a picker's row, disabled on a source that does not apply it.
+func (pick arbitPick) group(key, label string, disabled bool) arbitPickGroup {
+	g := arbitPickGroup{Key: key, Label: label, Disabled: disabled}
+	if disabled && pick.Set {
+		g.Carried = true
+		g.Carry = strings.Join(pick.Values, ",")
+	}
+	return g
 }
 
 // choice is one box of a picker, ticked unless the reader left it out.

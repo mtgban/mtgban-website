@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -223,15 +224,15 @@ func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 }
 
 // TestArbitFilterOptionsRouteBySealedMode pins which of legit/stable a
-// global page offers. Checks match "><title><" since the page also embeds
-// the palette's targets.
+// global page offers: on a sealed source Stable, with Legit greyed in place
+// so the bar keeps its shape; on a singles source Legit, and no Stable,
+// which is sealed's alone.
 func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 	for _, tt := range []struct {
 		sealed           bool
 		offers, withhold string
 	}{
-		{true, ">only Stable<", ">only Legit<"},
-		{false, ">only Legit<", ">only Stable<"},
+		{true, "stable", "legit"},
 	} {
 		seedArbitScraper(t, "CHIPSRC", tt.sealed)
 		mode := arbitMode{Global: true, Sealed: tt.sealed}
@@ -243,12 +244,35 @@ func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
 			},
 			UserNav: &NavElem{Short: "beta"},
 		})
-		if !strings.Contains(page, tt.offers) {
-			t.Errorf("sealed=%v: a global page does not offer %s", tt.sealed, tt.offers)
+		box := func(key string) string {
+			m := regexp.MustCompile(`<input type="checkbox" name="` + key + `"[^>]*>`).FindString(page)
+			if m == "" {
+				t.Fatalf("sealed=%v: a global page has no %s box", tt.sealed, key)
+			}
+			return m
 		}
-		if strings.Contains(page, tt.withhold) {
-			t.Errorf("sealed=%v: a global page still offers %s", tt.sealed, tt.withhold)
+		if strings.Contains(box(tt.offers), "disabled") {
+			t.Errorf("sealed=%v: %s is greyed where it applies", tt.sealed, tt.offers)
 		}
+		if !strings.Contains(box(tt.withhold), "disabled") {
+			t.Errorf("sealed=%v: %s can be ticked where it does not apply", tt.sealed, tt.withhold)
+		}
+	}
+
+	seedArbitScraper(t, "CHIPSRC", false)
+	page := renderArbit(t, PageVars{
+		ScraperShort: "CHIPSRC",
+		ArbitVars: ArbitVars{
+			GlobalMode: true,
+			ArbitBar:   newArbitBar(parseArbitState(nil, arbitOffer{}), arbitMode{Global: true}, arbitOffer{}, backend(), "CHIPSRC"),
+		},
+		UserNav: &NavElem{Short: "beta"},
+	})
+	if regexp.MustCompile(`<input type="checkbox" name="legit"[^>]*disabled`).MatchString(page) {
+		t.Error("a singles global page greys Legit")
+	}
+	if strings.Contains(page, `name="stable"`) {
+		t.Error("a singles global page shows Stable, which is sealed's alone")
 	}
 }
 

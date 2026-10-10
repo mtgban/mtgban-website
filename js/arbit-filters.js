@@ -42,25 +42,31 @@
 
     // What the page would read the same without posts nothing: an empty
     // field is a limit left to the page's default, and a picker with every
-    // box ticked keeps the whole list.
+    // box ticked keeps the whole list. dropped remembers what this disabled,
+    // apart from what the page itself greys out.
+    var dropped = [];
+    function drop(input) {
+        if (input.disabled) return;
+        input.disabled = true;
+        dropped.push(input);
+    }
     function dropEmpty(form) {
         form.querySelectorAll('input[type=number]').forEach(function (input) {
-            if (input.value === '') input.disabled = true;
+            if (input.value === '') drop(input);
         });
         form.querySelectorAll('[data-pick]').forEach(function (group) {
             var boxes = group.querySelectorAll('input[type=checkbox]');
             var all = Array.prototype.every.call(boxes, function (box) { return box.checked; });
             if (!all) return;
-            group.querySelectorAll('input').forEach(function (input) { input.disabled = true; });
+            group.querySelectorAll('input').forEach(drop);
         });
     }
 
     // Back from the results restores the form as it was submitted, the
     // dropped inputs still disabled.
-    function restore(form) {
-        form.querySelectorAll('input').forEach(function (input) {
-            input.disabled = false;
-        });
+    function restore() {
+        dropped.forEach(function (input) { input.disabled = false; });
+        dropped = [];
     }
 
     // Keep a state as the reader's own, with when it was applied. Only what
@@ -157,7 +163,7 @@
             dropEmpty(form);
             save(formQuery(form));
         });
-        window.addEventListener('pageshow', function () { restore(form); });
+        window.addEventListener('pageshow', function () { restore(); });
     }
 
     // Saved as a state of its own rather than deleted, so a reset is the

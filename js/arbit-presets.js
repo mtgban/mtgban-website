@@ -161,6 +161,10 @@
             var box = key ? form.querySelector('input[type=checkbox][name="' + key + '"]') : null;
             if (box) params.push([key, box.checked ? '1' : '0']);
         });
+        // The settings of options greyed for this source, kept as they were
+        Array.prototype.forEach.call(form.querySelectorAll('input[data-carry]'), function (input) {
+            params.push([input.name, input.value]);
+        });
         params.sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
         return new URLSearchParams(params).toString();
     }

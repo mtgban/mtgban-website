@@ -309,6 +309,11 @@
 .arb-filter-check:has(input:checked) { background: rgba(30,144,255,0.18); border-color: rgba(30,144,255,0.45); color: var(--ainfo); }
 .arb-filter-check:has(input:focus-visible) { outline: 2px solid var(--ainfo); outline-offset: 1px; }
 
+/* What this source does not apply, kept in place so the bar holds its shape */
+.arb-filter-off { opacity: 0.4; }
+.arb-filter-off .arb-filter-check,
+.arb-filter-check.arb-filter-off { cursor: default; pointer-events: none; }
+
 .arb-filter-range input {
     box-sizing: border-box;
     height: var(--arb-filter-line);

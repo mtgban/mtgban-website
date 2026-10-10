@@ -519,3 +519,65 @@ func TestArbitPresetNorms(t *testing.T) {
 		t.Errorf("sealed arbit's unbounded difference has a default spelled %q", spelled)
 	}
 }
+
+// TestArbitBarGreysWhatTheSourceDoesNotApply pins a sealed source's bar to
+// the singles' rows, greyed, each choice the reader made riding along so
+// that it is still there on a singles source after an Apply here.
+func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
+	st := parseArbitQuery(t, "cond=NM%2CSP&rl=1&f=1")
+	bar := newArbitBar(st, arbitMode{Sealed: true}, testArbitOffer, rarityBackend(mtgmatcher.GameMagic, testArbitOffer.Rarities, nil), "SRC")
+	if !bar.Condition.Disabled || len(bar.Condition.Choices) != len(arbitConditions) {
+		t.Fatalf("a sealed source's condition row is %+v, want every grade, greyed", bar.Condition)
+	}
+	if !bar.Condition.Carried || bar.Condition.Carry != "NM,SP" {
+		t.Errorf("the condition pick carries %q (%v), want NM,SP", bar.Condition.Carry, bar.Condition.Carried)
+	}
+	if bar.Rarity.Carried {
+		t.Errorf("an unset rarity pick carries %q", bar.Rarity.Carry)
+	}
+	var rl, decklists *arbitToggle
+	for i := range bar.Toggles {
+		switch bar.Toggles[i].Key {
+		case "rl":
+			rl = &bar.Toggles[i]
+		case "decklists":
+			decklists = &bar.Toggles[i]
+		}
+	}
+	if rl == nil || !rl.Disabled || rl.Carry != "1" || !rl.Checked {
+		t.Errorf("only RL on a sealed source is %+v, want greyed, ticked, carrying 1", rl)
+	}
+	if decklists == nil || decklists.Disabled {
+		t.Errorf("only Decklists on a sealed source is %+v, want offered", decklists)
+	}
+	globalSealed := newArbitBar(parseArbitQuery(t, ""), arbitMode{Global: true, Sealed: true}, testArbitOffer, backend(), "SRC")
+	for _, toggle := range globalSealed.Toggles {
+		if toggle.Key == "legit" && (!toggle.Disabled || !toggle.Checked || toggle.Carry != "") {
+			t.Errorf("only Legit on a sealed global page is %+v, want greyed and ticked, as a singles source applies it, carrying nothing", toggle)
+		}
+	}
+	if strings.Contains(bar.TogglesOn, "rl") {
+		t.Errorf("toggles_on %q lists a greyed option, which would read as turned off", bar.TogglesOn)
+	}
+
+	// What the sealed page's form posts reads back as the same choices
+	form := url.Values{"cond": {bar.Condition.Carry}, "rl": {rl.Carry}, "toggles_on": {bar.TogglesOn}, "f": {"1"}}
+	back := parseArbitState(form, testArbitOffer)
+	got := back.values().Encode()
+	if got != "cond=NM%2CSP&decklists=0&f=1&rl=1" {
+		t.Errorf("the sealed page's form reads back as %q", got)
+	}
+
+	singles := newArbitBar(st, arbitMode{}, testArbitOffer, backend(), "SRC")
+	if singles.Condition.Disabled || singles.Condition.Carried {
+		t.Errorf("a singles source greys or carries its condition row: %+v", singles.Condition)
+	}
+	for _, toggle := range singles.Toggles {
+		if toggle.Key == "decklists" && !toggle.Hidden {
+			t.Error("only Decklists shows on a singles source, where it has nothing to replace")
+		}
+		if toggle.Key == "rl" && (toggle.Disabled || toggle.Hidden) {
+			t.Error("only RL is greyed or hidden on a singles source")
+		}
+	}
+}

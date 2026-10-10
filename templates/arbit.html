@@ -215,7 +215,8 @@
                     <span class="arb-filter-label">Options</span>
                     <span class="arb-filter-values">
                         {{range $.ArbitBar.Toggles}}
-                            <label class="arb-filter-check"><input type="checkbox" name="{{.Key}}" value="1"{{if .Checked}} checked{{end}}>{{.Title}}</label>
+                            {{if not .Hidden}}<label class="arb-filter-check{{if .Disabled}} arb-filter-off{{end}}"><input type="checkbox" name="{{.Key}}" value="1"{{if .Checked}} checked{{end}}{{if .Disabled}} disabled{{end}}>{{.Title}}</label>{{end}}
+                            {{if .Carry}}<input type="hidden" name="{{.Key}}" value="{{.Carry}}" data-carry>{{end}}
                         {{end}}
                     </span>
                 </div>
@@ -614,13 +615,15 @@ wireLoadLists({section: '.arb-section', removed: 'arb-removed'});
 
 {{define "arb-filter-pick"}}
 {{if .Choices}}
-<div class="arb-filter-group" role="group" aria-label="{{.Label}}" data-pick>
+<div class="arb-filter-group{{if .Disabled}} arb-filter-off{{end}}" role="group" aria-label="{{.Label}}" data-pick>
     <span class="arb-filter-label">{{.Label}}</span>
-    <input type="hidden" name="{{.Key}}_on" value="1">
+    {{if not .Disabled}}<input type="hidden" name="{{.Key}}_on" value="1">{{end}}
+    {{if .Carried}}<input type="hidden" name="{{.Key}}" value="{{.Carry}}">{{end}}
     {{$key := .Key}}
+    {{$off := .Disabled}}
     <span class="arb-filter-values">
         {{range .Choices}}
-            <label class="arb-filter-check"><input type="checkbox" name="{{$key}}" value="{{.Value}}"{{if .Checked}} checked{{end}}>{{.Label}}</label>
+            <label class="arb-filter-check"><input type="checkbox" name="{{$key}}" value="{{.Value}}"{{if .Checked}} checked{{end}}{{if $off}} disabled{{end}}>{{.Label}}</label>
         {{end}}
     </span>
 </div>
