@@ -2,8 +2,11 @@ package main
 
 import (
 	"math/rand/v2"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -296,6 +299,54 @@ func TestNumberOrderIsTotalWithinANumber(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+// A saved default grouped by set is what the Alphabetical button asks for, and
+// the page sorts as the URL says: sort=alpha is plain alpha whatever is saved.
+func TestAlphabeticalButtonAsksForTheGroupedDefault(t *testing.T) {
+	request := func(saved string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/search?q=x&sort=alpha", nil)
+		if saved != "" {
+			r.AddCookie(&http.Cookie{Name: "SearchDefaultSort", Value: saved})
+		}
+		return r
+	}
+
+	if got := readSearchSort(request("hybrid"), SearchConfig{}); got != "alpha" {
+		t.Errorf("sort=alpha with a grouped default sorted %q, want alpha", got)
+	}
+
+	for saved, want := range map[string]string{"": "alpha", "hybrid": "hybrid", "retail": "alpha"} {
+		var vars SearchVars
+		fillSearchPrefs(&vars, request(saved))
+		if vars.AlphaSort != want {
+			t.Errorf("default %q: the button asks for %q, want %q", saved, vars.AlphaSort, want)
+		}
+	}
+
+	for _, mobile := range []bool{false, true} {
+		pv := PageVars{
+			UserNav: &NavElem{Short: "b"},
+			SearchVars: SearchVars{
+				AllKeys:     []string{"a"},
+				SearchRan:   true,
+				SearchQuery: "x",
+				SearchSort:  "chrono",
+				AlphaSort:   "hybrid",
+				TotalUnique: 1,
+			},
+		}
+		if !strings.Contains(renderPage(t, "search.html", mobile, pv), "sort=hybrid") {
+			t.Errorf("mobile=%v: the Alphabetical button does not link to its AlphaSort", mobile)
+		}
+
+		// Plain alpha on screen, as a shared link opens it, only reverses
+		pv.SearchSort = "alpha"
+		out := renderPage(t, "search.html", mobile, pv)
+		if strings.Contains(out, "sort=hybrid") || !strings.Contains(out, "sort=alpha&reverse=true") {
+			t.Errorf("mobile=%v: the Alphabetical button on plain alpha does not just reverse it", mobile)
 		}
 	}
 }
