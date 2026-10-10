@@ -600,6 +600,7 @@ var funcMap = template.FuncMap{
 	"palette_global_targets":    sync.OnceValue(func() template.JS { return palette.ArbitTargetsJSON(paletteArbitFilters("global")) }),
 	"guide_stores":              guideStoresJSON,
 	"usd":                       formatUSD,
+	"plural":                    plural,
 	"api_plans_json":            apiPlansJSON,
 	"plan_icon":                 planIcon,
 	"usage_path_url":            observability.PathURL,

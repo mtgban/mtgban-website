@@ -871,7 +871,7 @@
                     <a class="opt-toc-item" href="#opt-{{.}}">
                         <span class="toc-store">{{scraper_name .}}</span>
                         {{$qty := index $.OptimizedQuantities .}}
-                        <span class="toc-stats">{{len $entries}} cards{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
+                        <span class="toc-stats">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="toc-total">$ {{printf "%.2f" $total}}</span>
                     </a>
                 {{end}}
@@ -1022,7 +1022,7 @@
                         </form>
                         </div>
                         {{$qty := index $.OptimizedQuantities $scraperKey}}
-                        <span class="opt-count">{{len $entries}} cards{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
+                        <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
                     </div>
                     <table class="opt-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">

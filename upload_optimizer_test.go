@@ -144,3 +144,27 @@ func TestOptimizerCountsTheStoreItKept(t *testing.T) {
 		t.Errorf("quantities %v, want SCG's 3 alone", rows.optimizedQtys)
 	}
 }
+
+// TestOptimizerCardCount spells a split's card count, singular for one, and
+// adds the copies only where they differ from it.
+func TestOptimizerCardCount(t *testing.T) {
+	for _, tc := range []struct {
+		entries []OptimizedUploadEntry
+		qty     int
+		want    string
+	}{
+		{[]OptimizedUploadEntry{{CardID: "a", Quantity: 1}}, 1, `<span class="opt-count">1 card</span>`},
+		{[]OptimizedUploadEntry{{CardID: "a", Quantity: 4}}, 4, `<span class="opt-count">1 card (4 total)</span>`},
+		{[]OptimizedUploadEntry{{CardID: "a", Quantity: 1}, {CardID: "b", Quantity: 1}}, 2, `<span class="opt-count">2 cards</span>`},
+	} {
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{
+			Optimized:           map[string][]OptimizedUploadEntry{"CK": tc.entries},
+			OptimizedKeys:       []string{"CK"},
+			OptimizedTotals:     map[string]float64{"CK": 1},
+			OptimizedQuantities: map[string]int{"CK": tc.qty},
+		}})
+		if !strings.Contains(out, tc.want) {
+			t.Errorf("no %s", tc.want)
+		}
+	}
+}
