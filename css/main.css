@@ -1169,15 +1169,22 @@ body[data-game="yugioh"],
 body[data-game="yugioh"] [data-set] {
     --card-radius: 0;
 }
-/* Flesh and Blood scans are cut rounder than Magic's: an 18px circle on the
-   newest sets' 400x559 scans, 22px on the first ones. 22px covers both, since
-   the black border hides the excess where the white corner fill would not.
-   Singles only: a sealed product's photo keeps the surface's default. */
-body[data-game="fleshandblood"] [data-set]:not([data-sealed]) {
+/* These games' scans are cut rounder than Magic's: about 4.6% of the width,
+   an 18px circle on TCGplayer's 400x559 scans, up to 22px on Flesh and Blood's
+   first sets. 22px covers them all; the border hides the excess where the
+   corner fill would not. Singles only: a sealed product's photo keeps the
+   surface's default. */
+body:is(
+    [data-game="fleshandblood"], [data-game="gundam"], [data-game="onepiece"],
+    [data-game="palworld"], [data-game="pokemon"], [data-game="riftbound"]
+) [data-set]:not([data-sealed]) {
     --card-radius: 5.5% / 3.9%;
 }
 /* The same corner on a landscape card, which js/card-art-fallback.js flags. */
-body[data-game="fleshandblood"] [data-set]:not([data-sealed])[data-landscape] {
+body:is(
+    [data-game="fleshandblood"], [data-game="gundam"], [data-game="onepiece"],
+    [data-game="palworld"], [data-game="pokemon"], [data-game="riftbound"]
+) [data-set]:not([data-sealed])[data-landscape] {
     --card-radius: 3.9% / 5.5%;
 }
 
