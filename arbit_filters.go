@@ -502,6 +502,13 @@ type arbitBar struct {
 	// Whether the reader left the bar open, from the ArbitFiltersOpen
 	// cookie
 	Open bool
+
+	// The query keys this page does not apply, and each limit and toggle
+	// key's value at the page's default, spelled as values() writes them:
+	// what a preset is compared without, so that two queries filtering the
+	// same match
+	Ignored  []string
+	Defaults map[string]string
 }
 
 type arbitPickGroup struct {
@@ -630,7 +637,39 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Bac
 		bar.Toggles = append(bar.Toggles, arbitToggle{Key: key, Title: FilterOptConfig[key].Title, Checked: applied[key]})
 	}
 	bar.TogglesOn = strings.Join(shown, ",")
+	bar.Ignored, bar.Defaults = m.presetNorms()
 	return bar
+}
+
+// presetNorms are the keys a mode does not apply and the values its limits
+// and toggles take by default. An unbounded default has no spelling, so no
+// value matches it.
+func (m arbitMode) presetNorms() ([]string, map[string]string) {
+	var ignored []string
+	if m.Sealed {
+		ignored = append(ignored, arbitPickKeys...)
+	}
+	if m.Global {
+		ignored = append(ignored, "minqty")
+	}
+	defaults := map[string]string{}
+	values := arbitDefaults(m).values()
+	for i, key := range arbitBoundKeys {
+		if !math.IsInf(values[i], 0) {
+			defaults[key] = formatLimit(values[i])
+		}
+	}
+	for _, key := range FilterOptKeys {
+		if !FilterOptConfig[key].Shown(m.Global, m.Reverse, m.Sealed) {
+			ignored = append(ignored, key)
+			continue
+		}
+		defaults[key] = "0"
+		if m.toggleDefault(key) {
+			defaults[key] = "1"
+		}
+	}
+	return ignored, defaults
 }
 
 // choice is one box of a picker, ticked unless the reader left it out.

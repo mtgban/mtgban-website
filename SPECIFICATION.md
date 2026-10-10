@@ -546,6 +546,11 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   (`mtgban_arbit_filters`, merged per page group by apply time), and
   `ArbitFilters.refresh` rewrites an older cookie on load and after a
   sync, reloading once where the page was drawn from older filters.
+  Named presets of the bar (`js/arbit-presets.js`, localStorage
+  `mtgban_arbit_presets`, synced and merged preset by preset like upload's)
+  are listed per page group in a Preset select; a preset matches the page
+  when the two queries agree once each drops the keys the page ignores and
+  those at its defaults (`arbitMode.presetNorms`).
   8 sort orders (`arbitLess()`: available, sell price, buy price,
   profitability, diff, spread, edition, alpha).
 - **Sleepers** scores cards by how often they appear as opportunities across

@@ -465,3 +465,57 @@ func TestArbitSavedCookies(t *testing.T) {
 		}
 	}
 }
+
+// TestArbitPresetNorms pins what a page compares presets without: the keys
+// it does not apply, and each key's value at its default, spelled as
+// values() writes it so that an explicit default reads as no change.
+func TestArbitPresetNorms(t *testing.T) {
+	for _, tt := range []struct {
+		desc     string
+		mode     arbitMode
+		ignored  []string
+		defaults map[string]string
+	}{
+		{"arbit", arbitMode{},
+			[]string{"syp", "stocks", "legit", "stable", "tradable", "decklists"},
+			map[string]string{"minsell": "0", "minspread": "10", "mindiff": "0", "minqty": "0", "rl": "0", "abu4h": "0"}},
+		{"reverse", arbitMode{Reverse: true},
+			[]string{"syp", "stocks", "legit", "stable", "decklists"},
+			map[string]string{"minspread": "10", "tradable": "1", "rl": "0"}},
+		{"sealed arbit", arbitMode{Sealed: true},
+			[]string{"cond", "finish", "rarity", "rl", "abu4h"},
+			map[string]string{"minspread": "-30", "decklists": "0"}},
+		{"global", arbitMode{Global: true},
+			[]string{"minqty", "abu4h", "decklists", "stable", "tradable"},
+			map[string]string{"minsell": "1", "minbuy": "1", "minspread": "200", "maxspread": "1000", "mindiff": "5", "legit": "1", "syp": "0"}},
+		{"global sealed", arbitMode{Global: true, Sealed: true},
+			[]string{"cond", "finish", "rarity", "minqty", "legit", "syp"},
+			map[string]string{"minspread": "10", "mindiff": "1", "stable": "1"}},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			ignored, defaults := tt.mode.presetNorms()
+			for _, key := range tt.ignored {
+				if !slices.Contains(ignored, key) {
+					t.Errorf("%s is applied, want it ignored (ignored %v)", key, ignored)
+				}
+			}
+			for key, want := range tt.defaults {
+				if defaults[key] != want {
+					t.Errorf("%s defaults to %q, want %q", key, defaults[key], want)
+				}
+			}
+			for _, key := range []string{"maxsell", "maxbuy"} {
+				spelled, found := defaults[key]
+				if found {
+					t.Errorf("%s has a default spelled %q, want none: it is unbounded", key, spelled)
+				}
+			}
+		})
+	}
+	// Sealed arbit's difference has no floor, so no value matches its default
+	_, defaults := arbitMode{Sealed: true}.presetNorms()
+	spelled, found := defaults["mindiff"]
+	if found {
+		t.Errorf("sealed arbit's unbounded difference has a default spelled %q", spelled)
+	}
+}
