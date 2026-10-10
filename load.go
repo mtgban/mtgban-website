@@ -18,6 +18,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -411,6 +412,10 @@ func loadScrapersNG(bucket simplecloud.Reader, stores []string) error {
 		nil,
 	)
 
+	// A dump already past DropAfter is not served even for the hour until
+	// the staleness job would drop it.
+	dropStaleStores(time.Now())
+
 	// No @here: at startup nothing has loaded yet, so an absent scraper is
 	// the ordinary state rather than news. Breakage worth waking someone for
 	// is a scraper that was serving and stopped, which is the reload path.
@@ -566,6 +571,12 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 	}
 
 	if i < 0 {
+		// A store back from a drop is held to the size it had then
+		dropped := droppedEntries(sessionstore.Retail, seller.Info().Shorthand)
+		if len(inv) < dropped/2 && dropped > 100 {
+			return nil, errors.New("new inventory is missing too many entries")
+		}
+
 		next := make([]mtgban.Seller, len(current)+1)
 		copy(next, current)
 		next[len(current)] = seller
@@ -637,6 +648,12 @@ func buildNextVendors(current []mtgban.Vendor, vendor mtgban.Vendor, i int) ([]m
 	}
 
 	if i < 0 {
+		// A store back from a drop is held to the size it had then
+		dropped := droppedEntries(sessionstore.Buylist, vendor.Info().Shorthand)
+		if len(bl) < dropped/2 && dropped > 100 {
+			return nil, errors.New("new buylist is missing too many entries")
+		}
+
 		next := make([]mtgban.Vendor, len(current)+1)
 		copy(next, current)
 		next[len(current)] = vendor

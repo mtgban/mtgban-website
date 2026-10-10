@@ -506,3 +506,36 @@ func TestUpdateScraperIndexStoreLeavesASharedShorthandsOwnerAlone(t *testing.T) 
 		}
 	}
 }
+
+// A dump already past DropAfter at startup is left out by the load itself,
+// rather than served until the hourly staleness job gets to it.
+func TestLoadScrapersNGLeavesOutADumpPastDropAfter(t *testing.T) {
+	dir := t.TempDir()
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	prevIdx, prevDropped := scraperIndexPtr.Load(), droppedStoresPtr.Load()
+	prevGame := Config().Game
+	var noSellers []mtgban.Seller
+	var noVendors []mtgban.Vendor
+	sellersPtr.Store(&noSellers)
+	vendorsPtr.Store(&noVendors)
+	Config().Game = "magic"
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+		scraperIndexPtr.Store(prevIdx)
+		droppedStoresPtr.Store(prevDropped)
+		Config().Game = prevGame
+	})
+
+	writeSellerDump(t, filepath.Join(dir, "magic", "starcitygames", "retail", "SCG.json.xz"), inventoryOf("SCG", 3, time.Now()))
+	writeVendorDump(t, filepath.Join(dir, "magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, time.Now().Add(-8*24*time.Hour)))
+
+	err := loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
+	if err != nil {
+		t.Fatalf("loadScrapersNG: %v", err)
+	}
+	if len(GetSellers()) != 1 || len(GetVendors()) != 0 {
+		t.Errorf("served %d sellers and %d vendors, want SCG alone, ABU's 8-day-old buylist left out", len(GetSellers()), len(GetVendors()))
+	}
+}

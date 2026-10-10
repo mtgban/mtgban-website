@@ -534,11 +534,14 @@ func ckViewFor(q ckQuote, h ckHistory, hasHistory bool, odds *ckOdds, newHigh bo
 // CK's data, the history or the new highs change, and hourly because the
 // rules and facts count days and the other buylists reload.
 func rebuildCKSignals() {
-	if !ckAvailable() {
-		return
-	}
 	ckSignalsMu.Lock()
 	defer ckSignalsMu.Unlock()
+
+	// Without CK's buylist there is nothing to show, the last signals included
+	if !ckAvailable() {
+		ckSignalsPtr.Store(nil)
+		return
+	}
 
 	offers, _ := findVendorBuylist("CK")
 	// A missing inventory leaves stock unknown rather than zero.
