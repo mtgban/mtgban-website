@@ -3,16 +3,22 @@ import { readFileSync } from 'fs';
 
 const source = readFileSync(new URL('../js/arbit-filters.js', import.meta.url), 'utf8');
 
-function load(cfg, form = null, elements = {}, saved = {}) {
+function load(cfg, form = null, elements = {}, saved = {}, env = {}) {
     const listeners = {};
+    const reloads = [];
     const window = {
         BAN_ARBIT: cfg,
-        location: { href: '' },
+        location: { href: '', search: env.search || '', reload: () => reloads.push(1) },
         addEventListener: (ev, fn) => { listeners['window:' + ev] = fn; },
     };
+    const localStorage = env.local || fakeStorage();
+    const sessionStorage = env.session || fakeStorage();
     const document = { getElementById: (id) => (id === 'arbFilters' ? form : elements[id] || null) };
     const cookies = [];
-    const writeCookie = (...args) => cookies.push(args);
+    const writeCookie = (...args) => {
+        cookies.push(args);
+        saved[args[0]] = decodeURIComponent(args[1]);
+    };
     // What the form would submit, as pairs, standing in for a real form's
     class FormData {
         constructor(f) { this.pairs = (f && f.pairs) || []; }
@@ -20,8 +26,19 @@ function load(cfg, form = null, elements = {}, saved = {}) {
     }
     // getCookie hands back the value decoded, as cookies.js does
     const getCookie = (name) => (name in saved ? saved[name] : '');
-    new Function('window', 'document', 'writeCookie', 'getCookie', 'FormData', source)(window, document, writeCookie, getCookie, FormData);
-    return { window, listeners, cookies };
+    new Function('window', 'document', 'writeCookie', 'getCookie', 'FormData', 'localStorage', 'sessionStorage', source)(
+        window, document, writeCookie, getCookie, FormData, localStorage, sessionStorage);
+    return { window, listeners, cookies, reloads, localStorage };
+}
+
+function fakeStorage(initial = {}) {
+    const m = Object.assign({}, initial);
+    return {
+        getItem: (k) => (k in m ? m[k] : null),
+        setItem: (k, v) => { m[k] = String(v); },
+        removeItem: (k) => { delete m[k]; },
+        _map: m,
+    };
 }
 
 // The saved query a writeCookie call carries, less its time.
@@ -141,4 +158,59 @@ test('a page with no cookie to save in saves nothing', () => {
     const { window, cookies } = load({ source: 'CK', query: 'f=1' });
     window.sortBy('alpha', 'X');
     expect(cookies).toEqual([]);
+});
+
+test('a save keeps the synced copy with the same time as the cookie', () => {
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ global: { q: 'f=1&minsell=7', t: 5 } }) });
+    const { window, cookies, localStorage } = load({ source: 'CK', query: 'f=1', cookie: 'ArbitFilters' }, null, {}, {}, { local });
+    window.ArbitFilters.save('f=1&minsell=2');
+    const stored = JSON.parse(localStorage.getItem('mtgban_arbit_filters'));
+    expect(stored.global).toEqual({ q: 'f=1&minsell=7', t: 5 });
+    expect(stored.arbit.q).toBe('f=1&minsell=2');
+    expect(decodeURIComponent(cookies[cookies.length - 1][1])).toBe('f=1&minsell=2&t=' + stored.arbit.t);
+});
+
+test('filters applied later on another device reach the cookies, and the page reloads once', () => {
+    const synced = { arbit: { q: 'f=1&minsell=9', t: 200 }, global: { q: 'f=1&minsell=7', t: 50 } };
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify(synced) });
+    const session = fakeStorage();
+    const saved = { ArbitFilters: 'f=1&minsell=2&t=100', GlobalFilters: 'f=1&minsell=3&t=60' };
+    const { cookies, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, saved, { local, session });
+    expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['ArbitFilters', 'f=1&minsell=9&t=200']]);
+    expect(reloads.length).toBe(1);
+
+    // Drawn again from the same older cookie, as when cookies are blocked
+    const again = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, { ArbitFilters: 'f=1&minsell=2&t=100' }, { local, session });
+    expect(again.reloads.length).toBe(0);
+});
+
+test('a page opened from a link, or drawn from the newest state, does not reload', () => {
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: 200 } }) });
+    const linked = load({ source: 'CK', query: 'f=1&minsell=4', cookie: 'ArbitFilters', savedAt: 0 }, null, {}, {}, { local, search: '?source=CK&f=1&minsell=4' });
+    expect(linked.reloads.length).toBe(0);
+    expect(linked.cookies.map((c) => c[0])).toEqual(['ArbitFilters']);
+    const current = load({ source: 'CK', query: 'f=1&minsell=9', cookie: 'ArbitFilters', savedAt: 200 }, null, {}, { ArbitFilters: 'f=1&minsell=9&t=200' }, { local });
+    expect(current.reloads.length).toBe(0);
+    expect(current.cookies.length).toBe(0);
+});
+
+test('a cookie the synced copy never held is copied into it, without a reload', () => {
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ global: { q: 'f=1&minsell=7', t: 300 } }) });
+    const saved = { ArbitFilters: 'cond=NM%2CSP&f=1&minsell=2&t=100', GlobalFilters: 'f=1&minsell=3&t=50' };
+    const { cookies, reloads, localStorage } = load({ source: 'CK', query: 'cond=NM%2CSP&f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, saved, { local });
+    const stored = JSON.parse(localStorage.getItem('mtgban_arbit_filters'));
+    expect(stored.arbit).toEqual({ q: 'cond=NM%2CSP&f=1&minsell=2', t: 100 });
+    expect(stored.global).toEqual({ q: 'f=1&minsell=7', t: 300 });
+    // The older Global cookie still comes up to the synced copy
+    expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['GlobalFilters', 'f=1&minsell=7&t=300']]);
+    expect(reloads.length).toBe(0);
+});
+
+test('nothing is copied either way where the two agree', () => {
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: 100 } }) });
+    let writes = 0;
+    const counting = Object.assign({}, local, { setItem: (k, v) => { writes++; local.setItem(k, v); } });
+    const { cookies } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, { ArbitFilters: 'f=1&minsell=2&t=100' }, { local: counting });
+    expect(cookies.length).toBe(0);
+    expect(writes).toBe(0);
 });

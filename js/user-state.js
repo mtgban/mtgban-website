@@ -12,6 +12,7 @@
     var FAVORITES_KEY = 'mtgban_favorites';
     var RECENTS_KEY = 'mtgban_recent_searches';
     var PRESETS_KEY = 'mtgban_upload_presets';
+    var ARBIT_KEY = 'mtgban_arbit_filters';
     // Keys bundled into the preferences object.
     var PREF_KEYS = [
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
@@ -19,7 +20,7 @@
         'chartReleasesLongRange', 'chartCheckpointTypes',
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
         'mtgban_search_layout', 'mtgban_popular_collapsed',
-        'mtgban_upload_presets'
+        'mtgban_upload_presets', 'mtgban_arbit_filters'
     ];
 
     // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.
@@ -164,6 +165,7 @@
         if (typeof window.renderFavorites === 'function') window.renderFavorites();
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
         if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
+        if (window.ArbitFilters && typeof window.ArbitFilters.refresh === 'function') window.ArbitFilters.refresh();
         // Synced favorites arrive price-less; backfill (self-gating).
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
@@ -389,7 +391,8 @@
     }
 
     // Preferences: last-write-wins per key (local wins on first merge), but
-    // the upload presets, a list of their own, merge preset by preset.
+    // the upload presets, a list of their own, merge preset by preset, and
+    // the saved arbitrage filters page group by page group.
     function mergePrefs(localPrefs, serverPrefs) {
         var out = {};
         Object.keys(serverPrefs || {}).forEach(function(k) { out[k] = serverPrefs[k]; });
@@ -397,7 +400,25 @@
         if (localPrefs && serverPrefs && PRESETS_KEY in localPrefs && PRESETS_KEY in serverPrefs) {
             out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
         }
+        if (localPrefs && serverPrefs && ARBIT_KEY in localPrefs && ARBIT_KEY in serverPrefs) {
+            out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
+        }
         return out;
+    }
+
+    // Merge two copies of the saved arbitrage filters, one state per page
+    // group (arbit, global): the one applied later (t) wins, ties keep the
+    // local copy.
+    function mergeArbitFilters(local, server) {
+        function parse(s) {
+            try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
+        }
+        var l = parse(local), sv = parse(server), out = {};
+        Object.keys(sv).forEach(function(g) { out[g] = sv[g]; });
+        Object.keys(l).forEach(function(g) {
+            if (!out[g] || ((l[g] && l[g].t) || 0) >= ((out[g] && out[g].t) || 0)) out[g] = l[g];
+        });
+        return JSON.stringify(out);
     }
 
     // Merge two preset lists by id: the newer save or delete (savedAt) wins,

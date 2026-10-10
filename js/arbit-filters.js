@@ -1,8 +1,37 @@
 // The arbitrage pages' filter bar and sort links. arbit.html sets
-// window.BAN_ARBIT to the source, the filter state as a query, and the
-// cookie the page saves the reader's filters in.
+// window.BAN_ARBIT to the source, the filter state as a query, the cookie
+// the page saves the reader's filters in, and when the saved state it was
+// drawn from was applied.
 (function () {
     var cfg = window.BAN_ARBIT || {};
+
+    // The saved filters, also kept where user-state.js syncs them to the
+    // reader's other devices, one state per page group
+    var STORE_KEY = 'mtgban_arbit_filters';
+    var GROUPS = { arbit: 'ArbitFilters', global: 'GlobalFilters' };
+
+    function groupOf(cookie) {
+        return cookie === GROUPS.global ? 'global' : 'arbit';
+    }
+
+    function readSaved() {
+        try {
+            var o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+            return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function writeSaved(cookie, query, t) {
+        writeCookie(cookie, encodeURIComponent(query + (query ? '&' : '') + 't=' + t), 1000, '/');
+    }
+
+    // When a saved cookie's state was applied, 0 for none.
+    function cookieTime(cookie) {
+        var t = Number(new URLSearchParams(getCookie(cookie)).get('t'));
+        return isFinite(t) ? t : 0;
+    }
 
     // sortURL is the page sorted by sort, filters kept, at the table named.
     function sortURL(sort, name) {
@@ -38,8 +67,51 @@
     // the reader does on the page saves: following a link never does.
     function save(query) {
         if (!cfg.cookie) return;
-        var value = query + (query ? '&' : '') + 't=' + Date.now();
-        writeCookie(cfg.cookie, encodeURIComponent(value), 1000, '/');
+        var t = Date.now();
+        writeSaved(cfg.cookie, query, t);
+        try {
+            var saved = readSaved();
+            saved[groupOf(cfg.cookie)] = { q: query, t: t };
+            localStorage.setItem(STORE_KEY, JSON.stringify(saved));
+        } catch (e) {}
+    }
+
+    // Bring each cookie and the synced copy to whichever was applied later:
+    // a cookie to filters applied on another device, and the synced copy to
+    // a cookie it never held (saved signed out, or before syncing, or under
+    // an older copy a sync wrote back). Then show the newer filters where
+    // this page was drawn from older ones and no link of its own says
+    // otherwise. Runs on load, and from user-state.js after a sync.
+    function refresh() {
+        var saved = readSaved();
+        var adopted = false;
+        Object.keys(GROUPS).forEach(function (g) {
+            var entry = saved[g];
+            var cookieAt = cookieTime(GROUPS[g]);
+            if (entry && typeof entry.q === 'string' && entry.t > cookieAt) {
+                writeSaved(GROUPS[g], entry.q, entry.t);
+            } else if (cookieAt > ((entry && entry.t) || 0)) {
+                var q = new URLSearchParams(getCookie(GROUPS[g]));
+                q.delete('t');
+                saved[g] = { q: q.toString(), t: cookieAt };
+                adopted = true;
+            }
+        });
+        if (adopted) {
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(saved)); } catch (e) {}
+        }
+
+        var mine = cfg.cookie ? saved[groupOf(cfg.cookie)] : null;
+        var marked = new URLSearchParams(window.location.search).has('f');
+        if (marked || !mine || !(mine.t > (cfg.savedAt || 0))) return;
+        // Once per state, should the cookie not have taken
+        try {
+            if (sessionStorage.getItem('mtgban_arbit_reloaded') === String(mine.t)) return;
+            sessionStorage.setItem('mtgban_arbit_reloaded', String(mine.t));
+        } catch (e) {
+            return;
+        }
+        window.location.reload();
     }
 
     // The form as the query it submits, less the source, which a saved
@@ -95,5 +167,6 @@
         reset.addEventListener('click', function () { save('f=1'); });
     }
 
-    window.ArbitFilters = { sortURL: sortURL, dropEmpty: dropEmpty, restore: restore, setOpen: setOpen, save: save, formQuery: formQuery };
+    window.ArbitFilters = { sortURL: sortURL, dropEmpty: dropEmpty, restore: restore, setOpen: setOpen, save: save, formQuery: formQuery, refresh: refresh };
+    refresh();
 })();

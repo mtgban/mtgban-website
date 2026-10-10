@@ -4,6 +4,7 @@ import (
 	"math"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -389,25 +390,28 @@ func TestRequestArbitState(t *testing.T) {
 	saved := url.QueryEscape("f=1&cond=NM%2CSP&minsell=2&sort=diff&t=1728000000000")
 	for _, tt := range []struct {
 		desc, query, saved, want string
+		savedAt                  int64
 	}{
-		{"nothing saved", "source=CK", "", "f=1"},
-		{"the saved filters", "source=CK", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff"},
-		{"a marked link wins", "source=CK&f=1&minsell=5", saved, "f=1&minsell=5"},
-		{"a marked link with nothing set is the defaults", "source=CK&f=1", saved, "f=1"},
-		{"an unmarked sort is for this view", "source=CK&sort=spread", saved, "cond=NM%2CSP&f=1&minsell=2&sort=spread"},
-		{"an unknown sort is not", "source=CK&sort=bogus", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff"},
-		{"old chip keys do not mark a link", "source=CK&nolow=true", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff"},
-		{"a value that is no query is nothing saved", "source=CK&minsell=3", "%zz", "f=1&minsell=3"},
-		{"a reset saves the defaults", "source=CK", url.QueryEscape("f=1&t=1"), "f=1"},
+		{"nothing saved", "source=CK", "", "f=1", 0},
+		{"the saved filters", "source=CK", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff", 1728000000000},
+		{"a marked link wins", "source=CK&f=1&minsell=5", saved, "f=1&minsell=5", 0},
+		{"a marked link with nothing set is the defaults", "source=CK&f=1", saved, "f=1", 0},
+		{"an unmarked sort is for this view", "source=CK&sort=spread", saved, "cond=NM%2CSP&f=1&minsell=2&sort=spread", 1728000000000},
+		{"an unknown sort is not", "source=CK&sort=bogus", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff", 1728000000000},
+		{"old chip keys do not mark a link", "source=CK&nolow=true", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff", 1728000000000},
+		{"a value that is no query is nothing saved", "source=CK&minsell=3", "%zz", "f=1&minsell=3", 0},
+		{"a reset saves the defaults", "source=CK", url.QueryEscape("f=1&t=1"), "f=1", 1},
+		{"a saved state with no time", "source=CK", url.QueryEscape("f=1&minsell=2"), "f=1&minsell=2", 0},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			form, err := url.ParseQuery(tt.query)
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := requestArbitState(form, tt.saved, testArbitOffer).values().Encode()
-			if got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
+			st, savedAt := requestArbitState(form, tt.saved, testArbitOffer)
+			got := st.values().Encode()
+			if got != tt.want || savedAt != tt.savedAt {
+				t.Errorf("got %q applied at %d, want %q at %d", got, savedAt, tt.want, tt.savedAt)
 			}
 		})
 	}
@@ -455,6 +459,9 @@ func TestArbitSavedCookies(t *testing.T) {
 		}
 		if !strings.Contains(tt.page, `name="minsell" value="`+strings.TrimPrefix(tt.want, "minsell=")+`"`) {
 			t.Errorf("%s does not fill its saved %s into the bar", tt.desc, tt.want)
+		}
+		if !regexp.MustCompile(`savedAt:\s*1\b`).MatchString(tt.page) {
+			t.Errorf("%s does not tell its script when the saved state was applied", tt.desc)
 		}
 	}
 }
