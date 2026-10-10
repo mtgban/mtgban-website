@@ -322,7 +322,13 @@ each row in the condition the store sells it in (`cartLoadForArbit`).
   `https://abugames.com/cartview/buylist#ban=<id>:<qty>,...&v=<version>`,
   and `&side=retail` on a store split's link, since Strike Zone's two sides
   share one cart page. The fragment survives every store's page and never
-  reaches their servers or ours.
+  reaches their servers or ours. Where an affiliate code is configured for
+  the store, the page is opened the way the store's own links from us are
+  (`cartAffiliates`), so the cart it fills is credited the same way: Card
+  Kingdom's `partner` and `utm_*` query, Mint's `utm_*` query, CSI's
+  `utm_referrer`, and SCG's partner redirector,
+  `goto.starcitygames.com/c/<code>/…?u=<page>`, which lands on the sell site
+  with the fragment intact.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
   `cart-prompt` partial both pages share), named for the store and side
   pressed, holding the loader to drag to the bookmarks bar:

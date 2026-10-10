@@ -291,3 +291,31 @@ func TestCartBookmarklet(t *testing.T) {
 		t.Error("the version mark survived into the bookmarklet")
 	}
 }
+
+// A cart page opened from here carries the affiliate query the store's own
+// links do, where a code is configured
+func TestCartLoadAffiliates(t *testing.T) {
+	stubCartStores(t)
+	saved := affiliatesPtr.Load()
+	t.Cleanup(func() { affiliatesPtr.Store(saved) })
+	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused"}})
+	entries := []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}}
+
+	for _, tc := range []struct {
+		key     string
+		buylist bool
+		want    string
+	}{
+		{"CK", false, "https://www.cardkingdom.com/cart?partner=ban&utm_campaign=ban&utm_medium=affiliate&utm_source=ban#ban="},
+		{"MMC", true, "https://www.mtgmintcard.com/buylist-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
+		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
+		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="},
+		// A store with no affiliate query keeps its plain page
+		{"ABUGames", true, "https://abugames.com/cartview/buylist#ban="},
+	} {
+		got := cartLoadFor(tc.key, tc.buylist, entries).Link
+		if !strings.HasPrefix(got, tc.want) {
+			t.Errorf("%s link = %q, want it to start %q", tc.key, got, tc.want)
+		}
+	}
+}
