@@ -108,6 +108,66 @@ func TestSetSymbolImages(t *testing.T) {
 	}
 }
 
+// The printings strip under a card draws each set through the same partial,
+// inside a link titled with the set's name.
+func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
+	oldGame, oldBadges := Config().Game, rarityBadges
+	t.Cleanup(func() { Config().Game, rarityBadges = oldGame, oldBadges })
+	Config().Game = "onepiece"
+	loadRarityBadges()
+
+	for _, tc := range []struct {
+		name   string
+		set    mtgmatcher.Set
+		want   []string
+		absent []string
+	}{
+		{
+			name: "keyrune set",
+			set:  mtgmatcher.Set{Code: "PM10", Name: "Magic 2010 Promos", KeyruneCode: "M10"},
+			want: []string{
+				`href="/search?q=Bolt+s%3APM10"><i class="ss ss-m10 ss-2x ss-fw`,
+				`data-mark="★"`,
+			},
+			absent: []string{`<img`, `<svg`},
+		},
+		{
+			name: "symbol set",
+			set:  mtgmatcher.Set{Code: "MA", Name: "EX Team Magma vs Team Aqua", Symbol: "https://example.com/ma.png"},
+			want: []string{
+				`<a class="printing-symbol" title="EX Team Magma vs Team Aqua"`,
+				`<img class="set-symbol-art " src="https://example.com/ma.png" alt="MA" title="EX Team Magma vs Team Aqua"`,
+				`<span hidden> <svg`,
+				`>MA</text>`,
+			},
+			absent: []string{`title="MA"`, `class="ss `},
+		},
+		{
+			name:   "bare set",
+			set:    mtgmatcher.Set{Code: "PR-1840", Name: "Deck Exclusives"},
+			want:   []string{`<svg`, `>PR-1840</text>`},
+			absent: []string{`<img`, `class="ss `},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{tc.set.Code: &tc.set}}
+			co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{Name: "Bolt", Printings: []string{tc.set.Code}}}
+
+			got := strings.Join(strings.Fields(genCardPrintings(b, co)), " ")
+			for _, want := range tc.want {
+				if !strings.Contains(got, want) {
+					t.Errorf("%q missing %q", got, want)
+				}
+			}
+			for _, absent := range tc.absent {
+				if strings.Contains(got, absent) {
+					t.Errorf("%q has %q", got, absent)
+				}
+			}
+		})
+	}
+}
+
 func TestSetSymbolMark(t *testing.T) {
 	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, funcMap)
 	if err != nil {

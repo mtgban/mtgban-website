@@ -64,6 +64,9 @@
      know. Deciding here is the point: no page has to know which kind of game
      it is serving.
 
+     A published image's tooltip is the code, or Title where the caller has
+     a better one; it would otherwise hide the tooltip of a link around it.
+
      A published symbol is an address on someone else's server, not an asset
      this site controls, and that address moving is not hypothetical: every
      Pokemon symbol 404ed for nine days once, when tcgdex changed where the
@@ -74,9 +77,8 @@
 {{define "set-symbol"}}
     {{$symbol := .Symbol}}
     {{if $symbol}}
-        <img class="set-symbol-art {{.Class}}" src="{{$symbol}}" alt="{{.Code}}" title="{{.Code}}" width="{{.Size}}" height="{{.Size}}" loading="lazy"
-             onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
-        <span hidden>{{template "set-symbol-drawn" .}}</span>
+        <img class="set-symbol-art {{.Class}}" src="{{$symbol}}" alt="{{.Code}}" title="{{or .Title .Code}}" width="{{.Size}}" height="{{.Size}}" loading="lazy"
+             onerror="this.style.display='none';this.nextElementSibling.hidden=false;"><span hidden>{{template "set-symbol-drawn" .}}</span>
     {{else}}
         {{template "set-symbol-drawn" .}}
     {{end}}

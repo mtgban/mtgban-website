@@ -668,7 +668,30 @@ func buildTemplateCache() (map[string]*template.Template, error) {
 	}
 	cache[settingsBodyKey] = t
 
+	t, err = tmplparse.ParseFiles(setSymbolBase, []string{setSymbolFile}, funcMap)
+	if err != nil {
+		return nil, fmt.Errorf("parsing set symbol: %w", err)
+	}
+	cache[setSymbolKey] = t
+
 	return cache, nil
+}
+
+const (
+	setSymbolFile = "templates/partials/set-symbol.html"
+	setSymbolBase = "set-symbol.html"
+	// setSymbolKey is the partial's entry in TemplateCache, for markup
+	// built outside any page, like the printings strip.
+	setSymbolKey = "partials/set-symbol.html"
+)
+
+// setSymbolTemplate is the set-symbol partial on its own.
+func setSymbolTemplate() (*template.Template, error) {
+	t := TemplateCache[setSymbolKey]
+	if DevMode || t == nil {
+		return tmplparse.ParseFiles(setSymbolBase, []string{setSymbolFile}, funcMap)
+	}
+	return t, nil
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
