@@ -113,3 +113,16 @@ document.addEventListener('error', function (e) {
     }
     img.src = back;
 }, true);
+
+// A landscape card needs its corner radius turned on its side, and css cannot
+// see an image's shape, so the card's wrapper carries it (css/main.css).
+document.addEventListener('load', function (e) {
+    var img = e.target;
+    if (!(img instanceof HTMLImageElement) || !img.matches(CARD_ART_SELECTOR)) {
+        return;
+    }
+    var wrap = img.closest('[data-set]');
+    if (wrap) {
+        wrap.toggleAttribute('data-landscape', img.naturalWidth > img.naturalHeight);
+    }
+}, true);

@@ -188,3 +188,33 @@ test('a clean data-game value still builds the normal fallback path', () => {
 
     expect(image.src).toBe('/img/backs/magic.webp');
 });
+
+test('landscape card art flags its wrapper, and portrait art clears it', () => {
+    const handlers = {};
+    class FakeImage {}
+    const document = {
+        body: {getAttribute: () => 'riftbound'},
+        addEventListener: (type, handler) => { handlers[type] = handler; },
+    };
+    new Function('window', 'document', 'HTMLImageElement', 'Image', source)({}, document, FakeImage, undefined);
+
+    const flags = new Set();
+    const wrap = {toggleAttribute: (name, on) => (on ? flags.add(name) : flags.delete(name))};
+    const image = Object.assign(new FakeImage(), {
+        matches: selector => selector.includes('.hoverImage'),
+        closest: selector => selector === '[data-set]' ? wrap : null,
+    });
+
+    Object.assign(image, {naturalWidth: 1039, naturalHeight: 744});
+    handlers.load({target: image});
+    expect(flags.has('data-landscape')).toBe(true);
+
+    Object.assign(image, {naturalWidth: 744, naturalHeight: 1039});
+    handlers.load({target: image});
+    expect(flags.has('data-landscape')).toBe(false);
+
+    image.matches = () => false;
+    Object.assign(image, {naturalWidth: 1039, naturalHeight: 744});
+    handlers.load({target: image});
+    expect(flags.has('data-landscape')).toBe(false);
+});

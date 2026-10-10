@@ -1176,6 +1176,10 @@ body[data-game="yugioh"] [data-set] {
 body[data-game="fleshandblood"] [data-set]:not([data-sealed]) {
     --card-radius: 5.5% / 3.9%;
 }
+/* The same corner on a landscape card, which js/card-art-fallback.js flags. */
+body[data-game="fleshandblood"] [data-set]:not([data-sealed])[data-landscape] {
+    --card-radius: 3.9% / 5.5%;
+}
 
 
 /* ── Content-warning blur ── */
