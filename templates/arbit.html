@@ -303,13 +303,21 @@
                                 <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
                                 <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.InventoryEntry.Conditions}}"/>
                             {{end}}
-                            <a class="arb-load-btn sell" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
+                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
                             <noscript>
                                 <input type="submit" value="Load at {{$sourceKey}}"/>
                             </noscript>
                         </form>
                     {{end}}
 
+
+                    {{$buyCart := cart_load_arbit $sourceKey false $entries}}
+                    {{if $buyCart.Link}}
+                        {{$hasCart = true}}
+                        <span class="cart-load">
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}" onclick="return openCartPrompt(this)">Load at {{$buyCart.Store}}</a>
+                        </span>
+                    {{end}}
 
                     {{if eq $scraperKey "CK"}}
                         <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
@@ -331,13 +339,6 @@
                         </form>
                     {{end}}
 
-                    {{$buyCart := cart_load_arbit $sourceKey false $entries}}
-                    {{if $buyCart.Link}}
-                        {{$hasCart = true}}
-                        <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}" onclick="return openCartPrompt(this)">Load at {{$buyCart.Store}}</a>
-                        </span>
-                    {{end}}
                     {{$sellCart := cart_load_arbit $scraperKey true $entries}}
                     {{if $sellCart.Link}}
                         {{$hasCart = true}}
