@@ -335,8 +335,12 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if filterByVendors != "" {
 		var newEnabledStores []string
 		for _, filtered := range strings.Split(filterByVendors, ",") {
-			if storeEligible(filtered, enabledStores, nil) {
-				newEnabledStores = append(newEnabledStores, filtered)
+			// In any case, answered under the store's own tag, once
+			for _, tag := range enabledStores {
+				if strings.EqualFold(tag, filtered) && !slices.Contains(newEnabledStores, tag) {
+					newEnabledStores = append(newEnabledStores, tag)
+					break
+				}
 			}
 		}
 		enabledStores = newEnabledStores

@@ -663,6 +663,36 @@ func TestPriceAPISealedIgnoresFinish(t *testing.T) {
 	}
 }
 
+// vendor= matches a store's tag in any case, and answers under the store's
+// own tag, on v1 and v2 alike. A tag named twice is still one store, so v1
+// keeps the conditions it exports for a single store.
+func TestPriceAPIVendorFilterIgnoresCase(t *testing.T) {
+	withSigMode(t, true, false)
+	seedV2Scrapers(t)
+	s := newSite()
+	s.ds.Store(&datastore{backend: v2Backend()})
+
+	for _, tc := range []struct {
+		url     string
+		handler http.HandlerFunc
+	}{
+		{"/api/mtgban/retail.json?vendor=ct", s.PriceAPI},
+		{"/api/v2/retail.json?vendor=ct", s.PriceAPIv2},
+	} {
+		rec := httptest.NewRecorder()
+		tc.handler(rec, httptest.NewRequest(http.MethodGet, tc.url, nil))
+		if !strings.Contains(rec.Body.String(), `"CT":`) {
+			t.Errorf("%s = %s, want CT's prices under its own tag", tc.url, rec.Body.String())
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	s.PriceAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgban/retail.json?vendor=ct,CT", nil))
+	if !strings.Contains(rec.Body.String(), `"conditions":`) {
+		t.Errorf("vendor=ct,CT = %s, want the conditions a single store gets", rec.Body.String())
+	}
+}
+
 // A NaN or infinite price is no price: v1 and v2 leave it out rather than
 // fail to encode the response around it.
 func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
