@@ -347,31 +347,6 @@ func paletteNewspaperPages() []palette.NewspaperPage {
 	return out
 }
 
-// paletteArbitFilters lists the arbitrage filter options the command
-// palette offers on the "arbit", "reverse" or "global" page, in display
-// order: those the page shows some reader, for a sealed source or not.
-func paletteArbitFilters(variant string) []palette.ArbitFilter {
-	globalMode, reverseMode := variant == "global", variant == "reverse"
-	// Only arbit and reverse have readers who see the beta options: Global
-	// never sets scraperCompareOpts.AnyOptionEnabled
-	canShowAll := !globalMode
-
-	out := make([]palette.ArbitFilter, 0, len(FilterOptKeys))
-	for _, key := range FilterOptKeys {
-		cfg, ok := FilterOptConfig[key]
-		if !ok {
-			continue
-		}
-		shown := cfg.Shown(globalMode, reverseMode, canShowAll, false) ||
-			cfg.Shown(globalMode, reverseMode, canShowAll, true)
-		if !shown {
-			continue
-		}
-		out = append(out, palette.ArbitFilter{Key: key, Title: cfg.Title})
-	}
-	return out
-}
-
 const (
 	DefaultServerPort    = "8080"
 	DefaultConfigPath    = "config.json"

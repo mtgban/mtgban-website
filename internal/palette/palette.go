@@ -23,12 +23,6 @@ type NewspaperPage struct {
 	Option string
 }
 
-// ArbitFilter is one arbitrage filter option offered as a palette target.
-type ArbitFilter struct {
-	Key   string
-	Title string
-}
-
 // Service exposes the palette endpoints, wired to the host's live datastore
 // and scraper lists via callbacks so it always reflects current state.
 type Service struct {
@@ -595,10 +589,10 @@ type NavTarget struct {
 	Group string `json:"group,omitempty"`
 }
 
-// ArbitTargets is the arbit page's filter and sort options.
+// ArbitTargets is the arbitrage pages' sort options. Their filters are the
+// page's own filter bar, which the palette does not reach.
 type ArbitTargets struct {
-	Filters []NavTarget `json:"filters"`
-	Sorts   []NavTarget `json:"sorts"`
+	Sorts []NavTarget `json:"sorts"`
 }
 
 // NewspaperTargetsJSON returns JSON for the newspaper page views given, the
@@ -679,11 +673,10 @@ func SleepersTargetsJSON() template.JS {
 	return template.JS(data)
 }
 
-// ArbitTargetsJSON produces the targets for one arbitrage page: its sort
-// options, and the filters given, which are the ones that page shows.
-func ArbitTargetsJSON(filters []ArbitFilter) template.JS {
+// ArbitTargetsJSON produces the targets the arbitrage pages share: their
+// sort options.
+func ArbitTargetsJSON() template.JS {
 	out := ArbitTargets{
-		Filters: []NavTarget{},
 		Sorts: []NavTarget{
 			{Value: "profitability", Label: "Profitability"},
 			{Value: "spread", Label: "Spread %"},
@@ -694,12 +687,6 @@ func ArbitTargetsJSON(filters []ArbitFilter) template.JS {
 			{Value: "edition", Label: "Edition"},
 			{Value: "alpha", Label: "Alphabetical"},
 		},
-	}
-	for _, filter := range filters {
-		out.Filters = append(out.Filters, NavTarget{
-			Value: filter.Key,
-			Label: filter.Title,
-		})
 	}
 	data, _ := json.Marshal(out)
 	return template.JS(data)
