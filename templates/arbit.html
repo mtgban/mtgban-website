@@ -245,7 +245,7 @@
                     {{if eq $sourceKey "CK"}}
                         <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                            <input type="hidden" name="c" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
+                            <input type="hidden" name="c" data-load-list="ck" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
                             <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                             <noscript>
                                 <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -254,7 +254,7 @@
                     {{else if eq $sourceKey "CSI"}}
                         <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                            <input type="hidden" name="sList" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
+                            <input type="hidden" name="sList" data-load-list="csi" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
                             <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                             <noscript>
                                 <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -263,7 +263,7 @@
                     {{else if has_prefix $sourceKey "TCG"}}
                         <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
-                            <input type="hidden" name="c" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
+                            <input type="hidden" name="c" data-load-list="tcg" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
                             <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at TCG</a>
                             <noscript>
                                 <input type="submit" value="Load at TCG"/>
@@ -287,7 +287,7 @@
                         {{end}}
                         <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                            <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
+                            <input type="hidden" name="deck" data-load-list="manapool" value="{{base64enc $deck}}"/>
                             <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at Manapool</a>
                             <noscript>
                                 <input type="submit" value="Load at Manapool"/>
@@ -313,7 +313,7 @@
 
                     {{if eq $scraperKey "CK"}}
                         <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
-                            <input type="hidden" name="json" value='
+                            <input type="hidden" name="json" data-load-list="ckbuylist" value='
                                 {"contents": [
                                     {{range $entries}}
                                     {
@@ -335,14 +335,14 @@
                     {{if $buyCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" onclick="return openCartPrompt(this)">Load at {{$buyCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}" onclick="return openCartPrompt(this)">Load at {{$buyCart.Store}}</a>
                         </span>
                     {{end}}
                     {{$sellCart := cart_load_arbit $scraperKey true $entries}}
                     {{if $sellCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-buylist="true" onclick="return openCartPrompt(this)">Load buylist at {{$sellCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-buylist="true" data-load-list="cart" data-load-items="{{$sellCart.Items}}" onclick="return openCartPrompt(this)">Load buylist at {{$sellCart.Store}}</a>
                         </span>
                     {{end}}
 
@@ -422,9 +422,9 @@
                 </thead>
                 <tbody>
                 {{$arbitContainer := .}}
-                {{range .Arbit}}
+                {{range $n, $row := .Arbit}}
                     {{$card := (index $.Metadata .CardID)}}
-                    <tr data-arb-id="{{.CardID}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardID}}" data-arb-tcgid="{{$card.TCGId}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'{{$card.ImageURL}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                    <tr data-arb-id="{{.CardID}}" data-load-idx="{{$n}}" data-load-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-load-name="{{$card.Name}}" data-load-ckid="{{uuid2ckid .CardID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'{{$card.ImageURL}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 24 "Class" "set-icon"}}
@@ -522,6 +522,7 @@
         {{if $hasCart}}{{template "cart-prompt" $}}{{end}}
 </div>
 
+<script type="text/javascript" src="/js/load-lists.js?hash={{$.Hash}}"></script>
 <script>
 function toggleArbitRow(checkbox) {
     var row = checkbox.closest('tr');
@@ -543,87 +544,7 @@ function toggleAllArbitRows(masterCheckbox) {
     });
 }
 
-// Collect active (non-removed) rows from the arbit table in the same section
-function getActiveArbRows(section) {
-    var rows = [];
-    section.querySelectorAll('tr[data-arb-id]:not(.arb-removed)').forEach(function(row) {
-        rows.push({
-            id: row.dataset.arbId,
-            qty: row.dataset.arbQty || '1',
-            name: row.dataset.arbName || '',
-            cond: row.dataset.arbCond || '',
-            ckid: row.dataset.arbCkid || '',
-            tcgid: row.dataset.arbTcgid || ''
-        });
-    });
-    return rows;
-}
-
-function filterArbForm(form) {
-    var section = form.closest('.arb-page');
-    if (!section) return;
-    var active = getActiveArbRows(section);
-    var allRows = section.querySelectorAll('tr[data-arb-id]');
-    if (active.length === allRows.length) return;
-
-    // CK buylist JSON
-    var jsonInput = form.querySelector('input[name="json"]');
-    if (jsonInput) {
-        var contents = active.map(function(r) {
-            return '{"id":' + r.ckid + ',"qty":' + r.qty + '}';
-        });
-        jsonInput.value = '{"contents":[' + contents.join(',') + ',{}]}';
-        return;
-    }
-
-    // CK/CSI deckbuilder (name="c" or name="sList")
-    var cInput = form.querySelector('input[name="c"]');
-    if (cInput) {
-        // Check if TCG format (qty-tcgid||) or CK format (qty name||)
-        if (cInput.value.match(/\d+-\d+\|\|/)) {
-            cInput.value = active.map(function(r) { return r.qty + '-' + r.tcgid + '||'; }).join('');
-        } else {
-            cInput.value = active.map(function(r) { return r.qty + ' ' + r.name + '||'; }).join('');
-        }
-        return;
-    }
-    var sListInput = form.querySelector('input[name="sList"]');
-    if (sListInput) {
-        sListInput.value = active.map(function(r) { return r.qty + ' ' + r.name + '|'; }).join('');
-        return;
-    }
-
-    // Manapool deck (base64 encoded)
-    var deckInput = form.querySelector('input[name="deck"]');
-    if (deckInput) {
-        var deck = active.map(function(r) { return r.qty + ' ' + r.name; }).join('\n');
-        deckInput.value = btoa(deck);
-        return;
-    }
-
-    // Per-entry forms (hashes) — disable removed input groups
-    var removed = {};
-    section.querySelectorAll('tr.arb-removed').forEach(function(row) {
-        if (row.dataset.arbId) removed[row.dataset.arbId] = true;
-    });
-    var inputs = form.querySelectorAll('input[type="hidden"]');
-    var skip = false;
-    for (var i = 0; i < inputs.length; i++) {
-        var inp = inputs[i];
-        if (inp.name && inp.name.match(/hashes$/)) {
-            skip = removed[inp.value] || false;
-        }
-        if (skip) inp.disabled = true;
-    }
-}
-
-// Intercept clicks on arbit action buttons
-document.addEventListener('click', function(e) {
-    var btn = e.target.closest('.arb-load-btn');
-    if (!btn) return;
-    var form = btn.closest('form');
-    if (form) filterArbForm(form);
-}, true);
+wireLoadLists({section: '.arb-section', removed: 'arb-removed'});
 </script>
 {{end}}
 
