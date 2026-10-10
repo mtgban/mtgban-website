@@ -542,6 +542,10 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   arbit and reverse together and `GlobalFilters` for global
   (`arbitSavedCookie`); a request without `f=1` reads it
   (`requestArbitState`), its own `sort` still applying to that view.
+  For a signed-in reader the same state rides the synced preferences
+  (`mtgban_arbit_filters`, merged per page group by apply time), and
+  `ArbitFilters.refresh` rewrites an older cookie on load and after a
+  sync, reloading once where the page was drawn from older filters.
   8 sort orders (`arbitLess()`: available, sell price, buy price,
   profitability, diff, spread, edition, alpha).
 - **Sleepers** scores cards by how often they appear as opportunities across

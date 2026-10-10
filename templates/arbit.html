@@ -6,6 +6,8 @@
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/store-picker.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
 {{end}}
 
 {{define "content"}}
@@ -227,7 +229,7 @@
         {{end}}
 
         <script type="text/javascript">
-            window.BAN_ARBIT = {source: {{$.ScraperShort}}, query: {{$.ArbitQuery}}, cookie: {{$.ArbitCookie}}};
+            window.BAN_ARBIT = {source: {{$.ScraperShort}}, query: {{$.ArbitQuery}}, cookie: {{$.ArbitCookie}}, savedAt: {{$.ArbitSavedAt}}};
         </script>
         <script type="text/javascript" src="/js/arbit-filters.js?hash={{.Hash}}"></script>
         <script type='text/javascript'>
