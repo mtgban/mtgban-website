@@ -19,6 +19,13 @@ function openCartPrompt(link) {
 // the "?" beside the button: a user who skipped it can get the loader back.
 function showCartPrompt(link) {
     cartPromptLink = link.href;
+    // The box says what is stored, never what the browser restored into it,
+    // and unticking it here brings the panel back
+    var skip = false;
+    try {
+        skip = localStorage.getItem(CART_PROMPT_SKIP_KEY) === "true";
+    } catch (e) {}
+    document.getElementById("cart-prompt-skip").checked = skip;
     var buylist = link.dataset.buylist === "true";
     document.querySelectorAll("#cart-overlay .cart-prompt-store").forEach(function(el) {
         el.textContent = link.dataset.store;
@@ -38,11 +45,13 @@ function closeCartPrompt() {
 }
 
 function openCartStore() {
-    if (document.getElementById("cart-prompt-skip").checked) {
-        try {
+    try {
+        if (document.getElementById("cart-prompt-skip").checked) {
             localStorage.setItem(CART_PROMPT_SKIP_KEY, "true");
-        } catch (e) {}
-    }
+        } else {
+            localStorage.removeItem(CART_PROMPT_SKIP_KEY);
+        }
+    } catch (e) {}
     closeCartPrompt();
     window.open(cartPromptLink, "_blank", "noopener");
 }

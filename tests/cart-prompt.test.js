@@ -11,6 +11,7 @@ function load({skip = null, storageThrows = false} = {}) {
     const localStorage = {
         getItem: (key) => { if (storageThrows) throw new Error('blocked'); return stored[key] ?? null; },
         setItem: (key, value) => { if (storageThrows) throw new Error('blocked'); stored[key] = value; },
+        removeItem: (key) => { if (storageThrows) throw new Error('blocked'); delete stored[key]; },
     };
     const classes = new Set();
     const overlay = {classList: {add: (c) => classes.add(c), remove: (c) => classes.delete(c)}};
@@ -75,6 +76,26 @@ describe('cart-prompt', () => {
         expect(page.classes.has('open')).toBe(true);
         page.openCartStore();
         expect(page.opened).toEqual([[link.href, '_blank', 'noopener']]);
+    });
+
+    test('a box ticked by the browser, not the user, does not skip the panel', () => {
+        const page = load();
+        page.checkbox.checked = true;
+        page.openCartPrompt(link);
+        expect(page.checkbox.checked).toBe(false);
+        page.openCartStore();
+        expect(page.stored.cartPromptSkip).toBeUndefined();
+        expect(page.openCartPrompt(link)).toBe(false);
+    });
+
+    test('unticking the box from the ? link brings the panel back', () => {
+        const page = load({skip: 'true'});
+        page.showCartPrompt(link);
+        expect(page.checkbox.checked).toBe(true);
+        page.checkbox.checked = false;
+        page.openCartStore();
+        expect(page.stored.cartPromptSkip).toBeUndefined();
+        expect(page.openCartPrompt(link)).toBe(false);
     });
 
     test('blocked storage still shows the panel and opens the store', () => {
