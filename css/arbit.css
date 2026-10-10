@@ -218,11 +218,44 @@
 
 
 .arb-filter-bar {
+    margin-bottom: 14px;
+}
+
+/* Two columns of cells, each a stack of labelled rows: what to keep on the
+   left, the limits on the right */
+.arb-filter-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 28px;
+    align-items: start;
+}
+
+.arb-filter-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* A row is its label, then its boxes or fields, which wrap beside it. Every
+   line is one height, pills and fields alike, and the label sits level with
+   the first, so the rows space evenly down both columns */
+.arb-filter-group {
+    --arb-filter-line: 30px;
+    display: grid;
+    grid-template-columns: 116px minmax(0, 1fr);
+    align-items: start;
+}
+
+.arb-filter-values {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px 4px;
     flex-wrap: wrap;
-    margin-bottom: 14px;
+    min-height: var(--arb-filter-line);
+}
+
+.arb-filter-group > .arb-filter-label {
+    line-height: var(--arb-filter-line);
 }
 
 .arb-filter-label {
@@ -234,23 +267,147 @@
     margin-right: 4px;
 }
 
-.arb-filter-chip {
-    padding: 4px 12px;
+.arb-filter-group > .arb-filter-label {
+    white-space: nowrap;
+}
+
+/* A box of a picker reads as a chip, lit while ticked; the checkbox itself
+   stays in the form, out of sight but focusable */
+.arb-filter-check {
+    position: relative;
+    box-sizing: border-box;
+    height: var(--arb-filter-line, 30px);
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-subtle);
     background: var(--surface-1);
     color: var(--activetext);
     font-size: var(--text-base);
     font-weight: 600;
-    text-decoration: none;
+    cursor: pointer;
+    user-select: none;
     transition: all 0.12s;
 }
 
-.arb-filter-chip:hover { border-color: var(--accent-border); color: var(--normal); }
-.arb-filter-chip.on { background: rgba(63,185,80,0.1); border-color: rgba(63,185,80,0.25); color: var(--asuccess); }
+.arb-filter-check input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.arb-filter-check:hover { border-color: var(--accent-border); color: var(--normal); }
+.arb-filter-check:has(input:checked) { background: rgba(30,144,255,0.18); border-color: rgba(30,144,255,0.45); color: var(--ainfo); }
+.arb-filter-check:has(input:focus-visible) { outline: 2px solid var(--ainfo); outline-offset: 1px; }
+
+.arb-filter-range input {
+    box-sizing: border-box;
+    height: var(--arb-filter-line);
+    width: 76px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-base);
+    font-family: inherit;
+}
+
+.arb-filter-range input:focus { border-color: var(--ainfo); outline: none; }
+.arb-filter-range input::placeholder { color: var(--text-dim); }
+.arb-filter-dash { color: var(--text-dim); }
+
+/* The toggle and the edition field share the form's two columns, so the
+   field lines up over the limits */
+.arb-filter-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 28px;
+    align-items: center;
+}
+
+.arb-filter-panel {
+    margin-top: 12px;
+}
+
+.arb-filter-toggle {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-1);
+    color: var(--normal);
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.arb-filter-toggle::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 0.12s;
+}
+
+.arb-filter-toggle[aria-expanded="true"]::after { transform: translateY(2px) rotate(-135deg); }
+.arb-filter-toggle:hover { border-color: var(--accent-border); }
+
+.arb-filter-count {
+    padding: 1px 8px;
+    border-radius: var(--radius-lg);
+    background: rgba(30,144,255,0.18);
+    color: var(--ainfo);
+    font-size: var(--text-sm);
+}
+
+.arb-filter-actions {
+    margin-top: 12px;
+}
+
+.arb-filter-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.arb-filter-apply {
+    padding: 5px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-border);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-base);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.arb-filter-apply:hover { background: var(--surface-1); border-color: var(--ainfo); }
+
+.arb-filter-reset {
+    padding: 5px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    color: var(--activetext);
+    font-size: var(--text-base);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.arb-filter-reset:hover { color: var(--normal); border-color: var(--accent-border); text-decoration: none; }
 
 .arb-edition-filter {
-    margin-left: 8px;
     padding: 5px 10px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-moderate);
@@ -483,8 +640,10 @@
     .arb-card-cell .set-icon { display: none; }
     .arb-selector-bar { gap: 6px; }
 
-    /* Touch-friendly filter chips */
-    .arb-filter-chip { padding: 8px 14px; }
+    /* Touch-friendly filter chips, one column of cells */
+    .arb-filter-group { --arb-filter-line: 38px; }
+    .arb-filter-check { padding: 0 14px; }
+    .arb-filter-form, .arb-filter-head { grid-template-columns: minmax(0, 1fr); }
     .arb-alt-pill { padding: 8px 14px; }
 }
 
@@ -506,7 +665,7 @@
     .arb-load-btns { width: 100%; justify-content: flex-start; }
 
     /* Edition filter full width */
-    .arb-edition-filter { width: 100%; margin-left: 0; }
+    .arb-edition-filter { width: 100%; }
 }
 
 /* ── Row removal ── */

@@ -528,12 +528,17 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   source/scraper roles swapped: pick a vendor buylist to sell into, compare
   against every seller's retail), and **Global** (`mtgban.Mismatch()`,
   seller vs seller mismatches, 200 %+ spread, capped at 300 results).
-  19 toggleable filters (`FilterOptKeys`/`FilterOptConfig`: conditions,
-  foil, rarity, reserved list, profitability ≥ 1.74 (`MinProfitable` —
-  dropped from 4.0 when the profitability index switched to a log10 base),
-  penny floors, quantity, SYP/stocks lists…) and 8 sort orders
-  (`arbitLess()`: available, sell price, buy price, profitability, diff,
-  spread, edition, alpha).
+  A filter bar (`arbit_filters.go`, `js/arbit-filters.js`) sets the
+  reader's `arbitState`: condition, finish and rarity picks; min/max on the
+  table's two price columns and the spread; min difference, quantity and
+  profitability; and 8 on/off options (`FilterOptKeys`/`FilterOptConfig`:
+  RL, ABU4H, decklists, SYP, stocks, legit, stable, tradable). Unset fields
+  take the page's defaults (`arbitDefaults`), and the spread and difference
+  are held to per-page floors (`arbitMode.floors`; Global's spread floor is
+  the AnySpread tier gate). Price, max-spread and quantity limits are row
+  checks on the shown columns (`arbitRowFilter`). Every generated link
+  carries the state plus `f=1`. 8 sort orders (`arbitLess()`: available,
+  sell price, buy price, profitability, diff, spread, edition, alpha).
 - **Sleepers** scores cards by how often they appear as opportunities across
   all seller×vendor pairs (`getTiers()`), plus variants: bulk repricing
   (`getBulks()`), long-unreprinted (`getReprints()` — the 2-year/$3 floors

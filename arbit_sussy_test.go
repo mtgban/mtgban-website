@@ -132,7 +132,7 @@ func renderReverse(t *testing.T, query string) string {
 	r := httptest.NewRequest("GET", "/reverse?"+query, nil)
 	w := httptest.NewRecorder()
 	pageVars := PageVars{ReverseMode: true, UserNav: &NavElem{Short: "beta"}}
-	scraperCompare(backend(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
 
@@ -153,7 +153,7 @@ func TestReverseDropsIndexSellers(t *testing.T) {
 		t.Error("an index price is still one side of a trade by default")
 	}
 
-	page = renderReverse(t, "source=REVBUY&noindex=false")
+	page = renderReverse(t, "source=REVBUY&tradable=0")
 	if !strings.Contains(page, "Reverse Index") {
 		t.Error("turning the option off does not bring the index back")
 	}
@@ -222,44 +222,33 @@ func seedArbitScraper(t *testing.T, shorthand string, sealed bool) {
 	sellersPtr.Store(&sellers)
 }
 
-// TestArbitFilterOptionsRouteBySealedMode pins which of nosus/novolatile a
-// global page offers as a chip. Checks match "><title><" since the page
-// also embeds the palette's global list, which offers both for any source.
+// TestArbitFilterOptionsRouteBySealedMode pins which of legit/stable a
+// global page offers. Checks match "><title><" since the page also embeds
+// the palette's targets.
 func TestArbitFilterOptionsRouteBySealedMode(t *testing.T) {
-	seedArbitScraper(t, "SEALEDCHIP", true)
-	page := renderArbit(t, PageVars{
-		ScraperShort: "SEALEDCHIP",
-		ArbitVars: ArbitVars{
-			GlobalMode:     true,
-			ArbitOptKeys:   FilterOptKeys,
-			ArbitOptConfig: FilterOptConfig,
-			ArbitFilters:   map[string]bool{},
-		},
-		UserNav: &NavElem{Short: "beta"},
-	})
-	if !strings.Contains(page, ">only Stable<") {
-		t.Error("a sealed global page does not offer novolatile")
-	}
-	if strings.Contains(page, ">only Legit<") {
-		t.Error("a sealed global page still offers nosus")
-	}
-
-	seedArbitScraper(t, "SINGLESCHIP", false)
-	page = renderArbit(t, PageVars{
-		ScraperShort: "SINGLESCHIP",
-		ArbitVars: ArbitVars{
-			GlobalMode:     true,
-			ArbitOptKeys:   FilterOptKeys,
-			ArbitOptConfig: FilterOptConfig,
-			ArbitFilters:   map[string]bool{},
-		},
-		UserNav: &NavElem{Short: "beta"},
-	})
-	if !strings.Contains(page, ">only Legit<") {
-		t.Error("a singles global page does not offer nosus")
-	}
-	if strings.Contains(page, ">only Stable<") {
-		t.Error("a singles global page still offers novolatile")
+	for _, tt := range []struct {
+		sealed           bool
+		offers, withhold string
+	}{
+		{true, ">only Stable<", ">only Legit<"},
+		{false, ">only Legit<", ">only Stable<"},
+	} {
+		seedArbitScraper(t, "CHIPSRC", tt.sealed)
+		mode := arbitMode{Global: true, Sealed: tt.sealed}
+		page := renderArbit(t, PageVars{
+			ScraperShort: "CHIPSRC",
+			ArbitVars: ArbitVars{
+				GlobalMode: true,
+				ArbitBar:   newArbitBar(parseArbitState(nil, arbitOffer{}), mode, arbitOffer{}, backend(), "CHIPSRC"),
+			},
+			UserNav: &NavElem{Short: "beta"},
+		})
+		if !strings.Contains(page, tt.offers) {
+			t.Errorf("sealed=%v: a global page does not offer %s", tt.sealed, tt.offers)
+		}
+		if strings.Contains(page, tt.withhold) {
+			t.Errorf("sealed=%v: a global page still offers %s", tt.sealed, tt.withhold)
+		}
 	}
 }
 
@@ -309,15 +298,15 @@ func TestArbitAppliesOnlyShownFilters(t *testing.T) {
 		want, warn bool
 	}{
 		{false, "", true, true},
-		{false, "&nosyp=true", true, true},
-		{false, "&nosus=true", true, true},
+		{false, "&syp=1", true, true},
+		{false, "&legit=1", true, true},
 		{true, "", true, false},
-		{true, "&nosyp=true", false, false},
+		{true, "&syp=1", false, false},
 	} {
 		r := httptest.NewRequest("GET", "/?source=FILTSHOP"+tt.query, nil)
 		w := httptest.NewRecorder()
 		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: tt.global}, UserNav: &NavElem{Short: "beta"}}
-		scraperCompare(backend(), w, r, pageVars, []string{"FILTSHOP"}, nil, scraperCompareOpts{AllResults: true})
+		scraperCompare(testSite.datastore(), w, r, pageVars, []string{"FILTSHOP"}, nil, scraperCompareOpts{AllResults: true})
 		got := strings.Contains(w.Body.String(), row)
 		if got != tt.want {
 			t.Errorf("global=%v source=FILTSHOP%s lists the row: %v, want %v", tt.global, tt.query, got, tt.want)
@@ -365,7 +354,7 @@ func renderGlobal(t *testing.T, source, query string) string {
 	r := httptest.NewRequest("GET", "/global?source="+source+query, nil)
 	w := httptest.NewRecorder()
 	pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
-	scraperCompare(backend(), w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
+	scraperCompare(testSite.datastore(), w, r, pageVars, []string{source}, nil, scraperCompareOpts{AllResults: true})
 	return w.Body.String()
 }
 
@@ -384,7 +373,7 @@ func TestGlobalSealedDropsVolatile(t *testing.T) {
 		t.Error("a volatile product is listed by default")
 	}
 
-	page = renderGlobal(t, "SEALSRC", "&novolatile=false")
+	page = renderGlobal(t, "SEALSRC", "&stable=0")
 	if !strings.Contains(page, row) {
 		t.Fatal("turning the option off does not bring the product back")
 	}
