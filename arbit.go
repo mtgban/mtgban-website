@@ -19,7 +19,6 @@ const (
 	MaxArbitResults = 450
 	MaxPriceRatio   = 120.0
 	MinSpread       = 10.0
-	MinProfitable   = 1.74
 	MaxSpreadGlobal = 1000
 	MinSpreadGlobal = 200.0
 
@@ -29,9 +28,6 @@ const (
 
 	MinSpreadNegative = -30
 	MinDiffNegative   = -100
-
-	MinSpreadHighYield       = 100
-	MinSpreadHighYieldGlobal = 350
 
 	ProfConst       = 2
 	ProfConstGlobal = 10
@@ -58,28 +54,17 @@ var FilteredEditions = []string{
 	"Fourth Edition Black Border",
 }
 
-// Every single boolean option
+// The on/off options, in the order the filter bar lists them. Every
+// threshold is a field of arbitState instead.
 var FilterOptKeys = []string{
-	"nocond",
-	"nofoil",
-	"onlyfoil",
-	"nocomm",
-	"nononrl",
-	"nononabu4h",
-	"onlyprof",
-	"noposi",
-	"nopenny",
-	"nobuypenny",
-	"nolow",
-	"nodiff",
-	"nodiffplus",
-	"noqty",
-	"norand",
-	"nosyp",
-	"nostock",
-	"nosus",
-	"novolatile",
-	"noindex",
+	"rl",
+	"abu4h",
+	"decklists",
+	"syp",
+	"stocks",
+	"legit",
+	"stable",
+	"tradable",
 }
 
 type FilterOpt struct {
@@ -88,7 +73,6 @@ type FilterOpt struct {
 
 	ArbitOnly  bool
 	GlobalOnly bool
-	BetaFlag   bool
 	NoSealed   bool
 	SealedOnly bool
 
@@ -97,14 +81,12 @@ type FilterOpt struct {
 	ReverseOnly bool
 }
 
-// Shown reports whether an arbitrage page shows the option as a chip, given
-// which page it is, whether the reader may use the beta options, and whether
-// the source is sealed. The page's filter bar and the command palette both
-// ask it, and scraperCompare applies only the options it shows.
-func (opt FilterOpt) Shown(globalMode, reverseMode, canShowAll, sealedSource bool) bool {
+// Shown reports whether an arbitrage page offers the option, given which
+// page it is and whether the source is sealed. The filter bar asks it, and
+// arbitState.applied applies only the options it shows.
+func (opt FilterOpt) Shown(globalMode, reverseMode, sealedSource bool) bool {
 	switch {
-	case opt.BetaFlag && !canShowAll,
-		opt.ArbitOnly && globalMode,
+	case opt.ArbitOnly && globalMode,
 		opt.GlobalOnly && !globalMode,
 		opt.ReverseOnly && !reverseMode,
 		opt.NoSealed && sealedSource,
@@ -116,114 +98,29 @@ func (opt FilterOpt) Shown(globalMode, reverseMode, canShowAll, sealedSource boo
 
 // User-readable option name and associated function/visibility option
 var FilterOptConfig = map[string]FilterOpt{
-	"nocond": {
-		Title: "only NM/SP",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.Conditions = BadConditions
-		},
-		NoSealed: true,
-	},
-	"nofoil": {
-		Title: "only non-Foil",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.NoFoil = true
-		},
-		NoSealed: true,
-	},
-	"onlyfoil": {
-		Title: "only Foil",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.OnlyFoil = true
-		},
-		NoSealed: true,
-	},
-	"nocomm": {
-		Title:    "only Rare/Mythic",
-		NoSealed: true,
-	},
-	"nononrl": {
+	"rl": {
 		Title: "only RL",
 		Func: func(opts *mtgban.ArbitOpts) {
 			opts.OnlyReserveList = true
 		},
-		BetaFlag: true,
 		NoSealed: true,
 	},
-	"nononabu4h": {
+	"abu4h": {
 		Title: "only ABU4H",
 		Func: func(opts *mtgban.ArbitOpts) {
 			opts.OnlyEditions = ABU4H
 		},
 		ArbitOnly: true,
-		BetaFlag:  true,
 		NoSealed:  true,
 	},
-	"onlyprof": {
-		Title: "only Profitable",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinProfitability = MinProfitable
-		},
-		BetaFlag: true,
-		NoSealed: true,
-	},
-	"noposi": {
-		Title: "only Negative",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinSpread = MinSpreadNegative
-			opts.MinDiff = MinDiffNegative
-			opts.MaxSpread = MinSpread
-		},
-		ArbitOnly: true,
-		NoSealed:  true,
-	},
-	"nopenny": {
-		Title: "only Bucks+",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinPrice = 1
-		},
-		NoSealed: true,
-	},
-	"nobuypenny": {
-		Title: "only BuyBucks+",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinBuyPrice = 1
-		},
-		ArbitOnly: true,
-		NoSealed:  true,
-	},
-	"nolow": {
-		Title: "only Yield+",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinSpread = MinSpreadHighYield
-		},
-	},
-	"nodiff": {
-		Title: "only Difference+",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinDiff = 1
-		},
-	},
-	"nodiffplus": {
-		Title: "only Difference++",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinDiff = 5
-		},
-	},
-	"noqty": {
-		Title: "only Quantity+",
-		Func: func(opts *mtgban.ArbitOpts) {
-			opts.MinQuantity = 1
-		},
-		ArbitOnly: true,
-	},
-	"norand": {
-		Title: "only Decklists+",
+	"decklists": {
+		Title: "only Decklists",
 		Func: func(opts *mtgban.ArbitOpts) {
 			opts.SealedDecklist = true
 		},
 		SealedOnly: true,
 	},
-	"nosyp": {
+	"syp": {
 		Title: "only SYP",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
@@ -245,7 +142,7 @@ var FilterOptConfig = map[string]FilterOpt{
 		NoSealed:   true,
 		GlobalOnly: true,
 	},
-	"nostock": {
+	"stocks": {
 		Title: "only Stocks",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
@@ -264,7 +161,7 @@ var FilterOptConfig = map[string]FilterOpt{
 		NoSealed:   true,
 		GlobalOnly: true,
 	},
-	"nosus": {
+	"legit": {
 		Title: "only Legit",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
@@ -282,7 +179,7 @@ var FilterOptConfig = map[string]FilterOpt{
 		GlobalOnly: true,
 		NoSealed:   true,
 	},
-	"novolatile": {
+	"stable": {
 		Title: "only Stable",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
@@ -299,24 +196,13 @@ var FilterOptConfig = map[string]FilterOpt{
 		GlobalOnly: true,
 		SealedOnly: true,
 	},
-	"noindex": {
+	"tradable": {
 		Title:       "only Tradable",
 		ReverseOnly: true,
 	},
 }
 
 var BadConditions = []mtgban.Condition{mtgban.MP, mtgban.HP, mtgban.PO}
-
-// raritiesBelow lists the rarities b's game ranks commoner than the one
-// named, by the game's own order: below rare, Magic's are uncommon, common
-// and token.
-func raritiesBelow(b *mtgmatcher.Backend, rarity string) []string {
-	rank, found := b.RarityRank(rarity)
-	if !found {
-		return nil
-	}
-	return b.Rarities[rank+1:]
-}
 
 var ABU4H = []string{
 	"Limited Edition Alpha",
@@ -435,21 +321,23 @@ type Arbitrage struct {
 type ArbitVars struct {
 	ExtraNav        []NavElem
 	DirectStockNote string
-	ArbitOptKeys    []string
-	ArbitOptConfig  map[string]FilterOpt
-	ArbitFilters    map[string]bool
 	GlobalMode      bool
+
+	// The filter bar, and the state as a query (no source, no sort) for the
+	// sort links
+	ArbitBar   arbitBar
+	ArbitQuery string
 }
 
 func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
-	arbit(s, s.backend(), w, r, false)
+	arbit(s, s.datastore(), w, r, false)
 }
 
 func (s *site) Reverse(w http.ResponseWriter, r *http.Request) {
-	arbit(s, s.backend(), w, r, true)
+	arbit(s, s.datastore(), w, r, true)
 }
 
-func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, reverse bool) {
+func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, reverse bool) {
 	sig := verifiedSignature(r)
 
 	pageName := "Arbitrage"
@@ -459,8 +347,6 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	pageVars := genPageNav(s, r, pageName, sig)
 	pageVars.ReverseMode = reverse
 
-	var anyOptionEnabled bool
-
 	var allowlistSellers []string
 	allowlistSellersOpt := GetParamFromSig(sig, "ArbitEnabled")
 
@@ -468,8 +354,6 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		allowlistSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
 			return !info.MetadataOnly
 		})
-		// Enable any option with BetaFlag
-		anyOptionEnabled = true
 	} else if allowlistSellersOpt == "" {
 		allowlistSellers = Config().ArbitDefaultSellers
 	} else {
@@ -496,9 +380,8 @@ func arbit(s *site, b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 
 	start := time.Now()
 
-	scraperCompare(b, w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
-		AllResults:       true,
-		AnyOptionEnabled: anyOptionEnabled,
+	scraperCompare(ds, w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+		AllResults: true,
 	})
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -556,7 +439,7 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(s.backend(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+	scraperCompare(s.datastore(), w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
 		AllResults: anyEnabled,
 		AnySpread:  anySpread,
 	})
@@ -572,9 +455,8 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 // `flags ...bool` whose meaning was decoded from flags[0]/[1]/[2] inside
 // the function and required reading the body to understand each call.
 type scraperCompareOpts struct {
-	AllResults       bool // false caps the result list (MaxArbitResults, or MaxResultsGlobalLimit in global mode)
-	AnyOptionEnabled bool // show options gated by FilterOpt.BetaFlag
-	AnySpread        bool // use the higher spread/profitability thresholds (global mode only)
+	AllResults bool // false caps the result list (MaxArbitResults, or MaxResultsGlobalLimit in global mode)
+	AnySpread  bool // lower Global's spread floor to MinSpreadGlobalPro
 }
 
 // hasNoQty tells whether a table has no quantity column: a store keeping no
@@ -621,32 +503,18 @@ func suspectPriceFor(globalMode, reverseMode bool, sourceShort, scraperShort str
 	return nil
 }
 
-func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
+func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
+	b := ds.backend
 
 	var source mtgban.Scraper
 	var message string
-	var sorting string
-	arbitFilters := map[string]bool{}
 
 	limitedResults := !cmp.AllResults
-	anySpread := cmp.AnySpread
 
-	pageVars.CanShowAll = cmp.AnyOptionEnabled
-
-	// Set these flags for global, since it's likely users will want them
-	if pageVars.GlobalMode {
-		arbitFilters["nopenny"] = !arbitFilters["nopenny"]
-		arbitFilters["nodiff"] = !arbitFilters["nodiff"]
-		arbitFilters["nosus"] = !arbitFilters["nosus"]
-		arbitFilters["novolatile"] = !arbitFilters["novolatile"]
-	}
-
-	// Same for reverse, where what it drops would otherwise fill the whole
-	// ranking. The form loop below still lets the option be turned off
-	if pageVars.ReverseMode {
-		arbitFilters["noindex"] = !arbitFilters["noindex"]
-	}
+	offer := newArbitOffer(ds)
+	state := parseArbitState(r.Form, offer)
+	sorting := state.Sort
 
 	for k, v := range r.Form {
 		switch k {
@@ -687,13 +555,6 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 			if source == nil {
 				message = "Unknown " + v[0] + " source"
 			}
-
-		case "sort":
-			sorting = v[0]
-
-		// Assume anything else is a boolean option
-		default:
-			arbitFilters[k], _ = strconv.ParseBool(v[0])
 		}
 	}
 
@@ -753,12 +614,13 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 			nav.Name += " Sealed"
 		}
 
+		// A store link carries the filters it was asked for, and none where
+		// it was asked for none, so the page's defaults still apply there
 		v := url.Values{}
-		v.Set("source", scraper.Info().Shorthand)
-		for key, val := range arbitFilters {
-			v.Set(key, fmt.Sprint(val))
+		if r.Form.Has(arbitMarker) || !state.isZero() {
+			v = state.values()
 		}
-		v.Set("sort", fmt.Sprint(sorting))
+		v.Set("source", scraper.Info().Shorthand)
 
 		nav.Link += "?" + v.Encode()
 
@@ -778,72 +640,24 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 	}
 
 	pageVars.ScraperShort = source.Info().Shorthand
-	pageVars.ArbitFilters = arbitFilters
-	pageVars.ArbitOptKeys = FilterOptKeys
-	pageVars.ArbitOptConfig = FilterOptConfig
 
 	pageVars.Arb = []Arbitrage{}
 	pageVars.Metadata = map[string]GenericCard{}
 
-	opts := &mtgban.ArbitOpts{
-		MinSpread:             MinSpread,
-		ProfitabilityConstant: ProfConst,
+	mode := arbitMode{
+		Global:    pageVars.GlobalMode,
+		Reverse:   pageVars.ReverseMode,
+		Sealed:    source.Info().SealedMode,
+		AnySpread: cmp.AnySpread,
 	}
+	opts, rows := state.apply(b, mode)
+	applied := state.applied(mode)
 
-	// Set the options the page shows: one it has no chip for could not be
-	// turned off, so it does nothing, however it got into the URL
-	applied := map[string]bool{}
-	for _, key := range FilterOptKeys {
-		isSet := arbitFilters[key]
-		if !isSet {
-			continue
-		}
-		config, found := FilterOptConfig[key]
-		if !found {
-			continue
-		}
-		if !config.Shown(pageVars.GlobalMode, pageVars.ReverseMode, pageVars.CanShowAll, source.Info().SealedMode) {
-			continue
-		}
-		applied[key] = true
-		// Options the page acts on itself, by choosing what to compare
-		// or by reading the game being compared
-		if config.Func == nil {
-			continue
-		}
-		FilterOptConfig[key].Func(opts)
-	}
-	if applied["nocomm"] {
-		opts.Rarities = raritiesBelow(b, "rare")
-	}
-
-	// Customize opts for Globals
-	if pageVars.GlobalMode && !source.Info().SealedMode {
-		opts.MinSpread = MinSpreadGlobal
-		if anySpread {
-			opts.MinSpread = MinSpreadGlobalPro
-		}
-		opts.MaxSpread = MaxSpreadGlobal
-		opts.MaxPriceRatio = MaxPriceRatio
-
-		if applied["nolow"] {
-			opts.MinSpread = MinSpreadHighYieldGlobal
-		}
-		if applied["nodiff"] {
-			opts.MinDiff = 5
-		}
-		if applied["nodiffplus"] {
-			opts.MinDiff = 10
-		}
-
-		opts.Editions = FilteredEditions
-	}
-
-	if !pageVars.GlobalMode && source.Info().SealedMode {
-		opts.MinSpread = MinSpreadNegative
-		opts.MinDiff = MinDiffNegative
-		opts.ProfitabilityConstant = ProfConstGlobal
-	}
+	query := state.values()
+	query.Del("sort")
+	pageVars.ArbitQuery = query.Encode()
+	pageVars.ArbitBar = newArbitBar(state, mode, offer, b, source.Info().Shorthand)
+	pageVars.ArbitBar.Open = readCookie(r, "ArbitFiltersOpen") == "1"
 
 	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 
@@ -900,14 +714,19 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		// puts every such row above every real listing on the page. Global
 		// keeps them, since there the index is the reference the probe is
 		// measured against rather than a side of the trade
-		if applied["noindex"] && scraper.Info().MetadataOnly {
+		if applied["tradable"] && scraper.Info().MetadataOnly {
 			continue
 		}
 
 		// Set custom scraper options
 		opts.Conditions = conditions
 		if pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect" {
-			opts.Conditions = BadConditions
+			opts.Conditions = slices.Clone(conditions)
+			for _, grade := range BadConditions {
+				if !slices.Contains(opts.Conditions, grade) {
+					opts.Conditions = append(opts.Conditions, grade)
+				}
+			}
 		}
 
 		var arbit []mtgban.ArbitEntry
@@ -920,10 +739,14 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		} else {
 			arbit = mtgban.Arbit(b, opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
 		}
+		// The side whose copies a row buys: the probe on Global
 		seller := source
-		if pageVars.ReverseMode {
+		if pageVars.ReverseMode || (pageVars.GlobalMode && source.Info().SealedMode) {
 			seller = scraper
 		}
+		arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
+			return !rows.keep(res, seller.Info().NoQuantityInventory)
+		})
 		if !pageVars.GlobalMode && seller.Info().Shorthand == tcgDirectStore {
 			arbit = rankDirectAsOneCopy(arbit, opts.MinProfitability)
 		}
@@ -954,7 +777,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		// reference's: the TCGDirect price it vetted is the reference there,
 		// and a Direct listing above twice the market passed. Both are dropped
 		// here, on the price suspectPriceFor names for the mode.
-		if suspectPrice != nil && (applied["noindex"] || applied["nosus"]) {
+		if suspectPrice != nil && (applied["tradable"] || applied["legit"]) {
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
 				return invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
@@ -965,7 +788,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 		}
 
 		var sussy map[string]float64
-		if !applied["nosus"] && !applied["noindex"] && suspectPrice != nil {
+		if !applied["legit"] && !applied["tradable"] && suspectPrice != nil {
 			sussy = map[string]float64{}
 
 			tcgMarket, _ := findSellerInventory("TCGMarket")
@@ -976,7 +799,7 @@ func scraperCompare(b *mtgmatcher.Backend, w http.ResponseWriter, r *http.Reques
 				}
 			}
 		}
-		if !applied["novolatile"] && scraper.Info().SealedMode {
+		if !applied["stable"] && scraper.Info().SealedMode {
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {
