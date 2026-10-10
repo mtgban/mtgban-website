@@ -45,11 +45,14 @@ func (cs cartStore) page(buylist bool) string {
 	return cs.retail
 }
 
-// cartLoad is what a split's "Load at" button needs: the store's name, and
-// its cart page with the split's rows in the fragment.
+// cartLoad is what a split's "Load at" button needs: the store's name, its
+// cart page with the split's rows in the fragment, and each row's store item
+// id in row order, empty where the store lists none, for js/load-lists.js to
+// rebuild the fragment from the rows left ticked.
 type cartLoad struct {
 	Store string
 	Link  string
+	Items string
 }
 
 // cartLoadFor builds the button for a store split, or nothing for a store the
@@ -64,7 +67,8 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 		if page == "" {
 			return cartLoad{}
 		}
-		rows := cartRows(key, buylist, entries)
+		items := cartItems(key, buylist, entries)
+		rows := cartRows(items, entries)
 		if rows == "" {
 			return cartLoad{}
 		}
@@ -72,7 +76,7 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 		if !buylist {
 			link += "&side=retail"
 		}
-		return cartLoad{Store: cs.name, Link: link}
+		return cartLoad{Store: cs.name, Link: link, Items: strings.Join(items, ",")}
 	}
 	return cartLoad{}
 }
@@ -104,17 +108,15 @@ func cartStoresIn(keys []string, buylist bool) bool {
 	return false
 }
 
-// cartRows lists a store split's cards the way js/ban-to-cart.js reads them
-// from the fragment of the cart page: "id:qty" pairs joined by commas, one
-// per store item id, with the quantities of rows sharing an id added up. A
-// buylist row goes in as NM, a store row in the condition it was priced at.
-// A card the store lists no id for is left out.
-func cartRows(key string, buylist bool, entries []OptimizedUploadEntry) string {
+// cartItems is the store item id of each of a split's rows, empty for a card
+// the store lists no id for. A buylist row goes in as NM, a store row in the
+// condition it was priced at.
+func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []string {
 	var lookup func(cardID string, cond mtgban.Condition) string
 	if buylist {
 		bl, err := findVendorBuylist(key)
 		if err != nil {
-			return ""
+			return nil
 		}
 		// Sold as NM whatever the row says: the store grades what arrives.
 		// Sealed product carries no grade at all.
@@ -133,7 +135,7 @@ func cartRows(key string, buylist bool, entries []OptimizedUploadEntry) string {
 	} else {
 		inv, err := findSellerInventory(key)
 		if err != nil {
-			return ""
+			return nil
 		}
 		lookup = func(cardID string, cond mtgban.Condition) string {
 			entries := inv[cardID]
@@ -145,17 +147,28 @@ func cartRows(key string, buylist bool, entries []OptimizedUploadEntry) string {
 		}
 	}
 
+	items := make([]string, len(entries))
+	for i, entry := range entries {
+		items[i] = lookup(entry.CardID, entry.Condition)
+	}
+	return items
+}
+
+// cartRows lists a store split's cards the way js/ban-to-cart.js reads them
+// from the fragment of the cart page: "id:qty" pairs joined by commas, one
+// per store item id, with the quantities of rows sharing an id added up.
+// items holds each row's id, as cartItems finds them.
+func cartRows(items []string, entries []OptimizedUploadEntry) string {
 	var ids []string
 	quantities := map[string]int{}
-	for _, entry := range entries {
-		id := lookup(entry.CardID, entry.Condition)
+	for i, id := range items {
 		if id == "" {
 			continue
 		}
 		if _, found := quantities[id]; !found {
 			ids = append(ids, id)
 		}
-		quantities[id] += entry.Quantity
+		quantities[id] += entries[i].Quantity
 	}
 
 	pairs := make([]string, 0, len(ids))
