@@ -381,3 +381,80 @@ func TestArbitStoreLinksCarryState(t *testing.T) {
 		t.Error("a store link carries filters nobody asked for")
 	}
 }
+
+// TestRequestArbitState pins which state a request gets: its own query
+// where that carries the marker, else the saved filters with the query's
+// sort for the one view, else the query.
+func TestRequestArbitState(t *testing.T) {
+	saved := url.QueryEscape("f=1&cond=NM%2CSP&minsell=2&sort=diff&t=1728000000000")
+	for _, tt := range []struct {
+		desc, query, saved, want string
+	}{
+		{"nothing saved", "source=CK", "", "f=1"},
+		{"the saved filters", "source=CK", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff"},
+		{"a marked link wins", "source=CK&f=1&minsell=5", saved, "f=1&minsell=5"},
+		{"a marked link with nothing set is the defaults", "source=CK&f=1", saved, "f=1"},
+		{"an unmarked sort is for this view", "source=CK&sort=spread", saved, "cond=NM%2CSP&f=1&minsell=2&sort=spread"},
+		{"an unknown sort is not", "source=CK&sort=bogus", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff"},
+		{"old chip keys do not mark a link", "source=CK&nolow=true", saved, "cond=NM%2CSP&f=1&minsell=2&sort=diff"},
+		{"a value that is no query is nothing saved", "source=CK&minsell=3", "%zz", "f=1&minsell=3"},
+		{"a reset saves the defaults", "source=CK", url.QueryEscape("f=1&t=1"), "f=1"},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			form, err := url.ParseQuery(tt.query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := requestArbitState(form, tt.saved, testArbitOffer).values().Encode()
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestArbitSavedCookies pins arbit and reverse to one saved state, and
+// global to its own, read off the request the way the handler reads it.
+func TestArbitSavedCookies(t *testing.T) {
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Saved Source", Shorthand: "SAVSRC"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Saved Other", Shorthand: "SAVOTH"}),
+	}
+	sellersPtr.Store(&sellers)
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Saved Buyer", Shorthand: "SAVBUY"}),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Saved Buyer Two", Shorthand: "SAVBU2"}),
+	}
+	vendorsPtr.Store(&vendors)
+	withSigMode(t, true, false)
+
+	cookies := "ArbitFilters=" + url.QueryEscape("f=1&minsell=2&t=1") + "; GlobalFilters=" + url.QueryEscape("f=1&minsell=7&t=1")
+	render := func(path string, pageVars PageVars, allow []string) string {
+		r := httptest.NewRequest("GET", path, nil)
+		r.Header.Set("Cookie", cookies)
+		w := httptest.NewRecorder()
+		pageVars.UserNav = &NavElem{Short: "beta"}
+		scraperCompare(testSite.datastore(), w, r, pageVars, allow, nil, scraperCompareOpts{AllResults: true})
+		return w.Body.String()
+	}
+	for _, tt := range []struct {
+		desc, page string
+		want       string
+	}{
+		{"arbit", render("/arbit?source=SAVSRC", PageVars{}, []string{"SAVSRC", "SAVOTH"}), "minsell=2"},
+		{"reverse", render("/reverse?source=SAVBUY", PageVars{ReverseMode: true}, nil), "minsell=2"},
+		{"global", render("/global?source=SAVSRC", PageVars{ArbitVars: ArbitVars{GlobalMode: true}}, []string{"SAVSRC", "SAVOTH"}), "minsell=7"},
+	} {
+		if !strings.Contains(tt.page, "&amp;"+tt.want+"&amp;source=") {
+			t.Errorf("%s does not carry its saved %s into its links", tt.desc, tt.want)
+		}
+		if !strings.Contains(tt.page, `name="minsell" value="`+strings.TrimPrefix(tt.want, "minsell=")+`"`) {
+			t.Errorf("%s does not fill its saved %s into the bar", tt.desc, tt.want)
+		}
+	}
+}

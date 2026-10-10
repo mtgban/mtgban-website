@@ -327,6 +327,9 @@ type ArbitVars struct {
 	// sort links
 	ArbitBar   arbitBar
 	ArbitQuery string
+
+	// The cookie the page saves the reader's filters in
+	ArbitCookie string
 }
 
 func (s *site) Arbit(w http.ResponseWriter, r *http.Request) {
@@ -513,7 +516,8 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	limitedResults := !cmp.AllResults
 
 	offer := newArbitOffer(ds)
-	state := parseArbitState(r.Form, offer)
+	savedCookie := arbitSavedCookie(pageVars.GlobalMode)
+	state := requestArbitState(r.Form, readCookie(r, savedCookie), offer)
 	sorting := state.Sort
 
 	for k, v := range r.Form {
@@ -658,6 +662,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	pageVars.ArbitQuery = query.Encode()
 	pageVars.ArbitBar = newArbitBar(state, mode, offer, b, source.Info().Shorthand)
 	pageVars.ArbitBar.Open = readCookie(r, "ArbitFiltersOpen") == "1"
+	pageVars.ArbitCookie = savedCookie
 
 	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
 

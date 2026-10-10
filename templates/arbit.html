@@ -216,7 +216,7 @@
         <div class="arb-filter-actions">
             <div class="arb-filter-buttons">
                 <button type="submit" form="arbFilters" class="arb-filter-apply">Apply</button>
-                <a class="arb-filter-reset" href="?source={{$.ScraperShort}}&f=1">Restore defaults</a>
+                <a class="arb-filter-reset" id="arbFilterReset" href="?source={{$.ScraperShort}}&f=1">Restore defaults</a>
             </div>
         </div>
         </div>
@@ -227,7 +227,7 @@
         {{end}}
 
         <script type="text/javascript">
-            window.BAN_ARBIT = {source: {{$.ScraperShort}}, query: {{$.ArbitQuery}}};
+            window.BAN_ARBIT = {source: {{$.ScraperShort}}, query: {{$.ArbitQuery}}, cookie: {{$.ArbitCookie}}};
         </script>
         <script type="text/javascript" src="/js/arbit-filters.js?hash={{.Hash}}"></script>
         <script type='text/javascript'>

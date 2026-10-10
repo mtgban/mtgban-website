@@ -198,6 +198,39 @@ func parseArbitState(form url.Values, offer arbitOffer) arbitState {
 	return st
 }
 
+// arbitSavedCookie names the cookie a page keeps the reader's filters in:
+// one for arbit and reverse, which share their columns and limits, and one
+// for global, whose columns are other stores and whose floors differ.
+func arbitSavedCookie(global bool) string {
+	if global {
+		return "GlobalFilters"
+	}
+	return "ArbitFilters"
+}
+
+// requestArbitState is the state a request asks for: its own query where
+// that carries the marker, else the reader's saved filters, whose sort the
+// query can still change for the one view. A saved value that does not
+// read as a query is no saved value.
+func requestArbitState(form url.Values, saved string, offer arbitOffer) arbitState {
+	if form.Has(arbitMarker) || saved == "" {
+		return parseArbitState(form, offer)
+	}
+	unescaped, err := url.QueryUnescape(saved)
+	if err != nil {
+		return parseArbitState(form, offer)
+	}
+	savedForm, err := url.ParseQuery(unescaped)
+	if err != nil {
+		return parseArbitState(form, offer)
+	}
+	st := parseArbitState(savedForm, offer)
+	if slices.Contains(arbitSorts, form.Get("sort")) {
+		st.Sort = form.Get("sort")
+	}
+	return st
+}
+
 // values is the state as a query, the marker included: what every store,
 // sort and reset link carries.
 func (st arbitState) values() url.Values {

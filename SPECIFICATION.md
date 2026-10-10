@@ -537,8 +537,13 @@ and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
   are held to per-page floors (`arbitMode.floors`; Global's spread floor is
   the AnySpread tier gate). Price, max-spread and quantity limits are row
   checks on the shown columns (`arbitRowFilter`). Every generated link
-  carries the state plus `f=1`. 8 sort orders (`arbitLess()`: available,
-  sell price, buy price, profitability, diff, spread, edition, alpha).
+  carries the state plus `f=1`. Applying, sorting or restoring the
+  defaults saves the state client side in a cookie, `ArbitFilters` for
+  arbit and reverse together and `GlobalFilters` for global
+  (`arbitSavedCookie`); a request without `f=1` reads it
+  (`requestArbitState`), its own `sort` still applying to that view.
+  8 sort orders (`arbitLess()`: available, sell price, buy price,
+  profitability, diff, spread, edition, alpha).
 - **Sleepers** scores cards by how often they appear as opportunities across
   all seller×vendor pairs (`getTiers()`), plus variants: bulk repricing
   (`getBulks()`), long-unreprinted (`getReprints()` — the 2-year/$3 floors

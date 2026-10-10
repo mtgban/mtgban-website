@@ -1,5 +1,6 @@
 // The arbitrage pages' filter bar and sort links. arbit.html sets
-// window.BAN_ARBIT to the source and the filter state as a query.
+// window.BAN_ARBIT to the source, the filter state as a query, and the
+// cookie the page saves the reader's filters in.
 (function () {
     var cfg = window.BAN_ARBIT || {};
 
@@ -33,7 +34,34 @@
         });
     }
 
+    // Keep a state as the reader's own, with when it was applied. Only what
+    // the reader does on the page saves: following a link never does.
+    function save(query) {
+        if (!cfg.cookie) return;
+        var value = query + (query ? '&' : '') + 't=' + Date.now();
+        writeCookie(cfg.cookie, encodeURIComponent(value), 1000, '/');
+    }
+
+    // The form as the query it submits, less the source, which a saved
+    // state applies to every source.
+    function formQuery(form) {
+        var params = new URLSearchParams(new FormData(form));
+        params.delete('source');
+        return params.toString();
+    }
+
+    // A sort click saves the sort over what the reader saved, not over the
+    // page: one opened from someone else's link keeps its filters to itself.
+    function savedWithSort(sort) {
+        var saved = new URLSearchParams(cfg.cookie ? getCookie(cfg.cookie) : '');
+        saved.delete('t');
+        saved.set('f', '1');
+        saved.set('sort', sort);
+        return saved.toString();
+    }
+
     window.sortBy = function (sort, name) {
+        save(savedWithSort(sort));
         window.location.href = sortURL(sort, name);
     };
 
@@ -53,9 +81,19 @@
 
     var form = document.getElementById('arbFilters');
     if (form) {
-        form.addEventListener('submit', function () { dropEmpty(form); });
+        form.addEventListener('submit', function () {
+            dropEmpty(form);
+            save(formQuery(form));
+        });
         window.addEventListener('pageshow', function () { restore(form); });
     }
 
-    window.ArbitFilters = { sortURL: sortURL, dropEmpty: dropEmpty, restore: restore, setOpen: setOpen };
+    // Saved as a state of its own rather than deleted, so a reset is the
+    // latest thing the reader applied
+    var reset = document.getElementById('arbFilterReset');
+    if (reset) {
+        reset.addEventListener('click', function () { save('f=1'); });
+    }
+
+    window.ArbitFilters = { sortURL: sortURL, dropEmpty: dropEmpty, restore: restore, setOpen: setOpen, save: save, formQuery: formQuery };
 })();
