@@ -61,14 +61,18 @@
     banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;padding:12px;" +
         "background:#1f2937;color:#fff;font:16px sans-serif;text-align:center";
     document.body.appendChild(banner);
+    // Leaving the page mid-load stops it with the cart half filled, so the
+    // browser asks first until the loader is done
+    window.addEventListener("beforeunload", stay);
 
     // A store that matches the list itself takes it whole and shows its own
     // review of it
     if (store.upload) {
-        banner.textContent = "BAN: handing your list to " + store.name;
+        banner.textContent = "BAN: handing your list to " + store.name + ". Keep this tab open until it finishes.";
         try {
             await store.upload(ids, quantities);
         } catch (err) {
+            window.removeEventListener("beforeunload", stay);
             banner.remove();
             alert(err.message);
         }
@@ -76,6 +80,7 @@
     }
 
     try {
+        banner.textContent = "BAN: reading your " + store.name + " cart. Keep this tab open until it finishes.";
         // A card already in the cart adds no line
         var present = await store.cartIDs();
         var room = store.maxLines > 0 ? store.maxLines - present.length : Infinity;
@@ -98,7 +103,7 @@
             var chunk = rows.slice(i, i + store.chunkSize);
             while (chunk.length > 0) {
                 banner.textContent = "BAN: loading cards into your " + store.name + " cart, " +
-                    done + " of " + rows.length + " done";
+                    done + " of " + rows.length + " done. Keep this tab open until it finishes.";
                 if (await store.send(chunk, quantities, present)) {
                     done += chunk.length;
                     break;
@@ -137,12 +142,19 @@
         if (noRoom > 0) {
             message += " " + noRoom + " did not fit: " + store.name + "'s cart holds " + store.maxLines + " lines.";
         }
+        window.removeEventListener("beforeunload", stay);
         alert(message);
         history.replaceState(null, "", location.pathname + location.search);
         location.reload();
     } catch (err) {
+        window.removeEventListener("beforeunload", stay);
         banner.remove();
         alert(err.message);
+    }
+
+    function stay(event) {
+        event.preventDefault();
+        event.returnValue = "";
     }
 
     // abuStore loads ABU's buylist or store cart, whichever page this is,
@@ -240,6 +252,7 @@
                 if (!resp.ok || !body.fileId) {
                     throw new Error("SCG refused the list (" + (body.errorMessage || resp.status) + ").");
                 }
+                window.removeEventListener("beforeunload", stay);
                 location.href = "/mtg/uploads/" + body.fileId;
             }
         };

@@ -79,8 +79,24 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', search = 
     const history = {replaceState: (state, title, url) => { page.url = url; }};
     // A wait the loader asks for passes at once
     const setTimeout = (resolve) => resolve();
-    const script = new Function('location', 'localStorage', 'fetch', 'alert', 'document', 'history', 'setTimeout', 'return ' + source);
-    await script(location, localStorage, abu.fetch, (text) => alerts.push(text), document, history, setTimeout);
+    // The page notes whether leaving it would ask first at each request,
+    // alert and reload
+    const guards = new Set();
+    const window = {
+        addEventListener: (type, fn) => type === 'beforeunload' && guards.add(fn),
+        removeEventListener: (type, fn) => type === 'beforeunload' && guards.delete(fn),
+    };
+    page.guarded = {fetches: [], alerts: [], reload: null, href: null};
+    location.reload = () => { page.reloaded = true; page.guarded.reload = guards.size > 0; };
+    let href;
+    Object.defineProperty(location, 'href', {
+        get: () => href,
+        set: (url) => { href = url; page.guarded.href = guards.size > 0; },
+    });
+    const fetch = (...args) => { page.guarded.fetches.push(guards.size > 0); return abu.fetch(...args); };
+    const alert = (text) => { alerts.push(text); page.guarded.alerts.push(guards.size > 0); };
+    const script = new Function('location', 'localStorage', 'fetch', 'alert', 'document', 'history', 'setTimeout', 'window', 'return ' + source);
+    await script(location, localStorage, fetch, alert, document, history, setTimeout, window);
     return {alerts, page, posts: abu.posts};
 }
 
@@ -101,6 +117,14 @@ describe('ban-to-cart bookmarklet on ABU', () => {
             expect(alerts[0]).toContain('out of date');
             expect(posts).toHaveLength(0);
         }
+    });
+
+    test('leaving the page asks first while cards load, and not once it is done', async () => {
+        const {page} = await run({hash: '#ban=' + list(3)});
+        expect(page.guarded.fetches.length).toBeGreaterThan(0);
+        expect(page.guarded.fetches.every(Boolean)).toBe(true);
+        expect(page.guarded.alerts).toEqual([false]);
+        expect(page.guarded.reload).toBe(false);
     });
 
     test('a guest is told to log in and nothing is sent', async () => {
@@ -171,6 +195,7 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(alerts[0]).toContain('logged you out');
         expect(posts).toHaveLength(0);
         expect(page.reloaded).toBe(false);
+        expect(page.guarded.alerts).toEqual([false]);
     });
 });
 
@@ -238,6 +263,8 @@ describe('ban-to-cart bookmarklet on SCG', () => {
         expect(up.form.get('fileFormatId')).toBe('1');
         expect(await up.form.get('file').text()).toBe('quantity,productid\n2,SGL-A1\n1,SGL-B1\n');
         expect(page.location.href).toBe('/mtg/uploads/7151');
+        expect(page.guarded.href).toBe(false);
+        expect(page.guarded.fetches).toEqual([true]);
         expect(alerts).toHaveLength(0);
     });
 
@@ -245,6 +272,7 @@ describe('ban-to-cart bookmarklet on SCG', () => {
         const {alerts, page} = await run({...scgPage, hash: '#ban=SGL-A1:1', abu: fakeSCG({status: 401})});
         expect(alerts[0]).toContain('Log in to SCG first');
         expect(page.location.href).toBeUndefined();
+        expect(page.guarded.alerts).toEqual([false]);
     });
 });
 
