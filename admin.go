@@ -657,18 +657,22 @@ func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
 		info    mtgban.ScraperInfo
 		updated *time.Time
 		entries int
+		dropped bool
 	}
 	var scrapers []dashScraper
 	affiliates := Affiliates().List
 	if kind == sessionstore.Retail {
 		for _, seller := range GetSellers() {
-			scrapers = append(scrapers, dashScraper{seller.Info(), seller.Info().InventoryTimestamp, len(seller.Inventory())})
+			scrapers = append(scrapers, dashScraper{seller.Info(), seller.Info().InventoryTimestamp, len(seller.Inventory()), false})
 		}
 	} else {
 		affiliates = Affiliates().BuylistList
 		for _, vendor := range GetVendors() {
-			scrapers = append(scrapers, dashScraper{vendor.Info(), vendor.Info().BuylistTimestamp, len(vendor.Buylist())})
+			scrapers = append(scrapers, dashScraper{vendor.Info(), vendor.Info().BuylistTimestamp, len(vendor.Buylist()), false})
 		}
+	}
+	for _, store := range droppedStoresOf(kind) {
+		scrapers = append(scrapers, dashScraper{store.info, &store.updated, 0, true})
 	}
 
 	var table [][]string
@@ -714,6 +718,11 @@ func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
 			session = kind
 		}
 
+		badge := staleBadge(scraper.updated, now)
+		if scraper.dropped {
+			badge = "dropped " + staleAge(*scraper.updated, now)
+		}
+
 		row := []string{
 			name,
 			scraper.info.Shorthand,
@@ -723,7 +732,7 @@ func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
 			ref,
 			status,
 			session,
-			staleBadge(scraper.updated, now),
+			badge,
 		}
 		table = append(table, row)
 	}
