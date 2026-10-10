@@ -249,7 +249,7 @@
                 <div class="search-sidebar">
                     <div class="sidebar-pinned">
                         {{template "sidebar-search" .}}
-                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
+                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper"{{if .IsSealed}} data-sealed{{end}} onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
                             <img class="sidebar-card-img" id="cardImage" src=""/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>

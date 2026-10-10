@@ -1169,6 +1169,13 @@ body[data-game="yugioh"],
 body[data-game="yugioh"] [data-set] {
     --card-radius: 0;
 }
+/* Flesh and Blood scans are cut rounder than Magic's: an 18px circle on the
+   newest sets' 400x559 scans, 22px on the first ones. 22px covers both, since
+   the black border hides the excess where the white corner fill would not.
+   Singles only: a sealed product's photo keeps the surface's default. */
+body[data-game="fleshandblood"] [data-set]:not([data-sealed]) {
+    --card-radius: 5.5% / 3.9%;
+}
 
 
 /* ── Content-warning blur ── */
