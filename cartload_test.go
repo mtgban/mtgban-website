@@ -135,8 +135,8 @@ func TestCartRows(t *testing.T) {
 		// Each condition its own class in the store, one class on the buylist
 		{"HA", false, "27947:3,27948:1"},
 		{"HA", true, "356866:4"},
-		{"CK", false, "10190-NM:3,10190-EX:1"},
-		// Only CK's own split, not its sealed or graded ones
+		// Card Kingdom's store cart has no button for now
+		{"CK", false, ""},
 		{"CKSealed", false, ""},
 		{"CKGraded", false, ""},
 	} {
@@ -144,6 +144,11 @@ func TestCartRows(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("%s rows = %q, want %q", tc.key, got, tc.want)
 		}
+	}
+
+	ck := ckCartID(mtgban.InventoryEntry{Conditions: mtgban.SP, OriginalID: "10190"})
+	if ck != "10190-EX" {
+		t.Errorf("ckCartID = %q, want 10190-EX", ck)
 	}
 
 	// The button carries each row's id in row order, for the page to rebuild
@@ -189,7 +194,6 @@ func TestCartLoadButtons(t *testing.T) {
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
 		{"HA", false, `href="https://www.hareruyamtg.com/en/cart#ban=27947:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya"`},
-		{"CK", false, `href="https://www.cardkingdom.com/cart#ban=10190-NM:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Card Kingdom"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -211,7 +215,7 @@ func TestCartLoadButtons(t *testing.T) {
 		}
 	}
 
-	for _, key := range []string{"MKM", "SCG", "CKGraded", "CKSealed"} {
+	for _, key := range []string{"MKM", "SCG", "CK", "CKGraded", "CKSealed"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
 			OptimizedKeys:   []string{key},
@@ -309,7 +313,6 @@ func TestCartLoadAffiliates(t *testing.T) {
 		buylist bool
 		want    string
 	}{
-		{"CK", false, "https://www.cardkingdom.com/cart?partner=ban&utm_campaign=ban&utm_medium=affiliate&utm_source=ban#ban="},
 		{"MMC", true, "https://www.mtgmintcard.com/buylist-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
 		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="},
@@ -320,5 +323,10 @@ func TestCartLoadAffiliates(t *testing.T) {
 		if !strings.HasPrefix(got, tc.want) {
 			t.Errorf("%s link = %q, want it to start %q", tc.key, got, tc.want)
 		}
+	}
+
+	got := affiliated("CK", "https://www.cardkingdom.com/cart")
+	if got != "https://www.cardkingdom.com/cart?partner=ban&utm_campaign=ban&utm_medium=affiliate&utm_source=ban" {
+		t.Errorf("CK link = %q", got)
 	}
 }
