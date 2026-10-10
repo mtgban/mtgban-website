@@ -902,7 +902,7 @@
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
+                                <input type="hidden" name="c" data-load-list="ck" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -912,7 +912,7 @@
                         {{if and (not $.IsBuylist) (eq $sourceKey "CSI")}}
                             <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
+                                <input type="hidden" name="sList" data-load-list="csi" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -922,7 +922,7 @@
                         {{if and (not $.IsBuylist) (has_prefix $sourceKey "TCG")}}
                             <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
-                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
+                                <input type="hidden" name="c" data-load-list="tcg" value="{{range $entries}}{{.Quantity}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
                                 <noscript>
                                     <input type="submit" value="Load at TCG"/>
@@ -942,7 +942,7 @@
                             {{end}}
                             <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
+                                <input type="hidden" name="deck" data-load-list="manapool" value="{{base64enc $deck}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
                                 <noscript>
                                     <input type="submit" value="Load at Manapool"/>
@@ -967,7 +967,7 @@
 
                         {{if and $.IsBuylist (eq $scraperKey "CK")}}
                             <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
-                                <input type="hidden" name="json" value='
+                                <input type="hidden" name="json" data-load-list="ckbuylist" value='
                                     {"contents": [
                                         {{range $entries}}
                                         {
@@ -988,7 +988,7 @@
                         {{$cart := cart_load $scraperKey $.IsBuylist $entries}}
                         {{if $cart.Link}}
                             <span class="cart-load">
-                                <a class="opt-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-buylist="{{$.IsBuylist}}" onclick="return openCartPrompt(this)">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
+                                <a class="opt-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-buylist="{{$.IsBuylist}}" data-load-list="cart" data-load-items="{{$cart.Items}}" onclick="return openCartPrompt(this)">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
                             </span>
                         {{end}}
 
@@ -1034,11 +1034,11 @@
                             <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
-                        {{range $entries}}
+                        {{range $n, $row := $entries}}
                             {{$card := (index $.Metadata .CardID)}}
                             {{$scraperEntries := (index $.ResultPrices (print .CardID .Condition))}}
                             {{$price := (index $scraperEntries $scraperKey)}}
-                            <tr data-opt-id="{{.CardID}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardID).Name}}" data-opt-ckid="{{uuid2ckid .CardID}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <tr data-opt-id="{{.CardID}}" data-load-idx="{{$n}}" data-load-qty="{{.Quantity}}" data-load-name="{{$card.Name}}" data-load-ckid="{{uuid2ckid .CardID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
@@ -1081,6 +1081,7 @@
     {{if .Optimized}}
     <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
     <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
+    <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}"></script>
     {{end}}
 
