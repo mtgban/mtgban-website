@@ -117,13 +117,20 @@ func TestCartRows(t *testing.T) {
 		{"HA", false, "27947:3,27948:1"},
 		{"HA", true, "356866:4"},
 	} {
-		got := cartRows(tc.key, tc.buylist, entries)
+		got := cartRows(cartItems(tc.key, tc.buylist, entries), entries)
 		if got != tc.want {
 			t.Errorf("%s rows = %q, want %q", tc.key, got, tc.want)
 		}
 	}
 
-	got := cartLoadFor("MKM", true, entries)
+	// The button carries each row's id in row order, for the page to rebuild
+	// its list from the rows left ticked
+	got := cartLoadFor("ABUScans", false, entries)
+	if got.Items != "301,,,301,,,402,," {
+		t.Errorf("ABUScans items = %q", got.Items)
+	}
+
+	got = cartLoadFor("MKM", true, entries)
 	if got.Link != "" {
 		t.Errorf("a store the bookmarklet does not fill got a button: %+v", got)
 	}
