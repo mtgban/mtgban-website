@@ -1137,26 +1137,27 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
     --card-radius: 0;
 }
 /* Every card in these sets is oversized, so the set alone selects them;
-   adding a set is one more entry here. OC13-OC20, OCM1 and OCMD are
-   oversized too but keep the standard radius on purpose. */
+   adding a set is one more entry here. Their corner is a 25.5px circle on
+   Scryfall's 488x680 scan. OC13-OC20, OCM1 and OCMD are oversized too but
+   keep the standard radius on purpose. */
 :is(
     [data-set="OARC"], [data-set="PSSC"], [data-set="OE01"],
     [data-set="OPCA"], [data-set="PPC1"], [data-set="OPC2"],
     [data-set="PHOP"], [data-set="PCMD"], [data-set="OHOP"]
 ) {
-    --card-radius: 18px;
+    --card-radius: 5.25% / 3.75%;
 }
 /* PHEL is the exception: five oversized angels plus one normal-size
    double-faced token, and nothing else tells them apart - they share the set,
    and the whole set has no release date of its own. */
 [data-set="PHEL"]:not([data-name="Angel // Demon"]) {
-    --card-radius: 18px;
+    --card-radius: 5.25% / 3.75%;
 }
 /* DCI mixes ten oversized promos into eighty normal ones, and only those two
    print runs (Planechase planes, Archenemy schemes) are cut this way. No other
    DCI promo shares either date. */
 [data-set="DCI"]:is([data-date="2009-09-30"], [data-date="2010-09-30"]) {
-    --card-radius: 18px;
+    --card-radius: 5.25% / 3.75%;
 }
 
 /* Yu-Gi-Oh cards are cut square, so rounding any of them is wrong. That is the
