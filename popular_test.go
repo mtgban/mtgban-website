@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -286,6 +287,29 @@ func TestRefreshPopularSearchesSkipsUnresolvedKeys(t *testing.T) {
 	snap := popularOrganicSnapshot()
 	if snap == nil || len(snap.Tiles) != 1 || snap.Tiles[0].Key != "card:Black Lotus" {
 		t.Fatalf("snapshot = %+v, want only card:Black Lotus", snap)
+	}
+}
+
+// A basic land's tile would search every one of its thousand printings, so
+// it is left out; a set wider than that is a set tile, and stays.
+func TestRefreshPopularSearchesSkipsBasicLands(t *testing.T) {
+	store := &fakeRankStore{ranks: []observability.SearchRank{
+		{Key: "card:Island", Users: 9},
+		{Key: "card:Sol Ring", Users: 8},
+		{Key: "set:MH3", Users: 7},
+	}}
+	s := rankSite(t, store)
+	s.refreshPopularSearches()
+
+	snap := popularOrganicSnapshot()
+	var keys []string
+	if snap != nil {
+		for _, tile := range snap.Tiles {
+			keys = append(keys, tile.Key)
+		}
+	}
+	if !slices.Equal(keys, []string{"card:Sol Ring", "set:MH3"}) {
+		t.Errorf("tiles = %q, want Sol Ring and MH3 without Island", keys)
 	}
 }
 

@@ -44,6 +44,9 @@ const (
 	popularLimit         = 24
 	popularFloor         = 8
 	popularRetentionDays = 90
+	// A card with more printings than this is a Magic basic land, about
+	// 1100 each; the widest other card in any game, Luffy, has 312.
+	popularMaxPrintings = 500
 )
 
 // PopularTile is an organic tile: a PopularSearch plus the vote key and
@@ -288,7 +291,8 @@ func popularRankQuery(b *mtgmatcher.Backend, rank observability.SearchRank) (sea
 }
 
 // resolvePopularRanks turns a ranking into tiles, in rank order, skipping
-// a key that no longer resolves and never showing the same art twice.
+// a key that no longer resolves or a card wider than popularMaxPrintings,
+// and never showing the same art twice.
 func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []PopularTile {
 	var out []PopularTile
 	usedImages := make(map[string]struct{})
@@ -297,7 +301,12 @@ func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []Popu
 		if searchQuery == "" {
 			continue
 		}
-		card, ok := firstUnusedPopularCard(popularTopCards(ds, searchQuery), usedImages, func(id string) GenericCard {
+		ids := popularTopCards(ds, searchQuery)
+		// Every printing of a basic land is too wide a search to feature
+		if strings.HasPrefix(rank.Key, "card:") && len(ids) > popularMaxPrintings {
+			continue
+		}
+		card, ok := firstUnusedPopularCard(ids, usedImages, func(id string) GenericCard {
 			return uuid2card(ds.backend, id, false)
 		})
 		if !ok {
