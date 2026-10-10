@@ -1115,9 +1115,10 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
 }
 
 /* ── Card scan corners ── */
-/* Some printings are photographed with a much rounder corner than the modern
-   crop, so a wrapper that rounds to the usual radius shows a sliver of square
-   behind the art. Every surface that renders a card image reads --card-radius
+/* A wrapper rounding short of a scan's own corner shows the scan's corner
+   fill; one rounding past it cuts into the card. That corner is a share of
+   the image, so these rules give it as a percentage, right at every size the
+   card is drawn. Every surface that renders a card image reads --card-radius
    through a var() fallback for its own default, so these rules - keyed on the
    card identity the wrapper carries - are the only thing that ever sets the
    property and cannot be outranked by a surface's own selector. The list
@@ -1125,8 +1126,9 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
 
    Alpha and the Collectors' Editions are each their own case; the rest are
    oversized printings. */
+/* Alpha's corner is a 34px circle on Scryfall's 488x680 scan. */
 [data-set="LEA"] {
-    --card-radius: 22px;
+    --card-radius: 7% / 5%;
 }
 /* The two 1993 Collectors' Editions were cut with square corners - the tell
    that they were never tournament legal - so any rounding at all is wrong on
