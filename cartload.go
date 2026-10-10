@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"html/template"
 	"log"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/starcitygames"
 )
 
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
@@ -36,6 +38,50 @@ var cartStores = []cartStore{
 // exactly by its prefix.
 var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
 	"CK": ckCartID,
+}
+
+// cartAffiliates are how a store's own links from us credit our partner
+// account, by the prefix its splits share, applied to the cart page a "Load
+// at" button opens so that the cart it fills is credited the same way.
+var cartAffiliates = map[string]func(code, page string) string{
+	"CK": func(code, page string) string {
+		return withQuery(page, url.Values{"partner": {code}, "utm_source": {code}, "utm_campaign": {code}, "utm_medium": {"affiliate"}})
+	},
+	"MMC": func(code, page string) string {
+		return withQuery(page, url.Values{"utm_source": {code}, "utm_campaign": {code}, "utm_medium": {"referral"}})
+	},
+	"CSI": func(code, page string) string {
+		return withQuery(page, url.Values{"utm_referrer": {code}})
+	},
+	// Through the partner redirector, which keeps the fragment
+	"SCG": func(code, page string) string {
+		return fmt.Sprintf(starcitygames.PartnerProductURL, url.PathEscape(code)) + "?u=" + url.QueryEscape(page)
+	},
+}
+
+// affiliated is the cart page as a store's links from us carry it, where an
+// affiliate code is configured for the store.
+func affiliated(prefix, page string) string {
+	credit, found := cartAffiliates[prefix]
+	code := Affiliates().Codes[prefix]
+	if !found || code == "" {
+		return page
+	}
+	return credit(code, page)
+}
+
+// withQuery is page with the values added to its query.
+func withQuery(page string, add url.Values) string {
+	u, err := url.Parse(page)
+	if err != nil {
+		return page
+	}
+	values := u.Query()
+	for name, value := range add {
+		values[name] = value
+	}
+	u.RawQuery = values.Encode()
+	return u.String()
 }
 
 // ckStyles are Card Kingdom's names for the grades its store cart sells.
@@ -98,7 +144,7 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 		if rows == "" {
 			return cartLoad{}
 		}
-		link := page + "#ban=" + rows + "&v=" + cartVersion()
+		link := affiliated(cs.prefix, page) + "#ban=" + rows + "&v=" + cartVersion()
 		if !buylist {
 			link += "&side=retail"
 		}
