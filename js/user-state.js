@@ -13,6 +13,7 @@
     var RECENTS_KEY = 'mtgban_recent_searches';
     var PRESETS_KEY = 'mtgban_upload_presets';
     var ARBIT_KEY = 'mtgban_arbit_filters';
+    var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
     // Keys bundled into the preferences object.
     var PREF_KEYS = [
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
@@ -20,7 +21,7 @@
         'chartReleasesLongRange', 'chartCheckpointTypes',
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
         'mtgban_search_layout', 'mtgban_popular_collapsed',
-        'mtgban_upload_presets', 'mtgban_arbit_filters'
+        'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets'
     ];
 
     // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.
@@ -166,6 +167,7 @@
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
         if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
         if (window.ArbitFilters && typeof window.ArbitFilters.refresh === 'function') window.ArbitFilters.refresh();
+        if (window.ArbitPresets && typeof window.ArbitPresets.refresh === 'function') window.ArbitPresets.refresh();
         // Synced favorites arrive price-less; backfill (self-gating).
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
@@ -391,14 +393,17 @@
     }
 
     // Preferences: last-write-wins per key (local wins on first merge), but
-    // the upload presets, a list of their own, merge preset by preset, and
-    // the saved arbitrage filters page group by page group.
+    // the upload and arbitrage presets, lists of their own, merge preset by
+    // preset, and the saved arbitrage filters page group by page group.
     function mergePrefs(localPrefs, serverPrefs) {
         var out = {};
         Object.keys(serverPrefs || {}).forEach(function(k) { out[k] = serverPrefs[k]; });
         Object.keys(localPrefs || {}).forEach(function(k) { out[k] = localPrefs[k]; });
         if (localPrefs && serverPrefs && PRESETS_KEY in localPrefs && PRESETS_KEY in serverPrefs) {
             out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
+        }
+        if (localPrefs && serverPrefs && ARBIT_PRESETS_KEY in localPrefs && ARBIT_PRESETS_KEY in serverPrefs) {
+            out[ARBIT_PRESETS_KEY] = mergePresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
         }
         if (localPrefs && serverPrefs && ARBIT_KEY in localPrefs && ARBIT_KEY in serverPrefs) {
             out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);

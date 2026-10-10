@@ -179,6 +179,12 @@
     background: var(--accent-muted);
 }
 
+/* Preset names are short, so the select would be the narrowest pill of the
+   row; it takes the room of a store name instead */
+#arbPresetSelect {
+    min-width: 190px;
+}
+
 .arb-store-select {
     background: transparent;
     border: none;
@@ -371,18 +377,27 @@
     font-size: var(--text-sm);
 }
 
+/* One height for every control in the row, the name field included, so it
+   opening does not change the row's height and move the page below */
 .arb-filter-actions {
     margin-top: 12px;
+    min-height: 30px;
 }
 
 .arb-filter-buttons {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .arb-filter-apply {
-    padding: 5px 14px;
+    box-sizing: border-box;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    padding: 0 14px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--accent-border);
     background: var(--surface-2);
@@ -396,7 +411,12 @@
 .arb-filter-apply:hover { background: var(--surface-1); border-color: var(--ainfo); }
 
 .arb-filter-reset {
-    padding: 5px 14px;
+    box-sizing: border-box;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    padding: 0 14px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-moderate);
     color: var(--activetext);
@@ -406,6 +426,52 @@
 }
 
 .arb-filter-reset:hover { color: var(--normal); border-color: var(--accent-border); text-decoration: none; }
+
+button.arb-filter-reset {
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+button.arb-filter-reset:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.arb-preset-controls,
+.arb-preset-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Their display would otherwise win over the hidden attribute, which the
+   presets script lifts once it has something to show */
+.arb-selector-bar [hidden],
+.arb-filter-actions [hidden] {
+    display: none;
+}
+
+.arb-preset-name {
+    box-sizing: border-box;
+    height: 30px;
+    width: 160px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-base);
+    font-family: inherit;
+}
+
+.arb-preset-name:focus { border-color: var(--ainfo); outline: none; }
+
+.arb-preset-note {
+    color: var(--text-dim);
+    font-size: var(--text-base);
+}
 
 .arb-edition-filter {
     padding: 5px 10px;

@@ -140,3 +140,38 @@ test('a page group only one device saved survives the merge', async () => {
         { global: { q: 'f=1&minsell=7', t: 3 } });
     expect(pushed).toEqual({ arbit: { q: 'f=1&minsell=2', t: 5 }, global: { q: 'f=1&minsell=7', t: 3 } });
 });
+
+test('the arbitrage presets ride the synced preferences', () => {
+    const m = source.match(/var PREF_KEYS = \[([\s\S]*?)\];/);
+    expect(m[1]).toContain("'mtgban_arbit_presets'");
+});
+
+// Runs reconcile on a device with unsynced arbitrage presets, and returns
+// the list it pushes over the server's.
+async function reconcileArbitPresets(local, server) {
+    const m = { mtgban_userstate_dirty: '1', mtgban_arbit_presets: JSON.stringify(local) };
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_arbit_presets: JSON.stringify(server) } };
+    const puts = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PUT') puts.push(JSON.parse(opts.body));
+        return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] });
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(puts.length).toBe(1);
+    return JSON.parse(puts[0].preferences.mtgban_arbit_presets);
+}
+
+const arbitPreset = (id, name, savedAt, group = 'arbit') => ({ id, name, savedAt, group, q: 'f=1&minsell=' + savedAt });
+
+test('arbitrage presets made on two devices both survive, and a delete sticks', async () => {
+    const pushed = await reconcileArbitPresets(
+        [arbitPreset('p_a', 'Mine', 5), { id: 'p_c', del: true, savedAt: 9 }],
+        [arbitPreset('p_b', 'Theirs', 4, 'global'), arbitPreset('p_c', 'Gone', 3)]);
+    expect(pushed.filter((p) => !p.del).map((p) => p.id)).toEqual(['p_a', 'p_b']);
+    expect(pushed.find((p) => p.id === 'p_c').del).toBe(true);
+});

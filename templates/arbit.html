@@ -165,6 +165,11 @@
                 </select>
             </div>
             {{end}}
+            {{/* Filled and shown by arbit-presets.js, presets being kept in the browser */}}
+            <div class="arb-current-store" id="arbPresetBox" hidden>
+                <span class="store-type">Preset</span>
+                <select class="arb-store-select" id="arbPresetSelect" aria-label="Preset"></select>
+            </div>
         </div>
 
         <div class="arb-filter-bar">
@@ -180,7 +185,8 @@
         {{/* Shown regardless without JS, which is what opens it */}}
         <noscript><style>#arbFilterPanel[hidden] { display: block; }</style></noscript>
         <div class="arb-filter-panel" id="arbFilterPanel"{{if not $.ArbitBar.Open}} hidden{{end}}>
-        <form class="arb-filter-form" method="get" id="arbFilters">
+        {{/* autocomplete off: a reload shows the page's filters, not edits a browser kept */}}
+        <form class="arb-filter-form" method="get" id="arbFilters" autocomplete="off">
             <input type="hidden" name="source" value="{{$.ScraperShort}}">
             {{if $.ArbitBar.Sort}}<input type="hidden" name="sort" value="{{$.ArbitBar.Sort}}">{{end}}
             <input type="hidden" name="f" value="1">
@@ -219,6 +225,17 @@
             <div class="arb-filter-buttons">
                 <button type="submit" form="arbFilters" class="arb-filter-apply">Apply</button>
                 <a class="arb-filter-reset" id="arbFilterReset" href="?source={{$.ScraperShort}}&f=1">Restore defaults</a>
+                <span class="arb-preset-controls" id="arbPresetControls" hidden>
+                    <button type="button" class="arb-filter-reset" id="arbPresetSaveToggle" aria-expanded="false">Save as preset</button>
+                    <span class="arb-preset-save" id="arbPresetSaveRow" hidden>
+                        <input type="text" class="arb-preset-name" id="arbPresetName" maxlength="40" placeholder="Preset name" aria-label="Preset name" autocomplete="off">
+                        <button type="button" class="arb-filter-reset" id="arbPresetSave">Save</button>
+                        <button type="button" class="arb-filter-reset" id="arbPresetCancel">Cancel</button>
+                    </span>
+                    <button type="button" class="arb-filter-reset" id="arbPresetRename" disabled>Rename</button>
+                    <button type="button" class="arb-filter-reset" id="arbPresetDelete" disabled>Delete</button>
+                </span>
+                <span class="arb-preset-note" id="arbPresetNote" aria-live="polite"></span>
             </div>
         </div>
         </div>
@@ -229,9 +246,10 @@
         {{end}}
 
         <script type="text/javascript">
-            window.BAN_ARBIT = {source: {{$.ScraperShort}}, query: {{$.ArbitQuery}}, cookie: {{$.ArbitCookie}}, savedAt: {{$.ArbitSavedAt}}};
+            window.BAN_ARBIT = {source: {{$.ScraperShort}}, query: {{$.ArbitQuery}}, cookie: {{$.ArbitCookie}}, savedAt: {{$.ArbitSavedAt}}, sort: {{$.ArbitBar.Sort}}, ignored: {{$.ArbitBar.Ignored}}, defaults: {{$.ArbitBar.Defaults}}};
         </script>
         <script type="text/javascript" src="/js/arbit-filters.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/arbit-presets.js?hash={{.Hash}}"></script>
         <script type='text/javascript'>
             function getAllDirectQuantitiesFor(scraper) {
                 const delay = ms => new Promise(res => setTimeout(res, ms));
