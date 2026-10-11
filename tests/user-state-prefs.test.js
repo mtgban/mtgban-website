@@ -264,9 +264,73 @@ test('a delete stamped ahead of the clock still beats an older save, as made now
         [preset('p_x', 'X', Date.now() - day), preset('p_a', 'A2', Date.now() + 2 * hour)]);
     const x = pushed.find((p) => p.id === 'p_x');
     expect(x.del).toBe(true);
-    expect(Math.abs(x.savedAt - Date.now())).toBeLessThan(1000);
+    // keeping its own stamp, which counts as now while it runs ahead
+    expect(x.savedAt).toBeGreaterThan(Date.now() + 60 * 60 * 1000 - 1000);
     // Of two copies brought back to now together, the later one as given wins
     expect(pushed.find((p) => p.id === 'p_a').name).toBe('A2');
+});
+
+test('two devices\' arbitrage presets merge to the newest 10 per page group, names cut to 40', async () => {
+    const mine = [], theirs = [];
+    for (let i = 0; i < 8; i++) mine.push(arbitPreset('p_m' + i, 'Mine ' + i, 100 + i));
+    for (let i = 0; i < 8; i++) theirs.push(arbitPreset('p_t' + i, 'Theirs ' + i, 200 + i));
+    theirs.push(arbitPreset('p_g', 'G'.repeat(60), 50, 'global'));
+    const pushed = await reconcileArbitPresets(mine, theirs);
+    const arbit = pushed.filter((p) => !p.del && p.group === 'arbit').map((p) => p.savedAt).sort((a, b) => a - b);
+    expect(arbit).toEqual([106, 107, 200, 201, 202, 203, 204, 205, 206, 207]);
+    const global = pushed.filter((p) => p.group === 'global');
+    expect(global.map((p) => p.name)).toEqual(['G'.repeat(40)]);
+});
+
+test('presets brought back to now together keep their order for the cap', async () => {
+    const list = [];
+    for (let i = 0; i < 16; i++) list.push(arbitPreset('p_' + i, 'Preset ' + i, Date.now() + 60 * 60 * 1000 + i * 1000));
+    const pushed = await reconcileArbitPresets(list, []);
+    expect(pushed.filter((p) => !p.del).map((p) => Number(p.id.slice(2))).sort((a, b) => a - b)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    expect(pushed.filter((p) => !p.del).every((p) => p.savedAt < Date.now() + 1000)).toBe(true);
+});
+
+test('a preset the cap dropped stays dropped when a stale device still holds it', async () => {
+    const list = [];
+    for (let i = 0; i < 11; i++) list.push(arbitPreset('p_' + i, 'Preset ' + i, 100 + i));
+    const first = await reconcileArbitPresets(list, []);
+    expect(first.find((p) => p.id === 'p_0').del).toBe(true);
+    // A delete frees a slot; a device that never synced still holds p_0
+    const afterDelete = first.filter((p) => p.id !== 'p_5').concat([{ id: 'p_5', del: true, savedAt: Date.now() }]);
+    const second = await reconcileArbitPresets([list[0], { id: 'p_gone', del: true, savedAt: Date.now() }], afterDelete);
+    const live = second.filter((p) => !p.del).map((p) => p.id);
+    expect(live).not.toContain('p_0');
+    expect(live.length).toBe(9);
+});
+
+test('a preset the cap drops far ahead of the clock stays dropped when a stale device holds it', async () => {
+    const hour = 60 * 60 * 1000;
+    const list = [];
+    for (let i = 0; i < 11; i++) list.push(arbitPreset('p_' + i, 'Preset ' + i, Date.now() + hour + i));
+    const first = await reconcileArbitPresets(list, []);
+    expect(first.find((p) => p.id === 'p_0').del).toBe(true);
+    // Later, a delete frees a slot and a device that never synced still holds p_0
+    await new Promise((r) => setTimeout(r, 20));
+    const afterDelete = first.filter((p) => p.id !== 'p_5').concat([{ id: 'p_5', del: true, savedAt: Date.now() }]);
+    const second = await reconcileArbitPresets([list[0], { id: 'p_gone', del: true, savedAt: Date.now() }], afterDelete);
+    expect(second.filter((p) => !p.del).map((p) => p.id)).not.toContain('p_0');
+    // A delete and a save both ahead come out the same; the delete wins
+    const third = await reconcileArbitPresets(
+        [{ id: 'p_x', del: true, savedAt: Date.now() + hour }],
+        [arbitPreset('p_x', 'X', Date.now() + 2 * hour)]);
+    expect(third.find((p) => p.id === 'p_x').del).toBe(true);
+});
+
+test('two long names cut to the same 40 characters stay apart', async () => {
+    const stem = 'Sealed under fifty dollars with the spread';
+    const pushed = await reconcileArbitPresets(
+        [arbitPreset('p_a', stem + ' wide', 5)],
+        [arbitPreset('p_b', stem + ' narrow', 4), arbitPreset('p_c', stem.slice(0, 40), 3)]);
+    const names = Object.fromEntries(pushed.map((p) => [p.id, p.name]));
+    expect(names.p_c).toBe(stem.slice(0, 40));
+    expect(names.p_a).toBe(stem.slice(0, 36) + ' (2)');
+    expect(names.p_b).toBe(stem.slice(0, 36) + ' (3)');
+    expect(Object.values(names).every((n) => n.length <= 40)).toBe(true);
 });
 
 // Hydrates a clean device from a server an hour behind this device's clock,
@@ -370,4 +434,28 @@ test('a device an hour fast that saved before its first sync leaves the server o
     expect(JSON.parse(server.preferences.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
     await syncDevice(server, a);
     expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
+});
+
+test('a preset the cap drops stays dropped against its own stamp up to the tolerance ahead', async () => {
+    const list = [];
+    for (let i = 0; i < 10; i++) list.push(arbitPreset('p_' + i, 'Preset ' + i, Date.now() + 4500 + i));
+    const dropped = arbitPreset('p_old', 'Old', Date.now() + 4000);
+    const first = await reconcileArbitPresets(list.concat([dropped]), []);
+    const tomb = first.find((p) => p.id === 'p_old');
+    expect(tomb.del).toBe(true);
+    expect(tomb.savedAt).toBeGreaterThan(dropped.savedAt);
+    // A delete frees a slot, and a device that never synced still holds p_old
+    const afterDelete = first.filter((p) => p.id !== 'p_5').concat([{ id: 'p_5', del: true, savedAt: Date.now() }]);
+    const second = await reconcileArbitPresets([dropped, { id: 'p_gone', del: true, savedAt: Date.now() }], afterDelete);
+    expect(second.filter((p) => !p.del).map((p) => p.id)).not.toContain('p_old');
+});
+
+test('a device hydrating an over-long preset list alone holds it to 10 and sends it back', async () => {
+    const list = [];
+    for (let i = 0; i < 16; i++) list.push(arbitPreset('p_' + i, 'Preset ' + i, 100 + i));
+    const { stored, patches } = await hydrateBehind({ mtgban_arbit_presets: JSON.stringify(list) });
+    const kept = JSON.parse(stored.mtgban_arbit_presets).filter((p) => !p.del).map((p) => p.savedAt).sort((a, b) => a - b);
+    expect(kept).toEqual([106, 107, 108, 109, 110, 111, 112, 113, 114, 115]);
+    expect(patches.length).toBe(1);
+    expect(JSON.parse(patches[0].mtgban_arbit_presets).filter((p) => !p.del).length).toBe(10);
 });

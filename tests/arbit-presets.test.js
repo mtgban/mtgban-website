@@ -343,3 +343,11 @@ test('saves and deletes are stamped on the server\'s clock where a sync has read
     P.store.remove(r.preset.id);
     expect(stored(local)).toEqual([{ id: r.preset.id, del: true, savedAt: at }]);
 });
+
+test('a name longer than 40 characters is saved and renamed cut to 40', () => {
+    const { P } = load({});
+    const r = P.store.save({ name: 'x'.repeat(60), q: 'f=1&minsell=2' });
+    expect(r.preset.name).toBe('x'.repeat(40));
+    P.store.rename(r.preset.id, 'y'.repeat(50));
+    expect(P.store.list()[0].name).toBe('y'.repeat(40));
+});

@@ -464,7 +464,7 @@
         Object.keys(serverPrefs).forEach(function(k) { out[k] = serverPrefs[k]; });
         Object.keys(localPrefs).forEach(function(k) { out[k] = localPrefs[k]; });
         if (PRESETS_KEY in out) out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
-        if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergePresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
+        if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergeArbitPresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
         if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
         return out;
     }
@@ -498,13 +498,19 @@
         function parse(s) {
             try { var l = JSON.parse(s); return Array.isArray(l) ? l : []; } catch (e) { return []; }
         }
+        // Of a save and a delete that come out the same on the clock, the delete
+        function beats(p, cur) {
+            var now = serverNow();
+            if (!p.del !== !cur.del && onClock(p.savedAt || 0, now) === onClock(cur.savedAt || 0, now)) return !!p.del;
+            return later(p.savedAt, cur.savedAt);
+        }
         var byId = {};
         var order = [];
         parse(local).concat(parse(server)).forEach(function(p) {
             if (!p || !p.id) return;
             var cur = byId[p.id];
             if (!cur) order.push(p.id);
-            if (!cur || later(p.savedAt, cur.savedAt)) byId[p.id] = p;
+            if (!cur || beats(p, cur)) byId[p.id] = p;
         });
         var merged = order.map(function(id) { return byId[id]; });
         var live = merged.filter(function(p) { return !p.del; });
@@ -515,15 +521,62 @@
         return live.concat(merged.filter(function(p) { return p.del; }));
     }
 
-    // presetsOnClock is a merged list as stored, its stamps on the server's clock.
+    // presetsOnClock is a merged list as stored, its live stamps on the
+    // server's clock. A delete keeps its own, which still counts as now
+    // against a save it removed that runs ahead, so the save cannot return.
     function presetsOnClock(list) {
         var now = serverNow();
-        list.forEach(function(p) { if (typeof p.savedAt === 'number') p.savedAt = onClock(p.savedAt, now); });
+        list.forEach(function(p) { if (typeof p.savedAt === 'number' && !p.del) p.savedAt = onClock(p.savedAt, now); });
         return JSON.stringify(list);
     }
 
     function mergePresets(local, server) {
         return presetsOnClock(mergePresetList(local, server));
+    }
+
+    // The arbitrage presets merge as the upload ones do, then hold each page
+    // group to the newest 10 and each name to 40 characters, as
+    // arbit-presets.js saves them: two devices' lists cannot add up past it.
+    // The cap ranks by later and leaves a delete for each preset it drops,
+    // so a stale device cannot bring one back into a freed slot; a cut name
+    // that another takes gets a number, as "Name (2)", within the 40.
+    var ARBIT_PRESET_CAP = 10, ARBIT_PRESET_NAME_MAX = 40;
+    function mergeArbitPresets(local, server) {
+        var merged = mergePresetList(local, server);
+        var kept = {}, count = {};
+        var ranked = merged.filter(function(p) { return !p.del; }).sort(function(a, b) {
+            if (later(a.savedAt, b.savedAt)) return -1;
+            if (later(b.savedAt, a.savedAt)) return 1;
+            return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+        });
+        ranked.forEach(function(p) {
+            var g = String(p.group);
+            count[g] = (count[g] || 0) + 1;
+            if (count[g] <= ARBIT_PRESET_CAP) kept[p.id] = true;
+        });
+        var names = {};
+        function nameKey(p, name) { return String(p.group) + '\n' + name.toLowerCase(); }
+        ranked.forEach(function(p) {
+            if (kept[p.id] && String(p.name).length <= ARBIT_PRESET_NAME_MAX) names[nameKey(p, String(p.name))] = true;
+        });
+        ranked.forEach(function(p) {
+            var name = String(p.name);
+            if (!kept[p.id] || name.length <= ARBIT_PRESET_NAME_MAX) return;
+            var cut = name.slice(0, ARBIT_PRESET_NAME_MAX);
+            for (var n = 2; names[nameKey(p, cut)]; n++) {
+                cut = name.slice(0, ARBIT_PRESET_NAME_MAX - String(n).length - 3) + ' (' + n + ')';
+            }
+            names[nameKey(p, cut)] = true;
+            p.name = cut;
+        });
+        var now = serverNow();
+        var out = merged.filter(function(p) { return !p.del && kept[p.id]; });
+        merged.forEach(function(p) {
+            if (p.del) out.push(p);
+            // Past the preset's own stamp, which may run up to the tolerance ahead
+            else if (!kept[p.id]) out.push({ id: p.id, del: true, savedAt: Math.max(now, p.savedAt || 0) + 1 });
+        });
+        return presetsOnClock(out);
     }
 
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
