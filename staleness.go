@@ -281,6 +281,22 @@ func droppedEntries(kind, shorthand string) int {
 	return (*record)[shorthand+"/"+kind].entries
 }
 
+// droppedDump reports whether a dump timestamped ts, for kind's store under
+// shorthand, is not worth serving again after a drop: undated, past
+// DropAfter, or no newer than the data the store was dropped with.
+func droppedDump(kind, shorthand string, ts *time.Time, now time.Time) bool {
+	record := droppedStoresPtr.Load()
+	if record == nil {
+		return false
+	}
+	store, found := (*record)[shorthand+"/"+kind]
+	if !found {
+		return false
+	}
+	// An undated dump could never be dropped again
+	return ts == nil || pastDrop(ts, now) || !ts.After(store.updated)
+}
+
 // droppedStoresOf is kind's side of the dropped stores not served again, by
 // shorthand.
 func droppedStoresOf(kind string) []droppedStore {
