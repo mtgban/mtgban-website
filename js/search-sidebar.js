@@ -308,11 +308,17 @@ function updateSetValueMode() {
     }
 }
 
+// What tells one card on show from another, so updateSidebar leaves the
+// card it already shows alone.
+function sidebarCardKey(src, isFoil, isEtched, setCode, cardName) {
+    return [src || '', isFoil ? 'foil' : '', isEtched ? 'etched' : '', setCode || '', cardName || ''].join('\u001f');
+}
+
 function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName) {
     var img = document.getElementById('cardImage');
-    var sidebarCardKey = [src || '', isFoil ? 'foil' : '', isEtched ? 'etched' : '', setCode || '', cardName || ''].join('\u001f');
-    if (img && img.__sidebarCardKey === sidebarCardKey) return;
-    if (img) img.__sidebarCardKey = sidebarCardKey;
+    var cardKey = sidebarCardKey(src, isFoil, isEtched, setCode, cardName);
+    if (img && img.__sidebarCardKey === cardKey) return;
+    if (img) img.__sidebarCardKey = cardKey;
     // The sidebar image is reused across hover targets; let a
     // newly assigned source trigger the fallback independently.
     window.setCardArtSource(img, src);
@@ -407,7 +413,11 @@ function hoverDataFor(el) {
     if (!raw) return null;
     var args;
     try { args = JSON.parse(raw); } catch (e) { return null; }
-    header.__hoverData = { args: args, tpl: header.querySelector('.result-hover') };
+    header.__hoverData = {
+        args: args,
+        tpl: header.querySelector('.result-hover'),
+        key: sidebarCardKey(httpURL(args[0]), args[1], args[2], args[3], args[7]),
+    };
     return header.__hoverData;
 }
 window.hoverDataFor = hoverDataFor;
@@ -434,6 +444,10 @@ function hoverArgsFrom(data) {
 function showHoverFor(el, trusted) {
     var data = hoverDataFor(el);
     if (!data) return false;
+    // Every bubbling mouseover lands here: the card on show already is
+    // not worth cloning its template for updateSidebar to ignore
+    var img = document.getElementById('cardImage');
+    if (img && img.__sidebarCardKey === data.key) return true;
     var args = hoverArgsFrom(data);
     if (trusted) {
         __hoverTrusted = true;
