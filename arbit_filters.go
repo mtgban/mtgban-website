@@ -626,11 +626,12 @@ func formatLimit(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
-func (st arbitState) field(key string, fallback, floor float64) arbitField {
+// field is one limit's input: where the reader set it, the value the page
+// applies, held to the mode's floor, so that the field passes its own min.
+func (st arbitState) field(key string, value, fallback, floor float64) arbitField {
 	f := arbitField{Key: key, Placeholder: formatLimit(fallback), Floor: formatLimit(floor)}
-	bound := st.bound(key)
-	if bound.Set {
-		f.Value = formatLimit(bound.Value)
+	if st.bound(key).Set {
+		f.Value = formatLimit(value)
 	}
 	return f
 }
@@ -661,16 +662,16 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Bac
 		}
 	}
 	none := math.Inf(-1)
-	l := arbitDefaults(m)
+	l, v := arbitDefaults(m), st.limits(m)
 	minSpread, minDiff := m.floors()
-	bar.Sell = arbitRange{Label: sell, Unit: "$", Low: st.field("minsell", l.MinSell, 0), High: st.field("maxsell", l.MaxSell, 0)}
-	bar.Buy = arbitRange{Label: buy, Unit: "$", Low: st.field("minbuy", l.MinBuy, 0), High: st.field("maxbuy", l.MaxBuy, 0)}
-	bar.Spread = arbitRange{Label: "Spread", Unit: "%", Low: st.field("minspread", l.MinSpread, minSpread), High: st.field("maxspread", l.MaxSpread, none)}
-	bar.Diff = arbitRange{Label: "Difference", Unit: "$", Low: st.field("mindiff", l.MinDiff, minDiff)}
+	bar.Sell = arbitRange{Label: sell, Unit: "$", Low: st.field("minsell", v.MinSell, l.MinSell, 0), High: st.field("maxsell", v.MaxSell, l.MaxSell, 0)}
+	bar.Buy = arbitRange{Label: buy, Unit: "$", Low: st.field("minbuy", v.MinBuy, l.MinBuy, 0), High: st.field("maxbuy", v.MaxBuy, l.MaxBuy, 0)}
+	bar.Spread = arbitRange{Label: "Spread", Unit: "%", Low: st.field("minspread", v.MinSpread, l.MinSpread, minSpread), High: st.field("maxspread", v.MaxSpread, l.MaxSpread, none)}
+	bar.Diff = arbitRange{Label: "Difference", Unit: "$", Low: st.field("mindiff", v.MinDiff, l.MinDiff, minDiff)}
 	if !m.Global {
-		bar.Quantity = arbitRange{Label: "Quantity", Low: st.field("minqty", l.MinQty, 0)}
+		bar.Quantity = arbitRange{Label: "Quantity", Low: st.field("minqty", v.MinQty, l.MinQty, 0)}
 	}
-	bar.Profit = arbitRange{Label: "Profit", Low: st.field("minprof", l.MinProf, none)}
+	bar.Profit = arbitRange{Label: "Profit", Low: st.field("minprof", v.MinProf, l.MinProf, none)}
 
 	// The options this page offers for either kind of source, those for the
 	// other kind greyed, but for the sealed-only ones on a singles source

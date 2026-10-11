@@ -704,3 +704,33 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 		t.Errorf("a price window fills the preview with %d rows, want only the cheap ones drawn", cheap)
 	}
 }
+
+// TestArbitBarShowsTheAppliedLimit pins a field held to its mode's floor
+// to showing the floor it applies, not the value saved, which its min would
+// refuse: global singles and sealed share one saved state.
+func TestArbitBarShowsTheAppliedLimit(t *testing.T) {
+	for _, tt := range []struct {
+		desc                string
+		mode                arbitMode
+		query               string
+		spread, diff, floor string
+		set                 int
+	}{
+		{"global singles", arbitMode{Global: true}, "minspread=10&mindiff=-3", "200", "0", "200", 1},
+		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, "minspread=10", "50", "", "50", 0},
+		{"global sealed", arbitMode{Global: true, Sealed: true}, "minspread=-500&mindiff=-500", "-30", "-100", "-30", 2},
+		{"arbit", arbitMode{}, "minspread=15", "15", "", "-30", 1},
+		{"unset", arbitMode{Global: true}, "", "", "", "200", 0},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			bar := newArbitBar(parseArbitQuery(t, tt.query), tt.mode, testArbitOffer, backend(), "SRC")
+			if bar.Spread.Low.Value != tt.spread || bar.Spread.Low.Floor != tt.floor || bar.Diff.Low.Value != tt.diff {
+				t.Errorf("spread %q (min %q), difference %q, want %q (min %q), %q",
+					bar.Spread.Low.Value, bar.Spread.Low.Floor, bar.Diff.Low.Value, tt.spread, tt.floor, tt.diff)
+			}
+			if bar.Set != tt.set {
+				t.Errorf("the bar counts %d set, want %d", bar.Set, tt.set)
+			}
+		})
+	}
+}
