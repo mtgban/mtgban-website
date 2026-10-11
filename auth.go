@@ -553,17 +553,17 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		ip, err := ratelimit.IPAddress(r)
 		if err != nil {
 			log.Println(err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			errorResponse(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 			return
 		}
 
 		if !APIRateLimiter.Allow(string(ip)) {
-			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			errorResponse(w, http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests))
 			return
 		}
 
 		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			errorResponse(w, http.StatusServiceUnavailable, http.StatusText(http.StatusServiceUnavailable))
 			return
 		}
 
@@ -580,7 +580,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		v, err := apisig.Decode(sig)
 		if SigCheck && err != nil {
 			log.Println("API error, bad sig", err)
-			w.Write([]byte(`{"error": "invalid signature"}`))
+			errorResponse(w, http.StatusUnauthorized, "invalid signature")
 			return
 		}
 
@@ -588,7 +588,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		if exp := v.Get("Expires"); exp != "" {
 			if _, err := strconv.ParseInt(exp, 10, 64); err != nil {
 				log.Println("API error", err.Error())
-				w.Write([]byte(`{"error": "invalid or expired signature"}`))
+				errorResponse(w, http.StatusUnauthorized, "invalid or expired signature")
 				return
 			}
 		}
@@ -602,7 +602,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		err = apisig.Verify([]byte(secret), r.Method, signatureLink(), v, OptionalFields, time.Now())
 		if SigCheck && err != nil {
 			log.Println("API error, invalid", v.Get("UserEmail"), err)
-			w.Write([]byte(`{"error": "invalid or expired signature"}`))
+			errorResponse(w, http.StatusUnauthorized, "invalid or expired signature")
 			return
 		}
 
