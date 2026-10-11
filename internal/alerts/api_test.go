@@ -25,9 +25,11 @@ type fakeAlertStore struct {
 // confirmKey is one user's confirm mails to one address.
 type confirmKey struct{ userHash, address string }
 
-// confirmSend is when the last of them went.
+// confirmSend is when the last of them went, and whether a failed send
+// freed the address again.
 type confirmSend struct {
-	at time.Time
+	at       time.Time
+	released bool
 }
 
 type channelKey struct {
@@ -40,12 +42,26 @@ func newFakeAlertStore() *fakeAlertStore {
 	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}, confirmSends: map[confirmKey]confirmSend{}}
 }
 
-func (f *fakeAlertStore) RecordConfirmSend(_ context.Context, h, address string, at time.Time) error {
-	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at}
+// ClaimConfirmSend mirrors the store: one claim per address, from anyone, since since.
+func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string, now, since time.Time) (bool, error) {
+	for k, send := range f.confirmSends {
+		if k.address == strings.ToLower(address) && !send.released && !send.at.Before(since) {
+			return false, nil
+		}
+	}
+	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at: now}
+	return true, nil
+}
+
+func (f *fakeAlertStore) ReleaseConfirmSend(_ context.Context, h, address string, at time.Time) error {
+	k := confirmKey{h, strings.ToLower(address)}
+	if f.confirmSends[k].at.Equal(at) {
+		f.confirmSends[k] = confirmSend{at: at, released: true}
+	}
 	return nil
 }
 
-// PendingEmail mirrors the store: the user's newest send, when it went to
+// PendingEmail mirrors the store: the user's newest sent mail, when it went to
 // another address after the user row was verified, and since since.
 func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Time) (string, bool, error) {
 	row, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
@@ -55,7 +71,7 @@ func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Ti
 	var last string
 	var lastAt time.Time
 	for k, send := range f.confirmSends {
-		if k.userHash == h && (last == "" || send.at.After(lastAt)) {
+		if k.userHash == h && !send.released && (last == "" || send.at.After(lastAt)) {
 			last, lastAt = k.address, send.at
 		}
 	}
@@ -1054,23 +1070,30 @@ func TestAlertsAPISetEmail(t *testing.T) {
 		t.Fatalf("token expires in %v, want about a day", d)
 	}
 
-	// Three mails an hour; the fourth is refused, resend included.
-	for i := 0; i < 2; i++ {
-		w = httptest.NewRecorder()
-		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
-		if w.Code != http.StatusAccepted {
-			t.Fatalf("send %d = %d %s", i+2, w.Code, w.Body)
-		}
-	}
+	// One mail an hour to an address, whoever asks; the store keeps
+	// the count, so a restart does not reset it.
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
-	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "too many confirmation mails") {
-		t.Fatalf("fourth = %d %s", w.Code, w.Body)
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "within the hour") {
+		t.Fatalf("resend within the hour = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, testCaller("x@y.com", "Legacy")))
+	if w.Code != http.StatusTooManyRequests || len(sent) != 1 {
+		t.Fatalf("other user, same address = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+
+	// Three mails an hour per user; the fourth is refused, resend included.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me2@example.com"}`, sig))
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("third = %d %s", w.Code, w.Body)
 	}
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"other@example.com"}`, sig))
-	if w.Code != http.StatusTooManyRequests || len(sent) != 3 || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
-		t.Fatalf("fifth = %d %s sent=%d", w.Code, w.Body, len(sent))
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "too many confirmation mails") ||
+		len(sent) != 2 || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me2@example.com" {
+		t.Fatalf("fourth = %d %s sent=%d", w.Code, w.Body, len(sent))
 	}
 	// Another user has a limit of their own.
 	w = httptest.NewRecorder()
@@ -1124,8 +1147,10 @@ func TestAlertsAPISetEmailRefusals(t *testing.T) {
 	if kept := store.channels[channelKey{hash, ChannelEmail, SourceUser}]; kept.Address != "old@example.com" || channelState(kept) != stateVerified {
 		t.Fatalf("row after the sent change = %+v", kept)
 	}
-	// A row with no working address moves at once, to show as pending.
+	// A row with no working address moves at once, to show as pending; the
+	// hour since the last mail is taken as passed.
 	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser}
+	store.confirmSends[confirmKey{hash, "me@example.com"}] = confirmSend{at: time.Now().Add(-2 * time.Hour)}
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, sig))
 	if w.Code != http.StatusAccepted || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
@@ -1395,6 +1420,8 @@ func TestAlertsAPIResendBouncedVerified(t *testing.T) {
 	if w.Code != http.StatusAccepted || len(sent) != 1 {
 		t.Fatalf("resend = %d %s sent=%d", w.Code, w.Body, len(sent))
 	}
+	// The address had its mail this hour; once the hour passes it may have another.
+	store.confirmSends[confirmKey{hash, "me@example.com"}] = confirmSend{at: now.Add(-2 * time.Hour)}
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
 	if w.Code != http.StatusAccepted || len(sent) != 2 {

@@ -912,10 +912,17 @@ func TestConfirmMovesAVerifiedRowToItsReplacement(t *testing.T) {
 	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
 	clean()
 	t.Cleanup(clean)
-	verified := time.Now().Add(-time.Hour)
+	now := time.Now()
+	verified := now.Add(-4 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	must(t, s.RecordConfirmSend(ctx, h, strings.ToUpper(addr), time.Now()))
-	must(t, s.RecordConfirmSend(ctx, "someone-else", addr, time.Now()))
+	claimed, err := s.ClaimConfirmSend(ctx, h, strings.ToUpper(addr), now.Add(-2*time.Hour), now.Add(-3*time.Hour))
+	if err != nil || !claimed {
+		t.Fatalf("claim: %v %v", claimed, err)
+	}
+	claimed, err = s.ClaimConfirmSend(ctx, "someone-else", addr, now, now.Add(-time.Hour))
+	if err != nil || !claimed {
+		t.Fatalf("another user's claim an hour on: %v %v", claimed, err)
+	}
 	pending, ok, err := s.PendingEmail(ctx, h, time.Now().Add(-24*time.Hour))
 	if err != nil || !ok || pending != addr {
 		t.Fatalf("pending = %q %v %v", pending, ok, err)
@@ -960,8 +967,15 @@ func TestConfirmMovesOnlyOnTheCurrentRequest(t *testing.T) {
 	now := time.Now()
 	verified := now.Add(-4 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	must(t, s.RecordConfirmSend(ctx, h, typo, now.Add(-3*time.Hour)))
-	must(t, s.RecordConfirmSend(ctx, h, right, now.Add(-2*time.Hour)))
+	claim := func(addr string, at time.Time) {
+		t.Helper()
+		ok, err := s.ClaimConfirmSend(ctx, h, addr, at, at.Add(-time.Hour))
+		if err != nil || !ok {
+			t.Fatalf("claim %s: %v %v", addr, ok, err)
+		}
+	}
+	claim(typo, now.Add(-3*time.Hour))
+	claim(right, now.Add(-2*time.Hour))
 	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, typo, now)
 	if err != nil || ok {
 		t.Fatalf("superseded link moved the row: %v %v", ok, err)
@@ -977,14 +991,86 @@ func TestConfirmMovesOnlyOnTheCurrentRequest(t *testing.T) {
 	}
 	// An unsubscribed row does not move, even on the latest request.
 	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonUnsubscribed, now))
-	must(t, s.RecordConfirmSend(ctx, h, typo, now.Add(time.Minute)))
-	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, typo, now.Add(2*time.Minute))
+	claim(typo, now.Add(2*time.Hour))
+	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, typo, now.Add(3*time.Hour))
 	if err != nil || ok {
 		t.Fatalf("link undid an unsubscribe: %v %v", ok, err)
 	}
 	chans, err := s.Channels(ctx, h)
 	if err != nil || len(chans) != 1 || chans[0].Address != right || chans[0].DisabledReason != ReasonUnsubscribed {
 		t.Fatalf("row after the refused links: %+v %v", chans, err)
+	}
+}
+
+// TestFailedSendSupersedesNothing covers a request whose mail failed: the
+// earlier address's link still moves the row, and that address, not the
+// unsent one, shows as pending.
+func TestFailedSendSupersedesNothing(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	sent, failed := "sent-"+strings.ToLower(t.Name())+"@example.com", "failed-"+strings.ToLower(t.Name())+"@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now().Truncate(time.Microsecond)
+	verified := now.Add(-4 * time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+	for _, c := range []struct {
+		addr string
+		at   time.Time
+	}{{sent, now.Add(-3 * time.Hour)}, {failed, now.Add(-2 * time.Hour)}} {
+		ok, err := s.ClaimConfirmSend(ctx, h, c.addr, c.at, c.at.Add(-time.Hour))
+		if err != nil || !ok {
+			t.Fatalf("claim %s: %v %v", c.addr, ok, err)
+		}
+	}
+	must(t, s.ReleaseConfirmSend(ctx, h, failed, now.Add(-2*time.Hour)))
+	pending, ok, err := s.PendingEmail(ctx, h, now.Add(-24*time.Hour))
+	if err != nil || !ok || pending != sent {
+		t.Fatalf("pending = %q %v %v, want the sent one", pending, ok, err)
+	}
+	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, sent, now)
+	if err != nil || !ok {
+		t.Fatalf("the sent address's link after a failed newer send: %v %v", ok, err)
+	}
+}
+
+// TestClaimConfirmSendOncePerAddress covers the confirm throttle: one claim
+// per address in the window, from anyone and in any case, freed only by its
+// own release.
+func TestClaimConfirmSendOncePerAddress(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	addr := "claim-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now().Truncate(time.Microsecond)
+	ok, err := s.ClaimConfirmSend(ctx, "uA", addr, now, now.Add(-time.Hour))
+	if err != nil || !ok {
+		t.Fatalf("first claim: %v %v", ok, err)
+	}
+	later := now.Add(time.Minute)
+	ok, err = s.ClaimConfirmSend(ctx, "uB", strings.ToUpper(addr), later, later.Add(-time.Hour))
+	if err != nil || ok {
+		t.Fatalf("second claim in the hour: %v %v", ok, err)
+	}
+	must(t, s.ReleaseConfirmSend(ctx, "uA", addr, now.Add(time.Second)))
+	must(t, s.ReleaseConfirmSend(ctx, "uB", addr, now))
+	ok, _ = s.ClaimConfirmSend(ctx, "uB", addr, later, later.Add(-time.Hour))
+	if ok {
+		t.Fatal("another time's or user's release freed the claim")
+	}
+	must(t, s.ReleaseConfirmSend(ctx, "uA", addr, now))
+	ok, err = s.ClaimConfirmSend(ctx, "uB", addr, later, later.Add(-time.Hour))
+	if err != nil || !ok {
+		t.Fatalf("claim after release: %v %v", ok, err)
+	}
+	ok, err = s.ClaimConfirmSend(ctx, "uA", addr, now.Add(2*time.Hour), now.Add(time.Hour))
+	if err != nil || !ok {
+		t.Fatalf("claim after the hour: %v %v", ok, err)
 	}
 }
 
