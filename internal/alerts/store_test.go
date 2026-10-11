@@ -3,6 +3,7 @@ package alerts
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -1455,6 +1456,50 @@ func TestMarkOverAllowanceKeepsALatePause(t *testing.T) {
 		if st := alertStatus(t, s, h, created.ID); st != StatusPaused || len(r.moved) != 0 {
 			t.Fatalf("%s: alert %s, moved %+v after a late pause", step.name, st, r.moved)
 		}
+	}
+}
+
+// TestCreateWithinWaitsForAnotherCreate covers two identical creates at
+// once: the second waits for the first, then finds it a duplicate; and a
+// create at the allowance is refused.
+func TestCreateWithinWaitsForAnotherCreate(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	first, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = first.Rollback() }()
+	must(t, lockUser(ctx, first, h))
+	made, err := createAlert(ctx, first, sample(h))
+	must(t, err)
+	type result struct {
+		dup int64
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		_, dup, err := s.CreateWithin(ctx, sample(h), 5)
+		done <- result{dup, err}
+	}()
+	select {
+	case r := <-done:
+		t.Fatalf("create did not wait for the other: %+v", r)
+	case <-time.After(200 * time.Millisecond):
+	}
+	must(t, first.Commit())
+	r := <-done
+	if r.err != nil || r.dup != made.ID {
+		t.Fatalf("second create = dup %d %v, want dup %d", r.dup, r.err, made.ID)
+	}
+	other := sample(h)
+	other.CardID = "card-2"
+	_, _, err = s.CreateWithin(ctx, other, 1)
+	if !errors.Is(err, ErrAllowanceReached) {
+		t.Fatalf("create past the allowance = %v", err)
+	}
+	if n, _ := s.CountByUser(ctx, h, "magic"); n != 1 {
+		t.Fatalf("%d alerts, want 1", n)
 	}
 }
 

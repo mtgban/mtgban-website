@@ -192,11 +192,22 @@ func (f *fakeAlertStore) EnsureContact(_ context.Context, h, tier string) error 
 	f.contacts[h] = c
 	return nil
 }
-func (f *fakeAlertStore) Create(_ context.Context, a Alert) (Alert, error) {
+
+// CreateWithin mirrors the store: the allowance, then a duplicate, then the insert.
+func (f *fakeAlertStore) CreateWithin(ctx context.Context, a Alert, allowance int) (Alert, int64, error) {
+	existing, _ := f.ListByUser(ctx, a.UserHash, a.Game)
+	if len(existing) >= allowance {
+		return Alert{}, 0, ErrAllowanceReached
+	}
+	for _, e := range existing {
+		if sameAlert(e, a) {
+			return Alert{}, e.ID, nil
+		}
+	}
 	f.nextID++
 	a.ID, a.Status = f.nextID, StatusActive
 	f.rows[a.ID] = a
-	return a, nil
+	return a, 0, nil
 }
 func (f *fakeAlertStore) ListByUser(_ context.Context, h, game string) ([]Alert, error) {
 	var out []Alert
