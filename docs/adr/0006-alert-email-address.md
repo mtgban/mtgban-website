@@ -25,7 +25,11 @@ their Patreon login) needs to enter one.
 - A `user` row is written when the owner enters an address on the alerts
   page, and starts unverified: a signed confirmation link
   (`/alerts/confirm`) verifies it, the same shape as `/alerts/unsubscribe`.
-  A verified `user` row wins over a `patreon` row.
+  A verified `user` row wins over a `patreon` row. An address gets at most
+  one confirm mail an hour, whichever user asks (`alert_confirm_sends`,
+  which a restart does not reset as it does the per-user limiter). That
+  table also records who asked for each mail before it goes, so a
+  verified row keeps its address until the link for a new one is used.
 
 Four things read it: the evaluator's mail deliverer, to address a digest;
 the channels API, to show the owner their own address and to refuse a

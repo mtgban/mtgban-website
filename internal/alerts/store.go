@@ -219,10 +219,13 @@ func (s *Store) ChannelFor(ctx context.Context, userHash string, kind ChannelKin
 // false when no row matched. A user email row holding another address
 // first moves to this one, in the same transaction so a refused confirm
 // leaves the old address in place, if this was the user's latest confirm
-// mail and came after the row was verified; an unsubscribed or spam-marked
-// row never moves, so coming back takes a fresh add. A working row keeps
-// its verified_at, so confirming it again leaves a newer request valid.
-func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address string, at time.Time) (bool, error) {
+// mail, failed sends aside, and came after the row was verified; an
+// unsubscribed or spam-marked row never moves, so coming back takes a fresh
+// add. A working row keeps its verified_at, so confirming it again leaves a
+// newer request valid. A user email row's link names the claim its mail
+// went under, claimedAt, and confirms, in place or by moving the row, only
+// while that claim is the user's latest, failed sends aside.
+func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address string, claimedAt, at time.Time) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -235,9 +238,9 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 			  FROM alert_confirm_sends r
 			 WHERE c.user_hash = $1 AND c.kind = 'email' AND c.source = 'user' AND lower(c.address) <> lower($2)
 			   AND c.disabled_reason <> ALL($3)
-			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at > COALESCE(c.verified_at, '-infinity')
-			   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at)`,
-			userHash, address, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}))
+			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at = $4 AND r.sent_at > COALESCE(c.verified_at, '-infinity')
+			   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)`,
+			userHash, address, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}), claimedAt)
 		if err != nil {
 			return false, err
 		}
@@ -245,8 +248,10 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 	res, err := tx.ExecContext(ctx, `
 		UPDATE alert_channels SET verified_at = CASE WHEN verified_at IS NOT NULL AND disabled_at IS NULL THEN verified_at ELSE $5 END,
 		       disabled_at = NULL, disabled_reason = '', updated_at = now()
-		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND lower(address) = lower($4) AND disabled_reason <> ALL($6)`,
-		userHash, kind, source, address, at, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}))
+		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND lower(address) = lower($4) AND disabled_reason <> ALL($6)
+		   AND ($2 <> 'email' OR $3 <> 'user' OR EXISTS (SELECT 1 FROM alert_confirm_sends WHERE user_hash = $1 AND address = lower($4) AND sent_at = $7)
+		        AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > $7 AND NOT n.released))`,
+		userHash, kind, source, address, at, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}), claimedAt)
 	if err != nil {
 		return false, err
 	}
@@ -362,28 +367,65 @@ func (s *Store) ParkEmailAlerts(ctx context.Context, userHash, reason string) (i
 	return res.RowsAffected()
 }
 
-// RecordConfirmSend notes, before its mail goes, that userHash asked for a
-// confirm mail to address. The confirm link resolves against it, so the
+// ClaimConfirmSend records, before its mail goes, that userHash asked for
+// a confirm mail to address at now; false means one went to the address,
+// from anyone, since. The confirm link resolves against the record, so the
 // user's working address stays in place until the new one is confirmed.
-func (s *Store) RecordConfirmSend(ctx context.Context, userHash, address string, at time.Time) error {
-	_, err := s.db.ExecContext(ctx, `
+func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string, now, since time.Time) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockAddress(ctx, tx, address)
+	if err != nil {
+		return false, err
+	}
+	var recent bool
+	err = tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM alert_confirm_sends WHERE address = lower($1) AND sent_at >= $2 AND NOT released)`,
+		address, since).Scan(&recent)
+	if err != nil || recent {
+		return false, err
+	}
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, lower($2), $3)
-		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at`,
+		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at, released = false`,
+		userHash, address, now)
+	if err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
+// lockAddress serialises, until tx ends, the writers of one address's
+// confirm mail records.
+func lockAddress(ctx context.Context, tx *sql.Tx, address string) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1, hashtext(lower($2)))`, alertsSchemaLockID, address)
+	return err
+}
+
+// ReleaseConfirmSend frees the claim made at at, for a mail that did not
+// go out: the address may be mailed again at once.
+func (s *Store) ReleaseConfirmSend(ctx context.Context, userHash, address string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE alert_confirm_sends SET released = true WHERE user_hash = $1 AND address = lower($2) AND sent_at = $3`,
 		userHash, address, at)
 	return err
 }
 
 // PendingEmail is the replacement a user's own email row was last asked to
-// move to, since the row was last verified, if ever, and since since: the
-// address its link can move the row to, whether or not the row still
-// works. found is false when there is none.
+// move to, since the row was last verified, if ever, and since since,
+// failed sends aside: the address its link can move the row to, whether
+// or not the row still works. found is false when there is none.
 func (s *Store) PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error) {
 	var address string
 	err := s.db.QueryRowContext(ctx, `
 		SELECT r.address FROM alert_confirm_sends r
 		  JOIN alert_channels c ON c.user_hash = r.user_hash AND c.kind = 'email' AND c.source = 'user'
 		 WHERE r.user_hash = $1 AND r.address <> lower(c.address) AND r.sent_at > COALESCE(c.verified_at, '-infinity') AND r.sent_at > $2
-		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at)`,
+		   AND NOT r.released
+		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)`,
 		userHash, since).Scan(&address)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil

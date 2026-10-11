@@ -25,6 +25,9 @@ type Token struct {
 	UserHash string
 	Address  string
 	Expires  time.Time
+	// Claimed is when the confirm mail carrying the link was claimed; the
+	// link confirms only while that claim is the address's latest.
+	Claimed time.Time
 }
 
 // ErrBadToken and ErrTokenExpired are VerifyToken's failures.
@@ -38,7 +41,11 @@ func tokenPayload(t Token) string {
 	if !t.Expires.IsZero() {
 		exp = t.Expires.Unix()
 	}
-	return strings.Join([]string{string(t.Kind), t.UserHash, strings.ToLower(t.Address), strconv.FormatInt(exp, 10)}, "|")
+	claimed := int64(0)
+	if !t.Claimed.IsZero() {
+		claimed = t.Claimed.UnixMicro()
+	}
+	return strings.Join([]string{string(t.Kind), t.UserHash, strings.ToLower(t.Address), strconv.FormatInt(exp, 10), strconv.FormatInt(claimed, 10)}, "|")
 }
 
 // MintToken signs a confirm or unsubscribe link with BAN_SECRET's HMAC.
@@ -72,8 +79,10 @@ func VerifyToken(secret []byte, s string, now time.Time) (Token, error) {
 	if !hmac.Equal(mac.Sum(nil), want) {
 		return Token{}, ErrBadToken
 	}
+	// A four-field payload has no claim; unsubscribe links of that shape
+	// never expire, so they still verify.
 	parts := strings.Split(string(raw), "|")
-	if len(parts) != 4 {
+	if len(parts) != 4 && len(parts) != 5 {
 		return Token{}, ErrBadToken
 	}
 	if TokenKind(parts[0]) != TokenConfirm && TokenKind(parts[0]) != TokenUnsubscribe {
@@ -83,7 +92,17 @@ func VerifyToken(secret []byte, s string, now time.Time) (Token, error) {
 	if err != nil {
 		return Token{}, ErrBadToken
 	}
+	claimed := int64(0)
+	if len(parts) == 5 {
+		claimed, err = strconv.ParseInt(parts[4], 10, 64)
+		if err != nil {
+			return Token{}, ErrBadToken
+		}
+	}
 	t := Token{Kind: TokenKind(parts[0]), UserHash: parts[1], Address: parts[2]}
+	if claimed != 0 {
+		t.Claimed = time.UnixMicro(claimed).UTC()
+	}
 	if exp != 0 {
 		t.Expires = time.Unix(exp, 0).UTC()
 		if now.After(t.Expires) {
