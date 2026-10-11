@@ -114,6 +114,13 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(posts).toHaveLength(0);
     });
 
+    test('on a store page with no list it sends the user back to BAN', async () => {
+        const {alerts, posts} = await run({hash: ''});
+        expect(alerts[0]).toBe('This page has no list from BAN. Log in to ABU if you aren\'t, ' +
+            'then go back to BAN and press Load at ABU again.');
+        expect(posts).toHaveLength(0);
+    });
+
     test('a bookmark older than the link is told to update and sends nothing', async () => {
         for (const version of ['0badc0de', null]) {
             const {alerts, posts} = await run({hash: '#ban=1:1', version});
@@ -132,7 +139,7 @@ describe('ban-to-cart bookmarklet on ABU', () => {
 
     test('a guest is told to log in and nothing is sent', async () => {
         const {alerts, posts} = await run({hash: '#ban=1:1', loggedIn: false});
-        expect(alerts[0]).toContain('Log in to ABU first');
+        expect(alerts[0]).toBe('Log in to ABU first, then go back to BAN and press Load at ABU again.');
         expect(posts).toHaveLength(0);
     });
 
@@ -195,7 +202,7 @@ describe('ban-to-cart bookmarklet on ABU', () => {
 
     test('an expired login stops before sending', async () => {
         const {alerts, posts, page} = await run({hash: '#ban=1:1', abu: fakeABU({readStatus: 401})});
-        expect(alerts[0]).toContain('logged you out');
+        expect(alerts[0]).toBe('ABU logged you out. Log in again, then go back to BAN and press Load at ABU again.');
         expect(posts).toHaveLength(0);
         expect(page.reloaded).toBe(false);
         expect(page.guarded.alerts).toEqual([false]);
@@ -283,7 +290,7 @@ describe('ban-to-cart bookmarklet on SCG', () => {
 
     test('a visitor not logged in is told to log in', async () => {
         const {alerts, page} = await run({...scgPage, hash: '#ban=SGL-A1:1', abu: fakeSCG({status: 401})});
-        expect(alerts[0]).toContain('Log in to SCG first');
+        expect(alerts[0]).toBe('Log in to SCG first, then go back to BAN and press Load at SCG again.');
         expect(page.location.href).toBeUndefined();
         expect(page.guarded.alerts).toEqual([false]);
     });

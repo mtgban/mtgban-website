@@ -25,8 +25,14 @@
     var key = (store && store.key) || function (id) {
         return id;
     };
-    if (!store || !match) {
+    if (!store) {
         alert("Drag this link to your bookmarks bar. Then click it after the store's page loads.");
+        return;
+    }
+    // A store's login drops the fragment on its way back to the cart
+    var again = "go back to BAN and press Load at " + store.name + " again.";
+    if (!match) {
+        alert("This page has no list from BAN. Log in to " + store.name + " if you aren't, then " + again);
         return;
     }
     // The site stamps this copy and every link with the loader's version, and
@@ -37,7 +43,7 @@
         return;
     }
     if (!store.loggedIn()) {
-        alert("Log in to " + store.name + " first, then click the BAN-to-Cart bookmark again.");
+        alert("Log in to " + store.name + " first, then " + again);
         return;
     }
 
@@ -181,7 +187,7 @@
             cartIDs: async function () {
                 var resp = await fetch(cart, {headers: headers});
                 if (resp.status === 401) {
-                    throw new Error("ABU logged you out. Log in again, then click the BAN-to-Cart bookmark again.");
+                    throw new Error("ABU logged you out. Log in again, then " + again);
                 }
                 if (!resp.ok) {
                     throw new Error("ABU could not read your cart (" + resp.status + ").");
@@ -244,7 +250,7 @@
                     body: form
                 });
                 if (resp.status === 401) {
-                    throw new Error("Log in to SCG first, then click the BAN-to-Cart bookmark again.");
+                    throw new Error("Log in to SCG first, then " + again);
                 }
                 var body = await resp.json().catch(function () {
                     return {};
