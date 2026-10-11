@@ -67,6 +67,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
                 <input id="searchbox" class="landing-search" type="text" name="q"
                        placeholder="Search for a card or product..."
                        maxlength="1000" autofocus autocapitalize="none"
+                       data-autocomplete="false"
                        onFocus="this.setSelectionRange(0, this.value.length)">
                 {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
                 {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
@@ -76,9 +77,6 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
                 <a class="landing-action-btn" href="/random{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random Card"><i data-lucide="dice-5"></i></a>
             </div>
         </div>
-        <script type="text/javascript">
-            autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
-        </script>
 
         {{if not .ModalMode}}
         <div class="landing-tools">
