@@ -254,7 +254,7 @@ func TestWebhookBounceOnPendingRowKeepsAlertsOnPatreon(t *testing.T) {
 	store.channels["typo@example.com"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "typo@example.com", Source: SourceUser}}
 	store.channels["ann@patreon.example"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "ann@patreon.example", Source: SourcePatreon, VerifiedAt: &now}}
 	wh := &Webhook{Secret: secret, Store: store}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["typo@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["typo@example.com"]}}`)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
 	if rec.Code != http.StatusOK || len(store.disabled) != 1 || store.disabled[0].source != SourceUser {
@@ -317,7 +317,7 @@ func TestWebhookConfirmComplaintDisablesOnlyTheRequester(t *testing.T) {
 	}
 	// A bounce on a confirm mail is about the address, so it reaches every row.
 	store.disabled = nil
-	body = []byte(`{"type":"email.bounced","data":{"email_id":"m2","to":["b@example.com"],"tags":{"kind":"confirm","user":"uA"}}}`)
+	body = []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m2","to":["b@example.com"],"tags":{"kind":"confirm","user":"uA"}}}`)
 	rec = httptest.NewRecorder()
 	wh.ServeHTTP(rec, signedRequest(secret, "msg_2", now, body))
 	if rec.Code != http.StatusOK || len(store.disabled) != 3 {
@@ -346,6 +346,33 @@ func TestWebhookConfirmComplaintDisablesEveryRowOfTheRequester(t *testing.T) {
 	}
 	if len(store.parked) != 1 || store.parked["uA"] != ParkComplained {
 		t.Fatalf("parked %+v, want only uA", store.parked)
+	}
+}
+
+// Only a bounce Resend types Permanent disables: Transient (a full
+// mailbox), Undetermined and untyped ones are logged and left alone.
+func TestWebhookIgnoresSoftBounces(t *testing.T) {
+	secret := []byte("s")
+	now := time.Now()
+	for _, tc := range []struct {
+		bounce   string
+		disables bool
+	}{
+		{`"bounce":{"message":"m","subType":"MailboxFull","type":"Transient"},`, false},
+		{`"bounce":{"subType":"Undetermined","type":"Undetermined"},`, false},
+		{`"bounce":{"subType":"General","type":"Permanent"},`, true},
+		{``, false},
+	} {
+		store := newFakeWebhookStore()
+		store.channels["ann@example.com"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "ann@example.com", Source: SourcePatreon, VerifiedAt: &now}}
+		var logged []string
+		wh := &Webhook{Secret: secret, Store: store, Log: func(f string, args ...any) { logged = append(logged, fmt.Sprintf(f, args...)) }}
+		body := []byte(`{"type":"email.bounced","data":{"email_id":"m1",` + tc.bounce + `"to":["ann@example.com"]}}`)
+		rec := httptest.NewRecorder()
+		wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
+		if rec.Code != http.StatusOK || (len(store.disabled) == 1) != tc.disables || (len(logged) == 1) == tc.disables {
+			t.Errorf("%q: status %d disabled %+v logged %q", tc.bounce, rec.Code, store.disabled, logged)
+		}
 	}
 }
 
@@ -383,7 +410,7 @@ func TestWebhookServeHTTPNoSecretConfigured(t *testing.T) {
 	wh := &Webhook{Store: newFakeWebhookStore(), Log: func(format string, args ...any) {
 		logged = append(logged, fmt.Sprintf(format, args...))
 	}}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["ann@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["ann@example.com"]}}`)
 	req := httptest.NewRequest(http.MethodPost, "/alerts/mail-events", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)
@@ -398,7 +425,7 @@ func TestWebhookServeHTTPNoSecretConfigured(t *testing.T) {
 func TestWebhookServeHTTPBadSignature(t *testing.T) {
 	store := newFakeWebhookStore()
 	wh := &Webhook{Secret: []byte("right-secret"), Store: store}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["ann@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["ann@example.com"]}}`)
 	req := signedRequest([]byte("wrong-secret"), "msg_1", time.Now(), body)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)
@@ -440,7 +467,7 @@ func TestWebhookServeHTTPUnknownAddressDoesNothing(t *testing.T) {
 	secret := []byte("s")
 	store := newFakeWebhookStore()
 	wh := &Webhook{Secret: secret, Store: store}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["nobody@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["nobody@example.com"]}}`)
 	req := signedRequest(secret, "msg_1", time.Now(), body)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)
@@ -462,7 +489,7 @@ func TestWebhookServeHTTPBouncedDisablesAndParksOnce(t *testing.T) {
 		{UserHash: "u1", Kind: ChannelEmail, Address: "ann@example.com", Source: SourcePatreon},
 	}
 	wh := &Webhook{Secret: secret, Store: store}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["ann@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["ann@example.com"]}}`)
 	req := signedRequest(secret, "msg_1", time.Now(), body)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)
@@ -511,7 +538,7 @@ func TestWebhookServeHTTPStoreErrorAnswers500AndLogs(t *testing.T) {
 	wh := &Webhook{Secret: secret, Store: store, Log: func(format string, args ...any) {
 		logged = append(logged, fmt.Sprintf(format, args...))
 	}}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["ann@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["ann@example.com"]}}`)
 	req := signedRequest(secret, "msg_1", time.Now(), body)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)
@@ -536,7 +563,7 @@ func TestWebhookServeHTTPParkFailureThenRetrySucceeds(t *testing.T) {
 	store.channels["ann@example.com"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "ann@example.com", Source: SourceUser}}
 	store.parkErr = errors.New("db down")
 	wh := &Webhook{Secret: secret, Store: store}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["ann@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["ann@example.com"]}}`)
 
 	req1 := signedRequest(secret, "msg_1", time.Now(), body)
 	rec1 := httptest.NewRecorder()
@@ -595,7 +622,7 @@ func TestWebhookServeHTTPBounceDisablesAndParksDB(t *testing.T) {
 	secret := []byte("db-test-secret")
 	wh := &Webhook{Secret: secret, Store: s}
 
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["ann@example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["ann@example.com"]}}`)
 	req := signedRequest(secret, "msg_1", time.Now(), body)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)
@@ -632,7 +659,7 @@ func TestWebhookServeHTTPBounceDisablesAndParksDB(t *testing.T) {
 	}
 
 	// An unknown address changes nothing.
-	body2 := []byte(`{"type":"email.bounced","data":{"email_id":"m2","to":["nobody@example.com"]}}`)
+	body2 := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m2","to":["nobody@example.com"]}}`)
 	req2 := signedRequest(secret, "msg_2", time.Now(), body2)
 	rec2 := httptest.NewRecorder()
 	wh.ServeHTTP(rec2, req2)
@@ -696,7 +723,7 @@ func TestWebhookServeHTTPBounceAcrossTwoUsersSharingAnAddressDB(t *testing.T) {
 
 	secret := []byte("db-test-secret-2")
 	wh := &Webhook{Secret: secret, Store: s}
-	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["SHARED@Example.com"]}}`)
+	body := []byte(`{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["SHARED@Example.com"]}}`)
 	req := signedRequest(secret, "msg_1", time.Now(), body)
 	rec := httptest.NewRecorder()
 	wh.ServeHTTP(rec, req)

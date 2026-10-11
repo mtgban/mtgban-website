@@ -100,14 +100,20 @@ type MailEvent struct {
 	To   []string
 	// Tags are the ones the mail was sent with, as Resend echoes them.
 	Tags map[string]string
+	// BounceType is a bounce's data.bounce.type: Permanent, Transient or
+	// Undetermined.
+	BounceType string
 }
 
 // resendEvent is the wire shape of a Resend webhook body.
 type resendEvent struct {
 	Type string `json:"type"`
 	Data struct {
-		To   flexibleStrings `json:"to"`
-		Tags json.RawMessage `json:"tags"`
+		To     flexibleStrings `json:"to"`
+		Tags   json.RawMessage `json:"tags"`
+		Bounce struct {
+			Type string `json:"type"`
+		} `json:"bounce"`
 	} `json:"data"`
 }
 
@@ -154,7 +160,13 @@ func ParseMailEvent(body []byte) (MailEvent, error) {
 	// Tags that do not decode as an object are no tags, not a bad event.
 	var tags map[string]string
 	_ = json.Unmarshal(e.Data.Tags, &tags)
-	return MailEvent{Type: e.Type, To: []string(e.Data.To), Tags: tags}, nil
+	return MailEvent{Type: e.Type, To: []string(e.Data.To), Tags: tags, BounceType: e.Data.Bounce.Type}, nil
+}
+
+// softBounce is a bounce Resend does not call permanent, a full mailbox
+// say or one with no type at all, which leaves the address alone.
+func (e MailEvent) softBounce() bool {
+	return e.Type == "email.bounced" && e.BounceType != "Permanent"
 }
 
 // confirmRequester is the user a complained-about confirm mail was sent
@@ -244,6 +256,11 @@ func (w *Webhook) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 	reason, ok := mailEventReasons[event.Type]
 	if !ok {
+		rw.WriteHeader(http.StatusOK)
+		return
+	}
+	if event.softBounce() {
+		w.log("alerts: webhook leaves a bounce of type %q alone", event.BounceType)
 		rw.WriteHeader(http.StatusOK)
 		return
 	}
