@@ -706,7 +706,13 @@ func (a *API) channelRow(ctx context.Context, userHash string, kind ChannelKind,
 	return rows[i], true, nil
 }
 
-// parseEmail is a bare address, trimmed and lowercased; false when invalid.
+// NormalizeAddress is how every stored, mailed and reported address is
+// compared: trimmed and lowercased.
+func NormalizeAddress(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
+// parseEmail is a bare address, normalized; false when invalid.
 func parseEmail(s string) (string, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" || len(s) > maxEmailLen {
@@ -717,7 +723,7 @@ func parseEmail(s string) (string, bool) {
 	if err != nil || addr.Name != "" || addr.Address != s || strings.Contains(s, "|") {
 		return "", false
 	}
-	return strings.ToLower(s), true
+	return NormalizeAddress(s), true
 }
 
 // emailState is the answer to setting or resending an address.
@@ -873,7 +879,7 @@ func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 			jsonError(w, http.StatusNotFound, "no address to confirm")
 			return
 		}
-		address = strings.ToLower(cur.Address)
+		address = NormalizeAddress(cur.Address)
 	}
 	msg = reverifyRefusal(cur)
 	if msg != "" {

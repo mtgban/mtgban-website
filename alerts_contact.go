@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
@@ -54,7 +53,7 @@ func recordAlertContact(ctx context.Context, rec contactRecorder, userData *Patr
 	return rec.UpsertChannel(ctx, alerts.Channel{
 		UserHash:   userHash,
 		Kind:       alerts.ChannelEmail,
-		Address:    strings.ToLower(userData.Email),
+		Address:    alerts.NormalizeAddress(userData.Email),
 		Source:     alerts.SourcePatreon,
 		VerifiedAt: &now,
 	})
