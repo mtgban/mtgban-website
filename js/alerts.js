@@ -40,13 +40,24 @@
             // A verified row waiting on a replacement can resend its link.
             if (row.state === 'verified') return row.pending ? ['change', 'resend', 'remove'] : ['change', 'remove'];
             if (row.state === 'disabled') {
-                if (row.reason === 'unsubscribed') return ['remove'];
+                // The server refuses a confirm mail to either.
+                if (row.reason === 'unsubscribed' || row.reason === 'complained') return ['remove'];
                 return ['resend', 'remove'];
             }
         } else if (row.source === 'patreon' && row.state === 'disabled' && row.reason !== 'complained') {
             return ['enable'];
         }
         return [];
+    }
+
+    // channelNote is the replacement a verified address waits on, or why a
+    // disabled one offers no way back, or ''.
+    function channelNote(row) {
+        if (row.pending) return 'Waiting for confirmation: ' + row.pending;
+        if (row.state !== 'disabled') return '';
+        if (row.reason === 'complained') return 'This address marked our mail as spam, so we cannot send to it again.';
+        if (row.source === 'user' && row.reason === 'unsubscribed') return 'Remove it and add it again to confirm it afresh.';
+        return '';
     }
 
     // emailLines is the Email section: the patreon line, then the user line,
@@ -727,14 +738,11 @@
             return buildEmailForm(row.address, heading, 'Email address');
         }
         var noteNode = null;
-        if (row.source === 'user' && row.state === 'disabled' && row.reason === 'unsubscribed') {
+        var note = channelNote(row);
+        if (note) {
             noteNode = document.createElement('p');
             noteNode.className = 'alerts-channel-note';
-            noteNode.textContent = 'Remove it and add it again to confirm it afresh.';
-        } else if (row.pending) {
-            noteNode = document.createElement('p');
-            noteNode.className = 'alerts-channel-note';
-            noteNode.textContent = 'Waiting for confirmation: ' + row.pending;
+            noteNode.textContent = note;
         }
         var detail = row.address + (row.source === 'patreon' ? ' (Patreon)' : '') + ' - ' + channelState(row);
         var el = buildChannelRow(heading, detail, noteNode, channelButtons(row), line.receives ? 'receives alerts' : '');
@@ -932,5 +940,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig };
 })();
