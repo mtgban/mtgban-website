@@ -223,6 +223,10 @@ func validHostname(host string) (string, bool) {
 	return host, true
 }
 
+// patreonTimeout is how long a login or a handoff waits on Patreon, its
+// token exchange and lookups together.
+const patreonTimeout = 10 * time.Second
+
 func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	origin := requestOrigin(r)
 	if origin == "" {
@@ -246,11 +250,15 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The Patreon calls below share one deadline: their clients set none
+	patreonCtx, cancelPatreon := context.WithTimeout(r.Context(), patreonTimeout)
+	defer cancelPatreon()
+
 	// Get the access token for this connection
 	source := Config().Patreon.Source
 	clientID := Config().Patreon.Client[source]
 	secret := Config().Patreon.Secret[source]
-	tokens, err := patreon.GetAuthToken(r.Context(), clientID, secret, origin, code)
+	tokens, err := patreon.GetAuthToken(patreonCtx, clientID, secret, origin, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
 		if isHandoff {
@@ -262,10 +270,10 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The client to interface with Patreon
-	client := patreon.NewPatreonClient(r.Context(), tokens.AccessToken)
+	client := patreon.NewPatreonClient(patreonCtx, tokens.AccessToken)
 
 	// Retrieve information about the user who just authenticated
-	userData, err := getUserIDs(r.Context(), client)
+	userData, err := getUserIDs(patreonCtx, client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
 		if isHandoff {
@@ -288,7 +296,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Else, load the tier from the API
 	if tierTitle == "" {
-		foundTitle, err := getUserTier(r.Context(), client, userData.MembershipID)
+		foundTitle, err := getUserTier(patreonCtx, client, userData.MembershipID)
 		if err != nil {
 			LogPages["Admin"].Println("getUserTier error", err)
 		}
