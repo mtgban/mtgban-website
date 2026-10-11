@@ -71,9 +71,13 @@ function loadListRows(section, removedClass) {
 function cartLink(href, items, rows) {
     var ids = [];
     var quantities = {};
+    var skipped = 0;
     rows.forEach(function(r) {
         var id = items[r.idx];
-        if (!id) return;
+        if (!id) {
+            skipped++;
+            return;
+        }
         if (!(id in quantities)) {
             ids.push(id);
             quantities[id] = 0;
@@ -81,7 +85,8 @@ function cartLink(href, items, rows) {
         quantities[id] += parseInt(r.qty, 10);
     });
     var pairs = ids.map(function(id) { return id + ':' + quantities[id]; });
-    return href.replace(/([#&]ban=)[^&]*/, '$1' + pairs.join(','));
+    href = href.replace(/([#&]ban=)[^&]*/, '$1' + pairs.join(',')).replace(/&skip=\d*/, '');
+    return skipped > 0 ? href + '&skip=' + skipped : href;
 }
 
 // rebuildLoadLists rewrites every list in section from its ticked rows.

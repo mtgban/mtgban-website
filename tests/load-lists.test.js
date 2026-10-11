@@ -135,7 +135,7 @@ describe('load lists', () => {
         const page = loadPage({lists: [link]});
         page.untick(0);
         page.untick(2);
-        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=&v=abc&side=retail');
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=&v=abc&side=retail&skip=1');
         expect(link.box.hidden).toBe(true);
         page.tick(2);
         expect(link.box.hidden).toBe(false);
