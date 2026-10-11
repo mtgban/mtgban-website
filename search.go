@@ -1141,14 +1141,11 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 	sortData := resolveSortingData(b, allKeys)
 
 	// A reversed sort swaps what it compares, and so turns every field
-	// around but the finish, negated here so a nonfoil still leads its foil
+	// around but the finish, negated here so one card's finishes keep
+	// their order
 	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
 	if reversed {
-		for _, sorting := range sortData {
-			if sorting != nil {
-				sorting.finish = -sorting.finish
-			}
-		}
+		negateFinishes(sortData)
 	}
 
 	var less func(i, j int) bool
@@ -1237,6 +1234,25 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 	}
 
 	return reversed
+}
+
+// negateFinishes negates every finish rank cmpNumberAndFinish reads: the
+// nonfoil-foil-etched one, and the rank of the finish's name among the
+// sort's, which stands in for the name it otherwise compares.
+func negateFinishes(sortData map[string]*SortingData) {
+	var names []string
+	for _, sorting := range sortData {
+		if sorting != nil && !slices.Contains(names, sorting.finishName) {
+			names = append(names, sorting.finishName)
+		}
+	}
+	slices.Sort(names)
+	for _, sorting := range sortData {
+		if sorting != nil {
+			sorting.finish = -sorting.finish
+			sorting.finishRank = -slices.Index(names, sorting.finishName)
+		}
+	}
 }
 
 // sortOfferRows orders each card's offers in place, condition by condition:
@@ -2607,8 +2623,12 @@ type SortingData struct {
 	// which the default order reads before the number.
 	numberPrefix string
 
-	// The finish rank cmpNumberAndFinish orders by (finishOrder).
-	finish int
+	// The finish cmpNumberAndFinish orders by: its nonfoil-foil-etched rank
+	// (finishOrder), then its name, which negateFinishes ranks for a
+	// reversed sort; the rank is zero otherwise, leaving the name to order.
+	finish     int
+	finishName string
+	finishRank int
 }
 
 func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
@@ -2634,6 +2654,7 @@ func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
 	sorting.groupLower = sorting.editionLower
 	sorting.numberPrefix = setCodePrefix(co.Number)
 	sorting.finish = finishOrder(co)
+	sorting.finishName = co.Finish
 	return sorting, nil
 }
 
@@ -2768,8 +2789,11 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 	}
 	// Two finishes the flags above read alike (holofoil, reverse holofoil),
 	// then the uuid, so no two printings tie and the order is total.
-	if cI.Finish != cJ.Finish {
-		return cI.Finish < cJ.Finish
+	if sortingI.finishRank != sortingJ.finishRank {
+		return sortingI.finishRank < sortingJ.finishRank
+	}
+	if sortingI.finishName != sortingJ.finishName {
+		return sortingI.finishName < sortingJ.finishName
 	}
 	return cI.UUID < cJ.UUID
 }
