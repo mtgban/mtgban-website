@@ -99,14 +99,17 @@ func (f *fakeAlertStore) DeleteChannel(_ context.Context, h string, kind Channel
 	delete(f.channels, channelKey{h, kind, source})
 	return nil
 }
-func (f *fakeAlertStore) EnableChannel(_ context.Context, h string, kind ChannelKind, source ChannelSource) error {
+
+// EnableChannel mirrors the store: a row marked as spam stays disabled.
+func (f *fakeAlertStore) EnableChannel(_ context.Context, h string, kind ChannelKind, source ChannelSource) (bool, error) {
 	k := channelKey{h, kind, source}
 	c, ok := f.channels[k]
-	if ok {
-		c.DisabledAt, c.DisabledReason = nil, ""
-		f.channels[k] = c
+	if !ok || c.DisabledReason == ReasonComplained {
+		return false, nil
 	}
-	return nil
+	c.DisabledAt, c.DisabledReason = nil, ""
+	f.channels[k] = c
+	return true, nil
 }
 
 func (f *fakeAlertStore) Contact(_ context.Context, h string) (Contact, bool, error) {
