@@ -30,6 +30,9 @@ type Message struct {
 	To, Subject, Text, HTML string
 	// Headers are added after Date, for example List-Unsubscribe.
 	Headers map[string]string
+	// Tags label the mail for the provider's webhook events, never the
+	// recipient; Resend sends them, SMTP and Log drop them.
+	Tags map[string]string
 }
 
 // Mailer sends one message and returns the provider's id, "" when it has none.

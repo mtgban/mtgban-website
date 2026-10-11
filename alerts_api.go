@@ -13,7 +13,7 @@ import (
 // the service builds the limiter when a store is attached.
 func (s *site) alertAPIDeps() alerts.APIDeps {
 	// No mailer: the email endpoints answer 503.
-	var sendConfirm func(ctx context.Context, to, link string) error
+	var sendConfirm func(ctx context.Context, userHash, to, link string) error
 	if alertMailConfigured() {
 		sendConfirm = s.sendAlertConfirm
 	}
