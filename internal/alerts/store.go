@@ -132,22 +132,25 @@ func scanChannel(row rowScanner) (Channel, error) {
 
 // UpsertChannel inserts a channel or updates its address; verified_at is
 // written as given, and a changed address is a new row in all but its key.
+// A new email address a complaint is kept on starts marked as spam.
 func (s *Store) UpsertChannel(ctx context.Context, c Channel) error {
 	var verifiedAt any
 	if c.VerifiedAt != nil {
 		verifiedAt = *c.VerifiedAt
 	}
+	// Whether the row is email at an address any user's complaint is kept on.
+	complained := `$2 = 'email' AND EXISTS (SELECT 1 FROM alert_confirm_sends WHERE address = lower($3) AND complained_at IS NOT NULL)`
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO alert_channels (user_hash, kind, address, source, verified_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, now())
+		INSERT INTO alert_channels (user_hash, kind, address, source, verified_at, disabled_at, disabled_reason, updated_at)
+		VALUES ($1, $2, $3, $4, $5, CASE WHEN `+complained+` THEN now() END, CASE WHEN `+complained+` THEN $6 ELSE '' END, now())
 		ON CONFLICT (user_hash, kind, source) DO UPDATE
 		   SET address = EXCLUDED.address,
 		       verified_at = CASE WHEN lower(alert_channels.address) = lower(EXCLUDED.address) THEN COALESCE(EXCLUDED.verified_at, alert_channels.verified_at) ELSE EXCLUDED.verified_at END,
-		       disabled_at = CASE WHEN lower(alert_channels.address) = lower(EXCLUDED.address) THEN alert_channels.disabled_at ELSE NULL END,
-		       disabled_reason = CASE WHEN lower(alert_channels.address) = lower(EXCLUDED.address) THEN alert_channels.disabled_reason ELSE '' END,
+		       disabled_at = CASE WHEN lower(alert_channels.address) = lower(EXCLUDED.address) THEN alert_channels.disabled_at ELSE EXCLUDED.disabled_at END,
+		       disabled_reason = CASE WHEN lower(alert_channels.address) = lower(EXCLUDED.address) THEN alert_channels.disabled_reason ELSE EXCLUDED.disabled_reason END,
 		       created_at = CASE WHEN lower(alert_channels.address) = lower(EXCLUDED.address) THEN alert_channels.created_at ELSE now() END,
 		       updated_at = now()`,
-		c.UserHash, c.Kind, c.Address, c.Source, verifiedAt)
+		c.UserHash, c.Kind, c.Address, c.Source, verifiedAt, ReasonComplained)
 	return err
 }
 
@@ -215,7 +218,8 @@ func (s *Store) ChannelFor(ctx context.Context, userHash string, kind ChannelKin
 }
 
 // SetChannelVerified stamps a channel verified and enabled while it still
-// holds address and was neither unsubscribed nor marked as spam; found is
+// holds address and was neither unsubscribed nor marked as spam, its
+// confirm mail included; found is
 // false when no row matched. A user email row holding another address
 // first moves to this one, in the same transaction so a refused confirm
 // leaves the old address in place, if this was the user's latest confirm
@@ -231,6 +235,12 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if kind == ChannelEmail {
+		err = lockAddress(ctx, tx, address)
+		if err != nil {
+			return false, err
+		}
+	}
 	if kind == ChannelEmail && source == SourceUser {
 		_, err = tx.ExecContext(ctx, `
 			UPDATE alert_channels c
@@ -249,6 +259,7 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 		UPDATE alert_channels SET verified_at = CASE WHEN verified_at IS NOT NULL AND disabled_at IS NULL THEN verified_at ELSE $5 END,
 		       disabled_at = NULL, disabled_reason = '', updated_at = now()
 		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND lower(address) = lower($4) AND disabled_reason <> ALL($6)
+		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends WHERE address = lower($4) AND complained_at IS NOT NULL)
 		   AND ($2 <> 'email' OR $3 <> 'user' OR EXISTS (SELECT 1 FROM alert_confirm_sends WHERE user_hash = $1 AND address = lower($4) AND sent_at = $7)
 		        AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > $7 AND NOT n.released))`,
 		userHash, kind, source, address, at, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}), claimedAt)
@@ -371,6 +382,8 @@ func (s *Store) ParkEmailAlerts(ctx context.Context, userHash, reason string) (i
 // a confirm mail to address at now; false means one went to the address,
 // from anyone, since. The confirm link resolves against the record, so the
 // user's working address stays in place until the new one is confirmed.
+// An address a confirm mail drew a complaint from is never claimed again,
+// with ErrConfirmComplained.
 func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string, now, since time.Time) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -381,12 +394,19 @@ func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string, 
 	if err != nil {
 		return false, err
 	}
-	var recent bool
+	var recent, complained bool
 	err = tx.QueryRowContext(ctx, `
-		SELECT EXISTS (SELECT 1 FROM alert_confirm_sends WHERE address = lower($1) AND sent_at >= $2 AND NOT released)`,
-		address, since).Scan(&recent)
-	if err != nil || recent {
+		SELECT COALESCE(bool_or(sent_at >= $2 AND NOT released), false), COALESCE(bool_or(complained_at IS NOT NULL), false)
+		  FROM alert_confirm_sends WHERE address = lower($1)`,
+		address, since).Scan(&recent, &complained)
+	if err != nil {
 		return false, err
+	}
+	if complained {
+		return false, ErrConfirmComplained
+	}
+	if recent {
+		return false, nil
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, lower($2), $3)
@@ -396,6 +416,32 @@ func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string, 
 		return false, err
 	}
 	return true, tx.Commit()
+}
+
+// ErrConfirmComplained is an address whose recipient marked a confirm mail as spam.
+var ErrConfirmComplained = errors.New("alerts: address complained about a confirm mail")
+
+// ComplainConfirmSend records a complaint about a mail to address, which no
+// confirm mail then reaches: userHash's confirm mail, whether or not its
+// request is still on file, or with userHash empty any other alert mail.
+func (s *Store) ComplainConfirmSend(ctx context.Context, userHash, address string, at time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockAddress(ctx, tx, address)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO alert_confirm_sends (user_hash, address, sent_at, complained_at) VALUES ($1, lower($2), $3, $3)
+		ON CONFLICT (user_hash, address) DO UPDATE SET complained_at = COALESCE(alert_confirm_sends.complained_at, EXCLUDED.complained_at)`,
+		userHash, address, at)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // lockAddress serialises, until tx ends, the writers of one address's
@@ -425,7 +471,8 @@ func (s *Store) PendingEmail(ctx context.Context, userHash string, since time.Ti
 		  JOIN alert_channels c ON c.user_hash = r.user_hash AND c.kind = 'email' AND c.source = 'user'
 		 WHERE r.user_hash = $1 AND r.address <> lower(c.address) AND r.sent_at > COALESCE(c.verified_at, '-infinity') AND r.sent_at > $2
 		   AND NOT r.released
-		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)`,
+		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)
+		   AND r.complained_at IS NULL`,
 		userHash, since).Scan(&address)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
@@ -439,7 +486,7 @@ func (s *Store) PendingEmail(ctx context.Context, userHash string, since time.Ti
 // PruneUnverifiedChannels deletes user-entered addresses nobody ever
 // verified, and the confirm mails recorded before the same time.
 func (s *Store) PruneUnverifiedChannels(ctx context.Context, before time.Time) (int64, error) {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_confirm_sends WHERE sent_at < $1`, before)
+	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_confirm_sends WHERE sent_at < $1 AND complained_at IS NULL`, before)
 	if err != nil {
 		return 0, err
 	}

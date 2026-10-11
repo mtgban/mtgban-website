@@ -160,14 +160,15 @@ func alertConfirmMail(link string) (text, html string) {
 	return text, html
 }
 
-// sendAlertConfirm mails a confirmation link to an address the user entered.
-func (s *site) sendAlertConfirm(ctx context.Context, to, link string) error {
+// sendAlertConfirm mails a confirmation link to an address the user
+// entered, tagged so a complaint about it reaches only that user's row.
+func (s *site) sendAlertConfirm(ctx context.Context, userHash, to, link string) error {
 	m := s.alertMailer()
 	if m == nil {
 		return errors.New("alerts: mail not configured")
 	}
 	text, html := alertConfirmMail(link)
-	_, err := m.Send(ctx, mailer.Message{To: to, Subject: alertConfirmSubject, Text: text, HTML: html})
+	_, err := m.Send(ctx, mailer.Message{To: to, Subject: alertConfirmSubject, Text: text, HTML: html, Tags: alerts.ConfirmMailTags(userHash)})
 	return err
 }
 

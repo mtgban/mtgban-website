@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/mail"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
@@ -35,6 +37,13 @@ type resendRequest struct {
 	Text    string            `json:"text,omitempty"`
 	HTML    string            `json:"html,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
+	Tags    []resendTag       `json:"tags,omitempty"`
+}
+
+// resendTag is one name and value, each ASCII letters, digits, _ or -.
+type resendTag struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // Send implements Mailer. 429 and 5xx are retried once; see post for what is permanent.
@@ -42,7 +51,11 @@ func (r *Resend) Send(ctx context.Context, m Message) (string, error) {
 	if _, err := mail.ParseAddress(m.To); err != nil {
 		return "", &SendError{Status: 422, Permanent: true, Msg: "to: " + err.Error()}
 	}
-	body, err := json.Marshal(resendRequest{From: r.From, To: []string{m.To}, Subject: m.Subject, Text: m.Text, HTML: m.HTML, Headers: m.Headers})
+	var tags []resendTag
+	for _, k := range slices.Sorted(maps.Keys(m.Tags)) {
+		tags = append(tags, resendTag{Name: k, Value: m.Tags[k]})
+	}
+	body, err := json.Marshal(resendRequest{From: r.From, To: []string{m.To}, Subject: m.Subject, Text: m.Text, HTML: m.HTML, Headers: m.Headers, Tags: tags})
 	if err != nil {
 		return "", fmt.Errorf("mailer: encode: %w", err)
 	}

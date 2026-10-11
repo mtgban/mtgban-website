@@ -27,11 +27,12 @@ type fakeAlertStore struct {
 // confirmKey is one user's confirm mails to one address.
 type confirmKey struct{ userHash, address string }
 
-// confirmSend is when the last of them went, and whether a failed send
-// freed the address again.
+// confirmSend is when the last of them went, whether a failed send freed
+// the address again, and whether it drew a complaint.
 type confirmSend struct {
-	at       time.Time
-	released bool
+	at         time.Time
+	released   bool
+	complained bool
 }
 
 type channelKey struct {
@@ -46,6 +47,11 @@ func newFakeAlertStore() *fakeAlertStore {
 
 // ClaimConfirmSend mirrors the store: one claim per address, from anyone, since since.
 func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string, now, since time.Time) (bool, error) {
+	for k, send := range f.confirmSends {
+		if k.address == strings.ToLower(address) && send.complained {
+			return false, ErrConfirmComplained
+		}
+	}
 	for k, send := range f.confirmSends {
 		if k.address == strings.ToLower(address) && !send.released && !send.at.Before(since) {
 			return false, nil
@@ -75,13 +81,13 @@ func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Ti
 		verified = *row.VerifiedAt
 	}
 	var last string
-	var lastAt time.Time
+	var lastSend confirmSend
 	for k, send := range f.confirmSends {
-		if k.userHash == h && !send.released && (last == "" || send.at.After(lastAt)) {
-			last, lastAt = k.address, send.at
+		if k.userHash == h && !send.released && (last == "" || send.at.After(lastSend.at)) {
+			last, lastSend = k.address, send
 		}
 	}
-	if last == "" || strings.EqualFold(last, row.Address) || !lastAt.After(verified) || !lastAt.After(since) {
+	if last == "" || lastSend.complained || strings.EqualFold(last, row.Address) || !lastSend.at.After(verified) || !lastSend.at.After(since) {
 		return "", false, nil
 	}
 	return last, true, nil
@@ -925,7 +931,7 @@ func testChannelAPI(store APIStore, sent *[]sentConfirm, fail *bool) *API {
 		return []ChannelKind{ChannelDiscord}
 	}
 	api.deps.Mint = func(t Token) string { return MintToken(testTokenSecret, t) }
-	api.deps.SendConfirm = func(_ context.Context, to, link string) error {
+	api.deps.SendConfirm = func(_ context.Context, _, to, link string) error {
 		if fail != nil && *fail {
 			return &mailer.SendError{Status: 422, Permanent: true, Msg: "to: invalid"}
 		}
@@ -1124,7 +1130,7 @@ func TestAlertsAPIUncertainSendKeepsTheClaim(t *testing.T) {
 	store := newFakeAlertStore()
 	sent := []sentConfirm{}
 	api := testChannelAPI(store, &sent, nil)
-	api.deps.SendConfirm = func(context.Context, string, string) error {
+	api.deps.SendConfirm = func(context.Context, string, string, string) error {
 		return errors.New("mailer: resend: context deadline exceeded")
 	}
 	sig := testCaller("a@b.com", "Legacy")

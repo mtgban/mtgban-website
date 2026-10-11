@@ -98,14 +98,29 @@ func VerifySvix(secret []byte, headers http.Header, body []byte, now time.Time) 
 type MailEvent struct {
 	Type string
 	To   []string
+	// Tags are the ones the mail was sent with, as Resend echoes them.
+	Tags map[string]string
 }
 
 // resendEvent is the wire shape of a Resend webhook body.
 type resendEvent struct {
 	Type string `json:"type"`
 	Data struct {
-		To flexibleStrings `json:"to"`
+		To   flexibleStrings `json:"to"`
+		Tags json.RawMessage `json:"tags"`
 	} `json:"data"`
+}
+
+// Confirm mails carry these tags, which Resend echoes in data.tags.
+const (
+	tagKind    = "kind"
+	tagUser    = "user"
+	tagConfirm = "confirm"
+)
+
+// ConfirmMailTags labels a confirm mail with the user who asked for it.
+func ConfirmMailTags(userHash string) map[string]string {
+	return map[string]string{tagKind: tagConfirm, tagUser: userHash}
 }
 
 // flexibleStrings decodes a JSON value that is either a single string or an
@@ -136,7 +151,19 @@ func ParseMailEvent(body []byte) (MailEvent, error) {
 	if err != nil {
 		return MailEvent{}, err
 	}
-	return MailEvent{Type: e.Type, To: []string(e.Data.To)}, nil
+	// Tags that do not decode as an object are no tags, not a bad event.
+	var tags map[string]string
+	_ = json.Unmarshal(e.Data.Tags, &tags)
+	return MailEvent{Type: e.Type, To: []string(e.Data.To), Tags: tags}, nil
+}
+
+// confirmRequester is the user a complained-about confirm mail was sent
+// for, empty for any other mail.
+func (e MailEvent) confirmRequester() string {
+	if e.Type != "email.complained" || e.Tags[tagKind] != tagConfirm {
+		return ""
+	}
+	return e.Tags[tagUser]
 }
 
 // mailEventReason is what one bounce-like event type writes: the channel's
@@ -159,11 +186,13 @@ type WebhookStore interface {
 	DisableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, reason string, at time.Time) error
 	ParkEmailAlerts(ctx context.Context, userHash, reason string) (int64, error)
 	ChannelFor(ctx context.Context, userHash string, kind ChannelKind) (Channel, bool, error)
+	ComplainConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
 }
 
 // Webhook serves Resend's mail-events webhook: a bounce or complaint
-// disables every channel row at the recipient's address and parks the
-// email alerts of a user left with no working address.
+// disables every channel row at the recipient's address (a complaint about
+// a confirm mail only the requester's rows) and parks the email alerts of a
+// user left with no working address.
 type Webhook struct {
 	Secret []byte
 	Store  WebhookStore
@@ -225,7 +254,7 @@ func (w *Webhook) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		if addr == "" {
 			continue
 		}
-		err := w.handleAddress(ctx, addr, reason, at)
+		err := w.handleAddress(ctx, addr, event.confirmRequester(), reason, at)
 		if err != nil {
 			w.log("alerts: webhook %s for %s: %v", event.Type, addr, err)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -235,15 +264,28 @@ func (w *Webhook) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
-// handleAddress disables every channel row at addr, then parks the email
-// alerts of each affected user who has no working address left.
-func (w *Webhook) handleAddress(ctx context.Context, addr string, reason mailEventReason, at time.Time) error {
+// handleAddress disables every channel row at addr, or with requester set
+// only that user's rows, then parks the email alerts of each affected
+// user who has no working address left. A complaint about a confirm mail
+// is about whoever entered the address, not the users who own it.
+func (w *Webhook) handleAddress(ctx context.Context, addr, requester string, reason mailEventReason, at time.Time) error {
+	// Recorded first, on the address: the requester's row may not hold it
+	// yet, and a row removed and added again must not clear it.
+	if reason.channel == ReasonComplained {
+		err := w.Store.ComplainConfirmSend(ctx, requester, addr, at)
+		if err != nil {
+			return err
+		}
+	}
 	channels, err := w.Store.ChannelByAddress(ctx, ChannelEmail, addr)
 	if err != nil {
 		return err
 	}
 	var users []string
 	for _, ch := range channels {
+		if requester != "" && ch.UserHash != requester {
+			continue
+		}
 		err = w.Store.DisableChannel(ctx, ch.UserHash, ch.Kind, ch.Source, reason.channel, at)
 		if err != nil {
 			return err

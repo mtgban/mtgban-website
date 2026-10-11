@@ -46,6 +46,24 @@ func TestResendSendsTheMessageAndReturnsTheID(t *testing.T) {
 	if !ok || h["List-Unsubscribe"] != "<https://x/u>" {
 		t.Errorf("headers %v", got["headers"])
 	}
+	if _, ok := got["tags"]; ok {
+		t.Errorf("untagged mail sent tags %v", got["tags"])
+	}
+}
+
+func TestResendSendsTags(t *testing.T) {
+	var calls []map[string]any
+	srv := newResendServer(t, 200, `{"id":"m1"}`, &calls)
+	defer srv.Close()
+	r := &Resend{Key: "re_test", From: "a@b.c", Endpoint: srv.URL + "/emails", Client: srv.Client()}
+	_, err := r.Send(context.Background(), Message{To: "d@e.f", Subject: "s", Text: "t", Tags: map[string]string{"user": "ab12", "kind": "confirm"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(calls[0]["tags"])
+	if string(raw) != `[{"name":"kind","value":"confirm"},{"name":"user","value":"ab12"}]` {
+		t.Errorf("tags %s", raw)
+	}
 }
 
 func TestResendRetriesOnceOn429ThenGivesUp(t *testing.T) {
