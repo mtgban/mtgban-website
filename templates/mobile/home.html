@@ -5,8 +5,8 @@
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}" defer></script>
 {{end}}
 
 {{define "title"}}{{.Title}}{{end}}
@@ -78,5 +78,5 @@
 {{end}}
 
 {{define "extra-scripts"}}
-    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}" defer></script>
 {{end}}

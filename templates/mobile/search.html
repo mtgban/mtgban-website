@@ -21,11 +21,11 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js" as="script">
     {{end}}
     <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript">
         // What this page is the answer to, for the recent searches list: the
         // readable query the server rebuilt (a uuid search comes back as the
@@ -37,12 +37,12 @@
             found: {{if .CardHashes}}true{{else}}false{{end}}
         };
     </script>
-    <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}" defer></script>
     {{if .OfflineModeAllowed}}
-    <script type="text/javascript" src="/js/offline/offline-settings-mobile.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-settings-mobile.js?hash={{.Hash}}" defer></script>
     {{end}}
-    <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}" defer></script>
     {{if .PatreonLogin}}
     {{template "patreon-login-script" .}}
     {{end}}
@@ -88,7 +88,7 @@
         <button class="m-scope-go" id="nav-scope-go" type="button" title="Search with these pinned filters" aria-label="Search with these pinned filters">GO</button>
         <button class="m-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters">CLEAR</button>
     </div>
-    <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}" defer></script>
     {{end}}
 
     {{/* Toast notification */}}
@@ -181,7 +181,7 @@
             <button class="m-scope-go" id="nav-scope-go" type="button" title="Search with these pinned filters" aria-label="Search with these pinned filters">GO</button>
             <button class="m-scope-clear" id="nav-scope-clear" type="button" title="Clear pinned filters" aria-label="Clear pinned filters">CLEAR</button>
         </div>
-        <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}" defer></script>
         {{end}}
     </div>
 
@@ -959,9 +959,9 @@
 {{end}}
 
 {{define "extra-scripts"}}
-{{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}"></script>{{end}}
+{{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
 {{if not .DisableChart}}
-<script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}" defer></script>
 {{end}}
 <script>
 // Filter pills — toggle active within each group

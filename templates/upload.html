@@ -30,10 +30,10 @@
 
 {{define "content"}}
     <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
-    <script type="text/javascript" src="/js/upload-options.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/upload-presets.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/upload-options.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/upload-presets.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
@@ -437,7 +437,7 @@
                 buylist: {{if $.IsBuylist}}true{{else}}false{{end}}
             };
         </script>
-        <script type="text/javascript" src="/js/upload-form.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/upload-form.js?hash={{.Hash}}" defer></script>
 
     <br>
     <br>
@@ -858,8 +858,8 @@
         <div id="hoverWrap" class="foil-wrap hoverWrap">
             <img id="hoverImage" class="hoverImage" src="{{card_art_placeholder}}"/>
         </div>
-        <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}" defer></script>
+        <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}" defer></script>
 
         <p class="opt-intro">{{len .Optimized}} store splits for a theoretical maximum of <strong>$ {{printf "%.2f" .HighestTotal}}</strong></p>
 
@@ -1078,13 +1078,13 @@
     // contents of opened sealed products.
     window.BAN_UPLOAD_TABS = {unpacked: {{if .UnpackedSections}}true{{else}}false{{end}}};
     </script>
-    <script type="text/javascript" src="/js/upload-tabs.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/upload-tabs.js?hash={{.Hash}}" defer></script>
 
     {{if .Optimized}}
     <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
     <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
-    <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}" defer></script>
     {{end}}
 
     <!-- Printing picker overlay -->
@@ -1131,7 +1131,7 @@
             </div>
         </div>
     </div>
-    <script type="text/javascript" src="/js/upload-store-prompt.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/upload-store-prompt.js?hash={{.Hash}}" defer></script>
     {{end}}
 
     <!-- Hidden form for pick-printing re-submission and exports -->
@@ -1146,7 +1146,7 @@
         <input type="hidden" id="res_unpack" name="unpack" value="">
     </form>
 
-    <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}" defer></script>
 
     <!-- Reload button (hidden until a pick or remove is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
@@ -1170,7 +1170,7 @@
         }
     };
     </script>
-    <script type="text/javascript" src="/js/upload-printings.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/upload-printings.js?hash={{.Hash}}" defer></script>
 
     {{if ne .InfoMessage ""}}
         <br>
