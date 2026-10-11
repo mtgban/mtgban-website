@@ -189,14 +189,16 @@ function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
     var providerMode = false;
-    /* The name list arrives on the first focus, not at page load: it is
-     * 700 KB and most page views never touch the box. Folded once rather
-     * than per keystroke: the singles list is 37,000 names. */
+    /* The name list arrives on the first input, not at page load or on
+     * focus: it is 700 KB, and the navbar box takes focus on every page.
+     * Folded once rather than per keystroke: the singles list is 37,000
+     * names. */
     var arr = [], folded = [], squashed = [];
-    var namesRequested = false;
+    var namesRequested = false, namesFailed = false;
     function loadNames() {
         if (namesRequested) return;
         namesRequested = true;
+        namesFailed = false;
         fetchNames(sealed).then(function (names) {
             arr = names || [];
             folded = arr.map(__acFold);
@@ -206,13 +208,20 @@ function autocomplete(form, inp, sealed) {
             if (document.activeElement === inp && inp.value) {
                 inp.dispatchEvent(new Event('input'));
             }
-        }).catch(function () { namesRequested = false; });
+        }).catch(function () { namesRequested = false; namesFailed = true; });
     }
-    /* No { once: true }: a failed fetch resets namesRequested so the next
-     * focus retries, and loadNames itself is the guard against refetching
-     * after success. */
-    inp.addEventListener('focus', loadNames);
-    if (document.activeElement === inp) loadNames();
+    /* Ahead of the suggestion handler, and on every input: a failed fetch
+     * resets namesRequested so the next keystroke retries, and loadNames
+     * itself is the guard against refetching. */
+    inp.addEventListener('input', loadNames);
+    /* Text typed before this deferred script ran fired no input here; a
+     * value the page filled in is no reason to fetch. */
+    if (inp.value !== inp.defaultValue) loadNames();
+    /* Focus fetches only to retry a failed attempt for a query still in
+     * the box; the navbar box takes focus on every page. */
+    inp.addEventListener('focus', function () {
+        if (namesFailed && inp.value) loadNames();
+    });
 
     // Track viewport listeners so we can detach them when the dropdown closes
     var viewportListenersAttached = false;
@@ -595,7 +604,7 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
             var form = inp.form || (inp.closest ? inp.closest('form') : null);
             if (!form) return;
             if (inp.hasAttribute('data-autocomplete-value')) {
-                inp.value = inp.getAttribute('data-autocomplete-value');
+                inp.defaultValue = inp.getAttribute('data-autocomplete-value');
             }
             autocomplete(form, inp, inp.getAttribute('data-autocomplete'));
         });
