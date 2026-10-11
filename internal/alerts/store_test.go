@@ -1144,6 +1144,25 @@ func TestClaimConfirmSendOncePerAddress(t *testing.T) {
 	}
 }
 
+// TestDisableChannelAtSkipsAMovedRow covers a report about an address the
+// row no longer holds: it disables nothing.
+func TestDisableChannelAtSkipsAMovedRow(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	now := time.Now()
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "new@example.com", Source: SourceUser, VerifiedAt: &now}))
+	ok, err := s.DisableChannelAt(ctx, h, ChannelEmail, SourceUser, "old@example.com", ReasonBounced, now)
+	if err != nil || ok {
+		t.Fatalf("old address disabled the new one: %v %v", ok, err)
+	}
+	ok, err = s.DisableChannelAt(ctx, h, ChannelEmail, SourceUser, "NEW@example.com", ReasonBounced, now)
+	if err != nil || !ok {
+		t.Fatalf("own address: %v %v", ok, err)
+	}
+}
+
 // TestUpsertChannelCaseInsensitiveAddressKeepsVerified covers that
 // resubmitting the same address in a different case is not treated as a
 // changed address, so it does not clear verified_at.

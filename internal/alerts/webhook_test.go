@@ -192,6 +192,8 @@ type fakeWebhookStore struct {
 	parked      map[string]string // userHash -> reason
 	// complained is each confirm complaint, address -> requester.
 	complained map[string]string
+	// moved is the addresses whose rows hold another by the time they are disabled.
+	moved map[string]bool
 }
 
 func newFakeWebhookStore() *fakeWebhookStore {
@@ -210,12 +212,15 @@ func (f *fakeWebhookStore) ChannelByAddress(_ context.Context, _ ChannelKind, ad
 	return f.channels[strings.ToLower(address)], nil
 }
 
-func (f *fakeWebhookStore) DisableChannel(_ context.Context, userHash string, kind ChannelKind, source ChannelSource, reason string, _ time.Time) error {
+func (f *fakeWebhookStore) DisableChannelAt(_ context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason string, _ time.Time) (bool, error) {
 	if f.disableErr != nil {
-		return f.disableErr
+		return false, f.disableErr
+	}
+	if f.moved[address] {
+		return false, nil
 	}
 	f.disabled = append(f.disabled, disableCall{userHash, kind, source, reason})
-	return nil
+	return true, nil
 }
 
 func (f *fakeWebhookStore) ParkEmailAlerts(_ context.Context, userHash, reason string) (int64, error) {
@@ -363,6 +368,23 @@ func TestWebhookNormalizesTheReportedAddress(t *testing.T) {
 	wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
 	if rec.Code != http.StatusOK || len(store.disabled) != 1 {
 		t.Fatalf("status %d disabled %+v", rec.Code, store.disabled)
+	}
+}
+
+// A bounce for an address its row has since moved off leaves the row's
+// new address working, and parks nothing.
+func TestWebhookLateBounceSkipsAMovedRow(t *testing.T) {
+	secret := []byte("s")
+	now := time.Now()
+	store := newFakeWebhookStore()
+	store.channels["old@example.com"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &now}}
+	store.moved = map[string]bool{"old@example.com": true}
+	wh := &Webhook{Secret: secret, Store: store}
+	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":["old@example.com"]}}`)
+	rec := httptest.NewRecorder()
+	wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
+	if rec.Code != http.StatusOK || len(store.disabled) != 0 || len(store.parked) != 0 {
+		t.Fatalf("status %d disabled %+v parked %+v", rec.Code, store.disabled, store.parked)
 	}
 }
 

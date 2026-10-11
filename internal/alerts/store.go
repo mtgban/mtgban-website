@@ -290,13 +290,26 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 // DisableChannel marks a channel unusable, with the reason why. A complaint
 // is final: a row marked as spam keeps that reason and its time.
 func (s *Store) DisableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, reason string, at time.Time) error {
-	_, err := s.db.ExecContext(ctx, `
+	_, err := s.DisableChannelAt(ctx, userHash, kind, source, "", reason, at)
+	return err
+}
+
+// DisableChannelAt is DisableChannel for a row still holding address, an
+// empty one matching any; found is false when the row holds another by now,
+// so a late report about an old address leaves the new one alone.
+func (s *Store) DisableChannelAt(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason string, at time.Time) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
 		UPDATE alert_channels
 		   SET disabled_at = CASE WHEN disabled_reason = $6 THEN disabled_at ELSE $5 END,
 		       disabled_reason = CASE WHEN disabled_reason = $6 THEN disabled_reason ELSE $4 END,
 		       updated_at = now()
-		 WHERE user_hash = $1 AND kind = $2 AND source = $3`, userHash, kind, source, reason, at, ReasonComplained)
-	return err
+		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND ($7 = '' OR lower(address) = lower($7))`,
+		userHash, kind, source, reason, at, ReasonComplained, address)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // EnableChannel clears a channel's disabled state, unless it was marked as
