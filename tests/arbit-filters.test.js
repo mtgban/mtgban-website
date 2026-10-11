@@ -10,6 +10,7 @@ function load(cfg, form = null, elements = {}, saved = {}, env = {}) {
         BAN_ARBIT: cfg,
         location: { href: '', search: env.search || '', reload: () => reloads.push(1) },
         addEventListener: (ev, fn) => { listeners['window:' + ev] = fn; },
+        UserState: env.userState,
     };
     const localStorage = env.local || fakeStorage();
     const sessionStorage = env.session || fakeStorage();
@@ -204,26 +205,35 @@ test('a save keeps the synced copy with the same time as the cookie', () => {
     expect(decodeURIComponent(cookies[cookies.length - 1][1])).toBe('f=1&minsell=2&t=' + stored.arbit.t);
 });
 
+test('a save is stamped on the server\'s clock where a sync has read it', () => {
+    const local = fakeStorage();
+    const { window, cookies, localStorage } = load({ source: 'CK', query: 'f=1', cookie: 'ArbitFilters' }, null, {}, {},
+        { local, userState: { now: () => 4242, clamp: (t) => t, later: (a, b) => a > b } });
+    window.ArbitFilters.save('f=1&minsell=2');
+    expect(decodeURIComponent(cookies[0][1])).toBe('f=1&minsell=2&t=4242');
+    expect(JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit.t).toBe(4242);
+});
+
 test('filters applied later on another device reach the cookies, and the page reloads once', () => {
     const synced = { arbit: { q: 'f=1&minsell=9', t: 200 }, global: { q: 'f=1&minsell=7', t: 50 } };
     const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify(synced) });
     const session = fakeStorage();
     const saved = { ArbitFilters: 'f=1&minsell=2&t=100', GlobalFilters: 'f=1&minsell=3&t=60' };
-    const { cookies, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, saved, { local, session });
+    const { cookies, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {}, saved, { local, session });
     expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['ArbitFilters', 'f=1&minsell=9&t=200']]);
     expect(reloads.length).toBe(1);
 
     // Drawn again from the same older cookie, as when cookies are blocked
-    const again = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, { ArbitFilters: 'f=1&minsell=2&t=100' }, { local, session });
+    const again = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {}, { ArbitFilters: 'f=1&minsell=2&t=100' }, { local, session });
     expect(again.reloads.length).toBe(0);
 });
 
 test('a page opened from a link, or drawn from the newest state, does not reload', () => {
     const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: 200 } }) });
-    const linked = load({ source: 'CK', query: 'f=1&minsell=4', cookie: 'ArbitFilters', savedAt: 0 }, null, {}, {}, { local, search: '?source=CK&f=1&minsell=4' });
+    const linked = load({ source: 'CK', query: 'f=1&minsell=4', cookie: 'ArbitFilters' }, null, {}, {}, { local, search: '?source=CK&f=1&minsell=4' });
     expect(linked.reloads.length).toBe(0);
     expect(linked.cookies.map((c) => c[0])).toEqual(['ArbitFilters']);
-    const current = load({ source: 'CK', query: 'f=1&minsell=9', cookie: 'ArbitFilters', savedAt: 200 }, null, {}, { ArbitFilters: 'f=1&minsell=9&t=200' }, { local });
+    const current = load({ source: 'CK', query: 'f=1&minsell=9', cookie: 'ArbitFilters' }, null, {}, { ArbitFilters: 'f=1&minsell=9&t=200' }, { local });
     expect(current.reloads.length).toBe(0);
     expect(current.cookies.length).toBe(0);
 });
@@ -231,7 +241,7 @@ test('a page opened from a link, or drawn from the newest state, does not reload
 test('a cookie the synced copy never held is copied into it, without a reload', () => {
     const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ global: { q: 'f=1&minsell=7', t: 300 } }) });
     const saved = { ArbitFilters: 'cond=NM%2CSP&f=1&minsell=2&t=100', GlobalFilters: 'f=1&minsell=3&t=50' };
-    const { cookies, reloads, localStorage } = load({ source: 'CK', query: 'cond=NM%2CSP&f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, saved, { local });
+    const { cookies, reloads, localStorage } = load({ source: 'CK', query: 'cond=NM%2CSP&f=1&minsell=2', cookie: 'ArbitFilters' }, null, {}, saved, { local });
     const stored = JSON.parse(localStorage.getItem('mtgban_arbit_filters'));
     expect(stored.arbit).toEqual({ q: 'cond=NM%2CSP&f=1&minsell=2', t: 100 });
     expect(stored.global).toEqual({ q: 'f=1&minsell=7', t: 300 });
@@ -244,7 +254,112 @@ test('nothing is copied either way where the two agree', () => {
     const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: 100 } }) });
     let writes = 0;
     const counting = Object.assign({}, local, { setItem: (k, v) => { writes++; local.setItem(k, v); } });
-    const { cookies } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters', savedAt: 100 }, null, {}, { ArbitFilters: 'f=1&minsell=2&t=100' }, { local: counting });
+    const { cookies } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {}, { ArbitFilters: 'f=1&minsell=2&t=100' }, { local: counting });
     expect(cookies.length).toBe(0);
     expect(writes).toBe(0);
+});
+
+// The clock user-state.js keeps, loaded signed out so that it reads the
+// device's own
+function deviceUserState() {
+    const window = { addEventListener() {} };
+    const source = readFileSync(new URL('../js/user-state.js', import.meta.url), 'utf8');
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, { cookie: '', readyState: 'complete', addEventListener() {} }, fakeStorage(), fakeStorage(), null, { mtime: () => 0 });
+    return window.UserState;
+}
+
+test('a cookie stamped ahead of the clock loses to synced filters on it, which a merge settled', () => {
+    const hour = 60 * 60 * 1000, onTime = Date.now() - 60 * 1000, ahead = Date.now() + hour;
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: onTime } }) });
+    const saved = { ArbitFilters: 'f=1&minsell=2&t=' + ahead };
+    const { cookies, localStorage, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {}, saved,
+        { local, userState: deviceUserState() });
+    expect(JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit).toEqual({ q: 'f=1&minsell=9', t: onTime });
+    expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['ArbitFilters', 'f=1&minsell=9&t=' + onTime]]);
+    expect(reloads.length).toBe(1);
+});
+
+// Runs user-state.js's sync of a device's saved filters with the server's,
+// a dirty device's merge or a clean one's hydrate, and returns its storage
+// and clock for the page to load with.
+async function mergedFilters(local, server, dirty = true) {
+    const source = readFileSync(new URL('../js/user-state.js', import.meta.url), 'utf8');
+    const storage = fakeStorage(Object.assign({ mtgban_arbit_filters: JSON.stringify(local) }, dirty ? { mtgban_userstate_dirty: '1' } : {}));
+    const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_arbit_filters: JSON.stringify(server) } };
+    const window = { addEventListener() {} };
+    const fetch = () => Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} }, storage, fakeStorage(), fetch,
+        { mtime: (x) => x.m || x.t || 0, tombstones: () => [] }, () => 0, () => {});
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    return { local: storage, userState: window.UserState };
+}
+
+test('filters applied signed out on a fast clock survive signing in', async () => {
+    const ahead = Date.now() + 60 * 60 * 1000;
+    // Signed out, a save writes the cookie and the saved copy but marks nothing to sync
+    const { local, userState } = await mergedFilters(
+        { arbit: { q: 'f=1&minsell=2', t: ahead } },
+        { arbit: { q: 'f=1&minsell=9', t: Date.now() - 60 * 1000 } }, false);
+    const { cookies, localStorage, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {},
+        { ArbitFilters: 'f=1&minsell=2&t=' + ahead }, { local, userState });
+    expect(JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit.q).toBe('f=1&minsell=2');
+    expect(savedQuery(cookies[cookies.length - 1])).toBe('f=1&minsell=2');
+    expect(reloads.length).toBe(0);
+});
+
+test('filters a merge picked between two copies ahead of the clock hold against the losing cookie', async () => {
+    const hour = 60 * 60 * 1000, mine = Date.now() + hour;
+    const { local, userState } = await mergedFilters(
+        { arbit: { q: 'f=1&minsell=2', t: mine } },
+        { arbit: { q: 'f=1&minsell=9', t: mine + 5000 } });
+    const { cookies, localStorage, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {},
+        { ArbitFilters: 'f=1&minsell=2&t=' + mine }, { local, userState });
+    const stored = JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit;
+    expect(stored.q).toBe('f=1&minsell=9');
+    expect(Math.abs(stored.t - Date.now())).toBeLessThan(1000);
+    expect(decodeURIComponent(cookies[cookies.length - 1][1])).toBe('f=1&minsell=9&t=' + stored.t);
+    expect(reloads.length).toBe(1);
+});
+
+test('a cookie and a synced copy tied ahead of the clock both come back to it', () => {
+    const ahead = Date.now() + 60 * 60 * 1000;
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: ahead } }) });
+    const { cookies, localStorage, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {},
+        { ArbitFilters: 'f=1&minsell=2&t=' + ahead }, { local, userState: deviceUserState() });
+    const stored = JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit;
+    expect(stored.q).toBe('f=1&minsell=2');
+    expect(Math.abs(stored.t - Date.now())).toBeLessThan(1000);
+    expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['ArbitFilters', 'f=1&minsell=2&t=' + stored.t]]);
+    expect(reloads.length).toBe(0);
+});
+
+test('synced filters that beat the cookie both ahead of the clock reload the page to them', () => {
+    const hour = 60 * 60 * 1000;
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: Date.now() + 2 * hour } }) });
+    const cookieAt = Date.now() + hour;
+    const { cookies, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {},
+        { ArbitFilters: 'f=1&minsell=2&t=' + cookieAt }, { local, userState: deviceUserState() });
+    expect(savedQuery(cookies[cookies.length - 1])).toBe('f=1&minsell=9');
+    expect(reloads.length).toBe(1);
+});
+
+test('newer synced filters that read as the page\'s own restamp the cookie without a reload', () => {
+    const local = fakeStorage({ mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: 200 } }) });
+    const { cookies, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {},
+        { ArbitFilters: 'f=1&minsell=2&t=100' }, { local });
+    expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['ArbitFilters', 'f=1&minsell=2&t=200']]);
+    expect(reloads.length).toBe(0);
+});
+
+test('a cookie stamped ahead of the clock, alone, is kept as made now', () => {
+    const ahead = Date.now() + 60 * 60 * 1000;
+    const { cookies, localStorage, reloads } = load({ source: 'CK', query: 'f=1&minsell=2', cookie: 'ArbitFilters' }, null, {},
+        { ArbitFilters: 'f=1&minsell=2&t=' + ahead }, { userState: deviceUserState() });
+    const stored = JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit;
+    expect(stored.q).toBe('f=1&minsell=2');
+    expect(Math.abs(stored.t - Date.now())).toBeLessThan(1000);
+    expect(cookies.map((c) => [c[0], decodeURIComponent(c[1])])).toEqual([['ArbitFilters', 'f=1&minsell=2&t=' + stored.t]]);
+    expect(reloads.length).toBe(0);
 });

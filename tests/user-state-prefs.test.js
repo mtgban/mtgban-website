@@ -175,3 +175,199 @@ test('arbitrage presets made on two devices both survive, and a delete sticks', 
     expect(pushed.filter((p) => !p.del).map((p) => p.id)).toEqual(['p_a', 'p_b']);
     expect(pushed.find((p) => p.id === 'p_c').del).toBe(true);
 });
+
+test('a sync response\'s Date sets the clock the saved filters are stamped with', async () => {
+    const m = {};
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {} };
+    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    // The server's clock an hour behind this device's
+    const server = new Date(Date.now() - 60 * 60 * 1000).toUTCString();
+    const res = {
+        status: 200, ok: true, headers: { get: (h) => (h === 'Date' ? server : null) },
+        json: () => Promise.resolve({ version: 3, favorites: [], recents: [], preferences: {} }),
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, document, storage, session, () => Promise.resolve(res), { mtime: (x) => x.m || x.t || 0 });
+    expect(Math.abs(window.UserState.now() - Date.now())).toBeLessThan(1000);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(Math.abs(window.UserState.now() - (Date.parse(server) + 500))).toBeLessThan(1000);
+});
+
+// The clock a page loads with, signed out so that no response resets it,
+// from an offset another page stored at the time given.
+function clockAt(skew, at) {
+    const m = { mtgban_userstate_clock: JSON.stringify({ skew, at }) };
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const window = { addEventListener() {} };
+    const document = { cookie: '', readyState: 'complete', addEventListener() {} };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, document, storage, {}, () => Promise.reject(new Error('no fetch')), { mtime: () => 0 });
+    return window.UserState.now() - Date.now();
+}
+
+test('a stored clock offset holds only while it is younger than a hydrate\'s TTL', () => {
+    const hour = 60 * 60 * 1000;
+    expect(Math.abs(clockAt(-hour, Date.now() - 10 * 1000) + hour)).toBeLessThan(100);
+    // Stored ten minutes ago, or ahead of a clock set back since
+    expect(Math.abs(clockAt(-hour, Date.now() - 10 * 60 * 1000))).toBeLessThan(100);
+    expect(Math.abs(clockAt(-hour, Date.now() + hour))).toBeLessThan(100);
+});
+
+// The clock a hydrate leaves, its response arriving rtt after the request
+// with a Date the server wrote halfway, on the device's own clock, and an
+// offset of held already stored. jump then sets the device clock by, after
+// passes, and asleep passes with performance.now() stopped, as in a sleep.
+async function clockAfterTrip(rtt, held, jump = 0, after = 0, asleep = 0) {
+    const clock = { t: 1700000000000, p: 5000 };
+    const FakeDate = { now: () => clock.t, parse: Date.parse };
+    const FakePerf = { now: () => clock.p };
+    const m = { mtgban_userstate_clock: JSON.stringify({ skew: held, at: clock.t - 1000 }) };
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const window = { addEventListener() {} };
+    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const date = new Date(clock.t + rtt / 2).toUTCString();
+    const fetch = () => {
+        clock.t += rtt;
+        clock.p += rtt;
+        return Promise.resolve({ status: 304, ok: false, headers: { get: (h) => (h === 'Date' ? date : null) } });
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'Date', 'performance', source)(
+        window, document, storage, { getItem: () => null, setItem() {} }, fetch, { mtime: () => 0 }, FakeDate, FakePerf);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    const real = clock.t + after + asleep;
+    clock.t += jump + after + asleep;
+    clock.p += after;
+    return window.UserState.now() - real;
+}
+
+test('the clock offset reads a response\'s Date against the middle of its round trip', async () => {
+    // The header's half second, on a clock the device shares
+    expect(await clockAfterTrip(2000, 0)).toBe(500);
+    // Too slow a trip keeps the offset held
+    expect(await clockAfterTrip(10000, 1234)).toBe(1234);
+});
+
+test('an open page\'s clock runs on past a correction to the device\'s', async () => {
+    expect(await clockAfterTrip(2000, 0, -60 * 60 * 1000, 5000)).toBe(500);
+});
+
+test('an open page\'s clock runs on through a sleep that stops performance.now()', async () => {
+    expect(await clockAfterTrip(2000, 0, 0, 0, 10 * 60 * 60 * 1000)).toBe(500);
+});
+
+test('a delete stamped ahead of the clock still beats an older save, as made now', async () => {
+    const day = 24 * 60 * 60 * 1000, hour = 60 * 60 * 1000;
+    const pushed = await reconcilePresets(
+        [{ id: 'p_x', del: true, savedAt: Date.now() + hour }, preset('p_a', 'A1', Date.now() + hour)],
+        [preset('p_x', 'X', Date.now() - day), preset('p_a', 'A2', Date.now() + 2 * hour)]);
+    const x = pushed.find((p) => p.id === 'p_x');
+    expect(x.del).toBe(true);
+    expect(Math.abs(x.savedAt - Date.now())).toBeLessThan(1000);
+    // Of two copies brought back to now together, the later one as given wins
+    expect(pushed.find((p) => p.id === 'p_a').name).toBe('A2');
+});
+
+// Hydrates a clean device from a server an hour behind this device's clock,
+// holding preferences, and returns what the device stored and the
+// preferences it then sends back.
+async function hydrateBehind(preferences) {
+    const m = {};
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const date = new Date(Date.now() - 60 * 60 * 1000).toUTCString();
+    const patches = [];
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') patches.push(JSON.parse(opts.body).data);
+        const body = { version: 3, favorites: [], recents: [], preferences };
+        return Promise.resolve({ status: 200, ok: true, headers: { get: (h) => (h === 'Date' ? date : null) }, json: () => Promise.resolve(body) });
+    };
+    const timers = [];
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] },
+        (fn) => timers.push(fn), () => {});
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    timers.splice(0).forEach((fn) => fn());
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    return { stored: m, patches, serverNow: Date.parse(date) + 500 };
+}
+
+test('stamps ahead of the server\'s clock count as made now, on hydrate and in a merge', async () => {
+    const hour = 60 * 60 * 1000;
+    const ahead = Date.now();
+    const { stored, patches, serverNow } = await hydrateBehind({
+        mtgban_arbit_filters: JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: ahead } }),
+        mtgban_upload_presets: JSON.stringify([preset('p_a', 'A', ahead)]),
+    });
+    const filters = JSON.parse(stored.mtgban_arbit_filters);
+    expect(Math.abs(filters.arbit.t - serverNow)).toBeLessThan(1000);
+    expect(Math.abs(JSON.parse(stored.mtgban_upload_presets)[0].savedAt - serverNow)).toBeLessThan(1000);
+    expect(patches.length).toBe(1);
+    expect(JSON.parse(patches[0].mtgban_arbit_filters)).toEqual(filters);
+
+    const pushed = await reconcileArbit(
+        { arbit: { q: 'f=1&minsell=2', t: Date.now() + hour }, global: { q: 'f=1&minsell=7', t: Date.now() + hour } },
+        { arbit: { q: 'f=1&minsell=9', t: Date.now() - 1000 }, global: { q: 'f=1', t: Date.now() + hour + 1 } });
+    expect(pushed.arbit.q).toBe('f=1&minsell=2');
+    expect(pushed.arbit.t).toBeLessThan(Date.now() + 1000);
+    // Both counting as now, the later as given wins
+    expect(pushed.global.q).toBe('f=1');
+});
+
+// syncDevice loads user-state.js on a device whose clock runs skew ahead
+// of a server shared with other devices, lets its sync and any write it
+// schedules run, and returns the requests it sent.
+async function syncDevice(server, device) {
+    const FakeDate = { now: () => Date.now() + device.skew, parse: Date.parse };
+    const storage = { getItem: (k) => (k in device.m ? device.m[k] : null), setItem: (k, v) => { device.m[k] = String(v); }, removeItem: (k) => { delete device.m[k]; } };
+    const sent = [];
+    const reply = (status, body) => Promise.resolve({
+        status, ok: status === 200, headers: { get: (h) => (h === 'Date' ? new Date().toUTCString() : null) },
+        json: () => Promise.resolve(body),
+    });
+    const state = () => ({ version: server.version, favorites: [], recents: [], preferences: Object.assign({}, server.preferences) });
+    const fetch = (url, opts) => {
+        const method = (opts && opts.method) || 'GET';
+        sent.push(method);
+        if (method === 'GET') return reply(200, state());
+        const body = JSON.parse(opts.body);
+        if (body.version !== server.version) return reply(409, state());
+        server.preferences = method === 'PUT' ? body.preferences : body.data;
+        server.version++;
+        return reply(200, { version: server.version });
+    };
+    const timers = [];
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', 'Date', source)(
+        { addEventListener() {} }, { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} }, storage,
+        { getItem: () => null, setItem() {} }, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] },
+        (fn) => timers.push(fn), () => {}, FakeDate);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    timers.splice(0).forEach((fn) => fn());
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    return sent;
+}
+
+test('a device an hour fast that saved before its first sync leaves the server on the clock', async () => {
+    const hour = 60 * 60 * 1000;
+    const server = { version: 1, preferences: {} };
+    const a = { skew: hour, m: {} };
+    const b = { skew: 0, m: {} };
+    a.m.mtgban_userstate_dirty = '1';
+    a.m.mtgban_arbit_filters = JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: Date.now() + hour } });
+    expect(await syncDevice(server, a)).toContain('PUT');
+    expect(JSON.parse(server.preferences.mtgban_arbit_filters).arbit.t).toBeLessThan(Date.now() + 1000);
+
+    // 1.5 s on, as in the review, past the header's whole second: A syncs
+    // again, then B applies other filters, and they hold on both devices
+    await new Promise((r) => setTimeout(r, 1500));
+    await syncDevice(server, a);
+    expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=2');
+    b.m.mtgban_userstate_dirty = '1';
+    b.m.mtgban_arbit_filters = JSON.stringify({ arbit: { q: 'f=1&minsell=9', t: Date.now() } });
+    await syncDevice(server, b);
+    expect(JSON.parse(server.preferences.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
+    await syncDevice(server, a);
+    expect(JSON.parse(a.m.mtgban_arbit_filters).arbit.q).toBe('f=1&minsell=9');
+});

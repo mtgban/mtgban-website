@@ -70,6 +70,56 @@
         } catch (e) { return fallback; }
     }
 
+    // The server's clock, read off the Date header of each sync response:
+    // saved filters and presets are stamped with it, so that a device whose
+    // clock runs fast cannot outdate what another applied after it. It runs
+    // on from its last sample by whichever of Date.now() and
+    // performance.now() moved more: a clock set back while the page is open
+    // moves only the second, and a system sleep, which stops it, only the
+    // first; a clock set forward overshoots by what later() lets through.
+    // A page takes the offset another page stored only if it is younger than
+    // TTL_MS on this device's clock, as it is wherever hydrate skips its
+    // request: a clock corrected since moves that age out of range.
+    var CLOCK_KEY = 'mtgban_userstate_clock';
+    var clock = (function() {
+        try {
+            var c = JSON.parse(readLocal(CLOCK_KEY, 'null'));
+            var age = c ? Date.now() - c.at : NaN;
+            var now = Date.now();
+            return age >= 0 && age <= TTL_MS && isFinite(c.skew) ? { server: now + c.skew, perf: performance.now(), date: now } : null;
+        } catch (e) { return null; }
+    })();
+    // The header was written somewhere in the round trip from sent, on
+    // performance.now(): its middle is the nearest guess, and a trip longer
+    // than CLOCK_RTT_MAX_MS leaves too wide a guess to replace the sample.
+    var CLOCK_RTT_MAX_MS = 3000;
+    function noteServerClock(r, sent) {
+        var date = r && r.headers && typeof r.headers.get === 'function' ? Date.parse(r.headers.get('Date')) : NaN;
+        var at = performance.now();
+        if (!isFinite(date) || !(at - sent >= 0 && at - sent <= CLOCK_RTT_MAX_MS)) return;
+        // The header counts whole seconds, so its midpoint is nearer
+        var now = Date.now();
+        clock = { server: date + 500, perf: (sent + at) / 2, date: now - (at - sent) / 2 };
+        try { rawSetItem(CLOCK_KEY, JSON.stringify({ skew: serverNow() - now, at: now })); } catch (e) {}
+    }
+    function serverNow() {
+        if (!clock) return Date.now();
+        return clock.server + Math.max(Date.now() - clock.date, performance.now() - clock.perf);
+    }
+    // A stamp ahead of the server's clock, made before a device's first sync
+    // or by an older version, counts as made now: else it outdates every
+    // change until the clock catches up. later compares two stamps so, and
+    // two that come out the same by the stamps as given, so that ones
+    // brought back together keep their order.
+    var CLOCK_TOLERANCE_MS = 5000;
+    function onClock(t, now) { return t > now + CLOCK_TOLERANCE_MS ? now : t; }
+    function clampStamp(t) { return onClock(t, serverNow()); }
+    function later(a, b) {
+        var now = serverNow(), x = onClock(a || 0, now), y = onClock(b || 0, now);
+        return x !== y ? x > y : (a || 0) > (b || 0);
+    }
+    window.UserState = { now: serverNow, clamp: clampStamp, later: later };
+
     function readMarker() {
         try { var s = sessionStorage.getItem(FETCH_KEY); return s ? JSON.parse(s) : null; }
         catch (e) { return null; }
@@ -154,9 +204,16 @@
                 writeFP('recents', JSON.stringify(recents.map(trimRecent)));
             }
             if (state.preferences) {
-                Object.keys(state.preferences).forEach(function(k) {
-                    if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(state.preferences[k]));
+                // The saved filters merge in, should one have been applied
+                // signed out: on a synced device the server's are as new
+                var mine = {};
+                if (readLocal(ARBIT_KEY, null) != null) mine[ARBIT_KEY] = readLocal(ARBIT_KEY, null);
+                var prefs = mergePrefs(mine, state.preferences);
+                Object.keys(prefs).forEach(function(k) {
+                    if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(prefs[k]));
                 });
+                // A list the merge repaired goes back to the server
+                if (canonJSON(prefs) !== canonJSON(state.preferences)) { markDirty(); schedule('preferences'); }
             }
         } catch (e) {}
         if (typeof state.version === 'number') version = state.version;
@@ -179,12 +236,14 @@
         // Content already on the server: succeed without a request.
         if (fpMatches(section, payloadJSON)) return Promise.resolve(true);
         var body = '{"data":' + payloadJSON + ',"version":' + version + '}';
+        var sent = performance.now();
         return fetch(BASE + section, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: body,
             keepalive: keepalive === true
         }).then(function(r) {
+            noteServerClock(r, sent);
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
             if (!r.ok) {
                 console.warn('mtgban sync: ' + section + ' write failed (' + r.status + ')');
@@ -285,11 +344,13 @@
             favorites: mergedFavs.map(trimFavorite), recents: mergedRecents.map(trimRecent),
             preferences: mergedPrefs, version: version
         });
+        var sent = performance.now();
         return fetch(BASE, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: body
         }).then(function(r) {
+            noteServerClock(r, sent);
             if (r.status === 409) {
                 // Someone else wrote; merge again, up to the retry budget.
                 if (attempt >= MAX_RECONCILE_ATTEMPTS) return false;
@@ -394,41 +455,46 @@
 
     // Preferences: last-write-wins per key (local wins on first merge), but
     // the upload and arbitrage presets, lists of their own, merge preset by
-    // preset, and the saved arbitrage filters page group by page group.
+    // preset, and the saved arbitrage filters page group by page group. A
+    // list on one side only goes through its merge too, to be repaired.
     function mergePrefs(localPrefs, serverPrefs) {
+        localPrefs = localPrefs || {};
+        serverPrefs = serverPrefs || {};
         var out = {};
-        Object.keys(serverPrefs || {}).forEach(function(k) { out[k] = serverPrefs[k]; });
-        Object.keys(localPrefs || {}).forEach(function(k) { out[k] = localPrefs[k]; });
-        if (localPrefs && serverPrefs && PRESETS_KEY in localPrefs && PRESETS_KEY in serverPrefs) {
-            out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
-        }
-        if (localPrefs && serverPrefs && ARBIT_PRESETS_KEY in localPrefs && ARBIT_PRESETS_KEY in serverPrefs) {
-            out[ARBIT_PRESETS_KEY] = mergePresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
-        }
-        if (localPrefs && serverPrefs && ARBIT_KEY in localPrefs && ARBIT_KEY in serverPrefs) {
-            out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
-        }
+        Object.keys(serverPrefs).forEach(function(k) { out[k] = serverPrefs[k]; });
+        Object.keys(localPrefs).forEach(function(k) { out[k] = localPrefs[k]; });
+        if (PRESETS_KEY in out) out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
+        if (ARBIT_PRESETS_KEY in out) out[ARBIT_PRESETS_KEY] = mergePresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
+        if (ARBIT_KEY in out) out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
         return out;
     }
 
     // Merge two copies of the saved arbitrage filters, one state per page
-    // group (arbit, global): the one applied later (t) wins, ties keep the
-    // local copy.
+    // group (arbit, global): the one applied later (t, by later) wins, ties
+    // keep the local copy, and a winner ahead of the server's clock comes
+    // back to it, which a sync then sends on so the server stops holding it.
     function mergeArbitFilters(local, server) {
         function parse(s) {
             try { var o = JSON.parse(s); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; }
         }
+        function stamp(e) { return (e && e.t) || 0; }
         var l = parse(local), sv = parse(server), out = {};
         Object.keys(sv).forEach(function(g) { out[g] = sv[g]; });
         Object.keys(l).forEach(function(g) {
-            if (!out[g] || ((l[g] && l[g].t) || 0) >= ((out[g] && out[g].t) || 0)) out[g] = l[g];
+            if (!out[g] || !later(stamp(out[g]), stamp(l[g]))) out[g] = l[g];
+        });
+        var now = serverNow();
+        Object.keys(out).forEach(function(g) {
+            if (out[g] && typeof out[g].t === 'number') out[g].t = onClock(out[g].t, now);
         });
         return JSON.stringify(out);
     }
 
-    // Merge two preset lists by id: the newer save or delete (savedAt) wins,
-    // ties keep the local copy. Live presets by name, then the deletes.
-    function mergePresets(local, server) {
+    // Merge two preset lists by id: the newer save or delete (savedAt, by
+    // later) wins, ties keep the local copy. Live presets by name, then the
+    // deletes. The stamps stay as given, to rank before presetsOnClock
+    // brings them back.
+    function mergePresetList(local, server) {
         function parse(s) {
             try { var l = JSON.parse(s); return Array.isArray(l) ? l : []; } catch (e) { return []; }
         }
@@ -438,7 +504,7 @@
             if (!p || !p.id) return;
             var cur = byId[p.id];
             if (!cur) order.push(p.id);
-            if (!cur || (p.savedAt || 0) > (cur.savedAt || 0)) byId[p.id] = p;
+            if (!cur || later(p.savedAt, cur.savedAt)) byId[p.id] = p;
         });
         var merged = order.map(function(id) { return byId[id]; });
         var live = merged.filter(function(p) { return !p.del; });
@@ -446,7 +512,18 @@
             var x = String(a.name).toLowerCase(), y = String(b.name).toLowerCase();
             return x < y ? -1 : x > y ? 1 : 0;
         });
-        return JSON.stringify(live.concat(merged.filter(function(p) { return p.del; })));
+        return live.concat(merged.filter(function(p) { return p.del; }));
+    }
+
+    // presetsOnClock is a merged list as stored, its stamps on the server's clock.
+    function presetsOnClock(list) {
+        var now = serverNow();
+        list.forEach(function(p) { if (typeof p.savedAt === 'number') p.savedAt = onClock(p.savedAt, now); });
+        return JSON.stringify(list);
+    }
+
+    function mergePresets(local, server) {
+        return presetsOnClock(mergePresetList(local, server));
     }
 
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
@@ -509,7 +586,9 @@
             headers['If-None-Match'] = '"' + marker.v + '"';
         }
 
+        var sent = performance.now();
         fetch(BASE, { method: 'GET', headers: headers }).then(function(r) {
+            noteServerClock(r, sent);
             if (r.status === 304) { writeMarker(version); return null; } // unchanged
             if (r.status === 401 || r.status === 503) return null; // anon / unavailable
             if (!r.ok) return null;
