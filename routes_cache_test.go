@@ -7,9 +7,9 @@ import (
 )
 
 // A static file requested with the running build's hash never changes at
-// that URL, so it may be cached for 30 days; any other hash, no hash, or
-// dev mode (where the hash never names a real deploy) keeps the one-day
-// value.
+// that URL, so it may be cached for 30 days. Another hash revalidates every
+// time: during a rolling deploy an old instance can answer for the new hash.
+// No hash, or dev mode, keeps the one-day value.
 func TestStaticCacheControlFollowsTheHash(t *testing.T) {
 	savedDev, savedCommit := DevMode, BuildCommit
 	DevMode = false
@@ -21,7 +21,7 @@ func TestStaticCacheControlFollowsTheHash(t *testing.T) {
 		want string
 	}{
 		{"/css/main.css?hash=9e551ed0", "public, max-age=2592000, immutable"},
-		{"/css/main.css?hash=deadbeef", "public, max-age=86400"},
+		{"/css/main.css?hash=deadbeef", "no-cache"},
 		{"/js/utils.js?hash=", "public, max-age=86400"},
 		{"/img/logo/ban-round.png", "public, max-age=86400"},
 	} {
@@ -29,6 +29,12 @@ func TestStaticCacheControlFollowsTheHash(t *testing.T) {
 		if got := staticCacheControl(req); got != c.want {
 			t.Errorf("%s: Cache-Control %q, want %q", c.url, got, c.want)
 		}
+	}
+
+	DevMode = true
+	req := httptest.NewRequest(http.MethodGet, "/css/main.css?hash=deadbeef", nil)
+	if got := staticCacheControl(req); got != "public, max-age=86400" {
+		t.Errorf("dev mode: Cache-Control %q, want a day", got)
 	}
 }
 
