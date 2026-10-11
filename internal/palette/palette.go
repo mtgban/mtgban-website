@@ -747,7 +747,11 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	if _, contentsErr := sealed.ProductDecklist(b, co.SetCode, co.UUID); contentsErr == nil {
 		resp.HasContents = true
 	}
-	if _, picksErr := sealed.ProductPicks(b, co.SetCode, co.UUID); picksErr == nil {
+	// Pack-pull mode shows one opening, so it is offered where an opening can
+	// hold something. The counts say so without drawing one, and a product
+	// with nothing to open, or only accessories, lists none.
+	counts, countsErr := sealed.ProductCounts(b, co.SetCode, co.UUID)
+	if countsErr == nil && len(counts) > 0 {
 		resp.HasPicks = true
 	}
 

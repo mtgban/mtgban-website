@@ -1,6 +1,9 @@
 package palette
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"testing"
 
@@ -71,6 +74,50 @@ func TestSetMark(t *testing.T) {
 		got := SetMark(tc.code, tc.name)
 		if got != tc.want {
 			t.Errorf("SetMark(%q, %q) = %q, want %q", tc.code, tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestSealedOffersPicksOnlyWhereAnOpeningHoldsCards pins hasPicks: a product
+// whose contents open to nothing, as one listing no contents does, offers no
+// pack pull, while one holding a booster does.
+func TestSealedOffersPicksOnlyWhereAnOpeningHoldsCards(t *testing.T) {
+	b := mtgmatcher.NewBackend()
+	b.UUIDs["c1"] = &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: "c1", SetCode: "AAA"}}
+	// Decoded the way a datastore is, so a field added upstream does not
+	// break the test.
+	var booster mtgmatcher.Booster
+	err := json.Unmarshal([]byte(`{
+		"boosters": [{"contents": {"common": 1}, "weight": 1}],
+		"boostersTotalWeight": 1,
+		"sheets": {"common": {"cards": {"c1": 1}, "totalWeight": 1}}
+	}`), &booster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := &mtgmatcher.Set{Code: "AAA", Booster: map[string]mtgmatcher.Booster{"draft": booster}}
+	set.SealedProduct = []mtgmatcher.SealedProduct{
+		{UUID: "empty", Name: "Empty"},
+		{UUID: "pack", Name: "Pack", Contents: map[string][]mtgmatcher.SealedContent{
+			"pack": {{Set: "aaa", Code: "draft"}},
+		}},
+	}
+	for _, product := range set.SealedProduct {
+		b.UUIDs[product.UUID] = &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: product.UUID, SetCode: "AAA"}, Sealed: true}
+	}
+	b.Sets = map[string]*mtgmatcher.Set{"AAA": set}
+	s := &Service{Backend: func() *mtgmatcher.Backend { return b }}
+
+	for uuid, want := range map[string]bool{"empty": false, "pack": true} {
+		w := httptest.NewRecorder()
+		s.Sealed(w, httptest.NewRequest(http.MethodGet, "/api/palette/sealed/"+uuid, nil))
+		var resp SealedMetaResponse
+		err = json.NewDecoder(w.Body).Decode(&resp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !resp.Found || resp.HasPicks != want {
+			t.Errorf("%s: found %v, hasPicks %v, want found and hasPicks %v", uuid, resp.Found, resp.HasPicks, want)
 		}
 	}
 }
