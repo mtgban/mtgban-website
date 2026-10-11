@@ -704,3 +704,91 @@ func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
 		t.Errorf("a price window shows %d rows of the preview, want the cheap ones drawn, some and fewer than %d", cheap, MaxResultsGlobalLimit)
 	}
 }
+
+// TestArbitBarShowsTheAppliedLimit pins a field held to its mode's floor
+// to showing that floor as its placeholder, empty so that its min passes,
+// and carrying the value saved, which global singles and sealed share.
+func TestArbitBarShowsTheAppliedLimit(t *testing.T) {
+	for _, tt := range []struct {
+		desc         string
+		mode         arbitMode
+		query        string
+		spread, diff arbitField
+		set          int
+	}{
+		{"global singles", arbitMode{Global: true}, "minspread=10&mindiff=-3",
+			arbitField{Key: "minspread", Placeholder: "200", Floor: "200", Carry: "10"},
+			arbitField{Key: "mindiff", Placeholder: "0", Floor: "0", Carry: "-3"}, 1},
+		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, "minspread=10",
+			arbitField{Key: "minspread", Placeholder: "50", Floor: "50", Carry: "10"},
+			arbitField{Key: "mindiff", Placeholder: "5", Floor: "0"}, 0},
+		{"global sealed", arbitMode{Global: true, Sealed: true}, "minspread=-500&mindiff=-500",
+			arbitField{Key: "minspread", Placeholder: "-30", Floor: "-30", Carry: "-500"},
+			arbitField{Key: "mindiff", Placeholder: "-100", Floor: "-100", Carry: "-500"}, 2},
+		{"arbit", arbitMode{}, "minspread=15",
+			arbitField{Key: "minspread", Value: "15", Placeholder: "10", Floor: "-30"},
+			arbitField{Key: "mindiff", Placeholder: "0", Floor: "-100"}, 1},
+		{"unset", arbitMode{Global: true}, "",
+			arbitField{Key: "minspread", Placeholder: "200", Floor: "200"},
+			arbitField{Key: "mindiff", Placeholder: "5", Floor: "0"}, 0},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			bar := newArbitBar(parseArbitQuery(t, tt.query), tt.mode, testArbitOffer, backend(), "SRC")
+			if bar.Spread.Low != tt.spread || bar.Diff.Low != tt.diff {
+				t.Errorf("spread %+v, difference %+v, want %+v, %+v", bar.Spread.Low, bar.Diff.Low, tt.spread, tt.diff)
+			}
+			if bar.Set != tt.set {
+				t.Errorf("the bar counts %d set, want %d", bar.Set, tt.set)
+			}
+		})
+	}
+}
+
+// TestArbitCarriedLimitSurvivesApply pins an Apply on a source whose floor
+// holds a saved limit up to saving the reader's value, not the floor, and
+// a value typed in the field to replacing it.
+func TestArbitCarriedLimitSurvivesApply(t *testing.T) {
+	saved := parseArbitQuery(t, "f=1&mindiff=-50")
+	bar := newArbitBar(saved, arbitMode{Global: true}, testArbitOffer, backend(), "SRC")
+	for _, tt := range []struct {
+		typed string
+		want  float64
+	}{
+		{"", -50},
+		{"7", 7},
+	} {
+		// The form posts the field, then the hidden input carried beside it
+		form := url.Values{arbitMarker: {"1"}, "mindiff": {tt.typed, bar.Diff.Low.Carry}}
+		st := parseArbitState(form, testArbitOffer)
+		got := st.bound("mindiff")
+		if !got.Set || got.Value != tt.want {
+			t.Errorf("typed %q: mindiff %+v, want %v", tt.typed, *got, tt.want)
+		}
+	}
+}
+
+// TestArbitBarShowsTheCarriedLimit pins a saved limit the floor holds up to
+// showing beside its empty field, with a button that drops it.
+func TestArbitBarShowsTheCarriedLimit(t *testing.T) {
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Carry Source", Shorthand: "CARRYSRC"}),
+	}
+	sellersPtr.Store(&sellers)
+	withSigMode(t, true, false)
+
+	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
+	r.Header.Set("Cookie", "ArbitFilters="+url.QueryEscape("f=1&mindiff=-500&t=1"))
+	w := httptest.NewRecorder()
+	scraperCompare(testSite.datastore(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
+	body := w.Body.String()
+	for _, want := range []string{
+		`<input type="hidden" name="mindiff" value="-500" data-limit>`,
+		`>saved -500<button type="button" class="arb-filter-clear" data-limit-clear="mindiff"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the bar lacks %s", want)
+		}
+	}
+}

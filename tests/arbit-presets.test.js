@@ -124,7 +124,7 @@ test('applying a preset opens it with the page\'s sort and saves both', () => {
 
 // A filter form, as arbit.html lays it out: picker groups of boxes, number
 // fields, and the toggles the bar lists in toggles_on.
-function fakeFormDOM({ picks = {}, numbers = {}, toggles = {} } = {}) {
+function fakeFormDOM({ picks = {}, numbers = {}, toggles = {}, limits = {} } = {}) {
     const box = (name, value, checked) => ({ type: 'checkbox', name, value, checked });
     const groups = Object.keys(picks).map((name) => {
         const boxes = picks[name].map(([v, on]) => box(name, v, on));
@@ -132,13 +132,15 @@ function fakeFormDOM({ picks = {}, numbers = {}, toggles = {} } = {}) {
     });
     const nums = Object.keys(numbers).map((name) => ({ type: 'number', name, value: numbers[name] }));
     const toggleBoxes = Object.keys(toggles).map((name) => box(name, '1', toggles[name]));
+    const carried = Object.keys(limits).map((name) => ({ type: 'hidden', name, value: limits[name] }));
     return {
         groups, nums, toggleBoxes,
-        querySelectorAll: (sel) => (sel === '[data-pick]' ? groups : sel === 'input[type=number]' ? nums : []),
+        querySelectorAll: (sel) => (sel === '[data-pick]' ? groups : sel === 'input[type=number]' ? nums : sel === 'input[data-limit]' ? carried : []),
         querySelector: (sel) => {
             if (sel === 'input[name=toggles_on]') return { value: Object.keys(toggles).join(',') };
             const m = sel.match(/name="([^"]+)"/);
-            return m ? toggleBoxes.find((b) => b.name === m[1]) || null : null;
+            const pool = sel.startsWith('input[type=number]') ? nums : toggleBoxes;
+            return m ? pool.find((b) => b.name === m[1]) || null : null;
         },
     };
 }
@@ -153,6 +155,12 @@ test('the form reads as the query the server would write for it', () => {
     expect(P.formState(dom)).toBe('abu4h=0&cond=NM%2CSP&f=1&minsell=2.5&minspread=10&rarity=&rl=1');
     // The page's own canonical query for the same filters matches it
     expect(P.normalize(P.formState(dom))).toBe(P.normalize('cond=NM%2CSP&f=1&minsell=2.5&rarity=&rl=1'));
+});
+
+test('a limit the floor holds up saves as the value carried beside it, unless one is typed', () => {
+    const { P } = load({});
+    const empty = fakeFormDOM({ numbers: { mindiff: '', minspread: '300' }, limits: { mindiff: '-50', minspread: '10' } });
+    expect(P.formState(empty)).toBe('f=1&mindiff=-50&minspread=300');
 });
 
 // The preset row's elements, as arbit.html has them

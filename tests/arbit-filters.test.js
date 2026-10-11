@@ -58,14 +58,30 @@ function fakeGroup(checked) {
     };
 }
 
-function fakeForm(values, groups = []) {
-    const inputs = values.map((value) => ({ value, disabled: false }));
+// values are the number fields in order, named n0, n1...; carries are the
+// saved values carried beside them, by field name.
+function fakeForm(values, groups = [], carries = {}) {
+    const inputs = values.map((value, i) => ({ name: 'n' + i, value, disabled: false }));
+    const carried = [];
+    const parent = { removeChild: (c) => carried.splice(carried.indexOf(c), 1) };
+    Object.keys(carries).forEach((name) => carried.push({ name, value: carries[name], disabled: false, parentNode: parent }));
+    // Each carry's clear button, its click listener kept as click
+    const clears = Object.keys(carries).map((name) => ({
+        parentNode: { hidden: false },
+        getAttribute: () => name,
+        addEventListener(ev, fn) { this[ev] = fn; },
+    }));
     const listeners = {};
     const all = () => inputs.concat(...groups.map((g) => g.querySelectorAll('input')));
     return {
         inputs,
+        carried,
+        clears,
         listeners,
-        querySelectorAll: (sel) => (sel === 'input[type=number]' ? inputs : sel === '[data-pick]' ? groups : all()),
+        querySelectorAll: (sel) => (sel === 'input[type=number]' ? inputs : sel === '[data-pick]' ? groups
+            : sel === 'input[data-limit]' ? carried.slice() : sel === '[data-limit-clear]' ? clears : all()),
+        querySelector: (sel) => inputs.concat(carried).find((i) => sel === 'input[type=number][name="' + i.name + '"]' && inputs.includes(i)
+            || sel === 'input[data-limit][name="' + i.name + '"]' && carried.includes(i)) || null,
         addEventListener: (ev, fn) => { listeners[ev] = fn; },
     };
 }
@@ -107,6 +123,24 @@ test('submitting leaves empty limits out, and coming back re-enables them', () =
     expect(form.inputs.map((i) => i.disabled)).toEqual([true, false, true]);
     listeners['window:pageshow']();
     expect(form.inputs.map((i) => i.disabled)).toEqual([false, false, false]);
+});
+
+test('a field left empty posts the saved value carried beside it, and a typed one replaces it', () => {
+    const form = fakeForm(['', '7'], [], { n0: '-50', n1: '-3' });
+    const { listeners } = load({ source: 'CK', query: '' }, form);
+    form.listeners.submit();
+    expect(form.inputs.map((i) => i.disabled)).toEqual([true, false]);
+    expect(form.carried.map((i) => i.disabled)).toEqual([false, true]);
+    listeners['window:pageshow']();
+    expect(form.carried.map((i) => i.disabled)).toEqual([false, false]);
+});
+
+test('clearing a carried limit drops it from the form and hides its note', () => {
+    const form = fakeForm(['', ''], [], { n0: '-50', n1: '-3' });
+    load({ source: 'CK', query: '' }, form);
+    form.clears[0].click();
+    expect(form.carried.map((c) => c.name)).toEqual(['n1']);
+    expect(form.clears.map((b) => b.parentNode.hidden)).toEqual([true, false]);
 });
 
 test('a picker with every box ticked posts nothing, one with a box unticked posts all of it', () => {
