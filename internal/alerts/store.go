@@ -820,13 +820,60 @@ func nullKind(t Threshold) (any, any) {
 // Create inserts a validated alert, armed as it says, and returns it with
 // its id and defaults.
 func (s *Store) Create(ctx context.Context, a Alert) (Alert, error) {
+	return createAlert(ctx, s.db, a)
+}
+
+// ErrAllowanceReached is a create past the user's allowance for the game.
+var ErrAllowanceReached = errors.New("alerts: alert allowance reached")
+
+// CreateWithin inserts a validated alert unless the user already has
+// allowance alerts in its game (ErrAllowanceReached) or one that watches
+// the same thing (dup is its id). It decides under the user's lock, so two
+// creates at once cannot both pass either check.
+func (s *Store) CreateWithin(ctx context.Context, a Alert, allowance int) (Alert, int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Alert{}, 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, a.UserHash)
+	if err != nil {
+		return Alert{}, 0, err
+	}
+	existing, err := listByUser(ctx, tx, a.UserHash, a.Game)
+	if err != nil {
+		return Alert{}, 0, err
+	}
+	if len(existing) >= allowance {
+		return Alert{}, 0, ErrAllowanceReached
+	}
+	for _, e := range existing {
+		if sameAlert(e, a) {
+			return Alert{}, e.ID, nil
+		}
+	}
+	created, err := createAlert(ctx, tx, a)
+	if err != nil {
+		return Alert{}, 0, err
+	}
+	return created, 0, tx.Commit()
+}
+
+// querier is a pool or a transaction, read as well as written.
+type querier interface {
+	execer
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func createAlert(ctx context.Context, db querier, a Alert) (Alert, error) {
 	ak, av := nullKind(a.Above)
 	bk, bv := nullKind(a.Below)
 	var createdPrice any
 	if a.CreatedPrice != nil {
 		createdPrice = *a.CreatedPrice
 	}
-	row := s.db.QueryRowContext(ctx, `
+	row := db.QueryRowContext(ctx, `
 		INSERT INTO alerts (user_hash, game, card_id, side, condition, stores, reference_price,
 			above_kind, above_value, below_kind, below_value, delivery,
 			card_name, card_set, card_number, card_finish, created_price, above_armed, below_armed, origin)
@@ -840,7 +887,11 @@ func (s *Store) Create(ctx context.Context, a Alert) (Alert, error) {
 
 // ListByUser is one user's alerts for one game, newest first.
 func (s *Store) ListByUser(ctx context.Context, userHash, game string) ([]Alert, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+alertColumns+` FROM alerts
+	return listByUser(ctx, s.db, userHash, game)
+}
+
+func listByUser(ctx context.Context, db querier, userHash, game string) ([]Alert, error) {
+	rows, err := db.QueryContext(ctx, `SELECT `+alertColumns+` FROM alerts
 		WHERE user_hash = $1 AND game = $2 ORDER BY created_at DESC, id DESC`, userHash, game)
 	if err != nil {
 		return nil, err
