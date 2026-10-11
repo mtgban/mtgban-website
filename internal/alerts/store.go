@@ -43,10 +43,25 @@ func ensureSchema(db *sql.DB) error {
 		_ = tx.Rollback()
 		return fmt.Errorf("alerts: advisory lock: %w", err)
 	}
+	var newLedger bool
+	err = tx.QueryRowContext(ctx, `SELECT to_regclass('alert_mails') IS NULL`).Scan(&newLedger)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("alerts: find mail ledger: %w", err)
+	}
 	_, err = tx.ExecContext(ctx, schemaSQL)
 	if err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("alerts: ensure schema: %w", err)
+	}
+	// A new ledger starts with the day's mails as alert_events counted them,
+	// once: a restart finds the table and leaves it be.
+	if newLedger {
+		_, err = tx.ExecContext(ctx, ledgerBackfillSQL)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("alerts: backfill mail ledger: %w", err)
+		}
 	}
 	err = tx.Commit()
 	if err != nil {
@@ -677,17 +692,51 @@ func (s *Store) AddEvent(ctx context.Context, e Event) error {
 	return err
 }
 
-// MailsSentSince counts the distinct mails sent to a user's alerts since the
-// given time, for the email deliverer's daily ceiling; one mail can cover
-// several firings, so it counts message ids, not event rows.
-func (s *Store) MailsSentSince(ctx context.Context, userHash string, since time.Time) (int, error) {
-	var n int
-	err := s.db.QueryRowContext(ctx, `
-		SELECT count(DISTINCT e.message_id)
-		  FROM alert_events e JOIN alerts a ON a.id = e.alert_id
-		 WHERE a.user_hash = $1 AND e.message_id <> '' AND e.fired_at >= $2`,
-		userHash, since).Scan(&n)
-	return n, err
+// mailLockID namespaces the per-user advisory lock around a mail
+// reservation, apart from the schema's and the addresses' locks.
+const mailLockID = alertsSchemaLockID + 1
+
+// ReserveMail records, before it is sent, an alert mail to a user, digest
+// or park notice, in a ledger no alert row owns; ok is false, reserving
+// nothing, once the user had ceiling mails in the 24 hours before at. The
+// count and the reservation run under one lock per user, so two sends at
+// the last slot cannot both pass. A ceiling of 0 or less is none.
+func (s *Store) ReserveMail(ctx context.Context, userHash string, at time.Time, ceiling int) (int64, bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	_, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, mailLockID, userHash)
+	if err != nil {
+		return 0, false, err
+	}
+	if ceiling > 0 {
+		var n int
+		err = tx.QueryRowContext(ctx, `
+			SELECT count(*) FROM alert_mails WHERE user_hash = $1 AND sent_at > $2`,
+			userHash, at.Add(-24*time.Hour)).Scan(&n)
+		if err != nil {
+			return 0, false, err
+		}
+		if n >= ceiling {
+			return 0, false, nil
+		}
+	}
+	var id int64
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO alert_mails (user_hash, sent_at) VALUES ($1, $2) RETURNING id`,
+		userHash, at).Scan(&id)
+	if err != nil {
+		return 0, false, err
+	}
+	return id, true, tx.Commit()
+}
+
+// ReleaseMail drops a reserved mail that was not sent.
+func (s *Store) ReleaseMail(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_mails WHERE id = $1`, id)
+	return err
 }
 
 // LastEvents is the newest event per alert id.
@@ -874,6 +923,10 @@ func (s *Store) MarkChannelDisallowed(ctx context.Context, userHash, game string
 
 // PruneEvents drops firings older than before.
 func (s *Store) PruneEvents(ctx context.Context, before time.Time) (int64, error) {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_mails WHERE sent_at < $1`, before)
+	if err != nil {
+		return 0, err
+	}
 	res, err := s.db.ExecContext(ctx, `DELETE FROM alert_events WHERE fired_at < $1`, before)
 	if err != nil {
 		return 0, err

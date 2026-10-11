@@ -408,7 +408,13 @@ func sendNotice(ctx context.Context, deps EvalDeps, sum *evalSummary, userHash s
 			return
 		}
 		if found {
-			if err := m.NotifyPark(ctx, ch, notice); err != nil {
+			err = m.NotifyPark(ctx, ch, notice)
+			// A user at the daily ceiling goes untold: the notice is not retried.
+			if errors.Is(err, ErrDailyLimit) {
+				sum.skipped++
+				return
+			}
+			if err != nil {
 				sum.fail(deps, "park notice", err)
 				return
 			}

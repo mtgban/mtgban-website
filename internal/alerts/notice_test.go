@@ -2,6 +2,8 @@ package alerts
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -44,11 +46,26 @@ func TestRenderParkMail(t *testing.T) {
 	}
 }
 
-// A park notice is not a digest: it goes out at the daily ceiling, with the
-// unsubscribe headers, to the channel's address.
-func TestMailDelivererNotifyParkIgnoresTheCeiling(t *testing.T) {
+// A park notice goes out with the unsubscribe headers, to the channel's
+// address, reserved before the send so the daily ceiling counts it; a
+// failed send drops its reservation.
+func TestMailDelivererNotifyParkCountsTowardTheCeiling(t *testing.T) {
 	fm := &fakeMailer{id: "msg-1"}
-	m := testDeliverer(t, fm, 20)
+	m := testDeliverer(t, fm, 19)
+	reserved := map[int64]string{}
+	var next int64
+	// sentAtReserve is how many mails had gone at each reservation.
+	var sentAtReserve []int
+	m.Reserve = func(_ context.Context, userHash string, _ time.Time, ceiling int) (int64, bool, error) {
+		sentAtReserve = append(sentAtReserve, len(fm.sent))
+		next++
+		reserved[next] = userHash
+		return next, ceiling == 20, nil
+	}
+	m.Release = func(_ context.Context, id int64) error {
+		delete(reserved, id)
+		return nil
+	}
 	ch := Channel{UserHash: "u1", Address: "user@example.com"}
 
 	err := m.NotifyPark(context.Background(), ch, parkNoticeFixture(1))
@@ -60,6 +77,26 @@ func TestMailDelivererNotifyParkIgnoresTheCeiling(t *testing.T) {
 	}
 	if fm.sent[0].Headers["List-Unsubscribe"] != "<https://mtgban.com/alerts/unsubscribe?u=u1>" || fm.sent[0].Headers["List-Unsubscribe-Post"] == "" {
 		t.Fatalf("headers = %v", fm.sent[0].Headers)
+	}
+	if len(reserved) != 1 || reserved[1] != "u1" {
+		t.Fatalf("reserved = %v", reserved)
+	}
+
+	fm.err = errors.New("mail down")
+	err = m.NotifyPark(context.Background(), ch, parkNoticeFixture(1))
+	if err == nil || len(reserved) != 1 {
+		t.Fatalf("failed send: %v, reserved %v", err, reserved)
+	}
+	if !slices.Equal(sentAtReserve, []int{0, 1}) {
+		t.Fatalf("reserved with %v mails gone, want each before its send", sentAtReserve)
+	}
+
+	// At the ceiling the notice is held back like a digest.
+	fm.err = nil
+	m = testDeliverer(t, fm, 20)
+	err = m.NotifyPark(context.Background(), ch, parkNoticeFixture(1))
+	if !errors.Is(err, ErrDailyLimit) || len(fm.sent) != 2 {
+		t.Fatalf("at the ceiling: %v, sent %d", err, len(fm.sent))
 	}
 }
 

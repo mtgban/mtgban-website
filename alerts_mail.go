@@ -190,7 +190,8 @@ func (s *site) alertMailDeliverer(b *mtgmatcher.Backend) alerts.Deliverer {
 		Mailer:    s.alertMailer(),
 		Templates: s.mailTemplates,
 		Image:     func(cardID string) string { return alertCardImage(b, cardID) },
-		Sent:      s.alerts.Store().MailsSentSince,
+		Reserve:   s.alerts.Store().ReserveMail,
+		Release:   s.alerts.Store().ReleaseMail,
 		Ceiling:   alertMailCeiling,
 	}}
 }

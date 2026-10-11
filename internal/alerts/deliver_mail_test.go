@@ -23,20 +23,43 @@ func (f *fakeMailer) Send(_ context.Context, m mailer.Message) (string, error) {
 	return f.id, f.err
 }
 
-// testDeliverer builds a MailDeliverer over fm with a fixed Sent count and
-// the repo's real mail templates.
+// fakeLedger is a mail ledger already holding sent mails, reserving and
+// releasing as the store does.
+type fakeLedger struct {
+	sent     int
+	reserves int
+}
+
+func (l *fakeLedger) reserve(_ context.Context, _ string, _ time.Time, ceiling int) (int64, bool, error) {
+	if ceiling > 0 && l.sent >= ceiling {
+		return 0, false, nil
+	}
+	l.sent++
+	l.reserves++
+	return int64(l.reserves), true, nil
+}
+
+func (l *fakeLedger) release(context.Context, int64) error {
+	l.sent--
+	return nil
+}
+
+// testDeliverer builds a MailDeliverer over fm with sentCount mails already
+// in its ledger and the repo's real mail templates.
 func testDeliverer(t *testing.T, fm *fakeMailer, sentCount int) *MailDeliverer {
 	t.Helper()
 	tpl, err := LoadMailTemplates("../../templates/mail")
 	if err != nil {
 		t.Fatal(err)
 	}
+	ledger := &fakeLedger{sent: sentCount}
 	return &MailDeliverer{
 		Mailer:      fm,
 		Templates:   tpl,
 		Image:       func(string) string { return "" },
 		Unsubscribe: func(userHash string) string { return "https://mtgban.com/alerts/unsubscribe?u=" + userHash },
-		Sent:        func(context.Context, string, time.Time) (int, error) { return sentCount, nil },
+		Reserve:     ledger.reserve,
+		Release:     ledger.release,
 		Ceiling:     20,
 	}
 }
@@ -182,7 +205,7 @@ func TestMailDelivererNilUnsubscribeOmitsHeaders(t *testing.T) {
 }
 
 // TestMailDelivererRenderErrorFailsClosed covers RenderMail failing: every
-// firing gets the error back and nothing is sent, the same as a Sent or
+// firing gets the error back and nothing is sent, the same as a Reserve or
 // ceiling failure.
 func TestMailDelivererRenderErrorFailsClosed(t *testing.T) {
 	fm := &fakeMailer{id: "should-not-send"}
@@ -192,7 +215,7 @@ func TestMailDelivererRenderErrorFailsClosed(t *testing.T) {
 		Mailer:      fm,
 		Templates:   MailTemplates{HTML: okHTML, Text: badText},
 		Unsubscribe: func(string) string { return "https://mtgban.com/unsub" },
-		Sent:        func(context.Context, string, time.Time) (int, error) { return 0, nil },
+		Reserve:     (&fakeLedger{}).reserve,
 		Ceiling:     20,
 	}
 	d := digestFixture(1)

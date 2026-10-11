@@ -71,8 +71,8 @@ func RenderParkMail(tpl MailTemplates, n ParkNotice, unsubscribeURL string) (sub
 	return subject, textBuf.String(), htmlBuf.String(), nil
 }
 
-// NotifyPark mails one park notice. It is not a digest: the daily ceiling
-// does not count it, since a user whose alerts just stopped has to hear so.
+// NotifyPark mails one park notice, under the same daily ceiling as a
+// digest and counted toward it.
 func (m *MailDeliverer) NotifyPark(ctx context.Context, ch Channel, n ParkNotice) error {
 	if m.Mailer == nil || m.Templates.ParkedHTML == nil || m.Templates.ParkedText == nil {
 		return errMailNotConfigured
@@ -85,7 +85,7 @@ func (m *MailDeliverer) NotifyPark(ctx context.Context, ch Channel, n ParkNotice
 	if err != nil {
 		return err
 	}
-	_, err = m.Mailer.Send(ctx, mailer.Message{
+	_, err = m.sendCounted(ctx, ch.UserHash, mailer.Message{
 		To:      ch.Address,
 		Subject: subject,
 		Text:    text,

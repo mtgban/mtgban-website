@@ -1,5 +1,15 @@
 package alerts
 
+// ledgerBackfillSQL fills a new alert_mails with the mails of the last 24
+// hours, one per distinct message id a user's alert events carry.
+const ledgerBackfillSQL = `
+INSERT INTO alert_mails (user_hash, sent_at)
+SELECT a.user_hash, min(e.fired_at)
+  FROM alert_events e JOIN alerts a ON a.id = e.alert_id
+ WHERE e.message_id <> '' AND e.fired_at > now() - interval '24 hours'
+ GROUP BY a.user_hash, e.message_id
+`
+
 const schemaSQL = `
 CREATE TABLE IF NOT EXISTS alert_contacts (
     user_hash        TEXT PRIMARY KEY,
@@ -68,6 +78,13 @@ CREATE TABLE IF NOT EXISTS alert_channels (
 );
 CREATE INDEX IF NOT EXISTS alert_channels_by_address ON alert_channels (kind, lower(address));
 ALTER TABLE alert_events ADD COLUMN IF NOT EXISTS message_id TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS alert_mails (
+    id         BIGSERIAL PRIMARY KEY,
+    user_hash  TEXT NOT NULL,
+    sent_at    TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS alert_mails_by_user ON alert_mails (user_hash, sent_at);
 
 CREATE TABLE IF NOT EXISTS alert_confirm_sends (
     user_hash      TEXT NOT NULL,
