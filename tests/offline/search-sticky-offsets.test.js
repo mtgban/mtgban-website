@@ -128,6 +128,19 @@ test('the layout floors its height at that same line', () => {
     expect(min).not.toContain('--content-padding-slack');
 });
 
+test('the chart add-card frame keeps the sidebar pinned and the floor', () => {
+    // The frame zeroes --nav-height, so both rules above fit it as written.
+    // Unpinning the sidebar there scrolls the card image away with the
+    // results; cancelling the floor ends a short list's footer mid-frame.
+    const template = fs.readFileSync(path.join(__dirname, '../../templates/search.html'), 'utf8');
+    const modalRules = [...(css + template).matchAll(/(?<=^|[};{]|\*\/)\s*body\.modal-embed\s+([^{}]*)\{([^{}]*)\}/g)];
+    expect(modalRules.some(([, selector]) => selector.includes('.search-layout'))).toBe(true);
+    for (const [, selector, body] of modalRules) {
+        if (selector.includes('.search-sidebar')) expect(body).not.toMatch(/(^|[;\s])position\s*:/);
+        if (selector.includes('.search-layout')) expect(body).not.toMatch(/min-height/);
+    }
+});
+
 test('the footer starts where the results column does, not under the sidebar', () => {
     // The sidebar is fixed and reaches the viewport bottom, so a full-bleed
     // footer crosses it at the end of every page. That used to be paid for
