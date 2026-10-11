@@ -213,6 +213,10 @@ func TestCartLoadButtons(t *testing.T) {
 		if !strings.Contains(out, `id="cart-overlay"`) || !strings.Contains(out, `href="javascript:void%20`) {
 			t.Errorf("%s: no panel with the loader to drag", tc.key)
 		}
+		// A box the browser restored unticked would leave its row in the list
+		if !strings.Contains(out, `checked autocomplete="off" class="opt-row-check"`) {
+			t.Errorf("%s: the browser can restore a row's box", tc.key)
+		}
 	}
 
 	for _, key := range []string{"MKM", "SCG", "CK", "CKGraded", "CKSealed"} {
@@ -262,6 +266,9 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		}
 		if strings.Count(page, `id="cart-overlay"`) != 1 {
 			t.Errorf("%s: want the panel once", tc.name)
+		}
+		if !strings.Contains(page, `checked autocomplete="off" class="arb-row-check"`) {
+			t.Errorf("%s: the browser can restore a row's box", tc.name)
 		}
 	}
 

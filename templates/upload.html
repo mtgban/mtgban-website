@@ -1033,7 +1033,7 @@
                             <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>
                             <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Loaded</th>
                             <th data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Spread</th>
-                            <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="toggleAllOptRows(this)"></th>
+                            <th class="c" data-sort-method="none"><input type="checkbox" checked autocomplete="off" title="Toggle all" onchange="toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
                         {{range $n, $row := $entries}}
@@ -1061,7 +1061,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
-                                <td class="c"><input type="checkbox" checked class="opt-row-check" onchange="toggleOptRow(this)"></td>
+                                <td class="c"><input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
