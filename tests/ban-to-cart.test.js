@@ -121,10 +121,10 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(posts).toHaveLength(0);
     });
 
-    test('a bookmark older than the link is told to update and sends nothing', async () => {
+    test('a bookmark from another version than the link is told to update and sends nothing', async () => {
         for (const version of ['0badc0de', null]) {
             const {alerts, posts} = await run({hash: '#ban=1:1', version});
-            expect(alerts[0]).toContain('out of date');
+            expect(alerts[0]).toContain('bookmark or this BAN page is from a different version. Reload BAN');
             expect(posts).toHaveLength(0);
         }
     });
