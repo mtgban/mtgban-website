@@ -347,7 +347,9 @@ the section's, as `scraperCompare` picks its seller.
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
-  pairs. Each id names one condition.
+  pairs. Each id names one condition. An id of anything but letters,
+  digits, `_` and `-` is left out (`cartItemID`), as the loader would
+  leave it, and the loader's report counts any pair it could not read.
   - A buylist row always goes in as NM, and the store grades what
     arrives, so the cart quotes NM prices and reads higher than the
     split's total when the list has played cards; the panel says so.
@@ -366,12 +368,13 @@ the section's, as `scraperCompare` picks its seller.
   the pairs in the fragment,
   `https://abugames.com/cartview/buylist#ban=<id>:<qty>,...&v=<version>`,
   and `&side=retail` on a store split's link, since Strike Zone's two sides
-  share one cart page. The fragment survives every store's page and never
-  reaches their servers or ours. Where an affiliate code is configured for
-  the store, the page is opened the way the store's own links from us are
-  (`cartAffiliates`), so the cart it fills is credited the same way: Card
-  Kingdom's `partner` and `utm_*` query, Mint's `utm_*` query, CSI's
-  `utm_referrer`, and SCG's partner redirector,
+  share one cart page. `&skip=<n>` counts the split's rows with no id the
+  loader can take, which its report says were left out. The fragment
+  survives every store's page and never reaches their servers or ours. Where
+  an affiliate code is configured for the store, the page is opened the way
+  the store's own links from us are (`cartAffiliates`), so the cart it fills
+  is credited the same way: Card Kingdom's `partner` and `utm_*` query,
+  Mint's `utm_*` query, CSI's `utm_referrer`, and SCG's partner redirector,
   `goto.starcitygames.com/c/<code>/…?u=<page>`, which lands on the sell site
   with the fragment intact.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
@@ -400,7 +403,8 @@ drops the fragment on its way back to the cart, so the panel says to log
 in before pressing Continue, and a store page with no list, or a login the
 loader finds missing, sends the user back to BAN to press the button
 again.
-On SCG it then uploads the list as one CSV and opens SCG's review of it.
+On SCG it then uploads the list as one CSV, says what BAN left out of it,
+if anything, and opens SCG's review of it.
 On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a

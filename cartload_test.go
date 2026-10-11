@@ -21,6 +21,8 @@ func stubCartStores(t *testing.T) {
 	buylist.Add("card-b", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "201"})
 	// ABU prices this one's NM row at $0, which the scraper drops
 	buylist.Add("card-e", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 1, InstanceID: "501"})
+	// An id the loader would not take
+	buylist.Add("card-f", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "601,602"})
 	mkm := mtgban.BuylistRecord{}
 	mkm.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "999"})
 	inventory := mtgban.InventoryRecord{}
@@ -156,6 +158,12 @@ func TestCartRows(t *testing.T) {
 	got := cartLoadFor("ABUScans", false, entries)
 	if got.Items != "301,,,301,,,402,," {
 		t.Errorf("ABUScans items = %q", got.Items)
+	}
+
+	// An id the loader would drop stays out, and the others keep their rows
+	got = cartLoadFor("ABUGames", true, []OptimizedUploadEntry{{CardID: "card-f", Quantity: 1}, {CardID: "card-a", Quantity: 1}})
+	if got.Items != ",101" || !strings.Contains(got.Link, "#ban=101:1&") || !strings.HasSuffix(got.Link, "&skip=1") {
+		t.Errorf("ABUGames with a bad id = %+v", got)
 	}
 
 	got = cartLoadFor("MKM", true, entries)

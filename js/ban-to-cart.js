@@ -5,6 +5,8 @@
     // user on that store. docs/store-carts.md has what each store accepts.
     var match = /[#&]ban=([^&]*)/.exec(location.hash);
     var version = /[#&]v=([^&]*)/.exec(location.hash);
+    // Rows BAN found no item at this store for, left out before the link
+    var skip = /[#&]skip=(\d+)/.exec(location.hash);
     var store = null;
     if (location.hostname === "abugames.com") {
         store = abuStore();
@@ -57,10 +59,12 @@
     }
     var ids = [];
     var quantities = {};
+    var unread = 0;
     list.split(",").forEach(function (pair) {
         var parts = pair.split(":");
         var qty = parseInt(parts[1], 10);
         if (!/^[\w-]+$/.test(parts[0]) || !(qty > 0)) {
+            unread += pair ? 1 : 0;
             return;
         }
         if (!(parts[0] in quantities)) {
@@ -163,6 +167,7 @@
         if (noRoom > 0) {
             message += " " + noRoom + " did not fit: " + store.name + "'s cart holds " + store.maxLines + " lines.";
         }
+        message += leftOut();
         window.removeEventListener("beforeunload", stay);
         alert(message);
         history.replaceState(null, "", location.pathname + location.search);
@@ -177,6 +182,19 @@
     function stay(event) {
         event.preventDefault();
         event.returnValue = "";
+    }
+
+    // leftOut tells the rows the store never saw: pairs that did not read,
+    // and cards BAN found no item at this store for
+    function leftOut() {
+        var note = "";
+        if (unread > 0) {
+            note += " " + unread + " in the list from BAN could not be read and were left out.";
+        }
+        if (skip && parseInt(skip[1], 10) > 0) {
+            note += " " + parseInt(skip[1], 10) + " on BAN have no " + store.name + " item and were left out.";
+        }
+        return note;
     }
 
     // hold takes the store origin's lock of that name, shared by its tabs,
@@ -294,6 +312,9 @@
                     throw new Error("SCG refused the list (" + (body.errorMessage || resp.status) + ").");
                 }
                 window.removeEventListener("beforeunload", stay);
+                if (leftOut()) {
+                    alert("Handed " + rows.length + " cards to SCG for review." + leftOut());
+                }
                 location.href = "/mtg/uploads/" + body.fileId;
             }
         };

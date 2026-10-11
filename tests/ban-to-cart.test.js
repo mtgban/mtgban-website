@@ -158,6 +158,18 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(posts).toHaveLength(0);
     });
 
+    test('rows BAN found no item for are counted in the report', async () => {
+        const {alerts} = await run({hash: '#ban=1:1&skip=2'});
+        expect(alerts[0]).toBe('Loaded 1 cards into your ABU cart. 2 on BAN have no ABU item and were left out.');
+    });
+
+    test('a pair that does not read is left out and counted', async () => {
+        const abu = fakeABU();
+        const {alerts} = await run({hash: '#ban=1:1,a.b:2,3:0,4:x,5:2', abu});
+        expect(abu.lines).toEqual(['1', '5']);
+        expect(alerts[0]).toBe('Loaded 2 cards into your ABU cart. 3 in the list from BAN could not be read and were left out.');
+    });
+
     test('a guest is told to log in and nothing is sent', async () => {
         const {alerts, posts} = await run({hash: '#ban=1:1', loggedIn: false});
         expect(alerts[0]).toBe('Log in to ABU first, then go back to BAN and press Load at ABU again.');
@@ -336,6 +348,16 @@ describe('ban-to-cart bookmarklet on SCG', () => {
         expect(page.guarded.href).toBe(false);
         expect(page.guarded.fetches).toEqual([true]);
         expect(alerts).toHaveLength(0);
+    });
+
+    test('rows left out before SCG saw the list are told before its review opens', async () => {
+        const scg = fakeSCG();
+        const {alerts, page} = await run({...scgPage, hash: '#ban=SGL-A1:2,a.b:1&skip=1', abu: scg});
+        expect(await scg.uploads[0].form.get('file').text()).toBe('quantity,productid\n2,SGL-A1\n');
+        expect(alerts).toEqual(['Handed 1 cards to SCG for review. 1 in the list from BAN could not be read and were left out. ' +
+            '1 on BAN have no SCG item and were left out.']);
+        expect(page.guarded.alerts).toEqual([false]);
+        expect(page.location.href).toBe('/mtg/uploads/7151');
     });
 
     test('a visitor not logged in is told to log in', async () => {
