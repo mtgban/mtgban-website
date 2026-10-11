@@ -711,6 +711,38 @@ for sealed, but takes the `id` a request asks for, sealed included, and
 refuses one v2 does not know. Stores are keyed by shorthand, as in all of
 v2. Its `.csv` is v1's search CSV.
 
+`/api/v2/history/` (`HistoryAPI`, `api_history.go`), one route, serves
+daily prices from the timeseries archive for one card in every finish
+(`history/{id}.json`, the printing's finishes and finish twins from
+`finishUUIDs` and `FinishSiblings`), a batch of comma-separated ids in the path
+(`history/{a},{b}.json`), or a set in pages (`history/{set}.json`,
+`history/sealed/{set}.json`, `page=`); a single segment is tried as a set
+first, a list with a comma never is. `.csv` in place of `.json` answers
+the same points as rows of `id,finish,store,section,date,price`, `meta`
+in `X-MTGBAN-*` headers. The range is the signature's `APIlookback`, 30
+days without it (`range=` narrows it), within a budget of 120
+card-months, a card being one printing in one finish
+(`historyCardsAllowed`), counted on the finishes the ids resolve to; a
+batch of one id is exempt, and one naming more than three ids per card
+allowed (a printing has usually one to three finishes) is refused before
+it resolves. Cards map
+to archive ids through the warm variant cache (`cachedBanIDForCard`);
+one `HGetAllByBanIDs` read serves the request, four at a time per host,
+a request waiting at most 5 s for a slot. Providers are keyed by
+`historyDefaultKeys`, built from `timeseries/providers.json` (each
+provider's seed row and `history_key`, which tests hold to the SQL seed,
+the `Provider` constants and the doc's table); a dataset with a provider
+id may re-key it to a key no other provider holds (`buildHistoryKeys`,
+published with the chart registry). The JSON shape is card id, finish,
+store key, then `{dates, prices}` oldest first; `meta.latest` is the
+newest day. Responses are public-cacheable with an ETag to the next
+archive write (00:00 and 12:00, and 21:00 off Magic), a minute for the
+half hour after each, and `no-store` while this process writes; errors
+are JSON with real statuses. The mode is `history`, a package of its own
+in `apiproductlist` with `lookback_days` and no store scope, which the
+plans page shows only with `api_gateway.history_on_sale`.
+`docs/api-v2-history.md` has the design and the read-cost tables.
+
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 
 `discordgo` session with Guilds + GuildMessages intents. Commands: `!card` /

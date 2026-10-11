@@ -122,6 +122,72 @@ paths:
         "200": { $ref: "#/components/responses/Prices" }
         default: { $ref: "#/components/responses/Error" }
 
+  /history/{idsOrSet}.json:
+    get:
+      summary: Daily price history for cards or a page of a set
+      description: >-
+        idsOrSet is a set code for the set's singles, served in pages; a
+        card id (MTGBAN, MTGJSON, Scryfall, or TCGplayer) for one printing
+        in every finish; or a comma-separated list of card ids, with no
+        spaces, for a batch. A single segment is tried as a set code
+        first; a list with a comma is always a batch. Each id resolves to
+        its printing's finishes and finish twins, and the distinct cards a
+        batch covers, a card being one printing in one finish, count
+        against the budget for the range. One id is always served. A
+        printing has usually one to three finishes, so more than three ids
+        per card allowed is a 400 before any resolves. Unknown ids are
+        skipped; a batch of nothing but unknown ids is a 404. Needs
+        the history mode. Replace .json with .csv for the same points as a
+        flat table. Errors carry their HTTP status, unlike the price
+        endpoints' 200 with an error body.
+      parameters:
+        - $ref: "#/components/parameters/idsOrSet"
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/page"
+      responses:
+        "200": { $ref: "#/components/responses/History" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /history/{idsOrSet}.csv:
+    get:
+      summary: Daily price history for cards or a page of a set, as CSV
+      description: >-
+        The forms and limits of /history/{idsOrSet}.json, one row per
+        point. Errors stay JSON.
+      parameters:
+        - $ref: "#/components/parameters/idsOrSet"
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/page"
+      responses:
+        "200": { $ref: "#/components/responses/HistoryCSV" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /history/sealed/{set}.json:
+    get:
+      summary: Daily price history for a set's sealed products, in pages
+      parameters:
+        - $ref: "#/components/parameters/set"
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/page"
+      responses:
+        "200": { $ref: "#/components/responses/History" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /history/sealed/{set}.csv:
+    get:
+      summary: Daily price history for a set's sealed products, in pages, as CSV
+      parameters:
+        - $ref: "#/components/parameters/set"
+        - $ref: "#/components/parameters/id"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/page"
+      responses:
+        "200": { $ref: "#/components/responses/HistoryCSV" }
+        default: { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearer:
@@ -156,6 +222,36 @@ components:
       name: filter
       in: query
       schema: { type: string, enum: [sealed, singles] }
+    idsOrSet:
+      name: idsOrSet
+      in: path
+      required: true
+      description: A set code, one card id, or a comma-separated list of card ids
+      schema: { type: string }
+    set:
+      name: set
+      in: path
+      required: true
+      schema: { type: string }
+    range:
+      name: range
+      in: query
+      description: >-
+        The last N calendar days, today included, on the host's clock, up
+        to the plan's lookback, which is the default. A request may cover
+        120 card-months, a card being one printing in one finish: the
+        range in 30-day months, rounded, times the cards it names, each
+        finish an id resolves to counted. One id is always served whole,
+        every finish and finish twin of its printing, whatever that
+        costs.
+      schema: { type: integer, minimum: 1 }
+    page:
+      name: page
+      in: query
+      description: >-
+        1-based page of a set, each holding as many cards as the budget
+        allows for the range; meta.pages says how many there are
+      schema: { type: integer, minimum: 1, default: 1 }
 
   responses:
     Prices:
@@ -169,12 +265,39 @@ components:
           schema: { $ref: "#/components/schemas/PriceResponse" }
     Error:
       description: >-
-        401 bad key, 403 plan lacks the game or mode, 404 unknown path,
-        405 not GET, 429 rate limited (Retry-After),
-        502/503/504 upstream or database trouble
+        400 bad parameter on the history endpoints (id, range, page) or
+        too many ids, 401 bad key, 403 plan lacks the game or mode, 404
+        unknown path, card, set, or page past the end, 405 not GET, 429
+        rate limited (Retry-After), 502/503/504 upstream or database
+        trouble, 503 with Retry-After on the history endpoints when every
+        read slot stays busy or the archive read fails
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    History:
+      description: Daily prices, oldest first
+      headers:
+        ETag: { schema: { type: string } }
+        Cache-Control: { schema: { type: string }, description: "public, good until the next archive write; no-store while one is running" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/HistoryResponse" }
+    HistoryCSV:
+      description: >-
+        The JSON response's points as a flat table, header
+        id,finish,store,section,date,price, section being retail or
+        buylist; rows ordered by id, finish, store and date, retail before
+        buylist for a store in both. meta travels in headers.
+      headers:
+        ETag: { schema: { type: string } }
+        Cache-Control: { schema: { type: string }, description: "public, good until the next archive write; no-store while one is running" }
+        X-MTGBAN-Latest: { schema: { type: string, format: date }, description: The newest day in the response, empty when there is none }
+        X-MTGBAN-Range: { schema: { type: integer }, description: The days served }
+        X-MTGBAN-Page: { schema: { type: integer }, description: Set requests only }
+        X-MTGBAN-Pages: { schema: { type: integer }, description: Set requests only }
+      content:
+        text/csv:
+          schema: { type: string }
 
   schemas:
     PriceResponse:
@@ -259,3 +382,39 @@ components:
       properties:
         error: { type: string }
         game: { type: string }
+    HistoryResponse:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            date: { type: string, format: date-time }
+            version: { type: string }
+            base_url: { type: string }
+            latest: { type: string, format: date, description: "The newest day in the response; usually yesterday, since the snapshot runs twice a day" }
+            range: { type: integer, description: The days served }
+            page: { type: integer, description: Set requests only }
+            pages: { type: integer, description: Set requests only }
+        retail: { $ref: "#/components/schemas/HistoryMap" }
+        buylist: { $ref: "#/components/schemas/HistoryMap" }
+    HistoryMap:
+      type: object
+      description: >-
+        Card id, then finish, then store key (the price endpoints' tag for
+        the source, or the archive's own shorthand for a TCGplayer series no
+        store carries), then the series. A day a source has no price is left
+        out. Prices are USD with no condition: lower grades were scaled to
+        Near Mint before storage. A sealed product's series sit under the
+        source's single-card tag (CK), not the sealed tag (CKSealed) the
+        price endpoints use.
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/Series" }
+    Series:
+      type: object
+      required: [dates, prices]
+      properties:
+        dates: { type: array, items: { type: string, format: date }, description: Ascending }
+        prices: { type: array, items: { type: number, format: float }, description: One per date }

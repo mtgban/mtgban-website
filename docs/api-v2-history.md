@@ -1,28 +1,58 @@
 # Price history on API v2
 
 Design for a v2 endpoint that serves a card's price history from the
-archive the site's charts read, in a shape that matches v2's prices. Not
-built yet. The decisions taken so far are marked, and the open ones are at
-the end.
+archive the site's charts read, in a shape that matches v2's prices.
+Built on the site (`api_history.go`); the gateway's part is listed under
+Rollout. The decisions are marked, and what stays open is at the end.
 
 ## What it serves
 
-`GET /api/v2/history/{id}.json` on a game host, and
-`GET https://api.mtgban.com/v2/{game}/history/{id}.json` through the gateway.
+`GET /api/v2/history/{ids}.json` on a game host, and
+`GET https://api.mtgban.com/v2/{game}/history/{ids}.json` through the
+gateway, with `.csv` in place of `.json` for the same points as a table.
+One route, `/api/v2/history/`, serves every form:
 
-- `{id}` is one card or sealed product, resolved the way the v2 price API
-  resolves a single card (`b.MatchID` for each finish), so every finish of
-  the printing comes back in one response.
-- `range=<days>` asks for the most recent days, up to the plan's lookback
-  (below). Without it, the whole lookback.
+- `history/{id}.json` is one card or sealed product, resolved the way the
+  v1 and v2 price APIs resolve a single card (`finishUUIDs`: the printing's
+  uuid, then the rest of `FinishSiblings`, its finishes and the set-mates
+  filed as its finish twins), so every finish of the printing comes back
+  in one response.
+- `history/{a},{b},{c}.json` is a batch: card ids separated by commas, no
+  spaces, trimmed and deduplicated; an empty entry, as in `a,`, is
+  dropped.
+- `history/{set}.json` and `history/sealed/{set}.json` are a set's singles
+  and sealed products, served in pages (`page=`, `meta.pages`). A single
+  segment is tried as a set code first; a list with a comma is always a
+  batch.
+- `range=<days>` asks for the last N calendar days on the host's clock,
+  today included, up to the plan's lookback (below). Without it, the
+  whole lookback.
 - `id=` takes the v2 id modes (`ban`, `tcg`, `scryfall`, `mtgjson`,
   `mkm`, `ck`, `name`) and refuses any other, as the v2 price API does. It
   defaults to `scryfall` for singles and `mtgjson` for sealed, as v2 search
-  does, so a printing's finishes sit under one id.
-- One card per request. A set-wide history would cost one archive read per
-  printing, hundreds per request, where every other v2 endpoint reads the
-  in-memory scrapes.
-- JSON only to start with.
+  does, so a printing's finishes sit under one id. A card the mode has no
+  id for is left out, as v2 prices leave it out.
+- A request may cover 120 card-months, a card being one printing in one
+  finish: the range in 30-day months (rounded, at least one) times the
+  cards it names, so 120 at 30 days, 10 at a year. The budget counts the
+  finishes the ids resolve to, so a printing sold in five finishes costs
+  five. A batch naming more than three ids per card allowed is refused
+  before any id resolves, a printing having usually one to three
+  finishes: that cap bounds the ids, the budget bounds what is read. One
+  id is always served whole, every finish and finish twin of its
+  printing, so it is bounded by the printing rather than by any fixed
+  multiple of the budget; five uuids, the most on a Magic card measured,
+  is 610 card-months at a ten-year lookback.
+  A batch whose ids resolve no card is a 404, like a single unknown id;
+  unknown ids among known ones are skipped. See "What a read costs".
+- **CSV.** `.csv` answers the same points as a flat table, header
+  `id,finish,store,section,date,price`, `section` being `retail` or
+  `buylist`, rows ordered by id, finish, store and date, retail before
+  buylist for a store in both. `meta` travels as headers:
+  `X-MTGBAN-Latest` (the newest day), `X-MTGBAN-Range` (the days) and, on
+  a set, `X-MTGBAN-Page` and `X-MTGBAN-Pages`. Caching is the JSON form's
+  (below), the `ETag` over the CSV bytes. Errors stay JSON, with their
+  statuses.
 
 `/api/chart/{id}` stays as it is. It serves the site's chart page, in
 Chart.js's shape, and the two share the archive read.
@@ -57,9 +87,16 @@ and the deployed `config.json`:
 ### Sources and the store keys they get
 
 A source is a provider in the archive. Each is keyed by the store tag v2
-already uses for it, taken from `timeseries_config.datasets` (the first
-non-sealed entry of its `retail` or `buylist` list), and filed under the
-section that list names:
+already uses for it and filed under the section below. This table is the
+contract. `timeseries/providers.json` holds each provider's row and its
+`history_key`, `historyDefaultKeys` in `api_history.go` is built from it,
+and tests hold it to this table, to the SQL seed
+(`db_migration/02_seed_providers.sql`) and to the `Provider` constants. A
+`timeseries_config.datasets` entry with a
+provider id may re-key its provider to the first non-sealed entry of its
+`retail` or `buylist` list, under that list's section; a key another
+provider already holds is refused and logged, so no two sources share a
+key:
 
 | Provider | Section | Key |
 |---|---|---|
@@ -77,11 +114,12 @@ section that list names:
 | CSIBuylist (12) | buylist | `CSI` |
 | SealedEV (13) | retail | `TCGLowEV` |
 
-TCGMid (5), TCGHigh (6) and TCGDirectLow (7) map to no store in any
-config. They carry data for the other games, from tcgcsv, and are keyed by
-the provider's own shorthand, under retail. A sealed product's history is
-filed under the same providers (`CKSealed`, `TCGSealed` and `MKMSealed` are
-listed with them), under the finish `sealed`.
+TCGMid (5), TCGHigh (6) and TCGDirectLow (7) are in the table like every
+other provider. No store carries them, so their key is the provider's
+name; they carry data for the other games, from tcgcsv. A sealed
+product's history is filed under the same providers (`CKSealed`,
+`TCGSealed` and `MKMSealed` are listed with them), under the finish
+`sealed`.
 
 **Other games have only TCGplayer's history, with holes.** The Lorcana and
 One Piece configs list no `timeseries_config.datasets`, so their history is
@@ -110,6 +148,9 @@ confirmed on the droplets before the docs promise it, and if a host does
 not, its cron and `snapshotDate` should be pinned to UTC rather than the
 docs carrying a per-host timezone.
 
+`range` counts calendar days on the host's clock: `range=1` is today,
+`range=30` today and the 29 days before it, read from midnight.
+
 ## Response shape (decided: columns)
 
 The same nesting as v2 prices, card id, then finish, then store tag. Only
@@ -119,7 +160,7 @@ oldest first.
 
 ```json
 {
-  "meta": { "date": "2026-10-07T12:00:00Z", "version": "2", "base_url": "https://www.mtgban.com/go/" },
+  "meta": { "date": "2026-10-07T12:00:00Z", "version": "2", "base_url": "https://www.mtgban.com/go/", "latest": "2026-10-06", "range": 365 },
   "retail": {
     "aa21fc27-42d0-456a-9882-34d7f404270b": {
       "nonfoil": {
@@ -140,6 +181,8 @@ oldest first.
 - Every array in a leaf has the same length as its `dates`.
 - A day a source has no price is left out of the leaf, date and price
   together, not sent as a null.
+- **Today's point (decided):** the archive's as it stands; `meta.latest`
+  names the newest day served, and `meta.range` the days covered.
 
 A later series goes beside `prices` as another parallel array, not in an
 object of its own, since it is read off the same snapshot and shares its
@@ -151,11 +194,11 @@ quantities, so this is not planned, only the place it would go.
 ### What the shape costs
 
 Measured on 2026-10-07 against the production archive, read-only, with a
-throwaway probe that read each finish through `HGetAllLong` and encoded the
-same points three ways, each with the nesting above. "Objects" makes the
-leaf a list, `[{"date": "2026-10-06", "price": 8.49}, ...]`; "columns" is
-the shape above; "pairs" makes it `[["2026-10-06", 8.49], ...]`. Bytes are raw / gzipped, the
-gateway serves gzip.
+throwaway probe that read each finish through `HGetAllLong` and encoded
+the same points three ways, each with the nesting above. "Objects"
+makes the leaf a list, `[{"date": "2026-10-06", "price": 8.49}, ...]`;
+"columns" is the shape above; "pairs" makes it `[["2026-10-06", 8.49],
+...]`. Bytes are raw / gzipped, the gateway serves gzip.
 
 | Card | Range | Points | Objects | Columns | Pairs |
 |---|---|---|---|---|---|
@@ -172,6 +215,78 @@ largest card measured is 21 KB as columns against 41 KB as objects, both
 small next to the read that produces them (below); columns were chosen
 for the bytes and for the room they leave for a parallel series.
 
+### What a read costs
+
+`timeseries.TestHistoryReadCostLive` times the read the endpoint makes,
+`ban_id = ANY($1) AND date >= $2`, for a fresh id set ("cold") and the same
+set again ("warm"), on the production archive; run it with
+`CHARTLIVE_CONFIG` pointing at a site config to refresh the table. The
+`ids` column is archive ids, each one printing in one finish, which is
+what the budget counts. Measured before the budget was set; rerun the
+live test to refresh the table:
+
+| ids | days | cold ms | warm ms | rows |
+|---|---|---|---|---|
+| 10 | 30 | 393 | 120 | 1,971 |
+| 10 | 180 | 2,321 | 255 | 12,928 |
+| 10 | 365 | 3,229 | 187 | 23,073 |
+| 50 | 30 | 1,286 | 73 | 10,133 |
+| 50 | 180 | 9,435 | 302 | 60,641 |
+| 50 | 365 | 13,148 | 310 | 119,417 |
+| 100 | 30 | 2,428 | 99 | 21,092 |
+| 100 | 180 | 12,233 | 249 | 118,242 |
+| 100 | 365 | 20,393 | 323 | 241,880 |
+| 300 | 30 | 3,442 | 132 | 63,709 |
+| 300 | 180 | 39,842 | 684 | 370,539 |
+| 300 | 365 | 59,443 | 25,266 | 715,764 |
+
+The cost is cold I/O, about 20 ms per card per month of range: the plan
+is one index scan per monthly partition on the primary key, and 300 ids
+over a year read 90,274 blocks from disk. Batching saves round trips, not
+I/O (ten single reads at 30 days took 1,002 ms against 393 ms in one
+call), and warm reads stay cheap only while the result fits the cache.
+So the cap is a budget of card-months, 120, about 3 s cold at any range,
+and a set is paged by it.
+
+The same test's second table times the handler's three shapes, cold then
+warm, at 30, 90, 180, 365, 730, 1,825 and 3,650 days: one printing (every
+archive id sharing one MTGJSON uuid), one set page (the ids the budget
+allows at that range, `120 / months`), and a whole set of 300 ids. The
+printing measured has two finish variants. Measured when the endpoint was
+built; rerun the live test to refresh:
+
+| shape | ids | days | cold ms | warm ms | rows |
+|---|---|---|---|---|---|
+| single printing | 2 | 30 | 100 | 62 | 150 |
+| set page | 120 | 30 | 3521 | 301 | 24390 |
+| whole set (300) | 300 | 30 | 2554 | 207 | 61297 |
+| single printing | 2 | 90 | 183 | 61 | 510 |
+| set page | 40 | 90 | 4634 | 88 | 25290 |
+| whole set (300) | 300 | 90 | 12004 | 391 | 193887 |
+| single printing | 2 | 180 | 313 | 66 | 1250 |
+| set page | 20 | 180 | 3892 | 92 | 24795 |
+| whole set (300) | 300 | 180 | 34514 | 1232 | 371452 |
+| single printing | 2 | 365 | 460 | 66 | 2920 |
+| set page | 10 | 365 | 2679 | 96 | 23812 |
+| whole set (300) | 300 | 365 | 60758 | 8519 | 712653 |
+| single printing | 2 | 730 | 602 | 65 | 4587 |
+| set page | 5 | 730 | 2076 | 80 | 18637 |
+| whole set (300) | 300 | 730 | 95085 | 77376 | 1087026 |
+| single printing | 2 | 1825 | 2307 | 74 | 7022 |
+| set page | 1 | 1825 | 328 | 65 | 2796 |
+| whole set (300) | 300 | 1825 | 119461 | 109897 | 1335864 |
+| single printing | 2 | 3650 | 2663 | 128 | 8240 |
+| set page | 1 | 3650 | 1520 | 77 | 6624 |
+| whole set (300) | 300 | 3650 | 113363 | 112022 | 1419831 |
+
+The budgeted set page stays between 2 and 5 s cold up to two years, about
+19,000 to 25,000 points each; past that the budget allows one card a page,
+which reads in under 2 s. A single printing's finishes take 0.1 to 2.7 s.
+An unpaged set of 300 printings grows from 2.5 s at 30 days to about two
+minutes at five and ten years, and past a year its warm read is nearly as
+slow, the result no longer fitting the cache. That is why a set is paged
+by the budget.
+
 ## Plans (decided: a separate plan)
 
 History is its own package in `apiproductlist/products.json`, not an
@@ -182,14 +297,23 @@ add-on to the price plans:
   plan's key gets a 403 on history and a history plan's key gets a 403 on
   prices, from the check that exists today;
 - a lookback in days on the package. The gateway mints it into the
-  signature it forwards, as `SearchChartLoopback`, which `chartLookback`
-  already reads; a key without it falls back to that function's 30 days;
+  signature it forwards as `APIlookback`, the API key's own field beside
+  `APImode` and `UserEmail` (`apisig.APIFields`); a key without it gets 30
+  days. The site's `SearchChartLoopback`, which its own charts read, is
+  unrelated and means nothing to the history endpoint.
+  The package is `history` in `apiproductlist/products.json`, 365 days;
+  its price is a placeholder until the maintainers set it.
 - the sources are the archive's, not a store list, so the package has no
-  `store_scope`. Whether a history plan should narrow the sources to a
-  price plan's stores is open (below).
+  `store_scope`. Every history plan reads every source; plans differ by
+  lookback (decided).
+- it takes the `extra_game` add-on like every package.
 
-The gateway already unions an account's entitlements across its packages,
-so an account can hold a price plan and a history plan at once.
+The gateway unions an account's entitlements across its packages, but its
+billing allows one plan per account, so holding a price plan and a history
+plan at once waits on the gateway (Rollout, step 3).
+
+The plans page shows the package only where the config sets
+`api_gateway.history_on_sale`, off until the gateway can check it out.
 
 ## Rate limit (advice)
 
@@ -203,9 +327,9 @@ spends nor is allowed the price allowance.
 - The data changes once a day. One request a second is 86,400 cards a day
   per account, enough to walk any game's catalog daily, so it does not
   limit any use the data supports.
-- Every request is archive reads, one per finish: today three
-  (`HGetAllLong` for nonfoil, foil and etched). Read from a laptop over the
-  internet, the probe took 0.5 to 3.6 seconds a card; on the host,
+- Every request is one archive read, `HGetAllByBanIDs` over every id it
+  covers. Read from a laptop over the internet, the probe's per-finish
+  reads took 0.5 to 3.6 seconds a card; on the host,
   `fetchRosterPrices`'s note gives ten cards read one at a time as 848 ms,
   about 85 ms a card. A price request reads memory. At 10 a second per
   account, a few accounts walking a set would put a steady load of dozens
@@ -216,12 +340,13 @@ spends nor is allowed the price allowance.
 Two things matter more than the exact number, and the site should do them
 whatever the gateway's limit is:
 
-- **One read per card.** A query over the variants of one uuid, all
-  finishes, instead of one `HGetAllLong` per finish, cuts a request to one
-  round trip.
+- **One read per request** (built). `HGetAllByBanIDs` reads every id a
+  request covers in one round trip.
 - **A cap on concurrent history reads per host**, like
   `chartRosterConcurrency`, so the archive's load is bounded by the site
-  and not by how many accounts are subscribed.
+  and not by how many accounts are subscribed. Built: four at a time; a
+  request waits at most 5 s for a slot, then gets a 503 with
+  `Retry-After: 5`; a failed read is a 503 with `Retry-After: 30`.
 
 ### Caching
 
@@ -230,38 +355,59 @@ archive read after another. Caching takes most of it away, because a
 response changes only when a snapshot runs:
 
 - The site sends `Cache-Control: public` with a `max-age` running to the
-  next snapshot (00:00 or 12:00 on the host's clock), and the same
-  `ETag` for an unchanged response.
-- A response depends on the path, `range`, `id` and the plan's lookback,
-  and on nothing else about the account, since every history plan reads
-  the same sources (see the open questions). So the gateway, or a CDN in
-  front of it, can cache on those and answer a second account's request
-  for the same card without reaching the archive. The gateway caches
-  nothing today; this would be its first cache.
+  next archive write (00:00 or 12:00 on the host's clock, and 21:00 on
+  every game but Magic, where the tcgcsv ingest writes), and the same
+  `ETag` for an unchanged response. For the half hour after each of those
+  hours `max-age` is a minute: the standalone `cmd/tcgcsvd` and the other
+  instance of a blue-green deploy write without this process seeing it.
+- A response depends on the path, its extension, `range`, `id`, `page`
+  and the plan's lookback, and on nothing else about the account, since
+  every history plan reads the same sources (see Plans). So the gateway,
+  or a CDN in front of it, can cache on those and answer a second
+  account's request for the same card without reaching the archive. The
+  gateway caches nothing today; this would be its first cache.
 - Clients are told the data moves twice a day at most, so a client
   re-fetching a card more often gains nothing.
+- Built: `Cache-Control: public, max-age=` to the next archive write, an
+  `ETag` over the body (the JSON less `meta.date`, the CSV whole), 304
+  on an `If-None-Match` that names it, weak or strong, alone or in a
+  list, or `*`. An empty response, and any response served while this
+  process's snapshot or tcgcsv ingest is writing, is `no-store` with no
+  `ETag`.
 
 ## Open questions
 
-1. **Sources per plan.** Provisional: every history plan gets every source
-   the archive holds for the game, and plans differ by lookback. A plan
-   naming its sources would make history a way to sell a wider price plan,
-   and would split the cache by plan.
-2. **Lookback per plan.** How many days each tier grants. Open.
-3. **Today's point.** Provisional: serve what the archive holds, and say in
-   the docs that the latest day is usually yesterday, since at midday on
-   2026-10-07 the live chart had no point for that day for either Sol Ring.
-   `meta` can carry the latest date in the response, `latest`, so a client
-   tells a missing day from a day not yet written without a ticket.
-4. **Host timezone.** Confirm the droplets run in UTC, or pin the snapshot
+1. **Lookback per plan.** How many days each tier grants.
+2. **Host timezone.** Confirm the droplets run in UTC, or pin the snapshot
    to it (see "Days and timezones").
 
 ## Rollout
 
 1. Site: the handler, the provider-to-store table, the single-query read,
-   the concurrency cap, tests, and the guide and OpenAPI entries.
-2. `apiproductlist`: the package, its mode and its lookback, and the gateway
-   bump that picks it up.
-3. Gateway: the `history` route kind, its limiter, the lookback in the
-   minted signature, and the Stripe product.
-4. Deploy every game host, then the gateway, then the wiki.
+   the concurrency cap, tests, and the guide and OpenAPI entries. (built)
+2. `apiproductlist`: the package, its mode, its lookback, and `extra_game`
+   applying to it. (built)
+3. Gateway, in one PR:
+   - the `history` route kind, with `NeedsModes` returning `["history"]`
+     for it, and `history` in `ValidModes`;
+   - the Patreon trial not granting history;
+   - the store-scope guard and `Resolve` allowing a history-only plan,
+     which has no store scope;
+   - the history limiter (above);
+   - `APIlookback` minted from the package's `lookback_days`;
+   - the route: `history/` alone, with `.json`, `.csv` and comma lists
+     passed through as they come; `history.json` and `history.csv` are
+     gone, and on the site they fall to the price API;
+   - a re-pin of this module and a `catalog seed`, so Stripe sells the
+     package;
+   - two subscriptions per account: holding a price plan and a history
+     plan at once needs the gateway's billing to allow two subscriptions,
+     which it does not today, a decision for the maintainers;
+   - the `ETag` through gzip: nginx weakens a strong tag on a response it
+     gzips; the site compares `If-None-Match` weakly, so a weakened tag
+     still matches as long as the gateway forwards the header.
+4. Deploy every game host, then the gateway, then set
+   `api_gateway.history_on_sale` on the hosts and update the wiki.
+
+A host with no stores loaded refuses history too, with the price API's
+503, since the two share the API middleware (`enforceAPISigning`).
