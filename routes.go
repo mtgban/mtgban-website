@@ -6,25 +6,39 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/leemcloughlin/logfile"
 )
 
-// staticCacheControl: a file asked for with the running build's hash is
-// cached for 30 days at that URL (a deploy changes the hash, so 30 days
-// is plenty); any other hash, or none, or dev mode where the hash never
-// corresponds to a real deploy, gets a day instead.
+// staticCacheControl: nothing kept in dev or a build without a commit, a day
+// without a hash, 30 days at this build's.
 func staticCacheControl(r *http.Request) string {
-	hash := r.URL.Query().Get("hash")
-	if !DevMode && BuildCommit != "" && hash == BuildCommit {
-		return "public, max-age=2592000, immutable"
+	if DevMode || BuildCommit == "" {
+		return "no-store"
 	}
-	return "public, max-age=86400"
+	hash := r.URL.Query().Get("hash")
+	if hash == "" {
+		return "public, max-age=86400"
+	}
+	if hash != BuildCommit {
+		return "no-cache" // mid-deploy, an old instance can answer for a new hash
+	}
+	return "public, max-age=2592000, immutable"
 }
 
 func ServeFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", staticCacheControl(r))
 	http.ServeFile(w, r, r.URL.Path[1:])
+}
+
+// assetHash is the ?hash= every asset URL carries: the commit, plus the
+// start time in dev, since local edits keep the commit.
+func assetHash() string {
+	if DevMode {
+		return BuildCommit + "-" + strconv.FormatInt(StartTime.UnixNano(), 10)
+	}
+	return BuildCommit
 }
 
 // mountNav serves a page and its sub-pages on mux behind enforceSigning; a

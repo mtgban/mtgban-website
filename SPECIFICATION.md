@@ -418,8 +418,11 @@ handler, embedded in `PageVars` so templates read them unchanged: `UploadVars`
 (6) and `SleepVars` (5).
 
 Other routes: static `/css|/js|/img|/openapi` (plus `/favicon.ico`, `/robots.txt`)
-served from disk via `ServeFile` with `Cache-Control: public, max-age=86400`
-plus `?hash=<git commit>` cache-busting baked into template asset URLs;
+served from disk via `ServeFile` (`staticCacheControl`: 30 days immutable at the
+running build's `?hash=`, `no-cache` at another build's, a day with none,
+`no-store` in dev or a build without a commit, where `sw.js` also goes to the
+network first), the hash (`assetHash`: the commit, plus the start time in dev)
+baked into template asset URLs for cache-busting;
 `/go/{r|i|b}/{store}/{hash}` affiliate redirects, or the 2-segment
 `/go/{store}/{hash}` short form defaulting to retail (redirect.go), resolved
 via mtgjson UUID or an external id (scryfall/tcg product id); `/card/<set>/
