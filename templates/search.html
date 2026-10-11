@@ -42,21 +42,21 @@
 {{define "title"}}{{.Title}}{{if .CleanSearchQuery}}: {{.CleanSearchQuery}}{{end}}{{end}}
 
 {{define "extra-head"}}
-    <script type="text/javascript" src="/js/printings-panel.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/printings-panel.js?hash={{.Hash}}" defer></script>
     {{if .ChartID}}
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0"></script>
-        <script type="text/javascript" src="/js/chartopts.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/chart-range.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/chartopts.js?hash={{.Hash}}" defer></script>
+        <script type="text/javascript" src="/js/chart-range.js?hash={{.Hash}}" defer></script>
     {{end}}
     {{if .IsSealed}}
     <script type="text/javascript" src="/js/sealed.js?hash={{.Hash}}" defer></script>
     {{end}}
-    <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript">
         // What this page is the answer to, for the recent searches list: the
         // readable query the server rebuilt (a uuid search comes back as the
@@ -68,8 +68,8 @@
             found: {{if .CardHashes}}true{{else}}false{{end}}
         };
     </script>
-    <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}" defer></script>
     {{if .PatreonLogin}}
     {{template "patreon-login-script" .}}
     {{end}}
@@ -241,10 +241,10 @@
             {{end}}
         </div>
     {{else}}
-            <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
-            <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
+            <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}" defer></script>
+            <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}" defer></script>
 
-            <script type="text/javascript" src="/js/search-sidebar.js?hash={{.Hash}}"></script>
+            <script type="text/javascript" src="/js/search-sidebar.js?hash={{.Hash}}" defer></script>
 
             <div class="search-layout">
 
@@ -387,7 +387,7 @@
                                 downloadName: {{if .IsMultiChart}}'mtgban-chart.png'{{else}}{{$card := (index $.Metadata .ChartID)}}'{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png'{{end}}
                             };
                         </script>
-                        <script type="text/javascript" src="/js/search-chart.js?hash={{.Hash}}"></script>
+                        <script type="text/javascript" src="/js/search-chart.js?hash={{.Hash}}" defer></script>
 
                         <div id="chartAddOverlay" class="chart-add-overlay" onclick="if(event.target===this)closeChartAddModal()">
                             <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart">
@@ -789,13 +789,13 @@
         document.querySelectorAll(".buylist-extra[data-ratio]").forEach(renderCell);
     })();
 </script>
-    <script type="text/javascript" src="/js/search-result-nav.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/search-result-nav.js?hash={{.Hash}}" defer></script>
     {{end}}{{/* closes {{else}} for AllKeys check */}}
 {{end}}
 
 {{define "extra-scripts"}}
-{{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}"></script>{{end}}
-<script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}"></script>
+{{if .CanAlerts}}<script type="text/javascript" src="/js/alerts.js?hash={{.Hash}}" defer></script>{{end}}
+<script type="text/javascript" src="/js/search-quick-icons.js?hash={{.Hash}}" defer></script>
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->
@@ -839,7 +839,7 @@ window.BAN_SEARCH_MODAL = {
     maxCards: {{.MaxChartCards}}
 };
 </script>
-<script type="text/javascript" src="/js/search-modal.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/search-modal.js?hash={{.Hash}}" defer></script>
 {{end}}
 {{end}}
 

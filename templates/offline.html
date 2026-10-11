@@ -6,13 +6,13 @@
 {{define "title"}}Offline Search{{end}}
 
 {{define "extra-head"}}
-    <script type="text/javascript" src="/js/offline/offline-format.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/offline/offline-render-shared.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}"></script>
-    <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-format.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-render-shared.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}" defer></script>
 {{end}}
 
 {{define "content"}}
@@ -59,7 +59,7 @@
 {{end}}
 
 {{define "extra-scripts"}}
-<script type="text/javascript" src="/js/offline/offline-banner.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-banner.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript">
 (function () {
     'use strict';

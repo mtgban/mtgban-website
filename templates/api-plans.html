@@ -108,5 +108,5 @@
 
 {{define "extra-scripts"}}
 <script>window.__BAN_API_PLANS = {{api_plans_json .API}};</script>
-<script type="text/javascript" src="/js/api-plans.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/api-plans.js?hash={{.Hash}}" defer></script>
 {{end}}

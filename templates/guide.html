@@ -3,7 +3,7 @@
 {{end}}
 
 {{define "extra-head"}}
-    <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}" defer></script>
     <script>window.__BAN_STORES = {{guide_stores}};</script>
 {{end}}
 
@@ -48,5 +48,5 @@
 {{template "guide-syntax-content" .}}
 {{template "guide-api-content" .}}
 
-<script type="text/javascript" src="/js/guide.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/guide.js?hash={{.Hash}}" defer></script>
 {{end}}

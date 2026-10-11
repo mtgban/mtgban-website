@@ -27,6 +27,7 @@
 </head>
 
 <body class="light-theme mobile{{if .SearchScope}} has-scope{{end}}" data-game="{{game}}">
+<script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
 <svg width="0" height="0" aria-hidden="true" style="position:absolute">
   <filter id="grain" color-interpolation-filters="sRGB">
     <feTurbulence type="fractalNoise" baseFrequency="0.97" numOctaves="4"/>
@@ -58,14 +59,15 @@
      production on the first cold load after it lands, reviewed by nobody.
      It also costs a 302 through unpkg's version resolver on every cold
      load. Bump deliberately; the icon names in `data-lucide` attributes
-     are the compatibility surface to check when you do. -->
-<script src="https://unpkg.com/lucide@1.47.0/dist/umd/lucide.js"></script>
-<script>if (window.lucide) lucide.createIcons();</script>
+     are the compatibility surface to check when you do. Deferred, with
+     js/icons.js painting on DOM ready, so neither blocks first paint. -->
+<script src="https://unpkg.com/lucide@1.47.0/dist/umd/lucide.js" defer></script>
+<script type="text/javascript" src="/js/icons.js?hash={{.Hash}}" defer></script>
 {{end}}
-<script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}"></script>
-<script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}"></script>
-<script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}"></script>
-<script type="text/javascript" src="/js/offline/offline-watch.js?hash={{.Hash}}"></script>
-<script type="text/javascript" src="/js/tooltips.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/offline/offline-watch.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/tooltips.js?hash={{.Hash}}" defer></script>
 </body>
 </html>
