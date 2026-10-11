@@ -440,6 +440,10 @@ type SearchVars struct {
 	SetKeyrunes    map[string]string
 	NoSort         bool
 	HasAvailable   bool
+
+	// The page size the pagination links name (ps), zero for the default
+	PageSize int
+
 	// A search ran for this request. Not the same as SearchQuery being set:
 	// a pinned filter searches on its own, and the page has results to draw
 	// (or an empty-handed answer to give) with the box above it empty.
@@ -653,6 +657,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	shown := orderSearchKeys(r, ds, result, pageVars.SearchSort)
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
+	pageVars.PageSize = shown.pageSize
 
 	pageVars.Metadata, pageVars.Printings = searchMetadata(b, shown.keys, preferFlavor)
 
@@ -1107,11 +1112,20 @@ type searchPage struct {
 	keys       []string
 	reversed   bool
 	pagination Pagination
+	// The page size its links name, zero for the MaxSearchResults
+	// a link without one is read at
+	pageSize int
 }
 
-// searchPageSize is how many results one page shows for this request.
+// searchPageSize is how many results one page shows for this request: the
+// size its link names, MaxSearchResults for a page index without one, as
+// any such link was written for, else the layout's.
 func searchPageSize(r *http.Request) int {
-	if r != nil && isMobileRequest(r) {
+	size, _ := strconv.Atoi(r.FormValue("ps"))
+	if size == MaxSearchResultsMobile || size == MaxSearchResults {
+		return size
+	}
+	if r.FormValue("p") == "" && isMobileRequest(r) {
 		return MaxSearchResultsMobile
 	}
 	return MaxSearchResults
@@ -1130,6 +1144,9 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 	if len(shown.keys) > pageSize {
 		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
 		shown.keys, shown.pagination = Paginate(result.keys, pageIndex, pageSize, MaxSearchTotalResults)
+		if pageSize != MaxSearchResults {
+			shown.pageSize = pageSize
+		}
 	}
 
 	return shown
