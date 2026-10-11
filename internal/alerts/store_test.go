@@ -3,6 +3,9 @@ package alerts
 import (
 	"context"
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -971,6 +974,8 @@ func TestComplainedChannelStaysDisabled(t *testing.T) {
 	first := time.Now().Add(-time.Hour).Truncate(time.Second)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, VerifiedAt: &first}))
 	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonComplained, first))
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &first}))
+	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourcePatreon, ReasonComplained, first))
 	parked := parkedEmailAlert(t, s, h, "card-1", ParkComplained)
 	for _, reason := range []string{ReasonBounced, ReasonUnsubscribed} {
 		must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, reason, time.Now()))
@@ -986,8 +991,6 @@ func TestComplainedChannelStaysDisabled(t *testing.T) {
 		t.Fatalf("confirm link undid a complaint: %v %v", ok, err)
 	}
 	// Enable refuses it too, whatever the caller read before.
-	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &first}))
-	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourcePatreon, ReasonComplained, first))
 	ok, err = s.EnableChannel(ctx, h, ChannelEmail, SourcePatreon)
 	if err != nil || ok || alertStatus(t, s, h, parked) != StatusUndeliverable {
 		t.Fatalf("enable undid a complaint: %v %v", ok, err)
@@ -1035,12 +1038,8 @@ func TestConfirmMovesAVerifiedRowToItsReplacement(t *testing.T) {
 	now := time.Now()
 	verified := now.Add(-4 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	claimedAt := now.Add(-2 * time.Hour)
-	claimed, err := s.ClaimConfirmSend(ctx, h, strings.ToUpper(addr), claimedAt, now.Add(-3*time.Hour))
-	if err != nil || !claimed {
-		t.Fatalf("claim: %v %v", claimed, err)
-	}
-	claimed, err = s.ClaimConfirmSend(ctx, "someone-else", addr, now, now.Add(-time.Hour))
+	claimedAt := claimFor(t, s, h, strings.ToUpper(addr), now.Add(-2*time.Hour))
+	_, claimed, err := s.ClaimConfirmSend(ctx, "someone-else", addr)
 	if err != nil || !claimed {
 		t.Fatalf("another user's claim an hour on: %v %v", claimed, err)
 	}
@@ -1086,18 +1085,11 @@ func TestConfirmMovesOnlyOnTheCurrentRequest(t *testing.T) {
 	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
 	clean()
 	t.Cleanup(clean)
-	now := time.Now()
+	now := time.Now().Truncate(time.Microsecond)
 	verified := now.Add(-4 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	claim := func(addr string, at time.Time) {
-		t.Helper()
-		ok, err := s.ClaimConfirmSend(ctx, h, addr, at, at.Add(-time.Hour))
-		if err != nil || !ok {
-			t.Fatalf("claim %s: %v %v", addr, ok, err)
-		}
-	}
-	claim(typo, now.Add(-3*time.Hour))
-	claim(right, now.Add(-2*time.Hour))
+	claimFor(t, s, h, typo, now.Add(-3*time.Hour))
+	claimFor(t, s, h, right, now.Add(-2*time.Hour))
 	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, typo, now.Add(-3*time.Hour), now)
 	if err != nil || ok {
 		t.Fatalf("superseded link moved the row: %v %v", ok, err)
@@ -1113,7 +1105,7 @@ func TestConfirmMovesOnlyOnTheCurrentRequest(t *testing.T) {
 	}
 	// An unsubscribed row does not move, even on the latest request.
 	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonUnsubscribed, now))
-	claim(typo, now.Add(2*time.Hour))
+	claimFor(t, s, h, typo, now.Add(2*time.Hour))
 	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, typo, now.Add(2*time.Hour), now.Add(3*time.Hour))
 	if err != nil || ok {
 		t.Fatalf("link undid an unsubscribe: %v %v", ok, err)
@@ -1139,15 +1131,8 @@ func TestFailedSendSupersedesNothing(t *testing.T) {
 	now := time.Now().Truncate(time.Microsecond)
 	verified := now.Add(-4 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	for _, c := range []struct {
-		addr string
-		at   time.Time
-	}{{sent, now.Add(-3 * time.Hour)}, {failed, now.Add(-2 * time.Hour)}} {
-		ok, err := s.ClaimConfirmSend(ctx, h, c.addr, c.at, c.at.Add(-time.Hour))
-		if err != nil || !ok {
-			t.Fatalf("claim %s: %v %v", c.addr, ok, err)
-		}
-	}
+	claimFor(t, s, h, sent, now.Add(-3*time.Hour))
+	claimFor(t, s, h, failed, now.Add(-2*time.Hour))
 	must(t, s.ReleaseConfirmSend(ctx, h, failed, now.Add(-2*time.Hour)))
 	pending, ok, err := s.PendingEmail(ctx, h, now.Add(-24*time.Hour))
 	if err != nil || !ok || pending != sent {
@@ -1174,17 +1159,9 @@ func TestConfirmLinkNamesItsClaim(t *testing.T) {
 	now := time.Now().Truncate(time.Microsecond)
 	verified := now.Add(-6 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	claim := func(addr string, at time.Time) time.Time {
-		t.Helper()
-		ok, err := s.ClaimConfirmSend(ctx, h, addr, at, at.Add(-time.Hour))
-		if err != nil || !ok {
-			t.Fatalf("claim %s: %v %v", addr, ok, err)
-		}
-		return at
-	}
-	first := claim(a, now.Add(-5*time.Hour))
-	claim(b, now.Add(-4*time.Hour))
-	latest := claim(a, now.Add(-3*time.Hour))
+	first := claimFor(t, s, h, a, now.Add(-5*time.Hour))
+	claimFor(t, s, h, b, now.Add(-4*time.Hour))
+	latest := claimFor(t, s, h, a, now.Add(-3*time.Hour))
 	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, a, first, now)
 	if err != nil || ok {
 		t.Fatalf("first link moved the row to the newer request: %v %v", ok, err)
@@ -1197,7 +1174,7 @@ func TestConfirmLinkNamesItsClaim(t *testing.T) {
 	// The row now holds a, unverified; it is asked for again.
 	_, err = s.db.ExecContext(ctx, `UPDATE alert_channels SET verified_at = NULL WHERE user_hash = $1`, h)
 	must(t, err)
-	again := claim(a, now.Add(-time.Hour))
+	again := claimFor(t, s, h, a, now.Add(-time.Hour))
 	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, a, latest, now)
 	if err != nil || ok {
 		t.Fatalf("older link verified the row in place: %v %v", ok, err)
@@ -1224,13 +1201,9 @@ func TestOlderLinkLeavesANewerChange(t *testing.T) {
 	verified := now.Add(-4 * time.Hour)
 	first := claimFor(t, s, h, "a@example.com", verified.Add(-time.Minute))
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "a@example.com", Source: SourceUser, VerifiedAt: &verified}))
-	replacement := now.Add(-2 * time.Hour)
-	ok, err := s.ClaimConfirmSend(ctx, h, b, replacement, replacement.Add(-time.Hour))
-	if err != nil || !ok {
-		t.Fatalf("claim: %v %v", ok, err)
-	}
+	replacement := claimFor(t, s, h, b, now.Add(-2*time.Hour))
 	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonBounced, now.Add(-time.Hour)))
-	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, "a@example.com", first, now)
+	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, "a@example.com", first, now)
 	if err != nil || ok {
 		t.Fatalf("older link re-enabled the bounced address: %v %v", ok, err)
 	}
@@ -1254,49 +1227,497 @@ func TestClaimConfirmSendOncePerAddress(t *testing.T) {
 	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
 	clean()
 	t.Cleanup(clean)
-	now := time.Now().Truncate(time.Microsecond)
-	ok, err := s.ClaimConfirmSend(ctx, "uA", addr, now, now.Add(-time.Hour))
+	at, ok, err := s.ClaimConfirmSend(ctx, "uA", addr)
 	if err != nil || !ok {
 		t.Fatalf("first claim: %v %v", ok, err)
 	}
-	later := now.Add(time.Minute)
-	ok, err = s.ClaimConfirmSend(ctx, "uB", strings.ToUpper(addr), later, later.Add(-time.Hour))
+	_, ok, err = s.ClaimConfirmSend(ctx, "uB", strings.ToUpper(addr))
 	if err != nil || ok {
 		t.Fatalf("second claim in the hour: %v %v", ok, err)
 	}
-	must(t, s.ReleaseConfirmSend(ctx, "uA", addr, now.Add(time.Second)))
-	must(t, s.ReleaseConfirmSend(ctx, "uB", addr, now))
-	ok, _ = s.ClaimConfirmSend(ctx, "uB", addr, later, later.Add(-time.Hour))
+	must(t, s.ReleaseConfirmSend(ctx, "uA", addr, at.Add(time.Second)))
+	must(t, s.ReleaseConfirmSend(ctx, "uB", addr, at))
+	_, ok, _ = s.ClaimConfirmSend(ctx, "uB", addr)
 	if ok {
 		t.Fatal("another time's or user's release freed the claim")
 	}
-	must(t, s.ReleaseConfirmSend(ctx, "uA", addr, now))
-	ok, err = s.ClaimConfirmSend(ctx, "uB", addr, later, later.Add(-time.Hour))
+	must(t, s.ReleaseConfirmSend(ctx, "uA", addr, at))
+	_, ok, err = s.ClaimConfirmSend(ctx, "uB", addr)
 	if err != nil || !ok {
 		t.Fatalf("claim after release: %v %v", ok, err)
 	}
-	ok, err = s.ClaimConfirmSend(ctx, "uA", addr, now.Add(2*time.Hour), now.Add(time.Hour))
+	_, err = s.db.ExecContext(ctx, `UPDATE alert_confirm_sends SET sent_at = sent_at - interval '2 hours' WHERE address = $1`, addr)
+	must(t, err)
+	_, ok, err = s.ClaimConfirmSend(ctx, "uA", addr)
 	if err != nil || !ok {
 		t.Fatalf("claim after the hour: %v %v", ok, err)
 	}
 }
 
-// TestDisableChannelAtSkipsAMovedRow covers a report about an address the
-// row no longer holds: it disables nothing.
-func TestDisableChannelAtSkipsAMovedRow(t *testing.T) {
+// TestDisableAndParkSkipsAMovedRow covers a report about an address the
+// row no longer holds: it disables and parks nothing.
+func TestDisableAndParkSkipsAMovedRow(t *testing.T) {
 	s := testStore(t)
 	h := freshUser(t, s)
 	seedContact(t, s, h)
 	ctx := context.Background()
 	now := time.Now()
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "new@example.com", Source: SourceUser, VerifiedAt: &now}))
-	ok, err := s.DisableChannelAt(ctx, h, ChannelEmail, SourceUser, "old@example.com", ReasonBounced, now)
-	if err != nil || ok {
+	a := sample(h)
+	a.Delivery = DeliveryEmail
+	created, err := s.Create(ctx, a)
+	must(t, err)
+	ok, err := s.DisableAndPark(ctx, h, ChannelEmail, SourceUser, "old@example.com", ReasonBounced, ParkBounced, now)
+	if err != nil || ok || alertStatus(t, s, h, created.ID) != StatusActive {
 		t.Fatalf("old address disabled the new one: %v %v", ok, err)
 	}
-	ok, err = s.DisableChannelAt(ctx, h, ChannelEmail, SourceUser, "NEW@example.com", ReasonBounced, now)
-	if err != nil || !ok {
+	ok, err = s.DisableAndPark(ctx, h, ChannelEmail, SourceUser, "NEW@example.com", ReasonBounced, ParkBounced, now)
+	if err != nil || !ok || alertStatus(t, s, h, created.ID) != StatusUndeliverable {
 		t.Fatalf("own address: %v %v", ok, err)
+	}
+}
+
+// TestDisableAndParkWaitsForAConfirm covers a bounce on the user's Patreon
+// address landing while a confirm verifies their own one: the park waits
+// for the confirm and then sees the new address working.
+func TestDisableAndParkWaitsForAConfirm(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	now := time.Now()
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &now}))
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "mine@example.com", Source: SourceUser}))
+	a := sample(h)
+	a.Delivery = DeliveryEmail
+	created, err := s.Create(ctx, a)
+	must(t, err)
+
+	// The confirm, mid-way: it holds the user's lock and has verified the row.
+	confirm, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = confirm.Rollback() }()
+	must(t, lockUser(ctx, confirm, h))
+	_, err = confirm.ExecContext(ctx, `UPDATE alert_channels SET verified_at = now() WHERE user_hash = $1 AND source = 'user'`, h)
+	must(t, err)
+	result := make(chan error, 1)
+	go func() {
+		_, err := s.DisableAndPark(ctx, h, ChannelEmail, SourcePatreon, "pat@example.com", ReasonBounced, ParkBounced, now)
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		t.Fatalf("park did not wait for the confirm: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	must(t, confirm.Commit())
+	must(t, <-result)
+	if st := alertStatus(t, s, h, created.ID); st != StatusActive {
+		t.Fatalf("alert %s with a working address", st)
+	}
+}
+
+// TestStageEmailWaitsForAConfirm covers a new address entered while the
+// pending one is being confirmed: the write waits for the confirm, then
+// keeps the address it verified rather than overwrite it.
+func TestStageEmailWaitsForAConfirm(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
+	clean()
+	t.Cleanup(clean)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "a@example.com", Source: SourceUser}))
+
+	// The confirm, mid-way: it holds the user's lock and has verified the row.
+	confirm, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = confirm.Rollback() }()
+	must(t, lockUser(ctx, confirm, h))
+	_, err = confirm.ExecContext(ctx, `UPDATE alert_channels SET verified_at = now() WHERE user_hash = $1 AND source = 'user'`, h)
+	must(t, err)
+	result := make(chan error, 1)
+	go func() {
+		_, _, err := s.StageEmail(ctx, h, "b@example.com")
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		t.Fatalf("stage did not wait for the confirm: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	must(t, confirm.Commit())
+	must(t, <-result)
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].Address != "a@example.com" || !chans[0].Active() {
+		t.Fatalf("row after the stage: %+v %v", chans, err)
+	}
+	// With nothing working, the row takes the new address at once.
+	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonBounced, time.Now()))
+	_, err = s.db.ExecContext(ctx, `UPDATE alert_confirm_sends SET sent_at = sent_at - interval '2 hours' WHERE user_hash = $1`, h)
+	must(t, err)
+	_, claimed, err := s.StageEmail(ctx, h, "b@example.com")
+	if err != nil || !claimed {
+		t.Fatalf("stage over a bounced row: %v %v", claimed, err)
+	}
+	chans, err = s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].Address != "b@example.com" || chans[0].VerifiedAt != nil {
+		t.Fatalf("row after staging over a bounced one: %+v %v", chans, err)
+	}
+}
+
+// TestParkForNoAddressWaitsForAConfirm covers the evaluator parking an
+// email alert for want of an address while a confirm verifies one: the
+// park waits for the confirm and then leaves the alert active.
+func TestParkForNoAddressWaitsForAConfirm(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "mine@example.com", Source: SourceUser}))
+	a := sample(h)
+	a.Delivery = DeliveryEmail
+	created, err := s.Create(ctx, a)
+	must(t, err)
+
+	confirm, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = confirm.Rollback() }()
+	must(t, lockUser(ctx, confirm, h))
+	_, err = confirm.ExecContext(ctx, `UPDATE alert_channels SET verified_at = now() WHERE user_hash = $1 AND source = 'user'`, h)
+	must(t, err)
+	result := make(chan error, 1)
+	go func() {
+		_, err := s.ParkForNoAddress(ctx, h, created.ID, created.UpdatedAt, State{Status: StatusUndeliverable, AboveArmed: true, BelowArmed: true, LastError: ParkNoAddress})
+		result <- err
+	}()
+	select {
+	case err := <-result:
+		t.Fatalf("park did not wait for the confirm: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	must(t, confirm.Commit())
+	must(t, <-result)
+	if st := alertStatus(t, s, h, created.ID); st != StatusActive {
+		t.Fatalf("alert %s with a working address", st)
+	}
+	// With no address at all, the alert is parked.
+	must(t, s.DeleteChannel(ctx, h, ChannelEmail, SourceUser))
+	parked, err := s.ParkForNoAddress(ctx, h, created.ID, created.UpdatedAt, State{Status: StatusUndeliverable, AboveArmed: true, BelowArmed: true, LastError: ParkNoAddress})
+	if err != nil || !parked || alertStatus(t, s, h, created.ID) != StatusUndeliverable {
+		t.Fatalf("park with no address: %v %v", parked, err)
+	}
+}
+
+// TestUnsubscribeEmailIsOneStep covers the unsubscribe link: it waits for
+// another channel write of the user's, then disables every working email
+// row, a complaint kept, and parks the email alerts together.
+func TestUnsubscribeEmailIsOneStep(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	now := time.Now()
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &now}))
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "mine@example.com", Source: SourceUser, VerifiedAt: &now}))
+	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonComplained, now))
+	a := sample(h)
+	a.Delivery = DeliveryEmail
+	created, err := s.Create(ctx, a)
+	must(t, err)
+
+	enable, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = enable.Rollback() }()
+	must(t, lockUser(ctx, enable, h))
+	result := make(chan error, 1)
+	go func() { result <- s.UnsubscribeEmail(ctx, h, now) }()
+	select {
+	case err := <-result:
+		t.Fatalf("unsubscribe did not wait: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+	must(t, enable.Commit())
+	must(t, <-result)
+	chans, err := s.Channels(ctx, h)
+	must(t, err)
+	for _, c := range chans {
+		want := ReasonUnsubscribed
+		if c.Source == SourceUser {
+			want = ReasonComplained
+		}
+		if c.DisabledAt == nil || c.DisabledReason != want {
+			t.Fatalf("row after unsubscribe: %+v", c)
+		}
+	}
+	if st := alertStatus(t, s, h, created.ID); st != StatusUndeliverable {
+		t.Fatalf("alert %s after unsubscribe", st)
+	}
+}
+
+// TestUnsubscribeAfterAStagedAddress covers an unsubscribe landing after a
+// new address was claimed and staged: neither that address's link nor a
+// replacement's moves or verifies an unsubscribed row.
+func TestUnsubscribeAfterAStagedAddress(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now()
+	for _, tc := range []struct {
+		name    string
+		working bool
+	}{{"pending row", false}, {"working row", true}} {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM alert_channels WHERE user_hash = $1`, h)
+		must(t, err)
+		clean()
+		if tc.working {
+			verified := now.Add(-time.Hour)
+			must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+		}
+		claimedAt, claimed, err := s.StageEmail(ctx, h, "new@example.com")
+		if err != nil || !claimed {
+			t.Fatalf("%s: stage: %v %v", tc.name, claimed, err)
+		}
+		must(t, s.UnsubscribeEmail(ctx, h, now))
+		ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, "new@example.com", claimedAt, now.Add(time.Minute))
+		if err != nil || ok {
+			t.Fatalf("%s: link undid the unsubscribe: %v %v", tc.name, ok, err)
+		}
+	}
+}
+
+// TestUnsubscribeOverridesABounceDB covers an unsubscribe after a bounce:
+// the bounced row turns unsubscribed, which a confirm link does not undo.
+func TestUnsubscribeOverridesABounceDB(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	now := time.Now()
+	verified := now.Add(-time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, VerifiedAt: &verified}))
+	_, err := s.DisableAndPark(ctx, h, ChannelEmail, SourceUser, "me@example.com", ReasonBounced, ParkBounced, now)
+	must(t, err)
+	must(t, s.UnsubscribeEmail(ctx, h, now))
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].DisabledReason != ReasonUnsubscribed {
+		t.Fatalf("bounced row after an unsubscribe: %+v %v", chans, err)
+	}
+	claimed := claimFor(t, s, h, "me@example.com", now)
+	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, "me@example.com", claimed, now)
+	if err != nil || ok {
+		t.Fatalf("confirm link undid the unsubscribe: %v %v", ok, err)
+	}
+}
+
+// TestUpsertChannelRestoresParkedEmailAlerts covers a login writing the
+// Patreon address of a user whose email alerts were parked for want of
+// one: it waits on the user's lock, as a park does, and the alerts come
+// back with it; a Discord row leaves them alone, and so does a login for
+// alerts parked by an unsubscribe.
+func TestUpsertChannelRestoresParkedEmailAlerts(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	now := time.Now()
+	parked := parkedEmailAlert(t, s, h, "card-1", ParkNoAddress)
+	unsubscribed := parkedEmailAlert(t, s, h, "card-2", ParkUnsubscribed)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelDiscord, Address: "d1", Source: SourcePatreon, VerifiedAt: &now}))
+	if alertStatus(t, s, h, parked) != StatusUndeliverable {
+		t.Fatal("a discord row restored an email alert")
+	}
+	other, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = other.Rollback() }()
+	must(t, lockUser(ctx, other, h))
+	result := make(chan error, 1)
+	go func() {
+		result <- s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &now})
+	}()
+	time.Sleep(200 * time.Millisecond)
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 {
+		t.Fatalf("wrote while another write held the user's lock: %+v %v", chans, err)
+	}
+	must(t, other.Commit())
+	must(t, <-result)
+	if alertStatus(t, s, h, parked) != StatusActive || alertStatus(t, s, h, unsubscribed) != StatusUndeliverable {
+		t.Fatalf("after the patreon address: %s %s", alertStatus(t, s, h, parked), alertStatus(t, s, h, unsubscribed))
+	}
+}
+
+// TestUpsertChannelWaitsOnTheAddressLock covers a login writing an email
+// row while a complaint about that address is being recorded: it waits for
+// the complaint, so it sees it and starts the row disabled.
+func TestUpsertChannelWaitsOnTheAddressLock(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	addr := "locked-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	complaint, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = complaint.Rollback() }()
+	must(t, lockAddress(ctx, complaint, addr))
+	now := time.Now()
+	result := make(chan error, 1)
+	go func() {
+		result <- s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: addr, Source: SourcePatreon, VerifiedAt: &now})
+	}()
+	time.Sleep(200 * time.Millisecond)
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 0 {
+		t.Fatalf("wrote while a complaint held the address's lock: %+v %v", chans, err)
+	}
+	_, err = complaint.ExecContext(ctx, `
+		INSERT INTO alert_confirm_sends (user_hash, address, sent_at, complained_at) VALUES ('', $1, now(), now())`, addr)
+	must(t, err)
+	must(t, complaint.Commit())
+	must(t, <-result)
+	chans, err = s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].DisabledReason != ReasonComplained {
+		t.Fatalf("row after the complaint: %+v %v", chans, err)
+	}
+}
+
+// TestLaterCommitTakesTheLaterClaimDB covers two requests where the one
+// begun first commits last: its claim is timed once it holds the user's
+// lock, so its link moves the row and the other request's is refused.
+func TestLaterCommitTakesTheLaterClaimDB(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	h := testHash("a@b.com")
+	cleanUser(t, s, h)
+	seedContact(t, s, h)
+	a, b := "a-"+strings.ToLower(t.Name())+"@example.com", "b-"+strings.ToLower(t.Name())+"@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
+	clean()
+	t.Cleanup(clean)
+	verified := time.Now().Add(-4 * time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+
+	// The request for a holds the user's lock while b's begins.
+	other, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = other.Rollback() }()
+	must(t, lockUser(ctx, other, h))
+	sent := []sentConfirm{}
+	api := testChannelAPI(s, &sent, nil)
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"`+b+`"}`, testCaller("a@b.com", "Legacy")))
+		done <- w
+	}()
+	time.Sleep(200 * time.Millisecond)
+	var aAt time.Time
+	must(t, other.QueryRowContext(ctx, `
+		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, $2, clock_timestamp()) RETURNING sent_at`, h, a).Scan(&aAt))
+	must(t, other.Commit())
+	w := <-done
+	if w.Code != http.StatusAccepted || len(sent) != 1 {
+		t.Fatalf("set b = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	u, err := url.Parse(sent[0].link)
+	must(t, err)
+	tok, err := VerifyToken(testTokenSecret, u.Query().Get("token"), time.Now())
+	if err != nil || !tok.Claimed.After(aAt) {
+		t.Fatalf("b's claim %v is not after a's %v: %v", tok.Claimed, aAt, err)
+	}
+	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, a, aAt, time.Now())
+	if err != nil || ok {
+		t.Fatalf("a's link moved the row over b's later request: %v %v", ok, err)
+	}
+	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, b, tok.Claimed, time.Now())
+	if err != nil || !ok {
+		t.Fatalf("b's link: %v %v", ok, err)
+	}
+}
+
+// TestRefusedStageGoesBackDB covers a new address whose confirm mail the
+// provider refused: the pending row returns to the address it held, so the
+// page and Resend agree, unless a newer request has moved it on since.
+func TestRefusedStageGoesBackDB(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
+	clean()
+	t.Cleanup(clean)
+	row := func() string {
+		t.Helper()
+		chans, err := s.Channels(ctx, h)
+		if err != nil || len(chans) != 1 {
+			t.Fatalf("rows: %+v %v", chans, err)
+		}
+		return chans[0].Address
+	}
+	stage := func(addr string) time.Time {
+		t.Helper()
+		at, claimed, err := s.StageEmail(ctx, h, addr)
+		if err != nil || !claimed {
+			t.Fatalf("stage %s: %v %v", addr, claimed, err)
+		}
+		return at
+	}
+	name := strings.ToLower(t.Name())
+	a, b, c, d := "a-"+name+"@example.com", "b-"+name+"@example.com", "c-"+name+"@example.com", "d-"+name+"@example.com"
+	stage(a)
+	atB := stage(b)
+	must(t, s.ReleaseConfirmSend(ctx, h, b, atB))
+	if got := row(); got != a {
+		t.Fatalf("row after b's refusal = %s, want %s", got, a)
+	}
+	atC := stage(c)
+	stage(d)
+	must(t, s.ReleaseConfirmSend(ctx, h, c, atC))
+	if got := row(); got != d {
+		t.Fatalf("row after c's refusal with d newer = %s, want %s", got, d)
+	}
+}
+
+// TestStageEmailClaimsAndStagesTogether covers the claim moving with the
+// row: while another write holds the user's lock, neither happens.
+func TestStageEmailClaimsAndStagesTogether(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	addr := "together-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	other, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = other.Rollback() }()
+	must(t, lockUser(ctx, other, h))
+	result := make(chan error, 1)
+	go func() {
+		_, _, err := s.StageEmail(ctx, h, addr)
+		result <- err
+	}()
+	time.Sleep(200 * time.Millisecond)
+	var claims int
+	must(t, s.db.QueryRowContext(ctx, `SELECT count(*) FROM alert_confirm_sends WHERE address = $1`, addr).Scan(&claims))
+	if claims != 0 {
+		t.Fatal("claimed while another write held the user's lock")
+	}
+	must(t, other.Commit())
+	must(t, <-result)
+	must(t, s.db.QueryRowContext(ctx, `SELECT count(*) FROM alert_confirm_sends WHERE address = $1`, addr).Scan(&claims))
+	chans, err := s.Channels(ctx, h)
+	if err != nil || claims != 1 || len(chans) != 1 || chans[0].Address != addr {
+		t.Fatalf("after the stage: %d claims, rows %+v %v", claims, chans, err)
 	}
 }
 
