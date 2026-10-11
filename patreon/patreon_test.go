@@ -1,7 +1,11 @@
 package patreon
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -79,5 +83,62 @@ func TestUserDataRejectsNumericDiscordUserID(t *testing.T) {
 	err := json.Unmarshal([]byte(body), &u)
 	if err == nil {
 		t.Fatal("want an error decoding a numeric discord user_id, got nil")
+	}
+}
+
+// answering is a transport that answers every request with code and body.
+type answering struct {
+	code int
+	body string
+}
+
+func (a answering) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: a.code, Body: io.NopCloser(strings.NewReader(a.body)), Request: req}, nil
+}
+
+// A refused answer keeps the start of its body for the log, quoted, so an
+// expired token, a missing scope and a deleted membership read apart.
+func TestStatusErrorKeepsTheStartOfTheBody(t *testing.T) {
+	scope := `{"errors":[{"code_name":"Forbidden","detail":"missing scope"}]}` + "\n"
+	c := &Client{Client: &http.Client{Transport: answering{http.StatusForbidden, scope + strings.Repeat(" ", 1000)}}}
+	_, err := c.GetMembershipData(context.Background(), "m1")
+	var statusErr *StatusError
+	if !errors.As(err, &statusErr) || len(statusErr.Body) != statusBodyLimit || !strings.HasPrefix(statusErr.Body, scope) {
+		t.Fatalf("%v, want a StatusError holding the first %d bytes", err, statusBodyLimit)
+	}
+	if !strings.Contains(err.Error(), `missing scope\"}]}\n`) || strings.Contains(err.Error(), "\n") {
+		t.Errorf("%q, want the body quoted on one line", err.Error())
+	}
+}
+
+// A membership answer outside 2xx is a StatusError carrying the status, read
+// before the body, which an edge serves as HTML; a 2xx body that does not
+// decode is ErrUnreadable.
+func TestMembershipStatusIsTyped(t *testing.T) {
+	for _, tc := range []struct {
+		code int
+		body string
+	}{
+		{http.StatusBadGateway, "<html>502 Bad Gateway</html>"},
+		{http.StatusNotFound, `{"errors":[{"title":"not found"}]}`},
+	} {
+		c := &Client{Client: &http.Client{Transport: answering{tc.code, tc.body}}}
+		_, err := c.GetMembershipData(context.Background(), "m1")
+		var statusErr *StatusError
+		if !errors.As(err, &statusErr) || statusErr.StatusCode != tc.code {
+			t.Errorf("%d: %v, want a StatusError", tc.code, err)
+		}
+	}
+	c := &Client{Client: &http.Client{Transport: answering{http.StatusOK, `{"data":{}}`}}}
+	_, err := c.GetMembershipData(context.Background(), "m1")
+	if err != nil {
+		t.Errorf("200: %v", err)
+	}
+	for _, body := range []string{`{"data":{"relat`, "<html>ok</html>"} {
+		c = &Client{Client: &http.Client{Transport: answering{http.StatusOK, body}}}
+		_, err = c.GetMembershipData(context.Background(), "m1")
+		if !errors.Is(err, ErrUnreadable) {
+			t.Errorf("200 %q: %v, want ErrUnreadable", body, err)
+		}
 	}
 }

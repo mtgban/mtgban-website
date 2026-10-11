@@ -20,6 +20,7 @@ const (
 	ErrMsgAPIHandoffStale     = "That sign-in link has expired: start again from this page"
 	ErrMsgAPIHandoffNoAnswer  = "Patreon did not confirm who you are: start again from this page"
 	ErrMsgAPIHandoffNoEmail   = "Patreon did not share an email address for your account: add one there, then try again"
+	ErrMsgAPITierNoAnswer     = "Patreon did not say which tier you pledge to: start again from this page"
 )
 
 // apiGatewayUser is the api_user_secrets entry the gateway calls this site
@@ -131,8 +132,8 @@ var handoffPaths = map[string]string{
 
 // finishAPIHandoff mints the gateway token for the reader Patreon just named,
 // with the tier the site would give them, once the nonce shows this browser
-// started the handoff.
-func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, user *PatreonUserData, tier string) {
+// started the handoff. tierErr is why Patreon gave no answer for the tier.
+func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, user *PatreonUserData, tier string, tierErr error) {
 	// One use: whatever happens next, this handoff is spent
 	spendHandoffCookie(w, r, state)
 
@@ -161,6 +162,8 @@ func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state ha
 	// confirmed it.
 	case !user.EmailVerified:
 		msg, outcome = ErrMsgAPIEmailUnconfirmed, "unverified email"
+	case tierErr != nil:
+		msg, outcome = ErrMsgAPITierNoAnswer, "tier lookup failed"
 	case tier == "" && state.purpose == apihandoff.PurposeTrial:
 		msg, outcome = ErrMsgAPITrialPledge, "no tier"
 	case tier == "":

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"html"
 	"io"
 	"log"
@@ -83,14 +85,14 @@ func patreonRedirect(t *testing.T, rec *httptest.ResponseRecorder) (*url.URL, *h
 
 // handoffFinish runs the callback's handoff half for the reader Patreon named,
 // with nonce in this browser's cookie (none when empty).
-func handoffFinish(t *testing.T, state handoffState, nonce string, user *PatreonUserData, tier string) *httptest.ResponseRecorder {
+func handoffFinish(t *testing.T, state handoffState, nonce string, user *PatreonUserData, tier string, tierErr error) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/auth?code=x", nil)
 	if nonce != "" {
 		req.AddCookie(&http.Cookie{Name: handoffCookie, Value: nonce})
 	}
 	rec := httptest.NewRecorder()
-	testSite.finishAPIHandoff(rec, req, state, user, tier)
+	testSite.finishAPIHandoff(rec, req, state, user, tier, tierErr)
 	return rec
 }
 
@@ -166,7 +168,7 @@ func TestAPIHandoffCarriesOnlyOurReturnTo(t *testing.T) {
 			t.Errorf("return_to %s: state carries %q, want %q", target, state.returnTo, want)
 		}
 		state.returnTo = target
-		_, gw := gatewayToken(t, handoffFinish(t, state, nonce.Value, ann, "Legacy"), "/session")
+		_, gw := gatewayToken(t, handoffFinish(t, state, nonce.Value, ann, "Legacy", nil), "/session")
 		if got := gw.Query().Get("return_to"); got != want {
 			t.Errorf("return_to %s: the gateway gets %q, want %q", target, got, want)
 		}
@@ -178,7 +180,7 @@ func TestAPIHandoffFinishesWithPatreonsReader(t *testing.T) {
 	setGatewaySecret(t, "handoff-secret")
 	handoffSetup(t)
 	for purpose, path := range map[string]string{apihandoff.PurposeLogin: "/session", apihandoff.PurposeTrial: "/trial"} {
-		rec := handoffFinish(t, handoffState{purpose: purpose, nonce: "n1"}, "n1", ann, "Legacy")
+		rec := handoffFinish(t, handoffState{purpose: purpose, nonce: "n1"}, "n1", ann, "Legacy", nil)
 		claims, _ := gatewayToken(t, rec, path)
 		if claims.Email != "ann@example.com" || claims.Name != "Ann Example" || claims.Purpose != purpose || claims.Game != "magic" {
 			t.Errorf("%s: claims %+v", purpose, claims)
@@ -210,7 +212,7 @@ func TestAPIHandoffFinishesOnlyWhatThisBrowserStarted(t *testing.T) {
 		"unknown purpose": {handoffState{purpose: "admin", nonce: "n1"}, "n1", "unknown purpose"},
 	} {
 		logged.Reset()
-		rec := handoffFinish(t, tc.state, tc.cookie, ann, "Legacy")
+		rec := handoffFinish(t, tc.state, tc.cookie, ann, "Legacy", nil)
 		if rec.Code == http.StatusFound || !strings.Contains(rec.Body.String(), html.EscapeString(ErrMsgAPIHandoffStale)) {
 			t.Errorf("%s: status %d, location %q", name, rec.Code, rec.Header().Get("Location"))
 		}
@@ -230,17 +232,19 @@ func TestAPIHandoffRefusals(t *testing.T) {
 		purpose string
 		user    *PatreonUserData
 		tier    string
+		tierErr error
 		want    string
 		outcome string
 	}{
-		"unconfirmed email": {apihandoff.PurposeLogin, unconfirmed, "Legacy", ErrMsgAPIEmailUnconfirmed, `email="ann@example.com" tier="Legacy" outcome=unverified email`},
-		"no email":          {apihandoff.PurposeLogin, &PatreonUserData{EmailVerified: true}, "Legacy", ErrMsgAPIHandoffNoEmail, "outcome=no email"},
-		"a trial, no tier":  {apihandoff.PurposeTrial, ann, "", ErrMsgAPITrialPledge, `purpose=trial email="ann@example.com" tier="" outcome=no tier`},
-		"a login, no tier":  {apihandoff.PurposeLogin, ann, "", ErrMsgAPILoginPledge, `purpose=login email="ann@example.com" tier="" outcome=no tier`},
-		"a login":           {apihandoff.PurposeLogin, ann, "Legacy", "", `purpose=login email="ann@example.com" tier="Legacy" outcome=ok`},
+		"unconfirmed email":    {apihandoff.PurposeLogin, unconfirmed, "Legacy", nil, ErrMsgAPIEmailUnconfirmed, `email="ann@example.com" tier="Legacy" outcome=unverified email`},
+		"no email":             {apihandoff.PurposeLogin, &PatreonUserData{EmailVerified: true}, "Legacy", nil, ErrMsgAPIHandoffNoEmail, "outcome=no email"},
+		"a trial, no tier":     {apihandoff.PurposeTrial, ann, "", nil, ErrMsgAPITrialPledge, `purpose=trial email="ann@example.com" tier="" outcome=no tier`},
+		"a login, no tier":     {apihandoff.PurposeLogin, ann, "", nil, ErrMsgAPILoginPledge, `purpose=login email="ann@example.com" tier="" outcome=no tier`},
+		"a login":              {apihandoff.PurposeLogin, ann, "Legacy", nil, "", `purpose=login email="ann@example.com" tier="Legacy" outcome=ok`},
+		"Patreon gave no tier": {apihandoff.PurposeLogin, ann, "", context.DeadlineExceeded, ErrMsgAPITierNoAnswer, `purpose=login email="ann@example.com" tier="" outcome=tier lookup failed`},
 	} {
 		logged.Reset()
-		rec := handoffFinish(t, handoffState{purpose: tc.purpose, nonce: "n1"}, "n1", tc.user, tc.tier)
+		rec := handoffFinish(t, handoffState{purpose: tc.purpose, nonce: "n1"}, "n1", tc.user, tc.tier, tc.tierErr)
 		if tc.want != "" && (rec.Code == http.StatusFound || !strings.Contains(rec.Body.String(), html.EscapeString(tc.want))) {
 			t.Errorf("%s: status %d, want the message %q", name, rec.Code, tc.want)
 		}
@@ -257,7 +261,7 @@ func TestAPIHandoffDisabledWithoutSecret(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPIHandoffOff) {
 		t.Errorf("start: status %d, body lacks the disabled message", rec.Code)
 	}
-	rec = handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", ann, "Legacy")
+	rec = handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", ann, "Legacy", nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), ErrMsgAPIHandoffOff) {
 		t.Errorf("finish: status %d, body lacks the disabled message", rec.Code)
 	}
@@ -351,7 +355,7 @@ func TestAPIHandoffFailingAtPatreonEndsOnTheAPIPage(t *testing.T) {
 func handoffCallback(t *testing.T, state handoffState, cookie string, finish bool) *httptest.ResponseRecorder {
 	t.Helper()
 	if finish {
-		return handoffFinish(t, state, cookie, ann, "Legacy")
+		return handoffFinish(t, state, cookie, ann, "Legacy", nil)
 	}
 	encoded := handoffStatePrefix + url.Values{"p": {state.purpose}, "n": {state.nonce}}.Encode()
 	req := httptest.NewRequest(http.MethodGet, "/auth?"+url.Values{"error": {"access_denied"}, "state": {encoded}}.Encode(), nil)
@@ -426,10 +430,74 @@ func TestAPIHandoffLogsOneLineWhateverItIsSent(t *testing.T) {
 	req.Host = "mtgban.com"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	testSite.Auth(httptest.NewRecorder(), req)
-	handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", &PatreonUserData{Email: "ann@example.com" + forged, EmailVerified: true}, "Legacy")
+	handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", &PatreonUserData{Email: "ann@example.com" + forged, EmailVerified: true}, "Legacy", nil)
 
 	lines := strings.Split(strings.TrimSuffix(logged.String(), "\n"), "\n")
 	if len(lines) != 3 || !strings.HasPrefix(lines[1], "handoff: purpose=unknown ") {
 		t.Errorf("logged %q, want three lines, the second for an unknown purpose", lines)
+	}
+}
+
+// patreonStatus is a transport Patreon refuses every request through, with
+// itself as the status.
+type patreonStatus int
+
+func (code patreonStatus) RoundTrip(req *http.Request) (*http.Response, error) {
+	body := io.NopCloser(strings.NewReader(`{"errors":[{"code_name":"refused"}]}`))
+	return &http.Response{StatusCode: int(code), Body: body, Request: req}, nil
+}
+
+// A tier lookup whose token Patreon refused, or that Patreon failed, ends the
+// handoff saying Patreon did not answer; only one for no such member tells
+// the reader they do not pledge.
+func TestAPIHandoffTellsARefusedTierLookupFromNoPledge(t *testing.T) {
+	setGatewaySecret(t, "handoff-secret")
+	handoffSetup(t)
+	ctx := context.Background()
+	for code, want := range map[int]string{
+		http.StatusUnauthorized: ErrMsgAPITierNoAnswer,
+		http.StatusForbidden:    ErrMsgAPITierNoAnswer,
+		http.StatusBadGateway:   ErrMsgAPITierNoAnswer,
+		http.StatusNotFound:     ErrMsgAPILoginPledge,
+	} {
+		client := &patreon.Client{Client: &http.Client{Transport: patreonStatus(code)}}
+		_, err := getUserTier(ctx, client, "m1")
+		var tierErr error
+		if patreonDidNotAnswer(ctx, err) {
+			tierErr = err
+		}
+		rec := handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", ann, "", tierErr)
+		if !strings.Contains(rec.Body.String(), html.EscapeString(want)) {
+			t.Errorf("%d: status %d, want the message %q", code, rec.Code, want)
+		}
+	}
+}
+
+// Only a tier lookup Patreon never answered is told apart from a reader who
+// pledges nothing, who is told so.
+func TestPatreonDidNotAnswer(t *testing.T) {
+	expired, cancel := context.WithTimeout(context.Background(), -time.Second)
+	defer cancel()
+	unreachable := fmt.Errorf("cannot decode membership data: %w", &url.Error{Op: "Get", URL: patreon.PatreonMemberURL, Err: context.DeadlineExceeded})
+	for name, tc := range map[string]struct {
+		ctx  context.Context
+		err  error
+		want bool
+	}{
+		"an answer":         {context.Background(), nil, false},
+		"no tier":           {context.Background(), errors.New("empty tier title"), false},
+		"an error answered": {context.Background(), errors.New(`user data error: ["not found"]`), false},
+		"no answer":         {context.Background(), unreachable, true},
+		"out of time":       {expired, errors.New("unexpected EOF"), true},
+		"an edge's 502":     {context.Background(), fmt.Errorf("cannot decode membership data: %w", &patreon.StatusError{StatusCode: http.StatusBadGateway}), true},
+		"no such member":    {context.Background(), fmt.Errorf("cannot decode membership data: %w", &patreon.StatusError{StatusCode: http.StatusNotFound}), false},
+		"a refused token":   {context.Background(), fmt.Errorf("cannot decode membership data: %w", &patreon.StatusError{StatusCode: http.StatusForbidden}), true},
+		"cut short":         {context.Background(), fmt.Errorf("cannot decode membership data: %w", fmt.Errorf("%w: unexpected EOF", patreon.ErrUnreadable)), true},
+		"answered in time":  {expired, nil, false},
+	} {
+		got := patreonDidNotAnswer(tc.ctx, tc.err)
+		if got != tc.want {
+			t.Errorf("%s: %v, want %v", name, got, tc.want)
+		}
 	}
 }
