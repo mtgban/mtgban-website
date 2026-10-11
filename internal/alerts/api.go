@@ -25,7 +25,7 @@ import (
 type APIStore interface {
 	Contact(ctx context.Context, userHash string) (Contact, bool, error)
 	EnsureContact(ctx context.Context, userHash, tier string) error
-	Create(ctx context.Context, a Alert) (Alert, error)
+	CreateWithin(ctx context.Context, a Alert, allowance int) (Alert, int64, error)
 	ListByUser(ctx context.Context, userHash, game string) ([]Alert, error)
 	Get(ctx context.Context, id int64, userHash string) (Alert, bool, error)
 	Update(ctx context.Context, a Alert) (bool, error)
@@ -426,15 +426,6 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 		a.fail(w, "contact", err)
 		return
 	}
-	existing, err := a.deps.Store.ListByUser(ctx, userHash, a.game())
-	if err != nil {
-		a.fail(w, "list", err)
-		return
-	}
-	if len(existing) >= a.deps.Allowance(c.Values) {
-		jsonError(w, http.StatusConflict, "alert allowance reached; delete one first")
-		return
-	}
 	visible := a.deps.Prices(req.CardID, req.Side, c.Values)
 	stores, err := scopeStores(req.Stores, visible)
 	if err != nil {
@@ -472,19 +463,21 @@ func (a *API) create(w http.ResponseWriter, r *http.Request, c Caller) {
 		jsonError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	for _, e := range existing {
-		if sameAlert(e, alert) {
-			writeJSON(w, http.StatusConflict, struct {
-				Error   string `json:"error"`
-				AlertID int64  `json:"alert_id"`
-			}{"you already have this alert", e.ID})
-			return
-		}
-	}
 	alert.AboveArmed, alert.BelowArmed = startArmed(alert, best, hasPrice)
-	created, err := a.deps.Store.Create(ctx, alert)
+	created, dup, err := a.deps.Store.CreateWithin(ctx, alert, a.deps.Allowance(c.Values))
+	if errors.Is(err, ErrAllowanceReached) {
+		jsonError(w, http.StatusConflict, "alert allowance reached; delete one first")
+		return
+	}
 	if err != nil {
 		a.fail(w, "create", err)
+		return
+	}
+	if dup != 0 {
+		writeJSON(w, http.StatusConflict, struct {
+			Error   string `json:"error"`
+			AlertID int64  `json:"alert_id"`
+		}{"you already have this alert", dup})
 		return
 	}
 	v := View{Alert: created}
