@@ -361,20 +361,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		if err == nil {
 			filterByEdition = set.Code
 		} else {
-			for _, opts := range [][]bool{
-				// Check for nonfoil, foil, etched
-				{false, false}, {true, false}, {false, true},
-			} {
-				uuid, err := b.MatchID(base, opts...)
-				if err != nil {
-					continue
-				}
-				// Skip if hash is already present
-				if slices.Contains(filterByHash, uuid) {
-					continue
-				}
-				filterByHash = append(filterByHash, uuid)
-			}
+			filterByHash = finishUUIDs(b, base)
 			// Speed up search by keeping only the needed edition
 			if len(filterByHash) > 0 {
 				co, err := b.GetUUID(filterByHash[0])
@@ -495,6 +482,15 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 
 	out.Error = "Internal Server Error"
 	json.NewEncoder(w).Encode(&out)
+}
+
+// finishUUIDs is FinishSiblings with the id first when it is one of the matcher's uuids.
+func finishUUIDs(b *mtgmatcher.Backend, id string) []string {
+	siblings := b.FinishSiblings(id)
+	if i := slices.Index(siblings, id); i > 0 {
+		return slices.Concat([]string{id}, siblings[:i], siblings[i+1:])
+	}
+	return siblings
 }
 
 // getIDFromMode returns the id the given output mode uses for a card, or ""
