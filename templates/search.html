@@ -311,18 +311,6 @@
                 </div>
 
                 <div class="search-results">
-                    {{$haveFirst := false}}
-                    {{$firstImg := ""}}
-                    {{$firstPrint := ""}}
-                    {{$firstProduct := ""}}
-                    {{$firstProductCount := 0}}
-                    {{$firstFoil := false}}
-                    {{$firstEtched := false}}
-                    {{$firstSetCode := ""}}
-                    {{$firstWarning := false}}
-                    {{$firstDate := ""}}
-                    {{$firstName := ""}}
-
                     {{if and .PatreonLogin .AllKeys (not .ChartID)}}
                         <p class="search-results-blurb">Compare prices and availability for {{game_title}} singles and sealed products across markets below. On the left sidebar you can refine your search or expand it looking for products containing your search results. You may tweak sorting as needed.</p>
                     {{end}}
@@ -420,19 +408,6 @@
 
                     {{range $i, $cardId := .AllKeys}}
                         {{$card := (index $.Metadata $cardId)}}
-                        {{if not $haveFirst}}
-                            {{$haveFirst = true}}
-                            {{$firstImg = $card.FullImageURL}}
-                            {{$firstPrint = index $.Printings $cardId}}
-                            {{$firstProduct = $card.Products}}
-                            {{$firstProductCount = $card.NumProducts}}
-                            {{$firstFoil = $card.Foil}}
-                            {{$firstEtched = $card.Etched}}
-                            {{$firstSetCode = $card.SetCode}}
-                            {{$firstWarning = $card.HasContentWarning}}
-                            {{$firstDate = $card.Date}}
-                            {{$firstName = $card.Name}}
-                        {{end}}
 
                             <div class="result-header-cover"></div>
                             <div class="result-header{{if eq $i 0}} result-first{{end}}"
@@ -448,7 +423,11 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{index $card.PromoLabels $t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                                 data-hover="{{hover_args $card.FullImageURL $card.Foil $card.Etched $card.SetCode $card.HasContentWarning $card.NumProducts $card.Date $card.Name}}">
+                                <template class="result-hover">
+                                    <div class="hover-printings">{{trusted_html (index $.Printings $cardId)}}</div>
+                                    <div class="hover-products">{{trusted_html $card.Products}}</div>
+                                </template>
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}" aria-label="{{$card.Edition}}">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}
                                 </a>
@@ -537,7 +516,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -778,13 +757,6 @@
                         </div>
                     {{end}}
                 </div>{{/* Close .search-results */}}
-
-                    {{if eq $firstImg ""}}
-                        {{$firstImg = card_back}}
-                    {{end}}
-                <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}}, {{$firstProductCount}}, {{$firstDate}}, {{$firstName}});
-                </script>
             </div>{{/* Close .search-layout */}}
 </div>
 

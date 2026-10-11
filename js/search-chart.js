@@ -281,7 +281,7 @@ if (window.BAN_SEARCH_CHART.multi) {
             // one, else its uuid); match them to the row's data-chart-id,
             // not data-card-id.
             var row = document.querySelector('.result-header[data-chart-id="' + cardId + '"]');
-            if (row && typeof row.onmouseenter === 'function') row.onmouseenter();
+            if (row) window.showHoverFor(row, true);
         });
         legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
     })();

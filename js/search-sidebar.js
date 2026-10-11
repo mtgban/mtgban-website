@@ -287,6 +287,7 @@ function hoverSidebar() {
     if (!__hoverTrusted && (now - __lastMove > 100 || now - __lastKey < 120)) return;
     updateSidebar.apply(null, arguments);
 }
+window.hoverSidebar = hoverSidebar;
 
 // The set value tables render inline in the pinned printings
 // slot while the column is tall enough; only when inline
@@ -337,7 +338,15 @@ function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasW
             wrapper.classList.remove('content-warning');
         }
     }
-    document.getElementById('printings').innerHTML = printings;
+    // printings/products are DOM nodes cloned from the result's own
+    // <template> (never HTML text - CodeQL js/xss-through-dom), or null.
+    // Insert their childNodes, not the wrapper div, so markup lands flat.
+    var printingsEl = document.getElementById('printings');
+    if (printings) {
+        printingsEl.replaceChildren(...printings.childNodes);
+    } else {
+        printingsEl.replaceChildren();
+    }
     collapsePrintings();
     updateSetValueMode();
 
@@ -347,10 +356,11 @@ function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasW
 
     let productDiv = document.getElementById('products');
     if (productDiv) {
-        if (products === "") {
-            products = "n/a"
+        if (products && products.firstChild) {
+            productDiv.replaceChildren(...products.childNodes);
+        } else {
+            productDiv.textContent = 'n/a';
         }
-        productDiv.innerHTML = products;
     }
     let productCountSpan = document.getElementById('productsCount');
     if (productCountSpan) {
@@ -371,4 +381,84 @@ document.addEventListener('DOMContentLoaded', function() {
     const extras = document.querySelector('.search-sort-extras');
     if (!extras) return;
     new ResizeObserver(function() { markClippedSortExtras(extras); }).observe(extras);
+});
+
+// data-hover holds eight scalars; the printings/products HTML lives in
+// the header's <template class="result-hover"> child instead. Header,
+// template and body are siblings, so walk back from inside the body.
+function headerFor(el) {
+    var node = el;
+    while (node && node.nodeType === 1) {
+        if (node.classList.contains('result-header')) return node;
+        if (node.classList.contains('result-body')) break;
+        node = node.parentElement;
+    }
+    if (!node) return null;
+    var sib = node.previousElementSibling;
+    while (sib && !sib.classList.contains('result-header')) sib = sib.previousElementSibling;
+    return sib;
+}
+
+function hoverDataFor(el) {
+    var header = headerFor(el);
+    if (!header) return null;
+    if (header.__hoverData) return header.__hoverData;
+    var raw = header.getAttribute('data-hover');
+    if (!raw) return null;
+    var args;
+    try { args = JSON.parse(raw); } catch (e) { return null; }
+    header.__hoverData = { args: args, tpl: header.querySelector('.result-hover') };
+    return header.__hoverData;
+}
+window.hoverDataFor = hoverDataFor;
+window.updateSidebar = updateSidebar;
+
+// Builds updateSidebar's ten-argument list from hoverDataFor's eight
+// scalars: clones the result's template for the printings/products
+// nodes, and runs the image URL through httpURL so a tampered attribute
+// can reach img.src as nothing but http(s).
+function hoverArgsFrom(data) {
+    var a = data.args;
+    var printings = null, products = null;
+    if (data.tpl && data.tpl.content) {
+        var frag = data.tpl.content.cloneNode(true);
+        printings = frag.querySelector('.hover-printings');
+        products = frag.querySelector('.hover-products');
+    }
+    return [httpURL(a[0]), printings, products, a[1], a[2], a[3], a[4], a[5], a[6], a[7]];
+}
+
+// Shared by callers that used to rely on the removed inline
+// onmouseenter (keyboard paging, the scroll hit-test, chart legend
+// hover). trusted bypasses the phantom-hover guard; returns whether a row was found.
+function showHoverFor(el, trusted) {
+    var data = hoverDataFor(el);
+    if (!data) return false;
+    var args = hoverArgsFrom(data);
+    if (trusted) {
+        __hoverTrusted = true;
+        try {
+            window.hoverSidebar.apply(null, args);
+        } finally {
+            __hoverTrusted = false;
+        }
+    } else {
+        window.hoverSidebar.apply(null, args);
+    }
+    return true;
+}
+window.showHoverFor = showHoverFor;
+
+document.addEventListener('DOMContentLoaded', function() {
+    var results = document.querySelector('.search-results');
+    if (!results) return;
+    results.addEventListener('mouseover', function(e) {
+        showHoverFor(e.target, false);
+    });
+    // Seed the sidebar with the first result, as the inline call used to;
+    // with no results, the empty src still reaches updateSidebar so
+    // setCardArtSource falls back to the game's card back.
+    var first = results.querySelector('.result-header');
+    var seed = first ? hoverDataFor(first) : null;
+    updateSidebar.apply(null, seed ? hoverArgsFrom(seed) : ['', null, null, false, false, '', false, 0, '', '']);
 });
