@@ -1,0 +1,11 @@
+{
+  "name": "mtgban-lighthouse",
+  "private": true,
+  "type": "module",
+  "description": "Lighthouse runs over the site's main pages, both device profiles and both themes",
+  "dependencies": {
+    "chrome-launcher": "^1.2.2",
+    "lighthouse": "^13.5.0",
+    "puppeteer-core": "^25.13.0"
+  }
+}

@@ -30,6 +30,11 @@ cache_*
 # API product list (exempt from the *.json ignore above)
 !apiproductlist/products.json
 
+# The Lighthouse runner's manifest (exempt from the *.json ignore above)
+!scripts/lighthouse/package.json
+scripts/lighthouse/node_modules/
+scripts/lighthouse/out/
+
 # Logs directory
 logs/
 
