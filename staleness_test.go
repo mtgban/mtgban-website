@@ -374,7 +374,7 @@ func TestDropStaleStoresStopsServingOnlyOldData(t *testing.T) {
 // The alarm says once that a store is no longer served, and once that it is
 // again; the dashboard lists it as dropped in between.
 func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
-	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}, nil)
+	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}, nil)
 
 	checkStaleness()
 	checkStaleness()
@@ -384,11 +384,11 @@ func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
 
 	var pv PageVars
 	adminScraperTable(sessionstore.Retail, time.Now(), &pv)
-	if len(pv.Tables) != 1 || len(pv.Tables[0]) != 1 || pv.Tables[0][0][1] != "ZZOLD" || pv.Tables[0][0][8] != "dropped 8d" {
+	if len(pv.Tables) != 1 || len(pv.Tables[0]) != 2 || pv.Tables[0][1][1] != "ZZOLD" || pv.Tables[0][1][8] != "dropped 8d" {
 		t.Errorf("dashboard = %q, want ZZOLD marked dropped 8d", pv.Tables)
 	}
 
-	sellers := []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now())}
+	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
 	sellersPtr.Store(&sellers)
 	checkStaleness()
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is served again") {
@@ -398,7 +398,7 @@ func TestCheckStalenessAnnouncesADropAndItsReturn(t *testing.T) {
 
 // Dropping CK takes its signals with it rather than leaving the last ones up.
 func TestDroppingCKClearsItsSignals(t *testing.T) {
-	withDropState(t, nil, []mtgban.Vendor{buylistOf("CK", 1, time.Now().Add(-8*24*time.Hour))})
+	withDropState(t, nil, []mtgban.Vendor{buylistOf("CK", 1, time.Now().Add(-8*24*time.Hour)), buylistOf("ZZFRESHV", 1, time.Now())})
 	signals := map[string]ckView{"uuid-0": {PauseLabel: "paused"}}
 	ckSignalsPtr.Store(&signals)
 
@@ -455,7 +455,7 @@ func TestDropStaleStoresAsksSessionsBeforeLocking(t *testing.T) {
 // store is: the first dump after an outage is the likeliest to be partial.
 func TestAStoreBackFromADropIsHeldToItsSize(t *testing.T) {
 	old := time.Now().Add(-8 * 24 * time.Hour)
-	withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 200, old)}, []mtgban.Vendor{buylistOf("ZZOLDV", 200, old)})
+	withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 200, old)}, []mtgban.Vendor{buylistOf("ZZFRESHV", 1, time.Now()), buylistOf("ZZOLDV", 200, old)})
 	dropStaleStores(time.Now())
 
 	if updateSellers(inventoryOf("ZZOLD", 10, time.Now())) == nil {
@@ -473,14 +473,14 @@ func TestAStoreBackFromADropIsHeldToItsSize(t *testing.T) {
 // A store announced stale, then dropped, is announced once more on its
 // return, as served again, not also as fresh again.
 func TestAReturnAfterADropIsAnnouncedOnce(t *testing.T) {
-	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-3*24*time.Hour))}, nil)
+	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-3*24*time.Hour))}, nil)
 	checkStaleness()
 
-	sellers := []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
+	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
 	sellersPtr.Store(&sellers)
 	checkStaleness()
 
-	sellers = []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now())}
+	sellers = []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
 	sellersPtr.Store(&sellers)
 	checkStaleness()
 
@@ -511,10 +511,10 @@ func waitForStack(t *testing.T, frames ...string) {
 // A drop announced to no one yet keeps the store's stale row as it was: if
 // the store is back by the next check, that row still says it is fresh.
 func TestARefusedDropLineKeepsTheStaleRow(t *testing.T) {
-	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-3*24*time.Hour))}, nil)
+	notices := withDropState(t, []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-3*24*time.Hour))}, nil)
 	checkStaleness()
 
-	sellers := []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
+	sellers := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now().Add(-8*24*time.Hour))}
 	sellersPtr.Store(&sellers)
 	notifyStale = func(string, string) error { return errors.New("refused") }
 	checkStaleness()
@@ -523,11 +523,46 @@ func TestARefusedDropLineKeepsTheStaleRow(t *testing.T) {
 		*notices = append(*notices, message)
 		return nil
 	}
-	sellers = []mtgban.Seller{inventoryOf("ZZOLD", 1, time.Now())}
+	sellers = []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
 	sellersPtr.Store(&sellers)
 	checkStaleness()
 
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is fresh again") {
 		t.Errorf("notices = %q, want stale and then fresh again", *notices)
+	}
+}
+
+// A side whose every store is past DropAfter keeps its freshest one served,
+// so /healthz still passes, and the alarm says so once, with @here.
+func TestDropStaleStoresKeepsTheLastStoreOnASide(t *testing.T) {
+	now := time.Now()
+	notices := withDropState(t,
+		[]mtgban.Seller{inventoryOf("ZZOLDER", 1, now.Add(-9*24*time.Hour)), inventoryOf("ZZOLD", 1, now.Add(-8*24*time.Hour))},
+		[]mtgban.Vendor{buylistOf("ZZOLDV", 1, now.Add(-8*24*time.Hour))})
+
+	checkStaleness()
+	checkStaleness()
+
+	gotSellers, gotVendors := servedShorthands()
+	if !slices.Equal(gotSellers, []string{"ZZOLD"}) || !slices.Equal(gotVendors, []string{"ZZOLDV"}) {
+		t.Errorf("served sellers %v, vendors %v; want ZZOLD and ZZOLDV kept", gotSellers, gotVendors)
+	}
+	dropped := droppedStoresOf(sessionstore.Retail)
+	if len(dropped) != 1 || dropped[0].info.Shorthand != "ZZOLDER" {
+		t.Errorf("dropped retail = %v, want ZZOLDER", dropped)
+	}
+	if len(*notices) != 1 || strings.Count((*notices)[0], "@here") != 2 ||
+		!strings.Contains((*notices)[0], "(ZZOLD) is still served, not updated in 8d: it is the last retail store left") ||
+		!strings.Contains((*notices)[0], "(ZZOLDV) is still served, not updated in 8d: it is the last buylist store left") {
+		t.Errorf("notices = %q, want one message calling out both kept stores", *notices)
+	}
+
+	// A fresh store back on the side lets the kept one go
+	sellers := append(GetSellers(), inventoryOf("ZZFRESH", 1, now))
+	sellersPtr.Store(&sellers)
+	dropStaleStores(now)
+	gotSellers, _ = servedShorthands()
+	if !slices.Equal(gotSellers, []string{"ZZFRESH"}) {
+		t.Errorf("served sellers %v, want ZZFRESH alone", gotSellers)
 	}
 }

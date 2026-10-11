@@ -148,24 +148,47 @@ func takeStaleStores(now time.Time) []droppedStore {
 	scrapersWriteMu.Lock()
 	defer scrapersWriteMu.Unlock()
 
-	var dropped []droppedStore
-	var sellers []mtgban.Seller
+	var sellers, oldSellers []mtgban.Seller
 	for _, seller := range GetSellers() {
 		info := seller.Info()
 		if pastDrop(info.InventoryTimestamp, now) && !sessions[info.Shorthand+"/"+sessionstore.Retail] {
-			dropped = append(dropped, droppedStore{info, sessionstore.Retail, *info.InventoryTimestamp, len(seller.Inventory())})
+			oldSellers = append(oldSellers, seller)
 			continue
 		}
 		sellers = append(sellers, seller)
 	}
-	var vendors []mtgban.Vendor
+	// A side left empty fails /healthz, so its freshest store stays served
+	// and checkStaleness calls it out instead.
+	if len(sellers) == 0 && len(oldSellers) > 0 {
+		i := freshestStore(oldSellers, sessionstore.Retail)
+		sellers = append(sellers, oldSellers[i])
+		oldSellers = slices.Delete(oldSellers, i, i+1)
+		log.Printf("kept %s %s past DropAfter: the last one served", sessionstore.Retail, sellers[0].Info().Shorthand)
+	}
+	var vendors, oldVendors []mtgban.Vendor
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
 		if pastDrop(info.BuylistTimestamp, now) && !sessions[info.Shorthand+"/"+sessionstore.Buylist] {
-			dropped = append(dropped, droppedStore{info, sessionstore.Buylist, *info.BuylistTimestamp, len(vendor.Buylist())})
+			oldVendors = append(oldVendors, vendor)
 			continue
 		}
 		vendors = append(vendors, vendor)
+	}
+	if len(vendors) == 0 && len(oldVendors) > 0 {
+		i := freshestStore(oldVendors, sessionstore.Buylist)
+		vendors = append(vendors, oldVendors[i])
+		oldVendors = slices.Delete(oldVendors, i, i+1)
+		log.Printf("kept %s %s past DropAfter: the last one served", sessionstore.Buylist, vendors[0].Info().Shorthand)
+	}
+
+	var dropped []droppedStore
+	for _, seller := range oldSellers {
+		info := seller.Info()
+		dropped = append(dropped, droppedStore{info, sessionstore.Retail, *info.InventoryTimestamp, len(seller.Inventory())})
+	}
+	for _, vendor := range oldVendors {
+		info := vendor.Info()
+		dropped = append(dropped, droppedStore{info, sessionstore.Buylist, *info.BuylistTimestamp, len(vendor.Buylist())})
 	}
 	if len(dropped) == 0 {
 		return nil
@@ -184,6 +207,24 @@ func takeStaleStores(now time.Time) []droppedStore {
 	}
 	droppedStoresPtr.Store(&record)
 	return dropped
+}
+
+// freshestStore is the index of the store in stores with the latest kind
+// timestamp; every one of them has one, being past DropAfter.
+func freshestStore[S interface{ Info() mtgban.ScraperInfo }](stores []S, kind string) int {
+	timestamp := func(info mtgban.ScraperInfo) time.Time {
+		if kind == sessionstore.Retail {
+			return *info.InventoryTimestamp
+		}
+		return *info.BuylistTimestamp
+	}
+	best := 0
+	for i, store := range stores {
+		if timestamp(store.Info()).After(timestamp(stores[best].Info())) {
+			best = i
+		}
+	}
+	return best
 }
 
 // servedStore reports whether the snapshots serve shorthand on kind's side.
@@ -239,6 +280,7 @@ func checkStaleness() {
 			continue
 		}
 		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
+		changes = appendKeptChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
 	}
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
@@ -246,6 +288,7 @@ func checkStaleness() {
 			continue
 		}
 		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
+		changes = appendKeptChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
 	}
 	for _, kind := range []string{sessionstore.Retail, sessionstore.Buylist} {
 		changes = appendDropChanges(changes, kind, now)
@@ -276,6 +319,22 @@ func appendDropChanges(changes []staleChange, kind string, now time.Time) []stal
 		case staleRecovered:
 			changes = append(changes, staleChange{key: alarmKey, stale: false, line: label + " is served again"})
 		}
+	}
+	return changes
+}
+
+// appendKeptChange announces, with @here, a served store past DropAfter:
+// after dropStaleStores, only the last store on its side is one. Callers
+// must hold staleAlarmState.mu.
+func appendKeptChange(changes []staleChange, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
+	alarmKey := "kept/" + key
+	switch classifyStaleTransition(staleAlarmState.stale[alarmKey], pastDrop(ts, now)) {
+	case becameStale:
+		line := "@here " + staleLabel(kind, shorthand) + " is still served, not updated in " + staleAge(*ts, now) + ": it is the last " + kind + " store left"
+		return append(changes, staleChange{key: alarmKey, stale: true, line: line})
+	case staleRecovered:
+		// Its fresh load is announced on its own row
+		delete(staleAlarmState.stale, alarmKey)
 	}
 	return changes
 }
