@@ -1,6 +1,7 @@
-// Runs Lighthouse against Edge for a set of pages and profiles.
+// Runs Lighthouse for a set of pages and profiles, in the browser at
+// CHROME_PATH or else the Chrome that chrome-launcher finds.
 // usage: node audit.mjs <label> <base-url> [page ...]
-// Writes lh/out/<label>/<page>-<profile>.json and prints a summary table
+// Writes out/<label>/<page>-<profile>.json and prints a summary table
 // plus every failing audit in the four categories.
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
@@ -8,7 +9,6 @@ import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const [label, base, ...pageArgs] = process.argv.slice(2);
 // THEME=light|dark pins the site theme through localStorage; CATS narrows the categories.
 const THEME = process.env.THEME || '';
@@ -38,7 +38,7 @@ const outDir = path.join('out', label);
 fs.mkdirSync(outDir, { recursive: true });
 
 const chrome = await chromeLauncher.launch({
-  chromePath: EDGE,
+  chromePath: process.env.CHROME_PATH,
   chromeFlags: ['--headless=new', '--no-first-run', '--no-default-browser-check'],
 });
 

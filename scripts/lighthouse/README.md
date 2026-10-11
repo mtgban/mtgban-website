@@ -1,11 +1,11 @@
 # Lighthouse runs
 
 `audit.mjs` runs Lighthouse over the site's main pages, on a phone profile
-and a desktop one, against Edge (Lighthouse drives any Chromium; the path
-at the top of the script is Edge's usual one on Windows). It prints the
-four category scores and the Core Web Vitals per page, then every failing
-audit with the pages it failed on, and writes each run's JSON under
-`out/<label>/`.
+and a desktop one, in the Chromium browser `CHROME_PATH` names, or the
+Chrome chrome-launcher finds when it is unset. It prints the four category
+scores and the Core Web Vitals per page, then every failing audit with the
+pages it failed on, and writes each run's JSON under `out/<label>/`, below
+the directory it runs from.
 
 ```bash
 cd scripts/lighthouse
@@ -14,6 +14,7 @@ node audit.mjs baseline http://localhost:8080          # all four categories
 THEME=light CATS=accessibility node audit.mjs light http://localhost:8080
 CATS=performance node audit.mjs perf-after http://localhost:8080
 node audit.mjs prod https://www.mtgban.com /search?q=s%3ALEB
+CHROME_PATH='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' node audit.mjs edge http://localhost:8080
 ```
 
 `THEME=light|dark` pins the site theme by seeding `localStorage` before
