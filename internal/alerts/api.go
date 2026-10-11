@@ -890,7 +890,7 @@ func reverifyRefusal(cur Channel) string {
 	case cur.DisabledAt == nil, cur.DisabledReason == ReasonBounced, cur.DisabledReason == ReasonComplained:
 		return ""
 	case cur.DisabledReason == ReasonUnsubscribed:
-		return "this address unsubscribed; use Enable to turn it back on"
+		return "this address unsubscribed; remove it and add it again to confirm it afresh"
 	default:
 		return "this address cannot receive mail from us"
 	}
