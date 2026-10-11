@@ -444,7 +444,9 @@
     }
 
     // Merge two preset lists by id: the newer save or delete (savedAt) wins,
-    // ties keep the local copy. Live presets by name, then the deletes.
+    // ties keep the local copy. Live presets by name, then the deletes but
+    // those past the TTL the preset pages prune them at.
+    var PRESET_TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     function mergePresets(local, server) {
         function parse(s) {
             try { var l = JSON.parse(s); return Array.isArray(l) ? l : []; } catch (e) { return []; }
@@ -463,7 +465,10 @@
             var x = String(a.name).toLowerCase(), y = String(b.name).toLowerCase();
             return x < y ? -1 : x > y ? 1 : 0;
         });
-        return JSON.stringify(live.concat(merged.filter(function(p) { return p.del; })));
+        var now = serverNow();
+        return JSON.stringify(live.concat(merged.filter(function(p) {
+            return p.del && now - (p.savedAt || 0) <= PRESET_TOMB_TTL_MS;
+        })));
     }
 
     // The arbitrage presets merge as the upload ones do, then hold each page

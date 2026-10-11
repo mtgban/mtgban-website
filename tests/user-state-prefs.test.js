@@ -73,7 +73,7 @@ test('a stale device keeps the presets another device saved', async () => {
 
 test('a preset deleted on one device stays deleted, and the newer save wins', async () => {
     const pushed = await reconcilePresets(
-        [preset('p_a', 'A', 1), { id: 'p_x', del: true, savedAt: 6 }],
+        [preset('p_a', 'A', 1), { id: 'p_x', del: true, savedAt: Date.now() }],
         [preset('p_a', 'A renamed', 2), preset('p_x', 'X', 4)]);
     expect(pushed.filter((p) => !p.del).map((p) => p.name)).toEqual(['A renamed']);
     expect(pushed.find((p) => p.id === 'p_x').del).toBe(true);
@@ -170,7 +170,7 @@ const arbitPreset = (id, name, savedAt, group = 'arbit') => ({ id, name, savedAt
 
 test('arbitrage presets made on two devices both survive, and a delete sticks', async () => {
     const pushed = await reconcileArbitPresets(
-        [arbitPreset('p_a', 'Mine', 5), { id: 'p_c', del: true, savedAt: 9 }],
+        [arbitPreset('p_a', 'Mine', 5), { id: 'p_c', del: true, savedAt: Date.now() }],
         [arbitPreset('p_b', 'Theirs', 4, 'global'), arbitPreset('p_c', 'Gone', 3)]);
     expect(pushed.filter((p) => !p.del).map((p) => p.id)).toEqual(['p_a', 'p_b']);
     expect(pushed.find((p) => p.id === 'p_c').del).toBe(true);
@@ -205,4 +205,12 @@ test('two devices\' arbitrage presets merge to the newest 10 per page group, nam
     expect(arbit).toEqual([106, 107, 200, 201, 202, 203, 204, 205, 206, 207]);
     const global = pushed.filter((p) => p.group === 'global');
     expect(global.map((p) => p.name)).toEqual(['G'.repeat(40)]);
+});
+
+test('a delete past the 30 days a preset page keeps it is dropped by the merge too', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    const pushed = await reconcileArbitPresets(
+        [arbitPreset('p_a', 'Mine', Date.now())],
+        [{ id: 'p_old', del: true, savedAt: Date.now() - 31 * day }, { id: 'p_new', del: true, savedAt: Date.now() - day }]);
+    expect(pushed.map((p) => p.id)).toEqual(['p_a', 'p_new']);
 });
