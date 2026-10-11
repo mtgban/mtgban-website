@@ -11,7 +11,8 @@ import (
 
 // TestReverseSortKeepsNonfoilFirst is the is:promopack case from the site:
 // reversing a sort reverses the editions and numbers, but each printing
-// still lists its nonfoil before its foil, whatever the sort.
+// still lists its nonfoil before its foil, in every sort that reads both
+// finishes alike. A price sort parts them by price.
 func TestReverseSortKeepsNonfoilFirst(t *testing.T) {
 	skipWithoutDatastore(t)
 	ds := testSite.datastore()
@@ -28,15 +29,40 @@ func TestReverseSortKeepsNonfoilFirst(t *testing.T) {
 		t.Skip("no promo pack printings in the datastore")
 	}
 
-	for _, sortMode := range []string{"chrono", "alpha", "hybrid", "number", "retail", "buylist", "odds"} {
+	// A printing's finishes share one expected count, so the odds sort
+	// orders the printings and leaves its finishes to the tie-break
+	odds := map[string]float64{}
+	printings := map[string]float64{}
+	for _, uuid := range keys {
+		co, _ := backend().GetUUID(uuid)
+		printing := co.Edition + "|" + co.Card.Number
+		value, found := printings[printing]
+		if !found {
+			value = float64(len(printings))
+			printings[printing] = value
+		}
+		odds[uuid] = value
+	}
+
+	for _, sortMode := range []string{"chrono", "alpha", "hybrid", "number", "odds"} {
 		t.Run(sortMode, func(t *testing.T) {
 			forward := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, forward, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search", nil), ds, forward, odds, sortMode)
 			reversed := slices.Clone(keys)
-			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, reversed, nil, sortMode)
+			sortSearchKeys(httptest.NewRequest("GET", "/search?reverse=true", nil), ds, reversed, odds, sortMode)
 
 			if forward[0] == reversed[0] {
 				t.Errorf("%s leads both directions: the list was not reversed", forward[0])
+			}
+			if sortMode == "odds" {
+				for i := 1; i < len(keys); i++ {
+					if odds[forward[i-1]] > odds[forward[i]] {
+						t.Fatalf("forward: odds %v sorts ahead of %v", odds[forward[i-1]], odds[forward[i]])
+					}
+					if odds[reversed[i-1]] < odds[reversed[i]] {
+						t.Fatalf("reversed: odds %v sorts ahead of %v", odds[reversed[i-1]], odds[reversed[i]])
+					}
+				}
 			}
 
 			sortData := resolveSortingData(backend(), reversed)
