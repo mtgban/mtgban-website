@@ -661,16 +661,6 @@ body:has(.search-layout) {
     }
 }
 
-body.modal-embed .search-sidebar {
-    position: static;
-    top: auto;
-    left: auto;
-    width: auto;
-    height: auto;
-    max-height: none;
-    overflow: visible;
-}
-
 .sidebar-printings {
     font-size: var(--text-base);
     color: var(--activetext);
