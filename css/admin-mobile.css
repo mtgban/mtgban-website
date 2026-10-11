@@ -49,7 +49,7 @@
     font-weight: 600;
     border: none;
     border-radius: 6px;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     cursor: pointer;
     white-space: nowrap;
@@ -65,7 +65,7 @@
     padding: 0.5em 1.2em;
     font-size: 0.85rem;
     font-weight: 600;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     border-radius: 8px;
     z-index: 500;
@@ -276,7 +276,7 @@
     text-decoration: none;
     border: none;
     border-radius: 6px;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     cursor: pointer;
     min-height: 40px;

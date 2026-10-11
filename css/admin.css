@@ -152,7 +152,7 @@
     padding: 8px 14px;
     border-radius: var(--radius-sm);
     border: none;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: #fff;
     font-size: var(--text-md);
     font-weight: 600;
@@ -596,7 +596,7 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
     font-family: inherit;
     transition: all 0.12s;
 }
-.cfg-primary { background: var(--dodgerblue); color: #fff; }
+.cfg-primary { background: var(--dodgerblue-fill); color: #fff; }
 .cfg-primary:hover { filter: brightness(1.1); }
 .cfg-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
 .cfg-secondary {

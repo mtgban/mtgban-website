@@ -57,7 +57,7 @@
     padding: 8px 20px;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: #fff;
     font-weight: 600;
     text-decoration: none;

@@ -29,7 +29,7 @@
     font-weight: 700;
     padding: 0.15em 0.4em;
     border-radius: 3px;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     text-transform: uppercase;
 }
@@ -139,9 +139,9 @@
 }
 
 .m-news-opts-save {
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
-    border-color: var(--dodgerblue);
+    border-color: var(--dodgerblue-fill);
 }
 
 .m-news-opts-grid {
@@ -193,9 +193,9 @@
 }
 
 .m-news-nav-pill.active {
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
-    border-color: var(--dodgerblue);
+    border-color: var(--dodgerblue-fill);
 }
 
 /* Filter section (collapsed by default) */
@@ -279,7 +279,7 @@
     font-weight: 600;
     border: none;
     border-radius: 6px;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     cursor: pointer;
     min-height: 40px;

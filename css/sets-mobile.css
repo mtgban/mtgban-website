@@ -91,9 +91,9 @@
 }
 
 .m-sets-toggle.active {
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
-    border-color: var(--dodgerblue);
+    border-color: var(--dodgerblue-fill);
 }
 
 /* Sort pills */
@@ -122,9 +122,9 @@
 }
 
 .m-sets-sort-link.active {
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
-    border-color: var(--dodgerblue);
+    border-color: var(--dodgerblue-fill);
 }
 
 /* Edition cards */
