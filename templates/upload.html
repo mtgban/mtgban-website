@@ -42,7 +42,7 @@
                 <p class="page-subtitle">
                     {{if .UploadEntries}}{{len .UploadEntries}} row{{if ne (len .UploadEntries) 1}}s{{end}} &middot; {{end}}{{if .UnpackedFrom}}contents of {{.UnpackedFrom}} sealed product{{if ne .UnpackedFrom 1}}s{{end}} &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
                     {{if .RemoteLinkURL}}
-                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="copyShareLink(this)" title="Copy shareable link">
+                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="window.copyShareLink && copyShareLink(this)" title="Copy shareable link">
                             {{template "upload-icon" "share-2"}} Share
                         </a>
                         <input type="hidden" id="remoteLinkURL" value="{{.RemoteLinkURL}}">
@@ -52,7 +52,7 @@
                              are read off the page when the offer is taken, by the
                              same helper the exports use, so nothing is resolved or
                              carried for a reader who never asks. */}}
-                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="runUnpack()" title="Price the cards inside the sealed products instead">
+                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="window.runUnpack && runUnpack()" title="Price the cards inside the sealed products instead">
                             {{template "upload-icon" "package-open"}} Unpack {{.UnpackSealed}} sealed
                         </a>
                     {{end}}
@@ -112,8 +112,8 @@
                     </div>
 
                     <div class="upload-tabs" id="uploadTabs">
-                        <button type="button" class="upload-tab active" id="tab-singles" onclick="selectTab('singles')">Singles</button>
-                        <button type="button" class="upload-tab" id="tab-sealed" onclick="selectTab('sealed')">Sealed</button>
+                        <button type="button" class="upload-tab active" id="tab-singles" onclick="window.selectTab && selectTab('singles')">Singles</button>
+                        <button type="button" class="upload-tab" id="tab-sealed" onclick="window.selectTab && selectTab('sealed')">Sealed</button>
                     </div>
 
                     <!-- Reference prices: one list per tab, but shared by
@@ -150,9 +150,9 @@
                     <div class="upload-mode-stores-row">
                         <div class="upload-mode-col">
                             <div class="upload-mode-toggle">
-                                <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="reloadSelect('retail')">
+                                <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="window.reloadSelect && reloadSelect('retail')">
                                 <label for="retail">Retail</label>
-                                <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
+                                <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="window.reloadSelect && reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
                                 <label for="buylist" {{if not .CanBuylist}}class="disabled"{{end}}>
                                     {{if .CanBuylist}}
                                         Buylist
@@ -166,9 +166,9 @@
                             {{end}}
                             {{if .CanChangeStores}}
                             <div class="upload-store-bulk">
-                                <button type="button" class="upload-store-bulk-btn" onclick="setVisibleStores(true)">Select all</button>
+                                <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(true)">Select all</button>
                                 <span class="upload-store-bulk-sep">·</span>
-                                <button type="button" class="upload-store-bulk-btn" onclick="setVisibleStores(false)">Clear</button>
+                                <button type="button" class="upload-store-bulk-btn" onclick="window.setVisibleStores && setVisibleStores(false)">Clear</button>
                             </div>
                             {{end}}
                         </div>
@@ -197,15 +197,15 @@
                         </div>
                     {{else}}
                         <div class="upload-source-options">
-                            <div class="upload-source-btn active" id="src-btn-file" onclick="selectSource('file')">
+                            <div class="upload-source-btn active" id="src-btn-file" onclick="window.selectSource && selectSource('file')">
                                 <span class="upload-source-icon">&#128196;</span>
                                 Local CSV / XLS
                             </div>
-                            <div class="upload-source-btn" id="src-btn-url" onclick="selectSource('url')">
+                            <div class="upload-source-btn" id="src-btn-url" onclick="window.selectSource && selectSource('url')">
                                 <span class="upload-source-icon">&#128279;</span>
                                 Remote URL
                             </div>
-                            <div class="upload-source-btn" id="src-btn-text" onclick="selectSource('text')">
+                            <div class="upload-source-btn" id="src-btn-text" onclick="window.selectSource && selectSource('text')">
                                 <span class="upload-source-icon">&#9998;</span>
                                 Paste Text
                             </div>
@@ -213,10 +213,10 @@
 
                         <div class="upload-source-area" id="source-file">
                             <label>
-                                <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
+                                <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.txt,text/plain,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="window.pressed && pressed()">
                                 <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
                                 <span class="upload-file-hint">CSV, TXT, XLS, XLSX - max 5MB</span></span>
-                                <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();clearFile();">clear selection</span>
+                                <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();window.clearFile && clearFile();">clear selection</span>
                             </label>
                         </div>
 
@@ -225,7 +225,7 @@
                         </div>
 
                         <div class="upload-source-area upload-source-hidden" id="source-text">
-                            <textarea id="textArea" name="textArea" rows="10" placeholder="Paste card list or decklist here..." oninput="autoGrowTextArea(this); try{localStorage.setItem('uploadTextArea',this.value)}catch(e){}"></textarea>
+                            <textarea id="textArea" name="textArea" rows="10" placeholder="Paste card list or decklist here..." oninput="try{localStorage.setItem('uploadTextArea',this.value)}catch(e){} window.autoGrowTextArea && autoGrowTextArea(this)"></textarea>
                         </div>
                         <script>
                         (function(){
@@ -277,7 +277,9 @@
                                     form.target = '_blank';
                                 }
                             }
-                            syncUploadOptionsFromSettings();
+                            // Before the deferred settings sync loads, the list
+                            // goes with the server's default options.
+                            if (window.syncUploadOptionsFromSettings) syncUploadOptionsFromSettings();
                             form.submit();
                         }
                     </script>
@@ -504,10 +506,10 @@
                             <button type="button" class="ures-pick-btn"
                                 data-hash="{{.CardID}}"
                                 data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
-                                onclick="openPrintingPicker(this)">Select printing</button>
+                                onclick="window.openPrintingPicker && openPrintingPicker(this)">Select printing</button>
                             {{end}}
                         </div>
-                        {{if $canRemove}}<button type="button" class="ures-remove-btn" onclick="toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>{{end}}
+                        {{if $canRemove}}<button type="button" class="ures-remove-btn" onclick="window.toggleRemoveRow && toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>{{end}}
                     </div>
                 </td>
                 {{template "loaded-price" .}}
@@ -696,8 +698,8 @@
         <!-- Row 1: View tabs + Export buttons -->
         <div class="res-buttons-row">
             <div class="res-tabs">
-                <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
-                {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
+                <button class="res-tab on" onclick="window.showResTab && showResTab('results',this)">Results</button>
+                {{if .Optimized}}<button class="res-tab" onclick="window.showResTab && showResTab('optimizer',this)">Optimizer</button>{{end}}
             </div>
             <div class="res-btn-sep"></div>
             {{if .CanBuylist}}
@@ -706,7 +708,7 @@
                      the other side costs a click rather than a second upload -
                      and the stores, index prices and optimizer settings keep
                      coming from the cookies they always came from. */}}
-                <button class="upload-btn upload-btn-secondary res-mode-btn" onclick="switchUploadMode()"
+                <button class="upload-btn upload-btn-secondary res-mode-btn" onclick="window.switchUploadMode && switchUploadMode()"
                         title="Price this same list against store {{if .IsBuylist}}retail prices{{else}}buylists{{end}}">
                     {{template "upload-icon" "arrow-left-right"}}Switch to {{if .IsBuylist}}Retail{{else}}Buylist{{end}}
                 </button>
@@ -721,16 +723,16 @@
             {{end}}
             {{if .CanBuylist}}
             <div class="res-btn-sep"></div>
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('download', false)">Get CSV</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.submitExport && submitExport('download', false)">Get CSV</button>
             {{if .MagicOnlyExports}}
-            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="submitExport('estimate', true)">CardConduit</button>
-            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="submitExport('deckbox', false)">Deckbox</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="window.submitExport && submitExport('estimate', true)">CardConduit</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="window.submitExport && submitExport('deckbox', false)">Deckbox</button>
             {{end}}
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.submitExport && submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
             {{end}}
             {{if .CanPublishStore}}
             <div class="res-btn-sep"></div>
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="openStorePrompt()">Publish as store</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="window.openStorePrompt && openStorePrompt()">Publish as store</button>
             {{end}}
         </div>
 
@@ -759,10 +761,10 @@
             {{end}}
         {{else if .ShowResultTabs}}
             <div class="ures-subtabs">
-                {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="showUresView('all', this)">All</button>{{end}}
-                {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="showUresView('singles', this)">Singles</button>{{end}}
-                {{if .SealedEntries}}<button class="ures-subtab{{if eq .DefaultResultView "sealed"}} on{{end}}" onclick="showUresView('sealed', this)">Sealed</button>{{end}}
-                {{if .NotFoundEntries}}<button class="ures-subtab{{if eq .DefaultResultView "notfound"}} on{{end}}" onclick="showUresView('notfound', this)">Not Found</button>{{end}}
+                {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="window.showUresView && showUresView('all', this)">All</button>{{end}}
+                {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="window.showUresView && showUresView('singles', this)">Singles</button>{{end}}
+                {{if .SealedEntries}}<button class="ures-subtab{{if eq .DefaultResultView "sealed"}} on{{end}}" onclick="window.showUresView && showUresView('sealed', this)">Sealed</button>{{end}}
+                {{if .NotFoundEntries}}<button class="ures-subtab{{if eq .DefaultResultView "notfound"}} on{{end}}" onclick="window.showUresView && showUresView('notfound', this)">Not Found</button>{{end}}
             </div>
             <div class="ures-views" data-ures-view="{{.DefaultResultView}}">
                 {{if .ShowAllTab}}
@@ -989,7 +991,7 @@
                         {{$cart := cart_load $scraperKey $.IsBuylist $entries}}
                         {{if $cart.Link}}
                             <span class="cart-load">
-                                <a class="opt-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-buylist="{{$.IsBuylist}}" data-load-list="cart" data-load-items="{{$cart.Items}}" onclick="return openCartPrompt(this)">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
+                                <a class="opt-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$cart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="opt-btn load" href="{{$cart.Link}}" target="_blank" rel="noopener" data-store="{{$cart.Store}}" data-buylist="{{$.IsBuylist}}" data-load-list="cart" data-load-items="{{$cart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load {{if $.IsBuylist}}buylist {{end}}at {{$cart.Store}}</a>
                             </span>
                         {{end}}
 
@@ -1033,7 +1035,7 @@
                             <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Offer</th>
                             <th class="c" data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Loaded</th>
                             <th data-sort-method="number" data-sort-descending="{{$.IsBuylist}}">Spread</th>
-                            <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="toggleAllOptRows(this)"></th>
+                            <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="window.toggleAllOptRows && toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
                         {{range $n, $row := $entries}}
@@ -1042,7 +1044,7 @@
                             {{$price := (index $scraperEntries $scraperKey)}}
                             <tr data-opt-id="{{.CardID}}" data-load-idx="{{$n}}" data-load-qty="{{.Quantity}}" data-load-name="{{$card.Name}}" data-load-ckid="{{uuid2ckid .CardID}}" data-load-tcgid="{{$card.TCGId}}" data-load-set="{{$card.SetCode}}" data-load-number="{{$card.Number}}" onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});">
                                 <td class="opt-name">
-                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
+                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                 </td>
@@ -1061,7 +1063,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
-                                <td class="c"><input type="checkbox" checked class="opt-row-check" onchange="toggleOptRow(this)"></td>
+                                <td class="c"><input type="checkbox" checked class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
@@ -1088,11 +1090,11 @@
     {{end}}
 
     <!-- Printing picker overlay -->
-    <div id="printing-overlay" class="printing-overlay" onclick="if(event.target===this)closePrintingPicker()">
+    <div id="printing-overlay" class="printing-overlay" onclick="if(event.target===this)window.closePrintingPicker && closePrintingPicker()">
         <div class="printing-picker">
             <div class="printing-picker-header">
                 <span class="printing-picker-title">Select printing</span>
-                <button type="button" class="printing-picker-close" onclick="closePrintingPicker()">&times;</button>
+                <button type="button" class="printing-picker-close" onclick="window.closePrintingPicker && closePrintingPicker()">&times;</button>
             </div>
             <div id="printing-picker-grid" class="printing-picker-grid">
                 <!-- Populated dynamically by JS -->
@@ -1110,11 +1112,11 @@
          the game, which is the site's own. The list itself is read off the
          page when Publish is pressed, the way the exports read it, so a
          printing picked or a row removed above is what gets served. */}}
-    <div id="store-overlay" class="printing-overlay" onclick="if(event.target===this)closeStorePrompt()">
+    <div id="store-overlay" class="printing-overlay" onclick="if(event.target===this)window.closeStorePrompt && closeStorePrompt()">
         <div class="printing-picker store-prompt">
             <div class="printing-picker-header">
                 <span class="printing-picker-title">Publish as a {{if .IsBuylist}}buylist{{else}}retail{{end}} store</span>
-                <button type="button" class="printing-picker-close" onclick="closeStorePrompt()">&times;</button>
+                <button type="button" class="printing-picker-close" onclick="window.closeStorePrompt && closeStorePrompt()">&times;</button>
             </div>
             <p class="store-prompt-note">Served to everyone, in memory only, until it is removed from the admin page or the server restarts. Rows without a price are left out.</p>
             <label class="store-prompt-field">Name <input type="text" name="store_name" placeholder="Card Kingdom"></label>
@@ -1126,8 +1128,8 @@
             <label class="store-prompt-check"><input type="checkbox" name="store_noqty" value="true"> No quantity inventory</label>
             <label class="store-prompt-check"><input type="checkbox" name="store_qtyprio" value="true"> Quantity priority</label>
             <div class="store-prompt-actions">
-                <button type="button" class="upload-btn upload-btn-secondary" onclick="closeStorePrompt()">Cancel</button>
-                <button type="button" class="upload-btn upload-btn-primary" onclick="runPublishStore()">Publish</button>
+                <button type="button" class="upload-btn upload-btn-secondary" onclick="window.closeStorePrompt && closeStorePrompt()">Cancel</button>
+                <button type="button" class="upload-btn upload-btn-primary" onclick="window.runPublishStore && runPublishStore()">Publish</button>
             </div>
         </div>
     </div>
@@ -1152,7 +1154,7 @@
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
         <span class="reload-stat" id="reload-fixed-wrap" style="display:none"><span class="count-fixed" id="reload-fixed-count">0</span> updated</span>
         <span class="reload-stat" id="reload-removed-wrap" style="display:none"><span class="count-removed" id="reload-removed-count">0</span> removed</span>
-        <button class="opt-btn load" onclick="reprocessUploadResults()">Reload</button>
+        <button class="opt-btn load" onclick="window.reprocessUploadResults && reprocessUploadResults()">Reload</button>
     </div>
 
     <script>

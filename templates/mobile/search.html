@@ -163,7 +163,7 @@
             <button class="m-pin-btn{{if .SearchScope}} is-active{{end}}" id="nav-pin-btn" type="button" title="{{if .SearchScope}}Pinned: {{.SearchScope}}{{else}}Pinned filters{{end}}"><i data-lucide="filter"></i></button>
             {{end}}
             <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
-            <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
+            <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="window.openSettings && openSettings()"><i data-lucide="settings"></i></button>
         </div>
         {{if .CanScope}}
         <div class="m-scope-row" id="nav-scope">
@@ -238,7 +238,7 @@
                  data-has-warning="{{$card.HasContentWarning}}"
                  data-crop-url="{{$card.CropURL}}"
                  data-setcode="{{$card.SetCode}}"
-                 onclick="showCardDrawer({{$card.FullImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">
+                 onclick="window.showCardDrawer && showCardDrawer({{$card.FullImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">
                 <div class="m-card-icon">
                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}}
                 </div>
@@ -252,69 +252,69 @@
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
                     {{range $card.Treatments}}<a class="m-badge treatment" href="?q=is:{{.}}" onclick="event.stopPropagation()">{{index $card.PromoLabels .}}</a>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
-                    <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
-                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
-                    <button class="m-actions-btn" onclick="event.stopPropagation(); toggleActionsMenu(this);" title="More actions"><i data-lucide="more-vertical"></i></button>
+                    <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
+                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
+                    <button class="m-actions-btn" onclick="event.stopPropagation(); window.toggleActionsMenu && toggleActionsMenu(this);" title="More actions"><i data-lucide="more-vertical"></i></button>
                 </div>
             </div>
             <div class="m-actions-menu" data-card="{{$cardId}}">
                 {{/* In portrait the favorite + chart buttons collapse in here; in
                      landscape they stay inline in the header and these are hidden. */}}
-                <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this); closeActionsMenus();">
+                <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this); window.closeActionsMenus && closeActionsMenus();">
                     <i data-lucide="star"></i><span>Favorite</span>
                 </button>
                 {{if $.CanAlerts}}
-                <button type="button" class="m-actions-item m-actions-alert" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); closeActionsMenus(); openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'});">
+                <button type="button" class="m-actions-item m-actions-alert" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.closeActionsMenus && closeActionsMenus(); window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'});">
                     <i data-lucide="bell"></i><span>Price alert</span>
                 </button>
                 {{end}}
                 {{if not $.DisableChart}}
-                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
+                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}'); window.closeActionsMenus && closeActionsMenus();">
                         <i data-lucide="chart-line"></i><span>Price history</span>
                     </button>
                 {{end}}
                 {{if $card.Sealed}}
                     {{if $card.Booster}}
-                        <a class="m-actions-item" href='/search?q=unpack:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                        <a class="m-actions-item" href='/search?q=unpack:"{{$card.Name}}"' onclick="window.closeActionsMenus && closeActionsMenus()">
                             <i data-lucide="gift"></i><span>Simulate booster pack</span>
                         </a>
                     {{end}}
                     {{if $card.HasDeck}}
-                        <a class="m-actions-item" href="/api/tcgplayer/decklist/{{$card.UUID}}" onclick="closeActionsMenus()">
+                        <a class="m-actions-item" href="/api/tcgplayer/decklist/{{$card.UUID}}" onclick="window.closeActionsMenus && closeActionsMenus()">
                             <img src="/img/misc/decklist.png" alt=""><span>TCGplayer decklist</span>
                         </a>
-                        <a class="m-actions-item" href="/api/cardmarket/decklist/{{$card.UUID}}" onclick="closeActionsMenus()">
+                        <a class="m-actions-item" href="/api/cardmarket/decklist/{{$card.UUID}}" onclick="window.closeActionsMenus && closeActionsMenus()">
                             <img src="/img/misc/decklist-mkm.png" alt=""><span>Cardmarket decklist</span>
                         </a>
                     {{end}}
-                    <a class="m-actions-item" href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' onclick="window.closeActionsMenus && closeActionsMenus()">
                         <i data-lucide="search"></i><span>Search contents</span>
                     </a>
                 {{else if $.HasAvailable}}
-                    <a class="m-actions-item" href='/sealed?q=container:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href='/sealed?q=container:"{{$card.Name}}"' onclick="window.closeActionsMenus && closeActionsMenus()">
                         <i data-lucide="package"></i><span>Find in sealed products</span>
                     </a>
                 {{end}}
-                <button type="button" class="m-actions-item" onclick="event.stopPropagation(); copyAndBlink(this, '{{$card.Name}}'); closeActionsMenus();">
+                <button type="button" class="m-actions-item" onclick="event.stopPropagation(); window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}'); window.closeActionsMenus && closeActionsMenus();">
                     <i data-lucide="clipboard-copy"></i><span>Copy card name</span>
                 </button>
                 {{if not $card.Sealed}}
-                    <a class="m-actions-item" href="{{$card.DeckboxURL}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href="{{$card.DeckboxURL}}" target="_blank" rel="noopener" onclick="window.closeActionsMenus && closeActionsMenus()">
                         <img src="/img/logo/deckbox.webp" alt=""><span>Open on Deckbox</span>
                     </a>
                 {{end}}
                 {{if $card.CKRestockURL}}
-                    <a class="m-actions-item" href="{{$card.CKRestockURL}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href="{{$card.CKRestockURL}}" target="_blank" rel="noopener" onclick="window.closeActionsMenus && closeActionsMenus()">
                         <i data-lucide="bell"></i><span>CardKingdom restock notice</span>
                     </a>
                 {{end}}
                 {{if $card.ScryfallURL}}
-                    <a class="m-actions-item" href="{{$card.ScryfallURL}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href="{{$card.ScryfallURL}}" target="_blank" rel="noopener" onclick="window.closeActionsMenus && closeActionsMenus()">
                         <img src="/img/logo/scryfall.svg" alt=""><span>Open on Scryfall</span>
                     </a>
                 {{end}}
                 {{if $card.TCGId}}
-                    <a class="m-actions-item" href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" target="_blank" rel="noopener" onclick="window.closeActionsMenus && closeActionsMenus()">
                         <img src="/img/logo/tcgapp.png" alt=""><span>TCGplayer inventory</span>
                     </a>
                 {{end}}
@@ -651,7 +651,7 @@
             <form id="m-filter-form" action="" method="GET">
                 <label>Edition / Set</label>
                 <div class="m-filter-set-picker" id="m-filter-set" data-value="">
-                    <button type="button" class="m-filter-set-current" id="m-filter-set-current" onclick="openSetPicker()">All Sets</button>
+                    <button type="button" class="m-filter-set-current" id="m-filter-set-current" onclick="window.openSetPicker && openSetPicker()">All Sets</button>
                 </div>
 
                 <label>Finish</label>
@@ -662,7 +662,7 @@
                     <button type="button" class="m-filter-pill" data-val="e">Etched</button>
                 </div>
 
-                <button type="button" class="m-filter-apply" onclick="applyFilters()">Apply</button>
+                <button type="button" class="m-filter-apply" onclick="window.applyFilters && applyFilters()">Apply</button>
             </form>
         </div>
     </div>
@@ -670,7 +670,7 @@
     {{/* Full-screen edition/set picker */}}
     <div class="m-setpicker-overlay" id="m-setpicker-overlay">
         <div class="m-setpicker-header">
-            <button type="button" class="m-setpicker-close" onclick="closeSetPicker()" aria-label="Close"><i data-lucide="x"></i></button>
+            <button type="button" class="m-setpicker-close" onclick="window.closeSetPicker && closeSetPicker()" aria-label="Close"><i data-lucide="x"></i></button>
             <span class="m-setpicker-title">Select Edition</span>
         </div>
         <div class="m-setpicker-search">
@@ -678,9 +678,9 @@
             <input type="text" id="m-setpicker-search-input" placeholder="Filter editions..." autocomplete="off" autocapitalize="none" spellcheck="false">
         </div>
         <ul class="m-filter-set-list" id="m-filter-set-list">
-            <li data-value="" data-name="All Sets" onclick="selectSet(event)">All Sets</li>
+            <li data-value="" data-name="All Sets" onclick="window.selectSet && selectSet(event)">All Sets</li>
             {{range .EditionFilterList}}
-            <li data-value="{{.Code}}" data-name="{{.Name}}" onclick="selectSet(event)">
+            <li data-value="{{.Code}}" data-name="{{.Name}}" onclick="window.selectSet && selectSet(event)">
                 {{template "set-symbol" dict "Keyrune" .Keyrune "Edition" .Name "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Symbol" .Symbol "Size" 20 "Class" ""}}
                 <span>{{.Name}}</span>
             </li>
@@ -689,9 +689,9 @@
     </div>
 
     {{/* Settings drawer */}}
-    <div class="m-settings-overlay" id="m-settings-overlay" onclick="closeSettings()"></div>
+    <div class="m-settings-overlay" id="m-settings-overlay" onclick="window.closeSettings && closeSettings()"></div>
     <div class="m-settings-sheet" id="m-settings-sheet">
-        <div class="m-drawer-handle" onclick="closeSettings()"><span></span></div>
+        <div class="m-drawer-handle" onclick="window.closeSettings && closeSettings()"><span></span></div>
         <div class="m-settings-content">
             <h3>Search Settings</h3>
 
@@ -827,8 +827,8 @@
                 </div>
                 <div class="m-settings-collapse-body" id="m-set-sellers">
                     <div class="m-settings-bulk">
-                        <button type="button" onclick="mSettingsBulk('m-set-sellers', false)">Clear</button>
-                        <button type="button" onclick="mSettingsBulk('m-set-sellers', true)">Select All</button>
+                        <button type="button" onclick="window.mSettingsBulk && mSettingsBulk('m-set-sellers', false)">Clear</button>
+                        <button type="button" onclick="window.mSettingsBulk && mSettingsBulk('m-set-sellers', true)">Select All</button>
                     </div>
                     {{$keys := .SellerKeys}}
                     {{$hasSingles := false}}
@@ -862,8 +862,8 @@
                 </div>
                 <div class="m-settings-collapse-body" id="m-set-vendors">
                     <div class="m-settings-bulk">
-                        <button type="button" onclick="mSettingsBulk('m-set-vendors', false)">Clear</button>
-                        <button type="button" onclick="mSettingsBulk('m-set-vendors', true)">Select All</button>
+                        <button type="button" onclick="window.mSettingsBulk && mSettingsBulk('m-set-vendors', false)">Clear</button>
+                        <button type="button" onclick="window.mSettingsBulk && mSettingsBulk('m-set-vendors', true)">Select All</button>
                     </div>
                     {{$keys := .VendorKeys}}
                     {{$hasSingles := false}}
@@ -901,7 +901,7 @@
                     Syncs in the background; no Apply needed.</p>
                 <div class="m-settings-row">
                     <span>Enable offline mode</span>
-                    <div class="m-settings-toggle" id="m-offline-toggle" onclick="OfflineSettingsMobile && OfflineSettingsMobile.handleToggle(this)"><span class="m-toggle-knob"></span></div>
+                    <div class="m-settings-toggle" id="m-offline-toggle" onclick="window.OfflineSettingsMobile && OfflineSettingsMobile.handleToggle(this)"><span class="m-toggle-knob"></span></div>
                 </div>
                 <div id="m-offline-status" class="m-offline-status" aria-live="polite"></div>
                 <p class="m-offline-usage" id="m-offline-usage"></p>
@@ -909,18 +909,18 @@
             {{end}}
 
             {{/* Apply */}}
-            <button type="button" class="m-settings-apply" onclick="saveSettings()">Apply Settings</button>
+            <button type="button" class="m-settings-apply" onclick="window.saveSettings && saveSettings()">Apply Settings</button>
         </div>
     </div>
 
     {{/* Chart bottom drawer */}}
     {{if not .DisableChart}}
-    <div class="m-drawer-overlay" id="m-chart-overlay" onclick="hideChartDrawer()"></div>
+    <div class="m-drawer-overlay" id="m-chart-overlay" onclick="window.hideChartDrawer && hideChartDrawer()"></div>
     <div class="m-chart-drawer" id="m-chart-drawer">
-        <div class="m-drawer-handle" onclick="hideChartDrawer()"><span></span></div>
+        <div class="m-drawer-handle" onclick="window.hideChartDrawer && hideChartDrawer()"><span></span></div>
         <div class="m-chart-header">
             <span class="m-chart-name" id="m-chart-name"></span>
-            <select class="m-chart-range" id="m-chart-range" aria-label="Chart date range" onchange="changeChartRange(parseInt(this.value))" disabled>
+            <select class="m-chart-range" id="m-chart-range" aria-label="Chart date range" onchange="window.changeChartRange && changeChartRange(parseInt(this.value))" disabled>
                 <option value="30">1mo</option>
                 <option value="90"{{if lt $.MaxLookbackDays 90}} disabled{{end}}>3mo{{if lt $.MaxLookbackDays 90}} 🔒{{end}}</option>
                 <option value="180"{{if ge $.MaxLookbackDays 180}} selected{{end}}{{if lt $.MaxLookbackDays 180}} disabled{{end}}>6mo{{if lt $.MaxLookbackDays 180}} 🔒{{end}}</option>
@@ -929,7 +929,7 @@
                 <option value="1825"{{if lt $.MaxLookbackDays 1825}} disabled{{end}}>5yr{{if lt $.MaxLookbackDays 1825}} 🔒{{end}}</option>
                 <option value="3650"{{if lt $.MaxLookbackDays 3650}} disabled{{end}}>10yr{{if lt $.MaxLookbackDays 3650}} 🔒{{end}}</option>
             </select>
-            <button class="m-chart-reset" id="m-chart-reset" onclick="resetChartZoom()">Reset Zoom</button>
+            <button class="m-chart-reset" id="m-chart-reset" onclick="window.resetChartZoom && resetChartZoom()">Reset Zoom</button>
         </div>
         <div class="m-chart-range-failed" id="m-chart-range-failed" hidden>Failed to load more history. Pick the range again to retry.</div>
         <div class="m-chart-container">
@@ -941,9 +941,9 @@
     {{end}}
 
     {{/* Card image bottom drawer */}}
-    <div class="m-drawer-overlay" id="m-drawer-overlay" onclick="hideCardDrawer()"></div>
+    <div class="m-drawer-overlay" id="m-drawer-overlay" onclick="window.hideCardDrawer && hideCardDrawer()"></div>
     <div class="m-drawer" id="m-drawer">
-        <div class="m-drawer-handle" onclick="hideCardDrawer()"><span></span></div>
+        <div class="m-drawer-handle" onclick="window.hideCardDrawer && hideCardDrawer()"><span></span></div>
         <div class="m-drawer-content">
             <img class="m-drawer-img" id="m-drawer-img" src="" alt="" onclick="this.classList.add('cw-revealed')">
             <span class="m-drawer-name" id="m-drawer-name"></span>

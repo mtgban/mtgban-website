@@ -178,7 +178,7 @@
             <label class="arb-filter-group">
                 <span class="arb-filter-label">Edition</span>
                 <span class="arb-filter-values">
-                    <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Filter edition...">
+                    <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="window.filterTableByEdition && filterTableByEdition()" placeholder="Filter edition...">
                 </span>
             </label>
         </div>
@@ -379,7 +379,7 @@
                     {{if $buyCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}" onclick="return openCartPrompt(this)">Load at {{$buyCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load at {{$buyCart.Store}}</a>
                         </span>
                     {{end}}
 
@@ -407,7 +407,7 @@
                     {{if $sellCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-buylist="true" data-load-list="cart" data-load-items="{{$sellCart.Items}}" onclick="return openCartPrompt(this)">Load buylist at {{$sellCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-buylist="true" data-load-list="cart" data-load-items="{{$sellCart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load buylist at {{$sellCart.Store}}</a>
                         </span>
                     {{end}}
 
@@ -482,7 +482,7 @@
                         {{end}}
                     {{end}}
                     <th class="c">Links</th>
-                    <th class="c"><input type="checkbox" checked title="Toggle all" onchange="toggleAllArbitRows(this)"></th>
+                    <th class="c"><input type="checkbox" checked title="Toggle all" onchange="window.toggleAllArbitRows && toggleAllArbitRows(this)"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -570,7 +570,7 @@
                                 {{end}}
                             </div>
                         </td>
-                        <td class="c"><input type="checkbox" checked class="arb-row-check" onchange="toggleArbitRow(this)"></td>
+                        <td class="c"><input type="checkbox" checked class="arb-row-check" onchange="window.toggleArbitRow && toggleArbitRow(this)"></td>
                     </tr>
                 {{end}}
 

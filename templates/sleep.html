@@ -123,7 +123,7 @@
             <form class="sleepers-comp-builder" action="sleepers" method="GET">
                 <input type="hidden" name="page" value="gap">
                 <label for="ref">Reference Seller</label>
-                <select name="ref" id="ref" onchange="checkSleepersCompare()">
+                <select name="ref" id="ref" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Pick a reference...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{scraper_name .}}</option>
@@ -131,7 +131,7 @@
                 </select>
                 <div class="sleepers-comp-vs-divider">VS</div>
                 <label for="target">Target Seller</label>
-                <select name="target" id="target" onchange="checkSleepersCompare()">
+                <select name="target" id="target" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Pick where to buy...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{scraper_name .}}</option>

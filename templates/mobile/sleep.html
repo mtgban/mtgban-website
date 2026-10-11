@@ -93,14 +93,14 @@
             <span class="m-sleep-gap-custom-title">Custom Comparison</span>
             <form class="m-sleep-gap-form" action="sleepers" method="GET">
                 <input type="hidden" name="page" value="gap">
-                <select name="ref" id="ref" aria-label="Reference seller" onchange="checkSleepersCompare()">
+                <select name="ref" id="ref" aria-label="Reference seller" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Reference seller...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{scraper_name .}}</option>
                     {{end}}
                 </select>
                 <span class="m-sleep-vs">VS</span>
-                <select name="target" id="target" aria-label="Target seller" onchange="checkSleepersCompare()">
+                <select name="target" id="target" aria-label="Target seller" onchange="window.checkSleepersCompare && checkSleepersCompare()">
                     <option value="" disabled selected>Target seller...</option>
                     {{range .SellerKeys}}
                         <option value="{{.}}">{{scraper_name .}}</option>

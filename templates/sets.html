@@ -28,11 +28,11 @@
         <div class="sets-table-wrap">
             <div class="sets-toolbar">
                 <input class="sets-filter-input" type="text" id="filterInput"
-                       onkeyup="filterTableByName()" placeholder="Filter editions...">
+                       onkeyup="window.filterTableByName && filterTableByName()" placeholder="Filter editions...">
 
                 <span class="toolbar-sep"></span>
 
-                <button class="sets-toolbar-btn" id="expandBtn" onclick="toggleExpanded()">
+                <button class="sets-toolbar-btn" id="expandBtn" onclick="window.toggleExpanded && toggleExpanded()">
                     Show Colors &amp; Rarities
                 </button>
 

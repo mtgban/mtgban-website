@@ -18,7 +18,7 @@
         {{if .SelectableField}}
             <div class="m-admin-key-wrap">
                 <input class="m-admin-key-input" id="m-admin-key" value="{{.InfoMessage}}" onFocus="this.setSelectionRange(0, this.value.length)" readonly>
-                <button class="m-admin-key-copy" onclick="copyKey()">Copy</button>
+                <button class="m-admin-key-copy" onclick="window.copyKey && copyKey()">Copy</button>
             </div>
         {{else}}
             <div class="m-admin-msg">{{.InfoMessage}}</div>
