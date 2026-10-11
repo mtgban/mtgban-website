@@ -34,7 +34,7 @@ type APIStore interface {
 	ChannelFor(ctx context.Context, userHash string, kind ChannelKind) (Channel, bool, error)
 	UpsertChannel(ctx context.Context, c Channel) error
 	DeleteChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) error
-	EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) error
+	EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) (bool, error)
 	ChannelByAddress(ctx context.Context, kind ChannelKind, address string) ([]Channel, error)
 }
 
@@ -884,7 +884,7 @@ func (a *API) enableChannel(w http.ResponseWriter, r *http.Request, c Caller) {
 		jsonError(w, http.StatusUnprocessableEntity, "unknown channel")
 		return
 	}
-	cur, found, err := a.channelRow(ctx, c.UserHash, body.Kind, SourcePatreon)
+	_, found, err := a.channelRow(ctx, c.UserHash, body.Kind, SourcePatreon)
 	if err != nil {
 		a.fail(w, "channels", err)
 		return
@@ -893,13 +893,14 @@ func (a *API) enableChannel(w http.ResponseWriter, r *http.Request, c Caller) {
 		jsonError(w, http.StatusNotFound, "not found")
 		return
 	}
-	if cur.DisabledAt != nil && cur.DisabledReason == ReasonComplained {
-		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
-		return
-	}
-	err = a.deps.Store.EnableChannel(ctx, c.UserHash, body.Kind, SourcePatreon)
+	// The store refuses a row marked as spam, however late the complaint.
+	enabled, err := a.deps.Store.EnableChannel(ctx, c.UserHash, body.Kind, SourcePatreon)
 	if err != nil {
 		a.fail(w, "channel", err)
+		return
+	}
+	if !enabled {
+		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
