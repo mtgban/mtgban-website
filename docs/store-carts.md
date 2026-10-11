@@ -392,9 +392,10 @@ the section's, as `scraperCompare` picks its seller.
 Clicked on the page a button opened, `js/ban-to-cart.js` picks the store
 from the page's host. It first checks it is the loader the site expects:
 `cartLoader` stamps the start of the stripped code's hash into the
-bookmarklet and onto every link (`&v=`), so a bookmark saved before the
-code last changed says it is out of date and asks to be dragged again, and
-touches no cart. An edit to a comment changes no version. A store's login
+bookmarklet and onto every link (`&v=`), so a bookmark and a page from
+different versions of the code touch no cart. A hash cannot tell which
+side is older, so the loader asks for BAN to be reloaded and the bookmark
+dragged again. An edit to a comment changes no version. A store's login
 drops the fragment on its way back to the cart, so the panel says to log
 in before pressing Continue, and a store page with no list, or a login the
 loader finds missing, sends the user back to BAN to press the button

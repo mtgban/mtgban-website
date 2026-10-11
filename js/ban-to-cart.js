@@ -35,11 +35,11 @@
         alert("This page has no list from BAN. Log in to " + store.name + " if you aren't, then " + again);
         return;
     }
-    // The site stamps this copy and every link with the loader's version, and
-    // an older copy must not touch a cart
+    // The site stamps this copy and every link with the loader's version, a
+    // hash that cannot tell which is older, and a mismatch must not touch a cart
     if (!version || version[1] !== "__BAN_VERSION__") {
-        alert("Your BAN-to-Cart bookmark is out of date. Go back to BAN, press the ? next to the Load button, " +
-            "and drag BAN-to-Cart to your bookmarks bar again, replacing the old one.");
+        alert("Your BAN-to-Cart bookmark or this BAN page is from a different version. Reload BAN, " +
+            "press the ? next to the Load button, and drag BAN-to-Cart to your bookmarks bar again, replacing the old one.");
         return;
     }
     if (!store.loggedIn()) {
