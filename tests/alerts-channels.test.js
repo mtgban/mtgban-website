@@ -63,10 +63,21 @@ test('channelButtons: a user row disabled as unsubscribed only offers remove', (
     expect(channelButtons({ source: 'user', state: 'disabled', reason: 'unsubscribed' })).toEqual(['remove']);
 });
 
-test('channelButtons: a user row disabled by a bounce or complaint still offers resend', () => {
+test('channelButtons: a user row disabled by a bounce still offers resend', () => {
     const { channelButtons } = load();
     expect(channelButtons({ source: 'user', state: 'disabled', reason: 'bounced' })).toEqual(['resend', 'remove']);
-    expect(channelButtons({ source: 'user', state: 'disabled', reason: 'complained' })).toEqual(['resend', 'remove']);
+});
+
+test('channelButtons: a user row marked as spam offers no resend, and says why', () => {
+    const { channelButtons, channelNote } = load();
+    const row = { source: 'user', state: 'disabled', reason: 'complained' };
+    expect(channelButtons(row)).toEqual(['remove']);
+    expect(channelNote(row)).toContain('marked our mail as spam');
+    expect(channelNote({ source: 'patreon', state: 'disabled', reason: 'complained' })).toContain('marked our mail as spam');
+    expect(channelNote({ source: 'user', state: 'disabled', reason: 'unsubscribed' })).toBe('Remove it and add it again to confirm it afresh.');
+    expect(channelNote({ source: 'user', state: 'disabled', reason: 'bounced' })).toBe('');
+    expect(channelNote({ source: 'user', state: 'verified' })).toBe('');
+    expect(channelNote({ source: 'user', state: 'verified', pending: 'new@example.com' })).toBe('Waiting for confirmation: new@example.com');
 });
 
 test('channelButtons: a disabled patreon row offers enable, a verified one offers nothing', () => {
