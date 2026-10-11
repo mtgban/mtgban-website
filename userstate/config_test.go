@@ -2,6 +2,7 @@ package userstate
 
 import (
 	"os"
+	"strconv"
 	"testing"
 )
 
@@ -29,6 +30,15 @@ func testClient(t *testing.T) *Client {
 	cfg := SQLConfig{
 		Host: "127.0.0.1", Port: 5432, User: "mtgban",
 		Password: "mtgban", DBName: "user_state", SSLMode: "disable",
+	}
+	// USERSTATE_TEST_HOST and USERSTATE_TEST_PORT point the test elsewhere.
+	host := os.Getenv("USERSTATE_TEST_HOST")
+	if host != "" {
+		cfg.Host = host
+	}
+	port, err := strconv.Atoi(os.Getenv("USERSTATE_TEST_PORT"))
+	if err == nil {
+		cfg.Port = port
 	}
 	c, err := NewClient(cfg)
 	if err != nil {
