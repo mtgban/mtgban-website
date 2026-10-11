@@ -701,7 +701,7 @@ func TestHandoffClosesWhatItOpens(t *testing.T) {
 			InfoMessage:    told,
 		})
 
-		start := strings.Index(page, `<div class="page-content">`)
+		start := strings.Index(page, `<main class="page-content">`)
 		footer := strings.Index(page, "<footer")
 		if start < 0 || footer < 0 {
 			t.Fatalf("InfoMessage=%q: the page has no content container or no footer", told)
