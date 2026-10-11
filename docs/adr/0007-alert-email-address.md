@@ -1,4 +1,4 @@
-# ADR-0006: Storing an alert email address
+# ADR-0007: Storing an alert email address
 
 **Status:** Accepted
 **Date:** 2026-10-03
