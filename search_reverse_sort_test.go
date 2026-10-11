@@ -4,6 +4,8 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestReverseSortKeepsNonfoilFirst is the is:promopack case from the site:
@@ -60,5 +62,26 @@ func TestReverseSortKeepsNonfoilFirst(t *testing.T) {
 				t.Error("no foil promo pack printings, so this set no longer covers the case")
 			}
 		})
+	}
+}
+
+// TestReverseOddsSortKeepsUncoveredLast: reversing the drop-rate sort turns
+// the known rates around, and the cards no rate covers stay at the end.
+func TestReverseOddsSortKeepsUncoveredLast(t *testing.T) {
+	ds := &datastore{backend: &mtgmatcher.Backend{}}
+	odds := map[string]float64{"low": 0.5, "zero": 0, "high": 2}
+
+	for query, want := range map[string][]string{
+		"":              {"zero", "low", "high"},
+		"?reverse=true": {"high", "low", "zero"},
+	} {
+		keys := []string{"none", "high", "missing", "zero", "low"}
+		sortSearchKeys(httptest.NewRequest("GET", "/search"+query, nil), ds, keys, odds, "odds")
+		if !slices.Equal(keys[:3], want) {
+			t.Errorf("%q: covered cards sorted %v, want %v", query, keys[:3], want)
+		}
+		if !slices.Contains(keys[3:], "none") || !slices.Contains(keys[3:], "missing") {
+			t.Errorf("%q: uncovered cards are not last: %v", query, keys)
+		}
 	}
 }

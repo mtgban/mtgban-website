@@ -1167,8 +1167,9 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 		less = func(i, j int) bool {
 			oddsI, hasI := odds[allKeys[i]]
 			oddsJ, hasJ := odds[allKeys[j]]
+			// A reversed sort hands i and j over swapped
 			if hasI != hasJ {
-				return hasI
+				return hasI != reversed
 			}
 			if !hasI || oddsI == oddsJ {
 				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
