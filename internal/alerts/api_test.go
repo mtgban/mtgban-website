@@ -30,6 +30,7 @@ type confirmKey struct{ userHash, address string }
 type confirmSend struct {
 	at         time.Time
 	released   bool
+	withdrawn  bool
 	complained bool
 }
 
@@ -59,6 +60,16 @@ func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string, 
 	return true, nil
 }
 
+func (f *fakeAlertStore) WithdrawPending(_ context.Context, h, keep string) error {
+	for k, send := range f.confirmSends {
+		if k.userHash == h && k.address != strings.ToLower(keep) {
+			send.withdrawn = true
+			f.confirmSends[k] = send
+		}
+	}
+	return nil
+}
+
 func (f *fakeAlertStore) ReleaseConfirmSend(_ context.Context, h, address string, at time.Time) error {
 	k := confirmKey{h, strings.ToLower(address)}
 	if f.confirmSends[k].at.Equal(at) {
@@ -81,7 +92,7 @@ func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Ti
 			last, lastSend = k.address, send
 		}
 	}
-	if last == "" || lastSend.complained || strings.EqualFold(last, row.Address) || !lastSend.at.After(*row.VerifiedAt) || !lastSend.at.After(since) {
+	if last == "" || lastSend.complained || lastSend.withdrawn || strings.EqualFold(last, row.Address) || !lastSend.at.After(*row.VerifiedAt) || !lastSend.at.After(since) {
 		return "", false, nil
 	}
 	return last, true, nil
@@ -1239,6 +1250,17 @@ func TestAlertsAPIPendingReplacement(t *testing.T) {
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
 	if w.Code != http.StatusAccepted || len(sent) != 2 || sent[1].to != "new@example.com" {
 		t.Fatalf("resend = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	// Entering the working address again takes the replacement back.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"old@example.com"}`, sig))
+	if w.Code != http.StatusOK || len(sent) != 2 {
+		t.Fatalf("set the working address = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("GET", "/api/alerts/channels", "", sig))
+	if w.Code != http.StatusOK || strings.Contains(w.Body.String(), `"pending"`) {
+		t.Fatalf("channels after taking it back = %d %s", w.Code, w.Body)
 	}
 }
 

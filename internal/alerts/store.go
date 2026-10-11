@@ -307,7 +307,7 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 			  FROM alert_confirm_sends r
 			 WHERE c.user_hash = $1 AND c.kind = 'email' AND c.source = 'user' AND lower(c.address) <> lower($2)
 			   AND c.disabled_reason <> ALL($3)
-			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at > COALESCE(c.verified_at, '-infinity')
+			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at > COALESCE(c.verified_at, '-infinity') AND NOT r.withdrawn
 			   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)`,
 			userHash, address, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}))
 		if err != nil {
@@ -577,7 +577,7 @@ func claimConfirmSend(ctx context.Context, tx *sql.Tx, userHash, address string,
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, lower($2), $3)
-		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at, released = false`,
+		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at, released = false, withdrawn = false`,
 		userHash, address, now)
 	return err == nil, err
 }
@@ -625,6 +625,28 @@ func (s *Store) ReleaseConfirmSend(ctx context.Context, userHash, address string
 	return err
 }
 
+// WithdrawPending cancels userHash's confirm requests for any address but
+// keep: their links no longer move the row and none shows as pending. The
+// requests still count toward each address's hourly limit.
+func (s *Store) WithdrawPending(ctx context.Context, userHash, keep string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `
+		UPDATE alert_confirm_sends SET withdrawn = true WHERE user_hash = $1 AND address <> lower($2) AND NOT withdrawn`,
+		userHash, keep)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // PendingEmail is the replacement a user with a verified user email row
 // last asked to confirm, since it was verified and since since, failed sends
 // aside: the address its link can move the row to. found is false when
@@ -635,7 +657,7 @@ func (s *Store) PendingEmail(ctx context.Context, userHash string, since time.Ti
 		SELECT r.address FROM alert_confirm_sends r
 		  JOIN alert_channels c ON c.user_hash = r.user_hash AND c.kind = 'email' AND c.source = 'user'
 		 WHERE r.user_hash = $1 AND r.address <> lower(c.address) AND r.sent_at > c.verified_at AND r.sent_at > $2
-		   AND NOT r.released
+		   AND NOT r.released AND NOT r.withdrawn
 		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)
 		   AND r.complained_at IS NULL`,
 		userHash, since).Scan(&address)

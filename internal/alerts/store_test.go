@@ -970,6 +970,45 @@ func TestComplainedChannelStaysDisabled(t *testing.T) {
 	}
 }
 
+// TestWithdrawnReplacementStaysPut covers a replacement taken back: its link
+// no longer moves the row and it no longer shows as pending, though it still
+// holds its address's hourly slot.
+func TestWithdrawnReplacementStaysPut(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	addr := "typo-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now()
+	verified := now.Add(-4 * time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+	claimed, err := s.ClaimConfirmSend(ctx, h, addr, now.Add(-time.Minute), now.Add(-time.Hour))
+	if err != nil || !claimed {
+		t.Fatalf("claim: %v %v", claimed, err)
+	}
+	must(t, s.WithdrawPending(ctx, h, "OLD@example.com"))
+
+	_, ok, err := s.PendingEmail(ctx, h, now.Add(-24*time.Hour))
+	if err != nil || ok {
+		t.Fatalf("withdrawn replacement still pending: %v %v", ok, err)
+	}
+	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, addr, time.Now())
+	if err != nil || ok {
+		t.Fatalf("withdrawn link moved the row: %v %v", ok, err)
+	}
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].Address != "old@example.com" || !chans[0].Active() {
+		t.Fatalf("row after the withdrawn link: %+v %v", chans, err)
+	}
+	claimed, err = s.ClaimConfirmSend(ctx, "someone-else", addr, now, now.Add(-time.Hour))
+	if err != nil || claimed {
+		t.Fatalf("withdrawn request freed the hourly slot: %v %v", claimed, err)
+	}
+}
+
 // TestConfirmMovesAVerifiedRowToItsReplacement covers a change of address:
 // the verified row stays and shows its replacement as pending, another
 // user asking for the same address takes nothing from this one, and only

@@ -40,6 +40,7 @@ type APIStore interface {
 	ClaimConfirmSend(ctx context.Context, userHash, address string, now, since time.Time) (bool, error)
 	ReleaseConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
 	PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error)
+	WithdrawPending(ctx context.Context, userHash, keep string) error
 }
 
 // Caller is who a request is from: the user, their tier, and the
@@ -792,8 +793,14 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		return
 	}
 	if found && strings.EqualFold(cur.Address, address) {
-		// The address already confirmed and working needs no mail.
+		// The address already confirmed and working needs no mail, and
+		// entering it again takes back any replacement still pending.
 		if channelState(cur) == stateVerified {
+			err = a.deps.Store.WithdrawPending(ctx, c.UserHash, cur.Address)
+			if err != nil {
+				a.fail(w, "confirm sends", err)
+				return
+			}
 			writeJSON(w, http.StatusOK, emailState{State: stateVerified, Address: cur.Address})
 			return
 		}

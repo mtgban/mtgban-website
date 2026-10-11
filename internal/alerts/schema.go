@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS alert_confirm_sends (
     address        TEXT NOT NULL,
     sent_at        TIMESTAMPTZ NOT NULL,
     released       BOOLEAN NOT NULL DEFAULT false,
+    withdrawn      BOOLEAN NOT NULL DEFAULT false,
     complained_at  TIMESTAMPTZ,
     PRIMARY KEY (user_hash, address)
 );
