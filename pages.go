@@ -421,7 +421,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		PatreonIDs:   Config().Patreon.Client,
 		PatreonURL:   patreonURL,
 		PatreonLogin: showPatreonLogin,
-		Hash:         BuildCommit,
+		Hash:         assetHash(),
 		GatewayURL:   Config().APIGateway.URL,
 
 		// Read off the signature that is already parsed above, so the navbar

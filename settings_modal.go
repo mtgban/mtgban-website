@@ -221,7 +221,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 	_, offlineAllowed := offlineModeAllowed(r)
 
 	v := settingsModalVars{
-		Hash:               BuildCommit,
+		Hash:               assetHash(),
 		Tabs:               settingsTabs(nav, offlineAllowed),
 		TabNames:           settingsTabNames,
 		ListingLocked:      sig == "" && SigCheck,

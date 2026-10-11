@@ -4,6 +4,9 @@
 
 // URLs must match the page's ?hash= exactly, even when the build id is empty.
 var BUILD = self.__BUILD || '';
+// Dev, or a build without a commit: the server sends static files
+// no-store, so the cache answers only offline.
+var DEV = !!self.__DEV;
 var SHELL_CACHE = 'mtgban-shell-' + (BUILD || 'dev');
 var IMAGE_CACHE = 'mtgban-images-v2';
 
@@ -182,6 +185,15 @@ self.addEventListener('fetch', function (e) {
     if (req.mode === 'navigate') {
         e.respondWith(fetch(req).catch(function () {
             return caches.match('/offline', { cacheName: SHELL_CACHE }).then(function (hit) {
+                return hit || Response.error();
+            });
+        }));
+        return;
+    }
+
+    if (DEV) {
+        e.respondWith(fetch(req).catch(function () {
+            return caches.match(req, { cacheName: SHELL_CACHE }).then(function (hit) {
                 return hit || Response.error();
             });
         }));
