@@ -216,12 +216,51 @@ func (s *Store) ChannelFor(ctx context.Context, userHash string, kind ChannelKin
 
 // SetChannelVerified stamps a channel verified and enabled while it still
 // holds address and was neither unsubscribed nor marked as spam; found is
-// false when no row matched.
+// false when no row matched. A user email row holding another address
+// first moves to this one, in the same transaction so a refused confirm
+// leaves the old address in place, if this was the user's latest confirm
+// mail and came after the row was verified; an unsubscribed or spam-marked
+// row never moves, so coming back takes a fresh add. A working row keeps
+// its verified_at, so confirming it again leaves a newer request valid.
 func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address string, at time.Time) (bool, error) {
-	return s.enableAndRestore(ctx, userHash, kind, `
-		UPDATE alert_channels SET verified_at = $5, disabled_at = NULL, disabled_reason = '', updated_at = now()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if kind == ChannelEmail && source == SourceUser {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE alert_channels c
+			   SET address = r.address, verified_at = NULL, disabled_at = NULL, disabled_reason = '', created_at = now(), updated_at = now()
+			  FROM alert_confirm_sends r
+			 WHERE c.user_hash = $1 AND c.kind = 'email' AND c.source = 'user' AND lower(c.address) <> lower($2)
+			   AND c.disabled_reason <> ALL($3)
+			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at > COALESCE(c.verified_at, '-infinity')
+			   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at)`,
+			userHash, address, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}))
+		if err != nil {
+			return false, err
+		}
+	}
+	res, err := tx.ExecContext(ctx, `
+		UPDATE alert_channels SET verified_at = CASE WHEN verified_at IS NOT NULL AND disabled_at IS NULL THEN verified_at ELSE $5 END,
+		       disabled_at = NULL, disabled_reason = '', updated_at = now()
 		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND lower(address) = lower($4) AND disabled_reason <> ALL($6)`,
 		userHash, kind, source, address, at, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil || n == 0 {
+		return false, err
+	}
+	if kind == ChannelEmail {
+		err = restoreEmailAlerts(ctx, tx, userHash)
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit()
 }
 
 // DisableChannel marks a channel unusable, with the reason why. A complaint
@@ -261,15 +300,22 @@ func (s *Store) enableAndRestore(ctx context.Context, userHash string, kind Chan
 		return false, err
 	}
 	if n > 0 && kind == ChannelEmail {
-		_, err = tx.ExecContext(ctx, `
-			UPDATE alerts SET status = 'active', last_error = '', updated_at = now()
-			 WHERE user_hash = $1 AND status = 'undeliverable' AND delivery = 'email' AND last_error = ANY($2)`,
-			userHash, pq.Array(emailParkReasons))
+		err = restoreEmailAlerts(ctx, tx, userHash)
 		if err != nil {
 			return false, err
 		}
 	}
 	return n > 0, tx.Commit()
+}
+
+// restoreEmailAlerts returns a user's email alerts parked for their address
+// to active, inside the transaction that gave them a working one.
+func restoreEmailAlerts(ctx context.Context, tx *sql.Tx, userHash string) error {
+	_, err := tx.ExecContext(ctx, `
+		UPDATE alerts SET status = 'active', last_error = '', updated_at = now()
+		 WHERE user_hash = $1 AND status = 'undeliverable' AND delivery = 'email' AND last_error = ANY($2)`,
+		userHash, pq.Array(emailParkReasons))
+	return err
 }
 
 // DeleteChannel removes a channel outright.
@@ -313,8 +359,44 @@ func (s *Store) ParkEmailAlerts(ctx context.Context, userHash, reason string) (i
 	return res.RowsAffected()
 }
 
-// PruneUnverifiedChannels deletes user-entered addresses nobody ever verified.
+// RecordConfirmSend notes, before its mail goes, that userHash asked for a
+// confirm mail to address. The confirm link resolves against it, so the
+// user's working address stays in place until the new one is confirmed.
+func (s *Store) RecordConfirmSend(ctx context.Context, userHash, address string, at time.Time) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, lower($2), $3)
+		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at`,
+		userHash, address, at)
+	return err
+}
+
+// PendingEmail is the replacement a user with a verified user email row
+// last asked to confirm, since it was verified and since since: the one
+// address its link can move the row to. found is false when there is none.
+func (s *Store) PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error) {
+	var address string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT r.address FROM alert_confirm_sends r
+		  JOIN alert_channels c ON c.user_hash = r.user_hash AND c.kind = 'email' AND c.source = 'user'
+		 WHERE r.user_hash = $1 AND r.address <> lower(c.address) AND r.sent_at > c.verified_at AND r.sent_at > $2
+		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at)`,
+		userHash, since).Scan(&address)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return address, true, nil
+}
+
+// PruneUnverifiedChannels deletes user-entered addresses nobody ever
+// verified, and the confirm mails recorded before the same time.
 func (s *Store) PruneUnverifiedChannels(ctx context.Context, before time.Time) (int64, error) {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM alert_confirm_sends WHERE sent_at < $1`, before)
+	if err != nil {
+		return 0, err
+	}
 	res, err := s.db.ExecContext(ctx, `
 		DELETE FROM alert_channels WHERE source = 'user' AND verified_at IS NULL AND created_at < $1`, before)
 	if err != nil {

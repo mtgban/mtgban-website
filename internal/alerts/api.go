@@ -36,6 +36,8 @@ type APIStore interface {
 	DeleteChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) error
 	EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) (bool, error)
 	ChannelByAddress(ctx context.Context, kind ChannelKind, address string) ([]Channel, error)
+	RecordConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
+	PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error)
 }
 
 // Caller is who a request is from: the user, their tier, and the
@@ -631,6 +633,8 @@ type channelView struct {
 	Reason     string        `json:"reason"`
 	VerifiedAt *time.Time    `json:"verified_at"`
 	DisabledAt *time.Time    `json:"disabled_at"`
+	// Pending is the address a verified user row is waiting to move to.
+	Pending string `json:"pending,omitempty"`
 }
 
 // channelState is verified, pending or disabled, disabled winning.
@@ -670,7 +674,14 @@ func (a *API) channelViews(ctx context.Context, userHash string) ([]channelView,
 		}
 	}
 	for _, c := range rows {
-		views = append(views, viewChannel(c))
+		v := viewChannel(c)
+		if c.Kind == ChannelEmail && c.Source == SourceUser && v.State == stateVerified {
+			v.Pending, _, err = a.deps.Store.PendingEmail(ctx, userHash, time.Now().Add(-a.deps.ConfirmTTL))
+			if err != nil {
+				return nil, err
+			}
+		}
+		views = append(views, v)
 	}
 	return views, nil
 }
@@ -722,22 +733,29 @@ func (a *API) confirmRefusal(c Caller) (int, string) {
 	return http.StatusOK, ""
 }
 
-// mailConfirm mints a confirm link for address and mails it, answering 202.
-func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, address string) {
+// mailConfirm mints a confirm link for address and mails it; false means
+// it answered with the failure.
+func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, address string) bool {
 	token := a.deps.Mint(Token{Kind: TokenConfirm, UserHash: c.UserHash, Address: address, Expires: time.Now().Add(a.deps.ConfirmTTL)})
 	// No signing secret mints no token; a mail with a dead link helps nobody.
 	if token == "" {
 		jsonError(w, http.StatusServiceUnavailable, "confirmation links are not configured")
-		return
+		return false
 	}
 	link := c.Origin + "/alerts/confirm?token=" + url.QueryEscape(token)
-	err := a.deps.SendConfirm(ctx, address, link)
+	// Recorded before the send, so nothing after it can fail to land.
+	err := a.deps.Store.RecordConfirmSend(ctx, c.UserHash, address, time.Now())
+	if err != nil {
+		a.fail(w, "confirm sends", err)
+		return false
+	}
+	err = a.deps.SendConfirm(ctx, address, link)
 	if err != nil {
 		log.Printf("alerts: confirm mail failed: %v", err)
 		jsonError(w, http.StatusBadGateway, "could not send the confirmation mail")
-		return
+		return false
 	}
-	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
+	return true
 }
 
 func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
@@ -784,12 +802,19 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		a.fail(w, "contact", err)
 		return
 	}
-	err = a.deps.Store.UpsertChannel(ctx, Channel{UserHash: c.UserHash, Kind: ChannelEmail, Address: address, Source: SourceUser})
-	if err != nil {
-		a.fail(w, "channel", err)
+	// A working address stays until its successor is confirmed; a row
+	// holding none that works moves now, to show the address as pending.
+	if !found || channelState(cur) != stateVerified {
+		err = a.deps.Store.UpsertChannel(ctx, Channel{UserHash: c.UserHash, Kind: ChannelEmail, Address: address, Source: SourceUser})
+		if err != nil {
+			a.fail(w, "channel", err)
+			return
+		}
+	}
+	if !a.mailConfirm(ctx, w, c, address) {
 		return
 	}
-	a.mailConfirm(ctx, w, c, address)
+	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
 }
 
 func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
@@ -804,21 +829,37 @@ func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		a.fail(w, "channels", err)
 		return
 	}
-	// A verified address needs no mail unless a bounce disabled it.
-	if !found || channelState(cur) == stateVerified {
+	if !found {
 		jsonError(w, http.StatusNotFound, "no address to confirm")
 		return
+	}
+	address := strings.ToLower(cur.Address)
+	// A verified address needs no mail unless a bounce disabled it; its
+	// pending replacement, if any, is what a resend is for.
+	if channelState(cur) == stateVerified {
+		pending, ok, err := a.deps.Store.PendingEmail(ctx, c.UserHash, time.Now().Add(-a.deps.ConfirmTTL))
+		if err != nil {
+			a.fail(w, "confirm sends", err)
+			return
+		}
+		if !ok {
+			jsonError(w, http.StatusNotFound, "no address to confirm")
+			return
+		}
+		address = pending
 	}
 	msg = reverifyRefusal(cur)
 	if msg != "" {
 		jsonError(w, http.StatusUnprocessableEntity, msg)
 		return
 	}
-	address := strings.ToLower(cur.Address)
 	if !a.confirmAllowed(ctx, w, c, address) {
 		return
 	}
-	a.mailConfirm(ctx, w, c, address)
+	if !a.mailConfirm(ctx, w, c, address) {
+		return
+	}
+	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
 }
 
 // reverifyRefusal is why the user's own disabled row may not get a new

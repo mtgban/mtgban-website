@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/mtgban-website/mailer"
 )
 
+// verifiedCall is one SetChannelVerified that matched a row.
 type verifiedCall struct {
 	userHash string
 	kind     alerts.ChannelKind
@@ -43,6 +44,8 @@ type fakeLinkStore struct {
 	verified []verifiedCall
 	disabled []disabledCall
 	parked   []parkedCall
+	// sends is each user's confirm mails, keyed user + "|" + address.
+	sends map[string]bool
 }
 
 func (f *fakeLinkStore) Channels(_ context.Context, userHash string) ([]alerts.Channel, error) {
@@ -56,16 +59,22 @@ func (f *fakeLinkStore) Channels(_ context.Context, userHash string) ([]alerts.C
 }
 
 func (f *fakeLinkStore) SetChannelVerified(_ context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, at time.Time) (bool, error) {
-	f.verified = append(f.verified, verifiedCall{userHash, kind, source, address})
 	for i, c := range f.channels {
-		// The store's SQL skips a row unsubscribed or marked as spam.
-		if c.DisabledReason == alerts.ReasonUnsubscribed || c.DisabledReason == alerts.ReasonComplained {
+		if c.UserHash != userHash || c.Kind != kind || c.Source != source {
 			continue
 		}
-		if c.UserHash == userHash && c.Kind == kind && c.Source == source && strings.EqualFold(c.Address, address) {
-			f.channels[i].VerifiedAt, f.channels[i].DisabledAt, f.channels[i].DisabledReason = &at, nil, ""
-			return true, nil
+		// As the store does: a user row moves to an address the user asked
+		// to confirm, then skips one unsubscribed or marked as spam.
+		if !strings.EqualFold(c.Address, address) && source == alerts.SourceUser && f.sends[userHash+"|"+strings.ToLower(address)] {
+			c = alerts.Channel{UserHash: userHash, Kind: kind, Address: strings.ToLower(address), Source: source}
 		}
+		if c.DisabledReason == alerts.ReasonUnsubscribed || c.DisabledReason == alerts.ReasonComplained || !strings.EqualFold(c.Address, address) {
+			continue
+		}
+		c.VerifiedAt, c.DisabledAt, c.DisabledReason = &at, nil, ""
+		f.channels[i] = c
+		f.verified = append(f.verified, verifiedCall{userHash, kind, source, address})
+		return true, nil
 	}
 	return false, nil
 }
@@ -176,6 +185,26 @@ func TestAlertsConfirmRefusesComplainedRow(t *testing.T) {
 	err = confirmAlertEmail(context.Background(), store, alertTokenSecret(), token, time.Now())
 	if !errors.Is(err, alerts.ErrBadToken) || store.channels[0].DisabledReason != alerts.ReasonComplained {
 		t.Fatalf("confirm = %v, row %+v", err, store.channels[0])
+	}
+}
+
+// A link for a new address moves a working row to it only if that
+// address's last confirm mail was this user's.
+func TestAlertsConfirmMovesToTheRequestedAddress(t *testing.T) {
+	mailLinkSetup(t)
+	at := time.Now()
+	working := alerts.Channel{UserHash: "u1", Kind: alerts.ChannelEmail, Address: "old@example.com", Source: alerts.SourceUser, VerifiedAt: &at}
+	token := confirmToken("u1", "new@example.com", time.Now().Add(time.Hour))
+
+	store := &fakeLinkStore{channels: []alerts.Channel{working}, sends: map[string]bool{"u2|new@example.com": true}}
+	err := confirmAlertEmail(context.Background(), store, alertTokenSecret(), token, time.Now())
+	if !errors.Is(err, alerts.ErrBadToken) || store.channels[0].Address != "old@example.com" {
+		t.Fatalf("another user's request = %v, row %+v", err, store.channels[0])
+	}
+	store.sends["u1|new@example.com"] = true
+	err = confirmAlertEmail(context.Background(), store, alertTokenSecret(), token, time.Now())
+	if err != nil || store.channels[0].Address != "new@example.com" || !store.channels[0].Active() {
+		t.Fatalf("own request = %v, row %+v", err, store.channels[0])
 	}
 }
 

@@ -15,10 +15,19 @@ import (
 
 // fakeAlertStore keeps rows in memory; ids are assigned in order.
 type fakeAlertStore struct {
-	contacts map[string]Contact
-	rows     map[int64]Alert
-	channels map[channelKey]Channel
-	nextID   int64
+	contacts     map[string]Contact
+	rows         map[int64]Alert
+	channels     map[channelKey]Channel
+	confirmSends map[confirmKey]confirmSend
+	nextID       int64
+}
+
+// confirmKey is one user's confirm mails to one address.
+type confirmKey struct{ userHash, address string }
+
+// confirmSend is when the last of them went.
+type confirmSend struct {
+	at time.Time
 }
 
 type channelKey struct {
@@ -28,7 +37,32 @@ type channelKey struct {
 }
 
 func newFakeAlertStore() *fakeAlertStore {
-	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}}
+	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}, confirmSends: map[confirmKey]confirmSend{}}
+}
+
+func (f *fakeAlertStore) RecordConfirmSend(_ context.Context, h, address string, at time.Time) error {
+	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at}
+	return nil
+}
+
+// PendingEmail mirrors the store: the user's newest send, when it went to
+// another address after the user row was verified, and since since.
+func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Time) (string, bool, error) {
+	row, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
+	if !ok || row.VerifiedAt == nil {
+		return "", false, nil
+	}
+	var last string
+	var lastAt time.Time
+	for k, send := range f.confirmSends {
+		if k.userHash == h && (last == "" || send.at.After(lastAt)) {
+			last, lastAt = k.address, send.at
+		}
+	}
+	if last == "" || strings.EqualFold(last, row.Address) || !lastAt.After(*row.VerifiedAt) || !lastAt.After(since) {
+		return "", false, nil
+	}
+	return last, true, nil
 }
 
 func (f *fakeAlertStore) Channels(_ context.Context, h string) ([]Channel, error) {
@@ -1068,21 +1102,34 @@ func TestAlertsAPISetEmailRefusals(t *testing.T) {
 		t.Fatalf("no origin = %d %s", w.Code, w.Body)
 	}
 
-	// A failed send keeps the row for a resend.
+	// A failed send leaves the verified address it would have replaced.
+	before := time.Now()
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &before}
 	fail = true
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, sig))
 	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "could not send the confirmation mail") {
 		t.Fatalf("send fails = %d %s", w.Code, w.Body)
 	}
-	if store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
-		t.Fatalf("row after failed send = %+v", store.channels)
+	if kept := store.channels[channelKey{hash, ChannelEmail, SourceUser}]; kept.Address != "old@example.com" || channelState(kept) != stateVerified {
+		t.Fatalf("row after failed send = %+v", kept)
 	}
+	// A sent one leaves it too, until the link confirms the new address.
 	fail = false
 	w = httptest.NewRecorder()
-	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
-	if w.Code != http.StatusAccepted || len(sent) != 1 || sent[0].to != "me@example.com" {
-		t.Fatalf("resend = %d %s sent=%+v", w.Code, w.Body, sent)
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 1 || sent[0].to != "me@example.com" || store.confirmSends[confirmKey{hash, "me@example.com"}].at.IsZero() {
+		t.Fatalf("retry = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	if kept := store.channels[channelKey{hash, ChannelEmail, SourceUser}]; kept.Address != "old@example.com" || channelState(kept) != stateVerified {
+		t.Fatalf("row after the sent change = %+v", kept)
+	}
+	// A row with no working address moves at once, to show as pending.
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, sig))
+	if w.Code != http.StatusAccepted || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
+		t.Fatalf("pending change = %d %s row=%+v", w.Code, w.Body, store.channels)
 	}
 
 	// Re-entering a confirmed address sends nothing.
@@ -1092,7 +1139,7 @@ func TestAlertsAPISetEmailRefusals(t *testing.T) {
 	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = row
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"ME@example.com"}`, sig))
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"verified"`) || len(sent) != 1 {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"verified"`) || len(sent) != 2 {
 		t.Fatalf("same verified address = %d %s sent=%d", w.Code, w.Body, len(sent))
 	}
 
@@ -1106,6 +1153,36 @@ func TestAlertsAPISetEmailRefusals(t *testing.T) {
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, testCaller("x@y.com", "Legacy")))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("resend without row = %d %s", w.Code, w.Body)
+	}
+}
+
+// A replacement waiting on its link shows on the verified row, and a
+// resend goes to it rather than to the working address.
+func TestAlertsAPIPendingReplacement(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	verified := time.Now().Add(-3 * time.Hour)
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"new@example.com"}`, sig))
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("set = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("GET", "/api/alerts/channels", "", sig))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"address":"old@example.com"`) || !strings.Contains(w.Body.String(), `"pending":"new@example.com"`) {
+		t.Fatalf("channels = %d %s", w.Code, w.Body)
+	}
+	// The last mail is taken as an hour and more old.
+	store.confirmSends[confirmKey{hash, "new@example.com"}] = confirmSend{at: time.Now().Add(-2 * time.Hour)}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 2 || sent[1].to != "new@example.com" {
+		t.Fatalf("resend = %d %s sent=%+v", w.Code, w.Body, sent)
 	}
 }
 

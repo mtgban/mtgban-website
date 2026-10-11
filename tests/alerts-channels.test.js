@@ -40,6 +40,11 @@ test('channelButtons: a user row offers resend or change plus remove', () => {
     expect(channelButtons({ source: 'user', state: 'verified' })).toEqual(['change', 'remove']);
 });
 
+test('channelButtons: a verified user row waiting on a replacement offers resend', () => {
+    const { channelButtons } = load();
+    expect(channelButtons({ source: 'user', state: 'verified', pending: 'new@example.com' })).toEqual(['change', 'resend', 'remove']);
+});
+
 test('channelButtons: a user row disabled as unsubscribed only offers remove', () => {
     const { channelButtons } = load();
     expect(channelButtons({ source: 'user', state: 'disabled', reason: 'unsubscribed' })).toEqual(['remove']);
