@@ -225,6 +225,8 @@ func buildProviderRegistry() {
 	if len(registry) == 0 {
 		log.Println("no chart providers configured: every timeseries_config.datasets entry needs a \"provider\" id")
 	}
+	keys := buildHistoryKeys(Config().TimeseriesConfig.Datasets)
+	historyKeyTable.Store(&keys)
 	providerRegistry.Store(&registry)
 }
 
@@ -276,6 +278,24 @@ func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lo
 // ten cards over four still lands in three waves instead of ten.
 const chartRosterConcurrency = 4
 
+// acquireSlot takes one of slots, false once ctx ends or, when wait is not 0, wait passes.
+func acquireSlot(ctx context.Context, slots chan struct{}, wait time.Duration) bool {
+	var timeout <-chan time.Time
+	if wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		timeout = timer.C
+	}
+	select {
+	case slots <- struct{}{}:
+		return true
+	case <-timeout:
+		return false
+	case <-ctx.Done():
+		return false
+	}
+}
+
 // chartSeries is one roster card's fetched history, kept beside the identity
 // the chart and the legend name it by.
 type chartSeries struct {
@@ -310,7 +330,10 @@ func fetchRosterPrices(ctx context.Context, targets []chartSeries, lb timeseries
 	for i := range out {
 		wg.Go(func() {
 			defer recoverJob("chart roster read " + out[i].CardID)
-			slots <- struct{}{}
+			if !acquireSlot(ctx, slots, 0) {
+				out[i].Err = ctx.Err()
+				return
+			}
 			defer func() { <-slots }()
 			// Left in place if the read panics; a read that returns replaces it.
 			out[i].Err = errRosterReadPanicked
