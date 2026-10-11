@@ -1,0 +1,15 @@
+[
+  {"id": 1, "shorthand": "CKRetail", "public_name": "Card Kingdom Retail", "kind": "retail", "currency": "USD", "history_key": "CK"},
+  {"id": 2, "shorthand": "CKBuylist", "public_name": "Card Kingdom Buylist", "kind": "buylist", "currency": "USD", "history_key": "CK"},
+  {"id": 3, "shorthand": "TCGLow", "public_name": "TCGplayer Low", "kind": "retail", "currency": "USD", "history_key": "TCGLow"},
+  {"id": 4, "shorthand": "TCGMarket", "public_name": "TCGplayer Market", "kind": "retail", "currency": "USD", "history_key": "TCGMarket"},
+  {"id": 5, "shorthand": "TCGMid", "public_name": "TCGplayer Mid", "kind": "retail", "currency": "USD", "history_key": "TCGMid"},
+  {"id": 6, "shorthand": "TCGHigh", "public_name": "TCGplayer High", "kind": "retail", "currency": "USD", "history_key": "TCGHigh"},
+  {"id": 7, "shorthand": "TCGDirectLow", "public_name": "TCGplayer Direct Low", "kind": "retail", "currency": "USD", "history_key": "TCGDirectLow"},
+  {"id": 8, "shorthand": "MKMLow", "public_name": "Cardmarket Low", "kind": "retail", "currency": "EUR", "history_key": "MKMLow"},
+  {"id": 9, "shorthand": "MKMTrend", "public_name": "Cardmarket Trend", "kind": "retail", "currency": "EUR", "history_key": "MKMTrend"},
+  {"id": 10, "shorthand": "SCGBuylist", "public_name": "Star City Games Buylist", "kind": "buylist", "currency": "USD", "history_key": "SCG"},
+  {"id": 11, "shorthand": "ABUBuylist", "public_name": "ABU Games Buylist", "kind": "buylist", "currency": "USD", "history_key": "ABUGames"},
+  {"id": 12, "shorthand": "CSIBuylist", "public_name": "Cool Stuff Inc Buylist", "kind": "buylist", "currency": "USD", "history_key": "CSI"},
+  {"id": 13, "shorthand": "SealedEV", "public_name": "Sealed EV (TCG Low)", "kind": "derived", "currency": "USD", "history_key": "TCGLowEV"}
+]
