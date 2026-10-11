@@ -49,13 +49,14 @@ class FakeElement {
 
 // A fake <template>: content.cloneNode() hands back a fresh fragment
 // (itself a FakeElement standing in for a DocumentFragment) each time,
-// so two hovers over the same result don't share nodes.
+// so two hovers over the same result don't share nodes, and counts them.
 class FakeTemplate extends FakeElement {
     constructor(printingsHTML, productsHTML) {
         super('result-hover');
         this.printingsHTML = printingsHTML;
         this.productsHTML = productsHTML;
-        this.content = { cloneNode: () => this._buildFragment() };
+        this.clones = 0;
+        this.content = { cloneNode: () => { this.clones++; return this._buildFragment(); } };
     }
     _buildFragment() {
         const frag = new FakeElement('result-hover-fragment');
@@ -172,24 +173,45 @@ test('hoverDataFor finds the header from a nested body element and parses once',
 test('a mouseover inside a result calls hoverSidebar with DOM nodes, not HTML strings', () => {
     const dom = fakeDom();
     const { w, calls } = load(dom);
+    // The seed shows the first result, so the second goes first
+    dom.listeners.mouseover({ target: dom.h2 });
+    expect(calls[0][9]).toBe('Balance');
+    // Balance's template carried empty printings/products HTML: the
+    // cloned nodes exist but hold no children.
+    expect(calls[0][1].children.length).toBe(0);
+    expect(calls[0][2].children.length).toBe(0);
+    w.updateSidebar.apply(null, calls[0]);
+
     // dom.span1's result has a .result-card-extra between its header and
     // its body (see fakeDom); this also exercises headerFor walking past it.
     dom.listeners.mouseover({ target: dom.span1 });
-    expect(calls.length).toBe(1);
-    const [src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName] = calls[0];
+    expect(calls.length).toBe(2);
+    const [src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount, releaseDate, cardName] = calls[1];
     expect(typeof printings).not.toBe('string');
     expect(typeof products).not.toBe('string');
     expect(printings.cls).toBe('hover-printings');
     expect(products.cls).toBe('hover-products');
     expect(setCode).toBe('LEB');
     expect(cardName).toBe('Animate Wall');
+});
 
+test('a mouseover over the card on show clones nothing and calls nothing', () => {
+    const dom = fakeDom();
+    const { w, calls } = load(dom);
+    const tpl = dom.h1.children[0];
+    const seeded = tpl.clones; // the seed shows the first result
+    dom.listeners.mouseover({ target: dom.span1 });
+    dom.listeners.mouseover({ target: dom.h1 });
+    expect(tpl.clones).toBe(seeded);
+    expect(calls.length).toBe(0);
+
+    // Another card still updates, and once it shows, the first one does
     dom.listeners.mouseover({ target: dom.h2 });
-    expect(calls[1][9]).toBe('Balance');
-    // Balance's template carried empty printings/products HTML: the
-    // cloned nodes exist but hold no children.
-    expect(calls[1][1].children.length).toBe(0);
-    expect(calls[1][2].children.length).toBe(0);
+    expect(calls.length).toBe(1);
+    w.updateSidebar.apply(null, calls[0]);
+    dom.listeners.mouseover({ target: dom.span1 });
+    expect(calls.length).toBe(2);
+    expect(tpl.clones).toBe(seeded + 1);
 });
 
 test('an empty products node falls back to the n/a text the old "" case used', () => {
@@ -206,21 +228,24 @@ test('the image src is run through httpURL: an https URL passes through, javascr
     dom.h2.attrs['data-hover'] = JSON.stringify(['javascript:alert(1)', false, false, 'LEB', false, 0, '1993', 'Balance']);
     const { w, cardArtCalls } = load(dom);
 
-    dom.listeners.mouseover({ target: dom.h1 });
-    w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
-    expect(cardArtCalls[cardArtCalls.length - 1]).toBe('https://img.example/card.jpg');
-
     dom.listeners.mouseover({ target: dom.h2 });
     w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
     // httpURL rejects non-http(s) schemes, so the javascript: URL never
     // reaches setCardArtSource (and so never reaches img.src).
     expect(cardArtCalls).not.toContain('javascript:alert(1)');
     expect(cardArtCalls[cardArtCalls.length - 1]).toBe('');
+
+    dom.listeners.mouseover({ target: dom.h1 });
+    w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
+    expect(cardArtCalls[cardArtCalls.length - 1]).toBe('https://img.example/card.jpg');
 });
 
 test("updateSidebar inserts the template wrapper's children, not the wrapper itself", () => {
     const dom = fakeDom();
     const { w, printingsStub, productsStub } = load(dom);
+    // Away from the seeded first result and back
+    dom.listeners.mouseover({ target: dom.h2 });
+    w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
     dom.listeners.mouseover({ target: dom.h1 });
     w.updateSidebar.apply(null, w.__hoverCalls[w.__hoverCalls.length - 1]);
 
