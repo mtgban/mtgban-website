@@ -421,7 +421,7 @@ func TestAlertsMailEventsReachTheStore(t *testing.T) {
 	store := &fakeLinkStore{channels: []alerts.Channel{
 		{UserHash: "u1", Kind: alerts.ChannelEmail, Address: "bob@example.com", Source: alerts.SourcePatreon, VerifiedAt: &at},
 	}}
-	body := `{"type":"email.bounced","data":{"email_id":"m1","to":["bob@example.com"]}}`
+	body := `{"type":"email.bounced","data":{"bounce":{"type":"Permanent"},"email_id":"m1","to":["bob@example.com"]}}`
 
 	rec := httptest.NewRecorder()
 	unsigned := httptest.NewRequest(http.MethodPost, "/alerts/mail-events", strings.NewReader(body))
