@@ -550,7 +550,8 @@ type arbitToggle struct {
 	// greyed here, its setting riding along as Carry where the reader set it.
 	// Hidden is one offered for sealed sources alone (Decklists, Stable),
 	// which takes the place of the singles' options rather than sitting
-	// greyed beside them: only its Carry is rendered.
+	// greyed beside them, or one only another page offers: only its Carry
+	// is rendered.
 	Disabled bool
 	Hidden   bool
 	Carry    string
@@ -648,7 +649,17 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Bac
 	var shown []string
 	for _, key := range FilterOptKeys {
 		cfg := FilterOptConfig[key]
+		on, set := st.Toggles[key]
 		if !cfg.Shown(m.Global, m.Reverse, true) && !cfg.Shown(m.Global, m.Reverse, false) {
+			// Another page's option, reverse's only Tradable on arbit, rides
+			// along unseen where set: the two pages save one state
+			if set {
+				toggle := arbitToggle{Key: key, Disabled: true, Hidden: true, Carry: "0"}
+				if on {
+					toggle.Carry = "1"
+				}
+				bar.Toggles = append(bar.Toggles, toggle)
+			}
 			continue
 		}
 		toggle := arbitToggle{Key: key, Title: cfg.Title, Checked: applied[key]}
@@ -657,7 +668,6 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Bac
 			toggle.Hidden = cfg.SealedOnly
 			// What rides along to the other kind of source, as it will apply
 			// there: the reader's setting, else that source's default
-			on, set := st.Toggles[key]
 			if !set {
 				on = arbitMode{Global: m.Global, Reverse: m.Reverse, Sealed: !m.Sealed}.toggleDefault(key)
 			}
