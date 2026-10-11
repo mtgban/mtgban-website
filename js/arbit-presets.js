@@ -6,8 +6,9 @@
     var cfg = window.BAN_ARBIT || {};
 
     var KEY = 'mtgban_arbit_presets';
-    // How many presets a page group keeps
+    // How many presets a page group keeps, and how long a name runs
     var CAP = 10;
+    var NAME_MAX = 40;
     // A deleted preset stays behind as {id, del, savedAt} for this long, so
     // the delete syncs to other devices rather than the preset coming back.
     var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -78,7 +79,7 @@
             var all = readAll();
             var idx = -1;
             for (var i = 0; i < all.length; i++) if (all[i].id === p.id) idx = i;
-            var rec = { id: p.id || newId(), name: String(p.name), savedAt: now(), group: group, q: String(p.q) };
+            var rec = { id: p.id || newId(), name: String(p.name).slice(0, NAME_MAX), savedAt: now(), group: group, q: String(p.q) };
             if (idx >= 0) {
                 all[idx] = rec;
             } else if (store.list().length >= CAP) {
@@ -93,7 +94,7 @@
         rename: function (id, name) {
             var all = readAll(), hit = false;
             all.forEach(function (p) {
-                if (p.id === id) { p.name = String(name); p.savedAt = now(); hit = true; }
+                if (p.id === id) { p.name = String(name).slice(0, NAME_MAX); p.savedAt = now(); hit = true; }
             });
             return hit ? writeAll(all) : 'missing';
         },
@@ -234,6 +235,9 @@
         function dirty() { return !!(form && formQuery && formQuery(form) !== loaded); }
         function wanted() { return dirty() ? formState(form) : cfg.query; }
 
+        // The name as a save keeps it, should the input's maxlength not hold
+        function typedName() { return nameInput ? nameInput.value.trim().slice(0, NAME_MAX) : ''; }
+
         var renderedKey = null;
         function render() {
             var presets = store.list();
@@ -266,7 +270,7 @@
             if (renameBtn) renameBtn.disabled = !selected;
             if (deleteBtn) deleteBtn.disabled = !selected;
             if (saveBtn && saveRow && !saveRow.hidden) {
-                var d = decideSave(nameInput ? nameInput.value : '', presets, selectedId, wanted());
+                var d = decideSave(typedName(), presets, selectedId, wanted());
                 saveBtn.textContent = d.action === 'update' ? 'Update ' + d.preset.name : 'Save';
             }
         }
@@ -327,7 +331,8 @@
             var unapplied = dirty();
             var q = wanted();
             var presets = store.list();
-            var d = decideSave(nameInput.value, presets, selectedId, q);
+            var name = typedName();
+            var d = decideSave(name, presets, selectedId, q);
             if (d.action === 'empty') { say('Give the preset a name'); return; }
             if (d.action === 'reserved') { say('Default is built in; pick another name'); return; }
             if (d.action === 'duplicate') {
@@ -342,7 +347,7 @@
                 render();
                 return;
             }
-            var r = store.save({ id: d.action === 'update' ? d.preset.id : undefined, name: nameInput.value.trim(), q: q });
+            var r = store.save({ id: d.action === 'update' ? d.preset.id : undefined, name: name, q: q });
             if (!r.ok) {
                 say(r.reason === 'cap' ? 'You can keep ' + CAP + ' presets; delete one first' : 'Could not save: browser storage is unavailable');
                 return;
@@ -371,7 +376,7 @@
             if (!sel) return;
             var name = window.prompt ? window.prompt('Rename preset', sel.name) : null;
             if (!name || !name.trim()) return;
-            name = name.trim().slice(0, 40);
+            name = name.trim().slice(0, NAME_MAX);
             if (reserved(name)) { say('Default is built in; pick another name'); return; }
             var clash = null;
             presets.forEach(function (p) { if (p.id !== sel.id && p.name.toLowerCase() === name.toLowerCase()) clash = p; });
