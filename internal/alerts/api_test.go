@@ -1637,7 +1637,7 @@ func TestAlertsAPIUnsubscribedNotReverified(t *testing.T) {
 	hash := testHash("a@b.com")
 	now := time.Now()
 	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, VerifiedAt: &now, DisabledAt: &now, DisabledReason: "unsubscribed"}
-	const msg = "this address unsubscribed; use Enable to turn it back on"
+	const msg = "this address unsubscribed; remove it and add it again to confirm it afresh"
 
 	w := httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))

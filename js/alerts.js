@@ -592,23 +592,8 @@
 
     function channelsHost() { return document.getElementById('alerts-channels'); }
 
-    // userEmailRow is the address the user entered, null when there is none.
-    function userEmailRow(rows) {
-        return rows.filter(function (r) { return r.kind === 'email' && r.source === 'user'; })[0] || null;
-    }
-
     function anyEmailVerified(rows) {
         return rows.some(function (r) { return r.kind === 'email' && r.state === 'verified'; });
-    }
-
-    // mapChannelError rewords the one 422 the page cannot otherwise act on:
-    // a disabled user row only ever shows Remove, so a race that still hits
-    // this message needs a next step spelled out.
-    function mapChannelError(message, row) {
-        if (row && row.source === 'user' && message === 'this address unsubscribed; use Enable to turn it back on') {
-            return 'This address unsubscribed. Remove it and add it again to confirm it afresh.';
-        }
-        return message;
     }
 
     function channelButton(action) {
@@ -830,7 +815,6 @@
             showEmailError('enter a valid email address');
             return;
         }
-        var row = userEmailRow(channelsRows);
         var buttons = rowButtons(btn);
         setButtonsDisabled(buttons, true);
         showEmailError('');
@@ -839,12 +823,11 @@
             toast(res.state === 'verified' ? 'Email confirmed' : 'Confirmation mail sent');
             return loadChannelsBox();
         }).catch(function (err) {
-            showEmailError(mapChannelError(err.message, row));
+            showEmailError(err.message);
         }).then(function () { setButtonsDisabled(buttons, false); });
     }
 
     function resendEmail(btn) {
-        var row = userEmailRow(channelsRows);
         var buttons = rowButtons(btn);
         setButtonsDisabled(buttons, true);
         showEmailError('');
@@ -852,7 +835,7 @@
             toast('Confirmation mail sent');
             return loadChannelsBox();
         }).catch(function (err) {
-            showEmailError(mapChannelError(err.message, row));
+            showEmailError(err.message);
         }).then(function () { setButtonsDisabled(buttons, false); });
     }
 
