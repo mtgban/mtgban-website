@@ -802,7 +802,8 @@ body.settings-open {
 .settings-error .settings-btn { margin-left: 0.75em; }
 
 /* ── Rail + panes ────────────────────────────────────────── */
-.settings-modal:has(.settings-tabs) { height: 86vh; }
+/* Full height from the first frame, before the body is fetched */
+#settings-modal { height: 86vh; }
 .settings-modal-body:has(.settings-tabs) {
     display: flex;
     min-height: 0;
