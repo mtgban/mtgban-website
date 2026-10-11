@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -177,7 +179,28 @@ type MembershipData struct {
 	} `json:"included"`
 }
 
-// GetMembershipData retrieves the entitled tiers of one membership.
+// StatusError is a Patreon answer with a status outside 2xx. Its body is kept
+// only as text for the log, since an edge's 502 page is not JSON.
+type StatusError struct {
+	StatusCode int
+	// Body is the answer's first statusBodyLimit bytes
+	Body string
+}
+
+// statusBodyLimit is how much of a refused answer StatusError keeps.
+const statusBodyLimit = 512
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("patreon answered %d %s: %q", e.StatusCode, http.StatusText(e.StatusCode), e.Body)
+}
+
+// ErrUnreadable is a 2xx answer whose body is not the JSON asked for: cut
+// short, or not JSON at all.
+var ErrUnreadable = errors.New("patreon answer unreadable")
+
+// GetMembershipData retrieves the entitled tiers of one membership; a status
+// outside 2xx is a *StatusError, and a body that does not decode
+// ErrUnreadable.
 func (c *Client) GetMembershipData(ctx context.Context, userID string) (*MembershipData, error) {
 	link := PatreonMemberURL + userID + PatreonMemberOpts
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
@@ -189,11 +212,15 @@ func (c *Client) GetMembershipData(ctx context.Context, userID string) (*Members
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, statusBodyLimit))
+		return nil, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
 
 	var membershipData MembershipData
 	err = json.NewDecoder(resp.Body).Decode(&membershipData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrUnreadable, err)
 	}
 
 	return &membershipData, nil
