@@ -1,6 +1,10 @@
 package timeseries
 
 import (
+	"os"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -171,5 +175,81 @@ func TestTCGSubTypeCodesStayPut(t *testing.T) {
 	if tcgSubTypeCodes["Normal"] != 1 || tcgSubTypeCodes["Cold Foil"] != 4 ||
 		tcgSubTypeCodes["Unlimited Edition Rainbow Foil"] != 16 {
 		t.Error("a sub-type code was renumbered")
+	}
+}
+
+// ProviderIDs is providers.json's ids: every seeded id once, ascending, and
+// a copy the caller may change.
+func TestProviderIDs(t *testing.T) {
+	ids := ProviderIDs()
+	if want := []int16{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}; !slices.Equal(ids, want) {
+		t.Errorf("ProviderIDs() = %v, want %v", ids, want)
+	}
+	ids[0] = 99
+	if ProviderIDs()[0] != 1 {
+		t.Error("ProviderIDs() handed out the seed itself")
+	}
+}
+
+// providers.json, the SQL seed and the Provider constants name the same
+// providers: the seed's rows are the file's, in order.
+func TestProvidersMatchTheSeed(t *testing.T) {
+	raw, err := os.ReadFile("../db_migration/02_seed_providers.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := regexp.MustCompile(`\((\d+),\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)'\)`)
+	var seed []Provider
+	for _, m := range row.FindAllStringSubmatch(string(raw), -1) {
+		id, _ := strconv.Atoi(m[1])
+		seed = append(seed, Provider{ID: int16(id), Shorthand: m[2], PublicName: m[3], Kind: m[4], Currency: m[5]})
+	}
+	got := Providers()
+	if len(seed) != len(got) || len(got) == 0 {
+		t.Fatalf("seed has %d rows, providers.json %d, want the same, more than none", len(seed), len(got))
+	}
+	for i, want := range seed {
+		p := got[i]
+		p.HistoryKey = ""
+		if p != want {
+			t.Errorf("row %d: providers.json %+v, seed %+v", i, p, want)
+		}
+		if got[i].HistoryKey == "" {
+			t.Errorf("provider %d has no history key", got[i].ID)
+		}
+	}
+	got[0].ID = 99
+	if Providers()[0].ID != 1 {
+		t.Error("Providers() handed out the list itself")
+	}
+}
+
+// Each Provider constant is the id of the file's entry with its shorthand.
+func TestProviderConstantsMatchTheFile(t *testing.T) {
+	ids := map[string]int16{}
+	for _, p := range Providers() {
+		ids[p.Shorthand] = p.ID
+	}
+	for _, tc := range []struct {
+		constant  int16
+		shorthand string
+	}{
+		{ProviderCKRetail, "CKRetail"},
+		{ProviderCKBuylist, "CKBuylist"},
+		{ProviderTCGLow, "TCGLow"},
+		{ProviderTCGMarket, "TCGMarket"},
+		{ProviderTCGMid, "TCGMid"},
+		{ProviderTCGHigh, "TCGHigh"},
+		{ProviderTCGDirectLow, "TCGDirectLow"},
+		{ProviderMKMLow, "MKMLow"},
+		{ProviderMKMTrend, "MKMTrend"},
+		{ProviderSCGBuylist, "SCGBuylist"},
+		{ProviderABUBuylist, "ABUBuylist"},
+		{ProviderCSIBuylist, "CSIBuylist"},
+		{ProviderSealedEV, "SealedEV"},
+	} {
+		if id, ok := ids[tc.shorthand]; !ok || id != tc.constant {
+			t.Errorf("%s: constant %d, providers.json %d (listed %t)", tc.shorthand, tc.constant, id, ok)
+		}
 	}
 }
