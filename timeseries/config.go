@@ -114,8 +114,9 @@ type Client struct {
 	// never written again - so reading them needs no synchronisation. Nil when
 	// preparing failed, or on a client built without one, and the read falls
 	// back to Query.
-	stmtHGetAllLong    *sql.Stmt
-	stmtHGetAllByBanID *sql.Stmt
+	stmtHGetAllLong     *sql.Stmt
+	stmtHGetAllByBanID  *sql.Stmt
+	stmtHGetAllByBanIDs *sql.Stmt
 }
 
 // query runs a read through stmt when the client managed to prepare it, and as
@@ -217,6 +218,7 @@ func (c *Client) PrepareStatements(ctx context.Context) error {
 	}{
 		{&c.stmtHGetAllLong, hgetAllLongQuery},
 		{&c.stmtHGetAllByBanID, hgetAllByBanIDQuery},
+		{&c.stmtHGetAllByBanIDs, hgetAllByBanIDsQuery},
 	} {
 		if *s.stmt != nil {
 			continue
@@ -275,7 +277,7 @@ func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool,
 
 // Close shuts down the connection pool.
 func (c *Client) Close() error {
-	for _, stmt := range []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID} {
+	for _, stmt := range []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID, c.stmtHGetAllByBanIDs} {
 		if stmt != nil {
 			stmt.Close()
 		}
