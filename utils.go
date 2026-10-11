@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"log"
 	"math"
@@ -1281,7 +1282,7 @@ func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
+		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, html.EscapeString(set.Name), url.QueryEscape(co.Name+" s:"+setCode))
 
 		// Trimmed, since the strip is inline text and the partial's own
 		// whitespace would space out glyphs that sit flush.

@@ -143,6 +143,12 @@ func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
 			absent: []string{`title="MA"`, `class="ss `},
 		},
 		{
+			name:   "quoted name",
+			set:    mtgmatcher.Set{Code: "QQ", Name: `Duel Decks: "Anthology" & <More>`},
+			want:   []string{`<a class="printing-symbol" title="Duel Decks: &#34;Anthology&#34; &amp; &lt;More&gt;"`},
+			absent: []string{`"Anthology"`, `<More>`},
+		},
+		{
 			name:   "bare set",
 			set:    mtgmatcher.Set{Code: "PR-1840", Name: "Deck Exclusives"},
 			want:   []string{`<svg`, `>PR-1840</text>`},
