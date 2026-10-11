@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // LongPrice is one row of the long prices table: a single provider's price for a
@@ -104,6 +106,48 @@ func (c *Client) HGetAllByBanID(ctx context.Context, banID int64, lb Lookback) (
 		if pp == nil {
 			pp = ProviderPrices{}
 			result[day] = pp
+		}
+		pp[provider] = price
+	}
+	return result, rows.Err()
+}
+
+const hgetAllByBanIDsQuery = `
+		SELECT ban_id, date, provider, price FROM prices
+		 WHERE ban_id = ANY($1) AND date >= $2`
+
+// HGetAllByBanIDs reads several exact variants' histories from since on in
+// one round trip, pivoted to ban_id -> date -> (provider -> price).
+// The history API asks for a card's finishes, a batch or a page of a set with
+// it; an empty list is answered empty without asking the server.
+func (c *Client) HGetAllByBanIDs(ctx context.Context, banIDs []int64, since time.Time) (map[int64]map[string]ProviderPrices, error) {
+	result := make(map[int64]map[string]ProviderPrices, len(banIDs))
+	if len(banIDs) == 0 {
+		return result, nil
+	}
+	rows, err := c.query(ctx, c.stmtHGetAllByBanIDs, hgetAllByBanIDsQuery, pq.Array(banIDs), since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var banID int64
+		var d time.Time
+		var provider int16
+		var price float64
+		if err := rows.Scan(&banID, &d, &provider, &price); err != nil {
+			return nil, err
+		}
+		days := result[banID]
+		if days == nil {
+			days = make(map[string]ProviderPrices)
+			result[banID] = days
+		}
+		day := d.Format("2006-01-02")
+		pp := days[day]
+		if pp == nil {
+			pp = ProviderPrices{}
+			days[day] = pp
 		}
 		pp[provider] = price
 	}

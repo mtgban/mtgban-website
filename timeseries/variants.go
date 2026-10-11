@@ -1,9 +1,13 @@
 package timeseries
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	_ "embed"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,7 +15,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// Provider ids in the providers lookup table (see db_migration/02_seed_providers.sql).
+// Provider ids in the providers lookup table (providers.json, seeded by db_migration/02_seed_providers.sql).
 // These are stable and referenced by config.json's per-dataset "provider" field.
 const (
 	ProviderCKRetail     int16 = 1
@@ -28,6 +32,48 @@ const (
 	ProviderCSIBuylist   int16 = 12
 	ProviderSealedEV     int16 = 13
 )
+
+// providersJSON is the providers table as seeded; tests hold the SQL seed and the constants to it.
+//
+//go:embed providers.json
+var providersJSON []byte
+
+// Provider is one seeded provider: its row in the providers table and its history API store key.
+type Provider struct {
+	ID         int16  `json:"id"`
+	Shorthand  string `json:"shorthand"`
+	PublicName string `json:"public_name"`
+	Kind       string `json:"kind"`
+	Currency   string `json:"currency"`
+	HistoryKey string `json:"history_key"`
+}
+
+// providers is providers.json, parsed once, ascending by id.
+var providers = mustParseProviders(providersJSON)
+
+// mustParseProviders parses the embedded list, panicking on a broken file.
+func mustParseProviders(blob []byte) []Provider {
+	var out []Provider
+	if err := json.Unmarshal(blob, &out); err != nil {
+		panic("timeseries: providers.json: " + err.Error())
+	}
+	slices.SortFunc(out, func(a, b Provider) int { return cmp.Compare(a.ID, b.ID) })
+	return out
+}
+
+// Providers is every seeded provider, ascending by id, in a slice the caller may change.
+func Providers() []Provider {
+	return slices.Clone(providers)
+}
+
+// ProviderIDs is every seeded provider id, ascending.
+func ProviderIDs() []int16 {
+	ids := make([]int16, 0, len(providers))
+	for _, p := range providers {
+		ids = append(ids, p.ID)
+	}
+	return ids
+}
 
 // MagicVariant is the language-aware, condition-agnostic identity of a Magic
 // printing in the variants table. NormalizeUUID / NormalizeLanguage must have
