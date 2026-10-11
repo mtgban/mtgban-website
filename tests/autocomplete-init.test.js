@@ -19,13 +19,13 @@ test('fetchNames memoises one request per sealed value', async () => {
     expect(urls).toEqual(['/api/suggest?all=true&sealed=false', '/api/suggest?all=true&sealed=true']);
 });
 
-test('autocomplete fetches the names on first focus, not at init', () => {
-    // Source-level: the init no longer awaits fetchNames, and a focus
-    // listener does the loading.
+test('autocomplete fetches the names on first input, not at init or on focus', () => {
+    // Source-level: the init does not await fetchNames, and an input
+    // listener does the loading; the navbar box is focused on every page.
     const initRegion = autocomplete.slice(autocomplete.indexOf('function autocomplete('), autocomplete.indexOf('function fitToViewport'));
     expect(initRegion).not.toContain('await fetchNames');
-    expect(initRegion).toContain("addEventListener('focus'");
-    expect(initRegion).toContain('document.activeElement === inp');
+    expect(initRegion).toContain("addEventListener('input', loadNames)");
+    expect(initRegion).not.toContain("addEventListener('focus'");
 });
 
 function flushMicrotasks() {
@@ -33,12 +33,15 @@ function flushMicrotasks() {
 }
 
 /* A minimal EventTarget that actually honours { once: true } the way a real
- * <input> would, so a regression to { once: true } on the focus listener
- * makes this test fail rather than passing by accident. */
+ * <input> would, so a regression to { once: true } on the loading listener
+ * makes this test fail rather than passing by accident. Handlers run with
+ * the target as `this`, and an empty value, which the suggestion handler
+ * returns early on. */
 function fakeEventTarget() {
     const registry = {};
     const dispatched = {};
     return {
+        value: '',
         addEventListener(type, handler, options) {
             const once = !!(options && options.once);
             (registry[type] = registry[type] || []).push({ handler, once });
@@ -46,7 +49,7 @@ function fakeEventTarget() {
         dispatch(type) {
             const entries = (registry[type] || []).slice();
             for (const entry of entries) {
-                entry.handler();
+                entry.handler.call(this, {});
                 if (entry.once) {
                     registry[type] = registry[type].filter((e) => e !== entry);
                 }
@@ -67,7 +70,7 @@ function fakeEventTarget() {
     };
 }
 
-test('a focus after a failed fetch retries; a focus after success does not refetch', async () => {
+test('an input after a failed fetch retries; an input after success does not refetch', async () => {
     let calls = 0;
     let lastPromise;
     let shouldFail = true;
@@ -77,29 +80,30 @@ test('a focus after a failed fetch retries; a focus after success does not refet
         return lastPromise;
     }
     const inp = fakeEventTarget();
-    const documentStub = { activeElement: null, addEventListener() {} };
+    const documentStub = { activeElement: null, addEventListener() {}, getElementsByClassName: () => [] };
     const fn = new Function('fetchNames', 'document', 'window', 'self',
         autocomplete + '\n;return autocomplete;');
     const autocompleteFn = fn(fetchNamesStub, documentStub, {}, {});
     autocompleteFn({}, inp, 'false');
 
-    expect(inp.listenerCount('focus')).toBe(1);
+    expect(inp.listenerCount('focus')).toBe(0);
+    expect(calls).toBe(0);
 
-    inp.dispatch('focus');
+    inp.dispatch('input');
     await lastPromise.catch(() => {});
     await flushMicrotasks();
     expect(calls).toBe(1);
 
-    // The first fetch failed: a later focus must retry, not stay silent -
-    // this is where { once: true } would have removed the listener.
+    // The first fetch failed: the next keystroke must retry, not stay
+    // silent - this is where { once: true } would have removed the listener.
     shouldFail = false;
-    inp.dispatch('focus');
+    inp.dispatch('input');
     await lastPromise;
     await flushMicrotasks();
     expect(calls).toBe(2);
 
-    // The retry succeeded: a further focus must not fetch a third time.
-    inp.dispatch('focus');
+    // The retry succeeded: a further input must not fetch a third time.
+    inp.dispatch('input');
     await flushMicrotasks();
     expect(calls).toBe(2);
 });
@@ -122,17 +126,17 @@ test('a rejected fetchNames promise is retried, not cached forever', async () =>
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(['Animate Wall']) });
     };
     const inp = fakeEventTarget();
-    const documentStub = { activeElement: null, addEventListener() {} };
+    const documentStub = { activeElement: null, addEventListener() {}, getElementsByClassName: () => [] };
     const real = buildReal(fetchImpl, documentStub, {}, {});
     real.autocomplete({}, inp, 'false');
 
-    inp.dispatch('focus');
+    inp.dispatch('input');
     await flushMicrotasks();
     await flushMicrotasks();
     expect(calls).toBe(1);
 
     shouldFail = false;
-    inp.dispatch('focus');
+    inp.dispatch('input');
     await flushMicrotasks();
     await flushMicrotasks();
     expect(calls).toBe(2);
@@ -144,12 +148,12 @@ test('a resolved name list re-runs the input handler for text typed before it ar
     let resolveFetch;
     const fetchImpl = () => new Promise((resolve) => { resolveFetch = resolve; });
     const inp = fakeEventTarget();
-    inp.value = 'ani';
-    const documentStub = { activeElement: inp, addEventListener() {} };
+    const documentStub = { activeElement: inp, addEventListener() {}, getElementsByClassName: () => [] };
     const real = buildReal(fetchImpl, documentStub, {}, {});
     real.autocomplete({}, inp, 'false');
 
-    inp.dispatch('focus');
+    inp.dispatch('input');
+    inp.value = 'ani';
     await flushMicrotasks();
     expect(inp.dispatchedCount('input')).toBe(0);
 

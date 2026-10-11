@@ -189,9 +189,10 @@ function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
     var providerMode = false;
-    /* The name list arrives on the first focus, not at page load: it is
-     * 700 KB and most page views never touch the box. Folded once rather
-     * than per keystroke: the singles list is 37,000 names. */
+    /* The name list arrives on the first input, not at page load or on
+     * focus: it is 700 KB, and the navbar box takes focus on every page.
+     * Folded once rather than per keystroke: the singles list is 37,000
+     * names. */
     var arr = [], folded = [], squashed = [];
     var namesRequested = false;
     function loadNames() {
@@ -208,11 +209,10 @@ function autocomplete(form, inp, sealed) {
             }
         }).catch(function () { namesRequested = false; });
     }
-    /* No { once: true }: a failed fetch resets namesRequested so the next
-     * focus retries, and loadNames itself is the guard against refetching
-     * after success. */
-    inp.addEventListener('focus', loadNames);
-    if (document.activeElement === inp) loadNames();
+    /* Ahead of the suggestion handler, and on every input: a failed fetch
+     * resets namesRequested so the next keystroke retries, and loadNames
+     * itself is the guard against refetching. */
+    inp.addEventListener('input', loadNames);
 
     // Track viewport listeners so we can detach them when the dropdown closes
     var viewportListenersAttached = false;
