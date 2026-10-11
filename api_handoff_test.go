@@ -2,7 +2,6 @@ package main
 
 import (
 	"html"
-	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -28,15 +27,23 @@ func setGatewaySecret(t *testing.T, secret string) {
 }
 
 // handoffSetup configures the gateway and a Patreon client, with signatures
-// checked as production does them.
-func handoffSetup(t *testing.T) {
+// checked as production does them, and returns what the handoff logs.
+func handoffSetup(t *testing.T) *strings.Builder {
 	t.Helper()
 	signingEnabled(t, true)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	savedLog := LogPages["Admin"]
+	t.Cleanup(func() { LogPages["Admin"] = savedLog })
+	var logged strings.Builder
+	LogPages["Admin"] = log.New(&logged, "", 0)
 	savedGateway, savedPatreon := Config().APIGateway, Config().Patreon
 	t.Cleanup(func() { Config().APIGateway, Config().Patreon = savedGateway, savedPatreon })
 	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic"}}
 	Config().Patreon.Source = "main"
 	Config().Patreon.Client = map[string]string{"main": "client-id"}
+	return &logged
 }
 
 // handoffStart asks handler for path on mtgban.com, as a reader whose site
@@ -188,19 +195,24 @@ func TestAPIHandoffFinishesWithPatreonsReader(t *testing.T) {
 // nonce to match and hands over nobody.
 func TestAPIHandoffFinishesOnlyWhatThisBrowserStarted(t *testing.T) {
 	setGatewaySecret(t, "handoff-secret")
-	handoffSetup(t)
+	logged := handoffSetup(t)
 	for name, tc := range map[string]struct {
-		state  handoffState
-		cookie string
+		state   handoffState
+		cookie  string
+		outcome string
 	}{
-		"no cookie":       {handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, ""},
-		"another nonce":   {handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n2"},
-		"no nonce":        {handoffState{purpose: apihandoff.PurposeLogin}, ""},
-		"unknown purpose": {handoffState{purpose: "admin", nonce: "n1"}, "n1"},
+		"no cookie":       {handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "", "no nonce cookie"},
+		"another nonce":   {handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n2", "nonce mismatch"},
+		"no nonce":        {handoffState{purpose: apihandoff.PurposeLogin}, "", "no nonce cookie"},
+		"unknown purpose": {handoffState{purpose: "admin", nonce: "n1"}, "n1", "unknown purpose"},
 	} {
+		logged.Reset()
 		rec := handoffFinish(t, tc.state, tc.cookie, ann, "Legacy")
 		if rec.Code == http.StatusFound || !strings.Contains(rec.Body.String(), html.EscapeString(ErrMsgAPIHandoffStale)) {
 			t.Errorf("%s: status %d, location %q", name, rec.Code, rec.Header().Get("Location"))
+		}
+		if !strings.HasSuffix(logged.String(), "outcome="+tc.outcome+"\n") {
+			t.Errorf("%s: logged %q, want outcome %q", name, logged.String(), tc.outcome)
 		}
 	}
 }
@@ -209,22 +221,28 @@ func TestAPIHandoffFinishesOnlyWhatThisBrowserStarted(t *testing.T) {
 // it, and both handoffs are for supporters, as the site login is.
 func TestAPIHandoffRefusals(t *testing.T) {
 	setGatewaySecret(t, "handoff-secret")
-	handoffSetup(t)
+	logged := handoffSetup(t)
 	unconfirmed := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
 	for name, tc := range map[string]struct {
 		purpose string
 		user    *PatreonUserData
 		tier    string
 		want    string
+		outcome string
 	}{
-		"unconfirmed email": {apihandoff.PurposeLogin, unconfirmed, "Legacy", ErrMsgAPIEmailUnconfirmed},
-		"no email":          {apihandoff.PurposeLogin, &PatreonUserData{EmailVerified: true}, "Legacy", ErrMsgAPIHandoffStale},
-		"a trial, no tier":  {apihandoff.PurposeTrial, ann, "", ErrMsgAPITrialPledge},
-		"a login, no tier":  {apihandoff.PurposeLogin, ann, "", ErrMsgAPILoginPledge},
+		"unconfirmed email": {apihandoff.PurposeLogin, unconfirmed, "Legacy", ErrMsgAPIEmailUnconfirmed, "email=ann@example.com tier=Legacy outcome=unverified email"},
+		"no email":          {apihandoff.PurposeLogin, &PatreonUserData{EmailVerified: true}, "Legacy", ErrMsgAPIHandoffNoEmail, "outcome=no email"},
+		"a trial, no tier":  {apihandoff.PurposeTrial, ann, "", ErrMsgAPITrialPledge, "purpose=trial email=ann@example.com tier= outcome=no tier"},
+		"a login, no tier":  {apihandoff.PurposeLogin, ann, "", ErrMsgAPILoginPledge, "purpose=login email=ann@example.com tier= outcome=no tier"},
+		"a login":           {apihandoff.PurposeLogin, ann, "Legacy", "", "purpose=login email=ann@example.com tier=Legacy outcome=ok"},
 	} {
+		logged.Reset()
 		rec := handoffFinish(t, handoffState{purpose: tc.purpose, nonce: "n1"}, "n1", tc.user, tc.tier)
-		if rec.Code == http.StatusFound || !strings.Contains(rec.Body.String(), html.EscapeString(tc.want)) {
+		if tc.want != "" && (rec.Code == http.StatusFound || !strings.Contains(rec.Body.String(), html.EscapeString(tc.want))) {
 			t.Errorf("%s: status %d, want the message %q", name, rec.Code, tc.want)
+		}
+		if strings.Count(logged.String(), "handoff: ") != 1 || !strings.Contains(logged.String(), tc.outcome+"\n") {
+			t.Errorf("%s: logged %q, want one line ending %q", name, logged.String(), tc.outcome)
 		}
 	}
 }
@@ -286,14 +304,7 @@ func TestAPIHandoffsAreHiddenSubPagesOfTheAPIPage(t *testing.T) {
 // one that fails later does. A site login keeps going home.
 func TestAPIHandoffFailingAtPatreonEndsOnTheAPIPage(t *testing.T) {
 	setGatewaySecret(t, "handoff-secret")
-	handoffSetup(t)
-	if LogPages == nil {
-		LogPages = map[string]*log.Logger{}
-	}
-	if LogPages["Admin"] == nil {
-		LogPages["Admin"] = log.New(io.Discard, "", 0)
-		t.Cleanup(func() { delete(LogPages, "Admin") })
-	}
+	logged := handoffSetup(t)
 	state := handoffStatePrefix + url.Values{"p": {apihandoff.PurposeLogin}, "n": {"n1"}}.Encode()
 
 	callback := func(query string) *httptest.ResponseRecorder {
@@ -306,11 +317,15 @@ func TestAPIHandoffFailingAtPatreonEndsOnTheAPIPage(t *testing.T) {
 		return rec
 	}
 	// No secret configured, so the token exchange fails without a request.
-	for name, query := range map[string]string{
-		"turned down at Patreon": url.Values{"error": {"access_denied"}, "state": {state}}.Encode(),
-		"a code not exchanged":   url.Values{"code": {"x"}, "state": {state}}.Encode(),
+	for name, tc := range map[string]struct{ query, outcome string }{
+		"turned down at Patreon": {url.Values{"error": {"access_denied"}, "state": {state}}.Encode(), "no code from Patreon"},
+		"a code not exchanged":   {url.Values{"code": {"x"}, "state": {state}}.Encode(), "token exchange failed"},
 	} {
-		rec := callback(query)
+		logged.Reset()
+		rec := callback(tc.query)
+		if !strings.Contains(logged.String(), "handoff: purpose=login email= tier= outcome="+tc.outcome+"\n") {
+			t.Errorf("%s: logged %q, want outcome %q", name, logged.String(), tc.outcome)
+		}
 		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), html.EscapeString(ErrMsgAPIHandoffNoAnswer)) {
 			t.Errorf("%s: status %d location %q, want the API page's message", name, rec.Code, rec.Header().Get("Location"))
 		}

@@ -239,7 +239,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	if code == "" {
 		if isHandoff {
-			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			s.failAPIHandoff(w, r, handoff, "no code from Patreon")
 			return
 		}
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -254,7 +254,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
 		if isHandoff {
-			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			s.failAPIHandoff(w, r, handoff, "token exchange failed")
 			return
 		}
 		http.Redirect(w, r, "/?errmsg=TokenNotFound", http.StatusFound)
@@ -269,7 +269,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
 		if isHandoff {
-			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			s.failAPIHandoff(w, r, handoff, "identity lookup failed")
 			return
 		}
 		http.Redirect(w, r, "/?errmsg=UserNotFound", http.StatusFound)

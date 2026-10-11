@@ -19,6 +19,7 @@ const (
 	ErrMsgAPIEmailUnconfirmed = "Confirm your email with Patreon, then try again"
 	ErrMsgAPIHandoffStale     = "That sign-in link has expired: start again from this page"
 	ErrMsgAPIHandoffNoAnswer  = "Patreon did not confirm who you are: start again from this page"
+	ErrMsgAPIHandoffNoEmail   = "Patreon did not share an email address for your account: add one there, then try again"
 )
 
 // apiGatewayUser is the api_user_secrets entry the gateway calls this site
@@ -138,31 +139,41 @@ func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state ha
 	secret := apiGatewaySecret()
 	path, known := handoffPaths[state.purpose]
 	cookie := readCookie(r, handoffCookie)
-	msg := ""
+	email := ""
+	if user != nil {
+		email = user.Email
+	}
+	msg, outcome := "", "ok"
 	nonce := ""
 	switch {
 	case secret == "":
-		msg = ErrMsgAPIHandoffOff
-	case !known || cookie == "" || !hmac.Equal([]byte(cookie), []byte(state.nonce)):
-		msg = ErrMsgAPIHandoffStale
-	case user == nil || user.Email == "":
-		msg = ErrMsgAPIHandoffStale
+		msg, outcome = ErrMsgAPIHandoffOff, "no gateway secret"
+	case !known:
+		msg, outcome = ErrMsgAPIHandoffStale, "unknown purpose"
+	// Gone after handoffWindow; a second tab's handoff replaces the first's
+	case cookie == "":
+		msg, outcome = ErrMsgAPIHandoffStale, "no nonce cookie"
+	case !hmac.Equal([]byte(cookie), []byte(state.nonce)):
+		msg, outcome = ErrMsgAPIHandoffStale, "nonce mismatch"
+	case email == "":
+		msg, outcome = ErrMsgAPIHandoffNoEmail, "no email"
 	// The gateway signs in whoever the email names, so Patreon must have
 	// confirmed it.
 	case !user.EmailVerified:
-		msg = ErrMsgAPIEmailUnconfirmed
+		msg, outcome = ErrMsgAPIEmailUnconfirmed, "unverified email"
 	case tier == "" && state.purpose == apihandoff.PurposeTrial:
-		msg = ErrMsgAPITrialPledge
+		msg, outcome = ErrMsgAPITrialPledge, "no tier"
 	case tier == "":
-		msg = ErrMsgAPILoginPledge
+		msg, outcome = ErrMsgAPILoginPledge, "no tier"
 	default:
 		var err error
 		nonce, err = apihandoff.NewNonce()
 		if err != nil {
 			log.Println("apihandoff: NewNonce:", err)
-			msg = ErrMsgAPIHandoffOff
+			msg, outcome = ErrMsgAPIHandoffOff, "no token nonce"
 		}
 	}
+	logHandoff(state, email, tier, outcome)
 	if msg != "" {
 		s.renderAPIHandoffError(w, r, msg)
 		return
@@ -185,10 +196,16 @@ func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state ha
 }
 
 // failAPIHandoff ends a handoff Patreon gave no reader for: the reader turned
-// it down, or the code could not be exchanged or read.
-func (s *site) failAPIHandoff(w http.ResponseWriter, r *http.Request, msg string) {
+// it down, or the code could not be exchanged or read, which outcome says.
+func (s *site) failAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, outcome string) {
 	clearHandoffCookie(w)
-	s.renderAPIHandoffError(w, r, msg)
+	logHandoff(state, "", "", outcome)
+	s.renderAPIHandoffError(w, r, ErrMsgAPIHandoffNoAnswer)
+}
+
+// logHandoff records how a handoff ended, as the site login records its own.
+func logHandoff(state handoffState, email, tier, outcome string) {
+	LogPages["Admin"].Printf("handoff: purpose=%s email=%s tier=%s outcome=%s", state.purpose, email, tier, outcome)
 }
 
 // clearHandoffCookie drops the nonce, so a handoff is finished at most once.
