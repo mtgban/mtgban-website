@@ -38,7 +38,7 @@ func tokenPayload(t Token) string {
 	if !t.Expires.IsZero() {
 		exp = t.Expires.Unix()
 	}
-	return strings.Join([]string{string(t.Kind), t.UserHash, strings.ToLower(t.Address), strconv.FormatInt(exp, 10)}, "|")
+	return strings.Join([]string{string(t.Kind), t.UserHash, NormalizeAddress(t.Address), strconv.FormatInt(exp, 10)}, "|")
 }
 
 // MintToken signs a confirm or unsubscribe link with BAN_SECRET's HMAC.

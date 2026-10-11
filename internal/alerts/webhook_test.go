@@ -351,6 +351,21 @@ func TestWebhookIgnoresSoftBounces(t *testing.T) {
 	}
 }
 
+// A reported address is normalized as a stored one is, padding included.
+func TestWebhookNormalizesTheReportedAddress(t *testing.T) {
+	secret := []byte("s")
+	now := time.Now()
+	store := newFakeWebhookStore()
+	store.channels["ann@example.com"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "ann@example.com", Source: SourcePatreon, VerifiedAt: &now}}
+	wh := &Webhook{Secret: secret, Store: store}
+	body := []byte(`{"type":"email.bounced","data":{"email_id":"m1","to":[" Ann@Example.COM "]}}`)
+	rec := httptest.NewRecorder()
+	wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
+	if rec.Code != http.StatusOK || len(store.disabled) != 1 {
+		t.Fatalf("status %d disabled %+v", rec.Code, store.disabled)
+	}
+}
+
 func TestParseMailEventTags(t *testing.T) {
 	e, err := ParseMailEvent([]byte(`{"type":"email.complained","data":{"to":["a@b.c"],"tags":{"kind":"confirm","user":"u1"}}}`))
 	if err != nil || e.confirmRequester() != "u1" {

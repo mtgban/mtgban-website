@@ -262,7 +262,7 @@ func (w *Webhook) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	at := w.now()
 	for _, addr := range event.To {
-		addr = strings.TrimSpace(addr)
+		addr = NormalizeAddress(addr)
 		if addr == "" {
 			continue
 		}
