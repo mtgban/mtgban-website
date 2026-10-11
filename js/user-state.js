@@ -492,8 +492,9 @@
 
     // Merge two preset lists by id: the newer save or delete (savedAt, by
     // later) wins, ties keep the local copy. Live presets by name, then the
-    // deletes. The stamps stay as given, to rank before presetsOnClock
-    // brings them back.
+    // deletes but those past the TTL the preset pages prune them at. The
+    // stamps stay as given, to rank before presetsOnClock brings them back.
+    var PRESET_TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     function mergePresetList(local, server) {
         function parse(s) {
             try { var l = JSON.parse(s); return Array.isArray(l) ? l : []; } catch (e) { return []; }
@@ -518,7 +519,10 @@
             var x = String(a.name).toLowerCase(), y = String(b.name).toLowerCase();
             return x < y ? -1 : x > y ? 1 : 0;
         });
-        return live.concat(merged.filter(function(p) { return p.del; }));
+        var now = serverNow();
+        return live.concat(merged.filter(function(p) {
+            return p.del && now - onClock(p.savedAt || 0, now) <= PRESET_TOMB_TTL_MS;
+        }));
     }
 
     // presetsOnClock is a merged list as stored, its live stamps on the
