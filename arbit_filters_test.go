@@ -618,3 +618,89 @@ func TestArbitApplyKeepsReverseTradable(t *testing.T) {
 		t.Errorf("reverse applies %v after an Apply on arbit, want only RL and not Tradable", applied)
 	}
 }
+
+// TestArbitPreviewSample pins a preview's limits to narrowing the sample it
+// is cut to: a price window cannot reach past the rows the cut kept, and
+// the sample is drawn with none of them, picks and options kept.
+func TestArbitPreviewSample(t *testing.T) {
+	var entries []mtgban.ArbitEntry
+	for i := range 2 * MaxResultsGlobalLimit {
+		price := 100.0
+		if i >= MaxResultsGlobalLimit {
+			price = 5
+		}
+		entries = append(entries, mtgban.ArbitEntry{
+			InventoryEntry: mtgban.InventoryEntry{Price: price},
+			ReferenceEntry: mtgban.InventoryEntry{Price: 2 * price},
+			Spread:         float64(300 + i), Difference: price, Profitability: 1,
+		})
+	}
+	mode := arbitMode{Global: true}
+	for _, tt := range []struct {
+		query string
+		want  int
+	}{
+		{"", MaxResultsGlobalLimit},
+		{"maxsell=10", 0},
+		{"minspread=325", MaxResultsGlobalLimit - 25},
+		{"mindiff=200", 0},
+		{"minprof=2", 0},
+	} {
+		st := parseArbitQuery(t, tt.query)
+		_, rows := st.apply(backend(), mode)
+		got := previewSample(slices.Clone(entries), rows, false)
+		if len(got) != tt.want {
+			t.Errorf("%q keeps %d rows of the preview, want %d", tt.query, len(got), tt.want)
+		}
+	}
+
+	st := parseArbitQuery(t, "maxsell=10&minspread=400&minprof=3&cond=NM&rl=1")
+	got := st.unbounded().values().Encode()
+	if got != "cond=NM&f=1&rl=1" {
+		t.Errorf("a preview's sample is drawn with %q, want the picks and options alone", got)
+	}
+}
+
+// TestGlobalPreviewCannotSteerItsSample pins the preview's cut to coming
+// before the reader's limits: a price window over half the cards shows the
+// cheap ones among the 50 drawn, not 50 cheap ones.
+func TestGlobalPreviewCannotSteerItsSample(t *testing.T) {
+	skipWithoutDatastore(t)
+	m10 := backend().GetUUIDsInSet("M10")
+	if len(m10) < 2*MaxResultsGlobalLimit {
+		t.Skip("M10 not present in this datastore")
+	}
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	probe, reference := mtgban.InventoryRecord{}, mtgban.InventoryRecord{}
+	for i, cardID := range m10[:2*MaxResultsGlobalLimit] {
+		price := 100.0
+		if i%2 == 0 {
+			price = 5
+		}
+		probe.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: price, Quantity: 1, URL: "u"})
+		reference.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 4 * price, Quantity: 1, URL: "u"})
+	}
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(probe, mtgban.ScraperInfo{Name: "Preview Index", Shorthand: "PREVIDX"}),
+		mtgban.NewSellerFromInventory(reference, mtgban.ScraperInfo{Name: "Preview Store", Shorthand: "PREVSTORE"}),
+	}
+	sellersPtr.Store(&sellers)
+	withSigMode(t, true, false)
+
+	rows := func(query string) int {
+		r := httptest.NewRequest("GET", "/global?source=PREVIDX&f=1&legit=0"+query, nil)
+		w := httptest.NewRecorder()
+		pageVars := PageVars{ArbitVars: ArbitVars{GlobalMode: true}, UserNav: &NavElem{Short: "beta"}}
+		scraperCompare(testSite.datastore(), w, r, pageVars, []string{"PREVIDX"}, nil, scraperCompareOpts{})
+		return strings.Count(w.Body.String(), `data-arb-id="`)
+	}
+	all := rows("")
+	if all != MaxResultsGlobalLimit {
+		t.Fatalf("the preview shows %d rows, want %d", all, MaxResultsGlobalLimit)
+	}
+	cheap := rows("&maxsell=10")
+	if cheap >= MaxResultsGlobalLimit {
+		t.Errorf("a price window fills the preview with %d rows, want only the cheap ones drawn", cheap)
+	}
+}
