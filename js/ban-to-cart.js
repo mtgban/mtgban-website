@@ -57,10 +57,12 @@
     }
     var ids = [];
     var quantities = {};
+    var unread = 0;
     list.split(",").forEach(function (pair) {
         var parts = pair.split(":");
         var qty = parseInt(parts[1], 10);
         if (!/^[\w-]+$/.test(parts[0]) || !(qty > 0)) {
+            unread += pair ? 1 : 0;
             return;
         }
         if (!(parts[0] in quantities)) {
@@ -154,6 +156,9 @@
         }
         if (noRoom > 0) {
             message += " " + noRoom + " did not fit: " + store.name + "'s cart holds " + store.maxLines + " lines.";
+        }
+        if (unread > 0) {
+            message += " " + unread + " in the list from BAN could not be read and were left out.";
         }
         window.removeEventListener("beforeunload", stay);
         alert(message);

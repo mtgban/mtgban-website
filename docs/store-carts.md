@@ -342,7 +342,9 @@ the section's, as `scraperCompare` picks its seller.
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
-  pairs. Each id names one condition.
+  pairs. Each id names one condition. An id of anything but letters,
+  digits, `_` and `-` is left out (`cartItemID`), as the loader would
+  leave it, and the loader's report counts any pair it could not read.
   - A buylist row always goes in as NM, and the store grades what
     arrives, so the cart quotes NM prices and reads higher than the
     split's total when the list has played cards; the panel says so.

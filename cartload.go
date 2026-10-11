@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -258,10 +259,17 @@ func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []strin
 
 	items := make([]string, len(entries))
 	for i, entry := range entries {
-		items[i] = lookup(entry.CardID, entry.Condition)
+		id := lookup(entry.CardID, entry.Condition)
+		if cartItemID.MatchString(id) {
+			items[i] = id
+		}
 	}
 	return items
 }
+
+// cartItemID is the store item id js/ban-to-cart.js takes. Another would be
+// dropped there, and a comma would shift the button's ids out of row order.
+var cartItemID = regexp.MustCompile(`^[\w-]+$`)
 
 // cartRows lists a store split's cards the way js/ban-to-cart.js reads them
 // from the fragment of the cart page: "id:qty" pairs joined by commas, one

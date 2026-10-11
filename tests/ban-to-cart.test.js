@@ -143,6 +143,13 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(posts).toHaveLength(0);
     });
 
+    test('a pair that does not read is left out and counted', async () => {
+        const abu = fakeABU();
+        const {alerts} = await run({hash: '#ban=1:1,a.b:2,3:0,4:x,5:2', abu});
+        expect(abu.lines).toEqual(['1', '5']);
+        expect(alerts[0]).toBe('Loaded 2 cards into your ABU cart. 3 in the list from BAN could not be read and were left out.');
+    });
+
     test('a guest is told to log in and nothing is sent', async () => {
         const {alerts, posts} = await run({hash: '#ban=1:1', loggedIn: false});
         expect(alerts[0]).toBe('Log in to ABU first, then go back to BAN and press Load at ABU again.');
