@@ -31,11 +31,13 @@ import (
 const (
 	MaxSearchQueryLen = 1000
 	MaxSearchResults  = 100
-	TooLongMessage    = "Your query planeswalked away, try a shorter one"
-	TooManyMessage    = "Too many results, try adjusting your filters"
-	NoResultsMessage  = "No products matching your search could be found"
-	NoPromosMessage   = "No products matching your search could be found - some promos may be hidden"
-	NoCardsMessage    = "No products matching your search could be found"
+	// A phone pages at 25: the 100-result page was 2.6 MB of HTML.
+	MaxSearchResultsMobile = 25
+	TooLongMessage         = "Your query planeswalked away, try a shorter one"
+	TooManyMessage         = "Too many results, try adjusting your filters"
+	NoResultsMessage       = "No products matching your search could be found"
+	NoPromosMessage        = "No products matching your search could be found - some promos may be hidden"
+	NoCardsMessage         = "No products matching your search could be found"
 
 	MaxSearchTotalResults = 10000
 )
@@ -1106,6 +1108,14 @@ type searchPage struct {
 	pagination Pagination
 }
 
+// searchPageSize is how many results one page shows for this request.
+func searchPageSize(r *http.Request) int {
+	if r != nil && isMobileRequest(r) {
+		return MaxSearchResultsMobile
+	}
+	return MaxSearchResults
+}
+
 // orderSearchKeys sorts the results as the reader asked and returns the page
 // of them to show. The sort works in place: CardHashes is the same slice, and
 // the Uploader transfer posts it in this order.
@@ -1115,9 +1125,10 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 
 	// If results can't fit in one page, chunk response and enable pagination
 	shown.keys = result.keys
-	if len(shown.keys) > MaxSearchResults {
+	pageSize := searchPageSize(r)
+	if len(shown.keys) > pageSize {
 		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
-		shown.keys, shown.pagination = Paginate(result.keys, pageIndex, MaxSearchResults, MaxSearchTotalResults)
+		shown.keys, shown.pagination = Paginate(result.keys, pageIndex, pageSize, MaxSearchTotalResults)
 	}
 
 	return shown

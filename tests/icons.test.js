@@ -52,3 +52,30 @@ test('on DOM ready, with no cards, everything is painted once', () => {
     ready();
     expect(calls).toEqual(['document']);
 });
+
+test('on DOM ready, card icons are parked, the rest painted, and cards observed', () => {
+    const card1 = { querySelectorAll: () => [] }, card2 = { querySelectorAll: () => [] };
+    const inCard = placeholder(card1), outside = placeholder(null);
+    card1.querySelectorAll = (sel) => (sel === 'i[data-lucide-lazy]' ? [inCard] : []);
+    const { calls, ready, observer } = run({ cards: [card1, card2], placeholders: [inCard, outside] });
+    ready();
+    expect(inCard.attrs['data-lucide']).toBeUndefined();
+    expect(inCard.attrs['data-lucide-lazy']).toBe('star');
+    expect(outside.attrs['data-lucide']).toBe('star');
+    expect(calls).toEqual(['document']);
+    const io = observer();
+    expect(io.observed).toEqual([card1, card2]);
+    expect(io.opts.rootMargin).toBe('800px 0px');
+    io.cb([{ isIntersecting: true, target: card1 }, { isIntersecting: false, target: card2 }]);
+    expect(inCard.attrs['data-lucide']).toBe('star');
+    expect(inCard.attrs['data-lucide-lazy']).toBeUndefined();
+    expect(calls).toEqual(['document', card1]);
+    expect(io.unobserved).toEqual([card1]);
+});
+
+test('without IntersectionObserver every card is painted at once', () => {
+    const card = { querySelectorAll: () => [] };
+    const { calls, ready } = run({ cards: [card], io: undefined });
+    ready();
+    expect(calls).toEqual(['document', card]);
+});
