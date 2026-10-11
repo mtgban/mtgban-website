@@ -2,6 +2,7 @@ package userstate
 
 import (
 	"os"
+	"strconv"
 	"testing"
 )
 
@@ -26,9 +27,15 @@ func testClient(t *testing.T) *Client {
 	if os.Getenv("USERSTATE_TEST") == "" {
 		t.Skip("USERSTATE_TEST not set; skipping DB integration test")
 	}
+	// USERSTATE_TEST_HOST, _PORT, _USER, _PASSWORD and _DB name the server,
+	// each defaulting to the local one's.
+	port, err := strconv.Atoi(testEnv("USERSTATE_TEST_PORT", "5432"))
+	if err != nil {
+		t.Fatalf("USERSTATE_TEST_PORT: %v", err)
+	}
 	cfg := SQLConfig{
-		Host: "127.0.0.1", Port: 5432, User: "mtgban",
-		Password: "mtgban", DBName: "user_state", SSLMode: "disable",
+		Host: testEnv("USERSTATE_TEST_HOST", "127.0.0.1"), Port: port, User: testEnv("USERSTATE_TEST_USER", "mtgban"),
+		Password: testEnv("USERSTATE_TEST_PASSWORD", "mtgban"), DBName: testEnv("USERSTATE_TEST_DB", "user_state"), SSLMode: "disable",
 	}
 	c, err := NewClient(cfg)
 	if err != nil {
@@ -36,6 +43,15 @@ func testClient(t *testing.T) *Client {
 	}
 	t.Cleanup(func() { c.Close() })
 	return c
+}
+
+// testEnv is the named variable when it is set, empty included, else def.
+func testEnv(name, def string) string {
+	v, ok := os.LookupEnv(name)
+	if !ok {
+		return def
+	}
+	return v
 }
 
 func TestNewClientEnsuresSchema(t *testing.T) {

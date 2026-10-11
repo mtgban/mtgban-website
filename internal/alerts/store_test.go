@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,9 +16,15 @@ func testStore(t *testing.T) *Store {
 	if os.Getenv("USERSTATE_TEST") == "" {
 		t.Skip("USERSTATE_TEST not set; skipping DB integration test")
 	}
+	// USERSTATE_TEST_HOST, _PORT, _USER, _PASSWORD and _DB name the server,
+	// each defaulting to the local one's.
+	port, err := strconv.Atoi(testEnv("USERSTATE_TEST_PORT", "5432"))
+	if err != nil {
+		t.Fatalf("USERSTATE_TEST_PORT: %v", err)
+	}
 	cfg := timeseries.SQLConfig{
-		Host: "127.0.0.1", Port: 5432, User: "mtgban",
-		Password: "mtgban", DBName: "user_state", SSLMode: "disable",
+		Host: testEnv("USERSTATE_TEST_HOST", "127.0.0.1"), Port: port, User: testEnv("USERSTATE_TEST_USER", "mtgban"),
+		Password: testEnv("USERSTATE_TEST_PASSWORD", "mtgban"), DBName: testEnv("USERSTATE_TEST_DB", "user_state"), SSLMode: "disable",
 	}
 	db, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
@@ -29,6 +36,15 @@ func testStore(t *testing.T) *Store {
 		t.Fatalf("New: %v", err)
 	}
 	return s
+}
+
+// testEnv is the named variable when it is set, empty included, else def.
+func testEnv(name, def string) string {
+	v, ok := os.LookupEnv(name)
+	if !ok {
+		return def
+	}
+	return v
 }
 
 // freshUser returns a user hash unique to the test with no rows behind it.
