@@ -360,7 +360,7 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 			  FROM alert_confirm_sends r
 			 WHERE c.user_hash = $1 AND c.kind = 'email' AND c.source = 'user' AND lower(c.address) <> lower($2)
 			   AND c.disabled_reason <> ALL($3)
-			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at = $4 AND r.sent_at > COALESCE(c.verified_at, '-infinity')
+			   AND r.user_hash = $1 AND r.address = lower($2) AND r.sent_at = $4 AND r.sent_at > COALESCE(c.verified_at, '-infinity') AND NOT r.withdrawn
 			   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)`,
 			userHash, address, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}), claimedAt)
 		if err != nil {
@@ -404,7 +404,8 @@ func (s *Store) DisableChannel(ctx context.Context, userHash string, kind Channe
 // the new one alone, and parks the user's email alerts when no working
 // email channel is left. found is false when the row held another address.
 // It runs under the user's lock, so a confirm restoring alerts cannot land
-// between the check and the park.
+// between the check and the park. A complaint about the user's own row
+// withdraws their confirm requests too, since no link moves that row.
 func (s *Store) DisableAndPark(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason, parkReason string, at time.Time) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -418,6 +419,12 @@ func (s *Store) DisableAndPark(ctx context.Context, userHash string, kind Channe
 	disabled, err := disableChannelAt(ctx, tx, userHash, kind, source, address, reason, at)
 	if err != nil || !disabled {
 		return false, err
+	}
+	if kind == ChannelEmail && source == SourceUser && reason == ReasonComplained {
+		err = withdrawPending(ctx, tx, userHash, "")
+		if err != nil {
+			return false, err
+		}
 	}
 	if kind == ChannelEmail {
 		working, err := emailWorks(ctx, tx, userHash)
@@ -446,7 +453,8 @@ func emailWorks(ctx context.Context, tx *sql.Tx, userHash string) (bool, error) 
 }
 
 // UnsubscribeEmail disables every email row of the user's that is working
-// or bounced, from either source, and parks their email alerts, in one
+// or bounced, from either source, parks their email alerts and withdraws
+// their confirm requests, which no link can honour now, in one
 // transaction under the user's lock so an Enable cannot land in between.
 func (s *Store) UnsubscribeEmail(ctx context.Context, userHash string, at time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -461,6 +469,10 @@ func (s *Store) UnsubscribeEmail(ctx context.Context, userHash string, at time.T
 	_, err = tx.ExecContext(ctx, `
 		UPDATE alert_channels SET disabled_at = $2, disabled_reason = $3, updated_at = now()
 		 WHERE user_hash = $1 AND kind = 'email' AND (disabled_at IS NULL OR disabled_reason = $4)`, userHash, at, ReasonUnsubscribed, ReasonBounced)
+	if err != nil {
+		return err
+	}
+	err = withdrawPending(ctx, tx, userHash, "")
 	if err != nil {
 		return err
 	}
@@ -594,12 +606,13 @@ func parkEmailAlerts(ctx context.Context, db execer, userHash, reason string) (i
 	return res.RowsAffected()
 }
 
-// ClaimConfirmSend records, before its mail goes, that userHash asked for
-// a confirm mail to address, at claimedAt; claimed is false when one went
-// to the address, from anyone, within confirmAddressGap. The confirm link
-// resolves against the record, so the user's working address stays in
-// place until the new one is confirmed. An address a confirm mail drew a
-// complaint from is never claimed again, with ErrConfirmComplained.
+// ClaimConfirmSend records, before its mail goes, that userHash asked again
+// for a confirm mail to their own row's address, at claimedAt; claimed is
+// false when one went to the address, from anyone, within
+// confirmAddressGap. An address a confirm mail drew a complaint from is
+// never claimed again, with ErrConfirmComplained, and one whose row was
+// since unsubscribed or marked as spam, or whose request was withdrawn,
+// not now, with ErrNotPending.
 func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string) (claimedAt time.Time, claimed bool, err error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -614,9 +627,22 @@ func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string) 
 	if err != nil {
 		return time.Time{}, false, err
 	}
+	// Read before the claim, which clears withdrawn.
+	var eligible bool
+	err = tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM alert_channels
+		 WHERE user_hash = $1 AND kind = 'email' AND source = 'user' AND lower(address) = lower($2) AND disabled_reason <> ALL($3))
+		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends WHERE user_hash = $1 AND address = lower($2) AND withdrawn)`,
+		userHash, address, pq.Array([]string{ReasonUnsubscribed, ReasonComplained})).Scan(&eligible)
+	if err != nil {
+		return time.Time{}, false, err
+	}
 	claimedAt, claimed, err = claimConfirmSend(ctx, tx, userHash, address)
 	if err != nil || !claimed {
 		return time.Time{}, false, err
+	}
+	if !eligible {
+		return time.Time{}, false, ErrNotPending
 	}
 	return claimedAt, true, tx.Commit()
 }
@@ -643,7 +669,7 @@ func claimConfirmSend(ctx context.Context, tx *sql.Tx, userHash, address string)
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, lower($2), $3)
-		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at, released = false, replaced = ''`,
+		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at, released = false, withdrawn = false, replaced = ''`,
 		userHash, address, now)
 	if err != nil {
 		return time.Time{}, false, err
@@ -722,17 +748,97 @@ func (s *Store) ReleaseConfirmSend(ctx context.Context, userHash, address string
 	return tx.Commit()
 }
 
+// WithdrawPending cancels userHash's confirm requests for any address but
+// keep, while keep is their own row's working address: their links no
+// longer move the row and none shows as pending. The requests still count
+// toward each address's hourly limit. kept is false, withdrawing nothing,
+// when the row works at another address or not at all by the time the
+// user's lock is held.
+func (s *Store) WithdrawPending(ctx context.Context, userHash, keep string) (kept bool, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return false, err
+	}
+	err = tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM alert_channels
+		 WHERE user_hash = $1 AND kind = 'email' AND source = 'user' AND lower(address) = lower($2)
+		   AND verified_at IS NOT NULL AND disabled_at IS NULL)`, userHash, keep).Scan(&kept)
+	if err != nil || !kept {
+		return false, err
+	}
+	err = withdrawPending(ctx, tx, userHash, keep)
+	if err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
+// withdrawPending is WithdrawPending inside a transaction holding the
+// user's lock; an empty keep withdraws every request.
+func withdrawPending(ctx context.Context, db execer, userHash, keep string) error {
+	_, err := db.ExecContext(ctx, `
+		UPDATE alert_confirm_sends SET withdrawn = true WHERE user_hash = $1 AND address <> lower($2) AND NOT withdrawn`,
+		userHash, keep)
+	return err
+}
+
 // PendingEmail is the replacement a user's own email row was last asked to
 // move to, since the row was last verified, if ever, and since since,
 // failed sends aside: the address its link can move the row to, whether
 // or not the row still works. found is false when there is none.
 func (s *Store) PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error) {
+	return pendingEmail(ctx, s.db, userHash, since)
+}
+
+// ErrNotPending is a resend for an address no longer awaiting the user's
+// confirmation: not their pending replacement, or their own row's address
+// since unsubscribed, marked as spam or withdrawn.
+var ErrNotPending = errors.New("alerts: address is not pending")
+
+// ClaimPendingEmail claims a confirm mail to address as ClaimConfirmSend
+// does, while address is still the user's pending replacement as
+// PendingEmail answers it, else ErrNotPending. It decides under the user's
+// lock, so a replacement withdrawn since it was read is not claimed back.
+func (s *Store) ClaimPendingEmail(ctx context.Context, userHash, address string, pendingSince time.Time) (claimedAt time.Time, claimed bool, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	pending, found, err := pendingEmail(ctx, tx, userHash, pendingSince)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	if !found || pending != NormalizeAddress(address) {
+		return time.Time{}, false, ErrNotPending
+	}
+	err = lockAddress(ctx, tx, address)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	claimedAt, claimed, err = claimConfirmSend(ctx, tx, userHash, address)
+	if err != nil || !claimed {
+		return time.Time{}, false, err
+	}
+	return claimedAt, true, tx.Commit()
+}
+
+func pendingEmail(ctx context.Context, db querier, userHash string, since time.Time) (string, bool, error) {
 	var address string
-	err := s.db.QueryRowContext(ctx, `
+	err := db.QueryRowContext(ctx, `
 		SELECT r.address FROM alert_confirm_sends r
 		  JOIN alert_channels c ON c.user_hash = r.user_hash AND c.kind = 'email' AND c.source = 'user'
 		 WHERE r.user_hash = $1 AND r.address <> lower(c.address) AND r.sent_at > COALESCE(c.verified_at, '-infinity') AND r.sent_at > $2
-		   AND NOT r.released
+		   AND NOT r.released AND NOT r.withdrawn
 		   AND NOT EXISTS (SELECT 1 FROM alert_confirm_sends n WHERE n.user_hash = $1 AND n.sent_at > r.sent_at AND NOT n.released)
 		   AND r.complained_at IS NULL`,
 		userHash, since).Scan(&address)

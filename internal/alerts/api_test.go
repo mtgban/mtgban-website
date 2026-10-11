@@ -32,6 +32,7 @@ type confirmKey struct{ userHash, address string }
 type confirmSend struct {
 	at         time.Time
 	released   bool
+	withdrawn  bool
 	complained bool
 }
 
@@ -45,9 +46,33 @@ func newFakeAlertStore() *fakeAlertStore {
 	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}, confirmSends: map[confirmKey]confirmSend{}}
 }
 
-// ClaimConfirmSend mirrors the store: one claim per address, from anyone,
-// within confirmAddressGap, timed as it is made.
+// ClaimConfirmSend mirrors the store: a claim as claim makes, for the
+// address of the user's own row while it is not unsubscribed or marked as
+// spam and its request was not withdrawn.
 func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string) (time.Time, bool, error) {
+	k := confirmKey{h, strings.ToLower(address)}
+	prev, had := f.confirmSends[k]
+	row, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
+	eligible := ok && strings.EqualFold(row.Address, address) && row.DisabledReason != ReasonUnsubscribed &&
+		row.DisabledReason != ReasonComplained && !prev.withdrawn
+	at, claimed, err := f.claim(h, address)
+	if err != nil || !claimed {
+		return time.Time{}, false, err
+	}
+	if !eligible {
+		// Rolled back, as the store's transaction is.
+		delete(f.confirmSends, k)
+		if had {
+			f.confirmSends[k] = prev
+		}
+		return time.Time{}, false, ErrNotPending
+	}
+	return at, true, nil
+}
+
+// claim mirrors the store's claim: one per address, from anyone, within
+// confirmAddressGap, timed as it is made.
+func (f *fakeAlertStore) claim(h, address string) (time.Time, bool, error) {
 	now := time.Now().Truncate(time.Microsecond)
 	for k, send := range f.confirmSends {
 		if k.address == strings.ToLower(address) && send.complained {
@@ -61,6 +86,21 @@ func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string) 
 	}
 	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at: now}
 	return now, true, nil
+}
+
+// WithdrawPending mirrors the store: only while keep is the working row's address.
+func (f *fakeAlertStore) WithdrawPending(_ context.Context, h, keep string) (bool, error) {
+	row, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
+	if !ok || !strings.EqualFold(row.Address, keep) || channelState(row) != stateVerified {
+		return false, nil
+	}
+	for k, send := range f.confirmSends {
+		if k.userHash == h && k.address != strings.ToLower(keep) {
+			send.withdrawn = true
+			f.confirmSends[k] = send
+		}
+	}
+	return true, nil
 }
 
 func (f *fakeAlertStore) ReleaseConfirmSend(_ context.Context, h, address string, at time.Time) error {
@@ -89,10 +129,22 @@ func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Ti
 			last, lastSend = k.address, send
 		}
 	}
-	if last == "" || lastSend.complained || strings.EqualFold(last, row.Address) || !lastSend.at.After(verified) || !lastSend.at.After(since) {
+	if last == "" || lastSend.complained || lastSend.withdrawn || strings.EqualFold(last, row.Address) || !lastSend.at.After(verified) || !lastSend.at.After(since) {
 		return "", false, nil
 	}
 	return last, true, nil
+}
+
+// ClaimPendingEmail mirrors the store: a claim only while address is pending.
+func (f *fakeAlertStore) ClaimPendingEmail(ctx context.Context, h, address string, pendingSince time.Time) (time.Time, bool, error) {
+	pending, ok, err := f.PendingEmail(ctx, h, pendingSince)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	if !ok || pending != strings.ToLower(address) {
+		return time.Time{}, false, ErrNotPending
+	}
+	return f.claim(h, address)
 }
 
 func (f *fakeAlertStore) Channels(_ context.Context, h string) ([]Channel, error) {
@@ -138,7 +190,7 @@ func (f *fakeAlertStore) ChannelFor(_ context.Context, h string, kind ChannelKin
 // StageEmail mirrors the store: it claims as ClaimConfirmSend does, and a
 // working user row keeps its address.
 func (f *fakeAlertStore) StageEmail(ctx context.Context, h, address string) (time.Time, bool, error) {
-	claimedAt, claimed, err := f.ClaimConfirmSend(ctx, h, address)
+	claimedAt, claimed, err := f.claim(h, address)
 	if err != nil || !claimed {
 		return time.Time{}, false, err
 	}
@@ -1308,6 +1360,17 @@ func TestAlertsAPIPendingReplacement(t *testing.T) {
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
 	if w.Code != http.StatusAccepted || len(sent) != 2 || sent[1].to != "new@example.com" {
 		t.Fatalf("resend = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	// Entering the working address again takes the replacement back.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"old@example.com"}`, sig))
+	if w.Code != http.StatusOK || len(sent) != 2 {
+		t.Fatalf("set the working address = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("GET", "/api/alerts/channels", "", sig))
+	if w.Code != http.StatusOK || strings.Contains(w.Body.String(), `"pending"`) {
+		t.Fatalf("channels after taking it back = %d %s", w.Code, w.Body)
 	}
 }
 

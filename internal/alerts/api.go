@@ -41,6 +41,8 @@ type APIStore interface {
 	ClaimConfirmSend(ctx context.Context, userHash, address string) (time.Time, bool, error)
 	ReleaseConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
 	PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error)
+	ClaimPendingEmail(ctx context.Context, userHash, address string, pendingSince time.Time) (time.Time, bool, error)
+	WithdrawPending(ctx context.Context, userHash, keep string) (bool, error)
 }
 
 // Caller is who a request is from: the user, their tier, and the
@@ -804,9 +806,20 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		return
 	}
 	if found && strings.EqualFold(cur.Address, address) {
-		// The address already confirmed and working needs no mail.
+		// The address already confirmed and working needs no mail, and
+		// entering it again takes back any replacement still pending.
 		if channelState(cur) == stateVerified {
-			writeJSON(w, http.StatusOK, emailState{State: stateVerified, Address: cur.Address})
+			kept, err := a.deps.Store.WithdrawPending(ctx, c.UserHash, cur.Address)
+			if err != nil {
+				a.fail(w, "confirm sends", err)
+				return
+			}
+			if kept {
+				writeJSON(w, http.StatusOK, emailState{State: stateVerified, Address: cur.Address})
+				return
+			}
+			// The row changed before the lock was held; answer with it as it is.
+			a.writeCurrentEmail(ctx, w, c)
 			return
 		}
 		msg := reverifyRefusal(cur)
@@ -834,6 +847,20 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
+}
+
+// writeCurrentEmail answers with the user's own email row as it stands.
+func (a *API) writeCurrentEmail(ctx context.Context, w http.ResponseWriter, c Caller) {
+	cur, found, err := a.channelRow(ctx, c.UserHash, ChannelEmail, SourceUser)
+	if err != nil {
+		a.fail(w, "channels", err)
+		return
+	}
+	if !found {
+		jsonError(w, http.StatusNotFound, "not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, emailState{State: channelState(cur), Address: cur.Address})
 }
 
 func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
@@ -881,7 +908,13 @@ func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 	if !a.confirmAllowed(ctx, w, address) {
 		return
 	}
-	claimedAt, claimed, err := a.deps.Store.ClaimConfirmSend(ctx, c.UserHash, address)
+	var claimedAt time.Time
+	var claimed bool
+	if replacing {
+		claimedAt, claimed, err = a.deps.Store.ClaimPendingEmail(ctx, c.UserHash, address, pendingSince)
+	} else {
+		claimedAt, claimed, err = a.deps.Store.ClaimConfirmSend(ctx, c.UserHash, address)
+	}
 	if a.claimRefused(w, claimed, err) {
 		return
 	}
@@ -931,6 +964,8 @@ func (a *API) claimRefused(w http.ResponseWriter, claimed bool, err error) bool 
 	switch {
 	case errors.Is(err, ErrConfirmComplained):
 		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
+	case errors.Is(err, ErrNotPending):
+		jsonError(w, http.StatusNotFound, "no address to confirm")
 	case err != nil:
 		a.fail(w, "confirm sends", err)
 	case !claimed:

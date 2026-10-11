@@ -1023,6 +1023,231 @@ func TestUnsubscribedChannelOutlastsABounce(t *testing.T) {
 	}
 }
 
+// TestWithdrawnReplacementStaysPut covers a replacement taken back: its link
+// no longer moves the row and it no longer shows as pending, though it still
+// holds its address's hourly slot.
+func TestWithdrawnReplacementStaysPut(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	addr := "typo-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now()
+	verified := now.Add(-4 * time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+	claimedAt, claimed, err := s.StageEmail(ctx, h, addr)
+	if err != nil || !claimed {
+		t.Fatalf("claim: %v %v", claimed, err)
+	}
+	kept, err := s.WithdrawPending(ctx, h, "OLD@example.com")
+	if err != nil || !kept {
+		t.Fatalf("withdraw: %v %v", kept, err)
+	}
+
+	_, ok, err := s.PendingEmail(ctx, h, now.Add(-24*time.Hour))
+	if err != nil || ok {
+		t.Fatalf("withdrawn replacement still pending: %v %v", ok, err)
+	}
+	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, addr, claimedAt, time.Now())
+	if err != nil || ok {
+		t.Fatalf("withdrawn link moved the row: %v %v", ok, err)
+	}
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].Address != "old@example.com" || !chans[0].Active() {
+		t.Fatalf("row after the withdrawn link: %+v %v", chans, err)
+	}
+	_, claimed, err = s.ClaimConfirmSend(ctx, "someone-else", addr)
+	if err != nil || claimed {
+		t.Fatalf("withdrawn request freed the hourly slot: %v %v", claimed, err)
+	}
+}
+
+// TestFinalDisableWithdrawsPendingDB covers a replacement waiting on a row
+// that is then unsubscribed, or marked as spam: no link can move that row,
+// so the replacement is withdrawn with it and no longer shows as pending.
+func TestFinalDisableWithdrawsPendingDB(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	clean := func() {
+		_, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h)
+		_, _ = s.db.Exec(`DELETE FROM alert_channels WHERE user_hash = $1`, h)
+	}
+	clean()
+	t.Cleanup(clean)
+	for _, name := range []string{"unsubscribe", "complaint"} {
+		clean()
+		verified := time.Now().Add(-4 * time.Hour)
+		must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+		addr := name + "-" + strings.ToLower(t.Name()) + "@example.com"
+		_, claimed, err := s.StageEmail(ctx, h, addr)
+		if err != nil || !claimed {
+			t.Fatalf("%s: stage: %v %v", name, claimed, err)
+		}
+		if name == "unsubscribe" {
+			must(t, s.UnsubscribeEmail(ctx, h, time.Now()))
+		} else {
+			_, err = s.DisableAndPark(ctx, h, ChannelEmail, SourceUser, "old@example.com", ReasonComplained, ParkComplained, time.Now())
+			must(t, err)
+		}
+		_, pending, err := s.PendingEmail(ctx, h, time.Now().Add(-24*time.Hour))
+		if err != nil || pending {
+			t.Fatalf("%s: replacement still pending: %v %v", name, pending, err)
+		}
+	}
+}
+
+// withdrawingStore withdraws a user's pending replacement right after a
+// resend reads it, as the working address entered again just then would.
+type withdrawingStore struct {
+	*Store
+	keep string
+}
+
+func (w withdrawingStore) PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error) {
+	address, found, err := w.Store.PendingEmail(ctx, userHash, since)
+	if err != nil {
+		return "", false, err
+	}
+	_, err = w.WithdrawPending(ctx, userHash, w.keep)
+	return address, found, err
+}
+
+// TestResendAfterAWithdrawalDB covers a resend racing the working address
+// entered again: the replacement it read is withdrawn by the time it
+// claims, so it mails nothing and the request stays withdrawn.
+func TestResendAfterAWithdrawalDB(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	h := testHash("a@b.com")
+	cleanUser(t, s, h)
+	seedContact(t, s, h)
+	addr := "typo-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now()
+	verified := now.Add(-4 * time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+	claimFor(t, s, h, addr, now.Add(-2*time.Hour))
+
+	sent := []sentConfirm{}
+	api := testChannelAPI(withdrawingStore{Store: s, keep: "old@example.com"}, &sent, nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, testCaller("a@b.com", "Legacy")))
+	if w.Code != http.StatusNotFound || len(sent) != 0 {
+		t.Fatalf("resend of a withdrawn replacement = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	var withdrawn bool
+	must(t, s.db.QueryRowContext(ctx, `SELECT withdrawn FROM alert_confirm_sends WHERE user_hash = $1 AND address = $2`, h, addr).Scan(&withdrawn))
+	if !withdrawn {
+		t.Fatal("resend claimed the withdrawn replacement back")
+	}
+}
+
+// unsubscribingStore unsubscribes the user right after a resend reads
+// their pending replacement, as the unsubscribe link clicked just then would.
+type unsubscribingStore struct{ *Store }
+
+func (u unsubscribingStore) PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error) {
+	address, found, err := u.Store.PendingEmail(ctx, userHash, since)
+	if err != nil {
+		return "", false, err
+	}
+	return address, found, u.UnsubscribeEmail(ctx, userHash, time.Now())
+}
+
+// TestResendAfterAnUnsubscribeDB covers a resend racing an unsubscribe of
+// the pending row it read: the claim, under the user's lock, finds the row
+// unsubscribed and its request withdrawn, so nothing is mailed.
+func TestResendAfterAnUnsubscribeDB(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	h := testHash("a@b.com")
+	cleanUser(t, s, h)
+	seedContact(t, s, h)
+	addr := "pending-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	_, claimed, err := s.StageEmail(ctx, h, addr)
+	if err != nil || !claimed {
+		t.Fatalf("stage: %v %v", claimed, err)
+	}
+	// The first mail went over an hour ago.
+	_, err = s.db.ExecContext(ctx, `UPDATE alert_confirm_sends SET sent_at = sent_at - interval '2 hours' WHERE address = $1`, addr)
+	must(t, err)
+
+	sent := []sentConfirm{}
+	api := testChannelAPI(unsubscribingStore{s}, &sent, nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, testCaller("a@b.com", "Legacy")))
+	if w.Code != http.StatusNotFound || len(sent) != 0 {
+		t.Fatalf("resend after the unsubscribe = %d %s sent=%+v", w.Code, w.Body, sent)
+	}
+	var withdrawn bool
+	must(t, s.db.QueryRowContext(ctx, `SELECT withdrawn FROM alert_confirm_sends WHERE user_hash = $1 AND address = $2`, h, addr).Scan(&withdrawn))
+	if !withdrawn {
+		t.Fatal("resend claimed the unsubscribed row's request back")
+	}
+}
+
+// confirmingStore confirms the user's replacement right after the page's
+// read of their rows, as its link clicked just then would.
+type confirmingStore struct {
+	*Store
+	address string
+	claimed time.Time
+	done    bool
+}
+
+func (c *confirmingStore) Channels(ctx context.Context, userHash string) ([]Channel, error) {
+	rows, err := c.Store.Channels(ctx, userHash)
+	if err != nil || c.done {
+		return rows, err
+	}
+	c.done = true
+	_, err = c.SetChannelVerified(ctx, userHash, ChannelEmail, SourceUser, c.address, c.claimed, time.Now())
+	return rows, err
+}
+
+// TestReenterWorkingAddressAfterAMoveDB covers the working address entered
+// again while its replacement's link moves the row: the withdrawal, under
+// the user's lock, finds the row at the replacement, withdraws nothing,
+// and the answer is the row as it now stands.
+func TestReenterWorkingAddressAfterAMoveDB(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	h := testHash("a@b.com")
+	cleanUser(t, s, h)
+	seedContact(t, s, h)
+	addr := "next-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE user_hash = $1`, h) }
+	clean()
+	t.Cleanup(clean)
+	verified := time.Now().Add(-4 * time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+	at, claimed, err := s.StageEmail(ctx, h, addr)
+	if err != nil || !claimed {
+		t.Fatalf("stage: %v %v", claimed, err)
+	}
+
+	api := testChannelAPI(&confirmingStore{Store: s, address: addr, claimed: at}, &[]sentConfirm{}, nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"old@example.com"}`, testCaller("a@b.com", "Legacy")))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"address":"`+addr+`"`) {
+		t.Fatalf("working address entered again = %d %s", w.Code, w.Body)
+	}
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].Address != addr || !chans[0].Active() {
+		t.Fatalf("row after the move: %+v %v", chans, err)
+	}
+}
+
 // TestConfirmMovesAVerifiedRowToItsReplacement covers a change of address:
 // the verified row stays and shows its replacement as pending, another
 // user asking for the same address takes nothing from this one, and only
@@ -1040,10 +1265,7 @@ func TestConfirmMovesAVerifiedRowToItsReplacement(t *testing.T) {
 	verified := now.Add(-4 * time.Hour)
 	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
 	claimedAt := claimFor(t, s, h, strings.ToUpper(addr), now.Add(-2*time.Hour))
-	_, claimed, err := s.ClaimConfirmSend(ctx, "someone-else", addr)
-	if err != nil || !claimed {
-		t.Fatalf("another user's claim an hour on: %v %v", claimed, err)
-	}
+	claimFor(t, s, "someone-else", addr, now)
 	pending, ok, err := s.PendingEmail(ctx, h, time.Now().Add(-24*time.Hour))
 	if err != nil || !ok || pending != addr {
 		t.Fatalf("pending = %q %v %v", pending, ok, err)
@@ -1228,6 +1450,12 @@ func TestClaimConfirmSendOncePerAddress(t *testing.T) {
 	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
 	clean()
 	t.Cleanup(clean)
+	// Both users have the address on their own row, as a resend needs.
+	for _, h := range []string{"uA", "uB"} {
+		cleanUser(t, s, h)
+		seedContact(t, s, h)
+		must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: addr, Source: SourceUser}))
+	}
 	at, ok, err := s.ClaimConfirmSend(ctx, "uA", addr)
 	if err != nil || !ok {
 		t.Fatalf("first claim: %v %v", ok, err)
