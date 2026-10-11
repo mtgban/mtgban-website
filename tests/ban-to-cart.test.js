@@ -231,10 +231,20 @@ describe('ban-to-cart bookmarklet on CSI', () => {
         expect(alerts[0]).toBe('Loaded 2 cards into your CSI cart. 1 were not taken by CSI.');
     });
 
-    test('a card already in the cart is added to', async () => {
-        const csi = fakeCSI({cart: {7: 2}});
-        await run({...csiPage, hash: '#ban=7:1', abu: csi});
-        expect(csi.lines).toEqual({7: 3});
+    test('a card already in the cart gets only what it lacks', async () => {
+        const csi = fakeCSI({cart: {7: 2, 8: 3}});
+        const {posts} = await run({...csiPage, hash: '#ban=7:5,8:1,9:1', abu: csi});
+        expect(posts[0].rows).toEqual([{id: '7', qty: 3}, {id: '9', qty: 1}]);
+        expect(csi.lines).toEqual({7: 5, 8: 3, 9: 1});
+    });
+
+    test('loading the same list twice does not double it', async () => {
+        const csi = fakeCSI();
+        await run({...csiPage, hash: '#ban=1:2,2:1', abu: csi});
+        const {alerts, posts} = await run({...csiPage, hash: '#ban=1:2,2:1', abu: csi});
+        expect(csi.lines).toEqual({1: 2, 2: 1});
+        expect(posts).toHaveLength(1);
+        expect(alerts[0]).toBe('Loaded 2 cards into your CSI cart.');
     });
 });
 

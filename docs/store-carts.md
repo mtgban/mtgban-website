@@ -93,7 +93,8 @@ ajaxdata=uid_3813340qty_1||uid_3813344qty_2||
   reach the cart.
 - The cart page is `/buylist_cart.php`, and keeps a `#` fragment even
   with an empty cart. Its form names one field per row, `bl_q[<PPQID>]`,
-  which is how the bookmarklet reads the cart back.
+  which is how the bookmarklet reads the cart back, with its quantity, so
+  that a card already in the cart gets only what the list adds to it.
   `/buylist_cart.php?pa=clean` empties it.
 - A sell order needs $10 or more in the cart before CSI takes it.
 

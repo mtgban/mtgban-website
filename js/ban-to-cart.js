@@ -260,8 +260,9 @@
 
     // csiStore loads CSI's sell cart, kept by the browser's cookies, the way
     // its sell list page adds a row. CSI skips an id it does not buy and adds
-    // to a card already in the cart.
+    // to a card already in the cart, so such a card gets the difference.
     function csiStore() {
+        var held = {};
         return {
             name: "CSI",
             loggedIn: function () {
@@ -278,21 +279,30 @@
                     throw new Error("CSI could not read your sell cart (" + resp.status + ").");
                 }
                 var page = await resp.text();
-                var found = [];
-                var re = /name="bl_q\[(\d+)\]"/g;
+                held = {};
+                var re = /<[^>]*name="bl_q\[(\d+)\]"[^>]*>/g;
                 var m;
                 while ((m = re.exec(page)) !== null) {
-                    found.push(m[1]);
+                    var value = /value="(\d+)"/.exec(m[0]);
+                    held[m[1]] = value ? Number(value[1]) : 0;
                 }
-                return found;
+                return Object.keys(held);
             },
             send: async function (chunk, qty) {
+                var add = "";
+                for (var i = 0; i < chunk.length; i++) {
+                    var more = qty[chunk[i]] - (held[chunk[i]] || 0);
+                    if (more > 0) {
+                        add += "uid_" + chunk[i] + "qty_" + more + "||";
+                    }
+                }
+                if (!add) {
+                    return true;
+                }
                 var resp = await fetch("/ajax_buylist.php", {
                     method: "POST",
                     headers: {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"},
-                    body: "ajaxtype=addtocart&ajaxdata=" + encodeURIComponent(chunk.map(function (id) {
-                        return "uid_" + id + "qty_" + qty[id] + "||";
-                    }).join(""))
+                    body: "ajaxtype=addtocart&ajaxdata=" + encodeURIComponent(add)
                 });
                 if (!resp.ok) {
                     throw new Error("CSI refused the list (" + resp.status + ").");
