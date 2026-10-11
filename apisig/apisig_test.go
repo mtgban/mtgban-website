@@ -115,7 +115,7 @@ func TestAPIFieldsAreVerified(t *testing.T) {
 
 // testOptionalFields stands in for pages.go's OptionalFields, which the root
 // package's TestOptionalFieldsCoverAPIFields holds to APIFields.
-var testOptionalFields = []string{"UserName", "UserEmail", "APImode", "SearchDownloadCSV"}
+var testOptionalFields = []string{"UserName", "UserEmail", "APImode", "SearchDownloadCSV", "APIlookback"}
 
 func mustDecode(t *testing.T, blob string) url.Values {
 	t.Helper()

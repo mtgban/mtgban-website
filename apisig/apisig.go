@@ -16,8 +16,9 @@ import (
 const DefaultLink = "http://www.mtgban.com"
 
 // APIFields are the optional fields an API key carries, signed when present.
-// The website's verifier must list every one of them.
-var APIFields = []string{"APImode", "UserEmail"}
+// The website's verifier must list every one of them. APIlookback is the
+// history plan's lookback in days.
+var APIFields = []string{"APImode", "UserEmail", "APIlookback"}
 
 var (
 	// ErrInvalid means the signature does not match or is malformed.
