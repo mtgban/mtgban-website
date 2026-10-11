@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -31,6 +32,17 @@ type AlertsPageVars struct {
 	UnsubscribeURL string
 }
 
+// alertChannelList is alertChannels comma-joined, as the pages hand it to
+// js/alerts.js in data-alert-channels.
+func alertChannelList(v url.Values) string {
+	chans := alertChannels(v)
+	names := make([]string, len(chans))
+	for i, kind := range chans {
+		names[i] = string(kind)
+	}
+	return strings.Join(names, ",")
+}
+
 // Alerts renders the list, or the create form with ?card=, or the edit
 // form with ?edit=. enforceSigning has already let the reader in; what
 // they may do follows the ACL values their signature carries.
@@ -50,12 +62,7 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	api := s.alerts.API()
 	vars.Allowance = alertAllowance(c.Values)
 	vars.Allowed = vars.Allowance > 0
-	chans := alertChannels(c.Values)
-	names := make([]string, len(chans))
-	for i, kind := range chans {
-		names[i] = string(kind)
-	}
-	vars.AllowedChannels = strings.Join(names, ",")
+	vars.AllowedChannels = alertChannelList(c.Values)
 	vars.UnsubscribeURL = alertUnsubscribeURL(externalURL(r), c.UserHash)
 	store := api.Store()
 	if store == nil {

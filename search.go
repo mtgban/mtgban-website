@@ -502,6 +502,9 @@ type SearchVars struct {
 	// CanAlerts says the reader's ACL grants the Alerts page and an
 	// allowance, so result rows may offer the alert link.
 	CanAlerts bool
+	// AlertChannelList is the delivery channels the alert modal offers,
+	// read off #alert-modal's data-alert-channels by js/alerts.js.
+	AlertChannelList string
 
 	// Printings is each result's printings row for the sidebar, from
 	// cardPrintings.
@@ -521,6 +524,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(s, r, "Search", sig)
 	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, r)
+	pageVars.AlertChannelList = alertChannelList(parseSig(sig))
 
 	blocklistRetail, blocklistBuylist, _ := getSearchBlocklists(r, sig)
 

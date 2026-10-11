@@ -34,3 +34,29 @@ func TestAlertsPageOffersResumeAsTheAPIAllows(t *testing.T) {
 		}
 	}
 }
+
+// The search page's modal carries the delivery channels itself; on the
+// alerts page #alerts-page carries them, so the modal stays bare.
+func TestAlertModalCarriesTheChannelsOffTheAlertsPage(t *testing.T) {
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alert-modal.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tc := range map[string]struct {
+		vars PageVars
+		want bool
+	}{
+		"search": {PageVars{SearchVars: SearchVars{AlertChannelList: "discord,email"}}, true},
+		"alerts": {PageVars{AlertsPage: &AlertsPageVars{AllowedChannels: "discord,email"}}, false},
+	} {
+		var out strings.Builder
+		err := tmpl.ExecuteTemplate(&out, "alert-modal", tc.vars)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		got := strings.Contains(out.String(), `id="alert-modal" role="dialog" aria-modal="true" aria-labelledby="alert-modal-title" data-alert-channels="discord,email"`)
+		if got != tc.want {
+			t.Errorf("%s: modal carries the channels %v, want %v", name, got, tc.want)
+		}
+	}
+}
