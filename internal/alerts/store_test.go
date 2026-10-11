@@ -386,40 +386,110 @@ func TestEventsLastPerAlert(t *testing.T) {
 	}
 }
 
-// TestMailsSentSinceCountsDistinctMessages covers that MailsSentSince
-// counts mails, not event rows: two events sharing a message id count once,
-// a future since gives 0, and another user's mail under the same message
-// id is not counted (the user_hash join scopes it).
-func TestMailsSentSinceCountsDistinctMessages(t *testing.T) {
+// TestReserveMailKeepsTheCeiling covers the mail ledger: it counts one
+// user's mails in the last 24 hours, whatever happens to their alerts, a
+// released reservation does not count, and concurrent reservations at the
+// last slot let only one through.
+func TestReserveMailKeepsTheCeiling(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	clean := func() {
+		_, _ = s.db.Exec(`DELETE FROM alert_mails WHERE user_hash = $1 OR user_hash = $2`, h, h+"-other")
+	}
+	clean()
+	t.Cleanup(clean)
+	now := time.Now()
+	reserve := func(user string, at time.Time) bool {
+		t.Helper()
+		_, ok, err := s.ReserveMail(ctx, user, at, 3)
+		must(t, err)
+		return ok
+	}
+	if !reserve(h, now.Add(-25*time.Hour)) || !reserve(h, now) || !reserve(h, now) {
+		t.Fatal("reservations under the ceiling refused")
+	}
+	failed, ok, err := s.ReserveMail(ctx, h, now, 3)
+	if err != nil || !ok {
+		t.Fatalf("third mail in the day: %v %v", ok, err)
+	}
+	must(t, s.ReleaseMail(ctx, failed))
+	// Deleting the user's alerts leaves the ledger as it was.
+	a, err := s.Create(ctx, sample(h))
+	must(t, err)
+	_, err = s.Delete(ctx, a.ID, h)
+	must(t, err)
+	if !reserve(h, now) || reserve(h, now) {
+		t.Fatal("ceiling of three in the day not kept")
+	}
+	if !reserve(h+"-other", now) {
+		t.Fatal("another user's ledger is not this one's")
+	}
+
+	// A reservation racing another for the last slot waits for it, then
+	// counts it: here the other holds the user's lock and takes the slot.
+	_, err = s.db.Exec(`DELETE FROM alert_mails WHERE user_hash = $1`, h)
+	must(t, err)
+	reserve(h, now)
+	reserve(h, now)
+	other, err := s.db.BeginTx(ctx, nil)
+	must(t, err)
+	defer func() { _ = other.Rollback() }()
+	_, err = other.Exec(`SELECT pg_advisory_xact_lock($1, hashtext($2))`, mailLockID, h)
+	must(t, err)
+	result := make(chan bool, 1)
+	go func() {
+		_, ok, err := s.ReserveMail(ctx, h, now, 3)
+		result <- ok && err == nil
+	}()
+	select {
+	case <-result:
+		t.Fatal("reservation did not wait for the one holding the lock")
+	case <-time.After(200 * time.Millisecond):
+	}
+	_, err = other.Exec(`INSERT INTO alert_mails (user_hash, sent_at) VALUES ($1, $2)`, h, now)
+	must(t, err)
+	must(t, other.Commit())
+	if <-result {
+		t.Fatal("both reservations took the last slot")
+	}
+}
+
+// TestNewLedgerBackfillsTheDay covers the deploy that creates alert_mails:
+// it starts with the last day's mails as alert events counted them, one
+// per message id, and a later start adds nothing.
+func TestNewLedgerBackfillsTheDay(t *testing.T) {
 	s := testStore(t)
 	h := freshUser(t, s)
 	seedContact(t, s, h)
 	ctx := context.Background()
 	a, err := s.Create(ctx, sample(h))
 	must(t, err)
-
-	other := "test-" + t.Name() + "-other"
-	cleanUser(t, s, other)
-	seedContact(t, s, other)
-	b, err := s.Create(ctx, sample(other))
-	must(t, err)
-
 	now := time.Now()
-	must(t, s.AddEvent(ctx, Event{AlertID: a.ID, FiredAt: now, Threshold: "above", Store: "CK", Price: 1, Delivered: true, MessageID: "m1"}))
-	must(t, s.AddEvent(ctx, Event{AlertID: a.ID, FiredAt: now, Threshold: "below", Store: "SCG", Price: 2, Delivered: true, MessageID: "m1"}))
-	must(t, s.AddEvent(ctx, Event{AlertID: a.ID, FiredAt: now, Threshold: "above", Store: "CK", Price: 3, Delivered: true, MessageID: "m2"}))
-	must(t, s.AddEvent(ctx, Event{AlertID: b.ID, FiredAt: now, Threshold: "above", Store: "CK", Price: 1, Delivered: true, MessageID: "m1"}))
-
-	n, err := s.MailsSentSince(ctx, h, now.Add(-time.Hour))
-	must(t, err)
-	if n != 2 {
-		t.Fatalf("MailsSentSince = %d, want 2 (another user's m1 must not be counted)", n)
+	for _, e := range []Event{
+		{AlertID: a.ID, FiredAt: now, Threshold: "above", Store: "CK", Price: 1, Delivered: true, MessageID: "m1"},
+		{AlertID: a.ID, FiredAt: now, Threshold: "below", Store: "SCG", Price: 2, Delivered: true, MessageID: "m1"},
+		{AlertID: a.ID, FiredAt: now, Threshold: "above", Store: "CK", Price: 3, Delivered: true, MessageID: "m2"},
+		{AlertID: a.ID, FiredAt: now.Add(-25 * time.Hour), Threshold: "above", Store: "CK", Price: 4, Delivered: true, MessageID: "m0"},
+		{AlertID: a.ID, FiredAt: now, Threshold: "above", Store: "CK", Price: 5, Delivered: false},
+	} {
+		must(t, s.AddEvent(ctx, e))
 	}
-
-	n, err = s.MailsSentSince(ctx, h, now.Add(time.Hour))
+	_, err = s.db.ExecContext(ctx, `DROP TABLE alert_mails`)
 	must(t, err)
-	if n != 0 {
-		t.Fatalf("MailsSentSince with a future since = %d, want 0", n)
+	count := func() int {
+		t.Helper()
+		var n int
+		must(t, s.db.QueryRowContext(ctx, `SELECT count(*) FROM alert_mails WHERE user_hash = $1`, h).Scan(&n))
+		return n
+	}
+	for range 2 {
+		_, err = New(s.db)
+		must(t, err)
+		if n := count(); n != 2 {
+			t.Fatalf("ledger holds %d of the user's mails, want 2", n)
+		}
 	}
 }
 

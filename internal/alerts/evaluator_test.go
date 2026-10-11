@@ -1089,6 +1089,24 @@ func TestRunAlertEvaluationMailsTheNoticeWithoutDiscord(t *testing.T) {
 	}
 }
 
+// A park notice held back at the daily ceiling is a skip, not a failed run.
+func TestRunAlertEvaluationNoticeAtTheCeilingSkips(t *testing.T) {
+	a := activeAlert()
+	a.Contact.DiscordUserID = ""
+	store := newFakeEvalStore(a)
+	store.emails["u"] = "u@example.com"
+	md := &fakeDeliverer{kind: ChannelEmail, err: ErrDailyLimit}
+	deps := evalDeps(store, &fakeDeliverer{}, 9)
+	deps.Deliverers = append(deps.Deliverers, md)
+	deps.Allowance = func(url.Values) int { return 0 }
+
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	if sum.err != nil || sum.notices != 0 || sum.skipped != 1 || len(md.parks) != 1 {
+		t.Fatalf("err=%v notices=%d skipped=%d parks=%d", sum.err, sum.notices, sum.skipped, len(md.parks))
+	}
+}
+
 // With both channels the DM is the notice, and no mail goes out.
 func TestRunAlertEvaluationNoticePrefersDiscord(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
