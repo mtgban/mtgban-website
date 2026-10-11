@@ -68,4 +68,12 @@ CREATE TABLE IF NOT EXISTS alert_channels (
 );
 CREATE INDEX IF NOT EXISTS alert_channels_by_address ON alert_channels (kind, lower(address));
 ALTER TABLE alert_events ADD COLUMN IF NOT EXISTS message_id TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS alert_confirm_sends (
+    user_hash  TEXT NOT NULL,
+    address    TEXT NOT NULL,
+    sent_at    TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_hash, address)
+);
+CREATE INDEX IF NOT EXISTS alert_confirm_sends_by_address ON alert_confirm_sends (address, sent_at);
 `

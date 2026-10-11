@@ -37,7 +37,8 @@
     function channelButtons(row) {
         if (row.source === 'user') {
             if (row.state === 'pending') return ['resend', 'remove'];
-            if (row.state === 'verified') return ['change', 'remove'];
+            // A verified row waiting on a replacement can resend its link.
+            if (row.state === 'verified') return row.pending ? ['change', 'resend', 'remove'] : ['change', 'remove'];
             if (row.state === 'disabled') {
                 if (row.reason === 'unsubscribed') return ['remove'];
                 return ['resend', 'remove'];
@@ -744,6 +745,10 @@
             noteNode = document.createElement('p');
             noteNode.className = 'alerts-channel-note';
             noteNode.textContent = 'Remove it and add it again to confirm it afresh.';
+        } else if (row.pending) {
+            noteNode = document.createElement('p');
+            noteNode.className = 'alerts-channel-note';
+            noteNode.textContent = 'Waiting for confirmation: ' + row.pending;
         }
         var detail = row.address + (row.source === 'patreon' ? ' (Patreon)' : '') + ' - ' + channelState(row);
         var el = buildChannelRow(heading, detail, noteNode, channelButtons(row), line.receives ? 'receives alerts' : '');
