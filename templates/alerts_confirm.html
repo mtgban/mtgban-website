@@ -11,9 +11,9 @@
     <h1>{{.Heading}}</h1>
     <p>{{.Text}}</p>
     {{if .Token}}
-    <form method="post" action="/alerts/unsubscribe">
+    <form method="post" action="{{.Action}}">
         <input type="hidden" name="token" value="{{.Token}}">
-        <button type="submit" class="settings-btn primary">Unsubscribe</button>
+        <button type="submit" class="settings-btn primary">{{.Button}}</button>
     </form>
     {{end}}
     {{end}}
