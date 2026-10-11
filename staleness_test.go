@@ -671,3 +671,41 @@ func TestDropStaleStoresKeepsTheLastStoreOnASide(t *testing.T) {
 		t.Errorf("served sellers %v, want ZZFRESH alone", gotSellers)
 	}
 }
+
+// A reload lists a dropped store again, and the dump it finds is the one the
+// store was dropped with: that stays out, as does an undated one, and only a
+// newer one comes back.
+func TestADroppedStoresOldDumpStaysOutOnReload(t *testing.T) {
+	now := time.Now()
+	old := now.Add(-6 * 24 * time.Hour)
+	withDropState(t,
+		[]mtgban.Seller{inventoryOf("ZZFRESH", 1, now), inventoryOf("ZZOLD", 1, old)},
+		[]mtgban.Vendor{buylistOf("ZZFRESHV", 1, now), buylistOf("ZZOLDV", 1, old)})
+	// Dropped two days from now, its dump is not yet past DropAfter today
+	dropStaleStores(now.Add(2 * 24 * time.Hour))
+
+	for _, err := range []error{
+		updateSellers(inventoryOf("ZZOLD", 1, old)),
+		updateVendors(buylistOf("ZZOLDV", 1, old)),
+		updateSellers(inventoryOf("ZZOLD", 1, now.Add(-8*24*time.Hour))),
+		updateSellers(mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"uuid-0": {{Price: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZOLD"})),
+		updateVendors(mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{"uuid-0": {{BuyPrice: 1}}}, mtgban.ScraperInfo{Shorthand: "ZZOLDV"})),
+	} {
+		if !errors.Is(err, errDroppedDump) {
+			t.Errorf("an old dump was answered %v, want errDroppedDump", err)
+		}
+	}
+	gotSellers, gotVendors := servedShorthands()
+	if !slices.Equal(gotSellers, []string{"ZZFRESH"}) || !slices.Equal(gotVendors, []string{"ZZFRESHV"}) {
+		t.Errorf("served sellers %v, vendors %v; want the old dumps left out", gotSellers, gotVendors)
+	}
+
+	err := updateSellers(inventoryOf("ZZOLD", 1, old.Add(time.Hour)))
+	if err != nil {
+		t.Fatalf("a newer dump was refused: %s", err)
+	}
+	gotSellers, _ = servedShorthands()
+	if !slices.Equal(gotSellers, []string{"ZZFRESH", "ZZOLD"}) {
+		t.Errorf("served sellers %v, want ZZOLD back on a newer dump", gotSellers)
+	}
+}

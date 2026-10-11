@@ -522,6 +522,10 @@ func loadScraper(bucket simplecloud.Reader, game mtgmatcher.Game, name, kind, sh
 	return installErr
 }
 
+// errDroppedDump is updateSellers' and updateVendors' answer for a dropped
+// store's dump that droppedDump keeps out: not a failure, nothing installed.
+var errDroppedDump = errors.New("dump is undated, past DropAfter or no newer than when the store was dropped")
+
 // updateSellers installs the seller over its registered slot, answering with
 // the refusal where buildNextSellers turns the swap down. The caller is what
 // carries the answer back to whoever asked for the load - the reload
@@ -542,6 +546,12 @@ func updateSellers(scraper mtgban.Scraper) error {
 			sellerIndex = i
 			break
 		}
+	}
+
+	// Any reload lists a dropped store again; its old dump stays out quietly
+	if sellerIndex < 0 && droppedDump(sessionstore.Retail, seller.Info().Shorthand, seller.Info().InventoryTimestamp, time.Now()) {
+		log.Printf("%s inventory left out: %s", seller.Info().Shorthand, errDroppedDump)
+		return errDroppedDump
 	}
 
 	next, err := buildNextSellers(current, seller, sellerIndex)
@@ -621,6 +631,11 @@ func updateVendors(scraper mtgban.Scraper) error {
 			vendorIndex = i
 			break
 		}
+	}
+
+	if vendorIndex < 0 && droppedDump(sessionstore.Buylist, vendor.Info().Shorthand, vendor.Info().BuylistTimestamp, time.Now()) {
+		log.Printf("%s buylist left out: %s", vendor.Info().Shorthand, errDroppedDump)
+		return errDroppedDump
 	}
 
 	next, err := buildNextVendors(current, vendor, vendorIndex)
