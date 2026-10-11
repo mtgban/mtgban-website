@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/mtgban/mtgban-website/mailer"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
@@ -36,7 +37,8 @@ type APIStore interface {
 	DeleteChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) error
 	EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) (bool, error)
 	ChannelByAddress(ctx context.Context, kind ChannelKind, address string) ([]Channel, error)
-	RecordConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
+	ClaimConfirmSend(ctx context.Context, userHash, address string, now, since time.Time) (bool, error)
+	ReleaseConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
 	PendingEmail(ctx context.Context, userHash string, since time.Time) (string, bool, error)
 }
 
@@ -78,6 +80,9 @@ const (
 	defaultConfirmTTL = 24 * time.Hour
 	confirmBurst      = 3
 	maxEmailLen       = 254
+	// confirmAddressGap is the least time between two confirm mails to
+	// one address, from any user; the per-user limiter forgets on restart.
+	confirmAddressGap = time.Hour
 )
 
 // confirmRate refills one confirmation mail every 20 minutes.
@@ -734,29 +739,45 @@ func (a *API) confirmRefusal(c Caller) (int, string) {
 	return http.StatusOK, ""
 }
 
-// mailConfirm mints a confirm link for address and mails it; false means
-// it answered with the failure.
-func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, address string) bool {
-	token := a.deps.Mint(Token{Kind: TokenConfirm, UserHash: c.UserHash, Address: address, Expires: time.Now().Add(a.deps.ConfirmTTL)})
+// mailConfirm charges the confirm limiter, then mints a confirm link for
+// address and mails it under the claim made at claimedAt, releasing the
+// claim when the limiter or the provider refuses; false means it answered
+// with the failure.
+func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, address string, claimedAt time.Time) bool {
+	// Charged only now, so a claim the hourly gap refused costs nothing.
+	if !a.deps.ConfirmLimiter.Allow(c.UserHash) {
+		a.releaseConfirm(ctx, c, address, claimedAt)
+		jsonError(w, http.StatusTooManyRequests, "too many confirmation mails; try again later")
+		return false
+	}
+	token := a.deps.Mint(Token{Kind: TokenConfirm, UserHash: c.UserHash, Address: address, Expires: time.Now().Add(a.deps.ConfirmTTL), Claimed: claimedAt})
 	// No signing secret mints no token; a mail with a dead link helps nobody.
 	if token == "" {
+		a.releaseConfirm(ctx, c, address, claimedAt)
 		jsonError(w, http.StatusServiceUnavailable, "confirmation links are not configured")
 		return false
 	}
 	link := c.Origin + "/alerts/confirm?token=" + url.QueryEscape(token)
-	// Recorded before the send, so nothing after it can fail to land.
-	err := a.deps.Store.RecordConfirmSend(ctx, c.UserHash, address, time.Now())
-	if err != nil {
-		a.fail(w, "confirm sends", err)
-		return false
-	}
-	err = a.deps.SendConfirm(ctx, address, link)
+	err := a.deps.SendConfirm(ctx, address, link)
 	if err != nil {
 		log.Printf("alerts: confirm mail failed: %v", err)
+		// A send that may have gone out keeps its claim, and its hour.
+		if mailer.Refused(err) {
+			a.releaseConfirm(ctx, c, address, claimedAt)
+		}
 		jsonError(w, http.StatusBadGateway, "could not send the confirmation mail")
 		return false
 	}
 	return true
+}
+
+// releaseConfirm frees an address claimed at claimedAt for another mail
+// at once, even once the request is gone.
+func (a *API) releaseConfirm(ctx context.Context, c Caller, address string, claimedAt time.Time) {
+	err := a.deps.Store.ReleaseConfirmSend(context.WithoutCancel(ctx), c.UserHash, address, claimedAt)
+	if err != nil {
+		log.Printf("alerts: release confirm send: %v", err)
+	}
 }
 
 func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
@@ -794,12 +815,14 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 			return
 		}
 	}
-	if !a.confirmAllowed(ctx, w, c, address) {
+	claimedAt, ok := a.confirmAllowed(ctx, w, c, address)
+	if !ok {
 		return
 	}
 	// The channel row needs its contact, which a failed login write may not have left.
 	err = a.deps.Store.EnsureContact(ctx, c.UserHash, c.Tier)
 	if err != nil {
+		a.releaseConfirm(ctx, c, address, claimedAt)
 		a.fail(w, "contact", err)
 		return
 	}
@@ -808,11 +831,12 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 	if !found || channelState(cur) != stateVerified {
 		err = a.deps.Store.UpsertChannel(ctx, Channel{UserHash: c.UserHash, Kind: ChannelEmail, Address: address, Source: SourceUser})
 		if err != nil {
+			a.releaseConfirm(ctx, c, address, claimedAt)
 			a.fail(w, "channel", err)
 			return
 		}
 	}
-	if !a.mailConfirm(ctx, w, c, address) {
+	if !a.mailConfirm(ctx, w, c, address, claimedAt) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
@@ -860,10 +884,11 @@ func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		jsonError(w, http.StatusUnprocessableEntity, "this address was marked as spam; remove it and add the new one")
 		return
 	}
-	if !a.confirmAllowed(ctx, w, c, address) {
+	claimedAt, ok := a.confirmAllowed(ctx, w, c, address)
+	if !ok {
 		return
 	}
-	if !a.mailConfirm(ctx, w, c, address) {
+	if !a.mailConfirm(ctx, w, c, address, claimedAt) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, emailState{State: statePending, Address: address})
@@ -888,23 +913,31 @@ func reverifyRefusal(cur Channel) string {
 	}
 }
 
-// confirmAllowed charges the confirm limiter, then refuses an address
-// anyone's recipient marked as spam; false means it answered.
-func (a *API) confirmAllowed(ctx context.Context, w http.ResponseWriter, c Caller, address string) bool {
-	if !a.deps.ConfirmLimiter.Allow(c.UserHash) {
-		jsonError(w, http.StatusTooManyRequests, "too many confirmation mails; try again later")
-		return false
-	}
+// confirmAllowed refuses an address anyone's recipient marked as spam,
+// then claims the address's confirm mail for the caller, answering when it
+// was claimed; false means it answered.
+func (a *API) confirmAllowed(ctx context.Context, w http.ResponseWriter, c Caller, address string) (time.Time, bool) {
 	rows, err := a.deps.Store.ChannelByAddress(ctx, ChannelEmail, address)
 	if err != nil {
 		a.fail(w, "channels", err)
-		return false
+		return time.Time{}, false
 	}
 	if slices.ContainsFunc(rows, func(ch Channel) bool { return ch.DisabledAt != nil && ch.DisabledReason == ReasonComplained }) {
 		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
-		return false
+		return time.Time{}, false
 	}
-	return true
+	// Claimed before the send, so nothing after it can fail to land.
+	now := time.Now().Truncate(time.Microsecond)
+	claimed, err := a.deps.Store.ClaimConfirmSend(ctx, c.UserHash, address, now, now.Add(-confirmAddressGap))
+	if err != nil {
+		a.fail(w, "confirm sends", err)
+		return time.Time{}, false
+	}
+	if !claimed {
+		jsonError(w, http.StatusTooManyRequests, "a confirmation mail went to this address within the hour; check its inbox or try again later")
+		return time.Time{}, false
+	}
+	return now, true
 }
 
 func (a *API) deleteEmail(w http.ResponseWriter, r *http.Request, c Caller) {

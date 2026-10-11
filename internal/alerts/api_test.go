@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mtgban/mtgban-website/mailer"
 )
 
 // fakeAlertStore keeps rows in memory; ids are assigned in order.
@@ -25,9 +27,11 @@ type fakeAlertStore struct {
 // confirmKey is one user's confirm mails to one address.
 type confirmKey struct{ userHash, address string }
 
-// confirmSend is when the last of them went.
+// confirmSend is when the last of them went, and whether a failed send
+// freed the address again.
 type confirmSend struct {
-	at time.Time
+	at       time.Time
+	released bool
 }
 
 type channelKey struct {
@@ -40,12 +44,26 @@ func newFakeAlertStore() *fakeAlertStore {
 	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}, confirmSends: map[confirmKey]confirmSend{}}
 }
 
-func (f *fakeAlertStore) RecordConfirmSend(_ context.Context, h, address string, at time.Time) error {
-	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at}
+// ClaimConfirmSend mirrors the store: one claim per address, from anyone, since since.
+func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string, now, since time.Time) (bool, error) {
+	for k, send := range f.confirmSends {
+		if k.address == strings.ToLower(address) && !send.released && !send.at.Before(since) {
+			return false, nil
+		}
+	}
+	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at: now}
+	return true, nil
+}
+
+func (f *fakeAlertStore) ReleaseConfirmSend(_ context.Context, h, address string, at time.Time) error {
+	k := confirmKey{h, strings.ToLower(address)}
+	if f.confirmSends[k].at.Equal(at) {
+		f.confirmSends[k] = confirmSend{at: at, released: true}
+	}
 	return nil
 }
 
-// PendingEmail mirrors the store: the user's newest send, when it went to
+// PendingEmail mirrors the store: the user's newest sent mail, when it went to
 // another address after the user row was last verified, if ever, and since since.
 func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Time) (string, bool, error) {
 	row, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
@@ -59,7 +77,7 @@ func (f *fakeAlertStore) PendingEmail(_ context.Context, h string, since time.Ti
 	var last string
 	var lastAt time.Time
 	for k, send := range f.confirmSends {
-		if k.userHash == h && (last == "" || send.at.After(lastAt)) {
+		if k.userHash == h && !send.released && (last == "" || send.at.After(lastAt)) {
 			last, lastAt = k.address, send.at
 		}
 	}
@@ -896,7 +914,8 @@ const testOrigin = "https://mtgban.com"
 type sentConfirm struct{ to, link string }
 
 // testChannelAPI is testAlertsAPI with email allowed on Legacy and a
-// confirm mailer recording what it sends; fail makes every send fail.
+// confirm mailer recording what it sends; fail makes the provider refuse
+// every send.
 func testChannelAPI(store APIStore, sent *[]sentConfirm, fail *bool) *API {
 	api := testAlertsAPI(store)
 	api.deps.Channels = func(v url.Values) []ChannelKind {
@@ -908,7 +927,7 @@ func testChannelAPI(store APIStore, sent *[]sentConfirm, fail *bool) *API {
 	api.deps.Mint = func(t Token) string { return MintToken(testTokenSecret, t) }
 	api.deps.SendConfirm = func(_ context.Context, to, link string) error {
 		if fail != nil && *fail {
-			return errors.New("mail down")
+			return &mailer.SendError{Status: 422, Permanent: true, Msg: "to: invalid"}
 		}
 		*sent = append(*sent, sentConfirm{to, link})
 		return nil
@@ -1051,36 +1070,77 @@ func TestAlertsAPISetEmail(t *testing.T) {
 		t.Fatalf("link: %v", err)
 	}
 	tok, err := VerifyToken(testTokenSecret, u.Query().Get("token"), time.Now())
-	if err != nil || tok.Kind != TokenConfirm || tok.UserHash != hash || tok.Address != "me@example.com" {
+	if err != nil || tok.Kind != TokenConfirm || tok.UserHash != hash || tok.Address != "me@example.com" ||
+		!tok.Claimed.Equal(store.confirmSends[confirmKey{hash, "me@example.com"}].at) {
 		t.Fatalf("token = %+v %v", tok, err)
 	}
 	if d := time.Until(tok.Expires); d < 23*time.Hour || d > 25*time.Hour {
 		t.Fatalf("token expires in %v, want about a day", d)
 	}
 
-	// Three mails an hour; the fourth is refused, resend included.
-	for i := 0; i < 2; i++ {
+	// One mail an hour to an address, whoever asks; the store keeps
+	// the count, so a restart does not reset it.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "within the hour") {
+		t.Fatalf("resend within the hour = %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, testCaller("x@y.com", "Legacy")))
+	if w.Code != http.StatusTooManyRequests || len(sent) != 1 {
+		t.Fatalf("other user, same address = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+
+	// Three mails an hour per user, counting only claims that went through;
+	// the fourth is refused.
+	for _, addr := range []string{"me2@example.com", "me3@example.com"} {
 		w = httptest.NewRecorder()
-		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
+		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"`+addr+`"}`, sig))
 		if w.Code != http.StatusAccepted {
-			t.Fatalf("send %d = %d %s", i+2, w.Code, w.Body)
+			t.Fatalf("%s = %d %s", addr, w.Code, w.Body)
 		}
 	}
 	w = httptest.NewRecorder()
-	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
-	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "too many confirmation mails") {
-		t.Fatalf("fourth = %d %s", w.Code, w.Body)
-	}
-	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"other@example.com"}`, sig))
-	if w.Code != http.StatusTooManyRequests || len(sent) != 3 || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
-		t.Fatalf("fifth = %d %s sent=%d", w.Code, w.Body, len(sent))
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "too many confirmation mails") ||
+		len(sent) != 3 {
+		t.Fatalf("fourth = %d %s sent=%d", w.Code, w.Body, len(sent))
+	}
+	// The limiter's refusal frees the address it claimed.
+	if send := store.confirmSends[confirmKey{hash, "other@example.com"}]; !send.released {
+		t.Fatalf("claim after the limiter refused = %+v", send)
 	}
 	// Another user has a limit of their own.
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"x@example.com"}`, testCaller("x@y.com", "Legacy")))
 	if w.Code != http.StatusAccepted {
 		t.Fatalf("other user = %d %s", w.Code, w.Body)
+	}
+}
+
+// A send that may have reached the provider, a timeout say, keeps its
+// claim: the address gets no second mail within the hour.
+func TestAlertsAPIUncertainSendKeepsTheClaim(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	api.deps.SendConfirm = func(context.Context, string, string) error {
+		return errors.New("mailer: resend: context deadline exceeded")
+	}
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("uncertain send = %d %s", w.Code, w.Body)
+	}
+	if send := store.confirmSends[confirmKey{hash, "me@example.com"}]; send.at.IsZero() || send.released {
+		t.Fatalf("claim after an uncertain send = %+v", send)
+	}
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "within the hour") {
+		t.Fatalf("resend after an uncertain send = %d %s", w.Code, w.Body)
 	}
 }
 
@@ -1128,8 +1188,10 @@ func TestAlertsAPISetEmailRefusals(t *testing.T) {
 	if kept := store.channels[channelKey{hash, ChannelEmail, SourceUser}]; kept.Address != "old@example.com" || channelState(kept) != stateVerified {
 		t.Fatalf("row after the sent change = %+v", kept)
 	}
-	// A row with no working address moves at once, to show as pending.
+	// A row with no working address moves at once, to show as pending; the
+	// hour since the last mail is taken as passed.
 	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser}
+	store.confirmSends[confirmKey{hash, "me@example.com"}] = confirmSend{at: time.Now().Add(-2 * time.Hour)}
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", body, sig))
 	if w.Code != http.StatusAccepted || store.channels[channelKey{hash, ChannelEmail, SourceUser}].Address != "me@example.com" {
@@ -1157,6 +1219,32 @@ func TestAlertsAPISetEmailRefusals(t *testing.T) {
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, testCaller("x@y.com", "Legacy")))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("resend without row = %d %s", w.Code, w.Body)
+	}
+}
+
+// Saving the pending address again within the hour is refused by its claim
+// and costs none of the user's three mails, so the resend after it goes.
+func TestAlertsAPIRefusedClaimsCostNoMail(t *testing.T) {
+	store := newFakeAlertStore()
+	sent := []sentConfirm{}
+	api := testChannelAPI(store, &sent, nil)
+	sig := testCaller("a@b.com", "Legacy")
+	hash := testHash("a@b.com")
+	verified := time.Now().Add(-3 * time.Hour)
+	store.channels[channelKey{hash, ChannelEmail, SourceUser}] = Channel{UserHash: hash, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}
+
+	for i := range 4 {
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"new@example.com"}`, sig))
+		if i == 0 && w.Code != http.StatusAccepted || i > 0 && !strings.Contains(w.Body.String(), "within the hour") {
+			t.Fatalf("save %d = %d %s", i, w.Code, w.Body)
+		}
+	}
+	store.confirmSends[confirmKey{hash, "new@example.com"}] = confirmSend{at: time.Now().Add(-2 * time.Hour)}
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email/resend", `{}`, sig))
+	if w.Code != http.StatusAccepted || len(sent) != 2 || sent[1].to != "new@example.com" {
+		t.Fatalf("resend = %d %s sent=%+v", w.Code, w.Body, sent)
 	}
 }
 
@@ -1472,6 +1560,8 @@ func TestAlertsAPIResendBouncedVerified(t *testing.T) {
 	if w.Code != http.StatusAccepted || len(sent) != 1 {
 		t.Fatalf("resend = %d %s sent=%d", w.Code, w.Body, len(sent))
 	}
+	// The address had its mail this hour; once the hour passes it may have another.
+	store.confirmSends[confirmKey{hash, "me@example.com"}] = confirmSend{at: now.Add(-2 * time.Hour)}
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
 	if w.Code != http.StatusAccepted || len(sent) != 2 {

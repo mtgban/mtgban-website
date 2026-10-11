@@ -58,7 +58,7 @@ func (f *fakeLinkStore) Channels(_ context.Context, userHash string) ([]alerts.C
 	return out, f.err
 }
 
-func (f *fakeLinkStore) SetChannelVerified(_ context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, at time.Time) (bool, error) {
+func (f *fakeLinkStore) SetChannelVerified(_ context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, _, at time.Time) (bool, error) {
 	for i, c := range f.channels {
 		if c.UserHash != userHash || c.Kind != kind || c.Source != source {
 			continue
@@ -128,7 +128,15 @@ func mailLinkSetup(t *testing.T) {
 }
 
 func confirmToken(userHash, address string, expires time.Time) string {
-	return alerts.MintToken(alertTokenSecret(), alerts.Token{Kind: alerts.TokenConfirm, UserHash: userHash, Address: address, Expires: expires})
+	return alerts.MintToken(alertTokenSecret(), alerts.Token{Kind: alerts.TokenConfirm, UserHash: userHash, Address: address, Expires: expires, Claimed: expires.Add(-24 * time.Hour)})
+}
+
+// fourFieldToken signs a payload in the shape tokens had before they named
+// their claim.
+func fourFieldToken(payload string) string {
+	mac := hmac.New(sha256.New, alertTokenSecret())
+	mac.Write([]byte(payload))
+	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 func pendingEmail(userHash, address string) alerts.Channel {
@@ -218,6 +226,8 @@ func TestAlertsConfirmRefusesBadLinks(t *testing.T) {
 		{"tampered", good[:len(good)-2] + "xx", "bob@example.com"},
 		{"expired", confirmToken("u1", "bob@example.com", time.Now().Add(-time.Hour)), "bob@example.com"},
 		{"wrong kind", unsub, "bob@example.com"},
+		{"no claim", alerts.MintToken(alertTokenSecret(), alerts.Token{Kind: alerts.TokenConfirm, UserHash: "u1", Address: "bob@example.com", Expires: future}), "bob@example.com"},
+		{"four fields", fourFieldToken("confirm|u1|bob@example.com|" + strconv.FormatInt(future.Unix(), 10)), "bob@example.com"},
 		{"mismatched address", good, "new@example.com"},
 		{"no user row", good, ""},
 		{"missing", "", "bob@example.com"},
@@ -235,6 +245,15 @@ func TestAlertsConfirmRefusesBadLinks(t *testing.T) {
 		}
 		if len(store.verified) != 0 {
 			t.Errorf("%s: verified %+v", tc.name, store.verified)
+		}
+		// A token that cannot confirm anything offers no Confirm button.
+		if tc.token == good {
+			continue
+		}
+		rec = httptest.NewRecorder()
+		testSite.alertsConfirm(rec, httptest.NewRequest(http.MethodGet, "/alerts/confirm?token="+url.QueryEscape(tc.token), nil), store)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), alertsConfirmFailedText) || strings.Contains(rec.Body.String(), `action="/alerts/confirm"`) {
+			t.Errorf("%s GET: %d %s", tc.name, rec.Code, rec.Body)
 		}
 	}
 }

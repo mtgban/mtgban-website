@@ -27,7 +27,7 @@ const (
 
 	alertsConfirmAskText     = "Use %s for your price alerts?"
 	alertsConfirmedText      = "Your email address is confirmed."
-	alertsConfirmFailedText  = "This confirmation link is not valid or has expired."
+	alertsConfirmFailedText  = "This confirmation link is not valid or has expired. Ask for a new confirmation mail from your alerts page."
 	alertsUnsubscribeAskText = "Stop all price alert mail to this account?"
 	alertsUnsubscribedText   = "You will no longer receive alert mail."
 	alertsUnsubFailedText    = "This unsubscribe link is not valid."
@@ -234,7 +234,7 @@ func (m originMailDeliverer) NotifyPark(ctx context.Context, ch alerts.Channel, 
 // alertChannelStore is what the mail link pages need from the store.
 type alertChannelStore interface {
 	Channels(ctx context.Context, userHash string) ([]alerts.Channel, error)
-	SetChannelVerified(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, at time.Time) (bool, error)
+	SetChannelVerified(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, claimedAt, at time.Time) (bool, error)
 	DisableChannel(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, reason string, at time.Time) error
 	ParkEmailAlerts(ctx context.Context, userHash, reason string) (int64, error)
 }
@@ -252,14 +252,11 @@ func (s *site) alertLinkStore() alertChannelStore {
 // clearing any bounce, or moves the row to that address when the user asked
 // for its confirm mail; anything else is a bad token.
 func confirmAlertEmail(ctx context.Context, store alertChannelStore, secret []byte, raw string, now time.Time) error {
-	t, err := verifyAlertToken(secret, raw, alerts.TokenConfirm, now)
+	t, err := verifyConfirmToken(secret, raw, now)
 	if err != nil {
 		return err
 	}
-	if t.Address == "" {
-		return alerts.ErrBadToken
-	}
-	ok, err := store.SetChannelVerified(ctx, t.UserHash, alerts.ChannelEmail, alerts.SourceUser, t.Address, now)
+	ok, err := store.SetChannelVerified(ctx, t.UserHash, alerts.ChannelEmail, alerts.SourceUser, t.Address, t.Claimed, now)
 	if err != nil {
 		return err
 	}
@@ -267,6 +264,19 @@ func confirmAlertEmail(ctx context.Context, store alertChannelStore, secret []by
 		return alerts.ErrBadToken
 	}
 	return nil
+}
+
+// verifyConfirmToken checks a confirm token that names an address and the
+// claim its mail went under; one with no claim never confirms.
+func verifyConfirmToken(secret []byte, raw string, now time.Time) (alerts.Token, error) {
+	t, err := verifyAlertToken(secret, raw, alerts.TokenConfirm, now)
+	if err != nil {
+		return alerts.Token{}, err
+	}
+	if t.Address == "" || t.Claimed.IsZero() {
+		return alerts.Token{}, alerts.ErrBadToken
+	}
+	return t, nil
 }
 
 // unsubscribeAlertEmail disables every email row not already disabled,
@@ -317,7 +327,7 @@ func (s *site) alertsConfirm(w http.ResponseWriter, r *http.Request, store alert
 	var err error
 	if r.Method == http.MethodGet {
 		// Link scanners prefetch GETs, so a GET only checks the token.
-		t, err = verifyAlertToken(alertTokenSecret(), token, alerts.TokenConfirm, now)
+		t, err = verifyConfirmToken(alertTokenSecret(), token, now)
 	} else if store != nil {
 		err = confirmAlertEmail(r.Context(), store, alertTokenSecret(), token, now)
 	}

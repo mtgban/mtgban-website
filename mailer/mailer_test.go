@@ -396,6 +396,28 @@ func TestPermanentSendError(t *testing.T) {
 	}
 }
 
+// Refused is a send the provider definitely did not take; anything that
+// may have been accepted before it failed is not.
+func TestRefused(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{nil, false},
+		{errors.New("dial tcp: i/o timeout"), false},
+		{fmt.Errorf("wrapped: %w", &SendError{Status: 422, Permanent: true, Msg: "to"}), true},
+		{&SendError{Status: 550, Permanent: true, Msg: "no such user"}, true},
+		{&SendError{Status: 403, Msg: "domain not verified"}, true},
+		{&SendError{Status: 409}, false},
+		{&SendError{Status: 429, Msg: "slow down"}, false},
+		{&SendError{Status: 500, Msg: "internal"}, false},
+	} {
+		if got := Refused(tc.err); got != tc.want {
+			t.Errorf("Refused(%v) = %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
+
 // A server refusing our sender says nothing about the recipient: the error
 // stays transient, so a caller does not park the address for it.
 func TestSendKeepsASenderRefusalTransient(t *testing.T) {

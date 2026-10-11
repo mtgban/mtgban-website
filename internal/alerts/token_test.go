@@ -12,7 +12,7 @@ import (
 func TestTokenRoundTripAndTamper(t *testing.T) {
 	secret := []byte("0123456789abcdef0123456789abcdef")
 	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
-	tok := Token{Kind: TokenConfirm, UserHash: "u1", Address: "ann@example.com", Expires: now.Add(24 * time.Hour)}
+	tok := Token{Kind: TokenConfirm, UserHash: "u1", Address: "ann@example.com", Expires: now.Add(24 * time.Hour), Claimed: now.Add(-time.Microsecond)}
 	s := MintToken(secret, tok)
 	got, err := VerifyToken(secret, s, now)
 	if err != nil || got != tok {
@@ -29,7 +29,7 @@ func TestTokenRoundTripAndTamper(t *testing.T) {
 		t.Errorf("tamper: %v", err)
 	}
 	u := MintToken(secret, Token{Kind: TokenUnsubscribe, UserHash: "u1"})
-	if got, err := VerifyToken(secret, u, now.Add(1000*24*time.Hour)); err != nil || got.Kind != TokenUnsubscribe || !got.Expires.IsZero() {
+	if got, err := VerifyToken(secret, u, now.Add(1000*24*time.Hour)); err != nil || got.Kind != TokenUnsubscribe || !got.Expires.IsZero() || !got.Claimed.IsZero() {
 		t.Errorf("unsubscribe never expires: %+v %v", got, err)
 	}
 	if _, err := VerifyToken(secret, "", now); !errors.Is(err, ErrBadToken) {
@@ -40,13 +40,23 @@ func TestTokenRoundTripAndTamper(t *testing.T) {
 	if _, err := VerifyToken(secret, badKindToken, now); !errors.Is(err, ErrBadToken) {
 		t.Errorf("unknown kind with past expiry: %v", err)
 	}
-	extraPayload := "confirm|u1|ann@example.com|0|extra"
-	extraMac := hmac.New(sha256.New, secret)
-	extraMac.Write([]byte(extraPayload))
-	extraToken := base64.RawURLEncoding.EncodeToString([]byte(extraPayload)) + "." + base64.RawURLEncoding.EncodeToString(extraMac.Sum(nil))
+	extraToken := signedPayload(secret, "confirm|u1|ann@example.com|0|0|extra")
 	if _, err := VerifyToken(secret, extraToken, now); !errors.Is(err, ErrBadToken) {
 		t.Errorf("extra field: %v", err)
 	}
+	// A four-field unsubscribe payload, with no claim, still verifies.
+	old := signedPayload(secret, "unsubscribe|u1||0")
+	if got, err := VerifyToken(secret, old, now.Add(1000*24*time.Hour)); err != nil || got.Kind != TokenUnsubscribe || got.UserHash != "u1" || !got.Claimed.IsZero() {
+		t.Errorf("four-field unsubscribe: %+v %v", got, err)
+	}
+}
+
+// signedPayload signs a raw payload as MintToken does, for shapes it does
+// not mint.
+func signedPayload(secret []byte, payload string) string {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(payload))
+	return base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 // No secret mints no token, as the verify side accepts none without one.
