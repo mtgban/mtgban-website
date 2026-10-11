@@ -10,6 +10,7 @@ function load(cfg, form = null, elements = {}, saved = {}, env = {}) {
         BAN_ARBIT: cfg,
         location: { href: '', search: env.search || '', reload: () => reloads.push(1) },
         addEventListener: (ev, fn) => { listeners['window:' + ev] = fn; },
+        UserState: env.userState,
     };
     const localStorage = env.local || fakeStorage();
     const sessionStorage = env.session || fakeStorage();
@@ -168,6 +169,15 @@ test('a save keeps the synced copy with the same time as the cookie', () => {
     expect(stored.global).toEqual({ q: 'f=1&minsell=7', t: 5 });
     expect(stored.arbit.q).toBe('f=1&minsell=2');
     expect(decodeURIComponent(cookies[cookies.length - 1][1])).toBe('f=1&minsell=2&t=' + stored.arbit.t);
+});
+
+test('a save is stamped on the server\'s clock where a sync has read it', () => {
+    const local = fakeStorage();
+    const { window, cookies, localStorage } = load({ source: 'CK', query: 'f=1', cookie: 'ArbitFilters' }, null, {}, {},
+        { local, userState: { now: () => 4242 } });
+    window.ArbitFilters.save('f=1&minsell=2');
+    expect(decodeURIComponent(cookies[0][1])).toBe('f=1&minsell=2&t=4242');
+    expect(JSON.parse(localStorage.getItem('mtgban_arbit_filters')).arbit.t).toBe(4242);
 });
 
 test('filters applied later on another device reach the cookies, and the page reloads once', () => {

@@ -23,7 +23,7 @@ const ARBIT = {
 // sameSiteURL (utils.js) as it answers for this site's own query URLs
 const sameSite = (v) => (v.charAt(0) === '?' ? v : '');
 
-function load(cfg, { local = fakeStorage(), session = fakeStorage(), elements = {}, filters = null, sameSiteURL = sameSite } = {}) {
+function load(cfg, { local = fakeStorage(), session = fakeStorage(), elements = {}, filters = null, sameSiteURL = sameSite, userState } = {}) {
     const saves = [];
     const listeners = {};
     const window = {
@@ -33,6 +33,7 @@ function load(cfg, { local = fakeStorage(), session = fakeStorage(), elements = 
         ArbitFilters: filters || { save: (q) => saves.push(q), formQuery: (f) => f.query },
         prompt: null,
         confirm: null,
+        UserState: userState,
     };
     const document = {
         getElementById: (id) => elements[id] || null,
@@ -324,4 +325,13 @@ test('Default cannot be saved over or renamed to, and the defaults are already s
     page.listeners['rename:click']();
     expect(page.elements.arbPresetNote.textContent).toBe('Default is built in; pick another name');
     expect(Q.store.list().map((p) => p.name)).toEqual(['Two']);
+});
+
+test('saves and deletes are stamped on the server\'s clock where a sync has read it', () => {
+    const at = Date.now() - 60 * 60 * 1000;
+    const { P, local } = load({}, { userState: { now: () => at } });
+    const r = P.store.save({ name: 'A', q: 'f=1&minsell=2' });
+    expect(r.preset.savedAt).toBe(at);
+    P.store.remove(r.preset.id);
+    expect(stored(local)).toEqual([{ id: r.preset.id, del: true, savedAt: at }]);
 });

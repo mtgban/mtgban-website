@@ -69,11 +69,17 @@
         dropped = [];
     }
 
+    // When a state is applied, on the server's clock once a sync has read
+    // it (user-state.js), which the reader's devices share.
+    function now() {
+        return window.UserState ? window.UserState.now() : Date.now();
+    }
+
     // Keep a state as the reader's own, with when it was applied. Only what
     // the reader does on the page saves: following a link never does.
     function save(query) {
         if (!cfg.cookie) return;
-        var t = Date.now();
+        var t = now();
         writeSaved(cfg.cookie, query, t);
         try {
             var saved = readSaved();

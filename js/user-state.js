@@ -70,6 +70,21 @@
         } catch (e) { return fallback; }
     }
 
+    // The server's clock, read off the Date header of each sync response:
+    // saved filters and presets are stamped with it, so that a device whose
+    // clock runs fast cannot outdate what another applied after it.
+    var CLOCK_KEY = 'mtgban_userstate_clock';
+    function noteServerClock(r) {
+        var date = r && r.headers && typeof r.headers.get === 'function' ? Date.parse(r.headers.get('Date')) : NaN;
+        // The header counts whole seconds, so its midpoint is nearer
+        if (isFinite(date)) { try { rawSetItem(CLOCK_KEY, String(date + 500 - Date.now())); } catch (e) {} }
+    }
+    function serverNow() {
+        var skew = Number(readLocal(CLOCK_KEY, '0'));
+        return Date.now() + (isFinite(skew) ? skew : 0);
+    }
+    window.UserState = { now: serverNow };
+
     function readMarker() {
         try { var s = sessionStorage.getItem(FETCH_KEY); return s ? JSON.parse(s) : null; }
         catch (e) { return null; }
@@ -185,6 +200,7 @@
             body: body,
             keepalive: keepalive === true
         }).then(function(r) {
+            noteServerClock(r);
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
             if (!r.ok) {
                 console.warn('mtgban sync: ' + section + ' write failed (' + r.status + ')');
@@ -290,6 +306,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: body
         }).then(function(r) {
+            noteServerClock(r);
             if (r.status === 409) {
                 // Someone else wrote; merge again, up to the retry budget.
                 if (attempt >= MAX_RECONCILE_ATTEMPTS) return false;
@@ -510,6 +527,7 @@
         }
 
         fetch(BASE, { method: 'GET', headers: headers }).then(function(r) {
+            noteServerClock(r);
             if (r.status === 304) { writeMarker(version); return null; } // unchanged
             if (r.status === 401 || r.status === 503) return null; // anon / unavailable
             if (!r.ok) return null;

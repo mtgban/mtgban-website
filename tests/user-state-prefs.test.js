@@ -175,3 +175,22 @@ test('arbitrage presets made on two devices both survive, and a delete sticks', 
     expect(pushed.filter((p) => !p.del).map((p) => p.id)).toEqual(['p_a', 'p_b']);
     expect(pushed.find((p) => p.id === 'p_c').del).toBe(true);
 });
+
+test('a sync response\'s Date sets the clock the saved filters are stamped with', async () => {
+    const m = {};
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {} };
+    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    // The server's clock an hour behind this device's
+    const server = new Date(Date.now() - 60 * 60 * 1000).toUTCString();
+    const res = {
+        status: 200, ok: true, headers: { get: (h) => (h === 'Date' ? server : null) },
+        json: () => Promise.resolve({ version: 3, favorites: [], recents: [], preferences: {} }),
+    };
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, document, storage, session, () => Promise.resolve(res), { mtime: (x) => x.m || x.t || 0 });
+    expect(Math.abs(window.UserState.now() - Date.now())).toBeLessThan(1000);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(Math.abs(window.UserState.now() - (Date.parse(server) + 500))).toBeLessThan(1000);
+});
