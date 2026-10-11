@@ -2948,7 +2948,9 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData) bool {
 	cI, setDateI := sortingI.co, sortingI.releaseDate
 	cJ, setDateJ := sortingJ.co, sortingJ.releaseDate
 
-	if cI.Name == cJ.Name {
+	// One name in two spellings ("Ho-Oh", "Ho-oh") is one name, or its
+	// printings tie and the sort scatters them, finishes and all
+	if sortingI.nameLower == sortingJ.nameLower {
 		if setDateI.Equal(setDateJ) {
 			// Same number in two editions is a tie the number can't break
 			if cI.Edition != cJ.Edition && cI.Card.Number == cJ.Card.Number {

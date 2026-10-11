@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -104,6 +105,41 @@ func wrathOfGodKeys(t *testing.T) []string {
 		t.Skip("not enough printings of the test card")
 	}
 	return keys
+}
+
+// TestAlphabeticalSortReadsOneNameInTwoSpellings is Pokemon's Ho-Oh, also
+// spelled Ho-oh: the two spellings sort as one name, by number, each card
+// with its nonfoil first, either way round, instead of tying and scattering
+// both cards' finishes.
+func TestAlphabeticalSortReadsOneNameInTwoSpellings(t *testing.T) {
+	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{"S": {Code: "S", Name: "Set"}}, UUIDs: map[string]*mtgmatcher.CardObject{}}
+	var keys []string
+	for _, printing := range [][3]string{
+		{"Ho-Oh", "1", "holofoil"},
+		{"Ho-oh", "2", "nonfoil"},
+		{"Ho-Oh", "1", "nonfoil"},
+		{"Ho-oh", "2", "holofoil"},
+	} {
+		name, number, finish := printing[0], printing[1], printing[2]
+		uuid := number + "_" + finish
+		b.AddPrinting(&mtgmatcher.Card{Name: name, Number: number, SetCode: "S"}, uuid, finish)
+		keys = append(keys, uuid)
+	}
+	b.IndexSets()
+	ds := testSite.newDatastore(b, time.Now())
+
+	for _, sortMode := range []string{"alpha", "hybrid"} {
+		for query, want := range map[string][]string{
+			"":              {"1_nonfoil", "1_holofoil", "2_nonfoil", "2_holofoil"},
+			"?reverse=true": {"2_nonfoil", "2_holofoil", "1_nonfoil", "1_holofoil"},
+		} {
+			sorted := slices.Clone(keys)
+			sortSearchKeys(httptest.NewRequest(http.MethodGet, "/search"+query, nil), ds, sorted, nil, sortMode)
+			if !slices.Equal(sorted, want) {
+				t.Errorf("%s%s: sorted %v, want %v", sortMode, query, sorted, want)
+			}
+		}
+	}
 }
 
 // TestHybridSortFilesReprintsUnderParent checks that Alternate Fourth
