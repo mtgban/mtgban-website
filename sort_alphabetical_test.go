@@ -384,5 +384,12 @@ func TestAlphabeticalButtonAsksForTheGroupedDefault(t *testing.T) {
 		if strings.Contains(out, "sort=hybrid") || !strings.Contains(out, "sort=alpha&reverse=true") {
 			t.Errorf("mobile=%v: the Alphabetical button on plain alpha does not just reverse it", mobile)
 		}
+
+		// A grouped sort on screen, with no grouped default saved, reverses
+		// grouped
+		pv.SearchSort, pv.AlphaSort = "hybrid", "alpha"
+		if !strings.Contains(renderPage(t, "search.html", mobile, pv), "sort=hybrid&reverse=true") {
+			t.Errorf("mobile=%v: the Alphabetical button on hybrid does not just reverse it", mobile)
+		}
 	}
 }
