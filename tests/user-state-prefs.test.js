@@ -194,3 +194,15 @@ test('a sync response\'s Date sets the clock the saved filters are stamped with'
     for (let i = 0; i < 10; i++) await Promise.resolve();
     expect(Math.abs(window.UserState.now() - (Date.parse(server) + 500))).toBeLessThan(1000);
 });
+
+test('two devices\' arbitrage presets merge to the newest 10 per page group, names cut to 40', async () => {
+    const mine = [], theirs = [];
+    for (let i = 0; i < 8; i++) mine.push(arbitPreset('p_m' + i, 'Mine ' + i, 100 + i));
+    for (let i = 0; i < 8; i++) theirs.push(arbitPreset('p_t' + i, 'Theirs ' + i, 200 + i));
+    theirs.push(arbitPreset('p_g', 'G'.repeat(60), 50, 'global'));
+    const pushed = await reconcileArbitPresets(mine, theirs);
+    const arbit = pushed.filter((p) => !p.del && p.group === 'arbit').map((p) => p.savedAt).sort((a, b) => a - b);
+    expect(arbit).toEqual([106, 107, 200, 201, 202, 203, 204, 205, 206, 207]);
+    const global = pushed.filter((p) => p.group === 'global');
+    expect(global.map((p) => p.name)).toEqual(['G'.repeat(40)]);
+});

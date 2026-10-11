@@ -420,7 +420,7 @@
             out[PRESETS_KEY] = mergePresets(localPrefs[PRESETS_KEY], serverPrefs[PRESETS_KEY]);
         }
         if (localPrefs && serverPrefs && ARBIT_PRESETS_KEY in localPrefs && ARBIT_PRESETS_KEY in serverPrefs) {
-            out[ARBIT_PRESETS_KEY] = mergePresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
+            out[ARBIT_PRESETS_KEY] = mergeArbitPresets(localPrefs[ARBIT_PRESETS_KEY], serverPrefs[ARBIT_PRESETS_KEY]);
         }
         if (localPrefs && serverPrefs && ARBIT_KEY in localPrefs && ARBIT_KEY in serverPrefs) {
             out[ARBIT_KEY] = mergeArbitFilters(localPrefs[ARBIT_KEY], serverPrefs[ARBIT_KEY]);
@@ -464,6 +464,26 @@
             return x < y ? -1 : x > y ? 1 : 0;
         });
         return JSON.stringify(live.concat(merged.filter(function(p) { return p.del; })));
+    }
+
+    // The arbitrage presets merge as the upload ones do, then hold each page
+    // group to the newest 10 and each name to 40 characters, as
+    // arbit-presets.js saves them: two devices' lists cannot add up past it.
+    var ARBIT_PRESET_CAP = 10, ARBIT_PRESET_NAME_MAX = 40;
+    function mergeArbitPresets(local, server) {
+        var merged = JSON.parse(mergePresets(local, server));
+        var kept = {}, count = {};
+        merged.filter(function(p) { return !p.del; }).sort(function(a, b) {
+            return (b.savedAt || 0) - (a.savedAt || 0);
+        }).forEach(function(p) {
+            var g = String(p.group);
+            count[g] = (count[g] || 0) + 1;
+            if (count[g] <= ARBIT_PRESET_CAP) kept[p.id] = true;
+        });
+        return JSON.stringify(merged.filter(function(p) { return p.del || kept[p.id]; }).map(function(p) {
+            if (!p.del) p.name = String(p.name).slice(0, ARBIT_PRESET_NAME_MAX);
+            return p;
+        }));
     }
 
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
