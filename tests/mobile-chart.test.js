@@ -154,6 +154,14 @@ test('an archive that does not answer is a failure, and is not asked for more', 
     expect(errors.length).toBe(1);
 });
 
+test('a refused load says what the reader can do about it', async () => {
+    const limited = await openDrawer(() => ({ status: 429, error: 'slow down' }));
+    expect(limited.loading.textContent).toBe('Too many requests, try again in a moment');
+
+    const signedOut = await openDrawer(() => ({ status: 401, error: 'unauthorized' }));
+    expect(signedOut.loading.textContent).toBe('Signed out, log in again to load the chart');
+});
+
 test('an empty window whose wider read fails says it failed', async () => {
     const { calls, loading } = await openDrawer((range) => range === 3650 ? unavailable() : empty(range));
 

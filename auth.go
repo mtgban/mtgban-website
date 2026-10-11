@@ -693,7 +693,13 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 				limitKey = checked.Get("Signature")
 			}
 		}
+		// A script reading an API route needs a status it can test, not a page
+		api := strings.HasPrefix(r.URL.Path, "/api/")
 		if !UserRateLimiter.Allow(limitKey) && r.URL.Path != "/admin" {
+			if api {
+				errorResponse(w, http.StatusTooManyRequests, ErrMsgUseAPI)
+				return
+			}
 			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
@@ -703,6 +709,10 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 		}
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
+		if SigCheck && err != nil && api {
+			errorResponse(w, http.StatusUnauthorized, ErrMsg)
+			return
+		}
 		if SigCheck && err != nil {
 			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Unauthorized"
@@ -716,6 +726,10 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 		}
 
 		v, err := url.ParseQuery(string(raw))
+		if SigCheck && err != nil && api {
+			errorResponse(w, http.StatusUnauthorized, ErrMsg)
+			return
+		}
 		if SigCheck && err != nil {
 			pageVars := genPageNav(s, r, "Error", sig)
 			pageVars.Title = "Unauthorized"
@@ -747,6 +761,21 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 		if SigCheck && (err != nil || !signed || expires < time.Now().Unix()) {
 			if r.Method != "GET" {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			expired := err == nil && signed && expires < time.Now().Unix()
+			// A chart opened as the page's signature runs out gets the
+			// window a reader with no grant gets (chartLookback).
+			if expired && strings.HasPrefix(r.URL.Path, "/api/chart/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if api {
+				msg := ErrMsg
+				if expired {
+					msg = ErrMsgExpired
+				}
+				errorResponse(w, http.StatusUnauthorized, msg)
 				return
 			}
 			pageVars := genPageNav(s, r, "Error", sig)

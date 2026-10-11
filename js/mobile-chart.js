@@ -87,9 +87,21 @@
             .then(function(r) {
                 // An error status is a chart that failed to load, not a card
                 // with no history, so it must not read as an empty answer.
-                if (!r.ok) throw new Error('chart ' + r.status);
+                if (!r.ok) {
+                    var err = new Error('chart ' + r.status);
+                    err.status = r.status;
+                    throw err;
+                }
                 return r.json();
             });
+    }
+
+    // chartFailureText is what the drawer says for a failed load: the
+    // server's 429 and 401 each have something the reader can do.
+    function chartFailureText(err) {
+        if (err && err.status === 429) return 'Too many requests, try again in a moment';
+        if (err && err.status === 401) return 'Signed out, log in again to load the chart';
+        return 'Failed to load chart';
     }
 
     function prefetchFullRange(cardId, fullRange) {
@@ -420,7 +432,7 @@
                 })
                 .catch(function(err) {
                     loading.style.display = 'block';
-                    loading.textContent = 'Failed to load chart';
+                    loading.textContent = chartFailureText(err);
                     console.error(err);
                 });
         });

@@ -203,3 +203,53 @@ func TestTheUnconfirmedFlagIsSigned(t *testing.T) {
 		t.Errorf("flagged signature verifies: %v, with the flag deleted: %v", flaggedOK, strippedOK)
 	}
 }
+
+// An API route answers a refusal with a status and a JSON error a script can
+// test, where a page renders the error page; a chart asked with a signature
+// that just ran out is still answered.
+func TestEnforceSigningRefusesAPIRoutesWithAStatus(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	reached := ""
+	handler := enforceSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = r.URL.Path
+	}))
+	serve := func(target string) *httptest.ResponseRecorder {
+		reached = ""
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+		return rec
+	}
+	expired := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(-time.Hour)))
+
+	UserRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	for _, tc := range []struct {
+		target, body string
+		status       int
+	}{
+		{"/api/chart/ban:1", ErrMsg, http.StatusUnauthorized},
+		{"/api/search/retail/x?sig=" + expired, "logged out", http.StatusUnauthorized},
+		{"/api/prices/x?sig=not-base64!", ErrMsg, http.StatusUnauthorized},
+	} {
+		rec := serve(tc.target)
+		if rec.Code != tc.status || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") || !strings.Contains(rec.Body.String(), tc.body) || reached != "" {
+			t.Errorf("%s: %d %q %q, reached %q; want %d and a JSON error", tc.target, rec.Code, rec.Header().Get("Content-Type"), rec.Body.String(), reached, tc.status)
+		}
+	}
+
+	rec := serve("/api/chart/ban:1?sig=" + expired)
+	if reached != "/api/chart/ban:1" {
+		t.Errorf("an expired chart ask was refused: %d %q", rec.Code, rec.Body.String())
+	}
+	rec = serve("/search?sig=" + expired)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), html.EscapeString(ErrMsgExpired)) {
+		t.Errorf("an expired page = %d, want the logged-out page", rec.Code)
+	}
+
+	UserRateLimiter = ratelimit.NewLimiter(0, 0)
+	rec = serve("/api/chart/ban:1")
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), `"error"`) {
+		t.Errorf("a limited chart ask = %d %q, want 429 and a JSON error", rec.Code, rec.Body.String())
+	}
+}
