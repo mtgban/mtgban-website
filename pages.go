@@ -593,6 +593,9 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	// built from its own base, so the block cannot live in one of them.
 	files = append(files, "templates/partials/set-symbol.html")
 
+	// Same reasoning for the description meta tag: every base needs it.
+	files = append(files, "templates/partials/meta-description.html")
+
 	// Every desktop page carries the settings modal's shell; its body is
 	// fetched from /api/settings/modal on open
 	if !isMobile {

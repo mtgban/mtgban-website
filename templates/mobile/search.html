@@ -5,6 +5,8 @@
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
+{{define "description"}}{{if .Embed.Title}}{{.Embed.Title}} prices across stores and buylists. {{.Embed.Description}}{{else}}{{template "meta-description" .}}{{end}}{{end}}
+
 {{define "extra-meta"}}
     <link rel="search" type="application/opensearchdescription+xml" title="MTGBAN Price Search" href="/api/opensearch.xml" />
 {{end}}

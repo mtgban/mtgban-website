@@ -1,0 +1,7 @@
+{{/* The page's description meta tag text: the active nav entry's
+     subtitle as a sentence, else the site's own line. */}}
+{{define "meta-description" -}}
+{{- $desc := "Card prices and buylist offers from every major store, compared in one search." -}}
+{{- range .Nav}}{{if .Active}}{{if .Description}}{{$desc = printf "MTGBAN %s: %s." .Name .Description}}{{end}}{{end}}{{end -}}
+{{- $desc -}}
+{{- end}}
