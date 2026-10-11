@@ -325,6 +325,32 @@ func TestWebhookConfirmComplaintDisablesOnlyTheRequester(t *testing.T) {
 	}
 }
 
+// Only a permanent bounce disables: Resend's Transient (a full mailbox)
+// and Undetermined ones may yet deliver.
+func TestWebhookIgnoresSoftBounces(t *testing.T) {
+	secret := []byte("s")
+	now := time.Now()
+	for _, tc := range []struct {
+		bounce   string
+		disables bool
+	}{
+		{`"bounce":{"message":"m","subType":"MailboxFull","type":"Transient"},`, false},
+		{`"bounce":{"subType":"Undetermined","type":"Undetermined"},`, false},
+		{`"bounce":{"subType":"General","type":"Permanent"},`, true},
+		{``, true},
+	} {
+		store := newFakeWebhookStore()
+		store.channels["ann@example.com"] = []Channel{{UserHash: "u1", Kind: ChannelEmail, Address: "ann@example.com", Source: SourcePatreon, VerifiedAt: &now}}
+		wh := &Webhook{Secret: secret, Store: store}
+		body := []byte(`{"type":"email.bounced","data":{"email_id":"m1",` + tc.bounce + `"to":["ann@example.com"]}}`)
+		rec := httptest.NewRecorder()
+		wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
+		if rec.Code != http.StatusOK || (len(store.disabled) == 1) != tc.disables {
+			t.Errorf("%q: status %d disabled %+v", tc.bounce, rec.Code, store.disabled)
+		}
+	}
+}
+
 func TestParseMailEventTags(t *testing.T) {
 	e, err := ParseMailEvent([]byte(`{"type":"email.complained","data":{"to":["a@b.c"],"tags":{"kind":"confirm","user":"u1"}}}`))
 	if err != nil || e.confirmRequester() != "u1" {
