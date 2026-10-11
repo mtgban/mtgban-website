@@ -138,10 +138,59 @@ func (offer arbitOffer) values(key string) []string {
 	return values
 }
 
-// parseArbitState reads the filter state off a query. Numbers that are not
-// finite and values no picker offers are dropped, a selection of the whole
-// list is the same as none, and every other key is ignored.
+// arbitOldToggles are the chip keys of links made before the filter bar,
+// by the option each one turned on, true and false alike.
+var arbitOldToggles = map[string]string{
+	"nononrl":    "rl",
+	"nononabu4h": "abu4h",
+	"norand":     "decklists",
+	"nosyp":      "syp",
+	"nostock":    "stocks",
+	"nosus":      "legit",
+	"novolatile": "stable",
+	"noindex":    "tradable",
+}
+
+// oldArbitKeys are a query's old chip keys as the keys that replaced them,
+// where the query does not also name those; nopenny, "only Bucks+", is a
+// $1 floor on the price paid.
+func oldArbitKeys(form url.Values) url.Values {
+	v := url.Values{}
+	for old, key := range arbitOldToggles {
+		if form.Has(old) && !form.Has(key) {
+			v[key] = form[old]
+		}
+	}
+	penny, _ := strconv.ParseBool(form.Get("nopenny"))
+	if penny && !form.Has("minsell") {
+		v.Set("minsell", "1")
+	}
+	return v
+}
+
+// hasOldArbitKeys reports whether a query names an old chip key, on or off:
+// a link made before the filter bar, which spelled out its whole state.
+func hasOldArbitKeys(form url.Values) bool {
+	for old := range arbitOldToggles {
+		if form.Has(old) {
+			return true
+		}
+	}
+	return form.Has("nopenny")
+}
+
+// parseArbitState reads the filter state off a query, old chip keys
+// included. Numbers that are not finite and values no picker offers are
+// dropped, a selection of the whole list is the same as none, and every
+// other key is ignored.
 func parseArbitState(form url.Values, offer arbitOffer) arbitState {
+	old := oldArbitKeys(form)
+	if len(old) > 0 {
+		for key, values := range form {
+			old[key] = values
+		}
+		form = old
+	}
 	st := arbitState{Toggles: map[string]bool{}}
 	if slices.Contains(arbitSorts, form.Get("sort")) {
 		st.Sort = form.Get("sort")
@@ -209,13 +258,13 @@ func arbitSavedCookie(global bool) string {
 }
 
 // requestArbitState is the state a request asks for: its own query where
-// that carries the marker, else the reader's saved filters, whose sort the
-// query can still change for the one view. A saved value that does not
+// that carries the marker or an old chip key, else the reader's saved
+// filters, whose sort the query can still change for the one view. A saved value that does not
 // read as a query is no saved value. It also answers when the saved state
 // it used was applied (its t), 0 where it used none, which the page holds
 // against the copy synced from the reader's other devices.
 func requestArbitState(form url.Values, saved string, offer arbitOffer) (arbitState, int64) {
-	if form.Has(arbitMarker) || saved == "" {
+	if form.Has(arbitMarker) || hasOldArbitKeys(form) || saved == "" {
 		return parseArbitState(form, offer), 0
 	}
 	unescaped, err := url.QueryUnescape(saved)
