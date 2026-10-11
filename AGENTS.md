@@ -183,6 +183,7 @@ output, not a claim written here.
 | `user.go`, `discord_users.go` | The Account page (`/user`): the reader's tier, email and Discord link, their personal feature links, and the tier table built from the ACL; the bot lookup that names a Discord id, cached |
 | `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, the upload share link (api_upload_share.go), CSV exports |
 | `api_news.go` | The newspaper's reports on API v2 under `/api/v2/newspaper/`: `reports.json` and each report's live edition in JSON or CSV, filtered and sorted through `news.go`'s `newsFilter` and paged at 1,000 rows, sold as the `newspaper` add-on (`docs/api-v2-newspaper.md`) |
+| `api_history.go` | The v2 history endpoint under `/api/v2/history/`: one card, a comma-separated batch or a set page in the path, in JSON or CSV, its budget in card-months, a card being one printing in one finish, and its store keys from `timeseries/providers.json` (`docs/api-v2-history.md`) |
 | `admin.go`, `admin_searches.go`, `admin_alerts.go`, `discord.go` | Admin panel + commands, with the Searches tab's vote ranking and the Alerts tab's view of the alerts table each in its own file; Discord bot |
 | `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them (a changed table or grant list, saved or reloaded, stamps or pokes the readers it makes stale); per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
