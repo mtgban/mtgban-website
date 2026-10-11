@@ -98,7 +98,7 @@
     border: none;
     cursor: pointer;
 }
-.cart-btn-primary { background: var(--dodgerblue); color: #ffffff; }
+.cart-btn-primary { background: var(--dodgerblue-fill); color: #ffffff; }
 .cart-btn-primary:hover { filter: brightness(1.1); }
 .cart-btn-secondary {
     background: var(--surface-3);
