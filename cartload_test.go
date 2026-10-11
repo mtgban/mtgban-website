@@ -280,6 +280,68 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	if strings.Contains(page, `id="cart-overlay"`) {
 		t.Error("a page with no cart store carries the cart panel")
 	}
+
+	// Global buys at the page's own store, or on sealed at the section, and
+	// every section is a store, so no buylist cart is filled
+	sellers := append(GetSellers(), mtgban.NewSellerFromInventory(mtgban.InventoryRecord{},
+		mtgban.ScraperInfo{Shorthand: "IndexSealed", SealedMode: true}))
+	sellersPtr.Store(&sellers)
+	for _, tc := range []struct {
+		name  string
+		short string
+		key   string
+	}{
+		{"global", "ABUScans", "CSI"},
+		{"global sealed", "IndexSealed", "ABUScans"},
+		{"global CK", "ABUScans", "CK"},
+	} {
+		page := renderArbit(t, PageVars{
+			ScraperShort: tc.short,
+			ArbitVars:    ArbitVars{GlobalMode: true},
+			UserNav:      &NavElem{Short: "beta"},
+			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: rows}},
+		})
+		if !strings.Contains(page, buy) {
+			t.Errorf("%s: no store cart button with %s", tc.name, buy)
+		}
+		if strings.Contains(page, "Load buylist at") {
+			t.Errorf("%s: a store section got a buylist button", tc.name)
+		}
+		if strings.Count(page, `data-load-list="cart"`) != 1 {
+			t.Errorf("%s: want one cart button", tc.name)
+		}
+	}
+
+	// On Global sealed every store's own load button is the section's too,
+	// never the page's store's
+	sellers = append(sellers, mtgban.NewSellerFromInventory(mtgban.InventoryRecord{},
+		mtgban.ScraperInfo{Shorthand: "TCGSealed", SealedMode: true}))
+	sellersPtr.Store(&sellers)
+	for _, tc := range []struct {
+		short string
+		key   string
+		want  string
+	}{
+		{"IndexSealed", "CK", ">Load at CK<"},
+		{"IndexSealed", "CSI", ">Load at CSI<"},
+		{"IndexSealed", "TCGLow", ">Load at TCG<"},
+		{"IndexSealed", "MP", ">Load at Manapool<"},
+		{"IndexSealed", "SCG", ">Load at SCG<"},
+		{"TCGSealed", "ABUScans", ""},
+	} {
+		page := renderArbit(t, PageVars{
+			ScraperShort: tc.short,
+			ArbitVars:    ArbitVars{GlobalMode: true},
+			UserNav:      &NavElem{Short: "beta"},
+			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: rows}},
+		})
+		if tc.want != "" && !strings.Contains(page, tc.want) {
+			t.Errorf("global sealed %s: no %s button", tc.key, tc.want)
+		}
+		if strings.Contains(page, ">Load at TCG<") != (tc.want == ">Load at TCG<") {
+			t.Errorf("global sealed %s against %s: Load at TCG is the page's store's", tc.key, tc.short)
+		}
+	}
 }
 
 func TestCartBookmarklet(t *testing.T) {

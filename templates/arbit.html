@@ -300,7 +300,9 @@
                 <div class="arb-load-btns">
                     {{$scraperKey := $arb.Key}}
                     {{$sourceKey := $.ScraperShort}}
-                    {{if $.ReverseMode}}
+                    {{/* The store bought at is the section's on reverse and on Global
+                         sealed, as scraperCompare picks its seller */}}
+                    {{if or $.ReverseMode (and $.GlobalMode $sealedSource)}}
                         {{$scraperKey = $.ScraperShort}}
                         {{$sourceKey = $arb.Key}}
                     {{end}}
@@ -383,7 +385,7 @@
                         </span>
                     {{end}}
 
-                    {{if eq $scraperKey "CK"}}
+                    {{if and (eq $scraperKey "CK") (not $.GlobalMode)}}
                         <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
                             <input type="hidden" name="json" data-load-list="ckbuylist" value='
                                 {"contents": [
@@ -403,12 +405,15 @@
                         </form>
                     {{end}}
 
+                    {{/* Global sells nowhere */}}
+                    {{if not $.GlobalMode}}
                     {{$sellCart := cart_load_arbit $scraperKey true $entries}}
                     {{if $sellCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
                             <a class="arb-load-btn csv cart-help" href="#" onclick="return showCartPrompt(this.nextElementSibling)" title="How Load buylist at {{$sellCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn sell" href="{{$sellCart.Link}}" target="_blank" rel="noopener" data-store="{{$sellCart.Store}}" data-buylist="true" data-load-list="cart" data-load-items="{{$sellCart.Items}}" onclick="return openCartPrompt(this)">Load buylist at {{$sellCart.Store}}</a>
                         </span>
+                    {{end}}
                     {{end}}
 
                     {{if or (eq $scraperKey "CK") (eq $scraperKey "SCG")}}
