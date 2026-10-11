@@ -118,6 +118,7 @@ var OptionalFields = []string{
 	"AnyExperimentsEnabled",
 	"AnySpread",
 	"APImode",
+	"APIlookback",
 	"SleepersCYOA",
 	"SearchOfflineMode",
 	"SearchBackpackMax",

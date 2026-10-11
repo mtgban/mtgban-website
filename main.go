@@ -71,6 +71,8 @@ type APIGatewayConfig struct {
 	Games []matcher.Game `json:"games"`
 	// NewspaperOnSale shows the newspaper add-on on the plans page; off until the gateway sells it
 	NewspaperOnSale bool `json:"newspaper_on_sale"`
+	// HistoryOnSale shows the history package on the plans page; off until the gateway sells it
+	HistoryOnSale bool `json:"history_on_sale"`
 }
 
 // DiscordConfig contains the bot connection, community links, channel IDs,

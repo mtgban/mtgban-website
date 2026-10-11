@@ -41,8 +41,11 @@ var StoreScopes = []string{StoreScopeExplicit, StoreScopeBase, StoreScopeAll}
 // ModeNewspaper is the newspaper reports mode, which an add-on grants.
 const ModeNewspaper = "newspaper"
 
+// ModeHistory is the price-history mode; a package granting it grants nothing else.
+const ModeHistory = "history"
+
 // Modes are the API modes a package or add-on may grant, and the order a package must list them in.
-var Modes = []string{"retail", "buylist", "sealed", ModeNewspaper}
+var Modes = []string{"retail", "buylist", "sealed", ModeNewspaper, ModeHistory}
 
 // Currencies are the currencies Stripe is seeded in.
 var Currencies = []string{"usd"}
@@ -63,11 +66,18 @@ type Package struct {
 	// IncludedStores is how many selectable stores the price includes beyond the implied ones.
 	IncludedStores int      `json:"included_stores"`
 	Modes          []string `json:"modes"`
+	// LookbackDays is how far back a history package reads; 0 on a price package.
+	LookbackDays int `json:"lookback_days,omitempty"`
 	// Icon, Subtitle, and Bullets are the pricing page copy. Icon names one
 	// of the page's tier icons.
 	Icon     string   `json:"icon"`
 	Subtitle string   `json:"subtitle"`
 	Bullets  []string `json:"bullets"`
+}
+
+// IsHistory reports whether the package is the price-history one.
+func (p Package) IsHistory() bool {
+	return slices.Contains(p.Modes, ModeHistory)
 }
 
 // Addon is an extra a package can carry: counted per unit, or bought once to grant a mode.
@@ -178,6 +188,27 @@ func (c *ProductList) Validate() error {
 		if p.Monthly <= 0 {
 			return fmt.Errorf("package %s: monthly must be positive", p.Key)
 		}
+		if err := validateModes(p.Key, p.Modes); err != nil {
+			return err
+		}
+		if p.IsHistory() {
+			if len(p.Modes) != 1 {
+				return fmt.Errorf("package %s: history is a package of its own, not a mode beside prices", p.Key)
+			}
+			if p.StoreScope != "" {
+				return fmt.Errorf("package %s: a history package has no store_scope", p.Key)
+			}
+			if p.IncludedStores != 0 {
+				return fmt.Errorf("package %s: included_stores applies to an explicit scope only", p.Key)
+			}
+			if p.LookbackDays < 1 {
+				return fmt.Errorf("package %s: lookback_days must be at least 1", p.Key)
+			}
+			continue
+		}
+		if p.LookbackDays != 0 {
+			return fmt.Errorf("package %s: lookback_days applies to a history package only", p.Key)
+		}
 		if !slices.Contains(StoreScopes, p.StoreScope) {
 			return fmt.Errorf("package %s: store_scope must be one of %v", p.Key, StoreScopes)
 		}
@@ -188,9 +219,6 @@ func (c *ProductList) Validate() error {
 			return fmt.Errorf("package %s: included_stores applies to an explicit scope only", p.Key)
 		}
 		explicit = explicit || p.StoreScope == StoreScopeExplicit
-		if err := validateModes(p.Key, p.Modes); err != nil {
-			return err
-		}
 	}
 	for _, a := range c.Addons {
 		if err := claim(a.Key); err != nil {

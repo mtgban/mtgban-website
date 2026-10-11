@@ -4,6 +4,18 @@
     <link rel="stylesheet" type="text/css" href="/css/api-plans.css?hash={{.Hash}}">
 {{end}}
 
+{{/* api-card-body is the podium and history cards' shared inner markup; "." is the package. */}}
+{{define "api-card-body" -}}
+<div class="api-tier-icon">{{plan_icon .Icon}}</div>
+                    <h3><label for="api-package-{{.Key}}">{{.Name}}</label></h3>
+                    <p class="api-sub">{{.Subtitle}}</p>
+                    <p class="api-amount">{{usd .Monthly}}<span>per month</span></p>
+                    <ul class="api-bullets">
+                        {{range .Bullets}}<li>{{.}}</li>{{end}}
+                    </ul>
+                    <button type="button" class="api-btn api-cta" data-package="{{.Key}}" data-label="Choose {{.Name}}" data-selected="Selected">Choose {{.Name}}</button>
+{{- end}}
+
 {{define "content"}}
 {{with .API}}
 <div class="page-compact api-plans">
@@ -29,14 +41,7 @@
                 {{range .Cards}}
                 <div class="card api-card{{if eq .Key $.API.TopCard}} api-card-top{{end}}">
                     <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
-                    <div class="api-tier-icon">{{plan_icon .Icon}}</div>
-                    <h3><label for="api-package-{{.Key}}">{{.Name}}</label></h3>
-                    <p class="api-sub">{{.Subtitle}}</p>
-                    <p class="api-amount">{{usd .Monthly}}<span>per month</span></p>
-                    <ul class="api-bullets">
-                        {{range .Bullets}}<li>{{.}}</li>{{end}}
-                    </ul>
-                    <button type="button" class="api-btn api-cta" data-package="{{.Key}}" data-label="Choose {{.Name}}" data-selected="Selected">Choose {{.Name}}</button>
+                    {{template "api-card-body" .}}
                     {{if eq .Key $.API.TopCard}}
                     {{if $.API.CanTrial}}
                     <p class="api-cta-note"><a href="/api-trial?return_to={{$.API.ReturnTo}}">Try the API before you commit</a>: as a Patreon supporter you can request a one time key with FULL ACCESS for {{$.API.TrialDays}} days</p>
@@ -50,6 +55,22 @@
                 {{end}}
             </div>
         </section>
+
+        {{if .HistoryCards}}
+        <section class="api-section api-history">
+            <h2>Price history</h2>
+            <p class="api-note">A separate plan: every source this site charts, read back day by day.</p>
+            <div class="api-cards api-cards-history">
+                {{range .HistoryCards}}
+                <div class="card api-card">
+                    <input type="radio" name="package" id="api-package-{{.Key}}" value="{{.Key}}"{{if eq .Key $.API.DefaultPackage}} checked{{end}}>
+                    {{template "api-card-body" .}}
+                    <p class="api-cta-note">Billed monthly, cancel any time</p>
+                </div>
+                {{end}}
+            </div>
+        </section>
+        {{end}}
 
         <section class="api-section api-configurator" id="api-configure">
             <h2>{{if .Change}}Change your plan{{else}}Your plan{{end}}</h2>
