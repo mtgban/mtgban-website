@@ -109,17 +109,39 @@ describe('load lists', () => {
         expect(input.value).toBe('2-101||1-102||3-103||');
     });
 
+    // A store cart link in the span that holds it and its "?"
+    function cartButton(href, loadItems) {
+        const box = {hidden: false};
+        return {dataset: {loadList: 'cart', loadItems}, href, box, closest: (selector) => (selector === '.cart-load' ? box : null)};
+    }
+
     test('a cart link keeps only the ticked rows, adding up shared ids', () => {
         const href = 'https://abugames.com/cartview/shop#ban=301:5&v=abc&side=retail';
-        const link = {dataset: {loadList: 'cart', loadItems: '301,,301'}, href};
+        const link = cartButton(href, '301,,301');
         const page = loadPage({lists: [link]});
         page.untick(1);
         expect(link.href).toBe(href);
         page.untick(0);
         expect(link.href).toBe('https://abugames.com/cartview/shop#ban=301:3&v=abc&side=retail');
+        expect(link.box.hidden).toBe(false);
         page.tick(0);
         page.tick(1);
         expect(link.href).toBe(href);
+    });
+
+    test('a cart link with no row left the store lists hides until one is ticked', () => {
+        const href = 'https://abugames.com/cartview/shop#ban=301:2,302:3&v=abc&side=retail';
+        const link = cartButton(href, '301,,302');
+        const page = loadPage({lists: [link]});
+        page.untick(0);
+        page.untick(2);
+        expect(link.href).toBe('https://abugames.com/cartview/shop#ban=&v=abc&side=retail');
+        expect(link.box.hidden).toBe(true);
+        page.tick(2);
+        expect(link.box.hidden).toBe(false);
+        page.tick(0);
+        expect(link.href).toBe(href);
+        expect(link.box.hidden).toBe(false);
     });
 
     test('a hashes form disables only the unticked row, even for a repeated card', () => {

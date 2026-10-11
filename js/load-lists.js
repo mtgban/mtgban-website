@@ -103,6 +103,11 @@ function rebuildLoadLists(section, removedClass) {
         } else if (loadListFormats[format]) {
             el.value = loadListFormats[format](active);
         }
+        // A cart left with no row the store lists has no button, as the
+        // server gives none to such a split
+        if (format === 'cart') {
+            el.closest('.cart-load').hidden = /[#&]ban=(&|$)/.test(el.href);
+        }
     });
 
     var removed = {};
