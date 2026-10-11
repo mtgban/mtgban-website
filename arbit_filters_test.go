@@ -581,3 +581,40 @@ func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
 		}
 	}
 }
+
+// TestArbitApplyKeepsReverseTradable pins an Apply on arbit to the saved
+// only Tradable it has no control for: the form carries it unseen, so
+// reverse reads it back through the shared cookie.
+func TestArbitApplyKeepsReverseTradable(t *testing.T) {
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Carry Source", Shorthand: "CARRYSRC"}),
+	}
+	sellersPtr.Store(&sellers)
+	withSigMode(t, true, false)
+
+	r := httptest.NewRequest("GET", "/arbit?source=CARRYSRC", nil)
+	r.Header.Set("Cookie", "ArbitFilters="+url.QueryEscape("f=1&tradable=0&t=1"))
+	w := httptest.NewRecorder()
+	scraperCompare(testSite.datastore(), w, r, PageVars{UserNav: &NavElem{Short: "beta"}}, []string{"CARRYSRC"}, nil, scraperCompareOpts{AllResults: true})
+	if !strings.Contains(w.Body.String(), `<input type="hidden" name="tradable" value="0" data-carry>`) {
+		t.Fatal("arbit's form does not carry the saved only Tradable")
+	}
+
+	// What arbit's form posts once Apply ticks only RL, saved as the cookie
+	st := parseArbitQuery(t, "f=1&tradable=0")
+	bar := newArbitBar(st, arbitMode{}, testArbitOffer, backend(), "SRC")
+	form := url.Values{"f": {"1"}, "toggles_on": {bar.TogglesOn}, "rl": {"1"}}
+	for _, toggle := range bar.Toggles {
+		if toggle.Carry != "" {
+			form.Set(toggle.Key, toggle.Carry)
+		}
+	}
+	saved := url.QueryEscape(form.Encode() + "&t=2")
+	reverse, _ := requestArbitState(url.Values{"source": {"BUY"}}, saved, testArbitOffer)
+	applied := reverse.applied(arbitMode{Reverse: true})
+	if applied["tradable"] || !applied["rl"] {
+		t.Errorf("reverse applies %v after an Apply on arbit, want only RL and not Tradable", applied)
+	}
+}
