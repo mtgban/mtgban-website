@@ -185,16 +185,34 @@ function __acFetchCardMeta(name, onReady) {
     return null;
 }
 
-async function autocomplete(form, inp, sealed) {
+function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
     var providerMode = false;
-    const arr = (await fetchNames(sealed)) || [];
-    /* Folded once, here, rather than per keystroke: the singles list is 37,000
-     * names, and every one of them used to be normalized again on every letter
-     * typed. */
-    const folded = arr.map(__acFold);
-    const squashed = folded.map(__acSquash);
+    /* The name list arrives on the first focus, not at page load: it is
+     * 700 KB and most page views never touch the box. Folded once rather
+     * than per keystroke: the singles list is 37,000 names. */
+    var arr = [], folded = [], squashed = [];
+    var namesRequested = false;
+    function loadNames() {
+        if (namesRequested) return;
+        namesRequested = true;
+        fetchNames(sealed).then(function (names) {
+            arr = names || [];
+            folded = arr.map(__acFold);
+            squashed = folded.map(__acSquash);
+            /* Keystrokes typed before the list arrived got no suggestions;
+             * run the handler once more now that there is something to match. */
+            if (document.activeElement === inp && inp.value) {
+                inp.dispatchEvent(new Event('input'));
+            }
+        }).catch(function () { namesRequested = false; });
+    }
+    /* No { once: true }: a failed fetch resets namesRequested so the next
+     * focus retries, and loadNames itself is the guard against refetching
+     * after success. */
+    inp.addEventListener('focus', loadNames);
+    if (document.activeElement === inp) loadNames();
 
     // Track viewport listeners so we can detach them when the dropdown closes
     var viewportListenersAttached = false;
@@ -567,6 +585,22 @@ async function autocomplete(form, inp, sealed) {
         });
     }
 };
+
+/* Every search box declares itself: data-autocomplete is the sealed flag,
+ * data-autocomplete-value an initial value. Nothing inline calls
+ * autocomplete() any more, so the script can load deferred. */
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('input[data-autocomplete]').forEach(function (inp) {
+            var form = inp.form || (inp.closest ? inp.closest('form') : null);
+            if (!form) return;
+            if (inp.hasAttribute('data-autocomplete-value')) {
+                inp.value = inp.getAttribute('data-autocomplete-value');
+            }
+            autocomplete(form, inp, inp.getAttribute('data-autocomplete'));
+        });
+    });
+}
 
 /* Exposed for the tests; the browser gets these from the script tag itself. */
 if (typeof self !== "undefined") {
