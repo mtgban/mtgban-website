@@ -394,7 +394,11 @@ from the page's host. It first checks it is the loader the site expects:
 `cartLoader` stamps the start of the stripped code's hash into the
 bookmarklet and onto every link (`&v=`), so a bookmark saved before the
 code last changed says it is out of date and asks to be dragged again, and
-touches no cart. An edit to a comment changes no version.
+touches no cart. An edit to a comment changes no version. A store's login
+drops the fragment on its way back to the cart, so the panel says to log
+in before pressing Continue, and a store page with no list, or a login the
+loader finds missing, sends the user back to BAN to press the button
+again.
 On SCG it then uploads the list as one CSV and opens SCG's review of it.
 On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
 
