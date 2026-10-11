@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -195,9 +194,7 @@ var mailEventReasons = map[string]mailEventReason{
 // WebhookStore is what the mail-events webhook needs from the store.
 type WebhookStore interface {
 	ChannelByAddress(ctx context.Context, kind ChannelKind, address string) ([]Channel, error)
-	DisableChannelAt(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason string, at time.Time) (bool, error)
-	ParkEmailAlerts(ctx context.Context, userHash, reason string) (int64, error)
-	ChannelFor(ctx context.Context, userHash string, kind ChannelKind) (Channel, bool, error)
+	DisableAndPark(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason, parkReason string, at time.Time) (bool, error)
 	ComplainConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
 }
 
@@ -293,32 +290,12 @@ func (w *Webhook) handleAddress(ctx context.Context, addr, requester string, rea
 	if err != nil {
 		return err
 	}
-	var users []string
 	for _, ch := range channels {
 		if requester != "" && (ch.UserHash != requester || ch.Source != SourceUser) {
 			continue
 		}
-		// The row may have moved to another address since it was read.
-		disabled, err := w.Store.DisableChannelAt(ctx, ch.UserHash, ch.Kind, ch.Source, ch.Address, reason.channel, at)
-		if err != nil {
-			return err
-		}
-		if !disabled {
-			continue
-		}
-		if !slices.Contains(users, ch.UserHash) {
-			users = append(users, ch.UserHash)
-		}
-	}
-	for _, user := range users {
-		_, ok, err := w.Store.ChannelFor(ctx, user, ChannelEmail)
-		if err != nil {
-			return err
-		}
-		if ok {
-			continue
-		}
-		_, err = w.Store.ParkEmailAlerts(ctx, user, reason.alert)
+		// The store skips a row that moved to another address since it was read.
+		_, err = w.Store.DisableAndPark(ctx, ch.UserHash, ch.Kind, ch.Source, ch.Address, reason.channel, reason.alert, at)
 		if err != nil {
 			return err
 		}

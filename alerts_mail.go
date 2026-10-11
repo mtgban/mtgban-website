@@ -235,10 +235,8 @@ func (m originMailDeliverer) NotifyPark(ctx context.Context, ch alerts.Channel, 
 
 // alertChannelStore is what the mail link pages need from the store.
 type alertChannelStore interface {
-	Channels(ctx context.Context, userHash string) ([]alerts.Channel, error)
 	SetChannelVerified(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, at time.Time) (bool, error)
-	DisableChannel(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, reason string, at time.Time) error
-	ParkEmailAlerts(ctx context.Context, userHash, reason string) (int64, error)
+	UnsubscribeEmail(ctx context.Context, userHash string, at time.Time) error
 }
 
 // alertLinkStore is the site's store, or an untyped nil when there is none.
@@ -278,21 +276,7 @@ func unsubscribeAlertEmail(ctx context.Context, store alertChannelStore, secret 
 	if err != nil {
 		return err
 	}
-	chans, err := store.Channels(ctx, t.UserHash)
-	if err != nil {
-		return err
-	}
-	for _, ch := range chans {
-		if ch.Kind != alerts.ChannelEmail || ch.DisabledAt != nil {
-			continue
-		}
-		err = store.DisableChannel(ctx, t.UserHash, alerts.ChannelEmail, ch.Source, alerts.ReasonUnsubscribed, now)
-		if err != nil {
-			return err
-		}
-	}
-	_, err = store.ParkEmailAlerts(ctx, t.UserHash, alerts.ParkUnsubscribed)
-	return err
+	return store.UnsubscribeEmail(ctx, t.UserHash, now)
 }
 
 // isTokenError is a link that is bad or expired, as opposed to a store failure.

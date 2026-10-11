@@ -212,7 +212,9 @@ func (f *fakeWebhookStore) ChannelByAddress(_ context.Context, _ ChannelKind, ad
 	return f.channels[strings.ToLower(address)], nil
 }
 
-func (f *fakeWebhookStore) DisableChannelAt(_ context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason string, _ time.Time) (bool, error) {
+// DisableAndPark mirrors the store: a row still at address is disabled, then
+// the user is parked once no working email row is left.
+func (f *fakeWebhookStore) DisableAndPark(_ context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason, parkReason string, _ time.Time) (bool, error) {
 	if f.disableErr != nil {
 		return false, f.disableErr
 	}
@@ -220,21 +222,19 @@ func (f *fakeWebhookStore) DisableChannelAt(_ context.Context, userHash string, 
 		return false, nil
 	}
 	f.disabled = append(f.disabled, disableCall{userHash, kind, source, reason})
+	if f.working(userHash, ChannelEmail) {
+		return true, nil
+	}
+	if f.parkErr != nil {
+		return false, f.parkErr
+	}
+	f.parked[userHash] = parkReason
 	return true, nil
 }
 
-func (f *fakeWebhookStore) ParkEmailAlerts(_ context.Context, userHash, reason string) (int64, error) {
-	if f.parkErr != nil {
-		return 0, f.parkErr
-	}
-	f.parked[userHash] = reason
-	return 1, nil
-}
-
-// ChannelFor answers as the store does, over the rows not disabled since.
-func (f *fakeWebhookStore) ChannelFor(_ context.Context, userHash string, kind ChannelKind) (Channel, bool, error) {
-	var best Channel
-	found := false
+// working is whether the user has a working channel of kind, over the
+// rows not disabled since.
+func (f *fakeWebhookStore) working(userHash string, kind ChannelKind) bool {
 	for _, rows := range f.channels {
 		for _, c := range rows {
 			off := slices.Contains(f.disabled, disableCall{c.UserHash, c.Kind, c.Source, ReasonBounced}) ||
@@ -242,12 +242,10 @@ func (f *fakeWebhookStore) ChannelFor(_ context.Context, userHash string, kind C
 			if c.UserHash != userHash || c.Kind != kind || c.DisabledAt != nil || off || (c.Source == SourceUser && c.VerifiedAt == nil) {
 				continue
 			}
-			if !found || c.Source == SourceUser {
-				best, found = c, true
-			}
+			return true
 		}
 	}
-	return best, found, nil
+	return false
 }
 
 // A bounce on a pending alternate address leaves mail on the working

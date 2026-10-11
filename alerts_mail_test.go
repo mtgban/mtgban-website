@@ -93,15 +93,41 @@ func (f *fakeLinkStore) DisableChannel(_ context.Context, userHash string, kind 
 	return nil
 }
 
-// DisableChannelAt is DisableChannel for a row still at address, as the store does.
-func (f *fakeLinkStore) DisableChannelAt(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address, reason string, at time.Time) (bool, error) {
+// DisableAndPark disables a row still at address and parks the user once
+// no working email row is left, as the store does.
+func (f *fakeLinkStore) DisableAndPark(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address, reason, parkReason string, at time.Time) (bool, error) {
 	i := slices.IndexFunc(f.channels, func(c alerts.Channel) bool {
-		return c.UserHash == userHash && c.Kind == kind && c.Source == source && (address == "" || strings.EqualFold(c.Address, address))
+		return c.UserHash == userHash && c.Kind == kind && c.Source == source && strings.EqualFold(c.Address, address)
 	})
 	if i < 0 {
 		return false, nil
 	}
-	return true, f.DisableChannel(ctx, userHash, kind, source, reason, at)
+	err := f.DisableChannel(ctx, userHash, kind, source, reason, at)
+	if err != nil {
+		return false, err
+	}
+	_, working, err := f.ChannelFor(ctx, userHash, alerts.ChannelEmail)
+	if err != nil || working {
+		return true, err
+	}
+	_, err = f.ParkEmailAlerts(ctx, userHash, parkReason)
+	return true, err
+}
+
+// UnsubscribeEmail disables each email row not already disabled and parks
+// the user's email alerts, as the store does in one transaction.
+func (f *fakeLinkStore) UnsubscribeEmail(ctx context.Context, userHash string, at time.Time) error {
+	for _, ch := range f.channels {
+		if ch.UserHash != userHash || ch.Kind != alerts.ChannelEmail || ch.DisabledAt != nil {
+			continue
+		}
+		err := f.DisableChannel(ctx, userHash, alerts.ChannelEmail, ch.Source, alerts.ReasonUnsubscribed, at)
+		if err != nil {
+			return err
+		}
+	}
+	_, err := f.ParkEmailAlerts(ctx, userHash, alerts.ParkUnsubscribed)
+	return err
 }
 
 func (f *fakeLinkStore) ParkEmailAlerts(_ context.Context, userHash, reason string) (int64, error) {

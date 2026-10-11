@@ -127,8 +127,22 @@ func (f *fakeAlertStore) ChannelFor(_ context.Context, h string, kind ChannelKin
 	return Channel{UserHash: h, Kind: ChannelDiscord, Address: c.DiscordUserID, Source: SourcePatreon, VerifiedAt: &at}, true, nil
 }
 
-// UpsertChannel mirrors the store: the same address keeps its state, a new one resets it.
-func (f *fakeAlertStore) UpsertChannel(_ context.Context, c Channel) error {
+// StageEmail mirrors the store: it claims as ClaimConfirmSend does, and a
+// working user row keeps its address.
+func (f *fakeAlertStore) StageEmail(ctx context.Context, h, address string, now, since time.Time) (bool, error) {
+	claimed, err := f.ClaimConfirmSend(ctx, h, address, now, since)
+	if err != nil || !claimed {
+		return false, err
+	}
+	cur, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
+	if ok && cur.VerifiedAt != nil && cur.DisabledAt == nil && !strings.EqualFold(cur.Address, address) {
+		return true, nil
+	}
+	return true, f.upsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: address, Source: SourceUser})
+}
+
+// upsertChannel mirrors the store: the same address keeps its state, a new one resets it.
+func (f *fakeAlertStore) upsertChannel(_ context.Context, c Channel) error {
 	k := channelKey{c.UserHash, c.Kind, c.Source}
 	cur, ok := f.channels[k]
 	if ok && strings.EqualFold(cur.Address, c.Address) {

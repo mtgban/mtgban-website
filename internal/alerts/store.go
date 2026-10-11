@@ -148,11 +148,56 @@ func scanChannel(row rowScanner) (Channel, error) {
 // UpsertChannel inserts a channel or updates its address; verified_at is
 // written as given, and a changed address is a new row in all but its key.
 func (s *Store) UpsertChannel(ctx context.Context, c Channel) error {
+	return upsertChannel(ctx, s.db, c)
+}
+
+// StageEmail claims a confirm mail to address as ClaimConfirmSend does and
+// puts address on the user's own email row, unless the row holds a working
+// address, which stays until the new one is confirmed; claimed is false,
+// staging nothing, when the claim is refused. Both happen under the user's
+// lock, against the row as a confirm left it, so an unsubscribe lands
+// before the claim or after the row moved, never in between.
+func (s *Store) StageEmail(ctx context.Context, userHash, address string, now, since time.Time) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return false, err
+	}
+	err = lockAddress(ctx, tx, address)
+	if err != nil {
+		return false, err
+	}
+	claimed, err := claimConfirmSend(ctx, tx, userHash, address, now, since)
+	if err != nil || !claimed {
+		return false, err
+	}
+	var working bool
+	err = tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM alert_channels
+		 WHERE user_hash = $1 AND kind = 'email' AND source = 'user' AND verified_at IS NOT NULL AND disabled_at IS NULL
+		   AND lower(address) <> lower($2))`, userHash, address).Scan(&working)
+	if err != nil {
+		return false, err
+	}
+	if !working {
+		err = upsertChannel(ctx, tx, Channel{UserHash: userHash, Kind: ChannelEmail, Address: address, Source: SourceUser})
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit()
+}
+
+func upsertChannel(ctx context.Context, db execer, c Channel) error {
 	var verifiedAt any
 	if c.VerifiedAt != nil {
 		verifiedAt = *c.VerifiedAt
 	}
-	_, err := s.db.ExecContext(ctx, `
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO alert_channels (user_hash, kind, address, source, verified_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, now())
 		ON CONFLICT (user_hash, kind, source) DO UPDATE
@@ -245,6 +290,10 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return false, err
+	}
 	if kind == ChannelEmail {
 		err = lockAddress(ctx, tx, address)
 		if err != nil {
@@ -290,15 +339,102 @@ func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind Ch
 // DisableChannel marks a channel unusable, with the reason why. A complaint
 // is final: a row marked as spam keeps that reason and its time.
 func (s *Store) DisableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, reason string, at time.Time) error {
-	_, err := s.DisableChannelAt(ctx, userHash, kind, source, "", reason, at)
+	_, err := disableChannelAt(ctx, s.db, userHash, kind, source, "", reason, at)
 	return err
 }
 
-// DisableChannelAt is DisableChannel for a row still holding address, an
-// empty one matching any; found is false when the row holds another by now,
-// so a late report about an old address leaves the new one alone.
-func (s *Store) DisableChannelAt(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason string, at time.Time) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `
+// DisableAndPark is a mail report's write for one row: it disables the row
+// if it still holds address, so a late report about an old address leaves
+// the new one alone, and parks the user's email alerts when no working
+// email channel is left. found is false when the row held another address.
+// It runs under the user's lock, so a confirm restoring alerts cannot land
+// between the check and the park.
+func (s *Store) DisableAndPark(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason, parkReason string, at time.Time) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return false, err
+	}
+	disabled, err := disableChannelAt(ctx, tx, userHash, kind, source, address, reason, at)
+	if err != nil || !disabled {
+		return false, err
+	}
+	if kind == ChannelEmail {
+		working, err := emailWorks(ctx, tx, userHash)
+		if err != nil {
+			return false, err
+		}
+		if !working {
+			_, err = parkEmailAlerts(ctx, tx, userHash, parkReason)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+	return true, tx.Commit()
+}
+
+// emailWorks is whether the user has an email channel mail can go to, as
+// ChannelFor picks one.
+func emailWorks(ctx context.Context, tx *sql.Tx, userHash string) (bool, error) {
+	var working bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (SELECT 1 FROM alert_channels
+		 WHERE user_hash = $1 AND kind = 'email' AND disabled_at IS NULL AND (source = 'patreon' OR verified_at IS NOT NULL))`,
+		userHash).Scan(&working)
+	return working, err
+}
+
+// UnsubscribeEmail disables every email row of the user's not already
+// disabled, from either source, and parks their email alerts, in one
+// transaction under the user's lock so an Enable cannot land in between.
+func (s *Store) UnsubscribeEmail(ctx context.Context, userHash string, at time.Time) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `
+		UPDATE alert_channels SET disabled_at = $2, disabled_reason = $3, updated_at = now()
+		 WHERE user_hash = $1 AND kind = 'email' AND disabled_at IS NULL`, userHash, at, ReasonUnsubscribed)
+	if err != nil {
+		return err
+	}
+	_, err = parkEmailAlerts(ctx, tx, userHash, ParkUnsubscribed)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// execer is a pool or a transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// userLockID namespaces the per-user advisory lock that orders a mail
+// report's park against a confirm or enable restoring alerts.
+const userLockID = alertsSchemaLockID + 2
+
+// lockUser serialises, until tx ends, the channel writes that park or
+// restore one user's email alerts.
+func lockUser(ctx context.Context, tx *sql.Tx, userHash string) error {
+	_, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, userLockID, userHash)
+	return err
+}
+
+// disableChannelAt disables a row still holding address, an empty one
+// matching any; found is false when no row matched.
+func disableChannelAt(ctx context.Context, db execer, userHash string, kind ChannelKind, source ChannelSource, address, reason string, at time.Time) (bool, error) {
+	res, err := db.ExecContext(ctx, `
 		UPDATE alert_channels
 		   SET disabled_at = CASE WHEN disabled_reason = $6 THEN disabled_at ELSE $5 END,
 		       disabled_reason = CASE WHEN disabled_reason = $6 THEN disabled_reason ELSE $4 END,
@@ -328,6 +464,10 @@ func (s *Store) enableAndRestore(ctx context.Context, userHash string, kind Chan
 		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return false, err
+	}
 	res, err := tx.ExecContext(ctx, update, args...)
 	if err != nil {
 		return false, err
@@ -382,11 +522,11 @@ func (s *Store) ChannelByAddress(ctx context.Context, kind ChannelKind, address 
 	return out, rows.Err()
 }
 
-// ParkEmailAlerts marks a user's active email alerts undeliverable, for a
-// bounce or complaint the mail webhook reports; it answers how many rows it
-// touched.
-func (s *Store) ParkEmailAlerts(ctx context.Context, userHash, reason string) (int64, error) {
-	res, err := s.db.ExecContext(ctx, `
+// parkEmailAlerts marks a user's active email alerts undeliverable, inside
+// the transaction that took their last working address; it answers how many
+// rows it touched.
+func parkEmailAlerts(ctx context.Context, db execer, userHash, reason string) (int64, error) {
+	res, err := db.ExecContext(ctx, `
 		UPDATE alerts SET status = 'undeliverable', last_error = $2, updated_at = now()
 		 WHERE user_hash = $1 AND status = 'active' AND delivery = 'email'`,
 		userHash, reason)
@@ -412,8 +552,17 @@ func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string, 
 	if err != nil {
 		return false, err
 	}
+	claimed, err := claimConfirmSend(ctx, tx, userHash, address, now, since)
+	if err != nil || !claimed {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
+// claimConfirmSend is ClaimConfirmSend inside tx, which holds the address's lock.
+func claimConfirmSend(ctx context.Context, tx *sql.Tx, userHash, address string, now, since time.Time) (bool, error) {
 	var recent, complained bool
-	err = tx.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		SELECT COALESCE(bool_or(sent_at >= $2 AND NOT released), false), COALESCE(bool_or(complained_at IS NOT NULL), false)
 		  FROM alert_confirm_sends WHERE address = lower($1)`,
 		address, since).Scan(&recent, &complained)
@@ -430,10 +579,7 @@ func (s *Store) ClaimConfirmSend(ctx context.Context, userHash, address string, 
 		INSERT INTO alert_confirm_sends (user_hash, address, sent_at) VALUES ($1, lower($2), $3)
 		ON CONFLICT (user_hash, address) DO UPDATE SET sent_at = EXCLUDED.sent_at, released = false`,
 		userHash, address, now)
-	if err != nil {
-		return false, err
-	}
-	return true, tx.Commit()
+	return err == nil, err
 }
 
 // ErrConfirmComplained is an address whose recipient marked a confirm mail as spam.
@@ -681,11 +827,40 @@ func (s *Store) Delete(ctx context.Context, id int64, userHash string) (bool, er
 // SetState is the evaluator's write; it never touches a row the user paused,
 // nor one edited since the run listed it at seenUpdatedAt.
 func (s *Store) SetState(ctx context.Context, id int64, seenUpdatedAt time.Time, st State) (bool, error) {
+	return writeState(ctx, s.db, id, seenUpdatedAt, st)
+}
+
+// ParkForNoAddress is the evaluator's SetState for an email alert whose user
+// had no working address when the run looked; it writes nothing if one works
+// by now, deciding under the user's lock so a confirm restoring alerts
+// cannot land between the check and the park.
+func (s *Store) ParkForNoAddress(ctx context.Context, userHash string, id int64, seenUpdatedAt time.Time, st State) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	err = lockUser(ctx, tx, userHash)
+	if err != nil {
+		return false, err
+	}
+	working, err := emailWorks(ctx, tx, userHash)
+	if err != nil || working {
+		return false, err
+	}
+	parked, err := writeState(ctx, tx, id, seenUpdatedAt, st)
+	if err != nil {
+		return false, err
+	}
+	return parked, tx.Commit()
+}
+
+func writeState(ctx context.Context, db execer, id int64, seenUpdatedAt time.Time, st State) (bool, error) {
 	var fired any
 	if st.LastFiredAt != nil {
 		fired = *st.LastFiredAt
 	}
-	res, err := s.db.ExecContext(ctx, `
+	res, err := db.ExecContext(ctx, `
 		UPDATE alerts SET status = $2, above_armed = $3, below_armed = $4,
 			last_fired_at = COALESCE($5, last_fired_at), last_error = $6, updated_at = now()
 		WHERE id = $1 AND status = 'active' AND updated_at = $7`, id, st.Status, st.AboveArmed, st.BelowArmed, fired, st.LastError, seenUpdatedAt)

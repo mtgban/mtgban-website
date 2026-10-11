@@ -33,7 +33,7 @@ type APIStore interface {
 	LastEvents(ctx context.Context, ids []int64) (map[int64]Event, error)
 	Channels(ctx context.Context, userHash string) ([]Channel, error)
 	ChannelFor(ctx context.Context, userHash string, kind ChannelKind) (Channel, bool, error)
-	UpsertChannel(ctx context.Context, c Channel) error
+	StageEmail(ctx context.Context, userHash, address string, now, since time.Time) (bool, error)
 	DeleteChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) error
 	EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) (bool, error)
 	ChannelByAddress(ctx context.Context, kind ChannelKind, address string) ([]Channel, error)
@@ -810,26 +810,21 @@ func (a *API) setEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 			return
 		}
 	}
-	claimedAt, ok := a.confirmAllowed(ctx, w, c, address)
-	if !ok {
+	if !a.confirmAllowed(ctx, w, c, address) {
 		return
 	}
 	// The channel row needs its contact, which a failed login write may not have left.
 	err = a.deps.Store.EnsureContact(ctx, c.UserHash, c.Tier)
 	if err != nil {
-		a.releaseConfirm(ctx, c, address, claimedAt)
 		a.fail(w, "contact", err)
 		return
 	}
 	// A working address stays until its successor is confirmed; a row
 	// holding none that works moves now, to show the address as pending.
-	if !found || channelState(cur) != stateVerified {
-		err = a.deps.Store.UpsertChannel(ctx, Channel{UserHash: c.UserHash, Kind: ChannelEmail, Address: address, Source: SourceUser})
-		if err != nil {
-			a.releaseConfirm(ctx, c, address, claimedAt)
-			a.fail(w, "channel", err)
-			return
-		}
+	claimedAt := time.Now().Truncate(time.Microsecond)
+	claimed, err := a.deps.Store.StageEmail(ctx, c.UserHash, address, claimedAt, claimedAt.Add(-confirmAddressGap))
+	if a.claimRefused(w, claimed, err) {
+		return
 	}
 	if !a.mailConfirm(ctx, w, c, address, claimedAt) {
 		return
@@ -873,8 +868,12 @@ func (a *API) resendEmail(w http.ResponseWriter, r *http.Request, c Caller) {
 		jsonError(w, http.StatusUnprocessableEntity, msg)
 		return
 	}
-	claimedAt, ok := a.confirmAllowed(ctx, w, c, address)
-	if !ok {
+	if !a.confirmAllowed(ctx, w, c, address) {
+		return
+	}
+	claimedAt := time.Now().Truncate(time.Microsecond)
+	claimed, err := a.deps.Store.ClaimConfirmSend(ctx, c.UserHash, address, claimedAt, claimedAt.Add(-confirmAddressGap))
+	if a.claimRefused(w, claimed, err) {
 		return
 	}
 	if !a.mailConfirm(ctx, w, c, address, claimedAt) {
@@ -896,39 +895,39 @@ func reverifyRefusal(cur Channel) string {
 	}
 }
 
-// confirmAllowed charges the confirm limiter, refuses an address anyone's
-// recipient marked as spam, then claims the address's confirm mail for the
-// caller, answering when it was claimed; false means it answered.
-func (a *API) confirmAllowed(ctx context.Context, w http.ResponseWriter, c Caller, address string) (time.Time, bool) {
+// confirmAllowed charges the confirm limiter, then refuses an address
+// anyone's recipient marked as spam; false means it answered.
+func (a *API) confirmAllowed(ctx context.Context, w http.ResponseWriter, c Caller, address string) bool {
 	if !a.deps.ConfirmLimiter.Allow(c.UserHash) {
 		jsonError(w, http.StatusTooManyRequests, "too many confirmation mails; try again later")
-		return time.Time{}, false
+		return false
 	}
 	rows, err := a.deps.Store.ChannelByAddress(ctx, ChannelEmail, address)
 	if err != nil {
 		a.fail(w, "channels", err)
-		return time.Time{}, false
+		return false
 	}
 	if slices.ContainsFunc(rows, func(ch Channel) bool { return ch.DisabledAt != nil && ch.DisabledReason == ReasonComplained }) {
 		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
-		return time.Time{}, false
+		return false
 	}
-	// Claimed before the send, so nothing after it can fail to land.
-	now := time.Now().Truncate(time.Microsecond)
-	claimed, err := a.deps.Store.ClaimConfirmSend(ctx, c.UserHash, address, now, now.Add(-confirmAddressGap))
-	if errors.Is(err, ErrConfirmComplained) {
+	return true
+}
+
+// claimRefused answers a confirm-mail claim that did not go through, made
+// before the send so nothing after it can fail to land; false means it did.
+func (a *API) claimRefused(w http.ResponseWriter, claimed bool, err error) bool {
+	switch {
+	case errors.Is(err, ErrConfirmComplained):
 		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
-		return time.Time{}, false
-	}
-	if err != nil {
+	case err != nil:
 		a.fail(w, "confirm sends", err)
-		return time.Time{}, false
-	}
-	if !claimed {
+	case !claimed:
 		jsonError(w, http.StatusTooManyRequests, "a confirmation mail went to this address within the hour; check its inbox or try again later")
-		return time.Time{}, false
+	default:
+		return false
 	}
-	return now, true
+	return true
 }
 
 func (a *API) deleteEmail(w http.ResponseWriter, r *http.Request, c Caller) {
