@@ -323,10 +323,10 @@ window.clearFile = function() {
 };
 
 window.onload = (event) => {
+    // Restore only into an empty box: text typed or pasted before this ran wins.
     var textArea = document.getElementById('textArea');
-    if (textArea) {
-        var savedText = localStorage.getItem('uploadTextArea') || '';
-        textArea.value = savedText;
+    if (textArea && !textArea.value) {
+        textArea.value = localStorage.getItem('uploadTextArea') || '';
     }
     var savedMode = localStorage.getItem("uploadMode");
     if (savedMode === "buylist" || savedMode === "retail") {

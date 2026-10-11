@@ -228,7 +228,7 @@ func TestUnpackActionShipsNoList(t *testing.T) {
 		},
 	})
 
-	if !strings.Contains(out, `onclick="runUnpack()"`) {
+	if !strings.Contains(out, `onclick="window.runUnpack && runUnpack()"`) {
 		t.Fatal("the unpack action is missing from a result holding a sealed product")
 	}
 	if !strings.Contains(out, `id="res_unpack"`) {
@@ -263,7 +263,7 @@ func TestUnpackActionAbsentWithoutSealed(t *testing.T) {
 			UnpackSealed:  unpackableSealed(backend(), entries),
 		},
 	})
-	if strings.Contains(out, `onclick="runUnpack()"`) {
+	if strings.Contains(out, `onclick="window.runUnpack && runUnpack()"`) {
 		t.Error("an upload with no sealed rows still offered to unpack them")
 	}
 }
