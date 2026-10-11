@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -249,21 +248,15 @@ func (s *site) alertLinkStore() alertChannelStore {
 	return nil
 }
 
-// confirmAlertEmail verifies the user email row the token was minted for,
-// clearing any bounce; a token for another address is a bad token.
+// confirmAlertEmail verifies the user email row for the token's address,
+// clearing any bounce, or moves the row to that address when the user asked
+// for its confirm mail; anything else is a bad token.
 func confirmAlertEmail(ctx context.Context, store alertChannelStore, secret []byte, raw string, now time.Time) error {
 	t, err := verifyAlertToken(secret, raw, alerts.TokenConfirm, now)
 	if err != nil {
 		return err
 	}
-	chans, err := store.Channels(ctx, t.UserHash)
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(chans, func(c alerts.Channel) bool {
-		return c.Kind == alerts.ChannelEmail && c.Source == alerts.SourceUser
-	})
-	if t.Address == "" || i < 0 || strings.ToLower(chans[i].Address) != t.Address {
+	if t.Address == "" {
 		return alerts.ErrBadToken
 	}
 	ok, err := store.SetChannelVerified(ctx, t.UserHash, alerts.ChannelEmail, alerts.SourceUser, t.Address, now)
