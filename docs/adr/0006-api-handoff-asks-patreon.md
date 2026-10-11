@@ -94,6 +94,11 @@ answer, in `finishAPIHandoff`:
 - **The handoff needs the Patreon client configured** (`patreon.source` and
   its `client` entry), as the site login does, and the deployment's origin
   registered as a redirect URI. Without either it says the handoff is off.
+- **One handoff per browser at a time.** Each start sets `MTGBAN_HANDOFF`
+  anew, so of two tabs started together only the later one finishes,
+  whichever comes back first: a callback clears the cookie only when it
+  carries its nonce. The other is told its link expired, and logs
+  `outcome=nonce mismatch`. Accepted: starting again from that tab works.
 - **`-dev` can no longer fake a handoff with a cookie.** Trying it locally
   needs a Patreon client whose redirect URI is the local origin.
 

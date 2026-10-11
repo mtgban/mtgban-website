@@ -89,7 +89,7 @@ func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 		return nil, fmt.Errorf("cannot retrieve user data: %w", err)
 	}
 
-	LogPages["Admin"].Printf("getUserIds: email=%s name=%s memberships=%d",
+	LogPages["Admin"].Printf("getUserIds: email=%q name=%q memberships=%d",
 		userData.Data.Attributes.Email, userData.Data.Attributes.FullName,
 		len(userData.Data.Relationships.Memberships.Data))
 	if len(userData.Errors) > 0 {
@@ -239,7 +239,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	if code == "" {
 		if isHandoff {
-			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			s.failAPIHandoff(w, r, handoff, "no code from Patreon")
 			return
 		}
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -254,7 +254,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
 		if isHandoff {
-			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			s.failAPIHandoff(w, r, handoff, "token exchange failed")
 			return
 		}
 		http.Redirect(w, r, "/?errmsg=TokenNotFound", http.StatusFound)
@@ -269,7 +269,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
 		if isHandoff {
-			s.failAPIHandoff(w, r, ErrMsgAPIHandoffNoAnswer)
+			s.failAPIHandoff(w, r, handoff, "identity lookup failed")
 			return
 		}
 		http.Redirect(w, r, "/?errmsg=UserNotFound", http.StatusFound)
@@ -316,7 +316,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	LogPages["Admin"].Printf("auth: email=%s tier=%s", userData.Email, tierTitle)
+	LogPages["Admin"].Printf("auth: email=%q tier=%q", userData.Email, tierTitle)
 
 	// Sign our base URL with our tier and other data
 	sig := sign(tierTitle, userData, overrides, DefaultSignatureDuration)

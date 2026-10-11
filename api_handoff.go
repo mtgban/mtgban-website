@@ -19,6 +19,7 @@ const (
 	ErrMsgAPIEmailUnconfirmed = "Confirm your email with Patreon, then try again"
 	ErrMsgAPIHandoffStale     = "That sign-in link has expired: start again from this page"
 	ErrMsgAPIHandoffNoAnswer  = "Patreon did not confirm who you are: start again from this page"
+	ErrMsgAPIHandoffNoEmail   = "Patreon did not share an email address for your account: add one there, then try again"
 )
 
 // apiGatewayUser is the api_user_secrets entry the gateway calls this site
@@ -133,36 +134,46 @@ var handoffPaths = map[string]string{
 // started the handoff.
 func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, user *PatreonUserData, tier string) {
 	// One use: whatever happens next, this handoff is spent
-	clearHandoffCookie(w)
+	spendHandoffCookie(w, r, state)
 
 	secret := apiGatewaySecret()
 	path, known := handoffPaths[state.purpose]
 	cookie := readCookie(r, handoffCookie)
-	msg := ""
+	email := ""
+	if user != nil {
+		email = user.Email
+	}
+	msg, outcome := "", "ok"
 	nonce := ""
 	switch {
 	case secret == "":
-		msg = ErrMsgAPIHandoffOff
-	case !known || cookie == "" || !hmac.Equal([]byte(cookie), []byte(state.nonce)):
-		msg = ErrMsgAPIHandoffStale
-	case user == nil || user.Email == "":
-		msg = ErrMsgAPIHandoffStale
+		msg, outcome = ErrMsgAPIHandoffOff, "no gateway secret"
+	case !known:
+		msg, outcome = ErrMsgAPIHandoffStale, "unknown purpose"
+	// Gone after handoffWindow; a second tab's handoff replaces the first's
+	case cookie == "":
+		msg, outcome = ErrMsgAPIHandoffStale, "no nonce cookie"
+	case !hmac.Equal([]byte(cookie), []byte(state.nonce)):
+		msg, outcome = ErrMsgAPIHandoffStale, "nonce mismatch"
+	case email == "":
+		msg, outcome = ErrMsgAPIHandoffNoEmail, "no email"
 	// The gateway signs in whoever the email names, so Patreon must have
 	// confirmed it.
 	case !user.EmailVerified:
-		msg = ErrMsgAPIEmailUnconfirmed
+		msg, outcome = ErrMsgAPIEmailUnconfirmed, "unverified email"
 	case tier == "" && state.purpose == apihandoff.PurposeTrial:
-		msg = ErrMsgAPITrialPledge
+		msg, outcome = ErrMsgAPITrialPledge, "no tier"
 	case tier == "":
-		msg = ErrMsgAPILoginPledge
+		msg, outcome = ErrMsgAPILoginPledge, "no tier"
 	default:
 		var err error
 		nonce, err = apihandoff.NewNonce()
 		if err != nil {
 			log.Println("apihandoff: NewNonce:", err)
-			msg = ErrMsgAPIHandoffOff
+			msg, outcome = ErrMsgAPIHandoffOff, "no token nonce"
 		}
 	}
+	logHandoff(state, email, tier, outcome)
 	if msg != "" {
 		s.renderAPIHandoffError(w, r, msg)
 		return
@@ -185,10 +196,32 @@ func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state ha
 }
 
 // failAPIHandoff ends a handoff Patreon gave no reader for: the reader turned
-// it down, or the code could not be exchanged or read.
-func (s *site) failAPIHandoff(w http.ResponseWriter, r *http.Request, msg string) {
-	clearHandoffCookie(w)
-	s.renderAPIHandoffError(w, r, msg)
+// it down, or the code could not be exchanged or read, which outcome says.
+func (s *site) failAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, outcome string) {
+	spendHandoffCookie(w, r, state)
+	logHandoff(state, "", "", outcome)
+	s.renderAPIHandoffError(w, r, ErrMsgAPIHandoffNoAnswer)
+}
+
+// logHandoff records how a handoff ended, as the site login records its own.
+// The purpose comes back in the request and the email from Patreon, so the
+// one is logged only when this site sends it and the other quoted.
+func logHandoff(state handoffState, email, tier, outcome string) {
+	purpose := state.purpose
+	_, known := handoffPaths[purpose]
+	if !known {
+		purpose = "unknown"
+	}
+	LogPages["Admin"].Printf("handoff: purpose=%s email=%q tier=%q outcome=%s", purpose, email, tier, outcome)
+}
+
+// spendHandoffCookie drops the nonce when state carries it, so a handoff is
+// finished at most once; an older tab's callback leaves the newer tab's.
+func spendHandoffCookie(w http.ResponseWriter, r *http.Request, state handoffState) {
+	cookie := readCookie(r, handoffCookie)
+	if cookie != "" && hmac.Equal([]byte(cookie), []byte(state.nonce)) {
+		clearHandoffCookie(w)
+	}
 }
 
 // clearHandoffCookie drops the nonce, so a handoff is finished at most once.
