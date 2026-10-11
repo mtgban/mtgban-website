@@ -27,6 +27,8 @@ type APIPlansVars struct {
 	// Cards is the packages in podium order; TopCard is the one on the podium step.
 	Cards   []apiproductlist.Package
 	TopCard string
+	// HistoryCards are the history packages, shown after the podium once on sale.
+	HistoryCards []apiproductlist.Package
 	// Default is the package checked on arrival: the top card, so the fullest
 	// package is what the page opens on.
 	Default        apiproductlist.Package
@@ -154,7 +156,11 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		Email:      GetParamFromSig(sig, "UserEmail"),
 		TrialDays:  15,
 	}
-	v.Cards, v.TopCard = podiumOrder(apiProducts.Packages)
+	var history []apiproductlist.Package
+	v.Cards, v.TopCard, history = podiumOrder(apiProducts.Packages)
+	if Config().APIGateway.HistoryOnSale {
+		v.HistoryCards = history
+	}
 	v.ImpliedStores, v.Stores = storeFamilies()
 	if change {
 		v.WantedStores = wantedStores(r.URL.Query()["stores"])
@@ -167,7 +173,7 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		}
 	}
 	// A change link names the package the reader is on, so the form opens on it.
-	if p, ok := apiProducts.Package(r.FormValue("package")); ok {
+	if p, ok := apiProducts.Package(r.FormValue("package")); ok && (!p.IsHistory() || Config().APIGateway.HistoryOnSale) {
 		v.Default = p
 	}
 	v.DefaultPackage = v.Default.Key
@@ -332,18 +338,26 @@ func hasFamily(families []StoreFamily, key string) bool {
 	return slices.ContainsFunc(families, func(f StoreFamily) bool { return f.Key == key })
 }
 
-// podiumOrder puts the priciest package in the middle with the runner-up on
-// its left: 500, 800, 200 for the three-package list. Fewer or more packages
-// stay in ascending order. The second result is the key of the middle card.
-func podiumOrder(packages []apiproductlist.Package) ([]apiproductlist.Package, string) {
-	sorted := slices.Clone(packages)
-	slices.SortStableFunc(sorted, func(a, b apiproductlist.Package) int {
+// podiumOrder puts the priciest price package in the middle with the
+// runner-up on its left: 500, 800, 200 for the three-package list. Fewer or
+// more stay in ascending order. History packages are returned apart, since
+// they sit in their own section. The second result is the middle card's key.
+func podiumOrder(packages []apiproductlist.Package) (cards []apiproductlist.Package, top string, history []apiproductlist.Package) {
+	var prices []apiproductlist.Package
+	for _, p := range packages {
+		if p.IsHistory() {
+			history = append(history, p)
+		} else {
+			prices = append(prices, p)
+		}
+	}
+	slices.SortStableFunc(prices, func(a, b apiproductlist.Package) int {
 		return int(a.Monthly - b.Monthly)
 	})
-	if len(sorted) != 3 {
-		return sorted, ""
+	if len(prices) != 3 {
+		return prices, "", history
 	}
-	return []apiproductlist.Package{sorted[1], sorted[2], sorted[0]}, sorted[2].Key
+	return []apiproductlist.Package{prices[1], prices[2], prices[0]}, prices[2].Key, history
 }
 
 // apiPlansJSON is the configurator's data: every amount the client total needs.
@@ -370,6 +384,10 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		StoreKeys     []string         `json:"storeKeys,omitempty"`
 	}{Addons: map[string]int64{}, IncludedGames: v.Products.IncludedGames, StoreKeys: v.WantedStores}
 	for _, p := range v.Products.Packages {
+		// Off sale, history stays out of the page source as well as off the page.
+		if p.IsHistory() && !Config().APIGateway.HistoryOnSale {
+			continue
+		}
 		out.Packages = append(out.Packages, pkg{p.Key, p.Name, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores})
 	}
 	for _, a := range v.Products.Addons {
@@ -391,6 +409,7 @@ var tierIcons = map[string]string{
 	"globe":   `<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>`,
 	"crown":   `<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>`,
 	"sliders": `<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>`,
+	"history": `<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>`,
 }
 
 // planIcon renders a tier icon as inline SVG.

@@ -24,7 +24,7 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config().APIGateway
 	t.Cleanup(func() { DevMode, SigCheck, Config().APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}, HistoryOnSale: savedCfg.HistoryOnSale}
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req.Host = "mtgban.com"
@@ -40,7 +40,36 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	return rec.Body.String()
 }
 
+// withHistoryOnSale puts the history package on sale for one test.
+func withHistoryOnSale(t *testing.T) {
+	t.Helper()
+	saved := Config()
+	config := *saved
+	config.APIGateway.HistoryOnSale = true
+	liveConfig.Store(&config)
+	t.Cleanup(func() { liveConfig.Store(saved) })
+}
+
+// Until the gateway sells history, the page keeps it off: no section, no card.
+func TestAPIPlansHidesHistoryUntilOnSale(t *testing.T) {
+	body := apiPlansPage(t, "")
+	if strings.Contains(body, `id="api-package-history"`) || strings.Contains(body, "api-history") {
+		t.Error("history shown with history_on_sale off")
+	}
+	if got := strings.Count(body, `class="card api-card`); got != 3 {
+		t.Errorf("want three package cards, got %d", got)
+	}
+	if strings.Contains(body, `"key":"history"`) {
+		t.Error("history package in the configurator data with history_on_sale off")
+	}
+	withHistoryOnSale(t)
+	if body := apiPlansPage(t, ""); !strings.Contains(body, `"key":"history"`) {
+		t.Error("history package missing from the configurator data with history_on_sale on")
+	}
+}
+
 func TestAPIPlansRendersCatalog(t *testing.T) {
+	withHistoryOnSale(t)
 	body := apiPlansPage(t, "")
 	for _, want := range []string{
 		"À la carte", "$200", "Base Access", "$500", "All Access", "$800", "$150",
@@ -56,6 +85,9 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 		`name="interval" value="monthly" checked`,
 		`<fieldset class="api-fieldset" hidden>`,
 		`<p class="api-note">Sign in with Patreon to request the trial key.</p>`,
+		"Price History", "$300", "Daily prices, a year back", "Updated twice a day",
+		`name="package" id="api-package-history" value="history"`,
+		`<section class="api-section api-history">`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)
@@ -80,6 +112,32 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 	}
 	if !strings.Contains(body, `class="card api-card api-card-top"`) || !strings.Contains(body, `id="api-package-all_data"`) {
 		t.Error("the priciest package is not the podium card")
+	}
+	// History sits in its own section after the podium, off the podium's grid.
+	hist := strings.Index(body, `id="api-package-history"`)
+	if !(carte < hist) {
+		t.Errorf("history card before the podium: carte %d history %d", carte, hist)
+	}
+	if strings.Count(body, `class="card api-card`) != 4 {
+		t.Errorf("want four package cards, got %d", strings.Count(body, `class="card api-card`))
+	}
+}
+
+// A change link naming history is ignored while the package is off sale,
+// so a crafted query can't pick a package the page does not render.
+func TestAPIPlansChangeLinkIgnoresHistoryOffSale(t *testing.T) {
+	body := apiPlansPageAt(t, "", "/api-plans?package=history")
+	if !strings.Contains(body, `name="package" id="api-package-all_data" value="all_data" checked`) {
+		t.Error("the top card should stay checked when history is off sale")
+	}
+	if !strings.Contains(body, `id="api-total-package">All Access</span>`) {
+		t.Error("the total should still name the top card")
+	}
+
+	withHistoryOnSale(t)
+	body = apiPlansPageAt(t, "", "/api-plans?package=history")
+	if !strings.Contains(body, `name="package" id="api-package-history" value="history" checked`) {
+		t.Error("the history card should check once history is on sale")
 	}
 }
 
@@ -138,18 +196,23 @@ func TestFormatUSD(t *testing.T) {
 
 func TestPodiumOrder(t *testing.T) {
 	three := []apiproductlist.Package{{Key: "a", Monthly: 200}, {Key: "b", Monthly: 500}, {Key: "c", Monthly: 800}}
-	cards, top := podiumOrder(three)
-	if top != "c" || cards[0].Key != "b" || cards[1].Key != "c" || cards[2].Key != "a" {
-		t.Errorf("three packages: %+v top %q", cards, top)
+	cards, top, history := podiumOrder(three)
+	if top != "c" || cards[0].Key != "b" || cards[1].Key != "c" || cards[2].Key != "a" || len(history) != 0 {
+		t.Errorf("three packages: %+v top %q history %+v", cards, top, history)
 	}
 	two := []apiproductlist.Package{{Key: "x", Monthly: 900}, {Key: "y", Monthly: 100}}
-	cards, top = podiumOrder(two)
+	cards, top, _ = podiumOrder(two)
 	if top != "" || cards[0].Key != "y" || cards[1].Key != "x" {
 		t.Errorf("two packages: %+v top %q", cards, top)
 	}
-	// The only input here not already in price order.
 	if two[0].Key != "x" {
 		t.Error("input was reordered in place")
+	}
+	// A history package leaves the podium to the price packages.
+	four := append(slices.Clone(three), apiproductlist.Package{Key: "h", Monthly: 300, Modes: []string{"history"}})
+	cards, top, history = podiumOrder(four)
+	if top != "c" || len(cards) != 3 || len(history) != 1 || history[0].Key != "h" {
+		t.Errorf("with history: %+v top %q history %+v", cards, top, history)
 	}
 }
 
