@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=optional">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/navbar.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
@@ -107,7 +108,7 @@ window.__BAN_PALETTE_TARGETS = {
 <script type="text/javascript" src="/js/scope.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/palette-chips.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/palette-providers.js?hash={{.Hash}}" defer></script>
-<script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}" defer></script>
+{{block "guide-data" .}}<script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}" defer></script>{{end}}
 <script type="text/javascript" src="/js/command-palette.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}" defer></script>
 <script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}" defer></script>
