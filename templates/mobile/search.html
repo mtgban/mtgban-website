@@ -799,7 +799,7 @@
                 <div class="m-settings-dropdowns">
                     <div class="m-settings-dropdown-col">
                         <div class="m-settings-dropdown-label">Retail</div>
-                        <select class="m-settings-select" id="m-set-sellers-priority">
+                        <select class="m-settings-select" id="m-set-sellers-priority" aria-label="Preferred retail store">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .SellerKeys}}
                             <option value="{{$key}}">{{scraper_name $key}}</option>
@@ -808,7 +808,7 @@
                     </div>
                     <div class="m-settings-dropdown-col">
                         <div class="m-settings-dropdown-label">Buylist</div>
-                        <select class="m-settings-select" id="m-set-vendors-priority">
+                        <select class="m-settings-select" id="m-set-vendors-priority" aria-label="Preferred buylist store">
                             <option value="" selected>Default</option>
                             {{range $i, $key := .VendorKeys}}
                             <option value="{{$key}}">{{scraper_name $key}}</option>
