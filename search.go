@@ -1139,6 +1139,19 @@ func orderSearchKeys(r *http.Request, ds *datastore, result searchResults, sortM
 func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[string]float64, sortMode string) bool {
 	b := ds.backend
 	sortData := resolveSortingData(b, allKeys)
+
+	// A reversed sort swaps what it compares, and so turns every field
+	// around but the finish, negated here so a nonfoil still leads its foil
+	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
+	if reversed {
+		for _, sorting := range sortData {
+			if sorting != nil {
+				sorting.finish = -sorting.finish
+			}
+		}
+	}
+
+	var less func(i, j int) bool
 	switch sortMode {
 	case "odds":
 		// Ascending by default, unlike every other field here: what a
@@ -1151,7 +1164,7 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 		// an expected count is actually known for. Missing sorts last
 		// regardless of direction, ranked among itself by the fallback the
 		// other fields use.
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			oddsI, hasI := odds[allKeys[i]]
 			oddsJ, hasJ := odds[allKeys[j]]
 			if hasI != hasJ {
@@ -1161,20 +1174,20 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 			}
 			return oddsI < oddsJ
-		})
+		}
 	case "alpha":
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]])
-		})
+		}
 	case "hybrid":
 		fileReprintsUnderParent(sortData, ds.editions.ReprintParents)
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]])
-		})
+		}
 	case "number":
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
-		})
+		}
 	case "retail":
 		retSellers := defaultSellerPriorityOpt
 		retSeller := readCookie(r, "SearchSellersPriority")
@@ -1183,13 +1196,13 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 		}
 
 		prices := resolveBestPrices(allKeys, retSellers, price4seller)
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
 			if priceI == priceJ {
 				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 			}
 			return priceI > priceJ
-		})
+		}
 	case "buylist":
 		blVendors := defaultVendorPriorityOpt
 		blVendor := readCookie(r, "SearchVendorsPriority")
@@ -1199,7 +1212,7 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 
 		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
 		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			priceI, priceJ := buyPrices[allKeys[i]], buyPrices[allKeys[j]]
 			if priceI != priceJ {
 				return priceI > priceJ
@@ -1209,19 +1222,17 @@ func sortSearchKeys(r *http.Request, ds *datastore, allKeys []string, odds map[s
 				return priceI > priceJ
 			}
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
-		})
+		}
 	default:
-		sort.Slice(allKeys, func(i, j int) bool {
+		less = func(i, j int) bool {
 			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
-		})
+		}
 	}
 
-	// Invert the slice if requested
-	reversed, _ := strconv.ParseBool(r.FormValue("reverse"))
 	if reversed {
-		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
-			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
-		}
+		sort.Slice(allKeys, func(i, j int) bool { return less(j, i) })
+	} else {
+		sort.Slice(allKeys, less)
 	}
 
 	return reversed
@@ -2594,6 +2605,9 @@ type SortingData struct {
 	// The set code the card's number is written after (setCodePrefix),
 	// which the default order reads before the number.
 	numberPrefix string
+
+	// The finish rank cmpNumberAndFinish orders by (finishOrder).
+	finish int
 }
 
 func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
@@ -2618,6 +2632,7 @@ func getSortingData(b *mtgmatcher.Backend, uuid string) (*SortingData, error) {
 	}
 	sorting.groupLower = sorting.editionLower
 	sorting.numberPrefix = setCodePrefix(co.Number)
+	sorting.finish = finishOrder(co)
 	return sorting, nil
 }
 
@@ -2716,9 +2731,8 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 	// If their number is the same, nonfoil, foil, then etched, and within a
 	// finish by promo types, whatever their count: one key, so one order
 	if numI == numJ {
-		finishI, finishJ := finishOrder(cI), finishOrder(cJ)
-		if finishI != finishJ {
-			return finishI < finishJ
+		if sortingI.finish != sortingJ.finish {
+			return sortingI.finish < sortingJ.finish
 		}
 		// They are presorted anyway
 		promos := slices.Compare(cI.PromoTypes, cJ.PromoTypes)

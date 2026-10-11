@@ -277,7 +277,7 @@ func TestNumberOrderIsTotalWithinANumber(t *testing.T) {
 	printing := func(uuid, finish string, foil, etched bool, promos ...string) *SortingData {
 		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Number: "1", PromoTypes: promos}, Foil: foil, Etched: etched}
 		co.Finish = finish
-		return &SortingData{co: co}
+		return &SortingData{co: co, finish: finishOrder(co)}
 	}
 	all := []*SortingData{
 		printing("x", "foil", true, false),
