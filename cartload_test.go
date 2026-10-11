@@ -280,6 +280,94 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	if strings.Contains(page, `id="cart-overlay"`) {
 		t.Error("a page with no cart store carries the cart panel")
 	}
+
+	// Global buys at the page's own store, and every section is a store, so
+	// no buylist cart is filled
+	for _, tc := range []struct {
+		name string
+		key  string
+	}{
+		{"global", "CSI"},
+		{"global CK", "CK"},
+	} {
+		page := renderArbit(t, PageVars{
+			ScraperShort: "ABUScans",
+			ArbitVars:    ArbitVars{GlobalMode: true},
+			UserNav:      &NavElem{Short: "beta"},
+			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: rows}},
+		})
+		if !strings.Contains(page, buy) {
+			t.Errorf("%s: no store cart button with %s", tc.name, buy)
+		}
+		if strings.Contains(page, "Load buylist at") {
+			t.Errorf("%s: a store section got a buylist button", tc.name)
+		}
+		if strings.Count(page, `data-load-list="cart"`) != 1 {
+			t.Errorf("%s: want one cart button", tc.name)
+		}
+	}
+
+	// On Global sealed the copies are the section's, under go-mtgban's
+	// sealed shorthands, each listing ids as its scraper does
+	stock := func(entry mtgban.InventoryEntry) mtgban.InventoryRecord {
+		inv := mtgban.InventoryRecord{}
+		inv.Add("box-a", &entry)
+		return inv
+	}
+	sealed := func(short string, entry mtgban.InventoryEntry) mtgban.Seller {
+		return mtgban.NewSellerFromInventory(stock(entry), mtgban.ScraperInfo{Shorthand: short, SealedMode: true})
+	}
+	sellers := append(GetSellers(),
+		sealed("IndexSealed", mtgban.InventoryEntry{Price: 100}),
+		sealed("TCGSealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "500001", InstanceID: "600001"}),
+		sealed("CSISealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "434191", InstanceID: "10753985"}),
+		sealed("SCGSealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "SLD-1", InstanceID: "SLD-1"}),
+		sealed("MPSealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100}),
+		sealed("HASealed", mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100, OriginalID: "88001", InstanceID: "88002"}),
+		sealed("ABUSealed", mtgban.InventoryEntry{Price: 100, OriginalID: "abu-1"}),
+	)
+	sellersPtr.Store(&sellers)
+	sealedRows := []mtgban.ArbitEntry{{
+		CardID:         "box-a",
+		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 100},
+		Quantity:       2,
+	}}
+	haCart := `href="https://www.hareruyamtg.com/en/cart#ban=88002:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya" data-buylist="false"`
+	for _, tc := range []struct {
+		short string
+		key   string
+		want  string
+	}{
+		{"IndexSealed", "TCGSealed", ">Load at TCG<"},
+		{"IndexSealed", "HASealed", haCart},
+		// CK's, CSI's and Manapool's deck builders and SCG's upload take
+		// singles, and CSI's store cart was measured on singles only
+		{"IndexSealed", "CKSealed", ""},
+		{"IndexSealed", "CSISealed", ""},
+		{"IndexSealed", "MPSealed", ""},
+		{"IndexSealed", "SCGSealed", ""},
+		// ABU lists sealed product with no item id its cart takes
+		{"IndexSealed", "ABUSealed", ""},
+		// Never the page's store's
+		{"TCGSealed", "ABUSealed", ""},
+	} {
+		page := renderArbit(t, PageVars{
+			ScraperShort: tc.short,
+			ArbitVars:    ArbitVars{GlobalMode: true},
+			UserNav:      &NavElem{Short: "beta"},
+			Arb:          []Arbitrage{{Name: "Store", Key: tc.key, Arbit: sealedRows}},
+		})
+		buttons := strings.Count(page, `class="arb-load-btn buy"`)
+		if tc.want == "" && buttons != 0 {
+			t.Errorf("global sealed %s against %s: want no Load at button, got %d", tc.key, tc.short, buttons)
+		}
+		if tc.want != "" && (buttons != 1 || !strings.Contains(page, tc.want)) {
+			t.Errorf("global sealed %s against %s: want only %s, got %d buttons", tc.key, tc.short, tc.want, buttons)
+		}
+		if strings.Contains(page, "Load buylist at") {
+			t.Errorf("global sealed %s: a store section got a buylist button", tc.key)
+		}
+	}
 }
 
 func TestCartBookmarklet(t *testing.T) {

@@ -331,10 +331,13 @@ buylist and store splits, and SCG's and Mint's buylist splits. CSI's store
 button sits beside its deck builder button, which posts only names. SCG's
 store side and CK's buylist already have their own imports. Card Kingdom's
 store split gets no button for now, though the bookmarklet still fills its
-cart: a load logged a signed-in user out, and the cause is not known yet. The arbit, reverse and global pages give
+cart: a load logged a signed-in user out, and the cause is not known yet. The arbit and reverse pages give
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
-store sells it in (`cartLoadForArbit`).
+store sells it in (`cartLoadForArbit`). The global page compares two
+stores' listings and sells nowhere, so a section gets only "Load at", for
+the store whose copies its rows are: the page's own store, or on sealed
+the section's, as `scraperCompare` picks its seller.
 
 - `cartLoadFor` (`cartload.go`, the `cart_load` template function) builds
   the button, and `cartRows` turns the split into `item_id:quantity`
