@@ -10,9 +10,19 @@
     var dd = document.getElementById('tools-dropdown');
     if (!btn || !dd) return;
 
+    // Closed, the panel only fades out; inert keeps Tab and screen readers out.
     function isOpen() { return dd.classList.contains('open'); }
-    function open() { dd.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
-    function shut() { dd.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
+    function open() {
+        dd.inert = false;
+        dd.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+    }
+    function shut() {
+        if (dd.contains(document.activeElement)) btn.focus();
+        dd.inert = true;
+        dd.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+    }
 
     btn.addEventListener('click', function(e) {
         e.stopPropagation();

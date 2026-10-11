@@ -37,14 +37,14 @@
             {{end}}
         {{end}}
         <div class="nav2-tools-wrap">
-            <button class="nav2-section-btn is-tools" id="tools-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+            <button class="nav2-section-btn is-tools" id="tools-btn" type="button" aria-controls="tools-dropdown" aria-expanded="false">
                 Tools
                 <svg class="chev" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
         </div>
     </div>
 
-    <div class="tools-dropdown" id="tools-dropdown" role="group" aria-labelledby="tools-btn">
+    <div class="tools-dropdown" id="tools-dropdown" role="group" aria-labelledby="tools-btn" inert>
         <div class="tools-grid" id="tools-grid">
             <button class="tools-tile-hint" id="nav-hint" type="button" title="Got it - hide this tip" hidden>
                 <span class="tools-tile-icon">
