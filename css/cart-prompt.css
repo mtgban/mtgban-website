@@ -3,6 +3,8 @@
 /* The pair renders like the buttons beside it inside their forms, spaced
    like the header's other buttons */
 .cart-load { display: inline; white-space: nowrap; line-height: normal; }
+/* The display above outranks [hidden]'s own: a cart with no row left goes */
+.cart-load[hidden] { display: none; }
 .opt-header-actions .cart-help { margin-right: 6px; }
 .arb-load-btns .cart-help { margin-right: 4px; }
 .cart-overlay {
