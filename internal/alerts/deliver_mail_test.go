@@ -23,20 +23,43 @@ func (f *fakeMailer) Send(_ context.Context, m mailer.Message) (string, error) {
 	return f.id, f.err
 }
 
-// testDeliverer builds a MailDeliverer over fm with a fixed Sent count and
-// the repo's real mail templates.
+// fakeLedger is a mail ledger already holding sent mails, reserving and
+// releasing as the store does.
+type fakeLedger struct {
+	sent     int
+	reserves int
+}
+
+func (l *fakeLedger) reserve(_ context.Context, _ string, _ time.Time, ceiling int) (int64, bool, error) {
+	if ceiling > 0 && l.sent >= ceiling {
+		return 0, false, nil
+	}
+	l.sent++
+	l.reserves++
+	return int64(l.reserves), true, nil
+}
+
+func (l *fakeLedger) release(context.Context, int64) error {
+	l.sent--
+	return nil
+}
+
+// testDeliverer builds a MailDeliverer over fm with sentCount mails already
+// in its ledger and the repo's real mail templates.
 func testDeliverer(t *testing.T, fm *fakeMailer, sentCount int) *MailDeliverer {
 	t.Helper()
 	tpl, err := LoadMailTemplates("../../templates/mail")
 	if err != nil {
 		t.Fatal(err)
 	}
+	ledger := &fakeLedger{sent: sentCount}
 	return &MailDeliverer{
 		Mailer:      fm,
 		Templates:   tpl,
 		Image:       func(string) string { return "" },
 		Unsubscribe: func(userHash string) string { return "https://mtgban.com/alerts/unsubscribe?u=" + userHash },
-		Sent:        func(context.Context, string, time.Time) (int, error) { return sentCount, nil },
+		Reserve:     ledger.reserve,
+		Release:     ledger.release,
 		Ceiling:     20,
 	}
 }
@@ -76,6 +99,30 @@ func TestMailDelivererSendsOneMailForTheWholeDigest(t *testing.T) {
 	for _, r := range results {
 		if r.Err != nil || r.MessageID != "msg-1" {
 			t.Fatalf("result = %+v, want MessageID msg-1 and no error", r)
+		}
+	}
+}
+
+// Only a send the provider refused gives its reservation back; a timeout
+// or a 5xx may have gone out, and stays counted toward the ceiling.
+func TestMailDelivererReleasesOnlyARefusedSend(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		left int
+	}{
+		{"refused", &mailer.SendError{Status: 422, Permanent: true, Msg: "to: invalid"}, 0},
+		{"rate limited", &mailer.SendError{Status: 429, Msg: "slow down"}, 1},
+		{"server error", &mailer.SendError{Status: 500, Msg: "internal"}, 1},
+		{"timeout", errors.New("mailer: resend: context deadline exceeded"), 1},
+	} {
+		fm := &fakeMailer{err: tc.err}
+		m := testDeliverer(t, fm, 0)
+		ledger := &fakeLedger{}
+		m.Reserve, m.Release = ledger.reserve, ledger.release
+		m.Deliver(context.Background(), digestFixture(1), Channel{Address: "user@example.com"}, func(s string) string { return s })
+		if ledger.sent != tc.left {
+			t.Errorf("%s: %d mails counted, want %d", tc.name, ledger.sent, tc.left)
 		}
 	}
 }
@@ -182,7 +229,7 @@ func TestMailDelivererNilUnsubscribeOmitsHeaders(t *testing.T) {
 }
 
 // TestMailDelivererRenderErrorFailsClosed covers RenderMail failing: every
-// firing gets the error back and nothing is sent, the same as a Sent or
+// firing gets the error back and nothing is sent, the same as a Reserve or
 // ceiling failure.
 func TestMailDelivererRenderErrorFailsClosed(t *testing.T) {
 	fm := &fakeMailer{id: "should-not-send"}
@@ -192,7 +239,7 @@ func TestMailDelivererRenderErrorFailsClosed(t *testing.T) {
 		Mailer:      fm,
 		Templates:   MailTemplates{HTML: okHTML, Text: badText},
 		Unsubscribe: func(string) string { return "https://mtgban.com/unsub" },
-		Sent:        func(context.Context, string, time.Time) (int, error) { return 0, nil },
+		Reserve:     (&fakeLedger{}).reserve,
 		Ceiling:     20,
 	}
 	d := digestFixture(1)
