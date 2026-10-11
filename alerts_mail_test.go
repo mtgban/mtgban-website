@@ -94,6 +94,17 @@ func (f *fakeLinkStore) DisableChannel(_ context.Context, userHash string, kind 
 	return nil
 }
 
+// DisableChannelAt is DisableChannel for a row still at address, as the store does.
+func (f *fakeLinkStore) DisableChannelAt(ctx context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address, reason string, at time.Time) (bool, error) {
+	i := slices.IndexFunc(f.channels, func(c alerts.Channel) bool {
+		return c.UserHash == userHash && c.Kind == kind && c.Source == source && (address == "" || strings.EqualFold(c.Address, address))
+	})
+	if i < 0 {
+		return false, nil
+	}
+	return true, f.DisableChannel(ctx, userHash, kind, source, reason, at)
+}
+
 func (f *fakeLinkStore) ParkEmailAlerts(_ context.Context, userHash, reason string) (int64, error) {
 	f.parked = append(f.parked, parkedCall{userHash, reason})
 	return 1, nil
