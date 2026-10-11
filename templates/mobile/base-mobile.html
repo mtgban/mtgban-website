@@ -30,7 +30,7 @@
 </head>
 
 <body class="light-theme mobile{{if .SearchScope}} has-scope{{end}}" data-game="{{game}}">
-<script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
+<script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.body.setAttribute('data-theme-pref',pref);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
 <svg width="0" height="0" aria-hidden="true" style="position:absolute">
   <filter id="grain" color-interpolation-filters="sRGB">
     <feTurbulence type="fractalNoise" baseFrequency="0.97" numOctaves="4"/>

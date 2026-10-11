@@ -47,3 +47,16 @@ test('the phone base guards the theme inline before the navbar', () => {
     expect(guard).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(navbar);
 });
+
+test('every inline theme guard sets data-theme-pref before paint', () => {
+    const guards = [];
+    for (const f of templates(root)) {
+        const html = readFileSync(f, 'utf8');
+        for (const m of html.matchAll(/<script>([\s\S]*?)<\/script\b[^>]*>/gi)) {
+            if (!m[1].includes("localStorage.getItem('theme')")) continue;
+            guards.push(f.replace(root, ''));
+            expect(m[1]).toMatch(/document\.body\.setAttribute\(\s*'data-theme-pref',\s*pref\s*\)/);
+        }
+    }
+    expect(guards.length).toBeGreaterThanOrEqual(4);
+});
