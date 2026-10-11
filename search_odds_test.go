@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 // productWithVariableCards finds a product whose variable reading answers
@@ -25,8 +27,8 @@ func productWithVariableCards(t *testing.T) *mtgmatcher.CardObject {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !backend().SealedHasDecklist(code, product.UUID) ||
-				!backend().SealedIsRandom(code, product.UUID) {
+			if !sealed.HasDecklist(backend(), code, product.UUID) ||
+				!sealed.IsRandom(backend(), code, product.UUID) {
 				continue
 			}
 			co, err := backend().GetUUID(product.UUID)
@@ -407,4 +409,37 @@ func TestDropRateVisibilityDoesNotDependOnSort(t *testing.T) {
 	if counts[0] == 0 {
 		t.Fatal("no Avg Copies rows on the page at all")
 	}
+}
+
+// A product holding several copies of another reads each card's average as
+// the held product's, times the copies held: a box of 36 packs holds 36 times
+// whatever one pack holds, not one pack's worth.
+func TestDropOddsCountEveryCopyHeld(t *testing.T) {
+	skipWithoutDatastore(t)
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
+		if err != nil {
+			continue
+		}
+		for _, product := range set.SealedProduct {
+			held := product.Contents["sealed"]
+			if len(held) != 1 || held[0].Count < 2 || len(product.Contents) != 1 {
+				continue
+			}
+			inner := dropOdds(backend(), SearchConfig{ContentsMode: ContentsVariable, ContentsProduct: held[0].UUID})
+			if len(inner) == 0 {
+				continue
+			}
+			outer := dropOdds(backend(), SearchConfig{ContentsMode: ContentsVariable, ContentsProduct: product.UUID})
+			for uuid, count := range inner {
+				want := count * float64(held[0].Count)
+				if math.Abs(outer[uuid]-want) > 1e-9*want {
+					t.Fatalf("%s averages %v copies of %s, want %v: %d times the %v in %s",
+						product.Name, outer[uuid], uuid, want, held[0].Count, count, held[0].Name)
+				}
+			}
+			return
+		}
+	}
+	t.Fatal("no product holding several copies of one other")
 }

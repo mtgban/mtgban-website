@@ -21,6 +21,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
 )
@@ -1082,8 +1083,8 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 	path := "search"
 	if co.Sealed {
 		path = "sealed"
-		canBoosterGen = b.SealedIsRandom(co.SetCode, co.UUID)
-		hasDecklist = b.SealedHasDecklist(co.SetCode, co.UUID)
+		canBoosterGen = sealed.IsRandom(b, co.SetCode, co.UUID)
+		hasDecklist = sealed.HasDecklist(b, co.SetCode, co.UUID)
 	}
 
 	searchURL := fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query))

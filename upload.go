@@ -28,6 +28,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
@@ -2229,7 +2230,7 @@ func unpackableSealed(b *mtgmatcher.Backend, entries []UploadEntry) int {
 		if err != nil || !co.Sealed {
 			continue
 		}
-		if b.SealedHasDecklist(co.SetCode, co.UUID) {
+		if sealed.HasDecklist(b, co.SetCode, co.UUID) {
 			n++
 		}
 	}
@@ -2247,10 +2248,10 @@ func unpackableSealed(b *mtgmatcher.Backend, entries []UploadEntry) int {
 // against the product would find it does not add up. The whole-collection view
 // is the one the reader already had, a click away.
 //
-// Only what a product is guaranteed to contain: GetDecklist walks the decks,
-// the cards filed beside them, and nested sealed within those, but never the
-// packs - a booster's contents are drawn when it is opened and are nobody's to
-// list beforehand. So a booster box is not opened here, and not shown either:
+// Only what a product is guaranteed to contain: sealed.ProductDecklist walks
+// the decks, the cards filed beside them, and nested sealed within those, but
+// never the packs - a booster's contents are drawn when it is opened and are
+// nobody's to list beforehand. So a booster box is not opened here, and not shown either:
 // it has nothing to say about its contents.
 //
 // Quantities travel into the contents: two of a precon is two of every card in
@@ -2263,11 +2264,11 @@ func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) []UploadEntry {
 	for _, entry := range entries {
 		co, err := b.GetUUID(entry.CardID)
 		if entry.CardID == "" || entry.Unpacked || err != nil || !co.Sealed ||
-			!b.SealedHasDecklist(co.SetCode, co.UUID) {
+			!sealed.HasDecklist(b, co.SetCode, co.UUID) {
 			continue
 		}
 
-		picks, err := b.GetDecklist(co.SetCode, co.UUID)
+		picks, err := sealed.ProductDecklist(b, co.SetCode, co.UUID)
 		if err != nil || len(picks) == 0 {
 			continue
 		}

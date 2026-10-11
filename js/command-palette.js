@@ -1285,7 +1285,7 @@
         var name = ctx.sealedChip._sealedName;
         var meta = S.sealedMetaCache[name];
 
-        // View Contents is always shown; backend hasContents (GetDecklist) is too strict.
+        // View Contents is always shown; backend hasContents (sealed.ProductDecklist) is too strict.
         var rows = [
             { type: 'sealed-action', title: 'Search', subtitle: 'Price grid for this product',
               icon: 'search', actionKey: 'search', actionLabel: 'Search', sealedName: name },

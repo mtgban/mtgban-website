@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 )
 
@@ -74,7 +75,7 @@ func getDecklist(b *mtgmatcher.Backend, uuid string) ([]string, error) {
 		return nil, err
 	}
 
-	return b.GetDecklist(co.SetCode, co.UUID)
+	return sealed.ProductDecklist(b, co.SetCode, co.UUID)
 }
 
 func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {

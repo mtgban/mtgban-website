@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
@@ -27,7 +28,7 @@ func sealedProducts(t *testing.T) (withDeck, withoutDeck string) {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if backend().SealedHasDecklist(code, product.UUID) {
+			if sealed.HasDecklist(backend(), code, product.UUID) {
 				if withDeck == "" {
 					withDeck = product.UUID
 				}
@@ -139,21 +140,21 @@ func TestUnpackSealedKeepsTheProductAsAGhost(t *testing.T) {
 // held twice again.
 func TestUnpackSealedAddsUpThroughTheMerge(t *testing.T) {
 	skipWithoutDatastore(t)
-	sealed, _ := sealedProducts(t)
-	if sealed == "" {
+	productUUID, _ := sealedProducts(t)
+	if productUUID == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	co, err := backend().GetUUID(sealed)
+	co, err := backend().GetUUID(productUUID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	picks, err := backend().GetDecklist(co.SetCode, co.UUID)
+	picks, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
 	if err != nil || len(picks) == 0 {
 		t.Skipf("the chosen product does not open: %v", err)
 	}
 
 	merged := docparse.MergeIdenticalEntries(unpackSealed(backend(), []UploadEntry{
-		{CardID: sealed, Quantity: 2, HasQuantity: true},
+		{CardID: productUUID, Quantity: 2, HasQuantity: true},
 	}))
 
 	// Two of the product is two of everything in it, however the decklist
@@ -214,11 +215,11 @@ func renderUpload(t *testing.T, pageVars PageVars) string {
 // taken, so a reader who never asks pays nothing for it.
 func TestUnpackActionShipsNoList(t *testing.T) {
 	skipWithoutDatastore(t)
-	sealed, _ := sealedProducts(t)
-	if sealed == "" {
+	productUUID, _ := sealedProducts(t)
+	if productUUID == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	entries := []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}}
+	entries := []UploadEntry{{CardID: productUUID, Quantity: 1, HasQuantity: true}}
 
 	out := renderUpload(t, PageVars{
 		UploadVars: UploadVars{
@@ -235,7 +236,7 @@ func TestUnpackActionShipsNoList(t *testing.T) {
 	}
 
 	// Whatever the deck holds, none of it is in the page.
-	picks, err := backend().GetDecklist(mustCard(t, sealed).SetCode, sealed)
+	picks, err := sealed.ProductDecklist(backend(), mustCard(t, productUUID).SetCode, productUUID)
 	if err == nil && len(picks) > 0 {
 		if strings.Contains(out, `value="`+picks[0]+`"`) {
 			t.Error("the page carries the unpacked contents, which is what asking on demand avoids")

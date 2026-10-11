@@ -16,6 +16,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 type SearchConfig struct {
@@ -575,7 +576,7 @@ func fixupPicks(b *mtgmatcher.Backend, code string) []string {
 		return []string{}
 	}
 
-	picks, err := b.GetPicksForSealed(co.SetCode, co.UUID)
+	picks, err := sealed.ProductPicks(b, co.SetCode, co.UUID)
 	if err != nil {
 		return []string{}
 	}
@@ -969,7 +970,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 				config.ContentsMode = ContentsFixed
 			}
 			// Retrieve decklist
-			uuids, err = b.GetDecklist(co.SetCode, co.UUID)
+			uuids, err = sealed.ProductDecklist(b, co.SetCode, co.UUID)
 			// Assign data so that on error the entire db is returned
 			config.UUIDs = uuids
 			config.SearchMode = "hashing"
@@ -1236,7 +1237,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 				if err != nil {
 					continue
 				}
-				deck, err := b.GetDecklist(co.SetCode, co.UUID)
+				deck, err := sealed.ProductDecklist(b, co.SetCode, co.UUID)
 				if err != nil {
 					continue
 				}
