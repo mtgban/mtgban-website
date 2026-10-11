@@ -1622,6 +1622,9 @@ type Pagination struct {
 	CurrentIndex int
 	PrevIndex    int
 	NextIndex    int
+	// PageSize is the size the page links name (ps), zero where a page
+	// reads its links at its default size.
+	PageSize int
 }
 
 // Divide results in sub pages

@@ -624,14 +624,14 @@
     {{if .CurrentIndex}}
     <div class="m-pagination">
         {{if ne .CurrentIndex 1}}
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p=1&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.PrevIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p=1{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.PrevIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
         {{end}}
         <span class="m-pg-cur">{{.CurrentIndex}}</span>
         <span class="m-pg-info">/ {{.TotalIndex}}</span>
         {{if ne .CurrentIndex .TotalIndex}}
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.NextIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
-            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.TotalIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.NextIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
+            <a href="?q={{.SearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}&p={{.TotalIndex}}{{with .PageSize}}&ps={{.}}{{end}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
         {{end}}
     </div>
     {{end}}
