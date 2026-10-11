@@ -283,7 +283,7 @@
     margin-top: auto;
     padding: 10px 20px;
     border-radius: var(--radius-sm);
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: #fff;
     font-size: var(--text-lg);
     font-weight: 600;
@@ -340,7 +340,7 @@
     margin-bottom: 20px;
 }
 
-.sleepers-info-card h3 {
+.sleepers-info-card h2 {
     font-size: var(--text-2xl);
     font-weight: 600;
     margin: 0 0 10px 0;
@@ -401,6 +401,8 @@
     background: rgba(255,191,64,0.15);
     color: #e6a817;
 }
+.light-theme .tier-perk-legacy { color: #1b64bf; }
+.light-theme .tier-perk-vintage { color: #8a5f00; }
 
 /* ═══════════════════════════════════════
    Results View (tier rows)

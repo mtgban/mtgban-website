@@ -48,7 +48,12 @@ html { font-size: 17px; }
 
     --green: green;
     --blue: #559eff;
+    /* The named dodgerblue: 5.59:1 on #161616 and 4.88:1 on #1f2328 as
+       text, where .light-theme's darker #0a5fb4 would fail. */
     --dodgerblue: dodgerblue;
+    /* The fill white text sits on, 6.35:1; the named dodgerblue above
+       is only 3.2:1 under white. */
+    --dodgerblue-fill: #0a5fb4;
     --orange: orange;
     --red: red;
     --black: black;
@@ -139,19 +144,26 @@ html { font-size: 17px; }
     --tralternate: var(--violet);
     --hover: var(--blueish);
     --headingtext: var(--bluetext);
-    --activetext: var(--greytext);
+    /* The navy, not the grey-blue: 5.4:1 on the pale blue navbar */
+    --activetext: var(--bluetext);
+    /* Darker than the named dodgerblue: 6.35:1 under white text and
+       on white, where the named one is only 3.2:1 */
+    --dodgerblue: var(--dodgerblue-fill);
     --navbackground: var(--paleblue);
     --selectedhover: var(--almostblue);
     --headerbackground: var(--lightgrey);
     --normaltext: var(--quasiblack);
     --autocomplete: var(--verywhite);
 
-    --asuccess: var(--green);
+    /* Deeper than the named colours: these sit as text on tinted pills
+       and buttons, where green, orange and #559eff are under 4.5:1 */
+    --asuccess: #166534;
     --anormal: var(--blue);
     --ainfo: var(--dodgerblue);
-    --awarning: var(--orange);
+    --awarning: #a04a06;
     --adanger: var(--red);
     --adefault: var(--black);
+    --blue: #2a56ad;
 
     --aliasing: var(--lightyellow);
     --antialiasing: var(--lighteryellow);
@@ -182,7 +194,8 @@ html { font-size: 17px; }
     --surface-4: #d4d6d8;
     --border-subtle: rgba(0,0,0,0.06);
     --border-moderate: rgba(0,0,0,0.12);
-    --text-dim: #6b7280;
+    /* 4.5:1 on surface-3 too; #6b7280 only cleared white */
+    --text-dim: #5b6270;
     --accent-muted: rgba(85,158,255,0.08);
     --accent-border: rgba(85,158,255,0.2);
     --radius-sm: 6px;
@@ -198,7 +211,7 @@ html { font-size: 17px; }
     --normal: var(--darkgrey);
     --background: var(--lightblack);
     --tralternatebase: var(--verydarkgrey);
-    --tralternate: var(--grey);
+    --tralternate: #22262d;
     --hover: var(--almostgrey);
     --headingtext: var(--white);
     --activetext: var(--almostwhite);
@@ -244,7 +257,11 @@ html { font-size: 17px; }
     --surface-4: #323840;
     --border-subtle: rgba(255,255,255,0.06);
     --border-moderate: rgba(255,255,255,0.12);
-    --text-dim: #5f6672;
+    /* The dim and grey text, the green and the striped row each clear
+       4.5:1 on every dark surface they sit on; the old values were 2 to 3 */
+    --text-dim: #8a929e;
+    --greytext: #9aa5c8;
+    --green: #3fb950;
     --accent-muted: rgba(91,141,239,0.12);
     --accent-border: rgba(91,141,239,0.25);
     --radius-sm: 6px;

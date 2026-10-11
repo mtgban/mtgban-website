@@ -40,9 +40,9 @@ html {
     --search-row-hover: #eaeaef;
     --search-surface-1: #f0f0f4;
     --search-surface-2: #e4e4ea;
-    --search-link: #3b6fd4;
+    --search-link: #2f5fc0;
     --search-text-dim: #454545;
-    --search-result-dim: #bbb;
+    --search-result-dim: #5b6270;
 }
 .dark-theme {
     --search-row-even: #13151a;
@@ -52,7 +52,7 @@ html {
     --search-surface-2: #1f2328;
     --search-link: #5b8def;
     --search-text-dim: #b5b5b5;
-    --search-result-dim: #555;
+    --search-result-dim: #8a929e;
 }
 
 
@@ -934,6 +934,7 @@ body.modal-embed .search-sidebar {
     text-decoration: none;
     display: block;
     line-height: 1.5;
+    min-height: 24px;
 }
 .sidebar-products-list a:hover { text-decoration: underline; }
 
@@ -1178,6 +1179,8 @@ body.modal-embed .search-sidebar {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    /* A 24px tap target: the glyphs alone are 20px */
+    padding: 2px 0;
 }
 .result-card-name:hover { color: var(--search-link); }
 

@@ -458,8 +458,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 .m-cond-pill[data-cond="SP"].active {
-    background: var(--dodgerblue);
-    border-color: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
+    border-color: var(--dodgerblue-fill);
     box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
 }
 
@@ -504,8 +504,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 .m-offline-mode-pills .m-cond-pill.active {
-    background: var(--dodgerblue);
-    border-color: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
+    border-color: var(--dodgerblue-fill);
     color: white;
     box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
 }
@@ -762,7 +762,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-weight: 600;
     padding: 0.3em 0.75em;
     border-radius: 4px;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     text-decoration: none;
     white-space: nowrap;
@@ -976,9 +976,9 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 .m-filter-pill.active {
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
-    border-color: var(--dodgerblue);
+    border-color: var(--dodgerblue-fill);
 }
 
 .m-filter-apply {
@@ -990,7 +990,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     font-weight: 600;
     border: none;
     border-radius: 6px;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     cursor: pointer;
     min-height: 44px;
@@ -2060,7 +2060,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 .m-settings-apply {
     width: 100%;
     padding: 0.85em;
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: white;
     border: none;
     border-radius: 10px;

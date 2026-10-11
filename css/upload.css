@@ -108,7 +108,9 @@
 }
 
 .upload-mode-toggle input[type="radio"]:checked + label {
-    background: var(--dodgerblue);
+    /* Explicit, not --dodgerblue: that token is themed for text use,
+       and the named dodgerblue is only 3.2:1 under this white text. */
+    background: var(--dodgerblue-fill);
     color: #ffffff;
     box-shadow: 0 1px 4px rgba(30,144,255,0.3);
 }
@@ -573,7 +575,7 @@
 }
 
 .upload-btn-primary {
-    background: var(--dodgerblue);
+    background: var(--dodgerblue-fill);
     color: #ffffff;
 }
 
