@@ -2753,25 +2753,13 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 	numI := cI.Card.Number
 	numJ := cJ.Card.Number
 
-	// If their number is the same, nonfoil, foil, then etched, and within a
-	// finish by promo types, whatever their count: one key, so one order
-	if numI == numJ {
-		if sortingI.finish != sortingJ.finish {
-			return sortingI.finish < sortingJ.finish
-		}
-		// They are presorted anyway
-		promos := slices.Compare(cI.PromoTypes, cJ.PromoTypes)
-		if promos != 0 {
-			return promos < 0
-		}
-	}
-
 	// Every number is read one way, so a sort sees one order: comparing
 	// plain numbers by value and the rest as strings put 800, 1553 and
-	// 1553★ in a loop. Stripped, only the value of the digits counts first.
+	// 1553★ in a loop. Stripped, only the value of the digits counts first,
+	// read after the set code prefix the caller already compared.
 	if strip {
-		valI, hasI := digitsValue(numI)
-		valJ, hasJ := digitsValue(numJ)
+		valI, hasI := digitsValue(numI[len(sortingI.numberPrefix):])
+		valJ, hasJ := digitsValue(numJ[len(sortingJ.numberPrefix):])
 		if hasI != hasJ {
 			return hasI
 		}
@@ -2782,13 +2770,22 @@ func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 		return c < 0
 	}
 
-	// At this point, numbers look pretty similar, check for languages
-	if cI.Card.Language != cJ.Card.Language {
-		return cI.Card.Language < cJ.Card.Language
-	}
+	// Numbers sharing a value (1 and 1★, 3a and 3b) stay apart
 	natural := cmpNaturally(numI, numJ)
 	if natural != 0 {
 		return natural < 0
+	}
+	// One number: nonfoil, foil, then etched, and within a finish by promo
+	// types, whatever their count (they are presorted anyway), then language
+	if sortingI.finish != sortingJ.finish {
+		return sortingI.finish < sortingJ.finish
+	}
+	promos := slices.Compare(cI.PromoTypes, cJ.PromoTypes)
+	if promos != 0 {
+		return promos < 0
+	}
+	if cI.Card.Language != cJ.Card.Language {
+		return cI.Card.Language < cJ.Card.Language
 	}
 	// Two finishes the flags above read alike (holofoil, reverse holofoil),
 	// then the uuid, so no two printings tie and the order is total.
