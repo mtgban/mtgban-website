@@ -137,6 +137,52 @@ func TestLoadFromCloudUpdatesTheIndexToWhatItJustListed(t *testing.T) {
 	}
 }
 
+// A reload that finds a dropped store's old dump says it skipped it and keeps
+// the store out: a 409 when nothing else loaded, a 200 naming the skip when
+// the other side did.
+func TestLoadFromCloudReportsADroppedDumpAsSkipped(t *testing.T) {
+	now := time.Now()
+	old := now.Add(-8 * 24 * time.Hour)
+	for _, tc := range []struct {
+		name    string
+		buylist time.Time
+		dropped []string
+		status  int
+		skipped string
+		sellers int
+		vendors int
+	}{
+		{"the other side loaded", now, []string{"retail"}, http.StatusOK, "1 skipped: retail/CK: ", 0, 1},
+		{"nothing loaded", old, []string{"retail", "buylist"}, http.StatusConflict, "2 skipped: buylist/CK: ", 0, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			signingEnabled(t, false)
+			withLocalDumpsBucket(t, "magic")
+			prevDropped := droppedStoresPtr.Load()
+			t.Cleanup(func() { droppedStoresPtr.Store(prevDropped) })
+
+			record := map[string]droppedStore{}
+			for _, kind := range tc.dropped {
+				record["CK/"+kind] = droppedStore{info: mtgban.ScraperInfo{Shorthand: "CK"}, kind: kind, updated: old, entries: 3}
+			}
+			droppedStoresPtr.Store(&record)
+			writeSellerDump(t, filepath.Join("magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, old))
+			writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, tc.buylist))
+
+			req := httptest.NewRequest(http.MethodGet, "/api/load/cardkingdom?sig="+apiLoadSig(t, "cardkingdom"), nil)
+			w := httptest.NewRecorder()
+			testSite.LoadFromCloud(w, req)
+
+			if w.Code != tc.status || !strings.Contains(w.Body.String(), tc.skipped+errDroppedDump.Error()) {
+				t.Errorf("status = %d, body = %s, want %d naming %q", w.Code, w.Body.String(), tc.status, tc.skipped)
+			}
+			if len(GetSellers()) != tc.sellers || len(GetVendors()) != tc.vendors {
+				t.Errorf("served %d sellers and %d vendors, want %d and %d", len(GetSellers()), len(GetVendors()), tc.sellers, tc.vendors)
+			}
+		})
+	}
+}
+
 // A datastore ping while a reload runs is queued behind it, and the reply
 // names the running reload's start.
 func TestLoadDatastoreQueuesBehindTheRunningReload(t *testing.T) {

@@ -878,11 +878,15 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var failed, loaded []string
+	var failed, skipped, loaded []string
 	for kind, list := range scrapersConfig {
 		ok := false
 		for _, shorthand := range list {
 			err := loadScraperWithRetry(DataBucket, Config().Game, name, kind, shorthand)
+			if errors.Is(err, errDroppedDump) {
+				skipped = append(skipped, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
+				continue
+			}
 			if err != nil {
 				log.Println(err)
 				failed = append(failed, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
@@ -899,20 +903,38 @@ func (s *site) LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	// Whatever did load is news to the alerts, failures or not.
 	s.pokeAlerts(loaded...)
 
+	slices.Sort(failed)
+	slices.Sort(skipped)
+	msg := "Server reloaded " + name
+	if len(failed) > 0 {
+		msg += fmt.Sprintf(", %d did not load: %s", len(failed), strings.Join(failed, "; "))
+	}
+	if len(skipped) > 0 {
+		msg += fmt.Sprintf(", %d skipped: %s", len(skipped), strings.Join(skipped, "; "))
+	}
+	switch {
 	// A scraper that just finished producing and still will not load is the
 	// case worth waking someone for, unlike the same absence at startup.
-	if len(failed) > 0 {
-		slices.Sort(failed)
-		msg := fmt.Sprintf("Server reloaded %s, %d did not load: %s", name, len(failed), strings.Join(failed, "; "))
+	case len(failed) > 0:
 		ServerNotify("reload", msg, true)
 		// The caller is the scraper that just published, and a reload it
 		// asked for and did not get is its news as much as the channel's.
 		errorResponse(w, http.StatusInternalServerError, msg)
 		return
+	// Quiet, as the skip is: the store stays dropped until a newer dump
+	// arrives. A conflict only when nothing else loaded alongside it.
+	case len(skipped) > 0 && len(loaded) == 0:
+		ServerNotify("reload", msg)
+		errorResponse(w, http.StatusConflict, msg)
+		return
 	}
 
-	ServerNotify("reload", "Server reloaded "+name)
+	ServerNotify("reload", msg)
 	s.offline.RequestRefresh()
+	if len(skipped) > 0 {
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok", "msg": msg})
+		return
+	}
 	w.Write([]byte(`{"status": "ok"}`))
 }
 
