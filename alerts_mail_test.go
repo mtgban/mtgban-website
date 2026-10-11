@@ -130,8 +130,17 @@ func TestAlertsConfirmVerifiesAndRenders(t *testing.T) {
 	mailLinkSetup(t)
 	store := &fakeLinkStore{channels: []alerts.Channel{pendingEmail("u1", "bob@example.com")}}
 	token := confirmToken("u1", "Bob@Example.com", time.Now().Add(time.Hour))
-	req := httptest.NewRequest(http.MethodGet, "/alerts/confirm?token="+url.QueryEscape(token), nil)
+	// A GET, which a link scanner may send, only asks.
+	get := httptest.NewRequest(http.MethodGet, "/alerts/confirm?token="+url.QueryEscape(token), nil)
 	rec := httptest.NewRecorder()
+	testSite.alertsConfirm(rec, get, store)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, `action="/alerts/confirm"`) || !strings.Contains(body, `value="`+token+`"`) || len(store.verified) != 0 {
+		t.Fatalf("confirm GET = %d %s, verified %+v", rec.Code, body, store.verified)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/alerts/confirm", strings.NewReader("token="+url.QueryEscape(token)))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
 	testSite.alertsConfirm(rec, req, store)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), alertsConfirmedText) || !strings.Contains(rec.Body.String(), `href="/alerts"`) {
 		t.Fatalf("confirm = %d %s", rec.Code, rec.Body)
@@ -143,6 +152,8 @@ func TestAlertsConfirmVerifiesAndRenders(t *testing.T) {
 		t.Fatalf("row not verified and enabled: %+v", store.channels[0])
 	}
 	// The same link again is still a success.
+	req = httptest.NewRequest(http.MethodPost, "/alerts/confirm", strings.NewReader("token="+url.QueryEscape(token)))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec = httptest.NewRecorder()
 	testSite.alertsConfirm(rec, req, store)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), alertsConfirmedText) {
@@ -185,7 +196,8 @@ func TestAlertsConfirmRefusesBadLinks(t *testing.T) {
 		if tc.rowAddress != "" {
 			store.channels = []alerts.Channel{pendingEmail("u1", tc.rowAddress)}
 		}
-		req := httptest.NewRequest(http.MethodGet, "/alerts/confirm?token="+url.QueryEscape(tc.token), nil)
+		req := httptest.NewRequest(http.MethodPost, "/alerts/confirm", strings.NewReader("token="+url.QueryEscape(tc.token)))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
 		testSite.alertsConfirm(rec, req, store)
 		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), alertsConfirmFailedText) {
