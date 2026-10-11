@@ -6,15 +6,28 @@ const source = readFileSync(new URL('../js/alerts.js', import.meta.url), 'utf8')
 // Loads js/alerts.js the way tests/api-plans.test.js loads its script: a
 // stub window/document so the IIFE's top-level code (which only registers
 // a DOMContentLoaded listener, never fires it here) runs without a real DOM.
-function load() {
+function load(elements) {
     const window = {};
     const document = {
         addEventListener: function () {},
-        getElementById: function () { return null; },
+        getElementById: function (id) { return (elements && elements[id]) || null; },
     };
     new Function('window', 'document', source)(window, document);
     return window.alertsChannels;
 }
+
+// withChannels is an element whose data-alert-channels is list, or absent for null.
+const withChannels = (list) => ({ getAttribute: (name) => (name === 'data-alert-channels' ? list : null) });
+
+test('deliveryAllowed reads the alerts page, else the search page modal', () => {
+    expect(load({ 'alerts-page': withChannels('discord,email') }).deliveryAllowed()).toEqual(['discord', 'email']);
+    // The search page has no #alerts-page; its modal carries the list.
+    expect(load({ 'alert-modal': withChannels('discord,email') }).deliveryAllowed()).toEqual(['discord', 'email']);
+    expect(load({ 'alert-modal': withChannels('') }).deliveryAllowed()).toEqual([]);
+    // A modal without the attribute, or no page at all, offers Discord alone.
+    expect(load({ 'alert-modal': withChannels(null) }).deliveryAllowed()).toEqual(['discord']);
+    expect(load().deliveryAllowed()).toEqual(['discord']);
+});
 
 test('channelState labels verified, pending and disabled rows', () => {
     const { channelState } = load();

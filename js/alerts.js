@@ -290,13 +290,14 @@
         return window.BAN_ALERTS || {};
     }
 
-    // deliveryAllowed is the channels the ACL lists on #alerts-page; a page
-    // that carries no such element (the search page's copy of this modal)
-    // falls back to Discord alone, same as before this control existed.
+    // deliveryAllowed is the channels the ACL lists in data-alert-channels,
+    // on #alerts-page or, on the search page, on the modal itself; a page
+    // carrying neither offers Discord alone.
     function deliveryAllowed() {
-        var page = document.getElementById('alerts-page');
-        if (!page) return ['discord'];
-        return allowedChannels(page.getAttribute('data-alert-channels'));
+        var host = document.getElementById('alerts-page') || document.getElementById('alert-modal');
+        var list = host ? host.getAttribute('data-alert-channels') : null;
+        if (list === null) return ['discord'];
+        return allowedChannels(list);
     }
 
     // deliveryUsable is whether the given channel will actually accept this
@@ -931,5 +932,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, emailLines: emailLines, deliveryOptions: deliveryOptions, alertsConfig: alertsConfig };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig };
 })();

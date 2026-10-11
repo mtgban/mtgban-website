@@ -3,7 +3,7 @@
      same family; only the IDs differ so both can sit on one page. */}}
 {{define "alert-modal"}}
 <div class="settings-backdrop" id="alert-modal-backdrop"></div>
-<div class="settings-modal alert-modal" id="alert-modal" role="dialog" aria-modal="true" aria-labelledby="alert-modal-title">
+<div class="settings-modal alert-modal" id="alert-modal" role="dialog" aria-modal="true" aria-labelledby="alert-modal-title"{{if not .AlertsPage}} data-alert-channels="{{.AlertChannelList}}"{{end}}>
     <div class="settings-modal-header">
         <h2 id="alert-modal-title">Price alert</h2>
         <p class="alert-modal-card" id="alert-modal-card"></p>
