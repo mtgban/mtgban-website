@@ -616,4 +616,17 @@ var funcMap = template.FuncMap{
 		}
 		return m, nil
 	},
+	"hover_args": func(values ...any) (string, error) {
+		b, err := json.Marshal(values)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	},
+	// trusted_html marks a string as markup rather than text. Only for
+	// strings this server built from card data (genCardPrintings,
+	// GenericCard.Products) - never for anything carrying reader input.
+	"trusted_html": func(s string) template.HTML {
+		return template.HTML(s)
+	},
 }

@@ -72,8 +72,10 @@
             window.scrollTo(0, target);
         }
 
-        // Trigger the header's onmouseenter to update the sidebar image
-        headers[currentIdx].dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}));
+        // Drive the sidebar to the newly current header. Trusted: the
+        // capture-phase keydown listener in search-sidebar.js just set
+        // __lastKey, which would otherwise read as a phantom hover.
+        if (typeof window.showHoverFor === 'function') window.showHoverFor(headers[currentIdx], true);
     });
 
     // Rows sliding under a still cursor never produce a mouseenter: browsers
@@ -85,19 +87,14 @@
     function hoverRowUnderPointer() {
         if (typeof __mx !== 'number' || typeof __my !== 'number') return false;
         var el = document.elementFromPoint(__mx, __my);
-        var row = el && el.closest ? el.closest('[onmouseenter]') : null;
-        if (!row || typeof row.onmouseenter !== 'function') {
+        var row = el && el.closest ? el.closest('.result-header, .result-body') : null;
+        if (!row || typeof window.showHoverFor !== 'function') {
             lastPointerTarget = null;
             return false;
         }
         if (row !== lastPointerTarget) {
             lastPointerTarget = row;
-            __hoverTrusted = true;
-            try {
-                row.onmouseenter();
-            } finally {
-                __hoverTrusted = false;
-            }
+            window.showHoverFor(row, true);
         }
         return true;
     }
@@ -124,8 +121,8 @@
                 currentIdx = stuckIdx;
                 // Keyboard paging still needs currentIdx tracked, but the
                 // row under the pointer wins the sidebar when there is one.
-                if (!pointerHandled) {
-                    headers[stuckIdx].dispatchEvent(new MouseEvent('mouseenter', {bubbles: true}));
+                if (!pointerHandled && typeof window.showHoverFor === 'function') {
+                    window.showHoverFor(headers[stuckIdx], false);
                 }
             }
         });
