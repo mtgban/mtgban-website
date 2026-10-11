@@ -61,6 +61,25 @@ jobs:
       # variables to pull_request runs from forks (it resolved empty, leaving an
       # empty curl URL and failing every fork PR).
       DATASTORE_URL: https://mtgjson.com/api/v5/AllPrintings.json.xz
+      # The userstate and alerts store tests run against the service below,
+      # as its default user and database.
+      USERSTATE_TEST: 1
+      USERSTATE_TEST_USER: postgres
+      USERSTATE_TEST_PASSWORD: ""
+      USERSTATE_TEST_DB: postgres
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # A throwaway server only this job reaches: no password to keep.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
 
