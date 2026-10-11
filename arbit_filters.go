@@ -219,27 +219,24 @@ func arbitSavedCookie(global bool) string {
 // requestArbitState is the state a request asks for: its own query where
 // that carries the marker, else the reader's saved filters, whose sort the
 // query can still change for the one view. A saved value that does not
-// read as a query is no saved value. It also answers when the saved state
-// it used was applied (its t), 0 where it used none, which the page holds
-// against the copy synced from the reader's other devices.
-func requestArbitState(form url.Values, saved string, offer arbitOffer) (arbitState, int64) {
+// read as a query is no saved value.
+func requestArbitState(form url.Values, saved string, offer arbitOffer) arbitState {
 	if form.Has(arbitMarker) || saved == "" {
-		return parseArbitState(form, offer), 0
+		return parseArbitState(form, offer)
 	}
 	unescaped, err := url.QueryUnescape(saved)
 	if err != nil {
-		return parseArbitState(form, offer), 0
+		return parseArbitState(form, offer)
 	}
 	savedForm, err := url.ParseQuery(unescaped)
 	if err != nil {
-		return parseArbitState(form, offer), 0
+		return parseArbitState(form, offer)
 	}
 	st := parseArbitState(savedForm, offer)
 	if slices.Contains(arbitSorts, form.Get("sort")) {
 		st.Sort = form.Get("sort")
 	}
-	savedAt, _ := strconv.ParseInt(savedForm.Get("t"), 10, 64)
-	return st, savedAt
+	return st
 }
 
 // values is the state as a query, the marker included: what every store,

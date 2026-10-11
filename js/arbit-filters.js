@@ -1,7 +1,6 @@
 // The arbitrage pages' filter bar and sort links. arbit.html sets
-// window.BAN_ARBIT to the source, the filter state as a query, the cookie
-// the page saves the reader's filters in, and when the saved state it was
-// drawn from was applied.
+// window.BAN_ARBIT to the source, the filter state as a query and the
+// cookie the page saves the reader's filters in.
 (function () {
     var cfg = window.BAN_ARBIT || {};
 
@@ -25,6 +24,13 @@
 
     function writeSaved(cookie, query, t) {
         writeCookie(cookie, encodeURIComponent(query + (query ? '&' : '') + 't=' + t), 1000, '/');
+    }
+
+    // The state a saved cookie holds, less when it was applied
+    function cookieQuery(cookie) {
+        var q = new URLSearchParams(getCookie(cookie));
+        q.delete('t');
+        return q.toString();
     }
 
     // When a saved cookie's state was applied, 0 for none.
@@ -74,11 +80,25 @@
         dropped = [];
     }
 
+    // When a state is applied, on the server's clock once a sync has read
+    // it (user-state.js), which the reader's devices share.
+    function now() {
+        return window.UserState ? window.UserState.now() : Date.now();
+    }
+    // A stamp ahead of that clock, as one saved before the first sync is,
+    // counts as made now, and comes back to it when it wins.
+    function clamp(t) {
+        return window.UserState ? window.UserState.clamp(t) : t;
+    }
+    function later(a, b) {
+        return window.UserState ? window.UserState.later(a, b) : a > b;
+    }
+
     // Keep a state as the reader's own, with when it was applied. Only what
     // the reader does on the page saves: following a link never does.
     function save(query) {
         if (!cfg.cookie) return;
-        var t = Date.now();
+        var t = now();
         writeSaved(cfg.cookie, query, t);
         try {
             var saved = readSaved();
@@ -87,24 +107,35 @@
         } catch (e) {}
     }
 
-    // Bring each cookie and the synced copy to whichever was applied later:
-    // a cookie to filters applied on another device, and the synced copy to
+    // The saved state this page was drawn from, where no link of its own
+    // drew it, as cookieQuery spells it
+    var rendered = cfg.cookie ? cookieQuery(cfg.cookie) : '';
+
+    // Bring each cookie and the synced copy to whichever was applied later
+    // (by later, a tie going to the cookie), its stamp back on the clock: a
+    // cookie to filters applied on another device, and the synced copy to
     // a cookie it never held (saved signed out, or before syncing, or under
-    // an older copy a sync wrote back). Then show the newer filters where
-    // this page was drawn from older ones and no link of its own says
-    // otherwise. Runs on load, and from user-state.js after a sync.
+    // an older copy a sync wrote back). A cookie ahead of the clock loses to
+    // a synced copy on it: every save writes both, so that copy came out of
+    // a merge the cookie's save already took part in. Then show the winner
+    // where this page was drawn from other filters and no link of its own
+    // says otherwise. Runs on load, and from user-state.js after a sync.
     function refresh() {
         var saved = readSaved();
         var adopted = false;
         Object.keys(GROUPS).forEach(function (g) {
             var entry = saved[g];
+            var held = entry && typeof entry.q === 'string';
+            var entryAt = (entry && entry.t) || 0;
             var cookieAt = cookieTime(GROUPS[g]);
-            if (entry && typeof entry.q === 'string' && entry.t > cookieAt) {
-                writeSaved(GROUPS[g], entry.q, entry.t);
-            } else if (cookieAt > ((entry && entry.t) || 0)) {
-                var q = new URLSearchParams(getCookie(GROUPS[g]));
-                q.delete('t');
-                saved[g] = { q: q.toString(), t: cookieAt };
+            if (!held && !cookieAt) return;
+            var settled = held && clamp(cookieAt) !== cookieAt && clamp(entryAt) === entryAt;
+            var cookieWins = !held || (cookieAt && !settled && !later(entryAt, cookieAt));
+            var q = cookieWins ? cookieQuery(GROUPS[g]) : entry.q;
+            var t = clamp(cookieWins ? cookieAt : entryAt);
+            if (t !== cookieAt || q !== cookieQuery(GROUPS[g])) writeSaved(GROUPS[g], q, t);
+            if (!held || entry.q !== q || entryAt !== t) {
+                saved[g] = { q: q, t: t };
                 adopted = true;
             }
         });
@@ -114,7 +145,7 @@
 
         var mine = cfg.cookie ? saved[groupOf(cfg.cookie)] : null;
         var marked = new URLSearchParams(window.location.search).has('f');
-        if (marked || !mine || !(mine.t > (cfg.savedAt || 0))) return;
+        if (marked || !mine || new URLSearchParams(mine.q).toString() === rendered) return;
         // Once per state, should the cookie not have taken
         try {
             if (sessionStorage.getItem('mtgban_arbit_reloaded') === String(mine.t)) return;

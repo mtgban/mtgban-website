@@ -176,6 +176,17 @@ test('save with an existing id replaces opts and savedAt and keeps the id', () =
     expect(P.store.list()[0].opts.mode).toBe('true');
 });
 
+test('saves, renames and deletes are stamped on the server\'s clock where a sync has read it', () => {
+    const at = Date.now() - 60 * 60 * 1000;
+    const { P, localStorage } = loadPresets({ win: { UserState: { now: () => at } } });
+    const r = P.store.save({ name: 'a', opts: { mode: 'false' } });
+    expect(r.preset.savedAt).toBe(at);
+    P.store.rename(r.preset.id, 'b');
+    expect(P.store.list()[0].savedAt).toBe(at);
+    P.store.remove(r.preset.id);
+    expect(JSON.parse(localStorage.getItem('mtgban_upload_presets'))).toEqual([{ id: r.preset.id, del: true, savedAt: at }]);
+});
+
 test('the 11th preset is refused and nothing is evicted', () => {
     const { P } = loadPresets();
     for (let i = 0; i < 10; i++) expect(P.store.save({ name: 'p' + i, opts: { margin: String(i) } }).ok).toBe(true);

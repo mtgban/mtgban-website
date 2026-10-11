@@ -19,6 +19,12 @@
     // nothing can overwrite, rename or delete it, and its name is reserved.
     var DEFAULT = { id: 'default', name: 'Default', q: 'f=1' };
 
+    // When a preset is saved or deleted, on the server's clock once a sync
+    // has read it (user-state.js), which the reader's devices share.
+    function now() {
+        return window.UserState ? window.UserState.now() : Date.now();
+    }
+
     function reserved(name) { return String(name).trim().toLowerCase() === DEFAULT.name.toLowerCase(); }
 
     function byName(a, b) {
@@ -43,16 +49,16 @@
 
     // tombstones keeps the unexpired deletes of ids not live in list.
     function tombstones(list) {
-        var live = {}, now = Date.now();
+        var live = {}, at = now();
         list.forEach(function (p) { live[p.id] = true; });
-        return readRaw().filter(function (p) { return p.del && !live[p.id] && now - (p.savedAt || 0) <= TOMB_TTL_MS; });
+        return readRaw().filter(function (p) { return p.del && !live[p.id] && at - (p.savedAt || 0) <= TOMB_TTL_MS; });
     }
 
     // A full or missing store drops the write.
     function writeAll(list, deleted) {
         list.sort(byName);
         var tombs = tombstones(list);
-        if (deleted) tombs.push({ id: deleted, del: true, savedAt: Date.now() });
+        if (deleted) tombs.push({ id: deleted, del: true, savedAt: now() });
         try {
             localStorage.setItem(KEY, JSON.stringify(list.concat(tombs)));
             return true;
@@ -72,7 +78,7 @@
             var all = readAll();
             var idx = -1;
             for (var i = 0; i < all.length; i++) if (all[i].id === p.id) idx = i;
-            var rec = { id: p.id || newId(), name: String(p.name), savedAt: Date.now(), group: group, q: String(p.q) };
+            var rec = { id: p.id || newId(), name: String(p.name), savedAt: now(), group: group, q: String(p.q) };
             if (idx >= 0) {
                 all[idx] = rec;
             } else if (store.list().length >= CAP) {
@@ -87,7 +93,7 @@
         rename: function (id, name) {
             var all = readAll(), hit = false;
             all.forEach(function (p) {
-                if (p.id === id) { p.name = String(name); p.savedAt = Date.now(); hit = true; }
+                if (p.id === id) { p.name = String(name); p.savedAt = now(); hit = true; }
             });
             return hit ? writeAll(all) : 'missing';
         },

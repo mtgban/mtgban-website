@@ -131,6 +131,12 @@
     // the delete syncs to other devices rather than the preset coming back.
     var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+    // When a preset is saved or deleted, on the server's clock once a sync
+    // has read it (user-state.js), which the reader's devices share.
+    function now() {
+        return window.UserState ? window.UserState.now() : Date.now();
+    }
+
     function byName(a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0; }
 
     function readRaw() {
@@ -145,15 +151,15 @@
     }
     // tombstones keeps the unexpired deletes of ids not live in list.
     function tombstones(list) {
-        var live = {}, now = Date.now();
+        var live = {}, at = now();
         list.forEach(function (p) { live[p.id] = true; });
-        return readRaw().filter(function (p) { return p.del && !live[p.id] && now - (p.savedAt || 0) <= TOMB_TTL_MS; });
+        return readRaw().filter(function (p) { return p.del && !live[p.id] && at - (p.savedAt || 0) <= TOMB_TTL_MS; });
     }
     // A full or missing store drops the write, as list-storage.js does.
     function writeAll(list, deleted) {
         list.sort(byName);
         var tombs = tombstones(list);
-        if (deleted) tombs.push({ id: deleted, del: true, savedAt: Date.now() });
+        if (deleted) tombs.push({ id: deleted, del: true, savedAt: now() });
         try {
             localStorage.setItem(KEY, JSON.stringify(list.concat(tombs)));
             return true;
@@ -170,7 +176,7 @@
             var list = readAll();
             var idx = -1;
             for (var i = 0; i < list.length; i++) if (list[i].id === p.id) idx = i;
-            var rec = { id: p.id || newId(), name: String(p.name), savedAt: Date.now(), opts: canonical(p.opts) };
+            var rec = { id: p.id || newId(), name: String(p.name), savedAt: now(), opts: canonical(p.opts) };
             if (idx >= 0) list[idx] = rec;
             else if (list.length >= CAP) return { ok: false, reason: 'cap' };
             else list.push(rec);
@@ -180,7 +186,7 @@
         // rename and remove return 'missing' for an id that is gone, else whether storage took the write.
         rename: function (id, name) {
             var list = readAll(), hit = false;
-            list.forEach(function (p) { if (p.id === id) { p.name = String(name); p.savedAt = Date.now(); hit = true; } });
+            list.forEach(function (p) { if (p.id === id) { p.name = String(name); p.savedAt = now(); hit = true; } });
             return hit ? writeAll(list) : 'missing';
         },
         remove: function (id) {
