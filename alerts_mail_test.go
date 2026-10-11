@@ -48,6 +48,10 @@ type fakeLinkStore struct {
 	sends map[string]bool
 }
 
+func (f *fakeLinkStore) ComplainConfirmSend(context.Context, string, string, time.Time) error {
+	return nil
+}
+
 func (f *fakeLinkStore) Channels(_ context.Context, userHash string) ([]alerts.Channel, error) {
 	var out []alerts.Channel
 	for _, c := range f.channels {

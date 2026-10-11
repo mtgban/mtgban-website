@@ -101,7 +101,7 @@ func TestAlertMailWithoutAKey(t *testing.T) {
 	if s.alertAPIDeps().SendConfirm != nil || s.alertMailer() != nil {
 		t.Fatal("production without a key wired a mailer")
 	}
-	if err := s.sendAlertConfirm(context.Background(), "a@b.c", "https://x/confirm"); err == nil {
+	if err := s.sendAlertConfirm(context.Background(), "u1", "a@b.c", "https://x/confirm"); err == nil {
 		t.Fatal("confirm sent without a mailer")
 	}
 	// The evaluator gets no mail deliverer either, so no run logs a mail

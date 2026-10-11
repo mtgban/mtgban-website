@@ -3,6 +3,7 @@ package alerts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"mime"
@@ -69,7 +70,7 @@ type APIDeps struct {
 	Channels func(v url.Values) []ChannelKind
 	// Mint signs a confirm token; SendConfirm mails its link.
 	Mint        func(t Token) string
-	SendConfirm func(ctx context.Context, to, link string) error
+	SendConfirm func(ctx context.Context, userHash, to, link string) error
 	ConfirmTTL  time.Duration
 	// ConfirmLimiter caps confirmation mails per user.
 	ConfirmLimiter *ratelimit.Limiter
@@ -749,7 +750,7 @@ func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, 
 		return false
 	}
 	link := c.Origin + "/alerts/confirm?token=" + url.QueryEscape(token)
-	err := a.deps.SendConfirm(ctx, address, link)
+	err := a.deps.SendConfirm(ctx, c.UserHash, address, link)
 	if err != nil {
 		log.Printf("alerts: confirm mail failed: %v", err)
 		a.releaseConfirm(ctx, c, address, claimedAt)
@@ -909,6 +910,10 @@ func (a *API) confirmAllowed(ctx context.Context, w http.ResponseWriter, c Calle
 	// Claimed before the send, so nothing after it can fail to land.
 	now := time.Now().Truncate(time.Microsecond)
 	claimed, err := a.deps.Store.ClaimConfirmSend(ctx, c.UserHash, address, now, now.Add(-confirmAddressGap))
+	if errors.Is(err, ErrConfirmComplained) {
+		jsonError(w, http.StatusUnprocessableEntity, "this address cannot receive mail from us")
+		return time.Time{}, false
+	}
 	if err != nil {
 		a.fail(w, "confirm sends", err)
 		return time.Time{}, false

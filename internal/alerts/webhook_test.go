@@ -190,10 +190,17 @@ type fakeWebhookStore struct {
 	parkErr     error
 	disabled    []disableCall
 	parked      map[string]string // userHash -> reason
+	// complained is each confirm complaint, address -> requester.
+	complained map[string]string
 }
 
 func newFakeWebhookStore() *fakeWebhookStore {
-	return &fakeWebhookStore{channels: map[string][]Channel{}, parked: map[string]string{}}
+	return &fakeWebhookStore{channels: map[string][]Channel{}, parked: map[string]string{}, complained: map[string]string{}}
+}
+
+func (f *fakeWebhookStore) ComplainConfirmSend(_ context.Context, userHash, address string, _ time.Time) error {
+	f.complained[address] = userHash
+	return nil
 }
 
 func (f *fakeWebhookStore) ChannelByAddress(_ context.Context, _ ChannelKind, address string) ([]Channel, error) {
@@ -278,6 +285,59 @@ func TestWebhookComplaintParksOnlyTheUserLeftWithoutMail(t *testing.T) {
 	}
 	if len(store.parked) != 1 || store.parked["uB"] != ParkComplained {
 		t.Fatalf("parked %+v, want only uB", store.parked)
+	}
+	// The complaint stays on the address for no one user, past any row.
+	if who, ok := store.complained["b@example.com"]; !ok || who != "" {
+		t.Fatalf("complained %+v, want b@example.com for no user", store.complained)
+	}
+}
+
+// A complaint about a confirm mail uA asked for, to an address uB owns,
+// disables only uA's own row: uB never asked for that mail. Tags as in
+// Resend's email.complained example, an object of name to value.
+func TestWebhookConfirmComplaintDisablesOnlyTheRequester(t *testing.T) {
+	secret := []byte("s")
+	store := newFakeWebhookStore()
+	now := time.Now()
+	store.channels["b@example.com"] = []Channel{
+		{UserHash: "uA", Kind: ChannelEmail, Address: "b@example.com", Source: SourceUser},
+		{UserHash: "uB", Kind: ChannelEmail, Address: "b@example.com", Source: SourcePatreon, VerifiedAt: &now},
+		{UserHash: "uB", Kind: ChannelEmail, Address: "b@example.com", Source: SourceUser, VerifiedAt: &now},
+	}
+	wh := &Webhook{Secret: secret, Store: store}
+	body := []byte(`{"type":"email.complained","data":{"email_id":"m1","to":["b@example.com"],"tags":{"kind":"confirm","user":"uA"}}}`)
+	rec := httptest.NewRecorder()
+	wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
+	want := []disableCall{{"uA", ChannelEmail, SourceUser, ReasonComplained}}
+	if rec.Code != http.StatusOK || !slices.Equal(store.disabled, want) {
+		t.Fatalf("status %d disabled %+v", rec.Code, store.disabled)
+	}
+	if len(store.parked) != 1 || store.parked["uA"] != ParkComplained || store.complained["b@example.com"] != "uA" {
+		t.Fatalf("parked %+v complained %+v, want only uA", store.parked, store.complained)
+	}
+	// A bounce on a confirm mail is about the address, so it reaches every row.
+	store.disabled = nil
+	body = []byte(`{"type":"email.bounced","data":{"email_id":"m2","to":["b@example.com"],"tags":{"kind":"confirm","user":"uA"}}}`)
+	rec = httptest.NewRecorder()
+	wh.ServeHTTP(rec, signedRequest(secret, "msg_2", now, body))
+	if rec.Code != http.StatusOK || len(store.disabled) != 3 {
+		t.Fatalf("bounce status %d disabled %+v", rec.Code, store.disabled)
+	}
+}
+
+func TestParseMailEventTags(t *testing.T) {
+	e, err := ParseMailEvent([]byte(`{"type":"email.complained","data":{"to":["a@b.c"],"tags":{"kind":"confirm","user":"u1"}}}`))
+	if err != nil || e.confirmRequester() != "u1" {
+		t.Fatalf("tagged = %+v %v", e, err)
+	}
+	// Tags in a shape we do not read are no tags, and the event still parses.
+	e, err = ParseMailEvent([]byte(`{"type":"email.complained","data":{"to":["a@b.c"],"tags":[{"name":"kind","value":"confirm"}]}}`))
+	if err != nil || e.confirmRequester() != "" || len(e.To) != 1 {
+		t.Fatalf("array tags = %+v %v", e, err)
+	}
+	e, _ = ParseMailEvent([]byte(`{"type":"email.complained","data":{"to":["a@b.c"],"tags":{"kind":"digest","user":"u1"}}}`))
+	if e.confirmRequester() != "" {
+		t.Fatalf("digest tags = %+v", e)
 	}
 }
 
@@ -648,5 +708,98 @@ func TestWebhookServeHTTPBounceAcrossTwoUsersSharingAnAddressDB(t *testing.T) {
 	gotDiscordB, _, _ := s.Get(ctx, discordB.ID, hb)
 	if gotDiscordB.Status != StatusActive {
 		t.Fatalf("user b discord alert touched: %+v", gotDiscordB)
+	}
+}
+
+// TestDigestComplaintOutlivesTheRowDB covers a complaint about any other
+// mail: once the row it disabled is removed, the address still gets no
+// confirm mail.
+func TestDigestComplaintOutlivesTheRowDB(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	addr := "digest-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	now := time.Now()
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: addr, Source: SourceUser, VerifiedAt: &now}))
+	secret := []byte("s")
+	wh := &Webhook{Secret: secret, Store: s}
+	body := []byte(`{"type":"email.complained","data":{"email_id":"m1","to":["` + addr + `"]}}`)
+	rec := httptest.NewRecorder()
+	wh.ServeHTTP(rec, signedRequest(secret, "msg_1", now, body))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("webhook = %d", rec.Code)
+	}
+	must(t, s.DeleteChannel(ctx, h, ChannelEmail, SourceUser))
+	_, err := s.ClaimConfirmSend(ctx, h, addr, time.Now(), time.Now().Add(-time.Hour))
+	if !errors.Is(err, ErrConfirmComplained) {
+		t.Fatalf("confirm mail to a complained address after its row went = %v", err)
+	}
+}
+
+// TestConfirmComplaintBeforeTheSendReturnsDB delivers the complaint while
+// the confirm mail's send is still in flight, so before any row holds the
+// address: the complaint must still stop the link and any further mail.
+func TestConfirmComplaintBeforeTheSendReturnsDB(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	h := testHash("a@b.com")
+	cleanUser(t, s, h)
+	seedContact(t, s, h)
+	addr := "complaint-" + strings.ToLower(t.Name()) + "@example.com"
+	clean := func() { _, _ = s.db.Exec(`DELETE FROM alert_confirm_sends WHERE address = $1`, addr) }
+	clean()
+	t.Cleanup(clean)
+	verified := time.Now().Add(-time.Hour)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "old@example.com", Source: SourceUser, VerifiedAt: &verified}))
+
+	secret := []byte("s")
+	wh := &Webhook{Secret: secret, Store: s}
+	sent := []sentConfirm{}
+	api := testChannelAPI(s, &sent, nil)
+	api.deps.SendConfirm = func(_ context.Context, userHash, to, _ string) error {
+		body := []byte(`{"type":"email.complained","data":{"email_id":"m1","to":["` + to + `"],"tags":{"kind":"confirm","user":"` + userHash + `"}}}`)
+		rec := httptest.NewRecorder()
+		wh.ServeHTTP(rec, signedRequest(secret, "msg_1", time.Now(), body))
+		if rec.Code != http.StatusOK {
+			t.Errorf("webhook = %d", rec.Code)
+		}
+		return nil
+	}
+	sig := testCaller("a@b.com", "Legacy")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"`+addr+`"}`, sig))
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("set = %d %s", w.Code, w.Body)
+	}
+	// The link no longer confirms, and the move it would make is rolled
+	// back with it: the working address stays.
+	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, addr, time.Now())
+	if err != nil || ok {
+		t.Fatalf("confirmed a complained address: %v %v", ok, err)
+	}
+	chans, err := s.Channels(ctx, h)
+	if err != nil || len(chans) != 1 || chans[0].Address != "old@example.com" || !chans[0].Active() {
+		t.Fatalf("working address after the refused confirm: %+v %v", chans, err)
+	}
+	_, pending, err := s.PendingEmail(ctx, h, time.Now().Add(-24*time.Hour))
+	if err != nil || pending {
+		t.Fatalf("complained replacement still pending: %v %v", pending, err)
+	}
+	// Even a row that holds the address cannot be verified through it.
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: addr, Source: SourceUser}))
+	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, addr, time.Now())
+	if err != nil || ok {
+		t.Fatalf("verified a complained address: %v %v", ok, err)
+	}
+	// Nor does the address get another confirm mail, once the hour is past.
+	_, err = s.db.ExecContext(ctx, `UPDATE alert_confirm_sends SET sent_at = now() - interval '2 hours' WHERE address = $1`, addr)
+	must(t, err)
+	_, err = s.ClaimConfirmSend(ctx, "someone-else", addr, time.Now(), time.Now().Add(-time.Hour))
+	if !errors.Is(err, ErrConfirmComplained) {
+		t.Fatalf("claim on a complained address = %v", err)
 	}
 }
