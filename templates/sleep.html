@@ -24,7 +24,7 @@
     </div>
 
     <div class="card sleepers-info-card">
-        <h3>&#128161; About Sleepers</h3>
+        <h2>&#128161; About Sleepers</h2>
         <p>Results are tiered <strong>S through F</strong>. Higher tiers = stronger signals. These tools identify cards where market pricing hasn't kept pace with demand, scarcity, or cross-market pricing differences.</p>
         <div class="sleepers-tier-perks">
             <div class="sleepers-tier-perk">
@@ -122,7 +122,7 @@
             <div class="sleepers-comp-custom-title">Custom Comparison</div>
             <form class="sleepers-comp-builder" action="sleepers" method="GET">
                 <input type="hidden" name="page" value="gap">
-                <label>Reference Seller</label>
+                <label for="ref">Reference Seller</label>
                 <select name="ref" id="ref" onchange="checkSleepersCompare()">
                     <option value="" disabled selected>Pick a reference...</option>
                     {{range .SellerKeys}}
@@ -130,7 +130,7 @@
                     {{end}}
                 </select>
                 <div class="sleepers-comp-vs-divider">VS</div>
-                <label>Target Seller</label>
+                <label for="target">Target Seller</label>
                 <select name="target" id="target" onchange="checkSleepersCompare()">
                     <option value="" disabled selected>Pick where to buy...</option>
                     {{range .SellerKeys}}

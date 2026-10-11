@@ -252,7 +252,7 @@
                     <div class="sidebar-pinned">
                         {{template "sidebar-search" .}}
                         <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper"{{if .IsSealed}} data-sealed{{end}} onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
-                            <img class="sidebar-card-img" id="cardImage" src=""/>
+                            <img class="sidebar-card-img" id="cardImage" src="" alt="Card image"/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
                     </div>
@@ -291,8 +291,8 @@
                                     {{range .CardHashes}}
                                         <input type="hidden" name="hashes" value="{{.}}"/>
                                     {{end}}
-                                    <a class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit(); return false;'>Retail</a>
-                                    <a class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit(); return false;'>Buylist</a>
+                                    <button type="button" class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit();'>Retail</button>
+                                    <button type="button" class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit();'>Buylist</button>
                                     <noscript><input type="submit" value="Check Uploader!"/></noscript>
                                 </form>
                             </div>
@@ -449,7 +449,7 @@
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
                                  onmouseenter="hoverSidebar({{$card.FullImageURL}}, {{index $.Printings $cardId}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
-                                <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
+                                <a class="result-set-link" href="?q=s:{{$card.SetCode}}" aria-label="{{$card.Edition}}">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 32 "Class" "result-set-icon"}}
                                 </a>
                                 <div class="result-card-info">
@@ -483,8 +483,8 @@
                                             <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">&#127873;</span></a>
                                         {{end}}
                                         {{if $card.HasDeck}}
-                                            <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 src="/img/misc/decklist.png"></a>
-                                            <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 src="/img/misc/decklist-mkm.png"></a>
+                                            <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
+                                            <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
                                         {{end}}
                                         <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">&#128270;</span></a>
                                     {{else if $.HasAvailable}}
@@ -492,16 +492,16 @@
                                     {{end}}
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
                                     {{if not $card.Sealed}}
-                                        <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank><img width=22 src="/img/logo/deckbox.webp"></a>
+                                        <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank><img width=22 height=22 alt="" src="/img/logo/deckbox.webp"></a>
                                     {{end}}
                                     {{if $card.CKRestockURL}}
                                         <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank><span class="emoji">&#127984;</span></a>
                                     {{end}}
                                     {{if $card.ScryfallURL}}
-                                        <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank><img width=28 src="/img/logo/scryfall.svg"></a>
+                                        <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank><img width=28 height=28 alt="" src="/img/logo/scryfall.svg"></a>
                                     {{end}}
                                     {{if $card.TCGId}}
-                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
+                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 height=25 alt="" src="/img/logo/tcgapp.png"></a>
                                     {{end}}
                                     {{if not $.DisableChart}}
                                         {{if eq $.ChartIDsCSV ""}}

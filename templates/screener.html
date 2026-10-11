@@ -30,8 +30,8 @@
             <input type="hidden" name="dir" value="{{$.SortDir}}">
             <div class="news-filter-bar screener-filter-bar">
                 <div class="news-fg">
-                    <span class="news-fl">Metric</span>
-                    <select name="metric" onchange="screenerGo(this.form)">
+                    <label class="news-fl" for="scr-metric">Metric</label>
+                    <select name="metric" id="scr-metric" onchange="screenerGo(this.form)">
                         {{range .Metrics}}
                             <option value="{{.Index}}" {{if eq .Index $.Screener.SelMetric}}selected{{end}}>{{.Name}}</option>
                         {{end}}
@@ -40,8 +40,8 @@
                 <span class="toolbar-sep"></span>
 
                 <div class="news-fg">
-                    <span class="news-fl">Window</span>
-                    <select name="window" onchange="screenerGo(this.form)">
+                    <label class="news-fl" for="scr-window">Window</label>
+                    <select name="window" id="scr-window" onchange="screenerGo(this.form)">
                         {{range .Windows}}
                             <option value="{{.Days}}" {{if eq .Days $.Screener.SelWindow}}selected{{end}}>{{.Label}}</option>
                         {{end}}
@@ -50,8 +50,8 @@
                 <span class="toolbar-sep"></span>
 
                 <div class="news-fg">
-                    <span class="news-fl">Type</span>
-                    <select name="kind" onchange="screenerGo(this.form)">
+                    <label class="news-fl" for="scr-kind">Type</label>
+                    <select name="kind" id="scr-kind" onchange="screenerGo(this.form)">
                         <option value="singles" {{if eq .SelKind "singles"}}selected{{end}}>Singles</option>
                         <option value="sealed" {{if eq .SelKind "sealed"}}selected{{end}}>Sealed</option>
                         <option value="both" {{if eq .SelKind "both"}}selected{{end}}>Both</option>
@@ -60,8 +60,8 @@
                 <span class="toolbar-sep"></span>
 
                 <div class="news-fg">
-                    <span class="news-fl">Move</span>
-                    <select name="move" onchange="screenerGo(this.form)">
+                    <label class="news-fl" for="scr-move">Move</label>
+                    <select name="move" id="scr-move" onchange="screenerGo(this.form)">
                         <option value="up" {{if eq .Move "up"}}selected{{end}}>Up</option>
                         <option value="down" {{if eq .Move "down"}}selected{{end}}>Down</option>
                         <option value="either" {{if eq .Move "either"}}selected{{end}}>Either</option>
@@ -102,8 +102,8 @@
                 {{end}}
 
                 <div class="news-fg">
-                    <span class="news-fl">Per page</span>
-                    <select name="size" onchange="screenerGo(this.form)">
+                    <label class="news-fl" for="scr-size">Per page</label>
+                    <select name="size" id="scr-size" onchange="screenerGo(this.form)">
                         {{range .PageSizes}}
                             <option value="{{.}}" {{if eq . $.Screener.SelSize}}selected{{end}}>{{.}}</option>
                         {{end}}
