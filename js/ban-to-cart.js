@@ -79,7 +79,14 @@
         return;
     }
 
+    var release = function () {};
     try {
+        // A store that sends the difference from one read of the cart loads
+        // one tab at a time, or two tabs would each add the same difference
+        if (store.lock) {
+            banner.textContent = "BAN: waiting for another tab to finish loading your " + store.name + " cart.";
+            release = await hold(store.lock);
+        }
         banner.textContent = "BAN: reading your " + store.name + " cart. Keep this tab open until it finishes.";
         // A card already in the cart adds no line
         var present = await store.cartIDs();
@@ -132,6 +139,7 @@
         var loaded = rows.filter(function (id) {
             return after.indexOf(key(id)) >= 0;
         }).length;
+        release();
         var message = "Loaded " + loaded + " cards into your " + store.name + " cart.";
         if (unknown > 0) {
             message += " " + unknown + " that " + store.name + " no longer lists were left out.";
@@ -147,6 +155,7 @@
         history.replaceState(null, "", location.pathname + location.search);
         location.reload();
     } catch (err) {
+        release();
         window.removeEventListener("beforeunload", stay);
         banner.remove();
         alert(err.message);
@@ -155,6 +164,25 @@
     function stay(event) {
         event.preventDefault();
         event.returnValue = "";
+    }
+
+    // hold takes the store origin's lock of that name, shared by its tabs,
+    // and resolves to the function that lets it go. A browser with no locks,
+    // or one that refuses the request, runs unlocked.
+    function hold(name) {
+        var locks = window.navigator && window.navigator.locks;
+        if (!locks) {
+            return Promise.resolve(function () {});
+        }
+        return new Promise(function (granted) {
+            locks.request(name, function () {
+                return new Promise(function (release) {
+                    granted(release);
+                });
+            }).catch(function () {
+                granted(function () {});
+            });
+        });
     }
 
     // abuStore loads ABU's buylist or store cart, whichever page this is,
@@ -260,10 +288,12 @@
 
     // csiStore loads CSI's sell cart, kept by the browser's cookies, the way
     // its sell list page adds a row. CSI skips an id it does not buy and adds
-    // to a card already in the cart.
+    // to a card already in the cart, so such a card gets the difference.
     function csiStore() {
+        var held = {};
         return {
             name: "CSI",
+            lock: "ban-to-cart-csi",
             loggedIn: function () {
                 return true;
             },
@@ -278,21 +308,30 @@
                     throw new Error("CSI could not read your sell cart (" + resp.status + ").");
                 }
                 var page = await resp.text();
-                var found = [];
-                var re = /name="bl_q\[(\d+)\]"/g;
+                held = {};
+                var re = /<[^>]*name="bl_q\[(\d+)\]"[^>]*>/g;
                 var m;
                 while ((m = re.exec(page)) !== null) {
-                    found.push(m[1]);
+                    var value = /value="(\d+)"/.exec(m[0]);
+                    held[m[1]] = value ? Number(value[1]) : 0;
                 }
-                return found;
+                return Object.keys(held);
             },
             send: async function (chunk, qty) {
+                var add = "";
+                for (var i = 0; i < chunk.length; i++) {
+                    var more = qty[chunk[i]] - (held[chunk[i]] || 0);
+                    if (more > 0) {
+                        add += "uid_" + chunk[i] + "qty_" + more + "||";
+                    }
+                }
+                if (!add) {
+                    return true;
+                }
                 var resp = await fetch("/ajax_buylist.php", {
                     method: "POST",
                     headers: {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"},
-                    body: "ajaxtype=addtocart&ajaxdata=" + encodeURIComponent(chunk.map(function (id) {
-                        return "uid_" + id + "qty_" + qty[id] + "||";
-                    }).join(""))
+                    body: "ajaxtype=addtocart&ajaxdata=" + encodeURIComponent(add)
                 });
                 if (!resp.ok) {
                     throw new Error("CSI refused the list (" + resp.status + ").");
@@ -312,6 +351,7 @@
         var held = {};
         return {
             name: "CSI",
+            lock: "ban-to-cart-csi",
             loggedIn: function () {
                 return true;
             },

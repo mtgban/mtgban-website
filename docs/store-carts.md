@@ -93,8 +93,14 @@ ajaxdata=uid_3813340qty_1||uid_3813344qty_2||
   reach the cart.
 - The cart page is `/buylist_cart.php`, and keeps a `#` fragment even
   with an empty cart. Its form names one field per row, `bl_q[<PPQID>]`,
-  which is how the bookmarklet reads the cart back.
+  which is how the bookmarklet reads the cart back, with its quantity, so
+  that a card already in the cart gets only what the list adds to it.
   `/buylist_cart.php?pa=clean` empties it.
+- Two tabs loading at once would each add the difference from the same
+  read, so a load of either CSI cart holds `ban-to-cart-csi`, a
+  `navigator.locks` lock CSI's tabs share, from its first read of the
+  cart to its last. A browser without locks, or one that refuses the
+  request, loads unlocked.
 - A sell order needs $10 or more in the cart before CSI takes it.
 
 | Sent | Result |

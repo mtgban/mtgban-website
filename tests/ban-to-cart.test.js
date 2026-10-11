@@ -62,8 +62,22 @@ function fakeCSI({cart = {}, unknown = []} = {}) {
     return {fetch, posts, lines};
 }
 
+// fakeLocks stands in for navigator.locks, the one set a store origin's tabs
+// share: a request waits for the last holder of its name to let go.
+function fakeLocks() {
+    const tails = {};
+    const names = [];
+    const request = (name, fn) => {
+        names.push(name);
+        const turn = (tails[name] || Promise.resolve()).then(() => fn());
+        tails[name] = turn.catch(() => {});
+        return turn;
+    };
+    return {request, names};
+}
+
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false, locks = null} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
     if (hash && version !== null) {
@@ -86,6 +100,7 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', search = 
     // alert and reload
     const guards = new Set();
     const window = {
+        navigator: locks ? {locks} : {},
         addEventListener: (type, fn) => type === 'beforeunload' && guards.add(fn),
         removeEventListener: (type, fn) => type === 'beforeunload' && guards.delete(fn),
     };
@@ -231,10 +246,49 @@ describe('ban-to-cart bookmarklet on CSI', () => {
         expect(alerts[0]).toBe('Loaded 2 cards into your CSI cart. 1 were not taken by CSI.');
     });
 
-    test('a card already in the cart is added to', async () => {
-        const csi = fakeCSI({cart: {7: 2}});
-        await run({...csiPage, hash: '#ban=7:1', abu: csi});
-        expect(csi.lines).toEqual({7: 3});
+    test('a card already in the cart gets only what it lacks', async () => {
+        const csi = fakeCSI({cart: {7: 2, 8: 3}});
+        const {posts} = await run({...csiPage, hash: '#ban=7:5,8:1,9:1', abu: csi});
+        expect(posts[0].rows).toEqual([{id: '7', qty: 3}, {id: '9', qty: 1}]);
+        expect(csi.lines).toEqual({7: 5, 8: 3, 9: 1});
+    });
+
+    test('loading the same list twice does not double it', async () => {
+        const csi = fakeCSI();
+        await run({...csiPage, hash: '#ban=1:2,2:1', abu: csi});
+        const {alerts, posts} = await run({...csiPage, hash: '#ban=1:2,2:1', abu: csi});
+        expect(csi.lines).toEqual({1: 2, 2: 1});
+        expect(posts).toHaveLength(1);
+        expect(alerts[0]).toBe('Loaded 2 cards into your CSI cart.');
+    });
+
+    test('two tabs loading the same list at once take turns and do not double it', async () => {
+        const csi = fakeCSI();
+        const locks = fakeLocks();
+        const tabs = await Promise.all([1, 2].map(() => run({...csiPage, hash: '#ban=1:2,2:1', abu: csi, locks})));
+        expect(locks.names).toEqual(['ban-to-cart-csi', 'ban-to-cart-csi']);
+        expect(csi.lines).toEqual({1: 2, 2: 1});
+        expect(csi.posts).toHaveLength(1);
+        expect(tabs.map((tab) => tab.alerts[0])).toEqual(['Loaded 2 cards into your CSI cart.', 'Loaded 2 cards into your CSI cart.']);
+    });
+
+    test('a failed load lets the next tab go', async () => {
+        const locks = fakeLocks();
+        const failing = {fetch: async () => ({ok: false, status: 500}), posts: []};
+        const failed = await run({...csiPage, hash: '#ban=1:1', abu: failing, locks});
+        expect(failed.alerts[0]).toBe('CSI could not read your sell cart (500).');
+        const csi = fakeCSI();
+        const {alerts} = await run({...csiPage, hash: '#ban=1:1', abu: csi, locks});
+        expect(csi.lines).toEqual({1: 1});
+        expect(alerts[0]).toBe('Loaded 1 cards into your CSI cart.');
+    });
+
+    test('a lock request the browser refuses loads unlocked', async () => {
+        const locks = {request: async () => { throw new DOMException('denied', 'SecurityError'); }};
+        const csi = fakeCSI();
+        const {alerts} = await run({...csiPage, hash: '#ban=1:1', abu: csi, locks});
+        expect(csi.lines).toEqual({1: 1});
+        expect(alerts[0]).toBe('Loaded 1 cards into your CSI cart.');
     });
 });
 
@@ -759,6 +813,15 @@ describe('ban-to-cart bookmarklet on CSI\'s store', () => {
         const {alerts} = await run({...shop, hash: '#ban=434190-10753983:4,1-999:1&side=retail', abu: fake});
         expect(fake.lines).toEqual({10753983: 1});
         expect(alerts[0]).toBe('Loaded 1 cards into your CSI cart. 1 were not taken by CSI.');
+    });
+
+    test('two tabs loading the same list at once take turns and do not double it', async () => {
+        const fake = fakeCSIShop();
+        const locks = fakeLocks();
+        await Promise.all([1, 2].map(() => run({...shop, hash: '#ban=434190-10753983:2&side=retail', abu: fake, locks})));
+        expect(locks.names).toEqual(['ban-to-cart-csi', 'ban-to-cart-csi']);
+        expect(fake.lines).toEqual({10753983: 2});
+        expect(fake.posts).toHaveLength(1);
     });
 
     test('a list on the other side\'s cart is refused before anything is sent', async () => {
