@@ -1,8 +1,11 @@
 import { test, expect, describe } from 'bun:test';
 import { readFileSync } from 'fs';
 
-// The site stamps the version in; these run a copy stamped "test"
-const source = readFileSync(new URL('../js/ban-to-cart.js', import.meta.url), 'utf8').replace('__BAN_VERSION__', 'test');
+// The site strips the loader as stripLoader in cartload.go does, and stamps
+// the version in; these run a copy stripped the same way and stamped "test"
+const source = readFileSync(new URL('../js/ban-to-cart.js', import.meta.url), 'utf8')
+    .split('\n').map((line) => line.trim()).filter((line) => line && !line.startsWith('//')).join('\n')
+    .replace('__BAN_VERSION__', 'test');
 
 // fakeABU stands in for ABU's cart API: it keeps the cart's lines, answers a
 // row ABU does not know with 422 and keeps the rows before it, and skips a

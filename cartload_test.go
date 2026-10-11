@@ -363,12 +363,39 @@ func TestCartBookmarklet(t *testing.T) {
 	if len(version) != 8 {
 		t.Fatalf("version %q is not a short hash", version)
 	}
-	want := strings.Replace(strings.TrimSpace(string(source)), cartVersionMark, version, 1)
+	want := strings.Replace(stripLoader(string(source)), cartVersionMark, version, 1)
 	if decoded != want {
 		t.Error("bookmarklet does not decode back to js/ban-to-cart.js with its version stamped in")
 	}
 	if strings.Contains(decoded, cartVersionMark) {
 		t.Error("the version mark survived into the bookmarklet")
+	}
+	// Firefox drops a bookmark whose URL runs past 65,536 characters, and
+	// the loader only grows as stores are added
+	if len(link) >= 40000 {
+		t.Errorf("bookmarklet is %d characters, too close to Firefox's limit of 65,536 on a bookmark", len(link))
+	}
+}
+
+// The loader loses its comments and indentation and nothing else: a "//"
+// inside a string or after code stays
+func TestStripLoader(t *testing.T) {
+	source := "(function () {\n" +
+		"    // A comment\n" +
+		"\n" +
+		"    var url = \"https://api.abugames.com/\" + x; // kept\n" +
+		"        var re = /a\\/\\/b/;\n" +
+		"})();\n"
+	want := "(function () {\n" +
+		"var url = \"https://api.abugames.com/\" + x; // kept\n" +
+		"var re = /a\\/\\/b/;\n" +
+		"})();"
+	got := stripLoader(source)
+	if got != want {
+		t.Errorf("stripLoader = %q, want %q", got, want)
+	}
+	if stripLoader(strings.Replace(source, "A comment", "Another", 1)) != got {
+		t.Error("a comment's wording reaches the loader, and with it the version")
 	}
 }
 

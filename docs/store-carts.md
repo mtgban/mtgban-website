@@ -371,7 +371,10 @@ the section's, as `scraperCompare` picks its seller.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
   `cart-prompt` partial both pages share), named for the store and side
   pressed, holding the loader to drag to the bookmarks bar:
-  `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`). It
+  `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`),
+  without its indentation, blank lines and whole-line comments
+  (`stripLoader`), which keeps it under half of Firefox's limit of 65,536
+  characters on a bookmark's URL. It
   says to click the bookmark after the store's page loads, since nothing
   on that page can. Its Continue @ store button continues to the store, and
   "Don't show this again", kept in `localStorage`, lets later presses go
@@ -382,9 +385,10 @@ the section's, as `scraperCompare` picks its seller.
 
 Clicked on the page a button opened, `js/ban-to-cart.js` picks the store
 from the page's host. It first checks it is the loader the site expects:
-`cartLoader` stamps the start of the file's hash into the bookmarklet and
-onto every link (`&v=`), so a bookmark saved before the file last changed
-says it is out of date and asks to be dragged again, and touches no cart.
+`cartLoader` stamps the start of the stripped code's hash into the
+bookmarklet and onto every link (`&v=`), so a bookmark saved before the
+code last changed says it is out of date and asks to be dragged again, and
+touches no cart. An edit to a comment changes no version.
 On SCG it then uploads the list as one CSV and opens SCG's review of it.
 On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
 
