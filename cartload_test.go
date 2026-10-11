@@ -204,10 +204,10 @@ func TestCartLoadButtons(t *testing.T) {
 		if !strings.Contains(out, tc.link) {
 			t.Errorf("%s: no button with %s", tc.key, tc.link)
 		}
-		if !strings.Contains(out, `onclick="return openCartPrompt(this)"`) {
+		if !strings.Contains(out, `onclick="return window.openCartPrompt ? openCartPrompt(this) : true"`) {
 			t.Errorf("%s: the button skips the panel", tc.key)
 		}
-		if !strings.Contains(out, `onclick="return showCartPrompt(this.nextElementSibling)"`) {
+		if !strings.Contains(out, `onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false"`) {
 			t.Errorf("%s: no way back to the panel", tc.key)
 		}
 		if !strings.Contains(out, `id="cart-overlay"`) || !strings.Contains(out, `href="javascript:void%20`) {

@@ -46,7 +46,7 @@ func TestModeSwitchOffersTheOtherSide(t *testing.T) {
 		if strings.Contains(out, tc.hides) {
 			t.Errorf("buylist=%v: the results offer %q, which is the mode they are in", tc.buylist, tc.hides)
 		}
-		if !strings.Contains(out, `onclick="switchUploadMode()"`) {
+		if !strings.Contains(out, `onclick="window.switchUploadMode && switchUploadMode()"`) {
 			t.Errorf("buylist=%v: the switch has no action behind it", tc.buylist)
 		}
 		// The field the action flips, and the value the page came back as.
@@ -87,7 +87,7 @@ func TestModeSwitchUpsellsWithoutTheGrant(t *testing.T) {
 		},
 	})
 
-	if strings.Contains(out, `onclick="switchUploadMode()"`) {
+	if strings.Contains(out, `onclick="window.switchUploadMode && switchUploadMode()"`) {
 		t.Error("the results offer a switch to a mode the reader cannot have")
 	}
 	if !strings.Contains(out, "res-mode-upsell") {

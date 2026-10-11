@@ -31,7 +31,7 @@
             <div class="news-filter-bar screener-filter-bar">
                 <div class="news-fg">
                     <label class="news-fl" for="scr-metric">Metric</label>
-                    <select name="metric" id="scr-metric" onchange="screenerGo(this.form)">
+                    <select name="metric" id="scr-metric" onchange="window.screenerGo && screenerGo(this.form)">
                         {{range .Metrics}}
                             <option value="{{.Index}}" {{if eq .Index $.Screener.SelMetric}}selected{{end}}>{{.Name}}</option>
                         {{end}}
@@ -41,7 +41,7 @@
 
                 <div class="news-fg">
                     <label class="news-fl" for="scr-window">Window</label>
-                    <select name="window" id="scr-window" onchange="screenerGo(this.form)">
+                    <select name="window" id="scr-window" onchange="window.screenerGo && screenerGo(this.form)">
                         {{range .Windows}}
                             <option value="{{.Days}}" {{if eq .Days $.Screener.SelWindow}}selected{{end}}>{{.Label}}</option>
                         {{end}}
@@ -51,7 +51,7 @@
 
                 <div class="news-fg">
                     <label class="news-fl" for="scr-kind">Type</label>
-                    <select name="kind" id="scr-kind" onchange="screenerGo(this.form)">
+                    <select name="kind" id="scr-kind" onchange="window.screenerGo && screenerGo(this.form)">
                         <option value="singles" {{if eq .SelKind "singles"}}selected{{end}}>Singles</option>
                         <option value="sealed" {{if eq .SelKind "sealed"}}selected{{end}}>Sealed</option>
                         <option value="both" {{if eq .SelKind "both"}}selected{{end}}>Both</option>
@@ -61,7 +61,7 @@
 
                 <div class="news-fg">
                     <label class="news-fl" for="scr-move">Move</label>
-                    <select name="move" id="scr-move" onchange="screenerGo(this.form)">
+                    <select name="move" id="scr-move" onchange="window.screenerGo && screenerGo(this.form)">
                         <option value="up" {{if eq .Move "up"}}selected{{end}}>Up</option>
                         <option value="down" {{if eq .Move "down"}}selected{{end}}>Down</option>
                         <option value="either" {{if eq .Move "either"}}selected{{end}}>Either</option>
@@ -103,7 +103,7 @@
 
                 <div class="news-fg">
                     <label class="news-fl" for="scr-size">Per page</label>
-                    <select name="size" id="scr-size" onchange="screenerGo(this.form)">
+                    <select name="size" id="scr-size" onchange="window.screenerGo && screenerGo(this.form)">
                         {{range .PageSizes}}
                             <option value="{{.}}" {{if eq . $.Screener.SelSize}}selected{{end}}>{{.}}</option>
                         {{end}}

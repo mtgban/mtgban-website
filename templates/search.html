@@ -321,7 +321,7 @@
                             <canvas id="cardChart" width="760" height="480"></canvas>
                             <div class="chart-controls">
                                 <p class="chart-controls-actions">
-                                    <select id="dateRange" onchange="changeRange(parseInt(this.value))">
+                                    <select id="dateRange" onchange="window.changeRange && changeRange(parseInt(this.value))">
                                         {{if .IsMultiChart}}<option value="0">All</option>{{end}}
                                         <option value="30">1 Month</option>
                                         <option value="90" {{if lt $.MaxLookbackDays 90}} disabled {{end}}>3 Months{{if lt $.MaxLookbackDays 90}} (Standard+){{end}}</option>
@@ -346,15 +346,15 @@
                                      them once there is something to toggle. */}}
                                 {{if or .Checkpoints (lt .ChartLoadedDays .MaxLookbackDays)}}
                                 <p class="chart-checkpoint-toggles"{{if not .Checkpoints}} style="display: none;"{{end}}>
-                                    <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
-                                    <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
-                                    <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
+                                    <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="window.toggleCheckpointType && toggleCheckpointType('reprint', this.checked)"> Reprints</label>
+                                    <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="window.toggleCheckpointType && toggleCheckpointType('release', this.checked)"> Releases</label>
+                                    <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="window.toggleCheckpointType && toggleCheckpointType('ban', this.checked)"> Bans</label>
                                 </p>
                                 {{end}}
                                 {{if and .IsMultiChart .ChartReferences}}
                                 <p class="chart-ref-picker">
                                     {{range .ChartReferences}}
-                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)" onclick="selectReference({{.}}); return false;">{{.}}</a>
+                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)">{{.}}</a>
                                     {{end}}
                                 </p>
                                 {{end}}
@@ -389,16 +389,16 @@
                         </script>
                         <script type="text/javascript" src="/js/search-chart.js?hash={{.Hash}}" defer></script>
 
-                        <div id="chartAddOverlay" class="chart-add-overlay" onclick="if(event.target===this)closeChartAddModal()">
+                        <div id="chartAddOverlay" class="chart-add-overlay" onclick="if(event.target===this)window.closeChartAddModal && closeChartAddModal()">
                             <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart">
                                 <div class="chart-add-header">
                                     <span class="chart-add-title">&#10133; Add cards to this chart</span>
                                     <span style="display:flex;align-items:center;gap:8px;">
-                                        <button type="button" onclick="newChartSearch()" title="Search for another card"
+                                        <button type="button" onclick="window.newChartSearch && newChartSearch()" title="Search for another card"
                                                 style="background:var(--surface-2,rgba(0,0,0,0.05));border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:6px;font-size:13px;line-height:1;cursor:pointer;color:var(--normal);padding:7px 12px;">New search</button>
-                                        <button id="chartBatchCommit" type="button" onclick="commitChartBatch()" disabled title="Apply the batched cards and view the chart"
+                                        <button id="chartBatchCommit" type="button" onclick="window.commitChartBatch && commitChartBatch()" disabled title="Apply the batched cards and view the chart"
                                                 style="background:var(--search-link,#3b6fd4);border:1px solid var(--search-link,#3b6fd4);border-radius:6px;font-size:13px;font-weight:600;line-height:1;color:#fff;padding:7px 12px;opacity:0.5;cursor:default;">Update chart</button>
-                                        <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close">&times;</button>
+                                        <button class="chart-add-close" type="button" onclick="window.closeChartAddModal && closeChartAddModal()" aria-label="Close">&times;</button>
                                     </span>
                                 </div>
                                 <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"></iframe>
@@ -469,7 +469,7 @@
                                     {{else if $.HasAvailable}}
                                         <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint"><span class="emoji">&#128214;</span></a>
                                     {{end}}
-                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
+                                    <span class="emoji" style="cursor: pointer;" onclick="window.copyAndBlink && copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
                                     {{if not $card.Sealed}}
                                         <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank><img width=22 height=22 alt="" src="/img/logo/deckbox.webp"></a>
                                     {{end}}
@@ -500,9 +500,9 @@
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
                                          preview is hidden; opens the card art in a lightbox. */}}
-                                    <button type="button" class="qi-view-image" title="View image" onclick="showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
-                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
-                                    {{if $.CanAlerts}}<button type="button" class="alert-link" data-card-id="{{$cardId}}" onclick="openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'})" title="Set a price alert"><i data-lucide="bell"></i></button>{{end}}
+                                    <button type="button" class="qi-view-image" title="View image" onclick="window.showCardImageFromBtn && showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
+                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="window.toggleFavorite && toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
+                                    {{if $.CanAlerts}}<button type="button" class="alert-link" data-card-id="{{$cardId}}" onclick="window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'})" title="Set a price alert"><i data-lucide="bell"></i></button>{{end}}
                                     </div>
                                 </div>
                             </div>
@@ -799,7 +799,7 @@
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->
-<div class="card-image-modal" id="cardImageModal" onclick="hideCardImage()">
+<div class="card-image-modal" id="cardImageModal" onclick="window.hideCardImage && hideCardImage()">
     <img id="cardImageModalImg" src="" alt="Card image">
 </div>
 <script>

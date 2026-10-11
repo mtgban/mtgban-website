@@ -66,16 +66,16 @@
 
     <!-- Tabs -->
     <div class="admin-tabs">
-        <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="switchTab(this,'dashboard')">Dashboard</button>
+        <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="window.switchTab && switchTab(this,'dashboard')">Dashboard</button>
         <button class="admin-tab{{if eq .Page "usage"}} active{{end}}" onclick="location.href='?page=usage'">Usage</button>
         <button class="admin-tab{{if eq .Page "searches"}} active{{end}}" onclick="location.href='?page=searches'">Searches</button>
-        <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="switchTab(this,'people')">People</button>
-        <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="switchTab(this,'config')">Config</button>
-        <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="switchTab(this,'checkpoints')">Checkpoints</button>
-        <button class="admin-tab{{if eq .Page "acl"}} active{{end}}" onclick="switchTab(this,'acl')">Access</button>
-        <button class="admin-tab{{if eq .Page "affiliates"}} active{{end}}" onclick="switchTab(this,'affiliates')">Affiliates</button>
-        <button class="admin-tab{{if eq .Page "overrides"}} active{{end}}" onclick="switchTab(this,'overrides')">Key Overrides</button>
-        <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="switchTab(this,'tools')">Tools</button>
+        <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="window.switchTab && switchTab(this,'people')">People</button>
+        <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="window.switchTab && switchTab(this,'config')">Config</button>
+        <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="window.switchTab && switchTab(this,'checkpoints')">Checkpoints</button>
+        <button class="admin-tab{{if eq .Page "acl"}} active{{end}}" onclick="window.switchTab && switchTab(this,'acl')">Access</button>
+        <button class="admin-tab{{if eq .Page "affiliates"}} active{{end}}" onclick="window.switchTab && switchTab(this,'affiliates')">Affiliates</button>
+        <button class="admin-tab{{if eq .Page "overrides"}} active{{end}}" onclick="window.switchTab && switchTab(this,'overrides')">Key Overrides</button>
+        <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="window.switchTab && switchTab(this,'tools')">Tools</button>
     </div>
 
     <!-- ═══════════════════════
@@ -297,7 +297,7 @@
                 <h2>Configuration Editor</h2>
                 <span class="warn-tag">Caution</span>
                 <div class="config-actions">
-                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('config')">Format JSON</button>
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('config')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
                     <button class="cfg-btn cfg-primary" data-update-for="config" onclick="document.getElementById('configForm').requestSubmit()">Update</button>
                 </div>
@@ -320,7 +320,7 @@
                 <h2>Chart Checkpoints Editor</h2>
                 <span class="warn-tag">B2-backed</span>
                 <div class="config-actions">
-                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('checkpoints')">Format JSON</button>
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('checkpoints')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
                     <button class="cfg-btn cfg-primary" data-update-for="checkpoints" onclick="document.getElementById('checkpointsForm').requestSubmit()">Update</button>
                 </div>
@@ -353,7 +353,7 @@
                 <h2>Access Table Editor</h2>
                 <span class="warn-tag">{{.ACLSource}}</span>
                 <div class="config-actions">
-                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('acl')">Format JSON</button>
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('acl')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
                     <button class="cfg-btn cfg-primary" data-update-for="acl" onclick="document.getElementById('aclForm').requestSubmit()">Update</button>
                 </div>
@@ -374,7 +374,7 @@
                 <h2>Affiliates Editor</h2>
                 <span class="warn-tag">{{.AffiliatesSource}}</span>
                 <div class="config-actions">
-                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('affiliates')">Format JSON</button>
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('affiliates')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
                     <button class="cfg-btn cfg-primary" data-update-for="affiliates" onclick="document.getElementById('affiliatesForm').requestSubmit()">Update</button>
                 </div>
@@ -396,7 +396,7 @@
                 <h2>Key Overrides Editor</h2>
                 <span class="warn-tag">B2-backed</span>
                 <div class="config-actions">
-                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('overrides')">Format JSON</button>
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('overrides')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
                     <button class="cfg-btn cfg-primary" data-update-for="overrides" onclick="document.getElementById('overridesForm').requestSubmit()">Update</button>
                 </div>

@@ -21,8 +21,8 @@
         <div class="m-sets-toolbar">
             <div class="m-sets-toolbar-row">
                 <input class="m-sets-filter" type="text" id="setsFilter"
-                       placeholder="Filter editions..." oninput="filterEditions()">
-                <button class="m-sets-toggle" id="colorsBtn" onclick="toggleColors()">Show Details</button>
+                       placeholder="Filter editions..." oninput="window.filterEditions && filterEditions()">
+                <button class="m-sets-toggle" id="colorsBtn" onclick="window.toggleColors && toggleColors()">Show Details</button>
             </div>
             <div class="m-sets-sort">
                 <span class="m-sets-sort-label">Sort</span>
