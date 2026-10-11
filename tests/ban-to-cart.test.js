@@ -137,6 +137,12 @@ describe('ban-to-cart bookmarklet on ABU', () => {
         expect(page.guarded.reload).toBe(false);
     });
 
+    test('a list that does not decode is reported and nothing is sent', async () => {
+        const {alerts, posts} = await run({hash: '#ban=1:1%2'});
+        expect(alerts[0]).toBe('The list from BAN could not be read: go back to BAN and press Load at ABU again.');
+        expect(posts).toHaveLength(0);
+    });
+
     test('a guest is told to log in and nothing is sent', async () => {
         const {alerts, posts} = await run({hash: '#ban=1:1', loggedIn: false});
         expect(alerts[0]).toBe('Log in to ABU first, then go back to BAN and press Load at ABU again.');

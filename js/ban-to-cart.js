@@ -48,9 +48,16 @@
     }
 
     // The page link percent-encodes the separators
+    var list;
+    try {
+        list = decodeURIComponent(match[1]);
+    } catch (err) {
+        alert("The list from BAN could not be read: " + again);
+        return;
+    }
     var ids = [];
     var quantities = {};
-    decodeURIComponent(match[1]).split(",").forEach(function (pair) {
+    list.split(",").forEach(function (pair) {
         var parts = pair.split(":");
         var qty = parseInt(parts[1], 10);
         if (!/^[\w-]+$/.test(parts[0]) || !(qty > 0)) {
