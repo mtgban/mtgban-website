@@ -331,6 +331,18 @@
 .arb-filter-range input::placeholder { color: var(--text-dim); }
 .arb-filter-dash { color: var(--text-dim); }
 
+/* A saved limit this source holds at its floor, and the button dropping it */
+.arb-filter-saved { color: var(--text-dim); font-size: var(--text-sm); white-space: nowrap; }
+.arb-filter-clear {
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: var(--text-base);
+}
+.arb-filter-clear:hover { color: var(--normal); }
+
 /* The toggle and the edition field share the form's two columns, so the
    field lines up over the limits */
 .arb-filter-head {

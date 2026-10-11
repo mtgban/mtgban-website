@@ -54,6 +54,11 @@
         form.querySelectorAll('input[type=number]').forEach(function (input) {
             if (input.value === '') drop(input);
         });
+        // A typed limit replaces the saved value carried beside its field
+        form.querySelectorAll('input[data-limit]').forEach(function (carry) {
+            var typed = form.querySelector('input[type=number][name="' + carry.name + '"]');
+            if (typed && typed.value !== '') drop(carry);
+        });
         form.querySelectorAll('[data-pick]').forEach(function (group) {
             var boxes = group.querySelectorAll('input[type=checkbox]');
             var all = Array.prototype.every.call(boxes, function (box) { return box.checked; });
@@ -164,6 +169,14 @@
             save(formQuery(form));
         });
         window.addEventListener('pageshow', function () { restore(); });
+        // Clear drops a saved limit the floor holds up, so Apply leaves it unset
+        form.querySelectorAll('[data-limit-clear]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var carry = form.querySelector('input[data-limit][name="' + button.getAttribute('data-limit-clear') + '"]');
+                if (carry) carry.parentNode.removeChild(carry);
+                button.parentNode.hidden = true;
+            });
+        });
     }
 
     // Saved as a state of its own rather than deleted, so a reset is the

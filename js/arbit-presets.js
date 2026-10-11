@@ -161,6 +161,11 @@
             var box = key ? form.querySelector('input[type=checkbox][name="' + key + '"]') : null;
             if (box) params.push([key, box.checked ? '1' : '0']);
         });
+        // A limit left empty keeps the saved value carried beside it
+        Array.prototype.forEach.call(form.querySelectorAll('input[data-limit]'), function (carry) {
+            var typed = form.querySelector('input[type=number][name="' + carry.name + '"]');
+            if (!typed || typed.value === '') params.push([carry.name, carry.value]);
+        });
         // The settings of options greyed for this source, kept as they were
         Array.prototype.forEach.call(form.querySelectorAll('input[data-carry]'), function (input) {
             params.push([input.name, input.value]);

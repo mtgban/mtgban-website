@@ -148,7 +148,15 @@ func parseArbitState(form url.Values, offer arbitOffer) arbitState {
 	}
 
 	for _, key := range arbitBoundKeys {
-		raw := form.Get(key)
+		// The first value given: a field left empty yields to the saved
+		// value the bar carries beside it
+		raw := ""
+		for _, given := range form[key] {
+			if given != "" {
+				raw = given
+				break
+			}
+		}
 		if raw == "" {
 			continue
 		}
@@ -569,6 +577,10 @@ type arbitField struct {
 
 	// The lowest value the mode honours, for the input's min
 	Floor string
+
+	// Carry is a saved value the floor holds up, posted beside the empty
+	// field so that Apply keeps it for the sources it applies to.
+	Carry string
 }
 
 type arbitToggle struct {
@@ -626,11 +638,19 @@ func formatLimit(value float64) string {
 	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
-func (st arbitState) field(key string, fallback, floor float64) arbitField {
+// field is one limit's input: where the reader set it, the value the page
+// applies. One the mode's floor holds up shows the floor as its placeholder
+// and carries the saved value, so the field passes its own min and Apply
+// does not save the floor over the reader's value.
+func (st arbitState) field(key string, value, fallback, floor float64) arbitField {
 	f := arbitField{Key: key, Placeholder: formatLimit(fallback), Floor: formatLimit(floor)}
 	bound := st.bound(key)
-	if bound.Set {
-		f.Value = formatLimit(bound.Value)
+	switch {
+	case !bound.Set:
+	case value != bound.Value:
+		f.Placeholder, f.Carry = formatLimit(value), formatLimit(bound.Value)
+	default:
+		f.Value = formatLimit(value)
 	}
 	return f
 }
@@ -661,16 +681,16 @@ func newArbitBar(st arbitState, m arbitMode, offer arbitOffer, b *mtgmatcher.Bac
 		}
 	}
 	none := math.Inf(-1)
-	l := arbitDefaults(m)
+	l, v := arbitDefaults(m), st.limits(m)
 	minSpread, minDiff := m.floors()
-	bar.Sell = arbitRange{Label: sell, Unit: "$", Low: st.field("minsell", l.MinSell, 0), High: st.field("maxsell", l.MaxSell, 0)}
-	bar.Buy = arbitRange{Label: buy, Unit: "$", Low: st.field("minbuy", l.MinBuy, 0), High: st.field("maxbuy", l.MaxBuy, 0)}
-	bar.Spread = arbitRange{Label: "Spread", Unit: "%", Low: st.field("minspread", l.MinSpread, minSpread), High: st.field("maxspread", l.MaxSpread, none)}
-	bar.Diff = arbitRange{Label: "Difference", Unit: "$", Low: st.field("mindiff", l.MinDiff, minDiff)}
+	bar.Sell = arbitRange{Label: sell, Unit: "$", Low: st.field("minsell", v.MinSell, l.MinSell, 0), High: st.field("maxsell", v.MaxSell, l.MaxSell, 0)}
+	bar.Buy = arbitRange{Label: buy, Unit: "$", Low: st.field("minbuy", v.MinBuy, l.MinBuy, 0), High: st.field("maxbuy", v.MaxBuy, l.MaxBuy, 0)}
+	bar.Spread = arbitRange{Label: "Spread", Unit: "%", Low: st.field("minspread", v.MinSpread, l.MinSpread, minSpread), High: st.field("maxspread", v.MaxSpread, l.MaxSpread, none)}
+	bar.Diff = arbitRange{Label: "Difference", Unit: "$", Low: st.field("mindiff", v.MinDiff, l.MinDiff, minDiff)}
 	if !m.Global {
-		bar.Quantity = arbitRange{Label: "Quantity", Low: st.field("minqty", l.MinQty, 0)}
+		bar.Quantity = arbitRange{Label: "Quantity", Low: st.field("minqty", v.MinQty, l.MinQty, 0)}
 	}
-	bar.Profit = arbitRange{Label: "Profit", Low: st.field("minprof", l.MinProf, none)}
+	bar.Profit = arbitRange{Label: "Profit", Low: st.field("minprof", v.MinProf, l.MinProf, none)}
 
 	// The options this page offers for either kind of source, those for the
 	// other kind greyed, but for the sealed-only ones on a singles source

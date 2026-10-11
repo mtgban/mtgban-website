@@ -638,6 +638,10 @@ document.addEventListener('DOMContentLoaded', function () {
     <span class="arb-filter-label">{{.Label}}{{if .Unit}} {{.Unit}}{{end}}</span>
     <span class="arb-filter-values">
     <input type="number" step="any" name="{{.Low.Key}}" value="{{.Low.Value}}" placeholder="{{if .Low.Placeholder}}{{.Low.Placeholder}}{{else}}any{{end}}"{{if .Low.Floor}} min="{{.Low.Floor}}"{{end}} aria-label="{{.Label}} minimum">
+    {{if .Low.Carry}}
+        <input type="hidden" name="{{.Low.Key}}" value="{{.Low.Carry}}" data-limit>
+        <span class="arb-filter-saved" title="Saved {{.Low.Carry}}, held at {{.Low.Placeholder}} here">saved {{.Low.Carry}}<button type="button" class="arb-filter-clear" data-limit-clear="{{.Low.Key}}" aria-label="Drop the saved {{.Label}} minimum">&times;</button></span>
+    {{end}}
     {{if .High.Key}}
         <span class="arb-filter-dash">&ndash;</span>
         <input type="number" step="any" name="{{.High.Key}}" value="{{.High.Value}}" placeholder="{{if .High.Placeholder}}{{.High.Placeholder}}{{else}}any{{end}}"{{if .High.Floor}} min="{{.High.Floor}}"{{end}} aria-label="{{.Label}} maximum">
