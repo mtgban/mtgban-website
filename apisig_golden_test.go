@@ -12,6 +12,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
 // Golden vectors for the API signature format. The gateway repo mints
@@ -206,7 +207,7 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	withAPIUserSecret(t, "golden@example.com", goldenSecret)
 
 	blob := "QVBJPUFMTF9BQ0NFU1MmQVBJbW9kZT1hbGwmU2lnbmF0dXJlPU1tY0ZWZjBOMlBySzNvOHprOU81WWREcXo0ZyUzRCZVc2VyRW1haWw9Z29sZGVuJTQwZXhhbXBsZS5jb20="
-	const wantErr = `{"error": "invalid or expired signature"}`
+	const wantErr = `{"error":"invalid or expired signature"}`
 
 	called := false
 	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true }))
@@ -228,8 +229,8 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	}
 
 	rec = serve(blob[:len(blob)-8]+"AAAAAAA=", "192.0.2.2")
-	if called || strings.TrimSpace(rec.Body.String()) != wantErr {
-		t.Errorf("tampered blob accepted, body %q", rec.Body.String())
+	if called || rec.Code != http.StatusUnauthorized || strings.TrimSpace(rec.Body.String()) != wantErr {
+		t.Errorf("tampered blob accepted: code %d body %q", rec.Code, rec.Body.String())
 	}
 
 	// A valid signature over an unparseable Expires still has to be refused.
@@ -247,7 +248,49 @@ func TestEnforceAPISigningAcceptsGoldenBlob(t *testing.T) {
 	badExpires := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
 
 	rec = serve(badExpires, "192.0.2.3")
-	if called || strings.TrimSpace(rec.Body.String()) != wantErr {
-		t.Errorf("bad Expires accepted, body %q", rec.Body.String())
+	if called || rec.Code != http.StatusUnauthorized || strings.TrimSpace(rec.Body.String()) != wantErr {
+		t.Errorf("bad Expires accepted: code %d body %q", rec.Code, rec.Body.String())
 	}
+}
+
+// Every refusal is a JSON error with a failure status, so a caller testing
+// the status alone, as the scraper pinging /api/load/ does, sees it.
+func TestEnforceAPISigningRefusesWithAStatus(t *testing.T) {
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	prevLimiter := APIRateLimiter
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+		APIRateLimiter = prevLimiter
+	})
+	withSigMode(t, false, true)
+	h := enforceAPISigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	serve := func(target string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("GET", target, nil)
+		req.RemoteAddr = "192.0.2.90:1234"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	check := func(name string, rec *httptest.ResponseRecorder, status int) {
+		t.Helper()
+		if rec.Code != status || rec.Header().Get("Content-Type") != "application/json" || !strings.Contains(rec.Body.String(), `"error":`) {
+			t.Errorf("%s: %d %q %q, want %d and a JSON error", name, rec.Code, rec.Header().Get("Content-Type"), rec.Body.String(), status)
+		}
+	}
+
+	APIRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	var noSellers []mtgban.Seller
+	sellersPtr.Store(&noSellers)
+	check("not ready", serve("/api/load/cardkingdom?sig=x"), http.StatusServiceUnavailable)
+
+	sellers := []mtgban.Seller{nil}
+	vendors := []mtgban.Vendor{nil}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+	check("undecodable", serve("/api/load/cardkingdom?sig=not-base64!"), http.StatusUnauthorized)
+	check("unsigned load", serve("/api/load/cardkingdom"), http.StatusUnauthorized)
+
+	APIRateLimiter = ratelimit.NewLimiter(0, 0)
+	check("limited", serve("/api/load/cardkingdom"), http.StatusTooManyRequests)
 }
