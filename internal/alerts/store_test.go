@@ -1414,6 +1414,50 @@ func TestStageEmailClaimsAndStagesTogether(t *testing.T) {
 	}
 }
 
+// TestMarkOverAllowanceKeepsALatePause covers a pause landing between the
+// ranking and its update: the alert the run would restore stays paused,
+// and so does one the channel step would restore.
+func TestMarkOverAllowanceKeepsALatePause(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	created, err := s.Create(ctx, sample(h))
+	must(t, err)
+	for _, step := range []struct {
+		name, lastError string
+		run             func() ([]Moved, error)
+	}{
+		{"allowance", "", func() ([]Moved, error) { return s.MarkOverAllowance(ctx, h, "magic", 10) }},
+		{"channel", channelParkReason, func() ([]Moved, error) {
+			return s.MarkChannelDisallowed(ctx, h, "magic", []ChannelKind{ChannelDiscord})
+		}},
+	} {
+		_, err = s.db.ExecContext(ctx, `UPDATE alerts SET status = 'over_allowance', last_error = $2 WHERE id = $1`, created.ID, step.lastError)
+		must(t, err)
+		pause, err := s.db.BeginTx(ctx, nil)
+		must(t, err)
+		_, err = pause.ExecContext(ctx, `UPDATE alerts SET status = 'paused', updated_at = now() WHERE id = $1`, created.ID)
+		must(t, err)
+		type result struct {
+			moved []Moved
+			err   error
+		}
+		done := make(chan result, 1)
+		go func() {
+			moved, err := step.run()
+			done <- result{moved, err}
+		}()
+		time.Sleep(200 * time.Millisecond)
+		must(t, pause.Commit())
+		r := <-done
+		must(t, r.err)
+		if st := alertStatus(t, s, h, created.ID); st != StatusPaused || len(r.moved) != 0 {
+			t.Fatalf("%s: alert %s, moved %+v after a late pause", step.name, st, r.moved)
+		}
+	}
+}
+
 // TestUpsertChannelCaseInsensitiveAddressKeepsVerified covers that
 // resubmitting the same address in a different case is not treated as a
 // changed address, so it does not clear verified_at.

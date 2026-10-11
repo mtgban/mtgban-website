@@ -1027,12 +1027,13 @@ const channelParkReason = "channel not in your tier"
 
 // MarkOverAllowance keeps a user's newest alerts active up to the
 // allowance and parks the rest, restoring parked ones when room returns.
-// Alerts parked for their channel are left out. It answers with the
-// alerts it moved, newest first.
+// Alerts parked for their channel are left out, and so is one paused or
+// edited after the ranking read it. It answers with the alerts it moved,
+// newest first.
 func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, allowance int) ([]Moved, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		WITH ranked AS (
-			SELECT id, row_number() OVER (ORDER BY created_at DESC, id DESC) AS rn
+			SELECT id, status, updated_at, row_number() OVER (ORDER BY created_at DESC, id DESC) AS rn
 			  FROM alerts
 			 WHERE user_hash = $1 AND game = $2 AND status IN ('active', 'over_allowance')
 			   AND NOT (status = 'over_allowance' AND last_error = $4)
@@ -1041,7 +1042,7 @@ func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, al
 			   SET status = CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END,
 			       updated_at = now()
 			  FROM ranked r
-			 WHERE a.id = r.id
+			 WHERE a.id = r.id AND a.status = r.status AND a.updated_at = r.updated_at
 			   AND a.status <> CASE WHEN r.rn <= $3 THEN 'active' ELSE 'over_allowance' END
 			RETURNING a.id, a.status, a.card_name, a.card_set, a.card_number, a.card_finish,
 			          a.side, a.condition, a.origin, r.rn
@@ -1066,7 +1067,8 @@ func (s *Store) MarkOverAllowance(ctx context.Context, userHash, game string, al
 	return out, rows.Err()
 }
 
-// MarkChannelDisallowed parks and restores alerts by channel, reporting status changes.
+// MarkChannelDisallowed parks and restores alerts by channel, reporting
+// status changes; one paused or edited after it read them is left alone.
 func (s *Store) MarkChannelDisallowed(ctx context.Context, userHash, game string, allowed []ChannelKind) ([]Moved, error) {
 	kinds := make([]string, len(allowed))
 	for i, k := range allowed {
@@ -1074,7 +1076,7 @@ func (s *Store) MarkChannelDisallowed(ctx context.Context, userHash, game string
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		WITH target AS (
-			SELECT id, status AS was
+			SELECT id, status AS was, updated_at AS seen
 			  FROM alerts
 			 WHERE user_hash = $1 AND game = $2
 			   AND ((status IN ('active', 'over_allowance') AND last_error <> $4 AND delivery <> ALL($3))
@@ -1085,7 +1087,7 @@ func (s *Store) MarkChannelDisallowed(ctx context.Context, userHash, game string
 			       last_error = CASE WHEN a.last_error = $4 THEN '' ELSE $4 END,
 			       updated_at = now()
 			  FROM target t
-			 WHERE a.id = t.id AND a.status = t.was
+			 WHERE a.id = t.id AND a.status = t.was AND a.updated_at = t.seen
 			RETURNING a.id, a.status, a.card_name, a.card_set, a.card_number, a.card_finish,
 			          a.side, a.condition, a.origin, a.created_at, t.was
 		)
