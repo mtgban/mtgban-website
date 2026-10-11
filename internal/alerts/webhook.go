@@ -195,7 +195,7 @@ var mailEventReasons = map[string]mailEventReason{
 // WebhookStore is what the mail-events webhook needs from the store.
 type WebhookStore interface {
 	ChannelByAddress(ctx context.Context, kind ChannelKind, address string) ([]Channel, error)
-	DisableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, reason string, at time.Time) error
+	DisableChannelAt(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address, reason string, at time.Time) (bool, error)
 	ParkEmailAlerts(ctx context.Context, userHash, reason string) (int64, error)
 	ChannelFor(ctx context.Context, userHash string, kind ChannelKind) (Channel, bool, error)
 	ComplainConfirmSend(ctx context.Context, userHash, address string, at time.Time) error
@@ -303,9 +303,13 @@ func (w *Webhook) handleAddress(ctx context.Context, addr, requester string, rea
 		if requester != "" && ch.UserHash != requester {
 			continue
 		}
-		err = w.Store.DisableChannel(ctx, ch.UserHash, ch.Kind, ch.Source, reason.channel, at)
+		// The row may have moved to another address since it was read.
+		disabled, err := w.Store.DisableChannelAt(ctx, ch.UserHash, ch.Kind, ch.Source, ch.Address, reason.channel, at)
 		if err != nil {
 			return err
+		}
+		if !disabled {
+			continue
 		}
 		if !slices.Contains(users, ch.UserHash) {
 			users = append(users, ch.UserHash)
