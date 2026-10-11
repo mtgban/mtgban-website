@@ -54,6 +54,7 @@ type EvalStore interface {
 	MarkChannelDisallowed(ctx context.Context, userHash, game string, allowed []ChannelKind) ([]Moved, error)
 	ClaimFire(ctx context.Context, id int64, seenUpdatedAt time.Time, wasAbove, wasBelow, nextAbove, nextBelow bool) (bool, error)
 	SetState(ctx context.Context, id int64, seenUpdatedAt time.Time, st State) (bool, error)
+	ParkForNoAddress(ctx context.Context, userHash string, id int64, seenUpdatedAt time.Time, st State) (bool, error)
 	AddEvent(ctx context.Context, e Event) error
 	PruneEvents(ctx context.Context, before time.Time) (int64, error)
 	PruneUnverifiedChannels(ctx context.Context, before time.Time) (int64, error)
@@ -294,7 +295,16 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 			found[k] = ch
 		}
 		if !ch.ok {
-			setState(ctx, deps, &sum, a, State{Status: StatusUndeliverable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: missingChannelReason(kind)})
+			st := State{Status: StatusUndeliverable, AboveArmed: a.AboveArmed, BelowArmed: a.BelowArmed, LastError: missingChannelReason(kind)}
+			if kind == ChannelEmail {
+				// Rechecked under the user's lock, so a confirm since the lookup keeps the alert active.
+				_, err := deps.Store.ParkForNoAddress(ctx, a.Contact.UserHash, a.ID, a.UpdatedAt, st)
+				if err != nil {
+					sum.fail(deps, "state", err)
+				}
+			} else {
+				setState(ctx, deps, &sum, a, st)
+			}
 			stopped[a.ID] = true
 			sum.skipped++
 			continue

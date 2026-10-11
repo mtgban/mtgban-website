@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS alert_confirm_sends (
     sent_at        TIMESTAMPTZ NOT NULL,
     released       BOOLEAN NOT NULL DEFAULT false,
     complained_at  TIMESTAMPTZ,
+    replaced       TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (user_hash, address)
 );
 CREATE INDEX IF NOT EXISTS alert_confirm_sends_by_address ON alert_confirm_sends (address, sent_at);

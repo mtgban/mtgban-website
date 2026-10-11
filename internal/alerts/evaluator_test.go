@@ -208,6 +208,15 @@ func (f *fakeEvalStore) SetState(_ context.Context, id int64, seen time.Time, st
 	return true, nil
 }
 
+// ParkForNoAddress is SetState unless the user has an email address by now.
+func (f *fakeEvalStore) ParkForNoAddress(ctx context.Context, h string, id int64, seen time.Time, st State) (bool, error) {
+	_, working, _ := f.channelFor(ctx, h, ChannelEmail)
+	if working {
+		return false, nil
+	}
+	return f.SetState(ctx, id, seen, st)
+}
+
 func (f *fakeEvalStore) AddEvent(_ context.Context, e Event) error {
 	f.calls++
 	f.events = append(f.events, e)

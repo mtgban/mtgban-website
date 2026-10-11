@@ -45,20 +45,22 @@ func newFakeAlertStore() *fakeAlertStore {
 	return &fakeAlertStore{contacts: map[string]Contact{}, rows: map[int64]Alert{}, channels: map[channelKey]Channel{}, confirmSends: map[confirmKey]confirmSend{}}
 }
 
-// ClaimConfirmSend mirrors the store: one claim per address, from anyone, since since.
-func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string, now, since time.Time) (bool, error) {
+// ClaimConfirmSend mirrors the store: one claim per address, from anyone,
+// within confirmAddressGap, timed as it is made.
+func (f *fakeAlertStore) ClaimConfirmSend(_ context.Context, h, address string) (time.Time, bool, error) {
+	now := time.Now().Truncate(time.Microsecond)
 	for k, send := range f.confirmSends {
 		if k.address == strings.ToLower(address) && send.complained {
-			return false, ErrConfirmComplained
+			return time.Time{}, false, ErrConfirmComplained
 		}
 	}
 	for k, send := range f.confirmSends {
-		if k.address == strings.ToLower(address) && !send.released && !send.at.Before(since) {
-			return false, nil
+		if k.address == strings.ToLower(address) && !send.released && !send.at.Before(now.Add(-confirmAddressGap)) {
+			return time.Time{}, false, nil
 		}
 	}
 	f.confirmSends[confirmKey{h, strings.ToLower(address)}] = confirmSend{at: now}
-	return true, nil
+	return now, true, nil
 }
 
 func (f *fakeAlertStore) ReleaseConfirmSend(_ context.Context, h, address string, at time.Time) error {
@@ -133,8 +135,22 @@ func (f *fakeAlertStore) ChannelFor(_ context.Context, h string, kind ChannelKin
 	return Channel{UserHash: h, Kind: ChannelDiscord, Address: c.DiscordUserID, Source: SourcePatreon, VerifiedAt: &at}, true, nil
 }
 
-// UpsertChannel mirrors the store: the same address keeps its state, a new one resets it.
-func (f *fakeAlertStore) UpsertChannel(_ context.Context, c Channel) error {
+// StageEmail mirrors the store: it claims as ClaimConfirmSend does, and a
+// working user row keeps its address.
+func (f *fakeAlertStore) StageEmail(ctx context.Context, h, address string) (time.Time, bool, error) {
+	claimedAt, claimed, err := f.ClaimConfirmSend(ctx, h, address)
+	if err != nil || !claimed {
+		return time.Time{}, false, err
+	}
+	cur, ok := f.channels[channelKey{h, ChannelEmail, SourceUser}]
+	if ok && cur.VerifiedAt != nil && cur.DisabledAt == nil && !strings.EqualFold(cur.Address, address) {
+		return claimedAt, true, nil
+	}
+	return claimedAt, true, f.upsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: address, Source: SourceUser})
+}
+
+// upsertChannel mirrors the store: the same address keeps its state, a new one resets it.
+func (f *fakeAlertStore) upsertChannel(_ context.Context, c Channel) error {
 	k := channelKey{c.UserHash, c.Kind, c.Source}
 	cur, ok := f.channels[k]
 	if ok && strings.EqualFold(cur.Address, c.Address) {
