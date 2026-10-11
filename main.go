@@ -68,6 +68,8 @@ type APIGatewayConfig struct {
 	URL string `json:"url"`
 	// Games are the gateway's configured games, what the configurator offers
 	Games []mtgmatcher.Game `json:"games"`
+	// HistoryOnSale shows the history package on the plans page; off until the gateway sells it
+	HistoryOnSale bool `json:"history_on_sale"`
 }
 
 // DiscordConfig contains the bot connection, community links, channel IDs,

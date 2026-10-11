@@ -6,6 +6,39 @@ import (
 	"testing"
 )
 
+// wantPackage is what the golden test pins of one package.
+type wantPackage struct {
+	key            string
+	monthly        int64
+	scope          string
+	includedStores int
+	modes          []string
+	lookback       int
+}
+
+// checkPackage reports each field of p that differs from want, by name.
+func checkPackage(t *testing.T, p Package, want wantPackage) {
+	t.Helper()
+	if p.Key != want.key {
+		t.Errorf("%s: key %q want %q", want.key, p.Key, want.key)
+	}
+	if p.Monthly != want.monthly {
+		t.Errorf("%s: monthly %d want %d", want.key, p.Monthly, want.monthly)
+	}
+	if p.StoreScope != want.scope {
+		t.Errorf("%s: scope %q want %q", want.key, p.StoreScope, want.scope)
+	}
+	if p.IncludedStores != want.includedStores {
+		t.Errorf("%s: included stores %d want %d", want.key, p.IncludedStores, want.includedStores)
+	}
+	if !slices.Equal(p.Modes, want.modes) {
+		t.Errorf("%s: modes %v want %v", want.key, p.Modes, want.modes)
+	}
+	if p.LookbackDays != want.lookback {
+		t.Errorf("%s: lookback %d want %d", want.key, p.LookbackDays, want.lookback)
+	}
+}
+
 func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	c, err := Load()
 	if err != nil {
@@ -14,24 +47,45 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if c.Currency != "usd" {
 		t.Errorf("currency %q", c.Currency)
 	}
-	if len(c.Packages) != 3 || c.Packages[0].Key != "starter" || c.Packages[1].Key != "all_stores" || c.Packages[2].Key != "all_data" {
-		t.Errorf("packages %+v", c.Packages)
+	// The 500 tier is BASE_ACCESS per issue 230; the 800 tier adds sealed and
+	// every region; history is its own package, with a lookback and no stores.
+	want := []wantPackage{
+		{"starter", 20000, StoreScopeExplicit, 1, []string{"retail", "buylist"}, 0},
+		{"all_stores", 50000, StoreScopeBase, 0, []string{"retail", "buylist"}, 0},
+		{"all_data", 80000, StoreScopeAll, 0, []string{"retail", "buylist", "sealed"}, 0},
+		{"history", 30000, "", 0, []string{"history"}, 365},
 	}
-	if c.Packages[0].Monthly != 20000 || c.Packages[1].Monthly != 50000 || c.Packages[2].Monthly != 80000 {
-		t.Errorf("amounts %+v", c.Packages)
+	if len(c.Packages) != len(want) {
+		t.Fatalf("%d packages, want %d: %+v", len(c.Packages), len(want), c.Packages)
 	}
-	if c.Packages[0].StoreScope != StoreScopeExplicit || c.Packages[0].IncludedStores != 1 {
-		t.Errorf("starter %+v", c.Packages[0])
+	for i, w := range want {
+		checkPackage(t, c.Packages[i], w)
 	}
-	// The 500 tier is BASE_ACCESS per issue 230; the 800 tier adds sealed and every region.
-	if c.Packages[1].StoreScope != StoreScopeBase || c.Packages[2].StoreScope != StoreScopeAll {
-		t.Errorf("scopes %+v", c.Packages)
+	if !c.Packages[3].IsHistory() || c.Packages[2].IsHistory() {
+		t.Error("IsHistory is not the history package alone")
 	}
-	if !slices.Equal(c.Packages[1].Modes, []string{"retail", "buylist"}) || !slices.Equal(c.Packages[2].Modes, Modes) {
-		t.Errorf("modes %+v", c.Packages)
+	wantAddons := []Addon{
+		{Key: "extra_store", Monthly: 15000, AppliesTo: []string{"starter"}},
+		{Key: "extra_game", Monthly: 15000, AppliesTo: []string{"starter", "all_stores", "all_data", "history"}},
 	}
-	if len(c.Addons) != 2 || c.Addons[0].Key != "extra_store" || c.Addons[1].Key != "extra_game" {
-		t.Errorf("addons %+v", c.Addons)
+	if len(c.Addons) != len(wantAddons) {
+		t.Fatalf("%d addons, want %d: %+v", len(c.Addons), len(wantAddons), c.Addons)
+	}
+	for i, w := range wantAddons {
+		a := c.Addons[i]
+		if a.Key != w.Key || a.Monthly != w.Monthly || !slices.Equal(a.AppliesTo, w.AppliesTo) {
+			t.Errorf("addon %d: %s monthly %d applies to %v, want %s %d %v", i, a.Key, a.Monthly, a.AppliesTo, w.Key, w.Monthly, w.AppliesTo)
+		}
+	}
+	// Every package takes an extra game, so a new one cannot be left out.
+	if addon, ok := c.Addon("extra_game"); ok {
+		for _, p := range c.Packages {
+			if !slices.Contains(addon.AppliesTo, p.Key) {
+				t.Errorf("extra_game does not apply to %q", p.Key)
+			}
+		}
+	} else {
+		t.Error("no extra_game add-on")
 	}
 	if len(c.Intervals) != 2 || !c.Intervals[0].Public || c.Intervals[1].Public || c.Intervals[1].Count != 3 {
 		t.Errorf("intervals %+v", c.Intervals)
@@ -68,8 +122,16 @@ const explicit = `{
   "implied": {"key": "tcg", "name": "TCGplayer"}
 }`
 
+const history = `{
+  "currency": "usd",
+  "packages": [{"key": "h", "name": "H", "monthly": 100, "store_scope": "", "modes": ["history"], "lookback_days": 365, "icon": "history", "subtitle": "S", "bullets": ["B"]}],
+  "addons": [],
+  "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
+  "included_games": 1
+}`
+
 func TestParseMinimal(t *testing.T) {
-	for _, doc := range []string{minimal, explicit} {
+	for _, doc := range []string{minimal, explicit, history} {
 		if _, err := Parse([]byte(doc)); err != nil {
 			t.Fatal(err)
 		}
@@ -126,6 +188,12 @@ func TestValidateRejects(t *testing.T) {
 		{"uppercase implied key", rep(explicit, `"key": "tcg"`, `"key": "TCG"`), `implied key "TCG" must be lowercase letters and digits`},
 		{"implied key with underscore", rep(explicit, `"key": "tcg"`, `"key": "tcg_index"`), `implied key "tcg_index" must be lowercase letters and digits`},
 		{"implied without name", rep(explicit, `"name": "TCGplayer"`, `"name": ""`), "implied tcg: name is empty"},
+		{"history with a scope", rep(minimal, `"store_scope": "ALL_ACCESS", "modes": ["retail"]`, `"store_scope": "ALL_ACCESS", "modes": ["history"], "lookback_days": 30`), "package p: a history package has no store_scope"},
+		{"history with stores", rep(minimal, `"store_scope": "ALL_ACCESS", "modes": ["retail"]`, `"store_scope": "", "included_stores": 1, "modes": ["history"], "lookback_days": 30`), "package p: included_stores applies to an explicit scope only"},
+		{"history without lookback", rep(minimal, `"store_scope": "ALL_ACCESS", "modes": ["retail"]`, `"store_scope": "", "modes": ["history"]`), "package p: lookback_days must be at least 1"},
+		{"history beside prices", rep(minimal, `"store_scope": "ALL_ACCESS", "modes": ["retail"]`, `"store_scope": "ALL_ACCESS", "modes": ["retail", "history"], "lookback_days": 30`), "package p: history is a package of its own"},
+		{"lookback on a price package", rep(minimal, `"modes": ["retail"]`, `"modes": ["retail"], "lookback_days": 30`), "package p: lookback_days applies to a history package only"},
+		{"price package without a scope", rep(minimal, `"store_scope": "ALL_ACCESS"`, `"store_scope": ""`), "package p: store_scope must be one of"},
 	}
 	for _, c := range cases {
 		_, err := Parse([]byte(c.json))
