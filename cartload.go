@@ -303,21 +303,38 @@ func pricedEntry[T mtgban.GenericEntry](entries []T, cond mtgban.Condition) int 
 }
 
 // cartLoader is js/ban-to-cart.js as a link a user drags to their bookmarks
-// bar, read once, and the version stamped into it: the start of the file's
-// hash, which every cart link carries too, so a bookmark saved from an older
-// file can tell it is out of date.
+// bar, read once and stripped (stripLoader), and the version stamped into
+// it: the start of the stripped code's hash, which every cart link carries
+// too, so a bookmark saved from other code can tell it is out of date.
 var cartLoader = sync.OnceValues(func() (template.URL, string) {
 	source, err := os.ReadFile("js/ban-to-cart.js")
 	if err != nil {
 		log.Println("cart bookmarklet:", err)
 		return "", ""
 	}
-	sum := sha256.Sum256(source)
+	code := stripLoader(string(source))
+	sum := sha256.Sum256([]byte(code))
 	version := hex.EncodeToString(sum[:4])
-	code := strings.Replace(strings.TrimSpace(string(source)), cartVersionMark, version, 1)
+	code = strings.Replace(code, cartVersionMark, version, 1)
 	// void keeps the browser from replacing the page with the script's result
 	return template.URL("javascript:void%20" + url.PathEscape(code)), version
 })
+
+// stripLoader is the loader's code without its indentation, blank lines and
+// whole-line comments, to keep the bookmark well under Firefox's limit of
+// 65,536 characters on its URL. Only whole lines go, so a comment after
+// code on its line stays in.
+func stripLoader(source string) string {
+	var lines []string
+	for line := range strings.Lines(source) {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
 
 // cartVersionMark is where js/ban-to-cart.js takes its version.
 const cartVersionMark = "__BAN_VERSION__"
