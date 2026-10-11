@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 // A contents: or variable: query that names no product has nothing to be the
@@ -34,7 +35,7 @@ func TestContentsOfNothingIsNothing(t *testing.T) {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if backend().SealedIsRandom(code, product.UUID) && !backend().SealedHasDecklist(code, product.UUID) {
+			if sealed.IsRandom(backend(), code, product.UUID) && !sealed.HasDecklist(backend(), code, product.UUID) {
 				box = product.Name
 				break
 			}
@@ -132,10 +133,10 @@ func twoDisjointSealedProducts(t *testing.T) (a, b *mtgmatcher.CardObject) {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !backend().SealedHasDecklist(code, product.UUID) {
+			if !sealed.HasDecklist(backend(), code, product.UUID) {
 				continue
 			}
-			deck, err := backend().GetDecklist(code, product.UUID)
+			deck, err := sealed.ProductDecklist(backend(), code, product.UUID)
 			if err != nil || len(deck) == 0 {
 				continue
 			}
@@ -203,8 +204,8 @@ func TestContentsMultipleExactProductsUnion(t *testing.T) {
 		t.Skip("this datastore has no two products with disjoint decklists")
 	}
 
-	deckA, errA := backend().GetDecklist(a.SetCode, a.UUID)
-	deckB, errB := backend().GetDecklist(b.SetCode, b.UUID)
+	deckA, errA := sealed.ProductDecklist(backend(), a.SetCode, a.UUID)
+	deckB, errB := sealed.ProductDecklist(backend(), b.SetCode, b.UUID)
 	if errA != nil || errB != nil || len(deckA) == 0 || len(deckB) == 0 {
 		t.Skip("decklists unavailable")
 	}
@@ -251,7 +252,7 @@ func TestContentsSubstringFallsBackToProductType(t *testing.T) {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !backend().SealedHasDecklist(code, product.UUID) {
+			if !sealed.HasDecklist(backend(), code, product.UUID) {
 				continue
 			}
 			words := strings.Fields(product.Name)

@@ -23,6 +23,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
@@ -2161,15 +2162,17 @@ func dropOdds(b *mtgmatcher.Backend, config SearchConfig) map[string]float64 {
 		LogPages["Search"].Println("dropOdds:", config.ContentsProduct, err)
 		return nil
 	}
-	probs, err := b.GetProbabilitiesForSealed(co.SetCode, co.UUID)
+	entries, err := sealed.ProductCounts(b, co.SetCode, co.UUID)
 	if err != nil {
 		LogPages["Search"].Println("dropOdds:", co.Name, err)
 		return nil
 	}
 
-	counts := make(map[string]float64, len(probs))
-	for _, prob := range probs {
-		counts[prob.UUID] += prob.Probability
+	// An entry's ExpectedCount is per copy of the product it comes from;
+	// Total counts every copy, a box's 36 packs included.
+	counts := make(map[string]float64, len(entries))
+	for _, entry := range entries {
+		counts[entry.UUID] += entry.Total()
 	}
 	return counts
 }
@@ -2183,10 +2186,10 @@ func contentsViews(b *mtgmatcher.Backend, query string, config SearchConfig) *Co
 	if err != nil {
 		return nil
 	}
-	if !b.SealedHasDecklist(co.SetCode, co.UUID) {
+	if !sealed.HasDecklist(b, co.SetCode, co.UUID) {
 		return nil
 	}
-	if !b.SealedIsRandom(co.SetCode, co.UUID) {
+	if !sealed.IsRandom(b, co.SetCode, co.UUID) {
 		return nil
 	}
 

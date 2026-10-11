@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 // productWithBothKinds finds a product that holds a fixed list and cards it
@@ -19,8 +20,8 @@ func productWithBothKinds(t *testing.T) *mtgmatcher.CardObject {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !backend().SealedHasDecklist(code, product.UUID) ||
-				!backend().SealedIsRandom(code, product.UUID) {
+			if !sealed.HasDecklist(backend(), code, product.UUID) ||
+				!sealed.IsRandom(backend(), code, product.UUID) {
 				continue
 			}
 			co, err := backend().GetUUID(product.UUID)
@@ -41,11 +42,11 @@ func TestAProductHoldsMoreThanItGuarantees(t *testing.T) {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
 	}
 
-	deck, err := backend().GetDecklist(co.SetCode, co.UUID)
+	deck, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
 	if err != nil {
 		t.Fatalf("%s has no fixed list after all: %v", co.Name, err)
 	}
-	picks, err := backend().GetPicksForSealed(co.SetCode, co.UUID)
+	picks, err := sealed.ProductPicks(backend(), co.SetCode, co.UUID)
 	if err != nil {
 		t.Fatalf("%s opens into nothing: %v", co.Name, err)
 	}
@@ -63,7 +64,7 @@ func TestVariableIsTheContentsWithoutTheFixedList(t *testing.T) {
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
 	}
-	deck, err := backend().GetDecklist(co.SetCode, co.UUID)
+	deck, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,8 +140,8 @@ func TestAWrapperAnswersWithProductsNotCards(t *testing.T) {
 			if len(product.Contents) != 1 || len(product.Contents["sealed"]) == 0 {
 				continue
 			}
-			if !backend().SealedHasDecklist(code, product.UUID) ||
-				!backend().SealedIsRandom(code, product.UUID) {
+			if !sealed.HasDecklist(backend(), code, product.UUID) ||
+				!sealed.IsRandom(backend(), code, product.UUID) {
 				continue
 			}
 			wrapper = product.Name
@@ -174,7 +175,7 @@ func TestContainsSingles(t *testing.T) {
 	if co == nil {
 		t.Skip("this datastore has no product with both a fixed and a variable part")
 	}
-	deck, err := backend().GetDecklist(co.SetCode, co.UUID)
+	deck, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
 	if err != nil || len(deck) == 0 {
 		t.Skip("the product opens into nothing")
 	}
@@ -308,8 +309,8 @@ func twoProductsWithBothKinds(t *testing.T) (a, b *mtgmatcher.CardObject) {
 			continue
 		}
 		for _, product := range set.SealedProduct {
-			if !backend().SealedHasDecklist(code, product.UUID) ||
-				!backend().SealedIsRandom(code, product.UUID) {
+			if !sealed.HasDecklist(backend(), code, product.UUID) ||
+				!sealed.IsRandom(backend(), code, product.UUID) {
 				continue
 			}
 			co, err := backend().GetUUID(product.UUID)
@@ -355,7 +356,7 @@ func TestVariableNamesSeveralProductsExcludesEachOnesGuaranteedCards(t *testing.
 	}
 
 	for _, co := range []*mtgmatcher.CardObject{a, b} {
-		deck, err := backend().GetDecklist(co.SetCode, co.UUID)
+		deck, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
 		if err != nil {
 			t.Fatal(err)
 		}

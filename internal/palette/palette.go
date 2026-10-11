@@ -14,6 +14,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 // NewspaperPage is the slice of a newspaper page the palette needs to build
@@ -743,10 +744,10 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	// hasContents and hasPicks both check actual data availability via mtgmatcher;
 	// a "found+sealed" product can still legitimately have neither (e.g., a Case that
 	// contains other sealed products but no decklist of its own).
-	if _, contentsErr := b.GetDecklist(co.SetCode, co.UUID); contentsErr == nil {
+	if _, contentsErr := sealed.ProductDecklist(b, co.SetCode, co.UUID); contentsErr == nil {
 		resp.HasContents = true
 	}
-	if _, picksErr := b.GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
+	if _, picksErr := sealed.ProductPicks(b, co.SetCode, co.UUID); picksErr == nil {
 		resp.HasPicks = true
 	}
 
