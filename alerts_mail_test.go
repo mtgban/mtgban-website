@@ -58,6 +58,10 @@ func (f *fakeLinkStore) Channels(_ context.Context, userHash string) ([]alerts.C
 func (f *fakeLinkStore) SetChannelVerified(_ context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, address string, at time.Time) (bool, error) {
 	f.verified = append(f.verified, verifiedCall{userHash, kind, source, address})
 	for i, c := range f.channels {
+		// The store's SQL skips a row unsubscribed or marked as spam.
+		if c.DisabledReason == alerts.ReasonUnsubscribed || c.DisabledReason == alerts.ReasonComplained {
+			continue
+		}
 		if c.UserHash == userHash && c.Kind == kind && c.Source == source && strings.EqualFold(c.Address, address) {
 			f.channels[i].VerifiedAt, f.channels[i].DisabledAt, f.channels[i].DisabledReason = &at, nil, ""
 			return true, nil
@@ -69,7 +73,7 @@ func (f *fakeLinkStore) SetChannelVerified(_ context.Context, userHash string, k
 func (f *fakeLinkStore) DisableChannel(_ context.Context, userHash string, kind alerts.ChannelKind, source alerts.ChannelSource, reason string, at time.Time) error {
 	f.disabled = append(f.disabled, disabledCall{userHash, kind, source, reason})
 	for i, c := range f.channels {
-		if c.UserHash == userHash && c.Kind == kind && c.Source == source {
+		if c.UserHash == userHash && c.Kind == kind && c.Source == source && c.DisabledReason != alerts.ReasonComplained {
 			f.channels[i].DisabledAt, f.channels[i].DisabledReason = &at, reason
 		}
 	}
@@ -143,6 +147,24 @@ func TestAlertsConfirmVerifiesAndRenders(t *testing.T) {
 	testSite.alertsConfirm(rec, req, store)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), alertsConfirmedText) {
 		t.Fatalf("second confirm = %d", rec.Code)
+	}
+}
+
+// A confirm link clicked again after the address was marked as spam, or
+// bounced since, must not turn it back on.
+func TestAlertsConfirmRefusesComplainedRow(t *testing.T) {
+	mailLinkSetup(t)
+	row := pendingEmail("u1", "bob@example.com")
+	row.DisabledReason = alerts.ReasonComplained
+	store := &fakeLinkStore{channels: []alerts.Channel{row}}
+	err := store.DisableChannel(context.Background(), "u1", alerts.ChannelEmail, alerts.SourceUser, alerts.ReasonBounced, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := confirmToken("u1", "bob@example.com", time.Now().Add(time.Hour))
+	err = confirmAlertEmail(context.Background(), store, alertTokenSecret(), token, time.Now())
+	if !errors.Is(err, alerts.ErrBadToken) || store.channels[0].DisabledReason != alerts.ReasonComplained {
+		t.Fatalf("confirm = %v, row %+v", err, store.channels[0])
 	}
 }
 

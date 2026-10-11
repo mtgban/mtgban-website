@@ -728,7 +728,8 @@ func TestChannelsDisabledSince(t *testing.T) {
 		t.Fatalf("disabled at or after until counted: %d %v", n, err)
 	}
 
-	must(t, s.EnableChannel(ctx, h, ChannelEmail, SourcePatreon))
+	_, err = s.EnableChannel(ctx, h, ChannelEmail, SourcePatreon)
+	must(t, err)
 	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourcePatreon, "unsubscribed", now))
 	n, err = s.ChannelsDisabledSince(ctx, before, after)
 	if err != nil || n != 0 {
@@ -824,11 +825,13 @@ func TestEnableChannelRestoresParkedEmailAlerts(t *testing.T) {
 	other := parkedEmailAlert(t, s, h, "card-2", "this address refused our mail")
 
 	// A Discord enable leaves email alerts alone.
-	must(t, s.EnableChannel(ctx, h, ChannelDiscord, SourcePatreon))
+	_, err := s.EnableChannel(ctx, h, ChannelDiscord, SourcePatreon)
+	must(t, err)
 	if alertStatus(t, s, h, unsub) != StatusUndeliverable {
 		t.Fatal("discord enable restored an email alert")
 	}
-	must(t, s.EnableChannel(ctx, h, ChannelEmail, SourcePatreon))
+	_, err = s.EnableChannel(ctx, h, ChannelEmail, SourcePatreon)
+	must(t, err)
 	if alertStatus(t, s, h, unsub) != StatusActive || alertStatus(t, s, h, other) != StatusUndeliverable {
 		t.Fatalf("after enable: %s %s", alertStatus(t, s, h, unsub), alertStatus(t, s, h, other))
 	}
@@ -859,6 +862,39 @@ func TestSetChannelVerifiedRestoresParkedEmailAlerts(t *testing.T) {
 	ok, err = s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, "me@example.com", now)
 	if err != nil || ok || alertStatus(t, s, h, unsub) != StatusUndeliverable {
 		t.Fatalf("old confirm link undid an unsubscribe: %v %v", ok, err)
+	}
+}
+
+// TestComplainedChannelStaysDisabled covers a row marked as spam: a later
+// bounce or unsubscribe keeps the complaint and its time, and a confirm
+// link no longer turns it back on.
+func TestComplainedChannelStaysDisabled(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	first := time.Now().Add(-time.Hour).Truncate(time.Second)
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "me@example.com", Source: SourceUser, VerifiedAt: &first}))
+	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, ReasonComplained, first))
+	parked := parkedEmailAlert(t, s, h, "card-1", ParkComplained)
+	for _, reason := range []string{ReasonBounced, ReasonUnsubscribed} {
+		must(t, s.DisableChannel(ctx, h, ChannelEmail, SourceUser, reason, time.Now()))
+		chans, err := s.Channels(ctx, h)
+		must(t, err)
+		if chans[0].DisabledReason != ReasonComplained || chans[0].DisabledAt == nil || !chans[0].DisabledAt.Equal(first) {
+			t.Fatalf("after %s: %+v", reason, chans[0])
+		}
+	}
+	ok, err := s.SetChannelVerified(ctx, h, ChannelEmail, SourceUser, "me@example.com", time.Now())
+	if err != nil || ok || alertStatus(t, s, h, parked) != StatusUndeliverable {
+		t.Fatalf("confirm link undid a complaint: %v %v", ok, err)
+	}
+	// Enable refuses it too, whatever the caller read before.
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &first}))
+	must(t, s.DisableChannel(ctx, h, ChannelEmail, SourcePatreon, ReasonComplained, first))
+	ok, err = s.EnableChannel(ctx, h, ChannelEmail, SourcePatreon)
+	if err != nil || ok || alertStatus(t, s, h, parked) != StatusUndeliverable {
+		t.Fatalf("enable undid a complaint: %v %v", ok, err)
 	}
 }
 

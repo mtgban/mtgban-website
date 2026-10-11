@@ -215,28 +215,33 @@ func (s *Store) ChannelFor(ctx context.Context, userHash string, kind ChannelKin
 }
 
 // SetChannelVerified stamps a channel verified and enabled while it still
-// holds address and was not unsubscribed; found is false when no row matched.
+// holds address and was neither unsubscribed nor marked as spam; found is
+// false when no row matched.
 func (s *Store) SetChannelVerified(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, address string, at time.Time) (bool, error) {
 	return s.enableAndRestore(ctx, userHash, kind, `
 		UPDATE alert_channels SET verified_at = $5, disabled_at = NULL, disabled_reason = '', updated_at = now()
-		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND lower(address) = lower($4) AND disabled_reason <> $6`,
-		userHash, kind, source, address, at, ReasonUnsubscribed)
+		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND lower(address) = lower($4) AND disabled_reason <> ALL($6)`,
+		userHash, kind, source, address, at, pq.Array([]string{ReasonUnsubscribed, ReasonComplained}))
 }
 
-// DisableChannel marks a channel unusable, with the reason why.
+// DisableChannel marks a channel unusable, with the reason why. A complaint
+// is final: a row marked as spam keeps that reason and its time.
 func (s *Store) DisableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource, reason string, at time.Time) error {
 	_, err := s.db.ExecContext(ctx, `
-		UPDATE alert_channels SET disabled_at = $5, disabled_reason = $4, updated_at = now()
-		 WHERE user_hash = $1 AND kind = $2 AND source = $3`, userHash, kind, source, reason, at)
+		UPDATE alert_channels
+		   SET disabled_at = CASE WHEN disabled_reason = $6 THEN disabled_at ELSE $5 END,
+		       disabled_reason = CASE WHEN disabled_reason = $6 THEN disabled_reason ELSE $4 END,
+		       updated_at = now()
+		 WHERE user_hash = $1 AND kind = $2 AND source = $3`, userHash, kind, source, reason, at, ReasonComplained)
 	return err
 }
 
-// EnableChannel clears a channel's disabled state.
-func (s *Store) EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) error {
-	_, err := s.enableAndRestore(ctx, userHash, kind, `
+// EnableChannel clears a channel's disabled state, unless it was marked as
+// spam; found is false when no row was enabled.
+func (s *Store) EnableChannel(ctx context.Context, userHash string, kind ChannelKind, source ChannelSource) (bool, error) {
+	return s.enableAndRestore(ctx, userHash, kind, `
 		UPDATE alert_channels SET disabled_at = NULL, disabled_reason = '', updated_at = now()
-		 WHERE user_hash = $1 AND kind = $2 AND source = $3`, userHash, kind, source)
-	return err
+		 WHERE user_hash = $1 AND kind = $2 AND source = $3 AND disabled_reason <> $4`, userHash, kind, source, ReasonComplained)
 }
 
 // enableAndRestore runs a channel UPDATE and, when it matched an email row,
