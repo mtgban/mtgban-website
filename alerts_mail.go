@@ -26,6 +26,7 @@ const (
 	// alertMailCeiling is the most alert mails one user gets in 24 hours.
 	alertMailCeiling = 20
 
+	alertsConfirmAskText     = "Use %s for your price alerts?"
 	alertsConfirmedText      = "Your email address is confirmed."
 	alertsConfirmFailedText  = "This confirmation link is not valid or has expired."
 	alertsUnsubscribeAskText = "Stop all price alert mail to this account?"
@@ -39,8 +40,10 @@ const (
 type AlertsNoticeVars struct {
 	Heading string
 	Text    string
-	// Token, when set, shows the Unsubscribe button that posts it back.
-	Token string
+	// Token, when set, shows a Button that posts it back to Action.
+	Token  string
+	Action string
+	Button string
 }
 
 // alertTokenSecret keys the mailed tokens, as BAN_SECRET keys signatures.
@@ -302,31 +305,42 @@ func isTokenError(err error) bool {
 	return errors.Is(err, alerts.ErrBadToken) || errors.Is(err, alerts.ErrTokenExpired)
 }
 
-// AlertsConfirm verifies an address from its mailed link; no sign-in needed.
+// AlertsConfirm answers a mailed confirm link as AlertsUnsubscribe does:
+// GET shows a button, its POST verifies; no sign-in needed.
 func (s *site) AlertsConfirm(w http.ResponseWriter, r *http.Request) {
 	s.alertsConfirm(w, r, s.alertLinkStore())
 }
 
 func (s *site) alertsConfirm(w http.ResponseWriter, r *http.Request, store alertChannelStore) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	notice := AlertsNoticeVars{Heading: "Confirm alert email"}
 	status := http.StatusOK
-	if store == nil {
+	token := r.FormValue("token")
+	now := time.Now()
+	var t alerts.Token
+	var err error
+	if r.Method == http.MethodGet {
+		// Link scanners prefetch GETs, so a GET only checks the token.
+		t, err = verifyAlertToken(alertTokenSecret(), token, alerts.TokenConfirm, now)
+	} else if store != nil {
+		err = confirmAlertEmail(r.Context(), store, alertTokenSecret(), token, now)
+	}
+	switch {
+	case store == nil:
 		notice.Text, status = alertsUnavailableText, http.StatusServiceUnavailable
-	} else {
-		err := confirmAlertEmail(r.Context(), store, alertTokenSecret(), r.FormValue("token"), time.Now())
-		switch {
-		case err == nil:
-			notice.Text = alertsConfirmedText
-		case isTokenError(err):
-			notice.Text, status = alertsConfirmFailedText, http.StatusBadRequest
-		default:
-			log.Println("alerts: confirm:", err)
-			notice.Text, status = alertsLinkErrorText, http.StatusInternalServerError
-		}
+	case isTokenError(err):
+		notice.Text, status = alertsConfirmFailedText, http.StatusBadRequest
+	case err != nil:
+		log.Println("alerts: confirm:", err)
+		notice.Text, status = alertsLinkErrorText, http.StatusInternalServerError
+	case r.Method == http.MethodGet:
+		notice.Text = fmt.Sprintf(alertsConfirmAskText, t.Address)
+		notice.Token, notice.Action, notice.Button = token, "/alerts/confirm", "Confirm"
+	default:
+		notice.Text = alertsConfirmedText
 	}
 	s.renderAlertsNotice(w, r, status, notice)
 }
@@ -362,7 +376,8 @@ func (s *site) alertsUnsubscribe(w http.ResponseWriter, r *http.Request, store a
 		log.Println("alerts: unsubscribe:", err)
 		notice.Text, status = alertsLinkErrorText, http.StatusInternalServerError
 	case r.Method == http.MethodGet:
-		notice.Text, notice.Token = alertsUnsubscribeAskText, token
+		notice.Text = alertsUnsubscribeAskText
+		notice.Token, notice.Action, notice.Button = token, "/alerts/unsubscribe", "Unsubscribe"
 	default:
 		notice.Text = alertsUnsubscribedText
 	}
