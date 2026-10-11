@@ -656,7 +656,14 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 		Sealed:    source.Info().SealedMode,
 		AnySpread: cmp.AnySpread,
 	}
-	opts, rows := state.apply(b, mode)
+	// A preview draws its sample at the page's defaults, the reader's
+	// limits applying only within it
+	engineState := state
+	if limitedResults && mode.Global {
+		engineState = state.unbounded()
+	}
+	opts, rows := engineState.apply(b, mode)
+	readerRows := arbitRowFilter{limits: state.limits(mode), global: mode.Global}
 	applied := state.applied(mode)
 
 	query := state.values()
@@ -763,15 +770,13 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 		}
 
 		// For Global, drop results before sorting, to add some extra variance
-		if pageVars.GlobalMode {
-			maxResults := MaxResultsGlobal
-			// Lower max number of results for the preview
-			if limitedResults {
-				maxResults = MaxResultsGlobalLimit
+		if pageVars.GlobalMode && limitedResults {
+			arbit = previewSample(arbit, readerRows, seller.Info().NoQuantityInventory)
+			if len(arbit) == 0 {
+				continue
 			}
-			if len(arbit) > maxResults {
-				arbit = arbit[:maxResults]
-			}
+		} else if pageVars.GlobalMode && len(arbit) > MaxResultsGlobal {
+			arbit = arbit[:MaxResultsGlobal]
 		}
 
 		suspectPrice := suspectPriceFor(pageVars.GlobalMode, pageVars.ReverseMode,

@@ -418,6 +418,35 @@ func (f arbitRowFilter) keep(e mtgban.ArbitEntry, noQuantity bool) bool {
 		(noQuantity || float64(e.Quantity) >= l.MinQty)
 }
 
+// within reports whether a row is within the limits, the ones the engine
+// applies included, for rows drawn without the reader's.
+func (f arbitRowFilter) within(e mtgban.ArbitEntry, noQuantity bool) bool {
+	l := f.limits
+	return f.keep(e, noQuantity) && e.Spread >= l.MinSpread && e.Difference >= l.MinDiff &&
+		(math.IsNaN(e.Profitability) || e.Profitability >= l.MinProf)
+}
+
+// unbounded is the state with the reader's limits dropped, picks and
+// options kept: what a preview's sample is drawn with, so that the limits
+// narrow the sample rather than choose it.
+func (st arbitState) unbounded() arbitState {
+	for _, key := range arbitBoundKeys {
+		*st.bound(key) = arbitBound{}
+	}
+	return st
+}
+
+// previewSample cuts a comparison's rows to the preview's share, in the
+// engine's map order, then holds what is left to the reader's limits.
+func previewSample(entries []mtgban.ArbitEntry, limits arbitRowFilter, noQuantity bool) []mtgban.ArbitEntry {
+	if len(entries) > MaxResultsGlobalLimit {
+		entries = entries[:MaxResultsGlobalLimit]
+	}
+	return slices.DeleteFunc(entries, func(e mtgban.ArbitEntry) bool {
+		return !limits.within(e, noQuantity)
+	})
+}
+
 // apply builds the options one comparison runs with, and the filter its
 // rows go through after.
 func (st arbitState) apply(b *mtgmatcher.Backend, m arbitMode) (*mtgban.ArbitOpts, arbitRowFilter) {
