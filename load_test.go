@@ -529,13 +529,14 @@ func TestLoadScrapersNGLeavesOutADumpPastDropAfter(t *testing.T) {
 	})
 
 	writeSellerDump(t, filepath.Join(dir, "magic", "starcitygames", "retail", "SCG.json.xz"), inventoryOf("SCG", 3, time.Now()))
+	writeVendorDump(t, filepath.Join(dir, "magic", "starcitygames", "buylist", "SCG.json.xz"), buylistOf("SCG", 3, time.Now()))
 	writeVendorDump(t, filepath.Join(dir, "magic", "abugames", "buylist", "ABU.json.xz"), buylistOf("ABU", 2, time.Now().Add(-8*24*time.Hour)))
 
 	err := loadScrapersNG(&simplecloud.FileBucket{Root: dir}, nil)
 	if err != nil {
 		t.Fatalf("loadScrapersNG: %v", err)
 	}
-	if len(GetSellers()) != 1 || len(GetVendors()) != 0 {
+	if len(GetSellers()) != 1 || len(GetVendors()) != 1 || GetVendors()[0].Info().Shorthand != "SCG" {
 		t.Errorf("served %d sellers and %d vendors, want SCG alone, ABU's 8-day-old buylist left out", len(GetSellers()), len(GetVendors()))
 	}
 }

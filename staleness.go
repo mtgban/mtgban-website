@@ -128,48 +128,61 @@ func dropStaleStores(now time.Time) {
 // takeStaleStores publishes the snapshots without the stores past DropAfter,
 // records them, and returns them.
 func takeStaleStores(now time.Time) []droppedStore {
-	// Sessions takes its lock before scrapersWriteMu (see dropSessionScraper),
-	// so the session stores are asked for first; one published meanwhile is
-	// fresh, nowhere near DropAfter.
-	sessions := map[string]bool{}
-	for _, seller := range GetSellers() {
-		info := seller.Info()
-		if pastDrop(info.InventoryTimestamp, now) && Sessions.Is(sessionstore.Retail, info.Shorthand) {
-			sessions[info.Shorthand+"/"+sessionstore.Retail] = true
-		}
-	}
-	for _, vendor := range GetVendors() {
-		info := vendor.Info()
-		if pastDrop(info.BuylistTimestamp, now) && Sessions.Is(sessionstore.Buylist, info.Shorthand) {
-			sessions[info.Shorthand+"/"+sessionstore.Buylist] = true
-		}
-	}
-
-	scrapersWriteMu.Lock()
+	sessions := lockAskedSnapshots()
 	defer scrapersWriteMu.Unlock()
 
-	var dropped []droppedStore
-	var sellers []mtgban.Seller
+	// A real store counts as left on its side only with a date within
+	// DropAfter: an undated one has no age to be fresh by.
+	var oldSellers []mtgban.Seller
+	realSeller := false
 	for _, seller := range GetSellers() {
 		info := seller.Info()
-		if pastDrop(info.InventoryTimestamp, now) && !sessions[info.Shorthand+"/"+sessionstore.Retail] {
-			dropped = append(dropped, droppedStore{info, sessionstore.Retail, *info.InventoryTimestamp, len(seller.Inventory())})
+		session := sessions[info.Shorthand+"/"+sessionstore.Retail]
+		if pastDrop(info.InventoryTimestamp, now) && !session {
+			oldSellers = append(oldSellers, seller)
 			continue
 		}
-		sellers = append(sellers, seller)
+		realSeller = realSeller || (!session && info.InventoryTimestamp != nil)
 	}
-	var vendors []mtgban.Vendor
+	// A side with no dated real store left (session stores go on their own,
+	// an undated one has no age to vouch for it) keeps its freshest old one
+	// served, and checkStaleness calls it out.
+	if !realSeller && len(oldSellers) > 0 {
+		i := freshestStore(oldSellers, sessionstore.Retail)
+		log.Printf("kept %s %s past DropAfter: the last one served", sessionstore.Retail, oldSellers[i].Info().Shorthand)
+		oldSellers = slices.Delete(oldSellers, i, i+1)
+	}
+	var oldVendors []mtgban.Vendor
+	realVendor := false
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
-		if pastDrop(info.BuylistTimestamp, now) && !sessions[info.Shorthand+"/"+sessionstore.Buylist] {
-			dropped = append(dropped, droppedStore{info, sessionstore.Buylist, *info.BuylistTimestamp, len(vendor.Buylist())})
+		session := sessions[info.Shorthand+"/"+sessionstore.Buylist]
+		if pastDrop(info.BuylistTimestamp, now) && !session {
+			oldVendors = append(oldVendors, vendor)
 			continue
 		}
-		vendors = append(vendors, vendor)
+		realVendor = realVendor || (!session && info.BuylistTimestamp != nil)
+	}
+	if !realVendor && len(oldVendors) > 0 {
+		i := freshestStore(oldVendors, sessionstore.Buylist)
+		log.Printf("kept %s %s past DropAfter: the last one served", sessionstore.Buylist, oldVendors[i].Info().Shorthand)
+		oldVendors = slices.Delete(oldVendors, i, i+1)
+	}
+
+	var dropped []droppedStore
+	for _, seller := range oldSellers {
+		info := seller.Info()
+		dropped = append(dropped, droppedStore{info, sessionstore.Retail, *info.InventoryTimestamp, len(seller.Inventory())})
+	}
+	for _, vendor := range oldVendors {
+		info := vendor.Info()
+		dropped = append(dropped, droppedStore{info, sessionstore.Buylist, *info.BuylistTimestamp, len(vendor.Buylist())})
 	}
 	if len(dropped) == 0 {
 		return nil
 	}
+	sellers := withoutStores(GetSellers(), oldSellers)
+	vendors := withoutStores(GetVendors(), oldVendors)
 	sellersPtr.Store(&sellers)
 	vendorsPtr.Store(&vendors)
 
@@ -184,6 +197,70 @@ func takeStaleStores(now time.Time) []droppedStore {
 	}
 	droppedStoresPtr.Store(&record)
 	return dropped
+}
+
+// lockAskedSnapshots takes scrapersWriteMu over snapshots whose every store
+// Sessions was asked about, and returns whether each one, keyed like the
+// alarm's rows, was published from an upload. Sessions takes its lock before
+// scrapersWriteMu (see dropSessionScraper), so it is asked first, and asked
+// again when a load swaps a snapshot in meanwhile.
+func lockAskedSnapshots() map[string]bool {
+	for {
+		sellers, vendors := sellersPtr.Load(), vendorsPtr.Load()
+		sessions := map[string]bool{}
+		if sellers != nil {
+			for _, seller := range *sellers {
+				info := seller.Info()
+				sessions[info.Shorthand+"/"+sessionstore.Retail] = Sessions.Is(sessionstore.Retail, info.Shorthand)
+			}
+		}
+		if vendors != nil {
+			for _, vendor := range *vendors {
+				info := vendor.Info()
+				sessions[info.Shorthand+"/"+sessionstore.Buylist] = Sessions.Is(sessionstore.Buylist, info.Shorthand)
+			}
+		}
+
+		scrapersWriteMu.Lock()
+		if sellersPtr.Load() == sellers && vendorsPtr.Load() == vendors {
+			return sessions
+		}
+		scrapersWriteMu.Unlock()
+	}
+}
+
+// withoutStores is stores, in its order, less the ones in gone, matched by
+// shorthand as a side serves one store per shorthand.
+func withoutStores[S interface{ Info() mtgban.ScraperInfo }](stores, gone []S) []S {
+	shorthands := map[string]bool{}
+	for _, store := range gone {
+		shorthands[store.Info().Shorthand] = true
+	}
+	var kept []S
+	for _, store := range stores {
+		if !shorthands[store.Info().Shorthand] {
+			kept = append(kept, store)
+		}
+	}
+	return kept
+}
+
+// freshestStore is the index of the store in stores with the latest kind
+// timestamp; every one of them has one, being past DropAfter.
+func freshestStore[S interface{ Info() mtgban.ScraperInfo }](stores []S, kind string) int {
+	timestamp := func(info mtgban.ScraperInfo) time.Time {
+		if kind == sessionstore.Retail {
+			return *info.InventoryTimestamp
+		}
+		return *info.BuylistTimestamp
+	}
+	best := 0
+	for i, store := range stores {
+		if timestamp(store.Info()).After(timestamp(stores[best].Info())) {
+			best = i
+		}
+	}
+	return best
 }
 
 // servedStore reports whether the snapshots serve shorthand on kind's side.
@@ -239,6 +316,7 @@ func checkStaleness() {
 			continue
 		}
 		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
+		changes = appendKeptChange(changes, info.Shorthand+"/"+sessionstore.Retail, sessionstore.Retail, info.Shorthand, info.InventoryTimestamp, now)
 	}
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
@@ -246,6 +324,7 @@ func checkStaleness() {
 			continue
 		}
 		changes = appendStaleChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
+		changes = appendKeptChange(changes, info.Shorthand+"/"+sessionstore.Buylist, sessionstore.Buylist, info.Shorthand, info.BuylistTimestamp, now)
 	}
 	for _, kind := range []string{sessionstore.Retail, sessionstore.Buylist} {
 		changes = appendDropChanges(changes, kind, now)
@@ -276,6 +355,22 @@ func appendDropChanges(changes []staleChange, kind string, now time.Time) []stal
 		case staleRecovered:
 			changes = append(changes, staleChange{key: alarmKey, stale: false, line: label + " is served again"})
 		}
+	}
+	return changes
+}
+
+// appendKeptChange announces, with @here, a served store past DropAfter:
+// after dropStaleStores, only the last store on its side is one. Callers
+// must hold staleAlarmState.mu.
+func appendKeptChange(changes []staleChange, key, kind, shorthand string, ts *time.Time, now time.Time) []staleChange {
+	alarmKey := "kept/" + key
+	switch classifyStaleTransition(staleAlarmState.stale[alarmKey], pastDrop(ts, now)) {
+	case becameStale:
+		line := "@here " + staleLabel(kind, shorthand) + " is still served, not updated in " + staleAge(*ts, now) + ": it is the last " + kind + " store left"
+		return append(changes, staleChange{key: alarmKey, stale: true, line: line})
+	case staleRecovered:
+		// Its fresh load is announced on its own row
+		delete(staleAlarmState.stale, alarmKey)
 	}
 	return changes
 }
