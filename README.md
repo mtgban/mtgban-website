@@ -43,3 +43,9 @@ cookie signed before the property existed. To give a tier no channels at
 all, set `AlertChannels` to the literal string `none`, never an empty
 string: signing keeps empty values, but verification drops them, which
 breaks every signed page for that tier.
+
+`AlertChannels` is a new signed field, carried in the `MTGBAN` signature
+on the cookie every site shares. Deploy this build to every site before
+any tier in the shared `acl.json` sets it: a build that predates the field
+rejects a signature carrying it, so a login on an updated site would sign
+that reader out of the rest.

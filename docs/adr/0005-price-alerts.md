@@ -92,10 +92,13 @@ each for all of them.
   only a paused, undeliverable or unresolvable alert offers Resume, and an
   unresolvable one is parked again, silently, while its card is still
   missing. The run that parks a
-  user's alerts sends them one DM saying which and why: no sign-in for a
-  month, a tier without alerts, or the allowance. It goes at most once: a
-  notice that fails to send shows as the alerts job's problem on the admin
-  dashboard and is not retried, because the next run has nothing new to
-  park.
+  user's alerts sends them one notice saying which and why: no sign-in for
+  a month, a tier without alerts or without their channel, or the
+  allowance. It is a Discord DM when they have Discord, else a mail to
+  their email address. A mailed notice counts toward the daily mail
+  ceiling like a digest, and one at the ceiling is skipped. It goes at
+  most once: a notice that fails to send shows as the alerts job's
+  problem on the admin dashboard and is not retried, because the next run
+  has nothing new to park.
 - `AlertsMax` is a signed field name: renaming it after `acl.json` uses it
   takes another deploy of every site and an `acl.json` edit together.
