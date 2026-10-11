@@ -10,9 +10,20 @@ import (
 	"github.com/leemcloughlin/logfile"
 )
 
-// Cache for a week as these assets either never change or have a snapshot key in the URL
+// staticCacheControl: a file asked for with the running build's hash is
+// cached for 30 days at that URL (a deploy changes the hash, so 30 days
+// is plenty); any other hash, or none, or dev mode where the hash never
+// corresponds to a real deploy, gets a day instead.
+func staticCacheControl(r *http.Request) string {
+	hash := r.URL.Query().Get("hash")
+	if !DevMode && BuildCommit != "" && hash == BuildCommit {
+		return "public, max-age=2592000, immutable"
+	}
+	return "public, max-age=86400"
+}
+
 func ServeFile(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", staticCacheControl(r))
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
