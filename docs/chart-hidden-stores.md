@@ -14,7 +14,7 @@ provider's `public_name` from `timeseries_config.datasets`
 (`buildProviderRegistry`). So the list differs from card to card, and
 between the window the page first renders (`chartInitialRange`: the
 viewer's last range, else 180 days) and a wider one fetched later from
-`/api/chart` (`ChartRangeLoader` in js/chart-range.js; the single-card
+`/data/chart` (`ChartRangeLoader` in js/chart-range.js; the single-card
 `installChartPayload` in js/search-chart.js rebuilds the datasets from
 it). The legacy read lists every configured series, priced or not, so
 positions held there.
@@ -122,7 +122,7 @@ If names ever stop being good enough:
   `ChartAPIDataset` via `chartAPIDatasets` (api_chart.go), and in the
   template's inline datasets (templates/search.html). JS needs it too:
   `chartDatasetConfig` (js/chart-range.js) and the mobile `chartDatasets`.
-- Expect a transition window: `/api/chart` answers are sent
+- Expect a transition window: `/data/chart` answers are sent
   `Cache-Control: public, max-age=3600` (`writeChartAPIResponse`,
   api_chart.go), so for up to an hour after a deploy a page can still get
   a cached answer with no id, and needs to fall back to matching by name.

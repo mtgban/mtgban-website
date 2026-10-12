@@ -459,7 +459,7 @@ type SearchVars struct {
 	// ChartLoadedDays is how much history the page actually rendered inline:
 	// the window the chart first draws, or everything the tier allows when
 	// that window holds no prices. The front-end fetches the rest from
-	// /api/chart only if the viewer asks for a wider range.
+	// /data/chart only if the viewer asks for a wider range.
 	ChartLoadedDays   int
 	AxisLabels        []string
 	Datasets          []Dataset

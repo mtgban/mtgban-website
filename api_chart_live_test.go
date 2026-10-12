@@ -73,8 +73,8 @@ func TestChartDataAPILive(t *testing.T) {
 	// The tier ceiling with no signature is 30 days, so that is what a request
 	// naming no range gets, and a wider one cannot talk its way past it.
 	t.Run("the range is clamped to the tier", func(t *testing.T) {
-		unbounded := get(t, "/api/chart/"+id)
-		wide := get(t, "/api/chart/"+id+"?range=3650")
+		unbounded := get(t, "/data/chart/"+id)
+		wide := get(t, "/data/chart/"+id+"?range=3650")
 		if unbounded.MaxLookbackDays != 30 || unbounded.LoadedDays != 30 {
 			t.Errorf("no range: maxLookbackDays=%d loadedDays=%d, want 30/30",
 				unbounded.MaxLookbackDays, unbounded.LoadedDays)
@@ -89,8 +89,8 @@ func TestChartDataAPILive(t *testing.T) {
 
 	// A narrower range than the ceiling reads and returns less.
 	t.Run("a narrower range reads less", func(t *testing.T) {
-		wide := get(t, "/api/chart/"+id+"?range=30")
-		narrow := get(t, "/api/chart/"+id+"?range=7")
+		wide := get(t, "/data/chart/"+id+"?range=30")
+		narrow := get(t, "/data/chart/"+id+"?range=7")
 		if narrow.LoadedDays != 7 {
 			t.Errorf("loadedDays=%d, want 7", narrow.LoadedDays)
 		}
@@ -109,7 +109,7 @@ func TestChartDataAPILive(t *testing.T) {
 	// Gaps go over as null, and the response carries no sentinel string.
 	t.Run("gaps are null on the wire", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		testSite.ChartDataAPI(w, httptest.NewRequest("GET", "/api/chart/"+id+"?range=30", nil))
+		testSite.ChartDataAPI(w, httptest.NewRequest("GET", "/data/chart/"+id+"?range=30", nil))
 		body := w.Body.String()
 		if strings.Contains(body, "Number.NaN") {
 			t.Error("response still carries the Number.NaN sentinel")
@@ -125,7 +125,7 @@ func TestChartDataAPILive(t *testing.T) {
 		if second == "" {
 			t.Skip("CHARTLIVE_BAN_ID_2 not set; skipping the roster case")
 		}
-		resp := get(t, "/api/chart/"+id+","+"ban:"+second+"?range=30")
+		resp := get(t, "/data/chart/"+id+","+"ban:"+second+"?range=30")
 		if len(resp.References) == 0 {
 			t.Error("a roster response carries no reference list")
 		}

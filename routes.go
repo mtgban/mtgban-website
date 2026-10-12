@@ -139,6 +139,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/upload/handoff", noSigning(http.HandlerFunc(s.UploadHandoff)))
 
 	http.Handle("/search/oembed", noSigning(http.HandlerFunc(s.SearchOEmbed)))
+	http.Handle("/data/", enforceDataSigning(s, s.dataRoutes()))
 	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(s.PriceAPI)))
 	http.Handle("/api/v2/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
@@ -149,8 +150,6 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/mtgmatcher/raw/", enforceSigning(s, http.HandlerFunc(s.RawCardAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(s.SuggestAPI)))
 	http.Handle("/api/settings/modal", noSigning(http.HandlerFunc(s.SettingsModal)))
-	http.Handle("/api/chart/", enforceSigning(s, http.HandlerFunc(s.ChartDataAPI)))
-	http.Handle("/api/prices/", enforceSigning(s, http.HandlerFunc(s.BatchPricesAPI)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
 	http.Handle("/api/popular/vote", noSigning(http.HandlerFunc(s.PopularVoteAPI)))
 	// Its closures read the live datastore and prices per request.
@@ -191,4 +190,13 @@ func (s *site) registerRoutes() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
+}
+
+// dataRoutes serves what the site's own pages fetch with the reader's cookie,
+// all behind the one enforceDataSigning registered for /data/.
+func (s *site) dataRoutes() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.Handle("/data/chart/", http.HandlerFunc(s.ChartDataAPI))
+	mux.Handle("/data/prices/", http.HandlerFunc(s.BatchPricesAPI))
+	return mux
 }

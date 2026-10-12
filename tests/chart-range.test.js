@@ -6,16 +6,17 @@ const source = readFileSync(join(import.meta.dir, '..', 'js', 'chart-range.js'),
 
 // loadRange evaluates chart-range.js against a stubbed fetch, and reports every
 // url it asked for, so a test can tell "already loaded" from "went and got it".
-function loadRange({ payload = null, fail = false } = {}) {
+function loadRange({ payload = null, fail = false, status = 0 } = {}) {
     const calls = [];
     const fetch = (url) => {
         calls.push(url);
         if (fail) return Promise.reject(new Error('network'));
+        if (status) return Promise.resolve({ ok: false, status });
         return Promise.resolve({ ok: true, json: () => Promise.resolve(payload) });
     };
     const console = { warn() {} };
     const api = new Function('fetch', 'console', source +
-        '; return { ChartRangeLoader, chartNumbers, chartDatasetConfig };')(fetch, console);
+        '; return { ChartRangeLoader, chartNumbers, chartDatasetConfig, chartRangeFailureText };')(fetch, console);
     return { api, calls };
 }
 
@@ -52,7 +53,7 @@ test('a wider range fetches the whole entitlement, once', async () => {
     const failure = await new Promise((done) => loader.ensure(730, done));
 
     expect(failure).toBeNull();
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=3650']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=3650']);
     expect(installed).toEqual([payload]);
     expect(busy).toEqual([true, false]);
     expect(loader.loadedDays).toBe(3650);
@@ -162,4 +163,18 @@ test('a dataset keeps its roster identity through the conversion', () => {
     expect(ds.referenceKey).toBe('TCG Low');
     expect(ds.data).toEqual([1, null]);
     expect(ds.borderColor).toBe('red');
+});
+
+// /data/chart/ refuses with a status, and the page names the two a reader can
+// act on.
+test('a refused widening says why', async () => {
+    for (const [status, want] of [[429, 'Too many requests'], [401, 'Signed out'], [500, 'Failed to load more history']]) {
+        const { api } = loadRange({ status });
+        const { loader } = newLoader(api, {});
+        const err = await new Promise((done) => loader.ensure(365, done));
+        expect(err.status).toBe(status);
+        expect(api.chartRangeFailureText(err)).toContain(want);
+    }
+    const { api } = loadRange({ fail: true });
+    expect(api.chartRangeFailureText(new Error('network'))).toContain('Failed to load more history');
 });

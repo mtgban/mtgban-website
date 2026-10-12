@@ -803,11 +803,20 @@
             batches.push(allIds.slice(i, i + BATCH_SIZE));
         }
 
-        // Fetch all batches in parallel
+        // Fetch all batches in parallel. A refused one keeps the prices its
+        // favorites already hold, and the first refusal's status says why.
+        var refused = 0;
         var fetches = batches.map(function(batch) {
-            return fetch('/api/prices/?ids=' + encodeURIComponent(batch.join(',')))
-                .then(function(r) { return r.ok ? r.json() : {}; })
-                .catch(function() { return {}; });
+            return fetch('/data/prices/' + encodeURIComponent(batch.join(',')))
+                .then(function(r) {
+                    if (r.ok) return r.json();
+                    refused = refused || r.status;
+                    return {};
+                })
+                .catch(function() {
+                    refused = refused || -1;
+                    return {};
+                });
         });
 
         Promise.all(fetches).then(function(results) {
@@ -847,11 +856,20 @@
             if (updated) {
                 saveFavorites(favs);
                 renderFavorites();
-                if (showNotification) showToast('Prices updated');
-            } else if (showNotification) {
-                showToast('Prices are up to date');
             }
+            // A refused refresh may be tried again straight away
+            if (refused) lastRefreshAttempt = 0;
+            if (showNotification) showToast(refreshToastText(updated, refused));
         });
+    }
+
+    // refreshToastText is what a manual refresh says: why it was refused, or
+    // whether it changed anything.
+    function refreshToastText(updated, refused) {
+        if (refused === 429) return 'Too many requests, try again in a moment';
+        if (refused === 401) return 'Signed out, log in again to refresh prices';
+        if (refused) return 'Could not refresh prices, try again';
+        return updated ? 'Prices updated' : 'Prices are up to date';
     }
 
     function scheduleRefresh() {

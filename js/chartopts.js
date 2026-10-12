@@ -342,7 +342,7 @@ function rethemeFirstAxes(chart) {
 
 /* ── Legend persistence ── */
 
-// The stores a single-card chart hides, saved by name. /api/chart lists only
+// The stores a single-card chart hides, saved by name. /data/chart lists only
 // the stores with prices in the window, so a position names a different store
 // from one card, or one window, to the next. docs/chart-hidden-stores.md has
 // why a name rather than a shorthand or the provider id.

@@ -1,6 +1,6 @@
 // chart-range.js - keeps a chart's loaded history in step with the range asked
 // for. The page renders only what it first draws, so a wider range has to be
-// fetched from /api/chart. See docs/chart-page-loading.md.
+// fetched from /data/chart. See docs/chart-page-loading.md.
 
 // ChartRangeLoader fetches wider windows on demand. opts:
 //   ids         the roster, spelled as the ?chart= url spells it
@@ -53,9 +53,13 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
     this.onBusy(true);
 
     var failure = null;
-    fetch('/api/chart/' + encodeURIComponent(this.ids) + '?range=' + ask)
+    fetch('/data/chart/' + encodeURIComponent(this.ids) + '?range=' + ask)
         .then(function(r) {
-            if (!r.ok) throw new Error('chart range ' + r.status);
+            if (!r.ok) {
+                var err = new Error('chart range ' + r.status);
+                err.status = r.status;
+                throw err;
+            }
             return r.json();
         })
         .then(function(data) {
@@ -83,6 +87,14 @@ ChartRangeLoader.prototype.ensure = function(rangeDays, cb) {
             pending.forEach(function(fn) { fn(failure); });
         });
 };
+
+// chartRangeFailureText is what a failed widening says: the server's 429 and
+// 401 each have something the reader can do.
+function chartRangeFailureText(err) {
+    if (err && err.status === 429) return 'Too many requests, pick the range again in a moment.';
+    if (err && err.status === 401) return 'Signed out, log in again to load more history.';
+    return 'Failed to load more history. Pick the range again to retry.';
+}
 
 // chartNumbers normalises a fetched series to numbers and nulls. Usually a
 // copy, but responses cache for an hour, so one sent before gaps became null

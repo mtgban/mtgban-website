@@ -64,7 +64,7 @@ func writeChartAPIResponse(w http.ResponseWriter, resp ChartAPIResponse) {
 
 func (s *site) ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
-	uuid := strings.TrimPrefix(r.URL.Path, "/api/chart/")
+	uuid := strings.TrimPrefix(r.URL.Path, "/data/chart/")
 	uuid = strings.TrimSuffix(uuid, "/")
 	if uuid == "" {
 		errorResponse(w, http.StatusBadRequest, "missing card UUID")

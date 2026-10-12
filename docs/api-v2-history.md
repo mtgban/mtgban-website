@@ -24,7 +24,7 @@ the end.
   in-memory scrapes.
 - JSON only to start with.
 
-`/api/chart/{id}` stays as it is. It serves the site's chart page, in
+`/data/chart/{id}` stays separate. It serves the site's chart page, in
 Chart.js's shape, and the two share the archive read.
 
 ## What the archive holds

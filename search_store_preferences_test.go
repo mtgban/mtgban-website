@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetSearchBlocklists(t *testing.T) {
-	r := httptest.NewRequest("GET", "/api/prices/", nil)
+	r := httptest.NewRequest("GET", "/data/prices/", nil)
 	r.Header.Set("Cookie", "SearchSellersList=TCGMarket,SCG,; SearchVendorsList=CK,")
 
 	sig := base64.StdEncoding.EncodeToString([]byte("SearchDisabled=CONFIG_SELLER&SearchBuylistDisabled=CONFIG_VENDOR"))

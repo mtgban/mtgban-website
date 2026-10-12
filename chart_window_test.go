@@ -46,9 +46,8 @@ func TestChartWindowClampsToTheTier(t *testing.T) {
 	}
 }
 
-// /api/chart/ is mounted under noSigning, so nothing upstream has checked the
-// signature by the time the handler reads the lookback out of it. How far back
-// a chart may reach is a paid grant, so an unsigned one buys nothing: the
+// The chart handler reads the lookback out of the signature itself. How far
+// back a chart may reach is a paid grant, so an unsigned one buys nothing: the
 // handler has to end up on the 30-day fallback rather than on the ten years the
 // caller wrote for itself.
 func TestChartLookbackIgnoresAnUnsignedGrant(t *testing.T) {
@@ -67,12 +66,12 @@ func TestChartLookbackIgnoresAnUnsignedGrant(t *testing.T) {
 	// The premise: this forgery does buy ten years if it is read unverified,
 	// which is what both the query form and the cookie form used to do.
 	if _, maxDays := chartWindow(unverifiedSignature(httptest.NewRequest(
-		"GET", "/api/chart/ban:1?sig="+url.QueryEscape(forged), nil)), 0); maxDays != 3650 {
+		"GET", "/data/chart/ban:1?sig="+url.QueryEscape(forged), nil)), 0); maxDays != 3650 {
 		t.Fatalf("the forged signature is not actually a forgery worth testing: it bought %d days unverified", maxDays)
 	}
 
 	// Named in the query, the way a link would carry it.
-	r := httptest.NewRequest("GET", "/api/chart/ban:1?sig="+url.QueryEscape(forged), nil)
+	r := httptest.NewRequest("GET", "/data/chart/ban:1?sig="+url.QueryEscape(forged), nil)
 	if sig := verifiedRequestSignature(r); sig != "" {
 		t.Errorf("a forged query signature was accepted: %q", sig)
 	}
@@ -81,7 +80,7 @@ func TestChartLookbackIgnoresAnUnsignedGrant(t *testing.T) {
 	}
 
 	// And in the cookie, the way the page's own fetch would carry it.
-	r = httptest.NewRequest("GET", "/api/chart/ban:1", nil)
+	r = httptest.NewRequest("GET", "/data/chart/ban:1", nil)
 	r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: forged})
 	if _, maxDays := chartWindow(verifiedRequestSignature(r), 0); maxDays != 30 {
 		t.Errorf("a forged cookie signature bought %d days, want the 30-day fallback", maxDays)
@@ -152,7 +151,7 @@ func TestChartRangeParam(t *testing.T) {
 		{"?range=-5", 0},
 		{"?range=notanumber", 0},
 	} {
-		r := httptest.NewRequest("GET", "/api/chart/x"+tc.query, nil)
+		r := httptest.NewRequest("GET", "/data/chart/x"+tc.query, nil)
 		if got := chartRangeParam(r); got != tc.want {
 			t.Errorf("chartRangeParam(%q) = %d, want %d", tc.query, got, tc.want)
 		}

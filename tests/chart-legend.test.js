@@ -79,7 +79,7 @@ function openCard(localStorage, stores) {
     };
 }
 
-// Stores in the order /api/chart lists them.
+// Stores in the order /data/chart lists them.
 const LOW = { name: 'TCGplayer Low', color: 'rgb(1, 0, 0)' };
 const MARKET = { name: 'TCGplayer Market', color: 'rgb(2, 0, 0)' };
 const RETAIL = { name: 'Card Kingdom Retail', color: 'rgb(3, 0, 0)' };
@@ -91,7 +91,7 @@ const lines = ({ chart }) => chart.data.datasets.map((ds, i) => ds.label + (char
 const legendOf = ({ legend }) => [...legend.innerHTML.matchAll(/class="chart-legend-item( hidden)?".*?<\/span>([^<]*)<\/button>/g)]
     .map(([, hidden, name]) => name + (hidden ? ' (hidden)' : ''));
 
-// /api/chart lists only the stores with prices for the card, so the store at a
+// /data/chart lists only the stores with prices for the card, so the store at a
 // given position differs from one card to the next.
 test('a store hidden on one card is hidden on the next by name', () => {
     const viewer = storage();

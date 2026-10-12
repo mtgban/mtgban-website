@@ -28,9 +28,9 @@ func (s *site) BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 	blocklistRetail, blocklistBuylist, personalized := getSearchBlocklists(r, sig)
 
-	idsParam := r.FormValue("ids")
+	idsParam := strings.TrimPrefix(r.URL.Path, "/data/prices/")
 	if idsParam == "" {
-		errorResponse(w, http.StatusBadRequest, "missing ids parameter")
+		errorResponse(w, http.StatusBadRequest, "missing ids")
 		return
 	}
 

@@ -83,13 +83,25 @@
     }
 
     function fetchChart(cardId, range) {
-        return fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + range)
+        return fetch('/data/chart/' + encodeURIComponent(cardId) + '?range=' + range)
             .then(function(r) {
                 // An error status is a chart that failed to load, not a card
                 // with no history, so it must not read as an empty answer.
-                if (!r.ok) throw new Error('chart ' + r.status);
+                if (!r.ok) {
+                    var err = new Error('chart ' + r.status);
+                    err.status = r.status;
+                    throw err;
+                }
                 return r.json();
             });
+    }
+
+    // chartFailureText is what the drawer says for a failed load: the
+    // server's 429 and 401 each have something the reader can do.
+    function chartFailureText(err) {
+        if (err && err.status === 429) return 'Too many requests, try again in a moment';
+        if (err && err.status === 401) return 'Signed out, log in again to load the chart';
+        return 'Failed to load chart';
     }
 
     function prefetchFullRange(cardId, fullRange) {
@@ -111,7 +123,7 @@
     }
 
     // The wider window can hold stores the drawn one lacks, which shifts where
-    // /api/chart lists the rest, so the lines are rebuilt from it: matched by
+    // /data/chart lists the rest, so the lines are rebuilt from it: matched by
     // position, a line would draw another store's prices.
     function installPrefetched() {
         if (!prefetched || !currentChart) return;
@@ -167,7 +179,7 @@
         return window.getComputedStyle(el).getPropertyValue(name).trim();
     }
 
-    // chartDatasets turns /api/chart's datasets into the chart's lines, one per
+    // chartDatasets turns /data/chart's datasets into the chart's lines, one per
     // store, hiding the stores the viewer hid on this card or an earlier one.
     function chartDatasets(datasets) {
         var hidden = readHiddenVendors();
@@ -419,9 +431,10 @@
                     }
                 })
                 .catch(function(err) {
-                    loading.style.display = 'block';
-                    loading.textContent = 'Failed to load chart';
                     console.error(err);
+                    if (currentCardId !== cardId) return;
+                    loading.style.display = 'block';
+                    loading.textContent = chartFailureText(err);
                 });
         });
     };
