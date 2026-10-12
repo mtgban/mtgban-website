@@ -447,10 +447,18 @@
         };
     }
 
-    // mintStore loads Mint's buylist cart, kept by its session cookie, one
-    // card per call: the call its cart page's quantity picker makes, which
-    // sets the quantity and quietly skips an id Mint does not buy.
+    // mintStore loads Mint's buylist cart, or its store cart on that cart's
+    // page, kept by its session cookie, one card per call: the call each
+    // cart's quantity picker makes, which sets the quantity, trims it to what
+    // Mint wants or has, and quietly skips an id Mint does not take there.
     function mintStore() {
+        var buylist = location.pathname.indexOf("/shopping-cart") !== 0;
+        var retail = /[#&]side=retail(&|$)/.test(location.hash);
+        var cartPage = buylist ? "/buylist-cart" : "/shopping-cart";
+        var call = buylist ?
+            "ajax_buylist_cart_detail&action=update_buy_list_product" :
+            "ajax_shopping_cart&action=update_product";
+        var field = buylist ? "buylist_cart_product_" : "shopping_cart_product_";
         return {
             name: "MTG Mint Card",
             // The header links to the login page only for a guest
@@ -458,11 +466,16 @@
                 return !document.querySelector('a[href$="/login"]');
             },
             maxLines: 0,
+            // A call takes 0.4 to 1 s
             chunkSize: 1,
             cartIDs: async function () {
-                var resp = await fetch("/buylist-cart");
+                // A product id can be both a store row and a buylist one
+                if (retail === buylist) {
+                    throw new Error("This is not the MTG Mint Card cart the list is for. Go back to BAN and press its button again.");
+                }
+                var resp = await fetch(cartPage);
                 if (!resp.ok) {
-                    throw new Error("MTG Mint Card could not read your buylist cart (" + resp.status + ").");
+                    throw new Error("MTG Mint Card could not read your cart (" + resp.status + ").");
                 }
                 var page = await resp.text();
                 var found = [];
@@ -475,9 +488,8 @@
             },
             send: async function (chunk, qty) {
                 for (var i = 0; i < chunk.length; i++) {
-                    var resp = await fetch("/ajax_index.php?ajax_main_page=ajax_buylist_cart_detail" +
-                        "&action=update_buy_list_product&buylist_cart_product_id=" + chunk[i] +
-                        "&buylist_cart_product_qty=" + qty[chunk[i]]);
+                    var resp = await fetch("/ajax_index.php?ajax_main_page=" + call +
+                        "&" + field + "id=" + chunk[i] + "&" + field + "qty=" + qty[chunk[i]]);
                     if (!resp.ok) {
                         throw new Error("MTG Mint Card refused the list (" + resp.status + ").");
                     }

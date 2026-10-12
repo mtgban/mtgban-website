@@ -368,26 +368,30 @@ describe('ban-to-cart bookmarklet on SCG', () => {
     });
 });
 
-// fakeMint stands in for Mint's buylist cart: the cart page names a quantity
-// picker per row, and the picker's call sets a row's quantity and skips an
-// id Mint does not buy, as Mint does.
+// fakeMint stands in for Mint's buylist and store carts: each cart page
+// names a quantity picker per row, and the picker's call sets a row's
+// quantity and skips an id Mint does not take, as Mint does. reads lists
+// the cart pages fetched.
 function fakeMint({cart = {}, unknown = []} = {}) {
     const lines = {...cart};
     const posts = [];
+    const reads = [];
     const fetch = async (url) => {
-        if (url === '/buylist-cart') {
+        if (url === '/buylist-cart' || url === '/shopping-cart') {
+            reads.push(url);
             const fields = Object.keys(lines).map((id) => `<select name="multiple_quantity_${id}"></select>`);
             return {ok: true, status: 200, text: async () => fields.join('')};
         }
         const query = new URLSearchParams(url.split('?')[1]);
-        const id = query.get('buylist_cart_product_id');
-        posts.push({url, action: query.get('action'), id, qty: +query.get('buylist_cart_product_qty')});
+        const field = query.has('buylist_cart_product_id') ? 'buylist_cart_product_' : 'shopping_cart_product_';
+        const id = query.get(field + 'id');
+        posts.push({url, page: query.get('ajax_main_page'), action: query.get('action'), id, qty: +query.get(field + 'qty')});
         if (!unknown.includes(id)) {
-            lines[id] = +query.get('buylist_cart_product_qty');
+            lines[id] = +query.get(field + 'qty');
         }
         return {ok: true, status: 200};
     };
-    return {fetch, posts, lines};
+    return {fetch, posts, lines, reads};
 }
 
 describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
@@ -404,6 +408,7 @@ describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
         expect(alerts[0]).toBe('Loaded 2 cards into your MTG Mint Card cart.');
         expect(page.url).toBe('/buylist-cart');
         expect(page.reloaded).toBe(true);
+        expect(mint.reads).toEqual(['/buylist-cart', '/buylist-cart']);
     });
 
     test('a card already in the cart takes the list\'s quantity', async () => {
@@ -423,6 +428,29 @@ describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
         const {alerts, posts} = await run({...mintPage, hash: '#ban=1:1', abu: fakeMint(), loginLink: true});
         expect(alerts[0]).toContain('Log in to MTG Mint Card first');
         expect(posts).toHaveLength(0);
+    });
+
+    test('a store list goes to the store cart page\'s quantity call', async () => {
+        const mint = fakeMint({cart: {304456: 3}, unknown: ['999']});
+        const {alerts, page, posts} = await run({host: 'www.mtgmintcard.com', path: '/shopping-cart', hash: '#ban=304456%3a1%2c790305%3a2%2c999%3a1&side=retail', abu: mint});
+        expect(posts.map((p) => [p.page, p.action, p.id, p.qty])).toEqual([
+            ['ajax_shopping_cart', 'update_product', '304456', 1],
+            ['ajax_shopping_cart', 'update_product', '790305', 2],
+            ['ajax_shopping_cart', 'update_product', '999', 1],
+        ]);
+        expect(mint.lines).toEqual({304456: 1, 790305: 2});
+        expect(alerts[0]).toBe('Loaded 2 cards into your MTG Mint Card cart. 1 were not taken by MTG Mint Card.');
+        expect(page.url).toBe('/shopping-cart');
+        expect(mint.reads).toEqual(['/shopping-cart', '/shopping-cart']);
+    });
+
+    test('a list on the other side\'s cart page is refused and nothing is sent', async () => {
+        for (const [path, hash] of [['/buylist-cart', '#ban=8137:1&side=retail'], ['/shopping-cart', '#ban=8137:1']]) {
+            const mint = fakeMint();
+            const {alerts} = await run({host: 'www.mtgmintcard.com', path, hash, abu: mint});
+            expect(alerts[0]).toBe('This is not the MTG Mint Card cart the list is for. Go back to BAN and press its button again.');
+            expect(mint.posts).toHaveLength(0);
+        }
     });
 });
 

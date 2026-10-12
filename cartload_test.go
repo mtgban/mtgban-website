@@ -10,8 +10,8 @@ import (
 )
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
-// one item id per condition, CSI's buylist and sealed buylist, SCG's and
-// Mint's buylists, both sides of Strike Zone and Hareruya, and a store the
+// one item id per condition, CSI's buylist and sealed buylist, SCG's
+// buylist, both sides of Mint, Strike Zone and Hareruya, and a store the
 // bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
@@ -42,6 +42,10 @@ func stubCartStores(t *testing.T) {
 	mint := mtgban.BuylistRecord{}
 	mint.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 1, InstanceID: "8137"})
 	mint.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 0.5, InstanceID: "8137"})
+	// and its store sells each condition as its own product
+	mintStock := mtgban.InventoryRecord{}
+	mintStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1.79, InstanceID: "283193"})
+	mintStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 1.29, InstanceID: "663174"})
 	// Strike Zone lists each grade as its own row, under the id its cart's
 	// import takes, one id for buying and selling
 	sz := mtgban.BuylistRecord{}
@@ -97,6 +101,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(ckSealed, mtgban.ScraperInfo{Shorthand: "CKSealed"}),
 		mtgban.NewSellerFromInventory(ckGraded, mtgban.ScraperInfo{Shorthand: "CKGraded"}),
 		mtgban.NewSellerFromInventory(csiStock, mtgban.ScraperInfo{Shorthand: "CSI"}),
+		mtgban.NewSellerFromInventory(mintStock, mtgban.ScraperInfo{Shorthand: "MMC"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -132,6 +137,7 @@ func TestCartRows(t *testing.T) {
 		{"CSISealed", true, "701:1"},
 		{"SCG", true, "SGL-A1:4"},
 		{"MMC", true, "8137:4"},
+		{"MMC", false, "283193:3,663174:1"},
 		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
 		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
 		// Each condition its own class in the store, one class on the buylist
@@ -174,10 +180,6 @@ func TestCartRows(t *testing.T) {
 	if got.Link != "" {
 		t.Errorf("SCG's retail side, which has its own import, got a button: %+v", got)
 	}
-	got = cartLoadFor("MMC", false, entries)
-	if got.Link != "" {
-		t.Errorf("Mint's store side, which is not filled, got a button: %+v", got)
-	}
 }
 
 // A split's button opens the store cart it is for, with its rows in the
@@ -198,6 +200,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"CSI", false, `href="https://www.coolstuffinc.com/main_view_cart.php#ban=434190-10753983:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="CSI"`},
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
+		{"MMC", false, `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
@@ -303,6 +306,16 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	}
 	if !strings.Contains(csi, `class="arb-load-btn builder"`) || !strings.Contains(csi, ">Deck builder at CSI<") {
 		t.Error("CSI's deck builder button is not told apart from its cart's")
+	}
+
+	mint := renderArbit(t, PageVars{
+		ScraperShort: "MMC",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: rows}},
+	})
+	mintBuy := `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card" data-buylist="false"`
+	if !strings.Contains(mint, mintBuy) || !strings.Contains(mint, sell) {
+		t.Errorf("buying at Mint: want its store cart button with %s, and CSI's buylist one", mintBuy)
 	}
 
 	page := renderArbit(t, reversePageVars())
@@ -469,6 +482,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 		want    string
 	}{
 		{"MMC", true, "https://www.mtgmintcard.com/buylist-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
+		{"MMC", false, "https://www.mtgmintcard.com/shopping-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
 		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="},
 		// A store with no affiliate query keeps its plain page

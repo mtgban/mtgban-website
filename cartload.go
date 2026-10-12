@@ -20,15 +20,15 @@ import (
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
 // keyed by the prefix their splits' shorthands share, with the page each
 // side's button opens. An empty page gets no button: SCG's retail side and
-// CK's buylist have their own imports on the upload page, and Mint's store
-// cart is not filled. SCG's page is its CSV uploads, where the bookmarklet
-// hands SCG the list to match. Strike Zone buys and sells through one cart
-// page, so a retail link also says side=retail.
+// CK's buylist have their own imports on the upload page. SCG's page is its
+// CSV uploads, where the bookmarklet hands SCG the list to match. Strike Zone
+// buys and sells through one cart page, so a retail link also says
+// side=retail.
 var cartStores = []cartStore{
 	{"ABU", "ABU", "https://abugames.com/cartview/buylist", "https://abugames.com/cartview/shop"},
 	{"CSI", "CSI", "https://www.coolstuffinc.com/buylist_cart.php", "https://www.coolstuffinc.com/main_view_cart.php"},
 	{"SCG", "SCG", "https://sellyourcards.starcitygames.com/mtg/uploads", ""},
-	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", ""},
+	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", "https://www.mtgmintcard.com/shopping-cart"},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
 	{"HA", "Hareruya", "https://www.hareruyamtg.com/ja/purchase/cart", "https://www.hareruyamtg.com/en/cart"},
 	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
