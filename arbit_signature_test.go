@@ -85,13 +85,13 @@ func TestEnforceSigningHandsOnTheSignatureItChecked(t *testing.T) {
 	}
 
 	// Any handler behind it, whichever getter it reads, sees the ?sig= that
-	// was checked: /api/prices/ reads its blocklists with no check of its own.
+	// was checked: /data/prices/ reads its blocklists with no check of its own.
 	query := sign()
 	var seen string
-	plain := enforceSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	plain := enforceDataSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = unverifiedSignature(r)
 	}))
-	serve(plain, "/api/prices/", query, forge("SearchDisabled", "NONE"))
+	serve(plain, "/data/prices/", query, forge("SearchDisabled", "NONE"))
 	if seen != query {
 		t.Error("the handler behind enforceSigning read the forged cookie, not the checked ?sig=")
 	}

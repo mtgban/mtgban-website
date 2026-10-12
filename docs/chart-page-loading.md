@@ -49,7 +49,7 @@ is the common case for anything not recently viewed.
 1. **The requested range reaches the query.** It used to read the tier's
    maximum and trim the axis afterwards, so `?range=30` read six years.
 2. **The page renders the window it draws and widens through
-   `/api/chart`**, which carries an hour of cache the per-viewer search
+   `/data/chart`**, which carries an hour of cache the per-viewer search
    page cannot. 207KB to 9.2KB on the measured card.
 3. **A roster's cards are read together.** Ten cards: 848ms serial, 301ms
    concurrent, bounded so one roster cannot take the whole pool.
@@ -64,7 +64,7 @@ fetching the rest. Narrowing rosters belongs in their default range.
 A window with no prices in it renders the whole span instead. A retired
 printing, or a product no longer priced, has history only further back,
 and hiding its chart would also hide the select that widens it. The
-mobile drawer does the same, with a second request to `/api/chart`.
+mobile drawer does the same, with a second request to `/data/chart`.
 
 ## Still open
 

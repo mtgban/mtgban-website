@@ -16,7 +16,7 @@ import (
 // These are not assertions, they are measurements: run with -v to print the
 // table that sizes the payload against what the chart actually shows on load
 // (the dateRange select defaults to 180 days for a single-card chart). The page
-// now renders only that window and fetches wider ones through /api/chart, so
+// now renders only that window and fetches wider ones through /data/chart, so
 // the rows past 180 days are what a widened chart costs, not what every chart
 // page costs.
 

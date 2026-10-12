@@ -355,8 +355,10 @@ function applyRangeWindow(rangeDays) {
 // the select to it, where picking the range again retries, and says so.
 function drawRange(rangeDays) {
     return function(err) {
-        document.getElementById('chartRangeFailed').hidden = !err;
+        var failed = document.getElementById('chartRangeFailed');
+        failed.hidden = !err;
         if (err) {
+            failed.textContent = chartRangeFailureText(err);
             rangeDays = chartRange.loadedDays;
             document.getElementById('dateRange').value = String(rangeDays);
         }

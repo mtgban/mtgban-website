@@ -367,16 +367,17 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 |---|---|---|
 | `noSigning` | Home, Guide, Privacy, Offline page, suggest/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
 | `enforceSigning` | All feature pages, user APIs | Validates signature, expiry, per-page flag; 3 req/s per user email, or per invite signature once checked; POST only when `NavElem.CanPOST` |
+| `enforceDataSigning` | `/data/*`, what the site's own scripts fetch (`/data/chart/`, `/data/prices/`) | The same checks as `enforceSigning`; a refusal is a JSON error with 429 or 401 the script can test, not the error page |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/v2/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET`; refusals are JSON errors with 401, 429 or 503 |
 
-Static assets (`/css/`, `/js/`, `/img/`, `/openapi/`) go through none of these three —
+Static assets (`/css/`, `/js/`, `/img/`, `/openapi/`) go through none of these four —
 they're registered directly on `ServeFile` with no wrapper.
 
 `/api/load/datastore` instead uses its own HMAC-SHA256 scheme (`verify()` in
 api.go) over the request body with `X-Signature`/`X-Timestamp` headers,
 rejecting any timestamp more than 60s old.
 
-A fourth wrapper, `adminOnly`, composes behind `enforceSigning` on the
+A fifth wrapper, `adminOnly`, composes behind `enforceSigning` on the
 `/debug` pprof handler: it 404s (not 401s, so the endpoint's existence isn't
 advertised) unless the signature carries the `Admin` grant.
 
@@ -635,7 +636,7 @@ accepts `ban:<n>`, `tcg:<n>`, `scryfall:<uuid>`, `mtgjson:<uuid>`, or a bare
 id, and non-Magic cards chart correctly. Lookback
 is per-request, not a fixed per-tier table: `chartLookback()` reads days from
 the signed `SearchChartLoopback` ACL param, defaulting to 30 days when
-absent/invalid, and 3650 days in dev mode without `-sig`. `/api/chart/{id}`
+absent/invalid, and 3650 days in dev mode without `-sig`. `/data/chart/{id}`
 (`ChartDataAPI`) returns Chart.js-ready datasets plus checkpoint annotations
 for any id form above.
 
@@ -659,7 +660,7 @@ live sellers/vendors minus blocklists at request time — or `DEV_ACCESS`) and
 by those exact names; it keeps the sealed dump and per-set or per-card
 requests. An unknown dump name answers "Not found". A `/sealed/` search
 needs the `sealed` mode as the sealed dump does. Other user APIs: `/api/tcgplayer/decklist`,
-`/api/cardmarket/decklist` (CSV exports keyed to store SKUs), `/api/prices`
+`/api/cardmarket/decklist` (CSV exports keyed to store SKUs), `/data/prices/{ids}`
 (`BatchPricesAPI`, batch best-retail/best-buylist for ≤50 ids),
 `/api/palette/*` (public metadata for the command palette), and
 `/api/mtgban/search/` (shares `SearchAPI` with `/api/search/`).

@@ -652,8 +652,45 @@ func targetsSubPage(r *http.Request, link string) bool {
 }
 
 // enforceSigning takes the site because it builds the nav (genPageNav) and
-// checks ShouldHide, both of which read the site's current datastore.
+// checks ShouldHide, both of which read the site's current datastore. A
+// refusal renders the error page.
 func enforceSigning(s *site, next http.Handler) http.Handler {
+	return signing(s, next, false)
+}
+
+// enforceDataSigning checks what enforceSigning checks, for /data/, which
+// only the site's own scripts read: a refusal is a status and a JSON error
+// the script can test, not a page served with 200.
+func enforceDataSigning(s *site, next http.Handler) http.Handler {
+	return signing(s, next, true)
+}
+
+// signingRefusal is why signing turned a request away.
+type signingRefusal struct {
+	status int
+	title  string
+	msg    string
+	login  bool
+}
+
+// write answers the refused request: the JSON error for a script, the error
+// page for a reader.
+func (ref signingRefusal) write(w http.ResponseWriter, r *http.Request, s *site, sig string, script bool) {
+	if script {
+		errorResponse(w, ref.status, ref.msg)
+		return
+	}
+	pageVars := genPageNav(s, r, "Error", sig)
+	pageVars.Title = ref.title
+	pageVars.ErrorMessage = ref.msg
+	// genPageNav already offers it to a reader with no signature
+	if ref.login {
+		pageVars.PatreonLogin = true
+	}
+	render(w, "home.html", pageVars)
+}
+
+func signing(s *site, next http.Handler, script bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
@@ -723,37 +760,27 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 			}
 		}
 		if !UserRateLimiter.Allow(limitKey) && r.URL.Path != "/admin" {
-			pageVars := genPageNav(s, r, "Error", sig)
-			pageVars.Title = "Too Many Requests"
-			pageVars.ErrorMessage = ErrMsgUseAPI
-
-			render(w, "home.html", pageVars)
+			signingRefusal{status: http.StatusTooManyRequests, title: "Too Many Requests", msg: ErrMsgUseAPI}.write(w, r, s, sig, script)
 			return
 		}
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
-			pageVars := genPageNav(s, r, "Error", sig)
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
+			ref := signingRefusal{status: http.StatusUnauthorized, title: "Unauthorized", msg: ErrMsg}
 			if DevMode {
-				pageVars.ErrorMessage += " - " + err.Error()
+				ref.msg += " - " + err.Error()
 			}
-
-			render(w, "home.html", pageVars)
+			ref.write(w, r, s, sig, script)
 			return
 		}
 
 		v, err := url.ParseQuery(string(raw))
 		if SigCheck && err != nil {
-			pageVars := genPageNav(s, r, "Error", sig)
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
+			ref := signingRefusal{status: http.StatusUnauthorized, title: "Unauthorized", msg: ErrMsg}
 			if DevMode {
-				pageVars.ErrorMessage += " - " + err.Error()
+				ref.msg += " - " + err.Error()
 			}
-
-			render(w, "home.html", pageVars)
+			ref.write(w, r, s, sig, script)
 			return
 		}
 
@@ -778,26 +805,24 @@ func enforceSigning(s *site, next http.Handler) http.Handler {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
 			}
-			pageVars := genPageNav(s, r, "Error", sig)
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
+			ref := signingRefusal{status: http.StatusUnauthorized, title: "Unauthorized", msg: ErrMsg}
 			if signed && expires < time.Now().Unix() {
-				pageVars.ErrorMessage = ErrMsgExpired
-				pageVars.PatreonLogin = true
+				ref.msg = ErrMsgExpired
+				ref.login = true
 				if DevMode {
-					pageVars.ErrorMessage += " - sig expired"
+					ref.msg += " - sig expired"
 				}
 			}
 
 			if DevMode {
 				if err != nil {
-					pageVars.ErrorMessage += " - " + err.Error()
+					ref.msg += " - " + err.Error()
 				} else {
-					pageVars.ErrorMessage += " - wrong host"
+					ref.msg += " - wrong host"
 				}
 			}
 
-			render(w, "home.html", pageVars)
+			ref.write(w, r, s, sig, script)
 			return
 		}
 

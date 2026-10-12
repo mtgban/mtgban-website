@@ -27,7 +27,8 @@ func TestRecordablePath(t *testing.T) {
 		{"/api/tcgplayer/decklist/12345", false},
 		{"/api/cardmarket/foo", false},
 		{"/api/search/", false},
-		{"/api/prices/", false},
+		{"/data/prices/", false},
+		{"/data/chart/ban:1", false},
 	}
 	for _, c := range cases {
 		if got := recordablePath(c.path); got != c.want {

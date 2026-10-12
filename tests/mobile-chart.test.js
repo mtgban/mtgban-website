@@ -7,9 +7,9 @@ const cookies = readFileSync(join(import.meta.dir, '..', 'js', 'cookies.js'), 'u
 
 // openDrawer evaluates mobile-chart.js against a stubbed page, opens the chart
 // drawer on one card, and reports every url it fetched, every chart it drew and
-// every error it logged. answer(range) is what /api/chart sends back for that
-// range, with a status of its own when it is not a 200. cookie is the page's
-// cookie as the drawer opens.
+// every error it logged. answer(range, url) is what /data/chart sends back for
+// that range, or a promise of it, with a status of its own when it is not a
+// 200. cookie is the page's cookie as the drawer opens.
 async function openDrawer(answer, cookie = '') {
     const calls = [];
     const charts = [];
@@ -64,9 +64,10 @@ async function openDrawer(answer, cookie = '') {
     Chart.prototype.resetZoom = () => {};
     const fetch = (url) => {
         calls.push(url);
-        const reply = answer(Number(url.split('?range=')[1]));
-        const status = reply.status || 200;
-        return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(reply) });
+        return Promise.resolve(answer(Number(url.split('?range=')[1]), url)).then((reply) => {
+            const status = reply.status || 200;
+            return { ok: status < 400, status, json: () => Promise.resolve(reply) };
+        });
     };
     const localStorage = { getItem: () => null, setItem() {} };
     const console = { error: (err) => errors.push(err) };
@@ -92,10 +93,10 @@ const priced = (range) => ({
     axisLabels: ['2024-01-02', '2024-01-01'],
     datasets: [{ name: 'TCG Low', data: [2, null], color: 'rgb(1, 2, 3)' }],
 });
-// What /api/chart sends when the archive answered for no card.
+// What /data/chart sends when the archive answered for no card.
 const unavailable = () => ({ status: 503, error: 'charts not available' });
 
-// days lists n daily labels, newest first, the way /api/chart sends its axis.
+// days lists n daily labels, newest first, the way /data/chart sends its axis.
 function days(n) {
     const today = Date.UTC(2026, 8, 25);
     return Array.from({ length: n }, (_, i) => new Date(today - i * 86400000).toISOString().slice(0, 10));
@@ -111,7 +112,7 @@ const daily = (range) => ({
 test('an empty first window asks for all the tier allows, and draws that', async () => {
     const { calls, charts, errors, loading } = await openDrawer((range) => range === 3650 ? priced(range) : empty(range));
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650']);
     expect(charts.length).toBe(1);
     expect(charts[0].drawnFrom).toEqual(['2024-01-02', '2024-01-01']);
     expect(loading.style.display).toBe('none');
@@ -122,7 +123,7 @@ test('a first window with prices is drawn, and the rest prefetched', async () =>
     const first = { ...priced(180), axisLabels: ['2026-09-25'], datasets: [{ name: 'TCG Low', data: [3] }] };
     const { calls, charts, errors } = await openDrawer((range) => range === 180 ? first : priced(range));
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650']);
     expect(charts.length).toBe(1);
     expect(charts[0].drawnFrom).toEqual(['2026-09-25']);
     expect(errors).toEqual([]);
@@ -131,7 +132,7 @@ test('a first window with prices is drawn, and the rest prefetched', async () =>
 test('a card with no prices at all still says so', async () => {
     const { calls, charts, errors, loading } = await openDrawer(empty);
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650']);
     expect(charts.length).toBe(0);
     expect(loading.textContent).toBe('No chart data available');
     expect(errors).toEqual([]);
@@ -140,7 +141,7 @@ test('a card with no prices at all still says so', async () => {
 test('a window that is already the ceiling is not asked for twice', async () => {
     const { calls, errors, loading } = await openDrawer((range) => ({ ...empty(range), maxLookbackDays: 180 }));
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180']);
     expect(loading.textContent).toBe('No chart data available');
     expect(errors).toEqual([]);
 });
@@ -148,16 +149,39 @@ test('a window that is already the ceiling is not asked for twice', async () => 
 test('an archive that does not answer is a failure, and is not asked for more', async () => {
     const { calls, charts, errors, loading } = await openDrawer(unavailable);
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180']);
     expect(charts.length).toBe(0);
     expect(loading.textContent).toBe('Failed to load chart');
     expect(errors.length).toBe(1);
 });
 
+test('a refused load says what the reader can do about it', async () => {
+    const limited = await openDrawer(() => ({ status: 429, error: 'slow down' }));
+    expect(limited.loading.textContent).toBe('Too many requests, try again in a moment');
+
+    const signedOut = await openDrawer(() => ({ status: 401, error: 'unauthorized' }));
+    expect(signedOut.loading.textContent).toBe('Signed out, log in again to load the chart');
+});
+
+test('a failure for a card no longer shown leaves the newer card alone', async () => {
+    let refuseFirst;
+    const late = new Promise((done) => { refuseFirst = () => done({ status: 429, error: 'slow down' }); });
+    const { window, charts, loading } = await openDrawer((range, url) => url.includes('ban%3A1') ? late : priced(range));
+
+    window.showChartDrawer('ban:2', false, 'Mox Pearl');
+    await new Promise((done) => setTimeout(done, 0));
+    refuseFirst();
+    await new Promise((done) => setTimeout(done, 0));
+
+    expect(charts.length).toBe(1);
+    expect(loading.style.display).toBe('none');
+    expect(loading.textContent).not.toBe('Too many requests, try again in a moment');
+});
+
 test('an empty window whose wider read fails says it failed', async () => {
     const { calls, loading } = await openDrawer((range) => range === 3650 ? unavailable() : empty(range));
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650']);
     expect(loading.textContent).toBe('Failed to load chart');
 });
 
@@ -168,13 +192,13 @@ test('a prefetch that fails is asked again when the range widens', async () => {
     window.changeChartRange(365);
     await new Promise((done) => setTimeout(done, 0));
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650', '/api/chart/ban%3A1?range=365']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650', '/data/chart/ban%3A1?range=365']);
 });
 
 test('the prefetched ceiling is not drawn over the range the select names', async () => {
     const { calls, charts, errors, select } = await openDrawer(daily);
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650']);
     expect(select.value).toBe('180');
     expect(charts[0].data.labels).toEqual(days(180));
     expect(charts[0].options.scales.x.min).toBeUndefined();
@@ -231,13 +255,13 @@ test('an empty wider answer is a failed widening too', async () => {
     window.changeChartRange(730);
     await new Promise((done) => setTimeout(done, 0));
 
-    expect(calls).toEqual(['/api/chart/ban%3A1?range=180', '/api/chart/ban%3A1?range=3650', '/api/chart/ban%3A1?range=730']);
+    expect(calls).toEqual(['/data/chart/ban%3A1?range=180', '/data/chart/ban%3A1?range=3650', '/data/chart/ban%3A1?range=730']);
     expect(charts[0].data.labels).toEqual(days(180));
     expect(rangeFailed.hidden).toBe(false);
     expect(select.value).toBe('180');
 });
 
-// Three stores in the order /api/chart lists them, each at a price of its own,
+// Three stores in the order /data/chart lists them, each at a price of its own,
 // so a line that draws another store's prices shows it.
 const LOW = { name: 'TCGplayer Low', price: 1, color: 'rgb(1, 0, 0)' };
 const MARKET = { name: 'TCGplayer Market', price: 2, color: 'rgb(2, 0, 0)' };
@@ -293,7 +317,7 @@ test('a store only the wider window holds joins the chart and its legend', async
     expect(errors).toEqual([]);
 });
 
-// /api/chart lists stores in registry order, so one only the wider window holds
+// /data/chart lists stores in registry order, so one only the wider window holds
 // can sort ahead of a store the chart already draws and move it down the list.
 test('each line keeps its own store when a new one sorts ahead of it', async () => {
     const { charts, legend, window } = await openDrawer(firstThen(pricedBy(LOW, BUYLIST), pricedBy(LOW, MARKET, BUYLIST)));

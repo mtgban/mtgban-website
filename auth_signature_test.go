@@ -203,3 +203,92 @@ func TestTheUnconfirmedFlagIsSigned(t *testing.T) {
 		t.Errorf("flagged signature verifies: %v, with the flag deleted: %v", flaggedOK, strippedOK)
 	}
 }
+
+// A /data/ route answers a refusal with a status and a JSON error a script
+// can test; a page given the same refusal renders the error page.
+func TestEnforceDataSigningRefusesWithAStatus(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	reached := ""
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = r.URL.Path
+	})
+	serve := func(h http.Handler, target string) *httptest.ResponseRecorder {
+		reached = ""
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+		return rec
+	}
+	data, page := enforceDataSigning(testSite, next), enforceSigning(testSite, next)
+	expired := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(-time.Hour)))
+
+	UserRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	for _, tc := range []struct {
+		target, body string
+	}{
+		{"/data/chart/ban:1", ErrMsg},
+		{"/data/chart/ban:1?sig=" + expired, "logged out"},
+		{"/data/prices/x?sig=not-base64!", ErrMsg},
+	} {
+		rec := serve(data, tc.target)
+		if rec.Code != http.StatusUnauthorized || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") || !strings.Contains(rec.Body.String(), tc.body) || reached != "" {
+			t.Errorf("%s: %d %q %q, reached %q; want 401 and a JSON error", tc.target, rec.Code, rec.Header().Get("Content-Type"), rec.Body.String(), reached)
+		}
+	}
+	rec := serve(page, "/search?sig="+expired)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), html.EscapeString(ErrMsgExpired)) || reached != "" {
+		t.Errorf("an expired page = %d, want the logged-out page", rec.Code)
+	}
+
+	UserRateLimiter = ratelimit.NewLimiter(0, 0)
+	rec = serve(data, "/data/chart/ban:1")
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), `"error"`) {
+		t.Errorf("a limited chart ask = %d %q, want 429 and a JSON error", rec.Code, rec.Body.String())
+	}
+	rec = serve(page, "/search")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Too Many Requests") {
+		t.Errorf("a limited page = %d, want the error page", rec.Code)
+	}
+}
+
+// A refused reader with no signature keeps the login button genPageNav gives
+// them, whether the signature is missing or the rate limit ran out.
+func TestAnUnsignedRefusalOffersTheLogin(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	page := enforceSigning(testSite, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	for name, limiter := range map[string]*ratelimit.Limiter{
+		"unsigned":     ratelimit.NewLimiter(1000, 1000),
+		"rate limited": ratelimit.NewLimiter(0, 0),
+	} {
+		UserRateLimiter = limiter
+		rec := httptest.NewRecorder()
+		page.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://mtgban.com/search", nil))
+		body := rec.Body.String()
+		if !strings.Contains(body, "Log in") || strings.Contains(body, "Logout") {
+			t.Errorf("%s: the refusal page offers no login", name)
+		}
+	}
+}
+
+// Every route under /data/ is behind the one wrapper, a path it does not
+// serve included, so none of them answers a refusal with the error page.
+func TestEveryDataRouteRefusesWithAStatus(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	UserRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	h := enforceDataSigning(testSite, testSite.dataRoutes())
+	expired := url.QueryEscape(signedAs(t, url.Values{"UserEmail": {"sub@example.com"}}, time.Now().Add(-time.Hour)))
+
+	for _, p := range []string{"/data/chart/x", "/data/prices/x", "/data/unknown"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://mtgban.com"+p+"?sig="+expired, nil))
+		if rec.Code != http.StatusUnauthorized || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
+			t.Errorf("%s: %d %q, want 401 and a JSON error", p, rec.Code, rec.Header().Get("Content-Type"))
+		}
+	}
+}
