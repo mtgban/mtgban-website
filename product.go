@@ -957,7 +957,7 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 
 	var datasetIndex int
 	var found bool
-	for _, config := range Config().TimeseriesConfig.Datasets {
+	for _, config := range Datasets() {
 		if slices.Contains(config.Buylist, store) {
 			datasetIndex = config.Index
 			found = true

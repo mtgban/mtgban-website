@@ -59,7 +59,7 @@ func longFormWrites() bool {
 // the config. Used by the read callers (aggregate stats, movers) that still take
 // an index. Returns false if no dataset carries that index or its provider is unset.
 func providerForDatasetIndex(index int) (int16, bool) {
-	for _, c := range Config().TimeseriesConfig.Datasets {
+	for _, c := range Datasets() {
 		if c.Index == index {
 			return c.Provider, c.Provider != 0
 		}
@@ -200,16 +200,17 @@ func chartProviders() []providerDisplay {
 	return *registry
 }
 
-// buildProviderRegistry (re)builds providerRegistry from the loaded config. Call
-// it once after the config is parsed. Nothing is substituted for a dataset the
+// buildProviderRegistry (re)builds providerRegistry from the loaded datasets:
+// finishConfig calls it for the config's own, loadDatasets for a file's. Nothing is substituted for a dataset the
 // config leaves incomplete: a missing provider id can't be matched against a
 // price row, so it is logged and skipped, and a config that sets none at all
 // leaves the registry empty rather than charting a display the config never
 // asked for.
 func buildProviderRegistry() {
 	seen := map[int16]bool{}
-	registry := make([]providerDisplay, 0, len(Config().TimeseriesConfig.Datasets))
-	for _, d := range Config().TimeseriesConfig.Datasets {
+	datasets := Datasets()
+	registry := make([]providerDisplay, 0, len(datasets))
+	for _, d := range datasets {
 		if d.Provider == 0 {
 			log.Printf("dataset %q (index %d) has no \"provider\" id in the config: it won't chart, dual-write, or screen",
 				d.PublicName, d.Index)
@@ -223,7 +224,7 @@ func buildProviderRegistry() {
 		registry = append(registry, providerDisplay{d.Provider, d.PublicName, d.Color})
 	}
 	if len(registry) == 0 {
-		log.Println("no chart providers configured: every timeseries_config.datasets entry needs a \"provider\" id")
+		log.Println("no chart providers configured: every dataset needs a \"provider\" id")
 	}
 	providerRegistry.Store(&registry)
 }
@@ -620,7 +621,7 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 		if Sessions.Is(sessionstore.Retail, seller.Info().Shorthand) {
 			continue
 		}
-		for _, config := range Config().TimeseriesConfig.Datasets {
+		for _, config := range Datasets() {
 			if !slices.Contains(config.Retail, seller.Info().Shorthand) {
 				continue
 			}
@@ -657,7 +658,7 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 		if Sessions.Is(sessionstore.Buylist, vendor.Info().Shorthand) {
 			continue
 		}
-		for _, config := range Config().TimeseriesConfig.Datasets {
+		for _, config := range Datasets() {
 			if !slices.Contains(config.Buylist, vendor.Info().Shorthand) {
 				continue
 			}
@@ -1106,7 +1107,7 @@ func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.Price
 			log.Println("long-form: resolve ban_id:", err)
 			continue
 		}
-		for _, ds := range Config().TimeseriesConfig.Datasets {
+		for _, ds := range Datasets() {
 			if ds.Provider == 0 {
 				continue
 			}
