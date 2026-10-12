@@ -1313,7 +1313,7 @@
     flex-wrap: wrap;
     gap: 8px;
     /* Extra left padding hosts the absolutely-positioned section nav */
-    padding: 12px 16px 12px 43px;
+    padding: 8px 16px 8px 43px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border-subtle);
     position: relative;
@@ -1360,6 +1360,8 @@
     cursor: pointer;
     font-family: inherit;
     transition: all 0.12s;
+    /* Its padding takes up room, so a wrapped row of buttons clears the one above */
+    display: inline-block;
 }
 .opt-btn.load { background: rgba(63,185,80,0.12); color: var(--asuccess); border: 1px solid rgba(63,185,80,0.2); }
 .opt-btn.load:hover { background: rgba(63,185,80,0.22); }
