@@ -186,7 +186,7 @@ func TestScopeAloneThatFindsNothingSaysSo(t *testing.T) {
 
 // The parser is handed an empty query by both bars now - the search page when
 // the pinned bar is doing the searching, and the export links the results page
-// builds, which carry the query in the path and so name /api/search/retail/.csv
+// builds, which carry the query in the path and so name /search/export/retail/.csv
 // when there is none. It indexed the last byte before checking there was one.
 func TestParseEmptyQueryIsNotACrash(t *testing.T) {
 	for _, tc := range []struct {

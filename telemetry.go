@@ -13,10 +13,16 @@ import (
 var observabilityInstance string
 
 // recordablePath reports whether a request path should produce a telemetry
-// event. The API and the scripts' /data/ are excluded: some are signed like
-// pages but carry high-cardinality ids that must not enter the usage tables.
+// event. The API, the scripts' /data/ and the downloads under /search/ are
+// excluded: some are signed like pages but carry high-cardinality ids that
+// must not enter the usage tables.
 func recordablePath(urlPath string) bool {
-	return !strings.HasPrefix(urlPath, "/api/") && !strings.HasPrefix(urlPath, "/data/")
+	for _, prefix := range []string{"/api/", "/data/", "/search/"} {
+		if strings.HasPrefix(urlPath, prefix) {
+			return false
+		}
+	}
+	return true
 }
 
 // recordPageHit emits one telemetry event for a served gated request. It is a

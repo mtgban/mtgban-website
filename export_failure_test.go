@@ -55,7 +55,7 @@ func TestFailedExportIsNotADownload(t *testing.T) {
 		{"upload TCG tag", testSite.Upload, post(url.Values{
 			"tag": {"TCG"}, "TCGhashes": {card}, "TCGhashesQtys": {"1"}, "TCGhashesCond": {"NM"}})},
 		{"tcgplayer decklist", testSite.TCGHandler,
-			httptest.NewRequest(http.MethodGet, "/api/tcgplayer/decklist/"+decklist, nil)},
+			httptest.NewRequest(http.MethodGet, "/search/decklist/tcgplayer/"+decklist, nil)},
 	} {
 		rec := httptest.NewRecorder()
 		c.handler(rec, c.req)

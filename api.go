@@ -64,50 +64,28 @@ func getDecklist(b *mtgmatcher.Backend, uuid string) ([]string, error) {
 	return sealed.ProductDecklist(b, co.SetCode, co.UUID)
 }
 
+// TCGHandler serves a card's sealed product decklist as a TCGplayer CSV.
 func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 
-	isDecklist := strings.Contains(r.URL.Path, "decklist")
-
-	cardID := r.URL.Path
-	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/decklist/")
-
-	var data any
-	var err error
-	var useCSV bool
-	if isDecklist {
-		UserNotify("tcgDecklist", cardID)
-		data, err = getDecklist(b, cardID)
-		useCSV = true
-	} else {
-		err = errors.New("invalid endpoint")
-	}
+	cardID := strings.TrimPrefix(r.URL.Path, "/search/decklist/tcgplayer/")
+	UserNotify("tcgDecklist", cardID)
+	data, err := getDecklist(b, cardID)
 	if err != nil {
 		log.Println(err)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if useCSV {
-		co, _ := b.GetUUID(cardID)
-		setCSVDownloadHeaders(w, co.Name+".csv")
+	co, _ := b.GetUUID(cardID)
+	setCSVDownloadHeaders(w, co.Name+".csv")
 
-		csvWriter := csv.NewWriter(w)
-		err = UUID2TCGCSV(b, csvWriter, data.([]string), nil, nil)
-		if err != nil {
-			dropDownloadHeaders(w)
-			errorResponse(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		return
-	}
-
-	err = json.NewEncoder(w).Encode(data)
+	csvWriter := csv.NewWriter(w)
+	err = UUID2TCGCSV(b, csvWriter, data, nil, nil)
 	if err != nil {
-		log.Println(err)
+		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
-		return
 	}
 }
 
@@ -378,50 +356,28 @@ func UUID2TCGCSV(b *mtgmatcher.Backend, w *csv.Writer, ids, qtys, conds []string
 	return nil
 }
 
+// MKMHandler serves a card's sealed product decklist as a Cardmarket CSV.
 func (s *site) MKMHandler(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 
-	isDecklist := strings.Contains(r.URL.Path, "decklist")
-
-	cardID := r.URL.Path
-	cardID = strings.TrimPrefix(cardID, "/api/cardmarket/decklist/")
-
-	var data any
-	var err error
-	var useCSV bool
-	if isDecklist {
-		UserNotify("mkmDecklist", cardID)
-		data, err = getDecklist(b, cardID)
-		useCSV = true
-	} else {
-		err = errors.New("invalid endpoint")
-	}
+	cardID := strings.TrimPrefix(r.URL.Path, "/search/decklist/cardmarket/")
+	UserNotify("mkmDecklist", cardID)
+	data, err := getDecklist(b, cardID)
 	if err != nil {
 		log.Println(err)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if useCSV {
-		co, _ := b.GetUUID(cardID)
-		setCSVDownloadHeaders(w, co.Name+".csv")
+	co, _ := b.GetUUID(cardID)
+	setCSVDownloadHeaders(w, co.Name+".csv")
 
-		csvWriter := csv.NewWriter(w)
-		err = UUID2MKMCSV(b, csvWriter, data.([]string), nil, nil)
-		if err != nil {
-			dropDownloadHeaders(w)
-			errorResponse(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		return
-	}
-
-	err = json.NewEncoder(w).Encode(data)
+	csvWriter := csv.NewWriter(w)
+	err = UUID2MKMCSV(b, csvWriter, data, nil, nil)
 	if err != nil {
-		log.Println(err)
+		dropDownloadHeaders(w)
 		errorResponse(w, http.StatusInternalServerError, err.Error())
-		return
 	}
 }
 
@@ -630,12 +586,9 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	isAPI := isV2 || strings.HasPrefix(r.URL.Path, "/api/mtgban/search/")
 	isV2JSON := isV2 && isJSON
 
-	// Only allow JSON from a different (protected) endpoint
-	if isJSON && !isAPI {
-		pageVars := genPageNav(s, r, "Error", sig)
-		pageVars.Title = "Unauthorized"
-		pageVars.ErrorMessage = "Invalid endpoint for JSON"
-		render(w, "home.html", pageVars)
+	// The site's own exports are CSV; JSON is the API's
+	if !isAPI && !isCSV {
+		http.NotFound(w, r)
 		return
 	}
 

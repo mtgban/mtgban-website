@@ -29,13 +29,13 @@ func TestSitesServeIndependentDatastores(t *testing.T) {
 
 	t.Run("RawCardAPI", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		siteA.RawCardAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgmatcher/raw/FIXTUREA-1", nil))
+		siteA.RawCardAPI(rec, httptest.NewRequest(http.MethodGet, "/search/raw/FIXTUREA-1", nil))
 		if rec.Code != http.StatusOK {
 			t.Errorf("site A for its own card FIXTUREA-1 = %d, want %d", rec.Code, http.StatusOK)
 		}
 
 		rec = httptest.NewRecorder()
-		siteB.RawCardAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgmatcher/raw/FIXTUREA-1", nil))
+		siteB.RawCardAPI(rec, httptest.NewRequest(http.MethodGet, "/search/raw/FIXTUREA-1", nil))
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("site B for site A's card FIXTUREA-1 = %d, want %d", rec.Code, http.StatusNotFound)
 		}
@@ -138,7 +138,7 @@ func TestSiteDoesNotPinAReplacedDatastore(t *testing.T) {
 // exerciseSite serves a card, a suggestion, the palette sets and an offline
 // manifest refresh from the site's current datastore.
 func exerciseSite(s *site, cardID, name string) {
-	s.RawCardAPI(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/mtgmatcher/raw/"+cardID, nil))
+	s.RawCardAPI(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/search/raw/"+cardID, nil))
 	s.SuggestAPI(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/suggest?q="+url.QueryEscape(name), nil))
 	s.palette.Sets(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 	s.offline.RefreshManifest()
@@ -178,7 +178,7 @@ func TestSiteConcurrentPublishAndReadDontRace(t *testing.T) {
 		wg.Go(func() {
 			for time.Now().Before(deadline) {
 				rec := httptest.NewRecorder()
-				s.RawCardAPI(rec, httptest.NewRequest(http.MethodGet, "/api/mtgmatcher/raw/FIXTUREA-1", nil))
+				s.RawCardAPI(rec, httptest.NewRequest(http.MethodGet, "/search/raw/FIXTUREA-1", nil))
 
 				rec = httptest.NewRecorder()
 				s.SuggestAPI(rec, httptest.NewRequest(http.MethodGet, "/api/suggest?q=Fixture", nil))

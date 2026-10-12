@@ -255,7 +255,7 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 
 	// The site's own export is not a key, and keeps every store it shows.
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
-	req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(name)+".csv", nil)
+	req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(name)+".csv", nil)
 	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 	rec := httptest.NewRecorder()
 	testSite.SearchAPI(rec, req)
@@ -287,7 +287,7 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query, sortMode, saved string) []string {
-		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(query)+".csv?id=mtgjson&sort="+sortMode, nil)
+		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(query)+".csv?id=mtgjson&sort="+sortMode, nil)
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 		if saved != "" {
 			req.AddCookie(&http.Cookie{Name: "SearchDefaultSort", Value: saved})
@@ -348,7 +348,7 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query string) []string {
-		req := httptest.NewRequest(http.MethodGet, "/api/search/retail/"+url.PathEscape(query)+".csv?id=mtgjson", nil)
+		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(query)+".csv?id=mtgjson", nil)
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 		rec := httptest.NewRecorder()
 		testSite.SearchAPI(rec, req)
@@ -366,5 +366,14 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 	}
 	if got := exported("Counterspell skip:empty"); len(got) != len(priced) {
 		t.Errorf("Counterspell skip:empty: %d rows, want the %d with offers", len(got), len(priced))
+	}
+}
+
+// The site's export serves CSV only; JSON search is the API's, under /api/v2/.
+func TestSiteExportServesNoJSON(t *testing.T) {
+	rec := httptest.NewRecorder()
+	testSite.SearchAPI(rec, httptest.NewRequest(http.MethodGet, "/search/export/retail/Shock.json", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("a JSON export = %d, want 404", rec.Code)
 	}
 }

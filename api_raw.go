@@ -21,7 +21,7 @@ func (s *site) RawCardAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cardID := strings.TrimPrefix(r.URL.Path, "/api/mtgmatcher/raw/")
+	cardID := strings.TrimPrefix(r.URL.Path, "/search/raw/")
 	co, err := s.backend().GetUUID(cardID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)

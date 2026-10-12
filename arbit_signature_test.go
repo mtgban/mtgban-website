@@ -97,7 +97,7 @@ func TestEnforceSigningHandsOnTheSignatureItChecked(t *testing.T) {
 	}
 
 	// The raw card API checks the Admin grant itself too.
-	raw := httptest.NewRequest(http.MethodGet, "/api/mtgmatcher/raw/card-a", nil)
+	raw := httptest.NewRequest(http.MethodGet, "/search/raw/card-a", nil)
 	raw.AddCookie(&http.Cookie{Name: "MTGBAN", Value: forge("Admin", "true")})
 	rawRec := httptest.NewRecorder()
 	testSite.RawCardAPI(rawRec, raw)
