@@ -55,20 +55,6 @@ func getLastSold(ctx context.Context, b *mtgmatcher.Backend, cardID string, anyL
 	return latestSales, nil
 }
 
-func getDirectQty(ctx context.Context, b *mtgmatcher.Backend, cardID string) ([]tcgplayer.ListingData, error) {
-	tcgProductID := findTCGproductID(b, cardID)
-	if tcgProductID == "" {
-		return nil, ErrMissingTCGId
-	}
-
-	tcgID, err := strconv.Atoi(tcgProductID)
-	if err != nil {
-		return nil, err
-	}
-
-	return tcgplayer.GetDirectQtysForProductID(ctx, tcgID, true), nil
-}
-
 func getDecklist(b *mtgmatcher.Backend, uuid string) ([]string, error) {
 	co, err := b.GetUUID(uuid)
 	if err != nil {
@@ -82,25 +68,15 @@ func (s *site) TCGHandler(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	w.Header().Set("Content-Type", "application/json")
 
-	isLastSold := strings.Contains(r.URL.Path, "lastsold")
-	isDirectQty := strings.Contains(r.URL.Path, "directqty")
 	isDecklist := strings.Contains(r.URL.Path, "decklist")
 
 	cardID := r.URL.Path
-	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/lastsold/")
-	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/directqty/")
 	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/decklist/")
 
 	var data any
 	var err error
 	var useCSV bool
-	if isLastSold {
-		UserNotify("tcgLastSold", cardID)
-		data, err = getLastSold(r.Context(), b, cardID, false)
-	} else if isDirectQty {
-		UserNotify("tcgDirectQty", cardID)
-		data, err = getDirectQty(r.Context(), b, cardID)
-	} else if isDecklist {
+	if isDecklist {
 		UserNotify("tcgDecklist", cardID)
 		data, err = getDecklist(b, cardID)
 		useCSV = true

@@ -658,7 +658,7 @@ live sellers/vendors minus blocklists at request time — or `DEV_ACCESS`) and
 `Config.APIDemoStores` and is refused the full `all`/`retail`/`buylist` dumps,
 by those exact names; it keeps the sealed dump and per-set or per-card
 requests. An unknown dump name answers "Not found". A `/sealed/` search
-needs the `sealed` mode as the sealed dump does. Other user APIs: `/api/tcgplayer/{lastsold,directqty,decklist}`,
+needs the `sealed` mode as the sealed dump does. Other user APIs: `/api/tcgplayer/decklist`,
 `/api/cardmarket/decklist` (CSV exports keyed to store SKUs), `/api/prices`
 (`BatchPricesAPI`, batch best-retail/best-buylist for ≤50 ids),
 `/api/palette/*` (public metadata for the command palette), and
