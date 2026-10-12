@@ -255,6 +255,25 @@ func TestSetNumberShorthand(t *testing.T) {
 		checkValues(t, findFilter(config, "number"), "number", "234")
 	})
 
+	// Yu-Gi-Oh prints "INFO-EN067" and a reader types it whole or without
+	// the region code; both are the two words "info 067".
+	t.Run("a printed number reads as set code and number", func(t *testing.T) {
+		for _, query := range []string{"neo-234", "NEO-EN234", "neo-e234"} {
+			config := parseSearchOptionsNG(backend(), query, nil, nil, nil)
+			checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+			checkValues(t, findFilter(config, "number"), "number", "234")
+			if config.CleanQuery != "" {
+				t.Errorf("%q: CleanQuery = %q, want empty", query, config.CleanQuery)
+			}
+		}
+	})
+
+	t.Run("a dashed word that is no printed number keeps the name search", func(t *testing.T) {
+		for _, query := range []string{"neo-abc234", "neo-en", "neo-234a", "lightning-148", "Will-o'-the-Wisp"} {
+			checkNameSearch(t, query)
+		}
+	})
+
 	t.Run("unknown set code keeps the name search", func(t *testing.T) {
 		checkNameSearch(t, "lightning 148")
 	})

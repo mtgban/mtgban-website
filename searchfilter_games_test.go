@@ -246,3 +246,66 @@ func TestNumberWithTotalReachesItsPrintingInEveryGame(t *testing.T) {
 		t.Skip("no non-Magic datastore paths in the environment")
 	}
 }
+
+// A number typed the way its card prints it, "INFO-EN067" or "info-067",
+// reaches that printing in every game whose numbers carry their set's code.
+// A number carrying another set's code, as Magic's List and One Piece's
+// promos do, is read as that other set's card and is not checked.
+func TestPrintedNumberReachesItsPrintingInEveryGame(t *testing.T) {
+	var ran int
+	for game, envVar := range gameDatastores {
+		path := os.Getenv(envVar)
+		if path == "" {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			t.Logf("%s: %v", game, err)
+			continue
+		}
+		loaded, err := mtgmatcher.Open(game, f)
+		f.Close()
+		if err != nil {
+			t.Errorf("%s: %v", game, err)
+			continue
+		}
+		ran++
+
+		t.Run(string(game), func(t *testing.T) {
+			ds := testSite.newDatastore(loaded, time.Now())
+
+			var checked int
+			for _, uuid := range ds.backend.GetUUIDs() {
+				co, err := ds.backend.GetUUID(uuid)
+				if err != nil || co.Sealed {
+					continue
+				}
+				split, printed := splitPrintedNumber(ds.backend, co.Number)
+				if !printed || !strings.EqualFold(split[0], co.SetCode) ||
+					mtgmatcher.ExtractNumberAny(split[1]) == "" {
+					continue
+				}
+				checked++
+
+				for _, query := range []string{co.Number, split[0] + "-" + split[1]} {
+					keys, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, query, nil, nil, nil))
+					if err != nil {
+						t.Errorf("%s: %q: %v", game, query, err)
+						continue
+					}
+					if !slices.Contains(keys, uuid) {
+						t.Errorf("%s: %q does not reach %s", game, query, co.Name)
+					}
+				}
+				if checked >= 200 {
+					break
+				}
+			}
+			t.Logf("%-14s %d printed numbers checked", game, checked)
+		})
+	}
+
+	if ran == 0 {
+		t.Skip("no non-Magic datastore paths in the environment")
+	}
+}

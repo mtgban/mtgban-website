@@ -797,6 +797,30 @@ func namesASetCode(b *mtgmatcher.Backend, token string) bool {
 	return err == nil
 }
 
+// splitPrintedNumber reads a word written the way Yu-Gi-Oh prints a card's
+// number, set code and ordinal joined by a dash with an optional region code
+// before the ordinal: "info-067" and "info-en067" are the "info 067" a
+// person types. A word of any other shape is not one.
+func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
+	code, number, found := strings.Cut(token, "-")
+	if !found || number == "" {
+		return nil, false
+	}
+	region := strings.IndexFunc(number, func(r rune) bool { return !isLetter(r) })
+	if region < 0 || region > 2 || strings.ContainsFunc(number[region:], isNotDigit) {
+		return nil, false
+	}
+	_, err := b.GetSet(code)
+	if err != nil {
+		return nil, false
+	}
+	return []string{code, number[region:]}, true
+}
+
+func isLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
 func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
 	rawQuery := query
 	var filters []FilterElem
@@ -1490,6 +1514,12 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 	// after this parse, so such queries cannot be told apart here
 	if config.SearchMode == "" {
 		tokens := strings.Fields(query)
+		if len(tokens) == 1 {
+			split, printed := splitPrintedNumber(b, tokens[0])
+			if printed {
+				tokens = split
+			}
+		}
 		if len(tokens) == 2 {
 			number := mtgmatcher.ExtractNumberAny(tokens[1])
 			if (number != "" || typesSetTotal(tokens[1])) && !namesASetCode(b, tokens[1]) {
