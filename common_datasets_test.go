@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -90,5 +91,67 @@ func TestLoadDatasetsKeepsTheValueOnError(t *testing.T) {
 	got := Datasets()
 	if len(got) != 1 || got[0].PublicName != "Kept" {
 		t.Errorf("failed reload dropped the datasets: %+v", got)
+	}
+}
+
+// With no path configured a save refuses rather than reaching for a path that
+// names no file.
+func TestNoDatasetsPathRefusesSave(t *testing.T) {
+	withDatasetsConfig(t, "")
+	err := saveDatasets(context.Background(), []DatasetConfig{{PublicName: "Saved", Provider: 4}})
+	if err == nil {
+		t.Error("save with no datasets path did not error")
+	}
+}
+
+// A save writes the file, publishes the datasets and rebuilds the chart
+// providers from them. (The peer notification is a no-op here: tests run
+// without a price DB.)
+func TestSaveDatasetsWritesThePath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "datasets.json")
+	withDatasetsConfig(t, path)
+
+	err := saveDatasets(context.Background(), []DatasetConfig{{PublicName: "Saved", Provider: 4}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := Datasets()
+	if len(got) != 1 || got[0].PublicName != "Saved" {
+		t.Errorf("published datasets are not the saved ones: %+v", got)
+	}
+	providers := chartProviders()
+	if len(providers) != 1 || providers[0].Name != "Saved" {
+		t.Errorf("providers were not rebuilt from the save: %+v", providers)
+	}
+
+	datasetsPtr.Store(nil)
+	err = loadDatasets(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = Datasets()
+	if len(got) != 1 || got[0].PublicName != "Saved" || got[0].Provider != 4 {
+		t.Errorf("file holds %+v, want the saved datasets", got)
+	}
+}
+
+// The Datasets tab offers Update only when there is a file to save to.
+func TestAdminDatasetsUpdateNeedsAPath(t *testing.T) {
+	pv := PageVars{UserNav: &NavElem{Short: "b"}}
+	const update = `data-update-for="datasets"`
+
+	withDatasetsConfig(t, "")
+	out := renderPage(t, "admin.html", false, pv)
+	if strings.Contains(out, update) {
+		t.Error("Update offered with no datasets path")
+	}
+	if !strings.Contains(out, "timeseries_config.datasets (read-only)") {
+		t.Error("tab does not say the config's datasets are read-only")
+	}
+
+	Config().DatasetsPath = "datasets.json"
+	out = renderPage(t, "admin.html", false, pv)
+	if !strings.Contains(out, update) {
+		t.Error("Update not offered with a datasets path")
 	}
 }

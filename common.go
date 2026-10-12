@@ -128,8 +128,8 @@ func saveAffiliates(ctx context.Context, value AffiliatesConfig) error {
 	return nil
 }
 
-// datasetsMu serialises loadDatasets; readers go through the atomic and
-// never block.
+// datasetsMu serialises the writers (loadDatasets, saveDatasets); readers go
+// through the atomic and never block.
 var datasetsMu sync.Mutex
 var datasetsPtr atomic.Pointer[[]DatasetConfig]
 
@@ -170,6 +170,35 @@ func loadDatasets(ctx context.Context) error {
 	}
 	datasetsPtr.Store(&value)
 	buildProviderRegistry()
+	return nil
+}
+
+// saveDatasets persists the chart datasets to datasets_path and publishes
+// them on success, following saveAffiliates.
+func saveDatasets(ctx context.Context, value []DatasetConfig) error {
+	datasetsMu.Lock()
+	defer datasetsMu.Unlock()
+
+	path := Config().DatasetsPath
+	if path == "" {
+		return errors.New("datasets: no path configured")
+	}
+
+	writer, err := openBucketWriter(ctx, path)
+	if err != nil {
+		return err
+	}
+	err = json.NewEncoder(writer).Encode(value)
+	cerr := writer.Close()
+	if err != nil {
+		return err
+	}
+	if cerr != nil {
+		return cerr
+	}
+	datasetsPtr.Store(&value)
+	buildProviderRegistry()
+	notifyAccessReload(ctx, datasetsReloadChannel)
 	return nil
 }
 

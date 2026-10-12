@@ -8,8 +8,9 @@ import (
 	"github.com/lib/pq"
 )
 
-// Deployments that split the access table, the grant list and the affiliate
-// data into their own bucket files can share those files - the grants and
+// Deployments that split the access table, the grant list, the affiliate
+// data and the chart datasets into their own bucket files can share those
+// files - the grants and
 // the affiliates are one value across the magic and lorcana sites. A save on
 // one deployment then has to
 // reach the others, and the shared price database already connects them all:
@@ -23,6 +24,7 @@ const (
 	aclReloadChannel        = "acl_reload"
 	grantsReloadChannel     = "grants_reload"
 	affiliatesReloadChannel = "affiliates_reload"
+	datasetsReloadChannel   = "datasets_reload"
 )
 
 // notifyAccessReload tells the peer deployments to re-read the file behind
@@ -68,6 +70,9 @@ func startAccessReloadListener() {
 	}
 	if Config().AffiliatesPath != "" {
 		reloads[affiliatesReloadChannel] = loadAffiliates
+	}
+	if Config().DatasetsPath != "" {
+		reloads[datasetsReloadChannel] = loadDatasets
 	}
 	if len(reloads) == 0 {
 		return
