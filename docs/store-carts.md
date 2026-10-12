@@ -10,8 +10,9 @@ and Strike Zone have a CSV import, but no way to hand it a list from
 another site. The upload page reaches all seven through one bookmarklet,
 BAN-to-Cart, run on the store's page. ABU was measured against a real
 account on 2026-10-07, CSI, Strike Zone and Hareruya against a guest cart
-and SCG and Mint against a real account on 2026-10-09, and Card Kingdom
-against a guest cart on 2026-10-10.
+and SCG and Mint against a real account on 2026-10-09, Card Kingdom
+against a guest cart on 2026-10-10, and Mint's store against a guest cart
+on 2026-10-13.
 
 ## ABU: the calls
 
@@ -142,7 +143,7 @@ GET  /main_view_cart.php?action=delete-<row id>
 | above the stock | trimmed to it |
 | a delete | 0.34 s |
 
-## Mint: the call
+## Mint: the calls
 
 Mint's buylist cart page sets a row's quantity with a `GET`, and the same
 call adds a card not yet in the cart:
@@ -163,6 +164,9 @@ https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_buylist_cart_deta
   and adds to a row's quantity instead of setting it.
 - The cart page is `/buylist-cart`, with one `multiple_quantity_<id>`
   picker per row, which is how the bookmarklet reads the cart back.
+- A product id can name a row on both sides (8137 is a store product and
+  a buylist id), so the loader stops before sending anything when the
+  link's `side=retail` and the cart page disagree.
 
 | Sent | Result |
 |---|---|
@@ -170,6 +174,32 @@ https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_buylist_cart_deta
 | a card already in the cart | quantity replaced |
 | more than Mint wants | trimmed to Mint's own limit |
 | an id Mint does not buy, or a store-only id | skipped quietly, 200 |
+| quantity 0 | row removed |
+
+### Mint's store cart
+
+The store's quantity picker, on every product page, makes the same call
+to its own page, and it adds a card not yet in the cart too:
+
+```
+https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_shopping_cart
+    &action=update_product&shopping_cart_product_id=304456&shopping_cart_product_qty=2
+```
+
+- Each condition and finish of a card is its own `products_id`, which the
+  feed lists apart and the scraper stores as each inventory entry's
+  `InstanceID`, so a row goes in the condition it was priced at.
+- The cart page is `/shopping-cart`, with the same `multiple_quantity_<id>`
+  picker per row as the buylist cart's.
+- The feed's quantity is not Mint's stock: it tops out at 8, which most
+  rows report, and cards it listed at 8 took 10 and offered 24 in the cart.
+
+| Sent | Result |
+|---|---|
+| one row per call | 3 calls in 1.3 s |
+| a card already in the cart | quantity replaced |
+| more than Mint has | trimmed to the most the cart's picker offers |
+| an id out of stock, buylist-only or unknown | skipped quietly, 200 |
 | quantity 0 | row removed |
 
 ## Strike Zone: the CSV import
@@ -332,8 +362,8 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's, CSI's, Strike Zone's and Hareruya's
-buylist and store splits, and SCG's and Mint's buylist splits. CSI's store
+the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's and
+Mint's buylist and store splits, and SCG's buylist splits. CSI's store
 button sits beside its deck builder button, which posts only names. SCG's
 store side and CK's buylist already have their own imports. Card Kingdom's
 store split gets no button for now, though the bookmarklet still fills its
@@ -410,13 +440,16 @@ On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
    on Mint, stops while the page links to Mint's login page, which it
-   does only for a guest, since a sell order needs an account;
+   does only for a guest, since a sell order needs an account, and
+   whether a guest's store cart survives logging in was not measured;
 2. reads the cart and stops at ABU's caps, 750 buylist lines or 1,000
    store lines, counting what is already there, and says what was left
    out; the other stores have no cap;
 3. sends the rows in chunks with a progress banner: 300 for ABU's
    buylist, 50 for ABU's store so each request finishes in under a
-   minute, 100 for CSI, and one at a time for Mint, about a second each;
+   minute, 100 for CSI, and one at a time for Mint, 0.4 to 1 s each,
+   stopping before sending anything when the link's `side=retail` and
+   Mint's cart page disagree;
    on Strike Zone, 300 per CSV import, under `Buy #` or, for a link that
    says `side=retail`, `Sell #`, after cards through their links until one
    stays when the cart is empty, since Strike Zone skips a card it no
@@ -458,6 +491,8 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
   to `/cart/group` and `/cart/set` instead.
 - Whether a CSI guest's sell cart follows the user when they log in, and
   the same for Strike Zone.
+- Whether a Mint guest's store cart follows the user when they log in;
+  the loader asks for the login first.
 - How long Strike Zone's call limit lasts, and whether calls made while it
   holds lengthen it.
 - Strike Zone codes with an item of other than five or six digits, which
