@@ -887,6 +887,9 @@
             {{if $entries}}
                 {{$total := index $.OptimizedTotals .}}
                 <div class="opt-store" id="opt-{{.}}">
+                    <table class="opt-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
+                    <colgroup><col><col><col><col><col><col><col></colgroup>
+                    <thead><tr><td class="opt-store-head" colspan="7">
                     <div class="opt-store-header">
                         <div class="opt-section-nav">
                             {{if gt $i 0}}
@@ -1027,8 +1030,8 @@
                         <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
                     </div>
-                    <table class="opt-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
-                        <thead><tr>
+                    </td></tr>
+                        <tr>
                             <th>Card</th>
                             <th>Set</th>
                             <th data-sort-method="none">INFO</th>
