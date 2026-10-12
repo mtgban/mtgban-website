@@ -280,10 +280,10 @@
                         </a>
                     {{end}}
                     {{if $card.HasDeck}}
-                        <a class="m-actions-item" href="/api/tcgplayer/decklist/{{$card.UUID}}" onclick="window.closeActionsMenus && closeActionsMenus()">
+                        <a class="m-actions-item" href="/search/decklist/tcgplayer/{{$card.UUID}}" onclick="window.closeActionsMenus && closeActionsMenus()">
                             <img src="/img/misc/decklist.png" alt=""><span>TCGplayer decklist</span>
                         </a>
-                        <a class="m-actions-item" href="/api/cardmarket/decklist/{{$card.UUID}}" onclick="window.closeActionsMenus && closeActionsMenus()">
+                        <a class="m-actions-item" href="/search/decklist/cardmarket/{{$card.UUID}}" onclick="window.closeActionsMenus && closeActionsMenus()">
                             <img src="/img/misc/decklist-mkm.png" alt=""><span>Cardmarket decklist</span>
                         </a>
                     {{end}}

@@ -24,9 +24,10 @@ func TestRecordablePath(t *testing.T) {
 		{"/newspaper", true},
 		{"/search", true},
 		{"/", true},
-		{"/api/tcgplayer/decklist/12345", false},
-		{"/api/cardmarket/foo", false},
-		{"/api/search/", false},
+		{"/api/v2/all.json", false},
+		{"/search/decklist/tcgplayer/12345", false},
+		{"/search/export/retail/foo.csv", false},
+		{"/search/raw/12345", false},
 		{"/data/prices/", false},
 		{"/data/chart/ban:1", false},
 	}

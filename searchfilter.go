@@ -887,7 +887,7 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 	// An empty query has no last character and nothing below to parse out of
 	// it, but it still carries the blocklists gathered above: the search page
 	// reaches here with one whenever the pinned bar is doing the searching,
-	// and so does an export url with no name in it (/api/search/retail/.csv).
+	// and so does an export url with no name in it (/search/export/retail/.csv).
 	var lastChar string
 	if query != "" {
 		switch query[len(query)-1] {

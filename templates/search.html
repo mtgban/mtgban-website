@@ -279,9 +279,9 @@
                         <div class="sidebar-actions-compact">
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Export</span>
-                                <a class="sidebar-action success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
-                                <a class="sidebar-action warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
-                                <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
+                                <a class="sidebar-action success" href="/search/export/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
+                                <a class="sidebar-action warning" href="/search/export/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
+                                <a class="sidebar-action default" href="/search/export/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{with .SearchScope}}&scope={{.}}{{end}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
                             </div>
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Upload</span>
@@ -453,7 +453,7 @@
                                     <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis-vertical"></i></button>
                                     <div class="qi-actions">
                                     {{if $.CanFixSearch}}
-                                        <a class="raw-record" href="/api/mtgmatcher/raw/{{$cardId}}" target="_blank" rel="noopener" title="Raw mtgmatcher record for this card (admin)"><span class="emoji">&#128300;</span></a>
+                                        <a class="raw-record" href="/search/raw/{{$cardId}}" target="_blank" rel="noopener" title="Raw mtgmatcher record for this card (admin)"><span class="emoji">&#128300;</span></a>
                                         <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode - show a Fix link on each store (admin)" onclick="toggleAdminFixMode()">&#128295;</span>
                                     {{end}}
                                     {{if $card.Sealed}}
@@ -461,8 +461,8 @@
                                             <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">&#127873;</span></a>
                                         {{end}}
                                         {{if $card.HasDeck}}
-                                            <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
-                                            <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
+                                            <a href='/search/decklist/tcgplayer/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 height=28 alt="TCGplayer decklist" src="/img/misc/decklist.png"></a>
+                                            <a href='/search/decklist/cardmarket/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 height=28 alt="Cardmarket decklist" src="/img/misc/decklist-mkm.png"></a>
                                         {{end}}
                                         <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">&#128270;</span></a>
                                     {{else if $.HasAvailable}}
