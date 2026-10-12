@@ -1303,6 +1303,8 @@
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     margin-bottom: 24px;
+    /* The store header's height, which the column header pins under */
+    --opt-header-height: 48px;
     /* Land #opt-* jumps below the fixed navbar, where the sticky headers
        sit in flow instead of stacking over the first rows */
     scroll-margin-top: var(--nav-height);
@@ -1319,6 +1321,9 @@
     position: sticky;
     top: var(--nav-height);
     z-index: 5;
+    /* A floor rather than the content's height, which moves with the font */
+    box-sizing: border-box;
+    min-height: var(--opt-header-height);
 }
 .opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; align-self: end; }
 /* Out of the flex flow so the stacked arrows can never stretch the header */
@@ -1391,10 +1396,9 @@
     text-align: left;
     cursor: pointer;
     position: sticky;
-    /* Pin flush under the sticky .opt-store-header. Kept a hair short so the
-       column header tucks under it (overlap hidden behind the header) rather
-       than leaving a gap that lets a data row show through when scrolling. */
-    top: calc(var(--nav-height) + 48px);
+    /* Pin under the sticky .opt-store-header, a pixel short so the column
+       header tucks under it rather than leaving a gap for a row to show */
+    top: calc(var(--nav-height) + var(--opt-header-height) - 1px);
     z-index: 4;
 }
 .opt-table th:hover { color: var(--activetext); }
