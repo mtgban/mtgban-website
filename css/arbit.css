@@ -578,6 +578,8 @@ button.arb-filter-reset:disabled {
 .arb-load-btn.buy:hover { background: rgba(30,144,255,0.22); }
 .arb-load-btn.sell { background: rgba(210,153,34,0.12); color: var(--awarning); }
 .arb-load-btn.sell:hover { background: rgba(210,153,34,0.22); }
+.arb-load-btn.builder { background: rgba(63,185,80,0.12); color: var(--asuccess); }
+.arb-load-btn.builder:hover { background: rgba(63,185,80,0.22); }
 .arb-load-btn.csv { background: var(--surface-2); color: var(--activetext); border: 1px solid var(--border-subtle); }
 .arb-load-btn.csv:hover { border-color: var(--accent-border); color: var(--normal); }
 

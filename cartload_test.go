@@ -291,6 +291,20 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		t.Errorf("want Load at ABU before Load buylist at CK, at %d and %d", at, ckAt)
 	}
 
+	// CSI is bought from two ways, its deck builder and its cart: one button
+	// each, told apart, the cart's keeping the name the loader's messages use
+	csi := renderArbit(t, PageVars{
+		ScraperShort: "CSI",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CK", Arbit: rows}},
+	})
+	if strings.Count(csi, ">Load at CSI<") != 1 || !strings.Contains(csi, `data-store="CSI" data-buylist="false"`) {
+		t.Errorf("want one Load at CSI, the cart's, got %d", strings.Count(csi, ">Load at CSI<"))
+	}
+	if !strings.Contains(csi, `class="arb-load-btn builder"`) || !strings.Contains(csi, ">Deck builder at CSI<") {
+		t.Error("CSI's deck builder button is not told apart from its cart's")
+	}
+
 	page := renderArbit(t, reversePageVars())
 	if strings.Contains(page, `id="cart-overlay"`) {
 		t.Error("a page with no cart store carries the cart panel")
