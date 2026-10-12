@@ -1303,8 +1303,6 @@
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     margin-bottom: 24px;
-    /* The store header's height, which the column header pins under */
-    --opt-header-height: 48px;
     /* Land #opt-* jumps below the fixed navbar, where the sticky headers
        sit in flow instead of stacking over the first rows */
     scroll-margin-top: var(--nav-height);
@@ -1318,12 +1316,7 @@
     padding: 12px 16px 12px 43px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border-subtle);
-    position: sticky;
-    top: var(--nav-height);
-    z-index: 5;
-    /* A floor rather than the content's height, which moves with the font */
-    box-sizing: border-box;
-    min-height: var(--opt-header-height);
+    position: relative;
 }
 .opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; align-self: end; }
 /* Out of the flex flow so the stacked arrows can never stretch the header */
@@ -1376,14 +1369,21 @@
 .opt-btn.csv:hover { color: var(--normal); }
 
 .opt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+/* The store header and the column labels stick as one block, so the labels
+   stay under the header however tall it wraps */
+.opt-table thead { position: sticky; top: var(--nav-height); z-index: 5; }
+/* Widths on the cols: the first row is the store header, spanning them all */
+.opt-table col:nth-child(1) { width: 34%; }
+.opt-table col:nth-child(2) { width: 14%; }
+.opt-table col:nth-child(3) { width: 11%; }
+.opt-table col:nth-child(4) { width: 11%; }
+.opt-table col:nth-child(5) { width: 12%; }
+.opt-table col:nth-child(6) { width: 14%; }
+.opt-table col:nth-child(7) { width: 4%; }
 .opt-table td { padding: 7px 12px; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-base); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
-.opt-table td:nth-child(1) { width: 34%; }
-.opt-table td:nth-child(2) { width: 14%; }
-.opt-table td:nth-child(3) { width: 11%; text-align: left; }
-.opt-table td:nth-child(4) { width: 11%; }
-.opt-table td:nth-child(5) { width: 12%; }
-.opt-table td:nth-child(6) { width: 14%; }
-.opt-table td:nth-child(7) { width: 4%; text-align: center; }
+.opt-table td:nth-child(3) { text-align: left; }
+.opt-table td:nth-child(7) { text-align: center; }
+.opt-table td.opt-store-head { padding: 0; border-bottom: none; font-size: inherit; overflow: visible; text-align: left; }
 .opt-table th {
     padding: 7px 12px;
     font-size: var(--text-xs);
@@ -1395,21 +1395,9 @@
     border-bottom: 1px solid var(--border-subtle);
     text-align: left;
     cursor: pointer;
-    position: sticky;
-    /* Pin under the sticky .opt-store-header, a pixel short so the column
-       header tucks under it rather than leaving a gap for a row to show */
-    top: calc(var(--nav-height) + var(--opt-header-height) - 1px);
-    z-index: 4;
 }
 .opt-table th:hover { color: var(--activetext); }
 .opt-table th[aria-sort] { color: var(--ainfo); }
-.opt-table th:nth-child(1) { width: 34%; }
-.opt-table th:nth-child(2) { width: 14%; }
-.opt-table th:nth-child(3) { width: 11%; }
-.opt-table th:nth-child(4) { width: 11%; }
-.opt-table th:nth-child(5) { width: 12%; }
-.opt-table th:nth-child(6) { width: 14%; }
-.opt-table th:nth-child(7) { width: 4%; }
 .opt-table th.r { text-align: right; }
 .opt-table th.c { text-align: center; }
 .opt-table tbody tr:nth-child(even) { background: var(--row-even); }
