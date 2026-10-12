@@ -242,7 +242,6 @@
         </div>
     {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}" defer></script>
-            <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}" defer></script>
 
             <script type="text/javascript" src="/js/search-sidebar.js?hash={{.Hash}}" defer></script>
 
@@ -638,7 +637,7 @@
                                                         {{if .Secondary}}
                                                             <span class="secondary"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span></span>
                                                         {{else}}
-                                                            <span class="qty" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
+                                                            <span class="qty">
                                                                 {{if and .BundleIcon .Price}}
                                                                     <img style="padding-top:4px;" src="{{.BundleIcon}}">
                                                                 {{else if not .NoQuantity}}
