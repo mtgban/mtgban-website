@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"maps"
 	"os"
 	"path/filepath"
@@ -116,5 +117,42 @@ func TestConfigReloadFailureKeepsTheConfig(t *testing.T) {
 	if Config().Game != "lorcana" || !maps.Equal(Config().APIUserSecrets, want) {
 		t.Errorf("game %q, api_user_secrets %v: the failed reload changed the live config",
 			Config().Game, Config().APIUserSecrets)
+	}
+}
+
+// A reload that moves the datasets to a file that cannot be read charts
+// nothing, rather than keeping the providers the inline datasets built.
+func TestConfigReloadToAnUnreadableDatasetsPath(t *testing.T) {
+	path := withConfigFile(t)
+	savedDatasets := datasetsPtr.Load()
+	datasetsPtr.Store(nil)
+	t.Cleanup(func() { datasetsPtr.Store(savedDatasets) })
+
+	writeTestConfig(t, path, `{
+		"port": "8080",
+		"timeseries_config": {"datasets": [{"public_name": "TCGplayer Low", "provider": 1}]}
+	}`)
+	err := loadVars("8081", "", "flag-acl.json", "flag-grants.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chartProviders()) != 1 {
+		t.Fatalf("registry %+v, want the one inline dataset", chartProviders())
+	}
+
+	writeTestConfig(t, path, `{
+		"port": "8080",
+		"datasets_path": "`+filepath.Join(t.TempDir(), "nope.json")+`"
+	}`)
+	err = reloadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = loadDatasets(context.Background())
+	if err == nil {
+		t.Fatal("unreadable datasets path did not error")
+	}
+	if len(Datasets()) != 0 || len(chartProviders()) != 0 {
+		t.Errorf("datasets %+v, registry %+v: want both empty", Datasets(), chartProviders())
 	}
 }

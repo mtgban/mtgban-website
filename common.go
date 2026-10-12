@@ -11,11 +11,12 @@ import (
 	"github.com/mtgban/mtgban-website/internal/access"
 )
 
-// The access table, the grant list and the affiliate data live beside the
-// config rather than inside it, each in its own shared file: see
-// internal/access for the first two. This file wires the package to what
-// stays deployment-owned - the bucket openers (credentials) - and holds the
-// affiliate data, which is read and written the same way.
+// The access table, the grant list, the affiliate data and the chart
+// datasets live beside the config rather than inside it, each in its own
+// file: see internal/access for the first two. This file wires the package to
+// what stays deployment-owned - the bucket openers (credentials) - and holds
+// the affiliate data and the datasets, which are read and written the same
+// way.
 
 // PatreonGrant keeps its historical name for the config decode and the admin
 // code; the type lives with the package that manages the list.
@@ -38,17 +39,15 @@ func PatreonGrants() []PatreonGrant {
 	return Access.Grants()
 }
 
-// loadCommonConfig fills the access table, the grant list and the affiliate
-// data, each from its own path.
+// loadCommonConfig fills the access table, the grant list, the affiliate
+// data and the chart datasets, each from its own path. One failing does not
+// stop the others loading.
 func loadCommonConfig(ctx context.Context) error {
 	err := Access.Load(ctx, access.Sources{
 		TablePath:  Config().ACLPath,
 		GrantsPath: Config().PatreonGrantsPath,
 	})
-	if err != nil {
-		return err
-	}
-	return loadAffiliates(ctx)
+	return errors.Join(err, loadAffiliates(ctx), loadDatasets(ctx))
 }
 
 // AffiliatesConfig is the affiliate data every game shares: the codes are
@@ -126,6 +125,51 @@ func saveAffiliates(ctx context.Context, value AffiliatesConfig) error {
 	}
 	affiliatesPtr.Store(&value)
 	notifyAccessReload(ctx, affiliatesReloadChannel)
+	return nil
+}
+
+// datasetsMu serialises loadDatasets; readers go through the atomic and
+// never block.
+var datasetsMu sync.Mutex
+var datasetsPtr atomic.Pointer[[]DatasetConfig]
+
+// Datasets returns the chart datasets: the datasets_path file's when the
+// config names one, else timeseries_config.datasets. The result is shared and
+// must not be modified.
+func Datasets() []DatasetConfig {
+	if Config().DatasetsPath == "" {
+		return Config().TimeseriesConfig.Datasets
+	}
+	value := datasetsPtr.Load()
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+// loadDatasets reads the chart datasets from datasets_path, when the config
+// names one, and rebuilds the chart providers from them. A configured path
+// that cannot be read is an error, and the previous value stays published.
+func loadDatasets(ctx context.Context) error {
+	datasetsMu.Lock()
+	defer datasetsMu.Unlock()
+
+	path := Config().DatasetsPath
+	if path == "" {
+		return nil
+	}
+	reader, err := openBucketPath(ctx, path)
+	if err != nil {
+		return fmt.Errorf("datasets %s: %w", path, err)
+	}
+	defer reader.Close()
+	var value []DatasetConfig
+	err = json.NewDecoder(reader).Decode(&value)
+	if err != nil {
+		return fmt.Errorf("datasets %s: %w", path, err)
+	}
+	datasetsPtr.Store(&value)
+	buildProviderRegistry()
 	return nil
 }
 

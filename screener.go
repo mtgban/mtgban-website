@@ -20,8 +20,9 @@ type ScreenerMetric struct {
 }
 
 func screenerMetricList() []ScreenerMetric {
-	out := make([]ScreenerMetric, 0, len(Config().TimeseriesConfig.Datasets))
-	for _, d := range Config().TimeseriesConfig.Datasets {
+	datasets := Datasets()
+	out := make([]ScreenerMetric, 0, len(datasets))
+	for _, d := range datasets {
 		out = append(out, ScreenerMetric{Index: d.Index, Name: d.PublicName})
 	}
 	return out
@@ -44,7 +45,7 @@ var screenerWindows = []ScreenerWindow{
 }
 
 func validMetric(index int) bool {
-	for _, d := range Config().TimeseriesConfig.Datasets {
+	for _, d := range Datasets() {
 		if d.Index == index {
 			return true
 		}

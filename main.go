@@ -138,11 +138,13 @@ type ConfigType struct {
 	// shared between deployments or belong to one, which is a choice about
 	// the data, not the code. AffiliatesPath does the same for the
 	// affiliate data, which every game shares: a store a game doesn't
-	// carry never matches its list entries. These locate the files; see
-	// common.go for the readers and writers.
+	// carry never matches its list entries. DatasetsPath names the chart
+	// datasets' file; with none, timeseries_config.datasets is read. These
+	// locate the files; see common.go for the readers and writers.
 	ACLPath           string `json:"acl_path"`
 	PatreonGrantsPath string `json:"patreon_grants_path"`
 	AffiliatesPath    string `json:"affiliates_path"`
+	DatasetsPath      string `json:"datasets_path"`
 
 	Uploader map[string]string `json:"uploader"`
 
@@ -464,8 +466,9 @@ func applyOverrides(config *ConfigType, port, datastorePath, aclPath, grantsPath
 }
 
 // finishConfig defaults what a newly loaded config left unset and makes it
-// the live one, whole; then it rebuilds the chart provider registry from it
-// and defaults BAN_SECRET when the environment has none.
+// the live one, whole; then it rebuilds the chart provider registry from it,
+// unless loadDatasets reads the datasets from their own file, and defaults
+// BAN_SECRET when the environment has none.
 func finishConfig(config ConfigType) {
 	if config.Port == "" {
 		log.Println("Server port not configured, listening on", DefaultServerPort)
@@ -486,8 +489,12 @@ func finishConfig(config ConfigType) {
 
 	liveConfig.Store(&config)
 
-	// Build the game-agnostic chart provider registry from the dataset config.
-	buildProviderRegistry()
+	if config.DatasetsPath == "" {
+		buildProviderRegistry()
+	} else if datasetsPtr.Load() == nil {
+		// Nothing read from the file yet, so nothing charts until loadDatasets does.
+		providerRegistry.Store(&[]providerDisplay{})
+	}
 
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
@@ -703,10 +710,10 @@ func main() {
 		}
 	}
 
-	// The access table and the grant list, from their own paths or from what
-	// the config carried. A deployment that cannot read its access table has
-	// no way to tell an admin from anyone else, so this is fatal for the same
-	// reason a missing config is.
+	// The access table, the grant list, the affiliate data and the chart
+	// datasets, each from its own path. A deployment that cannot read its
+	// access table has no way to tell an admin from anyone else, so this is
+	// fatal for the same reason a missing config is.
 	err = loadCommonConfig(context.Background())
 	if err != nil {
 		if DevMode {
