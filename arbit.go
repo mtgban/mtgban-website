@@ -417,7 +417,8 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
 			return slices.Contains(Config().GlobalAllowList, info.Shorthand) &&
-				(anyExperiment || !slices.Contains(Config().SearchRetailBlockList, info.Shorthand))
+				(anyExperiment || !slices.Contains(Config().SearchRetailBlockList, info.Shorthand)) &&
+				!slices.Contains(Config().APIOnlyStores, info.Shorthand)
 		}
 		// These are hardcoded to provide a preview of the tool
 		return info.Shorthand == "TCGMarket" || info.Shorthand == "MKMTrend"
