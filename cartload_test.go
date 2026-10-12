@@ -308,14 +308,30 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		t.Error("CSI's deck builder button is not told apart from its cart's")
 	}
 
+	// Mint's store cart asks for what the buylist takes, or as many as Mint
+	// has where it names no amount; the buylist cart keeps the row's own
+	mintRows := []mtgban.ArbitEntry{rows[0], {
+		CardID:         "card-a",
+		InventoryEntry: mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 1},
+		BuylistEntry:   mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 2, Quantity: 20},
+		Quantity:       8,
+	}}
 	mint := renderArbit(t, PageVars{
 		ScraperShort: "MMC",
 		UserNav:      &NavElem{Short: "beta"},
-		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: rows}},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	mintBuy := `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card" data-buylist="false"`
-	if !strings.Contains(mint, mintBuy) || !strings.Contains(mint, sell) {
-		t.Errorf("buying at Mint: want its store cart button with %s, and CSI's buylist one", mintBuy)
+	mintBuy := `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:999,663174:20&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card" data-buylist="false" data-load-list="cart" data-load-items="283193,663174" data-load-qtys="999,20"`
+	if !strings.Contains(mint, mintBuy) {
+		t.Errorf("buying at Mint: no store cart button with %s", mintBuy)
+	}
+	mintSell := `href="https://www.coolstuffinc.com/buylist_cart.php#ban=601:10&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="CSI" data-buylist="true" data-load-list="cart" data-load-items="601,601" onclick`
+	if !strings.Contains(mint, mintSell) {
+		t.Errorf("buying at Mint: no buylist cart button with %s", mintSell)
+	}
+	// Other stores' carts carry the page's quantities
+	if strings.Contains(ck+csi, "data-load-qtys") {
+		t.Error("a cart other than Mint's store asks its own quantities")
 	}
 
 	page := renderArbit(t, reversePageVars())

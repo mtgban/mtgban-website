@@ -360,7 +360,7 @@
                     {{if $buyCart.Link}}
                         {{$hasCart = true}}
                         <span class="cart-load">
-                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load at {{$buyCart.Store}}</a>
+                            <a class="arb-load-btn csv cart-help" href="#" onclick="return window.showCartPrompt ? showCartPrompt(this.nextElementSibling) : false" title="How Load at {{$buyCart.Store}} works, and the BAN-to-Cart bookmark">?</a><a class="arb-load-btn buy" href="{{$buyCart.Link}}" target="_blank" rel="noopener" data-store="{{$buyCart.Store}}" data-buylist="false" data-load-list="cart" data-load-items="{{$buyCart.Items}}"{{with $buyCart.Quantities}} data-load-qtys="{{.}}"{{end}} onclick="return window.openCartPrompt ? openCartPrompt(this) : true">Load at {{$buyCart.Store}}</a>
                         </span>
                     {{end}}
 

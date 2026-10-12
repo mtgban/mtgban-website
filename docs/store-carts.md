@@ -192,7 +192,7 @@ https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_shopping_cart
 - The cart page is `/shopping-cart`, with the same `multiple_quantity_<id>`
   picker per row as the buylist cart's.
 - The feed's quantity is not Mint's stock: it tops out at 8, which most
-  rows report, and cards it listed at 8 took 10 and offered 24 in the cart.
+  rows report, and cards it listed at 8 took 10 and 24 when asked for 999.
 
 | Sent | Result |
 |---|---|
@@ -370,7 +370,10 @@ store split gets no button for now, though the bookmarklet still fills its
 cart: a load logged a signed-in user out, and the cause is not known yet. The arbit and reverse pages give
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
-store sells it in (`cartLoadForArbit`). The global page compares two
+store sells it in (`cartLoadForArbit`). Mint's feed caps its stock at
+8, so Mint's store button asks for what the buylist takes, or 999 where
+the buylist names no amount, and Mint trims it to what it has; the link
+carries those quantities (`data-load-qtys`) for the rows left ticked. The global page compares two
 stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.

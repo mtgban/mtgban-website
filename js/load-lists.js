@@ -67,8 +67,9 @@ function loadListRows(section, removedClass) {
 
 // cartLink rebuilds a store cart link's #ban= list of "id:qty" pairs. The
 // link's data-load-items holds each row's store item id by data-load-idx,
-// empty for a row the store lists no id for.
-function cartLink(href, items, rows) {
+// empty for a row the store lists no id for, and data-load-qtys, where set,
+// the quantity the link asks for each row in place of the row's own.
+function cartLink(href, items, rows, qtys) {
     var ids = [];
     var quantities = {};
     var skipped = 0;
@@ -82,7 +83,7 @@ function cartLink(href, items, rows) {
             ids.push(id);
             quantities[id] = 0;
         }
-        quantities[id] += parseInt(r.qty, 10);
+        quantities[id] += parseInt(qtys ? qtys[r.idx] : r.qty, 10);
     });
     var pairs = ids.map(function(id) { return id + ':' + quantities[id]; });
     href = href.replace(/([#&]ban=)[^&]*/, '$1' + pairs.join(',')).replace(/&skip=\d*/, '');
@@ -104,7 +105,8 @@ function rebuildLoadLists(section, removedClass) {
         if (whole) {
             el[field] = loadListOriginals.get(el);
         } else if (format === 'cart') {
-            el.href = cartLink(loadListOriginals.get(el), el.dataset.loadItems.split(','), active);
+            el.href = cartLink(loadListOriginals.get(el), el.dataset.loadItems.split(','), active,
+                el.dataset.loadQtys ? el.dataset.loadQtys.split(',') : null);
         } else if (loadListFormats[format]) {
             el.value = loadListFormats[format](active);
         }
