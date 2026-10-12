@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -117,6 +118,7 @@ type ConfigType struct {
 	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
 	SearchRetailBlockList  []string           `json:"search_block_list"`
 	SearchBuylistBlockList []string           `json:"search_buylist_block_list"`
+	APIOnlyStores          []string           `json:"api_only_stores"`
 	SleepersBlockList      []string           `json:"sleepers_block_list"`
 	UploadSealedBlockList  []string           `json:"upload_sealed_block_list"`
 	GlobalAllowList        []string           `json:"global_allow_list"`
@@ -194,6 +196,18 @@ func (c *ConfigType) UnmarshalJSON(data []byte) error {
 	}
 	c.Discord.applyDefaults()
 	return nil
+}
+
+// siteRetailBlockList is what the site hides from retail: the search block
+// list plus the stores only the price API serves. It is clipped, so a caller
+// may append to it.
+func (c *ConfigType) siteRetailBlockList() []string {
+	return append(slices.Clip(c.SearchRetailBlockList), c.APIOnlyStores...)
+}
+
+// siteBuylistBlockList is siteRetailBlockList for buylists.
+func (c *ConfigType) siteBuylistBlockList() []string {
+	return append(slices.Clip(c.SearchBuylistBlockList), c.APIOnlyStores...)
 }
 
 var DevMode bool

@@ -531,26 +531,29 @@ func TestStoreEligible(t *testing.T) {
 }
 
 // TestApiEnabledStores pins how the API turns the sig store option into the
-// store list: ALL_ACCESS applies the search blocklists at runtime,
-// DEV_ACCESS applies nothing, an explicit list bypasses them entirely, and
-// BASE_ACCESS additionally drops sealed and non-main-region stores, except
-// for metadata-only indexes.
+// store list: ALL_ACCESS applies the search blocklists at runtime but keeps
+// the API-only stores, DEV_ACCESS applies nothing, an explicit list bypasses
+// them entirely, and BASE_ACCESS additionally drops sealed and
+// non-main-region stores, except for metadata-only indexes.
 func TestApiEnabledStores(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
 	prevRetail := Config().SearchRetailBlockList
 	prevBuylist := Config().SearchBuylistBlockList
+	prevAPIOnly := Config().APIOnlyStores
 	Config().SearchRetailBlockList = []string{"PARITYIDX"}
 	Config().SearchBuylistBlockList = []string{"PARITYV"}
+	Config().APIOnlyStores = []string{"PARITYA"}
 	t.Cleanup(func() {
 		Config().SearchRetailBlockList = prevRetail
 		Config().SearchBuylistBlockList = prevBuylist
+		Config().APIOnlyStores = prevAPIOnly
 	})
 
 	got := apiEnabledStores("ALL_ACCESS")
 	if !slices.Contains(got, "PARITYA") {
-		t.Errorf("ALL_ACCESS should keep PARITYA, got %v", got)
+		t.Errorf("ALL_ACCESS should keep the API-only PARITYA, got %v", got)
 	}
 	if slices.Contains(got, "PARITYIDX") || slices.Contains(got, "PARITYV") {
 		t.Errorf("ALL_ACCESS should apply both blocklists, got %v", got)
@@ -673,28 +676,31 @@ func TestBaseAccessStoreEligible(t *testing.T) {
 
 // TestGetDefaultBlocklists pins the search-side counterpart: with no sig the
 // config blocklists apply, a sig can replace them with its own list, and
-// NONE disables them.
+// NONE disables them. The API-only stores stay blocked in every case.
 func TestGetDefaultBlocklists(t *testing.T) {
 	prevRetail := Config().SearchRetailBlockList
 	prevBuylist := Config().SearchBuylistBlockList
+	prevAPIOnly := Config().APIOnlyStores
 	Config().SearchRetailBlockList = []string{"RBLOCK"}
 	Config().SearchBuylistBlockList = []string{"BBLOCK"}
+	Config().APIOnlyStores = []string{"APIONLY"}
 	t.Cleanup(func() {
 		Config().SearchRetailBlockList = prevRetail
 		Config().SearchBuylistBlockList = prevBuylist
+		Config().APIOnlyStores = prevAPIOnly
 	})
 
 	retail, buylist := getDefaultBlocklists("")
-	if !slices.Equal(retail, []string{"RBLOCK"}) || !slices.Equal(buylist, []string{"BBLOCK"}) {
+	if !slices.Equal(retail, []string{"RBLOCK", "APIONLY"}) || !slices.Equal(buylist, []string{"BBLOCK", "APIONLY"}) {
 		t.Errorf("no sig should fall back to config: %v / %v", retail, buylist)
 	}
 
 	sig := base64.StdEncoding.EncodeToString([]byte("SearchDisabled=NONE&SearchBuylistDisabled=STOREX,STOREY"))
 	retail, buylist = getDefaultBlocklists(sig)
-	if retail != nil {
-		t.Errorf("NONE should disable the retail blocklist, got %v", retail)
+	if !slices.Equal(retail, []string{"APIONLY"}) {
+		t.Errorf("NONE should leave only the API-only stores, got %v", retail)
 	}
-	if !slices.Equal(buylist, []string{"STOREX", "STOREY"}) {
+	if !slices.Equal(buylist, []string{"STOREX", "STOREY", "APIONLY"}) {
 		t.Errorf("sig list should replace the buylist blocklist, got %v", buylist)
 	}
 }

@@ -123,15 +123,16 @@ func newSite() *site {
 
 		EnabledStores: func() []string {
 			var all []string
+			retailBlock, buylistBlock := Config().siteRetailBlockList(), Config().siteBuylistBlockList()
 			for _, seller := range GetSellers() {
 				shorthand := seller.Info().Shorthand
-				if !slices.Contains(Config().SearchRetailBlockList, shorthand) && !slices.Contains(all, shorthand) {
+				if !slices.Contains(retailBlock, shorthand) && !slices.Contains(all, shorthand) {
 					all = append(all, shorthand)
 				}
 			}
 			for _, vendor := range GetVendors() {
 				shorthand := vendor.Info().Shorthand
-				if !slices.Contains(Config().SearchBuylistBlockList, shorthand) && !slices.Contains(all, shorthand) {
+				if !slices.Contains(buylistBlock, shorthand) && !slices.Contains(all, shorthand) {
 					all = append(all, shorthand)
 				}
 			}
@@ -186,8 +187,8 @@ func newSite() *site {
 
 		WatermarkSecret: func() []byte { return []byte(os.Getenv("BAN_SECRET")) },
 
-		RetailBlockList:  func() []string { return Config().SearchRetailBlockList },
-		BuylistBlockList: func() []string { return Config().SearchBuylistBlockList },
+		RetailBlockList:  func() []string { return Config().siteRetailBlockList() },
+		BuylistBlockList: func() []string { return Config().siteBuylistBlockList() },
 	})
 
 	s.alerts = alerts.NewService(nil, s.alertEvalDeps(), s.alertAPIDeps())
