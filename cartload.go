@@ -133,11 +133,14 @@ func (cs cartStore) page(buylist bool) string {
 // cartLoad is what a split's "Load at" button needs: the store's name, its
 // cart page with the split's rows in the fragment, and each row's store item
 // id in row order, empty where the store lists none, for js/load-lists.js to
-// rebuild the fragment from the rows left ticked.
+// rebuild the fragment from the rows left ticked. Quantities, where set, are
+// each row's quantity in the same order, for a link whose rows ask for
+// other than the page's.
 type cartLoad struct {
-	Store string
-	Link  string
-	Items string
+	Store      string
+	Link       string
+	Items      string
+	Quantities string
 }
 
 // cartLoadFor builds the button for a store split, or nothing for a store the
@@ -176,18 +179,38 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 	return cartLoad{}
 }
 
+// cartMostQuantity is what a cart is asked for to get as many as the store
+// has, for a store whose cart trims a quantity to its stock.
+const cartMostQuantity = 999
+
 // cartLoadForArbit is cartLoadFor over an arbit section's rows, each in the
-// condition the store sells it in.
+// condition the store sells it in. Mint's feed caps its stock at 8, so its
+// store cart asks for what the buylist takes, or as many as Mint has where
+// the buylist names no amount, and Mint trims it to what it has.
 func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) cartLoad {
+	most := !buylist && strings.HasPrefix(key, "MMC")
 	rows := make([]OptimizedUploadEntry, 0, len(entries))
+	quantities := make([]string, 0, len(entries))
 	for _, entry := range entries {
+		qty := max(entry.Quantity, 1)
+		if most {
+			qty = entry.BuylistEntry.Quantity
+			if qty <= 0 {
+				qty = cartMostQuantity
+			}
+		}
 		rows = append(rows, OptimizedUploadEntry{
 			CardID:    entry.CardID,
 			Condition: entry.InventoryEntry.Conditions,
-			Quantity:  max(entry.Quantity, 1),
+			Quantity:  qty,
 		})
+		quantities = append(quantities, strconv.Itoa(qty))
 	}
-	return cartLoadFor(key, buylist, rows)
+	load := cartLoadFor(key, buylist, rows)
+	if most && load.Link != "" {
+		load.Quantities = strings.Join(quantities, ",")
+	}
+	return load
 }
 
 // cartStoresIn answers whether any of the splits keys names is one a store

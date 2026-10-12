@@ -110,9 +110,13 @@ describe('load lists', () => {
     });
 
     // A store cart link in the span that holds it and its "?"
-    function cartButton(href, loadItems) {
+    function cartButton(href, loadItems, loadQtys) {
         const box = {hidden: false};
-        return {dataset: {loadList: 'cart', loadItems}, href, box, closest: (selector) => (selector === '.cart-load' ? box : null)};
+        const dataset = {loadList: 'cart', loadItems};
+        if (loadQtys) {
+            dataset.loadQtys = loadQtys;
+        }
+        return {dataset, href, box, closest: (selector) => (selector === '.cart-load' ? box : null)};
     }
 
     test('a cart link keeps only the ticked rows, adding up shared ids', () => {
@@ -127,6 +131,14 @@ describe('load lists', () => {
         page.tick(0);
         page.tick(1);
         expect(link.href).toBe(href);
+    });
+
+    test('a cart link asking its own quantities keeps them for the ticked rows', () => {
+        const href = 'https://www.mtgmintcard.com/shopping-cart#ban=7:20,8:999,9:999&v=abc&side=retail';
+        const link = cartButton(href, '7,8,9', '20,999,999');
+        const page = loadPage({lists: [link]});
+        page.untick(1);
+        expect(link.href).toBe('https://www.mtgmintcard.com/shopping-cart#ban=7:20,9:999&v=abc&side=retail');
     });
 
     test('a cart link with no row left the store lists hides until one is ticked', () => {
