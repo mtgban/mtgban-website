@@ -74,6 +74,7 @@
         <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="window.switchTab && switchTab(this,'checkpoints')">Checkpoints</button>
         <button class="admin-tab{{if eq .Page "acl"}} active{{end}}" onclick="window.switchTab && switchTab(this,'acl')">Access</button>
         <button class="admin-tab{{if eq .Page "affiliates"}} active{{end}}" onclick="window.switchTab && switchTab(this,'affiliates')">Affiliates</button>
+        <button class="admin-tab{{if eq .Page "datasets"}} active{{end}}" onclick="window.switchTab && switchTab(this,'datasets')">Datasets</button>
         <button class="admin-tab{{if eq .Page "overrides"}} active{{end}}" onclick="window.switchTab && switchTab(this,'overrides')">Key Overrides</button>
         <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="window.switchTab && switchTab(this,'tools')">Tools</button>
     </div>
@@ -382,6 +383,29 @@
             <form id="affiliatesForm" action="/admin?page=affiliates" method="post">
                 <textarea id="affiliatesTextArea" name="affiliatesTextArea" style="display:none;">{{.AffiliatesText}}</textarea>
                 <div id="affiliatesEditor"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════
+         DATASETS
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "datasets"}} active{{end}}" id="panel-datasets">
+        <div class="admin-config-wrap">
+            <div class="admin-config-header">
+                <h2>Chart Datasets Editor</h2>
+                <span class="warn-tag">{{or (datasets_path) "timeseries_config.datasets (read-only)"}}</span>
+                <div class="config-actions">
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('datasets')">Format JSON</button>
+                    <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
+                    {{if datasets_path}}
+                    <button class="cfg-btn cfg-primary" data-update-for="datasets" onclick="document.getElementById('datasetsForm').requestSubmit()">Update</button>
+                    {{end}}
+                </div>
+            </div>
+            <form id="datasetsForm" action="/admin?page=datasets" method="post">
+                <textarea id="datasetsTextArea" name="datasetsTextArea" style="display:none;">{{datasets_text}}</textarea>
+                <div id="datasetsEditor"></div>
             </form>
         </div>
     </div>
@@ -828,6 +852,8 @@ window.addEventListener("beforeunload", function(e) {
     if (acle) window.__jsonEditors["acl"] = acle;
     var aff = initJSONEditor({ name: "affiliates", textareaId: "affiliatesTextArea", editorId: "affiliatesEditor", formId: "affiliatesForm" });
     if (aff) window.__jsonEditors["affiliates"] = aff;
+    var dse = initJSONEditor({ name: "datasets", textareaId: "datasetsTextArea", editorId: "datasetsEditor", formId: "datasetsForm" });
+    if (dse) window.__jsonEditors["datasets"] = dse;
 
     var ovr = initJSONEditor({ name: "overrides", textareaId: "keyOverridesTextArea", editorId: "overridesEditor", formId: "overridesForm" });
     if (ovr) window.__jsonEditors["overrides"] = ovr;

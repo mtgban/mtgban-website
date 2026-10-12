@@ -376,6 +376,23 @@ var funcMap = template.FuncMap{
 	"bantool_run_name": func(store string) string {
 		return newBantoolWorkflow(Config().Game, store).RunName
 	},
+	// datasets_text is the chart datasets as the admin editor shows them.
+	"datasets_text": func() string {
+		datasets := Datasets()
+		if datasets == nil {
+			datasets = []DatasetConfig{}
+		}
+		text, err := json.MarshalIndent(datasets, "", "    ")
+		if err != nil {
+			return ""
+		}
+		return string(text)
+	},
+	// datasets_path is the file the chart datasets are read from and saved
+	// to, empty when they are the config's own.
+	"datasets_path": func() string {
+		return Config().DatasetsPath
+	},
 	// stale_count counts the rows of an admin scraper table whose stale
 	// badge, column 8, is set.
 	"stale_count": func(rows [][]string) int {

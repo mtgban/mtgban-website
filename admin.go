@@ -158,6 +158,8 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	adminAffiliatesEditor(r, &pageVars)
 
+	adminDatasetsEditor(r, &pageVars)
+
 	s.adminKeyOverrides(r, b, &pageVars)
 
 	// now anchors every staleness check below, so one row is never compared
@@ -568,6 +570,28 @@ func adminAffiliatesEditor(r *http.Request, pageVars *PageVars) {
 	pageVars.AffiliatesSource = Config().AffiliatesPath
 	if pageVars.AffiliatesSource == "" {
 		pageVars.AffiliatesSource = "not configured"
+	}
+}
+
+// adminDatasetsEditor saves chart datasets posted from the dashboard's editor;
+// the template reads them back through datasets_text and datasets_path.
+func adminDatasetsEditor(r *http.Request, pageVars *PageVars) {
+	newDatasets := r.FormValue("datasetsTextArea")
+	if newDatasets == "" {
+		return
+	}
+	var parsed []DatasetConfig
+	decoder := json.NewDecoder(strings.NewReader(newDatasets))
+	// A typoed key would otherwise be dropped without a word.
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&parsed)
+	if err == nil {
+		err = saveDatasets(r.Context(), parsed)
+	}
+	if err != nil {
+		pageVars.WarningMessage = "Datasets not saved: " + err.Error()
+	} else {
+		pageVars.InfoMessage = "Datasets updated"
 	}
 }
 
