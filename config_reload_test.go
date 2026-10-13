@@ -48,15 +48,11 @@ func TestConfigReloadDropsWhatTheFileDropped(t *testing.T) {
 	writeTestConfig(t, path, `{
 		"game": "lorcana",
 		"port": "8080",
-		"api_user_secrets": {"kept@example.com": "a", "revoked@example.com": "b"},
-		"timeseries_config": {"datasets": [{"public_name": "TCGplayer Low", "provider": 1}]}
+		"api_user_secrets": {"kept@example.com": "a", "revoked@example.com": "b"}
 	}`)
 	err := loadVars("8081", "", "flag-acl.json", "flag-grants.json")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(chartProviders()) != 1 {
-		t.Fatalf("registry %+v, want the one configured dataset", chartProviders())
 	}
 
 	writeTestConfig(t, path, `{
@@ -72,10 +68,6 @@ func TestConfigReloadDropsWhatTheFileDropped(t *testing.T) {
 	_, found := Config().APIUserSecrets["revoked@example.com"]
 	if found || Config().APIUserSecrets["kept@example.com"] != "a" {
 		t.Errorf("api_user_secrets %v, want only the key the file still has", Config().APIUserSecrets)
-	}
-	if Config().TimeseriesConfig.Datasets != nil || len(chartProviders()) != 0 {
-		t.Errorf("datasets %+v, registry %+v, want both gone with timeseries_config",
-			Config().TimeseriesConfig.Datasets, chartProviders())
 	}
 
 	// What loadVars adds to the file it adds again.
@@ -120,9 +112,8 @@ func TestConfigReloadFailureKeepsTheConfig(t *testing.T) {
 	}
 }
 
-// A reload that moves the datasets to a file that cannot be read charts
-// nothing, rather than keeping the providers the inline datasets built.
-func TestConfigReloadToAnUnreadableDatasetsPath(t *testing.T) {
+// A config naming a datasets file that cannot be read charts nothing.
+func TestUnreadableDatasetsPathChartsNothing(t *testing.T) {
 	path := withConfigFile(t)
 	savedDatasets := datasetsPtr.Load()
 	datasetsPtr.Store(nil)
@@ -130,21 +121,9 @@ func TestConfigReloadToAnUnreadableDatasetsPath(t *testing.T) {
 
 	writeTestConfig(t, path, `{
 		"port": "8080",
-		"timeseries_config": {"datasets": [{"public_name": "TCGplayer Low", "provider": 1}]}
-	}`)
-	err := loadVars("8081", "", "flag-acl.json", "flag-grants.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(chartProviders()) != 1 {
-		t.Fatalf("registry %+v, want the one inline dataset", chartProviders())
-	}
-
-	writeTestConfig(t, path, `{
-		"port": "8080",
 		"datasets_path": "`+filepath.Join(t.TempDir(), "nope.json")+`"
 	}`)
-	err = reloadConfig()
+	err := loadVars("8081", "", "flag-acl.json", "flag-grants.json")
 	if err != nil {
 		t.Fatal(err)
 	}

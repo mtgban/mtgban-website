@@ -21,8 +21,6 @@ import (
 )
 
 type TimeseriesConfig struct {
-	Datasets []DatasetConfig `json:"datasets"`
-
 	// LongFormWrites dual-writes each snapshot into the new long tables
 	// (variants + prices) alongside the legacy wide tables. Charts and
 	// analytics read only the long tables. See db_migration/.
@@ -191,9 +189,9 @@ type providerDisplay struct {
 // order, so a new game (which reuses the shared TCGplayer providers) charts with
 // no extra code. Built at startup, and again on ?tool=config or an admin-editor
 // save, from the dataset config, which owns every provider's id, name, color, and
-// position: a provider a deployment wants on its charts needs an entry in
-// timeseries_config.datasets, including the TCGplayer metrics a non-Magic
-// deployment charts. Published whole, never modified: chartProviders reads it.
+// position: a provider a deployment wants on its charts needs an entry in its
+// datasets file, including the TCGplayer metrics a non-Magic deployment
+// charts. Published whole, never modified: chartProviders reads it.
 var providerRegistry atomic.Pointer[[]providerDisplay]
 
 // chartProviders is the current provider registry.
@@ -205,11 +203,11 @@ func chartProviders() []providerDisplay {
 	return *registry
 }
 
-// buildProviderRegistry (re)builds providerRegistry from the loaded datasets:
-// finishConfig calls it for the config's own, loadDatasets for a file's. Nothing is substituted for a dataset the
-// config leaves incomplete: a missing provider id can't be matched against a
-// price row, so it is logged and skipped, and a config that sets none at all
-// leaves the registry empty rather than charting a display the config never
+// buildProviderRegistry (re)builds providerRegistry from the loaded datasets;
+// loadDatasets calls it each time it reads them. Nothing is substituted for a
+// dataset the file leaves incomplete: a missing provider id can't be matched
+// against a price row, so it is logged and skipped, and a file that sets none
+// at all leaves the registry empty rather than charting a display it never
 // asked for.
 func buildProviderRegistry() {
 	seen := map[int16]bool{}

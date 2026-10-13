@@ -389,7 +389,7 @@ var funcMap = template.FuncMap{
 		return string(text)
 	},
 	// datasets_path is the file the chart datasets are read from and saved
-	// to, empty when they are the config's own.
+	// to, empty when the config names none.
 	"datasets_path": func() string {
 		return Config().DatasetsPath
 	},

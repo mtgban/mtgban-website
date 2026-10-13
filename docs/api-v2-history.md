@@ -57,7 +57,7 @@ and the deployed `config.json`:
 ### Sources and the store keys they get
 
 A source is a provider in the archive. Each is keyed by the store tag v2
-already uses for it, taken from `timeseries_config.datasets` (the first
+already uses for it, taken from the datasets file (`datasets_path`; the first
 non-sealed entry of its `retail` or `buylist` list), and filed under the
 section that list names:
 

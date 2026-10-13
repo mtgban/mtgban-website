@@ -205,15 +205,11 @@ func saveAffiliates(ctx context.Context, value AffiliatesConfig) error {
 var datasetsMu sync.Mutex
 var datasetsPtr atomic.Pointer[[]DatasetConfig]
 
-// Datasets returns the chart datasets: the datasets_path file's when the
-// config names one, else timeseries_config.datasets. The result is shared and
-// must not be modified.
+// Datasets returns the chart datasets read from datasets_path, none when the
+// config names no file. The result is shared and must not be modified.
 func Datasets() []DatasetConfig {
-	if Config().DatasetsPath == "" {
-		return Config().TimeseriesConfig.Datasets
-	}
 	value := datasetsPtr.Load()
-	if value == nil {
+	if Config().DatasetsPath == "" || value == nil {
 		return nil
 	}
 	return *value

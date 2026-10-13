@@ -29,16 +29,21 @@ func TestChartPageCostLive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
+	// The fixture carries the datasets inline, beside the timeseries settings.
 	var cfg struct {
 		SQLConfig        *timeseries.SQLConfig `json:"sql_config"`
-		TimeseriesConfig TimeseriesConfig      `json:"timeseries_config"`
+		TimeseriesConfig struct {
+			TimeseriesConfig
+			Datasets []DatasetConfig `json:"datasets"`
+		} `json:"timeseries_config"`
 	}
 	if err := json.Unmarshal(blob, &cfg); err != nil {
 		t.Fatalf("parse %s: %v", path, err)
 	}
 
 	// Chart the providers the deployment charts, in its own order.
-	Config().TimeseriesConfig = cfg.TimeseriesConfig
+	withDatasets(t, cfg.TimeseriesConfig.Datasets)
+	Config().TimeseriesConfig = cfg.TimeseriesConfig.TimeseriesConfig
 	buildProviderRegistry()
 
 	client, err := timeseries.NewClient(*cfg.SQLConfig)
