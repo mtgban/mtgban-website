@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -135,10 +136,13 @@ func TestSaveDatasetsWritesThePath(t *testing.T) {
 	}
 }
 
-// The Datasets tab offers Update only when there is a file to save to.
+// The Datasets tab offers Update, and an editable editor, only when there is
+// a file to save to.
 func TestAdminDatasetsUpdateNeedsAPath(t *testing.T) {
-	pv := PageVars{UserNav: &NavElem{Short: "b"}}
+	pv := PageVars{UserNav: &NavElem{Short: "b"}, AdminVars: AdminVars{ACLText: "{}"}}
 	const update = `data-update-for="datasets"`
+	readOnly := regexp.MustCompile(`formId: "datasetsForm", readOnly:\s*true\s*}`)
+	editable := regexp.MustCompile(`formId: "datasetsForm", readOnly:\s*false\s*}`)
 
 	withDatasetsConfig(t, "")
 	out := renderPage(t, "admin.html", false, pv)
@@ -148,10 +152,16 @@ func TestAdminDatasetsUpdateNeedsAPath(t *testing.T) {
 	if !strings.Contains(out, "timeseries_config.datasets (read-only)") {
 		t.Error("tab does not say the config's datasets are read-only")
 	}
+	if !readOnly.MatchString(out) {
+		t.Error("editor is editable with no datasets path")
+	}
 
 	Config().DatasetsPath = "datasets.json"
 	out = renderPage(t, "admin.html", false, pv)
 	if !strings.Contains(out, update) {
 		t.Error("Update not offered with a datasets path")
+	}
+	if !editable.MatchString(out) {
+		t.Error("editor is read-only with a datasets path")
 	}
 }

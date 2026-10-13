@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -128,16 +129,22 @@ func TestSaveInfrastructureWritesThePath(t *testing.T) {
 	}
 }
 
-// The Infrastructure tab offers Update only when there is a file to save to,
-// and shows the file alone, not the keys this deployment's config overrides.
+// The Infrastructure tab offers Update, and an editable editor, only when
+// there is a file to save to, and shows the file alone, not the keys this
+// deployment's config overrides.
 func TestAdminInfrastructureEditor(t *testing.T) {
-	pv := PageVars{UserNav: &NavElem{Short: "b"}}
+	pv := PageVars{UserNav: &NavElem{Short: "b"}, AdminVars: AdminVars{ACLText: "{}"}}
 	const update = `data-update-for="infrastructure"`
+	readOnly := regexp.MustCompile(`formId: "infrastructureForm", readOnly:\s*true\s*}`)
+	editable := regexp.MustCompile(`formId: "infrastructureForm", readOnly:\s*false\s*}`)
 
 	withInfrastructureConfig(t, "")
 	out := renderPage(t, "admin.html", false, pv)
 	if strings.Contains(out, update) {
 		t.Error("Update offered with no infrastructure path")
+	}
+	if !readOnly.MatchString(out) {
+		t.Error("editor is editable with no infrastructure path")
 	}
 
 	path := writeInfrastructureFile(t, `{"google_credentials": "file.json"}`)
@@ -150,6 +157,9 @@ func TestAdminInfrastructureEditor(t *testing.T) {
 	out = renderPage(t, "admin.html", false, pv)
 	if !strings.Contains(out, update) {
 		t.Error("Update not offered with an infrastructure path")
+	}
+	if !editable.MatchString(out) {
+		t.Error("editor is read-only with an infrastructure path")
 	}
 	if !strings.Contains(out, "file.json") || strings.Contains(out, "own.json") {
 		t.Error("the editor does not show the file alone")
