@@ -1,9 +1,11 @@
 // Command tcgcsvd runs the tcgcsv ingestion jobs on their own, without the web
 // server: the daily price pull, the weekly product catalog sync, and the
 // historical backfill. It reads the same config.json the server does, uses only
-// the sql_config and tcgcsv_config sections of it, and runs the two scheduled
-// jobs under the same cross-process crawl lock, so it can run beside a server
-// that still has its crons enabled without both crawling tcgcsv.com at once.
+// the sql_config and tcgcsv_config sections of it (sql_config from the
+// infrastructure file it names, unless it sets its own), and runs the two
+// scheduled jobs under the same cross-process crawl lock, so it can run beside a
+// server that still has its crons enabled without both crawling tcgcsv.com at
+// once.
 // The backfill stays outside that lock, as it does everywhere else: it is
 // operator-driven and runs for hours, and holding the lock for that long would
 // starve the daily pull. Time a long backfill so it doesn't sit on top of a
@@ -38,6 +40,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/notify"
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/tcgcsvd"
@@ -50,6 +53,9 @@ import (
 type config struct {
 	SQLConfig    *timeseries.SQLConfig `json:"sql_config"`
 	TCGCSVConfig *tcgcsv.Config        `json:"tcgcsv_config"`
+	// InfrastructurePath names the infrastructure file the deployments share,
+	// read for sql_config when the config sets none.
+	InfrastructurePath string `json:"infrastructure_path"`
 	// Game is what the deployment this config belongs to serves. A non-Magic
 	// one charts out of the long prices table and nothing else, and its own
 	// snapshot leaves the TCGplayer series to this ingest, so the long-form
@@ -91,19 +97,21 @@ func loadConfig(ctx context.Context, path string) (*config, error) {
 		return nil, errors.New("no config path given; pass -config or set BAN_CONFIG_PATH")
 	}
 
-	reader, err := simplecloud.Open(ctx, path,
-		simplecloud.WithB2Credentials(os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET")))
+	var cfg config
+	err := readJSON(ctx, path, &cfg)
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
-
-	var cfg config
-	if err := json.NewDecoder(reader).Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
 	if cfg.Discord.ServerWebhookURL == "" {
 		cfg.Discord.ServerWebhookURL = cfg.LegacyDiscordNotifHook
+	}
+	if cfg.InfrastructurePath != "" {
+		var file infrastructure.Config
+		err = readJSON(ctx, cfg.InfrastructurePath, &file)
+		if err != nil {
+			return nil, err
+		}
+		cfg.SQLConfig = infrastructure.Config{SQLConfig: cfg.SQLConfig}.Over(file).SQLConfig
 	}
 	if cfg.SQLConfig == nil {
 		return nil, fmt.Errorf("%s: no sql_config section; there is no price database to write to", path)
@@ -112,6 +120,22 @@ func loadConfig(ctx context.Context, path string) (*config, error) {
 		return nil, fmt.Errorf("%s: no tcgcsv_config.games; nothing to ingest", path)
 	}
 	return &cfg, nil
+}
+
+// readJSON decodes the JSON file at path, which may be a local file or a b2://
+// URL read with the config's own key pair.
+func readJSON(ctx context.Context, path string, v any) error {
+	reader, err := simplecloud.Open(ctx, path,
+		simplecloud.WithB2Credentials(os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET")))
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	err = json.NewDecoder(reader).Decode(v)
+	if err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	return nil
 }
 
 func main() {

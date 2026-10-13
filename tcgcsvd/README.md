@@ -148,7 +148,9 @@ and `BAN_CONFIG_SECRET` in the environment. Only four sections are read; the res
 of the server's config is ignored, so the deployed file works unchanged:
 
 - `sql_config` — the price database (a read-only client is refused, loudly,
-  rather than reporting a clean run that wrote nothing)
+  rather than reporting a clean run that wrote nothing). Where the config names
+  an `infrastructure_path`, it comes from that file unless the config sets its
+  own.
 - `tcgcsv_config` — the chosen categories and the User-Agent
 - `timeseries_config.long_form_writes` — dual-write into the long `prices` table
 - `discord.server_webhook_url` — optional, for job-level success and failure notices
