@@ -1397,6 +1397,62 @@ body:has(.search-layout) {
 }
 
 
+/* TCGplayer copies sold a day, newspaper tiers (salesvelocity.go) */
+.sales-velocity summary {
+    cursor: pointer;
+    list-style: none;
+}
+.sales-velocity summary::-webkit-details-marker {
+    display: none;
+}
+.sales-velocity summary .store-name:hover {
+    text-decoration: none;
+}
+.sales-velocity-chevron {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0.5;
+    transition: transform 150ms ease;
+}
+.sales-velocity[open] .sales-velocity-chevron {
+    transform: rotate(180deg);
+}
+.sales-velocity-detail {
+    padding: 6px 12px 8px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    white-space: pre-line;
+    color: var(--search-text-dim);
+    background: var(--search-surface-1);
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+.sales-velocity-detail .tip-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.sales-velocity-detail .tip-table tr {
+    background: none;
+}
+.sales-velocity-detail .tip-table td {
+    padding: 0;
+}
+.sales-velocity-detail .tip-table td:last-child {
+    text-align: right;
+}
+.sales-velocity-upsell {
+    padding: 3px 12px;
+    font-size: var(--text-xs);
+    font-style: italic;
+    text-align: center;
+    color: var(--search-text-dim);
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+.sales-velocity-upsell:hover {
+    color: var(--normal);
+}
+
 /* ── Price row ── */
 /* The row is a (sub)grid: column 1 holds the store name. store-cell wraps the
    name (and the admin Fix link) so the two share that one cell and the Fix link

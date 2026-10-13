@@ -676,6 +676,20 @@
                                 <!-- Buyers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Buyers</div>
+                                    {{if $card.Velocity}}
+                                        {{if $.CanVelocity}}
+                                            <details class="sales-velocity">
+                                                <summary class="price-row">
+                                                    <span class="store-name dim">TCGplayer sales</span>
+                                                    <span class="price"><span class="amt">{{$card.Velocity}}</span></span>
+                                                    <i class="sales-velocity-chevron" data-lucide="chevron-down"></i>
+                                                </summary>
+                                                <div class="sales-velocity-detail">{{tip_html $card.VelocityDetail}}</div>
+                                            </details>
+                                        {{else if $.ShowUpsell}}
+                                            <a class="sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">Increase your tier to unlock sales velocity</a>
+                                        {{end}}
+                                    {{end}}
                                     {{$condsEntry := (index $.FoundVendors $cardId)}}
                                     {{if not $condsEntry}}
                                         <div class="no-offers"><i>No offers</i></div>

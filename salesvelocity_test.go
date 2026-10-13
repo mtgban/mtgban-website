@@ -4,8 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -13,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/mtgban"
 )
 
 // setTestSalesVelocity files cards as the loaded sales, restoring the last load when the test ends.
@@ -525,5 +532,194 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 	card = uuid2card(b, currentPrices(), cardID, false, nil)
 	if card.Velocity != "" || card.VelocityDetail != "" {
 		t.Errorf("no data: got %q, %q", card.Velocity, card.VelocityDetail)
+	}
+}
+
+// velocityPageVars is one card on a results page, its velocity read from the snapshot.
+func velocityPageVars(canVelocity, showUpsell bool) PageVars {
+	const cardID = "velocity-card"
+	rate, detail := salesVelocityView(cardID)
+	return PageVars{
+		ShowUpsell: showUpsell,
+		SearchVars: SearchVars{
+			CondKeys:     []mtgban.Condition{"NM"},
+			AllKeys:      []string{cardID},
+			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{},
+			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
+			CanVelocity:  canVelocity,
+		},
+		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: rate, VelocityDetail: detail}},
+	}
+}
+
+const velocityUpsell = "Increase your tier to unlock sales velocity"
+
+// velocityPages renders vars on both layouts.
+func velocityPages(t *testing.T, vars PageVars) map[string]string {
+	t.Helper()
+	return map[string]string{"desktop": renderDesktopSearch(t, vars), "mobile": renderMobileSearch(t, vars)}
+}
+
+// TestSearchShowsSalesVelocity shows the row to a reader with the flag, the
+// upsell to one without, and neither for a card with no data.
+func TestSearchShowsSalesVelocity(t *testing.T) {
+	setTestSalesVelocity(t, map[string]*salesVelocity{
+		"velocity-card": {Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)},
+	})
+	for name, page := range velocityPages(t, velocityPageVars(true, true)) {
+		for _, want := range []string{"TCGplayer sales", "2.3/day", "Sold on TCGplayer, last 30 days", ">days with a sale<", ">2026-10-11<"} {
+			if strings.Count(page, want) != 1 {
+				t.Errorf("%s: want %q once, rendered:\n%s", name, want, page)
+			}
+		}
+		if strings.Contains(page, velocityUpsell) {
+			t.Errorf("%s: upsell shown to a reader with the row", name)
+		}
+	}
+
+	for name, page := range velocityPages(t, velocityPageVars(false, true)) {
+		if strings.Count(page, velocityUpsell) != 1 {
+			t.Errorf("%s: want the upsell once, rendered:\n%s", name, page)
+		}
+		for _, mark := range []string{"TCGplayer sales", "2.3/day", "Sold on TCGplayer", "2026-10-11"} {
+			if strings.Contains(page, mark) {
+				t.Errorf("%s: %q shown to a reader without the newspaper tier", name, mark)
+			}
+		}
+	}
+
+	for name, page := range velocityPages(t, velocityPageVars(false, false)) {
+		if strings.Contains(page, velocityUpsell) || strings.Contains(page, "TCGplayer sales") {
+			t.Errorf("%s: a reader hiding upsells still sees one", name)
+		}
+	}
+
+	setTestSalesVelocity(t, map[string]*salesVelocity{})
+	for _, canVelocity := range []bool{true, false} {
+		for name, page := range velocityPages(t, velocityPageVars(canVelocity, true)) {
+			if strings.Contains(page, "TCGplayer sales") || strings.Contains(page, velocityUpsell) {
+				t.Errorf("%s: row or upsell shown for a card with no sales data", name)
+			}
+		}
+	}
+}
+
+// TestMobileSalesRowOpensBuyers gives a card with no buylist a Buyers panel to
+// hold the row, saying there are no offers, and no panel without a row.
+func TestMobileSalesRowOpensBuyers(t *testing.T) {
+	setTestSalesVelocity(t, map[string]*salesVelocity{"velocity-card": {Copies: 69, Orders: 31, Days: 18}})
+	sellers := func(vars PageVars) PageVars {
+		vars.FoundSellers = map[string]map[mtgban.Condition][]SearchEntry{
+			"velocity-card": {"NM": {{ScraperName: "Some Store", Price: 1}}},
+		}
+		return vars
+	}
+	page := renderMobileSearch(t, sellers(velocityPageVars(true, true)))
+	if !strings.Contains(page, `id="buyers-velocity-card"`) || !strings.Contains(page, "No offers") {
+		t.Errorf("want a Buyers panel with no offers, rendered:\n%s", page)
+	}
+	page = renderMobileSearch(t, sellers(velocityPageVars(false, false)))
+	if strings.Contains(page, `id="buyers-velocity-card"`) {
+		t.Errorf("want no Buyers panel without a row, rendered:\n%s", page)
+	}
+}
+
+// setCounterspellVelocity files the same sales for every Counterspell printing.
+func setCounterspellVelocity(t *testing.T) {
+	t.Helper()
+	ids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(ids) == 0 {
+		t.Fatalf("no Counterspell printings to file sales for: %v", err)
+	}
+	cards := map[string]*salesVelocity{}
+	for _, id := range ids {
+		cards[id] = &salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+	}
+	setTestSalesVelocity(t, cards)
+}
+
+// TestSearchGatesSalesVelocityByTier shows the row only to a verified newspaper tier, and the upsell to the others.
+func TestSearchGatesSalesVelocityByTier(t *testing.T) {
+	skipWithoutDatastore(t)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+	setCounterspellVelocity(t)
+	page := func(cookie string) string {
+		req := httptest.NewRequest(http.MethodGet, "/search?q=Counterspell", nil)
+		if cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		}
+		w := httptest.NewRecorder()
+		testSite.Search(w, req)
+		return w.Body.String()
+	}
+
+	withSigMode(t, true, false)
+	if !strings.Contains(page(""), `class="sales-velocity"`) {
+		t.Error("dev mode with signing off: no row")
+	}
+
+	signingEnabled(t, true)
+	reader := func(news string) url.Values {
+		fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
+		if news != "" {
+			fields.Set("NewsEnabled", news)
+		}
+		return fields
+	}
+	for _, news := range []string{"1day", "3day"} {
+		got := page(signedAs(t, reader(news), time.Now().Add(time.Hour)))
+		if !strings.Contains(got, `class="sales-velocity"`) {
+			t.Errorf("a signed NewsEnabled=%s sees no row", news)
+		}
+		if strings.Contains(got, velocityUpsell) {
+			t.Errorf("a signed NewsEnabled=%s sees the upsell", news)
+		}
+	}
+
+	forgedFields := reader("1day")
+	forgedFields.Set("Expires", fmt.Sprint(time.Now().Add(time.Hour).Unix()))
+	forgedFields.Set("Signature", "forged")
+	forged := base64.StdEncoding.EncodeToString([]byte(forgedFields.Encode()))
+	for name, cookie := range map[string]string{
+		"anonymous":              "",
+		"signed, no NewsEnabled": signedAs(t, reader(""), time.Now().Add(time.Hour)),
+		"forged NewsEnabled":     forged,
+	} {
+		got := page(cookie)
+		if !strings.Contains(got, `class="result-card-name"`) {
+			t.Fatalf("%s: the page shows no results to check", name)
+		}
+		if strings.Contains(got, `class="sales-velocity"`) {
+			t.Errorf("%s: sees the row", name)
+		}
+		if !strings.Contains(got, velocityUpsell) {
+			t.Errorf("%s: sees no upsell", name)
+		}
+	}
+}
+
+// TestOEmbedLeavesOutSalesVelocity keeps the row and the upsell out of the unfurl everyone reads.
+func TestOEmbedLeavesOutSalesVelocity(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	openSearch(t)
+	setCounterspellVelocity(t)
+
+	w := httptest.NewRecorder()
+	target := "/search/oembed?format=json&url=" + url.QueryEscape("https://mtgban.com/search?q=Counterspell")
+	testSite.SearchOEmbed(w, httptest.NewRequest(http.MethodGet, target, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("answered %d, want 200", w.Code)
+	}
+	for _, mark := range []string{"sales-velocity", "2.3/day", "Sold on TCGplayer", velocityUpsell} {
+		if strings.Contains(w.Body.String(), mark) {
+			t.Errorf("the preview carries %q", mark)
+		}
 	}
 }

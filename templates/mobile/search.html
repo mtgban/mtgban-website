@@ -334,6 +334,7 @@
 
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
+            {{$salesRow := and $card.Velocity (or $.CanVelocity $.ShowUpsell)}}
             {{/* Open whichever side has offers when the default one has none. */}}
             {{$buyersTab := or (and $defaultBuyers $hasBuyers) (not $hasSellers)}}
 
@@ -377,7 +378,7 @@
             {{if not $expanded}}
             <div class="m-tabs" data-card="{{$cardId}}">
                 {{if $hasSellers}}<button class="m-tab{{if not $buyersTab}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab{{if $buyersTab}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+                {{if or $hasBuyers $salesRow}}<button class="m-tab{{if $buyersTab}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
             {{end}}
 
@@ -489,9 +490,26 @@
             {{end}}
 
             {{/* Buyers panel */}}
-            {{if $hasBuyers}}
+            {{if or $hasBuyers $salesRow}}
             <div class="m-tab-panel{{if or $expanded $buyersTab}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$headed := false}}
+                {{if $salesRow}}
+                    {{if $.CanVelocity}}
+                    <details class="m-vendor-row sales-velocity">
+                        <summary>
+                            <span class="m-vendor-name">TCGplayer sales</span>
+                            <span class="m-vendor-right">
+                                <span class="m-vendor-price">{{$card.Velocity}}</span>
+                                <span class="m-vendor-qty"></span>
+                                <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
+                            </span>
+                        </summary>
+                        <div class="m-vendor-detail"><div class="m-detail-note">{{tip_html $card.VelocityDetail}}</div></div>
+                    </details>
+                    {{else}}
+                    <a class="m-vendor-row sales-velocity-upsell" href="https://www.patreon.com/MTGBAN" target="_blank" rel="noopener">Increase your tier to unlock sales velocity</a>
+                    {{end}}
+                {{end}}
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
@@ -607,6 +625,9 @@
                         </div>
                         {{end}}
                     {{end}}
+                {{end}}
+                {{if and $hasSellers (not $hasBuyers)}}
+                <div class="m-vendor-row m-vendor-flat"><span class="m-vendor-name dim">No offers</span></div>
                 {{end}}
             </div>
             {{end}}
@@ -849,7 +870,7 @@
                         <div class="m-settings-toggle" data-val="skipEmpty" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
                     </div>
                     <div class="m-settings-row">
-                        <span>Hide CSV upsell</span>
+                        <span>Hide upsells</span>
                         <div class="m-settings-toggle" data-val="noUpsell" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
                     </div>
                 </div>
