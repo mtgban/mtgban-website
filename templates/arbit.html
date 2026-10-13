@@ -333,9 +333,11 @@
                         <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                             <input type="hidden" name="deck" data-load-list="manapool" value="{{base64enc $deck}}"/>
-                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at Manapool</a>
+                            {{/* Mana Pool's cart has a Load at button of its own below, which
+                                 the cart loader's messages name, so this one says what it opens */}}
+                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Mass entry at Mana Pool</a>
                             <noscript>
-                                <input type="submit" value="Load at Manapool"/>
+                                <input type="submit" value="Mass entry at Mana Pool"/>
                             </noscript>
                         </form>
                     {{end}}

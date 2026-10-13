@@ -949,9 +949,9 @@
                             <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                                 <input type="hidden" name="deck" data-load-list="manapool" value="{{base64enc $deck}}"/>
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Mass entry at Mana Pool</a>
                                 <noscript>
-                                    <input type="submit" value="Load at Manapool"/>
+                                    <input type="submit" value="Mass entry at Mana Pool"/>
                                 </noscript>
                             </form>
                         {{end}}

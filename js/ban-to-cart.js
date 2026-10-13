@@ -16,6 +16,8 @@
         store = scgStore();
     } else if (location.hostname === "www.mtgmintcard.com") {
         store = mintStore();
+    } else if (location.hostname === "manapool.com") {
+        store = mpStore();
     } else if (location.hostname === "shop.strikezoneonline.com") {
         store = szStore();
     } else if (location.hostname === "www.hareruyamtg.com") {
@@ -495,6 +497,113 @@
                     }
                 }
                 return true;
+            }
+        };
+    }
+
+    // mpStore loads Mana Pool's cart, which holds sellers' listings rather
+    // than products and is kept in the browser's storage, from where Mana
+    // Pool syncs a signed-in user's queued changes. Its public optimizer
+    // picks the cheapest listings for each product id; a card it has fewer
+    // of goes again at that many, and one it has none of is left out. The
+    // optimizer is not told what the cart holds, so the picks add to it.
+    function mpStore() {
+        // An empty cart, as Mana Pool starts one
+        var empty = {version: 5, revision: "00000000-0000-4000-8000-000000000000", cart: {entries: []}, changes: []};
+        function readCart() {
+            var stored = JSON.parse(localStorage.getItem("manapool-cart") || "null") || empty;
+            if (stored.version !== 5 || !stored.cart || !Array.isArray(stored.cart.entries) || !Array.isArray(stored.changes)) {
+                throw new Error("Mana Pool keeps its cart in a way this BAN-to-Cart does not know. Nothing was loaded.");
+            }
+            return stored;
+        }
+        return {
+            name: "Mana Pool",
+            loggedIn: function () {
+                return true;
+            },
+            upload: async function (rows, qty) {
+                readCart();
+                var lines = rows.map(function (id) {
+                    return {id: id, qty: qty[id]};
+                });
+                var picks = [];
+                var trimmed = 0;
+                var missing = 0;
+                // The optimizer takes up to 2,000 lines a call
+                for (var i = 0; i < lines.length; i += 2000) {
+                    var chunk = lines.slice(i, i + 2000);
+                    while (chunk.length > 0) {
+                        var resp = await fetch("/api/v1/buyer/optimizer", {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({model: "lowest_price", cart: chunk.map(function (line) {
+                                return {type: "product", product_type: "mtg_single", product_ids: [line.id], quantity_requested: line.qty};
+                            })})
+                        });
+                        var body = await resp.json().catch(function () {
+                            return {};
+                        });
+                        // Mana Pool refuses the whole call over the lines it
+                        // cannot fill, naming each with what it has
+                        if (resp.status === 409 && Array.isArray(body.details) && body.details.length > 0) {
+                            var cut = 0;
+                            body.details.forEach(function (detail) {
+                                var line = chunk[detail.item && detail.item.index];
+                                if (!line || line.qty === 0) {
+                                    return;
+                                }
+                                cut++;
+                                if (detail.total_available > 0 && detail.total_available < line.qty) {
+                                    line.qty = detail.total_available;
+                                    trimmed++;
+                                } else {
+                                    line.qty = 0;
+                                    missing++;
+                                }
+                            });
+                            if (cut === 0) {
+                                throw new Error("Mana Pool refused the list (" + (body.message || resp.status) + ").");
+                            }
+                            chunk = chunk.filter(function (line) {
+                                return line.qty > 0;
+                            });
+                            continue;
+                        }
+                        if (!resp.ok || !Array.isArray(body.cart)) {
+                            throw new Error("Mana Pool refused the list (" + (body.message || resp.status) + ").");
+                        }
+                        picks = picks.concat(body.cart);
+                        break;
+                    }
+                }
+                // Read again with no wait before the write, so a change made
+                // meanwhile stays; added the way Mana Pool's own optimizer
+                // adds a listing
+                var stored = readCart();
+                picks.forEach(function (pick) {
+                    var entry = stored.cart.entries.find(function (e) {
+                        return e.inventoryId === pick.inventory_id;
+                    });
+                    if (entry) {
+                        entry.quantitySelected += pick.quantity_selected;
+                    } else {
+                        stored.cart.entries.push({inventoryId: pick.inventory_id, quantitySelected: pick.quantity_selected, source: "optimizer", optimizerTouched: true});
+                    }
+                    stored.changes.push([pick.inventory_id, pick.quantity_selected, "optimizer", true]);
+                });
+                localStorage.setItem("manapool-cart", JSON.stringify(stored));
+                var message = "Added " + (rows.length - missing) + " cards to your Mana Pool cart, on top of what it held.";
+                if (trimmed > 0) {
+                    message += " " + trimmed + " were cut to the copies Mana Pool has.";
+                }
+                if (missing > 0) {
+                    message += " " + missing + " that Mana Pool has none of were left out.";
+                }
+                window.removeEventListener("beforeunload", stay);
+                alert(message + leftOut());
+                history.replaceState(null, "", location.pathname + location.search);
+                location.reload();
             }
         };
     }
