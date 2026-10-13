@@ -358,7 +358,7 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 			return !info.MetadataOnly
 		})
 	} else if allowlistSellersOpt == "" {
-		allowlistSellers = Config().ArbitDefaultSellers
+		allowlistSellers = Config().Stores.ArbitDefaultSellers
 	} else {
 		allowlistSellers = strings.Split(allowlistSellersOpt, ",")
 	}
@@ -416,9 +416,9 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 	allowlistSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
-			return slices.Contains(Config().GlobalAllowList, info.Shorthand) &&
-				(anyExperiment || !slices.Contains(Config().SearchRetailBlockList, info.Shorthand)) &&
-				!slices.Contains(Config().APIOnlyStores, info.Shorthand)
+			return slices.Contains(Config().Stores.GlobalAllowList, info.Shorthand) &&
+				(anyExperiment || !slices.Contains(Config().Stores.SearchRetailBlockList, info.Shorthand)) &&
+				!slices.Contains(Config().Stores.APIOnlyStores, info.Shorthand)
 		}
 		// These are hardcoded to provide a preview of the tool
 		return info.Shorthand == "TCGMarket" || info.Shorthand == "MKMTrend"

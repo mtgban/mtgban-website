@@ -28,9 +28,9 @@ func TestGetSearchBlocklists(t *testing.T) {
 // spare capacity behind them, two readers' appends land in the same slots and
 // one sees the other's stores.
 func TestDefaultBlocklistsAreSafeToAppendTo(t *testing.T) {
-	prev := Config().SearchRetailBlockList
-	t.Cleanup(func() { Config().SearchRetailBlockList = prev })
-	Config().SearchRetailBlockList = append(make([]string, 0, 4), "CONFIG_SELLER")
+	prev := Config().Stores.SearchRetailBlockList
+	t.Cleanup(func() { Config().Stores.SearchRetailBlockList = prev })
+	Config().Stores.SearchRetailBlockList = append(make([]string, 0, 4), "CONFIG_SELLER")
 
 	a, _ := getDefaultBlocklists("")
 	a = append(a, "CK")

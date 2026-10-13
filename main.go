@@ -108,25 +108,16 @@ type ConfigType struct {
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
 	// from the ban list document or the set registry.
-	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
-	ScraperConfig          ScraperConfig      `json:"scraper_config"`
-	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	Discord                DiscordConfig      `json:"discord"`
-	API                    map[string]string  `json:"api"`
-	APIDemoStores          []string           `json:"api_demo_stores"`
-	ArbitDefaultSellers    []string           `json:"arbit_default_sellers"`
-	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
-	SearchRetailBlockList  []string           `json:"search_block_list"`
-	SearchBuylistBlockList []string           `json:"search_buylist_block_list"`
-	APIOnlyStores          []string           `json:"api_only_stores"`
-	SleepersBlockList      []string           `json:"sleepers_block_list"`
-	UploadSealedBlockList  []string           `json:"upload_sealed_block_list"`
-	GlobalAllowList        []string           `json:"global_allow_list"`
-	GlobalProbeList        []string           `json:"global_probe_list"`
-	Patreon                PatreonConfig      `json:"patreon"`
-	APIUserSecrets         map[string]string  `json:"api_user_secrets"`
-	GoogleCredentials      string             `json:"google_credentials"`
-	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
+	FormatEvents        []FormatEvent      `json:"format_events,omitempty"`
+	ScraperConfig       ScraperConfig      `json:"scraper_config"`
+	TimeseriesConfig    TimeseriesConfig   `json:"timeseries_config"`
+	Discord             DiscordConfig      `json:"discord"`
+	API                 map[string]string  `json:"api"`
+	Stores              StoresConfig       `json:"stores"`
+	Patreon             PatreonConfig      `json:"patreon"`
+	APIUserSecrets      map[string]string  `json:"api_user_secrets"`
+	GoogleCredentials   string             `json:"google_credentials"`
+	BuylistMarketCredit map[string]float64 `json:"buylist_market_credit"`
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
@@ -160,9 +151,25 @@ type ConfigType struct {
 	sourcePath string
 }
 
-// UnmarshalJSON accepts the pre-discord-section keys during migration. New
-// configuration should use the nested discord object; legacy deployments can
-// roll forward without having to change their secrets in the same release.
+// StoresConfig says which stores show where, by shorthand.
+type StoresConfig struct {
+	APIDemoStores          []string `json:"api_demo_stores"`
+	ArbitDefaultSellers    []string `json:"arbit_default_sellers"`
+	ArbitBlockVendors      []string `json:"arbit_block_vendors"`
+	SearchRetailBlockList  []string `json:"search_block_list"`
+	SearchBuylistBlockList []string `json:"search_buylist_block_list"`
+	APIOnlyStores          []string `json:"api_only_stores"`
+	SleepersBlockList      []string `json:"sleepers_block_list"`
+	UploadSealedBlockList  []string `json:"upload_sealed_block_list"`
+	GlobalAllowList        []string `json:"global_allow_list"`
+	GlobalProbeList        []string `json:"global_probe_list"`
+}
+
+// UnmarshalJSON accepts the pre-discord-section keys, and the store lists at
+// the top level when there is no stores section, during migration. New
+// configuration should use the nested discord and stores objects; legacy
+// deployments can roll forward without having to change their secrets in the
+// same release.
 func (c *ConfigType) UnmarshalJSON(data []byte) error {
 	type configAlias ConfigType
 	legacy := struct {
@@ -177,6 +184,20 @@ func (c *ConfigType) UnmarshalJSON(data []byte) error {
 
 	if err := json.Unmarshal(data, &legacy); err != nil {
 		return err
+	}
+	// A config with no stores section keeps its store lists at the top level.
+	var section struct {
+		Stores json.RawMessage `json:"stores"`
+	}
+	err := json.Unmarshal(data, &section)
+	if err != nil {
+		return err
+	}
+	if section.Stores == nil {
+		err = json.Unmarshal(data, &c.Stores)
+		if err != nil {
+			return err
+		}
 	}
 	if c.Discord.UserWebhookURL == "" {
 		c.Discord.UserWebhookURL = legacy.DiscordHook
@@ -204,12 +225,12 @@ func (c *ConfigType) UnmarshalJSON(data []byte) error {
 // list plus the stores only the price API serves. It is clipped, so a caller
 // may append to it.
 func (c *ConfigType) siteRetailBlockList() []string {
-	return append(slices.Clip(c.SearchRetailBlockList), c.APIOnlyStores...)
+	return append(slices.Clip(c.Stores.SearchRetailBlockList), c.Stores.APIOnlyStores...)
 }
 
 // siteBuylistBlockList is siteRetailBlockList for buylists.
 func (c *ConfigType) siteBuylistBlockList() []string {
-	return append(slices.Clip(c.SearchBuylistBlockList), c.APIOnlyStores...)
+	return append(slices.Clip(c.Stores.SearchBuylistBlockList), c.Stores.APIOnlyStores...)
 }
 
 var DevMode bool

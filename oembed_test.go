@@ -123,7 +123,7 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 	vendorsPtr.Store(&vendors)
 
 	withConfigCopy(t)
-	Config().SearchRetailBlockList = []string{"HIDDENIDX"}
+	Config().Stores.SearchRetailBlockList = []string{"HIDDENIDX"}
 
 	expires := time.Now().Add(time.Hour)
 	forged := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("Expires=%d&SearchDisabled=NONE", expires.Unix())))
@@ -206,7 +206,7 @@ func TestOEmbedLeavesOutTheCustomBuylist(t *testing.T) {
 	vendorsPtr.Store(&vendors)
 
 	withConfigCopy(t)
-	Config().SearchRetailBlockList = []string{"HIDDENSTORE"}
+	Config().Stores.SearchRetailBlockList = []string{"HIDDENSTORE"}
 
 	expires := time.Now().Add(time.Hour)
 	signed := signedAs(t, url.Values{"UserName": {"Reader"}, "UserTier": {"Pro"}, "UploadCustom": {"true"}}, expires)

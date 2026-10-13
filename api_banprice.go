@@ -65,8 +65,8 @@ func apiEnabledStores(storesOpt string) []string {
 	case "ALL_ACCESS", "DEV_ACCESS", "BASE_ACCESS":
 		var blocklistRetail, blocklistBuylist []string
 		if storesOpt != "DEV_ACCESS" {
-			blocklistRetail = Config().SearchRetailBlockList
-			blocklistBuylist = Config().SearchBuylistBlockList
+			blocklistRetail = Config().Stores.SearchRetailBlockList
+			blocklistBuylist = Config().Stores.SearchBuylistBlockList
 		}
 		add := func(info mtgban.ScraperInfo, blocklist []string) {
 			if storeEligible(info.Shorthand, nil, blocklist) && !slices.Contains(enabledStores, info.Shorthand) &&
@@ -228,7 +228,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		storesOpt = "DEV_ACCESS"
 	}
 	if sig == "" && storesOpt == "" {
-		storesOpt = strings.Join(Config().APIDemoStores, ",")
+		storesOpt = strings.Join(Config().Stores.APIDemoStores, ",")
 		// Disable a few endpoints for this specific mode
 		if isFullDump && (kind == "all" || kind == "retail" || kind == "buylist") {
 			out.Error = "Invalid endpoint or missing signature"

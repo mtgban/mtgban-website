@@ -69,7 +69,7 @@ func TestConfigSwapDoesNotRaceReaders(t *testing.T) {
 				default:
 					apiGatewaySecret()
 					_ = string(Config().Game) + Config().Port
-					_ = len(Config().SearchRetailBlockList)
+					_ = len(Config().Stores.SearchRetailBlockList)
 				}
 			}
 		})

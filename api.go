@@ -681,7 +681,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	demoFilter := func(name string, forSeller bool) []FilterStoreElem {
 		return []FilterStoreElem{{
 			Name:          name,
-			Values:        fixupStoreCodeNG(strings.Join(Config().APIDemoStores, ",")),
+			Values:        fixupStoreCodeNG(strings.Join(Config().Stores.APIDemoStores, ",")),
 			OnlyForSeller: forSeller,
 			OnlyForVendor: !forSeller,
 		}}

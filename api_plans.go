@@ -230,10 +230,10 @@ func storeFamilies() (implied, selectable []StoreFamily) {
 		}
 	}
 	for _, seller := range GetSellers() {
-		add(seller.Info(), Config().SearchRetailBlockList)
+		add(seller.Info(), Config().Stores.SearchRetailBlockList)
 	}
 	for _, vendor := range GetVendors() {
-		add(vendor.Info(), Config().SearchBuylistBlockList)
+		add(vendor.Info(), Config().Stores.SearchBuylistBlockList)
 	}
 	for _, f := range families {
 		slices.Sort(f.Shorthands)

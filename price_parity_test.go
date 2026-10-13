@@ -539,16 +539,16 @@ func TestApiEnabledStores(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	prevRetail := Config().SearchRetailBlockList
-	prevBuylist := Config().SearchBuylistBlockList
-	prevAPIOnly := Config().APIOnlyStores
-	Config().SearchRetailBlockList = []string{"PARITYIDX"}
-	Config().SearchBuylistBlockList = []string{"PARITYV"}
-	Config().APIOnlyStores = []string{"PARITYA"}
+	prevRetail := Config().Stores.SearchRetailBlockList
+	prevBuylist := Config().Stores.SearchBuylistBlockList
+	prevAPIOnly := Config().Stores.APIOnlyStores
+	Config().Stores.SearchRetailBlockList = []string{"PARITYIDX"}
+	Config().Stores.SearchBuylistBlockList = []string{"PARITYV"}
+	Config().Stores.APIOnlyStores = []string{"PARITYA"}
 	t.Cleanup(func() {
-		Config().SearchRetailBlockList = prevRetail
-		Config().SearchBuylistBlockList = prevBuylist
-		Config().APIOnlyStores = prevAPIOnly
+		Config().Stores.SearchRetailBlockList = prevRetail
+		Config().Stores.SearchBuylistBlockList = prevBuylist
+		Config().Stores.APIOnlyStores = prevAPIOnly
 	})
 
 	got := apiEnabledStores("ALL_ACCESS")
@@ -678,16 +678,16 @@ func TestBaseAccessStoreEligible(t *testing.T) {
 // config blocklists apply, a sig can replace them with its own list, and
 // NONE disables them. The API-only stores stay blocked in every case.
 func TestGetDefaultBlocklists(t *testing.T) {
-	prevRetail := Config().SearchRetailBlockList
-	prevBuylist := Config().SearchBuylistBlockList
-	prevAPIOnly := Config().APIOnlyStores
-	Config().SearchRetailBlockList = []string{"RBLOCK"}
-	Config().SearchBuylistBlockList = []string{"BBLOCK"}
-	Config().APIOnlyStores = []string{"APIONLY"}
+	prevRetail := Config().Stores.SearchRetailBlockList
+	prevBuylist := Config().Stores.SearchBuylistBlockList
+	prevAPIOnly := Config().Stores.APIOnlyStores
+	Config().Stores.SearchRetailBlockList = []string{"RBLOCK"}
+	Config().Stores.SearchBuylistBlockList = []string{"BBLOCK"}
+	Config().Stores.APIOnlyStores = []string{"APIONLY"}
 	t.Cleanup(func() {
-		Config().SearchRetailBlockList = prevRetail
-		Config().SearchBuylistBlockList = prevBuylist
-		Config().APIOnlyStores = prevAPIOnly
+		Config().Stores.SearchRetailBlockList = prevRetail
+		Config().Stores.SearchBuylistBlockList = prevBuylist
+		Config().Stores.APIOnlyStores = prevAPIOnly
 	})
 
 	retail, buylist := getDefaultBlocklists("")

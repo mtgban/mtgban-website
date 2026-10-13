@@ -1565,7 +1565,7 @@ func blocklistsFromValues(v url.Values) ([]string, []string) {
 	opt := v.Get("SearchDisabled")
 	switch opt {
 	case "":
-		retail = slices.Clip(Config().SearchRetailBlockList)
+		retail = slices.Clip(Config().Stores.SearchRetailBlockList)
 	case "NONE":
 	default:
 		retail = strings.Split(opt, ",")
@@ -1573,13 +1573,13 @@ func blocklistsFromValues(v url.Values) ([]string, []string) {
 	opt = v.Get("SearchBuylistDisabled")
 	switch opt {
 	case "":
-		buylist = slices.Clip(Config().SearchBuylistBlockList)
+		buylist = slices.Clip(Config().Stores.SearchBuylistBlockList)
 	case "NONE":
 	default:
 		buylist = strings.Split(opt, ",")
 	}
-	retail = append(retail, Config().APIOnlyStores...)
-	buylist = append(buylist, Config().APIOnlyStores...)
+	retail = append(retail, Config().Stores.APIOnlyStores...)
+	buylist = append(buylist, Config().Stores.APIOnlyStores...)
 	return retail, buylist
 }
 
