@@ -4,14 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -525,5 +532,146 @@ func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
 	card = uuid2card(b, cardID, false)
 	if card.Velocity != "" || card.VelocityTip != "" {
 		t.Errorf("no data: got %q, %q", card.Velocity, card.VelocityTip)
+	}
+}
+
+// velocityPageVars is one card on a results page, its velocity read from the snapshot.
+func velocityPageVars(canVelocity bool) PageVars {
+	const cardID = "velocity-card"
+	badge, tip := salesVelocityView(cardID)
+	return PageVars{
+		SearchVars: SearchVars{
+			CondKeys:     []mtgban.Condition{"NM"},
+			AllKeys:      []string{cardID},
+			FoundSellers: map[string]map[mtgban.Condition][]SearchEntry{},
+			FoundVendors: map[string]map[mtgban.Condition][]SearchEntry{},
+			CanVelocity:  canVelocity,
+		},
+		Metadata: map[string]GenericCard{cardID: {Name: "Some Card", Edition: "Some Set", Velocity: badge, VelocityTip: tip}},
+	}
+}
+
+// TestSearchShowsSalesVelocity renders the badge only with the flag and the data.
+func TestSearchShowsSalesVelocity(t *testing.T) {
+	setTestSalesVelocity(t, map[string]*salesVelocity{
+		"velocity-card": {Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)},
+	})
+	const tip = "**Sold on TCGplayer, last 30 days**\n|copies|69\n|orders|31\n|days with a sale|18\n|last sale|2026-10-11"
+	const plain = "Sold on TCGplayer, last 30 days\ncopies: 69\norders: 31\ndays with a sale: 18\nlast sale: 2026-10-11"
+	shown := velocityPageVars(true)
+	for name, tc := range map[string]struct{ page, want string }{
+		"desktop": {renderDesktopSearch(t, shown), `<span class="sales-velocity" title="` + plain + `" data-tip="` + tip + `">2.3/day</span>`},
+		"mobile":  {renderMobileSearch(t, shown), `<span class="sales-velocity" title="` + plain + `">2.3/day</span>`},
+	} {
+		if strings.Count(tc.page, tc.want) != 1 {
+			t.Errorf("%s: want the badge once in the card header, rendered:\n%s", name, tc.page)
+		}
+	}
+
+	hidden := velocityPageVars(false)
+	for name, page := range map[string]string{"desktop": renderDesktopSearch(t, hidden), "mobile": renderMobileSearch(t, hidden)} {
+		if strings.Contains(page, `class="sales-velocity"`) {
+			t.Errorf("%s: badge shown to a reader without the newspaper tier", name)
+		}
+	}
+
+	setTestSalesVelocity(t, map[string]*salesVelocity{})
+	empty := velocityPageVars(true)
+	for name, page := range map[string]string{"desktop": renderDesktopSearch(t, empty), "mobile": renderMobileSearch(t, empty)} {
+		if strings.Contains(page, `class="sales-velocity"`) {
+			t.Errorf("%s: badge shown for a card with no sales data", name)
+		}
+	}
+}
+
+// setCounterspellVelocity files the same sales for every Counterspell printing.
+func setCounterspellVelocity(t *testing.T) {
+	t.Helper()
+	ids, err := backend().SearchEquals("Counterspell")
+	if err != nil || len(ids) == 0 {
+		t.Fatalf("no Counterspell printings to file sales for: %v", err)
+	}
+	cards := map[string]*salesVelocity{}
+	for _, id := range ids {
+		cards[id] = &salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+	}
+	setTestSalesVelocity(t, cards)
+}
+
+// TestSearchGatesSalesVelocityByTier shows the badge only to a verified newspaper tier.
+func TestSearchGatesSalesVelocityByTier(t *testing.T) {
+	skipWithoutDatastore(t)
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Search")
+	}
+	setCounterspellVelocity(t)
+	page := func(cookie string) string {
+		req := httptest.NewRequest(http.MethodGet, "/search?q=Counterspell", nil)
+		if cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		}
+		w := httptest.NewRecorder()
+		testSite.Search(w, req)
+		return w.Body.String()
+	}
+
+	withSigMode(t, true, false)
+	if !strings.Contains(page(""), `class="sales-velocity"`) {
+		t.Error("dev mode with signing off: no badge")
+	}
+
+	signingEnabled(t, true)
+	reader := func(news string) url.Values {
+		fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}}
+		if news != "" {
+			fields.Set("NewsEnabled", news)
+		}
+		return fields
+	}
+	for _, news := range []string{"1day", "3day"} {
+		if !strings.Contains(page(signedAs(t, reader(news), time.Now().Add(time.Hour))), `class="sales-velocity"`) {
+			t.Errorf("a signed NewsEnabled=%s sees no badge", news)
+		}
+	}
+
+	forgedFields := reader("1day")
+	forgedFields.Set("Expires", fmt.Sprint(time.Now().Add(time.Hour).Unix()))
+	forgedFields.Set("Signature", "forged")
+	forged := base64.StdEncoding.EncodeToString([]byte(forgedFields.Encode()))
+	for name, cookie := range map[string]string{
+		"anonymous":              "",
+		"signed, no NewsEnabled": signedAs(t, reader(""), time.Now().Add(time.Hour)),
+		"forged NewsEnabled":     forged,
+	} {
+		got := page(cookie)
+		if !strings.Contains(got, `class="result-card-name"`) {
+			t.Fatalf("%s: the page shows no results to check", name)
+		}
+		if strings.Contains(got, `class="sales-velocity"`) {
+			t.Errorf("%s: sees the badge", name)
+		}
+	}
+}
+
+// TestOEmbedLeavesOutSalesVelocity keeps the badge out of the unfurl everyone reads.
+func TestOEmbedLeavesOutSalesVelocity(t *testing.T) {
+	skipWithoutDatastore(t)
+	withSigMode(t, true, false)
+	setCounterspellVelocity(t)
+
+	w := httptest.NewRecorder()
+	target := "/search/oembed?format=json&url=" + url.QueryEscape("https://mtgban.com/search?q=Counterspell")
+	testSite.SearchOEmbed(w, httptest.NewRequest(http.MethodGet, target, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("answered %d, want 200", w.Code)
+	}
+	for _, mark := range []string{"sales-velocity", "2.3/day", "Sold on TCGplayer"} {
+		if strings.Contains(w.Body.String(), mark) {
+			t.Errorf("the preview carries %q", mark)
+		}
 	}
 }

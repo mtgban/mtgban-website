@@ -440,6 +440,7 @@
                                             {{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}
                                             {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
                                             {{if $card.Newspaper}}<span class="result-badge news">News</span>{{end}}
+                                            {{if and $.CanVelocity $card.Velocity}}<span class="sales-velocity" title="{{plain_tip $card.VelocityTip}}" data-tip="{{$card.VelocityTip}}">{{$card.Velocity}}</span>{{end}}
                                         </div>
                                     </div>
                                     <span class="result-set-title">

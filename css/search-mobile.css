@@ -346,6 +346,16 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     border-color: rgba(0, 0, 0, 0.15);
 }
 
+/* TCGplayer copies sold a day, newspaper tiers (salesvelocity.go) */
+.m-card-badges .sales-velocity {
+    font-size: 0.65rem;
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+    color: var(--greytext);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 /* Tab toggle: Sellers / Buyers */
 .m-tabs {
     display: flex;
