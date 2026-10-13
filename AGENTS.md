@@ -150,6 +150,7 @@ output, not a claim written here.
 | `settings_modal.go` | The settings modal's body: the tabs a reader's nav earns, each tab's lists from the handlers' shared functions, served by `/api/settings/modal` and rendered from `templates/settings/` |
 | `screener.go`, `popular.go`, `guide.go`, `changelog.go` | The price-movers screener; the landing page's popular searches, ranked from signed-in users' typed searches in the observability database and padded with the config's curated list; the guide; release notes read from Discord |
 | `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, CSV exports |
+| `api_news.go` | The newspaper's reports on API v2 under `/api/v2/newspaper/`: `reports.json` and each report's live edition in JSON or CSV, filtered and sorted through `news.go`'s `newsFilter` and paged at 1,000 rows, sold as the `newspaper` add-on (`docs/api-v2-newspaper.md`) |
 | `admin.go`, `admin_searches.go`, `discord.go` | Admin panel + commands, with the Searches tab's vote ranking in its own file; Discord bot |
 | `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them; per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |

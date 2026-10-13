@@ -587,6 +587,15 @@ forecast) are gone; only the PostgreSQL pages above remain. 25 rows/page
 (`DefaultPageSize`), filterable by edition/rarity/price bucket/finish/%
 change.
 
+A matched row keeps the card's rarity in `Rarity` and its `calc_date` in
+`Date`; a row whose TCGplayer id matches no card is dropped at cache
+time. The page and the API filter and sort a report through one pure
+function, `newsFilter` (a `newsQuery`: set, rarity, finish, bucket, the
+`NewspaperList` cookie's skipped sets, and inclusive bounds on the
+report's `Priced` and `PercChanged` columns), into a new slice, so the
+cached one is never reordered; the page then pages it. The page's links
+send 0 for an unset bound, which it reads as none.
+
 ### 5.5 Sealed EV (`product.go`)
 
 `runSealedAnalysis()` computes per-set values (TCGLow, TCGDirect,
@@ -714,6 +723,29 @@ Its JSON keys cards as v1's search does, by `scryfall` and by `mtgjson`
 for sealed, but takes the `id` a request asks for, sealed included, and
 refuses one v2 does not know. Stores are keyed by shorthand, as in all of
 v2. Its `.csv` is v1's search CSV.
+
+`/api/v2/newspaper/` (`NewspaperAPI`, `api_news.go`) serves the live
+edition of the newspaper's reports: `newspaper/reports.json` lists the
+reports a deployment carries (declared, shown, with rows), each with its
+columns (field, title, a kind from the heading's flags, sortable), the
+filters it takes and their values, and reads no options;
+`newspaper/{report}.json` and `.csv` are one report filtered and sorted
+by `newsFilter`, then paged at `newsPageSize` (1,000) rows by `page=`,
+with `rows` (matched, before paging), `page` and `pages` in meta or the
+`X-MTGBAN-Rows`, `-Page` and `-Pages` headers. Rows are keyed `ranking`,
+`id` (the mtgban uuid), `name`, `set`, `number`, `finish`, `rarity`, then
+the report's column fields; a number that is not finite is `null` in
+JSON and an empty CSV cell. An unknown report, an option the report
+does not take, a value outside its lists, a bad bound, `dir`, `sort` or
+`page` is a 400; a signature whose `APImode` lacks `newspaper` (or
+`all`) a 403; an empty cache a 503 with `Retry-After: 300`. Responses
+are public-cacheable to the next `33 */3 * * *` refresh (`newsCron`, at
+least 60 s; 60 s while the cache predates the last scheduled run; 300 s
+once stale) with an `ETag` over the body, compared weakly for a 304,
+and `Last-Modified` from the refresh. The mode is sold as the
+`newspaper` add-on in `apiproductlist` (`grants_mode`), which the plans
+page shows only with `api_gateway.newspaper_on_sale`.
+`docs/api-v2-newspaper.md` has the design and the read-cost table.
 
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 
