@@ -109,9 +109,11 @@ Boot sequence (`main()`):
    snapshots and the palette's sets/promos/finishes lists from it
    (`s.newDatastore()`, site.go), publishes backend and snapshots
    together in one `s.ds.Store()`, then itself spawns
-   `s.cacheNewspaper()` and `s.loadTCGListings()` as further goroutines,
-   which the tracker's recover does not reach: each defers `recoverJob()`
-   (recover.go) of its own.
+   `s.cacheNewspaper()`, `s.loadTCGListings()`, `s.loadSalesVelocity()`
+   and, where the observability database is configured,
+   `s.refreshPopularSearches()` as further goroutines, which the
+   tracker's recover does not reach: each runs under `tracked()`
+   (recover.go), which recovers it.
 6. Unless `-noload` (`SkipPrices`): `s.startScraperLoad()` (load.go) opens
    the dumps bucket (`openDumpsBucket()`, or with `-dumps <dir>` a
    `simplecloud.FileBucket{Root: dir}` in its place; either is kept as
@@ -152,6 +154,12 @@ Boot sequence (`main()`):
      once the newspaper finishes a scrape, and retries a scrape day whose
      load failed every 6 hours; every datastore load also runs it, which
      queries only if no day is loaded yet
+   - `55 * * * *` - `s.loadSalesVelocity()` (salesvelocity.go): reloads
+     TCGplayer's copies sold per card over the 30 days to the newspaper's
+     newest sale day, and each card's last sale in the year before, for
+     search's sales velocity badge, once the newspaper adds a sale day;
+     retries a day whose load failed every 6 hours; every datastore load
+     also runs it
    - `20 */12 * * *` — `s.offline.RequestRefresh()` (backstop; normal
      refreshes are event-driven)
    - `15 */6 * * *` — `refreshCheckpoints()` (reads no datastore, so it stays
@@ -494,6 +502,13 @@ override; phone UA detection via `mileusna/useragent`).
   ("blue eyed" finds "Blue-Eyed…", "fireice" finds "Fire // Ice"). Prefix
   ≥3 chars, capped at 30 results (`maxSuggestions`), 5-minute cache,
   OpenSearch-compatible array response — all unchanged from before.
+- **Sales velocity** (`salesvelocity.go`, `docs/search-sales-velocity.md`):
+  a badge in each result's header with TCGplayer's copies sold a day over
+  the last 30 days, from the newspaper's `tcgplayersalesdata`: `>=` where
+  the newspaper's five-orders-a-day cap made it a floor, `0/day` for a card
+  that sold in the year but not the window, nothing for one with no sale
+  in the year. Shown only to the Newspaper tiers (`newspaperTier`, news.go,
+  through `SearchVars.CanVelocity`), never in the oEmbed preview.
 
 ### 5.2 Upload (`upload.go`)
 
