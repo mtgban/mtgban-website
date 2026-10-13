@@ -31,6 +31,7 @@ var cartStores = []cartStore{
 	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", "https://www.mtgmintcard.com/shopping-cart"},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
 	{"HA", "Hareruya", "https://www.hareruyamtg.com/ja/purchase/cart", "https://www.hareruyamtg.com/en/cart"},
+	{"ML", "Manaleak", "https://www.manaleak.com/index.php?route=buylist/cart", "https://www.manaleak.com/index.php?route=checkout/cart"},
 	// Mana Pool buys nothing; its store cart is filled through its optimizer
 	{"MP", "Mana Pool", "", "https://manapool.com/cart"},
 	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no

@@ -558,6 +558,115 @@ describe('ban-to-cart bookmarklet on Mana Pool', () => {
     });
 });
 
+// fakeML stands in for Manaleak: each product page names its Near Mint
+// option, its HTML breaking lines inside tags, with the store's copies; a
+// cart page lists a quantity field per line, keyed by product and options;
+// an add adds to a line and the cart form sets one, as Manaleak does. A
+// cart is held as {line: qty}, a line being <id> for Near Mint or <id>:lp
+// for Light Play.
+function fakeML({products = {}, store = {}, buy = {}} = {}) {
+    const carts = {'checkout/cart': {...store}, 'buylist/cart': {...buy}};
+    const posts = [];
+    const reads = [];
+    const value = (line) => {
+        const [id, grade] = line.split(':');
+        return grade === 'lp' ? '9' + products[id].nm : products[id].nm;
+    };
+    const key = (line) => line.split(':')[0] + ':' + btoa(`a:1:{i:${products[line.split(':')[0]].option};s:5:"${value(line)}";}`) + ':';
+    const fetch = async (url, opts = {}) => {
+        const route = /route=([^&]+)/.exec(url)[1];
+        if (!opts.method) {
+            reads.push(route);
+            if (route === 'product/product') {
+                const p = products[/product_id=(\d+)/.exec(url)[1]];
+                const page = p ? `<select\nname="option[${p.option}]"><option\nvalue=""> --- Please Select ---</option>` +
+                    `<option\nvalue="${p.nm}" data-image="x.jpg">Mint/Near Mint    (£0.15)\n- ${p.stock ? 'Qty:' + p.stock : 'Out of Stock'}</option>` +
+                    `<option\nvalue="9${p.nm}">Light Play (£0.15)\n- Qty:6</option></select>` : 'Product not found!';
+                return {ok: true, status: 200, text: async () => page};
+            }
+            const fields = Object.entries(carts[route]).map(([line, q]) => `<input\ntype="text" name="quantity[${key(line)}]" value="${q}" size="1" />`);
+            return {ok: true, status: 200, text: async () => fields.join('')};
+        }
+        const body = new URLSearchParams(opts.body);
+        posts.push({route, body: Object.fromEntries(body)});
+        if (route.endsWith('/add')) {
+            const id = body.get('product_id');
+            const cartRoute = route.slice(0, -'/add'.length);
+            const qty = Number(body.get(cartRoute === 'buylist/cart' ? 'buylist_quantity' : 'quantity'));
+            const sent = body.get(`option[${products[id].option}]`);
+            const line = sent === products[id].nm ? id : sent === '9' + products[id].nm ? id + ':lp' : null;
+            if (line) {
+                carts[cartRoute][line] = (carts[cartRoute][line] || 0) + qty;
+            }
+        } else {
+            for (const [name, q] of body) {
+                const line = Object.keys(carts[route]).find((l) => 'quantity[' + key(l) + ']' === name);
+                carts[route][line] = Number(q);
+            }
+        }
+        return {ok: true, status: 200, text: async () => '{"success":"ok"}'};
+    };
+    return {fetch, posts, reads, carts};
+}
+
+describe('ban-to-cart bookmarklet on Manaleak', () => {
+    const products = {
+        7090: {option: 7090, nm: '35446', stock: 4},
+        178453: {option: 165360, nm: '82443', stock: 1},
+        500: {option: 500, nm: '11111', stock: 0},
+    };
+    const storePage = {host: 'www.manaleak.com', path: '/index.php', search: '?route=checkout/cart'};
+    const buyPage = {host: 'www.manaleak.com', path: '/index.php', search: '?route=buylist/cart'};
+
+    test('a store list adds each card\'s Near Mint copies up to the stock, and sets a card already there', async () => {
+        const ml = fakeML({products, store: {178453: 3}});
+        const {alerts, page, posts} = await run({...storePage, hash: '#ban=7090%3a10%2c178453%3a1%2c500%3a1%2c42%3a1&side=retail', abu: ml});
+        expect(posts).toEqual([
+            {route: 'checkout/cart/add', body: {product_id: '7090', quantity: '4', 'option[7090]': '35446'}},
+            {route: 'checkout/cart', body: {['quantity[178453:' + btoa('a:1:{i:165360;s:5:"82443";}') + ':]']: '1'}},
+        ]);
+        expect(ml.carts['checkout/cart']).toEqual({7090: 4, 178453: 1});
+        expect(ml.reads[0]).toBe('checkout/cart');
+        expect(alerts[0]).toBe('Loaded 2 cards into your Manaleak cart. 2 were not taken by Manaleak.');
+        expect(page.url).toBe('/index.php?route=checkout/cart');
+    });
+
+    test('a card the cart holds only in another condition is not counted as loaded', async () => {
+        const ml = fakeML({products, store: {'500:lp': 2}});
+        const {alerts, posts} = await run({...storePage, hash: '#ban=500:1&side=retail', abu: ml});
+        expect(posts).toHaveLength(0);
+        expect(alerts[0]).toBe('Loaded 0 cards into your Manaleak cart. 1 were not taken by Manaleak.');
+    });
+
+    test('a buylist list goes to the buylist cart whatever the stock', async () => {
+        const ml = fakeML({products});
+        const {alerts, posts} = await run({...buyPage, hash: '#ban=500:3', abu: ml});
+        expect(posts).toEqual([{route: 'buylist/cart/add', body: {product_id: '500', buylist_quantity: '3', 'option[500]': '11111'}}]);
+        expect(ml.carts['buylist/cart']).toEqual({500: 3});
+        expect(ml.reads).toEqual(['buylist/cart', 'product/product', 'buylist/cart']);
+        expect(alerts[0]).toBe('Loaded 1 cards into your Manaleak cart.');
+    });
+
+    test('two tabs loading the same list at once take turns and do not double it', async () => {
+        const ml = fakeML({products});
+        const locks = fakeLocks();
+        const tabs = await Promise.all([1, 2].map(() => run({...buyPage, hash: '#ban=7090:2', abu: ml, locks})));
+        expect(locks.names).toEqual(['ban-to-cart-ml', 'ban-to-cart-ml']);
+        expect(ml.carts['buylist/cart']).toEqual({7090: 2});
+        expect(ml.posts.map((p) => p.route)).toEqual(['buylist/cart/add', 'buylist/cart']);
+        expect(tabs.map((tab) => tab.alerts[0])).toEqual(['Loaded 1 cards into your Manaleak cart.', 'Loaded 1 cards into your Manaleak cart.']);
+    });
+
+    test('a list on the other side\'s cart page is refused and nothing is sent', async () => {
+        for (const [where, hash] of [[buyPage, '#ban=7090:1&side=retail'], [storePage, '#ban=7090:1']]) {
+            const ml = fakeML({products});
+            const {alerts} = await run({...where, hash, abu: ml});
+            expect(alerts[0]).toBe('This is not the Manaleak cart the list is for. Go back to BAN and press its button again.');
+            expect(ml.posts).toHaveLength(0);
+        }
+    });
+});
+
 // Import ids exported from Strike Zone's cart for these plain codes
 const szIDs = {
     'USCIDU-637-F-19290-285-OVN-RMS': '637-C-30571-106',
