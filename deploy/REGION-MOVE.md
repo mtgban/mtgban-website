@@ -106,9 +106,10 @@ points at, which is still the old one.
 
 ## 5. Point the app at the databases over the VPC
 
-Now that the app is in SFO3, use the databases' **private** addresses in each
-`config.json` (`sql_config`, `user_state_config`, `observability_config`,
-`new_newspaper_sql_config`). Public IPs would route out and back for no reason.
+Now that the app is in SFO3, use the databases' **private** addresses in
+`infrastructure.json` (`sql_config`, `user_state_config`,
+`observability_config`, `new_newspaper_sql_config`), and in any game config
+that still sets its own. Public IPs would route out and back for no reason.
 
 Keep `sslmode=require`. Then take the moment to fix the pool sizes, which were
 tuned around a slow link:

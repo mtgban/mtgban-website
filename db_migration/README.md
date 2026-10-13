@@ -38,8 +38,9 @@ python3 backfill.py prices     # resume; re-runs any pending/running/error chunk
 | 6 | `psql -f 06_validate_fk.sql` | VALIDATE ban_id FK (off-peak) | medium |
 | 7 | `psql -f 07_verify.sql` | Per-provider parity: source cells == prices rows | heavy |
 
-`psql` connection: driver reads `../config.json` `sql_config`. For raw psql, set
-`PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE` from that block.
+`psql` connection: driver reads `../config.json` `sql_config`, so a local config
+needs it inline (the deployed configs keep it in `infrastructure.json`). For raw
+psql, set `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE` from that block.
 
 ## Key facts (measured 2026-07-27)
 
