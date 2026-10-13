@@ -65,15 +65,17 @@ read-only transaction, their date bounds computed in Go from that day:
 the window grouped by product and printing, and the last sale per pair
 over the year.
 
-With no game column, both keep to this deployment's game through the
-listings loader's semi-join on `tcgplayerproductinfomodel`'s
-`game_name`. That keeps each deployment to its own game and makes the
-unmatched count mean something. A product with sales but no info row is
-left out.
+With no game column, all three queries keep to this deployment's game
+through the listings loader's semi-join on `tcgplayerproductinfomodel`'s
+`game_name`: the day query, and the window and lookback that follow it.
+That keeps each deployment to its own game and makes the unmatched
+count mean something. A product with sales but no info row is left out.
 
 Each pair resolves to a card through `b.Match` with the product id and
-the printing, as TCGplayer's own prices are filed, and two pairs on one
-card add up. A pair no card matches is counted and dropped: a finish the
+the printing, as TCGplayer's own prices are filed. Two pairs on one card
+add their copies and orders; their days with a sale keep the larger
+count rather than the sum, since the window rows cannot say which days
+overlap. A pair no card matches is counted and dropped: a finish the
 printing lacks, or a product the datastore does not carry, such as a
 sealed item. A load that matches no card fails and keeps the
 previous one.

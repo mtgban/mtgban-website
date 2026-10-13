@@ -52,8 +52,8 @@ type salesVelocityFailure struct {
 
 var salesVelocityFailed atomic.Pointer[salesVelocityFailure]
 
-// The newest day with a sale; the scrape lags today by a day.
-const salesVelocityDayQuery = `SELECT max(sale_date) FROM tcgplayersalesdata`
+// The newest day this game has a sale; the scrape lags today by a day.
+const salesVelocityDayQuery = `SELECT max(sale_date) FROM tcgplayersalesdata WHERE product_id IN (SELECT product_id FROM tcgplayerproductinfomodel WHERE game_name = $1)`
 
 // Copies, orders and sale days per product and printing of one game; five orders is the cap.
 const salesVelocityQuery = `
@@ -114,7 +114,7 @@ func (s *site) loadSalesVelocity() {
 	defer cancel()
 
 	var day sql.NullTime
-	err := NewNewspaperDB.QueryRowContext(ctx, salesVelocityDayQuery).Scan(&day)
+	err := NewNewspaperDB.QueryRowContext(ctx, salesVelocityDayQuery, game).Scan(&day)
 	if err != nil {
 		log.Println("sales velocity:", err)
 		backgroundJobs.Report(jobSalesVelocity, "", "cannot read the newspaper: "+err.Error())
@@ -282,7 +282,8 @@ func buildSalesVelocity(rows []salesRow, last []lastRow, match func(productID in
 		}
 		v.Copies += row.Copies
 		v.Orders += row.Orders
-		v.Days = min(v.Days+row.Days, salesVelocityWindow)
+		// The larger count, not the sum: the rows can't say which days overlap.
+		v.Days = max(v.Days, row.Days)
 		v.Capped = v.Capped || row.Capped
 	}
 	return cards, unmatched

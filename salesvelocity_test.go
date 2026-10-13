@@ -42,11 +42,11 @@ func TestBuildSalesVelocity(t *testing.T) {
 	rows := []salesRow{
 		{ProductID: 1, Variant: "Normal", Copies: 69, Orders: 31, Days: 18},
 		{ProductID: 2, Variant: "Foil", Copies: 12, Orders: 9, Days: 4, Capped: true},
-		// Two products filed under one card add up.
+		// Two products filed under one card: copies and orders add up.
 		{ProductID: 3, Variant: "Normal", Copies: 2, Orders: 2, Days: 2},
 		{ProductID: 4, Variant: "Normal", Copies: 3, Orders: 1, Days: 1},
-		// Their days add up too, but never past the window.
-		{ProductID: 7, Variant: "Normal", Copies: 40, Orders: 40, Days: 20},
+		// Their days keep the larger count, not the sum: the rows can't say which days overlap.
+		{ProductID: 7, Variant: "Normal", Copies: 40, Orders: 40, Days: 12},
 		{ProductID: 8, Variant: "Normal", Copies: 40, Orders: 40, Days: 20},
 		// No card.
 		{ProductID: 5, Variant: "Normal", Copies: 1, Orders: 1, Days: 1},
@@ -82,8 +82,8 @@ func TestBuildSalesVelocity(t *testing.T) {
 	want := map[string]salesVelocity{
 		"steady": {Copies: 69, Orders: 31, Days: 18, LastSale: day(10, 11)},
 		"capped": {Copies: 12, Orders: 9, Days: 4, Capped: true, LastSale: day(10, 12)},
-		"merged": {Copies: 5, Orders: 3, Days: 3, LastSale: day(10, 12)},
-		"busy":   {Copies: 80, Orders: 80, Days: salesVelocityWindow, LastSale: day(10, 12)},
+		"merged": {Copies: 5, Orders: 3, Days: 2, LastSale: day(10, 12)},
+		"busy":   {Copies: 80, Orders: 80, Days: 20, LastSale: day(10, 12)},
 		"zero":   {LastSale: day(8, 2)},
 	}
 	if len(cards) != len(want) {
@@ -383,8 +383,8 @@ func withFakeNewspaper(t *testing.T, f *fakeNewspaper) *site {
 	return s
 }
 
-// TestLoadSalesVelocityReadsOneGame reads the newest sale day, then that
-// day's sales for the site's own game only.
+// TestLoadSalesVelocityReadsOneGame reads the newest sale day for the
+// site's own game, then that day's sales for the same game only.
 func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
@@ -401,8 +401,8 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	if len(queries) != 3 {
 		t.Fatalf("got %d queries, want 3", len(queries))
 	}
-	if queries[0].sql != salesVelocityDayQuery || len(queries[0].args) != 0 {
-		t.Errorf("first query: got %q %v, want the day query", queries[0].sql, queries[0].args)
+	if queries[0].sql != salesVelocityDayQuery || len(queries[0].args) != 1 || queries[0].args[0] != gameMap[mtgmatcher.GameLorcana] {
+		t.Errorf("first query: got %q %v, want the day query scoped to %q", queries[0].sql, queries[0].args, gameMap[mtgmatcher.GameLorcana])
 	}
 	for _, q := range queries[1:] {
 		if len(q.args) != 3 || q.args[1] != "2026-10-12" || q.args[2] != gameMap[mtgmatcher.GameLorcana] {
@@ -412,6 +412,26 @@ func TestLoadSalesVelocityReadsOneGame(t *testing.T) {
 	failed := salesVelocityFailed.Load()
 	if failed == nil || !failed.Day.Equal(day) {
 		t.Errorf("a load matching no card: failure got %+v, want one for %s", failed, day.Format(time.DateOnly))
+	}
+}
+
+// TestLoadSalesVelocityNoSalesYet leaves the snapshot and the failure alone
+// when the day query finds no sales for this deployment's game.
+func TestLoadSalesVelocityNoSalesYet(t *testing.T) {
+	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
+		return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{nil}}}, nil
+	}}
+	s := withFakeNewspaper(t, f)
+
+	s.loadSalesVelocity()
+	if n := len(f.seen()); n != 1 {
+		t.Fatalf("got %d queries, want only the day query", n)
+	}
+	if snap := salesVelocityPtr.Load(); snap != nil {
+		t.Errorf("stored a snapshot: %+v", snap)
+	}
+	if failed := salesVelocityFailed.Load(); failed != nil {
+		t.Errorf("recorded a failure: %+v", failed)
 	}
 }
 
@@ -512,8 +532,8 @@ func TestLoadSalesVelocityPublishes(t *testing.T) {
 
 	s.loadSalesVelocity()
 	queries := f.seen()
-	if len(queries) != 4 || queries[3].sql != salesVelocityDayQuery {
-		t.Errorf("second run on the same day: got %d queries, want only the day query after the first 3", len(queries))
+	if len(queries) != 4 || queries[3].sql != salesVelocityDayQuery || len(queries[3].args) != 1 {
+		t.Errorf("second run on the same day: got %d queries, want only the day query, scoped to the game, after the first 3", len(queries))
 	}
 }
 
