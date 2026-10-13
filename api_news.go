@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"cmp"
+	"crypto/sha1"
+	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -12,10 +15,53 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/robfig/cron.v2"
 )
+
+// newsCron is the newspaper refresh's schedule, which jobs.go registers.
+const newsCron = "33 */3 * * *"
+
+// newsSchedule is newsCron parsed, for the API's max-age.
+var newsSchedule = mustNewsSchedule()
+
+// mustNewsSchedule parses newsCron, a constant.
+func mustNewsSchedule() cron.Schedule {
+	schedule, err := cron.Parse(newsCron)
+	if err != nil {
+		panic(err)
+	}
+	return schedule
+}
 
 // newsNow is the clock the API reads, a variable for tests.
 var newsNow = time.Now
+
+// newsStaleMaxAge is the max-age a stale cache sends, so a client rechecks soon.
+const newsStaleMaxAge = 300
+
+// newsMinMaxAge is the shortest max-age sent, and the one sent while a due refresh has not landed.
+const newsMinMaxAge = 60
+
+// newsLastRun is the latest scheduled refresh at or before now, zero when none fell in the last day.
+func newsLastRun(now time.Time) time.Time {
+	var last time.Time
+	for t := newsSchedule.Next(now.Add(-24 * time.Hour)); !t.IsZero() && !t.After(now); t = newsSchedule.Next(t) {
+		last = t
+	}
+	return last
+}
+
+// newsMaxAge is the seconds to the next refresh on the host clock, at least a minute; a minute while the last run's data is missing, five once stale.
+func newsMaxAge(now, refreshed time.Time, stale bool) int {
+	if stale {
+		return newsStaleMaxAge
+	}
+	if refreshed.Before(newsLastRun(now)) {
+		return newsMinMaxAge
+	}
+	return max(int(newsSchedule.Next(now).Sub(now).Seconds()), newsMinMaxAge)
+}
 
 // newsColumn is a report column past the card fields, as the API lists it.
 type newsColumn struct {
@@ -65,7 +111,10 @@ func newsFilters(page NewspaperPage) []string {
 }
 
 // newsOptions are every option a report can take; other query keys are ignored.
-var newsOptions = []string{"sort", "dir", "set", "rarity", "finish", "bucket", "min_price", "max_price", "min_change", "max_change"}
+var newsOptions = []string{"sort", "dir", "page", "set", "rarity", "finish", "bucket", "min_price", "max_price", "min_change", "max_change"}
+
+// newsPageSize is the most rows one page of a report carries.
+const newsPageSize = 1000
 
 // newsSortAliases maps the API's names for the card fields to their Head fields.
 var newsSortAliases = map[string]string{"name": "product_name", "set": "set_name", "number": "product_number", "finish": "variant"}
@@ -81,11 +130,11 @@ func newsValues(values []string) []string {
 	return out
 }
 
-// newsReports are the reports this deployment serves: declared, shown, and with a live edition.
+// newsReports are the reports this deployment serves, declared and shown, loaded or not.
 func newsReports() []NewspaperPage {
 	var out []NewspaperPage
 	for _, page := range GetNewspaperPages() {
-		if page.Query == "" || !page.shown() || len(page.Results) == 0 {
+		if page.Query == "" || !page.shown() {
 			continue
 		}
 		out = append(out, page)
@@ -105,7 +154,7 @@ func newsDate(page NewspaperPage) string {
 	return d
 }
 
-// newsRefreshed formats the cache's update time for meta and headers.
+// newsRefreshed formats the cache's update time for meta and headers, "" when never refreshed.
 func newsRefreshed(t time.Time) string {
 	if t.IsZero() {
 		return ""
@@ -129,7 +178,7 @@ type newsReport struct {
 // newsListMeta is reports.json's meta.
 type newsListMeta struct {
 	Latest    string `json:"latest"`
-	Refreshed string `json:"refreshed"`
+	Refreshed string `json:"refreshed,omitempty"`
 	Stale     bool   `json:"stale"`
 }
 
@@ -138,9 +187,11 @@ type newsReportMeta struct {
 	Report    string       `json:"report"`
 	Title     string       `json:"title"`
 	Date      string       `json:"date"`
-	Refreshed string       `json:"refreshed"`
+	Refreshed string       `json:"refreshed,omitempty"`
 	Stale     bool         `json:"stale"`
-	Rows      int          `json:"rows"`
+	Rows      int          `json:"rows"` // rows matched, before paging
+	Page      int          `json:"page"`
+	Pages     int          `json:"pages"`
 	Columns   []newsColumn `json:"columns"`
 }
 
@@ -150,9 +201,26 @@ func newsError(w http.ResponseWriter, status int, msg string) {
 	errorResponse(w, status, msg)
 }
 
+// newsNotLoaded answers a 503 the client retries in five minutes.
+func newsNotLoaded(w http.ResponseWriter, msg string) {
+	w.Header().Set("Retry-After", "300")
+	newsError(w, http.StatusServiceUnavailable, msg)
+}
+
+// newsETagMatches reports whether an If-None-Match header names etag, compared weakly (RFC 7232).
+func newsETagMatches(header, etag string) bool {
+	for _, tag := range strings.Split(header, ",") {
+		tag = strings.TrimSpace(tag)
+		if tag == "*" || tag != "" && strings.TrimPrefix(tag, "W/") == etag {
+			return true
+		}
+	}
+	return false
+}
+
 // newsParseQuery validates a report request's options into a query, or says what is wrong.
 func newsParseQuery(page NewspaperPage, values url.Values) (newsQuery, error) {
-	accepted := append([]string{"sort", "dir"}, newsFilters(page)...)
+	accepted := append([]string{"sort", "dir", "page"}, newsFilters(page)...)
 	for _, opt := range newsOptions {
 		if values.Has(opt) && !slices.Contains(accepted, opt) {
 			return newsQuery{}, fmt.Errorf("%s does not take %s", page.Option, opt)
@@ -240,14 +308,17 @@ func newsCardValues(r NewspaperResult) []string {
 	return []string{r.UUID, r.CardName, r.Edition, r.Number, r.Variant, r.Rarity}
 }
 
-// newsNumber is a numeric column's value as JSON: 0 when absent, null when not finite.
-func newsNumber(r NewspaperResult, field string) string {
-	v, err := strconv.ParseFloat(r.FieldValue(field), 64)
+// newsNumber is a numeric column's value as JSON, a percent column in percent: null when absent or not finite.
+func newsNumber(r NewspaperResult, c newsColumn) string {
+	v, err := strconv.ParseFloat(r.FieldValue(c.Field), 64)
 	if err != nil {
-		return "0"
+		return "null"
 	}
 	if math.IsNaN(v) || math.IsInf(v, 0) {
 		return "null"
+	}
+	if c.Kind == "percent" {
+		v = newsPercent(v)
 	}
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
@@ -276,7 +347,7 @@ func newsRowJSON(buf *bytes.Buffer, r NewspaperResult, cols []newsColumn) error 
 		buf.Write(k)
 		buf.WriteByte(':')
 		if c.Kind != "text" {
-			buf.WriteString(newsNumber(r, c.Field))
+			buf.WriteString(newsNumber(r, c))
 			continue
 		}
 		v, err := json.Marshal(r.FieldValue(c.Field))
@@ -311,15 +382,61 @@ func newsReportJSON(meta newsReportMeta, rows []NewspaperResult) ([]byte, error)
 	return buf.Bytes(), nil
 }
 
-// newsWrite sends a successful body.
-func newsWrite(w http.ResponseWriter, contentType string, body []byte) {
-	w.Header().Set("Content-Type", contentType)
+// newsCSV is a report's rows as a table: ranking, the card fields, then the report's columns.
+func newsCSV(rows []NewspaperResult, cols []newsColumn) ([]byte, error) {
+	var buf bytes.Buffer
+	cw := csv.NewWriter(&buf)
+	header := append([]string{"ranking"}, newsCardKeys...)
+	for _, c := range cols {
+		if c.Field != "ranking" {
+			header = append(header, c.Field)
+		}
+	}
+	cw.Write(header)
+	for _, r := range rows {
+		record := append([]string{strconv.Itoa(r.Ranking)}, newsCardValues(r)...)
+		for _, c := range cols {
+			if c.Field == "ranking" {
+				continue
+			}
+			if c.Kind == "text" {
+				record = append(record, r.FieldValue(c.Field))
+				continue
+			}
+			// A value that is absent or not finite is an empty cell.
+			v := newsNumber(r, c)
+			if v == "null" {
+				v = ""
+			}
+			record = append(record, v)
+		}
+		cw.Write(record)
+	}
+	cw.Flush()
+	return buf.Bytes(), cw.Error()
+}
+
+// newsWrite sends a body with its caching headers, or a 304 when the client holds it.
+func newsWrite(w http.ResponseWriter, r *http.Request, contentType string, body []byte, refreshed time.Time, stale bool) {
+	sum := sha1.Sum(body)
+	etag := `"` + hex.EncodeToString(sum[:]) + `"`
+	h := w.Header()
+	h.Set("Content-Type", contentType)
+	h.Set("ETag", etag)
+	h.Set("Cache-Control", "public, max-age="+strconv.Itoa(newsMaxAge(newsNow(), refreshed, stale)))
+	if !refreshed.IsZero() {
+		h.Set("Last-Modified", refreshed.UTC().Format(http.TimeFormat))
+	}
+	if newsETagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	w.Write(body)
 }
 
 // NewspaperAPI serves /api/v2/newspaper/: reports.json, the reports this game
-// carries, and {report}.json, one report's live edition filtered and sorted.
-// docs/api-v2-newspaper.md has the shape.
+// carries, and {report}.json or .csv, one report's live edition filtered,
+// sorted and paged. docs/api-v2-newspaper.md has the shape.
 func (s *site) NewspaperAPI(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	sig := r.FormValue("sig")
@@ -327,15 +444,22 @@ func (s *site) NewspaperAPI(w http.ResponseWriter, r *http.Request) {
 		newsError(w, http.StatusForbidden, "plan does not include newspaper")
 		return
 	}
-	key, isJSON := strings.CutSuffix(strings.TrimPrefix(r.URL.Path, "/api/v2/newspaper/"), ".json")
-	if !isJSON || key == "" || strings.Contains(key, "/") {
+	name := strings.TrimPrefix(r.URL.Path, "/api/v2/newspaper/")
+	key, asCSV := strings.CutSuffix(name, ".csv")
+	if !asCSV {
+		var isJSON bool
+		if key, isJSON = strings.CutSuffix(name, ".json"); !isJSON {
+			newsError(w, http.StatusNotFound, "Not found")
+			return
+		}
+	}
+	if key == "" || strings.Contains(key, "/") || key == "reports" && asCSV {
 		newsError(w, http.StatusNotFound, "Not found")
 		return
 	}
 	reports := newsReports()
-	if len(reports) == 0 {
-		w.Header().Set("Retry-After", "300")
-		newsError(w, http.StatusServiceUnavailable, "the newspaper is not loaded yet")
+	if !slices.ContainsFunc(reports, func(p NewspaperPage) bool { return p.Loaded }) {
+		newsNotLoaded(w, "the newspaper is not loaded yet")
 		return
 	}
 	refreshed := GetLastNewspaperUpdate()
@@ -347,7 +471,7 @@ func (s *site) NewspaperAPI(w http.ResponseWriter, r *http.Request) {
 			newsError(w, http.StatusInternalServerError, "Internal Server Error")
 			return
 		}
-		newsWrite(w, "application/json", body)
+		newsWrite(w, r, "application/json", body, refreshed, stale)
 		return
 	}
 
@@ -357,21 +481,55 @@ func (s *site) NewspaperAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := reports[i]
+	// A query that never succeeded is a 503; one that answered no rows is an empty page.
+	if !page.Loaded {
+		newsNotLoaded(w, "report not loaded yet")
+		return
+	}
 	q, err := newsParseQuery(page, r.URL.Query())
 	if err != nil {
 		newsError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	rows := newsFilter(b, page, page.Results, q)
+	pages := max(1, (len(rows)+newsPageSize-1)/newsPageSize)
+	pageNum, err := strconv.Atoi(cmp.Or(r.URL.Query().Get("page"), "1"))
+	if err != nil || pageNum < 1 || pageNum > pages {
+		newsError(w, http.StatusBadRequest, "page out of range")
+		return
+	}
+	matched := len(rows)
+	rows, _ = Paginate(rows, pageNum, newsPageSize, matched)
 	cols := newsColumns(page)
 	meta := newsReportMeta{
 		Report: page.Option, Title: page.Title, Date: newsDate(page),
-		Refreshed: newsRefreshed(refreshed), Stale: stale, Rows: len(rows), Columns: cols,
+		Refreshed: newsRefreshed(refreshed), Stale: stale, Rows: matched, Page: pageNum, Pages: pages, Columns: cols,
+	}
+
+	if asCSV {
+		body, err := newsCSV(rows, cols)
+		if err != nil {
+			newsError(w, http.StatusInternalServerError, "Internal Server Error")
+			return
+		}
+		h := w.Header()
+		if meta.Date != "" {
+			h.Set("X-MTGBAN-Date", meta.Date)
+		}
+		if meta.Refreshed != "" {
+			h.Set("X-MTGBAN-Refreshed", meta.Refreshed)
+		}
+		h.Set("X-MTGBAN-Stale", strconv.FormatBool(stale))
+		h.Set("X-MTGBAN-Rows", strconv.Itoa(matched))
+		h.Set("X-MTGBAN-Page", strconv.Itoa(pageNum))
+		h.Set("X-MTGBAN-Pages", strconv.Itoa(pages))
+		newsWrite(w, r, "text/csv", body, refreshed, stale)
+		return
 	}
 	body, err := newsReportJSON(meta, rows)
 	if err != nil {
 		newsError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
-	newsWrite(w, "application/json", body)
+	newsWrite(w, r, "application/json", body, refreshed, stale)
 }

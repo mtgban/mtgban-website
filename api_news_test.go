@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,12 +29,12 @@ func newsSpikeRows() []NewspaperResult {
 	}
 }
 
-// newsListingRows are greatest_increase_listings' fixture rows, in ranking order.
+// newsListingRows are greatest_increase_listings' fixture rows, in ranking order; changes are fractions.
 func newsListingRows() []NewspaperResult {
 	return []NewspaperResult{
-		{Date: newsCalcDate, UUID: "u-solring", Ranking: 1, CardName: "Sol Ring", Edition: "Commander Masters", Number: "395", Variant: "Normal", Rarity: "uncommon", SellersToday: 120, SellersLastWeek: 80, SellersMonthAgo: 60, WeeklyPctChange: 50},
-		{Date: newsCalcDate, UUID: "u-brainstorm", Ranking: 2, CardName: "Brainstorm", Edition: "Mercadian Masques", Number: "58", Variant: "Normal", Rarity: "common", SellersToday: 40, SellersLastWeek: 30, SellersMonthAgo: 5, WeeklyPctChange: 33.33},
-		{Date: newsCalcDate, UUID: "u-thoughtseize", Ranking: 3, CardName: "Thoughtseize", Edition: "Theros", Number: "107", Variant: "Foil", Rarity: "rare", SellersToday: 12, SellersLastWeek: 11, SellersMonthAgo: 10, WeeklyPctChange: 9.09},
+		{Date: newsCalcDate, UUID: "u-solring", Ranking: 1, CardName: "Sol Ring", Edition: "Commander Masters", Number: "395", Variant: "Normal", Rarity: "uncommon", SellersToday: 120, SellersLastWeek: 80, SellersMonthAgo: 60, WeeklyPctChange: 0.5},
+		{Date: newsCalcDate, UUID: "u-brainstorm", Ranking: 2, CardName: "Brainstorm", Edition: "Mercadian Masques", Number: "58", Variant: "Normal", Rarity: "common", SellersToday: 40, SellersLastWeek: 30, SellersMonthAgo: 5, WeeklyPctChange: 0.3333},
+		{Date: newsCalcDate, UUID: "u-thoughtseize", Ranking: 3, CardName: "Thoughtseize", Edition: "Theros", Number: "107", Variant: "Foil", Rarity: "rare", SellersToday: 12, SellersLastWeek: 11, SellersMonthAgo: 10, WeeklyPctChange: 0.0909},
 	}
 }
 
@@ -140,7 +141,7 @@ func TestNewsStale(t *testing.T) {
 	}
 }
 
-// reports.json lists the reports with rows in the page's order, each with its
+// reports.json lists the shown reports in the page's order, each with its
 // columns, filters and values; the buylist report is Magic's alone.
 func TestNewspaperAPIReports(t *testing.T) {
 	withConfigCopy(t)
@@ -166,7 +167,7 @@ func TestNewspaperAPIReports(t *testing.T) {
 	for _, r := range out.Reports {
 		keys = append(keys, r.Key)
 	}
-	if want := []string{"combined_spike_score", "spike_score", "greatest_increase_listings"}; !slices.Equal(keys, want) {
+	if want := []string{"combined_spike_score", "spike_score", "greatest_increase_listings", "greatest_decrease_listings"}; !slices.Equal(keys, want) {
 		t.Fatalf("reports %v, want %v", keys, want)
 	}
 
@@ -224,8 +225,116 @@ func TestNewspaperAPIReports(t *testing.T) {
 	for _, r := range out.Reports {
 		keys = append(keys, r.Key)
 	}
-	if want := []string{"spike_score", "greatest_increase_listings"}; !slices.Equal(keys, want) {
+	if want := []string{"spike_score", "greatest_increase_listings", "greatest_decrease_listings"}; !slices.Equal(keys, want) {
 		t.Errorf("lorcana reports %v, want %v", keys, want)
+	}
+}
+
+// A shown report whose query never succeeded lists with no rows and answers a 503 to retry.
+func TestNewspaperAPIUnloadedReport(t *testing.T) {
+	withNewsFixture(t, newsFixtureNow.Add(-27*time.Minute))
+	rec := newsServe(t, "/api/v2/newspaper/reports.json", "newspaper", nil)
+	var list newsReportsOut
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); rec.Code != http.StatusOK || err != nil {
+		t.Fatalf("%d %v %s", rec.Code, err, rec.Body.String())
+	}
+	i := slices.IndexFunc(list.Reports, func(r newsReport) bool { return r.Key == "greatest_decrease_listings" })
+	if i < 0 {
+		t.Fatalf("not listed: %s", rec.Body.String())
+	}
+	if r := list.Reports[i]; r.Rows != 0 || r.Sets == nil || len(r.Sets) != 0 || r.Finishes == nil || len(r.Finishes) != 0 || len(r.Columns) == 0 {
+		t.Errorf("unloaded entry %+v", r)
+	}
+	for _, path := range []string{"greatest_decrease_listings.json", "greatest_decrease_listings.csv", "greatest_decrease_listings.json?set=Alpha"} {
+		rec, out := newsGetReport(t, "/api/v2/newspaper/"+path)
+		h := rec.Header()
+		if rec.Code != http.StatusServiceUnavailable || out.Error != "report not loaded yet" || h.Get("Retry-After") != "300" ||
+			h.Get("Cache-Control") != "no-store" || h.Get("Content-Type") != "application/json" {
+			t.Errorf("%s: %d %q Retry-After %q Cache-Control %q", path, rec.Code, out.Error, h.Get("Retry-After"), h.Get("Cache-Control"))
+		}
+	}
+}
+
+// A report whose query ran and returned no rows is loaded: it lists with no
+// rows and answers an empty page, not the 503 a never-loaded one does.
+func TestNewspaperAPIEmptyReport(t *testing.T) {
+	empty := newsInitialPage(t, "greatest_decrease_listings")
+	empty.Loaded = true
+	withNewsPages(t, []NewspaperPage{
+		newsWithRows(t, "spike_score", newsSpikeRows()),
+		empty,
+		newsInitialPage(t, "options"),
+	}, newsFixtureNow.Add(-27*time.Minute))
+
+	rec := newsServe(t, "/api/v2/newspaper/reports.json", "newspaper", nil)
+	var list newsReportsOut
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); rec.Code != http.StatusOK || err != nil {
+		t.Fatalf("%d %v %s", rec.Code, err, rec.Body.String())
+	}
+	i := slices.IndexFunc(list.Reports, func(r newsReport) bool { return r.Key == "greatest_decrease_listings" })
+	if i < 0 || list.Reports[i].Rows != 0 || len(list.Reports[i].Sets) != 0 {
+		t.Errorf("empty report listed as %+v", list.Reports)
+	}
+
+	rec, out := newsGetReport(t, "/api/v2/newspaper/greatest_decrease_listings.json")
+	h := rec.Header()
+	if rec.Code != http.StatusOK || out.Error != "" || out.Meta.Rows != 0 || out.Meta.Page != 1 || out.Meta.Pages != 1 || out.Meta.Date != "" ||
+		!strings.Contains(rec.Body.String(), `"rows":[]`) || h.Get("Retry-After") != "" || !strings.HasPrefix(h.Get("Cache-Control"), "public") {
+		t.Errorf("json: %d %+v Retry-After %q Cache-Control %q\n%s", rec.Code, out.Meta, h.Get("Retry-After"), h.Get("Cache-Control"), rec.Body.String())
+	}
+
+	rec = newsServe(t, "/api/v2/newspaper/greatest_decrease_listings.csv", "newspaper", nil)
+	h = rec.Header()
+	if lines := strings.Split(strings.TrimRight(rec.Body.String(), "\r\n"), "\n"); rec.Code != http.StatusOK || len(lines) != 1 ||
+		!strings.HasPrefix(lines[0], "ranking,id,name,set,number,finish,rarity,") {
+		t.Errorf("csv: %d %q", rec.Code, rec.Body.String())
+	}
+	if _, ok := h["X-Mtgban-Date"]; ok || h.Get("X-MTGBAN-Rows") != "0" || h.Get("X-MTGBAN-Pages") != "1" || h.Get("Retry-After") != "" {
+		t.Errorf("csv headers: %v", h)
+	}
+
+	if rec, out := newsGetReport(t, "/api/v2/newspaper/greatest_decrease_listings.json?set=Alpha"); rec.Code != http.StatusBadRequest || out.Error == "" {
+		t.Errorf("set outside an empty list: %d %q", rec.Code, out.Error)
+	}
+}
+
+// A game whose every report loaded empty serves its list and empty pages, not the empty-cache 503.
+func TestNewspaperAPIAllReportsEmpty(t *testing.T) {
+	var pages []NewspaperPage
+	for _, page := range newspaperPagesInitial {
+		if page.Query != "" {
+			page.Loaded = true
+		}
+		pages = append(pages, page)
+	}
+	withNewsPages(t, pages, time.Time{})
+	rec := newsServe(t, "/api/v2/newspaper/reports.json", "newspaper", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"latest":""`) {
+		t.Errorf("reports.json: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec, out := newsGetReport(t, "/api/v2/newspaper/spike_score.json"); rec.Code != http.StatusOK || out.Meta.Rows != 0 {
+		t.Errorf("spike_score.json: %d %+v", rec.Code, out)
+	}
+}
+
+// An absent value is null in JSON and an empty cell in CSV, and fails a bound on its column.
+func TestNewspaperAPIAbsentValue(t *testing.T) {
+	bare := NewspaperResult{Date: newsCalcDate, UUID: "u-bare", Ranking: 5, CardName: "Bare", Edition: "Dominaria", Number: "1", Variant: "Normal", Rarity: "rare", BucketName: "$2+"}
+	withNewsPages(t, []NewspaperPage{newsWithRows(t, "spike_score", append(newsSpikeRows(), bare))}, newsFixtureNow.Add(-27*time.Minute))
+
+	rec, out := newsGetReport(t, "/api/v2/newspaper/spike_score.json")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"bucket_name":"$2+","bucket_rank":null,"current_price":null}`) {
+		t.Errorf("%d %s", rec.Code, rec.Body.String())
+	}
+	if got := out.rankings(); !slices.Equal(got, []int{1, 2, 3, 4, 5}) {
+		t.Errorf("no bound: rankings %v", got)
+	}
+	csv := newsServe(t, "/api/v2/newspaper/spike_score.csv", "newspaper", nil)
+	if !strings.HasSuffix(csv.Body.String(), "\n5,u-bare,Bare,Dominaria,1,Normal,rare,$2+,,\n") {
+		t.Errorf("CSV:\n%s", csv.Body.String())
+	}
+	if _, out := newsGetReport(t, "/api/v2/newspaper/spike_score.json?min_price=0"); !slices.Equal(out.rankings(), []int{1, 2, 3, 4}) {
+		t.Errorf("min_price=0: rankings %v", out.rankings())
 	}
 }
 
@@ -330,7 +439,6 @@ func TestNewspaperAPIRefusals(t *testing.T) {
 		msg    string
 	}{
 		{"nope.json", 400, `unknown report "nope"`},
-		{"greatest_decrease_listings.json", 400, `unknown report "greatest_decrease_listings"`},
 		{"options.json", 400, `unknown report "options"`},
 		{"spike_score.json?min_change=1", 400, "spike_score does not take min_change"},
 		{"greatest_increase_listings.json?bucket=%242%2B", 400, "greatest_increase_listings does not take bucket"},
@@ -437,14 +545,20 @@ func TestNewspaperAPIUnsigned(t *testing.T) {
 	}
 }
 
-// A report shown on Magic alone is an unknown report on another game.
+// A report shown on Magic alone is an unknown report on another game, loaded or not.
 func TestNewspaperAPIMagicOnlyReport(t *testing.T) {
 	withConfigCopy(t)
 	Config().Game = "lorcana"
-	withNewsFixture(t, newsFixtureNow.Add(-27*time.Minute))
-	rec, out := newsGetReport(t, "/api/v2/newspaper/combined_spike_score.json")
-	if rec.Code != http.StatusBadRequest || !strings.Contains(out.Error, `unknown report "combined_spike_score"`) {
-		t.Errorf("combined_spike_score on lorcana: %d %q", rec.Code, out.Error)
+	withNewsPages(t, []NewspaperPage{
+		newsWithRows(t, "combined_spike_score", newsCombinedRows()),
+		newsWithRows(t, "spike_score", newsSpikeRows()),
+		newsInitialPage(t, "greatest_increase_buylist"),
+	}, newsFixtureNow.Add(-27*time.Minute))
+	for _, key := range []string{"combined_spike_score", "greatest_increase_buylist"} {
+		rec, out := newsGetReport(t, "/api/v2/newspaper/"+key+".json")
+		if rec.Code != http.StatusBadRequest || !strings.Contains(out.Error, `unknown report "`+key+`"`) {
+			t.Errorf("%s on lorcana: %d %q", key, rec.Code, out.Error)
+		}
 	}
 }
 
@@ -474,7 +588,265 @@ func TestNewsReportJSONNotFinite(t *testing.T) {
 		t.Errorf("err %v body %s", err, body)
 	}
 	row.CurrentPrice = math.Inf(1)
-	if got := newsNumber(row, "current_price"); got != "null" {
+	if got := newsNumber(row, newsColumn{Field: "current_price", Kind: "dollar"}); got != "null" {
 		t.Errorf("Inf is %s", got)
+	}
+}
+
+// A percent column serves the stored fraction times 100, to two decimals.
+func TestNewsNumberPercent(t *testing.T) {
+	row := NewspaperResult{WeeklyPctChange: 0.0654, CurrentPrice: 0.0654}
+	if got := newsNumber(row, newsColumn{Field: "pct_gain_7d", Kind: "percent"}); got != "6.54" {
+		t.Errorf("0.0654 serves as %s, want 6.54", got)
+	}
+	if got := newsNumber(row, newsColumn{Field: "current_price", Kind: "dollar"}); got != "0.0654" {
+		t.Errorf("a dollar column serves as %s", got)
+	}
+}
+
+// max-age: to the next refresh, 60 at least or while a run is pending, 300 once stale.
+func TestNewsMaxAge(t *testing.T) {
+	at := func(h, m, s int) time.Time { return time.Date(2026, 10, 13, h, m, s, 0, time.Local) }
+	for _, tc := range []struct {
+		now, refreshed time.Time
+		stale          bool
+		want           int
+	}{
+		{at(7, 0, 0), at(6, 33, 0), false, 9180},
+		{at(7, 0, 0), at(6, 34, 0), false, 9180},
+		{at(7, 0, 0).Add(-500 * time.Millisecond), at(6, 34, 0), false, 9180},
+		{at(6, 31, 59), at(3, 34, 0), false, 61},
+		{at(6, 32, 30), at(3, 34, 0), false, 60},
+		{at(6, 32, 59), at(3, 34, 0), false, 60},
+		{at(6, 33, 0), at(6, 33, 0), false, 10800},
+		{at(6, 34, 0), at(6, 33, 30), false, 10740},
+		{at(23, 40, 0), at(21, 34, 0), false, 3180},
+		{at(1, 0, 0), at(0, 34, 0), false, 9180},
+		{at(7, 0, 0), at(6, 32, 59), false, 60},
+		{at(6, 33, 20), at(3, 34, 0), false, 60},
+		{at(1, 0, 0), at(21, 34, 0).Add(-24 * time.Hour), false, 60},
+		{at(7, 0, 0), time.Time{}, false, 60},
+		{at(7, 0, 0), at(6, 34, 0), true, 300},
+		{at(7, 0, 0), at(6, 32, 59), true, 300},
+	} {
+		if got := newsMaxAge(tc.now, tc.refreshed, tc.stale); got != tc.want {
+			t.Errorf("newsMaxAge(%s, %s, %t) = %d, want %d", tc.now.Format("15:04:05.0"), tc.refreshed.Format("01-02 15:04:05"), tc.stale, got, tc.want)
+		}
+	}
+}
+
+// RFC 7232's weak comparison: a list, W/ prefixes and * all match.
+func TestNewsETagMatches(t *testing.T) {
+	const etag = `"abc"`
+	for _, tc := range []struct {
+		header string
+		want   bool
+	}{
+		{`"abc"`, true},
+		{`W/"abc"`, true},
+		{`"x", W/"abc" , "y"`, true},
+		{`*`, true},
+		{`"abd"`, false},
+		{`"x", "y"`, false},
+		{``, false},
+	} {
+		if got := newsETagMatches(tc.header, etag); got != tc.want {
+			t.Errorf("newsETagMatches(%q) = %t, want %t", tc.header, got, tc.want)
+		}
+	}
+}
+
+// The CSV form is the same rows as a table, meta in headers; errors stay JSON.
+func TestNewspaperAPICSV(t *testing.T) {
+	refreshed := newsFixtureNow.Add(-27 * time.Minute)
+	withNewsFixture(t, refreshed)
+	rec := newsServe(t, "/api/v2/newspaper/spike_score.csv?sort=current_price&dir=asc", "newspaper", nil)
+	want := "ranking,id,name,set,number,finish,rarity,bucket_name,bucket_rank,current_price\n" +
+		"3,u-llanowar,Llanowar Elves,Dominaria,168,Normal,common,$2+,2,2.25\n" +
+		"4,u-counterspell,Counterspell,Modern Horizons 2,267,Normal,uncommon,$2+,1,3.1\n" +
+		"2,u-fable,Fable of the Mirror-Breaker,Kamigawa: Neon Dynasty,141,Foil,rare,$20+,1,24.5\n" +
+		"1,u-ragavan,\"Ragavan, Nimble Pilferer\",Modern Horizons 2,138,Normal,mythic,$50+,1,64.99\n"
+	if rec.Code != http.StatusOK || rec.Body.String() != want {
+		t.Errorf("spike_score.csv: %d\n%s\nwant\n%s", rec.Code, rec.Body.String(), want)
+	}
+	h := rec.Header()
+	if h.Get("Content-Type") != "text/csv" || h.Get("X-MTGBAN-Date") != "2026-10-13" ||
+		h.Get("X-MTGBAN-Refreshed") != refreshed.UTC().Format(time.RFC3339) ||
+		h.Get("X-MTGBAN-Stale") != "false" || h.Get("X-MTGBAN-Rows") != "4" {
+		t.Errorf("headers %v", h)
+	}
+
+	none := newsServe(t, "/api/v2/newspaper/spike_score.csv?rarity=S", "newspaper", nil)
+	if none.Body.String() != "ranking,id,name,set,number,finish,rarity,bucket_name,bucket_rank,current_price\n" || none.Header().Get("X-MTGBAN-Rows") != "0" {
+		t.Errorf("an empty CSV: %q rows %q", none.Body.String(), none.Header().Get("X-MTGBAN-Rows"))
+	}
+
+	listings := newsServe(t, "/api/v2/newspaper/greatest_increase_listings.csv", "newspaper", nil)
+	if !strings.HasPrefix(listings.Body.String(), "ranking,id,name,set,number,finish,rarity,sellers_Today,sellers_d7,sellers_d30,pct_gain_7d\n1,u-solring,Sol Ring,Commander Masters,395,Normal,uncommon,120,80,60,50\n") {
+		t.Errorf("listings CSV:\n%s", listings.Body.String())
+	}
+
+	nan, inf := newsSpikeRows()[0], newsSpikeRows()[1]
+	nan.CurrentPrice, inf.CurrentPrice = math.NaN(), math.Inf(-1)
+	inf.CardName = `Kongming, "Sleeping Dragon"`
+	body, err := newsCSV([]NewspaperResult{nan, inf}, newsColumns(newsInitialPage(t, "spike_score")))
+	if err != nil || !strings.HasSuffix(string(body), ",$50+,1,\n2,u-fable,\"Kongming, \"\"Sleeping Dragon\"\"\",Kamigawa: Neon Dynasty,141,Foil,rare,$20+,1,\n") {
+		t.Errorf("a value not finite is not an empty cell: %v\n%s", err, body)
+	}
+
+	for _, tc := range []struct {
+		target string
+		status int
+	}{
+		{"nope.csv", 400},
+		{"spike_score.csv?dir=up", 400},
+		{"reports.csv", 404},
+	} {
+		rec, out := newsGetReport(t, "/api/v2/newspaper/"+tc.target)
+		if rec.Code != tc.status || out.Error == "" || rec.Header().Get("Content-Type") != "application/json" {
+			t.Errorf("%s: %d %q %q", tc.target, rec.Code, out.Error, rec.Header().Get("Content-Type"))
+		}
+	}
+}
+
+// Before the first refresh is stamped, refreshed is left out of meta and headers.
+func TestNewspaperAPINeverRefreshed(t *testing.T) {
+	withNewsFixture(t, time.Time{})
+	for _, target := range []string{"reports.json", "spike_score.json", "spike_score.csv"} {
+		rec := newsServe(t, "/api/v2/newspaper/"+target, "newspaper", nil)
+		if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `"refreshed"`) {
+			t.Errorf("%s: %d %s", target, rec.Code, rec.Body.String())
+		}
+		if _, ok := rec.Header()["X-Mtgban-Refreshed"]; ok {
+			t.Errorf("%s: X-MTGBAN-Refreshed is set", target)
+		}
+	}
+}
+
+// Responses cache to the next refresh with an ETag and Last-Modified; a held ETag is a 304.
+func TestNewspaperAPICaching(t *testing.T) {
+	refreshed := newsFixtureNow.Add(-27 * time.Minute)
+	withNewsFixture(t, refreshed)
+	for _, path := range []string{"reports.json", "spike_score.json", "spike_score.csv"} {
+		target := "/api/v2/newspaper/" + path
+		rec := newsServe(t, target, "newspaper", nil)
+		h := rec.Header()
+		if cc := h.Get("Cache-Control"); cc != "public, max-age=9180" {
+			t.Errorf("%s: Cache-Control %q", path, cc)
+		}
+		if lm := h.Get("Last-Modified"); lm != refreshed.UTC().Format(http.TimeFormat) {
+			t.Errorf("%s: Last-Modified %q", path, lm)
+		}
+		etag := h.Get("ETag")
+		if etag == "" {
+			t.Fatalf("%s: no ETag", path)
+		}
+		if again := newsServe(t, target, "newspaper", nil); again.Header().Get("ETag") != etag {
+			t.Errorf("%s: ETag moved between two reads", path)
+		}
+		for _, held := range []string{etag, "W/" + etag, `"x", W/` + etag, "*"} {
+			nm := newsServe(t, target, "newspaper", http.Header{"If-None-Match": {held}})
+			if nm.Code != http.StatusNotModified || nm.Body.Len() != 0 || nm.Header().Get("ETag") != etag ||
+				nm.Header().Get("Cache-Control") != h.Get("Cache-Control") || nm.Header().Get("Last-Modified") != h.Get("Last-Modified") {
+				t.Errorf("%s If-None-Match %s: %d, %d bytes", path, held, nm.Code, nm.Body.Len())
+			}
+		}
+		if other := newsServe(t, target, "newspaper", http.Header{"If-None-Match": {`"other"`}}); other.Code != http.StatusOK {
+			t.Errorf("%s: another tag answered %d", path, other.Code)
+		}
+	}
+	plain := newsServe(t, "/api/v2/newspaper/spike_score.json", "newspaper", nil).Header().Get("ETag")
+	sorted := newsServe(t, "/api/v2/newspaper/spike_score.json?sort=current_price", "newspaper", nil).Header().Get("ETag")
+	csvTag := newsServe(t, "/api/v2/newspaper/spike_score.csv", "newspaper", nil).Header().Get("ETag")
+	if plain == sorted || plain == csvTag {
+		t.Errorf("ETags collide: json %s sorted %s csv %s", plain, sorted, csvTag)
+	}
+}
+
+// A stale cache tells a client to recheck in five minutes.
+func TestNewspaperAPICachingStale(t *testing.T) {
+	withNewsFixture(t, newsFixtureNow.Add(-13*time.Hour))
+	rec := newsServe(t, "/api/v2/newspaper/spike_score.csv", "newspaper", nil)
+	if cc := rec.Header().Get("Cache-Control"); cc != "public, max-age=300" {
+		t.Errorf("Cache-Control %q", cc)
+	}
+	if rec.Header().Get("X-MTGBAN-Stale") != "true" {
+		t.Errorf("X-MTGBAN-Stale %q", rec.Header().Get("X-MTGBAN-Stale"))
+	}
+}
+
+// newsManyRows are n spike_score rows in ranking order, for paging.
+func newsManyRows(n int) []NewspaperResult {
+	rows := make([]NewspaperResult, n)
+	for i := range rows {
+		rows[i] = NewspaperResult{Date: newsCalcDate, UUID: "u-" + strconv.Itoa(i+1), Ranking: i + 1, CardName: "Card " + strconv.Itoa(i+1), Edition: "Dominaria", Number: strconv.Itoa(i + 1), Variant: "Normal", Rarity: "common", BucketName: "$2+", BucketRank: i + 1, CurrentPrice: 2.5}
+	}
+	return rows
+}
+
+// A report pages at 1,000 rows; meta counts the rows matched, the page and the pages.
+func TestNewspaperAPIPaging(t *testing.T) {
+	withNewsPages(t, []NewspaperPage{newsWithRows(t, "spike_score", newsManyRows(1250))}, newsFixtureNow.Add(-27*time.Minute))
+
+	rec, out := newsGetReport(t, "/api/v2/newspaper/spike_score.json")
+	if rec.Code != http.StatusOK || len(out.Rows) != 1000 || out.Meta.Page != 1 || out.Meta.Pages != 2 || out.Meta.Rows != 1250 {
+		t.Errorf("page 1: %d, %d rows, meta %d/%d of %d", rec.Code, len(out.Rows), out.Meta.Page, out.Meta.Pages, out.Meta.Rows)
+	}
+	if len(out.Rows) > 0 && (out.Rows[0].Ranking != 1 || out.Rows[len(out.Rows)-1].Ranking != 1000) {
+		t.Errorf("page 1 runs %d to %d", out.Rows[0].Ranking, out.Rows[len(out.Rows)-1].Ranking)
+	}
+	rec2, out2 := newsGetReport(t, "/api/v2/newspaper/spike_score.json?page=2")
+	if rec2.Code != http.StatusOK || len(out2.Rows) != 250 || out2.Meta.Page != 2 || out2.Meta.Pages != 2 || out2.Meta.Rows != 1250 {
+		t.Errorf("page 2: %d, %d rows, meta %d/%d of %d", rec2.Code, len(out2.Rows), out2.Meta.Page, out2.Meta.Pages, out2.Meta.Rows)
+	}
+	if len(out2.Rows) > 0 && out2.Rows[0].Ranking != 1001 {
+		t.Errorf("page 2 starts at %d", out2.Rows[0].Ranking)
+	}
+	if rec.Header().Get("ETag") == rec2.Header().Get("ETag") {
+		t.Errorf("pages 1 and 2 share ETag %s", rec.Header().Get("ETag"))
+	}
+
+	for _, target := range []string{"spike_score.json?page=3", "spike_score.json?page=0", "spike_score.json?page=x", "spike_score.json?page=-1", "spike_score.csv?page=3"} {
+		rec, out := newsGetReport(t, "/api/v2/newspaper/"+target)
+		if rec.Code != http.StatusBadRequest || out.Error != "page out of range" {
+			t.Errorf("%s: %d %q", target, rec.Code, out.Error)
+		}
+	}
+
+	rec, out = newsGetReport(t, "/api/v2/newspaper/spike_score.json?rarity=M&page=1")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"rows":[]`) || out.Meta.Page != 1 || out.Meta.Pages != 1 || out.Meta.Rows != 0 {
+		t.Errorf("an empty page: %d meta %+v", rec.Code, out.Meta)
+	}
+
+	csv2 := newsServe(t, "/api/v2/newspaper/spike_score.csv?page=2", "newspaper", nil)
+	h := csv2.Header()
+	if csv2.Code != http.StatusOK || h.Get("X-MTGBAN-Page") != "2" || h.Get("X-MTGBAN-Pages") != "2" || h.Get("X-MTGBAN-Rows") != "1250" {
+		t.Errorf("CSV page 2: %d headers %v", csv2.Code, h)
+	}
+	if lines := strings.Count(csv2.Body.String(), "\n"); lines != 251 {
+		t.Errorf("CSV page 2 has %d lines, want a header and 250", lines)
+	}
+	csv1 := newsServe(t, "/api/v2/newspaper/spike_score.csv", "newspaper", nil)
+	if csv1.Header().Get("X-MTGBAN-Page") != "1" || strings.Count(csv1.Body.String(), "\n") != 1001 || csv1.Header().Get("ETag") == h.Get("ETag") {
+		t.Errorf("CSV page 1: page %q, %d lines", csv1.Header().Get("X-MTGBAN-Page"), strings.Count(csv1.Body.String(), "\n"))
+	}
+}
+
+// reports.json reads no options, page included, and lists page as no filter.
+func TestNewspaperAPIReportsIgnoresPage(t *testing.T) {
+	withNewsPages(t, []NewspaperPage{newsWithRows(t, "spike_score", newsManyRows(1250))}, newsFixtureNow.Add(-27*time.Minute))
+	plain := newsServe(t, "/api/v2/newspaper/reports.json", "newspaper", nil)
+	for _, query := range []string{"?page=2", "?sort=nope"} {
+		rec := newsServe(t, "/api/v2/newspaper/reports.json"+query, "newspaper", nil)
+		if rec.Code != http.StatusOK || rec.Body.String() != plain.Body.String() {
+			t.Errorf("reports.json%s: %d\n%s", query, rec.Code, rec.Body.String())
+		}
+	}
+	var out newsReportsOut
+	if err := json.Unmarshal(plain.Body.Bytes(), &out); err != nil || len(out.Reports) != 1 {
+		t.Fatalf("%v %s", err, plain.Body.String())
+	}
+	if r := out.Reports[0]; slices.Contains(r.Filters, "page") || r.Rows != 1250 {
+		t.Errorf("filters %v rows %d", r.Filters, r.Rows)
 	}
 }

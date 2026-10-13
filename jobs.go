@@ -83,7 +83,7 @@ func (s *site) startCrons() {
 	addJob("30 */12 * * *", jobSetAnalysis, s.runSealedAnalysis)
 
 	// Reload DB Newspaper every 3 hours
-	addJob("33 */3 * * *", jobNewspaper, s.cacheNewspaper)
+	addJob(newsCron, jobNewspaper, s.cacheNewspaper)
 
 	// Rebuild CK's buylist signals, reloading its stock history once the
 	// newspaper has a new day; until then that is one indexed MAX(date).

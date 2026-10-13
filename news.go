@@ -223,6 +223,9 @@ type NewspaperPage struct {
 	Results     []NewspaperResult
 	Results3Day []NewspaperResult
 
+	// Whether the live edition's query has succeeded at least once, even empty
+	Loaded bool
+
 	// Which editions are available in the cache
 	AvailableEditions     []string
 	AvailableEditions3Day []string
@@ -476,27 +479,26 @@ func noteNewspaperStaleness(pageVars *PageVars) {
 	pageVars.InfoMessage += " - " + notice
 }
 
-// refreshNewspaperEdition runs one edition of a page's query. The second
-// return value reports whether the results are good enough to replace what is
-// already cached: a failed query, an empty response, or a response that lost
-// more than half of the rows we had all keep the older data.
-func refreshNewspaperEdition(b *mtgmatcher.Backend, label, query string, cached []NewspaperResult) ([]NewspaperResult, bool) {
+// refreshNewspaperEdition runs one edition of a page's query. ok reports the
+// results good enough to replace the cache (not empty, not under half of the
+// cached rows); err is the failed query's, telling an empty answer from none.
+func refreshNewspaperEdition(b *mtgmatcher.Backend, label, query string, cached []NewspaperResult) ([]NewspaperResult, bool, error) {
 	results, err := getResults(b, NewNewspaperDB, query)
 	if err != nil {
 		log.Println(query, err)
-		return nil, false
+		return nil, false, err
 	}
 	if len(results) == 0 {
 		log.Println("newspaper:", label, "results are empty, keeping the cached slice")
-		return nil, false
+		return nil, false, nil
 	}
 	if cached != nil && len(results) < len(cached)/2 {
 		log.Println("newspaper:", label, "returned", len(results), "rows against", len(cached), "cached, keeping the cached slice")
-		return nil, false
+		return nil, false, nil
 	}
 
 	log.Println(label, "has", len(results), "elements")
-	return results, true
+	return results, true, nil
 }
 
 // newspaperFilterValues collects the editions and the finishes present in a
@@ -561,14 +563,19 @@ func (s *site) cacheNewspaper() {
 		// Both editions are fetched independently: a bad refresh on one of
 		// them keeps the previously cached data for that edition instead of
 		// blanking the page or skipping the other edition entirely.
-		if results, ok := refreshNewspaperEdition(b, next[i].Option, query, next[i].Results); ok {
+		results, ok, err := refreshNewspaperEdition(b, next[i].Option, query, next[i].Results)
+		if err == nil {
+			// An empty answer is still an answer: the API serves it as no rows.
+			next[i].Loaded = true
+		}
+		if ok {
 			next[i].Results = results
 			next[i].AvailableEditions, next[i].PossibleFinish = newspaperFilterValues(results)
 			refreshed++
 		}
 
 		query3day := strings.ReplaceAll(query, "0 DAY", "3 DAY")
-		if results, ok := refreshNewspaperEdition(b, next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
+		if results, ok, _ := refreshNewspaperEdition(b, next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
 			next[i].Results3Day = results
 			next[i].AvailableEditions3Day, next[i].PossibleFinish3Day = newspaperFilterValues(results)
 			refreshed++
@@ -1192,8 +1199,8 @@ func newsKeep(b *mtgmatcher.Backend, page NewspaperPage, row NewspaperResult, q 
 	if q.Rarity != "" && !newsRarityMatches(q.Rarity, row.Rarity) {
 		return false
 	}
-	return newsInBounds(row, page.Priced, q.MinPrice, q.MaxPrice) &&
-		newsInBounds(row, page.PercChanged, q.MinChange, q.MaxChange)
+	return newsInBounds(row, page.Priced, false, q.MinPrice, q.MaxPrice) &&
+		newsInBounds(row, page.PercChanged, true, q.MinChange, q.MaxChange)
 }
 
 // newsRarityMatches compares a rarity's first letter to M, R, U, C, S or a pair like M/R; no rarity passes.
@@ -1210,13 +1217,24 @@ func newsRarityMatches(want, rarity string) bool {
 	return false
 }
 
-// newsInBounds reports whether a row's field lies within inclusive bounds; no field or no bound passes.
-func newsInBounds(row NewspaperResult, field string, lo, hi *float64) bool {
+// newsInBounds reports whether a row's field lies within inclusive bounds; no field or no bound passes, no value fails.
+func newsInBounds(row NewspaperResult, field string, percent bool, lo, hi *float64) bool {
 	if field == "" || (lo == nil && hi == nil) {
 		return true
 	}
-	v, _ := strconv.ParseFloat(row.FieldValue(field), 64)
+	v, err := strconv.ParseFloat(row.FieldValue(field), 64)
+	if err != nil {
+		return false
+	}
+	if percent {
+		v = newsPercent(v)
+	}
 	return (lo == nil || v >= *lo) && (hi == nil || v <= *hi)
+}
+
+// newsPercent is a stored change fraction as the percent a reader sees, to two decimals.
+func newsPercent(v float64) float64 {
+	return math.Round(v*100*100) / 100
 }
 
 // newsSort orders rows by a field, numerically when either side is a nonzero number, ties kept.
@@ -1492,6 +1510,10 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		// live one is cached, and an empty table reads as a broken page
 		if len(results) == 0 {
 			pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
+			// The live query answered and found nothing: the same answer the API gives
+			if newspage.Loaded && pageVars.IsOneDay {
+				pageVars.InfoMessage = "No entries for this report right now"
+			}
 			noteNewspaperStaleness(&pageVars)
 			render(w, "news.html", pageVars)
 			return

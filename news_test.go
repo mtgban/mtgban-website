@@ -3,7 +3,11 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
+	"database/sql/driver"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -92,6 +96,67 @@ func TestCacheNewspaperLogsAGameMissingFromGameMap(t *testing.T) {
 	}
 }
 
+// emptyRowsConnector is a database whose every query succeeds with no rows.
+type emptyRowsConnector struct{}
+
+func (emptyRowsConnector) Connect(context.Context) (driver.Conn, error) { return emptyRowsConn{}, nil }
+func (emptyRowsConnector) Driver() driver.Driver                        { return nil }
+
+type emptyRowsConn struct{}
+
+func (emptyRowsConn) Prepare(string) (driver.Stmt, error) { return nil, io.ErrUnexpectedEOF }
+func (emptyRowsConn) Close() error                        { return nil }
+func (emptyRowsConn) Begin() (driver.Tx, error)           { return nil, io.ErrUnexpectedEOF }
+func (emptyRowsConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
+	return emptyRows{}, nil
+}
+
+type emptyRows struct{}
+
+func (emptyRows) Columns() []string {
+	return []string{"calc_date", "product_id", "ranking", "product_name", "set_name", "product_number", "variant"}
+}
+func (emptyRows) Close() error              { return nil }
+func (emptyRows) Next([]driver.Value) error { return io.EOF }
+
+// A query that succeeds with no rows marks the page loaded, so the API can
+// answer an empty report; a query that fails leaves it never loaded.
+func TestCacheNewspaperRecordsAnEmptyLoad(t *testing.T) {
+	prevDB, prevGame, prevSkip := NewNewspaperDB, Config().Game, SkipNewspaper
+	prevPages, prevUpdate := newspaperPagesPtr.Load(), lastNewspaperUpdatePtr.Load()
+	t.Cleanup(func() {
+		NewNewspaperDB, Config().Game, SkipNewspaper = prevDB, prevGame, prevSkip
+		newspaperPagesPtr.Store(prevPages)
+		lastNewspaperUpdatePtr.Store(prevUpdate)
+	})
+	Config().Game, SkipNewspaper = DefaultGame, false
+	initial := slices.Clone(newspaperPagesInitial)
+	newspaperPagesPtr.Store(&initial)
+
+	refusing := sql.OpenDB(&refusingConnector{})
+	t.Cleanup(func() { refusing.Close() })
+	NewNewspaperDB = refusing
+	newSite().cacheNewspaper()
+	for _, page := range GetNewspaperPages() {
+		if page.Loaded {
+			t.Errorf("%s: loaded after a failed query", page.Option)
+		}
+	}
+
+	empty := sql.OpenDB(emptyRowsConnector{})
+	t.Cleanup(func() { empty.Close() })
+	NewNewspaperDB = empty
+	newSite().cacheNewspaper()
+	for _, page := range GetNewspaperPages() {
+		if want := page.Query != ""; page.Loaded != want || len(page.Results) != 0 {
+			t.Errorf("%s: loaded %t with %d rows, want loaded %t and none", page.Option, page.Loaded, len(page.Results), want)
+		}
+	}
+	if !GetLastNewspaperUpdate().Equal(loadTime(prevUpdate)) {
+		t.Error("an empty load moved the update time")
+	}
+}
+
 // newsRowCols are a spike_score row's columns, as getResults reads them.
 var newsRowCols = []string{"calc_date", "product_id", "ranking", "product_name", "set_name", "product_number", "variant", "bucket_name", "bucket_rank", "current_price"}
 
@@ -153,10 +218,41 @@ func newsInitialPage(t *testing.T, option string) NewspaperPage {
 	return NewspaperPage{}
 }
 
+// Each report's price and change columns are dollar and percent columns it shows.
+func TestNewspaperReportsNameTheirColumns(t *testing.T) {
+	has := func(page NewspaperPage, field string, perc bool) bool {
+		return slices.ContainsFunc(page.Head, func(h Heading) bool {
+			return h.Field == field && (perc && h.IsPerc || !perc && h.IsDollar)
+		})
+	}
+	for _, page := range newspaperPagesInitial {
+		if page.Priced != "" && !has(page, page.Priced, false) {
+			t.Errorf("%s: Priced %q is not a dollar column", page.Option, page.Priced)
+		}
+		if page.PercChanged != "" && !has(page, page.PercChanged, true) {
+			t.Errorf("%s: PercChanged %q is not a percent column", page.Option, page.PercChanged)
+		}
+	}
+	for option, want := range map[string][2]string{
+		"combined_spike_score":       {"tcg_market_price", ""},
+		"spike_score":                {"current_price", ""},
+		"greatest_increase_listings": {"", "pct_gain_7d"},
+		"greatest_decrease_listings": {"", "pct_drop_7d"},
+		"greatest_increase_buylist":  {"ck_buy_price", "pct_increase_7d"},
+		"greatest_decrease_buylist":  {"ck_buy_price", "pct_decrease_7d"},
+	} {
+		page := newsInitialPage(t, option)
+		if got := [2]string{page.Priced, page.PercChanged}; got != want {
+			t.Errorf("%s: Priced, PercChanged = %q, want %q", option, got, want)
+		}
+	}
+}
+
 // newsWithRows is a report with a live edition and the filter values cached from it.
 func newsWithRows(t *testing.T, option string, rows []NewspaperResult) NewspaperPage {
 	t.Helper()
 	page := newsInitialPage(t, option)
+	page.Loaded = true
 	page.Results = rows
 	page.AvailableEditions, page.PossibleFinish = newspaperFilterValues(rows)
 	return page
@@ -177,14 +273,14 @@ func newsRankings(rows []NewspaperResult) []int {
 // newsFilterPage takes buckets, a price and a change.
 var newsFilterPage = NewspaperPage{Option: "fixture", HasBucket: true, Priced: "current_price", PercChanged: "pct_gain_7d"}
 
-// newsFilterRows span two sets, every rarity letter, both finishes, and one row with no rarity.
+// newsFilterRows span two sets, every rarity letter, both finishes, one row with no rarity and one with no change; changes are fractions.
 func newsFilterRows() []NewspaperResult {
 	return []NewspaperResult{
-		{Ranking: 1, UUID: "a", CardName: "Alpha", Edition: "Bloomburrow", Variant: "Normal", Rarity: "mythic", BucketName: "$50+", CurrentPrice: 60, WeeklyPctChange: 40},
-		{Ranking: 2, UUID: "b", CardName: "Bravo", Edition: "Bloomburrow", Variant: "Foil", Rarity: "rare", BucketName: "$20+", CurrentPrice: 25, WeeklyPctChange: -5},
-		{Ranking: 3, UUID: "c", CardName: "Charlie", Edition: "Duskmourn", Variant: "Normal", Rarity: "uncommon", BucketName: "$2+", CurrentPrice: 2.5, WeeklyPctChange: 12},
+		{Ranking: 1, UUID: "a", CardName: "Alpha", Edition: "Bloomburrow", Variant: "Normal", Rarity: "mythic", BucketName: "$50+", CurrentPrice: 60, WeeklyPctChange: 0.5},
+		{Ranking: 2, UUID: "b", CardName: "Bravo", Edition: "Bloomburrow", Variant: "Foil", Rarity: "rare", BucketName: "$20+", CurrentPrice: 25, WeeklyPctChange: -0.05},
+		{Ranking: 3, UUID: "c", CardName: "Charlie", Edition: "Duskmourn", Variant: "Normal", Rarity: "uncommon", BucketName: "$2+", CurrentPrice: 2.5, WeeklyPctChange: 0.3333},
 		{Ranking: 4, UUID: "d", CardName: "Delta", Edition: "Duskmourn", Variant: "Normal", Rarity: "common", BucketName: "$2+", CurrentPrice: 2.5, WeeklyPctChange: 0},
-		{Ranking: 5, UUID: "e", CardName: "Echo", Edition: "Duskmourn", Variant: "Foil", Rarity: "", BucketName: "$5+", CurrentPrice: 7, WeeklyPctChange: 3},
+		{Ranking: 5, UUID: "e", CardName: "Echo", Edition: "Duskmourn", Variant: "Foil", Rarity: "", BucketName: "$5+", CurrentPrice: 7, WeeklyPctChange: 0.03},
 	}
 }
 
@@ -216,15 +312,54 @@ func TestNewsFilter(t *testing.T) {
 		{"min price", newsQuery{MinPrice: boundOf(7)}, []int{1, 2, 5}},
 		{"max price", newsQuery{MaxPrice: boundOf(7)}, []int{3, 4, 5}},
 		{"price bounds are inclusive", newsQuery{MinPrice: boundOf(2.5), MaxPrice: boundOf(2.5)}, []int{3, 4}},
-		{"min change", newsQuery{MinChange: boundOf(0)}, []int{1, 3, 4, 5}},
-		{"max change", newsQuery{MaxChange: boundOf(0)}, []int{2, 4}},
-		{"change bounds", newsQuery{MinChange: boundOf(3), MaxChange: boundOf(12)}, []int{3, 5}},
+		{"min change", newsQuery{MinChange: boundOf(0)}, []int{1, 3, 5}},
+		{"max change", newsQuery{MaxChange: boundOf(0)}, []int{2}},
+		{"change bounds are inclusive percents", newsQuery{MinChange: boundOf(3), MaxChange: boundOf(33.33)}, []int{3, 5}},
+		{"min change in percent", newsQuery{MinChange: boundOf(40)}, []int{1}},
 		{"skip a set", newsQuery{SkipSets: []string{"BLB"}}, []int{3, 4, 5}},
 		{"skip sets", newsQuery{SkipSets: []string{"DSK", "XXX"}}, []int{1, 2}},
 		{"together", newsQuery{Set: "Duskmourn", Finish: "Normal", MinPrice: boundOf(2)}, []int{3, 4}},
 		{"nothing", newsQuery{Set: "Bloomburrow", Rarity: "C"}, []int{}},
 	} {
 		got := newsRankings(newsFilter(b, newsFilterPage, newsFilterRows(), tc.q))
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A change bound is in percent: the stored fraction times 100, to two decimals.
+func TestNewsFilterChangeIsPercent(t *testing.T) {
+	for _, tc := range []struct {
+		change, min float64
+		keep        bool
+	}{
+		{0.2, 20, true},
+		{0.2, 21, false},
+		{0.29, 29, true},
+	} {
+		rows := []NewspaperResult{{Ranking: 1, WeeklyPctChange: tc.change}}
+		got := len(newsFilter(newsFilterBackend(), newsFilterPage, rows, newsQuery{MinChange: boundOf(tc.min)})) == 1
+		if got != tc.keep {
+			t.Errorf("change %v, min_change=%v: kept %t, want %t", tc.change, tc.min, got, tc.keep)
+		}
+	}
+}
+
+// A row with no value in a bound's column fails the bound and passes without one.
+func TestNewsFilterNoValueFailsABound(t *testing.T) {
+	rows := []NewspaperResult{{Ranking: 1, CurrentPrice: 5, WeeklyPctChange: 0.1}, {Ranking: 2}}
+	for _, tc := range []struct {
+		name string
+		q    newsQuery
+		want []int
+	}{
+		{"no bound", newsQuery{}, []int{1, 2}},
+		{"min price 0", newsQuery{MinPrice: boundOf(0)}, []int{1}},
+		{"max price", newsQuery{MaxPrice: boundOf(100)}, []int{1}},
+		{"max change", newsQuery{MaxChange: boundOf(100)}, []int{1}},
+	} {
+		got := newsRankings(newsFilter(newsFilterBackend(), newsFilterPage, rows, tc.q))
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
@@ -300,6 +435,54 @@ func TestNewsParseBound(t *testing.T) {
 		got := newsPageBound(in)
 		if (got == nil) != (want == nil) || got != nil && *got != *want {
 			t.Errorf("newsPageBound(%q) = %v", in, got)
+		}
+	}
+}
+
+// A live edition whose query found nothing says so, on desktop and mobile
+// alike, where a never-loaded one and the delayed edition still say not ready.
+func TestNewspaperPageLoadedEmpty(t *testing.T) {
+	withSigMode(t, true, false)
+	db, err := timeseries.SQLConfig{Host: "127.0.0.1", Port: 1, User: "none", Password: "none", DBName: "none"}.OpenDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	prevDB, prevPages := NewNewspaperDB, newspaperPagesPtr.Load()
+	t.Cleanup(func() {
+		NewNewspaperDB = prevDB
+		newspaperPagesPtr.Store(prevPages)
+	})
+	NewNewspaperDB = db
+
+	loaded := newsInitialPage(t, "spike_score")
+	loaded.Loaded = true
+	pages := []NewspaperPage{loaded, newsInitialPage(t, "greatest_decrease_listings")}
+	newspaperPagesPtr.Store(&pages)
+
+	const empty, notReady = "No entries for this report right now", "This data is not ready yet"
+	get := func(query string, cookies ...*http.Cookie) string {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/newspaper?"+query, nil)
+		for _, c := range cookies {
+			req.AddCookie(c)
+		}
+		testSite.Newspaper(rec, req)
+		return rec.Body.String()
+	}
+	for _, tc := range []struct {
+		desc, query string
+		cookies     []*http.Cookie
+		want, not   string
+	}{
+		{"loaded empty, live", "page=spike_score", nil, empty, notReady},
+		{"loaded empty, live, mobile", "page=spike_score", []*http.Cookie{{Name: "MobileView", Value: "true"}}, empty, notReady},
+		{"loaded empty, delayed", "page=spike_score&force3day=true", nil, notReady, empty},
+		{"never loaded, live", "page=greatest_decrease_listings", nil, notReady, empty},
+	} {
+		body := get(tc.query, tc.cookies...)
+		if !strings.Contains(body, tc.want) || strings.Contains(body, tc.not) {
+			t.Errorf("%s: want %q and not %q", tc.desc, tc.want, tc.not)
 		}
 	}
 }
