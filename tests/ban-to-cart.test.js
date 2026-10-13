@@ -768,6 +768,157 @@ describe('ban-to-cart bookmarklet on Game Nerdz\'s store', () => {
     });
 });
 
+// fakeCT stands in for Card Trader: one card's listings answer filtered by
+// the property, condition and Zero filters it is sent, as Card Trader's own
+// filters do, the 1-Day Ready groups apart, and the add fills the quantity
+// from the listings it is given, up to their copies, as Card Trader does.
+function fakeCT({listings = [], groups = [], blueprint = '16310', limit = 100} = {}) {
+    const posts = [];
+    const fetch = async (url, opts = {}) => {
+        if (url.includes('/filter.json')) {
+            const body = new URLSearchParams(opts.body);
+            posts.push({url, body: [...body]});
+            if (!url.includes('/cards/' + blueprint + '/')) {
+                return {ok: true, status: 200, json: async () => ({products: [], odr_product_groups: []})};
+            }
+            // A key's keyword terms admit any of their values; a term, its one
+            const terms = {};
+            const flags = [];
+            for (const [k, v] of body) {
+                const keyword = /^q\[terms\]\[properties_hash\.(\w+)\.keyword\]/.exec(k);
+                const flag = /^q\[term\]\[properties_hash\.(\w+)\]$/.exec(k);
+                if (keyword) {
+                    (terms[keyword[1]] = terms[keyword[1]] || []).push(v);
+                } else if (flag) {
+                    flags.push([flag[1], v === 'true']);
+                }
+            }
+            const hub = body.get('q[term][user.can_sell_via_hub]');
+            const fits = (p) => Object.entries(terms).every(([k, vs]) => vs.includes(p.properties_hash[k])) &&
+                flags.every(([k, on]) => !!p.properties_hash[k] === on);
+            return {ok: true, status: 200, json: async () => ({
+                products: listings.filter((p) => fits(p) && (hub === null || String(p.user.can_sell_via_hub) === hub))
+                    .sort((a, b) => a.layered_price_cents - b.layered_price_cents).slice(0, limit),
+                odr_product_groups: groups.filter(fits),
+            })};
+        }
+        const query = new URLSearchParams(url.split('?')[1]);
+        const ids = query.getAll('product_ids[]').map(Number);
+        posts.push({url, quantity: Number(query.get('quantity')), ids, future: query.get('future_order')});
+        let want = Number(query.get('quantity'));
+        let delta = 0;
+        for (const p of [...listings, ...groups.map((g) => ({id: g.all_ids[0], quantity: g.quantity}))]) {
+            if (ids.includes(p.id) && want > 0) {
+                const take = Math.min(want, p.quantity);
+                want -= take;
+                delta += take;
+            }
+        }
+        return {ok: true, status: 200, json: async () => ({delta_changed_quantity: delta})};
+    };
+    return {fetch, posts};
+}
+
+// listing is one Card Trader listing as its card page answers, a Magic one
+// unless props says otherwise
+function listing(id, cents, {condition = 'Near Mint', lang = 'en', foil = false, hub = true, qty = 1, currency = 'EUR', props = null, ...rest} = {}) {
+    return {id, layered_price_cents: cents, price_currency: currency, quantity: qty, description: rest.description || null,
+        on_vacation: false, graded: false,
+        properties_hash: {condition, altered: !!rest.altered, signed: false, ...(props || {mtg_language: lang, mtg_foil: foil})},
+        user: {can_sell_via_hub: hub, country_code: rest.country || 'IT', user_type: rest.type || 'pro'}};
+}
+
+// ctID names a row as the site does: <blueprint>-<grade>-<price>-<split>-<base64url properties>
+function ctID(price, split, props = 'mtg_foil=&mtg_language=en', grade = 'NM', blueprint = '16310') {
+    return [blueprint, grade, price, split, Buffer.from(props).toString('base64url')].join('-');
+}
+
+describe('ban-to-cart bookmarklet on Card Trader', () => {
+    const cartPage = {host: 'www.cardtrader.com', path: '/it-IT/cart/edit'};
+
+    test('a Zero row goes to every live Zero listing at or under BAN\'s price, in its grade and properties', async () => {
+        const ct = fakeCT({listings: [
+            listing(1, 14), listing(2, 19, {qty: 6}), listing(3, 20, {qty: 9}),
+            listing(4, 12, {condition: 'Slightly Played'}), listing(5, 10, {altered: true}),
+            listing(6, 10, {description: 'Italian copy'}), listing(7, 10, {currency: 'USD'}),
+            listing(8, 10, {hub: false}), listing(9, 10, {foil: true}), listing(10, 10, {lang: 'it'}),
+        ]});
+        const {alerts, page, posts} = await run({...cartPage, hash: '#ban=' + ctID('19EUR', 'z') + '%3a3&side=retail', abu: ct});
+        expect(posts[0].url).toBe('/it-IT/cards/16310/filter.json');
+        expect(posts[0].body).toEqual([
+            ['q[terms][properties_hash.mtg_language.keyword][]', 'en'],
+            ['q[terms][properties_hash.condition.keyword][]', 'Mint'],
+            ['q[terms][properties_hash.condition.keyword][]', 'Near Mint'],
+            ['q[term][user.can_sell_via_hub]', 'true'],
+        ]);
+        expect(posts[1]).toEqual({url: '/it-IT/cart/add.json?quantity=3&product_ids[]=1&product_ids[]=2&future_order=1', quantity: 3, ids: [1, 2], future: '1'});
+        expect(alerts).toEqual(['Added 1 cards to your Card Trader cart, on top of what it held.']);
+        expect(page.url).toBe('/it-IT/cart/edit');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('another game\'s row matches on its own properties, a missing flag reading as off', async () => {
+        const fab = (id, cents, props) => listing(id, cents, {props: {fab_language: 'en', ...props}});
+        const ct = fakeCT({listings: [
+            fab(1, 50, {fab_foil_new: 'Rainbow Foil', first_edition: true}),
+            fab(2, 40, {fab_foil_new: 'Rainbow Foil'}),
+            fab(3, 30, {fab_foil_new: 'Cold Foil', first_edition: true}),
+            fab(4, 45, {fab_foil_new: 'Rainbow Foil', first_edition: false}),
+        ]});
+        const {posts} = await run({...cartPage, hash: '#ban=' + ctID('50EUR', 'z', 'fab_foil_new=Rainbow+Foil&fab_language=en&first_edition=true') + ':1,' +
+            ctID('50EUR', 'z', 'fab_foil_new=Rainbow+Foil&fab_language=en&first_edition=') + ':1&side=retail', abu: ct});
+        expect(posts[0].body.slice(0, 3)).toEqual([
+            ['q[terms][properties_hash.fab_foil_new.keyword][]', 'Rainbow Foil'],
+            ['q[terms][properties_hash.fab_language.keyword][]', 'en'],
+            ['q[term][properties_hash.first_edition]', 'true'],
+        ]);
+        expect(posts.filter((p) => p.ids).map((p) => p.ids)).toEqual([[1], [2, 4]]);
+    });
+
+    test('a 1-Day Ready row goes to its groups, and the storefront without Zero to its own sellers', async () => {
+        const ct = fakeCT({
+            listings: [listing(1, 30, {hub: false}), listing(2, 30, {hub: false, country: 'GB', type: 'normal'}), listing(3, 30, {hub: false, country: 'GB'})],
+            groups: [{...listing(50, 11, {qty: 4}), all_ids: [50, 51, 52, 53], user: null}],
+        });
+        const {alerts, posts} = await run({...cartPage, hash: '#ban=' + ctID('12EUR', 'd') + ':2,' + ctID('30EUR', 'm') + ':1&side=retail', abu: ct});
+        const hubOf = (post) => (post.body.find(([k]) => k === 'q[term][user.can_sell_via_hub]') || [])[1];
+        expect(hubOf(posts[0])).toBeUndefined();
+        expect(posts[1].ids).toEqual([50, 51, 52, 53]);
+        expect(hubOf(posts[2])).toBe('false');
+        expect(posts[3].ids).toEqual([1, 3]);
+        expect(alerts).toEqual(['Added 2 cards to your Card Trader cart, on top of what it held.']);
+    });
+
+    test('a card it has fewer of is cut, and one with nothing at or under BAN\'s price left out', async () => {
+        const ct = fakeCT({listings: [listing(1, 14, {qty: 2}), listing(2, 50)]});
+        const rows = [ctID('14EUR', 'z') + ':5', ctID('14EUR', 'z', undefined, 'NM', '99') + ':1', ctID('14GBP', 'z') + ':1'];
+        const {alerts, posts} = await run({...cartPage, hash: '#ban=' + rows.join(',') + '&side=retail', abu: ct});
+        expect(posts.filter((p) => p.ids)).toHaveLength(1);
+        expect(alerts).toEqual(['Added 1 cards to your Card Trader cart, on top of what it held. 1 were cut to the copies Card Trader has at or under BAN\'s price. ' +
+            '2 that Card Trader has none of at or under BAN\'s price were left out.']);
+    });
+
+    test('a foil row finds its listings behind the cheaper ones Card Trader would answer first', async () => {
+        const ct = fakeCT({limit: 2, listings: [listing(1, 10), listing(2, 11), listing(3, 12), listing(4, 90, {foil: true})]});
+        const {posts} = await run({...cartPage, hash: '#ban=' + ctID('100EUR', 'z', 'mtg_foil=true&mtg_language=en') + ':1&side=retail', abu: ct});
+        expect(posts[1].ids).toEqual([4]);
+    });
+
+    test('a Poor row sends no condition, since a signed or stamped copy reads as Poor too', async () => {
+        const ct = fakeCT({listings: [listing(1, 10, {condition: 'Near Mint', description: 'signed by the artist'})]});
+        const {posts} = await run({...cartPage, hash: '#ban=' + ctID('10EUR', 'z', undefined, 'PO') + ':1&side=retail', abu: ct});
+        expect(posts[0].body.some(([k]) => k.includes('condition'))).toBe(false);
+        expect(posts[1].ids).toEqual([1]);
+    });
+
+    test('two tabs loading at once take turns', async () => {
+        const ct = fakeCT({listings: [listing(1, 14, {qty: 9})]});
+        const locks = fakeLocks();
+        await Promise.all([1, 2].map(() => run({...cartPage, hash: '#ban=' + ctID('14EUR', 'z') + ':1&side=retail', abu: ct, locks})));
+        expect(locks.names).toEqual(['ban-to-cart-ct', 'ban-to-cart-ct']);
+    });
+});
+
 // fakeML stands in for Manaleak: each product page names its Near Mint
 // option, its HTML breaking lines inside tags, with the store's copies; a
 // cart page lists a quantity field per line, keyed by product and options;

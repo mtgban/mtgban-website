@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"html/template"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,17 +40,52 @@ var cartStores = []cartStore{
 	// Nerdz's store is a BigCommerce one
 	{"GN", "Game Nerdz", "https://buylist.gamenerdz.com/retailer/buylist", "https://www.gamenerdz.com/cart.php"},
 	{"VS", "Vegas Singles", "https://buylist.vegas.singles/retailer/buylist", ""},
+	// Card Trader buys nothing; its store cart is filled from the listings
+	// live at load time
+	{"CT", "Card Trader", "", "https://www.cardtrader.com/cart/edit"},
 	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
 	// button until a load that logs a signed-in user out is explained
 	{"CK", "Card Kingdom", "", ""},
 }
 
 // cartRetailIDs name a store row the way a store's cart takes it, for a store
-// whose cart is not keyed by the entry's InstanceID, on the split named
-// exactly by its prefix.
+// whose cart is not keyed by the entry's InstanceID, by the splits it was
+// measured on.
 var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
-	"CK":  ckCartID,
-	"CSI": csiCartID,
+	"CK":    ckCartID,
+	"CSI":   csiCartID,
+	"CT":    ctCartID,
+	"CT0":   ctCartID,
+	"CT1DR": ctCartID,
+}
+
+// ctSplits name Card Trader's storefronts the way its loader tells their
+// listings apart: everyone, Zero's sellers, and the 1-Day Ready groups.
+var ctSplits = map[string]string{
+	"Card Trader":      "m",
+	"Card Trader Zero": "z",
+	"Card Trader 1DR":  "d",
+}
+
+// ctCartID names a Card Trader row by what its loader looks the card's live
+// listings up with, as <blueprint>-<grade>-<price cents><currency>-<split>-
+// <properties>: the price as Card Trader quotes the one BAN shows, and the
+// properties_hash keys and values that tell the game's listings apart, as a
+// query, base64url so any value fits the id.
+func ctCartID(entry mtgban.InventoryEntry) string {
+	fields := entry.CustomFields
+	split := ctSplits[entry.SellerName]
+	if split == "" || entry.OriginalID == "" || entry.Conditions == "" ||
+		fields["PriceCents"] == "" || fields["PriceCurrency"] == "" || fields["Properties"] == "" {
+		return ""
+	}
+	return strings.Join([]string{
+		entry.OriginalID,
+		string(entry.Conditions),
+		fields["PriceCents"] + fields["PriceCurrency"],
+		split,
+		base64.RawURLEncoding.EncodeToString([]byte(fields["Properties"])),
+	}, "-")
 }
 
 // cartBuylistIDs name a buylist row the way a store's cart takes it, for a
@@ -91,6 +128,9 @@ var cartAffiliates = map[string]func(code, page string) string{
 		return withQuery(page, url.Values{"utm_referrer": {code}})
 	},
 	// Mana Pool's own ref query, as its product links carry it
+	"CT": func(code, page string) string {
+		return withQuery(page, url.Values{"share_code": {code}})
+	},
 	"MP": func(code, page string) string {
 		return withQuery(page, url.Values{"ref": {code}})
 	},
@@ -207,20 +247,12 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 	return cartLoad{}
 }
 
-// cartAsksMost are the stores whose feed does not give their stock: Mint's
-// caps it at 8. Mana Pool's gives none, but its optimizer fills a line from
-// the cheapest listings up, at rising prices, so it asks for the row's own.
-var cartAsksMost = []string{"MMC"}
-
-// asksMost reports whether key's split is one of cartAsksMost's stores.
-func asksMost(key string) bool {
-	for _, prefix := range cartAsksMost {
-		if strings.HasPrefix(key, prefix) {
-			return true
-		}
-	}
-	return false
-}
+// cartAsksMost are the splits whose feed does not give their stock: Mint's
+// caps it at 8, and Card Trader's is gone by the time a listing is loaded,
+// which is filled from every listing at or under the price BAN shows. Mana
+// Pool's gives none, but its optimizer fills a line from the cheapest
+// listings up, at rising prices, so it asks for the row's own.
+var cartAsksMost = []string{"MMC", "CT", "CT0", "CT1DR"}
 
 // cartMostQuantity is what a cart is asked for to get as many as the store
 // has, for a store whose cart trims a quantity to its stock.
@@ -232,7 +264,7 @@ const cartMostQuantity = 999
 // as it has where the buylist names no amount, and the store trims it to
 // what it has.
 func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) cartLoad {
-	most := !buylist && asksMost(key)
+	most := !buylist && slices.Contains(cartAsksMost, key)
 	rows := make([]OptimizedUploadEntry, 0, len(entries))
 	quantities := make([]string, 0, len(entries))
 	for _, entry := range entries {
@@ -272,13 +304,14 @@ func cartStoresIn(keys []string, buylist bool) bool {
 
 // cartTakes reports whether a store's cart takes key's split on the side
 // buylist says. A store whose rows go by its own ids (cartRetailIDs) was
-// measured on its own split alone, not its graded or sealed ones.
+// measured on the splits named there alone, not its graded or sealed ones.
 func cartTakes(cs cartStore, key string, buylist bool) bool {
 	if !strings.HasPrefix(key, cs.prefix) || cs.page(buylist) == "" {
 		return false
 	}
 	_, own := cartRetailIDs[cs.prefix]
-	return buylist || !own || key == cs.prefix
+	_, named := cartRetailIDs[key]
+	return buylist || !own || named
 }
 
 // cartItems is the store item id of each of a split's rows, empty for a card
@@ -321,14 +354,14 @@ func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []strin
 			return entry.InstanceID
 		}
 		for _, cs := range cartStores {
-			named, found := cartRetailIDs[cs.prefix]
-			if !found || !strings.HasPrefix(key, cs.prefix) {
+			_, own := cartRetailIDs[cs.prefix]
+			if !own || !strings.HasPrefix(key, cs.prefix) {
 				continue
 			}
 			if !cartTakes(cs, key, false) {
 				return nil
 			}
-			name = named
+			name = cartRetailIDs[key]
 			break
 		}
 		lookup = func(cardID string, cond mtgban.Condition) string {
