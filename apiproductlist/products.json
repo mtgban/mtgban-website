@@ -60,6 +60,13 @@
       "name": "Additional game",
       "monthly": 15000,
       "applies_to": ["starter", "all_stores", "all_data"]
+    },
+    {
+      "key": "newspaper",
+      "name": "Newspaper reports",
+      "monthly": 100,
+      "applies_to": ["starter", "all_stores", "all_data"],
+      "grants_mode": "newspaper"
     }
   ],
   "intervals": [
