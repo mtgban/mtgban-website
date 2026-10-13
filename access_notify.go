@@ -9,7 +9,8 @@ import (
 )
 
 // Deployments that split the access table, the grant list, the affiliate
-// data and the chart datasets into their own bucket files can share those
+// data, the chart datasets and the infrastructure settings into their own
+// bucket files can share those
 // files - the grants and
 // the affiliates are one value across the magic and lorcana sites. A save on
 // one deployment then has to
@@ -21,10 +22,11 @@ import (
 // The NOTIFY channels, one per shared file. The payload is the sender's
 // instance name, so the sender can recognize and skip its own notification.
 const (
-	aclReloadChannel        = "acl_reload"
-	grantsReloadChannel     = "grants_reload"
-	affiliatesReloadChannel = "affiliates_reload"
-	datasetsReloadChannel   = "datasets_reload"
+	aclReloadChannel            = "acl_reload"
+	grantsReloadChannel         = "grants_reload"
+	affiliatesReloadChannel     = "affiliates_reload"
+	datasetsReloadChannel       = "datasets_reload"
+	infrastructureReloadChannel = "infrastructure_reload"
 )
 
 // notifyAccessReload tells the peer deployments to re-read the file behind
@@ -74,6 +76,9 @@ func startAccessReloadListener() {
 	}
 	if Config().DatasetsPath != "" {
 		reloads[datasetsReloadChannel] = loadDatasets
+	}
+	if Config().InfrastructurePath != "" {
+		reloads[infrastructureReloadChannel] = loadInfrastructure
 	}
 	if len(reloads) == 0 {
 		return

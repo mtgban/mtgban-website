@@ -28,6 +28,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/jobs"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/observability"
@@ -159,6 +160,8 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	adminAffiliatesEditor(r, &pageVars)
 
 	adminDatasetsEditor(r, &pageVars)
+
+	adminInfrastructureEditor(r, &pageVars)
 
 	s.adminKeyOverrides(r, b, &pageVars)
 
@@ -592,6 +595,29 @@ func adminDatasetsEditor(r *http.Request, pageVars *PageVars) {
 		pageVars.WarningMessage = "Datasets not saved: " + err.Error()
 	} else {
 		pageVars.InfoMessage = "Datasets updated"
+	}
+}
+
+// adminInfrastructureEditor saves the infrastructure settings posted from the
+// dashboard's editor; the template reads them back through
+// infrastructure_text and infrastructure_path.
+func adminInfrastructureEditor(r *http.Request, pageVars *PageVars) {
+	newInfrastructure := r.FormValue("infrastructureTextArea")
+	if newInfrastructure == "" {
+		return
+	}
+	var parsed infrastructure.Config
+	decoder := json.NewDecoder(strings.NewReader(newInfrastructure))
+	// A typoed key would otherwise be dropped without a word.
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&parsed)
+	if err == nil {
+		err = saveInfrastructure(r.Context(), parsed)
+	}
+	if err != nil {
+		pageVars.WarningMessage = "Infrastructure not saved: " + err.Error()
+	} else {
+		pageVars.InfoMessage = "Infrastructure updated"
 	}
 }
 

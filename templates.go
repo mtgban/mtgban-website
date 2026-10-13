@@ -393,6 +393,21 @@ var funcMap = template.FuncMap{
 	"datasets_path": func() string {
 		return Config().DatasetsPath
 	},
+	// infrastructure_text is the infrastructure_path file as the admin editor
+	// shows it: the file alone, without the keys this deployment's config
+	// overrides.
+	"infrastructure_text": func() string {
+		text, err := json.MarshalIndent(infrastructureFile(), "", "    ")
+		if err != nil {
+			return ""
+		}
+		return string(text)
+	},
+	// infrastructure_path is the file the infrastructure settings are read
+	// from and saved to, empty when the config names none.
+	"infrastructure_path": func() string {
+		return Config().InfrastructurePath
+	},
 	// stale_count counts the rows of an admin scraper table whose stale
 	// badge, column 8, is set.
 	"stale_count": func(rows [][]string) int {

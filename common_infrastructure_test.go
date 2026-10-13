@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
@@ -86,5 +91,102 @@ func TestLoadInfrastructureKeepsTheValueOnError(t *testing.T) {
 	}
 	if Infrastructure().GoogleCredentials != "kept.json" {
 		t.Errorf("failed reload dropped the file: %+v", Infrastructure())
+	}
+}
+
+// With no path configured a save refuses rather than reaching for a path that
+// names no file.
+func TestNoInfrastructurePathRefusesSave(t *testing.T) {
+	withInfrastructureConfig(t, "")
+	err := saveInfrastructure(context.Background(), infrastructure.Config{GoogleCredentials: "saved.json"})
+	if err == nil {
+		t.Error("save with no infrastructure path did not error")
+	}
+}
+
+// A save writes the file and publishes it. (The peer notification is a no-op
+// here: tests run without a price DB.)
+func TestSaveInfrastructureWritesThePath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "infrastructure.json")
+	withInfrastructureConfig(t, path)
+
+	err := saveInfrastructure(context.Background(), infrastructure.Config{GoogleCredentials: "saved.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Infrastructure().GoogleCredentials != "saved.json" {
+		t.Errorf("published file is not the saved one: %+v", Infrastructure())
+	}
+
+	infrastructurePtr.Store(nil)
+	err = loadInfrastructure(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Infrastructure().GoogleCredentials != "saved.json" {
+		t.Errorf("file holds %+v, want the saved value", infrastructureFile())
+	}
+}
+
+// The Infrastructure tab offers Update only when there is a file to save to,
+// and shows the file alone, not the keys this deployment's config overrides.
+func TestAdminInfrastructureEditor(t *testing.T) {
+	pv := PageVars{UserNav: &NavElem{Short: "b"}}
+	const update = `data-update-for="infrastructure"`
+
+	withInfrastructureConfig(t, "")
+	out := renderPage(t, "admin.html", false, pv)
+	if strings.Contains(out, update) {
+		t.Error("Update offered with no infrastructure path")
+	}
+
+	path := writeInfrastructureFile(t, `{"google_credentials": "file.json"}`)
+	Config().InfrastructurePath = path
+	Config().GoogleCredentials = "own.json"
+	err := loadInfrastructure(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out = renderPage(t, "admin.html", false, pv)
+	if !strings.Contains(out, update) {
+		t.Error("Update not offered with an infrastructure path")
+	}
+	if !strings.Contains(out, "file.json") || strings.Contains(out, "own.json") {
+		t.Error("the editor does not show the file alone")
+	}
+}
+
+// postInfrastructureEditor posts body to the Infrastructure tab's editor and
+// returns the page it fills.
+func postInfrastructureEditor(body string) PageVars {
+	form := url.Values{"infrastructureTextArea": {body}}
+	r := httptest.NewRequest(http.MethodPost, "/admin?page=infrastructure", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	var pv PageVars
+	adminInfrastructureEditor(r, &pv)
+	return pv
+}
+
+// The editor refuses an unknown key without writing anything, and saves and
+// publishes a valid file.
+func TestAdminInfrastructureEditorSaves(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "infrastructure.json")
+	withInfrastructureConfig(t, path)
+
+	pv := postInfrastructureEditor(`{"bucket_key": {}}`)
+	if pv.WarningMessage == "" {
+		t.Error("an unknown key was not refused")
+	}
+	_, err := os.Stat(path)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a refused save touched the file: %v", err)
+	}
+
+	pv = postInfrastructureEditor(`{"google_credentials": "saved.json"}`)
+	if pv.InfoMessage == "" || pv.WarningMessage != "" {
+		t.Errorf("a valid save reported %q / %q", pv.InfoMessage, pv.WarningMessage)
+	}
+	if infrastructureFile().GoogleCredentials != "saved.json" {
+		t.Errorf("published file %+v, want the saved one", infrastructureFile())
 	}
 }
