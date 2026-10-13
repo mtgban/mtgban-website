@@ -26,6 +26,9 @@ type chartTarget struct {
 	Foil   bool
 	Etched bool
 	Name   string
+	// Label names this printing on a roster chart, where two printings of
+	// one card share a Name.
+	Label string
 	// SearchID is the mtgmatcher id of this exact printing, which is what the
 	// results table below the chart resolves a row from. Resolving a roster id
 	// answers both questions at once - the chart's target and the table's row -
@@ -151,6 +154,7 @@ func matcherTarget(ctx context.Context, b *mtgmatcher.Backend, id string) (*char
 		// product leaves BanID 0 and the canonical uuid path takes over.
 		return &chartTarget{
 			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
+			Label:    co.String(),
 			BanID:    resolveBanIDForCard(ctx, co),
 			SearchID: searchID,
 		}, nil
@@ -321,6 +325,7 @@ func targetFromTCGID(ctx context.Context, b *mtgmatcher.Backend, tcgID int) (*ch
 		if co, err := b.GetUUID(matched); err == nil {
 			return &chartTarget{
 				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
+				Label:    co.String(),
 				BanID:    resolveBanIDForCard(ctx, co),
 				SearchID: matched,
 			}, nil
@@ -355,10 +360,12 @@ func targetFromBanID(ctx context.Context, b *mtgmatcher.Backend, banID int64) (*
 			// The uuid, kept on the finish the ban_id names.
 			SearchID: magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched),
 		}
-		// Display name comes from mtgmatcher; the base uuid suffices since the
-		// name is finish-independent (the chart uses BanID for data).
-		if co, err := b.GetUUID(vi.MtgjsonUUID); err == nil {
+		// Display name comes from mtgmatcher, read off the finish's own id so
+		// the label names it (the chart uses BanID for data).
+		co, err := b.GetUUID(t.SearchID)
+		if err == nil {
 			t.Name = co.Name
+			t.Label = co.String()
 		}
 		return t, nil
 	}
@@ -380,6 +387,7 @@ func nonMagicTarget(ctx context.Context, b *mtgmatcher.Backend, vi timeseries.Va
 		if vi.TCGSubType != "" && vi.TCGSubType != "Normal" {
 			t.Name += " (" + vi.TCGSubType + ")"
 		}
+		t.Label = t.Name
 	}
 	return t
 }
