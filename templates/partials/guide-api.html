@@ -13,6 +13,7 @@
 <template data-section="api-endpoints">
 <p>Paths are relative to <code>https://api.mtgban.com/v1/{game}/</code>. Only <code>GET</code> is accepted. Every endpoint returns JSON; replace <code>.json</code> with <code>.csv</code> for a human-readable CSV that leaves out the fields a flat file cannot hold, except on <code>all/{SET}</code> and the unfiltered full snapshot. Editions use <a href="https://scryfall.com/sets" target="_blank" rel="noopener">Scryfall set codes</a>.</p>
 <p>Version 2, under <code>https://api.mtgban.com/v2/{game}/</code>, serves the same endpoints. Its search keys cards as the version 1 search does, by Scryfall id and MTGJSON id for sealed products, unless <code>id</code> says otherwise, and stores by tag as its other endpoints do. Its price CSV, search included, is the version 1 CSV. Its <code>stores.json</code> describes each store rather than listing tags, and it adds <code>finishes.json</code>; see Response Format.</p>
+<p>Version 2 also serves price history, on its own plan. <code>history/{id}.json</code> is one card in every finish, by an MTGBAN, MTGJSON, Scryfall or TCGplayer id; <code>history/{SET}.json</code> and <code>history/sealed/{SET}.json</code> walk a set in pages (<code>page=N</code>, <code>meta.pages</code> says how many); <code>history/a,b,c.json</code>, card ids separated by commas, is a batch. Replace <code>.json</code> with <code>.csv</code> for the same points as a flat table, one row per point under the header <code>id,finish,store,section,date,price</code>, with <code>meta</code> in the <code>X-MTGBAN-Latest</code>, <code>X-MTGBAN-Range</code> and, for a set, <code>X-MTGBAN-Page</code> and <code>X-MTGBAN-Pages</code> headers. <code>range=N</code> asks for the last N calendar days, today included, up to the plan's lookback. A request may cover 120 card-months, a card being one printing in one finish (the range in 30-day months times the cards it names), so a year is ten cards a request and a month is a hundred and twenty; one card, or a batch of one id, is always served. The data moves twice a day at most; a response says how long to cache it. The other games carry TCGplayer's series only, from February 2024, and a day their ingest missed stays missing.</p>
 </template>
 
 <template data-section="api-options">
@@ -80,6 +81,7 @@
   { "value": "foil", "label": "Foil", "count": 60310 },
   { "value": "sealed", "label": "Sealed", "count": 12011 }
 ]</code></pre>
+<p>A history response keeps the version 2 nesting, card id, then finish, then store key, and each leaf is a series: <code>{"dates": ["2026-10-05", "2026-10-06"], "prices": [8.49, 8.49]}</code>, oldest first, with a day the source had no price left out. <code>meta.latest</code> is the newest day served, usually yesterday. Prices are USD with no condition. A sealed product's series sit under the source's single-card tag, such as <code>CK</code>, not the sealed tag, such as <code>CKSealed</code>, its version 2 price uses.</p>
 <p>Both versions are written out as <a href="#api-openapi">OpenAPI specifications</a> at the end of this tab.</p>
 </template>
 

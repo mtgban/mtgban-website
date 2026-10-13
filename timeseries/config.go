@@ -73,13 +73,14 @@ type Client struct {
 	// prices) write path. Warm it once with WarmVariantCache; misses mint.
 	variants variantCache
 
-	// The chart reads are kept prepared, which is what stops their
+	// The chart and history reads are kept prepared, which is what stops their
 	// hundred-partition plan from being rebuilt on every request. Set once by
 	// NewClient, before the client is handed out, and never written again -
 	// so reading them needs no synchronisation. Nil when preparing failed, or
 	// on a client built without one, and the read falls back to Query.
-	stmtHGetAllLong    *sql.Stmt
-	stmtHGetAllByBanID *sql.Stmt
+	stmtHGetAllLong     *sql.Stmt
+	stmtHGetAllByBanID  *sql.Stmt
+	stmtHGetAllByBanIDs *sql.Stmt
 
 	// The screener's anchor walk asks for a provider's newest date up to
 	// sixteen times a build, and the unbounded form spans every partition, so
@@ -205,6 +206,7 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	// pays for its plan every time.
 	c.stmtHGetAllLong, _ = db.Prepare(hgetAllLongQuery)
 	c.stmtHGetAllByBanID, _ = db.Prepare(hgetAllByBanIDQuery)
+	c.stmtHGetAllByBanIDs, _ = db.Prepare(hgetAllByBanIDsQuery)
 	for _, shape := range []struct{ bounded, strict bool }{{false, false}, {true, false}, {true, true}} {
 		stmt, _ := db.Prepare(providerLatestDateQuery(shape.bounded, shape.strict))
 		c.stmtProviderLatestDate[providerLatestDateShape(shape.bounded, shape.strict)] = stmt
@@ -256,7 +258,7 @@ func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool,
 
 // Close shuts down the connection pool.
 func (c *Client) Close() error {
-	stmts := []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID}
+	stmts := []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID, c.stmtHGetAllByBanIDs}
 	stmts = append(stmts, c.stmtProviderLatestDate[:]...)
 	for _, stmt := range stmts {
 		if stmt != nil {

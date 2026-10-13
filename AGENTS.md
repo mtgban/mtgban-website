@@ -149,7 +149,7 @@ output, not a claim written here.
 | `alerts_*.go` | Price alerts: the Alerts page, the ACL values and login contact it reads, the site's wiring of `internal/alerts`, and alert mail delivery and the webhook (`docs/adr/0005-price-alerts.md`, `docs/adr/0007-alert-email-address.md`) |
 | `settings_modal.go` | The settings modal's body: the tabs a reader's nav earns, each tab's lists from the handlers' shared functions, served by `/api/settings/modal` and rendered from `templates/settings/` |
 | `screener.go`, `popular.go`, `guide.go`, `changelog.go` | The price-movers screener; the landing page's popular searches, ranked from signed-in users' typed searches in the observability database and padded with the config's curated list; the guide; release notes read from Discord |
-| `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, CSV exports |
+| `api*.go` | Price API, price history (`api_history.go`: the v2 history endpoint under `/api/v2/history/`, one card, a comma-separated batch or a set page in the path, in JSON or CSV, its budget in card-months, a card being one printing in one finish, and its store keys from `timeseries/providers.json`), batch prices, chart/suggest/userstate APIs, CSV exports |
 | `admin.go`, `admin_searches.go`, `discord.go` | Admin panel + commands, with the Searches tab's vote ranking in its own file; Discord bot |
 | `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them; per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
