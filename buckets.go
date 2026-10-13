@@ -11,13 +11,6 @@ import (
 	"github.com/mtgban/simplecloud"
 )
 
-// BucketKey is a B2 application key pair scoped to a single bucket, keyed by
-// bucket name in Config.BucketKeys.
-type BucketKey struct {
-	AccessKey    string `json:"access_key"`
-	AccessSecret string `json:"access_secret"`
-}
-
 // configBucketName is the bucket the config itself was read from, or "" when
 // the config is a local file. Parsed rather than remembered, so it cannot go
 // stale against the path a reload reads.
@@ -29,22 +22,20 @@ func configBucketName() string {
 	return u.Host
 }
 
-// bucketCredentials returns the key pair for the named bucket: the matching
-// bucket_keys entry when present, else the pair the config itself was read
-// with. Any other bucket gets no pair, and B2 refuses it.
+// bucketCredentials returns the key pair for the named bucket: for the config
+// bucket, the pair the config itself was read with, else the matching
+// bucket_keys entry. Any other bucket gets no pair, and B2 refuses it.
 //
-// The config bucket needs its own answer because its key pair is in the
-// environment, not the config file - a file cannot name the key it is itself
-// read with - so it can never be a bucket_keys entry. Everything filed beside
-// the config is read with it: the Google credentials, the key overrides.
+// The config bucket's key pair is in the environment, not a file - a file
+// cannot name the key it is itself read with - so a bucket_keys entry for it
+// is ignored. Everything filed beside the config is read with it: the
+// infrastructure file, the Google credentials, the key overrides.
 func bucketCredentials(bucketName string) (string, string) {
-	if creds, ok := Config().BucketKeys[bucketName]; ok {
-		return creds.AccessKey, creds.AccessSecret
-	}
 	if bucketName != "" && bucketName == configBucketName() {
 		return os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET")
 	}
-	return "", ""
+	creds := Infrastructure().BucketKeys[bucketName]
+	return creds.AccessKey, creds.AccessSecret
 }
 
 // newB2ClientFor builds a B2 client for the named bucket with its credentials.

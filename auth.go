@@ -40,12 +40,6 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
 
-type PatreonConfig struct {
-	Source string            `json:"source"`
-	Client map[string]string `json:"client"`
-	Secret map[string]string `json:"secret"`
-}
-
 type PatreonUserData struct {
 	UserID        string
 	MembershipID  string
@@ -272,9 +266,10 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	defer cancelPatreon()
 
 	// Get the access token for this connection
-	source := Config().Patreon.Source
-	clientID := Config().Patreon.Client[source]
-	secret := Config().Patreon.Secret[source]
+	patreonConfig := Infrastructure().Patreon
+	source := patreonConfig.Source
+	clientID := patreonConfig.Client[source]
+	secret := patreonConfig.Secret[source]
 	tokens, err := patreon.GetAuthToken(patreonCtx, clientID, secret, origin, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
