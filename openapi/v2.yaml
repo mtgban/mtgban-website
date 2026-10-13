@@ -122,6 +122,82 @@ paths:
         "200": { $ref: "#/components/responses/Prices" }
         default: { $ref: "#/components/responses/Error" }
 
+  /newspaper/reports.json:
+    get:
+      summary: The newspaper's reports for the game, and what each one takes
+      description: >-
+        The reports in the newspaper's order, each with its columns, the
+        filters it accepts and the values they take. A report not shown
+        on this game is left out (combined_spike_score and the two
+        buylist reports are Magic's alone); one not loaded yet, or whose
+        query found no rows, is listed with rows 0 and empty sets and
+        finishes. Takes no options: any query parameter is ignored. Needs
+        the newspaper mode: 403 without it, 503 with Retry-After while no
+        report has loaded (startup, or no newspaper on the host). Errors
+        carry their HTTP status.
+      responses:
+        "200": { $ref: "#/components/responses/NewspaperReports" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /newspaper/{report}.json:
+    get:
+      summary: One newspaper report's latest edition, filtered, sorted and paged
+      description: >-
+        The ranked report, filtered and sorted, 1,000 rows a page; meta
+        carries page, pages and the rows matched. An option the report
+        does not list under filters in reports.json is a 400, as is a
+        value outside the lists it gives, a bound that is not a finite
+        number, a dir other than asc or desc, a sort on a column that is not
+        sortable, or a page out of range; so is a report reports.json
+        does not list. A report it lists whose query has never succeeded
+        is a 503, report not loaded yet, with Retry-After: 300; one whose
+        query ran and found no rows is a 200 with rows: [] and no date. A
+        row with no value in a bound's column fails the bound. A filter
+        that matches nothing answers rows: []. Replace .json with .csv for
+        the same rows as a table. Needs the newspaper mode.
+      parameters:
+        - $ref: "#/components/parameters/report"
+        - $ref: "#/components/parameters/newsSort"
+        - $ref: "#/components/parameters/newsDir"
+        - $ref: "#/components/parameters/newsPage"
+        - $ref: "#/components/parameters/newsSet"
+        - $ref: "#/components/parameters/newsRarity"
+        - $ref: "#/components/parameters/newsFinish"
+        - $ref: "#/components/parameters/newsBucket"
+        - $ref: "#/components/parameters/minPrice"
+        - $ref: "#/components/parameters/maxPrice"
+        - $ref: "#/components/parameters/minChange"
+        - $ref: "#/components/parameters/maxChange"
+      responses:
+        "200": { $ref: "#/components/responses/NewspaperReport" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /newspaper/{report}.csv:
+    get:
+      summary: One newspaper report's latest edition as CSV
+      description: >-
+        The rows of /newspaper/{report}.json as a table, with its options,
+        paging and refusals. Errors stay JSON.
+      parameters:
+        - $ref: "#/components/parameters/report"
+        - $ref: "#/components/parameters/newsSort"
+        - $ref: "#/components/parameters/newsDir"
+        - $ref: "#/components/parameters/newsPage"
+        - $ref: "#/components/parameters/newsSet"
+        - $ref: "#/components/parameters/newsRarity"
+        - $ref: "#/components/parameters/newsFinish"
+        - $ref: "#/components/parameters/newsBucket"
+        - $ref: "#/components/parameters/minPrice"
+        - $ref: "#/components/parameters/maxPrice"
+        - $ref: "#/components/parameters/minChange"
+        - $ref: "#/components/parameters/maxChange"
+      responses:
+        "200": { $ref: "#/components/responses/NewspaperCSV" }
+        "304": { description: "Not modified: If-None-Match holds the ETag" }
+        default: { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     bearer:
@@ -156,6 +232,80 @@ components:
       name: filter
       in: query
       schema: { type: string, enum: [sealed, singles] }
+    report:
+      name: report
+      in: path
+      required: true
+      description: A newspaper report key, as reports.json lists them
+      schema: { type: string, enum: [combined_spike_score, spike_score, greatest_increase_listings, greatest_decrease_listings, greatest_increase_buylist, greatest_decrease_buylist] }
+    newsSort:
+      name: sort
+      in: query
+      description: >-
+        A sortable column's field from reports.json, or one of ranking,
+        name, set, number, finish. Numbers sort as numbers, the rest as
+        text, ties in ranking order
+      schema: { type: string, default: ranking }
+    newsDir:
+      name: dir
+      in: query
+      description: asc by default for ranking, desc for any other sort
+      schema: { type: string, enum: [asc, desc] }
+    newsPage:
+      name: page
+      in: query
+      description: >-
+        The page of the filtered, sorted rows, 1,000 rows a page; past
+        meta.pages, below 1 or not an integer is a 400
+      schema: { type: integer, minimum: 1, default: 1 }
+    newsSet:
+      name: set
+      in: query
+      description: An edition name from the report's sets in reports.json, matched exactly
+      schema: { type: string }
+    newsRarity:
+      name: rarity
+      in: query
+      description: The first letter of the card's rarity, or either of a pair
+      schema: { type: string, enum: [M, R, U, C, S, M/R, U/C] }
+    newsFinish:
+      name: finish
+      in: query
+      description: A finish from the report's finishes in reports.json, matched exactly
+      schema: { type: string }
+    newsBucket:
+      name: bucket
+      in: query
+      description: A price bucket, on reports that list bucket under filters
+      schema: { type: string, enum: [$2+, $5+, $10+, $20+, $35+, $50+, $75+] }
+    minPrice:
+      name: min_price
+      in: query
+      description: Inclusive lower bound on the report's price column, on reports that list min_price; a row with no price fails it
+      schema: { type: number }
+    maxPrice:
+      name: max_price
+      in: query
+      description: Inclusive upper bound on the report's price column, on reports that list max_price; a row with no price fails it
+      schema: { type: number }
+    minChange:
+      name: min_change
+      in: query
+      description: >-
+        Inclusive lower bound on the report's weekly change, in percent as
+        the percent column is served (20 means 20%), on reports that list
+        min_change; a row with no change fails it
+      schema: { type: number }
+      example: 20
+    maxChange:
+      name: max_change
+      in: query
+      description: >-
+        Inclusive upper bound on the report's weekly change, in percent as
+        the percent column is served (-10 means -10%), on reports that list
+        max_change; a row with no change fails it
+      schema: { type: number }
+      example: -10
 
   responses:
     Prices:
@@ -169,12 +319,59 @@ components:
           schema: { $ref: "#/components/schemas/PriceResponse" }
     Error:
       description: >-
-        401 bad key, 403 plan lacks the game or mode, 404 unknown path,
+        400 a bad option or report, 401 bad key, 403 plan lacks the game
+        or mode, 404 unknown path,
         405 not GET, 429 rate limited (Retry-After),
-        502/503/504 upstream or database trouble
+        502/503/504 upstream or database trouble, 503 also a newspaper
+        report whose query has never succeeded (Retry-After)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    NewspaperReports:
+      description: The reports this game serves
+      headers:
+        ETag: { schema: { type: string } }
+        Cache-Control: { $ref: "#/components/headers/NewspaperCacheControl" }
+        Last-Modified: { schema: { type: string }, description: When the site last refreshed the newspaper }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/NewspaperReports" }
+    NewspaperReport:
+      description: One page of a report's rows, in the order asked for
+      headers:
+        ETag: { schema: { type: string } }
+        Cache-Control: { $ref: "#/components/headers/NewspaperCacheControl" }
+        Last-Modified: { schema: { type: string }, description: When the site last refreshed the newspaper }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/NewspaperReport" }
+    NewspaperCSV:
+      description: >-
+        One page of the rows as a table, header
+        ranking,id,name,set,number,finish,rarity then the report's column
+        fields, in the order asked for. meta travels in headers; a value
+        that is absent or not a finite number is an empty cell.
+      headers:
+        ETag: { schema: { type: string } }
+        Cache-Control: { $ref: "#/components/headers/NewspaperCacheControl" }
+        Last-Modified: { schema: { type: string }, description: When the site last refreshed the newspaper }
+        X-MTGBAN-Date: { schema: { type: string, format: date }, description: The report's date; absent for a report with no rows }
+        X-MTGBAN-Refreshed: { schema: { type: string, format: date-time }, description: When the site last refreshed the newspaper; absent before its first refresh }
+        X-MTGBAN-Stale: { schema: { type: boolean }, description: True once that refresh is 12 hours old }
+        X-MTGBAN-Rows: { schema: { type: integer }, description: Rows the filters matched, before paging }
+        X-MTGBAN-Page: { schema: { type: integer }, description: This page }
+        X-MTGBAN-Pages: { schema: { type: integer }, description: Pages of 1,000 rows the matched rows fill, at least 1 }
+      content:
+        text/csv:
+          schema: { type: string }
+
+  headers:
+    NewspaperCacheControl:
+      description: >-
+        public, max-age to the next newspaper refresh (33 */3 * * * on the
+        host's clock), at least 60 seconds; 60 while a due refresh has not
+        landed, 300 once stale
+      schema: { type: string }
 
   schemas:
     PriceResponse:
@@ -259,3 +456,85 @@ components:
       properties:
         error: { type: string }
         game: { type: string }
+    NewspaperMeta:
+      type: object
+      required: [latest, stale]
+      properties:
+        latest: { type: string, format: date, description: The newest report date }
+        refreshed: { type: string, format: date-time, description: When the site last refreshed the newspaper; absent before its first refresh }
+        stale: { type: boolean, description: True once that refresh is 12 hours old }
+    NewspaperColumn:
+      type: object
+      required: [field, title, kind, sortable]
+      properties:
+        field: { type: string, description: The row key the column's values sit under }
+        title: { type: string }
+        kind:
+          type: string
+          enum: [dollar, percent, number, text]
+          description: >-
+            Numbers for dollar, percent and number, null where absent;
+            strings for text. A percent is a percentage, the stored change
+            times 100 to two decimals: 6.5 means 6.5%
+        sortable: { type: boolean }
+    NewspaperReportInfo:
+      type: object
+      required: [key, title, description, columns, filters, sets, finishes, rows]
+      properties:
+        key: { type: string }
+        title: { type: string }
+        description: { type: string }
+        columns: { type: array, items: { $ref: "#/components/schemas/NewspaperColumn" } }
+        filters:
+          type: array
+          items: { type: string, enum: [set, rarity, finish, bucket, min_price, max_price, min_change, max_change] }
+        sets: { type: array, items: { type: string } }
+        finishes: { type: array, items: { type: string } }
+        buckets: { type: array, items: { type: string }, description: Reports that take bucket only }
+        rows: { type: integer, description: "The latest edition's rows before filtering, 0 for a report not loaded yet or loaded empty" }
+    NewspaperReports:
+      type: object
+      required: [meta, reports]
+      properties:
+        meta: { $ref: "#/components/schemas/NewspaperMeta" }
+        reports: { type: array, items: { $ref: "#/components/schemas/NewspaperReportInfo" } }
+    NewspaperReport:
+      type: object
+      required: [meta, rows]
+      properties:
+        meta:
+          type: object
+          required: [report, title, date, stale, rows, page, pages, columns]
+          properties:
+            report: { type: string }
+            title: { type: string }
+            date: { type: string, format: date, description: "The report's date, empty for a report with no rows" }
+            refreshed: { type: string, format: date-time, description: When the site last refreshed the newspaper; absent before its first refresh }
+            stale: { type: boolean }
+            rows: { type: integer, description: Rows the filters matched, before paging }
+            page: { type: integer, description: This page }
+            pages: { type: integer, description: Pages of 1,000 rows the matched rows fill, at least 1 }
+            columns: { type: array, items: { $ref: "#/components/schemas/NewspaperColumn" } }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/NewspaperRow" }
+    NewspaperRow:
+      type: object
+      required: [ranking, id, name, set, number, finish, rarity]
+      description: >-
+        The card fields, then one key per column in meta.columns past
+        ranking: a number for the dollar, percent and number kinds (null
+        where the row has none or it is not finite; a percent in percent,
+        6.5 for 6.5%) and a string for text
+      properties:
+        ranking: { type: integer }
+        id: { type: string, description: "The card's MTGBAN id, as id=ban keys the price endpoints" }
+        name: { type: string }
+        set: { type: string }
+        number: { type: string }
+        finish: { type: string }
+        rarity: { type: string }
+      additionalProperties:
+        oneOf:
+          - { type: number, nullable: true }
+          - { type: string }
