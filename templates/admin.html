@@ -723,28 +723,32 @@ function initJSONEditor(opts) {
         autoCloseBrackets: true,
         tabSize: 4,
         indentWithTabs: false,
-        viewportMargin: Infinity
+        viewportMargin: Infinity,
+        readOnly: !!opts.readOnly
     });
     editor.setSize("100%", "600px");
 
     // Dirty tracking: enable the matching Update button only when the editor
     // differs from the last-saved baseline, and feed the unsaved-changes guard.
-    var baseline = editor.getValue();
-    var updateBtn = opts.name ? document.querySelector('[data-update-for="' + opts.name + '"]') : null;
-    function refreshDirty() {
-        editor.__dirty = editor.getValue() !== baseline;
-        if (updateBtn) updateBtn.disabled = !editor.__dirty;
-    }
-    editor.on("change", refreshDirty);
-    refreshDirty();
+    // A read-only editor has nowhere to save to, so it is never dirty.
+    if (!opts.readOnly) {
+        var baseline = editor.getValue();
+        var updateBtn = opts.name ? document.querySelector('[data-update-for="' + opts.name + '"]') : null;
+        var refreshDirty = function() {
+            editor.__dirty = editor.getValue() !== baseline;
+            if (updateBtn) updateBtn.disabled = !editor.__dirty;
+        };
+        editor.on("change", refreshDirty);
+        refreshDirty();
 
-    form.addEventListener("submit", function() {
-        textarea.value = editor.getValue();
-        // Submitting saves this editor; clear its dirty flag so the
-        // beforeunload guard does not fire on the resulting reload.
-        baseline = editor.getValue();
-        editor.__dirty = false;
-    });
+        form.addEventListener("submit", function() {
+            textarea.value = editor.getValue();
+            // Submitting saves this editor; clear its dirty flag so the
+            // beforeunload guard does not fire on the resulting reload.
+            baseline = editor.getValue();
+            editor.__dirty = false;
+        });
+    }
 
     new MutationObserver(function() {
         var dark = document.body.classList.contains("dark-theme");
@@ -876,9 +880,9 @@ window.addEventListener("beforeunload", function(e) {
     if (acle) window.__jsonEditors["acl"] = acle;
     var aff = initJSONEditor({ name: "affiliates", textareaId: "affiliatesTextArea", editorId: "affiliatesEditor", formId: "affiliatesForm" });
     if (aff) window.__jsonEditors["affiliates"] = aff;
-    var dse = initJSONEditor({ name: "datasets", textareaId: "datasetsTextArea", editorId: "datasetsEditor", formId: "datasetsForm" });
+    var dse = initJSONEditor({ name: "datasets", textareaId: "datasetsTextArea", editorId: "datasetsEditor", formId: "datasetsForm", readOnly: {{not datasets_path}} });
     if (dse) window.__jsonEditors["datasets"] = dse;
-    var infra = initJSONEditor({ name: "infrastructure", textareaId: "infrastructureTextArea", editorId: "infrastructureEditor", formId: "infrastructureForm" });
+    var infra = initJSONEditor({ name: "infrastructure", textareaId: "infrastructureTextArea", editorId: "infrastructureEditor", formId: "infrastructureForm", readOnly: {{not infrastructure_path}} });
     if (infra) window.__jsonEditors["infrastructure"] = infra;
 
     var ovr = initJSONEditor({ name: "overrides", textareaId: "keyOverridesTextArea", editorId: "overridesEditor", formId: "overridesForm" });
