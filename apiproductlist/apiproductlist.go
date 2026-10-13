@@ -38,8 +38,11 @@ const StoreScopeAll = "ALL_ACCESS"
 // StoreScopes are the store_scope values a package may carry.
 var StoreScopes = []string{StoreScopeExplicit, StoreScopeBase, StoreScopeAll}
 
-// Modes are the API modes a package may grant, and the order a package must list them in.
-var Modes = []string{"retail", "buylist", "sealed"}
+// ModeNewspaper is the newspaper reports mode, which an add-on grants.
+const ModeNewspaper = "newspaper"
+
+// Modes are the API modes a package or add-on may grant, and the order a package must list them in.
+var Modes = []string{"retail", "buylist", "sealed", ModeNewspaper}
 
 // Currencies are the currencies Stripe is seeded in.
 var Currencies = []string{"usd"}
@@ -67,13 +70,15 @@ type Package struct {
 	Bullets  []string `json:"bullets"`
 }
 
-// Addon is a per-unit extra a package can carry.
+// Addon is an extra a package can carry: counted per unit, or bought once to grant a mode.
 type Addon struct {
 	Key  string `json:"key"`
 	Name string `json:"name"`
 	// Monthly is the price per unit per month in the smallest unit of the currency (cents for usd).
 	Monthly   int64    `json:"monthly"`
 	AppliesTo []string `json:"applies_to"`
+	// GrantsMode is the mode a bought-once add-on grants; empty on a counted one.
+	GrantsMode string `json:"grants_mode,omitempty"`
 }
 
 // Interval is a billing cadence. A non-public one needs an invite.
@@ -199,6 +204,9 @@ func (c *ProductList) Validate() error {
 		}
 		if err := uniqueList("addon "+a.Key+" applies_to", a.AppliesTo, c.hasPackage, "a known package"); err != nil {
 			return err
+		}
+		if a.GrantsMode != "" && !isMode(a.GrantsMode) {
+			return fmt.Errorf("addon %s: grants_mode %q must be one of %v", a.Key, a.GrantsMode, Modes)
 		}
 	}
 	if len(c.Intervals) == 0 {

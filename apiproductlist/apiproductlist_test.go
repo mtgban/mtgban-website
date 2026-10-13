@@ -27,11 +27,26 @@ func TestEmbeddedListMatchesIssue230(t *testing.T) {
 	if c.Packages[1].StoreScope != StoreScopeBase || c.Packages[2].StoreScope != StoreScopeAll {
 		t.Errorf("scopes %+v", c.Packages)
 	}
-	if !slices.Equal(c.Packages[1].Modes, []string{"retail", "buylist"}) || !slices.Equal(c.Packages[2].Modes, Modes) {
+	if !slices.Equal(c.Packages[1].Modes, []string{"retail", "buylist"}) || !slices.Equal(c.Packages[2].Modes, []string{"retail", "buylist", "sealed"}) {
 		t.Errorf("modes %+v", c.Packages)
 	}
-	if len(c.Addons) != 2 || c.Addons[0].Key != "extra_store" || c.Addons[1].Key != "extra_game" {
-		t.Errorf("addons %+v", c.Addons)
+	// The newspaper is bought once for its mode; its price is a placeholder.
+	wantAddons := []Addon{
+		{Key: "extra_store", Monthly: 15000, AppliesTo: []string{"starter"}},
+		{Key: "extra_game", Monthly: 15000, AppliesTo: []string{"starter", "all_stores", "all_data"}},
+		{Key: "newspaper", Monthly: 100, AppliesTo: []string{"starter", "all_stores", "all_data"}, GrantsMode: ModeNewspaper},
+	}
+	if len(c.Addons) != len(wantAddons) {
+		t.Fatalf("%d addons, want %d: %+v", len(c.Addons), len(wantAddons), c.Addons)
+	}
+	for i, w := range wantAddons {
+		a := c.Addons[i]
+		if a.Key != w.Key || a.Monthly != w.Monthly || !slices.Equal(a.AppliesTo, w.AppliesTo) || a.GrantsMode != w.GrantsMode {
+			t.Errorf("addon %d: %+v, want %+v", i, a, w)
+		}
+	}
+	if a, _ := c.Addon("newspaper"); a.Name != "Newspaper reports" {
+		t.Errorf("newspaper add-on name %q", a.Name)
 	}
 	if len(c.Intervals) != 2 || !c.Intervals[0].Public || c.Intervals[1].Public || c.Intervals[1].Count != 3 {
 		t.Errorf("intervals %+v", c.Intervals)
@@ -68,8 +83,17 @@ const explicit = `{
   "implied": {"key": "tcg", "name": "TCGplayer"}
 }`
 
+// modeAddon is minimal with an add-on bought once for a mode.
+const modeAddon = `{
+  "currency": "usd",
+  "packages": [{"key": "p", "name": "P", "monthly": 100, "store_scope": "ALL_ACCESS", "modes": ["retail"], "icon": "globe", "subtitle": "S", "bullets": ["B"]}],
+  "addons": [{"key": "news", "name": "News", "monthly": 100, "applies_to": ["p"], "grants_mode": "newspaper"}],
+  "intervals": [{"key": "monthly", "interval": "month", "count": 1, "public": true}],
+  "included_games": 1
+}`
+
 func TestParseMinimal(t *testing.T) {
-	for _, doc := range []string{minimal, explicit} {
+	for _, doc := range []string{minimal, explicit, modeAddon} {
 		if _, err := Parse([]byte(doc)); err != nil {
 			t.Fatal(err)
 		}
@@ -126,6 +150,7 @@ func TestValidateRejects(t *testing.T) {
 		{"uppercase implied key", rep(explicit, `"key": "tcg"`, `"key": "TCG"`), `implied key "TCG" must be lowercase letters and digits`},
 		{"implied key with underscore", rep(explicit, `"key": "tcg"`, `"key": "tcg_index"`), `implied key "tcg_index" must be lowercase letters and digits`},
 		{"implied without name", rep(explicit, `"name": "TCGplayer"`, `"name": ""`), "implied tcg: name is empty"},
+		{"addon grants an unknown mode", rep(modeAddon, `"grants_mode": "newspaper"`, `"grants_mode": "news"`), `addon news: grants_mode "news" must be one of`},
 	}
 	for _, c := range cases {
 		_, err := Parse([]byte(c.json))
