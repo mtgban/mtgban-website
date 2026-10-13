@@ -87,10 +87,7 @@ type DiscordConfig struct {
 type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
-	Datastore     struct {
-		CheckpointsPath string `json:"checkpoints_path"`
-	} `json:"datastore"`
-	Offline struct {
+	Offline       struct {
 		ManifestPath string `json:"manifest_path"`
 		ImagesPath   string `json:"images_path"`
 	} `json:"offline"`

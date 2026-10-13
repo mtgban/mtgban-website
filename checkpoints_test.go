@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -49,5 +51,25 @@ func TestSameDayCheckpointsKeepOneOrder(t *testing.T) {
 		if !slices.Equal(got, want) {
 			t.Fatalf("markers in order %v, want %v", got, want)
 		}
+	}
+}
+
+// timeseries_config.checkpoints_path is the path the checkpoints document is
+// read from and saved to.
+func TestCheckpointsPathFromTimeseriesConfig(t *testing.T) {
+	withConfigCopy(t)
+	var config ConfigType
+	err := json.Unmarshal([]byte(`{"timeseries_config": {"checkpoints_path": "checkpoints.json"}}`), &config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	Config().TimeseriesConfig = config.TimeseriesConfig
+
+	_, path, err := checkpointsStore.Bucket(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "checkpoints.json" {
+		t.Errorf("checkpoints read from %q, want checkpoints.json", path)
 	}
 }

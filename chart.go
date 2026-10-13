@@ -26,6 +26,10 @@ type TimeseriesConfig struct {
 	// (variants + prices) alongside the legacy wide tables. Charts and
 	// analytics read only the long tables. See db_migration/.
 	LongFormWrites bool `json:"long_form_writes"`
+
+	// CheckpointsPath is the curated checkpoints document a game other than
+	// Magic draws its chart markers from.
+	CheckpointsPath string `json:"checkpoints_path"`
 }
 
 type DatasetConfig struct {

@@ -65,15 +65,14 @@ type ChartCheckpoint struct {
 }
 
 // checkpointsStore holds the checkpoints document. The bucket is built per
-// operation, mirroring loadDatastore's URL-scheme switch with the datastore
-// credentials, since the document lives on the same bucket as the datastore —
-// reload/save are infrequent enough that the extra B2 auth round-trip is not
-// worth a long-lived client.
+// operation, with the key pair held for the bucket the path names; reload and
+// save are infrequent enough that the extra B2 auth round-trip is not worth a
+// long-lived client.
 var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		cpPath := Config().Datastore.CheckpointsPath
+		cpPath := Config().TimeseriesConfig.CheckpointsPath
 		if cpPath == "" {
-			return nil, "", errors.New("checkpoints_path not configured")
+			return nil, "", errors.New("timeseries_config.checkpoints_path not configured")
 		}
 		u, err := url.Parse(cpPath)
 		if err != nil {
@@ -102,7 +101,7 @@ func reloadCheckpoints() error {
 	if err := checkpointsStore.Load(context.Background()); err != nil {
 		return err
 	}
-	cpPath := Config().Datastore.CheckpointsPath
+	cpPath := Config().TimeseriesConfig.CheckpointsPath
 	source := "disk"
 	if strings.HasPrefix(cpPath, "b2://") {
 		source = "B2"
