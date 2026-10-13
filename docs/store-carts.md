@@ -7,18 +7,21 @@ and both calls take a list. MTG Mint Card and Card Kingdom's store have the
 same kind of call, one card at a time, and so does Manaleak, after a read
 of the card's page; Hareruya has both: a form that takes a whole store
 list, and one call per card for its buylist. Mana Pool's public optimizer
-takes a whole list and answers with the listings to put in its cart. Game
-Nerdz's and Vegas Singles' buylists run on StorePass, whose page keeps the
-cart and prices it itself, so the loader adds through the page's own code;
-Game Nerdz's store is a BigCommerce one, filled one SKU at a time.
+takes a whole list and answers with the listings to put in its cart, and
+Card Trader's add takes every listing of a card a buyer could have and
+fills the quantity from them. Game Nerdz's and Vegas Singles' buylists run
+on StorePass, whose page keeps the cart and prices it itself, so the loader
+adds through the page's own code; Game Nerdz's store is a BigCommerce one,
+filled one SKU at a time.
 Star City Games and Strike Zone have a CSV import, but no way to hand it a
-list from another site. The upload page reaches all eleven through one
+list from another site. The upload page reaches all twelve through one
 bookmarklet, BAN-to-Cart, run on the store's page. ABU was measured
 against a real account on 2026-10-07, CSI, Strike Zone and Hareruya
 against a guest cart and SCG and Mint against a real account on
 2026-10-09, Card Kingdom against a guest cart on 2026-10-10, and Mint's
-store, Mana Pool and Manaleak against a guest cart on 2026-10-13, and Game
-Nerdz and Vegas Singles against a guest cart on 2026-10-14.
+store, Mana Pool, Manaleak and Card Trader against a guest cart on
+2026-10-13, and Game Nerdz and Vegas Singles against a guest cart on
+2026-10-14.
 
 ## ABU: the calls
 
@@ -353,6 +356,68 @@ PUT    /api/storefront/carts/<cart>/items/<line>   {"lineItem": {"productId", "q
 | an unknown SKU | nothing added |
 | a PUT / DELETE of a line | quantity set / line removed, the cart with its last |
 
+## Card Trader: the listings at load time
+
+A Card Trader listing sells between scrapes, so the listing BAN saw is
+often gone when the list loads. The loader reads the card's live listings
+instead, in the storefront BAN priced it in, and hands Card Trader's add
+every one at or under BAN's price:
+
+```
+POST /<locale>/cards/16310/filter.json   q[terms][properties_hash.mtg_language.keyword][]=en
+                                         q[terms][properties_hash.condition.keyword][]=Near Mint
+                                         q[term][user.can_sell_via_hub]=true
+POST /<locale>/cart/add.json?quantity=3&product_ids[]=387303611&product_ids[]=448276463&future_order=1
+```
+
+- A row names `<blueprint>-<grade>-<price cents><currency>-<split>-
+  <properties>` (`ctCartID`), from what go-mtgban's `cardtrader` scraper
+  keeps of the cheapest listing: the blueprint as `OriginalID`, and
+  `PriceCents`, `PriceCurrency` and `Properties` in its `CustomFields`. The
+  split is `m` for Card Trader, `z` for Zero and `d` for 1-Day Ready.
+- `Properties` are the `properties_hash` keys that tell one game's
+  listings of a blueprint apart beside the condition, as a query,
+  base64url in the id so any value fits: `mtg_language=en&mtg_foil=` for
+  Magic, `<game>_language` and `<game>_foil` for Lorcana, Riftbound and
+  One Piece, `fab_foil_new` and `first_edition` for Flesh and Blood,
+  `pokemon_reverse` and `first_edition` for Pokemon, `first_edition` for
+  Yu-Gi-Oh, and the language alone for Gundam and Palworld, whose
+  blueprint is the printing. A flag off is empty, and a listing matches
+  where each key reads the same, a flag missing or false as empty (One
+  Piece leaves `onepiece_foil` out when off).
+- The card page answers 100 listings at most, cheapest first: 100 of a
+  Lorcana card's 1,705 English Zero ones, none of them foil. So what can
+  be filtered goes along: each property set (a flag on as a term, a value
+  as a keyword) and the grade's condition names, but for Poor, which
+  go-mtgban also reads off a signed or stamped copy. Near Mint foil of
+  that card then answers whole, 19 listings.
+- The listing's price as the API quotes it, in its own currency, is
+  `layered_price_cents` on the card page's listings, in `price_currency`,
+  whatever the page's locale (`price.cents` follows the locale: $0.18
+  under `en-US` for €0.14). So the loader compares in the listing's own
+  currency, on the page's locale, with no exchange rate.
+- `user.can_sell_via_hub` picks Zero's sellers or the others; the 1-Day
+  Ready groups come apart, as `odr_product_groups`, each naming its
+  listings in `all_ids`. The loader leaves out the listings go-mtgban does:
+  altered, graded, on vacation, a description naming "ita" or "mix", and
+  for the storefront without Zero, private sellers in GB, ES and CH; it
+  reads a signed listing, or one whose description names signed, inked,
+  stamp, poor or water, as Poor.
+- The add answers with how many copies it added
+  (`delta_changed_quantity`), spread over the listings it is given, and
+  the whole cart. It is not told what the cart holds, so a load adds to it,
+  and two tabs take turns on `ban-to-cart-ct`. `future_order=1` is what the
+  card page's own buttons send.
+- The cart is kept by Card Trader's session cookie, guests included; the
+  page's `csrf-token` goes with each call as `X-CSRF-Token`, and
+  `DELETE /<locale>/cart_items/<id>.json` removes a line.
+
+| Sent | Result |
+|---|---|
+| a card's listings | 0.6 s, every Near Mint English listing of 16310 in one answer |
+| 3 asked of five listings at or under 19¢ | 3 added, from two of them, in 0.75 s |
+| `price.currency` under `it-IT`, `de-DE`, `en-EU` / `en-US` | EUR / USD |
+
 ## Strike Zone: the CSV import
 
 Strike Zone buys and sells through one cart, whose Tools menu has a CSV
@@ -515,7 +580,8 @@ uploads page offers takes the whole list and prices it itself:
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's,
 Mint's, Manaleak's and Game Nerdz's buylist and store splits, Mana Pool's
-store split, and SCG's and Vegas Singles' buylist splits. CSI's store button sits beside its deck builder
+store split, Card Trader's three store splits, and SCG's and Vegas Singles'
+buylist splits. CSI's store button sits beside its deck builder
 button, and Mana Pool's beside its mass entry button, both of which post
 only names. SCG's
 store side and CK's buylist already have their own imports. Card Kingdom's
@@ -524,14 +590,16 @@ cart: a load logged a signed-in user out, and the cause is not known yet. The ar
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
 store sells it in (`cartLoadForArbit`). Mint's feed caps its stock at
-8 (`cartAsksMost`), so its store button asks for what the buylist takes,
-or 999 where the buylist names no amount, and Mint trims it to what it
-has; the link carries those quantities (`data-load-qtys`) for the rows
-left ticked. Mana Pool's feed gives no stock either, but its button asks
-for the row's quantity, as other stores' do: the optimizer fills a line
-from the cheapest listings up, at rising prices, and the section's spread
-was worked out from the cheapest copy alone. A Mana Pool row's quantity is
-0, so in practice that is one copy a row, the one the spread priced. The global page compares two
+8 and Card Trader's is gone by load time (`cartAsksMost`), so their store
+buttons ask for what the buylist takes, or 999 where the buylist names no
+amount, and the store trims it to what it has, Card Trader to the listings
+at or under BAN's price; the link carries those quantities
+(`data-load-qtys`) for the rows left ticked. Mana Pool's feed gives no
+stock either, but its button asks for the row's quantity, as other stores'
+do: the optimizer fills a line from the cheapest listings up, at rising
+prices, and the section's spread was worked out from the cheapest copy
+alone. A Mana Pool row's quantity is 0, so in practice that is one copy a
+row, the one the spread priced. The global page compares two
 stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.
@@ -573,8 +641,10 @@ the section's, as `scraperCompare` picks its seller.
   pressed, holding the loader to drag to the bookmarks bar:
   `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`),
   without its indentation, blank lines and whole-line comments
-  (`stripLoader`), which keeps it well under Firefox's limit of 65,536
-  characters on a bookmark's URL. It
+  (`stripLoader`), which keeps it under Firefox's limit of 65,536
+  characters on a bookmark's URL: about 56,000 with twelve stores.
+  `TestCartBookmarklet` fails past 60,000, so the store that takes it
+  there is a decision about the loader's size rather than a surprise. It
   says to click the bookmark after the store's page loads, since nothing
   on that page can. Its Continue @ store button continues to the store, and
   "Don't show this again", kept in `localStorage`, lets later presses go
@@ -596,6 +666,9 @@ loader finds missing, sends the user back to BAN to press the button
 again.
 On SCG it then uploads the list as one CSV, says what BAN left out of it,
 if anything, and opens SCG's review of it.
+On Card Trader it reads each card's live listings in the row's storefront,
+grade, language and finish, hands every one at or under BAN's price to
+Card Trader's add, says what it cut and left out, and reloads the cart.
 On Mana Pool it asks the optimizer for the list, again with the cards it
 has fewer of cut to that and the ones it has none of left out, adds the
 listings it answers with to the cart, says what it cut and left out, and
@@ -663,6 +736,10 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
   the same for Strike Zone.
 - Whether a Mint guest's store cart follows the user when they log in;
   the loader asks for the login first.
+- Card Trader's cart for a signed-in user, and a card with more than 100
+  listings at or under BAN's price in one grade and finish.
+- Card Trader's other games live beyond a Lorcana card's listings and a
+  Flesh and Blood card's `fab_foil_new` filter.
 - Mana Pool's cart for a signed-in user: whether the queued changes the
   loader adds reach the account's cart, as they do for Mana Pool's own
   adds, or the account's copy replaces them.

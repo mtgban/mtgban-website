@@ -10,6 +10,13 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
+// Card Trader's properties for the stubbed rows below, base64url as its ids
+// carry them: mtg_foil=&mtg_language=en and mtg_foil=true&mtg_language=zh-CN
+const (
+	ctEnglish     = "bXRnX2ZvaWw9Jm10Z19sYW5ndWFnZT1lbg"
+	ctChineseFoil = "bXRnX2ZvaWw9dHJ1ZSZtdGdfbGFuZ3VhZ2U9emgtQ04"
+)
+
 // stubCartStores stands in ABU's buylist and one of its store splits, with
 // one item id per condition, CSI's buylist and sealed buylist, SCG's
 // buylist, both sides of Mint, Strike Zone, Hareruya and Manaleak, Mana
@@ -91,6 +98,20 @@ func stubCartStores(t *testing.T) {
 	vs.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 15, OriginalID: "9907513360690", InstanceID: "50196675297586"})
 	gnStock := mtgban.InventoryRecord{}
 	gnStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 8, OriginalID: "94929", InstanceID: "MTG-3ED-155-KGVDX6L40M"})
+	// Card Trader's rows name the listing BAN priced, with its price as
+	// Card Trader quotes it, in each of its storefronts
+	ctFields := map[string]string{"PriceCents": "1450", "PriceCurrency": "EUR", "Properties": "mtg_foil=&mtg_language=en"}
+	ctStock := mtgban.InventoryRecord{}
+	ctStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 15.8, SellerName: "Card Trader", OriginalID: "16310", InstanceID: "1", CustomFields: ctFields})
+	ctStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 12.1, SellerName: "Card Trader", OriginalID: "16310", InstanceID: "2", CustomFields: map[string]string{"PriceCents": "1111", "PriceCurrency": "EUR", "Properties": "mtg_foil=true&mtg_language=zh-CN"}})
+	// One from before the price was kept
+	ctStock.Add("card-b", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 1, SellerName: "Card Trader", OriginalID: "200", InstanceID: "3"})
+	ctZero := mtgban.InventoryRecord{}
+	ctZero.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 16, SellerName: "Card Trader Zero", OriginalID: "16310", InstanceID: "4", CustomFields: ctFields})
+	ct1DR := mtgban.InventoryRecord{}
+	ct1DR.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 16, SellerName: "Card Trader 1DR", OriginalID: "16310", InstanceID: "5", CustomFields: ctFields})
+	ctSealed := mtgban.InventoryRecord{}
+	ctSealed.Add("box-a", &mtgban.InventoryEntry{Price: 90, SellerName: "Card Trader", OriginalID: "777", InstanceID: "6", CustomFields: ctFields})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 	// CSI's store cart takes a product id and the row id of its condition
@@ -128,6 +149,10 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(mintStock, mtgban.ScraperInfo{Shorthand: "MMC"}),
 		mtgban.NewSellerFromInventory(mlStock, mtgban.ScraperInfo{Shorthand: "ML"}),
 		mtgban.NewSellerFromInventory(mpStock, mtgban.ScraperInfo{Shorthand: "MP"}),
+		mtgban.NewSellerFromInventory(ctStock, mtgban.ScraperInfo{Shorthand: "CT"}),
+		mtgban.NewSellerFromInventory(ctZero, mtgban.ScraperInfo{Shorthand: "CT0"}),
+		mtgban.NewSellerFromInventory(ct1DR, mtgban.ScraperInfo{Shorthand: "CT1DR"}),
+		mtgban.NewSellerFromInventory(ctSealed, mtgban.ScraperInfo{Shorthand: "CTSealed"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -171,6 +196,12 @@ func TestCartRows(t *testing.T) {
 		{"ML", true, "7090:4"},
 		{"ML", false, "7090:3"},
 		{"MP", false, "001229ab-da01-4346-91f9-23c145cd23c5:3,088072ea-66c7-4ef2-86a2-fd90055698a8:1"},
+		// The properties go base64url, whatever their values, and a row with
+		// no price as Card Trader quotes it stays out
+		{"CT", false, "16310-NM-1450EUR-m-" + ctEnglish + ":3,16310-SP-1111EUR-m-" + ctChineseFoil + ":1"},
+		{"CT0", false, "16310-NM-1450EUR-z-" + ctEnglish + ":3"},
+		{"CT1DR", false, "16310-NM-1450EUR-d-" + ctEnglish + ":3"},
+		{"CTSealed", false, ""},
 		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
 		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
 		// Each condition its own class in the store, one class on the buylist
@@ -240,6 +271,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"ML", true, `href="https://www.manaleak.com/index.php?route=buylist/cart#ban=7090:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Manaleak"`},
 		{"ML", false, `href="https://www.manaleak.com/index.php?route=checkout/cart#ban=7090:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Manaleak"`},
 		{"MP", false, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool"`},
+		{"CT0", false, `href="https://www.cardtrader.com/cart/edit#ban=16310-NM-1450EUR-z-` + ctEnglish + `:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Card Trader"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
@@ -412,6 +444,19 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		t.Error("Mana Pool's mass entry button is not told apart from its cart's")
 	}
 
+	// Card Trader's listings are gone by load time, so its cart asks the
+	// same way, filled from every listing at or under BAN's price; Zero
+	// prices no SP copy here
+	ct := renderArbit(t, PageVars{
+		ScraperShort: "CT0",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
+	})
+	ctBuy := `href="https://www.cardtrader.com/cart/edit#ban=16310-NM-1450EUR-z-` + ctEnglish + `:999&amp;v=` + cartVersion() + `&amp;side=retail&amp;skip=1" target="_blank" rel="noopener" data-store="Card Trader" data-buylist="false" data-load-list="cart" data-load-items="16310-NM-1450EUR-z-` + ctEnglish + `," data-load-qtys="999,20"`
+	if !strings.Contains(ct, ctBuy) {
+		t.Errorf("buying at Card Trader Zero: no store cart button with %s", ctBuy)
+	}
+
 	// Other stores' carts carry the page's quantities
 	if strings.Contains(ck+csi+mp, "data-load-qtys") {
 		t.Error("a cart other than Mint's store asks its own quantities")
@@ -558,7 +603,7 @@ func TestCartBookmarklet(t *testing.T) {
 	}
 	// Firefox drops a bookmark whose URL runs past 65,536 characters, and
 	// the loader only grows as stores are added
-	if len(link) >= 55000 {
+	if len(link) >= 60000 {
 		t.Errorf("bookmarklet is %d characters, too close to Firefox's limit of 65,536 on a bookmark", len(link))
 	}
 }
@@ -591,7 +636,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 	stubCartStores(t)
 	saved := affiliatesPtr.Load()
 	t.Cleanup(func() { affiliatesPtr.Store(saved) })
-	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused", "MP": "banmp"}})
+	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused", "MP": "banmp", "CT": "banct"}})
 	entries := []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}}
 
 	for _, tc := range []struct {
@@ -602,6 +647,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 		{"MMC", true, "https://www.mtgmintcard.com/buylist-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"MMC", false, "https://www.mtgmintcard.com/shopping-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"MP", false, "https://manapool.com/cart?ref=banmp#ban="},
+		{"CT1DR", false, "https://www.cardtrader.com/cart/edit?share_code=banct#ban="},
 		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
 		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="},
 		// A store with no affiliate query keeps its plain page

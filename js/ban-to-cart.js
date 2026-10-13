@@ -24,6 +24,8 @@
         store = storePassStore("Vegas Singles");
     } else if (location.hostname === "www.gamenerdz.com") {
         store = gnShop();
+    } else if (location.hostname === "www.cardtrader.com") {
+        store = ctStore();
     } else if (location.hostname === "www.manaleak.com") {
         store = mlStore();
     } else if (location.hostname === "shop.strikezoneonline.com") {
@@ -851,6 +853,169 @@
                     }
                 }
                 return true;
+            }
+        };
+    }
+
+    // ctStore loads Card Trader's cart, kept by its session cookie, guests
+    // included. A listing BAN saw may be sold by now, so each card's live
+    // listings are read first, in the storefront BAN priced it in, and every
+    // one at or under BAN's price goes to Card Trader's add, which fills the
+    // quantity from them. Card Trader is not told what the cart holds, so a
+    // load adds to it.
+    function ctStore() {
+        // Card Trader's grades as go-mtgban reads them
+        var grades = {"": "NM", "Mint": "NM", "Near Mint": "NM", "Slightly Played": "SP", "Lightly Played": "SP",
+            "Moderately Played": "MP", "Played": "HP", "Heavily Played": "HP", "Poor": "PO", "Damaged": "PO"};
+        // The page's own locale; a listing's price in its own currency
+        // reads the same in every one
+        var locale = (/^\/([a-z]{2}-[A-Z]{2})\//.exec(location.pathname) || [null, "en-EU"])[1];
+        // row reads a row's id: <blueprint>-<grade>-<price cents><currency>-
+        // <split>-<base64url properties>, or null for one it cannot read
+        function row(id) {
+            var parts = id.split("-");
+            var price = /^(\d+)([A-Z]{3})$/.exec(parts[2] || "");
+            if (parts.length < 5 || !price) {
+                return null;
+            }
+            var props;
+            try {
+                var b64 = parts.slice(4).join("-").replace(/-/g, "+").replace(/_/g, "/");
+                props = new URLSearchParams(atob(b64 + "===".slice((b64.length + 3) % 4)));
+            } catch (err) {
+                return null;
+            }
+            return {blueprint: parts[0], grade: parts[1], cents: Number(price[1]), currency: price[2], split: parts[3], props: props};
+        }
+        function token() {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            return meta ? meta.content : "";
+        }
+        async function call(url, body) {
+            var resp = await fetch(url, {
+                method: "POST",
+                headers: {"X-CSRF-Token": token(), Accept: "application/json", "X-Requested-With": "XMLHttpRequest"},
+                body: body
+            });
+            if (!resp.ok) {
+                throw new Error("Card Trader refused the list (" + resp.status + ").");
+            }
+            return resp.json();
+        }
+        // grade is a listing's grade as go-mtgban prices it, or "" for one
+        // it leaves out
+        function grade(p) {
+            var props = p.properties_hash || {};
+            var text = (p.description || "").toLowerCase();
+            if (p.quantity < 1 || p.on_vacation || props.altered || p.graded || /ita|mix/.test(text)) {
+                return "";
+            }
+            if (props.signed || /signed|inked|stamp|poor|water/.test(text)) {
+                return "PO";
+            }
+            return grades[props.condition || ""] || "";
+        }
+        // listings are the live listings of one row, cheapest first, at or
+        // under its price, with every property it names: a flag false or
+        // missing reads as empty
+        async function listings(id) {
+            var want = row(id);
+            if (!want) {
+                return [];
+            }
+            // Card Trader answers 100 listings at most, cheapest first, so
+            // what can be filtered goes along: each property set, a flag as
+            // a term; and the grade's names, but for Poor, which go-mtgban
+            // also reads off a description
+            var body = new URLSearchParams();
+            want.props.forEach(function (value, key) {
+                if (value === "true") {
+                    body.append("q[term][properties_hash." + key + "]", "true");
+                } else if (value) {
+                    body.append("q[terms][properties_hash." + key + ".keyword][]", value);
+                }
+            });
+            if (want.grade !== "PO") {
+                Object.keys(grades).forEach(function (name) {
+                    if (name && grades[name] === want.grade) {
+                        body.append("q[terms][properties_hash.condition.keyword][]", name);
+                    }
+                });
+            }
+            if (want.split !== "d") {
+                body.append("q[term][user.can_sell_via_hub]", String(want.split === "z"));
+            }
+            var page = await call("/" + locale + "/cards/" + want.blueprint + "/filter.json", body);
+            var found = want.split === "d" ? page.odr_product_groups : page.products;
+            return (found || []).filter(function (p) {
+                var props = p.properties_hash || {};
+                var user = p.user || {};
+                // The storefront without Zero leaves out the private sellers
+                // whose shipping go-mtgban does not price
+                if (want.split === "m" && user.user_type === "normal" && ["GB", "ES", "CH"].indexOf(user.country_code) >= 0) {
+                    return false;
+                }
+                var same = true;
+                want.props.forEach(function (value, key) {
+                    same = same && (props[key] ? String(props[key]) : "") === value;
+                });
+                // The price a buyer is shown, in the listing's own currency,
+                // whatever the page's
+                return same && grade(p) === want.grade &&
+                    p.price_currency === want.currency && p.layered_price_cents <= want.cents;
+            });
+        }
+        return {
+            name: "Card Trader",
+            loggedIn: function () {
+                return true;
+            },
+            upload: async function (rows, qty) {
+                // An add adds to the cart, so two tabs would each add the same cards
+                var release = await hold("ban-to-cart-ct");
+                var added = 0;
+                var cut = 0;
+                var none = 0;
+                try {
+                    for (var i = 0; i < rows.length; i++) {
+                        banner.textContent = "BAN: loading cards into your Card Trader cart, " + i + " of " +
+                            rows.length + " done. Keep this tab open until it finishes.";
+                        var ids = [];
+                        (await listings(rows[i])).forEach(function (p) {
+                            ids = ids.concat(p.all_ids || [p.id]);
+                        });
+                        if (ids.length === 0) {
+                            none++;
+                            continue;
+                        }
+                        var query = "quantity=" + qty[rows[i]] + "&" + ids.map(function (listing) {
+                            return "product_ids[]=" + listing;
+                        }).join("&") + "&future_order=1";
+                        var body = await call("/" + locale + "/cart/add.json?" + query);
+                        var delta = Number(body.delta_changed_quantity) || 0;
+                        if (delta <= 0) {
+                            none++;
+                            continue;
+                        }
+                        added++;
+                        if (delta < qty[rows[i]]) {
+                            cut++;
+                        }
+                    }
+                } finally {
+                    release();
+                }
+                var message = "Added " + added + " cards to your Card Trader cart, on top of what it held.";
+                if (cut > 0) {
+                    message += " " + cut + " were cut to the copies Card Trader has at or under BAN's price.";
+                }
+                if (none > 0) {
+                    message += " " + none + " that Card Trader has none of at or under BAN's price were left out.";
+                }
+                window.removeEventListener("beforeunload", stay);
+                alert(message + leftOut());
+                history.replaceState(null, "", location.pathname + location.search);
+                location.reload();
             }
         };
     }
