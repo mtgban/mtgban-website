@@ -24,9 +24,9 @@ func TestSearchKeepsBlockedStoresFromAForgedGrant(t *testing.T) {
 		LogPages["Search"] = log.New(io.Discard, "", 0)
 		t.Cleanup(func() { delete(LogPages, "Search") })
 	}
-	prev := Config().SearchRetailBlockList
-	t.Cleanup(func() { Config().SearchRetailBlockList = prev })
-	Config().SearchRetailBlockList = []string{"SCG"}
+	prev := Config().Stores.SearchRetailBlockList
+	t.Cleanup(func() { Config().Stores.SearchRetailBlockList = prev })
+	Config().Stores.SearchRetailBlockList = []string{"SCG"}
 
 	fields := url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}, "SearchDisabled": {"NONE"}}
 	signed := signedAs(t, fields, time.Now().Add(time.Hour))

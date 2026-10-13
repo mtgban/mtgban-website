@@ -54,7 +54,7 @@ func TestTCGSKU2UUIDNoInfos(t *testing.T) {
 
 func TestBlocklistsFromValues(t *testing.T) {
 	withConfigCopy(t)
-	Config().SearchRetailBlockList = []string{"TCG"}
+	Config().Stores.SearchRetailBlockList = []string{"TCG"}
 
 	retail, buylist := blocklistsFromValues(url.Values{})
 	if len(retail) != 1 || retail[0] != "TCG" || len(buylist) != 0 {

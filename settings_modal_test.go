@@ -53,9 +53,9 @@ func TestSettingsKeysWithNoScrapers(t *testing.T) {
 // The grant replaces the config block list, NONE clears it, and with no
 // grant the config list stands.
 func TestArbitBlockedVendorsReadsTheGrant(t *testing.T) {
-	prev := Config().ArbitBlockVendors
-	t.Cleanup(func() { Config().ArbitBlockVendors = prev })
-	Config().ArbitBlockVendors = []string{"CONFIG_VENDOR"}
+	prev := Config().Stores.ArbitBlockVendors
+	t.Cleanup(func() { Config().Stores.ArbitBlockVendors = prev })
+	Config().Stores.ArbitBlockVendors = []string{"CONFIG_VENDOR"}
 
 	cases := []struct {
 		name string

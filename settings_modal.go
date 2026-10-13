@@ -29,7 +29,7 @@ func arbitBlockedVendors(sig string) []string {
 	blocklistVendorsOpt := GetParamFromSig(sig, "ArbitDisabledVendors")
 	if blocklistVendorsOpt == "" {
 		// Clipped: callers append the cookie's vendors to it
-		return slices.Clip(Config().ArbitBlockVendors)
+		return slices.Clip(Config().Stores.ArbitBlockVendors)
 	}
 	if blocklistVendorsOpt == "NONE" {
 		return nil
@@ -52,7 +52,7 @@ func arbitVendorKeys(blocklistVendors []string, reverse bool) []string {
 // globalProbeBlocklist is every seller outside the Global probe list.
 func globalProbeBlocklist() []string {
 	return filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(Config().GlobalProbeList, info.Shorthand)
+		return !slices.Contains(Config().Stores.GlobalProbeList, info.Shorthand)
 	})
 }
 
@@ -66,9 +66,9 @@ func globalVendorKeys(blocklistVendors []string) []string {
 // sleepBlocklists is the default blocklist plus the Sleepers one.
 func sleepBlocklists(sig string) (retail, buylist []string) {
 	retail, buylist = getDefaultBlocklists(sig)
-	if Config().SleepersBlockList != nil {
-		retail = append(retail, Config().SleepersBlockList...)
-		buylist = append(buylist, Config().SleepersBlockList...)
+	if Config().Stores.SleepersBlockList != nil {
+		retail = append(retail, Config().Stores.SleepersBlockList...)
+		buylist = append(buylist, Config().Stores.SleepersBlockList...)
 	}
 	return retail, buylist
 }
@@ -97,7 +97,7 @@ func uploadStoreLists(sig string) (singlesSellers, sealedSellers, singlesVendors
 	})
 	sealedSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && info.SealedMode &&
-			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
+			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand)
 	})
 	singlesVendors = filterVendors(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode &&
@@ -105,7 +105,7 @@ func uploadStoreLists(sig string) (singlesSellers, sealedSellers, singlesVendors
 	})
 	sealedVendors = filterVendors(func(info mtgban.ScraperInfo) bool {
 		return info.SealedMode &&
-			!slices.Contains(Config().UploadSealedBlockList, info.Shorthand)
+			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand)
 	})
 	return singlesSellers, sealedSellers, singlesVendors, sealedVendors
 }

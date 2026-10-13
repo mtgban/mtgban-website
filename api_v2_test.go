@@ -588,9 +588,9 @@ func TestWriteV2Response(t *testing.T) {
 func TestPriceAPIDemoRefusesFullDumps(t *testing.T) {
 	withSigMode(t, false, true)
 	seedV2Scrapers(t)
-	prevDemo := Config().APIDemoStores
-	t.Cleanup(func() { Config().APIDemoStores = prevDemo })
-	Config().APIDemoStores = []string{"CT", "CK", "CTSealed"}
+	prevDemo := Config().Stores.APIDemoStores
+	t.Cleanup(func() { Config().Stores.APIDemoStores = prevDemo })
+	Config().Stores.APIDemoStores = []string{"CT", "CK", "CTSealed"}
 
 	s := newSite()
 	s.ds.Store(&datastore{backend: v2Backend()})

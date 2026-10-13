@@ -204,13 +204,13 @@ func stubScrapers(t *testing.T, s scraperStub) {
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	prevIdx := scraperIndexPtr.Load()
 	prevOverrides := Config().ScraperConfig.NameOverride
-	prevRetail, prevBuylist := Config().SearchRetailBlockList, Config().SearchBuylistBlockList
+	prevRetail, prevBuylist := Config().Stores.SearchRetailBlockList, Config().Stores.SearchBuylistBlockList
 	t.Cleanup(func() {
 		sellersPtr.Store(prevSellers)
 		vendorsPtr.Store(prevVendors)
 		scraperIndexPtr.Store(prevIdx)
 		Config().ScraperConfig.NameOverride = prevOverrides
-		Config().SearchRetailBlockList, Config().SearchBuylistBlockList = prevRetail, prevBuylist
+		Config().Stores.SearchRetailBlockList, Config().Stores.SearchBuylistBlockList = prevRetail, prevBuylist
 	})
 	info := func(sh string) mtgban.ScraperInfo {
 		name, ok := s.names[sh]
@@ -231,7 +231,7 @@ func stubScrapers(t *testing.T, s scraperStub) {
 	vendorsPtr.Store(&vendors)
 	scraperIndexPtr.Store(buildScraperIndex(s.config))
 	Config().ScraperConfig.NameOverride = s.overrides
-	Config().SearchRetailBlockList, Config().SearchBuylistBlockList = s.retailBlock, s.buylistBlock
+	Config().Stores.SearchRetailBlockList, Config().Stores.SearchBuylistBlockList = s.retailBlock, s.buylistBlock
 }
 
 // magicStub mirrors the live magic config: split tcg_* and cardkingdom_* keys, blocklists, sealed scrapers, a session store.
