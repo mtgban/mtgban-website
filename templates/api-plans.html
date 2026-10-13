@@ -78,6 +78,17 @@
                 </div>
             </fieldset>
 
+            {{if .ModeAddons}}
+            <fieldset class="api-fieldset" id="api-mode-addons">
+                <legend>Add-ons</legend>
+                <div class="api-choices">
+                    {{range .ModeAddons}}
+                    <label class="api-choice"><input type="checkbox" name="addons" value="{{.Key}}"> {{.Name}}, {{usd .Monthly}}/month</label>
+                    {{end}}
+                </div>
+            </fieldset>
+            {{end}}
+
             <fieldset class="api-fieldset"{{if not .Invite}} hidden{{end}}>
                 <legend>Billing</legend>
                 <div class="api-choices">

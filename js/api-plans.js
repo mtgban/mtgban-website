@@ -2,7 +2,7 @@
 (function () {
     // computeTotal mirrors billing.Plan.LineItems: package, extra stores past
     // the included count on an explicit package, extra games past the
-    // included count, all times the interval count.
+    // included count, each checked mode add-on once, all times the interval count.
     function computeTotal(data, choice) {
         var pkg = null;
         for (var i = 0; i < data.packages.length; i++) {
@@ -20,6 +20,15 @@
         }
         var extraGames = Math.max(0, choice.games - data.includedGames);
         monthly += extraGames * (data.addons.extra_game || 0);
+        var modeAddons = choice.modeAddons || [];
+        var applies = data.addon_applies || {};
+        for (var m = 0; m < modeAddons.length; m++) {
+            if ((data.mode_addons || []).indexOf(modeAddons[m]) === -1) continue;
+            // A missing or non-array list applies to no package, same as the backend's Addon.Applies.
+            var list = applies[modeAddons[m]];
+            if (!Array.isArray(list) || list.indexOf(choice.package) === -1) continue;
+            monthly += data.addons[modeAddons[m]] || 0;
+        }
         return {cents: monthly * count, count: count};
     }
 
@@ -68,6 +77,19 @@
                 storeBoxes[k].disabled = !explicit;
             }
         }
+        // A mode add-on only applies to some packages; hide and uncheck the rest.
+        var applies = data.addon_applies || {};
+        var addonBoxes = form.querySelectorAll('input[name="addons"]');
+        for (var ab = 0; ab < addonBoxes.length; ab++) {
+            var box = addonBoxes[ab];
+            // A missing or non-array list applies to no package, same as the backend's Addon.Applies.
+            var list = applies[box.value];
+            var allowed = Array.isArray(list) && !!pkg && list.indexOf(pkg.key) !== -1;
+            if (!allowed) box.checked = false;
+            box.disabled = !allowed;
+            var row = box.closest ? box.closest('.api-choice') : null;
+            if (row) row.hidden = !allowed;
+        }
         var checkedStores = explicit ? checkedValues('stores').length : 0;
         var checkedGames = form.querySelectorAll('input[name="games"]:checked').length;
         // Checkout needs the included stores picked on an explicit package, and at least the included games.
@@ -79,7 +101,8 @@
             package: pkg ? pkg.key : '',
             interval: checkedValues('interval')[0] || 'monthly',
             stores: checkedStores,
-            games: checkedGames
+            games: checkedGames,
+            modeAddons: checkedValues('addons')
         });
         if (!total) return;
         var name = document.getElementById('api-total-package');
@@ -102,7 +125,7 @@
                 if (radios[r].value === params.get('package')) radios[r].checked = true;
             }
         }
-        ['games', 'stores'].forEach(function (name) {
+        ['games', 'stores', 'addons'].forEach(function (name) {
             // The server resolves legacy store shorthands to family keys.
             var wanted = name === 'stores' && data.storeKeys ? data.storeKeys : params.getAll(name).join(',').split(',');
             wanted = wanted.map(function (w) { return w.trim().toLowerCase(); }).filter(Boolean);
