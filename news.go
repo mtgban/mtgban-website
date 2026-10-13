@@ -1520,8 +1520,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageSize *= 2
 	}
 
-	// Padded like changelog.go's call: Paginate's cap floors otherwise, hiding the last page.
-	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results)+pageSize-1)
+	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
 		c := uuid2card(b, result.UUID, preferFlavor)
