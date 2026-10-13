@@ -15,6 +15,8 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 )
 
 var NameToBeFound string
@@ -52,7 +54,7 @@ func TestMain(m *testing.M) {
 	// of Config.Game. CI sets none and loads nothing.
 	keyID, appKey := os.Getenv("B2_KEY_ID"), os.Getenv("B2_APP_KEY")
 	if keyID != "" && appKey != "" {
-		Config().BucketKeys = map[string]BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
+		Config().BucketKeys = map[string]infrastructure.BucketKey{dumpsBucket: {AccessKey: keyID, AccessSecret: appKey}}
 		bucket, err := openDumpsBucket(context.Background())
 		if err == nil {
 			err = loadScrapersNG(bucket, nil)

@@ -65,7 +65,8 @@ const patreonAuthorizeURL = "https://www.patreon.com/oauth2/authorize"
 // site's cookie, which travels in links and scripts can read.
 func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose string) {
 	origin := requestOrigin(r)
-	clientID := Config().Patreon.Client[Config().Patreon.Source]
+	patreonConfig := Infrastructure().Patreon
+	clientID := patreonConfig.Client[patreonConfig.Source]
 	nonce := ""
 	var err error
 	if apiGatewaySecret() != "" && origin != "" && clientID != "" {

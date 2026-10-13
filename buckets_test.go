@@ -1,16 +1,20 @@
 package main
 
-import "testing"
+import (
+	"testing"
 
-// The config bucket's key pair is in the environment rather than the config
-// file, so it can never be a bucket_keys entry — which is why it needs an
-// answer of its own. A bucket with neither gets no pair.
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
+)
+
+// The config bucket's key pair is in the environment rather than a file, so a
+// bucket_keys entry for it is ignored. A bucket with neither gets no pair.
 func TestBucketCredentials(t *testing.T) {
 	withConfigCopy(t)
 
 	Config().sourcePath = "b2://mtgban-config/pokemon/config.json"
-	Config().BucketKeys = map[string]BucketKey{
+	Config().BucketKeys = map[string]infrastructure.BucketKey{
 		"mtgban-images": {AccessKey: "images-key", AccessSecret: "images-secret"},
+		"mtgban-config": {AccessKey: "stale-key", AccessSecret: "stale-secret"},
 	}
 	t.Setenv("BAN_CONFIG_KEY", "config-key")
 	t.Setenv("BAN_CONFIG_SECRET", "config-secret")
@@ -21,7 +25,7 @@ func TestBucketCredentials(t *testing.T) {
 		key, secret string
 	}{
 		{"the config bucket, read with the pair the config itself was", "mtgban-config", "config-key", "config-secret"},
-		{"a bucket_keys entry wins over both", "mtgban-images", "images-key", "images-secret"},
+		{"another bucket, read with its bucket_keys entry", "mtgban-images", "images-key", "images-secret"},
 		{"anything else gets no pair", "mtgban-dumps", "", ""},
 		{"an empty name is not the config bucket", "", "", ""},
 	}

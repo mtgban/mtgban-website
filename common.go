@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/mtgban/mtgban-website/internal/access"
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 )
 
 // The access table, the grant list, the affiliate data and the chart
@@ -39,15 +40,61 @@ func PatreonGrants() []PatreonGrant {
 	return Access.Grants()
 }
 
-// loadCommonConfig fills the access table, the grant list, the affiliate
-// data and the chart datasets, each from its own path. One failing does not
-// stop the others loading.
+// loadCommonConfig fills the infrastructure, the access table, the
+// grant list, the affiliate data and the chart datasets, each from its own
+// path. The infrastructure goes first, since its bucket keys may be
+// what the others are read with; one failing does not stop the others.
 func loadCommonConfig(ctx context.Context) error {
+	infrastructureErr := loadInfrastructure(ctx)
 	err := Access.Load(ctx, access.Sources{
 		TablePath:  Config().ACLPath,
 		GrantsPath: Config().PatreonGrantsPath,
 	})
-	return errors.Join(err, loadAffiliates(ctx), loadDatasets(ctx))
+	return errors.Join(infrastructureErr, err, loadAffiliates(ctx), loadDatasets(ctx))
+}
+
+// infrastructurePtr holds the infrastructure_path file as last read or
+// saved; readers go through the atomic and never block.
+var infrastructurePtr atomic.Pointer[infrastructure.Config]
+
+// infrastructureFile returns the infrastructure_path file as last read or
+// saved, empty when the config names none. The result is shared and must not
+// be modified.
+func infrastructureFile() infrastructure.Config {
+	value := infrastructurePtr.Load()
+	if Config().InfrastructurePath == "" || value == nil {
+		return infrastructure.Config{}
+	}
+	return *value
+}
+
+// Infrastructure returns the infrastructure settings this deployment uses:
+// the infrastructure_path file's, with every key its own config sets in place
+// of the file's. The result is shared and must not be modified.
+func Infrastructure() infrastructure.Config {
+	return Config().Config.Over(infrastructureFile())
+}
+
+// loadInfrastructure reads the infrastructure_path file, when the config
+// names one. A path that cannot be read is an error, and the previous value
+// stays published.
+func loadInfrastructure(ctx context.Context) error {
+	path := Config().InfrastructurePath
+	if path == "" {
+		return nil
+	}
+	reader, err := openBucketPath(ctx, path)
+	if err != nil {
+		return fmt.Errorf("infrastructure %s: %w", path, err)
+	}
+	defer reader.Close()
+	var value infrastructure.Config
+	err = json.NewDecoder(reader).Decode(&value)
+	if err != nil {
+		return fmt.Errorf("infrastructure %s: %w", path, err)
+	}
+	infrastructurePtr.Store(&value)
+	return nil
 }
 
 // AffiliatesConfig is the affiliate data every game shares: the codes are

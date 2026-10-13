@@ -24,6 +24,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
@@ -95,7 +96,6 @@ type ConfigType struct {
 	Mail struct {
 		From string `json:"from"`
 	} `json:"mail"`
-	BucketKeys map[string]BucketKey `json:"bucket_keys"`
 
 	Game         mtgmatcher.Game `json:"game"`
 	InstanceName string          `json:"instance_name"`
@@ -109,9 +109,7 @@ type ConfigType struct {
 	Discord             DiscordConfig      `json:"discord"`
 	API                 map[string]string  `json:"api"`
 	Stores              StoresConfig       `json:"stores"`
-	Patreon             PatreonConfig      `json:"patreon"`
 	APIUserSecrets      map[string]string  `json:"api_user_secrets"`
-	GoogleCredentials   string             `json:"google_credentials"`
 	BuylistMarketCredit map[string]float64 `json:"buylist_market_credit"`
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
@@ -125,19 +123,19 @@ type ConfigType struct {
 	// the data, not the code. AffiliatesPath does the same for the
 	// affiliate data, which every game shares: a store a game doesn't
 	// carry never matches its list entries. DatasetsPath names the chart
-	// datasets' file; with none, timeseries_config.datasets is read. These
-	// locate the files; see common.go for the readers and writers.
-	ACLPath           string `json:"acl_path"`
-	PatreonGrantsPath string `json:"patreon_grants_path"`
-	AffiliatesPath    string `json:"affiliates_path"`
-	DatasetsPath      string `json:"datasets_path"`
+	// datasets' file; with none, timeseries_config.datasets is read.
+	// InfrastructurePath names the infrastructure file. These locate the
+	// files; see common.go for the readers and writers.
+	ACLPath            string `json:"acl_path"`
+	PatreonGrantsPath  string `json:"patreon_grants_path"`
+	AffiliatesPath     string `json:"affiliates_path"`
+	DatasetsPath       string `json:"datasets_path"`
+	InfrastructurePath string `json:"infrastructure_path"`
 
-	Uploader map[string]string `json:"uploader"`
-
-	SQLConfig             *timeseries.SQLConfig `json:"sql_config"`
-	UserStateConfig       *userstate.SQLConfig  `json:"user_state_config"`
-	ObservabilityConfig   *timeseries.SQLConfig `json:"observability_config"`
-	NewNewspaperSQLConfig *timeseries.SQLConfig `json:"new_newspaper_sql_config"`
+	// The infrastructure every deployment uses, filed in the
+	// infrastructure_path file; a key set here wins over the file's. Read it
+	// through Infrastructure(), never directly.
+	infrastructure.Config
 
 	TCGCSVConfig *tcgcsv.Config   `json:"tcgcsv_config"`
 	APIGateway   APIGatewayConfig `json:"api_gateway"`
@@ -544,10 +542,11 @@ func applyAPIGatewayDefaults(c *APIGatewayConfig, game mtgmatcher.Game) {
 }
 
 func (s *site) openDBs() (err error) {
-	if Config().SQLConfig == nil {
+	infra := Infrastructure()
+	if infra.SQLConfig == nil {
 		log.Println("no SQL configuration set, Charts won't be available")
 	} else {
-		PricesArchiveDB, err = timeseries.NewClient(*Config().SQLConfig)
+		PricesArchiveDB, err = timeseries.NewClient(*infra.SQLConfig)
 		if err != nil {
 			return fmt.Errorf("error opening the timeseries SQL client: %w", err)
 		}
@@ -578,10 +577,10 @@ func (s *site) openDBs() (err error) {
 		}
 	}
 
-	if Config().UserStateConfig == nil {
+	if infra.UserStateConfig == nil {
 		log.Println("no user_state configuration set, cross-device sync won't be available")
 	} else {
-		UserStateDB, err = userstate.NewClient(*Config().UserStateConfig)
+		UserStateDB, err = userstate.NewClient(*infra.UserStateConfig)
 		if err != nil {
 			return fmt.Errorf("error opening the user_state SQL client: %w", err)
 		}
@@ -597,11 +596,11 @@ func (s *site) openDBs() (err error) {
 
 	observabilityInstance = Config().InstanceName
 
-	if Config().ObservabilityConfig == nil {
+	if infra.ObservabilityConfig == nil {
 		log.Println("no observability configuration set, telemetry won't be recorded")
 	} else if observabilityInstance == "" {
 		log.Println("observability disabled: instance_name not set in config")
-	} else if obsDB, oerr := observability.NewClient(*Config().ObservabilityConfig); oerr != nil {
+	} else if obsDB, oerr := observability.NewClient(*infra.ObservabilityConfig); oerr != nil {
 		log.Println("observability disabled, init failed:", oerr)
 	} else {
 		ObservabilityDB = obsDB
@@ -611,8 +610,8 @@ func (s *site) openDBs() (err error) {
 		log.Println("observability telemetry enabled")
 	}
 
-	if Config().NewNewspaperSQLConfig != nil {
-		NewNewspaperDB, err = Config().NewNewspaperSQLConfig.OpenDB()
+	if infra.NewNewspaperSQLConfig != nil {
+		NewNewspaperDB, err = infra.NewNewspaperSQLConfig.OpenDB()
 		if err != nil {
 			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
 		}
@@ -624,7 +623,8 @@ func (s *site) openDBs() (err error) {
 }
 
 func loadGoogleCredentials() (*http.Client, error) {
-	if Config().GoogleCredentials == "" {
+	credentials := Infrastructure().GoogleCredentials
+	if credentials == "" {
 		log.Println("no google credentials, skipping")
 		return nil, nil
 	}
@@ -633,7 +633,7 @@ func loadGoogleCredentials() (*http.Client, error) {
 	// the url apart and ask the config bucket for the path half, so credentials
 	// named in another bucket were fetched from the config one, and a local
 	// path was read from wherever the config happened to live.
-	reader, err := openBucketPath(context.Background(), Config().GoogleCredentials)
+	reader, err := openBucketPath(context.Background(), credentials)
 	if err != nil {
 		return nil, err
 	}
@@ -726,10 +726,11 @@ func main() {
 		}
 	}
 
-	// The access table, the grant list, the affiliate data and the chart
-	// datasets, each from its own path. A deployment that cannot read its
-	// access table has no way to tell an admin from anyone else, so this is
-	// fatal for the same reason a missing config is.
+	// The infrastructure, then the access table, the grant list, the
+	// affiliate data and the chart datasets, each from its own path. A
+	// deployment that cannot read its access table has no way to tell an
+	// admin from anyone else, so this is fatal for the same reason a missing
+	// config is.
 	err = loadCommonConfig(context.Background())
 	if err != nil {
 		if DevMode {

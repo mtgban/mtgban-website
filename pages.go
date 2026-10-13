@@ -418,7 +418,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
 
-		PatreonIDs:   Config().Patreon.Client,
+		PatreonIDs:   Infrastructure().Patreon.Client,
 		PatreonURL:   patreonURL,
 		PatreonLogin: showPatreonLogin,
 		Hash:         assetHash(),

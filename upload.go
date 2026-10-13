@@ -2474,7 +2474,7 @@ func loadMoxfield(ctx context.Context, b *mtgmatcher.Backend, link string, maxRo
 	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.Contains(link, "://") {
 		return nil, "", errors.New("invalid Moxfield deck URL")
 	}
-	base, err := url.Parse(Config().Uploader["moxfield"])
+	base, err := url.Parse(Infrastructure().Uploader["moxfield"])
 	if err != nil {
 		return nil, "", errors.New("invalid Moxfield uploader configuration")
 	}
@@ -2531,7 +2531,7 @@ func loadManabox(ctx context.Context, b *mtgmatcher.Backend, link string, maxRow
 // proxy, which carries a browser TLS fingerprint - direct fetches from
 // datacenter IPs get blocked by Cloudflare) and matches its products.
 func loadCollectr(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
-	proxyBase := Config().Uploader["collectr"]
+	proxyBase := Infrastructure().Uploader["collectr"]
 	if proxyBase == "" {
 		return nil, "", errors.New("no Collectr proxy is configured")
 	}
