@@ -451,3 +451,79 @@ func TestLoadSalesVelocityRunsOnce(t *testing.T) {
 	}
 	release()
 }
+
+// TestVelocityText words each state: a rate to one decimal, under a tenth,
+// a capped floor, and zero with the last sale.
+func TestVelocityText(t *testing.T) {
+	last := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
+	const head = "**Sold on TCGplayer, last 30 days**\n"
+	for _, tc := range []struct {
+		desc         string
+		v            salesVelocity
+		window       int
+		rate, detail string
+	}{
+		{"a rate", salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: last}, 30, "2.3/day",
+			head + "|copies|69\n|orders|31\n|days with a sale|18\n|last sale|2026-10-11"},
+		{"rounded to one decimal", salesVelocity{Copies: 74, Orders: 60, Days: 25, LastSale: last}, 30, "2.5/day",
+			head + "|copies|74\n|orders|60\n|days with a sale|25\n|last sale|2026-10-11"},
+		{"a whole number keeps its decimal", salesVelocity{Copies: 60, Orders: 50, Days: 30, LastSale: last}, 30, "2.0/day",
+			head + "|copies|60\n|orders|50\n|days with a sale|30\n|last sale|2026-10-11"},
+		{"a tenth", salesVelocity{Copies: 3, Orders: 3, Days: 3, LastSale: last}, 30, "0.1/day",
+			head + "|copies|3\n|orders|3\n|days with a sale|3\n|last sale|2026-10-11"},
+		{"under a tenth", salesVelocity{Copies: 2, Orders: 2, Days: 1, LastSale: last}, 30, "<0.1/day",
+			head + "|copies|2\n|orders|2\n|days with a sale|1\n|last sale|2026-10-11"},
+		{"capped", salesVelocity{Copies: 69, Orders: 31, Days: 18, Capped: true, LastSale: last}, 30, ">=2.3/day",
+			head + "|copies|69 (at least)\n|orders|31 (at least)\n|days with a sale|18\n|last sale|2026-10-11\n" +
+				"the newspaper keeps five orders a day, so these are floors"},
+		{"zero", salesVelocity{LastSale: time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)}, 30, "0/day",
+			head + "no sale in the window; last sold 2026-09-02"},
+		{"another window", salesVelocity{Copies: 7, Orders: 7, Days: 5, LastSale: last}, 7, "1.0/day",
+			"**Sold on TCGplayer, last 7 days**\n|copies|7\n|orders|7\n|days with a sale|5\n|last sale|2026-10-11"},
+	} {
+		rate, detail := velocityText(tc.v, tc.window)
+		if rate != tc.rate || detail != tc.detail {
+			t.Errorf("%s: got %q, %q; want %q, %q", tc.desc, rate, detail, tc.rate, tc.detail)
+		}
+	}
+}
+
+// TestSalesVelocityView words a loaded card and leaves a card with no data blank.
+func TestSalesVelocityView(t *testing.T) {
+	v := salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+	setTestSalesVelocity(t, map[string]*salesVelocity{"card": &v})
+	wantRate, wantDetail := velocityText(v, salesVelocityWindow)
+	rate, detail := salesVelocityView("card")
+	if rate != wantRate || detail != wantDetail {
+		t.Errorf("card: got %q, %q; want %q, %q", rate, detail, wantRate, wantDetail)
+	}
+	rate, detail = salesVelocityView("missing")
+	if rate != "" || detail != "" {
+		t.Errorf("missing: got %q, %q; want nothing", rate, detail)
+	}
+}
+
+// TestUUID2CardCarriesSalesVelocity fills a card's rate and details from the
+// loaded sales, and leaves them empty without.
+func TestUUID2CardCarriesSalesVelocity(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+	cardID := randomUUID(b, false)
+	co, err := b.GetUUID(cardID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)}
+	setTestSalesVelocity(t, map[string]*salesVelocity{co.UUID: &v})
+	wantRate, wantDetail := velocityText(v, salesVelocityWindow)
+	card := uuid2card(b, currentPrices(), cardID, false, nil)
+	if card.Velocity != wantRate || card.VelocityDetail != wantDetail {
+		t.Errorf("got %q, %q; want %q, %q", card.Velocity, card.VelocityDetail, wantRate, wantDetail)
+	}
+
+	setTestSalesVelocity(t, map[string]*salesVelocity{})
+	card = uuid2card(b, currentPrices(), cardID, false, nil)
+	if card.Velocity != "" || card.VelocityDetail != "" {
+		t.Errorf("no data: got %q, %q", card.Velocity, card.VelocityDetail)
+	}
+}
