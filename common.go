@@ -97,6 +97,31 @@ func loadInfrastructure(ctx context.Context) error {
 	return nil
 }
 
+// saveInfrastructure writes the infrastructure_path file, publishes it, and
+// tells the peers to reload it.
+func saveInfrastructure(ctx context.Context, value infrastructure.Config) error {
+	path := Config().InfrastructurePath
+	if path == "" {
+		return errors.New("infrastructure: no path configured")
+	}
+
+	writer, err := openBucketWriter(ctx, path)
+	if err != nil {
+		return err
+	}
+	err = json.NewEncoder(writer).Encode(value)
+	cerr := writer.Close()
+	if err != nil {
+		return err
+	}
+	if cerr != nil {
+		return cerr
+	}
+	infrastructurePtr.Store(&value)
+	notifyAccessReload(ctx, infrastructureReloadChannel)
+	return nil
+}
+
 // AffiliatesConfig is the affiliate data every game shares: the codes are
 // the partner accounts, and a store a game doesn't carry never matches its
 // list entries, so one file serves all deployments.

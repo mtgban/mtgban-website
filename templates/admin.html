@@ -75,6 +75,7 @@
         <button class="admin-tab{{if eq .Page "acl"}} active{{end}}" onclick="window.switchTab && switchTab(this,'acl')">Access</button>
         <button class="admin-tab{{if eq .Page "affiliates"}} active{{end}}" onclick="window.switchTab && switchTab(this,'affiliates')">Affiliates</button>
         <button class="admin-tab{{if eq .Page "datasets"}} active{{end}}" onclick="window.switchTab && switchTab(this,'datasets')">Datasets</button>
+        <button class="admin-tab{{if eq .Page "infrastructure"}} active{{end}}" onclick="window.switchTab && switchTab(this,'infrastructure')">Infrastructure</button>
         <button class="admin-tab{{if eq .Page "overrides"}} active{{end}}" onclick="window.switchTab && switchTab(this,'overrides')">Key Overrides</button>
         <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="window.switchTab && switchTab(this,'tools')">Tools</button>
     </div>
@@ -406,6 +407,29 @@
             <form id="datasetsForm" action="/admin?page=datasets" method="post">
                 <textarea id="datasetsTextArea" name="datasetsTextArea" style="display:none;">{{datasets_text}}</textarea>
                 <div id="datasetsEditor"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════
+         INFRASTRUCTURE
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "infrastructure"}} active{{end}}" id="panel-infrastructure">
+        <div class="admin-config-wrap">
+            <div class="admin-config-header">
+                <h2>Infrastructure Editor</h2>
+                <span class="warn-tag">{{or (infrastructure_path) "not configured"}}</span>
+                <div class="config-actions">
+                    <button class="cfg-btn cfg-format" onclick="window.formatEditorByName && formatEditorByName('infrastructure')">Format JSON</button>
+                    <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
+                    {{if infrastructure_path}}
+                    <button class="cfg-btn cfg-primary" data-update-for="infrastructure" onclick="document.getElementById('infrastructureForm').requestSubmit()">Update</button>
+                    {{end}}
+                </div>
+            </div>
+            <form id="infrastructureForm" action="/admin?page=infrastructure" method="post">
+                <textarea id="infrastructureTextArea" name="infrastructureTextArea" style="display:none;">{{infrastructure_text}}</textarea>
+                <div id="infrastructureEditor"></div>
             </form>
         </div>
     </div>
@@ -854,6 +878,8 @@ window.addEventListener("beforeunload", function(e) {
     if (aff) window.__jsonEditors["affiliates"] = aff;
     var dse = initJSONEditor({ name: "datasets", textareaId: "datasetsTextArea", editorId: "datasetsEditor", formId: "datasetsForm" });
     if (dse) window.__jsonEditors["datasets"] = dse;
+    var infra = initJSONEditor({ name: "infrastructure", textareaId: "infrastructureTextArea", editorId: "infrastructureEditor", formId: "infrastructureForm" });
+    if (infra) window.__jsonEditors["infrastructure"] = infra;
 
     var ovr = initJSONEditor({ name: "overrides", textareaId: "keyOverridesTextArea", editorId: "overridesEditor", formId: "overridesForm" });
     if (ovr) window.__jsonEditors["overrides"] = ovr;
