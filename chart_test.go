@@ -192,6 +192,23 @@ func TestMergeMultiCardDatasetsOverridesNameAndColor(t *testing.T) {
 	}
 }
 
+// A card's label names its lines, so two printings of one card read apart;
+// a card with no label falls back to its name.
+func TestMergeMultiCardDatasetsPrefersLabel(t *testing.T) {
+	cards := []multiCardInput{
+		{Name: "Overgrown Farmland", Label: "Overgrown Farmland|FRA|185|nonfoil",
+			Datasets: []Dataset{{Reference: "TCG Low", Data: dummyData()}}},
+		{Name: "Overgrown Farmland",
+			Datasets: []Dataset{{Reference: "TCG Low", Data: dummyData()}}},
+	}
+	out, _ := mergeMultiCardDatasets(cards)
+	got := []string{out[0].Name, out[1].Name}
+	want := []string{"Overgrown Farmland|FRA|185|nonfoil", "Overgrown Farmland"}
+	if !slices.Equal(got, want) {
+		t.Errorf("names = %q, want %q", got, want)
+	}
+}
+
 func TestMergeMultiCardDatasetsFiltersEmptyData(t *testing.T) {
 	cards := []multiCardInput{
 		{

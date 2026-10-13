@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -286,6 +287,7 @@ const chartRosterConcurrency = 4
 type chartSeries struct {
 	CardID string
 	Name   string
+	Label  string
 	Prices map[string]timeseries.ProviderPrices
 	// Err is set when the archive did not answer for this card, or reading it
 	// panicked, which is not the same as answering that it holds nothing.
@@ -421,6 +423,7 @@ func plotSeries(ds *datastore, series []chartSeries, lb timeseries.Lookback, mul
 		cards[i] = multiCardInput{
 			CardID:   cs.CardID,
 			Name:     cs.Name,
+			Label:    cs.Label,
 			Datasets: chartDatasetsFrom(cs.Prices, plot.axis),
 		}
 	}
@@ -505,19 +508,20 @@ func buildProviderDataset(results map[string]timeseries.ProviderPrices, labels [
 	return Dataset{Name: pd.Name, Data: data, Color: pd.Color, Reference: pd.Name}
 }
 
-// multiCardInput is one card's contribution to a multi-card chart: the
-// display name to render in the legend, and the raw datasets returned by
-// chartDatasetsFrom for that card.
+// multiCardInput is one card's contribution to a multi-card chart: its name,
+// which checkpoints match on, the label to render in the legend, and the raw
+// datasets returned by chartDatasetsFrom for that card.
 type multiCardInput struct {
 	CardID   string
 	Name     string
+	Label    string
 	Datasets []Dataset
 }
 
 // mergeMultiCardDatasets flattens per-card datasets into the (card × reference)
 // list a multi-card chart renders. Each card's datasets get a palette color
 // (round-robin, wrap-around past multiCardPalette's length) and the supplied
-// card Name, replacing whatever chartDatasetsFrom put there. Datasets with no data
+// card Label (its Name where it has none), replacing whatever chartDatasetsFrom put there. Datasets with no data
 // are dropped so reference names that a card doesn't support don't pollute the
 // reference picker. The returned reference order is the first-seen order
 // across all cards — a card later in the list that introduces a new reference
@@ -534,7 +538,7 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 				continue
 			}
 
-			ds.Name = card.Name
+			ds.Name = cmp.Or(card.Label, card.Name)
 			ds.CardID = card.CardID
 			ds.Color = color
 			datasets = append(datasets, ds)

@@ -1652,7 +1652,7 @@ func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, ros
 		if target == nil {
 			continue
 		}
-		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, target: target})
+		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, Label: target.Label, target: target})
 	}
 	series := fetchRosterPrices(r.Context(), resolved, lb)
 	// An empty window hides the chart and the select that could widen it,

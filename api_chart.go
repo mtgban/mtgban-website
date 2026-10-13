@@ -104,7 +104,7 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 		if target == nil {
 			continue
 		}
-		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, target: target})
+		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, Label: target.Label, target: target})
 	}
 	if len(resolved) == 0 {
 		errorResponse(w, http.StatusNotFound, "card not found")
