@@ -126,9 +126,7 @@ func (s *site) Changelog(w http.ResponseWriter, r *http.Request) {
 	entries, err := getChangelogEntries()
 	groups := groupChangelogEntries(entries)
 	pageIndex := atoiDefault(r.URL.Query().Get("page"), 1)
-	// Paginate caps the number of pages from maxTotalResults. Round that cap up
-	// so a final partial page of groups remains reachable.
-	pageVars.Changelog, pageVars.Pagination = Paginate(groups, pageIndex, changelogPageSize, len(groups)+changelogPageSize-1)
+	pageVars.Changelog, pageVars.Pagination = Paginate(groups, pageIndex, changelogPageSize, len(groups))
 	if err != nil {
 		pageVars.ChangelogError = "Announcements are temporarily unavailable."
 		log.Println("changelog:", err)
