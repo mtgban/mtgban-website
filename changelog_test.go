@@ -18,7 +18,7 @@ func resetChangelogCache() {
 	cachedChangelog = changelogCache{}
 }
 
-func TestDiscordConfigSupportsNestedAndLegacyKeys(t *testing.T) {
+func TestDiscordConfigDecodesAndDefaults(t *testing.T) {
 	var nested ConfigType
 	if err := json.Unmarshal([]byte(`{"discord":{"bot_token":"token","guild_id":"guild","invite_url":"https://discord.gg/ban","changelog_channel_id":"announcements","development_channel_id":"dev","recap_channel_id":"recap","chat_channel_id":"chat","user_webhook_url":"user","server_webhook_url":"server","api_webhook_url":"api"}}`), &nested); err != nil {
 		t.Fatal(err)
@@ -27,15 +27,13 @@ func TestDiscordConfigSupportsNestedAndLegacyKeys(t *testing.T) {
 		t.Fatalf("nested Discord config was not decoded: %#v", nested.Discord)
 	}
 
-	var legacy ConfigType
-	if err := json.Unmarshal([]byte(`{"discord_token":"token","discord_invite_link":"https://discord.gg/ban","discord_hook":"user","discord_notif_hook":"server","discord_api_notif_hook":"api","discord_changelog_channel_id":"announcements"}`), &legacy); err != nil {
+	var empty ConfigType
+	err := json.Unmarshal([]byte(`{}`), &empty)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if legacy.Discord.BotToken != "token" || legacy.Discord.InviteURL != "https://discord.gg/ban" || legacy.Discord.UserWebhookURL != "user" || legacy.Discord.ServerWebhookURL != "server" || legacy.Discord.ChangelogChannelID != "announcements" {
-		t.Fatalf("legacy Discord config was not migrated: %#v", legacy.Discord)
-	}
-	if legacy.Discord.GuildID == "" || legacy.Discord.DevelopmentChannelID == "" {
-		t.Fatalf("Discord defaults were not applied: %#v", legacy.Discord)
+	if empty.Discord.GuildID == "" || empty.Discord.DevelopmentChannelID == "" {
+		t.Fatalf("Discord defaults were not applied: %#v", empty.Discord)
 	}
 }
 

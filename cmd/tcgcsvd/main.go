@@ -65,7 +65,6 @@ type config struct {
 	Discord struct {
 		ServerWebhookURL string `json:"server_webhook_url"`
 	} `json:"discord"`
-	LegacyDiscordNotifHook string `json:"discord_notif_hook"`
 
 	TimeseriesConfig struct {
 		LongFormWrites bool `json:"long_form_writes"`
@@ -101,9 +100,6 @@ func loadConfig(ctx context.Context, path string) (*config, error) {
 	err := readJSON(ctx, path, &cfg)
 	if err != nil {
 		return nil, err
-	}
-	if cfg.Discord.ServerWebhookURL == "" {
-		cfg.Discord.ServerWebhookURL = cfg.LegacyDiscordNotifHook
 	}
 	if cfg.InfrastructurePath != "" {
 		var file infrastructure.Config

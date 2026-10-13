@@ -158,57 +158,12 @@ type StoresConfig struct {
 	GlobalProbeList        []string `json:"global_probe_list"`
 }
 
-// UnmarshalJSON accepts the pre-discord-section keys, and the store lists at
-// the top level when there is no stores section, during migration. New
-// configuration should use the nested discord and stores objects; legacy
-// deployments can roll forward without having to change their secrets in the
-// same release.
+// UnmarshalJSON fills the Discord settings the config leaves unset.
 func (c *ConfigType) UnmarshalJSON(data []byte) error {
 	type configAlias ConfigType
-	legacy := struct {
-		*configAlias
-		DiscordHook               string `json:"discord_hook"`
-		DiscordNotifHook          string `json:"discord_notif_hook"`
-		DiscordAPINotifHook       string `json:"discord_api_notif_hook"`
-		DiscordInviteLink         string `json:"discord_invite_link"`
-		DiscordChangelogChannelID string `json:"discord_changelog_channel_id"`
-		DiscordToken              string `json:"discord_token"`
-	}{configAlias: (*configAlias)(c)}
-
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return err
-	}
-	// A config with no stores section keeps its store lists at the top level.
-	var section struct {
-		Stores json.RawMessage `json:"stores"`
-	}
-	err := json.Unmarshal(data, &section)
+	err := json.Unmarshal(data, (*configAlias)(c))
 	if err != nil {
 		return err
-	}
-	if section.Stores == nil {
-		err = json.Unmarshal(data, &c.Stores)
-		if err != nil {
-			return err
-		}
-	}
-	if c.Discord.UserWebhookURL == "" {
-		c.Discord.UserWebhookURL = legacy.DiscordHook
-	}
-	if c.Discord.ServerWebhookURL == "" {
-		c.Discord.ServerWebhookURL = legacy.DiscordNotifHook
-	}
-	if c.Discord.APIWebhookURL == "" {
-		c.Discord.APIWebhookURL = legacy.DiscordAPINotifHook
-	}
-	if c.Discord.InviteURL == "" {
-		c.Discord.InviteURL = legacy.DiscordInviteLink
-	}
-	if c.Discord.ChangelogChannelID == "" {
-		c.Discord.ChangelogChannelID = legacy.DiscordChangelogChannelID
-	}
-	if c.Discord.BotToken == "" {
-		c.Discord.BotToken = legacy.DiscordToken
 	}
 	c.Discord.applyDefaults()
 	return nil
