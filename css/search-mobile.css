@@ -560,6 +560,25 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     border-bottom: none;
 }
 
+/* TCGplayer copies sold a day, newspaper tiers (salesvelocity.go). A stat rather
+   than an offer; it grows left of the price column, keeping the prices' edge. */
+.sales-velocity .m-vendor-name {
+    color: var(--greytext);
+}
+.sales-velocity .m-vendor-price {
+    justify-self: end;
+    font-weight: 400;
+}
+.m-vendor-row.sales-velocity-upsell {
+    display: block;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.7rem;
+    font-style: italic;
+    text-align: center;
+    text-decoration: none;
+    color: var(--greytext);
+}
+
 /* Names a stack of rows the way the desktop column header does. Only drawn on
    an expanded card, where the tab bar that would otherwise name the panels is
    not there - without it a sealed product's simulated values run straight into

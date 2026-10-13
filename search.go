@@ -582,6 +582,8 @@ type SearchVars struct {
 	CanAlerts bool
 	// CanUpload says the navbar offers Upload, so the backpack may send to it.
 	CanUpload bool
+	// CanVelocity shows the sales velocity row to the newspaper tiers.
+	CanVelocity bool
 	// AlertChannelList is the delivery channels the alert modal offers,
 	// read off #alert-modal's data-alert-channels by js/alerts.js.
 	AlertChannelList string
@@ -605,6 +607,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(s, r, "Search", sig)
 	pageVars.CanAlerts, pageVars.CanFixSearch = searchReader(s, r)
+	pageVars.CanVelocity = newspaperTier(sig)
 	pageVars.AlertChannelList = alertChannelList(parseSig(sig))
 	pageVars.CanUpload = navOffers(s, parseSig(sig), "Upload")
 
