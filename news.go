@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"slices"
 	"sort"
@@ -661,7 +662,8 @@ var newspaperPagesInitial = []NewspaperPage{
                   FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
                  WHERE game_name = '__GAME__'
                    AND ` + newspaperCalcDateFilter("scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards", ""),
-		Sort: "ranking ASC",
+		Sort:   "ranking ASC",
+		Priced: "tcg_market_price",
 		Head: []Heading{
 			{
 				IsHidden: true,
@@ -741,7 +743,8 @@ var newspaperPagesInitial = []NewspaperPage{
                   FROM scripts__tcgplayersalesdata_spike_score_cards
                  WHERE game_name = '__GAME__'
                    AND ` + newspaperCalcDateFilter("scripts__tcgplayersalesdata_spike_score_cards", ""),
-		Sort: "ranking ASC",
+		Sort:   "ranking ASC",
+		Priced: "current_price",
 		Head: []Heading{
 			{
 				IsHidden: true,
@@ -807,7 +810,8 @@ var newspaperPagesInitial = []NewspaperPage{
                   FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
                  WHERE game_name = '__GAME__'
                    AND ` + newspaperCalcDateFilter("scripts__tcgplayer_greatest_increase_in_vendor_listings_cards", "pct_gain_7d <> 0"),
-		Sort: "ranking ASC",
+		Sort:        "ranking ASC",
+		PercChanged: "pct_gain_7d",
 		Head: []Heading{
 			{
 				IsHidden: true,
@@ -879,7 +883,8 @@ var newspaperPagesInitial = []NewspaperPage{
                   FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
                  WHERE game_name = '__GAME__'
                    AND ` + newspaperCalcDateFilter("scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards", "pct_drop_7d <> 0"),
-		Sort: "ranking ASC",
+		Sort:        "ranking ASC",
+		PercChanged: "pct_drop_7d",
 		Head: []Heading{
 			{
 				IsHidden: true,
@@ -951,7 +956,9 @@ var newspaperPagesInitial = []NewspaperPage{
                   FROM scripts__cardkingdom_buylist_increase_score_cards
                  WHERE game_name = '__GAME__'
                    AND ` + newspaperCalcDateFilter("scripts__cardkingdom_buylist_increase_score_cards", "pct_increase_7d <> 0"),
-		Sort: "ranking ASC",
+		Sort:        "ranking ASC",
+		Priced:      "ck_buy_price",
+		PercChanged: "pct_increase_7d",
 		Head: []Heading{
 			{
 				IsHidden: true,
@@ -1030,7 +1037,9 @@ var newspaperPagesInitial = []NewspaperPage{
                   FROM scripts__cardkingdom_buylist_decrease_score_cards
                  WHERE game_name = '__GAME__'
                    AND ` + newspaperCalcDateFilter("scripts__cardkingdom_buylist_decrease_score_cards", "pct_decrease_7d <> 0"),
-		Sort: "ranking ASC",
+		Sort:        "ranking ASC",
+		Priced:      "ck_buy_price",
+		PercChanged: "pct_decrease_7d",
 		Head: []Heading{
 			{
 				IsHidden: true,
@@ -1134,6 +1143,132 @@ type NewsVars struct {
 	Finishes []string
 }
 
+// newsQuery is a report's filters and sort, as the page and the API read them.
+type newsQuery struct {
+	Sort, Dir            string
+	Set, Rarity, Finish  string
+	Bucket               string
+	MinPrice, MaxPrice   *float64
+	MinChange, MaxChange *float64
+	SkipSets             []string // the page's NewspaperList cookie, by set code
+}
+
+// newsFilter applies the query's filters and sort to a report's rows.
+func newsFilter(b *mtgmatcher.Backend, page NewspaperPage, rows []NewspaperResult, q newsQuery) []NewspaperResult {
+	out := make([]NewspaperResult, 0, len(rows))
+	for _, row := range rows {
+		if newsKeep(b, page, row, q) {
+			out = append(out, row)
+		}
+	}
+	if q.Sort != "" {
+		newsSort(out, q.Sort, q.Dir)
+	}
+	return out
+}
+
+// newsKeep reports whether a row passes every filter the query sets.
+func newsKeep(b *mtgmatcher.Backend, page NewspaperPage, row NewspaperResult, q newsQuery) bool {
+	if len(q.SkipSets) > 0 {
+		set, err := b.GetSetByName(row.Edition)
+		if err == nil && slices.Contains(q.SkipSets, set.Code) {
+			return false
+		}
+	}
+	if q.Set != "" && q.Set != row.Edition {
+		return false
+	}
+	if q.Bucket != "" && q.Bucket != row.BucketName {
+		return false
+	}
+	if q.Finish != "" && q.Finish != row.Variant {
+		return false
+	}
+	if q.Rarity != "" && !newsRarityMatches(q.Rarity, row.Rarity) {
+		return false
+	}
+	return newsInBounds(row, page.Priced, q.MinPrice, q.MaxPrice) &&
+		newsInBounds(row, page.PercChanged, q.MinChange, q.MaxChange)
+}
+
+// newsRarityMatches compares a rarity's first letter to M, R, U, C, S or a pair like M/R; no rarity passes.
+func newsRarityMatches(want, rarity string) bool {
+	if rarity == "" {
+		return true
+	}
+	first := strings.ToLower(rarity[:1])
+	for _, letter := range strings.Split(want, "/") {
+		if strings.ToLower(letter) == first {
+			return true
+		}
+	}
+	return false
+}
+
+// newsInBounds reports whether a row's field lies within inclusive bounds; no field or no bound passes.
+func newsInBounds(row NewspaperResult, field string, lo, hi *float64) bool {
+	if field == "" || (lo == nil && hi == nil) {
+		return true
+	}
+	v, _ := strconv.ParseFloat(row.FieldValue(field), 64)
+	return (lo == nil || v >= *lo) && (hi == nil || v <= *hi)
+}
+
+// newsSort orders rows by a field, numerically when either side is a nonzero number, ties kept.
+func newsSort(rows []NewspaperResult, field, dir string) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		vi := rows[i].FieldValue(field)
+		vj := rows[j].FieldValue(field)
+		var vif, vjf float64
+		vif, _ = strconv.ParseFloat(vi, 64)
+		vjf, _ = strconv.ParseFloat(vj, 64)
+		numberSort := vif != 0 || vjf != 0
+		if dir == "asc" {
+			if numberSort {
+				return vif < vjf
+			}
+			return vi < vj
+		}
+		if numberSort {
+			return vif > vjf
+		}
+		return vi > vj
+	})
+}
+
+// newsParseBound reads a price or change bound: nil when blank, an error when not a finite number.
+func newsParseBound(s string) (*float64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil, err
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return nil, errors.New("not a finite number")
+	}
+	return &v, nil
+}
+
+// newsPageBound is a bound from the page's form, whose links send 0 for none.
+func newsPageBound(s string) *float64 {
+	v, err := newsParseBound(s)
+	if err != nil || v == nil || *v == 0 {
+		return nil
+	}
+	return v
+}
+
+// newsBoundValue is a bound as the page's inputs show it, 0 for none.
+func newsBoundValue(v *float64) float64 {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
 func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
@@ -1178,10 +1313,10 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	rarity := r.FormValue("rarity")
 	bucket := r.FormValue("bucket")
 	finish := r.FormValue("finish")
-	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
-	maxPrice, _ := strconv.ParseFloat(r.FormValue("max_price"), 64)
-	minPercChange, _ := strconv.ParseFloat(r.FormValue("min_change"), 64)
-	maxPercChange, _ := strconv.ParseFloat(r.FormValue("max_change"), 64)
+	minPrice := newsPageBound(r.FormValue("min_price"))
+	maxPrice := newsPageBound(r.FormValue("max_price"))
+	minPercChange := newsPageBound(r.FormValue("min_change"))
+	maxPercChange := newsPageBound(r.FormValue("max_change"))
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
 
 	preferFlavor := readSearchMiscOpts(r).has("preferFlavor")
@@ -1307,19 +1442,21 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.FilterRarity = rarity
 	pageVars.FilterBucket = bucket
 	pageVars.FilterFinish = finish
-	pageVars.FilterMinPrice = minPrice
-	pageVars.FilterMaxPrice = maxPrice
-	pageVars.FilterMinPercChange = minPercChange
-	pageVars.FilterMaxPercChange = maxPercChange
+	pageVars.FilterMinPrice = newsBoundValue(minPrice)
+	pageVars.FilterMaxPrice = newsBoundValue(maxPrice)
+	pageVars.FilterMinPercChange = newsBoundValue(minPercChange)
+	pageVars.FilterMaxPercChange = newsBoundValue(maxPercChange)
 	pageVars.Rarities = NewspaperAllRarities
 
 	skipEditionsOpt := readCookie(r, "NewspaperList")
 
 	var results []NewspaperResult
+	var report NewspaperPage
 	for _, newspage := range pageVars.ToC {
 		if newspage.Option != page {
 			continue
 		}
+		report = newspage
 		pageVars.Page = newspage.Option
 		pageVars.Subtitle = newspage.Title
 		pageVars.InfoMessage = newspage.Desc
@@ -1358,69 +1495,23 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 
-	if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" || finish != "" {
-		var output []NewspaperResult
-		for _, result := range results {
-			if skipEditionsOpt != "" {
-				filters := strings.Split(skipEditionsOpt, ",")
-				set, err := b.GetSetByName(result.Edition)
-				if err == nil && slices.Contains(filters, set.Code) {
-					continue
-				}
-			}
-			if filter != "" && filter != result.Edition {
-				continue
-			}
-			if bucket != "" && bucket != result.BucketName {
-				continue
-			}
-			if finish != "" && finish != result.Variant {
-				continue
-			}
-			if rarity != "" && result.Rarity != "" {
-				cardRarity := result.Rarity
-				if strings.Contains(rarity, "/") {
-					rarities := strings.Split(rarity, "/")
-					if string(cardRarity[0]) != strings.ToLower(rarities[0]) && string(cardRarity[0]) != strings.ToLower(rarities[1]) {
-						continue
-					}
-				} else if string(cardRarity[0]) != strings.ToLower(rarity) {
-					continue
-				}
-			}
-			output = append(output, result)
-		}
-
-		results = output
+	query := newsQuery{
+		Sort:      sorting,
+		Dir:       dir,
+		Set:       filter,
+		Rarity:    rarity,
+		Finish:    finish,
+		Bucket:    bucket,
+		MinPrice:  minPrice,
+		MaxPrice:  maxPrice,
+		MinChange: minPercChange,
+		MaxChange: maxPercChange,
 	}
-
-	if sorting != "" {
-		for _, newspage := range pageVars.ToC {
-			if newspage.Option != page {
-				continue
-			}
-
-			sort.SliceStable(results, func(i, j int) bool {
-				vi := results[i].FieldValue(sorting)
-				vj := results[j].FieldValue(sorting)
-				var vif, vjf float64
-				vif, _ = strconv.ParseFloat(vi, 64)
-				vjf, _ = strconv.ParseFloat(vj, 64)
-				numberSort := vif != 0 || vjf != 0
-				if dir == "asc" {
-					if numberSort {
-						return vif < vjf
-					}
-					return vi < vj
-				}
-				if numberSort {
-					return vif > vjf
-				}
-				return vi > vj
-			})
-			break
-		}
+	if skipEditionsOpt != "" {
+		query.SkipSets = strings.Split(skipEditionsOpt, ",")
 	}
+	// A new slice: the cached one is shared and never reordered.
+	results = newsFilter(b, report, results, query)
 
 	// Set the page size depending on level
 	pageSize := DefaultPageSize
@@ -1429,7 +1520,8 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageSize *= 2
 	}
 
-	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
+	// Padded like changelog.go's call: Paginate's cap floors otherwise, hiding the last page.
+	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results)+pageSize-1)
 
 	for _, result := range pageVars.Table {
 		c := uuid2card(b, result.UUID, preferFlavor)
@@ -1438,7 +1530,9 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(pageVars.Cards) == 0 {
-		if filter == "" && rarity == "" && bucket == "" && finish == "" {
+		unfiltered := filter == "" && rarity == "" && bucket == "" && finish == "" &&
+			minPrice == nil && maxPrice == nil && minPercChange == nil && maxPercChange == nil
+		if unfiltered {
 			pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
 		} else {
 			pageVars.InfoMessage = "No results for the current filter options"
