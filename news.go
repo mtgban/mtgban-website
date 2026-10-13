@@ -46,13 +46,14 @@ type Heading struct {
 
 type NewspaperResult struct {
 	// Common fields (all pages)
-	Date     string // calc_date or row_names (hidden)
+	Date     string // calc_date (hidden)
 	UUID     string // product_id or uuid (hidden)
 	Ranking  int
 	CardName string
 	Edition  string
 	Number   string
-	Variant  string // variant or rarity
+	Variant  string // variant, the finish
+	Rarity   string // the matched card's rarity
 
 	// Spike score pages
 	BucketName string
@@ -332,43 +333,9 @@ func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperRes
 			}
 		}
 
-		// Override a few fields for better integration with the site
-		if db == NewNewspaperDB {
-			uuid, err := b.MatchID(raw[1], raw[6] != "Normal")
-			if err != nil {
-				LogPages["Newspaper"].Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
-				continue
-			}
-			co, _ := b.GetUUID(uuid)
-			raw[0] = co.Rarity
-			raw[1] = uuid
-			raw[3] = co.Name
-			raw[4] = co.Edition
-			raw[5] = co.Number
-		}
-
-		// Map common fields (first 7 columns are always the same order)
-		result := NewspaperResult{
-			Date:     raw[0],
-			UUID:     raw[1],
-			CardName: raw[3],
-			Edition:  raw[4],
-			Number:   raw[5],
-			Variant:  raw[6],
-		}
-		if raw[2] != "" {
-			result.Ranking, _ = strconv.Atoi(raw[2])
-		}
-
-		// Map remaining columns by SQL column name; unknown columns are
-		// ignored, matching the original switch's lack of a default case.
-		for j := 7; j < len(cols); j++ {
-			if raw[j] == "" {
-				continue
-			}
-			if set := newspaperColumnSetters[cols[j]]; set != nil {
-				set(&result, raw[j])
-			}
+		result, ok := newspaperRow(b, cols, raw, db == NewNewspaperDB)
+		if !ok {
+			continue
 		}
 
 		// Allocate a result row with all mapped fields
@@ -376,6 +343,50 @@ func getResults(b *mtgmatcher.Backend, db *sql.DB, query string) ([]NewspaperRes
 	}
 
 	return results, nil
+}
+
+// newspaperRow maps one row's cells to a result. With match set it resolves
+// the TCGplayer id to a card, whose values replace the row's, or drops the row.
+func newspaperRow(b *mtgmatcher.Backend, cols, raw []string, match bool) (NewspaperResult, bool) {
+	// Map common fields (first 7 columns are always the same order)
+	result := NewspaperResult{
+		Date:     raw[0],
+		UUID:     raw[1],
+		CardName: raw[3],
+		Edition:  raw[4],
+		Number:   raw[5],
+		Variant:  raw[6],
+	}
+
+	// Override a few fields for better integration with the site
+	if match {
+		uuid, err := b.MatchID(raw[1], raw[6] != "Normal")
+		if err != nil {
+			LogPages["Newspaper"].Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
+			return NewspaperResult{}, false
+		}
+		co, _ := b.GetUUID(uuid)
+		result.UUID = uuid
+		result.CardName = co.Name
+		result.Edition = co.Edition
+		result.Number = co.Number
+		result.Rarity = co.Rarity
+	}
+	if raw[2] != "" {
+		result.Ranking, _ = strconv.Atoi(raw[2])
+	}
+
+	// Map remaining columns by SQL column name; unknown columns are
+	// ignored, matching the original switch's lack of a default case.
+	for j := 7; j < len(cols); j++ {
+		if raw[j] == "" {
+			continue
+		}
+		if set := newspaperColumnSetters[cols[j]]; set != nil {
+			set(&result, raw[j])
+		}
+	}
+	return result, true
 }
 
 // gameMap names every game a deployment can be configured as. For a game
@@ -1366,8 +1377,8 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 			if finish != "" && finish != result.Variant {
 				continue
 			}
-			if rarity != "" && result.Date != "" {
-				cardRarity := result.Date // Date field holds rarity for overridden rows
+			if rarity != "" && result.Rarity != "" {
+				cardRarity := result.Rarity
 				if strings.Contains(rarity, "/") {
 					rarities := strings.Split(rarity, "/")
 					if string(cardRarity[0]) != strings.ToLower(rarities[0]) && string(cardRarity[0]) != strings.ToLower(rarities[1]) {

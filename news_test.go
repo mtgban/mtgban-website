@@ -6,6 +6,8 @@ import (
 	"log"
 	"strings"
 	"testing"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // The delayed edition is built by rewriting "0 DAY" into "3 DAY" in the live
@@ -82,5 +84,54 @@ func TestCacheNewspaperLogsAGameMissingFromGameMap(t *testing.T) {
 	log.SetOutput(prevLog)
 	if !strings.Contains(logged.String(), `"nosuchgame" is missing from gameMap`) {
 		t.Errorf("log = %q, want a line naming the missing game", logged.String())
+	}
+}
+
+// newsRowCols are a spike_score row's columns, as getResults reads them.
+var newsRowCols = []string{"calc_date", "product_id", "ranking", "product_name", "set_name", "product_number", "variant", "bucket_name", "bucket_rank", "current_price"}
+
+// A matched row takes the card's name, edition, number and rarity, keeps its
+// calc_date in Date, and maps the report's own columns.
+func TestNewspaperRowKeepsRarityApart(t *testing.T) {
+	co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{
+		UUID: "u-ragavan", Name: "Ragavan, Nimble Pilferer", SetCode: "MH2", Number: "138", Rarity: "mythic",
+	}, Edition: "Modern Horizons 2"}
+	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{"u-ragavan": co}}
+	raw := []string{"2026-10-13T00:00:00Z", "u-ragavan", "1", "RAGAVAN", "MH2", "138", "Normal", "$50+", "1", "64.99"}
+
+	got, ok := newspaperRow(b, newsRowCols, raw, true)
+	want := NewspaperResult{
+		Date: "2026-10-13T00:00:00Z", UUID: "u-ragavan", Ranking: 1,
+		CardName: "Ragavan, Nimble Pilferer", Edition: "Modern Horizons 2", Number: "138",
+		Variant: "Normal", Rarity: "mythic", BucketName: "$50+", BucketRank: 1, CurrentPrice: 64.99,
+	}
+	if !ok || got != want {
+		t.Errorf("matched row = %+v, %t\nwant %+v", got, ok, want)
+	}
+
+	// Unmatched, the row keeps its own values and has no rarity.
+	got, ok = newspaperRow(b, newsRowCols, raw, false)
+	if !ok || got.Date != "2026-10-13T00:00:00Z" || got.CardName != "RAGAVAN" || got.Edition != "MH2" || got.Rarity != "" {
+		t.Errorf("unmatched row = %+v, %t", got, ok)
+	}
+}
+
+// A row whose id matches no card is dropped and logged.
+func TestNewspaperRowDropsAnUnknownID(t *testing.T) {
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	saved := LogPages["Newspaper"]
+	t.Cleanup(func() { LogPages["Newspaper"] = saved })
+	var logged bytes.Buffer
+	LogPages["Newspaper"] = log.New(&logged, "", 0)
+
+	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{}}
+	raw := []string{"2026-10-13", "999", "1", "Nope", "XXX", "1", "Normal", "$2+", "1", "2"}
+	if got, ok := newspaperRow(b, newsRowCols, raw, true); ok {
+		t.Errorf("unknown id kept: %+v", got)
+	}
+	if !strings.Contains(logged.String(), "match 999 Normal") {
+		t.Errorf("log = %q", logged.String())
 	}
 }
