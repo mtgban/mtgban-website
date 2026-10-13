@@ -451,10 +451,15 @@ const newspaperStaleAfter = 12 * time.Hour
 // blanking the tables -- but it also means the numbers look live when they are
 // not, and the reader is the one acting on them.
 func newspaperStaleNotice(last time.Time) string {
-	if last.IsZero() || time.Since(last) < newspaperStaleAfter {
+	if !newsStale(last, time.Now()) {
 		return ""
 	}
 	return "these numbers last refreshed " + last.Format("Jan 2 15:04 MST") + " and are not current"
+}
+
+// newsStale reports the cache refreshed, and newspaperStaleAfter or more before now.
+func newsStale(refreshed, now time.Time) bool {
+	return !refreshed.IsZero() && now.Sub(refreshed) >= newspaperStaleAfter
 }
 
 // noteNewspaperStaleness appends the notice to whatever the page was already
