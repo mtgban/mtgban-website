@@ -1192,8 +1192,8 @@ func newsKeep(b *mtgmatcher.Backend, page NewspaperPage, row NewspaperResult, q 
 	if q.Rarity != "" && !newsRarityMatches(q.Rarity, row.Rarity) {
 		return false
 	}
-	return newsInBounds(row, page.Priced, q.MinPrice, q.MaxPrice) &&
-		newsInBounds(row, page.PercChanged, q.MinChange, q.MaxChange)
+	return newsInBounds(row, page.Priced, false, q.MinPrice, q.MaxPrice) &&
+		newsInBounds(row, page.PercChanged, true, q.MinChange, q.MaxChange)
 }
 
 // newsRarityMatches compares a rarity's first letter to M, R, U, C, S or a pair like M/R; no rarity passes.
@@ -1210,13 +1210,24 @@ func newsRarityMatches(want, rarity string) bool {
 	return false
 }
 
-// newsInBounds reports whether a row's field lies within inclusive bounds; no field or no bound passes.
-func newsInBounds(row NewspaperResult, field string, lo, hi *float64) bool {
+// newsInBounds reports whether a row's field lies within inclusive bounds; no field or no bound passes, no value fails.
+func newsInBounds(row NewspaperResult, field string, percent bool, lo, hi *float64) bool {
 	if field == "" || (lo == nil && hi == nil) {
 		return true
 	}
-	v, _ := strconv.ParseFloat(row.FieldValue(field), 64)
+	v, err := strconv.ParseFloat(row.FieldValue(field), 64)
+	if err != nil {
+		return false
+	}
+	if percent {
+		v = newsPercent(v)
+	}
 	return (lo == nil || v >= *lo) && (hi == nil || v <= *hi)
+}
+
+// newsPercent is a stored change fraction as the percent a reader sees, to two decimals.
+func newsPercent(v float64) float64 {
+	return math.Round(v*100*100) / 100
 }
 
 // newsSort orders rows by a field, numerically when either side is a nonzero number, ties kept.

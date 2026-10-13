@@ -153,6 +153,36 @@ func newsInitialPage(t *testing.T, option string) NewspaperPage {
 	return NewspaperPage{}
 }
 
+// Each report's price and change columns are dollar and percent columns it shows.
+func TestNewspaperReportsNameTheirColumns(t *testing.T) {
+	has := func(page NewspaperPage, field string, perc bool) bool {
+		return slices.ContainsFunc(page.Head, func(h Heading) bool {
+			return h.Field == field && (perc && h.IsPerc || !perc && h.IsDollar)
+		})
+	}
+	for _, page := range newspaperPagesInitial {
+		if page.Priced != "" && !has(page, page.Priced, false) {
+			t.Errorf("%s: Priced %q is not a dollar column", page.Option, page.Priced)
+		}
+		if page.PercChanged != "" && !has(page, page.PercChanged, true) {
+			t.Errorf("%s: PercChanged %q is not a percent column", page.Option, page.PercChanged)
+		}
+	}
+	for option, want := range map[string][2]string{
+		"combined_spike_score":       {"tcg_market_price", ""},
+		"spike_score":                {"current_price", ""},
+		"greatest_increase_listings": {"", "pct_gain_7d"},
+		"greatest_decrease_listings": {"", "pct_drop_7d"},
+		"greatest_increase_buylist":  {"ck_buy_price", "pct_increase_7d"},
+		"greatest_decrease_buylist":  {"ck_buy_price", "pct_decrease_7d"},
+	} {
+		page := newsInitialPage(t, option)
+		if got := [2]string{page.Priced, page.PercChanged}; got != want {
+			t.Errorf("%s: Priced, PercChanged = %q, want %q", option, got, want)
+		}
+	}
+}
+
 // newsWithRows is a report with a live edition and the filter values cached from it.
 func newsWithRows(t *testing.T, option string, rows []NewspaperResult) NewspaperPage {
 	t.Helper()
@@ -177,14 +207,14 @@ func newsRankings(rows []NewspaperResult) []int {
 // newsFilterPage takes buckets, a price and a change.
 var newsFilterPage = NewspaperPage{Option: "fixture", HasBucket: true, Priced: "current_price", PercChanged: "pct_gain_7d"}
 
-// newsFilterRows span two sets, every rarity letter, both finishes, and one row with no rarity.
+// newsFilterRows span two sets, every rarity letter, both finishes, one row with no rarity and one with no change; changes are fractions.
 func newsFilterRows() []NewspaperResult {
 	return []NewspaperResult{
-		{Ranking: 1, UUID: "a", CardName: "Alpha", Edition: "Bloomburrow", Variant: "Normal", Rarity: "mythic", BucketName: "$50+", CurrentPrice: 60, WeeklyPctChange: 40},
-		{Ranking: 2, UUID: "b", CardName: "Bravo", Edition: "Bloomburrow", Variant: "Foil", Rarity: "rare", BucketName: "$20+", CurrentPrice: 25, WeeklyPctChange: -5},
-		{Ranking: 3, UUID: "c", CardName: "Charlie", Edition: "Duskmourn", Variant: "Normal", Rarity: "uncommon", BucketName: "$2+", CurrentPrice: 2.5, WeeklyPctChange: 12},
+		{Ranking: 1, UUID: "a", CardName: "Alpha", Edition: "Bloomburrow", Variant: "Normal", Rarity: "mythic", BucketName: "$50+", CurrentPrice: 60, WeeklyPctChange: 0.5},
+		{Ranking: 2, UUID: "b", CardName: "Bravo", Edition: "Bloomburrow", Variant: "Foil", Rarity: "rare", BucketName: "$20+", CurrentPrice: 25, WeeklyPctChange: -0.05},
+		{Ranking: 3, UUID: "c", CardName: "Charlie", Edition: "Duskmourn", Variant: "Normal", Rarity: "uncommon", BucketName: "$2+", CurrentPrice: 2.5, WeeklyPctChange: 0.3333},
 		{Ranking: 4, UUID: "d", CardName: "Delta", Edition: "Duskmourn", Variant: "Normal", Rarity: "common", BucketName: "$2+", CurrentPrice: 2.5, WeeklyPctChange: 0},
-		{Ranking: 5, UUID: "e", CardName: "Echo", Edition: "Duskmourn", Variant: "Foil", Rarity: "", BucketName: "$5+", CurrentPrice: 7, WeeklyPctChange: 3},
+		{Ranking: 5, UUID: "e", CardName: "Echo", Edition: "Duskmourn", Variant: "Foil", Rarity: "", BucketName: "$5+", CurrentPrice: 7, WeeklyPctChange: 0.03},
 	}
 }
 
@@ -216,15 +246,54 @@ func TestNewsFilter(t *testing.T) {
 		{"min price", newsQuery{MinPrice: boundOf(7)}, []int{1, 2, 5}},
 		{"max price", newsQuery{MaxPrice: boundOf(7)}, []int{3, 4, 5}},
 		{"price bounds are inclusive", newsQuery{MinPrice: boundOf(2.5), MaxPrice: boundOf(2.5)}, []int{3, 4}},
-		{"min change", newsQuery{MinChange: boundOf(0)}, []int{1, 3, 4, 5}},
-		{"max change", newsQuery{MaxChange: boundOf(0)}, []int{2, 4}},
-		{"change bounds", newsQuery{MinChange: boundOf(3), MaxChange: boundOf(12)}, []int{3, 5}},
+		{"min change", newsQuery{MinChange: boundOf(0)}, []int{1, 3, 5}},
+		{"max change", newsQuery{MaxChange: boundOf(0)}, []int{2}},
+		{"change bounds are inclusive percents", newsQuery{MinChange: boundOf(3), MaxChange: boundOf(33.33)}, []int{3, 5}},
+		{"min change in percent", newsQuery{MinChange: boundOf(40)}, []int{1}},
 		{"skip a set", newsQuery{SkipSets: []string{"BLB"}}, []int{3, 4, 5}},
 		{"skip sets", newsQuery{SkipSets: []string{"DSK", "XXX"}}, []int{1, 2}},
 		{"together", newsQuery{Set: "Duskmourn", Finish: "Normal", MinPrice: boundOf(2)}, []int{3, 4}},
 		{"nothing", newsQuery{Set: "Bloomburrow", Rarity: "C"}, []int{}},
 	} {
 		got := newsRankings(newsFilter(b, newsFilterPage, newsFilterRows(), tc.q))
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A change bound is in percent: the stored fraction times 100, to two decimals.
+func TestNewsFilterChangeIsPercent(t *testing.T) {
+	for _, tc := range []struct {
+		change, min float64
+		keep        bool
+	}{
+		{0.2, 20, true},
+		{0.2, 21, false},
+		{0.29, 29, true},
+	} {
+		rows := []NewspaperResult{{Ranking: 1, WeeklyPctChange: tc.change}}
+		got := len(newsFilter(newsFilterBackend(), newsFilterPage, rows, newsQuery{MinChange: boundOf(tc.min)})) == 1
+		if got != tc.keep {
+			t.Errorf("change %v, min_change=%v: kept %t, want %t", tc.change, tc.min, got, tc.keep)
+		}
+	}
+}
+
+// A row with no value in a bound's column fails the bound and passes without one.
+func TestNewsFilterNoValueFailsABound(t *testing.T) {
+	rows := []NewspaperResult{{Ranking: 1, CurrentPrice: 5, WeeklyPctChange: 0.1}, {Ranking: 2}}
+	for _, tc := range []struct {
+		name string
+		q    newsQuery
+		want []int
+	}{
+		{"no bound", newsQuery{}, []int{1, 2}},
+		{"min price 0", newsQuery{MinPrice: boundOf(0)}, []int{1}},
+		{"max price", newsQuery{MaxPrice: boundOf(100)}, []int{1}},
+		{"max change", newsQuery{MaxChange: boundOf(100)}, []int{1}},
+	} {
+		got := newsRankings(newsFilter(newsFilterBackend(), newsFilterPage, rows, tc.q))
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
