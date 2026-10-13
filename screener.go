@@ -472,8 +472,7 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reuse the Newspaper access tier.
-	enabled := GetParamFromSig(sig, "NewsEnabled")
-	if !(enabled == "1day" || enabled == "3day" || enabled == "0day" || (DevMode && !SigCheck)) {
+	if !newspaperTier(sig) {
 		pageVars.Title = "This feature is BANned"
 		pageVars.ErrorMessage = ErrMsgDenied
 		render(w, "screener.html", pageVars)
