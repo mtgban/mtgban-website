@@ -31,6 +31,8 @@ var cartStores = []cartStore{
 	{"MMC", "MTG Mint Card", "https://www.mtgmintcard.com/buylist-cart", "https://www.mtgmintcard.com/shopping-cart"},
 	{"SZ", "Strike Zone", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637", "http://shop.strikezoneonline.com/TUser?MC=CUVC&MF=B&BUID=637"},
 	{"HA", "Hareruya", "https://www.hareruyamtg.com/ja/purchase/cart", "https://www.hareruyamtg.com/en/cart"},
+	// Mana Pool buys nothing; its store cart is filled through its optimizer
+	{"MP", "Mana Pool", "", "https://manapool.com/cart"},
 	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
 	// button until a load that logs a signed-in user out is explained
 	{"CK", "Card Kingdom", "", ""},
@@ -65,6 +67,10 @@ var cartAffiliates = map[string]func(code, page string) string{
 	},
 	"CSI": func(code, page string) string {
 		return withQuery(page, url.Values{"utm_referrer": {code}})
+	},
+	// Mana Pool's own ref query, as its product links carry it
+	"MP": func(code, page string) string {
+		return withQuery(page, url.Values{"ref": {code}})
 	},
 	// Through the partner redirector, which keeps the fragment
 	"SCG": func(code, page string) string {
@@ -179,16 +185,31 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 	return cartLoad{}
 }
 
+// cartAsksMost are the stores whose feed does not give their stock: Mint's
+// caps it at 8, and Mana Pool's gives none.
+var cartAsksMost = []string{"MMC", "MP"}
+
+// asksMost reports whether key's split is one of cartAsksMost's stores.
+func asksMost(key string) bool {
+	for _, prefix := range cartAsksMost {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // cartMostQuantity is what a cart is asked for to get as many as the store
 // has, for a store whose cart trims a quantity to its stock.
 const cartMostQuantity = 999
 
 // cartLoadForArbit is cartLoadFor over an arbit section's rows, each in the
-// condition the store sells it in. Mint's feed caps its stock at 8, so its
-// store cart asks for what the buylist takes, or as many as Mint has where
-// the buylist names no amount, and Mint trims it to what it has.
+// condition the store sells it in. A store whose feed does not give its stock
+// (cartAsksMost) asks its store cart for what the buylist takes, or as many
+// as it has where the buylist names no amount, and the store trims it to
+// what it has.
 func cartLoadForArbit(key string, buylist bool, entries []mtgban.ArbitEntry) cartLoad {
-	most := !buylist && strings.HasPrefix(key, "MMC")
+	most := !buylist && asksMost(key)
 	rows := make([]OptimizedUploadEntry, 0, len(entries))
 	quantities := make([]string, 0, len(entries))
 	for _, entry := range entries {

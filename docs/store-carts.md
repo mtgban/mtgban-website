@@ -5,14 +5,15 @@ buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
 and both calls take a list. MTG Mint Card and Card Kingdom's store have the
 same kind of call, one card at a time, and Hareruya both: a form that takes
-a whole store list, and one call per card for its buylist. Star City Games
-and Strike Zone have a CSV import, but no way to hand it a list from
-another site. The upload page reaches all seven through one bookmarklet,
-BAN-to-Cart, run on the store's page. ABU was measured against a real
-account on 2026-10-07, CSI, Strike Zone and Hareruya against a guest cart
-and SCG and Mint against a real account on 2026-10-09, Card Kingdom
-against a guest cart on 2026-10-10, and Mint's store against a guest cart
-on 2026-10-13.
+a whole store list, and one call per card for its buylist. Mana Pool's public optimizer
+takes a whole list and answers with the listings to put in its cart.
+Star City Games and Strike Zone have a CSV import, but no way to hand it a
+list from another site. The upload page reaches all eight through one
+bookmarklet, BAN-to-Cart, run on the store's page. ABU was measured
+against a real account on 2026-10-07, CSI, Strike Zone and Hareruya
+against a guest cart and SCG and Mint against a real account on
+2026-10-09, Card Kingdom against a guest cart on 2026-10-10, and Mint's
+store and Mana Pool against a guest cart on 2026-10-13.
 
 ## ABU: the calls
 
@@ -202,6 +203,42 @@ https://www.mtgmintcard.com/ajax_index.php?ajax_main_page=ajax_shopping_cart
 | an id out of stock, buylist-only or unknown | skipped quietly, 200 |
 | quantity 0 | row removed |
 
+## Mana Pool: the optimizer
+
+Mana Pool's cart holds sellers' listings, not products, so a list goes
+through its public optimizer first, the call its own Optimize button
+makes (`/api/docs/v1` has it):
+
+```
+POST https://manapool.com/api/v1/buyer/optimizer
+{"model": "lowest_price", "cart": [{"type": "product", "product_type": "mtg_single",
+  "product_ids": ["088072ea-66c7-4ef2-86a2-fd90055698a8"], "quantity_requested": 2}]}
+```
+
+- The id is the `product_id` of Mana Pool's variants feed, one card,
+  condition, finish and language, which go-mtgban's `manapool` scraper
+  stores as `InstanceID` on each singles row. Sealed and the index split
+  carry none: the optimizer needs to be told a product's type.
+- It answers a guest too, with `{"cart": [{"inventory_id", "quantity_selected"}]}`,
+  the cheapest listings that fill each line, in 0.34 s for two lines.
+- A line it cannot fill fails the whole call with a 409 whose `details`
+  name each such line by `item.index`, with `total_available`. The loader
+  asks again with those lines cut to what Mana Pool has, or without them.
+  The optimizer takes at most 2,000 lines a call.
+- The cart is the browser's `manapool-cart` in `localStorage`, version 5:
+  `cart.entries` of `{inventoryId, quantitySelected, source,
+  optimizerTouched}` and a `changes` queue of `[inventoryId, delta,
+  source, optimizerTouched]`, from which Mana Pool syncs a signed-in
+  user's cart. The loader adds each listing to both, as Mana Pool's own
+  add does, reading the cart again just before it writes, and reloads the
+  page; a cart in another version is left alone. The optimizer is not told
+  what the cart holds, so a load adds to it rather than setting it, and
+  the report says so.
+- The mass entry the "Mass entry at Mana Pool" button opens
+  (`/add-deck?deck=<base64 list>`) matches names, set and number only: a
+  line for the Oath of the Gatewatch promo in LP foil came back as a 15¢
+  near mint nonfoil Foundations copy.
+
 ## Strike Zone: the CSV import
 
 Strike Zone buys and sells through one cart, whose Tools menu has a CSV
@@ -362,18 +399,21 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's and
-Mint's buylist and store splits, and SCG's buylist splits. CSI's store
-button sits beside its deck builder button, which posts only names. SCG's
+the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's
+and Mint's buylist and store splits, Mana Pool's store split,
+and SCG's buylist splits. CSI's store button sits beside its deck builder
+button, and Mana Pool's beside its mass entry button, both of which post
+only names. SCG's
 store side and CK's buylist already have their own imports. Card Kingdom's
 store split gets no button for now, though the bookmarklet still fills its
 cart: a load logged a signed-in user out, and the cause is not known yet. The arbit and reverse pages give
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
 store sells it in (`cartLoadForArbit`). Mint's feed caps its stock at
-8, so Mint's store button asks for what the buylist takes, or 999 where
-the buylist names no amount, and Mint trims it to what it has; the link
-carries those quantities (`data-load-qtys`) for the rows left ticked. The global page compares two
+8 and Mana Pool's gives none (`cartAsksMost`), so their store buttons ask
+for what the buylist takes, or 999 where the buylist names no amount, and
+the store trims it to what it has; the link carries those quantities
+(`data-load-qtys`) for the rows left ticked. The global page compares two
 stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.
@@ -415,7 +455,7 @@ the section's, as `scraperCompare` picks its seller.
   pressed, holding the loader to drag to the bookmarks bar:
   `js/ban-to-cart.js` as a `javascript:` link (`cart_bookmarklet`),
   without its indentation, blank lines and whole-line comments
-  (`stripLoader`), which keeps it under half of Firefox's limit of 65,536
+  (`stripLoader`), which keeps it well under Firefox's limit of 65,536
   characters on a bookmark's URL. It
   says to click the bookmark after the store's page loads, since nothing
   on that page can. Its Continue @ store button continues to the store, and
@@ -438,6 +478,10 @@ loader finds missing, sends the user back to BAN to press the button
 again.
 On SCG it then uploads the list as one CSV, says what BAN left out of it,
 if anything, and opens SCG's review of it.
+On Mana Pool it asks the optimizer for the list, again with the cards it
+has fewer of cut to that and the ones it has none of left out, adds the
+listings it answers with to the cart, says what it cut and left out, and
+reloads the cart.
 On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
@@ -496,6 +540,9 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
   the same for Strike Zone.
 - Whether a Mint guest's store cart follows the user when they log in;
   the loader asks for the login first.
+- Mana Pool's cart for a signed-in user: whether the queued changes the
+  loader adds reach the account's cart, as they do for Mana Pool's own
+  adds, or the account's copy replaces them.
 - How long Strike Zone's call limit lasts, and whether calls made while it
   holds lengthen it.
 - Strike Zone codes with an item of other than five or six digits, which

@@ -11,8 +11,8 @@ import (
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
 // one item id per condition, CSI's buylist and sealed buylist, SCG's
-// buylist, both sides of Mint, Strike Zone and Hareruya, and a store the
-// bookmarklet does not fill.
+// buylist, both sides of Mint, Strike Zone and Hareruya, Mana Pool's store,
+// and a store the bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -71,6 +71,10 @@ func stubCartStores(t *testing.T) {
 	ckGraded.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 50, OriginalID: "555001"})
 	szStock := mtgban.InventoryRecord{}
 	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
+	// Mana Pool's product ids name one condition and finish each
+	mpStock := mtgban.InventoryRecord{}
+	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.5, InstanceID: "001229ab-da01-4346-91f9-23c145cd23c5"})
+	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.4, InstanceID: "088072ea-66c7-4ef2-86a2-fd90055698a8"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 	// CSI's store cart takes a product id and the row id of its condition
@@ -102,6 +106,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(ckGraded, mtgban.ScraperInfo{Shorthand: "CKGraded"}),
 		mtgban.NewSellerFromInventory(csiStock, mtgban.ScraperInfo{Shorthand: "CSI"}),
 		mtgban.NewSellerFromInventory(mintStock, mtgban.ScraperInfo{Shorthand: "MMC"}),
+		mtgban.NewSellerFromInventory(mpStock, mtgban.ScraperInfo{Shorthand: "MP"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -138,6 +143,7 @@ func TestCartRows(t *testing.T) {
 		{"SCG", true, "SGL-A1:4"},
 		{"MMC", true, "8137:4"},
 		{"MMC", false, "283193:3,663174:1"},
+		{"MP", false, "001229ab-da01-4346-91f9-23c145cd23c5:3,088072ea-66c7-4ef2-86a2-fd90055698a8:1"},
 		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
 		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
 		// Each condition its own class in the store, one class on the buylist
@@ -201,6 +207,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"MMC", false, `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
+		{"MP", false, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
@@ -329,6 +336,21 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	if !strings.Contains(mint, mintSell) {
 		t.Errorf("buying at Mint: no buylist cart button with %s", mintSell)
 	}
+	// Mana Pool's feed gives no stock, so its cart asks the same way, beside
+	// its mass entry form, told apart from it
+	mp := renderArbit(t, PageVars{
+		ScraperShort: "MP",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
+	})
+	mpBuy := `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:999,088072ea-66c7-4ef2-86a2-fd90055698a8:20&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool" data-buylist="false" data-load-list="cart" data-load-items="001229ab-da01-4346-91f9-23c145cd23c5,088072ea-66c7-4ef2-86a2-fd90055698a8" data-load-qtys="999,20"`
+	if !strings.Contains(mp, mpBuy) {
+		t.Errorf("buying at Mana Pool: no store cart button with %s", mpBuy)
+	}
+	if strings.Count(mp, ">Load at Mana Pool<") != 1 || !strings.Contains(mp, `class="arb-load-btn builder"`) || !strings.Contains(mp, ">Mass entry at Mana Pool<") {
+		t.Error("Mana Pool's mass entry button is not told apart from its cart's")
+	}
+
 	// Other stores' carts carry the page's quantities
 	if strings.Contains(ck+csi, "data-load-qtys") {
 		t.Error("a cart other than Mint's store asks its own quantities")
@@ -489,7 +511,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 	stubCartStores(t)
 	saved := affiliatesPtr.Load()
 	t.Cleanup(func() { affiliatesPtr.Store(saved) })
-	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused"}})
+	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused", "MP": "banmp"}})
 	entries := []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}}
 
 	for _, tc := range []struct {
@@ -499,6 +521,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 	}{
 		{"MMC", true, "https://www.mtgmintcard.com/buylist-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"MMC", false, "https://www.mtgmintcard.com/shopping-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
+		{"MP", false, "https://manapool.com/cart?ref=banmp#ban="},
 		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
 		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="},
 		// A store with no affiliate query keeps its plain page

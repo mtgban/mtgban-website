@@ -77,7 +77,7 @@ function fakeLocks() {
 }
 
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false, locks = null} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false, locks = null, stored = {}} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
     if (hash && version !== null) {
@@ -85,8 +85,13 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', search = 
     }
     const location = {hostname: host, pathname: path, search, hash, reload: () => { page.reloaded = true; }};
     page.location = location;
-    const storage = {isLoggedIn: loggedIn ? 'true' : 'false', 'accessToken-ABU': 'abc'};
-    const localStorage = {getItem: (key) => storage[key] ?? null};
+    const storage = {isLoggedIn: loggedIn ? 'true' : 'false', 'accessToken-ABU': 'abc', ...stored};
+    const localStorage = {getItem: (key) => storage[key] ?? null, setItem: (key, value) => { storage[key] = String(value); }};
+    page.storage = storage;
+    // A store whose page changes it mid-load gets to reach it
+    if (abu.attach) {
+        abu.attach(page);
+    }
     const document = {
         createElement: () => ({style: {}, remove() {}}),
         body: {appendChild() {}},
@@ -451,6 +456,105 @@ describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
             expect(alerts[0]).toBe('This is not the MTG Mint Card cart the list is for. Go back to BAN and press its button again.');
             expect(mint.posts).toHaveLength(0);
         }
+    });
+});
+
+// fakeMP stands in for Mana Pool's optimizer: it fills each product line
+// from the listings stock holds, cheapest first, or refuses the whole call
+// with a 409 naming every line it cannot fill and what it has, as Mana Pool
+// does.
+function fakeMP({stock = {}, meanwhile = null} = {}) {
+    const posts = [];
+    let page;
+    const fetch = async (url, opts = {}) => {
+        const body = JSON.parse(opts.body);
+        posts.push({url, body});
+        if (meanwhile) {
+            meanwhile(page.storage);
+        }
+        const details = [];
+        const cart = [];
+        body.cart.forEach((line, index) => {
+            const listings = stock[line.product_ids[0]] || [];
+            const have = listings.reduce((n, l) => n + l.qty, 0);
+            if (have < line.quantity_requested) {
+                details.push({item: {...line, index}, total_available: have, reason: have ? 'insufficient_quantity' : 'no_candidates'});
+                return;
+            }
+            let want = line.quantity_requested;
+            for (const listing of listings) {
+                const take = Math.min(want, listing.qty);
+                if (take > 0) {
+                    cart.push({inventory_id: listing.id, quantity_selected: take});
+                    want -= take;
+                }
+            }
+        });
+        if (details.length > 0) {
+            return {ok: false, status: 409, json: async () => ({status: 409, message: 'Could not find inventory to satisfy request', details})};
+        }
+        return {ok: true, status: 200, json: async () => ({cart, totals: {}})};
+    };
+    return {fetch, posts, attach: (p) => { page = p; }};
+}
+
+describe('ban-to-cart bookmarklet on Mana Pool', () => {
+    const cartPage = {host: 'manapool.com', path: '/cart'};
+    const cart = (entries, changes = []) => JSON.stringify({version: 5, revision: '00000000-0000-4000-8000-000000000000', cart: {entries}, changes});
+
+    test('the optimizer\'s listings go into the cart the way Mana Pool adds them', async () => {
+        const mp = fakeMP({stock: {'p-1': [{id: 'inv-a', qty: 1}, {id: 'inv-b', qty: 5}], 'p-2': [{id: 'inv-c', qty: 9}]}});
+        const held = cart([{inventoryId: 'inv-c', quantitySelected: 1, source: 'browse', optimizerTouched: false}]);
+        const {alerts, page, posts} = await run({...cartPage, hash: '#ban=p-1%3a3%2cp-2%3a2&side=retail', abu: mp, stored: {'manapool-cart': held}});
+        expect(posts).toHaveLength(1);
+        expect(posts[0].url).toBe('/api/v1/buyer/optimizer');
+        expect(posts[0].body.cart).toEqual([
+            {type: 'product', product_type: 'mtg_single', product_ids: ['p-1'], quantity_requested: 3},
+            {type: 'product', product_type: 'mtg_single', product_ids: ['p-2'], quantity_requested: 2},
+        ]);
+        const stored = JSON.parse(page.storage['manapool-cart']);
+        expect(stored.cart.entries).toEqual([
+            {inventoryId: 'inv-c', quantitySelected: 3, source: 'browse', optimizerTouched: false},
+            {inventoryId: 'inv-a', quantitySelected: 1, source: 'optimizer', optimizerTouched: true},
+            {inventoryId: 'inv-b', quantitySelected: 2, source: 'optimizer', optimizerTouched: true},
+        ]);
+        expect(stored.changes).toEqual([['inv-a', 1, 'optimizer', true], ['inv-b', 2, 'optimizer', true], ['inv-c', 2, 'optimizer', true]]);
+        expect(alerts).toEqual(['Added 2 cards to your Mana Pool cart, on top of what it held.']);
+        expect(page.url).toBe('/cart');
+        expect(page.reloaded).toBe(true);
+        expect(page.guarded.reload).toBe(false);
+    });
+
+    test('a card Mana Pool has fewer of goes at what it has, and one it has none of is left out', async () => {
+        const mp = fakeMP({stock: {'p-1': [{id: 'inv-a', qty: 2}], 'p-2': [{id: 'inv-c', qty: 9}]}});
+        const {alerts, page, posts} = await run({...cartPage, hash: '#ban=p-1:999,p-2:1,p-9:1&side=retail&skip=1', abu: mp});
+        expect(posts.map((p) => p.body.cart.map((l) => [l.product_ids[0], l.quantity_requested]))).toEqual([
+            [['p-1', 999], ['p-2', 1], ['p-9', 1]],
+            [['p-1', 2], ['p-2', 1]],
+        ]);
+        expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => [e.inventoryId, e.quantitySelected])).toEqual([['inv-a', 2], ['inv-c', 1]]);
+        expect(alerts).toEqual(['Added 2 cards to your Mana Pool cart, on top of what it held. 1 were cut to the copies Mana Pool has. ' +
+            '1 that Mana Pool has none of were left out. 1 on BAN have no Mana Pool item and were left out.']);
+    });
+
+    test('a change made to the cart while the optimizer answers is kept', async () => {
+        const mp = fakeMP({
+            stock: {'p-1': [{id: 'inv-a', qty: 2}]},
+            meanwhile: (storage) => {
+                storage['manapool-cart'] = cart([{inventoryId: 'inv-z', quantitySelected: 1, source: 'browse', optimizerTouched: false}]);
+            },
+        });
+        const {page} = await run({...cartPage, hash: '#ban=p-1:1&side=retail', abu: mp});
+        expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => e.inventoryId)).toEqual(['inv-z', 'inv-a']);
+    });
+
+    test('a cart kept in a way the loader does not know is left alone', async () => {
+        const mp = fakeMP({stock: {'p-1': [{id: 'inv-a', qty: 2}]}});
+        const held = JSON.stringify({version: 6, cart: {lines: []}});
+        const {alerts, page, posts} = await run({...cartPage, hash: '#ban=p-1:1&side=retail', abu: mp, stored: {'manapool-cart': held}});
+        expect(alerts[0]).toContain('Nothing was loaded');
+        expect(posts).toHaveLength(0);
+        expect(page.storage['manapool-cart']).toBe(held);
     });
 });
 
