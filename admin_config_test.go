@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,16 +43,23 @@ func TestAdminConfigSaveGetsDefaultsAndRegistry(t *testing.T) {
 	// and the published ones stay.
 	aclPath := filepath.Join(filepath.Dir(path), "acl.json")
 	grantsPath := filepath.Join(filepath.Dir(path), "grants.json")
+	datasetsPath := filepath.Join(filepath.Dir(path), "datasets.json")
+	err = os.WriteFile(datasetsPath, []byte(`[{"public_name": "TCGplayer Low", "provider": 1}]`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	savedDatasets := datasetsPtr.Load()
+	t.Cleanup(func() { datasetsPtr.Store(savedDatasets) })
 	saveConfigText(fmt.Sprintf(`{
 		"port": "9000",
 		"datastore_path": "saved.json.xz",
 		"acl_path": %q,
 		"patreon_grants_path": %q,
-		"timeseries_config": {"datasets": [{"public_name": "TCGplayer Low", "provider": 1}]}
-	}`, aclPath, grantsPath))
+		"datasets_path": %q
+	}`, aclPath, grantsPath, datasetsPath))
 
-	if len(Config().TimeseriesConfig.Datasets) != 1 {
-		t.Fatalf("datasets %+v: the save did not take", Config().TimeseriesConfig.Datasets)
+	if Config().DatasetsPath != datasetsPath {
+		t.Fatalf("datasets path %q: the save did not take", Config().DatasetsPath)
 	}
 	for _, c := range []struct{ name, got, want string }{
 		{"game, which the text left out", string(Config().Game), string(DefaultGame)},

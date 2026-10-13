@@ -24,25 +24,24 @@ func withDatasetsConfig(t *testing.T, path string) {
 	Config().DatasetsPath = path
 }
 
-// With no path configured the datasets are the config's own.
-func TestDatasetsWithoutAPathAreTheConfigs(t *testing.T) {
+// With no path configured there are no datasets, even ones read from a path
+// the config named before.
+func TestDatasetsWithoutAPathAreNone(t *testing.T) {
 	withDatasetsConfig(t, "")
-	Config().TimeseriesConfig = TimeseriesConfig{Datasets: []DatasetConfig{
-		{PublicName: "Inline", Provider: 3},
-	}}
+	datasetsPtr.Store(&[]DatasetConfig{{PublicName: "Stale", Provider: 3}})
 
 	err := loadDatasets(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := Datasets()
-	if len(got) != 1 || got[0].PublicName != "Inline" {
-		t.Errorf("datasets did not come from the config: %+v", got)
+	if got != nil {
+		t.Errorf("datasets %+v with no path, want none", got)
 	}
 }
 
-// A configured path wins over the config's datasets, and the chart providers
-// are rebuilt from the file.
+// The datasets come from the configured path, and the chart providers are
+// rebuilt from the file.
 func TestLoadDatasetsReadsThePath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "datasets.json")
 	data := []byte(`[{"retail": ["TCGMarket"], "public_name": "TCGplayer Market", "index": 3, "provider": 4, "color": "rgb(255, 159, 64)"}]`)
@@ -52,9 +51,6 @@ func TestLoadDatasetsReadsThePath(t *testing.T) {
 	}
 
 	withDatasetsConfig(t, path)
-	Config().TimeseriesConfig = TimeseriesConfig{Datasets: []DatasetConfig{
-		{PublicName: "Inline", Provider: 3},
-	}}
 	err = loadDatasets(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -149,8 +145,10 @@ func TestAdminDatasetsUpdateNeedsAPath(t *testing.T) {
 	if strings.Contains(out, update) {
 		t.Error("Update offered with no datasets path")
 	}
-	if !strings.Contains(out, "timeseries_config.datasets (read-only)") {
-		t.Error("tab does not say the config's datasets are read-only")
+	panel := out[strings.Index(out, `id="panel-datasets"`):]
+	panel = panel[:strings.Index(panel, `class="admin-panel`)]
+	if !strings.Contains(panel, "not configured") {
+		t.Error("tab does not say no datasets file is configured")
 	}
 	if !readOnly.MatchString(out) {
 		t.Error("editor is editable with no datasets path")

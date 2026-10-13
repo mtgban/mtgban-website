@@ -10,8 +10,8 @@ A single-card chart draws one line per *provider series* from the price
 archive, not per scraper. On the long-form read, `chartDatasetsFrom`
 (chart.go) emits one dataset per provider in `providerRegistry` with
 prices in the requested window, in registry order, named by the
-provider's `public_name` from `timeseries_config.datasets`
-(`buildProviderRegistry`). So the list differs from card to card, and
+provider's `public_name` from the datasets file (`datasets_path`,
+`buildProviderRegistry`). So the list differs from card to card, and
 between the window the page first renders (`chartInitialRange`: the
 viewer's last range, else 180 days) and a wider one fetched later from
 `/data/chart` (`ChartRangeLoader` in js/chart-range.js; the single-card
@@ -86,7 +86,7 @@ through `ProviderTCGDirectLow`, defined in timeseries/variants.go), with
 no scraper at all. A series has exactly one name, but zero, one, or
 several shorthands.
 
-**Provider id** (`provider` in `timeseries_config.datasets`, which is
+**Provider id** (`provider` in the datasets file, which is
 `providers.id` in the archive) is the sturdiest key: unique per series
 (`buildProviderRegistry` drops a repeated id), shared across games, and
 unaffected by editing a `public_name`. But the page is never sent it:

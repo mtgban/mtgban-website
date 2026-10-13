@@ -331,17 +331,20 @@ func TestMergeMultiCardDatasetsCardWithNoDatasetsSkipsPaletteSlot(t *testing.T) 
 	}
 }
 
-// withDatasets swaps in a dataset config for the duration of a test, restoring
-// both it and the derived provider registry afterwards.
+// withDatasets publishes datasets as if read from a datasets file for the
+// duration of a test, restoring the config, the published datasets and the
+// derived provider registry afterwards.
 func withDatasets(t *testing.T, datasets []DatasetConfig) {
 	t.Helper()
-	prevConfig := Config().TimeseriesConfig
+	withConfigCopy(t)
+	prevDatasets := datasetsPtr.Load()
 	prevRegistry := chartProviders()
 	t.Cleanup(func() {
-		Config().TimeseriesConfig = prevConfig
+		datasetsPtr.Store(prevDatasets)
 		providerRegistry.Store(&prevRegistry)
 	})
-	Config().TimeseriesConfig = TimeseriesConfig{Datasets: datasets}
+	Config().DatasetsPath = "datasets.json"
+	datasetsPtr.Store(&datasets)
 }
 
 // The config owns the whole display: which providers chart, under what name and

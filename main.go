@@ -123,7 +123,7 @@ type ConfigType struct {
 	// the data, not the code. AffiliatesPath does the same for the
 	// affiliate data, which every game shares: a store a game doesn't
 	// carry never matches its list entries. DatasetsPath names the chart
-	// datasets' file; with none, timeseries_config.datasets is read.
+	// datasets' file; with none, nothing charts.
 	// InfrastructurePath names the infrastructure file. These locate the
 	// files; see common.go for the readers and writers.
 	ACLPath            string `json:"acl_path"`
@@ -435,9 +435,9 @@ func applyOverrides(config *ConfigType, port, datastorePath, aclPath, grantsPath
 }
 
 // finishConfig defaults what a newly loaded config left unset and makes it
-// the live one, whole; then it rebuilds the chart provider registry from it,
-// unless loadDatasets reads the datasets from their own file, and defaults
-// BAN_SECRET when the environment has none.
+// the live one, whole; it empties the chart provider registry until
+// loadDatasets has read a datasets file, and defaults BAN_SECRET when the
+// environment has none.
 func finishConfig(config ConfigType) {
 	if config.Port == "" {
 		log.Println("Server port not configured, listening on", DefaultServerPort)
@@ -451,6 +451,9 @@ func finishConfig(config ConfigType) {
 		log.Println("Datastore path not configured, using", DefaultDatastorePath)
 		config.DatastorePath = DefaultDatastorePath
 	}
+	if config.DatasetsPath == "" {
+		log.Println("Datasets path not configured, charts disabled")
+	}
 	if config.Mail.From == "" {
 		config.Mail.From = DefaultMailFrom
 	}
@@ -458,10 +461,7 @@ func finishConfig(config ConfigType) {
 
 	liveConfig.Store(&config)
 
-	if config.DatasetsPath == "" {
-		buildProviderRegistry()
-	} else if datasetsPtr.Load() == nil {
-		// Nothing read from the file yet, so nothing charts until loadDatasets does.
+	if config.DatasetsPath == "" || datasetsPtr.Load() == nil {
 		providerRegistry.Store(&[]providerDisplay{})
 	}
 
