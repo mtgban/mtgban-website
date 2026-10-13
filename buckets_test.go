@@ -4,13 +4,11 @@ import "testing"
 
 // The config bucket's key pair is in the environment rather than the config
 // file, so it can never be a bucket_keys entry — which is why it needs an
-// answer of its own, ahead of the datastore fallback.
+// answer of its own. A bucket with neither gets no pair.
 func TestBucketCredentials(t *testing.T) {
 	withConfigCopy(t)
 
 	Config().sourcePath = "b2://mtgban-config/pokemon/config.json"
-	Config().Datastore.BucketAccessKey = "datastore-key"
-	Config().Datastore.BucketSecretKey = "datastore-secret"
 	Config().BucketKeys = map[string]BucketKey{
 		"mtgban-images": {AccessKey: "images-key", AccessSecret: "images-secret"},
 	}
@@ -24,8 +22,8 @@ func TestBucketCredentials(t *testing.T) {
 	}{
 		{"the config bucket, read with the pair the config itself was", "mtgban-config", "config-key", "config-secret"},
 		{"a bucket_keys entry wins over both", "mtgban-images", "images-key", "images-secret"},
-		{"anything else falls back to the datastore", "mtgban-dumps", "datastore-key", "datastore-secret"},
-		{"an empty name is not the config bucket", "", "datastore-key", "datastore-secret"},
+		{"anything else gets no pair", "mtgban-dumps", "", ""},
+		{"an empty name is not the config bucket", "", "", ""},
 	}
 
 	for _, test := range tests {
@@ -45,8 +43,6 @@ func TestBucketCredentialsLocalConfig(t *testing.T) {
 
 	Config().sourcePath = "config.json"
 	Config().BucketKeys = nil
-	Config().Datastore.BucketAccessKey = "datastore-key"
-	Config().Datastore.BucketSecretKey = "datastore-secret"
 	t.Setenv("BAN_CONFIG_KEY", "config-key")
 	t.Setenv("BAN_CONFIG_SECRET", "config-secret")
 
@@ -54,7 +50,7 @@ func TestBucketCredentialsLocalConfig(t *testing.T) {
 		t.Errorf("configBucketName() = %q, want empty for a local path", name)
 	}
 	key, _ := bucketCredentials("mtgban-config")
-	if key != "datastore-key" {
-		t.Errorf("got %q, want the datastore key", key)
+	if key != "" {
+		t.Errorf("got %q, want no key", key)
 	}
 }
