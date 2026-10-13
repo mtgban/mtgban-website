@@ -94,7 +94,7 @@ func (s *site) scheduleCrons() *cron.Cron {
 
 	// Reload DB Newspaper every 3 hours, TCGplayer's copies sold a day after it.
 	// refreshNewspaper tracks each as its own job.
-	newspaperSchedule, err := cron.Parse("33 */3 * * *")
+	newspaperSchedule, err := cron.Parse(newsCron)
 	if err != nil {
 		log.Fatalln("cron", jobNewspaper, err)
 	}
