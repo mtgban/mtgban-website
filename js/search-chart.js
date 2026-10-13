@@ -270,10 +270,60 @@ if (window.BAN_SEARCH_CHART.multi) {
     (function() {
         var legendEl = document.getElementById('chartLegend');
         if (!legendEl) return;
+
+        // The entry's own art floats below the legend, under the entry and
+        // clear of the others, styled as the arbit and news tables' hover
+        // image. On body: the chart container's backdrop-filter would make
+        // it the positioning parent.
+        var art = document.createElement('div');
+        art.className = 'foil-wrap hoverWrap';
+        var artImg = document.createElement('img');
+        artImg.className = 'hoverImage';
+        artImg.alt = '';
+        art.appendChild(artImg);
+        document.body.appendChild(art);
+        var artItem = null;
+
+        function placeArt() {
+            if (!artItem) return;
+            var r = artItem.getBoundingClientRect();
+            var legend = legendEl.getBoundingClientRect();
+            var w = artImg.offsetWidth, h = artImg.offsetHeight;
+            var top = legend.bottom + 6;
+            if (top + h > window.innerHeight && legend.top - h - 6 >= 0) top = legend.top - h - 6;
+            var left = Math.max(0, Math.min(r.left, window.innerWidth - w - 6));
+            art.style.left = (left + window.pageXOffset) + 'px';
+            art.style.top = (top + window.pageYOffset) + 'px';
+        }
+        artImg.addEventListener('load', placeArt);
+
+        function showArt(item, row) {
+            var data = row && window.hoverDataFor(row);
+            if (!data) return hideArt();
+            var a = data.args;
+            art.setAttribute('data-foil', a[1]);
+            art.setAttribute('data-etched', a[2]);
+            art.setAttribute('data-set', a[3]);
+            art.setAttribute('data-date', a[6]);
+            art.setAttribute('data-name', a[7]);
+            art.classList.toggle('content-warning', !!a[4]);
+            artItem = item;
+            placeArt();
+            window.setCardArtSource(artImg, httpURL(a[0]));
+        }
+        function hideArt() {
+            artItem = null;
+            window.setCardArtSource(artImg, window.cardArtPlaceholder);
+        }
+
         var lastHoverId = null;
         legendEl.addEventListener('mouseover', function(e) {
             var item = e.target.closest('.chart-legend-item[data-card-id]');
-            if (!item) return;
+            if (!item) {
+                lastHoverId = null;
+                hideArt();
+                return;
+            }
             var cardId = item.getAttribute('data-card-id');
             if (cardId === lastHoverId) return;
             lastHoverId = cardId;
@@ -282,8 +332,12 @@ if (window.BAN_SEARCH_CHART.multi) {
             // not data-card-id.
             var row = document.querySelector('.result-header[data-chart-id="' + cardId + '"]');
             if (row) window.showHoverFor(row, true);
+            showArt(item, row);
         });
-        legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
+        legendEl.addEventListener('mouseleave', function() {
+            lastHoverId = null;
+            hideArt();
+        });
     })();
 } else {
     // Load state from local storage
