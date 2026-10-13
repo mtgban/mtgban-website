@@ -88,8 +88,6 @@ type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
-		BucketAccessKey string `json:"bucket_access_key"`
-		BucketSecretKey string `json:"bucket_access_secret"`
 		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
 	Offline struct {
