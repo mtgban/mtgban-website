@@ -4,16 +4,17 @@ Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
 buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
 and both calls take a list. MTG Mint Card and Card Kingdom's store have the
-same kind of call, one card at a time, and Hareruya both: a form that takes
-a whole store list, and one call per card for its buylist. Mana Pool's public optimizer
+same kind of call, one card at a time, and so does Manaleak, after a read
+of the card's page; Hareruya has both: a form that takes a whole store
+list, and one call per card for its buylist. Mana Pool's public optimizer
 takes a whole list and answers with the listings to put in its cart.
 Star City Games and Strike Zone have a CSV import, but no way to hand it a
-list from another site. The upload page reaches all eight through one
+list from another site. The upload page reaches all nine through one
 bookmarklet, BAN-to-Cart, run on the store's page. ABU was measured
 against a real account on 2026-10-07, CSI, Strike Zone and Hareruya
 against a guest cart and SCG and Mint against a real account on
 2026-10-09, Card Kingdom against a guest cart on 2026-10-10, and Mint's
-store and Mana Pool against a guest cart on 2026-10-13.
+store, Mana Pool and Manaleak against a guest cart on 2026-10-13.
 
 ## ABU: the calls
 
@@ -239,6 +240,43 @@ POST https://manapool.com/api/v1/buyer/optimizer
   line for the Oath of the Gatewatch promo in LP foil came back as a 15¢
   near mint nonfoil Foundations copy.
 
+## Manaleak: the forms
+
+Manaleak sells each condition of a card as an option of one product, and
+buys it under the same product:
+
+```
+POST /index.php?route=checkout/cart/add   product_id=7090  quantity=2         option[7090]=35446
+POST /index.php?route=buylist/cart/add    product_id=7090  buylist_quantity=2 option[7090]=35446
+```
+
+- The id is the `product_id` every listing row's link carries, which
+  go-mtgban's `manaleak` scraper stores as `InstanceID` on both sides.
+  It prices Near Mint only, so the loader adds Near Mint.
+- The option's field and value differ per product (`option[165360]=824434`
+  on 178453), so the loader reads each card's page for its "Mint/Near Mint"
+  option first, and in the store for its "Qty:" too. That HTML breaks
+  lines inside a tag. A product with no such option is left out.
+- Both adds refuse a line with no option ("Card Condition required!").
+- The carts are kept by Manaleak's session cookie, guests included. Each
+  cart page (`route=checkout/cart`, `route=buylist/cart`) lists a
+  `quantity[<product id>:<base64 options>:]` field per line, the options
+  PHP-serialized (`a:1:{i:7090;s:5:"35446";}`); posting those fields to
+  the page sets the quantities, and `&remove=<key>` drops a line.
+- A product id names a row on both sides, so the loader stops before
+  sending anything when the link's `side=retail` and the cart page
+  disagree.
+- An add adds to a line, so a load holds `ban-to-cart-ml`, a lock
+  Manaleak's tabs share, as CSI's does, and counts a card as loaded only
+  when its Near Mint line is in the cart.
+
+| Sent | Result |
+|---|---|
+| an add | 0.17 to 0.46 s, the page read about as long |
+| a card already in the cart | quantity added to, so the loader sets it through the cart form instead |
+| more than the store has | kept, marked *** at checkout, so the loader trims to the page's "Qty:" |
+| an out of stock card | left out by the loader |
+
 ## Strike Zone: the CSV import
 
 Strike Zone buys and sells through one cart, whose Tools menu has a CSV
@@ -399,8 +437,8 @@ uploads page offers takes the whole list and prices it itself:
 ## What the site does
 
 Each store split the upload optimizer lists gets a "Load at" button where
-the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's
-and Mint's buylist and store splits, Mana Pool's store split,
+the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's,
+Mint's and Manaleak's buylist and store splits, Mana Pool's store split,
 and SCG's buylist splits. CSI's store button sits beside its deck builder
 button, and Mana Pool's beside its mass entry button, both of which post
 only names. SCG's
@@ -482,7 +520,7 @@ On Mana Pool it asks the optimizer for the list, again with the cards it
 has fewer of cut to that and the ones it has none of left out, adds the
 listings it answers with to the cart, says what it cut and left out, and
 reloads the cart.
-On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
+On ABU, CSI, Mint, Manaleak, Strike Zone, Hareruya and Card Kingdom it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
@@ -496,7 +534,9 @@ On ABU, CSI, Mint, Strike Zone, Hareruya and Card Kingdom it:
    buylist, 50 for ABU's store so each request finishes in under a
    minute, 100 for CSI, and one at a time for Mint, 0.4 to 1 s each,
    stopping before sending anything when the link's `side=retail` and
-   Mint's cart page disagree;
+   Mint's cart page disagree; 10 for Manaleak, each card a read of its page
+   and an add, or for a card already in the cart one form setting it,
+   with the same stop;
    on Strike Zone, 300 per CSV import, under `Buy #` or, for a link that
    says `side=retail`, `Sell #`, after cards through their links until one
    stays when the cart is empty, since Strike Zone skips a card it no
@@ -543,6 +583,8 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
 - Mana Pool's cart for a signed-in user: whether the queued changes the
   loader adds reach the account's cart, as they do for Mana Pool's own
   adds, or the account's copy replaces them.
+- Whether a Manaleak guest's carts follow the user at login, and what its
+  buylist does above what it wants.
 - How long Strike Zone's call limit lasts, and whether calls made while it
   holds lengthen it.
 - Strike Zone codes with an item of other than five or six digits, which

@@ -18,6 +18,8 @@
         store = mintStore();
     } else if (location.hostname === "manapool.com") {
         store = mpStore();
+    } else if (location.hostname === "www.manaleak.com") {
+        store = mlStore();
     } else if (location.hostname === "shop.strikezoneonline.com") {
         store = szStore();
     } else if (location.hostname === "www.hareruyamtg.com") {
@@ -604,6 +606,128 @@
                 alert(message + leftOut());
                 history.replaceState(null, "", location.pathname + location.search);
                 location.reload();
+            }
+        };
+    }
+
+    // mlStore loads Manaleak's store cart, or its buylist cart on that
+    // cart's page, kept by its session cookie. Each card's page names the
+    // option its Near Mint copies go by and, in the store, how many it has;
+    // a card already in the cart gets the list's quantity through the cart
+    // form, and a new one is added in the store's own way.
+    function mlStore() {
+        var buylist = /[?&]route=buylist\//.test(location.search);
+        var retail = /[#&]side=retail(&|$)/.test(location.hash);
+        var route = buylist ? "buylist/cart" : "checkout/cart";
+        // The cart's lines by key, <product id>:<base64 options>:
+        var held = {};
+        // Each card's Near Mint option value once its page was read, null
+        // for a card with none
+        var nmValues = {};
+        async function post(url, body) {
+            var resp = await fetch(url, {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest"},
+                body: new URLSearchParams(body)
+            });
+            if (!resp.ok) {
+                throw new Error("Manaleak refused the list (" + resp.status + ").");
+            }
+            return resp.text();
+        }
+        // lineOptions is the options a cart line's key names, as Manaleak
+        // serializes them: a:1:{i:<option>;s:5:"<value>";}
+        function lineOptions(key) {
+            try {
+                return atob(key.split(":")[1] || "");
+            } catch (err) {
+                return "";
+            }
+        }
+        // nearMint reads a card's page for its Near Mint option: the field,
+        // the value, and the copies the store has, 0 when out of stock
+        async function nearMint(id) {
+            var resp = await fetch("/index.php?route=product/product&product_id=" + id);
+            if (!resp.ok) {
+                return null;
+            }
+            var page = await resp.text();
+            // Its HTML breaks lines inside a tag
+            var select = /<select\s+name="(option\[\d+\])">([\s\S]*?)<\/select>/.exec(page);
+            var option = select && /<option\s+value="(\d+)"[^>]*>\s*Mint\/Near Mint[^<]*/.exec(select[2]);
+            if (!option) {
+                return null;
+            }
+            var stock = /Qty:\s*(\d+)/.exec(option[0]);
+            return {field: select[1], value: option[1], stock: stock ? Number(stock[1]) : 0};
+        }
+        return {
+            name: "Manaleak",
+            // An add adds to a line, so two tabs would each add the same cards
+            lock: "ban-to-cart-ml",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            // A card takes a read of its page and one call, about 0.6 s
+            chunkSize: 10,
+            cartIDs: async function () {
+                // A product is sold and bought under the same id
+                if (retail === buylist) {
+                    throw new Error("This is not the Manaleak cart the list is for. Go back to BAN and press its button again.");
+                }
+                var resp = await fetch("/index.php?route=" + route);
+                if (!resp.ok) {
+                    throw new Error("Manaleak could not read your cart (" + resp.status + ").");
+                }
+                var page = await resp.text();
+                held = {};
+                var found = [];
+                var re = /name="quantity\[([^\]]+)\]"\s+value="(\d+)"/g;
+                var m;
+                while ((m = re.exec(page)) !== null) {
+                    held[m[1]] = Number(m[2]);
+                    // A card counts as held in Near Mint, once that is known
+                    var id = m[1].split(":")[0];
+                    if (!(id in nmValues) || (nmValues[id] !== null && lineOptions(m[1]).indexOf('"' + nmValues[id] + '"') >= 0)) {
+                        found.push(id);
+                    }
+                }
+                return found;
+            },
+            // Manaleak adds to a line rather than set it, and lets a store
+            // line pass its stock, so the loader trims to what it has
+            send: async function (chunk, qty) {
+                var update = {};
+                var updates = 0;
+                for (var i = 0; i < chunk.length; i++) {
+                    var id = chunk[i];
+                    var nm = await nearMint(id);
+                    nmValues[id] = nm ? nm.value : null;
+                    if (!nm) {
+                        continue;
+                    }
+                    var want = buylist ? qty[id] : Math.min(qty[id], nm.stock);
+                    if (want <= 0) {
+                        continue;
+                    }
+                    var key = Object.keys(held).find(function (k) {
+                        return k.split(":")[0] === id && lineOptions(k).indexOf('"' + nm.value + '"') >= 0;
+                    });
+                    if (key) {
+                        update["quantity[" + key + "]"] = String(want);
+                        updates++;
+                        continue;
+                    }
+                    var add = {product_id: id};
+                    add[buylist ? "buylist_quantity" : "quantity"] = String(want);
+                    add[nm.field] = nm.value;
+                    await post("/index.php?route=" + route + "/add", add);
+                }
+                if (updates > 0) {
+                    await post("/index.php?route=" + route, update);
+                }
+                return true;
             }
         };
     }

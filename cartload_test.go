@@ -11,8 +11,8 @@ import (
 
 // stubCartStores stands in ABU's buylist and one of its store splits, with
 // one item id per condition, CSI's buylist and sealed buylist, SCG's
-// buylist, both sides of Mint, Strike Zone and Hareruya, Mana Pool's store,
-// and a store the bookmarklet does not fill.
+// buylist, both sides of Mint, Strike Zone, Hareruya and Manaleak, Mana
+// Pool's store, and a store the bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -71,6 +71,11 @@ func stubCartStores(t *testing.T) {
 	ckGraded.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 50, OriginalID: "555001"})
 	szStock := mtgban.InventoryRecord{}
 	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
+	// Manaleak sells and buys a card under one product id
+	ml := mtgban.BuylistRecord{}
+	ml.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 0.1, InstanceID: "7090"})
+	mlStock := mtgban.InventoryRecord{}
+	mlStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.2, Quantity: 1, InstanceID: "7090"})
 	// Mana Pool's product ids name one condition and finish each
 	mpStock := mtgban.InventoryRecord{}
 	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.5, InstanceID: "001229ab-da01-4346-91f9-23c145cd23c5"})
@@ -96,6 +101,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewVendorFromBuylist(mint, mtgban.ScraperInfo{Shorthand: "MMC"}),
 		mtgban.NewVendorFromBuylist(sz, mtgban.ScraperInfo{Shorthand: "SZ"}),
 		mtgban.NewVendorFromBuylist(ha, mtgban.ScraperInfo{Shorthand: "HA"}),
+		mtgban.NewVendorFromBuylist(ml, mtgban.ScraperInfo{Shorthand: "ML"}),
 	}
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "ABUScans"}),
@@ -106,6 +112,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(ckGraded, mtgban.ScraperInfo{Shorthand: "CKGraded"}),
 		mtgban.NewSellerFromInventory(csiStock, mtgban.ScraperInfo{Shorthand: "CSI"}),
 		mtgban.NewSellerFromInventory(mintStock, mtgban.ScraperInfo{Shorthand: "MMC"}),
+		mtgban.NewSellerFromInventory(mlStock, mtgban.ScraperInfo{Shorthand: "ML"}),
 		mtgban.NewSellerFromInventory(mpStock, mtgban.ScraperInfo{Shorthand: "MP"}),
 	}
 	vendorsPtr.Store(&vendors)
@@ -143,6 +150,8 @@ func TestCartRows(t *testing.T) {
 		{"SCG", true, "SGL-A1:4"},
 		{"MMC", true, "8137:4"},
 		{"MMC", false, "283193:3,663174:1"},
+		{"ML", true, "7090:4"},
+		{"ML", false, "7090:3"},
 		{"MP", false, "001229ab-da01-4346-91f9-23c145cd23c5:3,088072ea-66c7-4ef2-86a2-fd90055698a8:1"},
 		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
 		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
@@ -207,6 +216,8 @@ func TestCartLoadButtons(t *testing.T) {
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"MMC", false, `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
+		{"ML", true, `href="https://www.manaleak.com/index.php?route=buylist/cart#ban=7090:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Manaleak"`},
+		{"ML", false, `href="https://www.manaleak.com/index.php?route=checkout/cart#ban=7090:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Manaleak"`},
 		{"MP", false, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
