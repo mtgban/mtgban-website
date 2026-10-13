@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -430,11 +431,7 @@ func TestLoadSalesVelocityRunsOnce(t *testing.T) {
 		release()
 		wg.Wait()
 	})
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.loadSalesVelocity()
-	}()
+	wg.Go(s.loadSalesVelocity)
 	select {
 	case <-f.entered:
 	case <-time.After(5 * time.Second):
@@ -442,12 +439,10 @@ func TestLoadSalesVelocityRunsOnce(t *testing.T) {
 	}
 
 	second := make(chan struct{})
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		s.loadSalesVelocity()
 		close(second)
-	}()
+	})
 	select {
 	case <-second:
 	case <-time.After(5 * time.Second):
@@ -457,6 +452,69 @@ func TestLoadSalesVelocityRunsOnce(t *testing.T) {
 		t.Errorf("got %d queries while one load ran, want 1", n)
 	}
 	release()
+}
+
+// counterspellProduct is a Counterspell printing whose TCGplayer id matches back to it as Normal.
+func counterspellProduct(t *testing.T, b *mtgmatcher.Backend) (cardID string, productID int64) {
+	t.Helper()
+	ids, err := b.SearchEquals("Counterspell")
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := salesVelocityMatcher(b)
+	for _, id := range ids {
+		co, err := b.GetUUID(id)
+		if err != nil || co.Foil || co.Etched {
+			continue
+		}
+		pid, err := strconv.ParseInt(co.Identifiers["tcgplayerProductId"], 10, 64)
+		if err == nil && match(pid, "Normal") == co.UUID {
+			return co.UUID, pid
+		}
+	}
+	t.Fatal("no Counterspell printing matches back from its TCGplayer id")
+	return "", 0
+}
+
+// TestLoadSalesVelocityPublishes files a load's sales under the matched card,
+// and a second run on the same sale day reads only the day.
+func TestLoadSalesVelocityPublishes(t *testing.T) {
+	skipWithoutDatastore(t)
+	cardID, productID := counterspellProduct(t, backend())
+	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+	lastSale := day.AddDate(0, 0, -1)
+	f := &fakeNewspaper{answer: func(query string) (*fakeRows, error) {
+		switch query {
+		case salesVelocityDayQuery:
+			return &fakeRows{cols: []string{"max"}, vals: [][]driver.Value{{day}}}, nil
+		case salesVelocityQuery:
+			return &fakeRows{cols: []string{"p", "v", "c", "o", "d", "x"}, vals: [][]driver.Value{
+				{productID, "Normal", int64(69), int64(31), int64(18), false},
+			}}, nil
+		}
+		return &fakeRows{cols: []string{"p", "v", "l"}, vals: [][]driver.Value{{productID, "Normal", lastSale}}}, nil
+	}}
+	s := withFakeNewspaper(t, f)
+	s.ds.Store(testSite.datastore())
+
+	s.loadSalesVelocity()
+	if n := len(f.seen()); n != 3 {
+		t.Fatalf("got %d queries, want the day, the window and the lookback", n)
+	}
+	got, found := salesVelocityFor(cardID)
+	want := salesVelocity{Copies: 69, Orders: 31, Days: 18, LastSale: lastSale}
+	if !found || got != want {
+		t.Errorf("%s: got %+v, %v; want %+v", cardID, got, found, want)
+	}
+	if snap := salesVelocityPtr.Load(); snap == nil || !snap.Day.Equal(day) {
+		t.Errorf("snapshot: got %+v, want one for %s", snap, day.Format(time.DateOnly))
+	}
+
+	s.loadSalesVelocity()
+	queries := f.seen()
+	if len(queries) != 4 || queries[3].sql != salesVelocityDayQuery {
+		t.Errorf("second run on the same day: got %d queries, want only the day query after the first 3", len(queries))
+	}
 }
 
 // TestVelocityText words each state: a rate to one decimal, under a tenth,
