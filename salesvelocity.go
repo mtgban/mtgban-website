@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -310,4 +311,52 @@ func salesVelocityReport(snap *salesVelocitySnapshot, unmatched int) string {
 	}
 	return fmt.Sprintf("%d cards over the %d days to %s, %d capped, %d not matched",
 		len(snap.Cards), snap.Window, snap.Day.Format(time.DateOnly), capped, unmatched)
+}
+
+// velocityText is a card's rate and its details (tip_html format) over window days.
+func velocityText(v salesVelocity, window int) (rate, detail string) {
+	head := fmt.Sprintf("**Sold on TCGplayer, last %d days**", window)
+	if v.Copies == 0 {
+		zero := "no sale in the window"
+		if !v.LastSale.IsZero() {
+			zero += "; last sold " + v.LastSale.Format(time.DateOnly)
+		}
+		return "0/day", head + "\n" + zero
+	}
+
+	perDay := float64(v.Copies) / float64(window)
+	rate = strconv.FormatFloat(perDay, 'f', 1, 64) + "/day"
+	switch {
+	case perDay < 0.1:
+		rate = "<0.1/day"
+	case v.Capped:
+		rate = ">=" + rate
+	}
+
+	floor := ""
+	if v.Capped {
+		floor = " (at least)"
+	}
+	lines := []string{
+		head,
+		"|copies|" + strconv.Itoa(int(v.Copies)) + floor,
+		"|orders|" + strconv.Itoa(int(v.Orders)) + floor,
+		"|days with a sale|" + strconv.Itoa(int(v.Days)),
+	}
+	if !v.LastSale.IsZero() {
+		lines = append(lines, "|last sale|"+v.LastSale.Format(time.DateOnly))
+	}
+	if v.Capped {
+		lines = append(lines, "the newspaper keeps five orders a day, so these are floors")
+	}
+	return rate, strings.Join(lines, "\n")
+}
+
+// salesVelocityView is a card's rate and details, both empty without data.
+func salesVelocityView(cardID string) (rate, detail string) {
+	v, found := salesVelocityFor(cardID)
+	if !found {
+		return "", ""
+	}
+	return velocityText(v, salesVelocityWindow)
 }

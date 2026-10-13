@@ -545,6 +545,8 @@ type GenericCard struct {
 	CKPause           string // "Paused 12d" on a card CK is not buying
 	CKPauseWait       bool
 	CKPauseTip        string
+	Velocity          string // TCGplayer copies sold a day, see salesvelocity.go
+	VelocityDetail    string
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
@@ -1058,6 +1060,7 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 	if newHigh {
 		hotlistNewTip = ckNewHighTipFor(co)
 	}
+	velocity, velocityDetail := salesVelocityView(co.UUID)
 
 	return GenericCard{
 		UUID:           co.UUID,
@@ -1113,6 +1116,8 @@ func uuid2card(b *matcher.Backend, p *prices, cardID string, preferFlavorName bo
 		CKPause:           ck.PauseLabel,
 		CKPauseWait:       ck.PauseWait,
 		CKPauseTip:        ck.PauseTip,
+		Velocity:          velocity,
+		VelocityDetail:    velocityDetail,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,
