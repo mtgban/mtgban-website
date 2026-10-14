@@ -77,8 +77,10 @@ Boot sequence (`main()`):
    parses the config and defaults `Config.Game`/`Config.Port`/
    `Config.DatastorePath`; `BAN_SECRET` seeds HMAC signing, falling back to
    `DefaultSecret` when unset in any mode (outside dev a defaulted secret
-   only logs a warning). `loadCommonConfig()` loads the ACL/grants table and
-   affiliates. `loadRarityBadges()` (no-op for the default game).
+   only logs a warning). `loadCommonConfig()` (common.go) loads the
+   infrastructure file first, since its bucket keys may be what the others
+   are read with, then the ACL/grants table, the affiliates and the chart
+   datasets (§2.4). `loadRarityBadges()` (no-op for the default game).
 2. `s := newSite()` (site.go) — the site the routes and jobs are bound to,
    with its palette and offline services; pure, no I/O.
 3. If any `-tcgcsv-*` job flag is set, `s.runTCGCSVMaintenance()`
@@ -89,12 +91,13 @@ Boot sequence (`main()`):
    `openDBs()` → `PricesArchiveDB` (PostgreSQL, `timeseries` package, price
    history for charts, plus `tcg_prices`/`tcg_products` when TCGCSV
    ingestion is configured), `NewNewspaperDB` (PostgreSQL), `UserStateDB`
-   (cross-device sync, only if `Config.UserStateConfig` is set), and
-   `ObservabilityDB` (usage telemetry, only if `Config.ObservabilityConfig`
-   + an instance name are set). `Newspaper1dayDB`/`Newspaper3dayDB` (MySQL)
-   no longer exist. Then `startAccessReloadListener()` (picks up ACL/grant
-   saves made by peer deployments sharing the price DB, recovering a reload
-   that panics so it keeps listening), `initTCGCSVService(s)`
+   (cross-device sync, only if `user_state_config` is set), and
+   `ObservabilityDB` (usage telemetry, only if `observability_config` + an
+   instance name are set), each one's settings read from
+   `Infrastructure()` (§2.4). Then `startAccessReloadListener()` (picks up
+   saves of the ACL, grants, affiliates, datasets and infrastructure files
+   made by peer deployments sharing the price DB, recovering a reload that
+   panics so it keeps listening), `initTCGCSVService(s)`
    (non-fatal if unconfigured), `reloadCheckpoints()`,
    `s.offline.LoadPersisted()`, then the production template cache
    build (`buildTemplateCache()`) — see §7.
@@ -315,16 +318,58 @@ read, or its workflow state's names.
   image bucket-auth are unconfigured no-ops until a deployment supplies the
   bucket paths out-of-band.
 - **Checkpoints** (`checkpoints.go`): curated chart annotations (bans,
-  releases, reprints) loaded from B2/file into `checkpointsStore`, editable
-  as JSON in the admin panel, rendered as markers on price charts.
+  releases, reprints) that a game other than Magic loads from
+  `timeseries_config.checkpoints_path` (B2 or file) into
+  `checkpointsStore`, editable as JSON in the admin panel, rendered as
+  markers on price charts. Magic draws its markers from the published ban
+  list instead (`banlist.go`).
+
+### 2.4 Configuration (`ConfigType`, main.go)
+
+One JSON file per deployment, from a local path or `b2://` (§2.1), decoded
+into `ConfigType` and published whole through `liveConfig` (§2.2). Beside
+its own keys (`game`, `port`, `datastore_path`, `scraper_config`,
+`timeseries_config`, `stores`, `discord`, `api_user_secrets`,
+`tcgcsv_config`, `api_gateway` and the rest), it names by path the files
+kept beside it, which deployments may share. `loadCommonConfig()` (common.go) reads each at
+startup and again on a config reload (`?tool=config`) or a config-editor
+save, and each has an admin tab that edits it (§5.9):
+
+- `infrastructure_path`: the infrastructure settings,
+  `internal/infrastructure.Config` — `bucket_keys`, `google_credentials`
+  (the credentials file's path), `patreon`, `uploader` (the Moxfield and
+  Collectr endpoints), `sql_config`, `user_state_config`,
+  `observability_config` and `new_newspaper_sql_config`. The config may
+  set any of these keys itself, and its value wins (`Over`); code reads the
+  result through `Infrastructure()`. A path in the config's own bucket is
+  read with the key pair the config was read with (`BAN_CONFIG_KEY`/
+  `BAN_CONFIG_SECRET`), never a `bucket_keys` entry (buckets.go).
+- `acl_path` and `patreon_grants_path`: the access table and the grant
+  list (`internal/access`, §3.3).
+- `affiliates_path`: the affiliate codes and lists, one file for every game.
+- `datasets_path`: the chart datasets (`[]DatasetConfig`: the stores each
+  is drawn from, its public name, provider id and colour). With none,
+  nothing charts.
+
+Saving one sends a Postgres NOTIFY on that file's channel, and the peers
+sharing the price database re-read it (access_notify.go).
+
+`timeseries_config` holds `long_form_writes` (§5.6) and `checkpoints_path`
+(§2.3). The `stores` section (`StoresConfig`) says which stores show where,
+by shorthand: `api_demo_stores` (what an unsigned API request gets, §5.7),
+`arbit_default_sellers`, `arbit_block_vendors`, `search_block_list`,
+`search_buylist_block_list`, `sleepers_block_list`,
+`upload_sealed_block_list`, `global_allow_list`, `global_probe_list`, and
+`api_only_stores`, the stores only the price API serves.
 
 ## 3. Authentication & authorization
 
 ### 3.1 Patreon OAuth (`Auth`, auth.go)
 
-`/auth?code=…` exchanges the code via the `patreon` package, fetches user
+`/auth?code=…` exchanges the code via the `patreon` package, with the
+OAuth client from `Infrastructure().Patreon` (§2.4), fetches user
 identity, and checks the shared grant list (`PatreonGrants()`, loaded from
-the file at `Config.PatreonGrantsPath` — not a `Config.Patreon` field) for a
+the file at `Config.PatreonGrantsPath`) for a
 hardcoded per-email tier override; failing that it fetches
 `currently_entitled_tiers` and maps Patreon's tier labels onto four internal
 tiers (`Pioneer`, `Modern`, `Legacy`, `Vintage` — Patreon's own "Standard"
@@ -656,7 +701,7 @@ enabled stores), `tag=names` (full store names instead of shorthands), and
 sig params `API` (an explicit store list, or `ALL_ACCESS` — expanded from
 live sellers/vendors minus blocklists at request time — or `DEV_ACCESS`) and
 `APImode`; a request with neither `sig` nor `API` falls back to
-`Config.APIDemoStores` and is refused the full `all`/`retail`/`buylist` dumps,
+`Config.Stores.APIDemoStores` and is refused the full `all`/`retail`/`buylist` dumps,
 by those exact names; it keeps the sealed dump and per-set or per-card
 requests. An unknown dump name answers "Not found". A `/sealed/` search
 needs the `sealed` mode as the sealed dump does. Other user APIs: `/search/decklist/tcgplayer/`,
@@ -747,19 +792,24 @@ Discord answers, without its URL.
 ### 5.9 Admin (`admin.go`)
 
 One handler, `Admin`, which calls a function of its own for each action,
-tool, editor and table, driving nine tabs —
-Dashboard, Usage, People, Config, Checkpoints, Access, Affiliates, Key
-Overrides, Tools — through query-command dispatch: scraper refresh via
+tool, editor and table, driving its tabs —
+Dashboard, Usage, Searches, People, Config, Checkpoints, Access,
+Affiliates, Datasets, Infrastructure, Key Overrides, Tools — through
+query-command dispatch: scraper refresh via
 GitHub Actions dispatch (`?refresh=`) or direct reload (`?reload=&table=&tag=`),
 log download or redirect to the CI log (`?logs=`), and the `?tool=`
 family (`adminTools`), the dashboard's server actions and admin tools:
 `datastore` (`s.startDatastoreReload`), `config` (reload
-config plus the ACL/grants/affiliates that ride beside it), `checkpoints`
+config plus the files it names, §2.4), `checkpoints`
 (chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
 price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
 generation, `&user=&duration=`), and `invite` (a signed invite link for a
-tier, `&tier=&duration=`, for up to the 31 days its cookie lasts). Five JSON editors — config,
-checkpoints, ACL/access table, affiliates, key overrides — the last backed
+tier, `&tier=&duration=`, for up to the 31 days its cookie lasts). JSON
+editors for the config, checkpoints, ACL/access table, affiliates, chart
+datasets, infrastructure file and key overrides; the datasets and
+infrastructure editors are read-only when the config names no path for
+them, and the infrastructure one shows the file alone, without the keys
+the deployment's own config sets. Key overrides are backed
 by a per-store UUID-remap builder reached from a "Fix" link on search
 results (`search.go`/`search.html`). A People tab adds/removes Patreon
 grants in place. The dashboard lists retail/buylist scraper freshness with
@@ -858,7 +908,8 @@ staleness alarm's map and messages, from 15 minutes after startup.
   `.github/workflows/<game>-deploy.yml`. All `*.json` files, including every
   `config*.json`, are gitignored — the copies in a local checkout are stripped
   dev config, not production; real per-deployment config is pulled from the
-  config bucket, so don't infer live behavior from a local file.
+  config bucket, so don't infer live behavior from a local file. Settings
+  kept in files of their own are named in it by path (§2.4).
 - **Commit convention**: lowercase area prefix — `search:`, `upload:`,
   `api/banprice:`, `fix(mobile):` — small focused commits, no `Co-Authored-By`
   trailer.

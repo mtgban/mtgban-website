@@ -20,7 +20,8 @@ run for hours, and holding the lock that long would starve the daily pull — bu
 its snapshot fallback takes it, being the same full crawl the daily job makes.
 The lock needs one Postgres session throughout, which PgBouncer in transaction
 mode does not keep: where `sql_config` points at one, set its `direct_port` to
-Postgres's own port, in this binary's config and the website's alike.
+Postgres's own port in every `sql_config` the two read, the infrastructure
+file's and any config's own.
 
 ```
 go install github.com/mtgban/mtgban-website/cmd/tcgcsvd@latest
@@ -144,15 +145,17 @@ archive as withdrawn rather than stopping on the extractor.
 
 `-config` takes a local path or a `b2://` URL, the same two schemes the server
 accepts, and falls back to `$BAN_CONFIG_PATH`. A b2 URL needs `BAN_CONFIG_KEY`
-and `BAN_CONFIG_SECRET` in the environment. Only four sections are read; the rest
+and `BAN_CONFIG_SECRET` in the environment. Only these keys are read; the rest
 of the server's config is ignored, so the deployed file works unchanged:
 
 - `sql_config` — the price database (a read-only client is refused, loudly,
-  rather than reporting a clean run that wrote nothing). Where the config names
-  an `infrastructure_path`, it comes from that file unless the config sets its
-  own.
+  rather than reporting a clean run that wrote nothing)
+- `infrastructure_path` — the infrastructure file the deployments share, read
+  for `sql_config` when the config sets none of its own
 - `tcgcsv_config` — the chosen categories and the User-Agent
 - `timeseries_config.long_form_writes` — dual-write into the long `prices` table
+- `game` — a game other than Magic always writes the long `prices` table,
+  whatever the flag above says
 - `discord.server_webhook_url` — optional, for job-level success and failure notices
 
 ## Running it as its own service
