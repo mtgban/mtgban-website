@@ -116,6 +116,13 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Everything that saves reads a POST's body, so a link cannot reach it;
+	// a POST another site's page sent is turned away before it is read.
+	if crossSitePost(r) {
+		http.Error(w, "cross-site form refused", http.StatusForbidden)
+		return
+	}
+
 	ds := s.datastore()
 	b := ds.backend
 	sig := verifiedSignature(r)
@@ -216,9 +223,37 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	render(w, "admin.html", pageVars)
 }
 
+// crossSitePost reports whether r changes state from another site's page.
+// GET, HEAD and OPTIONS never do. The browser's Sec-Fetch-Site says where a
+// form came from; without it, Origin has to be this site's own, scheme and
+// public host as requestOrigin reads them behind the proxy, or on a host it
+// does not know, a dev box, the request's own. A request with neither, as
+// curl sends, passes.
+func crossSitePost(r *http.Request) bool {
+	switch r.Method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return false
+	}
+	site := r.Header.Get("Sec-Fetch-Site")
+	if site != "" {
+		return site != "same-origin" && site != "none"
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	own := requestOrigin(r)
+	if own != "" {
+		return !strings.EqualFold(origin, own)
+	}
+	u, err := url.Parse(origin)
+	return err != nil || !strings.EqualFold(u.Host, r.Host)
+}
+
 // adminActions runs the refresh, reload, removestore or logs action the
 // request names, if any, and reports whether it answered the request. A
 // logs name it does not know leaves a message for the page instead.
+// removestore drops a live store, so only a POST's body names it.
 func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
 	refresh := r.FormValue("refresh")
 	if refresh != "" {
@@ -253,11 +288,11 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		return true
 	}
 
-	removeStore := r.FormValue("removestore")
+	removeStore := r.PostFormValue("removestore")
 	if removeStore != "" {
 		v := url.Values{}
 		v.Set("msg", removeStore+" removed")
-		err := Sessions.Remove(r.FormValue("kind"), removeStore)
+		err := Sessions.Remove(r.PostFormValue("kind"), removeStore)
 		if err != nil {
 			v.Set("msg", "remove of "+removeStore+" error: "+err.Error())
 		}
@@ -375,14 +410,19 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 		}()
 
 	case "newKey", "demokey":
+		// A new key is saved into the config, so it takes the form's POST
+		if r.Method != http.MethodPost {
+			pageVars.WarningMessage = "API keys are generated from the Tools tab's forms"
+			break
+		}
 		v = url.Values{}
 		redirect = true
 
-		user := r.FormValue("user")
+		user := r.PostFormValue("user")
 		if user == "" {
 			user = DefaultAPIDemoUser
 		}
-		dur := r.FormValue("duration")
+		dur := r.PostFormValue("duration")
 		// A blank duration is the picker back on its placeholder, not a request for a permanent key.
 		if dur == "" {
 			dur = "30"
@@ -435,7 +475,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 // when the save failed.
 func adminConfigEditor(r *http.Request, pageVars *PageVars) {
 	// -- Config: handle POST if submitted --
-	newConfig := r.FormValue("textArea")
+	newConfig := r.PostFormValue("textArea")
 	if newConfig != "" {
 		var config ConfigType
 		err := json.Unmarshal([]byte(newConfig), &config)
@@ -479,7 +519,7 @@ func adminConfigEditor(r *http.Request, pageVars *PageVars) {
 // editor, then fills the editor with the checkpoints as they stand.
 func adminCheckpointsEditor(r *http.Request, pageVars *PageVars) {
 	// -- Checkpoints: handle POST if submitted --
-	newCheckpoints := r.FormValue("checkpointsTextArea")
+	newCheckpoints := r.PostFormValue("checkpointsTextArea")
 	if newCheckpoints != "" {
 		var parsed checkpointsFile
 		if err := json.Unmarshal([]byte(newCheckpoints), &parsed); err != nil {
@@ -506,7 +546,7 @@ func adminCheckpointsEditor(r *http.Request, pageVars *PageVars) {
 // from.
 func adminACLEditor(r *http.Request, pageVars *PageVars) {
 	// -- Access table: handle POST if submitted --
-	newACL := r.FormValue("aclTextArea")
+	newACL := r.PostFormValue("aclTextArea")
 	if newACL != "" {
 		var parsed access.Table
 		err := json.Unmarshal([]byte(newACL), &parsed)
@@ -543,7 +583,7 @@ func adminACLEditor(r *http.Request, pageVars *PageVars) {
 // are read from.
 func adminAffiliatesEditor(r *http.Request, pageVars *PageVars) {
 	// -- Affiliates: handle POST if submitted --
-	newAffiliates := r.FormValue("affiliatesTextArea")
+	newAffiliates := r.PostFormValue("affiliatesTextArea")
 	if newAffiliates != "" {
 		var parsed AffiliatesConfig
 		decoder := json.NewDecoder(strings.NewReader(newAffiliates))
@@ -579,7 +619,7 @@ func adminAffiliatesEditor(r *http.Request, pageVars *PageVars) {
 // adminDatasetsEditor saves chart datasets posted from the dashboard's editor;
 // the template reads them back through datasets_text and datasets_path.
 func adminDatasetsEditor(r *http.Request, pageVars *PageVars) {
-	newDatasets := r.FormValue("datasetsTextArea")
+	newDatasets := r.PostFormValue("datasetsTextArea")
 	if newDatasets == "" {
 		return
 	}
@@ -602,7 +642,7 @@ func adminDatasetsEditor(r *http.Request, pageVars *PageVars) {
 // dashboard's editor; the template reads them back through
 // infrastructure_text and infrastructure_path.
 func adminInfrastructureEditor(r *http.Request, pageVars *PageVars) {
-	newInfrastructure := r.FormValue("infrastructureTextArea")
+	newInfrastructure := r.PostFormValue("infrastructureTextArea")
 	if newInfrastructure == "" {
 		return
 	}
@@ -627,7 +667,7 @@ func adminInfrastructureEditor(r *http.Request, pageVars *PageVars) {
 // pre-filled it.
 func (s *site) adminKeyOverrides(r *http.Request, b *mtgmatcher.Backend, pageVars *PageVars) {
 	// -- Key overrides: handle POST if submitted --
-	newOverrides := r.FormValue("keyOverridesTextArea")
+	newOverrides := r.PostFormValue("keyOverridesTextArea")
 	if newOverrides != "" {
 		var parsed KeyOverrides
 		if err := json.Unmarshal([]byte(newOverrides), &parsed); err != nil {
@@ -814,18 +854,19 @@ func adminGrantAdd(r *http.Request, pageVars *PageVars) {
 	// Reuses the config editor's persistence: the amended config is written
 	// to the config source and swapped in memory, so the grant survives
 	// restarts and shows in the table below immediately.
-	grantEmail := strings.ToLower(strings.TrimSpace(r.FormValue("grantEmail")))
+	grantEmail := strings.ToLower(strings.TrimSpace(r.PostFormValue("grantEmail")))
 	if grantEmail != "" {
-		grantTier := r.FormValue("grantTier")
+		grantTier := r.PostFormValue("grantTier")
 		newGrant := PatreonGrant{
-			Category: strings.TrimSpace(r.FormValue("grantCategory")),
+			Category: strings.TrimSpace(r.PostFormValue("grantCategory")),
 			Email:    grantEmail,
-			Name:     strings.TrimSpace(r.FormValue("grantName")),
+			Name:     strings.TrimSpace(r.PostFormValue("grantName")),
 			Tier:     grantTier,
 		}
 
 		var overridesErr error
-		if raw := strings.TrimSpace(r.FormValue("grantOverrides")); raw != "" {
+		raw := strings.TrimSpace(r.PostFormValue("grantOverrides"))
+		if raw != "" {
 			overridesErr = json.Unmarshal([]byte(raw), &newGrant.Overrides)
 		}
 
@@ -865,7 +906,7 @@ func adminGrantRevoke(r *http.Request, pageVars *PageVars) {
 	// -- People: remove a Patreon grant --
 	// Persists like the quick-add above, so the row disappears from the
 	// table rendered below and stays gone after a restart.
-	revokeEmail := strings.ToLower(strings.TrimSpace(r.FormValue("revokeEmail")))
+	revokeEmail := strings.ToLower(strings.TrimSpace(r.PostFormValue("revokeEmail")))
 	if revokeEmail != "" {
 		idx := slices.IndexFunc(PatreonGrants(), func(person PatreonGrant) bool {
 			return strings.EqualFold(person.Email, revokeEmail)
