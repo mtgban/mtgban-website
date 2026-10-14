@@ -208,8 +208,9 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 }
 
 // cartAsksMost are the stores whose feed does not give their stock: Mint's
-// caps it at 8, and Mana Pool's gives none.
-var cartAsksMost = []string{"MMC", "MP"}
+// caps it at 8. Mana Pool's gives none, but its optimizer fills a line from
+// the cheapest listings up, at rising prices, so it asks for the row's own.
+var cartAsksMost = []string{"MMC"}
 
 // asksMost reports whether key's split is one of cartAsksMost's stores.
 func asksMost(key string) bool {
