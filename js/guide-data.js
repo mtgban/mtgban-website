@@ -818,6 +818,30 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'search-pools',
+            category: 'Search Syntax',
+            title: 'Search Inside a Pool',
+            icon: 'layers',
+            summary: 'Run a query only inside another query\'s results, a set\'s printings or a product\'s contents.',
+            snippets: ['in:(SUBQUERY)', 'in:CODE', 'in:"Product"', '-in:(SUBQUERY)'],
+            keywords: ['in', 'pool', 'subquery', 'scope', 'inside', 'within', 'nested', 'quote', 'quoted', 'quotes'],
+            content: {
+                table: [
+                    { value: 'in:(SUBQUERY)', short: 'The results of SUBQUERY, a query of its own' },
+                    { value: 'in:CODE', short: 'The printings of set CODE' },
+                    { value: 'in:"Name"', short: 'The contents of a sealed product' },
+                    { value: '-in:(SUBQUERY)', short: 'Everything outside the pool' }
+                ],
+                examples: [
+                    { query: 'r:mythic in:"Commander Legends Collector Booster"', desc: 'Mythics the booster can hold' },
+                    { query: 's:CMR in:(sm:any dragon)', desc: 'CMR printings of cards with dragon in the name' },
+                    { query: 'contents:"Bundle" -in:(decklist:"Bundle")', desc: 'What a bundle draws at random, the same as variable:' },
+                    { query: '"S:P Little Knight"', desc: 'Quotes keep a name whole when it looks like a filter' }
+                ]
+            }
+        },
+
+        {
             id: 'sorting',
             category: 'Search Syntax',
             title: 'Sorting',
