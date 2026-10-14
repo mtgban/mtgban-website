@@ -7,14 +7,17 @@ and both calls take a list. MTG Mint Card and Card Kingdom's store have the
 same kind of call, one card at a time, and so does Manaleak, after a read
 of the card's page; Hareruya has both: a form that takes a whole store
 list, and one call per card for its buylist. Mana Pool's public optimizer
-takes a whole list and answers with the listings to put in its cart.
+takes a whole list and answers with the listings to put in its cart. Game
+Nerdz's and Vegas Singles' buylists run on StorePass, whose page keeps the
+cart and prices it itself, so the loader adds through the page's own code.
 Star City Games and Strike Zone have a CSV import, but no way to hand it a
-list from another site. The upload page reaches all nine through one
+list from another site. The upload page reaches all eleven through one
 bookmarklet, BAN-to-Cart, run on the store's page. ABU was measured
 against a real account on 2026-10-07, CSI, Strike Zone and Hareruya
 against a guest cart and SCG and Mint against a real account on
 2026-10-09, Card Kingdom against a guest cart on 2026-10-10, and Mint's
-store, Mana Pool and Manaleak against a guest cart on 2026-10-13.
+store, Mana Pool and Manaleak against a guest cart on 2026-10-13, and Game
+Nerdz and Vegas Singles against a guest cart on 2026-10-14.
 
 ## ABU: the calls
 
@@ -283,6 +286,48 @@ POST /index.php?route=buylist/cart/add    product_id=7090  buylist_quantity=2 op
 | more than the store has | kept, marked *** at checkout, so the loader trims to the page's "Qty:" |
 | an out of stock card | left out by the loader |
 
+## Game Nerdz and Vegas Singles: StorePass buylists
+
+Both buylists run on StorePass (`store.storepass.co`). The buylist page,
+`/retailer/buylist`, keeps the cart in its own state, prices each line from
+the store's settings (a discount per condition, a quantity limit, native
+offers), and saves the whole cart under the session its cookie names:
+
+```
+GET  /saas/buylist-session?session_id=<cookie>&store_id=<store>
+POST /saas/buylist-session?store_id=<store>      {"sessionId", "cartProducts", "posSessionId"}
+GET  /saas/search?mongo=true&store_id=<store>&product_id=152060&condition=NM
+```
+
+- The cookie is `bga-buylist-cart-<store id>`: `OvpVz0pNlL` for Game
+  Nerdz, `d4lDsS3ZNf` for Vegas Singles. The session is read with
+  `session_id`; asked as `sessionId` instead, the service answered with
+  another visitor's cart, so the parameter is pinned by a test.
+- A row names `<product id>-<variant id>` (`storePassCartID`), the
+  `OriginalID` and `InstanceID` go-mtgban's `gamenerdz` and `vegassingles`
+  scrapers store. Game Nerdz prices one variant per printing; Vegas Singles
+  one per condition, named for it ("Near Mint", "Lightly Played").
+- Copying the page's pricing would drift from it, so the loader finds the
+  page's cart component through React's fiber on a node of the page and
+  calls its own `didAddToCart(product, quantity, condition)` with the
+  product as the page's own search answers it: the variant's title for a
+  store pricing each condition (`condition_type` `per-product`), the
+  product's own condition otherwise. A card already in the cart gets the
+  difference, so the cart ends at the list's quantity, and the store's
+  limit holds (8 a card at Game Nerdz, 100 at Vegas Singles).
+- The loader reads the saved cart into the page first, so a load in
+  another tab is kept, and holds `ban-to-cart-<store id>` while it loads,
+  then saves the cart as the page does and reloads the page.
+- A page whose cart component is not found loads nothing, and says the
+  page has changed.
+
+| Sent | Result |
+|---|---|
+| 3 of a card the cart held 1 of | 3, then 1 and 0 on later loads, each saved |
+| 2 NM and 1 LP of one Vegas Singles card | two lines, $18.65 and $15.85 |
+| 9 more of a card held at 2 at Game Nerdz | 8, its limit |
+| a product id the store does not list | left out |
+
 ## Strike Zone: the CSV import
 
 Strike Zone buys and sells through one cart, whose Tools menu has a CSV
@@ -445,7 +490,7 @@ uploads page offers takes the whole list and prices it itself:
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's,
 Mint's and Manaleak's buylist and store splits, Mana Pool's store split,
-and SCG's buylist splits. CSI's store button sits beside its deck builder
+and SCG's, Game Nerdz's and Vegas Singles' buylist splits. CSI's store button sits beside its deck builder
 button, and Mana Pool's beside its mass entry button, both of which post
 only names. SCG's
 store side and CK's buylist already have their own imports. Card Kingdom's
@@ -526,7 +571,8 @@ On Mana Pool it asks the optimizer for the list, again with the cards it
 has fewer of cut to that and the ones it has none of left out, adds the
 listings it answers with to the cart, says what it cut and left out, and
 reloads the cart.
-On ABU, CSI, Mint, Manaleak, Strike Zone, Hareruya and Card Kingdom it:
+On ABU, CSI, Mint, Manaleak, Game Nerdz, Vegas Singles, Strike Zone,
+Hareruya and Card Kingdom it:
 
 1. on ABU, stops unless ABU's own `isLoggedIn` flag is set, since a
    guest's buylist cart fails and a guest's store cart is lost at login;
@@ -577,6 +623,7 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
 
 ## Not tested
 
+- A signed-in StorePass buylist, whose session may follow the account.
 - What an expired ABU token returns, presumably the same 401.
 - What ABU's buylist checkout does with rows above its buy limit or rows
   it stopped buying.

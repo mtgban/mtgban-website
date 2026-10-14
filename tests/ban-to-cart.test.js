@@ -77,7 +77,7 @@ function fakeLocks() {
 }
 
 // run executes the bookmarklet on a stand-in store page.
-async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false, locks = null, stored = {}} = {}) {
+async function run({host = 'abugames.com', path = '/cartview/buylist', search = '', hash = '', version = 'test', loggedIn = true, abu = fakeABU(), cookie = '', loginLink = false, locks = null, stored = {}, nodes = []} = {}) {
     const alerts = [];
     const page = {reloaded: false, url: null};
     if (hash && version !== null) {
@@ -101,6 +101,7 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', search = 
         body: {appendChild() {}},
         cookie,
         querySelector: (selector) => (loginLink && selector === 'a[href$="/login"]' ? {} : null),
+        querySelectorAll: () => nodes,
     };
     const history = {replaceState: (state, title, url) => { page.url = url; }};
     // A wait the loader asks for passes at once
@@ -587,6 +588,93 @@ describe('ban-to-cart bookmarklet on Mana Pool', () => {
         expect(alerts[0]).toContain('Nothing was loaded');
         expect(posts).toHaveLength(0);
         expect(page.storage['manapool-cart']).toBe(held);
+    });
+});
+
+// fakeStorePass stands in for a StorePass buylist page: its cart component,
+// reached through React's fiber on a node of the page, adds to a line or
+// makes one as the page's own add does, holding a card to the store's
+// limit; the session answers by session_id with what was last saved, and a
+// search by product id.
+function fakeStorePass({conditionType = 'global', products = [], saved = [], limit = 8} = {}) {
+    let session = saved;
+    const posts = [];
+    const reads = [];
+    const component = {
+        state: {store: {id: 'OvpVz0pNlL', buylist_settings: {condition_type: conditionType}}, cartProducts: [], posSessionId: null},
+        setState(change, done) {
+            Object.assign(this.state, change);
+            if (done) {
+                done();
+            }
+        },
+        didAddToCart(product, qty, condition) {
+            const lines = this.state.cartProducts;
+            const line = lines.find((l) => l.product_id == product.product_id && l.condition === condition);
+            if (line) {
+                line.quantity = Math.min(line.quantity + qty, limit);
+                this.state.cartProducts = lines.filter((l) => l.quantity > 0);
+            } else if (qty > 0) {
+                lines.unshift({...product, quantity: Math.min(qty, limit), condition});
+            }
+        },
+    };
+    const node = {'__reactFiber$abc': {stateNode: null, return: {stateNode: component}}};
+    const fetch = async (url, opts = {}) => {
+        if (opts.method === 'POST') {
+            posts.push({url, body: JSON.parse(opts.body)});
+            session = JSON.parse(opts.body).cartProducts;
+            return {ok: true, status: 200, json: async () => ({success: true})};
+        }
+        reads.push(url);
+        if (url.startsWith('/saas/buylist-session?')) {
+            return {ok: true, status: 200, json: async () => ({cartProducts: url.includes('session_id=sid%201') ? JSON.parse(JSON.stringify(session)) : []})};
+        }
+        const id = /product_id=(\d+)/.exec(url)[1];
+        return {ok: true, status: 200, json: async () => ({products: products.filter((p) => String(p.product_id) === id)})};
+    };
+    return {fetch, posts, reads, component, nodes: [node]};
+}
+
+describe('ban-to-cart bookmarklet on a StorePass buylist', () => {
+    const gnPage = {host: 'buylist.gamenerdz.com', path: '/retailer/buylist', cookie: 'bga-buylist-cart-OvpVz0pNlL=sid%201'};
+    const vsPage = {host: 'buylist.vegas.singles', path: '/retailer/buylist', cookie: 'bga-buylist-cart-d4lDsS3ZNf=sid%201'};
+    const sphinx = {product_id: 152060, condition: 'New', offer_price: 16.04, store_pass_variant_info: [{id: 151169, title: 'Default Title'}]};
+    const consultation = {product_id: 99, condition: 'New', store_pass_variant_info: [{id: 1, title: 'Near Mint'}, {id: 2, title: 'Lightly Played'}]};
+
+    test('each card goes through the page\'s own add, a held one by the difference, and the cart is saved as the page saves it', async () => {
+        const sp = fakeStorePass({products: [sphinx], saved: [{...sphinx, quantity: 1, condition: 'New'}]});
+        const {alerts, page} = await run({...gnPage, hash: '#ban=152060-151169%3a3%2c777-1%3a1', abu: sp, nodes: sp.nodes});
+        expect(sp.reads[0]).toBe('/saas/buylist-session?session_id=sid%201&store_id=OvpVz0pNlL');
+        expect(sp.component.state.cartProducts.map((l) => [l.product_id, l.quantity, l.condition])).toEqual([[152060, 3, 'New']]);
+        expect(sp.posts).toHaveLength(1);
+        expect(sp.posts[0].url).toBe('/saas/buylist-session?store_id=OvpVz0pNlL');
+        expect(sp.posts[0].body.sessionId).toBe('sid 1');
+        expect(sp.posts[0].body.cartProducts.map((l) => l.quantity)).toEqual([3]);
+        expect(alerts[0]).toBe('Loaded 1 cards into your Game Nerdz cart. 1 were not taken by Game Nerdz.');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('a store pricing each condition takes the variant\'s own, and a held line goes down to the list\'s', async () => {
+        const sp = fakeStorePass({conditionType: 'per-product', products: [consultation], saved: [{...consultation, quantity: 4, condition: 'Lightly Played'}]});
+        await run({...vsPage, hash: '#ban=99-1:2,99-2:1', abu: sp, nodes: sp.nodes});
+        expect(sp.component.state.cartProducts.map((l) => [l.quantity, l.condition])).toEqual([[2, 'Near Mint'], [1, 'Lightly Played']]);
+    });
+
+    test('a store list on the buylist is refused, and a page whose cart BAN cannot find loads nothing', async () => {
+        const sp = fakeStorePass({products: [sphinx]});
+        const wrong = await run({...gnPage, hash: '#ban=152060-151169:1&side=retail', abu: sp, nodes: sp.nodes});
+        expect(wrong.alerts[0]).toBe('This is Game Nerdz\'s buylist, but the list is for its store. Go back to BAN and press its button again.');
+        const changed = await run({...gnPage, hash: '#ban=152060-151169:1', abu: sp, nodes: []});
+        expect(changed.alerts[0]).toBe('Game Nerdz\'s buylist page has changed, so BAN cannot fill its cart. Nothing was loaded.');
+        expect(sp.posts).toHaveLength(0);
+    });
+
+    test('two tabs on one store take turns', async () => {
+        const sp = fakeStorePass({products: [sphinx]});
+        const locks = fakeLocks();
+        await Promise.all([1, 2].map(() => run({...gnPage, hash: '#ban=152060-151169:1', abu: sp, nodes: sp.nodes, locks})));
+        expect(locks.names).toEqual(['ban-to-cart-OvpVz0pNlL', 'ban-to-cart-OvpVz0pNlL']);
     });
 });
 
