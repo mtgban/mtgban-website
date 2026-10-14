@@ -34,16 +34,31 @@
         return out;
     }
 
-    // tokenize splits on whitespace honoring double-quoted phrases.
+    // tokenize splits on whitespace honoring double-quoted phrases and, as
+    // online does, a key:(...) value to its matching paren.
     function tokenize(str) {
         var tokens = [];
-        var re = /"([^"]*)"|(\S+)/g;
+        var re = /"([^"]*)"|(-?[a-zA-Z_]+:\()|(\S+)/g;
         var m;
         while ((m = re.exec(str)) !== null) {
             if (m[1] !== undefined) {
                 tokens.push({text: m[1], quoted: true});
+            } else if (m[2] !== undefined) {
+                var depth = 1, quoted = false, k = re.lastIndex;
+                for (; k < str.length && depth > 0; k++) {
+                    var ch = str.charAt(k);
+                    if (ch === '"') {
+                        quoted = !quoted;
+                    } else if (!quoted && ch === '(') {
+                        depth++;
+                    } else if (!quoted && ch === ')') {
+                        depth--;
+                    }
+                }
+                tokens.push({text: str.slice(m.index, k), quoted: false});
+                re.lastIndex = k;
             } else {
-                tokens.push({text: m[2], quoted: false});
+                tokens.push({text: m[3], quoted: false});
             }
         }
         return tokens;
