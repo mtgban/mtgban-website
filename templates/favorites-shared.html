@@ -1,0 +1,55 @@
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/search.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+<div class="search-toast" id="desktop-fav-toast"></div>
+<div class="search-landing">
+    <div class="landing-pane landing-pane-favorites landing-pane-shared" id="shared-favorites">
+        <div class="landing-pane-header">
+            <span class="landing-pane-title">Shared favorites{{if .SharedCount}} ({{.SharedCount}}){{end}}</span>
+            {{if .SharedRows}}
+            <span class="landing-pane-actions">
+                <button class="landing-pane-btn landing-pane-merge" id="shared-merge" type="button" title="Add these cards to your favorites">Merge into my favorites</button>
+            </span>
+            {{end}}
+        </div>
+        {{if .SharedNotice}}
+        <div class="landing-empty">{{.SharedNotice}}</div>
+        {{else if not .SharedRows}}
+        <div class="landing-empty">This list is empty.</div>
+        {{else}}
+        <div class="landing-pane-body">
+            {{range .SharedRows}}
+            <a class="landing-item landing-item-fav landing-item-shared" href="/search?q={{.Query}}" data-fav-id="{{.ID}}">
+                <div class="landing-item-thumb"><span class="landing-item-thumb-placeholder">&#9733;</span></div>
+                <div class="landing-item-info">
+                    <div class="landing-item-line1">
+                        <span class="landing-item-name">{{.Name}}</span>
+                        <span class="landing-item-set">{{.Set}}{{if .Number}} &middot; #{{.Number}}{{end}}</span>
+                        {{if .FinishTag}}<span class="result-badge {{if .FinishClass}}{{.FinishClass}}{{else}}foil{{end}}">{{.FinishTag}}</span>{{end}}
+                    </div>
+                    <div class="landing-item-prices" data-shared-prices></div>
+                </div>
+            </a>
+            {{end}}
+        </div>
+        {{end}}
+        <p class="landing-shared-note">A link to this list shows its owner's favorites as they are now. Merge copies them into yours once.</p>
+    </div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script type="text/javascript">
+    window.BAN_SHARED_FAVORITES = {
+        signedIn: {{.SharedSignedIn}},
+        rows: {{.SharedRows}}
+    };
+</script>
+<script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/favorites-shared.js?hash={{.Hash}}" defer></script>
+{{end}}

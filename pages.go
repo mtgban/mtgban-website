@@ -174,6 +174,14 @@ func init() {
 						return len(s.backend().GetSealedUUIDs()) == 0
 					},
 				},
+				{
+					// A favorites list shared by link; the id is the credential.
+					Name:       "FavoritesShared",
+					Link:       "/search/shared",
+					Handle:     (*site).FavoritesShared,
+					NoSigning:  true,
+					ShouldHide: func(*site) bool { return true },
+				},
 			},
 		},
 		"Newspaper": {
@@ -316,6 +324,7 @@ type PageVars struct {
 	GuideVars
 	NewsVars
 	SearchVars
+	SharedVars
 	SleepVars
 	UploadVars
 
