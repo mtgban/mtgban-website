@@ -212,6 +212,7 @@ func (s *site) newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastor
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
+		sources:  newSourcesSnapshot(b),
 		names:    suggest.NewNames(b.Names(mtgmatcher.NameFormCanonical, false), b.Names(mtgmatcher.NameFormCanonical, true)),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
