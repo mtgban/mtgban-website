@@ -467,3 +467,28 @@ test('a device hydrating an over-long preset list alone holds it to 10 and sends
     expect(patches.length).toBe(1);
     expect(JSON.parse(patches[0].mtgban_arbit_presets).filter((p) => !p.del).length).toBe(10);
 });
+
+test('the store adjustments ride the synced preferences', () => {
+    const m = source.match(/var PREF_KEYS = \[([\s\S]*?)\];/);
+    expect(m[1]).toContain("'mtgban_store_factors'");
+});
+
+test('a sync hands the store adjustments to their mirror', () => {
+    expect(source).toContain('window.StoreFactors.mirror()');
+});
+
+test('base.html loads store-factors.js before settings.js', () => {
+    const html = readFileSync(new URL('../templates/base.html', import.meta.url), 'utf8');
+    const factorsIdx = html.indexOf('/js/store-factors.js');
+    const settingsIdx = html.indexOf('/js/settings.js');
+    expect(factorsIdx).toBeGreaterThan(-1);
+    expect(factorsIdx).toBeLessThan(settingsIdx);
+});
+
+test('base-mobile.html loads store-factors.js after cookies.js', () => {
+    const html = readFileSync(new URL('../templates/mobile/base-mobile.html', import.meta.url), 'utf8');
+    const cookiesIdx = html.indexOf('/js/cookies.js');
+    const factorsIdx = html.indexOf('/js/store-factors.js');
+    expect(cookiesIdx).toBeGreaterThan(-1);
+    expect(factorsIdx).toBeGreaterThan(cookiesIdx);
+});

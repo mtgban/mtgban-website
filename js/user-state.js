@@ -22,7 +22,7 @@
         'theme', 'chartDateRange', 'mtgban_nav_layout_v1',
         'chartReleasesLongRange', 'chartCheckpointTypes',
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
-        'mtgban_search_layout', 'mtgban_popular_collapsed',
+        'mtgban_search_layout', 'mtgban_popular_collapsed', 'mtgban_store_factors',
         'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets'
     ];
 
@@ -234,6 +234,7 @@
         if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
         if (window.ArbitFilters && typeof window.ArbitFilters.refresh === 'function') window.ArbitFilters.refresh();
         if (window.ArbitPresets && typeof window.ArbitPresets.refresh === 'function') window.ArbitPresets.refresh();
+        if (window.StoreFactors && typeof window.StoreFactors.mirror === 'function') window.StoreFactors.mirror();
         // Synced favorites arrive price-less; backfill (self-gating).
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
