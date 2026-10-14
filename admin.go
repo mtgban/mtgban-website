@@ -623,25 +623,36 @@ func adminDatasetsEditor(r *http.Request, pageVars *PageVars) {
 }
 
 // adminInfrastructureEditor saves the infrastructure settings posted from the
-// dashboard's editor; the template reads them back through
-// infrastructure_text and infrastructure_path.
+// dashboard's editor, saying which of the changes wait for a restart; the
+// template reads them back through infrastructure_text and
+// infrastructure_path.
 func adminInfrastructureEditor(r *http.Request, pageVars *PageVars) {
 	newInfrastructure := r.PostFormValue("infrastructureTextArea")
 	if newInfrastructure == "" {
 		return
 	}
-	var parsed infrastructure.Config
+	var parsed *infrastructure.Config
 	decoder := json.NewDecoder(strings.NewReader(newInfrastructure))
 	// A typoed key would otherwise be dropped without a word.
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&parsed)
+	if err == nil && parsed == nil {
+		err = errors.New("the settings are null")
+	}
+	before := Infrastructure()
 	if err == nil {
-		err = saveInfrastructure(r.Context(), parsed)
+		err = saveInfrastructure(r.Context(), *parsed)
 	}
 	if err != nil {
 		pageVars.WarningMessage = "Infrastructure not saved: " + err.Error()
-	} else {
-		pageVars.InfoMessage = "Infrastructure updated"
+		return
+	}
+	pageVars.InfoMessage = "Infrastructure updated"
+	restart := infrastructureRestartKeys(before, Infrastructure())
+	if len(restart) == 1 {
+		pageVars.InfoMessage += "; " + restart[0] + " takes effect on restart"
+	} else if len(restart) > 1 {
+		pageVars.InfoMessage += "; " + strings.Join(restart, ", ") + " take effect on restart"
 	}
 }
 
