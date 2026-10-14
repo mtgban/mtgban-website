@@ -1,0 +1,59 @@
+{{define "icons"}}<!-- no lucide: this page has no icons -->{{end}}
+
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+<div class="m-page">
+    <div class="m-toast" id="m-fav-toast"></div>
+    <div id="m-favorites" class="m-shared">
+        <div class="m-fav-header">
+            <span class="m-fav-title">Shared favorites{{if .SharedCount}} ({{.SharedCount}}){{end}}</span>
+            <span class="m-fav-actions">
+                {{if .SharedRows}}<button class="m-fav-btn m-fav-merge" id="shared-merge" type="button">Merge</button>{{end}}
+            </span>
+        </div>
+        {{if .SharedNotice}}
+        <div class="m-fav-empty">{{.SharedNotice}}</div>
+        {{else if not .SharedRows}}
+        <div class="m-fav-empty">This list is empty.</div>
+        {{else}}
+        <div class="m-fav-list">
+            {{range .SharedRows}}
+            <a class="m-fav-item" href="/search?q={{.Query}}" data-fav-id="{{.ID}}">
+                <div class="m-fav-thumb" data-shared-thumb><span class="landing-item-thumb-placeholder">&#9733;</span></div>
+                <div class="m-fav-item-body">
+                    <div class="m-fav-item-top">
+                        <span class="m-fav-name">{{.Name}}</span>
+                        <span class="m-fav-set">{{.Set}}{{if .Number}} #{{.Number}}{{end}}</span>
+                        <span class="m-fav-chips">{{if .FinishTag}}<span class="m-badge {{if .FinishClass}}{{.FinishClass}}{{else}}foil{{end}}">{{.FinishTag}}</span>{{end}}</span>
+                    </div>
+                    <div class="m-fav-item-prices" data-shared-prices></div>
+                </div>
+            </a>
+            {{end}}
+        </div>
+        {{end}}
+        <p class="m-fav-empty">A link to this list shows its owner's favorites as they are now. Merge copies them into yours once.</p>
+    </div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script type="text/javascript">
+    window.BAN_SHARED_FAVORITES = {
+        signedIn: {{.SharedSignedIn}},
+        rows: {{.SharedRows}}
+    };
+</script>
+<script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+<script type="text/javascript" src="/js/favorites-shared.js?hash={{.Hash}}" defer></script>
+{{end}}

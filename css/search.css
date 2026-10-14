@@ -2306,6 +2306,10 @@ body.modal-embed .cp-overlay {
     gap: 0;
 }
 
+/* Share panel under the favorites header: the link, copy, stop. */
+.fav-share-panel { display: flex; gap: 0.5em; align-items: center; padding: 0.5em 1em; flex-wrap: wrap; }
+.fav-share-link { flex: 1 1 14em; min-width: 0; font-size: 0.85em; padding: 0.35em 0.5em; }
+
 .landing-pane-btn {
     background: transparent;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
@@ -2354,6 +2358,11 @@ body.modal-embed .cp-overlay {
     padding: 0.5em;
     border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
+
+/* Shared favorites page: one pane, centred, read-only rows. */
+.landing-pane-shared { max-width: 52em; margin: 0 auto; }
+.landing-pane-merge { padding: 0.35em 0.9em; }
+.landing-shared-note { margin: 0.75em 1em; font-size: 0.85em; opacity: 0.75; }
 
 .landing-page-btn {
     background: transparent;

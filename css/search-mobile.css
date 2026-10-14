@@ -1279,6 +1279,15 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     border-color: rgba(0, 0, 0, 0.1);
 }
 
+/* Shared favorites page */
+.m-shared .m-fav-empty { padding: 1em; opacity: 0.8; }
+.m-fav-merge { font-weight: 600; }
+.m-shared .m-fav-thumb { display: flex; align-items: center; justify-content: center; }
+.m-shared .landing-item-thumb-placeholder { font-size: 1.5em; opacity: 0.6; }
+/* Text buttons: a pill, not the star's circle, and shown in portrait too. */
+.m-fav-actions .m-fav-merge,
+.m-fav-actions .m-fav-share { display: inline-flex; width: auto; border-radius: 1em; padding: 0.3em 0.8em; }
+
 .m-fav-item {
     display: flex;
     flex-direction: row;
@@ -1718,6 +1727,10 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     align-items: center;
     gap: 0.3em;
 }
+
+.m-shared .m-fav-header, .fav-share-panel { flex-wrap: wrap; }
+.fav-share-panel { display: flex; gap: 0.5em; padding: 0.5em 1em; }
+.fav-share-link { flex: 1 1 100%; font-size: 0.9em; padding: 0.4em 0.5em; }
 
 .m-fav-refresh {
     font-size: 0.7rem;
