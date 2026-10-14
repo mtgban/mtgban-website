@@ -22,6 +22,8 @@ import (
 type SearchConfig struct {
 	// The search strategy to be used
 	SearchMode string
+	// DefaultMode says SearchMode is the game's default, not one the query chose.
+	DefaultMode bool
 
 	// Sort strategy
 	SortMode string
@@ -88,6 +90,11 @@ type FilterElem struct {
 	// compiling here rather than at the comparison is the difference
 	// between one compile and one per card.
 	Regexp *regexp.Regexp
+
+	// Pool is the sub-search a pool filter is the members of, as parsed.
+	// The search resolves it, with the datastore in hand, into Members.
+	Pool    *SearchConfig
+	Members map[string]bool
 }
 
 type FilterStoreElem struct {
@@ -218,6 +225,187 @@ func setFilterNamesNothing(b *mtgmatcher.Backend, field string) bool {
 		}
 	}
 	return true
+}
+
+// poolSpan is one in: term lifted out of a query before the filter regexp
+// reads it.
+type poolSpan struct {
+	// Raw is the term as typed, for AppliedFilters: "-in:(s:CMR r:rare)".
+	Raw string
+	// Value is what in: was given, parentheses or quotes removed.
+	Value string
+	// Paren says the value was a parenthesised subquery, not a set code
+	// or a product name.
+	Paren  bool
+	Negate bool
+}
+
+// protectedMark stands in for a quoted span of free text while the filter
+// regexp reads the query; restoreProtected puts the text back.
+const protectedMark = "\uE000"
+
+// poolMark stands in for an in: term the same way; the parser puts the
+// term back where it was when it drops the pool.
+const poolMark = "\uE001"
+
+// splitQuery lifts out of a query what the filter regexp cannot read: in:
+// terms, whose value may be a parenthesised subquery, and quoted free text
+// that follows no key. Each lifted span leaves its mark in rest; a
+// protected span is kept with its quotes.
+func splitQuery(query string) (pools []poolSpan, protected []string, rest string) {
+	var sb strings.Builder
+	i := 0
+	for i < len(query) {
+		if start, ok := poolKeyAt(query, i); ok {
+			end, value, paren := poolValue(query, start)
+			pools = append(pools, poolSpan{
+				Raw:    query[i:end],
+				Value:  value,
+				Paren:  paren,
+				Negate: query[i] == '-',
+			})
+			sb.WriteString(poolMark)
+			i = end
+			continue
+		}
+		if query[i] == '"' {
+			if (i > 0 && strings.IndexByte(":<>", query[i-1]) != -1) || followsBar(query, i) {
+				// A filter value, or a Pricefall |"Set" the | branch makes
+				// one of, with any comma-joined quoted values after it:
+				// the regexp reads these.
+				end := skipQuotedValue(query, i)
+				sb.WriteString(query[i:end])
+				i = end
+				continue
+			}
+			end := strings.IndexByte(query[i+1:], '"')
+			if end == -1 {
+				protected = append(protected, query[i:])
+				i = len(query)
+			} else {
+				protected = append(protected, query[i:i+1+end+1])
+				i = i + 1 + end + 1
+			}
+			sb.WriteString(" " + protectedMark + " ")
+			continue
+		}
+		sb.WriteByte(query[i])
+		i++
+	}
+	return pools, protected, sb.String()
+}
+
+// followsBar reports whether the quote at i comes after a Pricefall |,
+// spaces aside.
+func followsBar(query string, i int) bool {
+	j := i - 1
+	for j >= 0 && query[j] == ' ' {
+		j--
+	}
+	return j >= 0 && query[j] == '|'
+}
+
+// poolKeyAt reports whether an in: term, negated or not and in any case,
+// starts at i on a word boundary, and where its value begins.
+func poolKeyAt(query string, i int) (int, bool) {
+	if i > 0 && !unicode.IsSpace(rune(query[i-1])) {
+		return 0, false
+	}
+	j := i
+	if j < len(query) && query[j] == '-' {
+		j++
+	}
+	if j+3 > len(query) || !strings.EqualFold(query[j:j+2], "in") || query[j+2] != ':' {
+		return 0, false
+	}
+	return j + 3, true
+}
+
+// poolValue reads an in: value at start: a parenthesised subquery to its
+// matching paren, a quoted value to its closing quote, or a run of non-space
+// characters. An unbalanced one closes at the end of the query.
+func poolValue(query string, start int) (end int, value string, paren bool) {
+	if start >= len(query) {
+		return start, "", false
+	}
+	switch query[start] {
+	case '(':
+		depth, quoted := 0, false
+		for k := start; k < len(query); k++ {
+			switch query[k] {
+			case '"':
+				// After a key a quote opens a value; a bare one opens a
+				// span only when its closing quote comes before the next
+				// paren, else it is a character of a pattern.
+				switch closing, paren := strings.IndexByte(query[k+1:], '"'), strings.IndexByte(query[k+1:], ')'); {
+				case quoted:
+					quoted = false
+				case strings.IndexByte(":<>", query[k-1]) != -1:
+					quoted = true
+				case closing != -1 && (paren == -1 || closing < paren):
+					quoted = true
+				}
+			case '(':
+				if !quoted {
+					depth++
+				}
+			case ')':
+				if !quoted {
+					depth--
+					if depth == 0 {
+						return k + 1, query[start+1 : k], true
+					}
+				}
+			}
+		}
+		return len(query), query[start+1:], true
+	case '"':
+		closing := strings.IndexByte(query[start+1:], '"')
+		if closing == -1 {
+			return len(query), query[start+1:], false
+		}
+		return start + 1 + closing + 1, query[start+1 : start+1+closing], false
+	}
+	space := strings.IndexFunc(query[start:], unicode.IsSpace)
+	if space == -1 {
+		return len(query), query[start:], false
+	}
+	return start + space, query[start : start+space], false
+}
+
+// skipQuotedValue returns the index past a filter's quoted value at i and
+// past any comma-joined quoted values after it: s:"A B","C D".
+func skipQuotedValue(query string, i int) int {
+	for {
+		closing := strings.IndexByte(query[i+1:], '"')
+		if closing == -1 {
+			return len(query)
+		}
+		i = i + 1 + closing + 1
+		if i+1 < len(query) && query[i] == ',' && query[i+1] == '"' {
+			i++
+			continue
+		}
+		return i
+	}
+}
+
+// restoreProtected puts the quoted free text splitQuery lifted back where
+// it was, along with the spaces splitQuery padded it with. The quotes come
+// off unless verbatim: in a regexp they are characters of the pattern.
+func restoreProtected(query string, protected []string, verbatim bool) string {
+	padded := " " + protectedMark + " "
+	for _, text := range protected {
+		if !verbatim {
+			text = strings.TrimSuffix(strings.TrimPrefix(text, `"`), `"`)
+		}
+		mark := protectedMark
+		if strings.Contains(query, padded) {
+			mark = padded
+		}
+		query = strings.Replace(query, mark, text, 1)
+	}
+	return query
 }
 
 // Return a list of shorthands representing the selected stores
@@ -834,7 +1022,27 @@ func isLetter(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 }
 
-func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
+// parseSearchOptionsNG reads a query into a SearchConfig. The outer query is
+// depth zero; parseSearchOptionsDepth counts the in: pools nested in it.
+func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+	budget := maxPools
+	return parseSearchOptionsDepth(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+}
+
+// maxPoolDepth is how deep in: pools nest. A pool found at depth
+// maxPoolDepth is read as words, the way a set filter naming no set is.
+const maxPoolDepth = 3
+
+// maxPools is how many in: pools one query may carry across every depth;
+// the rest are read as words the way a pool past maxPoolDepth is.
+const maxPools = 8
+
+// stripMarks removes a typed sentinel, so only the scanner's own marks
+// reach restoreProtected and the pool loop.
+var stripMarks = strings.NewReplacer(protectedMark, "", poolMark, "")
+
+func parseSearchOptionsDepth(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
+	query = stripMarks.Replace(query)
 	rawQuery := query
 	var filters []FilterElem
 	var filterStores []FilterStoreElem
@@ -909,6 +1117,12 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 			query = strings.TrimRight(query, "&*~`")
 		}
 	}
+
+	// in: terms and quoted free text come out first: the filter regexp has
+	// no nested region, so a subquery's filters would read as this query's
+	// and a key inside a quoted name as a filter.
+	pools, protected, rest := splitQuery(query)
+	query = rest
 
 	// Iterate over the various possible filters. A set filter no edition
 	// answers to is dropped first, so the words it is made of stay in the
@@ -1493,6 +1707,42 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 		}
 	}
 
+	// A pool is the members of a search of its own, parsed here and resolved
+	// by the search. A bare value is a set when one answers to it, else a
+	// product's contents. A scryfall search keeps no filter, pools included.
+	// A term given nothing vanishes; one past the depth or the budget goes
+	// back into the query as the words it is made of, the way a set filter
+	// naming no set stays.
+	emptyPool := false
+	for _, pool := range pools {
+		if pool.Value == "" {
+			query = strings.Replace(query, poolMark, " ", 1)
+			emptyPool = true
+			continue
+		}
+		if depth >= maxPoolDepth || *budget == 0 || config.SearchMode == "scryfall" {
+			query = strings.Replace(query, poolMark, pool.Raw, 1)
+			continue
+		}
+		query = strings.Replace(query, poolMark, " ", 1)
+		config.AppliedFilters = append(config.AppliedFilters, pool.Raw)
+		*budget--
+		sub := pool.Value
+		if !pool.Paren {
+			if _, err := b.GetSet(pool.Value); err == nil {
+				sub = "s:" + pool.Value
+			} else {
+				sub = `contents:"` + pool.Value + `"`
+			}
+		}
+		subConfig := parseSearchOptionsDepth(b, sub, nil, nil, nil, depth+1, budget)
+		filters = append(filters, FilterElem{
+			Name:   "pool",
+			Negate: pool.Negate,
+			Pool:   &subConfig,
+		})
+	}
+
 	// Support Scryfall bot syntax only when the search mode is not set
 	if config.SearchMode == "" && strings.Contains(query, "|") {
 		elements := strings.Split(query, "|")
@@ -1693,9 +1943,15 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 	// "<set> <number>" shorthand - still see the state they were written for.
 	if config.SearchMode == "" && Config().Game != DefaultGame {
 		config.SearchMode = "any"
+		config.DefaultMode = true
 	}
 
-	config.CleanQuery = strings.TrimSpace(query)
+	config.CleanQuery = strings.TrimSpace(restoreProtected(query, protected, config.SearchMode == "regexp"))
+	// An empty in: that leaves no text and no filter is a pool holding
+	// nothing, resolved already, not a search of everything.
+	if emptyPool && config.CleanQuery == "" && len(config.AppliedFilters) == 0 {
+		filters = append(filters, FilterElem{Name: "pool", Members: map[string]bool{}})
+	}
 	config.CardFilters = filters
 	config.StoreFilters = filterStores
 	config.PriceFilters = filterPrices
@@ -2279,6 +2535,12 @@ func cardFilterColorIdentity(filters []string, co *mtgmatcher.CardObject) bool {
 	return false
 }
 
+// cardFilterPool skips a card the pool does not hold. An unresolved pool
+// holds nothing.
+func cardFilterPool(members map[string]bool, co *mtgmatcher.CardObject) bool {
+	return !members[co.UUID]
+}
+
 func cardFilterIdlookup(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, co.UUID)
 }
@@ -2668,6 +2930,8 @@ func shouldSkipCardNG(b *mtgmatcher.Backend, cardID string, filters []FilterElem
 		switch filters[i].Name {
 		case "name_regexp", "edition_regexp", "number_regexp":
 			res = cardFilterRegexp(filters[i].Name, filters[i].Regexp, co)
+		case "pool":
+			res = cardFilterPool(filters[i].Members, co)
 		default:
 			res = applyCardFilter(b, filters[i].Name, filters[i].Values, co)
 		}
