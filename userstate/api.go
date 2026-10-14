@@ -3,7 +3,9 @@
 package userstate
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -49,10 +51,11 @@ func backpackError(raw json.RawMessage, limit int) string {
 	return ""
 }
 
-// ServeAPI handles GET/PUT on /api/userstate/ and PATCH on /{section} for an
-// already-authenticated email, whose backpack may hold backpackMax cards; a
-// nil db is 503.
-func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string, backpackMax int) {
+// ServeAPI handles GET/PUT on /api/userstate/, PATCH on /{section} and
+// GET/POST/DELETE on /share for an already-authenticated email, whose
+// backpack may hold backpackMax cards; a nil db is 503. game is the site's,
+// which a new share is made for.
+func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game string, backpackMax int) {
 	if !apiLimiter.Allow(email) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many requests"})
 		return
@@ -67,6 +70,10 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string, 
 
 	// Determine section suffix after the base path, if any.
 	section := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/userstate/"), "/")
+	if section == "share" {
+		serveShare(w, r, db, hash, game)
+		return
+	}
 
 	switch r.Method {
 	case http.MethodGet:
@@ -157,6 +164,62 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string, 
 		}
 		writeJSON(w, http.StatusOK, map[string]int64{"version": result.Version})
 
+	default:
+		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// shareStore is what serveShare asks of the store; *Client is one, tests
+// fake it.
+type shareStore interface {
+	ShareFor(ctx context.Context, emailHash, game string) (string, error)
+	CreateShare(ctx context.Context, emailHash, game string) (string, error)
+	RevokeShare(ctx context.Context, emailHash, game string) error
+}
+
+// serveShare is /api/userstate/share: the owner's live favorites share
+// link id. GET shows it, POST makes or replaces it, DELETE ends it.
+func serveShare(w http.ResponseWriter, r *http.Request, db shareStore, hash, game string) {
+	ctx := r.Context()
+	w.Header().Set("Cache-Control", "private, no-store")
+	// The cookie rides cross-site requests; a custom header needs a CORS
+	// preflight that another site's page cannot pass.
+	if (r.Method == http.MethodPost || r.Method == http.MethodDelete) && r.Header.Get("X-Requested-With") != "fetch" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "same-origin only"})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		id, err := db.ShareFor(ctx, hash, game)
+		if err != nil {
+			log.Printf("userstate: share GET failed for %.10s: %v", hash, err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "read failed"})
+			return
+		}
+		if id == "" {
+			writeJSON(w, http.StatusOK, map[string]string{})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"id": id})
+	case http.MethodPost:
+		id, err := db.CreateShare(ctx, hash, game)
+		// A lost race whose winner was revoked meanwhile leaves no id.
+		if err == nil && id == "" {
+			err = errors.New("no live share after create")
+		}
+		if err != nil {
+			log.Printf("userstate: share POST failed for %.10s: %v", hash, err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "write failed"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"id": id})
+	case http.MethodDelete:
+		if err := db.RevokeShare(ctx, hash, game); err != nil {
+			log.Printf("userstate: share DELETE failed for %.10s: %v", hash, err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "write failed"})
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 	}
