@@ -1841,6 +1841,12 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: rgba(0, 0, 0, 0.45);
 }
 
+.m-settings-hint {
+    font-size: 0.8em;
+    color: var(--greytext);
+    margin-bottom: 0.5em;
+}
+
 /* Pill selectors (mutually exclusive) — contained group */
 .m-settings-pills {
     display: flex;
@@ -1931,6 +1937,36 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 .light-theme .m-settings-select {
     background: rgba(0, 0, 0, 0.03);
+}
+
+/* Store adjustments rows; settings-modal.css is not always loaded here */
+.m-settings-section .store-factors-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    margin-bottom: 0.75em;
+}
+.m-settings-section .store-factors-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5em;
+    align-items: center;
+}
+.m-settings-section .store-factors-row .store-factors-store {
+    grid-column: 1 / -1;
+}
+.m-settings-section .store-factors-row input[type="number"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+.m-settings-section .store-factors-row input:disabled {
+    opacity: 0.4;
+}
+.m-settings-section .store-factors-row select,
+.m-settings-section .store-factors-row input,
+.m-settings-section .store-factors-row button {
+    font-size: 0.9em;
+    padding: 0.4em 0.5em;
 }
 
 /* Toggle switches */

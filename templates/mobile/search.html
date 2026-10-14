@@ -804,6 +804,13 @@
                 </div>
             </div>
 
+            {{/* Store adjustments */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Store adjustments</div>
+                <div class="m-settings-hint">Percent off a store's retail, and what its credit is worth to you in percent of face.</div>
+                <div class="store-factors" id="m-set-store-factors" data-stores="{{store_factor_options .SellerKeys .VendorKeys}}"></div>
+            </div>
+
             {{/* Display Options */}}
             <div class="m-settings-section">
                 <div class="m-settings-label">Display Options</div>
@@ -1316,6 +1323,9 @@ function loadSettings() {
     document.querySelectorAll('#m-set-vendors input[type="checkbox"]').forEach(function(cb) {
         cb.checked = vendorList.indexOf(cb.name) !== -1;
     });
+
+    var factors = document.getElementById('m-set-store-factors');
+    if (factors && window.StoreFactors) window.StoreFactors.render(factors, window.StoreFactors.read());
 }
 
 // Save all settings to cookies and show toast
@@ -1371,6 +1381,9 @@ function saveSettings() {
 
     // Close drawer
     closeSettings();
+
+    var factors = document.getElementById('m-set-store-factors');
+    if (factors && window.StoreFactors) window.StoreFactors.saveEditor(factors);
 
     // Show toast
     var toast = document.getElementById('m-fav-toast');

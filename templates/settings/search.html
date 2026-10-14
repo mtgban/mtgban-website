@@ -22,6 +22,18 @@
     </div>
 </section>
 
+<!-- Store adjustments - a discount or a credit value per store -->
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">        <h3>Store adjustments</h3>
+
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">A retail discount you get at a store, in percent off, and what its buylist credit is worth to you, in percent of face. Search shows and ranks the adjusted prices; the store's own number is on hover.</p>
+        <div class="store-factors" id="settings-store-factors" data-stores="{{store_factor_options .SellerKeys .VendorKeys}}"></div>
+    </div>
+</section>
+
 <!-- Result Sorting -->
 <section class="settings-section expanded">
     <div class="settings-section-header" data-role="section-toggle">        <h3>Result Sorting</h3>

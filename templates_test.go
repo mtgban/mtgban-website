@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"html/template"
 	"strings"
 	"testing"
@@ -382,5 +383,58 @@ func TestBuylistDetailTint(t *testing.T) {
 		if !strings.Contains(b.String(), tc.want) || (tc.not != "" && strings.Contains(b.String(), tc.not)) {
 			t.Errorf("signal %q always %v: rendered %s", tc.signal, tc.always, b.String())
 		}
+	}
+}
+
+func TestStoreFactorOptions(t *testing.T) {
+	got := storeFactorOptions([]string{"TCG", "CK"}, []string{"CK", "ABU"})
+	var list []struct {
+		K string `json:"k"`
+		N string `json:"n"`
+		R bool   `json:"r"`
+		B bool   `json:"b"`
+	}
+	if err := json.Unmarshal([]byte(got), &list); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, got)
+	}
+	if len(list) != 3 {
+		t.Fatalf("got %d stores, want 3: %s", len(list), got)
+	}
+	byKey := map[string][2]bool{}
+	for _, s := range list {
+		byKey[s.K] = [2]bool{s.R, s.B}
+		if s.N == "" {
+			t.Errorf("%s has no name", s.K)
+		}
+	}
+	if byKey["CK"] != [2]bool{true, true} || byKey["TCG"] != [2]bool{true, false} || byKey["ABU"] != [2]bool{false, true} {
+		t.Errorf("sides wrong: %v", byKey)
+	}
+	// With no scrapers loaded the names fall back to shorthands
+	if list[0].K != "ABU" || list[1].K != "CK" || list[2].K != "TCG" {
+		t.Errorf("order %s, want ABU, CK, TCG", got)
+	}
+	if storeFactorOptions(nil, nil) != "[]" {
+		t.Errorf("empty is %q, want []", storeFactorOptions(nil, nil))
+	}
+}
+
+func TestStoreFactorOptionsSkipsIndexes(t *testing.T) {
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "IDX", Name: "Index", MetadataOnly: true}),
+	}
+	sellersPtr.Store(&sellers)
+
+	var list []struct {
+		K string `json:"k"`
+	}
+	got := storeFactorOptions([]string{"IDX", "CK"}, nil)
+	if err := json.Unmarshal([]byte(got), &list); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, got)
+	}
+	if len(list) != 1 || list[0].K != "CK" {
+		t.Errorf("got %s, want CK only", got)
 	}
 }
