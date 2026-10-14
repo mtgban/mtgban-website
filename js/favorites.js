@@ -163,6 +163,7 @@
             html += '<span class="m-fav-title">Favorites</span>';
             html += '<span class="m-fav-actions">';
             html += '<span class="m-fav-sort">' + sortPillsHtml() + '</span>';
+            html += shareButtonHtml('mobile');
             html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh prices"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
             html += '<button class="m-fav-clear" onclick="window.clearFavorites(this)">Clear</button>';
             html += '</span>';
@@ -219,6 +220,7 @@
             html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-buylist" onclick="window.sendFavoritesToUploader(\'buylist\')" title="Send to uploader (buylist)" aria-label="Send to uploader (buylist)"><i data-lucide="upload"></i></button>';
             html += '</span>';
             html += '</span>';
+            html += shareButtonHtml('desktop');
             // Charts are login-gated server-side, so only offer the button
             // where the page that rendered the pane could chart at all.
             if (favs.length > 1 && container.dataset.chartsEnabled === 'true') {
@@ -544,6 +546,82 @@
         });
         document.body.appendChild(form);
         form.submit();
+    };
+
+    /* Sharing: a signed-in user's favorites by link. The server keeps one
+     * live link per owner; the panel shows it, copies it, or ends it. */
+    function isSignedIn() {
+        return document.documentElement.dataset.signedIn === 'true';
+    }
+
+    function shareButtonHtml(mode) {
+        if (!isSignedIn()) return '';
+        if (mode === 'mobile') {
+            return '<button class="m-fav-btn m-fav-share" onclick="window.openFavoritesShare(this)" title="Share this list">Share</button>';
+        }
+        return '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.openFavoritesShare(this)" title="Share favorites by link" aria-label="Share favorites by link"><i data-lucide="share-2"></i></button>';
+    }
+
+    function sharePanelHtml(id) {
+        var link = location.origin + '/search/shared?id=' + encodeURIComponent(id);
+        return '<div class="fav-share-panel" id="fav-share-panel">' +
+            '<input class="fav-share-link" type="text" readonly value="' + escapeAttr(link) + '" onclick="this.select()" aria-label="Share link">' +
+            '<button class="landing-pane-btn fav-share-copy" type="button" onclick="window.copyFavoritesShare()">Copy</button>' +
+            '<button class="landing-pane-btn fav-share-stop" type="button" onclick="window.stopFavoritesShare()">Stop sharing</button>' +
+            '</div>';
+    }
+
+    function shareRequest(method) {
+        // The server takes a POST or DELETE only with this header.
+        return fetch('/api/userstate/share', { method: method, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }).then(function(r) {
+            if (r.status === 204) return {};
+            if (!r.ok) throw r.status;
+            return r.json();
+        });
+    }
+
+    // The pending open, so a second click does not POST a second link.
+    var shareBusy = null;
+
+    window.openFavoritesShare = function(btn) {
+        if (shareBusy) return shareBusy;
+        var open = document.getElementById('fav-share-panel');
+        if (open) { open.remove(); return Promise.resolve(); }
+        var pane = btn.closest('.landing-pane, #m-favorites');
+        var pending = shareRequest('GET').then(function(res) {
+            return res.id ? res : shareRequest('POST');
+        }).then(function(res) {
+            var header = pane && pane.querySelector('.landing-pane-header, .m-fav-header');
+            if (header) header.insertAdjacentHTML('afterend', sharePanelHtml(res.id));
+        }).catch(function(status) {
+            showToast(status === 503 ? 'Sharing is unavailable right now' : 'Could not share the list');
+        });
+        var done = function() { shareBusy = null; };
+        pending.then(done, done);
+        shareBusy = pending;
+        return pending;
+    };
+
+    window.copyFavoritesShare = function() {
+        var input = document.querySelector('#fav-share-panel .fav-share-link');
+        if (!input) return;
+        var done = function() { showToast('Link copied'); };
+        var fallback = function() { input.select(); try { document.execCommand('copy'); } catch (e) {} done(); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(done, fallback);
+        } else {
+            fallback();
+        }
+    };
+
+    window.stopFavoritesShare = function() {
+        return shareRequest('DELETE').then(function() {
+            var panel = document.getElementById('fav-share-panel');
+            if (panel) panel.remove();
+            showToast('Sharing stopped');
+        }).catch(function() {
+            showToast('Could not stop sharing');
+        });
     };
 
     // ── Import: restore favorites from an MTGBAN favorites CSV ──────
