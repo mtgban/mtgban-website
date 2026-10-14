@@ -144,6 +144,7 @@ output, not a claim written here.
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
 | `product.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV; price charts and the ids they accept; chart annotations, ban-list markers among them |
 | `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
+| `store_factors.go` | A user's per-store retail discount and credit value from the `SearchStoreFactors` cookie (a mirror of the synced preference), applied to the search offers before they are ranked |
 | `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
 | `alerts_*.go` | Price alerts: the Alerts page, the ACL values and login contact it reads, the site's wiring of `internal/alerts`, and alert mail delivery and the webhook (`docs/adr/0005-price-alerts.md`, `docs/adr/0007-alert-email-address.md`) |
 | `settings_modal.go` | The settings modal's body: the tabs a reader's nav earns, each tab's lists from the handlers' shared functions, served by `/api/settings/modal` and rendered from `templates/settings/` |

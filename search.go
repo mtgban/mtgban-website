@@ -84,6 +84,13 @@ type SearchEntry struct {
 	ExtraValues map[string]float64
 
 	Locked bool
+
+	// OrigPrice and OrigCredit hold the quoted number when a user's store
+	// adjustment rewrote Price or Credit (store_factors.go); zero otherwise.
+	OrigPrice  float64
+	OrigCredit float64
+	// DiscountPct is the percent a store discount took off Price; zero otherwise.
+	DiscountPct int
 }
 
 // marketValue is what a buylist offer is worth on the market: its store
@@ -635,6 +642,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.NoSort = config.SortMode != ""
 
 	result := runSearch(r, ds, config)
+	applyStoreFactors(result, readStoreFactors(r))
 	if result.message != "" {
 		pageVars.Notices = append(pageVars.Notices, result.message)
 	}

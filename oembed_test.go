@@ -154,6 +154,7 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 		if probe.cookie != "" {
 			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: probe.cookie})
 		}
+		req.AddCookie(&http.Cookie{Name: "SearchStoreFactors", Value: "SHOWNIDX:50:"})
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -167,6 +168,12 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 		}
 		if strings.Contains(preview.HTML, "Hidden Index") {
 			t.Errorf("%s: preview quotes a store the blocklist hides:\n%s", probe.name, preview.HTML)
+		}
+		if strings.Contains(preview.HTML, "0.50") {
+			t.Errorf("%s: preview applied the reader's store discount:\n%s", probe.name, preview.HTML)
+		}
+		if !strings.Contains(preview.HTML, "1.00") {
+			t.Errorf("%s: preview does not quote the store's own price:\n%s", probe.name, preview.HTML)
 		}
 	}
 }

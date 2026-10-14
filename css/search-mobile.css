@@ -713,6 +713,13 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     color: var(--greytext);
 }
 
+/* A number a store adjustment rewrote; the details show the quoted one */
+.m-price-adjusted {
+    text-decoration: underline dotted;
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+}
+
 /* Card Kingdom's stock facts and the odds behind its signal */
 .m-vendor-row .m-detail-note {
     padding: 0.25rem 1rem 0.5rem 0.75rem;
