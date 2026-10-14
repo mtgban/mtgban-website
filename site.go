@@ -74,8 +74,9 @@ func newSite() *site {
 		FinishNames:  finishNames,
 		Snapshot:     func() *palette.Snapshot { return s.datastore().palette },
 
-		Sellers: GetSellers,
-		Vendors: GetVendors,
+		Sellers:      GetSellers,
+		Vendors:      GetVendors,
+		HiddenStores: func() []string { return Config().Stores.APIOnlyStores },
 	}
 
 	s.offline = offlineapi.NewService(offlineapi.Deps{

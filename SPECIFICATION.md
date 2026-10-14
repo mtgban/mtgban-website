@@ -719,7 +719,10 @@ A store `stores.api_only_stores` names is the price API's alone: the price
 endpoints, `stores.json` and both API searches serve it to a key whose
 scope reaches it (`ALL_ACCESS`, or a list naming it), and the site hides it
 from every reader, a key signed into the site included: the search page,
-its export, and every surface reading the search block lists.
+its export, every surface reading the search block lists, Arbitrage,
+Reverse and Global as a source or a table whatever `ArbitEnabled` grants,
+their settings grids, the palette's store list, and the guide's store
+reference.
 
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 

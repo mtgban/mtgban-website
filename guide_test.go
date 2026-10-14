@@ -51,3 +51,38 @@ func TestGuideStoresBreakNameTiesByShorthand(t *testing.T) {
 		}
 	}
 }
+
+// The guide's store reference lists what a site search can name, so the
+// stores only the price API serves are left out, sellers and vendors both.
+func TestGuideStoresLeaveOutAPIOnlyStores(t *testing.T) {
+	withConfigCopy(t)
+	Config().Stores.APIOnlyStores = []string{"APIINDEX", "APIBUY"}
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "An Index", Shorthand: "APIINDEX", MetadataOnly: true}),
+	}
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Card Kingdom", Shorthand: "CK"}),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "A Buylist", Shorthand: "APIBUY"}),
+	}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	var stores []GuideStore
+	err := json.Unmarshal([]byte(guideStoresJSON()), &stores)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, s := range stores {
+		got = append(got, s.Code)
+	}
+	if !slices.Equal(got, []string{"CK"}) {
+		t.Errorf("guide stores %v, want only CK", got)
+	}
+}

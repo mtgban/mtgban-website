@@ -181,6 +181,11 @@ func (c *ConfigType) siteBuylistBlockList() []string {
 	return append(slices.Clip(c.Stores.SearchBuylistBlockList), c.Stores.APIOnlyStores...)
 }
 
+// apiOnly reports whether the store is one only the price API serves.
+func (c *ConfigType) apiOnly(shorthand string) bool {
+	return slices.Contains(c.Stores.APIOnlyStores, shorthand)
+}
+
 var DevMode bool
 var SigCheck bool
 var SkipPrices bool
