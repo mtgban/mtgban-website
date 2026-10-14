@@ -14,7 +14,47 @@ var __acCardMetaInflight = {};
  * searchfilter.go): a token shaped like one of these is a search filter, not
  * part of a card name, so suggestions match on the remaining words only and
  * the completed value carries the filters along. */
-var __acFilterToken = /^-?(format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cns|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
+var __acFilterToken = /^-?(in|format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cns|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
+
+/* An in:(...) pool is one filter, to its matching paren: split on spaces it
+ * would hand its own filters to the name. Pushes each span onto filters and
+ * returns the text with a space in its place. */
+function __acLiftPools(val, filters) {
+    var out = '';
+    var i = 0;
+    while (i < val.length) {
+        var m = /^-?in:\(/i.exec(val.slice(i));
+        var boundary = i === 0 || /\s/.test(val.charAt(i - 1));
+        if (m && boundary) {
+            var depth = 0, quoted = false, k = i + m[0].length - 1;
+            for (; k < val.length; k++) {
+                var ch = val.charAt(k);
+                if (ch === '"') {
+                    /* After a key a quote opens a value; a bare one only when
+                     * its closing quote comes before the next paren */
+                    var closing = val.indexOf('"', k + 1), paren = val.indexOf(')', k + 1);
+                    if (quoted) {
+                        quoted = false;
+                    } else if (/[:<>]/.test(val.charAt(k - 1)) || (closing !== -1 && (paren === -1 || closing < paren))) {
+                        quoted = true;
+                    }
+                } else if (!quoted && ch === '(') {
+                    depth++;
+                } else if (!quoted && ch === ')' && --depth === 0) {
+                    k++;
+                    break;
+                }
+            }
+            filters.push(val.slice(i, k));
+            out += ' ';
+            i = k;
+            continue;
+        }
+        out += val.charAt(i);
+        i++;
+    }
+    return out;
+}
 
 /* Leading words a name may be found without. Nobody types "Secret Lair Drop"
  * to find a drop, and 762 of the 4,184 sealed names begin with it. */
@@ -383,8 +423,8 @@ function autocomplete(form, inp, sealed) {
         var filterPrefix = '';
         if (/[:<>]/.test(val)) {
             var filters = [];
-            /* Quoted option values may contain spaces, extract them first */
-            var rest = val.replace(/-?[a-zA-Z_]+[:<>]"[^"]*"/g, function (m) {
+            /* Pools first, then quoted option values, which may contain spaces */
+            var rest = __acLiftPools(val, filters).replace(/-?[a-zA-Z_]+[:<>]"[^"]*"/g, function (m) {
                 if (__acFilterToken.test(m)) {
                     filters.push(m);
                     return ' ';
@@ -620,5 +660,6 @@ if (typeof self !== "undefined") {
         matchOffset: __acMatchOffset,
         originalSpan: __acOriginalSpan,
         matchSpan: __acMatchSpan,
+        liftPools: __acLiftPools,
     };
 }
