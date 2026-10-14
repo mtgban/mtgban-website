@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -47,6 +48,42 @@ func TestSettingsKeysWithNoScrapers(t *testing.T) {
 	r, b := sleepBlocklists("")
 	if s, v := sleepModalKeys(r, b); len(s) != 0 || len(v) != 0 {
 		t.Errorf("sleep keys = %v %v, want none", s, v)
+	}
+}
+
+// The search grids and the upload store lists leave out the stores only
+// the price API serves, sealed ones included.
+func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
+	store := func(shorthand string, sealed bool) mtgban.ScraperInfo {
+		return mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand, SealedMode: sealed}
+	}
+	publishStores(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("SHOP", false)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("APISHOP", false)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("SHOPSEALED", true)),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, store("APISEALED", true)),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, store("BUY", false)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, store("APIBUY", false)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, store("BUYSEALED", true)),
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, store("APIBUYSEALED", true)),
+	})
+	withConfigCopy(t)
+	Config().Stores.APIOnlyStores = []string{"APISHOP", "APISEALED", "APIBUY", "APIBUYSEALED"}
+
+	sellers, vendors := searchSettingsKeys()
+	singlesSellers, sealedSellers, singlesVendors, sealedVendors := uploadStoreLists("")
+	for name, c := range map[string]struct{ got, want []string }{
+		"search sellers":         {sellers, []string{"SHOP", "SHOPSEALED"}},
+		"search vendors":         {vendors, []string{"BUY", "BUYSEALED"}},
+		"upload singles sellers": {singlesSellers, []string{"SHOP"}},
+		"upload sealed sellers":  {sealedSellers, []string{"SHOPSEALED"}},
+		"upload singles vendors": {singlesVendors, []string{"BUY"}},
+		"upload sealed vendors":  {sealedVendors, []string{"BUYSEALED"}},
+	} {
+		if !slices.Equal(c.got, c.want) {
+			t.Errorf("%s = %v, want %v", name, c.got, c.want)
+		}
 	}
 }
 

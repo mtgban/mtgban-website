@@ -12,15 +12,13 @@ import (
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
-// searchSettingsKeys lists every loaded seller and vendor, in display order.
+// searchSettingsKeys lists every loaded seller and vendor the site shows,
+// in display order.
 func searchSettingsKeys() (sellers, vendors []string) {
-	for _, seller := range GetSellers() {
-		sellers = append(sellers, seller.Info().Shorthand)
+	shown := func(info mtgban.ScraperInfo) bool {
+		return !Config().apiOnly(info.Shorthand)
 	}
-	for _, vendor := range GetVendors() {
-		vendors = append(vendors, vendor.Info().Shorthand)
-	}
-	return sortKeysByScraperName(sellers), sortKeysByScraperName(vendors)
+	return sortKeysByScraperName(filterSellers(shown)), sortKeysByScraperName(filterVendors(shown))
 }
 
 // arbitBlockedVendors is the reader's ArbitDisabledVendors grant, or the
@@ -102,7 +100,8 @@ func uploadStoreLists(sig string) (singlesSellers, sealedSellers, singlesVendors
 	})
 	sealedSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.MetadataOnly && info.SealedMode &&
-			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand)
+			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand) &&
+			!Config().apiOnly(info.Shorthand)
 	})
 	singlesVendors = filterVendors(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode &&
@@ -110,7 +109,8 @@ func uploadStoreLists(sig string) (singlesSellers, sealedSellers, singlesVendors
 	})
 	sealedVendors = filterVendors(func(info mtgban.ScraperInfo) bool {
 		return info.SealedMode &&
-			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand)
+			!slices.Contains(Config().Stores.UploadSealedBlockList, info.Shorthand) &&
+			!Config().apiOnly(info.Shorthand)
 	})
 	return singlesSellers, sealedSellers, singlesVendors, sealedVendors
 }
