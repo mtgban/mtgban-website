@@ -1564,6 +1564,13 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 .price-row .price-wait {
     color: var(--awarning);
 }
+/* A number a store adjustment rewrote; the quoted one is in the title */
+.price-row .price-adjusted .amt,
+.buylist-extra.adjusted {
+    text-decoration: underline dotted;
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+}
 .price-row .store-cell .ck-wait {
     flex-shrink: 0;
     color: var(--awarning);
