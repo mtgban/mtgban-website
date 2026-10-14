@@ -1,10 +1,14 @@
 package main
 
 import (
+	"os"
+	"slices"
 	"strconv"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 func TestSplitIDPrefix(t *testing.T) {
@@ -298,4 +302,95 @@ func TestTCGSubTypeForCardGenericNames(t *testing.T) {
 			t.Errorf("%s: got %q, want %q", finish, got, want)
 		}
 	}
+}
+
+// One card's printings share a TCGplayer product name, so a roster of them is
+// told apart by the card each variant maps to, in every game whose datastore
+// is at hand; a product mtgmatcher does not know keeps the product name.
+func TestNonMagicPrintingLabelsEachPrinting(t *testing.T) {
+	var ran int
+	for game, envVar := range gameDatastores {
+		path := os.Getenv(envVar)
+		if path == "" {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			t.Errorf("%s: %v", game, err)
+			continue
+		}
+		b, err := mtgmatcher.Open(game, f)
+		f.Close()
+		if err != nil {
+			t.Errorf("%s: %v", game, err)
+			continue
+		}
+		ran++
+
+		t.Run(string(game), func(t *testing.T) {
+			name, products := productsSharingAName(b)
+			if len(products) < 2 {
+				t.Skip("no card printed under two products")
+			}
+			labels := map[string]bool{}
+			for i, pid := range products {
+				vi := timeseries.VariantInfo{BanID: int64(i + 1), TCGProductID: pid, TCGSubType: "Normal"}
+				target := nonMagicPrinting(b, vi, name)
+				co, err := b.GetUUID(target.SearchID)
+				if err != nil {
+					t.Fatalf("product %d: search id %q: %v", pid, target.SearchID, err)
+				}
+				if target.Name != name || target.Label != co.String() {
+					t.Errorf("product %d: name/label = %q/%q, want %q/%q", pid, target.Name, target.Label, name, co.String())
+				}
+				labels[target.Label] = true
+			}
+			if len(labels) != len(products) {
+				t.Errorf("%d printings of %s drew %d labels: %v", len(products), name, len(labels), labels)
+			}
+
+			unknown := nonMagicPrinting(b, timeseries.VariantInfo{BanID: 1, TCGProductID: -1}, name)
+			if unknown.SearchID != "" || unknown.Label != name {
+				t.Errorf("unknown product: search id/label = %q/%q, want none/%q", unknown.SearchID, unknown.Label, name)
+			}
+		})
+	}
+	if ran == 0 {
+		t.Skip("no non-Magic datastore configured")
+	}
+}
+
+// productsSharingAName finds a card name printed under more than one TCGplayer
+// product, each sold plain, and those products: one per printing mtgmatcher
+// tells apart, since One Piece files several promos under one set and number.
+func productsSharingAName(b *mtgmatcher.Backend) (string, []int) {
+	uuids := slices.Sorted(slices.Values(b.GetUUIDs()))
+	byName := map[string][]int{}
+	printings := map[string]bool{}
+	var order []string
+	for _, uuid := range uuids {
+		co, err := b.GetUUID(uuid)
+		if err != nil || co.Sealed {
+			continue
+		}
+		pid, err := strconv.Atoi(co.Identifiers["tcgplayerProductId"])
+		if err != nil {
+			continue
+		}
+		plain, err := b.GetUUID(tcgFinishID(b, pid, "Normal"))
+		if err != nil || printings[plain.String()] {
+			continue
+		}
+		printings[plain.String()] = true
+		if byName[co.Name] == nil {
+			order = append(order, co.Name)
+		}
+		byName[co.Name] = append(byName[co.Name], pid)
+	}
+	for _, name := range order {
+		if len(byName[name]) > 1 {
+			return name, byName[name]
+		}
+	}
+	return "", nil
 }

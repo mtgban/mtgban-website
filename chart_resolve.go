@@ -376,18 +376,33 @@ func targetFromBanID(ctx context.Context, b *mtgmatcher.Backend, banID int64) (*
 // the tcg_products catalog and tagging the printing's sub-type when it is not the
 // base ("Normal").
 func nonMagicTarget(ctx context.Context, b *mtgmatcher.Backend, vi timeseries.VariantInfo) *chartTarget {
-	t := &chartTarget{BanID: vi.BanID}
+	var name string
+	p, ok, _ := PricesArchiveDB.GetTCGProduct(ctx, vi.TCGProductID)
+	if ok {
+		name = p.Name
+		if vi.TCGSubType != "" && vi.TCGSubType != "Normal" {
+			name += " (" + vi.TCGSubType + ")"
+		}
+	}
+	return nonMagicPrinting(b, vi, name)
+}
+
+// nonMagicPrinting is the chart target of a non-Magic variant whose product the
+// catalog names name. It is labelled as the card mtgmatcher maps the variant
+// to, since one card's printings share a product name; the name stands in
+// where mtgmatcher does not know the product.
+func nonMagicPrinting(b *mtgmatcher.Backend, vi timeseries.VariantInfo, name string) *chartTarget {
+	t := &chartTarget{BanID: vi.BanID, Name: name, Label: name}
 	// The product id maps back to the game's own card id, on the finish the
 	// variant's sub-type names.
-	if searchID, ok := tcgVariantSearchID(b, vi); ok {
-		t.SearchID = searchID
+	searchID, ok := tcgVariantSearchID(b, vi)
+	if !ok {
+		return t
 	}
-	if p, ok, _ := PricesArchiveDB.GetTCGProduct(ctx, vi.TCGProductID); ok {
-		t.Name = p.Name
-		if vi.TCGSubType != "" && vi.TCGSubType != "Normal" {
-			t.Name += " (" + vi.TCGSubType + ")"
-		}
-		t.Label = t.Name
+	t.SearchID = searchID
+	co, err := b.GetUUID(searchID)
+	if err == nil {
+		t.Label = co.String()
 	}
 	return t
 }
