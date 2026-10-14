@@ -222,6 +222,12 @@ POST https://manapool.com/api/v1/buyer/optimizer
   carry none: the optimizer needs to be told a product's type.
 - It answers a guest too, with `{"cart": [{"inventory_id", "quantity_selected"}]}`,
   the cheapest listings that fill each line, in 0.34 s for two lines.
+  A filled answer is `application/x-ndjson`: one better solution per line
+  while the optimizer works, two over 2 s for 68 cards, 6 s for 200. The
+  loader reads the stream as it comes, keeps the last solution, and shows
+  its total in the banner; read as one JSON document, a list of more than
+  a few dozen cards failed on its second line ("refused the list (200)").
+  From outside the site, without its cookies, the call answers 401.
 - A line it cannot fill fails the whole call with a 409 whose `details`
   name each such line by `item.index`, with `total_available`. The loader
   asks again with those lines cut to what Mana Pool has, or without them.

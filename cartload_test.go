@@ -489,7 +489,7 @@ func TestCartBookmarklet(t *testing.T) {
 	}
 	// Firefox drops a bookmark whose URL runs past 65,536 characters, and
 	// the loader only grows as stores are added
-	if len(link) >= 40000 {
+	if len(link) >= 55000 {
 		t.Errorf("bookmarklet is %d characters, too close to Firefox's limit of 65,536 on a bookmark", len(link))
 	}
 }

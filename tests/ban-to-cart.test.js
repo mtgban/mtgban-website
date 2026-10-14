@@ -92,8 +92,12 @@ async function run({host = 'abugames.com', path = '/cartview/buylist', search = 
     if (abu.attach) {
         abu.attach(page);
     }
+    // The banner keeps every text it shows
+    const banner = {style: {}, remove() {}, texts: []};
+    Object.defineProperty(banner, 'textContent', {get: () => banner.texts[banner.texts.length - 1], set: (text) => banner.texts.push(text)});
+    page.banner = banner;
     const document = {
-        createElement: () => ({style: {}, remove() {}}),
+        createElement: () => banner,
         body: {appendChild() {}},
         cookie,
         querySelector: (selector) => (loginLink && selector === 'a[href$="/login"]' ? {} : null),
@@ -462,8 +466,9 @@ describe('ban-to-cart bookmarklet on MTG Mint Card', () => {
 // fakeMP stands in for Mana Pool's optimizer: it fills each product line
 // from the listings stock holds, cheapest first, or refuses the whole call
 // with a 409 naming every line it cannot fill and what it has, as Mana Pool
-// does.
-function fakeMP({stock = {}, meanwhile = null} = {}) {
+// does. A fill streams as one solution per line, a worse one first where
+// streamed is set, split over chunks as Mana Pool's stream arrives.
+function fakeMP({stock = {}, meanwhile = null, streamed = false, extra = ''} = {}) {
     const posts = [];
     let page;
     const fetch = async (url, opts = {}) => {
@@ -491,9 +496,20 @@ function fakeMP({stock = {}, meanwhile = null} = {}) {
             }
         });
         if (details.length > 0) {
-            return {ok: false, status: 409, json: async () => ({status: 409, message: 'Could not find inventory to satisfy request', details})};
+            return {ok: false, status: 409, text: async () => JSON.stringify({status: 409, message: 'Could not find inventory to satisfy request', details})};
         }
-        return {ok: true, status: 200, json: async () => ({cart, totals: {}})};
+        const best = JSON.stringify({cart, totals: {total_cents: 1500}}) + '\n';
+        if (!streamed) {
+            return {ok: true, status: 200, text: async () => best};
+        }
+        const worse = JSON.stringify({cart: [], totals: {total_cents: 2000}}) + '\n';
+        const bytes = new TextEncoder().encode(worse + extra + best);
+        // The middle cut falls inside the last é's two bytes, if there is
+        // one, for the next chunk to complete
+        const e = bytes.lastIndexOf(0xc3);
+        const cuts = [10, e > worse.length ? e + 1 : worse.length + 5, bytes.length];
+        const parts = cuts.map((end, i) => bytes.slice(i ? cuts[i - 1] : 0, end));
+        return {ok: true, status: 200, body: {getReader: () => ({read: async () => (parts.length ? {done: false, value: parts.shift()} : {done: true})})}};
     };
     return {fetch, posts, attach: (p) => { page = p; }};
 }
@@ -535,6 +551,22 @@ describe('ban-to-cart bookmarklet on Mana Pool', () => {
         expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => [e.inventoryId, e.quantitySelected])).toEqual([['inv-a', 2], ['inv-c', 1]]);
         expect(alerts).toEqual(['Added 2 cards to your Mana Pool cart, on top of what it held. 1 were cut to the copies Mana Pool has. ' +
             '1 that Mana Pool has none of were left out. 1 on BAN have no Mana Pool item and were left out.']);
+    });
+
+    test('a streamed answer is read to its last solution, shown as it comes', async () => {
+        const mp = fakeMP({streamed: true, stock: {'p-1': [{id: 'inv-a', qty: 3}]}});
+        const {alerts, page} = await run({...cartPage, hash: '#ban=p-1:2&side=retail', abu: mp});
+        expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => [e.inventoryId, e.quantitySelected])).toEqual([['inv-a', 2]]);
+        expect(page.banner.texts).toContain('BAN: Mana Pool is finding the cheapest listings for 1 cards, best so far $20.00. Keep this tab open until it finishes.');
+        expect(page.banner.texts).toContain('BAN: Mana Pool is finding the cheapest listings for 1 cards, best so far $15.00. Keep this tab open until it finishes.');
+        expect(alerts).toEqual(['Added 1 cards to your Mana Pool cart, on top of what it held.']);
+    });
+
+    test('a character split between chunks, and a line that is no solution, do not lose the answer', async () => {
+        const mp = fakeMP({streamed: true, extra: 'null\n', stock: {'p-1': [{id: 'inv-é', qty: 3}]}});
+        const {alerts, page} = await run({...cartPage, hash: '#ban=p-1:1&side=retail', abu: mp});
+        expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => e.inventoryId)).toEqual(['inv-é']);
+        expect(alerts).toEqual(['Added 1 cards to your Mana Pool cart, on top of what it held.']);
     });
 
     test('a change made to the cart while the optimizer answers is kept', async () => {
