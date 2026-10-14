@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"maps"
 	"net/http"
 	"net/http/httptest"
@@ -261,6 +263,78 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 	testSite.SearchAPI(rec, req)
 	if !strings.Contains(rec.Body.String(), "Star City Games") {
 		t.Errorf("the search page's export lost a store: %s", rec.Body.String())
+	}
+}
+
+// A store only the price API serves follows a key's scope on search as on
+// the price endpoints, and stays off the site's search page and export.
+func TestSearchAPIKeysReachAPIOnlyStores(t *testing.T) {
+	name := searchStores(t)
+	signingEnabled(t, true)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+	withConfigCopy(t)
+	Config().Stores.APIOnlyStores = []string{"SCG"}
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+
+	handler := enforceAPISigning(http.HandlerFunc(testSite.SearchAPI))
+	requests := 0
+	search := func(prefix, scope string) string {
+		t.Helper()
+		key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+			API:     scope,
+			Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"plan@example.com"}},
+			Expires: time.Now().Add(time.Hour).Unix(),
+		})
+		req := httptest.NewRequest(http.MethodGet, prefix+"retail/"+url.PathEscape(name)+".json?sig="+url.QueryEscape(key), nil)
+		// The API limiter is shared and keyed on the address.
+		requests++
+		req.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", 160+requests)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Body.String()
+	}
+	// v1 keys a store by its name, v2 by its shorthand.
+	for prefix, label := range map[string][2]string{
+		"/api/mtgban/search/": {"Card Kingdom", "Star City Games"},
+		"/api/v2/search/":     {`"CK"`, `"SCG"`},
+	} {
+		for scope, want := range map[string]bool{"ALL_ACCESS": true, "CK,SCG": true, "CK": false} {
+			body := search(prefix, scope)
+			if !strings.Contains(body, label[0]) {
+				t.Fatalf("%s %s: a store in scope is missing: %s", prefix, scope, body)
+			}
+			if strings.Contains(body, label[1]) != want {
+				t.Errorf("%s %s: the API-only store shown %v, want %v", prefix, scope, !want, want)
+			}
+		}
+	}
+
+	// The same key signed into the site sees the site's stores there.
+	cookie := signedAs(t, url.Values{"UserEmail": {"key@example.com"}, "API": {"ALL_ACCESS"}, "SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
+	for _, page := range []struct {
+		target string
+		serve  func(http.ResponseWriter, *http.Request)
+	}{
+		{"/search/export/retail/" + url.PathEscape(name) + ".csv", testSite.SearchAPI},
+		{"/search?q=" + url.QueryEscape(name), testSite.Search},
+	} {
+		req := httptest.NewRequest(http.MethodGet, page.target, nil)
+		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		rec := httptest.NewRecorder()
+		page.serve(rec, req)
+		body := rec.Body.String()
+		if !strings.Contains(body, "Card Kingdom") {
+			t.Fatalf("%s: a store the site shows is missing: %s", page.target, body)
+		}
+		if strings.Contains(body, "Star City Games") {
+			t.Errorf("%s: the site showed the API-only store", page.target)
+		}
 	}
 }
 

@@ -1557,10 +1557,19 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 	return blocklistsFromValues(parseSig(sig))
 }
 
-// blocklistsFromValues reads the store blocklists off ACL values: an absent
-// key falls back to the config list, NONE clears it. The stores only the
-// price API serves are blocked whatever the values say.
+// blocklistsFromValues reads the store blocklists off ACL values, as
+// sigBlocklists does, plus the stores only the price API serves, blocked
+// whatever the values say.
 func blocklistsFromValues(v url.Values) ([]string, []string) {
+	retail, buylist := sigBlocklists(v)
+	retail = append(retail, Config().Stores.APIOnlyStores...)
+	buylist = append(buylist, Config().Stores.APIOnlyStores...)
+	return retail, buylist
+}
+
+// sigBlocklists reads the store blocklists off ACL values: an absent key
+// falls back to the config list, NONE clears it.
+func sigBlocklists(v url.Values) ([]string, []string) {
 	var retail, buylist []string
 	opt := v.Get("SearchDisabled")
 	switch opt {
@@ -1578,8 +1587,6 @@ func blocklistsFromValues(v url.Values) ([]string, []string) {
 	default:
 		buylist = strings.Split(opt, ",")
 	}
-	retail = append(retail, Config().Stores.APIOnlyStores...)
-	buylist = append(buylist, Config().Stores.APIOnlyStores...)
 	return retail, buylist
 }
 

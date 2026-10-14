@@ -603,7 +603,18 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A key sees only the stores it was sold, as on the price API. Its scope
+	// is one more store filter, so the query's own still narrow within it.
+	// A site login signs API=true for the API page, which names no store.
+	storesOpt := GetParamFromSig(sig, "API")
+	keyScoped := storesOpt != "" && storesOpt != "true" && isAPI
+
+	// The stores only the price API serves are a key's to see if its scope
+	// names them, and hidden from everyone else.
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	if keyScoped {
+		blocklistRetail, blocklistBuylist = sigBlocklists(parseSig(sig))
+	}
 
 	// Expand blocklist as needed
 	skipSellersOpt := readCookie(r, "SearchSellersList")
@@ -687,11 +698,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 		}}
 	}
 
-	// A key sees only the stores it was sold, as on the price API. Its scope
-	// is one more store filter, so the query's own still narrow within it.
-	// A site login signs API=true for the API page, which names no store.
-	storesOpt := GetParamFromSig(sig, "API")
-	if storesOpt != "" && storesOpt != "true" && isAPI {
+	if keyScoped {
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
 			Name:   "store",
 			Values: fixupStoreCodeNG(strings.Join(apiEnabledStores(storesOpt), ",")),

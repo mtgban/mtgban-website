@@ -715,6 +715,12 @@ for sealed, but takes the `id` a request asks for, sealed included, and
 refuses one v2 does not know. Stores are keyed by shorthand, as in all of
 v2. Its `.csv` is v1's search CSV.
 
+A store `stores.api_only_stores` names is the price API's alone: the price
+endpoints, `stores.json` and both API searches serve it to a key whose
+scope reaches it (`ALL_ACCESS`, or a list naming it), and the site hides it
+from every reader, a key signed into the site included: the search page,
+its export, and every surface reading the search block lists.
+
 ### 5.8 Discord bot (`discord.go`, `embed.go`, `internal/embed/`)
 
 `discordgo` session with Guilds + GuildMessages intents. Commands: `!card` /
