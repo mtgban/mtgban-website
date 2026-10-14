@@ -39,7 +39,8 @@ func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
 
 	// A blank user is the demo user, from the button and the form alike.
 	for _, tool := range []string{"demokey", "newKey&user=&duration=30"} {
-		req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&tool="+tool, nil)
+		req := httptest.NewRequest(http.MethodPost, "/admin?page=tools", strings.NewReader("tool="+tool))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Host = "mtgban.com"
 		rec := httptest.NewRecorder()
 		testSite.Admin(rec, req)
@@ -74,7 +75,9 @@ func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 	const user = "ops@example.com"
 	withAPIUserSecret(t, user, goldenSecret)
 
-	req := httptest.NewRequest(http.MethodGet, "/admin?page=tools&tool=newKey&user="+user+"&duration=", nil)
+	form := url.Values{"tool": {"newKey"}, "user": {user}, "duration": {""}}
+	req := httptest.NewRequest(http.MethodPost, "/admin?page=tools", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Host = "mtgban.com"
 	rec := httptest.NewRecorder()
 	testSite.Admin(rec, req)
