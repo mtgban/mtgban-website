@@ -630,6 +630,17 @@
         icon: setsProvider.icon,
         getCandidates: setsProvider.getCandidates
     });
+    // in: scopes a search to a set, a product or a subquery; only the set
+    // code is a menu's to offer.
+    register({
+        prefix: 'in:',
+        name: setsProvider.name,
+        icon: setsProvider.icon,
+        getCandidates: function (query, ctx) {
+            if (/^[("]/.test(query)) return [];
+            return setsProvider.getCandidates(query, ctx);
+        }
+    });
 
     // ── Stores provider (store: / seller: / vendor:) ─────────────
 

@@ -62,7 +62,7 @@ const catalogSets = {
 };
 
 test('offline, the sets come from the catalog', async () => {
-    for (const prefix of ['s:', 'e:']) {
+    for (const prefix of ['s:', 'e:', 'in:']) {
         const { providers, opened } = load(null, { catalogSets }, true);
         expect(await values(providers, prefix)).toEqual(['MST', 'WTR']);
         expect(opened).toEqual(['catalogSets']);
@@ -165,4 +165,14 @@ test('Magic keeps its letters and named groups', () => {
         expect(offered.slice(0, 5)).toEqual(['W', 'U', 'B', 'R', 'G']);
         expect(offered).toContain('azorius');
     }
+});
+
+// After in:( or in:" the value is a subquery or a product, not a set code,
+// so the menu stands down and lets the person type.
+test('in: offers no set once a paren or quote opens the value', async () => {
+    const { providers } = load(null, { catalogSets }, true);
+    await values(providers, 'in:');
+    expect(providers.getProvider('in:').getCandidates('(s:')).toEqual([]);
+    expect(providers.getProvider('in:').getCandidates('"Comm')).toEqual([]);
+    expect(providers.getProvider('in:').getCandidates('mst').length).toBe(1);
 });
