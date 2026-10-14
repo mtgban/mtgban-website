@@ -3,8 +3,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // The search page loads both, and a widened single-card chart is rebuilt with
-// chart-range.js's chartDatasetConfig.
-const scripts = ['chartopts.js', 'chart-range.js']
+// chart-range.js's chartDatasetConfig. utils.js, which base.html loads first,
+// holds the escapeHtml they write labels with.
+const scripts = ['utils.js', 'chartopts.js', 'chart-range.js']
     .map((name) => readFileSync(join(import.meta.dir, '..', 'js', name), 'utf8'))
     .join('\n');
 
@@ -146,4 +147,51 @@ test('flags saved by position hide nothing, and the next click replaces them', (
 
     card.click(BUYLIST);
     expect(JSON.parse(viewer.getItem(KEY))).toEqual(['Card Kingdom Buylist']);
+});
+
+// fakeElement is enough of a created element for the tooltip to fill and place.
+function fakeElement() {
+    return { style: {}, innerHTML: '', appendChild() {} };
+}
+
+// A label can be a TCGplayer product name from tcgcsv, and a card id is the
+// one the roster url names, so neither may reach the page as markup.
+const MARKUP = '<img src=x onerror="alert(1)">';
+
+// tags lists the elements an html string opens, which is what it would add to
+// the page beyond text.
+const tags = (html) => [...html.matchAll(/<([a-z]+)/g)].map(([, tag]) => tag);
+
+// unescape reads html text back as the text it shows.
+const unescape = (html) => html.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+
+test('a legend entry shows its label and card id as text', () => {
+    const legend = { innerHTML: '', querySelectorAll: () => [] };
+    const document = { getElementById: () => legend };
+    const page = new Function('Chart', 'document', 'localStorage', scripts +
+        '; return { renderChartLegend };')(Chart, document, storage());
+    const cardId = '" onmouseover="alert(2)';
+    page.renderChartLegend(new Chart([{ label: MARKUP, cardId, data: [1], borderColor: 'red' }]), 'chartLegend');
+
+    expect(tags(legend.innerHTML)).toEqual(['button', 'span']);
+    const [, id, label] = legend.innerHTML.match(/data-card-id="([^"]*)".*<\/span>([^<]*)<\/button>/);
+    expect(unescape(id)).toBe(cardId);
+    expect(unescape(label)).toBe(MARKUP);
+});
+
+test('a tooltip row shows its line as text', () => {
+    const el = fakeElement();
+    const document = { getElementById: () => null, createElement: () => el };
+    const page = new Function('Chart', 'document', 'localStorage', scripts +
+        '; return { externalTooltipHandler };')(Chart, document, storage());
+    const container = { querySelector: () => null, appendChild() {}, clientWidth: 100 };
+    const line = MARKUP + ': $1.00';
+    page.externalTooltipHandler({
+        chart: { canvas: { parentNode: container, offsetLeft: 0, offsetTop: 0 }, width: 100 },
+        tooltip: { opacity: 1, body: [{ lines: [line] }], labelColors: [{ borderColor: 'red' }], caretX: 0, caretY: 0 },
+    });
+
+    expect(tags(el.innerHTML)).toEqual(['div', 'span', 'span']);
+    expect(unescape(el.innerHTML.match(/<span>([^<]*)<\/span>/)[1])).toBe(line);
 });
