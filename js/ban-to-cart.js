@@ -574,17 +574,21 @@
             upload: async function (rows, qty) {
                 readCart();
                 var lines = rows.map(function (id) {
-                    return {id: id, qty: qty[id]};
+                    return {id: id, qty: qty[id], want: qty[id]};
                 });
                 var picks = [];
-                var trimmed = 0;
-                var missing = 0;
+                // cutSoFar counts the lines a 409 has cut or dropped so far
+                function cutSoFar(all) {
+                    return all.filter(function (line) {
+                        return line.qty < line.want;
+                    }).length;
+                }
                 // The optimizer takes up to 2,000 lines a call
                 for (var i = 0; i < lines.length; i += 2000) {
                     var chunk = lines.slice(i, i + 2000);
                     while (chunk.length > 0) {
                         banner.textContent = "BAN: asking Mana Pool for " + chunk.length + " cards" +
-                            (trimmed + missing > 0 ? ", " + (trimmed + missing) + " cut or left out so far" : "") +
+                            (cutSoFar(lines) > 0 ? ", " + cutSoFar(lines) + " cut or left out so far" : "") +
                             ". Keep this tab open until it finishes.";
                         var resp = await fetch("/api/v1/buyer/optimizer", {
                             method: "POST",
@@ -606,10 +610,8 @@
                                 cut++;
                                 if (detail.total_available > 0 && detail.total_available < line.qty) {
                                     line.qty = detail.total_available;
-                                    trimmed++;
                                 } else {
                                     line.qty = 0;
-                                    missing++;
                                 }
                             });
                             if (cut === 0) {
@@ -627,6 +629,14 @@
                         break;
                     }
                 }
+                // A line can be cut by one 409 and dropped by the next, so
+                // each counts once, by what was last asked of it
+                var trimmed = lines.filter(function (line) {
+                    return line.qty > 0 && line.qty < line.want;
+                }).length;
+                var missing = lines.filter(function (line) {
+                    return line.qty === 0;
+                }).length;
                 // Read again with no wait before the write, so a change made
                 // meanwhile stays; added the way Mana Pool's own optimizer
                 // adds a listing

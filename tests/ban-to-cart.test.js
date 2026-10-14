@@ -476,7 +476,7 @@ function fakeMP({stock = {}, meanwhile = null, streamed = false, extra = ''} = {
         const body = JSON.parse(opts.body);
         posts.push({url, body});
         if (meanwhile) {
-            meanwhile(page.storage);
+            meanwhile(page.storage, posts.length);
         }
         const details = [];
         const cart = [];
@@ -568,6 +568,31 @@ describe('ban-to-cart bookmarklet on Mana Pool', () => {
         const {alerts, page} = await run({...cartPage, hash: '#ban=p-1:1&side=retail', abu: mp});
         expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => e.inventoryId)).toEqual(['inv-é']);
         expect(alerts).toEqual(['Added 1 cards to your Mana Pool cart, on top of what it held.']);
+    });
+
+    test('a card cut by one refusal and cut again or dropped by the next counts once, by how it ends', async () => {
+        const stock = {'p-1': [{id: 'inv-a', qty: 2}], 'p-2': [{id: 'inv-b', qty: 3}], 'p-3': [{id: 'inv-c', qty: 1}]};
+        // Between the first call and the second, p-1 sells out and p-2 sells one
+        const mp = fakeMP({
+            stock,
+            meanwhile: (storage, call) => {
+                if (call === 2) {
+                    stock['p-1'] = [];
+                    stock['p-2'] = [{id: 'inv-b', qty: 2}];
+                }
+            },
+        });
+        const {alerts, page, posts} = await run({...cartPage, hash: '#ban=p-1:5,p-2:5,p-3:1&side=retail', abu: mp});
+        expect(posts.map((p) => p.body.cart.map((l) => [l.product_ids[0], l.quantity_requested]))).toEqual([
+            [['p-1', 5], ['p-2', 5], ['p-3', 1]],
+            [['p-1', 2], ['p-2', 3], ['p-3', 1]],
+            [['p-2', 2], ['p-3', 1]],
+        ]);
+        expect(JSON.parse(page.storage['manapool-cart']).cart.entries.map((e) => [e.inventoryId, e.quantitySelected])).toEqual([['inv-b', 2], ['inv-c', 1]]);
+        // The banner counts each line once while it works, as the report does
+        expect(page.banner.texts).toContain('BAN: asking Mana Pool for 3 cards, 2 cut or left out so far. Keep this tab open until it finishes.');
+        expect(alerts).toEqual(['Added 2 cards to your Mana Pool cart, on top of what it held. 1 were cut to the copies Mana Pool has. ' +
+            '1 that Mana Pool has none of were left out.']);
     });
 
     test('a change made to the cart while the optimizer answers is kept', async () => {
