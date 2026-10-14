@@ -61,6 +61,7 @@ Filter by well-known land cycles and set groupings using <code>is:VALUE</code>:
 
 <template data-section="prices">
 <p>Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store's price - <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.</p>
+<p>Price filters judge the price a store quotes. A per-store discount or credit value set in Settings changes the number a row shows, not the one the filter reads, so <code>price&lt;5</code> hides a $5.50 quote even when your discount would show it at $4.40.</p>
 <p>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.</p>
 <p><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).</p>
 </template>

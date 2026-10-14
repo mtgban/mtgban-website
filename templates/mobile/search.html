@@ -432,7 +432,7 @@
                                     </span>
                                 </div>
                                 {{else}}
-                                {{$hasDetail := $entry.Credit}}
+                                {{$hasDetail := or $entry.Credit $entry.OrigPrice}}
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
@@ -441,7 +441,7 @@
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                             <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{plain_tip $entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
@@ -453,6 +453,12 @@
                                             <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
                                         </div>
                                         {{end}}
+                                        {{if $entry.OrigPrice}}
+                                        <div class="m-detail-row">
+                                            <span class="m-vendor-name">Store price</span>
+                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.OrigPrice}}</span><span class="m-vendor-qty"></span></span>
+                                        </div>
+                                        {{end}}
                                     </div>
                                 </details>
                                 {{else}}
@@ -462,7 +468,7 @@
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price{{if $entry.OrigPrice}} m-price-adjusted{{end}}">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                         <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{else if $entry.Listings}}<span class="tcg-listings" title="{{plain_tip $entry.ListingsTitle}}">{{$entry.Listings}}</span>{{end}}</span>
                                     </span>
                                 </div>
@@ -555,6 +561,12 @@
                                         <div class="m-detail-row">
                                             <span class="m-vendor-name">Credit</span>
                                             <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
+                                        </div>
+                                        {{end}}
+                                        {{if $entry.OrigCredit}}
+                                        <div class="m-detail-row">
+                                            <span class="m-vendor-name">Credit at face</span>
+                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.OrigCredit}}</span><span class="m-vendor-qty"></span></span>
                                         </div>
                                         {{end}}
                                         {{if $entry.MarketCredit}}
