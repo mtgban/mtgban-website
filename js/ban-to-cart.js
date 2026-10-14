@@ -18,6 +18,10 @@
         store = mintStore();
     } else if (location.hostname === "manapool.com") {
         store = mpStore();
+    } else if (location.hostname === "buylist.gamenerdz.com") {
+        store = storePassStore("Game Nerdz");
+    } else if (location.hostname === "buylist.vegas.singles") {
+        store = storePassStore("Vegas Singles");
     } else if (location.hostname === "www.manaleak.com") {
         store = mlStore();
     } else if (location.hostname === "shop.strikezoneonline.com") {
@@ -606,6 +610,121 @@
                 alert(message + leftOut());
                 history.replaceState(null, "", location.pathname + location.search);
                 location.reload();
+            }
+        };
+    }
+
+    // storePassStore loads a StorePass buylist cart, which the buylist page
+    // keeps in its own state and saves whole under the session its cookie
+    // names. Each card goes through the page's own add, which prices it from
+    // the store's settings and holds it to the store's limit; a row names
+    // <product id>-<variant id>, the variant one per condition where the
+    // store prices each.
+    function storePassStore(name) {
+        var page = null;
+        var session = /(?:^|; )bga-buylist-cart-(\w+)=([^;]*)/.exec(document.cookie);
+        // cart is the buylist page's own cart component
+        function cart() {
+            if (page) {
+                return page;
+            }
+            var nodes = document.querySelectorAll("div, button");
+            for (var i = 0; i < nodes.length; i++) {
+                var fiber = nodes[i][Object.keys(nodes[i]).find(function (k) {
+                    return k.indexOf("__reactFiber$") === 0;
+                })];
+                for (; fiber; fiber = fiber["return"]) {
+                    if (fiber.stateNode && typeof fiber.stateNode.didAddToCart === "function") {
+                        page = fiber.stateNode;
+                        return page;
+                    }
+                }
+            }
+            throw new Error(name + "'s buylist page has changed, so BAN cannot fill its cart. Nothing was loaded.");
+        }
+        async function call(url, opts) {
+            var resp = await fetch(url, opts);
+            if (!resp.ok) {
+                throw new Error(name + " refused the list (" + resp.status + ").");
+            }
+            return resp.json();
+        }
+        // settle resolves once the page has applied its pending changes
+        function settle(change) {
+            return new Promise(function (resolve) {
+                cart().setState(change || {}, resolve);
+            });
+        }
+        function storeID() {
+            return cart().state.store.id;
+        }
+        // condition is the one the page's add takes for a variant
+        function condition(product, variant) {
+            if (cart().state.store.buylist_settings.condition_type === "per-product") {
+                return variant.title;
+            }
+            return product.condition;
+        }
+        // lineID names a cart line as a row does
+        function lineID(line) {
+            var variants = line.store_pass_variant_info || [];
+            var variant = variants.find(function (v) {
+                return v.title === line.condition;
+            }) || (variants.length === 1 ? variants[0] : null);
+            return variant ? line.product_id + "-" + variant.id : String(line.product_id);
+        }
+        return {
+            name: name,
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            chunkSize: 10,
+            lock: "ban-to-cart-" + (session ? session[1] : "storepass"),
+            // The cart as last saved, which another tab may have changed
+            // since this page loaded
+            cartIDs: async function () {
+                if (/[#&]side=retail(&|$)/.test(location.hash)) {
+                    throw new Error("This is " + name + "'s buylist, but the list is for its store. Go back to BAN and press its button again.");
+                }
+                if (!session) {
+                    throw new Error("This page has no " + name + " buylist cart yet. Reload it, then " + again);
+                }
+                var saved = await call("/saas/buylist-session?session_id=" + encodeURIComponent(decodeURIComponent(session[2])) +
+                    "&store_id=" + storeID(), {headers: {"Content-Type": "application/json"}});
+                await settle({cartProducts: saved.cartProducts || []});
+                return cart().state.cartProducts.map(lineID);
+            },
+            // A held card gets the difference to the list's quantity; the
+            // page skips a card the store does not price, and the cart is
+            // saved as the page saves it
+            send: async function (chunk, qty) {
+                for (var i = 0; i < chunk.length; i++) {
+                    var ids = chunk[i].split("-");
+                    var found = await call("/saas/search?mongo=true&store_id=" + storeID() + "&product_id=" + ids[0] + "&condition=NM");
+                    var product = (found.products || [])[0];
+                    var variant = product && (product.store_pass_variant_info || []).find(function (v) {
+                        return String(v.id) === ids[1];
+                    });
+                    if (!variant) {
+                        continue;
+                    }
+                    var cond = condition(product, variant);
+                    var held = cart().state.cartProducts.find(function (line) {
+                        return line.product_id == product.product_id && line.condition === cond;
+                    });
+                    var more = qty[chunk[i]] - (held ? held.quantity : 0);
+                    if (more !== 0) {
+                        cart().didAddToCart(product, more, cond);
+                        await settle();
+                    }
+                }
+                await call("/saas/buylist-session?store_id=" + storeID(), {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({sessionId: decodeURIComponent(session[2]), cartProducts: cart().state.cartProducts, posSessionId: cart().state.posSessionId})
+                });
+                return true;
             }
         };
     }

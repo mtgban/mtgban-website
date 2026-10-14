@@ -80,6 +80,13 @@ func stubCartStores(t *testing.T) {
 	mpStock := mtgban.InventoryRecord{}
 	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.5, InstanceID: "001229ab-da01-4346-91f9-23c145cd23c5"})
 	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.4, InstanceID: "088072ea-66c7-4ef2-86a2-fd90055698a8"})
+	// StorePass buylists name a product and the variant it is bought in,
+	// one per condition where the store prices each
+	gn := mtgban.BuylistRecord{}
+	gn.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 16, OriginalID: "152060", InstanceID: "151169"})
+	vs := mtgban.BuylistRecord{}
+	vs.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 18, OriginalID: "9907513360690", InstanceID: "50196675264818"})
+	vs.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 15, OriginalID: "9907513360690", InstanceID: "50196675297586"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 	// CSI's store cart takes a product id and the row id of its condition
@@ -101,6 +108,8 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewVendorFromBuylist(mint, mtgban.ScraperInfo{Shorthand: "MMC"}),
 		mtgban.NewVendorFromBuylist(sz, mtgban.ScraperInfo{Shorthand: "SZ"}),
 		mtgban.NewVendorFromBuylist(ha, mtgban.ScraperInfo{Shorthand: "HA"}),
+		mtgban.NewVendorFromBuylist(gn, mtgban.ScraperInfo{Shorthand: "GN"}),
+		mtgban.NewVendorFromBuylist(vs, mtgban.ScraperInfo{Shorthand: "VS"}),
 		mtgban.NewVendorFromBuylist(ml, mtgban.ScraperInfo{Shorthand: "ML"}),
 	}
 	sellers := []mtgban.Seller{
@@ -149,6 +158,9 @@ func TestCartRows(t *testing.T) {
 		{"CSISealed", true, "701:1"},
 		{"SCG", true, "SGL-A1:4"},
 		{"MMC", true, "8137:4"},
+		// A buylist row goes in as NM, named by product and variant
+		{"GN", true, "152060-151169:4"},
+		{"VS", true, "9907513360690-50196675264818:4"},
 		{"MMC", false, "283193:3,663174:1"},
 		{"ML", true, "7090:4"},
 		{"ML", false, "7090:3"},
@@ -215,6 +227,8 @@ func TestCartLoadButtons(t *testing.T) {
 		{"CSI", false, `href="https://www.coolstuffinc.com/main_view_cart.php#ban=434190-10753983:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="CSI"`},
 		{"SCG", true, `href="https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="SCG"`},
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
+		{"GN", true, `href="https://buylist.gamenerdz.com/retailer/buylist#ban=152060-151169:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Game Nerdz"`},
+		{"VS", true, `href="https://buylist.vegas.singles/retailer/buylist#ban=9907513360690-50196675264818:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Vegas Singles"`},
 		{"MMC", false, `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"ML", true, `href="https://www.manaleak.com/index.php?route=buylist/cart#ban=7090:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Manaleak"`},
 		{"ML", false, `href="https://www.manaleak.com/index.php?route=checkout/cart#ban=7090:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Manaleak"`},
@@ -489,7 +503,7 @@ func TestCartBookmarklet(t *testing.T) {
 	}
 	// Firefox drops a bookmark whose URL runs past 65,536 characters, and
 	// the loader only grows as stores are added
-	if len(link) >= 40000 {
+	if len(link) >= 55000 {
 		t.Errorf("bookmarklet is %d characters, too close to Firefox's limit of 65,536 on a bookmark", len(link))
 	}
 }

@@ -34,6 +34,9 @@ var cartStores = []cartStore{
 	{"ML", "Manaleak", "https://www.manaleak.com/index.php?route=buylist/cart", "https://www.manaleak.com/index.php?route=checkout/cart"},
 	// Mana Pool buys nothing; its store cart is filled through its optimizer
 	{"MP", "Mana Pool", "", "https://manapool.com/cart"},
+	// Both buylists run on StorePass, whose page keeps the cart
+	{"GN", "Game Nerdz", "https://buylist.gamenerdz.com/retailer/buylist", ""},
+	{"VS", "Vegas Singles", "https://buylist.vegas.singles/retailer/buylist", ""},
 	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
 	// button until a load that logs a signed-in user out is explained
 	{"CK", "Card Kingdom", "", ""},
@@ -45,6 +48,23 @@ var cartStores = []cartStore{
 var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
 	"CK":  ckCartID,
 	"CSI": csiCartID,
+}
+
+// cartBuylistIDs name a buylist row the way a store's cart takes it, for a
+// store whose cart is not keyed by the entry's InstanceID, by its splits.
+var cartBuylistIDs = map[string]func(mtgban.BuylistEntry) string{
+	"GN": storePassCartID,
+	"VS": storePassCartID,
+}
+
+// storePassCartID names a StorePass buylist row as <product id>-<variant
+// id>: the product its page looks up, and the variant, one per condition
+// where the store prices each, that the row is offered in.
+func storePassCartID(entry mtgban.BuylistEntry) string {
+	if entry.OriginalID == "" || entry.InstanceID == "" {
+		return ""
+	}
+	return entry.OriginalID + "-" + entry.InstanceID
 }
 
 // csiCartID names a CSI store row as <product id>-<row id>, the pair its
@@ -269,6 +289,13 @@ func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []strin
 		if err != nil {
 			return nil
 		}
+		name := func(entry mtgban.BuylistEntry) string {
+			return entry.InstanceID
+		}
+		named, found := cartBuylistIDs[key]
+		if found {
+			name = named
+		}
 		// Sold as NM whatever the row says: the store grades what arrives.
 		// Sealed product carries no grade at all.
 		lookup = func(cardID string, _ mtgban.Condition) string {
@@ -281,7 +308,7 @@ func cartItems(key string, buylist bool, entries []OptimizedUploadEntry) []strin
 			if i < 0 {
 				return ""
 			}
-			return entries[i].InstanceID
+			return name(entries[i])
 		}
 	} else {
 		inv, err := findSellerInventory(key)
