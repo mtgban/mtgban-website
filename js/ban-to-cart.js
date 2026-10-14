@@ -512,6 +512,47 @@
     function mpStore() {
         // An empty cart, as Mana Pool starts one
         var empty = {version: 5, revision: "00000000-0000-4000-8000-000000000000", cart: {entries: []}, changes: []};
+        // answer reads the optimizer's answer, which streams one better
+        // solution per line while it works, keeping the last, and shows
+        // each in the banner as it comes
+        async function answer(resp, cards) {
+            var text = "";
+            var last = {};
+            function take(line) {
+                var parsed;
+                try {
+                    parsed = JSON.parse(line);
+                } catch (err) {
+                    return;
+                }
+                // A line that is not a solution or an error leaves the last
+                if (!parsed || typeof parsed !== "object") {
+                    return;
+                }
+                last = parsed;
+                if (last.totals && last.totals.total_cents > 0) {
+                    banner.textContent = "BAN: Mana Pool is finding the cheapest listings for " + cards + " cards, best so far $" +
+                        (last.totals.total_cents / 100).toFixed(2) + ". Keep this tab open until it finishes.";
+                }
+            }
+            var reader = resp.body && resp.body.getReader ? resp.body.getReader() : null;
+            if (!reader) {
+                (await resp.text()).split("\n").forEach(take);
+                return last;
+            }
+            var decoder = new TextDecoder();
+            for (;;) {
+                var part = await reader.read();
+                // The end flushes whatever the decoder still holds
+                text += part.done ? decoder.decode() : decoder.decode(part.value, {stream: true});
+                var lines = text.split("\n");
+                text = part.done ? "" : lines.pop();
+                lines.forEach(take);
+                if (part.done) {
+                    return last;
+                }
+            }
+        }
         function readCart() {
             var stored = JSON.parse(localStorage.getItem("manapool-cart") || "null") || empty;
             if (stored.version !== 5 || !stored.cart || !Array.isArray(stored.cart.entries) || !Array.isArray(stored.changes)) {
@@ -536,6 +577,9 @@
                 for (var i = 0; i < lines.length; i += 2000) {
                     var chunk = lines.slice(i, i + 2000);
                     while (chunk.length > 0) {
+                        banner.textContent = "BAN: asking Mana Pool for " + chunk.length + " cards" +
+                            (trimmed + missing > 0 ? ", " + (trimmed + missing) + " cut or left out so far" : "") +
+                            ". Keep this tab open until it finishes.";
                         var resp = await fetch("/api/v1/buyer/optimizer", {
                             method: "POST",
                             headers: {"Content-Type": "application/json"},
@@ -543,9 +587,7 @@
                                 return {type: "product", product_type: "mtg_single", product_ids: [line.id], quantity_requested: line.qty};
                             })})
                         });
-                        var body = await resp.json().catch(function () {
-                            return {};
-                        });
+                        var body = await answer(resp, chunk.length);
                         // Mana Pool refuses the whole call over the lines it
                         // cannot fill, naming each with what it has
                         if (resp.status === 409 && Array.isArray(body.details) && body.details.length > 0) {
