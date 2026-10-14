@@ -24,6 +24,7 @@ func withInfrastructureConfig(t *testing.T, path string) {
 	withConfigCopy(t)
 	savedValue := infrastructurePtr.Load()
 	t.Cleanup(func() { infrastructurePtr.Store(savedValue) })
+	infrastructurePtr.Store(nil)
 	Config().InfrastructurePath = path
 	Config().Config = infrastructure.Config{}
 }
@@ -198,5 +199,85 @@ func TestAdminInfrastructureEditorSaves(t *testing.T) {
 	}
 	if infrastructureFile().GoogleCredentials != "saved.json" {
 		t.Errorf("published file %+v, want the saved one", infrastructureFile())
+	}
+}
+
+// The editor refuses null, and a file that takes from every peer a bucket
+// key, a Patreon client or secret, or a database setting the running file
+// holds, leaving the file as it was. A save that keeps them goes through,
+// and says when a change it made waits for a restart.
+func TestAdminInfrastructureEditorRefusesWhatBreaksPeers(t *testing.T) {
+	const running = `{
+		"bucket_keys": {
+			"mtgban-dumps": {"access_key": "dk", "access_secret": "ds"},
+			"mtgban-datastore": {"access_key": "sk", "access_secret": "ss"}
+		},
+		"patreon": {"source": "ban", "client": {"ban": "c"}, "secret": {"ban": "s"}},
+		"sql_config": {"host": "db", "dbname": "prices"},
+		"user_state_config": {"host": "db", "dbname": "state"}
+	}`
+	path := writeInfrastructureFile(t, running)
+	withInfrastructureConfig(t, path)
+	err := loadInfrastructure(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Each one drops a single thing the running file holds
+	drops := []string{`null`, `{}`}
+	for _, edit := range [][2]string{
+		{`,
+			"mtgban-datastore": {"access_key": "sk", "access_secret": "ss"}`, ``},
+		{`"access_secret": "ds"`, `"access_secret": ""`},
+		{`"client": {"ban": "c"}`, `"client": {}`},
+		{`"client": {"ban": "c"}`, `"client": {"ban": ""}`},
+		{`, "secret": {"ban": "s"}`, ``},
+		{`"secret": {"ban": "s"}`, `"secret": {"ban": ""}`},
+		{`"sql_config": {"host": "db", "dbname": "prices"}`, `"sql_config": {}`},
+		{`"user_state_config": {"host": "db", "dbname": "state"}`, `"user_state_config": {}`},
+	} {
+		dropped := strings.Replace(running, edit[0], edit[1], 1)
+		if dropped == running {
+			t.Fatalf("%q is not in the running file", edit[0])
+		}
+		drops = append(drops, dropped)
+	}
+	for _, body := range drops {
+		pv := postInfrastructureEditor(body)
+		if pv.WarningMessage == "" || pv.InfoMessage != "" {
+			t.Errorf("%s: reported %q / %q, want it refused", body, pv.InfoMessage, pv.WarningMessage)
+		}
+		saved, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(saved) != running {
+			t.Fatalf("%s: a refused save rewrote the file", body)
+		}
+	}
+
+	kept := `{
+		"bucket_keys": {
+			"mtgban-dumps": {"access_key": "dk", "access_secret": "ds"},
+			"mtgban-datastore": {"access_key": "sk", "access_secret": "ss"},
+			"mtgban-images": {"access_key": "ik", "access_secret": "is"}
+		},
+		"patreon": {"source": "ban", "client": {"ban": "c"}, "secret": {"ban": "s"}},
+		"uploader": {"moxfield": "https://proxy"},
+		"sql_config": {"host": "db", "dbname": "prices"},
+		"user_state_config": {"host": "db", "dbname": "state"}
+	}`
+	pv := postInfrastructureEditor(kept)
+	if pv.WarningMessage != "" || pv.InfoMessage != "Infrastructure updated" {
+		t.Errorf("a save keeping every key reported %q / %q", pv.InfoMessage, pv.WarningMessage)
+	}
+	if Infrastructure().Uploader["moxfield"] != "https://proxy" {
+		t.Errorf("published %+v, want the saved file", infrastructureFile())
+	}
+
+	moved := strings.Replace(kept, `"dbname": "prices"`, `"dbname": "moved"`, 1)
+	pv = postInfrastructureEditor(moved)
+	if pv.WarningMessage != "" || !strings.Contains(pv.InfoMessage, "sql_config takes effect on restart") {
+		t.Errorf("a moved sql_config reported %q / %q, want the restart said", pv.InfoMessage, pv.WarningMessage)
 	}
 }

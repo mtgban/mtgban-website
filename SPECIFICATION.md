@@ -832,7 +832,18 @@ as sent from another site (`Sec-Fetch-Site`), or without that whose
 `Origin` is not this site's own as `requestOrigin` reads it behind the
 proxy (scheme and public host; the request's host on one it does not
 know, a dev box), is refused with 403 before anything reads it
-(`crossSitePost`). The other actions and tools, and every view, answer a GET. The dashboard lists retail/buylist scraper freshness with
+(`crossSitePost`). The other actions and tools, and every view, answer a GET.
+
+The Infrastructure editor's file is read by every peer, so
+`saveInfrastructure` (common.go) refuses, through `validateInfrastructure`,
+a file that drops a bucket key or a Patreon client or secret, by name and
+a blank value included, or empties one of the database settings
+(`sql_config`, `user_state_config`, `observability_config`,
+`new_newspaper_sql_config`) where the file it replaces holds them; the
+editor refuses `null`. Bucket keys, Patreon and the uploader apply as soon as the
+save publishes. The database clients, the NOTIFY listener and the Google
+client are built at startup (main.go), so a save that changes their keys
+says they take effect on restart. The dashboard lists retail/buylist scraper freshness with
 live 🔶 status from a `?workflows=` GitHub Actions poll, registered pages,
 uptime, memory via `go-osstat`, and disk via the platform-specific
 `internal/diskusage.Stats` — a no-op returning zero on Windows. The Usage
