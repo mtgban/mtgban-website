@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -257,6 +260,94 @@ func TestPlotSeriesDrawsALoneRosterCardAsARoster(t *testing.T) {
 	if !slices.Equal(plot.references, []string{"TCG Low"}) {
 		t.Errorf("references = %v, want [TCG Low]", plot.references)
 	}
+}
+
+// A roster of one card's printings reads apart in the datasets the page and
+// the API draw: each line is labelled by its printing, whether it was named
+// by uuid or by TCGplayer id, while the checkpoints still match the name.
+func TestRosterDatasetsLabelEachPrinting(t *testing.T) {
+	skipWithoutDatastore(t)
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "TCG Low", Provider: timeseries.ProviderTCGLow, Color: "red"},
+	})
+	buildProviderRegistry()
+	// Without an archive a Magic printing resolves from the matcher alone.
+	prev := PricesArchiveDB
+	t.Cleanup(func() { PricesArchiveDB = prev })
+	PricesArchiveDB = nil
+
+	b := backend()
+	uuid, tcgID, other := twoPrintingsOfOneCard(t)
+	ids := []string{uuid, "tcg:" + strconv.Itoa(tcgID)}
+	byUUID, err := matcherTarget(context.Background(), b, uuid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byTCGID, err := targetFromTCGID(context.Background(), b, tcgID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	series := chartTargetCache{ids[0]: byUUID, ids[1]: byTCGID}.series(context.Background(), b, ids)
+
+	// The prices fetchRosterPrices would have read.
+	day := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	for i := range series {
+		series[i].Prices = map[string]timeseries.ProviderPrices{day: {timeseries.ProviderTCGLow: 1}}
+	}
+	plot := plotSeries(testSite.datastore(), series, timeseries.Lookback(30), true)
+
+	var want []string
+	for _, id := range []string{uuid, other} {
+		co, err := b.GetUUID(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, co.String())
+	}
+	var got []string
+	for _, ds := range chartAPIDatasets(plot.datasets) {
+		got = append(got, ds.Name)
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("lines = %q, want %q", got, want)
+	}
+	if series[0].Name != series[1].Name {
+		t.Errorf("names = %q / %q, want the card's name on both", series[0].Name, series[1].Name)
+	}
+}
+
+// twoPrintingsOfOneCard finds a card printed plain in two sets, the second
+// sold under a TCGplayer id the matcher resolves to it: the first printing's
+// uuid, the second's TCGplayer id and its uuid.
+func twoPrintingsOfOneCard(t *testing.T) (string, int, string) {
+	t.Helper()
+	b := backend()
+	first := map[string]*mtgmatcher.CardObject{}
+	for _, uuid := range slices.Sorted(slices.Values(b.GetUUIDs())) {
+		co, err := b.GetUUID(uuid)
+		if err != nil || co.Sealed || co.Foil || co.Etched {
+			continue
+		}
+		seen, ok := first[co.Name]
+		if !ok {
+			first[co.Name] = co
+			continue
+		}
+		if seen.SetCode == co.SetCode {
+			continue
+		}
+		tcgID, err := strconv.Atoi(co.Identifiers["tcgplayerProductId"])
+		if err != nil {
+			continue
+		}
+		matched, err := b.MatchID(strconv.Itoa(tcgID))
+		if err != nil || matched != uuid {
+			continue
+		}
+		return seen.UUID, tcgID, uuid
+	}
+	t.Skip("no card printed plain in two sets")
+	return "", 0, ""
 }
 
 func TestMergeMultiCardDatasetsPaletteRoundRobin(t *testing.T) {
