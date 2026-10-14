@@ -153,6 +153,7 @@ output, not a claim written here.
 | `auth_renew.go` | Renewing a signature from its Patreon session inside the signing middleware: `decideRenewal`, the lease-refresh-commit sequence, `renewalEnabled`, and `Pokes`, the `internal/poke` set of what lifts the age check: the readers the `patreon_poke` NOTIFY (`access_notify.go`) and grant edits poked, and the moment the access table last changed (`docs/adr/0008-patreon-session-renewal.md`) |
 | `auth_webhook.go` | Patreon's member webhook (`POST /webhook/patreon`): reads the raw body under its cap, checks its signature and takes the member's email through the `patreon` package, and pokes it here and, through `patreon_poke`, on every other site (`docs/adr/0008-patreon-session-renewal.md`) |
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
+| `favorites_share.go` | The shared favorites page (`/search/shared`), a list read by its share id; the owner's link lives in `userstate` under `/api/userstate/share` |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
