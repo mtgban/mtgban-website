@@ -91,6 +91,11 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 		log.Println("userstate: patreon sessions unavailable:", err)
 	}
 
+	// Non-fatal too: losing this table loses only favorites share links.
+	if _, err := db.Exec(createSharesSQL); err != nil {
+		log.Println("userstate: favorites shares unavailable:", err)
+	}
+
 	return &Client{db: db}, nil
 }
 

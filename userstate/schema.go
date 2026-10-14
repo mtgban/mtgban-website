@@ -61,3 +61,16 @@ CREATE INDEX IF NOT EXISTS patreon_sessions_expires ON patreon_sessions (expires
 const addBackpackSQL = `ALTER TABLE user_state ADD COLUMN IF NOT EXISTS backpack JSONB NOT NULL DEFAULT '[]'`
 
 const backpackColumnSQL = `SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'user_state' AND column_name = 'backpack'`
+
+// createSharesSQL is the share-link table, additive like the alerts
+// schema: a later start applies it to an existing database. The unique
+// index holds one live share per owner and game.
+const createSharesSQL = `
+CREATE TABLE IF NOT EXISTS favorites_shares (
+    share_id    TEXT PRIMARY KEY,
+    email_hash  TEXT NOT NULL,
+    game        TEXT NOT NULL DEFAULT '',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at  TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS favorites_shares_by_owner_game ON favorites_shares (email_hash, game) WHERE revoked_at IS NULL`
