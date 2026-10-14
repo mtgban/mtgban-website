@@ -173,12 +173,14 @@ destroy it. Remove its IP from any allowlists, including the database's
 
 ---
 
-## Appendix A: the other six deployments
+## Appendix A: the other deployments
 
-Magic is the only droplet. Every other deployment is an App Platform app driven
-by `doctl` — `beta`, `fleshandblood`, `lorcana`, `onepiece`, `riftbound`,
-`yugioh` — so the same question applies six more times, and they are the easier
-half: an App Platform app carries no state at all.
+`pokemon` and `yugioh` run on droplets of their own, moved the same way as
+above, with `GAME=<game>` at bootstrap and `DROPLET_HOST_<GAME>` in place of
+`DROPLET_HOST` at cutover. Every other game deploys as an App
+Platform app driven by `doctl` — `fleshandblood`, `gundam`, `lorcana`,
+`onepiece`, `palworld`, `riftbound` — and those are the easier half: an App
+Platform app carries no state at all.
 
 Find out where each one actually is before moving anything:
 

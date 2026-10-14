@@ -202,10 +202,10 @@ blank-imports included, so no dependency bump was ever needed for this.)
 Two deploy patterns exist, chosen by how big the card pool is:
 
 - **DigitalOcean App Platform** (`lorcana`, `onepiece`, `fleshandblood`,
-  `riftbound`, `gundam`, `palworld`, plus `beta`) — a `.github/workflows/
+  `riftbound`, `gundam`, `palworld`) — a `.github/workflows/
   <game>-deploy.yml` that does nothing but `doctl apps create-deployment
-  ${{ secrets.DO_<GAME>_APP_ID }} --wait` on a `v*`/`<game>-*` tag push
-  (`beta-*` alone for beta), or `workflow_dispatch`. All the actual build/deploy config lives in that
+  ${{ secrets.DO_<GAME>_APP_ID }} --wait` on a `v*`/`<game>-*` tag push,
+  or `workflow_dispatch`. All the actual build/deploy config lives in that
   DigitalOcean App's own spec, not in this repo. This is the one to copy for
   a small non-Magic game's card pool.
 - **Droplet over SSH** (`magic`, `pokemon`, `yugioh`) — the workflow SSHes

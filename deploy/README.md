@@ -1,6 +1,6 @@
 # Droplet zero-downtime deploy
 
-Pushing a semver tag (`vX.Y.Z` or `beta-X.Y.Z`) triggers
+Pushing a `vX.Y.Z` or `magic-*` tag triggers
 `.github/workflows/magic-deploy.yml`, which SSHes into the droplet and runs
 `deploy/deploy.sh`. The script builds the tag in the **idle** port's checkout,
 starts it, waits for `/healthz`, flips nginx to it, then drains and stops the
