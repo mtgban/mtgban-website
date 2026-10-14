@@ -82,7 +82,7 @@ function externalTooltipHandler(context) {
         var colors = tooltip.labelColors[i];
         html += '<div class="chart-tooltip-row">' +
             '<span class="chart-tooltip-swatch" style="background:' + colors.borderColor + '"></span>' +
-            '<span>' + line + '</span>' +
+            '<span>' + escapeHtml(line) + '</span>' +
             '</div>';
     });
 
@@ -289,11 +289,11 @@ function renderChartLegend(chart, containerId, storageKey) {
         // entry back to its result row and drive the sidebar preview on hover.
         // Single-card entries are price sources and carry none.
         if (ds.cardId) {
-            html += ' data-card-id="' + ds.cardId + '"';
+            html += ' data-card-id="' + escapeHtml(ds.cardId) + '"';
         }
         html += ' style="border-color:' + color + '">';
         html += '<span class="chart-legend-dot" style="background:' + color + '"></span>';
-        html += ds.label;
+        html += escapeHtml(ds.label);
         html += '</button>';
     });
     container.innerHTML = html;
