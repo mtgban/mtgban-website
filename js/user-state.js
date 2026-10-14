@@ -30,6 +30,11 @@
     // a cheap signed-in gate, not a check of the signature.
     var signedIn = document.documentElement.dataset.signedIn === 'true';
 
+    // Settles once the first hydrate has read the server, or at once without
+    // sync: the shared page's Merge waits for it so it never merges unread.
+    var markReady;
+    window.UserStateSync = { ready: new Promise(function(res) { markReady = res; }) };
+
     // Local-only bookkeeping keys (never synced).
     var DIRTY_KEY = 'mtgban_userstate_dirty';
     var SYNCED_KEY = 'mtgban_userstate_synced';
@@ -681,7 +686,7 @@
         }
 
         var sent = performance.now();
-        fetch(BASE, { method: 'GET', headers: headers }).then(function(r) {
+        return fetch(BASE, { method: 'GET', headers: headers }).then(function(r) {
             noteServerClock(r, sent);
             if (r.status === 304) { writeMarker(version); return null; } // unchanged
             if (r.status === 401 || r.status === 503) return null; // anon / unavailable
@@ -693,14 +698,23 @@
             var hasLocal = localFavorites().length > 0 || localRecents().length > 0 ||
                 localBackpack().some(function(e) { return e && !e.del; });
             rawSetItem(SYNCED_KEY, '1');
+            var done = null;
             if (isDirty() || (firstSync && hasLocal)) {
-                reconcile(state);
+                done = reconcile(state);
             } else {
                 applyState(state);
                 rerender();
             }
             writeMarker(typeof state.version === 'number' ? state.version : version);
+            return done;
         }).catch(function() {});
+    }
+
+    // The one place ready settles for a signed-in page, whatever hydrate did.
+    function hydrateAndSettle() {
+        var p;
+        try { p = hydrate(); } catch (e) {}
+        Promise.resolve(p).then(markReady, markReady);
     }
 
     // Anonymous visitors get no sync layer (no shim, listeners, or hydrate).
@@ -714,9 +728,11 @@
         window.addEventListener('pagehide', flushPending);
 
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', hydrate);
+            document.addEventListener('DOMContentLoaded', hydrateAndSettle);
         } else {
-            hydrate();
+            hydrateAndSettle();
         }
+    } else {
+        markReady();
     }
 })();

@@ -492,3 +492,30 @@ test('base-mobile.html loads store-factors.js after cookies.js', () => {
     expect(cookiesIdx).toBeGreaterThan(-1);
     expect(factorsIdx).toBeGreaterThan(cookiesIdx);
 });
+
+// Runs user-state.js signed in or out with the given GET answer; returns whether
+// UserStateSync.ready had settled after a few ticks.
+async function readySettles(signedIn, res) {
+    const m = {};
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: String(signedIn) } }, readyState: 'complete', addEventListener() {} };
+    const fetch = () => (res ? Promise.resolve(res) : Promise.reject(new Error('offline')));
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0 });
+    let settled = false;
+    window.UserStateSync.ready.then(() => { settled = true; });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    return settled;
+}
+
+test('sync ready settles at once when signed out', async () => {
+    expect(await readySettles(false, null)).toBe(true);
+});
+
+test('sync ready settles after the first read, or its failure', async () => {
+    const ok = { status: 200, ok: true, json: () => Promise.resolve({ version: 1, favorites: [], recents: [], preferences: {} }) };
+    expect(await readySettles(true, ok)).toBe(true);
+    expect(await readySettles(true, null)).toBe(true);
+});
