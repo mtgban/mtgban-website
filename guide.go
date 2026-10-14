@@ -26,8 +26,8 @@ type GuideStore struct {
 
 // guideStoresJSON returns every registered store shorthand with its role
 // markers, sorted by display name and then by shorthand. The full set is
-// always emitted: any shorthand is valid syntax regardless of tier, which
-// only gates results.
+// emitted whatever the tier, which only gates results, but for the stores
+// only the price API serves, which no site search reaches.
 func guideStoresJSON() template.JS {
 	stores := map[string]*GuideStore{}
 
@@ -45,6 +45,9 @@ func guideStoresJSON() template.JS {
 			continue
 		}
 		info := seller.Info()
+		if Config().apiOnly(info.Shorthand) {
+			continue
+		}
 		s := ensure(info.Name, info.Shorthand, info.SealedMode)
 		if info.MetadataOnly {
 			s.Index = true
@@ -57,6 +60,9 @@ func guideStoresJSON() template.JS {
 			continue
 		}
 		info := vendor.Info()
+		if Config().apiOnly(info.Shorthand) {
+			continue
+		}
 		s := ensure(info.Name, info.Shorthand, info.SealedMode)
 		s.Buylist = true
 	}

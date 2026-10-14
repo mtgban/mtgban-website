@@ -24,17 +24,20 @@ func searchSettingsKeys() (sellers, vendors []string) {
 }
 
 // arbitBlockedVendors is the reader's ArbitDisabledVendors grant, or the
-// config block list when the grant is absent; NONE clears it.
+// config block list when the grant is absent; NONE clears it. The stores
+// only the price API serves are blocked whatever the grant says.
 func arbitBlockedVendors(sig string) []string {
+	var blocked []string
 	blocklistVendorsOpt := GetParamFromSig(sig, "ArbitDisabledVendors")
-	if blocklistVendorsOpt == "" {
+	switch blocklistVendorsOpt {
+	case "":
 		// Clipped: callers append the cookie's vendors to it
-		return slices.Clip(Config().Stores.ArbitBlockVendors)
+		blocked = slices.Clip(Config().Stores.ArbitBlockVendors)
+	case "NONE":
+	default:
+		blocked = strings.Split(blocklistVendorsOpt, ",")
 	}
-	if blocklistVendorsOpt == "NONE" {
-		return nil
-	}
-	return strings.Split(blocklistVendorsOpt, ",")
+	return append(blocked, Config().Stores.APIOnlyStores...)
 }
 
 // arbitVendorKeys is the Arbitrage or Reverse vendor grid, in display order.
@@ -49,17 +52,19 @@ func arbitVendorKeys(blocklistVendors []string, reverse bool) []string {
 	return sortKeysByScraperName(filterVendors(notBlocked))
 }
 
-// globalProbeBlocklist is every seller outside the Global probe list.
+// globalProbeBlocklist is every seller outside the Global probe list, and
+// every one only the price API serves.
 func globalProbeBlocklist() []string {
 	return filterSellers(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(Config().Stores.GlobalProbeList, info.Shorthand)
+		return !slices.Contains(Config().Stores.GlobalProbeList, info.Shorthand) ||
+			Config().apiOnly(info.Shorthand)
 	})
 }
 
 // globalVendorKeys is the Global vendor grid, in display order.
 func globalVendorKeys(blocklistVendors []string) []string {
 	return sortKeysByScraperName(filterVendors(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(blocklistVendors, info.Shorthand)
+		return !slices.Contains(blocklistVendors, info.Shorthand) && !Config().apiOnly(info.Shorthand)
 	}))
 }
 

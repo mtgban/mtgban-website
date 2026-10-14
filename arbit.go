@@ -362,6 +362,8 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 	} else {
 		allowlistSellers = strings.Split(allowlistSellersOpt, ",")
 	}
+	// No store only the price API serves is a source, whatever the grant says
+	allowlistSellers = slices.DeleteFunc(slices.Clone(allowlistSellers), Config().apiOnly)
 
 	blocklistVendors := arbitBlockedVendors(sig)
 
@@ -414,11 +416,13 @@ func (s *site) Global(w http.ResponseWriter, r *http.Request) {
 
 	// The "menu" section, the reference
 	allowlistSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
+		if Config().apiOnly(info.Shorthand) {
+			return false
+		}
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
 			return slices.Contains(Config().Stores.GlobalAllowList, info.Shorthand) &&
-				(anyExperiment || !slices.Contains(Config().Stores.SearchRetailBlockList, info.Shorthand)) &&
-				!slices.Contains(Config().Stores.APIOnlyStores, info.Shorthand)
+				(anyExperiment || !slices.Contains(Config().Stores.SearchRetailBlockList, info.Shorthand))
 		}
 		// These are hardcoded to provide a preview of the tool
 		return info.Shorthand == "TCGMarket" || info.Shorthand == "MKMTrend"

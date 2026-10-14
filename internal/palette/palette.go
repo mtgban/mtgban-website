@@ -33,6 +33,9 @@ type Service struct {
 	// endpoint.
 	Sellers func() []mtgban.Seller
 	Vendors func() []mtgban.Vendor
+	// HiddenStores returns the stores the stores endpoint leaves out, nil
+	// for none.
+	HiddenStores func() []string
 
 	// PromoAliases returns the shorthands a promo type also answers to, so
 	// the endpoint can offer them beside the type itself.
@@ -543,13 +546,17 @@ func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 		Sellers: []Store{},
 		Vendors: []Store{},
 	}
+	var hidden []string
+	if s.HiddenStores != nil {
+		hidden = s.HiddenStores()
+	}
 	seen := map[string]bool{}
 	for _, seller := range s.Sellers() {
 		if seller == nil {
 			continue
 		}
 		info := seller.Info()
-		if seen["s:"+info.Shorthand] {
+		if seen["s:"+info.Shorthand] || slices.Contains(hidden, info.Shorthand) {
 			continue
 		}
 		seen["s:"+info.Shorthand] = true
@@ -566,7 +573,7 @@ func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		info := vendor.Info()
-		if seen["v:"+info.Shorthand] {
+		if seen["v:"+info.Shorthand] || slices.Contains(hidden, info.Shorthand) {
 			continue
 		}
 		seen["v:"+info.Shorthand] = true
