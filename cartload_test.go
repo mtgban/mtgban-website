@@ -81,12 +81,15 @@ func stubCartStores(t *testing.T) {
 	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.5, InstanceID: "001229ab-da01-4346-91f9-23c145cd23c5"})
 	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.4, InstanceID: "088072ea-66c7-4ef2-86a2-fd90055698a8"})
 	// StorePass buylists name a product and the variant it is bought in,
-	// one per condition where the store prices each
+	// one per condition where the store prices each; Game Nerdz's store
+	// takes the SKU
 	gn := mtgban.BuylistRecord{}
 	gn.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 16, OriginalID: "152060", InstanceID: "151169"})
 	vs := mtgban.BuylistRecord{}
 	vs.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 18, OriginalID: "9907513360690", InstanceID: "50196675264818"})
 	vs.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.SP, BuyPrice: 15, OriginalID: "9907513360690", InstanceID: "50196675297586"})
+	gnStock := mtgban.InventoryRecord{}
+	gnStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 8, OriginalID: "94929", InstanceID: "MTG-3ED-155-KGVDX6L40M"})
 	csiSealed := mtgban.BuylistRecord{}
 	csiSealed.Add("box-a", &mtgban.BuylistEntry{BuyPrice: 90, InstanceID: "701"})
 	// CSI's store cart takes a product id and the row id of its condition
@@ -120,6 +123,7 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(ckSealed, mtgban.ScraperInfo{Shorthand: "CKSealed"}),
 		mtgban.NewSellerFromInventory(ckGraded, mtgban.ScraperInfo{Shorthand: "CKGraded"}),
 		mtgban.NewSellerFromInventory(csiStock, mtgban.ScraperInfo{Shorthand: "CSI"}),
+		mtgban.NewSellerFromInventory(gnStock, mtgban.ScraperInfo{Shorthand: "GN"}),
 		mtgban.NewSellerFromInventory(mintStock, mtgban.ScraperInfo{Shorthand: "MMC"}),
 		mtgban.NewSellerFromInventory(mlStock, mtgban.ScraperInfo{Shorthand: "ML"}),
 		mtgban.NewSellerFromInventory(mpStock, mtgban.ScraperInfo{Shorthand: "MP"}),
@@ -161,6 +165,7 @@ func TestCartRows(t *testing.T) {
 		// A buylist row goes in as NM, named by product and variant
 		{"GN", true, "152060-151169:4"},
 		{"VS", true, "9907513360690-50196675264818:4"},
+		{"GN", false, "MTG-3ED-155-KGVDX6L40M:3"},
 		{"MMC", false, "283193:3,663174:1"},
 		{"ML", true, "7090:4"},
 		{"ML", false, "7090:3"},
@@ -229,6 +234,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"MMC", true, `href="https://www.mtgmintcard.com/buylist-cart#ban=8137:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"GN", true, `href="https://buylist.gamenerdz.com/retailer/buylist#ban=152060-151169:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Game Nerdz"`},
 		{"VS", true, `href="https://buylist.vegas.singles/retailer/buylist#ban=9907513360690-50196675264818:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Vegas Singles"`},
+		{"GN", false, `href="https://www.gamenerdz.com/cart.php#ban=MTG-3ED-155-KGVDX6L40M:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Game Nerdz"`},
 		{"MMC", false, `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"ML", true, `href="https://www.manaleak.com/index.php?route=buylist/cart#ban=7090:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Manaleak"`},
 		{"ML", false, `href="https://www.manaleak.com/index.php?route=checkout/cart#ban=7090:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Manaleak"`},

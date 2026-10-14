@@ -9,7 +9,8 @@ of the card's page; Hareruya has both: a form that takes a whole store
 list, and one call per card for its buylist. Mana Pool's public optimizer
 takes a whole list and answers with the listings to put in its cart. Game
 Nerdz's and Vegas Singles' buylists run on StorePass, whose page keeps the
-cart and prices it itself, so the loader adds through the page's own code.
+cart and prices it itself, so the loader adds through the page's own code;
+Game Nerdz's store is a BigCommerce one, filled one SKU at a time.
 Star City Games and Strike Zone have a CSV import, but no way to hand it a
 list from another site. The upload page reaches all eleven through one
 bookmarklet, BAN-to-Cart, run on the store's page. ABU was measured
@@ -328,6 +329,30 @@ GET  /saas/search?mongo=true&store_id=<store>&product_id=152060&condition=NM
 | 9 more of a card held at 2 at Game Nerdz | 8, its limit |
 | a product id the store does not list | left out |
 
+## Game Nerdz's store
+
+Game Nerdz's store is BigCommerce, its cart kept by the store's cookies,
+guests included:
+
+```
+GET    /cart.php?action=add&sku=MTG-3ED-155-KGVDX6L40M&qty=2
+GET    /api/storefront/carts?include=lineItems.physicalItems.options
+PUT    /api/storefront/carts/<cart>/items/<line>   {"lineItem": {"productId", "quantity"}}
+```
+
+- The SKU is each store row's `InstanceID`. 266 of 32,804 Magic SKUs carry
+  a ★ or a /, which no id the loader takes can, so those rows are left out.
+- The add refuses a quantity above the stock outright, answering with the
+  product's page, whose `available_to_sell` the loader adds again at; a
+  card already in the cart is set through the storefront API.
+
+| Sent | Result |
+|---|---|
+| an add | 1.2 s |
+| 3 or 50 of a card with 2 in stock | refused, then 2 added, 3.4 s in all |
+| an unknown SKU | nothing added |
+| a PUT / DELETE of a line | quantity set / line removed, the cart with its last |
+
 ## Strike Zone: the CSV import
 
 Strike Zone buys and sells through one cart, whose Tools menu has a CSV
@@ -489,8 +514,8 @@ uploads page offers takes the whole list and prices it itself:
 
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's,
-Mint's and Manaleak's buylist and store splits, Mana Pool's store split,
-and SCG's, Game Nerdz's and Vegas Singles' buylist splits. CSI's store button sits beside its deck builder
+Mint's, Manaleak's and Game Nerdz's buylist and store splits, Mana Pool's
+store split, and SCG's and Vegas Singles' buylist splits. CSI's store button sits beside its deck builder
 button, and Mana Pool's beside its mass entry button, both of which post
 only names. SCG's
 store side and CK's buylist already have their own imports. Card Kingdom's
@@ -623,7 +648,8 @@ cookies to, and every call must echo SCG's `XSRF-TOKEN` cookie.
 
 ## Not tested
 
-- A signed-in StorePass buylist, whose session may follow the account.
+- A signed-in StorePass buylist, whose session may follow the account, and
+  a Game Nerdz store account.
 - What an expired ABU token returns, presumably the same 401.
 - What ABU's buylist checkout does with rows above its buy limit or rows
   it stopped buying.

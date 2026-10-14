@@ -22,6 +22,8 @@
         store = storePassStore("Game Nerdz");
     } else if (location.hostname === "buylist.vegas.singles") {
         store = storePassStore("Vegas Singles");
+    } else if (location.hostname === "www.gamenerdz.com") {
+        store = gnShop();
     } else if (location.hostname === "www.manaleak.com") {
         store = mlStore();
     } else if (location.hostname === "shop.strikezoneonline.com") {
@@ -766,6 +768,78 @@
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({sessionId: decodeURIComponent(session[2]), cartProducts: cart().state.cartProducts, posSessionId: cart().state.posSessionId})
                 });
+                return true;
+            }
+        };
+    }
+
+    // gnShop loads Game Nerdz's store cart, a BigCommerce one kept by its
+    // cookies, guests included, keyed by the SKU go-mtgban stores for each
+    // row. BigCommerce's cart link adds a SKU and refuses the whole add above
+    // the stock, answering with the product's page, whose available_to_sell
+    // the add then goes again at; a card already in the cart is set through
+    // the storefront API.
+    function gnShop() {
+        var held = {};
+        var cartID = "";
+        // call makes a change to the cart, stopping the load on a refusal
+        async function call(url, opts) {
+            var resp = await fetch(url, opts);
+            if (!resp.ok) {
+                throw new Error("Game Nerdz refused the list (" + resp.status + ").");
+            }
+            return resp;
+        }
+        async function read() {
+            var resp = await fetch("/api/storefront/carts?include=lineItems.physicalItems.options");
+            if (!resp.ok) {
+                throw new Error("Game Nerdz could not read your cart (" + resp.status + ").");
+            }
+            var carts = await resp.json();
+            held = {};
+            cartID = carts.length > 0 ? carts[0].id : "";
+            ((carts[0] && carts[0].lineItems.physicalItems) || []).forEach(function (item) {
+                held[item.sku] = item;
+            });
+            return Object.keys(held);
+        }
+        return {
+            name: "Game Nerdz",
+            lock: "ban-to-cart-gn-shop",
+            loggedIn: function () {
+                return true;
+            },
+            maxLines: 0,
+            chunkSize: 5,
+            cartIDs: async function () {
+                if (!/[#&]side=retail(&|$)/.test(location.hash)) {
+                    throw new Error("This is Game Nerdz's store, but the list is for its buylist. Go back to BAN and press its button again.");
+                }
+                return read();
+            },
+            send: async function (chunk, qty) {
+                for (var i = 0; i < chunk.length; i++) {
+                    var sku = chunk[i];
+                    var line = held[sku];
+                    if (line && line.quantity !== qty[sku]) {
+                        await call("/api/storefront/carts/" + cartID + "/items/" + line.id, {
+                            method: "PUT",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({lineItem: {productId: line.productId, quantity: qty[sku]}})
+                        });
+                        continue;
+                    }
+                    if (line) {
+                        continue;
+                    }
+                    var page = await (await call("/cart.php?action=add&sku=" + encodeURIComponent(sku) + "&qty=" + qty[sku])).text();
+                    await read();
+                    var stock = /"available_to_sell":(\d+)/.exec(page);
+                    if (!held[sku] && stock && Number(stock[1]) > 0 && Number(stock[1]) < qty[sku]) {
+                        await call("/cart.php?action=add&sku=" + encodeURIComponent(sku) + "&qty=" + stock[1]);
+                        await read();
+                    }
+                }
                 return true;
             }
         };

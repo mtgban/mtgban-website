@@ -34,8 +34,9 @@ var cartStores = []cartStore{
 	{"ML", "Manaleak", "https://www.manaleak.com/index.php?route=buylist/cart", "https://www.manaleak.com/index.php?route=checkout/cart"},
 	// Mana Pool buys nothing; its store cart is filled through its optimizer
 	{"MP", "Mana Pool", "", "https://manapool.com/cart"},
-	// Both buylists run on StorePass, whose page keeps the cart
-	{"GN", "Game Nerdz", "https://buylist.gamenerdz.com/retailer/buylist", ""},
+	// Both buylists run on StorePass, whose page keeps the cart; Game
+	// Nerdz's store is a BigCommerce one
+	{"GN", "Game Nerdz", "https://buylist.gamenerdz.com/retailer/buylist", "https://www.gamenerdz.com/cart.php"},
 	{"VS", "Vegas Singles", "https://buylist.vegas.singles/retailer/buylist", ""},
 	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
 	// button until a load that logs a signed-in user out is explained

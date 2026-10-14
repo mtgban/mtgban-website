@@ -678,6 +678,71 @@ describe('ban-to-cart bookmarklet on a StorePass buylist', () => {
     });
 });
 
+// fakeGNShop stands in for Game Nerdz's BigCommerce store: the cart link
+// adds a SKU, refusing the whole add above the stock with the product's
+// page, which says what is available; the storefront API reads the cart
+// and sets a line.
+function fakeGNShop({stock = {}, cart = {}} = {}) {
+    const lines = {...cart};
+    const calls = [];
+    const fetch = async (url, opts = {}) => {
+        calls.push([opts.method || 'GET', url, opts.body ? JSON.parse(opts.body) : null]);
+        if (url.startsWith('/api/storefront/carts/')) {
+            const sku = Object.keys(lines).find((k) => url.endsWith('/items/line-' + k));
+            lines[sku] = JSON.parse(opts.body).lineItem.quantity;
+            return {ok: true, status: 200, json: async () => ({})};
+        }
+        if (url.startsWith('/api/storefront/carts')) {
+            const items = Object.entries(lines).map(([sku, quantity]) => ({id: 'line-' + sku, sku, quantity, productId: 7}));
+            return {ok: true, status: 200, json: async () => (items.length ? [{id: 'cart-1', lineItems: {physicalItems: items}}] : [])};
+        }
+        const query = new URLSearchParams(url.split('?')[1]);
+        const sku = query.get('sku');
+        const qty = Number(query.get('qty'));
+        if (!(sku in stock)) {
+            return {ok: true, status: 200, text: async () => '<html>cart</html>'};
+        }
+        if (qty > stock[sku]) {
+            return {ok: true, status: 200, text: async () => '{"instock":true,"available_to_sell":' + stock[sku] + ',"available_on_hand":' + stock[sku] + '}'};
+        }
+        lines[sku] = (lines[sku] || 0) + qty;
+        return {ok: true, status: 200, text: async () => '<html>cart</html>'};
+    };
+    return {fetch, calls, lines};
+}
+
+describe('ban-to-cart bookmarklet on Game Nerdz\'s store', () => {
+    const shop = {host: 'www.gamenerdz.com', path: '/cart.php'};
+
+    test('a SKU is added, again at what the store has when it refuses, and a held one is set', async () => {
+        const gn = fakeGNShop({stock: {'MTG-A-1': 2, 'MTG-B-2': 9, 'MTG-C-3': 5}, cart: {'MTG-C-3': 4}});
+        const {alerts} = await run({...shop, hash: '#ban=MTG-A-1%3a3%2cMTG-B-2%3a1%2cMTG-C-3%3a1%2cMTG-X-9%3a1&side=retail', abu: gn});
+        expect(gn.lines).toEqual({'MTG-A-1': 2, 'MTG-B-2': 1, 'MTG-C-3': 1});
+        expect(gn.calls.filter(([, url]) => url.startsWith('/cart.php')).map(([, url]) => url)).toEqual([
+            '/cart.php?action=add&sku=MTG-A-1&qty=3', '/cart.php?action=add&sku=MTG-A-1&qty=2',
+            '/cart.php?action=add&sku=MTG-B-2&qty=1', '/cart.php?action=add&sku=MTG-X-9&qty=1',
+        ]);
+        expect(gn.calls.find(([method]) => method === 'PUT')).toEqual(['PUT', '/api/storefront/carts/cart-1/items/line-MTG-C-3', {lineItem: {productId: 7, quantity: 1}}]);
+        expect(alerts[0]).toBe('Loaded 3 cards into your Game Nerdz cart. 1 were not taken by Game Nerdz.');
+    });
+
+    test('a change the store refuses stops the load instead of reporting it loaded', async () => {
+        const gn = fakeGNShop({stock: {'MTG-C-3': 5}, cart: {'MTG-C-3': 4}});
+        const fetch = gn.fetch;
+        gn.fetch = async (url, opts = {}) => (opts.method === 'PUT' ? {ok: false, status: 422} : fetch(url, opts));
+        const {alerts, page} = await run({...shop, hash: '#ban=MTG-C-3:1&side=retail', abu: gn});
+        expect(alerts).toEqual(['Game Nerdz refused the list (422).']);
+        expect(page.reloaded).toBe(false);
+    });
+
+    test('a buylist list on the store is refused and nothing is sent', async () => {
+        const gn = fakeGNShop({stock: {'MTG-A-1': 2}});
+        const {alerts} = await run({...shop, hash: '#ban=MTG-A-1:1', abu: gn});
+        expect(alerts[0]).toBe('This is Game Nerdz\'s store, but the list is for its buylist. Go back to BAN and press its button again.');
+        expect(gn.calls).toHaveLength(0);
+    });
+});
+
 // fakeML stands in for Manaleak: each product page names its Near Mint
 // option, its HTML breaking lines inside tags, with the store's copies; a
 // cart page lists a quantity field per line, keyed by product and options;
