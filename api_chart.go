@@ -97,15 +97,7 @@ func chartDataAPILong(ds *datastore, w http.ResponseWriter, r *http.Request, raw
 	// Resolve on this goroutine, before anything is read concurrently: a
 	// resolution can reach the variants table, and a roster naming the same
 	// card twice should only ask once.
-	resolved := make([]chartSeries, 0, len(ids))
-	targets := chartTargetCache{}
-	for _, id := range ids {
-		target := targets.target(r.Context(), ds.backend, id)
-		if target == nil {
-			continue
-		}
-		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, Label: target.Label, target: target})
-	}
+	resolved := chartTargetCache{}.series(r.Context(), ds.backend, ids)
 	if len(resolved) == 0 {
 		errorResponse(w, http.StatusNotFound, "card not found")
 		return

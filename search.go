@@ -1646,14 +1646,7 @@ func fillLongFormChart(pageVars *SearchVars, r *http.Request, ds *datastore, ros
 	// Resolution stays here, on the request's own goroutine, because
 	// roster.targets is an unlocked per-request map; only the archive
 	// reads that follow are issued together.
-	resolved := make([]chartSeries, 0, len(roster.ids))
-	for _, id := range roster.ids {
-		target := roster.targets.target(r.Context(), b, id)
-		if target == nil {
-			continue
-		}
-		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, Label: target.Label, target: target})
-	}
+	resolved := roster.targets.series(r.Context(), b, roster.ids)
 	series := fetchRosterPrices(r.Context(), resolved, lb)
 	// An empty window hides the chart and the select that could widen it,
 	// so a card whose prices all predate the window reads the ceiling. A
@@ -1745,6 +1738,20 @@ func (cache chartTargetCache) target(ctx context.Context, b *mtgmatcher.Backend,
 	}
 	cache[id] = target
 	return target
+}
+
+// series is the roster ids that resolve, in order, each as the series the
+// chart reads it into, named and labelled by its target.
+func (cache chartTargetCache) series(ctx context.Context, b *mtgmatcher.Backend, ids []string) []chartSeries {
+	resolved := make([]chartSeries, 0, len(ids))
+	for _, id := range ids {
+		target := cache.target(ctx, b, id)
+		if target == nil {
+			continue
+		}
+		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, Label: target.Label, target: target})
+	}
+	return resolved
 }
 
 // marketplaceLoaded reports whether this site serves a seller from the named
