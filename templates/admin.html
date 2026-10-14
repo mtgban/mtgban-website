@@ -574,7 +574,7 @@
 
                 <div class="admin-tool">
                     <label>Generate API Key</label>
-                    <form>
+                    <form action="admin" method="POST">
                         <input type="hidden" name="tool" value="newKey"/>
                         <input type="text" name="user" id="user" placeholder="User email">
                         <div class="tool-row">
@@ -593,7 +593,7 @@
 
                 <div class="admin-tool">
                     <label>API Demo Key</label>
-                    <form action="admin" method="GET">
+                    <form action="admin" method="POST">
                         <input type="hidden" name="tool" value="demokey"/>
                         <button type="submit" class="admin-tool-btn">Generate Demo Key</button>
                     </form>

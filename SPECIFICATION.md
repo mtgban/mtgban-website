@@ -812,7 +812,8 @@ family (`adminTools`), the dashboard's server actions and admin tools:
 config plus the files it names, §2.4), `checkpoints`
 (chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
 price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
-generation, `&user=&duration=`), and `invite` (a signed invite link for a
+generation, `user` and `duration` posted from the Tools tab's forms), and
+`invite` (a signed invite link for a
 tier, `&tier=&duration=`, for up to the 31 days its cookie lasts). JSON
 editors for the config, checkpoints, ACL/access table, affiliates, chart
 datasets, infrastructure file and key overrides; the datasets and
@@ -821,7 +822,15 @@ them, and the infrastructure one shows the file alone, without the keys
 the deployment's own config sets. Key overrides are backed
 by a per-store UUID-remap builder reached from a "Fix" link on search
 results (`search.go`/`search.html`). A People tab adds/removes Patreon
-grants in place. The dashboard lists retail/buylist scraper freshness with
+grants in place.
+
+Whatever saves — the editors (datasets and infrastructure among them), the
+grant forms, `removestore` and `newKey`/`demokey` — acts only on a POST and
+reads its fields from the body (`r.PostFormValue`), so a link carrying the
+same fields in its query string saves nothing. A POST the browser marks
+as sent from another site (`http.CrossOriginProtection`: `Sec-Fetch-Site`,
+or an `Origin` whose host is not the request's) is refused with 403
+before anything reads it. The other actions and tools, and every view, answer a GET. The dashboard lists retail/buylist scraper freshness with
 live 🔶 status from a `?workflows=` GitHub Actions poll, registered pages,
 uptime, memory via `go-osstat`, and disk via the platform-specific
 `internal/diskusage.Stats` — a no-op returning zero on Windows. The Usage

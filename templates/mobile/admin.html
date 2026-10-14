@@ -106,7 +106,7 @@
 
         <div class="m-admin-tool">
             <label>Generate API Key</label>
-            <form>
+            <form action="admin" method="POST">
                 <input type="hidden" name="tool" value="newKey"/>
                 <input type="text" name="user" id="m-api-user" placeholder="User email" inputmode="email">
                 <select name="duration" onchange="if (document.getElementById('m-api-user').value !== '') { this.form.submit() }">
@@ -123,7 +123,7 @@
 
         <div class="m-admin-tool">
             <label>API Demo Key</label>
-            <form action="admin" method="GET">
+            <form action="admin" method="POST">
                 <input type="hidden" name="tool" value="demokey"/>
                 <button type="submit" class="m-admin-tool-btn">Generate Demo Key</button>
             </form>
