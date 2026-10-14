@@ -249,6 +249,20 @@ func TestCartLoadButtons(t *testing.T) {
 		}
 	}
 
+	// CSI is bought from two ways, its deck builder and its cart: one button
+	// each, told apart, the cart's keeping the name the loader's messages use
+	csi := renderUpload(t, PageVars{UploadVars: UploadVars{
+		Optimized:       map[string][]OptimizedUploadEntry{"CSI": entries},
+		OptimizedKeys:   []string{"CSI"},
+		OptimizedTotals: map[string]float64{"CSI": 1},
+	}})
+	if strings.Count(csi, ">Load at CSI<") != 1 || !strings.Contains(csi, `data-store="CSI" data-buylist="false"`) {
+		t.Errorf("want one Load at CSI, the cart's, got %d", strings.Count(csi, ">Load at CSI<"))
+	}
+	if !strings.Contains(csi, ">Deck builder at CSI<") || !strings.Contains(csi, `value="Deck builder at CSI"`) {
+		t.Error("CSI's deck builder button is not told apart from its cart's")
+	}
+
 	for _, key := range []string{"MKM", "SCG", "CK", "CKGraded", "CKSealed"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},

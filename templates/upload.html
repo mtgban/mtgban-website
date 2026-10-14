@@ -919,9 +919,11 @@
                             <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                                 <input type="hidden" name="sList" data-load-list="csi" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
-                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
+                                {{/* CSI's cart has a Load at button of its own below, which the
+                                     cart loader's messages name, so this one says what it opens */}}
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Deck builder at {{$sourceKey}}</a>
                                 <noscript>
-                                    <input type="submit" value="Load at {{$sourceKey}}"/>
+                                    <input type="submit" value="Deck builder at {{$sourceKey}}"/>
                                 </noscript>
                             </form>
                         {{end}}
