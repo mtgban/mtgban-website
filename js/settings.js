@@ -273,6 +273,13 @@
         });
     }
 
+    // ─── Store adjustments (rows drawn by js/store-factors.js) ──
+    function bindStoreFactors(elementId) {
+        const el = document.getElementById(elementId);
+        if (!el || !window.StoreFactors) return;
+        addBinding(window.StoreFactors.binding(el));
+    }
+
     // ─── Misc bitmap (many [data-misc] checkboxes → CSV cookie) ──
     function readMisc(container) {
         const names = [];
@@ -334,6 +341,7 @@
         });
         (BINDINGS.selects || []).forEach(bindSelect);
         Object.entries(BINDINGS.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
+        bindStoreFactors('settings-store-factors');
         Object.entries(BINDINGS.misc || {}).forEach(function (e) {
             const defaults = (BINDINGS.miscDefaults || {})[e[0]];
             bindMiscBitmap(e[0], e[1], defaults);

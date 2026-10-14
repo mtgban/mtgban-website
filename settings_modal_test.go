@@ -402,3 +402,26 @@ func TestSettingsBodyDrawsListingLocked(t *testing.T) {
 		t.Error("a signed reader's pills are not bound to the cookie")
 	}
 }
+
+func TestSettingsBodyDrawsStoreFactors(t *testing.T) {
+	baseName, files := settingsBodyFiles()
+	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	v := settingsModalVars{
+		Tabs: []string{"search"}, TabNames: settingsTabNames,
+		SellerKeys: []string{"CK", "TCG"}, VendorKeys: []string{"CK"},
+	}
+	if err := tmpl.ExecuteTemplate(&buf, baseName, v); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `id="settings-store-factors"`) {
+		t.Fatal("no store adjustments container")
+	}
+	if !strings.Contains(out, `&#34;k&#34;:&#34;CK&#34;`) && !strings.Contains(out, `"k":"CK"`) && !strings.Contains(out, `&quot;k&quot;:&quot;CK&quot;`) {
+		t.Errorf("data-stores does not carry CK:\n%s", out)
+	}
+}
