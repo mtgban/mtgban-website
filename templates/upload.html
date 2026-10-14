@@ -887,7 +887,7 @@
             {{if $entries}}
                 {{$total := index $.OptimizedTotals .}}
                 <div class="opt-store" id="opt-{{.}}">
-                    <table class="opt-table" onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }">
+                    <table class="opt-table" onmouseout="window.optTableOut && optTableOut(this, event)">
                     <colgroup><col><col><col><col><col><col><col></colgroup>
                     <thead><tr><td class="opt-store-head" colspan="7">
                     <div class="opt-store-header">

@@ -5,6 +5,18 @@ document.querySelectorAll('.opt-table').forEach(function(t) {
     });
 });
 
+// optTableOut takes the card art down when the pointer leaves a table's
+// rows, out of the table or up into the store header pinned in its head.
+function optTableOut(table, event) {
+    var to = event.relatedTarget;
+    var rows = table.tBodies[0];
+    if (to && rows && rows.contains(to)) return;
+    window.setCardArtSource(document.getElementById('hoverImage'), window.cardArtPlaceholder);
+    var hw = document.getElementById('hoverWrap');
+    hw.setAttribute('data-foil', 'false');
+    hw.setAttribute('data-etched', 'false');
+}
+
 function toggleOptRow(checkbox) {
     var row = checkbox.closest('tr');
     if (!row) return;
