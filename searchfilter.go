@@ -799,8 +799,8 @@ func namesASetCode(b *mtgmatcher.Backend, token string) bool {
 
 // splitPrintedNumber reads a word written the way Yu-Gi-Oh prints a card's
 // number, set code and ordinal joined by a dash with an optional region code
-// before the ordinal: "info-067" and "info-en067" are the "info 067" a
-// person types. A word of any other shape is not one.
+// before the ordinal, into its set code and ordinal: "info-067" and
+// "info-en067" both give "info 067". A word of any other shape is not one.
 func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
 	code, number, found := strings.Cut(token, "-")
 	if !found || number == "" {
@@ -815,6 +815,19 @@ func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
 		return nil, false
 	}
 	return []string{code, number[region:]}, true
+}
+
+// setPrintsNumber reports whether a card of the set carries number exactly,
+// compared the way cns: compares it.
+func setPrintsNumber(b *mtgmatcher.Backend, code, number string) bool {
+	set, err := b.GetSet(code)
+	if err != nil {
+		return false
+	}
+	number = strings.ToLower(number)
+	return slices.ContainsFunc(set.Cards, func(card mtgmatcher.Card) bool {
+		return strings.ToLower(card.Number) == number
+	})
 }
 
 func isLetter(r rune) bool {
@@ -1516,7 +1529,21 @@ func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, 
 		tokens := strings.Fields(query)
 		if len(tokens) == 1 {
 			split, printed := splitPrintedNumber(b, tokens[0])
-			if printed {
+			// A word a card of its set carries is that number exactly
+			// (LOB-E027 is not LOB-027); one none carries, like info-067,
+			// is set and ordinal. Built rather than parsed as cns:, which
+			// reads 1-10 as a range.
+			if printed && setPrintsNumber(b, split[0], tokens[0]) {
+				filters = append(filters, FilterElem{
+					Name:   "edition",
+					Values: fixupEditionNG(b, split[0]),
+				}, FilterElem{
+					Name:   "number_strict",
+					Values: fixupNumberNG(b, tokens[0], "number_strict"),
+				})
+				query = ""
+				tokens = nil
+			} else if printed {
 				tokens = split
 			}
 		}
