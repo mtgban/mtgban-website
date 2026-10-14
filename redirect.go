@@ -182,7 +182,7 @@ func (s *site) CardRedirect(w http.ResponseWriter, r *http.Request) {
 			cards := printingsAt(b, set, number)
 			name := openingName(cards)
 			if name != "" {
-				query = name + " " + query
+				query = quoteIfFilter(name) + " " + query
 			}
 			if len(fields) > 2 && namesFinish(b, cards, fields[2]) {
 				query += " f:" + fields[2]
@@ -248,7 +248,7 @@ func (s *site) SealedRedirect(w http.ResponseWriter, r *http.Request) {
 			slug := fields[1]
 			product := sealedProductBySlug(s.backend(), set, slug)
 			if product != nil {
-				query = product.Name
+				query = quoteIfFilter(product.Name)
 			} else {
 				query += " " + strings.ReplaceAll(slug, "-", " ")
 			}
