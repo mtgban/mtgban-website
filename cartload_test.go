@@ -3,6 +3,7 @@ package main
 import (
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -347,23 +348,38 @@ func TestCartLoadArbitButtons(t *testing.T) {
 	if !strings.Contains(mint, mintSell) {
 		t.Errorf("buying at Mint: no buylist cart button with %s", mintSell)
 	}
-	// Mana Pool's feed gives no stock, so its cart asks the same way, beside
-	// its mass entry form, told apart from it
+	// Mana Pool's optimizer fills a line at rising prices, so its cart asks
+	// for the rows' own quantities, beside its mass entry form, told apart
+	// from it
 	mp := renderArbit(t, PageVars{
 		ScraperShort: "MP",
 		UserNav:      &NavElem{Short: "beta"},
 		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
 	})
-	mpBuy := `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:999,088072ea-66c7-4ef2-86a2-fd90055698a8:20&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool" data-buylist="false" data-load-list="cart" data-load-items="001229ab-da01-4346-91f9-23c145cd23c5,088072ea-66c7-4ef2-86a2-fd90055698a8" data-load-qtys="999,20"`
+	mpBuy := `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2,088072ea-66c7-4ef2-86a2-fd90055698a8:8&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool" data-buylist="false" data-load-list="cart" data-load-items="001229ab-da01-4346-91f9-23c145cd23c5,088072ea-66c7-4ef2-86a2-fd90055698a8" onclick`
 	if !strings.Contains(mp, mpBuy) {
 		t.Errorf("buying at Mana Pool: no store cart button with %s", mpBuy)
+	}
+	// Mana Pool's feed gives no stock, so a live row's quantity is 0, and
+	// its cart asks for one copy, the one the spread priced
+	liveMP := slices.Clone(mintRows)
+	for i := range liveMP {
+		liveMP[i].Quantity = 0
+	}
+	mpLive := renderArbit(t, PageVars{
+		ScraperShort: "MP",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: liveMP}},
+	})
+	if !strings.Contains(mpLive, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:1,088072ea-66c7-4ef2-86a2-fd90055698a8:1&amp;`) {
+		t.Error("buying at Mana Pool: a row with no quantity does not ask for one copy")
 	}
 	if strings.Count(mp, ">Load at Mana Pool<") != 1 || !strings.Contains(mp, `class="arb-load-btn builder"`) || !strings.Contains(mp, ">Mass entry at Mana Pool<") {
 		t.Error("Mana Pool's mass entry button is not told apart from its cart's")
 	}
 
 	// Other stores' carts carry the page's quantities
-	if strings.Contains(ck+csi, "data-load-qtys") {
+	if strings.Contains(ck+csi+mp, "data-load-qtys") {
 		t.Error("a cart other than Mint's store asks its own quantities")
 	}
 
@@ -396,6 +412,25 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		if strings.Count(page, `data-load-list="cart"`) != 1 {
 			t.Errorf("%s: want one cart button", tc.name)
 		}
+	}
+	// Where no buylist names an amount, Mana Pool's cart asks for the row's
+	globalMP := renderArbit(t, PageVars{
+		ScraperShort: "MP",
+		ArbitVars:    ArbitVars{GlobalMode: true},
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: rows}},
+	})
+	if !strings.Contains(globalMP, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2&amp;`) || strings.Contains(globalMP, "data-load-qtys") {
+		t.Error("global at Mana Pool: the cart does not ask for the row's quantity")
+	}
+	globalLive := renderArbit(t, PageVars{
+		ScraperShort: "MP",
+		ArbitVars:    ArbitVars{GlobalMode: true},
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: liveMP[:1]}},
+	})
+	if !strings.Contains(globalLive, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:1&amp;`) {
+		t.Error("global at Mana Pool: a row with no quantity does not ask for one copy")
 	}
 
 	// On Global sealed the copies are the section's, under go-mtgban's

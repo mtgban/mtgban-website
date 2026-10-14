@@ -454,10 +454,14 @@ cart: a load logged a signed-in user out, and the cause is not known yet. The ar
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
 store sells it in (`cartLoadForArbit`). Mint's feed caps its stock at
-8 and Mana Pool's gives none (`cartAsksMost`), so their store buttons ask
-for what the buylist takes, or 999 where the buylist names no amount, and
-the store trims it to what it has; the link carries those quantities
-(`data-load-qtys`) for the rows left ticked. The global page compares two
+8 (`cartAsksMost`), so its store button asks for what the buylist takes,
+or 999 where the buylist names no amount, and Mint trims it to what it
+has; the link carries those quantities (`data-load-qtys`) for the rows
+left ticked. Mana Pool's feed gives no stock either, but its button asks
+for the row's quantity, as other stores' do: the optimizer fills a line
+from the cheapest listings up, at rising prices, and the section's spread
+was worked out from the cheapest copy alone. A Mana Pool row's quantity is
+0, so in practice that is one copy a row, the one the spread priced. The global page compares two
 stores' listings and sells nowhere, so a section gets only "Load at", for
 the store whose copies its rows are: the page's own store, or on sealed
 the section's, as `scraperCompare` picks its seller.
