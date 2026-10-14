@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -186,4 +188,67 @@ func (e SearchEntry) RetailTip() string {
 		lines = append(lines, tip)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// storeFactorOptions lists the stores the adjustments editor offers, each
+// with its name and the sides it has, as JSON for a data attribute.
+func storeFactorOptions(sellers, vendors []string) string {
+	type option struct {
+		Key   string `json:"k"`
+		Name  string `json:"n"`
+		Sells bool   `json:"r"`
+		Buys  bool   `json:"b"`
+	}
+	byKey := map[string]*option{}
+	var keys []string
+	add := func(shorthand string, sells bool) {
+		o, ok := byKey[shorthand]
+		if !ok {
+			name := scraperName(shorthand)
+			if name == "" {
+				name = shorthand
+			}
+			o = &option{Key: shorthand, Name: name}
+			byKey[shorthand] = o
+			keys = append(keys, shorthand)
+		}
+		if sells {
+			o.Sells = true
+		} else {
+			o.Buys = true
+		}
+	}
+	for _, s := range sellers {
+		if metadataOnly(s) {
+			continue
+		}
+		add(s, true)
+	}
+	for _, v := range vendors {
+		add(v, false)
+	}
+	list := make([]option, 0, len(keys))
+	for _, k := range keys {
+		list = append(list, *byKey[k])
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		a, b := strings.ToLower(list[i].Name), strings.ToLower(list[j].Name)
+		if a != b {
+			return a < b
+		}
+		return list[i].Key < list[j].Key
+	})
+	out, _ := json.Marshal(list)
+	return string(out)
+}
+
+// metadataOnly says whether a loaded seller is a reference index, not a
+// store a user buys from.
+func metadataOnly(shorthand string) bool {
+	for _, seller := range GetSellers() {
+		if seller.Info().Shorthand == shorthand {
+			return seller.Info().MetadataOnly
+		}
+	}
+	return false
 }

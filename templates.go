@@ -303,6 +303,7 @@ var funcMap = template.FuncMap{
 	"scraper_name": func(s string) string {
 		return scraperName(s)
 	},
+	"store_factor_options": storeFactorOptions,
 	"strip_edition": func(name, edition string, sealed bool) string {
 		if !sealed || edition == "" {
 			return name
