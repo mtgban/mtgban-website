@@ -467,3 +467,30 @@ test('a device hydrating an over-long preset list alone holds it to 10 and sends
     expect(patches.length).toBe(1);
     expect(JSON.parse(patches[0].mtgban_arbit_presets).filter((p) => !p.del).length).toBe(10);
 });
+
+// Runs user-state.js with the given cookie and GET answer; returns whether
+// UserStateSync.ready had settled after a few ticks.
+async function readySettles(cookie, res) {
+    const m = {};
+    const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {} };
+    const document = { cookie, readyState: 'complete', addEventListener() {} };
+    const fetch = () => (res ? Promise.resolve(res) : Promise.reject(new Error('offline')));
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
+        window, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0 });
+    let settled = false;
+    window.UserStateSync.ready.then(() => { settled = true; });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    return settled;
+}
+
+test('sync ready settles at once when signed out', async () => {
+    expect(await readySettles('', null)).toBe(true);
+});
+
+test('sync ready settles after the first read, or its failure', async () => {
+    const ok = { status: 200, ok: true, json: () => Promise.resolve({ version: 1, favorites: [], recents: [], preferences: {} }) };
+    expect(await readySettles('MTGBAN=x', ok)).toBe(true);
+    expect(await readySettles('MTGBAN=x', null)).toBe(true);
+});
