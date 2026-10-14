@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -242,14 +243,20 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 // searchSuggestions adapts a parsed search that found nothing into the
 // suggest package's inputs.
 func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
-	return suggest.Build(suggest.Params{
+	quoted := quoteIfFilter(config.CleanQuery)
+	didYouMean, alts := suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
-		CleanQuery:     config.CleanQuery,
+		CleanQuery:     quoted,
 		SearchMode:     config.SearchMode,
 		AppliedFilters: config.AppliedFilters,
 		Sealed:         sealed,
 		Backend:        b,
 	})
+	// Did-you-mean compares names, so it reads the name unquoted.
+	if quoted != config.CleanQuery && config.SearchMode != "hashing" {
+		didYouMean = suggest.Closest(b, config.CleanQuery, sealed)
+	}
+	return didYouMean, alts
 }
 
 // searchFallback re-reads a search whose name matched nothing, in the order a
@@ -491,6 +498,8 @@ type SearchVars struct {
 	// navbar is shared with pages that run no search.
 	SearchScope string
 	CanScope    bool
+	// The clean query as a link writes it, quoted when the name looks like a filter.
+	ShowAllQuery string
 	// The bar holds something that parses to no filter at all, so the
 	// search passes over it whole.
 	ScopeIgnored bool
@@ -644,6 +653,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	config.CustomBuylist = canUploadCustom || (DevMode && !SigCheck)
 
 	pageVars.CleanSearchQuery = config.CleanQuery
+	pageVars.ShowAllQuery = quoteIfFilter(config.CleanQuery)
 	pageVars.SearchSort = readSearchSort(r, config)
 	pageVars.NoSort = config.SortMode != ""
 
@@ -2124,6 +2134,34 @@ func dedupeKeys(keys []string) []string {
 	return out
 }
 
+// contentsSeedUUIDs returns what the products of the first contents filter
+// that exactly bounds the result set can hold, and whether one did: the
+// uuids whose SourceProducts name them, from the snapshot built at load. The
+// contents filter still runs over them; the seed spares the walk over every
+// uuid. Only the mixed mode, which is what contents: and variable: set.
+func contentsSeedUUIDs(sources *sourcesSnapshot, mode string, filters []FilterElem) ([]string, bool) {
+	if sources == nil || mode != "mixed" {
+		return nil, false
+	}
+	for i := range filters {
+		if filters[i].Name != "contents" || filters[i].Negate || filters[i].ApplyTo != nil || len(filters[i].Values) == 0 {
+			continue
+		}
+		seen := make(map[string]bool)
+		var uuids []string
+		for _, product := range filters[i].Values {
+			for _, uuid := range sources.byProduct[product] {
+				if !seen[uuid] {
+					seen[uuid] = true
+					uuids = append(uuids, uuid)
+				}
+			}
+		}
+		return uuids, true
+	}
+	return nil, false
+}
+
 // editionSeedCodes returns the set codes of the first filter that exactly
 // bounds the result set: a non-negated edition filter that applies to every
 // set. Anything else (negations, ApplyTo-scoped filters) cannot seed.
@@ -2217,6 +2255,24 @@ func dropOdds(b *mtgmatcher.Backend, config SearchConfig) map[string]float64 {
 	return counts
 }
 
+// indexOutsidePools returns the first index of substr in query that is not
+// inside an in: term, or -1.
+func indexOutsidePools(query, substr string) int {
+	i := 0
+	for i < len(query) {
+		if start, ok := poolKeyAt(query, i); ok {
+			end, _, _ := poolValue(query, start)
+			i = end
+			continue
+		}
+		if strings.HasPrefix(query[i:], substr) {
+			return i
+		}
+		i++
+	}
+	return -1
+}
+
 func contentsViews(b *mtgmatcher.Backend, query string, config SearchConfig) *ContentsViews {
 	if config.ContentsProduct == "" || config.ContentsMode == "" {
 		return nil
@@ -2234,9 +2290,14 @@ func contentsViews(b *mtgmatcher.Backend, query string, config SearchConfig) *Co
 	}
 
 	// The filter is swapped in the query as it was typed, so whatever else it
-	// carries is carried over with it.
+	// carries is carried over with it. Outside any pool: a contents: inside
+	// an in: term is that search's, not this one's.
 	swap := func(to string) string {
-		return strings.Replace(query, config.ContentsMode+":", to+":", 1)
+		at := indexOutsidePools(query, config.ContentsMode+":")
+		if at == -1 {
+			return query
+		}
+		return query[:at] + to + query[at+len(config.ContentsMode):]
 	}
 
 	return &ContentsViews{
@@ -2364,13 +2425,82 @@ func storeSeedUUIDs(b *mtgmatcher.Backend, config SearchConfig) ([]string, bool)
 	return dedupeKeys(uuids), true
 }
 
+// errEmptyPool is the answer of a search inside a pool that holds nothing:
+// an error, as a name no card carries is, so the page says no cards rather
+// than showing an empty result.
+var errEmptyPool = errors.New("pool holds no cards")
+
+// resolvePools returns the config's card filters with every pool's members
+// filled in from its own search. A new slice: the pinned bar and the
+// fallback share the one on the config. A sub-search that chose no mode
+// inherits sealed or mixed from the outer search, so a pool on the sealed
+// tab names products.
+func resolvePools(ds *datastore, config SearchConfig) ([]FilterElem, error) {
+	filters := slices.Clone(config.CardFilters)
+	for i := range filters {
+		if filters[i].Name != "pool" {
+			continue
+		}
+		// The parser resolves an empty in: itself, to nothing.
+		if filters[i].Pool == nil {
+			if len(filters[i].Members) == 0 && !filters[i].Negate {
+				return nil, errEmptyPool
+			}
+			continue
+		}
+		sub := *filters[i].Pool
+		if (sub.SearchMode == "" || sub.DefaultMode) && (config.SearchMode == "sealed" || config.SearchMode == "mixed") {
+			sub.SearchMode = config.SearchMode
+			sub.DefaultMode = false
+		}
+		members := map[string]bool{}
+		if uuids, err := searchAndFilter(ds, sub); err == nil {
+			for _, uuid := range uuids {
+				members[uuid] = true
+			}
+		}
+		// The sealed tab never answers with a single.
+		if config.SearchMode == "sealed" {
+			maps.DeleteFunc(members, func(uuid string, _ bool) bool {
+				co, err := ds.backend.GetUUID(uuid)
+				return err != nil || !co.Sealed
+			})
+		}
+		if len(members) == 0 && !filters[i].Negate {
+			return nil, errEmptyPool
+		}
+		filters[i].Members = members
+	}
+	return filters, nil
+}
+
+// poolSeedUUIDs returns the members of the first pool that exactly bounds
+// the result set, and whether one did. A negated pool names what to leave
+// out and a scoped one passes every card outside its scope, so neither
+// bounds anything; a hashing search names its own uuids and a scryfall one
+// is not ours to seed.
+func poolSeedUUIDs(mode string, filters []FilterElem) ([]string, bool) {
+	if mode == "hashing" || mode == "scryfall" {
+		return nil, false
+	}
+	for i := range filters {
+		if filters[i].Name != "pool" || filters[i].Negate || filters[i].ApplyTo != nil || filters[i].Members == nil {
+			continue
+		}
+		return slices.Sorted(maps.Keys(filters[i].Members)), true
+	}
+	return nil, false
+}
+
 func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 	query := config.CleanQuery
-	filters := config.CardFilters
+	filters, err := resolvePools(ds, config)
+	if err != nil {
+		return nil, err
+	}
 
 	var uuids []string
 	var seeded bool
-	var err error
 
 	// With no text to search, the mode switch below degrades to seeding
 	// from the whole uuid pool. A positive edition filter names its exact
@@ -2383,15 +2513,22 @@ func searchAndFilter(ds *datastore, config SearchConfig) ([]string, error) {
 	// not seed" sent the search back to the whole pool to rediscover the
 	// same emptiness.
 	if query == "" {
-		if codes, ok := editionSeedCodes(filters); ok {
-			for _, code := range codes {
-				switch config.SearchMode {
-				case "", "prefix", "any":
-					uuids = append(uuids, ds.backend.GetUUIDsInSet(code)...)
-					seeded = true
-				case "sealed":
-					uuids = append(uuids, ds.backend.GetSealedUUIDsInSet(code)...)
-					seeded = true
+		// A pool names its exact result set, ahead of every other seed.
+		uuids, seeded = poolSeedUUIDs(config.SearchMode, filters)
+		if !seeded {
+			uuids, seeded = contentsSeedUUIDs(ds.sources, config.SearchMode, filters)
+		}
+		if !seeded {
+			if codes, ok := editionSeedCodes(filters); ok {
+				for _, code := range codes {
+					switch config.SearchMode {
+					case "", "prefix", "any":
+						uuids = append(uuids, ds.backend.GetUUIDsInSet(code)...)
+						seeded = true
+					case "sealed":
+						uuids = append(uuids, ds.backend.GetSealedUUIDsInSet(code)...)
+						seeded = true
+					}
 				}
 			}
 		}
