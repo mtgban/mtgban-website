@@ -35,8 +35,8 @@ front end is unacceptable), see the appendix.
 - [ ] Confirm what else runs on the app droplet: `systemctl list-units --type=service --state=running`,
       and `crontab -l` for both the deploy user and root. Anything found here
       has to move too, or be deliberately left behind.
-- [ ] Have the real `/etc/mtgban.env` and the per-checkout `config.json` to
-      hand. Neither is in git; both are needed on the new host.
+- [ ] Have the real `/etc/mtgban.env` to hand. It is not in git, and it
+      holds the key the new host reads its config from the bucket with.
 
 ## 1. Provision the new droplet in SFO3
 
@@ -77,11 +77,11 @@ From the **old** droplet:
 ```bash
 # secrets (root-owned, mode 600)
 sudo cat /etc/mtgban.env                    # copy into the same path on the new host
-
-# per-checkout config — contains database credentials
-scp mtgban-website-8081/config.json  new-host:/home/koda/src/mtgban-website-8081/
-scp mtgban-website-8082/config.json  new-host:/home/koda/src/mtgban-website-8082/
 ```
+
+The config stays in the bucket (`b2://mtgban-config/<game>/config.json`, baked
+into the unit at bootstrap), and the database settings in the
+`infrastructure.json` it names, so there is no config to copy.
 
 If the datastore is a local file rather than `b2://` or `https://`, copy it into
 both checkouts as well, or the first boot spends minutes fetching it:
@@ -199,9 +199,8 @@ doctl apps spec get <app-id> > /tmp/app.yaml
 doctl apps create --spec /tmp/app.yaml --wait
 ```
 
-Each one needs its own `config.json` equivalent — these apps read their config
-from the app spec's env vars, so the database host swap from step 5 has to
-happen in the spec, not in a file on disk.
+Their database settings come from the same `infrastructure.json`, so step 5
+covers them too; only a game config that sets its own needs the swap as well.
 
 An app already in SFO3 is fine as it is; check before assuming.
 
@@ -210,13 +209,14 @@ An app already in SFO3 is fine as it is; check before assuming.
 More work, and it is the direction with the data in it. Two options:
 
 **Snapshot and rebuild.** Power off, snapshot, transfer the snapshot to NYC1,
-build a droplet from it, repoint every `config.json`. Downtime is the transfer,
-which at this table's size is not minutes.
+build a droplet from it, repoint `infrastructure.json` and any config that sets
+its own databases. Downtime is the transfer, which at this table's size is not
+minutes.
 
 **Replicate and promote.** Stand up a Postgres in NYC1, set up streaming
 replication from SFO3, let it catch up, then stop writes, promote the replica,
-and repoint the configs. Minutes of downtime instead of hours, at the cost of a
-more delicate procedure. Remember the *three* databases (`card_prices`,
+and repoint them the same way. Minutes of downtime instead of hours, at the cost
+of a more delicate procedure. Remember the *three* databases (`card_prices`,
 `userstate`, `observability`) plus the separate newspaper host — each needs the
 same treatment, and the ingest that runs beside the archive needs to move with
 it or reach it across the country instead.

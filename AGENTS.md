@@ -80,14 +80,23 @@ output, not a claim written here.
   default config path.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
   for the current line, it moves): scraper config (`icons`, `name_override`
-  and `stores`), Patreon OAuth, ACL (tier → page → flags), affiliates, DB
-  addresses, B2 bucket credentials. The store list comes from listing
+  and `stores`), the `stores` section (which stores show where, by
+  shorthand, `api_only_stores` among them: stores only the price API
+  serves), `timeseries_config`, Discord, API secrets. Settings kept in
+  files of their own, which deployments may share, are named by path:
+  `infrastructure_path`
+  (bucket keys, Google and Patreon credentials, uploader endpoints, the
+  SQL databases; `internal/infrastructure`, and a key the config sets
+  itself wins), `acl_path` (tier → page → flags), `patreon_grants_path`,
+  `affiliates_path` and `datasets_path` (the chart datasets). The admin
+  page edits each of them. The store list comes from listing
   bantool's dumps at startup (`load.go`'s `loadScrapersNG`/`listDumps`),
   which live in bucket `mtgban-dumps` (or a local copy, with `-dumps`) as
   `<game>/<store>/<kind>/<shorthand>.json.xz` and are read with the
   `bucket_keys["mtgban-dumps"]` key pair. `scraper_config.stores`, or
   `-stores` for one run, narrows what loads at startup to the stores
-  named; empty loads every store listed. See SPECIFICATION.md §2.3.
+  named; empty loads every store listed. See SPECIFICATION.md §2.3
+  and §2.4.
 
 ## Repository conventions
 

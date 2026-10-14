@@ -5,10 +5,11 @@ behind two config flags, so the cutover is a sequence of config flips with a
 verify gate between each. The legacy wide path stays intact until the end, so
 every step is reversible by flipping the flag back.
 
-## 1. config.json additions (NOT in git — config.json is gitignored)
+## 1. Config and datasets file additions (NOT in git)
 
-Add a `provider` id to every `timeseries_config.datasets` entry, and the two
-flags on `timeseries_config`. Nothing is derived or defaulted in code: a dataset
+Add a `provider` id to every entry of the datasets file the config names in
+`datasets_path` (the admin page's Datasets tab edits it), and the flag on
+`timeseries_config`. Nothing is derived or defaulted in code: a dataset
 without a `provider` is dropped from the chart registry, skipped by the long-form
 dual-write, and unresolvable for buylist metrics and the screener (issue #282: a
 config missing the field charted only TCGplayer Low and Market, because those
@@ -31,27 +32,30 @@ The index→provider mapping (plan 17.5):
 | 9 | coolstuffinc_buylist_price | 12 |
 
 ```jsonc
+// config.json
 "timeseries_config": {
-    "long_form_writes": false,   // step 2 flips this on
-    "datasets": [
-        { "public_name": "TCGplayer Low", "index": 2, "provider": 3, ... },
-        { "public_name": "TCGplayer Market", "index": 3, "provider": 4, ... },
-        // ... provider on every dataset ...
-    ]
+    "long_form_writes": false   // step 2 flips this on
 }
+
+// the datasets file
+[
+    { "public_name": "TCGplayer Low", "index": 2, "provider": 3, ... },
+    { "public_name": "TCGplayer Market", "index": 3, "provider": 4, ... },
+    // ... provider on every dataset ...
+]
 ```
 
 A deployment that ran dual-write with the field missing left gaps in `prices` for
 every provider it skipped. Re-run `08_catchup.sql` with `-v since=<first
-dual-write day>` after fixing the config; it is idempotent and fills only the
-missing (ban_id, date, provider) rows.
+dual-write day>` after fixing the datasets file; it is idempotent and fills only
+the missing (ban_id, date, provider) rows.
 
 The tcgcsv (non-Magic) ingest writes providers 3/4/5/6/7 — columns low/market/
-mid/high/direct_low — and the chart renders whichever of those the config names.
-Mid, High, and Direct Low have no Magic dataset behind them, so a deployment that
-charts non-Magic products needs an entry for each; `index` goes unused on that
-path (pick ids past the wide columns), while `provider`, `public_name`, and
-`color` are what the chart reads:
+mid/high/direct_low — and the chart renders whichever of those the datasets file
+names. Mid, High, and Direct Low have no Magic dataset behind them, so a
+deployment that charts non-Magic products needs an entry for each; `index` goes
+unused on that path (pick ids past the wide columns), while `provider`,
+`public_name`, and `color` are what the chart reads:
 
 ```jsonc
 { "public_name": "TCGplayer Mid",        "index": 20, "provider": 5, "color": "rgb(255, 206, 86)" },

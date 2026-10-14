@@ -30,7 +30,7 @@ Chart.js's shape, and the two share the archive read.
 ## What the archive holds
 
 From `timeseries/`, the long-form tables (`db_migration/01_schema.sql`),
-and the deployed `config.json`:
+and the deployed config and datasets file:
 
 - **One price per printing, per source, per day.** `prices(ban_id, date,
   provider, price)`. The snapshot runs every 12 hours and the day's last
@@ -81,7 +81,7 @@ filed under the same providers (`CKSealed`, `TCGSealed` and `MKMSealed` are
 listed with them), under the finish `sealed`.
 
 **Other games have only TCGplayer's history, with holes.** The Lorcana and
-One Piece configs list no `timeseries_config.datasets`, so their history is
+One Piece deployments list no datasets of their own, so their history is
 the TCGplayer series (Low, Market, Mid, High, Direct Low) the daily tcgcsv
 ingest writes, from 2024-02-08 on. tcgcsv withdrew its archive in September
 2026 (`docs/tcgcsv-archive-withdrawal.md`), so a day the ingest misses can
