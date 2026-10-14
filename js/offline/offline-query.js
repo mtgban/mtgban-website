@@ -34,16 +34,39 @@
         return out;
     }
 
-    // tokenize splits on whitespace honoring double-quoted phrases.
+    // tokenize splits on whitespace honoring double-quoted phrases and a
+    // key:(...) value to its matching paren. Online reads only in:(...) that
+    // way; here any key does, so a pool's filters stay one token.
     function tokenize(str) {
         var tokens = [];
-        var re = /"([^"]*)"|(\S+)/g;
+        var re = /"([^"]*)"|(-?[a-zA-Z_]+:\()|(\S+)/g;
         var m;
         while ((m = re.exec(str)) !== null) {
             if (m[1] !== undefined) {
                 tokens.push({text: m[1], quoted: true});
+            } else if (m[2] !== undefined) {
+                var depth = 1, quoted = false, k = re.lastIndex;
+                for (; k < str.length && depth > 0; k++) {
+                    var ch = str.charAt(k);
+                    if (ch === '"') {
+                        // After a key a quote opens a value; a bare one only
+                        // when its closing quote comes before the next paren
+                        var closing = str.indexOf('"', k + 1), paren = str.indexOf(')', k + 1);
+                        if (quoted) {
+                            quoted = false;
+                        } else if (/[:<>]/.test(str.charAt(k - 1)) || (closing !== -1 && (paren === -1 || closing < paren))) {
+                            quoted = true;
+                        }
+                    } else if (!quoted && ch === '(') {
+                        depth++;
+                    } else if (!quoted && ch === ')') {
+                        depth--;
+                    }
+                }
+                tokens.push({text: str.slice(m.index, k), quoted: false});
+                re.lastIndex = k;
             } else {
-                tokens.push({text: m[2], quoted: false});
+                tokens.push({text: m[3], quoted: false});
             }
         }
         return tokens;
