@@ -116,8 +116,12 @@ func uploadSourceFrom(raw string) (name string, link string) {
 // what is left. It lives here rather than inline so that the choice of
 // branch is something a test can hold - a handed-over list is only told
 // from a pasted one by which of these arms it lands in.
-func uploadQuery(hashes []string, textArea, handedFrom, remoteURL, remoteName, filename string) (query string, link string) {
+func uploadQuery(shared bool, hashes []string, textArea, handedFrom, remoteURL, remoteName, filename string) (query string, link string) {
 	switch {
+	case shared:
+		// Reopened from a share link: the rows say nothing about where
+		// they first came from, and the owner is not named.
+		return "a shared list", ""
 	case len(hashes) != 0:
 		return "hashes", ""
 	case textArea != "":

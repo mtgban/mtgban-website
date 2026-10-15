@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -63,6 +64,12 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	if _, err := db.Exec(createTableSQL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("userstate: ensure schema: %w", err)
+	}
+
+	// Non-fatal: a role that cannot create this table keeps sync and
+	// loses only upload sharing, whose insert then fails.
+	if _, err := db.Exec(createUploadSharesSQL); err != nil {
+		log.Println("userstate: upload shares unavailable:", err)
 	}
 
 	return &Client{db: db}, nil

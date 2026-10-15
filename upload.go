@@ -35,6 +35,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/mtgban-website/manabox"
 	"github.com/mtgban/mtgban-website/moxfield"
+	"github.com/mtgban/mtgban-website/userstate"
 )
 
 const (
@@ -421,6 +422,7 @@ type UploadVars struct {
 	MagicOnlyExports     bool
 	CanChangeStores      bool
 	CanPublishStore      bool
+	CanShare             bool
 	RemoteLinkURL        string
 	TotalQuantity        int
 	Optimized            map[string][]OptimizedUploadEntry
@@ -501,6 +503,19 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A share link reopens stored rows: resolved before the mode, which
+	// the share carries, and before the input, which it fills.
+	var shared *userstate.UploadShare
+	if key := r.FormValue("share"); key != "" {
+		share, found := loadUploadShare(r.Context(), uploadShareSource(), key)
+		if !found {
+			pageVars.InfoMessage = uploadShareMissingMsg
+			render(w, "upload.html", pageVars)
+			return
+		}
+		shared = &share
+	}
+
 	// Check cookies to set preferences
 	blMode := readSetFlag(w, r, "mode", "uploadMode")
 
@@ -511,6 +526,9 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	if !canBuylist {
 		blMode = false
+	}
+	if shared != nil {
+		blMode = sharedMode(shared.Buylist, canBuylist)
 	}
 
 	st := readUploadSettings(r, blMode)
@@ -543,7 +561,13 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.EnabledIndexes = selected.enabledIndexKeys
 	pageVars.EnabledSealedIndexes = selected.enabledSealedIndexKeys
 
+	pageVars.CanShare = GetParamFromSig(sig, "UserEmail") != "" || (DevMode && !SigCheck)
+
+	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
 	in := readUploadInput(r)
+	if shared != nil {
+		in = withSharedRows(in, shared.Rows, modes.maxRows)
+	}
 	if in.fileErr != nil && in.remoteURL == "" && in.textArea == "" && len(in.hashes) == 0 {
 		// A GET is someone arriving at the uploader, which is this page. A
 		// POST that carries nothing is a request that went wrong on the way -
@@ -602,7 +626,6 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledSealedSellers = selected.enabledSealedStores
 	}
 
-	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
 	start := time.Now()
 
 	uploadedData, uploadName, err := loadUploadEntries(r, b, in, modes.maxRows)
@@ -773,7 +796,7 @@ func fillUploadEntries(pageVars *UploadVars, r *http.Request, b *mtgmatcher.Back
 		uploadFilename = in.handler.Filename
 	}
 	pageVars.UploadQuery, pageVars.UploadSourceURL = uploadQuery(
-		in.hashes, in.textArea, r.FormValue("uploadSource"), in.remoteURL, uploadName, uploadFilename,
+		in.shared, in.hashes, in.textArea, r.FormValue("uploadSource"), in.remoteURL, uploadName, uploadFilename,
 	)
 	pageVars.UploadEntries = uploadedData
 
@@ -1660,6 +1683,8 @@ type uploadInput struct {
 	file           multipart.File
 	handler        *multipart.FileHeader
 	fileErr        error
+	// shared is set when the rows came from a share link.
+	shared bool
 }
 
 // readUploadInput reads the list a request carries. A file that came is left
@@ -1706,6 +1731,56 @@ func readUploadInput(r *http.Request) uploadInput {
 		handler:        handler,
 		fileErr:        err,
 	}
+}
+
+// uploadShareReader is the one read a share link makes.
+type uploadShareReader interface {
+	UploadShareByKey(ctx context.Context, key, game string) (userstate.UploadShare, bool, error)
+}
+
+// uploadShareSource is the userstate client as a reader, or a nil
+// interface without one, so loadUploadShare's nil check holds.
+var uploadShareSource = func() uploadShareReader {
+	if UserStateDB == nil {
+		return nil
+	}
+	return UserStateDB
+}
+
+// loadUploadShare resolves a share key; found is false without a reader
+// and for a malformed, unknown or expired key, or a read error.
+func loadUploadShare(ctx context.Context, rd uploadShareReader, key string) (userstate.UploadShare, bool) {
+	if rd == nil || !userstate.ValidUploadShareKey(key) {
+		return userstate.UploadShare{}, false
+	}
+	share, found, err := rd.UploadShareByKey(ctx, key, string(Config().Game))
+	if err != nil {
+		log.Println("upload share:", err)
+		return userstate.UploadShare{}, false
+	}
+	return share, found
+}
+
+// withSharedRows puts a share's rows where the hash path reads them, cut
+// to maxRows when that is positive.
+func withSharedRows(in uploadInput, rows string, maxRows int) uploadInput {
+	in.hashes, in.hashesQtys, in.hashesCond, in.hashesPrice, in.hashesNotes,
+		in.hashesFrom, in.hashesFromQtys = splitRows(rows)
+	if maxRows > 0 {
+		for _, f := range []*[]string{&in.hashes, &in.hashesQtys, &in.hashesCond, &in.hashesPrice,
+			&in.hashesNotes, &in.hashesFrom, &in.hashesFromQtys} {
+			if len(*f) > maxRows {
+				*f = (*f)[:maxRows]
+			}
+		}
+	}
+	in.shared = true
+	return in
+}
+
+// sharedMode is the share's mode where the reader may use it, else retail.
+func sharedMode(shareBuylist, canBuylist bool) bool {
+	return shareBuylist && canBuylist
 }
 
 // uploadModes are the exports a request asks for, and the most rows it may

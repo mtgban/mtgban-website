@@ -280,7 +280,7 @@ func TestResultIconsDoNotWaitOnALibrary(t *testing.T) {
 				UploadVars: UploadVars{
 					UploadEntries: []UploadEntry{{CardID: "card-1"}},
 					CanBuylist:    true,
-					RemoteLinkURL: "https://docs.google.com/spreadsheets/d/abc",
+					CanShare:      true,
 					UnpackSealed:  1,
 				},
 			},
