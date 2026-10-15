@@ -988,8 +988,7 @@ func (s *site) stashInTimeseries() {
 	// Accumulate all prices into a single row per (date, uuid, foil, etched).
 	accumulated := map[string]*timeseries.PriceRow{}
 	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
-		row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
-		row.SetPriceForDataset(config.Index, price)
+		accumulatePrice(accumulated, card, config, date, price)
 	})
 
 	// Upsert all accumulated rows in batches
@@ -1089,13 +1088,14 @@ func warmVariantCache(ctx context.Context) error {
 
 // stashLongForm mirrors the accumulated wide rows into the long prices table. It
 // warms the variant cache once, resolves each row's ban_id (minting new
-// printings on the fly), and emits one LongPrice per set provider column with a
-// positive price (zeros are omitted, matching the backfill). Returns the number
-// of price rows upserted.
+// printings on the fly), and emits one LongPrice per set provider column or
+// Extra entry with a positive price (zeros are omitted, matching the backfill).
+// Returns the number of price rows upserted.
 func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
 	if err := warmVariantCache(ctx); err != nil {
 		return 0, fmt.Errorf("warm variant cache: %w", err)
 	}
+	datasets := Datasets()
 	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
 	for _, row := range accumulated {
 		lang := ""
@@ -1113,19 +1113,49 @@ func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.Price
 			log.Println("long-form: resolve ban_id:", err)
 			continue
 		}
-		for _, ds := range Datasets() {
-			if ds.Provider == 0 {
-				continue
-			}
-			if p := row.PriceForDataset(ds.Index); p != nil && *p > 0 {
-				longRows = append(longRows, timeseries.LongPrice{
-					BanID:    banID,
-					Date:     row.Date,
-					Provider: ds.Provider,
-					Price:    *p,
-				})
-			}
-		}
+		longRows = append(longRows, longRowsFor(row, banID, datasets)...)
 	}
 	return PricesArchiveDB.UpsertLongPrices(ctx, longRows, 0)
+}
+
+// longRowsFor turns one accumulated row into long prices: a row per dataset
+// with a wide column and a positive price, then one per Extra entry.
+func longRowsFor(row *timeseries.PriceRow, banID int64, datasets []DatasetConfig) []timeseries.LongPrice {
+	var out []timeseries.LongPrice
+	for _, ds := range datasets {
+		if ds.Provider == 0 {
+			continue
+		}
+		if p := row.PriceForDataset(ds.Index); p != nil && *p > 0 {
+			out = append(out, timeseries.LongPrice{
+				BanID:    banID,
+				Date:     row.Date,
+				Provider: ds.Provider,
+				Price:    *p,
+			})
+		}
+	}
+	for provider, price := range row.Extra {
+		if price <= 0 {
+			continue
+		}
+		out = append(out, timeseries.LongPrice{
+			BanID:    banID,
+			Date:     row.Date,
+			Provider: provider,
+			Price:    price,
+		})
+	}
+	return out
+}
+
+// accumulatePrice files one Magic snapshot price on its row: in the dataset's
+// wide column, or under its provider in Extra when the index has no column.
+func accumulatePrice(accumulated map[string]*timeseries.PriceRow, card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
+	row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
+	if timeseries.HasWideColumn(config.Index) {
+		row.SetPriceForDataset(config.Index, price)
+	} else if config.Provider != 0 {
+		row.SetExtra(config.Provider, price)
+	}
 }
