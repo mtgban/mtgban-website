@@ -152,6 +152,9 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(s.SuggestAPI)))
 	http.Handle("/api/settings/modal", noSigning(http.HandlerFunc(s.SettingsModal)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
+	// Stores a results page's rows for a share link; it checks the reader's
+	// own signature for the Upload grant.
+	http.Handle("/api/upload/share", noSigning(http.HandlerFunc(UploadShareAPI)))
 	http.Handle("/api/popular/vote", noSigning(http.HandlerFunc(s.PopularVoteAPI)))
 	// Its closures read the live datastore and prices per request.
 	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
