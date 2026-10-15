@@ -20,9 +20,9 @@ require (
 	github.com/mtgban/simplecloud v0.1.1
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/oauth2 v0.37.0
-	golang.org/x/sync v0.23.0
-	golang.org/x/sys v0.48.0
-	golang.org/x/text v0.42.0
+	golang.org/x/sync v0.24.0
+	golang.org/x/sys v0.49.0
+	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20230915040305-7677e8164883
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
