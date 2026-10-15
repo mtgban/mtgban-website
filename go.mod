@@ -109,3 +109,5 @@ require (
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+replace github.com/mtgban/go-mtgban => github.com/the-muppet2/go-mtgban v0.10.2-0.20261015074824-58d507743794
