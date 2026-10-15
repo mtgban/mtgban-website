@@ -1,0 +1,199 @@
+/* Account page: the reader's card, feature links and the tier table. */
+.user-page {
+    max-width: 56em;
+    margin: 0 auto;
+    padding: 1.5em var(--page-gutter) 4em;
+}
+
+.user-header {
+    margin-bottom: 1.5em;
+}
+
+.user-section-title {
+    margin: 2em 0 0.75em;
+    color: var(--headingtext);
+    font-size: var(--text-xl);
+    font-weight: 600;
+}
+
+/* The tier tints the navbar uses, scoped to this page's badges. */
+.user-page [data-tier="vintage"] { --tier-tint: 155, 89, 182; }
+.user-page [data-tier="legacy"]  { --tier-tint: 52, 152, 219; }
+.user-page [data-tier="modern"]  { --tier-tint: 231, 76, 60; }
+.user-page [data-tier="pioneer"] { --tier-tint: 26, 188, 156; }
+
+.user-tier {
+    display: inline-block;
+    margin: 0;
+    padding: 0.2em 0.7em;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--activetext);
+    font-size: var(--text-base);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.user-tier[data-tier],
+.user-tier-card[data-tier] .user-tier {
+    background: rgba(var(--tier-tint), 0.15);
+    color: rgb(var(--tier-tint));
+}
+
+/* ── The reader's card ── */
+.user-card {
+    padding: 1.25em 1.5em;
+}
+.user-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16em, 1fr));
+    gap: 1em 2em;
+    margin: 0;
+}
+.user-detail dt {
+    margin-bottom: 0.3em;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.user-detail dd {
+    margin: 0;
+    color: var(--normal);
+    font-size: var(--text-md);
+    overflow-wrap: anywhere;
+}
+.user-manage {
+    display: block;
+    margin-top: 0.3em;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+.user-manage:hover { color: var(--ainfo); }
+
+.user-pill {
+    display: inline-block;
+    padding: 0.15em 0.6em;
+    border-radius: 999em;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
+    color: var(--activetext);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.user-pill-warn {
+    background: color-mix(in srgb, var(--awarning) 15%, transparent);
+    border-color: var(--awarning);
+    color: var(--awarning);
+}
+
+/* ── Feature links ── */
+.user-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16em, 1fr));
+    gap: 0.9em;
+}
+.user-feature {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+    padding: 1em 1.2em;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.user-feature:hover {
+    border-color: var(--accent-border);
+    background: var(--surface-2);
+    text-decoration: none;
+}
+.user-feature-name {
+    color: var(--activetext);
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+.user-feature-desc {
+    color: var(--text-dim);
+    font-size: var(--text-md);
+    line-height: 1.4;
+}
+
+/* ── The tier table ── */
+.user-tiers {
+    column-width: 16em;
+    column-gap: 0.9em;
+}
+.user-tier-card {
+    break-inside: avoid;
+    margin-bottom: 0.9em;
+    padding: 1em 1.2em 1.1em;
+}
+.user-tier-card.is-current {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 1px var(--accent-border);
+}
+.user-tier-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-bottom: 0.7em;
+    margin-bottom: 0.5em;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.user-tier-page {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    padding: 0.6em 0;
+}
+.user-tier-page + .user-tier-page {
+    border-top: 1px dashed var(--border-subtle);
+}
+.user-tier-page-name {
+    color: var(--activetext);
+    font-size: var(--text-md);
+    font-weight: 600;
+}
+.user-tier-page-desc {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+.user-perks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+    margin-top: 0.3em;
+}
+
+.user-note {
+    margin: 1em 0 0;
+    color: var(--text-dim);
+    font-size: var(--text-md);
+}
+.user-note a {
+    color: var(--ainfo);
+}
+
+@media (max-width: 40em) {
+    .user-page {
+        padding-top: 1em;
+    }
+    .user-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75em;
+    }
+    .user-details,
+    .user-features {
+        grid-template-columns: 1fr;
+    }
+    .user-tiers {
+        column-width: auto;
+        column-count: 1;
+    }
+}
