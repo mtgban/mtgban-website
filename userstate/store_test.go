@@ -3,6 +3,7 @@ package userstate
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 )
 
@@ -149,5 +150,113 @@ func TestPatchRejectsUnknownSection(t *testing.T) {
 	h := freshHash(t, c)
 	if _, _, err := c.Patch(context.Background(), h, "bogus", json.RawMessage(`{}`), 0); err == nil {
 		t.Fatal("expected error for unknown section")
+	}
+}
+
+// sameBackpack compares decoded entries: JSONB reorders keys and spacing.
+func sameBackpack(t *testing.T, got, want json.RawMessage) bool {
+	t.Helper()
+	type entry struct {
+		ID  string `json:"id"`
+		Qty int    `json:"qty"`
+		T   int    `json:"t"`
+		M   int    `json:"m"`
+	}
+	var g, w []entry
+	if err := json.Unmarshal(got, &g); err != nil {
+		t.Fatalf("decode got %s: %v", got, err)
+	}
+	if err := json.Unmarshal(want, &w); err != nil {
+		t.Fatalf("decode want %s: %v", want, err)
+	}
+	return slices.Equal(g, w)
+}
+
+func TestBackpackIsASection(t *testing.T) {
+	c := testClient(t)
+	h := freshHash(t, c)
+
+	st, err := c.Get(context.Background(), h)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if string(st.Backpack) != "[]" {
+		t.Fatalf("zero backpack: %s", st.Backpack)
+	}
+
+	pack := json.RawMessage(`[{"id":"abc","qty":2,"t":1,"m":1}]`)
+	res, conflict, err := c.Patch(context.Background(), h, "backpack", pack, 0)
+	if err != nil || conflict {
+		t.Fatalf("Patch: err=%v conflict=%v", err, conflict)
+	}
+	if !sameBackpack(t, res.Backpack, pack) || string(res.Favorites) != "[]" {
+		t.Fatalf("after patch: %+v", res)
+	}
+
+	st, err = c.Get(context.Background(), h)
+	if err != nil || !sameBackpack(t, st.Backpack, pack) || st.Version != 1 {
+		t.Fatalf("Get after patch: %+v err=%v", st, err)
+	}
+
+	st.Favorites = json.RawMessage(`[{"id":"f1"}]`)
+	res, conflict, err = c.Put(context.Background(), h, st, st.Version)
+	if err != nil || conflict {
+		t.Fatalf("Put: err=%v conflict=%v", err, conflict)
+	}
+	if !sameBackpack(t, res.Backpack, pack) {
+		t.Fatalf("Put dropped the backpack: %s", res.Backpack)
+	}
+
+	res, conflict, err = c.Patch(context.Background(), h, "favorites", json.RawMessage(`[{"id":"f2"}]`), res.Version)
+	if err != nil || conflict || !sameBackpack(t, res.Backpack, pack) {
+		t.Fatalf("Patch favorites touched the backpack: %+v conflict=%v err=%v", res, conflict, err)
+	}
+}
+
+func TestPutWithoutBackpackKeepsIt(t *testing.T) {
+	c := testClient(t)
+	h := freshHash(t, c)
+	ctx := context.Background()
+
+	pack := json.RawMessage(`[{"id":"abc","qty":3,"t":1,"m":1}]`)
+	res, conflict, err := c.Patch(ctx, h, "backpack", pack, 0)
+	if err != nil || conflict {
+		t.Fatalf("Patch: err=%v conflict=%v", err, conflict)
+	}
+
+	// An old client's PUT carries no backpack key.
+	old := State{Favorites: json.RawMessage(`[{"id":"f1"}]`), Recents: json.RawMessage(`[]`), Preferences: json.RawMessage(`{}`)}
+	res, conflict, err = c.Put(ctx, h, old, res.Version)
+	if err != nil || conflict {
+		t.Fatalf("Put without backpack: err=%v conflict=%v", err, conflict)
+	}
+	got, err := c.Get(ctx, h)
+	if err != nil || !sameBackpack(t, got.Backpack, pack) {
+		t.Fatalf("backpack after a Put without it: %s err=%v", got.Backpack, err)
+	}
+
+	repl := json.RawMessage(`[{"id":"xyz","qty":1,"t":2,"m":2}]`)
+	old.Backpack = repl
+	if _, conflict, err = c.Put(ctx, h, old, res.Version); err != nil || conflict {
+		t.Fatalf("Put with backpack: err=%v conflict=%v", err, conflict)
+	}
+	got, err = c.Get(ctx, h)
+	if err != nil || !sameBackpack(t, got.Backpack, repl) {
+		t.Fatalf("backpack after a Put with one: %s err=%v", got.Backpack, err)
+	}
+}
+
+func TestEnsureSchemaIsIdempotent(t *testing.T) {
+	c := testClient(t)
+	if _, err := c.db.Exec(createTableSQL); err != nil {
+		t.Fatalf("create again: %v", err)
+	}
+	if _, err := c.db.Exec(addBackpackSQL); err != nil {
+		t.Fatalf("alter again: %v", err)
+	}
+	// NewClient skips the ALTER when this finds the column.
+	var one int
+	if err := c.db.QueryRow(backpackColumnSQL).Scan(&one); err != nil || one != 1 {
+		t.Fatalf("column lookup: one=%d err=%v", one, err)
 	}
 }
