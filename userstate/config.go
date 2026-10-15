@@ -65,6 +65,11 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 		return nil, fmt.Errorf("userstate: ensure schema: %w", err)
 	}
 
+	if _, err := db.Exec(createSharesSQL); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("userstate: ensure shares schema: %w", err)
+	}
+
 	return &Client{db: db}, nil
 }
 

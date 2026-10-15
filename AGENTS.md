@@ -148,6 +148,7 @@ output, not a claim written here.
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
+| `favorites_share.go` | The shared favorites page (`/search/shared`), a list read by its share id; the owner's link lives in `userstate` under `/api/userstate/share` |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
