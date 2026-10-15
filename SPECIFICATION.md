@@ -413,10 +413,10 @@ handler right after `genPageNav`, which keeps only the handful of pages that
 ship a mobile template. Every page handler fills a `PageVars` (pages.go): the
 nav, the messages and the fields several pages share, plus the one or two of
 each small page (changelog, screener, API plans, alerts, upload handoff). The
-six pages with many fields of their own keep them in a struct beside their
+seven pages with many fields of their own keep them in a struct beside their
 handler, embedded in `PageVars` so templates read them unchanged: `UploadVars`
 (49 fields), `SearchVars` (48), `AdminVars` (23), `NewsVars` (17), `ArbitVars`
-(6) and `SleepVars` (5).
+(6), `CardTraderVars` (6) and `SleepVars` (5).
 
 Other routes: static `/css|/js|/img|/openapi` (plus `/favicon.ico`, `/robots.txt`)
 served from disk via `ServeFile` (`staticCacheControl`: 30 days immutable at the
@@ -524,6 +524,13 @@ flag), `MaxUploadTotalEntries` **15,000, not 10,000** (granted by a
 `UploadNoLimit` flag, or implied by dev mode, the CardConduit estimate
 flow, Deckbox export, the TCGplayer CSV export, or a buylist CSV download),
 and `MaxUploadFileSize` 5 MB (`5 << 20` bytes).
+
+`/upload/cardtrader` (`cardtrader_inventory.go`) takes a CardTrader seller's
+API token from a POST, fetches their stock once through go-mtgban's
+`(*cardtrader.CTAuthClient).ExportInventory`, matches this game's listings
+(Magic through `Preprocess`, other games by the blueprint's TCGplayer and
+Cardmarket ids) and embeds a raw CSV in CardTrader's import columns and a BAN
+CSV for the page script to download; the token is never stored or logged.
 
 ### 5.3 Arbitrage (`arbit.go`) and Sleepers (`sleep.go`)
 
