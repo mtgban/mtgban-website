@@ -1,4 +1,4 @@
-// Best-effort cross-device sync of favorites, recents, and prefs for signed-in users.
+// Best-effort cross-device sync of favorites, recents, the backpack, and prefs for signed-in users.
 (function() {
     var BASE = '/api/userstate/';
     var DEBOUNCE_MS = 1500;
@@ -11,6 +11,8 @@
     // Keys that map to dedicated server columns.
     var FAVORITES_KEY = 'mtgban_favorites';
     var RECENTS_KEY = 'mtgban_recent_searches';
+    var BACKPACK_KEY = 'mtgban_backpack';
+    var BACKPACK_MAX = 200;
     var PRESETS_KEY = 'mtgban_upload_presets';
     var ARBIT_KEY = 'mtgban_arbit_filters';
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
@@ -142,6 +144,7 @@
         var m = {};
         m[FAVORITES_KEY] = 'favorites';
         m[RECENTS_KEY] = 'recents';
+        m[BACKPACK_KEY] = 'backpack';
         PREF_KEYS.forEach(function(k) { m[k] = 'preferences'; });
         return m;
     })();
@@ -150,6 +153,7 @@
     function payloadForSection(section) {
         if (section === 'favorites') return JSON.parse(readLocal(FAVORITES_KEY, '[]')).map(trimFavorite);
         if (section === 'recents') return JSON.parse(readLocal(RECENTS_KEY, '[]')).map(trimRecent);
+        if (section === 'backpack') return localBackpack().map(trimBackpack);
         return buildPreferences();
     }
 
@@ -203,6 +207,10 @@
                 rawSetItem(RECENTS_KEY, JSON.stringify(recents));
                 writeFP('recents', JSON.stringify(recents.map(trimRecent)));
             }
+            if (state.backpack) {
+                rawSetItem(BACKPACK_KEY, JSON.stringify(state.backpack));
+                writeFP('backpack', JSON.stringify(state.backpack.map(trimBackpack)));
+            }
             if (state.preferences) {
                 // The saved filters merge in, should one have been applied
                 // signed out: on a synced device the server's are as new
@@ -222,6 +230,7 @@
     function rerender() {
         if (typeof window.renderFavorites === 'function') window.renderFavorites();
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
+        if (typeof window.renderBackpack === 'function') window.renderBackpack();
         if (window.UploadPresets && typeof window.UploadPresets.refresh === 'function') window.UploadPresets.refresh();
         if (window.ArbitFilters && typeof window.ArbitFilters.refresh === 'function') window.ArbitFilters.refresh();
         if (window.ArbitPresets && typeof window.ArbitPresets.refresh === 'function') window.ArbitPresets.refresh();
@@ -301,6 +310,7 @@
         if (!serverState) return Promise.resolve(false);
         var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
         var mergedRecents = mergeList(localRecents(), serverState.recents || [], recentId, 15);
+        var mergedPack = mergeList(localBackpack(), serverState.backpack || [], function(e) { return e.id; }, BACKPACK_MAX, BACKPACK_MAX);
         var mergedPrefs = mergePrefs(buildPreferences(), serverState.preferences || {});
         // Must run before the write below: it reads the pre-merge local copies.
         mergedRecents = keepRecentArt(mergedRecents);
@@ -308,6 +318,7 @@
         try {
             rawSetItem(FAVORITES_KEY, JSON.stringify(mergedFavs));
             rawSetItem(RECENTS_KEY, JSON.stringify(mergedRecents));
+            rawSetItem(BACKPACK_KEY, JSON.stringify(mergedPack));
             Object.keys(mergedPrefs).forEach(function(k) {
                 if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(mergedPrefs[k]));
             });
@@ -317,7 +328,7 @@
         rerender();
 
         // Nothing new to push: adopt version, skip the write.
-        if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState)) {
+        if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState, mergedPack)) {
             // Record a fingerprint only for a section the server verifiably
             // holds. Claiming one for a payload that was never sent makes the
             // next flush skip its PATCH, stranding the local copy for good.
@@ -332,6 +343,10 @@
             if (sameList(trimmedRecents, (serverState.recents || []).map(trimRecent), recentId)) {
                 writeFP('recents', JSON.stringify(trimmedRecents));
             } else { schedule('recents'); synced = false; }
+            var trimmedPack = mergedPack.map(trimBackpack);
+            if (sameList(trimmedPack, (serverState.backpack || []).map(trimBackpack), function(e) { return e.id; })) {
+                writeFP('backpack', JSON.stringify(trimmedPack));
+            } else { schedule('backpack'); synced = false; }
             if (canonJSON(mergedPrefs) === canonJSON(serverState.preferences || {})) {
                 writeFP('preferences', JSON.stringify(mergedPrefs));
             } else { schedule('preferences'); synced = false; }
@@ -342,6 +357,7 @@
 
         var body = JSON.stringify({
             favorites: mergedFavs.map(trimFavorite), recents: mergedRecents.map(trimRecent),
+            backpack: mergedPack.map(trimBackpack),
             preferences: mergedPrefs, version: version
         });
         var sent = performance.now();
@@ -365,6 +381,7 @@
                 writeMarker(version);
                 writeFP('favorites', JSON.stringify(mergedFavs.map(trimFavorite)));
                 writeFP('recents', JSON.stringify(mergedRecents.map(trimRecent)));
+                writeFP('backpack', JSON.stringify(mergedPack.map(trimBackpack)));
                 writeFP('preferences', JSON.stringify(mergedPrefs));
                 markClean();
                 return true;
@@ -376,7 +393,7 @@
     }
 
     // True when local has an entry the server lacks or a newer copy of one.
-    function localHasNew(favs, recents, prefs, server) {
+    function localHasNew(favs, recents, prefs, server, pack) {
         function newer(localList, serverList, idOf) {
             var sv = {};
             (serverList || []).forEach(function(x) {
@@ -392,6 +409,7 @@
         }
         if (newer(favs, server.favorites, function(f) { return f.id; })) return true;
         if (newer(recents, server.recents, function(s) { return ('' + (s.q || '')).toLowerCase(); })) return true;
+        if (newer(pack || [], server.backpack, function(e) { return e.id; })) return true;
         var sp = server.preferences || {};
         var keys = Object.keys(prefs);
         for (var k = 0; k < keys.length; k++) { if (String(sp[keys[k]]) !== String(prefs[keys[k]])) return true; }
@@ -400,7 +418,8 @@
 
     // Merge by id: the copy with newer intent (m, fallback t) wins wholesale,
     // including its del and pinned state. Ties keep the local copy.
-    function mergeList(local, server, idOf, cap) {
+    // tombCap bounds the tombstones kept (ListStorage's default when unset).
+    function mergeList(local, server, idOf, cap, tombCap) {
         var byId = {};
         var order = [];
         function add(item) {
@@ -425,7 +444,7 @@
             var unpinned = live.filter(function(x) { return !x.pinned; });
             live = pinned.concat(unpinned).slice(0, cap);
         }
-        return live.concat(ListStorage.tombstones(merged));
+        return live.concat(ListStorage.tombstones(merged, tombCap));
     }
 
     // A payload and the server's copy of it agree on content but not on shape:
@@ -584,7 +603,17 @@
     }
 
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
+    function localBackpack() { try { return JSON.parse(readLocal(BACKPACK_KEY, '[]')); } catch (e) { return []; } }
     function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
+
+    // The backpack syncs identity and the count; prices stay on the page.
+    function trimBackpack(e) {
+        return {
+            id: e.id, qty: e.qty, t: e.t, m: e.m, del: e.del,
+            name: e.name, edition: e.edition, set: e.set, number: e.number,
+            finishTag: e.finishTag, finishClass: e.finishClass, img: e.img, cw: e.cw
+        };
+    }
 
     // Sync only identity/intent fields; prices are refetched per device.
     function trimFavorite(f) {
@@ -653,7 +682,8 @@
         }).then(function(state) {
             if (!state) return;
             var firstSync = readLocal(SYNCED_KEY, null) === null;
-            var hasLocal = localFavorites().length > 0 || localRecents().length > 0;
+            var hasLocal = localFavorites().length > 0 || localRecents().length > 0 ||
+                localBackpack().some(function(e) { return e && !e.del; });
             rawSetItem(SYNCED_KEY, '1');
             if (isDirty() || (firstSync && hasLocal)) {
                 reconcile(state);

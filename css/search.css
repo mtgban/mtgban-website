@@ -2178,6 +2178,7 @@ body.modal-embed .cp-overlay {
     /* The favorite button and the alert link match the others (their base
        rules are more specific and lay them out for the inline icon row). */
     .result-quick-icons .qi-actions > .fav-btn,
+    .result-quick-icons .qi-actions > .pack-btn,
     .result-quick-icons .qi-actions > .alert-link {
         display: grid;
         grid-template-columns: 24px 1fr;
@@ -2799,6 +2800,7 @@ body.modal-embed .cp-overlay {
 /* === Favorite star button on desktop result rows === */
 
 .result-quick-icons .fav-btn,
+.result-quick-icons .pack-btn,
 .result-quick-icons .alert-link {
     background: transparent;
     border: none;
@@ -2818,6 +2820,8 @@ body.modal-embed .cp-overlay {
    by setting --qi-icon-size on .qi-actions, above. */
 .result-quick-icons .fav-btn svg,
 .result-quick-icons .fav-btn i[data-lucide],
+.result-quick-icons .pack-btn svg,
+.result-quick-icons .pack-btn i[data-lucide],
 .result-quick-icons .alert-link svg,
 .result-quick-icons .alert-link i[data-lucide] {
     display: block;
@@ -2826,6 +2830,7 @@ body.modal-embed .cp-overlay {
 }
 
 .result-quick-icons .fav-btn:hover,
+.result-quick-icons .pack-btn:hover,
 .result-quick-icons .alert-link:hover {
     color: var(--normal);
 }
