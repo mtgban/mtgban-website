@@ -41,11 +41,10 @@
                 <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{if .UploadSourceURL}}<a class="upload-source-link" href="{{.UploadSourceURL}}" target="_blank" rel="nofollow noopener">{{.UploadQuery}}</a>{{else}}{{.UploadQuery}}{{end}}{{end}}</h1>
                 <p class="page-subtitle">
                     {{if .UploadEntries}}{{len .UploadEntries}} row{{if ne (len .UploadEntries) 1}}s{{end}} &middot; {{end}}{{if .UnpackedFrom}}contents of {{.UnpackedFrom}} sealed product{{if ne .UnpackedFrom 1}}s{{end}} &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
-                    {{if .RemoteLinkURL}}
-                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="window.copyShareLink && copyShareLink(this)" title="Copy shareable link">
-                            {{template "upload-icon" "share-2"}} Share
-                        </a>
-                        <input type="hidden" id="remoteLinkURL" value="{{.RemoteLinkURL}}">
+                    {{if .CanShare}}
+                    &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="window.copyShareLink && copyShareLink(this)" title="Copy a link to this list, kept for 7 days">
+                        {{template "upload-icon" "share-2"}} Share
+                    </a>
                     {{end}}
                     {{if .UnpackSealed}}
                         {{/* Re-posts this list with the sealed rows opened. The rows
@@ -63,24 +62,6 @@
                 <div class="upload-warning">
                     <h4><i>{{.WarningMessage}}</i></h4>
                 </div>
-            {{end}}
-
-            {{if .RemoteLinkURL}}
-            <script>
-            function copyShareLink(el) {
-                var remoteURL = document.getElementById('remoteLinkURL').value;
-                var shareURL = window.location.origin + '/upload?gdocURL=' + encodeURIComponent(remoteURL);
-                navigator.clipboard.writeText(shareURL).then(function() {
-                    var orig = el.innerHTML;
-                    el.innerHTML = '<i data-lucide="check" style="width:14px;height:14px;vertical-align:-2px"></i> Copied!';
-                    lucide.createIcons();
-                    setTimeout(function() {
-                        el.innerHTML = orig;
-                        lucide.createIcons();
-                    }, 1500);
-                });
-            }
-            </script>
             {{end}}
 
             {{template "upload-results" .}}
@@ -392,7 +373,7 @@
 
                 <div class="upload-help-card">
                     <h3>Privacy &amp; Access</h3>
-                    <p>No data is stored on the website. Your exports are private to you only.</p>
+                    <p>Nothing you upload is stored on the website unless you click Share: a shared list is kept for seven days, and anyone with the link who can use this page can open it. Your exports are private to you only.</p>
                     <p>Some features may be available at certain tiers only. At <i>Modern</i> you can customize the list of Retail stores. At <i>Legacy</i>, you get access to <strong>Buylist</strong> prices, CSV downloads, and exports. At <i>Vintage</i> you have no download limits and can import custom searches.</p>
                 </div>
 
@@ -1154,6 +1135,7 @@
     </form>
 
     <script type="text/javascript" src="/js/upload-exports.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/upload-share.js?hash={{.Hash}}" defer></script>
 
     <!-- Reload button (hidden until a pick or remove is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">

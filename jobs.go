@@ -24,6 +24,7 @@ const (
 	jobStaleness      = "Staleness check"
 	jobAlerts         = "Alert evaluation"
 	jobPopular        = "Popular searches"
+	jobUploadShares   = "Upload shares"
 )
 
 // backgroundJobs records every run of the jobs above.
@@ -136,6 +137,11 @@ func (s *site) startCrons() {
 	// the retry for a boot-time load that failed: a fetch that never
 	// succeeded leaves the index empty and every chart without its markers.
 	addJob("15 */6 * * *", jobCheckpoints, refreshCheckpoints)
+
+	// Expired upload shares are already misses; this reclaims their rows.
+	if UserStateDB != nil {
+		addJob("10 5 * * *", jobUploadShares, pruneUploadShares)
+	}
 
 	// Alarm on a store whose retail or buylist data has gone stale (see
 	// staleness.go); notifies only on the transition, so this can run
