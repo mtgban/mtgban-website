@@ -699,3 +699,16 @@ test('rejection degradation: one set fails, others succeed', async () => {
     expect(out.results[0].uuid).toBe('u-good-1');
     expect(out.missingSets).toEqual(['BAD']);
 });
+
+// Online scopes a search with in:(...); offline cannot, and says so as one
+// token rather than reading the pool's filters as the query's.
+test('an in: pool is one unsupported token', () => {
+    const r = p('in:(s:CMR r:rare) sol ring');
+    expect(r.unsupported).toEqual(['in:(s:CMR r:rare)']);
+    expect(r.names).toEqual(['sol', 'ring']);
+    expect(r.set).toEqual([]);
+    expect(r.rarity).toEqual([]);
+    expect(p('-in:(contents:"A (B)") x').unsupported).toEqual(['-in:(contents:"A (B)")']);
+    expect(p('in:CMR').unsupported).toEqual(['in:CMR']);
+    expect(p('in:(s:CMR').unsupported).toEqual(['in:(s:CMR']);
+});

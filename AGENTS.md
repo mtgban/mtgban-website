@@ -143,7 +143,7 @@ output, not a claim written here.
 | `routes.go` | `registerRoutes`: static files, redirects, the `NavElem` pages and the APIs, each behind its signing middleware |
 | `pages.go` | The `NavElem` page registry (`ExtraNavs`, filled in `init()`, and `OrderNav`), `PageVars` (what pages share; `UploadVars`, `SearchVars`, `AdminVars`, `NewsVars`, `ArbitVars` and `SleepVars`, each beside its handler, are embedded in it), the per-request nav (`genPageNav`), the template cache and `render` |
 | `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
-| `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`), published together |
+| `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`, sources in `search_sources.go`), published together |
 | `templates.go` | The template `FuncMap` — the helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |

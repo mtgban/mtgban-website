@@ -1,6 +1,7 @@
 {{define "guide-syntax-content"}}
 <template data-section="basic-syntax">
 <p>Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.</p>
+<p>Quotes keep a run of words together as a name: <code>"S:P Little Knight"</code> searches that card rather than reading <code>S:P</code> as a set filter. Quotes around an ordinary name change nothing.</p>
 <p>Human-readable tags are also supported - for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).</p>
 <p>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:</p>
 </template>
@@ -84,6 +85,11 @@ Filter by well-known land cycles and set groupings using <code>is:VALUE</code>:
 <template data-section="sealed-contents">
 <p>A sealed product's name resolves the same way for three filters, each reading its contents differently: <code>contents:"NAME"</code> lists everything the product can hold, guaranteed cards and random draws together; <code>decklist:"NAME"</code> lists only what it always holds (empty for a product that is pure boosters); <code>variable:"NAME"</code> lists only what it draws at random - the guaranteed cards taken back out. A product with both a fixed part and a random part shows a three-pill switch on the results page to jump between all three; naming more than one product in a query pools their contents but drops the switch, since it no longer names one product to read.</p>
 <p>Under <code>variable:</code> alone, each card also carries an <strong>Avg Copies (est.)</strong> row: how many copies of that card you would get, on average, opening the product once. It is a count, not a chance - a card only one slot in the product can hold reads as a share below 1 (0.4 is roughly two packs in five), but a common card drawn from more than one slot in the same product adds up across those slots and can read well above 1 (a common land can average several copies in a full booster case). A fourth sort button next to the switch, shaped like a copy icon, orders results by this count, longest shot first by default. The row itself does not depend on that button showing: a product with nothing guaranteed at all has no three-way switch to offer (there is only one reading of it), but its cards still carry Avg Copies under a plain <code>variable:</code> search.</p>
+</template>
+
+<template data-section="search-pools">
+<p>An <code>in:</code> term sets the pool the rest of the query runs inside. <code>in:(SUBQUERY)</code> takes a whole query in parentheses and pools its results; <code>in:CODE</code> pools a set's printings; <code>in:"Name"</code> pools everything a sealed product can hold. Several <code>in:</code> terms intersect, <code>-in:</code> excludes the pool, and a subquery may carry an <code>in:</code> of its own, three deep.</p>
+<p>A pool is a set of cards: store, price and sort terms inside a subquery are read but do not change which cards it holds. A pool that holds nothing answers no cards. On the sealed tab a pool with no search mode of its own names products.</p>
 </template>
 
 <template data-section="sorting">

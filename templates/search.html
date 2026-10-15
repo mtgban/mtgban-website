@@ -257,7 +257,7 @@
                     </div>
                     <div class="sidebar-body">
                         {{if .CanShowAll}}
-                            <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}{{with .SearchScope}}&scope={{.}}{{end}}">Show all versions</a>
+                            <a class="sidebar-action primary" href="search?q={{.ShowAllQuery}}{{with .SearchScope}}&scope={{.}}{{end}}">Show all versions</a>
                         {{end}}
                         {{if .HasAvailable}}
                             <div class="sidebar-products-card" id="productsCard">

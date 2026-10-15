@@ -1243,11 +1243,21 @@ func (m cardMetadata) add(b *mtgmatcher.Backend, cardID string, preferFlavor boo
 	m[cardID] = uuid2card(b, cardID, preferFlavor)
 }
 
+// quoteIfFilter quotes a card name the filter regexp would read a filter
+// out of, "S:P Little Knight", so a query built from it searches the name.
+// Every other name is returned as it is (#467).
+func quoteIfFilter(name string) string {
+	if re.MatchString(name) {
+		return `"` + name + `"`
+	}
+	return name
+}
+
 func genQuery(co *mtgmatcher.CardObject) string {
-	query := co.Name
+	query := quoteIfFilter(co.Name)
 	if !co.Sealed {
 		// cns: compares the number as printed, which is what co.Number is.
-		query = fmt.Sprintf("%s s:%s cns:%s", co.Name, co.SetCode, co.Number)
+		query = fmt.Sprintf("%s s:%s cns:%s", query, co.SetCode, co.Number)
 		if co.Etched {
 			query += " f:etched"
 		} else if co.Foil {
@@ -1282,7 +1292,7 @@ func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
 		if err != nil {
 			continue
 		}
-		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, html.EscapeString(set.Name), url.QueryEscape(co.Name+" s:"+setCode))
+		fmt.Fprintf(&sb, `<a class="printing-symbol" title="%s" href="/search?q=%s">`, html.EscapeString(set.Name), url.QueryEscape(quoteIfFilter(co.Name)+" s:"+setCode))
 
 		// Trimmed, since the strip is inline text and the partial's own
 		// whitespace would space out glyphs that sit flush.
