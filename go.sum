@@ -156,8 +156,6 @@ github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
 github.com/mtgban/go-cardmarket v0.4.0 h1:Qt3g3U3HkJFk2ATiwTS1xuMFWOXBxCoBGbYj9KiEKN0=
 github.com/mtgban/go-cardmarket v0.4.0/go.mod h1:FzFQ8zAm0w8vY8iaHJR47yGKBCQGQjKTzqM0Fz6hitw=
-github.com/mtgban/go-mtgban v0.10.1 h1:pPhDsS4rNUsTVK314E7En8WlCTEGByUWYTRQM8VEbXo=
-github.com/mtgban/go-mtgban v0.10.1/go.mod h1:P+Tyc7FBfb7xHYIUvrmxeSenXv/ljcMBndy97BNu2oA=
 github.com/mtgban/go-tcgplayer v0.2.0 h1:n9/vE9yHDhJk0jI0xWddQaJxKlOOzUyfZJ4JJN+ubhc=
 github.com/mtgban/go-tcgplayer v0.2.0/go.mod h1:R27t98OFgcBtz4SnKqoOvYx31UNZi1tGWmH1Hmu/SYI=
 github.com/mtgban/simplecloud v0.1.1 h1:lSQUKMsV2YyGTIFJ+graatpLcbdkSpOXtL30EBOqAk8=
@@ -176,6 +174,8 @@ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UV
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
+github.com/the-muppet2/go-mtgban v0.10.2-0.20261019094716-5f35700e83a3 h1:wo7/3xBs1E/d6r7UTtA8EMzdoEMWLJssvk8/PBEuOiA=
+github.com/the-muppet2/go-mtgban v0.10.2-0.20261019094716-5f35700e83a3/go.mod h1:VvgzPiv0giQXmpeT3V9lKPkzSuhTTGvno6W5QSv6lfw=
 github.com/tiendc/go-deepcopy v1.7.2 h1:Ut2yYR7W9tWjTQitganoIue4UGxZwCcJy3orjrrIj44=
 github.com/tiendc/go-deepcopy v1.7.2/go.mod h1:4bKjNC2r7boYOkD2IOuZpYjmlDdzjbpTRyCx+goBCJQ=
 github.com/ulikunitz/xz v0.5.6/go.mod h1:2bypXElzHzzJZwzH67Y6wb67pO62Rzfn7BSiF4ABRW8=
