@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/tmplparse"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/userstate"
 )
-
-type refreshedTier struct{ userHash, tier string }
 
 type deletedChannel struct {
 	userHash string
@@ -19,10 +19,9 @@ type deletedChannel struct {
 }
 
 type recordedContacts struct {
-	got       []alerts.Contact
-	refreshed []refreshedTier
-	channels  []alerts.Channel
-	deleted   []deletedChannel
+	got      []alerts.Contact
+	channels []alerts.Channel
+	deleted  []deletedChannel
 	// order is each write's method name, to pin the contact first.
 	order []string
 }
@@ -45,11 +44,6 @@ func (r *recordedContacts) DeleteChannel(_ context.Context, userHash string, kin
 	return nil
 }
 
-func (r *recordedContacts) RefreshContactTier(_ context.Context, userHash, tier string) error {
-	r.refreshed = append(r.refreshed, refreshedTier{userHash, tier})
-	return nil
-}
-
 func TestRecordAlertContactHashesTheBareEmail(t *testing.T) {
 	rec := &recordedContacts{}
 	user := &PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
@@ -59,9 +53,6 @@ func TestRecordAlertContactHashesTheBareEmail(t *testing.T) {
 	}
 	if len(rec.got) != 1 {
 		t.Fatalf("recorded %d contacts, want 1", len(rec.got))
-	}
-	if len(rec.refreshed) != 0 {
-		t.Fatalf("allowed login also refreshed: %+v", rec.refreshed)
 	}
 	c := rec.got[0]
 	if c.UserHash != userstate.HashEmail("a@b.com") || c.DiscordUserID != "77" || !c.DiscordKnown || c.Tier != "Legacy" {
@@ -134,22 +125,24 @@ func TestRecordAlertContactNoChannelsWithoutAlertsOrVerification(t *testing.T) {
 	}
 }
 
-func TestRecordAlertContactNotAllowedRefreshesTierOnly(t *testing.T) {
+// A tier without alerts still records the login: the Account page reads
+// the Discord id off this row, and the evaluator reads the tier.
+func TestRecordAlertContactNotAllowedWritesTheContactOnly(t *testing.T) {
 	rec := &recordedContacts{}
 	user := &PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
 	err := recordAlertContact(context.Background(), rec, user, "Legacy", false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rec.got) != 0 {
-		t.Fatalf("not-allowed login upserted a contact: %+v", rec.got)
+	if len(rec.got) != 1 {
+		t.Fatalf("contacts upserted %d, want 1: %+v", len(rec.got), rec.got)
 	}
-	if len(rec.refreshed) != 1 {
-		t.Fatalf("refreshed %d times, want 1", len(rec.refreshed))
+	c := rec.got[0]
+	if c.UserHash != userstate.HashEmail("a@b.com") || c.Tier != "Legacy" || c.DiscordUserID != "77" || !c.DiscordKnown {
+		t.Fatalf("unexpected contact %+v", c)
 	}
-	r := rec.refreshed[0]
-	if r.userHash != userstate.HashEmail("a@b.com") || r.tier != "Legacy" {
-		t.Fatalf("unexpected refresh %+v", r)
+	if len(rec.channels) != 0 || len(rec.deleted) != 0 {
+		t.Fatalf("not-allowed login wrote channels %+v deleted %+v", rec.channels, rec.deleted)
 	}
 }
 
@@ -160,8 +153,8 @@ func TestRecordAlertContactSkipsUnverified(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rec.got) != 0 || len(rec.refreshed) != 0 {
-		t.Fatalf("unverified login recorded got=%+v refreshed=%+v", rec.got, rec.refreshed)
+	if len(rec.got) != 0 {
+		t.Fatalf("unverified login recorded %+v", rec.got)
 	}
 }
 
@@ -210,5 +203,25 @@ func TestPatreonUserFromDataAbsentDiscord(t *testing.T) {
 	got := patreonUserFromData(&userData)
 	if got.DiscordKnown || got.DiscordID != "" {
 		t.Fatalf("unexpected %+v", got)
+	}
+}
+
+// The privacy policy says what the login keeps: the contact row exists
+// for every verified login, alerts tier or not.
+func TestPrivacyPolicyNamesTheLoginContact(t *testing.T) {
+	baseName, files := renderTemplateFiles("privacy.html", false)
+	tmpl, err := tmplparse.ParseFiles(baseName, files, funcMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	err = tmpl.ExecuteTemplate(&out, baseName, PageVars{Title: "Privacy", Hash: "test", UserNav: &NavElem{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"hashed form of it", "Discord account Patreon reports as linked", "whether or not your tier includes price alerts"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("privacy policy lacks %q", want)
+		}
 	}
 }
