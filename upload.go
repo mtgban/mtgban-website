@@ -477,6 +477,13 @@ type UploadVars struct {
 }
 
 func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
+	// The CardTrader page is a sub-page of this one, served through the
+	// same signing, with a form and a result of its own.
+	if r.URL.Path == "/upload/cardtrader" {
+		s.CardTraderInventory(w, r)
+		return
+	}
+
 	ds := s.datastore()
 	b := ds.backend
 	sig := verifiedSignature(r)
