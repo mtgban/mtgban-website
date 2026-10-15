@@ -1271,6 +1271,17 @@ body:has(.search-layout) {
 .light-theme .result-badge.treatment:hover {
     background: rgba(0, 0, 0, 0.12);
 }
+/* TCGplayer copies sold a day, newspaper tiers (salesvelocity.go) */
+.result-badges .sales-velocity {
+    font-size: var(--text-xs);
+    padding: 0.15em 0.5em;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--search-text-dim);
+    background: var(--search-surface-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: help;
+}
 
 .result-quick-icons {
     grid-column: 3;

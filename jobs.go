@@ -17,6 +17,7 @@ const (
 	jobNewspaper      = "Newspaper cache"
 	jobCKSignals      = "CK signals"
 	jobTCGListings    = "TCG listings"
+	jobSalesVelocity  = "Sales velocity"
 	jobOffline        = "Offline refresh"
 	jobTCGCSVPrices   = "TCGCSV prices"
 	jobTCGCSVProducts = "TCGCSV products"
@@ -105,6 +106,9 @@ func (s *site) startCrons() {
 	// Reload TCGplayer's sellers and copies per grade once the newspaper
 	// finishes a scrape; until then that is one MAX(calc_date).
 	addJob("50 * * * *", jobTCGListings, s.loadTCGListings)
+
+	// Reload TCGplayer's copies sold a day once the newspaper adds a sale day.
+	addJob("55 * * * *", jobSalesVelocity, s.loadSalesVelocity)
 
 	// Rank the month's typed searches for the landing strip; only where the
 	// observability database holds the votes.

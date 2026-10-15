@@ -3,7 +3,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"log"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -82,5 +84,41 @@ func TestCacheNewspaperLogsAGameMissingFromGameMap(t *testing.T) {
 	log.SetOutput(prevLog)
 	if !strings.Contains(logged.String(), `"nosuchgame" is missing from gameMap`) {
 		t.Errorf("log = %q, want a line naming the missing game", logged.String())
+	}
+}
+
+// TestNewspaperTier opens the Newspaper tiers, 0day, 1day and 3day, and dev
+// mode with signing off, and nothing else.
+func TestNewspaperTier(t *testing.T) {
+	tierSig := func(tier string) string {
+		return base64.StdEncoding.EncodeToString([]byte(url.Values{"NewsEnabled": {tier}}.Encode()))
+	}
+	withSigMode(t, false, true)
+	for _, tc := range []struct {
+		desc string
+		sig  string
+		want bool
+	}{
+		{"0day", tierSig("0day"), true},
+		{"1day", tierSig("1day"), true},
+		{"3day", tierSig("3day"), true},
+		{"an empty tier", tierSig(""), false},
+		{"an unknown tier", tierSig("7day"), false},
+		{"a page flag", tierSig("true"), false},
+		{"no signature", "", false},
+	} {
+		got := newspaperTier(tc.sig)
+		if got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.desc, got, tc.want)
+		}
+	}
+
+	withSigMode(t, true, false)
+	if !newspaperTier("") {
+		t.Error("dev mode with signing off: refused")
+	}
+	withSigMode(t, true, true)
+	if newspaperTier("") {
+		t.Error("dev mode with signing on: granted with no signature")
 	}
 }

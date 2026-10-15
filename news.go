@@ -1123,6 +1123,15 @@ type NewsVars struct {
 	Finishes []string
 }
 
+// newspaperTier reports whether the signature carries the Newspaper page.
+func newspaperTier(sig string) bool {
+	switch GetParamFromSig(sig, "NewsEnabled") {
+	case "0day", "1day", "3day":
+		return true
+	}
+	return DevMode && !SigCheck
+}
+
 func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 	b := ds.backend
@@ -1139,24 +1148,25 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enabled := GetParamFromSig(sig, "NewsEnabled")
-	switch {
-	case enabled == "1day":
-		pageVars.IsOneDay = true
-	case enabled == "3day":
-		// the default newspaper view needs no flag
-	case enabled == "0day" || (DevMode && !SigCheck):
-		force3day := readSetFlag(w, r, "force3day", "BanNewspaperPref")
-		if !force3day {
-			pageVars.IsOneDay = true
-		}
-		pageVars.CanSwitchDay = true
-	default:
+	if !newspaperTier(sig) {
 		pageVars.Title = "This feature is BANned"
 		pageVars.ErrorMessage = ErrMsgDenied
 
 		render(w, "news.html", pageVars)
 		return
+	}
+	switch GetParamFromSig(sig, "NewsEnabled") {
+	case "1day":
+		pageVars.IsOneDay = true
+	case "3day":
+		// the default newspaper view needs no flag
+	default:
+		// 0day, or dev mode with signing off
+		force3day := readSetFlag(w, r, "force3day", "BanNewspaperPref")
+		if !force3day {
+			pageVars.IsOneDay = true
+		}
+		pageVars.CanSwitchDay = true
 	}
 
 	r.ParseForm()
