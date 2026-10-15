@@ -14,6 +14,22 @@ function exportRows(category) {
     return views.querySelectorAll('.ures-block-singles ' + sel + ', .ures-block-sealed ' + sel);
 }
 
+// The rows on the page as the server reads them: one line a row, seven
+// tab-separated fields, removed rows and rows without a hash left out.
+function packRows(category) {
+    var lines = [];
+    exportRows(category || 'all').forEach(function(row) {
+        if (!row.dataset.hash) return;
+        if (row.classList.contains('ures-removed-row')) return;
+        lines.push(['hash','qtys','cond','price','notes','from','fromqty'].map(function(key) {
+            // Tabs and newlines are the separators, and no field this
+            // carries is allowed to hold one.
+            return (row.dataset[key] || '').replace(/[\t\r\n]+/g, ' ');
+        }).join('\t'));
+    });
+    return lines.join('\n');
+}
+
 function ensureHashesLoaded(category) {
     var form = document.getElementById("upload_form");
 
@@ -28,21 +44,10 @@ function ensureHashesLoaded(category) {
     // counts values and stops at 10,000, handing the server an empty form
     // rather than a short one. Five a row capped an export at 2,000 rows,
     // which a few opened precons pass without trying.
-    var lines = [];
-    exportRows(category || 'all').forEach(function(row) {
-        if (!row.dataset.hash) return;
-        if (row.classList.contains('ures-removed-row')) return;
-        lines.push(['hash','qtys','cond','price','notes','from','fromqty'].map(function(key) {
-            // Tabs and newlines are the separators, and no field this
-            // carries is allowed to hold one.
-            return (row.dataset[key] || '').replace(/[\t\r\n]+/g, ' ');
-        }).join('\t'));
-    });
-
     var input = document.createElement("input");
     input.type = "hidden";
     input.name = "rows";
-    input.value = lines.join('\n');
+    input.value = packRows(category);
     form.appendChild(input);
 }
 

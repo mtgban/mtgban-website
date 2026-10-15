@@ -270,6 +270,7 @@ func TestUploadQuery(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		shared     bool
 		hashes     []string
 		textArea   string
 		handed     string
@@ -301,6 +302,12 @@ func TestUploadQuery(t *testing.T) {
 		filename:  "collection.csv",
 		wantQuery: "collection.csv",
 	}, {
+		name:      "a share comes before everything",
+		shared:    true,
+		hashes:    []string{"abc"},
+		textArea:  "a,b\n1,2\n",
+		wantQuery: "a shared list",
+	}, {
 		name:      "hashes come first",
 		hashes:    []string{"abc"},
 		textArea:  "a,b\n1,2\n",
@@ -330,7 +337,7 @@ func TestUploadQuery(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			query, link := uploadQuery(tc.hashes, tc.textArea, tc.handed, tc.remoteURL, tc.remoteName, tc.filename)
+			query, link := uploadQuery(tc.shared, tc.hashes, tc.textArea, tc.handed, tc.remoteURL, tc.remoteName, tc.filename)
 			if query != tc.wantQuery {
 				t.Errorf("query = %q, want %q", query, tc.wantQuery)
 			}
