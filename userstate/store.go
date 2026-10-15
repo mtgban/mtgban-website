@@ -13,11 +13,12 @@ type State struct {
 	Favorites   json.RawMessage `json:"favorites"`
 	Recents     json.RawMessage `json:"recents"`
 	Preferences json.RawMessage `json:"preferences"`
+	Backpack    json.RawMessage `json:"backpack"`
 	Version     int64           `json:"version"`
 }
 
 var validSections = map[string]bool{
-	"favorites": true, "recents": true, "preferences": true,
+	"favorites": true, "recents": true, "preferences": true, "backpack": true,
 }
 
 // Get returns the row for emailHash, or the zero state if missing.
@@ -26,12 +27,13 @@ func (c *Client) Get(ctx context.Context, emailHash string) (State, error) {
 		Favorites:   json.RawMessage("[]"),
 		Recents:     json.RawMessage("[]"),
 		Preferences: json.RawMessage("{}"),
+		Backpack:    json.RawMessage("[]"),
 	}
-	var fav, rec, pref []byte
+	var fav, rec, pref, pack []byte
 	err := c.db.QueryRowContext(ctx,
-		`SELECT favorites, recents, preferences, version FROM user_state WHERE email_hash = $1`,
+		`SELECT favorites, recents, preferences, backpack, version FROM user_state WHERE email_hash = $1`,
 		emailHash,
-	).Scan(&fav, &rec, &pref, &st.Version)
+	).Scan(&fav, &rec, &pref, &pack, &st.Version)
 	if errors.Is(err, sql.ErrNoRows) {
 		return st, nil
 	}
@@ -41,6 +43,7 @@ func (c *Client) Get(ctx context.Context, emailHash string) (State, error) {
 	st.Favorites = json.RawMessage(fav)
 	st.Recents = json.RawMessage(rec)
 	st.Preferences = json.RawMessage(pref)
+	st.Backpack = json.RawMessage(pack)
 	return st, nil
 }
 
@@ -63,13 +66,14 @@ func (c *Client) GetVersion(ctx context.Context, emailHash string) (int64, error
 func (c *Client) writeWithConflict(ctx context.Context, query string, args ...any) (State, bool, error) {
 	var updated bool
 	var version int64
-	var fav, rec, pref []byte
-	err := c.db.QueryRowContext(ctx, query, args...).Scan(&updated, &version, &fav, &rec, &pref)
+	var fav, rec, pref, pack []byte
+	err := c.db.QueryRowContext(ctx, query, args...).Scan(&updated, &version, &fav, &rec, &pref, &pack)
 	if errors.Is(err, sql.ErrNoRows) {
 		return State{
 			Favorites:   json.RawMessage("[]"),
 			Recents:     json.RawMessage("[]"),
 			Preferences: json.RawMessage("{}"),
+			Backpack:    json.RawMessage("[]"),
 		}, true, nil
 	}
 	if err != nil {
@@ -79,44 +83,46 @@ func (c *Client) writeWithConflict(ctx context.Context, query string, args ...an
 		Favorites:   json.RawMessage(fav),
 		Recents:     json.RawMessage(rec),
 		Preferences: json.RawMessage(pref),
+		Backpack:    json.RawMessage(pack),
 		Version:     version,
 	}, !updated, nil
 }
 
 // Put fully replaces all sections, version-checked; on conflict returns the current state.
+// A nil Backpack (a client older than the backpack) keeps the stored one.
 func (c *Client) Put(ctx context.Context, emailHash string, st State, expectedVersion int64) (State, bool, error) {
 	if expectedVersion == 0 {
 		return c.writeWithConflict(ctx, `
 			WITH ins AS (
-				INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
-				VALUES ($1, $2, $3, $4, 1)
+				INSERT INTO user_state (email_hash, favorites, recents, preferences, backpack, version)
+				VALUES ($1, $2, $3, $4, $5, 1)
 				ON CONFLICT (email_hash) DO NOTHING
-				RETURNING version, favorites, recents, preferences
+				RETURNING version, favorites, recents, preferences, backpack
 			)
-			SELECT TRUE AS updated, version, favorites, recents, preferences FROM ins
+			SELECT TRUE AS updated, version, favorites, recents, preferences, backpack FROM ins
 			UNION ALL
-			SELECT FALSE AS updated, version, favorites, recents, preferences
+			SELECT FALSE AS updated, version, favorites, recents, preferences, backpack
 			  FROM user_state
 			 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM ins)`,
 			emailHash,
-			jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"),
+			jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"), jsonOrEmpty(st.Backpack, "[]"),
 		)
 	}
 	return c.writeWithConflict(ctx, `
 		WITH upd AS (
 			UPDATE user_state
-			   SET favorites = $2, recents = $3, preferences = $4,
+			   SET favorites = $2, recents = $3, preferences = $4, backpack = COALESCE($5::jsonb, backpack),
 			       version = version + 1, updated_at = now()
-			 WHERE email_hash = $1 AND version = $5
-			 RETURNING version, favorites, recents, preferences
+			 WHERE email_hash = $1 AND version = $6
+			 RETURNING version, favorites, recents, preferences, backpack
 		)
-		SELECT TRUE AS updated, version, favorites, recents, preferences FROM upd
+		SELECT TRUE AS updated, version, favorites, recents, preferences, backpack FROM upd
 		UNION ALL
-		SELECT FALSE AS updated, version, favorites, recents, preferences
+		SELECT FALSE AS updated, version, favorites, recents, preferences, backpack
 		  FROM user_state
 		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`,
 		emailHash,
-		jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"),
+		jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"), jsonOrNull(st.Backpack),
 		expectedVersion,
 	)
 }
@@ -130,21 +136,21 @@ func (c *Client) Patch(ctx context.Context, emailHash, section string, payload j
 	if expectedVersion == 0 {
 		// Strings, not []byte: with binary_parameters lib/pq sends []byte in
 		// binary format, which JSONB rejects ("unsupported jsonb version").
-		cols := map[string]string{"favorites": "[]", "recents": "[]", "preferences": "{}"}
+		cols := map[string]string{"favorites": "[]", "recents": "[]", "preferences": "{}", "backpack": "[]"}
 		cols[section] = jsonOrEmpty(payload, defaultFor(section))
 		return c.writeWithConflict(ctx, `
 			WITH ins AS (
-				INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
-				VALUES ($1, $2, $3, $4, 1)
+				INSERT INTO user_state (email_hash, favorites, recents, preferences, backpack, version)
+				VALUES ($1, $2, $3, $4, $5, 1)
 				ON CONFLICT (email_hash) DO NOTHING
-				RETURNING version, favorites, recents, preferences
+				RETURNING version, favorites, recents, preferences, backpack
 			)
-			SELECT TRUE AS updated, version, favorites, recents, preferences FROM ins
+			SELECT TRUE AS updated, version, favorites, recents, preferences, backpack FROM ins
 			UNION ALL
-			SELECT FALSE AS updated, version, favorites, recents, preferences
+			SELECT FALSE AS updated, version, favorites, recents, preferences, backpack
 			  FROM user_state
 			 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM ins)`,
-			emailHash, cols["favorites"], cols["recents"], cols["preferences"],
+			emailHash, cols["favorites"], cols["recents"], cols["preferences"], cols["backpack"],
 		)
 	}
 
@@ -154,11 +160,11 @@ func (c *Client) Patch(ctx context.Context, emailHash, section string, payload j
 			UPDATE user_state
 			   SET %s = $2, version = version + 1, updated_at = now()
 			 WHERE email_hash = $1 AND version = $3
-			 RETURNING version, favorites, recents, preferences
+			 RETURNING version, favorites, recents, preferences, backpack
 		)
-		SELECT TRUE AS updated, version, favorites, recents, preferences FROM upd
+		SELECT TRUE AS updated, version, favorites, recents, preferences, backpack FROM upd
 		UNION ALL
-		SELECT FALSE AS updated, version, favorites, recents, preferences
+		SELECT FALSE AS updated, version, favorites, recents, preferences, backpack
 		  FROM user_state
 		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`, section)
 	return c.writeWithConflict(ctx, q, emailHash, jsonOrEmpty(payload, defaultFor(section)), expectedVersion)
@@ -176,4 +182,12 @@ func jsonOrEmpty(raw json.RawMessage, empty string) string {
 		return empty
 	}
 	return string(raw)
+}
+
+// jsonOrNull sends SQL NULL for an absent section, so COALESCE keeps the column.
+func jsonOrNull(raw json.RawMessage) sql.NullString {
+	if len(raw) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(raw), Valid: true}
 }

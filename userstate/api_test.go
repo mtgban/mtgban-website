@@ -41,3 +41,17 @@ func TestServeAPIUnknownSectionIs400(t *testing.T) {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
 }
+
+func TestServeAPIBackpackIsAKnownSection(t *testing.T) {
+	c := testClient(t)
+	freshHash(t, c) // the row for t.Name()+"@example.com" starts and ends empty
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/userstate/backpack",
+		strings.NewReader(`{"data":[],"version":0}`))
+	w := httptest.NewRecorder()
+	ServeAPI(w, req, c, t.Name()+"@example.com")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("backpack PATCH: expected 200, got %d", w.Code)
+	}
+}

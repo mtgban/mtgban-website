@@ -65,6 +65,19 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 		db.Close()
 		return nil, fmt.Errorf("userstate: ensure schema: %w", err)
 	}
+	// ALTER needs ownership even when the column exists, so look first.
+	var one int
+	err = db.QueryRow(backpackColumnSQL).Scan(&one)
+	switch {
+	case err == sql.ErrNoRows:
+		if _, err := db.Exec(addBackpackSQL); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("userstate: the backpack column is missing and could not be added (run the ALTER in userstate/schema.go as the table owner): %w", err)
+		}
+	case err != nil:
+		db.Close()
+		return nil, fmt.Errorf("userstate: ensure schema: %w", err)
+	}
 
 	// Non-fatal: a role that cannot create this table keeps sync and
 	// loses only upload sharing, whose insert then fails.
