@@ -42,6 +42,10 @@ each for all of them.
    stored at the user's last login (none where a grant named it) and their
    live grant, so a revoked grant takes its tier with it, and on every run
    keeps the newest alerts within the allowance active and parks the rest.
+   Every verified login writes that contact row (the hashed email, the
+   tier and the Discord id Patreon reports), whatever the tier, since the
+   Account page shows the Discord link from it; channel rows are written
+   only where the tier grants alerts.
 4. **One tier per user, not per game.** The shared cookie already gives a
    user one tier on every site; a per-game tier would leave a user who only
    ever logs in on mtgban.com parked on every other game.

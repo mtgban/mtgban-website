@@ -202,42 +202,6 @@ func TestEnsureContactKeepsDiscordID(t *testing.T) {
 	}
 }
 
-// TestRefreshContactTierOnlyUpdatesExistingRows covers that RefreshContactTier
-// never creates a row; it only moves the tier on one that already exists.
-func TestRefreshContactTierOnlyUpdatesExistingRows(t *testing.T) {
-	s := testStore(t)
-	h := freshUser(t, s)
-	ctx := context.Background()
-
-	err := s.RefreshContactTier(ctx, h, "Modern")
-	if err != nil {
-		t.Fatalf("RefreshContactTier unknown hash: %v", err)
-	}
-	_, found, _ := s.Contact(ctx, h)
-	if found {
-		t.Fatal("RefreshContactTier inserted a row for an unknown hash")
-	}
-
-	seedContact(t, s, h)
-	before, _, _ := s.Contact(ctx, h)
-
-	time.Sleep(10 * time.Millisecond)
-	err = s.RefreshContactTier(ctx, h, "Vintage")
-	if err != nil {
-		t.Fatalf("RefreshContactTier: %v", err)
-	}
-	after, found, _ := s.Contact(ctx, h)
-	if !found {
-		t.Fatal("seeded contact missing after refresh")
-	}
-	if after.Tier != "Vintage" {
-		t.Fatalf("tier = %q, want Vintage", after.Tier)
-	}
-	if !after.UpdatedAt.After(before.UpdatedAt) {
-		t.Fatalf("updated_at not bumped: before=%v after=%v", before.UpdatedAt, after.UpdatedAt)
-	}
-}
-
 func seedContact(t *testing.T, s *Store, h string) {
 	t.Helper()
 	err := s.UpsertContact(context.Background(), Contact{UserHash: h, DiscordUserID: "1", DiscordKnown: true, Tier: "Legacy"})
