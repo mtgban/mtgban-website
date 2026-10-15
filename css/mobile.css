@@ -89,6 +89,18 @@
     gap: 0.5em;
 }
 
+.m-nav-backpack {
+    position: relative;
+    width: 32px; height: 32px;
+    background: none; border: none;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    padding: 0;
+    color: inherit;
+    display: flex; align-items: center; justify-content: center;
+}
+.m-nav-backpack[hidden] { display: none; }
+
 .m-nav-hamburger {
     font-size: 1.4rem;
     background: none;

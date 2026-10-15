@@ -39,6 +39,16 @@ test('at most 50 tombstones are kept', () => {
     expect(kept[49].q).toBe('q49');
 });
 
+test('save keeps up to the tombstone cap it is given', () => {
+    const { ListStorage, values } = load();
+    const now = Date.now();
+    const tombs = Array.from({ length: 120 }, (_, i) => ({ q: 'q' + i, del: now - i, m: now - i }));
+    ListStorage.save('k', tombs, 200, 200);
+    expect(JSON.parse(values.get('k'))).toHaveLength(120);
+    ListStorage.save('k', tombs, 200);
+    expect(JSON.parse(values.get('k'))).toHaveLength(50);
+});
+
 test('read answers an empty list for a missing or unreadable key', () => {
     const { ListStorage, values } = load();
     expect(ListStorage.read('missing')).toEqual([]);
