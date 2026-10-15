@@ -132,6 +132,7 @@ Boot sequence (`main()`):
    the admin dashboard's Background Jobs ("Background jobs" in §5.9):
    - `0 */12 * * *` — `s.stashInTimeseries()` (snapshot prices to Postgres)
    - `30 */12 * * *` — `s.runSealedAnalysis()`
+   - `40 */12 * * *`: `s.loadDirectHistory()` (directhistory.go), the trailing window of Direct prices for the SYP fallback (`docs/direct-history.md`)
    - `33 */3 * * *` — `s.cacheNewspaper()`
    - `45 * * * *` — `s.refreshCKSignals()` (ckbuylist.go): reloads CK's
      stock history once the newspaper has a new day, rereads the odds its
@@ -623,7 +624,9 @@ twice daily, normalizing non-NM conditions up via grade multipliers
 (`defaultGradeMap`: NM 1×, SP 1.25×, MP 1.67×, HP 2.5×, PO 4×), and — when
 `LongFormWrites` is on — best-effort dual-writes the same snapshot into the
 long tables via `stashLongForm()`. That path resolves every row through
-`ResolveMagicBanID`. A non-Magic deployment skips the wide table, which
+`ResolveMagicBanID`. A dataset whose index has no wide column (TCG Direct,
+provider 7) is kept in the row's `Extra` map under its provider, which only
+the long form writes. A non-Magic deployment skips the wide table, which
 cannot hold its card ids, and writes the long tables whatever the flags say
 (`stashNonMagicTimeseries`). Its ban_ids are not drawn from the identity
 sequence: a new non-Magic variant is filed under `timeseries.TCGBanID`,
@@ -688,6 +691,7 @@ v2's `stores.json` lists the caller's stores as objects, sellers and
 vendors apart (`banprice.Stores`): shorthand, name, country, and whether a
 store is sealed, an index (its prices carry no condition) or carries `qty`,
 a vendor's credit multiplier, and when its prices were collected.
+v2 JSON retail answers also carry `TCGDirectHist` (v2's `.csv` goes through v1's writers and never does), a derived index store with a SYP card's trailing average of recorded Direct prices where the live Direct inventory lacks it, offered where `TCGDirect` is; `docs/direct-history.md` has the window.
 `finishes.json` (v2 only) lists the finish keys the game's prices use with
 a label and a count, commonest first; `filter=singles|sealed` narrows both.
 v2's JSON takes no `tag`: its prices are keyed by store shorthand, which
