@@ -445,3 +445,76 @@ func TestEnsureTCGVariantsLive(t *testing.T) {
 		t.Fatalf("UpsertLongPrices on the derived id = %d, %v", n, err)
 	}
 }
+
+func TestWindowAveragesLongLive(t *testing.T) {
+	ctx := context.Background()
+	c, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	cleanup := func() {
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid=$1`, liveSentinelUUID)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, liveSentinelProvider)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+	if _, err := c.db.ExecContext(ctx, `INSERT INTO providers (id, shorthand, public_name, kind, currency)
+		VALUES ($1,'SENTINEL','Sentinel','retail','USD') ON CONFLICT (id) DO NOTHING`, liveSentinelProvider); err != nil {
+		t.Fatal(err)
+	}
+
+	plain, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: liveSentinelUUID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foil, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: liveSentinelUUID, IsFoil: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ja, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: liveSentinelUUID, Language: "Japanese"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	day := func(n int) string { return today.AddDate(0, 0, -n).Format("2006-01-02") }
+	rows := []LongPrice{
+		{BanID: plain, Date: day(1), Provider: liveSentinelProvider, Price: 10},
+		{BanID: plain, Date: day(3), Provider: liveSentinelProvider, Price: 20},
+		{BanID: plain, Date: day(12), Provider: liveSentinelProvider, Price: 1000}, // outside a 7 day window
+		{BanID: foil, Date: day(2), Provider: liveSentinelProvider, Price: 50},
+		{BanID: ja, Date: day(1), Provider: liveSentinelProvider, Price: 500}, // other language, left out
+	}
+	for _, r := range rows {
+		if err := c.EnsurePricePartition(ctx, mustDay(t, r.Date)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := c.UpsertLongPrices(ctx, rows, 100); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := c.GetWindowAveragesLong(ctx, liveSentinelProvider, today.AddDate(0, 0, -7))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := got[AggregatePriceKey{MtgjsonUUID: liveSentinelUUID}]
+	if p.Samples != 2 || p.Average != 15 || p.Latest.Format("2006-01-02") != day(1) {
+		t.Errorf("plain: %+v", p)
+	}
+	f := got[AggregatePriceKey{MtgjsonUUID: liveSentinelUUID, IsFoil: true}]
+	if f.Samples != 1 || f.Average != 50 {
+		t.Errorf("foil: %+v", f)
+	}
+}
+
+func mustDay(t *testing.T, s string) time.Time {
+	t.Helper()
+	d, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
