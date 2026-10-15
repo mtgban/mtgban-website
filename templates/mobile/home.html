@@ -34,7 +34,7 @@
 
     <div class="m-home-tools">
         {{range .Nav}}
-            {{if and (ne .Name "Home") (ne .Name "Changelog")}}
+            {{if and (ne .Name "Home") (ne .Name "Changelog") (ne .Name "Account")}}
                 <a class="m-home-tool" href="{{.Link}}">
                     <span class="m-home-tool-icon">{{.Short}}</span> {{.Name}}
                 </a>
@@ -62,6 +62,7 @@
                     <button class="m-home-login-btn patreon" type="button" disabled title="Login is unavailable because Patreon is not configured">Login</button>
                 {{end}}
             {{else}}
+                <a class="m-home-login-btn account" href="/user">Account</a>
                 <a class="m-home-login-btn patreon" href="/?errmsg=logout">Logout</a>
             {{end}}
             <button class="ban-theme-toggle" type="button" title="Toggle theme">

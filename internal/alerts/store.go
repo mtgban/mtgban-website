@@ -97,17 +97,6 @@ func (s *Store) EnsureContact(ctx context.Context, userHash, tier string) error 
 	return err
 }
 
-// RefreshContactTier moves an existing contact's tier; it never inserts,
-// so a user without alerts leaves no row behind. It also bumps updated_at,
-// so updated_at means the last login of any tier, not just one with alerts,
-// and the evaluator still computes allowance 0 from a lapsed tier.
-func (s *Store) RefreshContactTier(ctx context.Context, userHash, tier string) error {
-	_, err := s.db.ExecContext(ctx, `
-		UPDATE alert_contacts SET tier = $2, updated_at = now() WHERE user_hash = $1`,
-		userHash, tier)
-	return err
-}
-
 // Contact reads one user's row; found is false when there is none.
 func (s *Store) Contact(ctx context.Context, userHash string) (Contact, bool, error) {
 	c := Contact{UserHash: userHash}

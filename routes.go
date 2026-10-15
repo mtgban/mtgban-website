@@ -92,6 +92,8 @@ func (s *site) registerRoutes() {
 
 	// Public changelog sourced from the Discord announcement channel.
 	http.Handle("/changelog", noSigning(http.HandlerFunc(s.Changelog)))
+	// Public account page: the tier table, and the reader's own account when signed in.
+	http.Handle("/user", noSigning(http.HandlerFunc(s.User)))
 
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(s.Home)))

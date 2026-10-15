@@ -1,0 +1,98 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/user.css?hash={{.Hash}}">
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+{{with .User}}
+<div class="user-page">
+    <header class="page-header user-header">
+        <div>
+            <h1>Account</h1>
+            <p class="page-subtitle">{{if .SignedIn}}Your BAN account on this site{{else}}What each tier unlocks{{end}}</p>
+        </div>
+        {{if .SignedIn}}
+        <a class="page-action" href="/?errmsg=logout">Log out</a>
+        {{else if $.PatreonLogin}}
+            {{template "patreon-login-script" $}}
+            {{if $.PatreonIDs}}
+                {{range $ref, $id := $.PatreonIDs}}
+                <a class="page-action user-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in with Patreon</a>
+                {{end}}
+            {{else}}
+                <button class="page-action user-login" type="button" disabled title="Login is unavailable because Patreon is not configured">Log in with Patreon</button>
+            {{end}}
+        {{end}}
+    </header>
+
+    {{if .SignedIn}}
+    <section class="card user-card">
+        <dl class="user-details">
+            <div class="user-detail">
+                <dt>Tier</dt>
+                <dd><span class="user-tier"{{if .TierKey}} data-tier="{{.TierKey}}"{{end}}>{{if .Tier}}{{.Tier}}{{else}}None{{end}}</span></dd>
+            </div>
+            {{if .Name}}
+            <div class="user-detail">
+                <dt>Name</dt>
+                <dd>{{.Name}}</dd>
+            </div>
+            {{end}}
+            <div class="user-detail">
+                <dt>Email</dt>
+                <dd>{{.Email}}{{if .Unverified}} <span class="user-pill user-pill-warn" title="Patreon has not confirmed this address">Unverified</span>{{end}}</dd>
+            </div>
+            <div class="user-detail">
+                <dt>Discord</dt>
+                <dd>
+                    {{if eq .Discord.State "linked"}}{{if .Discord.Handle}}{{.Discord.Handle}}{{else}}Linked{{end}}{{else if eq .Discord.State "unlinked"}}Not linked{{else if eq .Discord.State "unverified"}}Verify your Patreon email to show it{{else if eq .Discord.State "unavailable"}}Not available on this site{{else}}Shown after your next login{{end}}
+                    <a class="user-manage" href="https://www.patreon.com/settings/apps" target="_blank" rel="noopener">Manage on Patreon</a>
+                </dd>
+            </div>
+        </dl>
+    </section>
+
+    <h2 class="user-section-title">Your features</h2>
+    {{if .Features}}
+    <div class="user-features">
+        {{range .Features}}
+        <a class="card user-feature" href="{{.Link}}">
+            <span class="user-feature-name">{{.Name}}</span>
+            <span class="user-feature-desc">{{.Description}}</span>
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="user-note">Your tier grants no personal features here.</p>
+    {{end}}
+    {{end}}
+
+    <h2 class="user-section-title">Tiers</h2>
+    {{if .Tiers}}
+    <div class="user-tiers">
+        {{range .Tiers}}
+        <section class="card user-tier-card{{if .Current}} is-current{{end}}"{{if .Key}} data-tier="{{.Key}}"{{end}}>
+            <header class="user-tier-head">
+                <h3 class="user-tier">{{.Name}}</h3>
+                {{if .Current}}<span class="user-pill">Your tier</span>{{end}}
+            </header>
+            {{range .Pages}}
+            <div class="user-tier-page">
+                <span class="user-tier-page-name">{{.Name}}</span>
+                <span class="user-tier-page-desc">{{.Description}}</span>
+                {{if .Perks}}
+                <span class="user-perks">{{range .Perks}}<span class="user-pill">{{.}}</span>{{end}}</span>
+                {{end}}
+            </div>
+            {{end}}
+        </section>
+        {{end}}
+    </div>
+    {{else}}
+    <p class="user-note">Tier details are unavailable right now.</p>
+    {{end}}
+    <p class="user-note">Tiers are Patreon memberships; <a href="https://www.patreon.com/mtgban" target="_blank" rel="noopener">subscribe or change yours there</a>.</p>
+</div>
+{{end}}
+{{end}}

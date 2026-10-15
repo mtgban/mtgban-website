@@ -82,6 +82,13 @@ var DefaultNav = []NavElem{
 		Link:        "/changelog",
 		Page:        "changelog.html",
 	},
+	{
+		Name:        "Account",
+		Short:       "👤",
+		Description: "Your tier, email and personal features",
+		Link:        "/user",
+		Page:        "user.html",
+	},
 }
 
 // List of keys that may be present or not, and when present they are
@@ -388,6 +395,9 @@ type PageVars struct {
 
 	// Alert mail link pages' payload (nil elsewhere)
 	AlertsNotice *AlertsNoticeVars
+
+	// Account page payload (nil elsewhere)
+	User *UserVars
 }
 
 func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
@@ -627,7 +637,7 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 			"templates/partials/guide-faq.html",
 		)
 	}
-	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" {
+	if name == "home.html" || name == "search.html" || name == "upload_handoff.html" || name == "user.html" {
 		files = append(files, "templates/partials/patreon-login.html")
 	}
 	if name == "alerts.html" {
