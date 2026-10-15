@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // UpsertRow inserts or updates a full price row. On conflict it merges
@@ -146,4 +147,12 @@ type AggregatePriceStats struct {
 	P90      float64
 	Count    int64
 	PriorMax float64
+}
+
+// WindowAverage is one card's average price over a trailing window of one
+// provider's rows, with how many days contributed and the newest of them.
+type WindowAverage struct {
+	Average float64
+	Samples int
+	Latest  time.Time
 }

@@ -181,6 +181,36 @@ func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16,
 	return result, rows.Err()
 }
 
+// GetWindowAveragesLong averages one provider's price per Magic card over
+// rows with date >= since, keyed by (uuid, foil, etched). Alt printings and
+// other languages are left out, so this is the base printing's average,
+// as the snapshot's stash keys it.
+func (c *Client) GetWindowAveragesLong(ctx context.Context, provider int16, since time.Time) (map[AggregatePriceKey]WindowAverage, error) {
+	rows, err := c.db.QueryContext(ctx, `
+		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
+		       AVG(p.price), COUNT(*), MAX(p.date)
+		  FROM prices p
+		  JOIN variants v ON v.ban_id = p.ban_id
+		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0
+		   AND v.mtgjson_uuid IS NOT NULL AND NOT v.is_alt AND v.language = ''
+		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched`, provider, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[AggregatePriceKey]WindowAverage)
+	for rows.Next() {
+		var key AggregatePriceKey
+		var avg WindowAverage
+		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &avg.Average, &avg.Samples, &avg.Latest); err != nil {
+			return nil, err
+		}
+		result[key] = avg
+	}
+	return result, rows.Err()
+}
+
 // CategoryMagic is TCGplayer's own category id for Magic. Magic rows are keyed
 // by mtgjson uuid rather than by TCGplayer product, so this doubles as the
 // discriminator between the two identities a mover row can carry.
