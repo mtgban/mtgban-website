@@ -412,7 +412,7 @@ stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 
 | Wrapper | Used for | Behavior |
 |---|---|---|
-| `noSigning` | Home, Guide, Privacy, Offline page, suggest/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
+| `noSigning` | Home, Changelog, Account (`/user`), Guide, Privacy, Offline page, suggest/userstate/opensearch/palette APIs, `/api/load/datastore` | No checks; captures `?sig=` into cookie |
 | `enforceSigning` | All feature pages, and the downloads and raw record a search links to (`/search/decklist/`, `/search/export/`, `/search/raw/`) | Validates signature, expiry, per-page flag; 3 req/s per user email, or per invite signature once checked; POST only when `NavElem.CanPOST` |
 | `enforceDataSigning` | `/data/*`, what the site's own scripts fetch (`/data/chart/`, `/data/prices/`) | The same checks as `enforceSigning`; a refusal is a JSON error with 429 or 401 the script can test, not the error page |
 | `enforceAPISigning` | `/api/mtgban/*`, `/api/v2/*`, `/api/load/*` (except `/api/load/datastore`) | JSON content-type; 10 req/s per IP (`ratelimit` token-bucket per IP via `x/time/rate`); HMAC-SHA1 validation via `apisig.Verify`, per-user secret from `Config.APIUserSecrets` falling back to `BAN_SECRET`; refusals are JSON errors with 401, 429 or 503 |
@@ -441,8 +441,9 @@ current game), `SubPages` (e.g. `/sets`, `/sealed` under Search) and
 handlers are methods on `*site` (site.go); `NavElem.Handle` is
 `func(*site, http.ResponseWriter, *http.Request)`, filled with method
 expressions (`Handle: (*site).Search`) so `ExtraNavs` stays static data built
-in `init()`, before any `*site` exists (`DefaultNav`'s entries, Home and
-Changelog, carry no `Handle`). `ShouldHide` is
+in `init()`, before any `*site` exists (`DefaultNav`'s entries, Home,
+Changelog and Account, carry no `Handle`; each is routed by hand in
+`registerRoutes` behind `noSigning`). `ShouldHide` is
 `func(*site) bool` for the same reason (it reads the site's current datastore
 for visibility only, e.g. the Sealed sub-tab hides when the loaded backend has
 no sealed product). `main()` builds `s := newSite()` and `s.registerRoutes()`
