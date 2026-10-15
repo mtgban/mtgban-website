@@ -13,6 +13,7 @@ import (
 // name them.
 const (
 	jobStash          = "Price stash"
+	jobDirectHistory  = "Direct history"
 	jobSetAnalysis    = "Set analysis"
 	jobNewspaper      = "Newspaper cache"
 	jobCKSignals      = "CK signals"
@@ -78,6 +79,11 @@ func (s *site) startCrons() {
 
 	// Take a snapshot twice a day
 	addJob("0 */12 * * *", jobStash, s.stashInTimeseries)
+	// Then the Direct history the SYP fallback reads from it; only on Magic,
+	// whose uuids the archive's Direct rows are.
+	if datastoreGame() == DefaultGame {
+		addJob("40 */12 * * *", jobDirectHistory, s.loadDirectHistory)
+	}
 
 	// Update set values with new prices
 	addJob("30 */12 * * *", jobSetAnalysis, s.runSealedAnalysis)

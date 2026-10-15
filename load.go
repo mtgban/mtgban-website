@@ -334,6 +334,11 @@ func (s *site) startScraperLoad(dumpsDir string, stores []string, datastoreLoade
 		// backend it starts with, so it waits for the datastore: read
 		// from a bucket, it can arrive after the prices.
 		<-datastoreLoaded
+		// The Direct history the SYP EV fallback reads (directhistory.go),
+		// once the datastore the fold needs is in; Magic only, like its cron.
+		if datastoreGame() == DefaultGame {
+			go tracked(jobDirectHistory, s.loadDirectHistory)()
+		}
 		// Alerts wait for both the datastore and the prices.
 		s.pricesLoaded.Store(true)
 		s.alerts.RequestEvaluate(alerts.SideRetail, alerts.SideBuylist)
