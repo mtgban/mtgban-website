@@ -602,6 +602,11 @@ body.light-theme .navbar-v2[data-tier="modern"] {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 180px;
+    text-decoration: none;
+}
+a.tools-quick-user:hover {
+    color: var(--normal);
+    text-decoration: none;
 }
 
 /* Offline-mode navbar toggle: orange accent when engaged. */
