@@ -1187,7 +1187,8 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 
 /* Favorites */
 /* Star button in card header */
-.m-fav-btn {
+.m-fav-btn,
+.m-pack-btn {
     background: none;
     border: none;
     cursor: pointer;
@@ -1201,17 +1202,20 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     -webkit-tap-highlight-color: transparent;
 }
 
-.m-fav-btn::before {
+.m-fav-btn::before,
+.m-pack-btn::before {
     content: '';
     position: absolute;
     inset: -4px;
 }
 
-.m-fav-btn {
+.m-fav-btn,
+.m-pack-btn {
     transition: transform 0.1s ease, background-color 0.1s ease;
 }
 
-.m-fav-btn:active {
+.m-fav-btn:active,
+.m-pack-btn:active {
     background: rgba(255, 255, 255, 0.1);
     transform: scale(0.85);
 }
@@ -1221,7 +1225,9 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 }
 
 .m-fav-btn i,
-.m-fav-btn svg {
+.m-fav-btn svg,
+.m-pack-btn i,
+.m-pack-btn svg {
     width: 18px;
     height: 18px;
 }
@@ -1504,6 +1510,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
 /* Favorited state for the menu copy of the star. */
 .m-actions-fav.active { color: #f5c518; }
 .m-actions-fav.active svg { fill: #f5c518; stroke: #f5c518; }
+.m-actions-pack.active { color: var(--dodgerblue); }
 .m-actions-alert.active { color: #f5c518; }
 .m-actions-alert.active svg { fill: #f5c518; stroke: #f5c518; }
 
@@ -1512,6 +1519,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
    landscape they stay inline and the menu copies hide (see the landscape block). */
 @media (orientation: portrait) {
     .m-fav-btn,
+    .m-pack-btn,
     .m-chart-btn { display: none; }
 }
 
@@ -2135,6 +2143,7 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     /* Landscape has room for the favorite + chart buttons inline, so drop their
        collapsed copies from the actions menu. */
     .m-actions-fav,
+    .m-actions-pack,
     .m-actions-chart { display: none; }
 
     /* Navbar inline search: show search in navbar, hide standalone bar */

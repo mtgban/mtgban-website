@@ -264,6 +264,7 @@ body.light-theme .navbar-v2[data-tier="modern"] {
 @media (max-width: 900px) {
     .nav2-utility { margin-left: 0; }
 }
+.nav2-icon-btn.nav2-backpack[hidden] { display: none; }
 .nav2-icon-btn {
     display: inline-flex; align-items: center; justify-content: center;
     width: 36px; height: 36px;

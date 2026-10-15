@@ -157,7 +157,7 @@ output, not a claim written here.
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
 | `timeseries/` | PostgreSQL price-history client (charts) |
-| `userstate/`, `observability/` | Postgres stores for per-user preferences and for page visits (the admin usage tab) and search votes (the popular-searches ranking) |
+| `userstate/`, `observability/` | Postgres stores for per-user favorites, recents, preferences and the search backpack, and for page visits (the admin usage tab) and search votes (the popular-searches ranking) |
 | `banprice/` | The price API's wire types |
 | `tcgcsv/` | tcgcsv.com client that `tcgcsvd/` ingests through |
 | `tcgcsvd/` | Non-Magic price/catalog ingest from tcgcsv.com — see its own README |
