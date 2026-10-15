@@ -1,0 +1,124 @@
+/* The CardTrader inventory page: a one-line form, the counts, two buttons
+   and the table of what did not match. Rides on .legal for the column. */
+
+.ct-error {
+    margin: 1em 0;
+    padding: 0.75em 1em;
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    color: var(--normal);
+    font-weight: 600;
+}
+
+.ct-form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5em 0.75em;
+    align-items: center;
+    margin: 1.5em 0;
+}
+
+.ct-form label {
+    grid-column: 1 / -1;
+    font-weight: 600;
+    color: var(--normal);
+}
+
+.ct-form input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6em 0.75em;
+    font-size: 1em;
+    font-family: var(--font-mono);
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
+    color: var(--normal);
+}
+
+/* The shape of upload.css's .upload-btn, which this page does not load. */
+.ct-btn {
+    padding: 0.6em 1.4em;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    background: var(--dodgerblue-fill);
+    color: #ffffff;
+}
+
+.ct-btn:hover {
+    background: var(--dodgerblue);
+}
+
+.ct-btn-secondary {
+    background: var(--surface-3);
+    color: var(--normal);
+    border: 1px solid var(--border-moderate);
+}
+
+.ct-btn-secondary:hover {
+    background: var(--surface-4);
+    color: var(--normal);
+}
+
+.ct-hint {
+    grid-column: 1 / -1;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.ct-summary {
+    margin: 0.5em 0 1em;
+    padding-left: 1.25em;
+}
+
+.ct-downloads {
+    display: flex;
+    gap: 0.75em;
+    flex-wrap: wrap;
+}
+
+.ct-table-wrap {
+    overflow-x: auto;
+}
+
+.ct-more {
+    margin-top: 0.5em;
+    opacity: 0.8;
+}
+
+.ct-unmatched {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+.ct-unmatched caption {
+    text-align: left;
+    padding-bottom: 0.5em;
+    opacity: 0.8;
+}
+
+.ct-unmatched th,
+.ct-unmatched td {
+    text-align: left;
+    padding: 0.4em 0.6em;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.ct-unmatched .ct-num {
+    text-align: right;
+}
+
+@media (max-width: 40em) {
+    .ct-form {
+        grid-template-columns: 1fr;
+    }
+}

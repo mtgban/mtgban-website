@@ -729,6 +729,11 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 				if nav.Link == r.URL.Path {
 					ok = nav.CanPOST
 				}
+				for _, subPage := range nav.SubPages {
+					if targetsSubPage(r, subPage.Link) {
+						ok = subPage.CanPOST
+					}
+				}
 			}
 			if !ok {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)

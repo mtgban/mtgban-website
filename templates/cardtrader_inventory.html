@@ -1,0 +1,66 @@
+{{/* No icons of its own, like the handoff page: the palette fetches
+     lucide itself when it opens. */}}
+{{define "icons"}}<!-- no lucide: this page has no icons -->{{end}}
+
+{{define "title"}}CardTrader inventory - MTGBAN{{end}}
+
+{{define "extra-css"}}<link rel="stylesheet" type="text/css" href="/css/cardtrader.css?hash={{.Hash}}">{{end}}
+
+{{define "content"}}
+<div class="legal" id="cardtrader">
+    <h1>CardTrader inventory</h1>
+    <p>
+        Load the stock you sell on CardTrader and download it as a CSV:
+        the raw one in CardTrader's own column names, or the BAN one that
+        <a href="/upload">Upload</a> values as-is. The token is used for
+        this one load and is not kept.
+    </p>
+
+    {{if .CTError}}<p class="ct-error" role="alert">{{.CTError}}</p>{{end}}
+
+    <form method="post" action="/upload/cardtrader" autocomplete="off" class="ct-form">
+        <label for="ct-token">CardTrader API token</label>
+        <input type="password" id="ct-token" name="token" autocomplete="off" required
+               placeholder="Paste the token from cardtrader.com">
+        <button type="submit" class="ct-btn">Load inventory</button>
+        <span class="ct-hint">On cardtrader.com: Profile, Settings, API. A large stock takes up to a minute.</span>
+    </form>
+    <p class="ct-hint">Upload takes up to {{uploadLimit}} rows at a time, {{uploadProLimit}} with the Optimizer, and skips rows with no stock.</p>
+
+    {{if .CTLoaded}}
+    <h2>What loaded</h2>
+    <ul class="ct-summary">
+        <li><strong>{{.CTSummary.Listings}}</strong> listings</li>
+        <li><strong>{{.CTSummary.ThisGame}}</strong> in this game: <strong>{{.CTSummary.Matched}}</strong> matched, <strong>{{.CTSummary.Unmatched}}</strong> unmatched</li>
+        <li><strong>{{.CTSummary.OtherGames}}</strong> in other games, in the raw CSV only</li>
+        {{if .CTSummary.NoCatalog}}<li><strong>{{.CTSummary.NoCatalog}}</strong> whose expansion catalog CardTrader did not serve</li>{{end}}
+        {{if .CTSummary.NoRates}}<li>Non-dollar prices left empty: no exchange rates</li>{{end}}
+    </ul>
+    <p class="ct-downloads">
+        <button type="button" id="ct-download-raw" class="ct-btn ct-btn-secondary">Raw CSV</button>
+        <button type="button" id="ct-download-ban" class="ct-btn ct-btn-secondary">BAN CSV</button>
+    </p>
+
+    <h2>Unmatched</h2>
+    {{if .CTUnmatched}}
+    <div class="ct-table-wrap">
+    <table class="ct-unmatched">
+        <caption>Listings the BAN CSV carries by name only</caption>
+        <thead><tr><th>Name</th><th>Expansion</th><th>Number</th><th class="ct-num">Qty</th><th>Reason</th></tr></thead>
+        <tbody>
+        {{range .CTUnmatched}}
+        <tr><td>{{.Name}}</td><td>{{.Expansion}}</td><td>{{.Number}}</td><td class="ct-num">{{.Quantity}}</td><td>{{.Reason}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{if gt .CTUnmatchedTotal (len .CTUnmatched)}}<p class="ct-more">and {{dec .CTUnmatchedTotal (len .CTUnmatched)}} more in the BAN CSV</p>{{end}}
+    {{else}}
+    <p>Every listing matched.</p>
+    {{end}}
+
+    <script>window.BAN_CT_EXPORT = {{.CTExport}};</script>
+    <script type="text/javascript" src="/js/cardtrader-export.js?hash={{.Hash}}" defer></script>
+    {{end}}
+</div>
+{{end}}

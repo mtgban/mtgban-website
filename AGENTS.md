@@ -141,7 +141,7 @@ output, not a claim written here.
 |---|---|
 | `main.go` | Startup, flags, config |
 | `routes.go` | `registerRoutes`: static files, redirects, the `NavElem` pages and the APIs, each behind its signing middleware |
-| `pages.go` | The `NavElem` page registry (`ExtraNavs`, filled in `init()`, and `OrderNav`), `PageVars` (what pages share; `UploadVars`, `SearchVars`, `AdminVars`, `NewsVars`, `ArbitVars` and `SleepVars`, each beside its handler, are embedded in it), the per-request nav (`genPageNav`), the template cache and `render` |
+| `pages.go` | The `NavElem` page registry (`ExtraNavs`, filled in `init()`, and `OrderNav`), `PageVars` (what pages share; `UploadVars`, `SearchVars`, `AdminVars`, `NewsVars`, `ArbitVars`, `CardTraderVars` and `SleepVars`, each beside its handler, are embedded in it), the per-request nav (`genPageNav`), the template cache and `render` |
 | `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
 | `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`), published together |
 | `templates.go` | The template `FuncMap` — the helper funcs templates call by name |
@@ -163,6 +163,7 @@ output, not a claim written here.
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
 | `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the cron schedule (`startCrons`), the stale-data alarm, panic recovery and reporting, page-visit recording |
 | `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |
+| `cardtrader_inventory.go` | The CardTrader inventory page under Upload: a seller's stock fetched with their token through go-mtgban's `ExportInventory`, matched, and offered as a raw CSV in CardTrader's import columns and a BAN CSV Upload reads |
 | `api_plans.go`, `api_handoff.go` | The public API pricing page and configurator (`/api-plans`, renders `apiproductlist`), and the Patreon handoff redirects to the gateway (`/api-trial`, `/api-login`) |
 | `utils.go`, `redirect.go`, `mobile.go` | Helpers (including the non-Magic rarity-badge `colorRarityMap` — see `img/setsymbol/README.md`), affiliate redirects, mobile toggle |
 | `timeseries/` | PostgreSQL price-history client (charts) |

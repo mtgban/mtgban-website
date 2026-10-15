@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/cardtrader"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
@@ -225,6 +226,21 @@ func init() {
 			SettingsTab: "upload",
 			CanPOST:     true,
 			DesktopOnly: true,
+			SubPages: []NavElem{
+				{
+					Name:        "CardTrader",
+					Short:       "🧾",
+					Description: "Export your CardTrader inventory",
+					Link:        "/upload/cardtrader",
+					SettingsTab: "upload",
+					CanPOST:     true,
+					// Hidden on a game CardTrader does not sell.
+					ShouldHide: func(*site) bool {
+						_, found := cardtrader.GameID(Config().Game)
+						return !found
+					},
+				},
+			},
 		},
 		"Global": {
 			Name:        "Global",
@@ -304,6 +320,7 @@ type PageVars struct {
 	// templates read them.
 	AdminVars
 	ArbitVars
+	CardTraderVars
 	NewsVars
 	SearchVars
 	SleepVars
