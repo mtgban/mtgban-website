@@ -721,6 +721,12 @@ func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (ca
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
 		card.ChartID = chartIDForCard(b, cardID)
+		// Only the search page lists a product's contents.
+		if card.Sealed {
+			if co, err := b.GetUUID(cardID); err == nil {
+				card.Contents, card.ContentsMore = productContents(b, co, contentsLineLimit)
+			}
+		}
 		metadata[cardID] = card
 		printings[cardID] = cardPrintings(b, cardID)
 	}
