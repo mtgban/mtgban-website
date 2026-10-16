@@ -618,15 +618,22 @@
                                                     {{end}}
                                                     {{if not .Locked}}
                                                         {{$priceWarn := false}}
+                                                        {{/* Judge the store's own price, not the discounted one */}}
+                                                        {{$checkPrice := .Price}}{{if .OrigPrice}}{{$checkPrice = .OrigPrice}}{{end}}
                                                         {{if eq .Shorthand "TCGDirect"}}
-                                                            {{$priceWarn = invalid_direct $cardId .Price}}
+                                                            {{$priceWarn = invalid_direct $cardId $checkPrice}}
+                                                        {{end}}
+                                                        {{$warnTip := ""}}
+                                                        {{if $priceWarn}}
+                                                            {{$warnTip = price_warning_tip $checkPrice (tcg_market_price $cardId)}}
+                                                            {{if .Adjusted}}{{$warnTip = printf "%s\n%s" $warnTip .AdjustTip}}{{end}}
                                                         {{end}}
                                                         {{if .Secondary}}
                                                         <span class="price-right has-secondary">
                                                         {{else}}
                                                         <span class="price-right">
                                                         {{end}}
-                                                        <span class="price{{if $priceWarn}} price-warn{{end}}" {{if $priceWarn}}{{$warnTip := price_warning_tip .Price (tcg_market_price $cardId)}}title="{{plain_tip $warnTip}}" data-tip="{{$warnTip}}"{{else if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}}>
+                                                        <span class="price{{if $priceWarn}} price-warn{{end}}{{if .Adjusted}} price-adjusted{{end}}" {{if $priceWarn}}title="{{plain_tip $warnTip}}" data-tip="{{$warnTip}}"{{else if .RetailTip}}title="{{.RetailTip}}"{{end}}>
                                                             {{if or .PriceUnit .Price}}
                                                                 {{if .PriceSymbol}}<span class="cur">{{.PriceSymbol}}</span>{{end}}<span class="amt">{{.PriceAmount}}</span>
                                                             {{else if .BundleIcon}}
@@ -671,7 +678,7 @@
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
+                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .OrigCredit}}Credit at face: $ {{printf "%.2f\n" .OrigCredit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
                                                 {{if .Locked}}
                                                     <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
                                                     <span class="locked-cta">
@@ -711,7 +718,7 @@
                                                 {{if $pausePill}}
                                                 <span class="buylist-extra">{{$pausePill}}</span>
                                                 {{else}}
-                                                <span class="buylist-extra"
+                                                <span class="buylist-extra{{if .OrigCredit}} adjusted{{end}}"
                                                     data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'
                                                     data-credit='{{if .Credit}}{{printf "%.02f" .Credit}}{{end}}'
                                                     data-marketcredit='{{if .MarketCredit}}{{printf "%.02f" .MarketCredit}}{{end}}'>
