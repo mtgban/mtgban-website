@@ -241,6 +241,8 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
 }
+.admin-dim { color: var(--text-dim); }
+.admin-alerts-error { max-width: 18em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Staleness: a scraper row whose retail or buylist data is older than the
    48h alarm threshold (staleness.go). Reuses the danger red already used
    elsewhere on this page (.admin-action.danger, .admin-msg-error). */
