@@ -927,6 +927,12 @@ body:has(.search-layout) {
     min-height: 24px;
 }
 .sidebar-products-list a:hover { text-decoration: underline; }
+.sidebar-products-list .product-odds {
+    font-size: var(--text-xs);
+    color: var(--search-text-dim);
+    margin-left: 0.35em;
+    white-space: nowrap;
+}
 
 .sidebar-actions {
     display: flex;

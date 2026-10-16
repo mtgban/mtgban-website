@@ -1092,27 +1092,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 
 	sourceSealed := cardobject2sources(co)
 
-	var products string
-	var numProducts int
-	if len(sourceSealed) > 0 {
-		products += "<h4>"
-		for _, sealed := range sourceSealed {
-			// The sealed uuids while known might have changed and we need to
-			// make sure they don't crash the system here
-			sealedCo, err := b.GetUUID(sealed)
-			if err != nil {
-				continue
-			}
-			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
-			numProducts++
-		}
-		products += "</h4>"
-		if len(sourceSealed) > 5 {
-			products = strings.Replace(products, "h4>", "h6>", -1)
-		} else if len(sourceSealed) > 3 {
-			products = strings.Replace(products, "h4>", "h5>", -1)
-		}
-	}
+	products, numProducts := productsHTML(b, sourceSealed, nil)
 
 	tcgID := findTCGproductID(b, co.UUID)
 
@@ -1216,6 +1196,40 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 		CropURL:           cropURL,
 		FullImageURL:      co.Images["full"],
 	}
+}
+
+// productsHTML lists a card's source products as the sidebar's Available In
+// box draws them; odds, when given, labels each product.
+func productsHTML(b *mtgmatcher.Backend, sourceSealed []string, odds func(productUUID string) string) (string, int) {
+	if len(sourceSealed) == 0 {
+		return "", 0
+	}
+	products := "<h4>"
+	var numProducts int
+	for _, sealed := range sourceSealed {
+		// The sealed uuids while known might have changed and we need to
+		// make sure they don't crash the system here
+		sealedCo, err := b.GetUUID(sealed)
+		if err != nil {
+			continue
+		}
+		var label string
+		if odds != nil {
+			if text := odds(sealed); text != "" {
+				label = ` <span class="product-odds">` + text + `</span>`
+			}
+		}
+		products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + label + "</a>"
+		numProducts++
+	}
+	products += "</h4>"
+	// The heading level follows the declared list, resolved or not, as before.
+	if len(sourceSealed) > 5 {
+		products = strings.Replace(products, "h4>", "h6>", -1)
+	} else if len(sourceSealed) > 3 {
+		products = strings.Replace(products, "h4>", "h5>", -1)
+	}
+	return products, numProducts
 }
 
 // cardPrintings is a card's printings row for the search sidebar: a symbol
