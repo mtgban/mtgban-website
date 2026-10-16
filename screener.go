@@ -599,7 +599,7 @@ func (s *site) Screener(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cardID = res.UUID
 		}
-		c := uuid2card(b, cardID, preferFlavor)
+		c := uuid2card(b, cardID, preferFlavor, nil)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, cardID)
 	}

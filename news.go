@@ -1441,7 +1441,7 @@ func (s *site) Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
-		c := uuid2card(b, result.UUID, preferFlavor)
+		c := uuid2card(b, result.UUID, preferFlavor, nil)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result.UUID)
 	}

@@ -114,6 +114,6 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	vars.Cards = cardMetadata{}
 	for _, view := range views {
-		vars.Cards[view.CardID] = uuid2card(b, view.CardID, false)
+		vars.Cards[view.CardID] = uuid2card(b, view.CardID, false, nil)
 	}
 }
