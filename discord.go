@@ -939,7 +939,7 @@ func prepareCard(b *matcher.Backend, searchRes *EmbedSearchResult, ogFields []Em
 	}
 
 	// Prepare card data
-	card := uuid2card(b, searchRes.CardID, false)
+	card := uuid2card(b, searchRes.CardID, false, nil)
 	co, _ := b.GetUUID(searchRes.CardID)
 
 	printings := embed.PrintingsLine(co.Printings)

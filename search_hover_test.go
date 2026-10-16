@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"html"
+	"os"
 	"strings"
 	"testing"
 )
@@ -123,5 +124,33 @@ func TestSearchInitialArtKeepsFirstResultMetadata(t *testing.T) {
 	}
 	if args[3] == "TWO" || args[1] == true || args[7] == "Second Product" {
 		t.Errorf("first result's hover payload leaked the second result's metadata: %v", args)
+	}
+}
+
+// TestSearchResultProductsKeepOddsMarkup checks the odds span survives the
+// template: Products is trusted HTML in the result's hover template.
+func TestSearchResultProductsKeepOddsMarkup(t *testing.T) {
+	page := sealedPage(nil)
+	page.AllKeys = []string{"first"}
+	page.Metadata = map[string]GenericCard{
+		"first": {
+			Name:        "Some Card",
+			SetCode:     "ONE",
+			Products:    `<h4><a href=/sealed?q=abc>Some Box <span class="product-odds">1 in 12</span></a></h4>`,
+			NumProducts: 1,
+		},
+	}
+	out := renderPage(t, "search.html", false, page)
+
+	want := `<div class="hover-products"><h4><a href=/sealed?q=abc>Some Box <span class="product-odds">1 in 12</span></a></h4></div>`
+	if !strings.Contains(out, want) {
+		t.Errorf("rendered page lacks the odds span unescaped; want %s", want)
+	}
+	css, err := os.ReadFile("css/search.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), ".sidebar-products-list .product-odds") {
+		t.Error("search.css has no .sidebar-products-list .product-odds rule")
 	}
 }

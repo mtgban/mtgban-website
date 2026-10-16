@@ -19,7 +19,7 @@ func promoTypeCards(t *testing.T) (plain, chipped string) {
 		if err != nil || co.Sealed {
 			continue
 		}
-		card := uuid2card(backend(), uuid, false)
+		card := uuid2card(backend(), uuid, false, nil)
 		if plain == "" && len(card.PromoTypes) > 0 {
 			plain = uuid
 		}
@@ -44,7 +44,7 @@ func TestPromoTypesAndTreatmentsAreDisjoint(t *testing.T) {
 		t.Skip("this datastore has no printing with a treatment chip")
 	}
 
-	card := uuid2card(backend(), chipped, false)
+	card := uuid2card(backend(), chipped, false, nil)
 	for _, chip := range card.Treatments {
 		for _, p := range card.PromoTypes {
 			if p == chip {
@@ -84,7 +84,7 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 			continue
 		}
 		found = true
-		card := uuid2card(backend(), uuid, false)
+		card := uuid2card(backend(), uuid, false, nil)
 		var shown bool
 		for _, p := range card.PromoTypes {
 			if p == "showcase" || p == "extendedart" || p == "borderless" {

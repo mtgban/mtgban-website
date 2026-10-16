@@ -16,8 +16,8 @@ import (
 // pre-stores (site.go), the value served before the first load completes:
 // numbers (exact-number searches scan instead, and a number searched alone
 // is no collector number), sources (contents: searches scan instead), names
-// (SuggestAPI answers 204) and palette (lists served no-store) all wait for
-// an actual load.
+// (SuggestAPI answers 204), palette (lists served no-store) and odds (no
+// labels) all wait for an actual load.
 type datastore struct {
 	backend  *matcher.Backend
 	numbers  *numbersSnapshot
@@ -26,5 +26,6 @@ type datastore struct {
 	editions *editionsSnapshot
 	palette  *palette.Snapshot
 	finishes []banprice.Finish
+	odds     *productOdds
 	loadedAt time.Time
 }

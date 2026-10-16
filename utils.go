@@ -960,7 +960,9 @@ var allLanguageFlags = map[string]string{
 	"Spanish":             "🇪🇸",
 }
 
-func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool) GenericCard {
+// uuid2card reads what the pages show of one card. odds labels its source
+// products with how often each yields it; nil off the search page.
+func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool, odds *productOdds) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
@@ -1081,27 +1083,7 @@ func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool) Generic
 
 	sourceSealed := cardobject2sources(co)
 
-	var products string
-	var numProducts int
-	if len(sourceSealed) > 0 {
-		products += "<h4>"
-		for _, sealed := range sourceSealed {
-			// The sealed uuids while known might have changed and we need to
-			// make sure they don't crash the system here
-			sealedCo, err := b.GetUUID(sealed)
-			if err != nil {
-				continue
-			}
-			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
-			numProducts++
-		}
-		products += "</h4>"
-		if len(sourceSealed) > 5 {
-			products = strings.Replace(products, "h4>", "h6>", -1)
-		} else if len(sourceSealed) > 3 {
-			products = strings.Replace(products, "h4>", "h5>", -1)
-		}
-	}
+	products, numProducts := productsHTML(b, sourceSealed, odds, co.UUID)
 
 	tcgID := findTCGproductID(b, co.UUID)
 
@@ -1207,6 +1189,40 @@ func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool) Generic
 	}
 }
 
+// productsHTML lists a card's source products as the sidebar's Available In
+// box draws them; odds, when given, labels each product with how it yields
+// the card, the title its tip.
+func productsHTML(b *matcher.Backend, sourceSealed []string, odds *productOdds, cardUUID string) (string, int) {
+	if len(sourceSealed) == 0 {
+		return "", 0
+	}
+	products := "<h4>"
+	var numProducts int
+	for _, sealed := range sourceSealed {
+		// The sealed uuids while known might have changed and we need to
+		// make sure they don't crash the system here
+		sealedCo, err := b.GetUUID(sealed)
+		if err != nil {
+			continue
+		}
+		var label string
+		text, title := odds.label(sealed, cardUUID)
+		if text != "" {
+			label = ` <span class="product-odds" title="` + title + `">` + text + `</span>`
+		}
+		products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + label + "</a>"
+		numProducts++
+	}
+	products += "</h4>"
+	// The heading level follows the declared list, resolved or not, as before.
+	if len(sourceSealed) > 5 {
+		products = strings.Replace(products, "h4>", "h6>", -1)
+	} else if len(sourceSealed) > 3 {
+		products = strings.Replace(products, "h4>", "h5>", -1)
+	}
+	return products, numProducts
+}
+
 // cardPrintings is a card's printings row for the search sidebar: a symbol
 // for each set the card was printed in. For a sealed product it is the set's
 // value panel instead.
@@ -1229,7 +1245,7 @@ func (m cardMetadata) add(b *matcher.Backend, cardID string, preferFlavor bool) 
 	if _, found := m[cardID]; found {
 		return
 	}
-	m[cardID] = uuid2card(b, cardID, preferFlavor)
+	m[cardID] = uuid2card(b, cardID, preferFlavor, nil)
 }
 
 // quoteIfFilter quotes a card name the filter regexp would read a filter

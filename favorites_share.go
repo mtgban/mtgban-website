@@ -188,7 +188,7 @@ func sharedRows(b *matcher.Backend, raw json.RawMessage) []sharedFavorite {
 // sharedCard is the row for a card id the way search shows the card, and
 // the query its result links to.
 func sharedCard(b *matcher.Backend, id string) sharedFavorite {
-	card := uuid2card(b, id, false)
+	card := uuid2card(b, id, false, nil)
 	co, _ := b.GetUUID(id)
 	treatments := make([]string, 0, len(card.Treatments))
 	for _, promoType := range card.Treatments {

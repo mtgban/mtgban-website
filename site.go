@@ -209,14 +209,16 @@ func (s *site) backend() *matcher.Backend {
 // newDatastore builds every derived snapshot from b; an empty backend gives
 // empty snapshots.
 func (s *site) newDatastore(b *matcher.Backend, loadedAt time.Time) *datastore {
+	sources := newSourcesSnapshot(b)
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
-		sources:  newSourcesSnapshot(b),
+		sources:  sources,
 		names:    suggest.NewNames(b.Names(matcher.NameFormCanonical, false), b.Names(matcher.NameFormCanonical, true)),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
 		finishes: v2FinishList(b),
+		odds:     newProductOdds(b, sources),
 		loadedAt: loadedAt,
 	}
 }
