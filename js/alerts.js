@@ -104,6 +104,13 @@
 
     var BUTTON_TEXT = { add: 'Add', change: 'Change', save: 'Change', cancel: 'Cancel', resend: 'Resend confirmation', remove: 'Remove', enable: 'Enable' };
 
+    // apiError carries the response status, so a caller can tell a 404 apart.
+    function apiError(message, status) {
+        var err = new Error(message);
+        err.status = status;
+        return err;
+    }
+
     function api(method, path, body) {
         return fetch(path, {
             method: method,
@@ -114,10 +121,10 @@
             if (res.status === 204) return null;
             var contentType = res.headers.get('content-type') || '';
             if (contentType.indexOf('application/json') === -1) {
-                throw new Error('request failed: ' + res.status);
+                throw apiError('request failed: ' + res.status, res.status);
             }
             return res.json().then(function (data) {
-                if (!res.ok) throw new Error(data.error || ('request failed: ' + res.status));
+                if (!res.ok) throw apiError(data.error || ('request failed: ' + res.status), res.status);
                 return data;
             });
         });
@@ -259,11 +266,18 @@
         return parts.join(', ');
     }
 
-    // Alerts already on this card sit above a new alert's form, each with an Edit link.
+    // existingForCard is what the box above a new alert's form lists: the
+    // card's own alerts, and nothing while the modal edits one.
+    function existingForCard(existing, cardId, alertId) {
+        if (alertId) return [];
+        return (existing || []).filter(function (a) { return a.card_id === cardId; });
+    }
+
+    // Alerts already on this card sit above a new alert's form, each with Edit and Remove.
     function renderExisting() {
         var host = document.getElementById('alert-modal-existing');
         host.innerHTML = '';
-        var mine = state.alertId ? [] : (state.existing || []).filter(function (a) { return a.card_id === state.cardId; });
+        var mine = existingForCard(state.existing, state.cardId, state.alertId);
         host.hidden = !mine.length;
         if (!mine.length) return;
         var head = document.createElement('span');
@@ -280,8 +294,39 @@
             edit.setAttribute('data-edit-id', a.id);
             edit.textContent = 'Edit';
             row.appendChild(edit);
+            var remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'alert-existing-remove';
+            remove.setAttribute('data-remove-id', a.id);
+            remove.textContent = 'Remove';
+            row.appendChild(remove);
             host.appendChild(row);
         });
+    }
+
+    // Remove one of the card's alerts from the box; the Alerts page reloads
+    // so its table agrees, search updates the box and the bell in place.
+    // A 404 means it was already gone, so the row goes all the same.
+    function removeExisting(id) {
+        var removed = function (note) {
+            if (document.getElementById('alerts-page')) { window.location.reload(); return; }
+            state.existing = (state.existing || []).filter(function (a) { return String(a.id) !== String(id); });
+            renderExisting();
+            markExistingBells();
+            toast(note);
+        };
+        var run = function () {
+            api('DELETE', '/api/alerts/' + id).then(function () { removed('Alert removed'); })
+               .catch(function (err) {
+                   if (err.status === 404) { removed('Alert was already removed'); return; }
+                   setError(err.message);
+               });
+        };
+        if (typeof window.confirmDialog === 'function') {
+            window.confirmDialog('Remove this alert?', run, { confirmLabel: 'Remove' });
+        } else if (window.confirm('Remove this alert?')) {
+            run();
+        }
     }
 
     function renderThreshold(name, kind, value) {
@@ -519,6 +564,8 @@
     function onModalClick(e) {
         var editLink = e.target.closest('[data-edit-id]');
         if (editLink) { open({ alertId: editLink.getAttribute('data-edit-id') }); return; }
+        var removeLink = e.target.closest('[data-remove-id]');
+        if (removeLink) { removeExisting(removeLink.getAttribute('data-remove-id')); return; }
         var pill = e.target.closest('.settings-pill[data-value]');
         if (pill && form.contains(pill)) {
             var field = pill.parentNode.getAttribute('data-field');
@@ -561,6 +608,8 @@
 
     function onKeydown(e) {
         if (!modal || !modal.classList.contains('open')) return;
+        // A confirm open over the modal owns the keyboard until it closes.
+        if (document.querySelector('.ban-confirm-dialog-host:not([hidden])')) return;
         if (e.key === 'Escape') { e.preventDefault(); close(); }
         if (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT') { e.preventDefault(); save(); }
     }
@@ -572,6 +621,36 @@
             : api('PATCH', '/api/alerts/' + id, { status: action === 'pause' ? 'paused' : 'active' });
         req.then(function () { window.location.reload(); })
            .catch(function (err) { toast(err.message); });
+    }
+
+    // deleteAllPrompt is the Delete all confirm's text for n alerts on the page.
+    function deleteAllPrompt(n) {
+        return n === 1 ? 'Delete your only alert? This cannot be undone.' : 'Delete all ' + n + ' alerts? This cannot be undone.';
+    }
+
+    // deletedNote is what Delete all says when the server removed a count
+    // other than the n the page showed (alerts added or removed in another
+    // tab), or '' when they agree.
+    function deletedNote(n, deleted) {
+        if (typeof deleted !== 'number' || deleted === n) return '';
+        return deleted === 1 ? 'Deleted 1 alert' : 'Deleted ' + deleted + ' alerts';
+    }
+
+    function onDeleteAllClick() {
+        var n = document.querySelectorAll('.alerts-table tr[data-id]').length;
+        var run = function () {
+            api('DELETE', '/api/alerts/').then(function (data) {
+                var note = deletedNote(n, data && data.deleted);
+                if (!note) { window.location.reload(); return; }
+                toast(note);
+                setTimeout(function () { window.location.reload(); }, 1500);
+            }).catch(function (err) { toast(err.message); });
+        };
+        if (typeof window.confirmDialog === 'function') {
+            window.confirmDialog(deleteAllPrompt(n), run, { confirmLabel: 'Delete all' });
+        } else if (window.confirm(deleteAllPrompt(n))) {
+            run();
+        }
     }
 
     function onTableClick(e) {
@@ -919,6 +998,8 @@
         }
         var table = document.querySelector('.alerts-table');
         if (table) table.addEventListener('click', onTableClick);
+        var deleteAll = document.querySelector('.alerts-delete-all');
+        if (deleteAll) deleteAll.addEventListener('click', onDeleteAllClick);
         markExistingBells();
 
         var channelsBox = channelsHost();
@@ -940,5 +1021,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard };
 })();
