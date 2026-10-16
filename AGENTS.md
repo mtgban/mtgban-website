@@ -146,7 +146,7 @@ output, not a claim written here.
 | `routes.go` | `registerRoutes`: static files, redirects, the `NavElem` pages and the APIs, each behind its signing middleware |
 | `pages.go` | The `NavElem` page registry (`ExtraNavs`, filled in `init()`, and `OrderNav`), `PageVars` (what pages share; `UploadVars`, `SearchVars`, `AdminVars`, `NewsVars`, `ArbitVars` and `SleepVars`, each beside its handler, are embedded in it), the per-request nav (`genPageNav`), the template cache and `render` |
 | `site.go` | The `site` value page handlers, crons and Discord callbacks hang off, as methods; owns the live datastore (`ds`), the palette and offline services, the datastore loader (`loadDatastore`, `newDatastore`) and the reload tracker (`reloads`, `startDatastoreReload`) |
-| `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`, sources in `search_sources.go`), published together |
+| `datastore.go` | The `datastore` value: one load's backend and the snapshots built from it (numbers in `search_numbers.go`, editions in `product.go`, names in `internal/suggest`, palette lists in `internal/palette`, sources in `search_sources.go`, product odds in `product_odds.go`), published together |
 | `templates.go` | The template `FuncMap` — the helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
@@ -157,7 +157,7 @@ output, not a claim written here.
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
-| `product.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV; price charts and the ids they accept; chart annotations, ban-list markers among them |
+| `product.go`, `product_odds.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV; the odds of opening a card in each product it comes in, shown in the search sidebar; price charts and the ids they accept; chart annotations, ban-list markers among them |
 | `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
 | `store_factors.go` | A user's per-store retail discount and credit value from the `SearchStoreFactors` cookie (a mirror of the synced preference), applied to the search offers after the price filters judged the quoted price and before they are ranked |
 | `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
