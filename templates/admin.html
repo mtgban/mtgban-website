@@ -69,6 +69,7 @@
         <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="window.switchTab && switchTab(this,'dashboard')">Dashboard</button>
         <button class="admin-tab{{if eq .Page "usage"}} active{{end}}" onclick="location.href='?page=usage'">Usage</button>
         <button class="admin-tab{{if eq .Page "searches"}} active{{end}}" onclick="location.href='?page=searches'">Searches</button>
+        <button class="admin-tab{{if eq .Page "alerts"}} active{{end}}" onclick="location.href='?page=alerts'">Alerts</button>
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="window.switchTab && switchTab(this,'people')">People</button>
         <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="window.switchTab && switchTab(this,'config')">Config</button>
         <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="window.switchTab && switchTab(this,'checkpoints')">Checkpoints</button>
@@ -206,6 +207,13 @@
          ═══════════════════════ -->
     <div class="admin-panel{{if eq .Page "searches"}} active{{end}}" id="panel-searches">
         {{if eq .Page "searches"}}{{template "admin-searches" .}}{{end}}
+    </div>
+
+    <!-- ═══════════════════════
+         ALERTS
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "alerts"}} active{{end}}" id="panel-alerts">
+        {{if eq .Page "alerts"}}{{template "admin-alerts" .}}{{end}}
     </div>
 
     <!-- ═══════════════════════

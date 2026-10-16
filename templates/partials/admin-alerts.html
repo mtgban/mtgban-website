@@ -1,0 +1,46 @@
+{{define "admin-alerts"}}
+{{if .AlertStats}}
+<div class="admin-usage-bar">
+    <span class="admin-usage-range">{{.AlertStats.Game}} &middot; {{.AlertStats.Totals.Alerts}} alerts from {{.AlertStats.Totals.Users}} users &middot; active {{.AlertStats.Active}}, paused {{.AlertStats.Paused}}, parked {{.AlertStats.Parked}} &middot; buylist {{.AlertStats.Buylist}}, retail {{.AlertStats.Retail}} &middot; discord {{.AlertStats.Discord}}, email {{.AlertStats.Email}} &middot; loaded <time class="admin-localtime" datetime="{{.AlertStats.Loaded.UTC.Format "2006-01-02T15:04:05Z"}}">{{.AlertStats.Loaded.Format "15:04"}}</time></span>
+</div>
+
+{{if .AlertStats.Failed}}
+<div class="admin-msg">The alerts query failed; see the log. What is below may be missing a part.</div>
+{{end}}
+
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Newest alerts</h2>
+        <span class="count">{{if .AlertStats.Dropped}}Showing {{len .AlertStats.Rows}} of {{.AlertStats.Totals.Alerts}}{{else}}{{len .AlertStats.Rows}} alerts{{end}}</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Created</th><th>Owner</th><th>Card</th><th>Side</th><th>Cond</th><th>Stores</th><th class="num">Reference</th><th class="num">Above</th><th class="num">Below</th><th>Delivery</th><th>Status</th><th>Last fired</th><th>Last error</th></tr></thead>
+        <tbody>
+        {{range .AlertStats.Rows}}
+            <tr>
+                <td class="admin-mono"><time class="admin-localtime" datetime="{{.CreatedAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.CreatedAt.Format "2006-01-02 15:04"}}</time></td>
+                <td class="admin-mono">{{.Owner}}</td>
+                <td><a href="/search?q={{.CardID}}">{{.Card.Name}}</a><br><span class="admin-dim">{{.Card.Set}} #{{.Card.Number}} {{.Card.Finish}}</span></td>
+                <td>{{.Side}}</td>
+                <td>{{.Condition}}</td>
+                <td>{{if not .Stores}}any{{else if eq (len .Stores) 1}}1 store{{else}}{{len .Stores}} stores{{end}}</td>
+                <td class="num admin-mono">${{printf "%.2f" .ReferencePrice}}</td>
+                <td class="num admin-mono">{{if .Above.Kind}}{{if eq .Above.Kind "pct"}}+{{.Above.Value}}%{{else}}${{printf "%.2f" .Above.Value}}{{end}}{{else}}off{{end}}</td>
+                <td class="num admin-mono">{{if .Below.Kind}}{{if eq .Below.Kind "pct"}}-{{.Below.Value}}%{{else}}${{printf "%.2f" .Below.Value}}{{end}}{{else}}off{{end}}</td>
+                <td>{{.Delivery}}</td>
+                <td>{{.Status}}</td>
+                <td class="admin-mono">{{if .LastFiredAt}}<time class="admin-localtime" datetime="{{.LastFiredAt.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastFiredAt.Format "2006-01-02 15:04"}}</time>{{else}}never{{end}}</td>
+                <td class="admin-dim admin-alerts-error"{{if .LastError}} title="{{.LastError}}"{{end}}>{{.LastError}}</td>
+            </tr>
+        {{else}}
+            <tr><td colspan="13" class="admin-usage-empty">{{if $.AlertStats.Failed}}Nothing to show{{else}}No alerts on this site yet{{end}}</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+</div>
+{{else}}
+<div class="admin-msg">Alerts are not configured on this site.</div>
+{{end}}
+{{end}}
