@@ -66,7 +66,6 @@
         }
         function onKey(e) {
             if (e.key === 'Escape') cleanup();
-            if (e.key === 'Enter') { cleanup(); onConfirm(); }
         }
         h.addEventListener('click', onClick);
         document.addEventListener('keydown', onKey);

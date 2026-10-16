@@ -2166,3 +2166,48 @@ func TestChannelParkSitsOutOfTheAllowance(t *testing.T) {
 		t.Fatalf("email alert after the re-mark: %+v", got)
 	}
 }
+
+// Delete all empties one user's alerts on one game and leaves the user's
+// other games and other users alone.
+func TestDeleteAllByUserKeepsOtherGamesAndUsers(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	other := h + "-other"
+	cleanOther := func() {
+		_, _ = s.db.Exec(`DELETE FROM alerts WHERE user_hash = $1`, other)
+		_, _ = s.db.Exec(`DELETE FROM alert_contacts WHERE user_hash = $1`, other)
+	}
+	cleanOther()
+	t.Cleanup(cleanOther)
+	seedContact(t, s, other)
+	ctx := context.Background()
+
+	for _, row := range []struct{ user, game, card string }{
+		{h, "magic", "card-1"}, {h, "magic", "card-2"}, {h, "lorcana", "card-1"}, {other, "magic", "card-1"},
+	} {
+		a := sample(row.user)
+		a.Game, a.CardID = row.game, row.card
+		if _, err := s.Create(ctx, a); err != nil {
+			t.Fatalf("Create %+v: %v", row, err)
+		}
+	}
+
+	n, err := s.DeleteAllByUser(ctx, h, "magic")
+	if err != nil || n != 2 {
+		t.Fatalf("DeleteAllByUser = %d, %v; want 2, nil", n, err)
+	}
+	if left, err := s.ListByUser(ctx, h, "magic"); err != nil || len(left) != 0 {
+		t.Fatalf("magic alerts after delete all: n=%d err=%v, want none", len(left), err)
+	}
+	if kept, err := s.ListByUser(ctx, h, "lorcana"); err != nil || len(kept) != 1 {
+		t.Fatalf("lorcana alerts: n=%d err=%v, want 1 untouched", len(kept), err)
+	}
+	if kept, err := s.ListByUser(ctx, other, "magic"); err != nil || len(kept) != 1 {
+		t.Fatalf("the other user's alerts: n=%d err=%v, want 1 untouched", len(kept), err)
+	}
+	n, err = s.DeleteAllByUser(ctx, h, "magic")
+	if err != nil || n != 0 {
+		t.Fatalf("second DeleteAllByUser = %d, %v; want 0, nil", n, err)
+	}
+}
