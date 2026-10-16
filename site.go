@@ -217,6 +217,7 @@ func (s *site) newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastor
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
 		finishes: v2FinishList(b),
+		odds:     newProductOdds(b),
 		loadedAt: loadedAt,
 	}
 }

@@ -659,7 +659,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.ReverseMode = shown.reversed
 	pageVars.Pagination = shown.pagination
 
-	pageVars.Metadata, pageVars.Printings = searchMetadata(b, shown.keys, preferFlavor)
+	pageVars.Metadata, pageVars.Printings = searchMetadata(ds, shown.keys, preferFlavor)
 
 	// Optionally sort according to price
 	if !pageVars.ListingLocked && readCookie(r, "SearchListingPriority") != "stores" {
@@ -706,7 +706,8 @@ func searchTitle(title string, charting, sealed, editions bool) string {
 // searchMetadata reads what the page shows of each card on it: its details,
 // and its printings row for the sidebar. It does not use cardMetadata.add,
 // because ChartID is set before the card is stored.
-func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
+func searchMetadata(ds *datastore, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
+	b := ds.backend
 	metadata := cardMetadata{}
 	printings := map[string]string{}
 
@@ -716,7 +717,9 @@ func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (ca
 		if found {
 			continue
 		}
-		card := uuid2card(b, cardID, preferFlavor)
+		// Only the search page says how likely each product is to open the
+		// card, so only it hands uuid2card the datastore's odds.
+		card := uuid2card(b, cardID, preferFlavor, ds.odds)
 		// Search results chart cards, so upgrade the chart handle to the cached
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
