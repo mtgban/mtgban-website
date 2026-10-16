@@ -151,7 +151,7 @@ output, not a claim written here.
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |
 | `news.go` | Newspaper reports (SQL-backed), plus `gameMap`/`gameBadgeMap` — every deployable game has to be named there, or its newspaper stays empty and each refresh logs an error |
-| `product.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV; price charts and the ids they accept; chart annotations, ban-list markers among them |
+| `product.go`, `product_contents.go`, `chart.go`, `chart_resolve.go`, `checkpoints.go`, `banlist.go` | Sealed EV and the short contents list a sealed result shows; price charts and the ids they accept; chart annotations, ban-list markers among them |
 | `ckbuylist.go`, `ckodds.go` | Card Kingdom buylist signals on search and the odds their tooltips quote (`docs/adr/0004-ck-buylist-signals.md`) |
 | `tcglistings.go` | TCGplayer seller and copy counts per grade, from the newspaper's nightly listings scrape |
 | `alerts_*.go` | Price alerts: the Alerts page, the ACL values and login contact it reads, the site's wiring of `internal/alerts`, and alert mail delivery and the webhook (`docs/adr/0005-price-alerts.md`, `docs/adr/0007-alert-email-address.md`) |
