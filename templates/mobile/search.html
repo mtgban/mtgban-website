@@ -247,6 +247,12 @@
                     {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
                     {{if $card.PromoTypes}}<span class="m-card-variant">{{range $i, $p := $card.PromoTypes}}{{if $i}} {{end}}<a href="?q=is:{{$p}}" onclick="event.stopPropagation()">{{index $card.PromoLabels $p}}</a>{{end}}</span>{{end}}
                     <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{with $card.SetTotal}}/{{.}}{{end}}{{end}}</span>
+                    {{if $card.Contents}}
+                    <span class="m-card-contents">
+                        {{range $i, $line := $card.Contents}}{{if $i}}<span class="m-card-contents-sep">·</span>{{end}}{{if $line.Link}}<a href="{{$line.Link}}" onclick="event.stopPropagation()">{{end}}{{if $line.Count}}{{$line.Count}}x {{end}}{{$line.Name}}{{if $line.Link}}</a>{{end}}{{if $line.Price}} <span class="m-card-contents-price" title="TCG Market">${{printf "%.2f" $line.Price}}</span>{{end}}{{end}}
+                    </span>
+                    <a class="m-card-contents-more" href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' onclick="event.stopPropagation()">{{if $card.ContentsMore}}+{{$card.ContentsMore}} more{{else}}All contents{{end}}</a>
+                    {{end}}
                 </div>
                 <div class="m-card-badges">
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
