@@ -80,6 +80,7 @@ var BuildCommit = func() string {
 type AdminVars struct {
 	UsageStats  *UsageDashboard
 	SearchStats *SearchesDashboard
+	AlertStats  *AlertsAdminDashboard
 
 	CheckpointsText    string
 	ACLText            string
@@ -218,6 +219,12 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// The Searches tab reads the vote ranking the same way.
 	if s.popularRanks != nil && page == "searches" {
 		pageVars.SearchStats = loadSearchesDashboard(r.Context(), ds, s.popularRanks, searchesWindow(r.FormValue("window")))
+	}
+	// The Alerts tab reads this game's alerts table the same way.
+	if page == "alerts" {
+		if store := s.alerts.Store(); store != nil {
+			pageVars.AlertStats = loadAlertsDashboard(r.Context(), store, string(Config().Game))
+		}
 	}
 
 	render(w, "admin.html", pageVars)
