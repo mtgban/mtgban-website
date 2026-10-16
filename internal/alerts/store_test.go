@@ -2166,3 +2166,122 @@ func TestChannelParkSitsOutOfTheAllowance(t *testing.T) {
 		t.Fatalf("email alert after the re-mark: %+v", got)
 	}
 }
+
+// Delete all empties one user's alerts on one game and leaves the user's
+// other games and other users alone.
+func TestDeleteAllByUserKeepsOtherGamesAndUsers(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	other := h + "-other"
+	cleanOther := func() {
+		_, _ = s.db.Exec(`DELETE FROM alerts WHERE user_hash = $1`, other)
+		_, _ = s.db.Exec(`DELETE FROM alert_contacts WHERE user_hash = $1`, other)
+	}
+	cleanOther()
+	t.Cleanup(cleanOther)
+	seedContact(t, s, other)
+	ctx := context.Background()
+
+	for _, row := range []struct{ user, game, card string }{
+		{h, "magic", "card-1"}, {h, "magic", "card-2"}, {h, "lorcana", "card-1"}, {other, "magic", "card-1"},
+	} {
+		a := sample(row.user)
+		a.Game, a.CardID = row.game, row.card
+		if _, err := s.Create(ctx, a); err != nil {
+			t.Fatalf("Create %+v: %v", row, err)
+		}
+	}
+
+	n, err := s.DeleteAllByUser(ctx, h, "magic")
+	if err != nil || n != 2 {
+		t.Fatalf("DeleteAllByUser = %d, %v; want 2, nil", n, err)
+	}
+	if left, err := s.ListByUser(ctx, h, "magic"); err != nil || len(left) != 0 {
+		t.Fatalf("magic alerts after delete all: n=%d err=%v, want none", len(left), err)
+	}
+	if kept, err := s.ListByUser(ctx, h, "lorcana"); err != nil || len(kept) != 1 {
+		t.Fatalf("lorcana alerts: n=%d err=%v, want 1 untouched", len(kept), err)
+	}
+	if kept, err := s.ListByUser(ctx, other, "magic"); err != nil || len(kept) != 1 {
+		t.Fatalf("the other user's alerts: n=%d err=%v, want 1 untouched", len(kept), err)
+	}
+	n, err = s.DeleteAllByUser(ctx, h, "magic")
+	if err != nil || n != 0 {
+		t.Fatalf("second DeleteAllByUser = %d, %v; want 0, nil", n, err)
+	}
+}
+
+// The admin's view counts a game's alerts across every user and lists the
+// newest first, capped; a game of its own keeps other tests' rows out.
+func TestAdminTotalsAndListRecentAcrossUsers(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	other := h + "-other"
+	cleanOther := func() {
+		_, _ = s.db.Exec(`DELETE FROM alerts WHERE user_hash = $1`, other)
+		_, _ = s.db.Exec(`DELETE FROM alert_contacts WHERE user_hash = $1`, other)
+	}
+	cleanOther()
+	t.Cleanup(cleanOther)
+	seedContact(t, s, other)
+	ctx := context.Background()
+	game := "test-" + t.Name()
+
+	var ids []int64
+	for _, row := range []struct {
+		user   string
+		card   string
+		side   Side
+		status Status
+	}{
+		{h, "card-1", SideBuylist, StatusActive},
+		{h, "card-2", SideRetail, StatusActive},
+		{other, "card-1", SideBuylist, StatusActive},
+	} {
+		a := sample(row.user)
+		a.Game, a.CardID, a.Side = game, row.card, row.side
+		created, err := s.Create(ctx, a)
+		if err != nil {
+			t.Fatalf("Create %+v: %v", row, err)
+		}
+		ids = append(ids, created.ID)
+	}
+	if ok, err := s.SetStatus(ctx, ids[1], h, StatusPaused); err != nil || !ok {
+		t.Fatalf("SetStatus: ok=%v err=%v", ok, err)
+	}
+
+	totals, err := s.AdminTotals(ctx, game)
+	if err != nil {
+		t.Fatalf("AdminTotals: %v", err)
+	}
+	if totals.Alerts != 3 || totals.Users != 2 {
+		t.Fatalf("totals = %d alerts from %d users, want 3 from 2", totals.Alerts, totals.Users)
+	}
+	if totals.ByStatus[StatusActive] != 2 || totals.ByStatus[StatusPaused] != 1 {
+		t.Fatalf("by status = %v", totals.ByStatus)
+	}
+	if totals.BySide[SideBuylist] != 2 || totals.BySide[SideRetail] != 1 {
+		t.Fatalf("by side = %v", totals.BySide)
+	}
+	if totals.ByDelivery[DeliveryDiscord] != 3 {
+		t.Fatalf("by delivery = %v", totals.ByDelivery)
+	}
+
+	recent, err := s.ListRecent(ctx, game, 2)
+	if err != nil || len(recent) != 2 {
+		t.Fatalf("ListRecent: n=%d err=%v, want 2", len(recent), err)
+	}
+	if recent[0].ID != ids[2] || recent[1].ID != ids[1] {
+		t.Fatalf("ListRecent order = %d, %d; want newest first %d, %d", recent[0].ID, recent[1].ID, ids[2], ids[1])
+	}
+	if recent[0].UserHash != other {
+		t.Fatalf("ListRecent lost the owner: %q", recent[0].UserHash)
+	}
+
+	empty, err := s.AdminTotals(ctx, game+"-none")
+	if err != nil || empty.Alerts != 0 || empty.Users != 0 || len(empty.ByStatus) != 0 {
+		t.Fatalf("empty game totals = %+v, %v", empty, err)
+	}
+}

@@ -1021,6 +1021,63 @@ func (s *Store) CountByUser(ctx context.Context, userHash, game string) (int, er
 	return n, err
 }
 
+// AdminTotals counts a game's alerts the way the admin tab groups them.
+type AdminTotals struct {
+	Alerts     int
+	Users      int // distinct user_hash
+	ByStatus   map[Status]int
+	BySide     map[Side]int
+	ByDelivery map[DeliveryChannel]int
+}
+
+// AdminTotals counts every user's alerts on one game.
+func (s *Store) AdminTotals(ctx context.Context, game string) (AdminTotals, error) {
+	t := AdminTotals{ByStatus: map[Status]int{}, BySide: map[Side]int{}, ByDelivery: map[DeliveryChannel]int{}}
+	err := s.db.QueryRowContext(ctx, `SELECT count(*), count(DISTINCT user_hash) FROM alerts WHERE game = $1`, game).Scan(&t.Alerts, &t.Users)
+	if err != nil {
+		return AdminTotals{}, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT status, side, delivery, count(*) FROM alerts WHERE game = $1 GROUP BY status, side, delivery`, game)
+	if err != nil {
+		return AdminTotals{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			status   Status
+			side     Side
+			delivery DeliveryChannel
+			n        int
+		)
+		if err := rows.Scan(&status, &side, &delivery, &n); err != nil {
+			return AdminTotals{}, err
+		}
+		t.ByStatus[status] += n
+		t.BySide[side] += n
+		t.ByDelivery[delivery] += n
+	}
+	return t, rows.Err()
+}
+
+// ListRecent is a game's newest alerts across every user, at most limit.
+func (s *Store) ListRecent(ctx context.Context, game string, limit int) ([]Alert, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+alertColumns+` FROM alerts
+		WHERE game = $1 ORDER BY created_at DESC, id DESC LIMIT $2`, game, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Alert
+	for rows.Next() {
+		a, err := scanAlert(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 // Get reads one alert, only for its owner.
 func (s *Store) Get(ctx context.Context, id int64, userHash string) (Alert, bool, error) {
 	a, err := scanAlert(s.db.QueryRowContext(ctx, `SELECT `+alertColumns+` FROM alerts WHERE id = $1 AND user_hash = $2`, id, userHash))
@@ -1076,6 +1133,16 @@ func (s *Store) Delete(ctx context.Context, id int64, userHash string) (bool, er
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// DeleteAllByUser removes every alert a user holds on one game and says
+// how many went. Events cascade; channels and the mail ledger stay.
+func (s *Store) DeleteAllByUser(ctx context.Context, userHash, game string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM alerts WHERE user_hash = $1 AND game = $2`, userHash, game)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // SetState is the evaluator's write; it never touches a row the user paused,

@@ -314,6 +314,16 @@ func (f *fakeAlertStore) Delete(_ context.Context, id int64, h string) (bool, er
 	delete(f.rows, id)
 	return true, nil
 }
+func (f *fakeAlertStore) DeleteAllByUser(_ context.Context, h, game string) (int64, error) {
+	var n int64
+	for id, a := range f.rows {
+		if a.UserHash == h && a.Game == game {
+			delete(f.rows, id)
+			n++
+		}
+	}
+	return n, nil
+}
 func (f *fakeAlertStore) LastEvents(context.Context, []int64) (map[int64]Event, error) {
 	return map[int64]Event{}, nil
 }
@@ -1770,5 +1780,67 @@ func TestAlertsAPIConfirmRefusesAnUnsignedToken(t *testing.T) {
 	api.ServeHTTP(w, channelRequest("POST", "/api/alerts/channels/email", `{"address":"me@example.com"}`, sig))
 	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "not configured") || len(sent) != 0 {
 		t.Fatalf("= %d %s, sent %d", w.Code, w.Body, len(sent))
+	}
+}
+
+// Delete all empties the caller's alerts on the API's game and reports the
+// count; a second call finds nothing and still answers 200.
+func TestAlertsAPIDeleteAllScopedToCallerAndGame(t *testing.T) {
+	store := newFakeAlertStore()
+	api := testAlertsAPI(store)
+	game := api.game()
+	h := testHash("a@b.com")
+	store.rows[1] = Alert{ID: 1, UserHash: h, Game: game, CardID: "card-1", Status: StatusActive}
+	store.rows[2] = Alert{ID: 2, UserHash: h, Game: game, CardID: "card-2", Status: StatusPaused}
+	store.rows[3] = Alert{ID: 3, UserHash: h, Game: "other-game", CardID: "card-1", Status: StatusActive}
+	store.rows[4] = Alert{ID: 4, UserHash: testHash("c@d.com"), Game: game, CardID: "card-1", Status: StatusActive}
+	sig := testCaller("a@b.com", "Pioneer")
+
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("DELETE", "/api/alerts/", "", sig))
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete all = %d %s", w.Code, w.Body)
+	}
+	var got struct {
+		Deleted int64 `json:"deleted"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil || got.Deleted != 2 {
+		t.Fatalf("delete all body = %s (%v), want deleted 2", w.Body, err)
+	}
+	if _, ok := store.rows[3]; !ok {
+		t.Fatal("another game's alert was deleted")
+	}
+	if _, ok := store.rows[4]; !ok {
+		t.Fatal("another user's alert was deleted")
+	}
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("DELETE", "/api/alerts/", "", sig))
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"deleted":0`) {
+		t.Fatalf("second delete all = %d %s, want 200 with deleted 0", w.Code, w.Body)
+	}
+
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("GET", "/api/alerts/", "", sig))
+	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != "[]" {
+		t.Fatalf("list after delete all = %d %s, want an empty list", w.Code, w.Body)
+	}
+}
+
+func TestAlertsAPIDeleteAllRefusesCrossSite(t *testing.T) {
+	store := newFakeAlertStore()
+	api := testAlertsAPI(store)
+	h := testHash("a@b.com")
+	store.rows[1] = Alert{ID: 1, UserHash: h, Game: api.game(), CardID: "card-1", Status: StatusActive}
+
+	r := alertsRequest("DELETE", "/api/alerts/", "", testCaller("a@b.com", "Pioneer"))
+	r.Header.Set("Sec-Fetch-Site", "cross-site")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("cross-site delete all = %d, want 403", w.Code)
+	}
+	if _, ok := store.rows[1]; !ok {
+		t.Fatal("a refused request deleted the alert")
 	}
 }

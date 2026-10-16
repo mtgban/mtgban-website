@@ -23,6 +23,7 @@
 }
 .alerts-heading {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: 0.75em;
     margin: 0.5em 0 0.75em;
@@ -37,6 +38,12 @@
     font-size: var(--text-md);
     font-variant-numeric: tabular-nums;
 }
+.alerts-delete-all {
+    margin-left: auto;
+    align-self: center;
+    padding: 0.3em 0.7em;
+    font-size: var(--text-sm);
+}
 .alerts-notice,
 .alerts-empty {
     padding: 0.75em 1em;
@@ -47,6 +54,18 @@
     font-size: var(--text-md);
     line-height: 1.45;
 }
+/* The empty page's flow: favorites' rules from main.css, sized for a page. */
+.alerts-page { container-type: inline-size; }
+.alerts-empty-flow {
+    margin: 1.5em auto 0;
+    max-width: 40em;
+}
+.alerts-empty-bell {
+    color: var(--awarning);
+    fill: none;
+    filter: drop-shadow(0 0 0.4em color-mix(in srgb, var(--awarning) 60%, transparent));
+}
+.alerts-empty-mini-alert .alert-status { font-size: var(--text-xs); }
 .alerts-error { color: var(--adanger); }
 
 /* ── Channels box ────────────────────────────────────────── */
@@ -223,13 +242,14 @@
 }
 
 /* Row buttons: the settings buttons at table size. */
-.alerts-table .alert-actions { white-space: nowrap; text-align: right; }
+.alerts-table .alert-actions { white-space: nowrap; text-align: right; vertical-align: middle; }
 .alerts-table .settings-btn {
     padding: 0.3em 0.7em;
     font-size: var(--text-sm);
     margin-left: 0.3em;
 }
-.alerts-table .alert-actions .settings-btn:nth-child(2) { min-width: 6em; }
+/* Pause and Resume share one width so the row does not jump between them. */
+.alerts-table .alert-actions .alert-btn-toggle { min-width: 6em; }
 .settings-btn.alert-btn-danger {
     background: color-mix(in srgb, var(--adanger) 10%, transparent);
     border-color: color-mix(in srgb, var(--adanger) 45%, transparent);
@@ -271,7 +291,8 @@
 .alert-modal-existing[hidden] { display: none; }
 .alert-existing-head { display: block; font-weight: 600; margin-bottom: 0.2em; }
 .alert-existing { display: block; color: var(--text-dim); }
-.alert-existing-edit {
+.alert-existing-edit,
+.alert-existing-remove {
     background: none;
     border: 0;
     padding: 0;
@@ -281,7 +302,9 @@
     font-weight: 600;
     cursor: pointer;
 }
-.alert-existing-edit:hover { text-decoration: underline; }
+.alert-existing-remove { color: var(--adanger); }
+.alert-existing-edit:hover,
+.alert-existing-remove:hover { text-decoration: underline; }
 
 .alert-field { margin: 0 0 1em; }
 .alert-field:last-child { margin-bottom: 0; }
