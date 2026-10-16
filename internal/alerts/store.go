@@ -1078,6 +1078,16 @@ func (s *Store) Delete(ctx context.Context, id int64, userHash string) (bool, er
 	return n > 0, nil
 }
 
+// DeleteAllByUser removes every alert a user holds on one game and says
+// how many went. Events cascade; channels and the mail ledger stay.
+func (s *Store) DeleteAllByUser(ctx context.Context, userHash, game string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM alerts WHERE user_hash = $1 AND game = $2`, userHash, game)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // SetState is the evaluator's write; it never touches a row the user paused,
 // nor one edited since the run listed it at seenUpdatedAt.
 func (s *Store) SetState(ctx context.Context, id int64, seenUpdatedAt time.Time, st State) (bool, error) {

@@ -31,6 +31,7 @@ type APIStore interface {
 	Update(ctx context.Context, a Alert) (bool, error)
 	SetStatus(ctx context.Context, id int64, userHash string, status Status) (bool, error)
 	Delete(ctx context.Context, id int64, userHash string) (bool, error)
+	DeleteAllByUser(ctx context.Context, userHash, game string) (int64, error)
 	LastEvents(ctx context.Context, ids []int64) (map[int64]Event, error)
 	Channels(ctx context.Context, userHash string) ([]Channel, error)
 	ChannelFor(ctx context.Context, userHash string, kind ChannelKind) (Channel, bool, error)
@@ -182,7 +183,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// ServeHTTP answers /api/alerts/: list, create, options, edit, delete and channels.
+// ServeHTTP answers /api/alerts/: list, create, options, edit, delete, delete all and channels.
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if a == nil || a.deps.Identity == nil {
 		jsonError(w, http.StatusServiceUnavailable, "alerts unavailable")
@@ -233,6 +234,14 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, views)
 	case rest == "" && r.Method == http.MethodPost:
 		a.create(w, r, c)
+	case rest == "" && r.Method == http.MethodDelete:
+		// The page's Delete all: one request, so the limiter sees one hit.
+		n, err := a.deps.Store.DeleteAllByUser(ctx, userHash, a.game())
+		if err != nil {
+			a.fail(w, "delete all", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]int64{"deleted": n})
 	case rest == "options" && r.Method == http.MethodGet:
 		// keep lists an alert's own stores so the edit form shows them unpriced.
 		var keep []string
