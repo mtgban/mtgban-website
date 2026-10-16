@@ -189,6 +189,9 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
 - The card datastore is the same pattern once more: backend plus its
   numbers/names/editions snapshots, the palette's sets/promos/finishes
   lists, and its own load time are one `datastore` value (datastore.go),
+  plus the one piece that is not a snapshot, the product odds memo
+  (`product_odds.go`), a `sync.Map` each load fills on first use and
+  drops with it,
   built by `s.newDatastore()` (site.go) and published in a single
   `s.ds.Store()` by `s.loadDatastore()`, itself started by
   `s.startDatastoreReload()` (an admin or `/api/load/datastore` reload) or
