@@ -709,6 +709,7 @@ func searchTitle(title string, charting, sealed, editions bool) string {
 func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (cardMetadata, map[string]string) {
 	metadata := cardMetadata{}
 	printings := map[string]string{}
+	odds := newProductOdds(b)
 
 	// Load up image links and other metadata
 	for _, cardID := range keys {
@@ -721,6 +722,13 @@ func searchMetadata(b *mtgmatcher.Backend, keys []string, preferFlavor bool) (ca
 		// ban:<id> here rather than inside uuid2card, which also feeds pages
 		// that never chart.
 		card.ChartID = chartIDForCard(b, cardID)
+		// Only the search page says how likely each product is to open the
+		// card, so the list is rebuilt here with the odds, not in uuid2card.
+		if !card.Sealed {
+			if co, err := b.GetUUID(cardID); err == nil {
+				card.Products, card.NumProducts = productsHTML(b, cardobject2sources(co), odds.labelFor(co))
+			}
+		}
 		metadata[cardID] = card
 		printings[cardID] = cardPrintings(b, cardID)
 	}
