@@ -276,8 +276,8 @@ read, or its workflow state's names.
   load at startup and only they are indexed; the list is logged once, and
   a named store the listing lacks is logged and skipped. An empty list
   loads every store listed. Reloads aren't held to the list:
-  `/api/load/<store>` loads and indexes whatever store it names, and admin
-  `?reload=` loads whatever dump it names. Each load is fetched at that
+  `/api/load/<store>` loads and indexes whatever store it names, and the
+  admin `reload` action loads whatever dump it names. Each load is fetched at that
   same key and
   deserialized via
   `mtgban.ReadSellerFromJSON`/`ReadVendorFromJSON`, 3 retries with backoff
@@ -300,7 +300,7 @@ read, or its workflow state's names.
   retry a timeout as startup does, each attempt on its own
   `context.Background()`, so a transient B2 timeout is not a 500 to the
   scraper that just published, and a reload finishes even if that caller
-  hangs up. `?reload=` from the admin page names the store, kind and
+  hangs up. The admin page's `reload` action names the store, kind and
   shorthand directly.
 - **"Offline" now means the PWA offline experience**, not a data-loading
   mode — `api_load.go` and the old "run without B2, reconstruct
@@ -804,16 +804,24 @@ One handler, `Admin`, which calls a function of its own for each action,
 tool, editor and table, driving its tabs —
 Dashboard, Usage, Searches, People, Config, Checkpoints, Access,
 Affiliates, Datasets, Infrastructure, Key Overrides, Tools — through
-query-command dispatch: scraper refresh via
-GitHub Actions dispatch (`?refresh=`) or direct reload (`?reload=&table=&tag=`),
-log download or redirect to the CI log (`?logs=`), and the `?tool=`
+command dispatch: scraper refresh via
+GitHub Actions dispatch (`refresh`) or direct reload (`reload`, `table`, `tag`),
+log download or redirect to the CI log (`?logs=`), and the `tool`
 family (`adminTools`), the dashboard's server actions and admin tools:
 `datastore` (`s.startDatastoreReload`), `config` (reload
 config plus the files it names, §2.4), `checkpoints`
 (chart checkpoints), `snapshot` (stash into timeseries), `tcgcsv` (TCGCSV
 price ingestion), `server` (process exit only), `newKey`/`demokey` (API-key
-generation, `&user=&duration=`), and `invite` (a signed invite link for a
-tier, `&tier=&duration=`, for up to the 31 days its cookie lasts). JSON
+generation, `user` and `duration`), and `invite` (a signed invite link for a
+tier, `?tier=&duration=`, for up to the 31 days its cookie lasts). Every
+command but `logs` and `invite` changes state, so it runs only from a POST,
+reads its fields from the body (`r.PostFormValue`; the dashboard's buttons
+and the scraper names are small forms), and a link carrying them does
+nothing; a POST the browser marks as sent from another site
+(`http.CrossOriginProtection`: `Sec-Fetch-Site`, or an `Origin` whose host
+is not the request's) gets 403, since a link from another site still
+carries the `MTGBAN` cookie. `invite` mints a link onto the admin's own page and saves
+nothing, so it and the views stay on GET. JSON
 editors for the config, checkpoints, ACL/access table, affiliates, chart
 datasets, infrastructure file and key overrides; the datasets and
 infrastructure editors are read-only when the config names no path for
@@ -829,7 +837,7 @@ tab aggregates 30 days of `ObservabilityDB` telemetry, cached 5 minutes.
 
 Each row's store name comes from the scraper index's reverse lookup
 (`scraperStoreOf`). Every place the dashboard talks to GitHub (the
-`?refresh=` dispatch and the busy check in front of it, and the `?logs=`
+`refresh` dispatch and the busy check in front of it, and the `?logs=`
 redirect) names the target workflow through `newBantoolWorkflow(game,
 store)`, one helper with no Magic special case: `EventType`
 (`<game>-<store>`, also the `repository_dispatch` payload), `File`

@@ -221,11 +221,11 @@
     font-weight: 500;
 }
 .admin-table a:hover { text-decoration: underline; }
-/* The session-store remove action posts rather than following a link - see
-   admin-scraper-cells - so it needs a submit button reading as the same
-   inline text link the rest of this table uses. */
+/* A scraper's refresh and a session store's remove post rather than follow
+   a link - see admin-scraper-cells - so each is a submit button reading as
+   the same inline text link the rest of this table uses. */
 .admin-inline-form { display: inline; }
-.admin-remove-link {
+.admin-link-button {
     border: none;
     background: none;
     padding: 0;
@@ -236,7 +236,7 @@
     font-family: inherit;
     cursor: pointer;
 }
-.admin-remove-link:hover { text-decoration: underline; }
+.admin-link-button:hover { text-decoration: underline; }
 .admin-mono {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
@@ -343,6 +343,10 @@ td.admin-stale-date { color: var(--adanger); font-weight: 600; }
     text-decoration: none;
     transition: all 0.12s;
     cursor: pointer;
+    /* Most actions are submit buttons: undo their own font and centring */
+    font-family: inherit;
+    line-height: inherit;
+    text-align: left;
 }
 .admin-action:hover {
     border-color: var(--accent-border);
