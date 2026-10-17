@@ -87,6 +87,27 @@ func TestSettingsKeysLeaveOutAPIOnlyStores(t *testing.T) {
 	}
 }
 
+// The Global grid lists the sellers the Global page compares against,
+// since those are what its cookie hides, and only the probe list's.
+func TestGlobalVendorKeysListTheProbeSellers(t *testing.T) {
+	publishStores(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Probe", Shorthand: "PROBE"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Off Probe", Shorthand: "OFFPROBE"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "API Shop", Shorthand: "APISHOP"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Name: "Index", Shorthand: "INDEX", SealedMode: true, MetadataOnly: true}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Name: "Buyer", Shorthand: "BUY"}),
+	})
+	withConfigCopy(t)
+	Config().Stores.APIOnlyStores = []string{"APISHOP"}
+	Config().Stores.GlobalProbeList = []string{"PROBE", "APISHOP", "INDEX", "BUY"}
+
+	got := globalVendorKeys(globalProbeBlocklist())
+	if !slices.Equal(got, []string{"PROBE"}) {
+		t.Errorf("global grid = %v, want [PROBE]", got)
+	}
+}
+
 // The grant replaces the config block list, NONE clears it, and with no
 // grant the config list stands.
 func TestArbitBlockedVendorsReadsTheGrant(t *testing.T) {

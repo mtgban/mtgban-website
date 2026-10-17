@@ -511,6 +511,12 @@ func suspectPriceFor(globalMode, reverseMode bool, sourceShort, scraperShort str
 	return nil
 }
 
+// comparableSeller reports whether Global and Reverse compare against a
+// seller: a sealed index prices nothing anyone can buy, so it is left out.
+func comparableSeller(info mtgban.ScraperInfo) bool {
+	return !info.SealedMode || !info.MetadataOnly
+}
+
 func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
 	b := ds.backend
@@ -688,8 +694,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
 		for _, seller := range GetSellers() {
-			// Skip unactionable sellers
-			if seller.Info().SealedMode && seller.Info().MetadataOnly {
+			if !comparableSeller(seller.Info()) {
 				continue
 			}
 
