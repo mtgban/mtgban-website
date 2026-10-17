@@ -59,10 +59,12 @@ const (
 )
 
 // Bounds on what one uploaded workbook may unpack to. excelize's own default
-// is 16GB; the largest list an upload takes unpacks to about 10MB.
+// is 16GB; the largest list an upload takes unpacks to about 10MB. Parsing
+// shared strings costs about seven times their size, so at these limits one
+// upload holds at most about 220MB.
 const (
-	xlsxUnzipSizeLimit    = 64 << 20
-	xlsxUnzipXMLSizeLimit = 16 << 20
+	xlsxUnzipSizeLimit    = 32 << 20
+	xlsxUnzipXMLSizeLimit = 8 << 20
 )
 
 // maxUploadColumns refuses a row wider than any list. excelize pads a row
@@ -2899,17 +2901,21 @@ func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadE
 	}
 	defer rows.Close()
 
+	// Next steps through every row number, blank ones included, so the
+	// count is the row as the spreadsheet numbers it
+	sheetRow := 0
 	next := func() ([]string, bool, error) {
 		if !rows.Next() {
 			return nil, false, rows.Error()
 		}
+		sheetRow++
 		row, err := rows.Columns()
 		if err != nil {
 			// GetRows stopped at the first row it could not read
 			return nil, false, nil
 		}
 		if len(row) > maxUploadColumns {
-			return nil, false, fmt.Errorf("a row has %d columns, more than the %d an upload can have", len(row), maxUploadColumns)
+			return nil, false, fmt.Errorf("row %d has %d columns, more than the %d an upload can have", sheetRow, len(row), maxUploadColumns)
 		}
 		return row, true, nil
 	}

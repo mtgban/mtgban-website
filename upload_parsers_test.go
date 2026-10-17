@@ -495,8 +495,8 @@ func TestLoadXlsxRefusesARowPastTheColumnCap(t *testing.T) {
 	}
 
 	_, err := loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
-	if err == nil || !strings.Contains(err.Error(), "16384 columns") {
-		t.Errorf("err = %v, want the row refused for its width", err)
+	if err == nil || !strings.Contains(err.Error(), "row 2 has 16384 columns") {
+		t.Errorf("err = %v, want row 2 refused for its width", err)
 	}
 }
 
