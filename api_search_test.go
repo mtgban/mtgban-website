@@ -338,6 +338,198 @@ func TestSearchAPIKeysReachAPIOnlyStores(t *testing.T) {
 	}
 }
 
+// A key's scope meets the search block lists on search as on the price API:
+// an explicit list is the whole policy, ALL_ACCESS and BASE_ACCESS take the
+// config's lists and not the signature's. The site keeps reading both.
+func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
+	name := searchStores(t)
+	id, _ := plainCard(t)
+	co, err := backend().GetUUID(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signingEnabled(t, true)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+	withConfigCopy(t)
+	Config().Stores.SearchRetailBlockList = []string{"SCG"}
+	Config().Stores.APIDemoStores = []string{"CK", "SCG"}
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Search"] == nil {
+		LogPages["Search"] = log.New(io.Discard, "", 0)
+		t.Cleanup(func() { delete(LogPages, "Search") })
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(testSite.SearchAPI)))
+	mux.Handle("/api/v2/search/", enforceAPISigning(http.HandlerFunc(testSite.SearchAPI)))
+	mux.Handle("/api/v2/", enforceAPISigning(http.HandlerFunc(testSite.PriceAPIv2)))
+	requests := 0
+	get := func(target string, fields url.Values, scope string) []byte {
+		t.Helper()
+		if scope != "" {
+			fields.Set("APImode", "all")
+			fields.Set("UserEmail", "plan@example.com")
+			key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+				API:     scope,
+				Fields:  fields,
+				Expires: time.Now().Add(time.Hour).Unix(),
+			})
+			sep := "?"
+			if strings.Contains(target, "?") {
+				sep = "&"
+			}
+			target += sep + "sig=" + url.QueryEscape(key)
+		}
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		// The API limiter is shared and keyed on the address.
+		requests++
+		req.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", 200+requests)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		return rec.Body.Bytes()
+	}
+	// v2Stores lists the stores a v2 answer prices the card at.
+	v2Stores := func(body []byte) []string {
+		t.Helper()
+		var out PriceAPIOutputV2
+		err := json.Unmarshal(body, &out)
+		if err != nil {
+			t.Fatalf("%v\n%s", err, body)
+		}
+		var stores []string
+		for _, byStore := range out.Retail[co.Identifiers["scryfallId"]] {
+			stores = append(stores, slices.Collect(maps.Keys(byStore))...)
+		}
+		slices.Sort(stores)
+		return slices.Compact(stores)
+	}
+
+	for _, tc := range []struct {
+		scope, disabled string
+		want            []string
+	}{
+		{"CK,SCG", "", []string{"CK", "SCG"}},
+		{"CK,SCG", "CK", []string{"CK", "SCG"}},
+		{"ALL_ACCESS", "", []string{"CK"}},
+		{"ALL_ACCESS", "NONE", []string{"CK"}},
+		{"ALL_ACCESS", "CK", []string{"CK"}},
+		{"BASE_ACCESS", "CK", []string{"CK"}},
+	} {
+		fields := func() url.Values {
+			v := url.Values{}
+			if tc.disabled != "" {
+				v.Set("SearchDisabled", tc.disabled)
+			}
+			return v
+		}
+		label := tc.scope + " SearchDisabled=" + tc.disabled
+		priced := v2Stores(get("/api/v2/retail/"+id+".json?id=scryfall", fields(), tc.scope))
+		if !slices.Equal(priced, tc.want) {
+			t.Fatalf("%s: the price API gave %v, want %v", label, priced, tc.want)
+		}
+		found := v2Stores(get("/api/v2/search/retail/"+url.PathEscape(name)+".json", fields(), tc.scope))
+		if !slices.Equal(found, priced) {
+			t.Errorf("%s: v2 search gave %v, the price API %v", label, found, priced)
+		}
+		body := string(get("/api/mtgban/search/retail/"+url.PathEscape(name)+".json", fields(), tc.scope))
+		v1 := map[string]bool{"CK": strings.Contains(body, "Card Kingdom"), "SCG": strings.Contains(body, "Star City Games")}
+		for store, shown := range v1 {
+			if shown != slices.Contains(priced, store) {
+				t.Errorf("%s: v1 search showed %s %v, the price API %v", label, store, shown, !shown)
+			}
+		}
+	}
+
+	// The demo sees its own stores, block lists or not.
+	demo := string(get("/api/mtgban/search/retail/"+url.PathEscape(name)+".json", nil, ""))
+	if !strings.Contains(demo, "Star City Games") {
+		t.Errorf("the demo lost a demo store: %s", demo)
+	}
+
+	// The site's page and export keep the signature's block lists, or the
+	// config's where it names none, for a key signed into the site too.
+	for _, tc := range []struct {
+		values  url.Values
+		showSCG bool
+	}{
+		{url.Values{"API": {"CK,SCG"}}, false},
+		{url.Values{"API": {"ALL_ACCESS"}, "SearchDisabled": {"NONE"}}, true},
+	} {
+		tc.values.Set("UserEmail", "key@example.com")
+		tc.values.Set("SearchDownloadCSV", "true")
+		cookie := signedAs(t, tc.values, time.Now().Add(time.Hour))
+		for _, page := range []struct {
+			target string
+			serve  func(http.ResponseWriter, *http.Request)
+		}{
+			{"/search/export/retail/" + url.PathEscape(name) + ".csv", testSite.SearchExport},
+			{"/search?q=" + url.QueryEscape(name), testSite.Search},
+		} {
+			req := httptest.NewRequest(http.MethodGet, page.target, nil)
+			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+			rec := httptest.NewRecorder()
+			page.serve(rec, req)
+			body := rec.Body.String()
+			if !strings.Contains(body, "Card Kingdom") {
+				t.Fatalf("%s %v: a store the site shows is missing: %s", page.target, tc.values, body)
+			}
+			if strings.Contains(body, "Star City Games") != tc.showSCG {
+				t.Errorf("%s %v: Star City Games shown %v, want %v", page.target, tc.values, !tc.showSCG, tc.showSCG)
+			}
+		}
+	}
+
+	// ALL_ACCESS and BASE_ACCESS keep one list for both sides, as the price
+	// API does: SCG buylisting under the same shorthand keeps it in the list
+	// whichever side's block list names it, on search as on prices.
+	scgBuys := mtgban.BuylistRecord{}
+	scgBuys.Add(id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 1})
+	publishStores(t, slices.Clone(GetSellers()), append(slices.Clone(GetVendors()),
+		mtgban.NewVendorFromBuylist(scgBuys, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"})))
+	v2BuylistStores := func(body []byte) []string {
+		t.Helper()
+		var out PriceAPIOutputV2
+		err := json.Unmarshal(body, &out)
+		if err != nil {
+			t.Fatalf("%v\n%s", err, body)
+		}
+		var stores []string
+		for _, byStore := range out.Buylist[co.Identifiers["scryfallId"]] {
+			stores = append(stores, slices.Collect(maps.Keys(byStore))...)
+		}
+		slices.Sort(stores)
+		return slices.Compact(stores)
+	}
+	for _, blocked := range []struct {
+		side            string
+		retail, buylist []string
+	}{
+		{"retail", []string{"SCG"}, nil},
+		{"buylist", nil, []string{"SCG"}},
+	} {
+		Config().Stores.SearchRetailBlockList = blocked.retail
+		Config().Stores.SearchBuylistBlockList = blocked.buylist
+		for _, scope := range []string{"ALL_ACCESS", "BASE_ACCESS"} {
+			label := scope + " with SCG blocked on " + blocked.side
+			priced := v2Stores(get("/api/v2/retail/"+id+".json?id=scryfall", url.Values{}, scope))
+			if !slices.Contains(priced, "SCG") {
+				t.Fatalf("%s: the price API sold at %v, want SCG kept by its buylist", label, priced)
+			}
+			found := v2Stores(get("/api/v2/search/retail/"+url.PathEscape(name)+".json", url.Values{}, scope))
+			if !slices.Equal(found, priced) {
+				t.Errorf("%s: v2 retail search gave %v, the price API %v", label, found, priced)
+			}
+			pricedBuy := v2BuylistStores(get("/api/v2/buylist/"+id+".json?id=scryfall", url.Values{}, scope))
+			foundBuy := v2BuylistStores(get("/api/v2/search/buylist/"+url.PathEscape(name)+".json", url.Values{}, scope))
+			if !slices.Equal(foundBuy, pricedBuy) {
+				t.Errorf("%s: v2 buylist search gave %v, the price API %v", label, foundBuy, pricedBuy)
+			}
+		}
+	}
+}
+
 // TestSearchCSVKeepsThePageOrder exports in the order the page sorts by,
 // a price sort included, rather than falling back to release order. It
 // reads the sort as the page does: the query's own sort:, else the sort

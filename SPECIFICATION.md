@@ -759,7 +759,14 @@ filed as the v2 price API files them (`sellerSearchV2`, `vendorSearchV2`).
 Its JSON keys cards as v1's search does, by `scryfall` and by `mtgjson`
 for sealed, but takes the `id` a request asks for, sealed included, and
 refuses one v2 does not know. Stores are keyed by shorthand, as in all of
-v2. Its `.csv` is v1's search CSV.
+v2. Its `.csv` is v1's search CSV. On both API searches a key's store
+scope replaces the search block lists, as on the price endpoints
+(`apiEnabledStores`): an explicit list is the whole policy, and
+`ALL_ACCESS`/`BASE_ACCESS` leave out what the config's
+`search_block_list`/`search_buylist_block_list` name, whatever the
+signature's own `SearchDisabled`/`SearchBuylistDisabled` say. Their list
+is one for both sides, so a store one side's block list names stays in it
+when it also trades on the other under the same shorthand.
 
 A store `stores.api_only_stores` names is the price API's alone: the price
 endpoints, `stores.json` and both API searches serve it to a key whose

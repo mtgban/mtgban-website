@@ -622,11 +622,13 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	storesOpt := GetParamFromSig(sig, "API")
 	keyScoped := storesOpt != "" && storesOpt != "true" && isAPI
 
-	// The stores only the price API serves are a key's to see if its scope
-	// names them, and hidden from everyone else.
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
-	if keyScoped {
-		blocklistRetail, blocklistBuylist = sigBlocklists(parseSig(sig))
+	// A key's scope is its whole store policy, as on the price API: the
+	// store filter below takes apiEnabledStores, which heeds the search
+	// block lists only for ALL_ACCESS and BASE_ACCESS. The rest get the
+	// site's, which hide the API-only stores.
+	var blocklistRetail, blocklistBuylist []string
+	if !keyScoped {
+		blocklistRetail, blocklistBuylist = getDefaultBlocklists(sig)
 	}
 
 	// Expand blocklist as needed
