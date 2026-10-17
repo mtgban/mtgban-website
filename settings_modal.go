@@ -59,10 +59,13 @@ func globalProbeBlocklist() []string {
 	})
 }
 
-// globalVendorKeys is the Global vendor grid, in display order.
+// globalVendorKeys is the Global vendor grid, in display order: the sellers
+// Global compares against, which its GlobalVendorsList cookie hides, less
+// the unactionable sealed ones it never compares against.
 func globalVendorKeys(blocklistVendors []string) []string {
-	return sortKeysByScraperName(filterVendors(func(info mtgban.ScraperInfo) bool {
-		return !slices.Contains(blocklistVendors, info.Shorthand) && !Config().apiOnly(info.Shorthand)
+	return sortKeysByScraperName(filterSellers(func(info mtgban.ScraperInfo) bool {
+		return comparableSeller(info) &&
+			!slices.Contains(blocklistVendors, info.Shorthand) && !Config().apiOnly(info.Shorthand)
 	}))
 }
 
