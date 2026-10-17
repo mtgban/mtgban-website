@@ -1741,7 +1741,8 @@ func (cache chartTargetCache) target(ctx context.Context, b *mtgmatcher.Backend,
 }
 
 // series is the roster ids that resolve, in order, each as the series the
-// chart reads it into, named and labelled by its target.
+// chart reads it into, named and labelled by its target, with labels the
+// roster's lines share told apart.
 func (cache chartTargetCache) series(ctx context.Context, b *mtgmatcher.Backend, ids []string) []chartSeries {
 	resolved := make([]chartSeries, 0, len(ids))
 	for _, id := range ids {
@@ -1751,7 +1752,111 @@ func (cache chartTargetCache) series(ctx context.Context, b *mtgmatcher.Backend,
 		}
 		resolved = append(resolved, chartSeries{CardID: id, Name: target.Name, Label: target.Label, target: target})
 	}
+	distinguishLabels(b, resolved)
 	return resolved
+}
+
+// distinguishLabels tells apart the lines of a roster that share a label,
+// since Name|SET|number|finish does not name every printing on its own: One
+// Piece files several promos under one set and number, Yu-Gi-Oh! one number
+// in several rarities. A label no other line shares is left as it is.
+func distinguishLabels(b *mtgmatcher.Backend, series []chartSeries) {
+	byLabel := map[string][]int{}
+	for i, cs := range series {
+		if cs.Label != "" {
+			byLabel[cs.Label] = append(byLabel[cs.Label], i)
+		}
+	}
+	for label, lines := range byLabel {
+		if len(lines) < 2 {
+			continue
+		}
+		var known []int
+		var details [][]string
+		for _, i := range lines {
+			co, err := b.GetUUID(series[i].target.SearchID)
+			if err != nil {
+				continue
+			}
+			known = append(known, i)
+			details = append(details, append(labelDetails(co), banIDDetail(series[i].target.BanID)))
+		}
+		if len(known) < 2 {
+			continue
+		}
+		for j, distinct := range labelsWithDetails(label, details) {
+			series[known[j]].Label = distinct
+		}
+	}
+}
+
+// labelDetails is what tells apart printings sharing Name|SET|number|finish,
+// in the order a label takes them: promo types, language, rarity, the total
+// printed beside the number, and last the TCGplayer product, which settles
+// any the others leave alike.
+func labelDetails(co *mtgmatcher.CardObject) []string {
+	details := []string{strings.Join(co.PromoTypes, ","), co.Language, co.Rarity, co.SetTotal, ""}
+	pid, ok := tcgProductID(co)
+	if ok {
+		details[len(details)-1] = "tcg:" + strconv.Itoa(pid)
+	}
+	return details
+}
+
+// banIDDetail names the archive variant a line charts, the last detail a
+// label takes: two lines can chart one printing's language or alt variant,
+// or two sub-types read as one finish, and only the ban id parts them.
+func banIDDetail(banID int64) string {
+	if banID == 0 {
+		return ""
+	}
+	return "ban:" + strconv.FormatInt(banID, 10)
+}
+
+// labelsWithDetails extends one shared label per printing with the details
+// that differ among them, a kind at a time, until the labels part. A detail a
+// printing lacks adds nothing to its label.
+func labelsWithDetails(label string, details [][]string) []string {
+	labels := make([]string, len(details))
+	for i := range labels {
+		labels[i] = label
+	}
+	for kind := range details[0] {
+		if allDistinct(labels) {
+			break
+		}
+		if !detailDiffers(details, kind) {
+			continue
+		}
+		for i := range labels {
+			if details[i][kind] != "" {
+				labels[i] += "|" + details[i][kind]
+			}
+		}
+	}
+	return labels
+}
+
+// detailDiffers reports whether the printings disagree on one kind of detail.
+func detailDiffers(details [][]string, kind int) bool {
+	for _, d := range details[1:] {
+		if d[kind] != details[0][kind] {
+			return true
+		}
+	}
+	return false
+}
+
+// allDistinct reports whether no two labels are the same.
+func allDistinct(labels []string) bool {
+	seen := make(map[string]bool, len(labels))
+	for _, label := range labels {
+		if seen[label] {
+			return false
+		}
+		seen[label] = true
+	}
+	return true
 }
 
 // marketplaceLoaded reports whether this site serves a seller from the named

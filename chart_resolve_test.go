@@ -394,3 +394,23 @@ func productsSharingAName(b *mtgmatcher.Backend) (string, []int) {
 	}
 	return "", nil
 }
+
+// openGameDatastore loads one game's datastore from the variable gameDatastores
+// names for it, and skips the test when it is not set.
+func openGameDatastore(t *testing.T, game mtgmatcher.Game) *mtgmatcher.Backend {
+	t.Helper()
+	path := os.Getenv(gameDatastores[game])
+	if path == "" {
+		t.Skipf("%s not set", gameDatastores[game])
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	b, err := mtgmatcher.Open(game, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}

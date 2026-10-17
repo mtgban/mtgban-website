@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -314,6 +315,124 @@ func TestRosterDatasetsLabelEachPrinting(t *testing.T) {
 	if series[0].Name != series[1].Name {
 		t.Errorf("names = %q / %q, want the card's name on both", series[0].Name, series[1].Name)
 	}
+}
+
+// Lines sharing Name|SET|number|finish are told apart by the first details
+// that part them, and only those lines: a label no other line shares stays.
+func TestRosterLabelsTellApartOnlyWhatCollides(t *testing.T) {
+	cards := map[string]mtgmatcher.Card{
+		"plain":    {Name: "Luffy", SetCode: "P", Number: "P-001", Rarity: "promo", Identifiers: map[string]string{"tcgplayerProductId": "1"}},
+		"textured": {Name: "Luffy", SetCode: "P", Number: "P-001", Rarity: "promo", Identifiers: map[string]string{"tcgplayerProductId": "2"}, PromoTypes: []string{"textured"}},
+		"rare":     {Name: "Wings", SetCode: "GD05", Number: "102", Rarity: "rare", Identifiers: map[string]string{"tcgplayerProductId": "3"}},
+		"rplus":    {Name: "Wings", SetCode: "GD05", Number: "102", Rarity: "r+", Identifiers: map[string]string{"tcgplayerProductId": "4"}},
+		"energy1":  {Name: "Energy", SetCode: "SMK", Number: "1", Rarity: "common", Identifiers: map[string]string{"tcgplayerProductId": "5"}},
+		"energy2":  {Name: "Energy", SetCode: "SMK", Number: "1", Rarity: "common", Identifiers: map[string]string{"tcgplayerProductId": "6"}},
+		"zoro":     {Name: "Zoro", SetCode: "P", Number: "P-002", Rarity: "promo", Identifiers: map[string]string{"tcgplayerProductId": "7"}},
+	}
+	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{}}
+	cache := chartTargetCache{}
+	ids := []string{"plain", "textured", "rare", "rplus", "energy1", "energy2", "zoro"}
+	for _, id := range ids {
+		co := &mtgmatcher.CardObject{Card: cards[id]}
+		b.UUIDs[id] = co
+		cache[id] = &chartTarget{Name: co.Name, Label: co.String(), SearchID: id}
+	}
+	// Two archive variants of one printing, a language say, share every
+	// detail of it but their ban id
+	jace := &mtgmatcher.CardObject{Card: mtgmatcher.Card{Name: "Jace", SetCode: "WAR", Number: "54", Rarity: "rare"}}
+	b.UUIDs["jace"] = jace
+	for i, id := range []string{"ban:11", "ban:12"} {
+		cache[id] = &chartTarget{Name: jace.Name, Label: jace.String(), SearchID: "jace", BanID: int64(11 + i)}
+		ids = append(ids, id)
+	}
+
+	var got []string
+	for _, cs := range cache.series(context.Background(), b, ids) {
+		got = append(got, cs.Label)
+	}
+	want := []string{
+		"Luffy|P|P-001|nonfoil",
+		"Luffy|P|P-001|nonfoil|textured",
+		"Wings|GD05|102|nonfoil|rare",
+		"Wings|GD05|102|nonfoil|r+",
+		"Energy|SMK|1|nonfoil|tcg:5",
+		"Energy|SMK|1|nonfoil|tcg:6",
+		"Zoro|P|P-002|nonfoil",
+		"Jace|WAR|54|nonfoil|ban:11",
+		"Jace|WAR|54|nonfoil|ban:12",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("labels =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// One Piece files several promos of one card under one set and number, so a
+// roster of all of a card's printings needs more than Name|SET|number|finish
+// to read apart; the lines that already read apart keep their label.
+func TestRosterLabelsTellApartOnePiecePromos(t *testing.T) {
+	b := openGameDatastore(t, "onepiece")
+	prev := PricesArchiveDB
+	t.Cleanup(func() { PricesArchiveDB = prev })
+	PricesArchiveDB = nil
+
+	ids, plain := printingsOfMostCollidingCard(b)
+	if len(ids) == 0 {
+		t.Fatal("no One Piece card has printings sharing a label")
+	}
+	cache := chartTargetCache{}
+	for _, id := range ids {
+		target, err := matcherTarget(context.Background(), b, id)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		cache[id] = target
+	}
+	series := cache.series(context.Background(), b, ids)
+
+	labels := map[string]bool{}
+	for i, cs := range series {
+		labels[cs.Label] = true
+		label := cache[ids[i]].Label
+		switch {
+		case plain[label] == 1 && cs.Label != label:
+			t.Errorf("%s: %q relabelled %q, though no other line shares it", ids[i], label, cs.Label)
+		case !strings.HasPrefix(cs.Label, label):
+			t.Errorf("%s: %q relabelled %q, which drops what it said", ids[i], label, cs.Label)
+		case cs.Label != label:
+			t.Logf("%q -> %q", label, cs.Label)
+		}
+	}
+	if len(labels) != len(ids) {
+		t.Errorf("%d printings of %s drew %d labels", len(ids), series[0].Name, len(labels))
+	}
+}
+
+// printingsOfMostCollidingCard is every printing of the card whose printings
+// share the most labels, and how many of them carry each label.
+func printingsOfMostCollidingCard(b *mtgmatcher.Backend) ([]string, map[string]int) {
+	byName := map[string][]string{}
+	for _, id := range slices.Sorted(slices.Values(b.GetUUIDs())) {
+		co, err := b.GetUUID(id)
+		if err != nil || co.Sealed {
+			continue
+		}
+		byName[co.Name] = append(byName[co.Name], id)
+	}
+	var best []string
+	var bestLabels map[string]int
+	var bestShared int
+	for _, name := range slices.Sorted(maps.Keys(byName)) {
+		labels := map[string]int{}
+		for _, id := range byName[name] {
+			co, _ := b.GetUUID(id)
+			labels[co.String()]++
+		}
+		shared := len(byName[name]) - len(labels)
+		if shared > bestShared {
+			best, bestLabels, bestShared = byName[name], labels, shared
+		}
+	}
+	return best, bestLabels
 }
 
 // twoPrintingsOfOneCard finds a card printed plain in two sets, the second
