@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"io"
 	"log"
@@ -471,6 +473,103 @@ func TestLoadXlsxStopsAtTheRowLimit(t *testing.T) {
 	}
 	if len(entries) > 10 {
 		t.Errorf("read %d rows against a limit of 10", len(entries))
+	}
+}
+
+// excelize pads a row out to its last cell, so one cell in column XFD made
+// every row 16384 strings wide, and a 52KB file ran the server out of memory
+// before the row limit was reached.
+func TestLoadXlsxRefusesARowPastTheColumnCap(t *testing.T) {
+	quietUploadLog(t)
+
+	f := excelize.NewFile()
+	defer f.Close()
+	for c, h := range []string{"Name", "Edition", "Quantity"} {
+		cell, _ := excelize.CoordinatesToCellName(c+1, 1)
+		f.SetCellStr("Sheet1", cell, h)
+	}
+	f.SetCellStr("Sheet1", "XFD2", "x")
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), "row 2 has 16384 columns") {
+		t.Errorf("err = %v, want row 2 refused for its width", err)
+	}
+}
+
+// A row as wide as the cap is still a row: it is reported as a mismatch
+// against its header, as any row wider than the header is.
+func TestLoadXlsxReadsARowAtTheColumnCap(t *testing.T) {
+	quietUploadLog(t)
+
+	wide := make([]string, maxUploadColumns)
+	wide[0], wide[len(wide)-1] = "Lightning Bolt", "x"
+	rows := [][]string{{"Name", "Edition", "Quantity"}, wide, {"Lightning Bolt", "Beta", "1"}}
+	entries, err := loadXlsx(newUploadParser(backend()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
+	if err != nil {
+		t.Fatalf("loadXlsx: %v", err)
+	}
+	if len(entries) != 2 || entries[0].MismatchError == nil {
+		t.Errorf("entries = %+v, want the wide row as a mismatch and the next one read", entries)
+	}
+}
+
+// A workbook is a zip, and what it unpacks to is bounded rather than left at
+// excelize's 16GB default.
+func TestLoadXlsxRefusesAWorkbookPastTheUnzipLimit(t *testing.T) {
+	quietUploadLog(t)
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create("xl/worksheets/sheet1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.CopyN(w, zeros{}, xlsxUnzipSizeLimit+1); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), "unzip size exceeds") {
+		t.Errorf("err = %v, want the workbook refused for its unpacked size", err)
+	}
+}
+
+type zeros struct{}
+
+func (zeros) Read(p []byte) (int, error) {
+	clear(p)
+	return len(p), nil
+}
+
+// excelize hands any compound file to its decryptor, whose container reader
+// sizes a slice from the header's directory sector count: this 512-byte
+// header asks it for 32GB. An .xlsx is a zip, so loadXlsx refuses the
+// header before excelize sees it.
+func TestLoadXlsxRefusesACompoundFile(t *testing.T) {
+	quietUploadLog(t)
+
+	header := make([]byte, 512)
+	copy(header, oleSignature)
+	binary.LittleEndian.PutUint16(header[24:], 0x3e)       // minor version
+	binary.LittleEndian.PutUint16(header[26:], 4)          // major version 4: 4096-byte sectors
+	binary.LittleEndian.PutUint16(header[28:], 0xfffe)     // byte order
+	binary.LittleEndian.PutUint16(header[30:], 12)         // sector shift
+	binary.LittleEndian.PutUint16(header[32:], 6)          // mini sector shift
+	binary.LittleEndian.PutUint32(header[40:], 0xfffffff0) // directory sectors
+	binary.LittleEndian.PutUint32(header[48:], 0xfffffffe) // directory start: end of chain
+	binary.LittleEndian.PutUint32(header[60:], 0xfffffffe) // mini FAT start
+	binary.LittleEndian.PutUint32(header[68:], 0xfffffffe) // DIFAT start
+
+	_, err := loadXlsx(newUploadParser(backend()), bytes.NewReader(header), uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), ".xls") {
+		t.Errorf("err = %v, want the compound file refused", err)
 	}
 }
 
