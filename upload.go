@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/csv"
@@ -48,9 +50,28 @@ const (
 	MaxUploadProEntries   = 1000
 	MaxUploadTotalEntries = 15000
 	MaxUploadFileSize     = 5 << 20
+	// MaxUploadBodySize caps the body of any request to a signed page,
+	// upload's file among it. ParseMultipartForm only decides what stays in
+	// memory, and spills the rest to disk.
+	MaxUploadBodySize = 10 << 20
 
 	ProfitabilityConstant = 2
 )
+
+// Bounds on what one uploaded workbook may unpack to. excelize's own default
+// is 16GB; the largest list an upload takes unpacks to about 10MB.
+const (
+	xlsxUnzipSizeLimit    = 64 << 20
+	xlsxUnzipXMLSizeLimit = 16 << 20
+)
+
+// maxUploadColumns refuses a row wider than any list. excelize pads a row
+// out to its last cell, so a single cell in column XFD is 16384 of them.
+const maxUploadColumns = 256
+
+// oleSignature opens every compound file, which is what an .xls is and what
+// a password-protected .xlsx is wrapped in.
+var oleSignature = []byte{0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1}
 
 // uploadTagName keys every price an upload looks up by its store's
 // shorthand.
@@ -464,9 +485,12 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// error survives: ParseMultipartForm returns "not multipart" for a form
 	// that never was one, which hides a body the parser actually refused - and
 	// a refused body arrives as an empty form, indistinguishable from a
-	// request that carried nothing.
+	// request that carried nothing. A body past MaxUploadBodySize, which
+	// signing caps, is refused the same way, so its error is kept too.
 	formErr := r.ParseForm()
-	r.ParseMultipartForm(MaxUploadFileSize)
+	if err := r.ParseMultipartForm(MaxUploadFileSize); formErr == nil && !errors.Is(err, http.ErrNotMultipart) {
+		formErr = err
+	}
 
 	// A transfer from the results posts a store's tag: answer with that
 	// store's CSV, or with SCG's mass entry
@@ -2836,10 +2860,22 @@ func loadOldXls(parser *docparse.Parser, reader io.ReadSeeker, maxRows int) ([]U
 }
 
 func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadEntry, error) {
-	f, err := excelize.OpenReader(reader)
+	// excelize hands any compound file to its decryptor, whose container
+	// reader sizes slices from counts in the file. An .xlsx is a zip, so a
+	// compound file is refused before it gets there.
+	br := bufio.NewReader(reader)
+	if head, _ := br.Peek(len(oleSignature)); bytes.Equal(head, oleSignature) {
+		return nil, errors.New("this is an .xls or a password-protected workbook, save it as .xlsx or .csv")
+	}
+
+	f, err := excelize.OpenReader(br, excelize.Options{
+		UnzipSizeLimit:    xlsxUnzipSizeLimit,
+		UnzipXMLSizeLimit: xlsxUnzipXMLSizeLimit,
+	})
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	sheets := f.GetSheetList()
 	if len(sheets) == 0 {
@@ -2855,18 +2891,38 @@ func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadE
 		}
 	}
 
-	// Get all the rows in the Sheet1.
-	rows, err := f.GetRows(sheets[sheetIndex])
+	// Rows are read one at a time, so a sheet longer than maxRows is never
+	// held whole, as GetRows would.
+	rows, err := f.Rows(sheets[sheetIndex])
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
-	if len(rows) == 0 {
+	next := func() ([]string, bool, error) {
+		if !rows.Next() {
+			return nil, false, rows.Error()
+		}
+		row, err := rows.Columns()
+		if err != nil {
+			// GetRows stopped at the first row it could not read
+			return nil, false, nil
+		}
+		if len(row) > maxUploadColumns {
+			return nil, false, fmt.Errorf("a row has %d columns, more than the %d an upload can have", len(row), maxUploadColumns)
+		}
+		return row, true, nil
+	}
+
+	header, ok, err := next()
+	if err != nil {
+		return nil, err
+	} else if !ok {
 		return nil, errors.New("empty sheet")
 	}
 
 	var i int
-	indexMap, err := parser.ParseHeader(rows[0])
+	indexMap, err := parser.ParseHeader(header)
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		i-- // Parse the first line again
 	} else if err != nil {
@@ -2874,18 +2930,28 @@ func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadE
 	}
 
 	var uploadEntries []UploadEntry
+	row := header
 	for {
 		i++
-		if i > maxRows || i >= len(rows) {
+		if i > maxRows {
 			break
-		} else if len(rows[i]) > len(rows[0]) {
+		}
+		if i > 0 {
+			row, ok, err = next()
+			if err != nil {
+				return nil, err
+			} else if !ok {
+				break
+			}
+		}
+		if len(row) > len(header) {
 			var res UploadEntry
 			res.MismatchError = errors.New("wrong number of fields")
 			uploadEntries = append(uploadEntries, res)
 			continue
 		}
 
-		res, err := parser.ParseRow(indexMap, rows[i])
+		res, err := parser.ParseRow(indexMap, row)
 		if err != nil {
 			continue
 		}

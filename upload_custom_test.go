@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +13,38 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
+
+// A body past MaxUploadBodySize is cut off at the limit rather than spilled
+// to disk whole, and the page says why nothing loaded. It goes through
+// enforceSigning, whose FormValue is the first to read the body.
+func TestUploadRefusesABodyPastTheLimit(t *testing.T) {
+	quietUploadLog(t)
+	savedDev, savedSig := DevMode, SigCheck
+	DevMode, SigCheck = true, false // render the page from disk, unsigned
+	t.Cleanup(func() { DevMode, SigCheck = savedDev, savedSig })
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	part, err := mw.CreateFormFile("cardListFile", "list.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	part.Write([]byte("Name,Quantity\n"))
+	line := []byte("Lightning Bolt,1\n")
+	part.Write(bytes.Repeat(line, MaxUploadBodySize/len(line)+1))
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	rec := httptest.NewRecorder()
+	enforceSigning(testSite, http.HandlerFunc(testSite.Upload)).ServeHTTP(rec, req)
+
+	if page := rec.Body.String(); !strings.Contains(page, "request body too large") {
+		t.Error("the page does not say the upload was too large")
+	}
+}
 
 // The custom buylist is the reader's own rule over a store's retail list, so
 // pricing the list in store credit leaves its offers as the rule sets them,
