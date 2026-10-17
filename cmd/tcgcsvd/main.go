@@ -1,11 +1,13 @@
 // Command tcgcsvd runs the tcgcsv ingestion jobs on their own, without the web
 // server: the daily price pull, the weekly product catalog sync, and the
-// historical backfill. It reads the same config.json the server does, uses only
-// the sql_config and tcgcsv_config sections of it (sql_config from the
-// infrastructure file it names, unless it sets its own), and runs the two
-// scheduled jobs under the same cross-process crawl lock, so it can run beside a
-// server that still has its crons enabled without both crawling tcgcsv.com at
-// once.
+// historical backfill. It reads the same config.json the server does, and only
+// the keys the ingest needs: sql_config (from the file infrastructure_path
+// names, unless it sets its own), tcgcsv_config, game and
+// timeseries_config.long_form_writes (which decide whether it writes the long
+// prices table), and discord.server_webhook_url for its job reports. It runs
+// the two scheduled jobs under the same cross-process crawl lock, so it can run
+// beside a server that still has its crons enabled without both crawling
+// tcgcsv.com at once.
 // The backfill stays outside that lock, as it does everywhere else: it is
 // operator-driven and runs for hours, and holding the lock for that long would
 // starve the daily pull. Time a long backfill so it doesn't sit on top of a
