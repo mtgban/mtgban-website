@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -409,7 +410,7 @@ func TestAdminSnapshotRecovers(t *testing.T) {
 	sellers := []mtgban.Seller{nil}
 	sellersPtr.Store(&sellers)
 
-	testSite.Admin(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/admin?tool=snapshot", nil))
+	testSite.Admin(httptest.NewRecorder(), adminRequest(http.MethodPost, url.Values{"tool": {"snapshot"}}))
 
 	_, _, source := panicReport(t, posts)
 	if source != "source job: "+jobStash {

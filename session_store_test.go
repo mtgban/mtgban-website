@@ -266,14 +266,12 @@ func TestAdminDashboardOffersToRemoveSessionStores(t *testing.T) {
 	out := renderPage(t, "admin.html", false, pv)
 
 	for _, want := range []string{
-		// Remove is a POST (unlike refresh/logs, which stay plain links,
-		// matching the destructive-action convention the grant-revoke form
-		// already uses on this same page) - a form per session store, not a
-		// link, so removing one is never a bare GET request away.
+		// Remove and refresh are each a POST form, so neither is a bare
+		// GET request away; the logs stay a plain link.
 		`<input type="hidden" name="removestore" value="ZZS">`,
 		`<input type="hidden" name="kind" value="retail">`,
 		`<input type="hidden" name="kind" value="buylist">`,
-		`href="?refresh=cardkingdom"`,
+		`<input type="hidden" name="refresh" value="cardkingdom">`,
 		`href="?logs=cardkingdom"`,
 	} {
 		if !strings.Contains(out, want) {
@@ -285,7 +283,8 @@ func TestAdminDashboardOffersToRemoveSessionStores(t *testing.T) {
 			strings.Count(out, `name="removestore" value="ZZS"`))
 	}
 	for _, absent := range []string{
-		`href="?refresh=session"`,
+		`href="?refresh=`,
+		`name="refresh" value="session"`,
 		`href="?logs=session"`,
 		`href="?removestore=`,
 		`name="removestore" value="CK"`,

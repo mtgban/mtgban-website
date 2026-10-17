@@ -116,6 +116,13 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The actions that change state read a POST's body, so a link cannot
+	// start them; a POST sent from another site's page is turned away.
+	if crossSitePost(r) {
+		http.Error(w, "cross-site form refused", http.StatusForbidden)
+		return
+	}
+
 	ds := s.datastore()
 	b := ds.backend
 	sig := verifiedSignature(r)
@@ -147,7 +154,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.adminTools(w, r, &pageVars) {
+	if s.adminTools(w, r) {
 		return
 	}
 
@@ -200,7 +207,6 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.DisableChart = IsStashingInProgress()
 	pageVars.Jobs = backgroundJobs.Rows()
-	// Read last: ?tool=datastore above may have just started one.
 	pageVars.DatastoreReload = s.reloads.Status()
 
 	// Only the Usage tab reads these aggregates and each one scans a 30-day
@@ -216,11 +222,23 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	render(w, "admin.html", pageVars)
 }
 
+// adminCrossOrigin tells a form posted from another site's page by what the
+// browser says of it: Sec-Fetch-Site, or failing that an Origin whose host
+// is not the request's. A request with neither, as curl sends, passes.
+var adminCrossOrigin = http.NewCrossOriginProtection()
+
+// crossSitePost reports whether r changes state from another site's page.
+// GET, HEAD and OPTIONS never do.
+func crossSitePost(r *http.Request) bool {
+	return adminCrossOrigin.Check(r) != nil
+}
+
 // adminActions runs the refresh, reload, removestore or logs action the
 // request names, if any, and reports whether it answered the request. A
 // logs name it does not know leaves a message for the page instead.
+// refresh and reload are read from a POST's body alone.
 func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
-	refresh := r.FormValue("refresh")
+	refresh := r.PostFormValue("refresh")
 	if refresh != "" {
 		v := url.Values{}
 		_, found := currentScraperIndex().byStore[refresh]
@@ -238,15 +256,16 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		http.Redirect(w, r, r.URL.String(), http.StatusFound)
 		return true
 	}
-	reload := r.FormValue("reload")
+	reload := r.PostFormValue("reload")
 	if reload != "" {
 		v := url.Values{}
 		v.Set("msg", reload+" reloaded")
-		err := loadScraper(DataBucket, Config().Game, reload, r.FormValue("table"), r.FormValue("tag"))
+		table := r.PostFormValue("table")
+		err := loadScraper(DataBucket, Config().Game, reload, table, r.PostFormValue("tag"))
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
 		} else {
-			s.pokeAlerts(r.FormValue("table"))
+			s.pokeAlerts(table)
 		}
 		r.URL.RawQuery = v.Encode()
 		http.Redirect(w, r, r.URL.String(), http.StatusFound)
@@ -297,19 +316,35 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 	return false
 }
 
+// restartServer ends the process, a few seconds on so the redirect reaches
+// the admin first, for the system to start it again.
+var restartServer = func() {
+	time.Sleep(5 * time.Second)
+	log.Println("Admin requested server restart")
+	os.Exit(0)
+}
+
 // adminTools runs the server action or admin tool the request names, if
-// any, and reports whether it answered with a redirect. A datastore reload
-// answers on the page instead, through its message.
-func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
-	tool := r.FormValue("tool")
+// any, and reports whether it answered with a redirect. Every tool but
+// invite changes something, so it is named in a POST's body; an invite
+// link is minted for the admin's own page and saved nowhere, so a GET's
+// query can ask for one.
+func (s *site) adminTools(w http.ResponseWriter, r *http.Request) bool {
+	tool := r.PostFormValue("tool")
+	if r.FormValue("tool") == "invite" {
+		tool = "invite"
+	}
 	redirect := false
 	var v url.Values
 	switch tool {
 	case "datastore":
+		v = url.Values{}
+		redirect = true
+
 		if s.startDatastoreReload(Config().DatastorePath, "admin") {
-			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
+			v.Set("msg", "Reloading the datastore, this page will say when it is done...")
 		} else {
-			pageVars.InfoMessage = "A datastore reload is already running, this one will start when it ends"
+			v.Set("msg", "A datastore reload is already running, this one will start when it ends")
 		}
 
 	case "config":
@@ -367,22 +402,17 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *Page
 		v.Set("msg", "Restarting the server...")
 		redirect = true
 
-		// Let the system restart the server
-		go func() {
-			time.Sleep(5 * time.Second)
-			log.Println("Admin requested server restart")
-			os.Exit(0)
-		}()
+		go restartServer()
 
 	case "newKey", "demokey":
 		v = url.Values{}
 		redirect = true
 
-		user := r.FormValue("user")
+		user := r.PostFormValue("user")
 		if user == "" {
 			user = DefaultAPIDemoUser
 		}
-		dur := r.FormValue("duration")
+		dur := r.PostFormValue("duration")
 		// A blank duration is the picker back on its placeholder, not a request for a permanent key.
 		if dur == "" {
 			dur = "30"
