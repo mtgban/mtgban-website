@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // The access table, the grant list, the affiliate data and the chart
@@ -98,11 +102,16 @@ func loadInfrastructure(ctx context.Context) error {
 }
 
 // saveInfrastructure writes the infrastructure_path file, publishes it, and
-// tells the peers to reload it.
+// tells the peers to reload it, unless validateInfrastructure refuses it
+// against the file as last read or saved.
 func saveInfrastructure(ctx context.Context, value infrastructure.Config) error {
 	path := Config().InfrastructurePath
 	if path == "" {
 		return errors.New("infrastructure: no path configured")
+	}
+	err := validateInfrastructure(value, infrastructureFile())
+	if err != nil {
+		return err
 	}
 
 	writer, err := openBucketWriter(ctx, path)
@@ -120,6 +129,84 @@ func saveInfrastructure(ctx context.Context, value infrastructure.Config) error 
 	infrastructurePtr.Store(&value)
 	notifyAccessReload(ctx, infrastructureReloadChannel)
 	return nil
+}
+
+// validateInfrastructure refuses a file that takes from every peer what
+// running, the file it replaces, gives them: a bucket key (B2 refuses the
+// next load), a Patreon client or secret (login breaks), or a database's
+// settings (a restart opens none).
+// Dropping one of those is an edit to the file itself, not the editor's.
+func validateInfrastructure(value, running infrastructure.Config) error {
+	var problems []string
+	for _, name := range slices.Sorted(maps.Keys(running.BucketKeys)) {
+		key := value.BucketKeys[name]
+		if key.AccessKey == "" || key.AccessSecret == "" {
+			problems = append(problems, "drops the bucket key for "+name)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(running.Patreon.Client)) {
+		if value.Patreon.Client[name] == "" {
+			problems = append(problems, "drops the Patreon client for "+name)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(running.Patreon.Secret)) {
+		if value.Patreon.Secret[name] == "" {
+			problems = append(problems, "drops the Patreon secret for "+name)
+		}
+	}
+	for _, db := range []struct {
+		key            string
+		running, value *timeseries.SQLConfig
+	}{
+		{"sql_config", running.SQLConfig, value.SQLConfig},
+		{"user_state_config", running.UserStateConfig, value.UserStateConfig},
+		{"observability_config", running.ObservabilityConfig, value.ObservabilityConfig},
+		{"new_newspaper_sql_config", running.NewNewspaperSQLConfig, value.NewNewspaperSQLConfig},
+	} {
+		if !emptySQLConfig(db.running) && emptySQLConfig(db.value) {
+			problems = append(problems, "empties "+db.key)
+		}
+	}
+	if len(problems) > 0 {
+		return errors.New(strings.Join(problems, "; "))
+	}
+	return nil
+}
+
+func emptySQLConfig(config *timeseries.SQLConfig) bool {
+	return config == nil || *config == (timeseries.SQLConfig{})
+}
+
+// infrastructureRestartKeys names the keys that differ between before and
+// after among those read only at startup (main.go): the database clients,
+// the NOTIFY listener and the Google client. The bucket keys, Patreon and
+// the uploader are read on every use, so they apply as soon as published.
+func infrastructureRestartKeys(before, after infrastructure.Config) []string {
+	var keys []string
+	for _, db := range []struct {
+		key           string
+		before, after *timeseries.SQLConfig
+	}{
+		{"sql_config", before.SQLConfig, after.SQLConfig},
+		{"user_state_config", before.UserStateConfig, after.UserStateConfig},
+		{"observability_config", before.ObservabilityConfig, after.ObservabilityConfig},
+		{"new_newspaper_sql_config", before.NewNewspaperSQLConfig, after.NewNewspaperSQLConfig},
+	} {
+		if !sameSQLConfig(db.before, db.after) {
+			keys = append(keys, db.key)
+		}
+	}
+	if before.GoogleCredentials != after.GoogleCredentials {
+		keys = append(keys, "google_credentials")
+	}
+	return keys
+}
+
+func sameSQLConfig(a, b *timeseries.SQLConfig) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // AffiliatesConfig is the affiliate data every game shares: the codes are
