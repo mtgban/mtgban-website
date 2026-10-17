@@ -48,34 +48,36 @@
     {{/* Server Actions */}}
     <div class="m-admin-section">
         <h2>Server Actions</h2>
-        <div class="m-admin-actions">
-            <a class="m-admin-action" href="?tool=datastore" onclick="return confirm('Reload datastore?')">
+        {{/* Each action changes something on the server, so it is a button
+             posting this form rather than a link. */}}
+        <form class="m-admin-actions" method="POST" action="admin">
+            <button type="submit" class="m-admin-action" name="tool" value="datastore" onclick="return confirm('Reload datastore?')">
                 <span class="m-act-icon">🔄</span>
-                <div class="m-act-text"><span class="m-act-title">Reload Datastore</span><span class="m-act-desc">Refresh from primary source</span></div>
-            </a>
-            <a class="m-admin-action" href="?tool=config" onclick="return confirm('Reload config?')">
+                <span class="m-act-text"><span class="m-act-title">Reload Datastore</span><span class="m-act-desc">Refresh from primary source</span></span>
+            </button>
+            <button type="submit" class="m-admin-action" name="tool" value="config" onclick="return confirm('Reload config?')">
                 <span class="m-act-icon">⚙️</span>
                 <span class="m-act-title">Reload Config</span>
-            </a>
-            <a class="m-admin-action" href="?tool=checkpoints" onclick="return confirm('Reload chart checkpoints?')">
+            </button>
+            <button type="submit" class="m-admin-action" name="tool" value="checkpoints" onclick="return confirm('Reload chart checkpoints?')">
                 <span class="m-act-icon">📌</span>
                 <span class="m-act-title">Reload Checkpoints</span>
-            </a>
-            <a class="m-admin-action" href="?tool=snapshot" onclick="return confirm('Take a data snapshot?')">
+            </button>
+            <button type="submit" class="m-admin-action" name="tool" value="snapshot" onclick="return confirm('Take a data snapshot?')">
                 <span class="m-act-icon">📸</span>
                 <span class="m-act-title">Take Snapshot</span>
                 {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
-            </a>
-            <a class="m-admin-action" href="?tool=tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
+            </button>
+            <button type="submit" class="m-admin-action" name="tool" value="tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
                 <span class="m-act-icon">🃏</span>
                 <span class="m-act-title">Ingest TCGCSV Prices</span>
-            </a>
-            <a class="m-admin-action m-admin-danger" href="?tool=server" onclick="return confirm('Restart server?')">
+            </button>
+            <button type="submit" class="m-admin-action m-admin-danger" name="tool" value="server" onclick="return confirm('Restart server?')">
                 <span class="m-act-icon">⚠️</span>
                 <span class="m-act-title">Restart Server</span>
                 {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
-            </a>
-        </div>
+            </button>
+        </form>
     </div>
 
     {{/* Admin Tools */}}

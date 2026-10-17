@@ -161,6 +161,8 @@
 
 /* Server actions */
 .m-admin-actions {
+    display: flex;
+    flex-direction: column;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     overflow: hidden;
@@ -170,7 +172,8 @@
     border-color: rgba(0, 0, 0, 0.1);
 }
 
-.m-admin-action {
+/* Scoped to the list so its 48px outranks .page-content button's 44px */
+.m-admin-actions .m-admin-action {
     display: flex;
     align-items: center;
     gap: 0.6em;
@@ -179,7 +182,15 @@
     color: var(--text);
     font-size: 0.85rem;
     min-height: 48px;
+    /* Each action is a submit button: undo its own sizing, font and centring */
+    box-sizing: content-box;
+    line-height: inherit;
+    background: none;
+    border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
 .light-theme .m-admin-action {

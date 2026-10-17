@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -29,14 +30,14 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 			desc:       "a running reload says so and holds the action back",
 			hold:       true,
 			wantShown:  []string{"Datastore update in progress", "updating,", "Already running"},
-			wantAbsent: []string{"?tool=datastore\""},
+			wantAbsent: []string{`name="tool" value="datastore"`},
 		},
 		{
 			desc:       "a reload asked for meanwhile is said to follow it",
 			hold:       true,
 			queue:      true,
 			wantShown:  []string{"Datastore update in progress", "Another reload is queued to follow it."},
-			wantAbsent: []string{"?tool=datastore\""},
+			wantAbsent: []string{`name="tool" value="datastore"`},
 		},
 		{
 			desc:       "a failed one says why",
@@ -90,9 +91,8 @@ func TestAdminPageReportsTheReload(t *testing.T) {
 	}
 }
 
-// The click that starts a reload is answered by a page that says it is
-// running: the handler reads the tracker after the datastore tool, not
-// before. The load blocks on a server that answers only once released.
+// The click that starts a reload is redirected to a page that says it is
+// running. The load blocks on a server that answers only once released.
 func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 	withSigMode(t, true, false)
 	release := make(chan struct{})
@@ -108,7 +108,13 @@ func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 	// than carrying state another test left running.
 	s := newSite()
 	rec := httptest.NewRecorder()
-	s.Admin(rec, httptest.NewRequest(http.MethodGet, "/admin?tool=datastore", nil))
+	s.Admin(rec, adminRequest(http.MethodPost, url.Values{"tool": {"datastore"}}))
+	if rec.Code != http.StatusFound {
+		t.Fatalf("starting the reload answered %d, want a redirect", rec.Code)
+	}
+	location := rec.Header().Get("Location")
+	rec = httptest.NewRecorder()
+	s.Admin(rec, httptest.NewRequest(http.MethodGet, location, nil))
 	close(release)
 	waitForReload(t, &s.reloads)
 
@@ -118,7 +124,7 @@ func TestAdminPageShowsTheReloadItStarted(t *testing.T) {
 			t.Errorf("the page that started the reload does not say %q", want)
 		}
 	}
-	if strings.Contains(page, `href="?tool=datastore"`) {
+	if strings.Contains(page, `name="tool" value="datastore"`) {
 		t.Error("the page that started the reload still offers to start one")
 	}
 }
