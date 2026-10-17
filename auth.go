@@ -689,6 +689,10 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
+		// Bound the body before anything below reads the form: FormValue
+		// parses a multipart body whole, on every path through here.
+		r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBodySize)
+
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := ACL()["Any"]
 		if checkNoAuth {
