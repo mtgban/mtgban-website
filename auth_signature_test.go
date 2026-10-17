@@ -187,6 +187,60 @@ func TestOnlyACheckedSignatureIsKeptAsTheCookie(t *testing.T) {
 	}
 }
 
+// The MTGBAN cookie is Lax wherever it is written, so a link from another
+// site, and Patreon's redirect back to /auth, arrive signed in: Strict would
+// drop it there, and no attribute leaves it to each browser's default.
+func TestTheSignatureCookieIsSameSiteLax(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+	UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
+
+	valid := signedAs(t, url.Values{"UserEmail": {"sub@example.com"}, "UserTier": {"Test"}}, time.Now().Add(time.Hour))
+	nothing := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	request := func(host, target string) *http.Request {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.Host = host
+		req.Header.Set("X-Forwarded-Proto", "https")
+		return req
+	}
+
+	for name, write := range map[string]func(http.ResponseWriter){
+		// What Auth calls once Patreon has named the reader
+		"login": func(w http.ResponseWriter) {
+			putSignatureInCookies(w, request("mtgban.com", "/auth?code=x"), valid)
+		},
+		"login on an untrusted host": func(w http.ResponseWriter) {
+			putSignatureInCookies(w, request("raw.example.invalid", "/auth?code=x"), valid)
+		},
+		"?sig= through noSigning": func(w http.ResponseWriter) {
+			noSigning(nothing).ServeHTTP(w, request("mtgban.com", "/limited?sig="+url.QueryEscape(valid)))
+		},
+		"?sig= through enforceSigning": func(w http.ResponseWriter) {
+			enforceSigning(testSite, nothing).ServeHTTP(w, request("mtgban.com", "/limited?sig="+url.QueryEscape(valid)))
+		},
+		"logout": func(w http.ResponseWriter) {
+			testSite.Home(w, request("lorcana.mtgban.com", "/?errmsg=logout"))
+		},
+	} {
+		rec := httptest.NewRecorder()
+		write(rec)
+		written := 0
+		for _, line := range rec.Header().Values("Set-Cookie") {
+			if !strings.HasPrefix(line, "MTGBAN=") {
+				continue
+			}
+			written++
+			if !strings.Contains(line, "; SameSite=Lax") {
+				t.Errorf("%s: Set-Cookie %q, want SameSite=Lax", name, line)
+			}
+		}
+		if written != 1 {
+			t.Errorf("%s: wrote the MTGBAN cookie %d times, want once", name, written)
+		}
+	}
+}
+
 // An unconfirmed email is flagged inside the signature: the pricing page and
 // alerts read the flag, and deleting it breaks the HMAC like any other edit.
 func TestTheUnconfirmedFlagIsSigned(t *testing.T) {
@@ -290,5 +344,19 @@ func TestEveryDataRouteRefusesWithAStatus(t *testing.T) {
 		if rec.Code != http.StatusUnauthorized || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
 			t.Errorf("%s: %d %q, want 401 and a JSON error", p, rec.Code, rec.Header().Get("Content-Type"))
 		}
+	}
+}
+
+// A preference cookie stays first party only, Strict, beside the signature's
+// Lax: only the one global cookie has to ride a link from another site.
+func TestPreferenceCookiesStayStrict(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/search", nil)
+	req.Host = "mtgban.com"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	setForeverCookie(rec, req, "SearchSellersList", "CK")
+	lines := rec.Header().Values("Set-Cookie")
+	if len(lines) == 0 || !strings.Contains(lines[0], "; SameSite=Strict") {
+		t.Errorf("preference Set-Cookie %q, want SameSite=Strict", lines)
 	}
 }
