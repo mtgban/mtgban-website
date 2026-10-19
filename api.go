@@ -564,7 +564,21 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 	xml.NewEncoder(w).Encode(&openSearchDescription)
 }
 
+// SearchAPI answers the price API's searches, /api/v2/search/ and
+// /api/mtgban/search/, in JSON or CSV, to an API key's signature.
 func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
+	s.searchPrices(w, r, true)
+}
+
+// SearchExport answers the search page's CSV downloads under /search/export/
+// to a reader signed into the site.
+func (s *site) SearchExport(w http.ResponseWriter, r *http.Request) {
+	s.searchPrices(w, r, false)
+}
+
+// searchPrices runs a search and writes its prices: for the price API when
+// isAPI, else as the site's CSV export.
+func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) {
 	ds := s.datastore()
 	b := ds.backend
 	// The API middleware checks a ?sig= and lets a request without one
@@ -582,8 +596,7 @@ func (s *site) SearchAPI(w http.ResponseWriter, r *http.Request) {
 	isJSON := strings.HasSuffix(r.URL.Path, ".json")
 	isCSV := strings.HasSuffix(r.URL.Path, ".csv")
 	// v2 serves v1's CSV, as its price API does
-	isV2 := strings.HasPrefix(r.URL.Path, "/api/v2/search/")
-	isAPI := isV2 || strings.HasPrefix(r.URL.Path, "/api/mtgban/search/")
+	isV2 := isAPI && strings.HasPrefix(r.URL.Path, "/api/v2/search/")
 	isV2JSON := isV2 && isJSON
 
 	// The site's own exports are CSV; JSON is the API's

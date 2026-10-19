@@ -142,7 +142,7 @@ func (s *site) registerRoutes() {
 	// The downloads and the raw record a search result links to
 	http.Handle("/search/decklist/tcgplayer/", enforceSigning(s, http.HandlerFunc(s.TCGHandler)))
 	http.Handle("/search/decklist/cardmarket/", enforceSigning(s, http.HandlerFunc(s.MKMHandler)))
-	http.Handle("/search/export/", enforceSigning(s, http.HandlerFunc(s.SearchAPI)))
+	http.Handle("/search/export/", enforceSigning(s, http.HandlerFunc(s.SearchExport)))
 	http.Handle("/search/raw/", enforceSigning(s, http.HandlerFunc(s.RawCardAPI)))
 	http.Handle("/data/", enforceDataSigning(s, s.dataRoutes()))
 	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))

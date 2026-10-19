@@ -260,7 +260,7 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(name)+".csv", nil)
 	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 	rec := httptest.NewRecorder()
-	testSite.SearchAPI(rec, req)
+	testSite.SearchExport(rec, req)
 	if !strings.Contains(rec.Body.String(), "Star City Games") {
 		t.Errorf("the search page's export lost a store: %s", rec.Body.String())
 	}
@@ -321,7 +321,7 @@ func TestSearchAPIKeysReachAPIOnlyStores(t *testing.T) {
 		target string
 		serve  func(http.ResponseWriter, *http.Request)
 	}{
-		{"/search/export/retail/" + url.PathEscape(name) + ".csv", testSite.SearchAPI},
+		{"/search/export/retail/" + url.PathEscape(name) + ".csv", testSite.SearchExport},
 		{"/search?q=" + url.QueryEscape(name), testSite.Search},
 	} {
 		req := httptest.NewRequest(http.MethodGet, page.target, nil)
@@ -367,7 +367,7 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 			req.AddCookie(&http.Cookie{Name: "SearchDefaultSort", Value: saved})
 		}
 		rec := httptest.NewRecorder()
-		testSite.SearchAPI(rec, req)
+		testSite.SearchExport(rec, req)
 		var ids []string
 		for _, line := range strings.Split(rec.Body.String(), "\n")[1:] {
 			id, _, found := strings.Cut(line, ",")
@@ -425,7 +425,7 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(query)+".csv?id=mtgjson", nil)
 		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
 		rec := httptest.NewRecorder()
-		testSite.SearchAPI(rec, req)
+		testSite.SearchExport(rec, req)
 		var ids []string
 		for _, line := range strings.Split(rec.Body.String(), "\n")[1:] {
 			id, _, found := strings.Cut(line, ",")
@@ -446,7 +446,7 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 // The site's export serves CSV only; JSON search is the API's, under /api/v2/.
 func TestSiteExportServesNoJSON(t *testing.T) {
 	rec := httptest.NewRecorder()
-	testSite.SearchAPI(rec, httptest.NewRequest(http.MethodGet, "/search/export/retail/Shock.json", nil))
+	testSite.SearchExport(rec, httptest.NewRequest(http.MethodGet, "/search/export/retail/Shock.json", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("a JSON export = %d, want 404", rec.Code)
 	}

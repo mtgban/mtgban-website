@@ -708,7 +708,8 @@ needs the `sealed` mode as the sealed dump does. Other user APIs: `/search/deckl
 `/search/decklist/cardmarket/` (CSV exports keyed to store SKUs), `/data/prices/{ids}`
 (`BatchPricesAPI`, batch best-retail/best-buylist for ≤50 ids),
 `/api/palette/*` (public metadata for the command palette), and
-`/api/mtgban/search/` (shares `SearchAPI` with `/search/export/`).
+`/api/mtgban/search/` (`SearchAPI`, which shares `searchPrices` with the
+site's `/search/export/`, `SearchExport`).
 
 `/api/v2/` (version "2", `PriceAPIv2`, `api_banprice_v2.go`) serves the same
 endpoints, options and access as v1, and v1's CSV. Its JSON prices are
