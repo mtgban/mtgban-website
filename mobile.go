@@ -89,6 +89,7 @@ var mobileEnabledPages = []string{
 	"Sleepers",
 	"Alerts",
 	"Changelog",
+	"CardTrader",
 	"Admin",
 	"Guide",
 	"API",
