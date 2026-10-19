@@ -60,6 +60,10 @@ var sleepersLanguages = []string{
 	"Sanskrit",
 }
 
+// playtestEditions hold nothing but playtest cards; sleepersLayout drops the
+// playtest cards printed in other sets.
+var playtestEditions = []string{"CMB1", "CMB2", "PUNK", "UNK"}
+
 // SleepVars are the PageVars fields only the sleepers page fills and reads.
 type SleepVars struct {
 	Sleepers       map[string][]string
@@ -90,6 +94,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	if skipEditionsOpt != "" {
 		skipEditions = strings.Split(skipEditionsOpt, ",")
 	}
+	skipEditions = append(skipEditions, playtestEditions...)
 
 	pageVars.SellerKeys = filterSellers(func(info mtgban.ScraperInfo) bool {
 		return !info.SealedMode && !slices.Contains(blocklistRetail, info.Shorthand)
@@ -272,7 +277,7 @@ func getHotlist(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
 	bl, _ := findVendorBuylist("CK")
 
 	// Skip bad editions
-	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI", "CMB1", "CMB2")
+	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI")
 
 	for cardID, hotlistEntries := range GetInfos()["hotlist"] {
 		// Make sure the older price is set, otherwise a lot of cards that were
@@ -509,6 +514,10 @@ func noOversize(co *mtgmatcher.CardObject) (float64, bool) {
 func sleepersLayout(b *mtgmatcher.Backend, tiers map[string]int) (map[string][]string, error) {
 	results := []Sleeper{}
 	for c := range tiers {
+		co, err := b.GetUUID(c)
+		if err == nil && co.HasPromoType("playtest") {
+			continue
+		}
 		if tiers[c] > 1 {
 			results = append(results, Sleeper{
 				CardID: c,
