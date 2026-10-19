@@ -46,6 +46,22 @@
         "Real arbitrage: all available markets are added",
         "Priority support"
       ]
+    },
+    {
+      "key": "history",
+      "name": "Price History",
+      "monthly": 30000,
+      "store_scope": "",
+      "included_stores": 0,
+      "modes": ["history"],
+      "lookback_days": 365,
+      "icon": "history",
+      "subtitle": "Daily prices, a year back",
+      "bullets": [
+        "Every source this site charts, by finish, in USD",
+        "One card, a batch of cards or a set per request",
+        "Updated twice a day"
+      ]
     }
   ],
   "addons": [
@@ -59,7 +75,7 @@
       "key": "extra_game",
       "name": "Additional game",
       "monthly": 15000,
-      "applies_to": ["starter", "all_stores", "all_data"]
+      "applies_to": ["starter", "all_stores", "all_data", "history"]
     }
   ],
   "intervals": [

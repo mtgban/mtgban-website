@@ -1,6 +1,8 @@
 package timeseries
 
 import (
+	"context"
+	"database/sql"
 	"regexp"
 	"slices"
 	"strings"
@@ -186,5 +188,43 @@ func TestMoverAnchorFastPathQueries(t *testing.T) {
 	}
 	if probe := gameHasRowsOnQuery(71); !strings.Contains(probe, "v.tcgp_category_id = $3") {
 		t.Errorf("non-magic probe does not carry its category at $3:\n%s", probe)
+	}
+}
+
+// The history read takes its ids as one array parameter and bounds the
+// window the way the single reads do, so it shares their partition pruning.
+func TestHGetAllByBanIDsQueryShape(t *testing.T) {
+	if !strings.Contains(hgetAllByBanIDsQuery, "ban_id = ANY($1)") {
+		t.Errorf("query does not take an id array: %s", hgetAllByBanIDsQuery)
+	}
+	if !strings.Contains(hgetAllByBanIDsQuery, "date >= $2") {
+		t.Errorf("query does not bound the window: %s", hgetAllByBanIDsQuery)
+	}
+	if !strings.Contains(hgetAllByBanIDsQuery, "SELECT ban_id, date, provider, price") {
+		t.Errorf("query does not return the ban_id each row belongs to: %s", hgetAllByBanIDsQuery)
+	}
+}
+
+// No ids is no read: the handler asks with an empty list when nothing it
+// was given has an archive id, and the answer is empty rather than an error
+// from a server that never saw a query.
+func TestHGetAllByBanIDsEmptyAsksNothing(t *testing.T) {
+	db, err := sql.Open("postgres", "postgres://127.0.0.1:1/nothing?sslmode=disable&connect_timeout=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	c := &Client{db: db}
+	got, err := c.HGetAllByBanIDs(context.Background(), nil, time.Now().AddDate(0, 0, -30))
+	if err != nil {
+		t.Fatalf("empty read errored: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("empty read returned %v", got)
+	}
+	// With ids it reaches the (absent) server.
+	_, err = c.HGetAllByBanIDs(context.Background(), []int64{1}, time.Now().AddDate(0, 0, -30))
+	if err == nil {
+		t.Error("read against a dead server did not error")
 	}
 }

@@ -68,6 +68,8 @@ type APIGatewayConfig struct {
 	URL string `json:"url"`
 	// Games are the gateway's configured games, what the configurator offers
 	Games []mtgmatcher.Game `json:"games"`
+	// HistoryOnSale shows the history package on the plans page; off until the gateway sells it
+	HistoryOnSale bool `json:"history_on_sale"`
 }
 
 // DiscordConfig contains the bot connection, community links, channel IDs,
@@ -440,9 +442,9 @@ func applyOverrides(config *ConfigType, port, datastorePath, aclPath, grantsPath
 }
 
 // finishConfig defaults what a newly loaded config left unset and makes it
-// the live one, whole; it empties the chart provider registry until
-// loadDatasets has read a datasets file, and defaults BAN_SECRET when the
-// environment has none.
+// the live one, whole; it empties the chart provider registry and resets the
+// history keys until loadDatasets has read a datasets file, and defaults
+// BAN_SECRET when the environment has none.
 func finishConfig(config ConfigType) {
 	if config.Port == "" {
 		log.Println("Server port not configured, listening on", DefaultServerPort)
@@ -468,6 +470,7 @@ func finishConfig(config ConfigType) {
 
 	if config.DatasetsPath == "" || datasetsPtr.Load() == nil {
 		providerRegistry.Store(&[]providerDisplay{})
+		historyKeyTable.Store(nil)
 	}
 
 	// Load from env

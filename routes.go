@@ -148,6 +148,7 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(s.PriceAPI)))
 	http.Handle("/api/v2/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
+	http.Handle("/api/v2/history/", enforceAPISigning(http.HandlerFunc(s.HistoryAPI)))
 	http.Handle("/api/v2/", enforceAPISigning(http.HandlerFunc(s.PriceAPIv2)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(s.SuggestAPI)))
 	http.Handle("/api/settings/modal", noSigning(http.HandlerFunc(s.SettingsModal)))
