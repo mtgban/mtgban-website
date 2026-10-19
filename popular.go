@@ -205,7 +205,7 @@ func curatedPopularSearches(ds *datastore) []PopularSearch {
 			}
 		}
 		card, ok := firstUnusedPopularCard(candidateIDs, usedImages, func(id string) GenericCard {
-			return uuid2card(ds.backend, id, false)
+			return uuid2card(ds.backend, id, false, nil)
 		})
 		if !ok {
 			continue
@@ -307,7 +307,7 @@ func resolvePopularRanks(ds *datastore, ranks []observability.SearchRank) []Popu
 			continue
 		}
 		card, ok := firstUnusedPopularCard(ids, usedImages, func(id string) GenericCard {
-			return uuid2card(ds.backend, id, false)
+			return uuid2card(ds.backend, id, false, nil)
 		})
 		if !ok {
 			continue
