@@ -348,7 +348,7 @@ func TestFinishPredicateParity(t *testing.T) {
 	}
 }
 
-// TestSearchDownloadFilters pins the search download path (SearchAPI): it
+// TestSearchDownloadFilters pins the search download path (SearchExport): it
 // hands the fully parsed config to the walks and converts the rows, so
 // query-level store and entry filters shape the output. The old path
 // re-derived a store list from blocklists alone and silently dropped every

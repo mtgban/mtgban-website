@@ -36,9 +36,10 @@ number. `price_parity_test.go` pins that.
   `.cond-PO` under `:has()`); mobile shows a PO pill instead.
 - **Vendor quantities.** The API sums a vendor row's quantity unless the
   store is an index, where only a want-count (`PriceUnitCount`) is summed.
-- **Search downloads.** `SearchAPI` hands its parsed config to the same walks
-  and converts the rows, so a query's store, entry and price filters shape
-  the file (`TestSearchDownloadFilters`).
+- **Search downloads.** `searchPrices`, behind `SearchAPI` and
+  `SearchExport`, hands its parsed config to the same walks and converts the
+  rows, so a query's store, entry and price filters shape the file
+  (`TestSearchDownloadFilters`).
 
 ## The one place they differ
 
