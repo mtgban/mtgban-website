@@ -38,3 +38,27 @@ func TestOpenAPIListsEveryIDMode(t *testing.T) {
 		}
 	}
 }
+
+// The OpenAPI document lists every report the newspaper declares, in its
+// order, so a client generated from it can ask for each.
+func TestOpenAPINamesEveryNewspaperReport(t *testing.T) {
+	doc, err := os.ReadFile("openapi/v2.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enum := regexp.MustCompile(`description: A newspaper report key[^\n]*\s+schema: \{ type: string, enum: \[([^\]]*)\]`)
+	m := enum.FindSubmatch(doc)
+	if m == nil {
+		t.Fatal("openapi/v2.yaml: no newspaper report enum")
+	}
+	listed := strings.Split(strings.ReplaceAll(string(m[1]), " ", ""), ",")
+	var want []string
+	for _, page := range newspaperPagesInitial {
+		if page.Query != "" {
+			want = append(want, page.Option)
+		}
+	}
+	if !slices.Equal(listed, want) {
+		t.Errorf("openapi/v2.yaml lists %v, the newspaper declares %v", listed, want)
+	}
+}

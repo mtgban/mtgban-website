@@ -24,7 +24,7 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config().APIGateway
 	t.Cleanup(func() { DevMode, SigCheck, Config().APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}, NewspaperOnSale: savedCfg.NewspaperOnSale}
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req.Host = "mtgban.com"
@@ -480,6 +480,35 @@ func TestAPIStoresIsGetOnly(t *testing.T) {
 	APIStores(rec, httptest.NewRequest(http.MethodPost, "/api-plans/stores.json", nil))
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status %d", rec.Code)
+	}
+}
+
+// The newspaper add-on reaches the page and its data only once the flag is set.
+func TestAPIPlansNewspaperAddonBehindTheFlag(t *testing.T) {
+	withConfigCopy(t)
+	Config().APIGateway.NewspaperOnSale = false
+	off := apiPlansPage(t, "")
+	for _, absent := range []string{`name="addons"`, "Newspaper reports", `"mode_addons"`, `"newspaper":`, `"addon_applies"`} {
+		if strings.Contains(off, absent) {
+			t.Errorf("off sale, the page carries %s", absent)
+		}
+	}
+
+	Config().APIGateway.NewspaperOnSale = true
+	on := apiPlansPage(t, "")
+	for _, present := range []string{
+		`<label class="api-choice"><input type="checkbox" name="addons" value="newspaper"> Newspaper reports, $1/month</label>`,
+		`"mode_addons":["newspaper"]`,
+		`"newspaper":`,
+		`"addon_applies":{"newspaper":["starter","all_stores","all_data"]}`,
+	} {
+		if !strings.Contains(on, present) {
+			t.Errorf("on sale, the page lacks %s", present)
+		}
+	}
+	// Below the games picker, above billing.
+	if games, box, billing := strings.Index(on, `name="games"`), strings.Index(on, `name="addons"`), strings.Index(on, "<legend>Billing</legend>"); !(games < box && box < billing) {
+		t.Errorf("checkbox out of place: games %d addons %d billing %d", games, box, billing)
 	}
 }
 

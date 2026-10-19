@@ -55,6 +55,8 @@ type APIPlansVars struct {
 	WantedStores []string
 	// PaidStores are keys a change request names that this site no longer offers.
 	PaidStores []string
+	// ModeAddons are the add-ons that grant a mode, listed once on sale.
+	ModeAddons []apiproductlist.Addon
 
 	// TrialDays must match the gateway's trial_days config.
 	TrialDays int
@@ -178,6 +180,11 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	if a, ok := apiProducts.Addon("extra_store"); ok {
 		v.ExtraStoreMonthly = a.Monthly
 	}
+	for _, a := range apiProducts.Addons {
+		if modeAddonOnSale(a) {
+			v.ModeAddons = append(v.ModeAddons, a)
+		}
+	}
 	// The gateway signs in whoever the email names, so Patreon must have confirmed it.
 	emailOK := v.Email != "" && GetParamFromSig(sig, "UserEmailUnverified") != "true"
 	v.HandoffOn = emailOK && apiGatewaySecret() != ""
@@ -187,6 +194,11 @@ func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 		v.Games = append(v.Games, APIPlanGame{Key: g, Name: mtgmatcher.Title(string(g)), Checked: g == Config().Game})
 	}
 	return v
+}
+
+// modeAddonOnSale reports whether a mode add-on is sold here: the newspaper, once its flag is set.
+func modeAddonOnSale(a apiproductlist.Addon) bool {
+	return a.GrantsMode == apiproductlist.ModeNewspaper && Config().APIGateway.NewspaperOnSale
 }
 
 // familyKeys maps each lowercased configured shorthand to its family key, the config key up to its first underscore.
@@ -363,17 +375,27 @@ func apiPlansJSON(v *APIPlansVars) template.JS {
 		Count int64  `json:"count"`
 	}
 	out := struct {
-		Packages      []pkg            `json:"packages"`
-		Addons        map[string]int64 `json:"addons"`
-		Intervals     []interval       `json:"intervals"`
-		IncludedGames int              `json:"includedGames"`
-		StoreKeys     []string         `json:"storeKeys,omitempty"`
-	}{Addons: map[string]int64{}, IncludedGames: v.Products.IncludedGames, StoreKeys: v.WantedStores}
+		Packages      []pkg               `json:"packages"`
+		Addons        map[string]int64    `json:"addons"`
+		ModeAddons    []string            `json:"mode_addons,omitempty"`
+		AddonApplies  map[string][]string `json:"addon_applies,omitempty"`
+		Intervals     []interval          `json:"intervals"`
+		IncludedGames int                 `json:"includedGames"`
+		StoreKeys     []string            `json:"storeKeys,omitempty"`
+	}{Addons: map[string]int64{}, AddonApplies: map[string][]string{}, IncludedGames: v.Products.IncludedGames, StoreKeys: v.WantedStores}
 	for _, p := range v.Products.Packages {
 		out.Packages = append(out.Packages, pkg{p.Key, p.Name, p.Monthly, p.StoreScope == apiproductlist.StoreScopeExplicit, p.IncludedStores})
 	}
 	for _, a := range v.Products.Addons {
+		// Off sale, a mode add-on stays out of the page source too.
+		if a.GrantsMode != "" && !slices.ContainsFunc(v.ModeAddons, func(m apiproductlist.Addon) bool { return m.Key == a.Key }) {
+			continue
+		}
 		out.Addons[a.Key] = a.Monthly
+	}
+	for _, a := range v.ModeAddons {
+		out.ModeAddons = append(out.ModeAddons, a.Key)
+		out.AddonApplies[a.Key] = a.AppliesTo
 	}
 	for _, iv := range v.Products.Intervals {
 		out.Intervals = append(out.Intervals, interval{iv.Key, iv.Count})
