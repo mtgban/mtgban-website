@@ -67,8 +67,9 @@ func TestChartPointReadsNonFiniteAsGap(t *testing.T) {
 	}
 }
 
-// Postgres double precision holds NaN and Infinity, and the archive predates
-// any guard, so a historic row can carry one into a chart.
+// The archive's numeric price column holds NaN, and predates any guard, so a
+// historic row can carry one into a chart. Infinity is checked too, though a
+// numeric(10,2) column cannot hold it.
 func TestPriceAtTreatsNonFiniteAsGap(t *testing.T) {
 	results := map[string]timeseries.ProviderPrices{
 		"2026-09-24": {1: math.NaN(), 2: math.Inf(1), 3: 5},

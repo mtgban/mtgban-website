@@ -511,7 +511,7 @@ func priceAt(results map[string]timeseries.ProviderPrices, label string, provide
 	}
 	price, ok := pp[provider]
 	if !ok || !isFinitePrice(price) {
-		// The archive can hold NaN or Infinity from before snapshots refused them.
+		// The archive's numeric column can hold NaN from before snapshots refused it.
 		return ChartPoint{}
 	}
 	return ChartPoint{Price: price, Known: true}

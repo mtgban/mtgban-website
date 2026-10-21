@@ -152,7 +152,7 @@ const aggregatePriceStatsQuery = `
 		       COALESCE(MAX(p.price) FILTER (WHERE p.date < $3), 0)  AS prior_max
 		  FROM prices p
 		  JOIN variants v ON v.ban_id = p.ban_id
-		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0 AND p.price < 'Infinity'
+		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0 AND p.price <> 'NaN'
 		   AND v.mtgjson_uuid IS NOT NULL
 		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched`
 
@@ -162,8 +162,9 @@ const aggregatePriceStatsQuery = `
 // lookups while iterating a buylist/inventory. Scoped to Magic variants
 // (mtgjson_uuid IS NOT NULL) so a shared provider (3/4) doesn't pull other games'
 // rows (plan 17.3). price > 0 is redundant with the zero-omitting backfill but
-// kept defensive; price < 'Infinity' drops the NaN and Infinity rows the
-// archive can hold, which pass > 0 and would win MAX and the percentile.
+// kept defensive. The numeric price column can hold NaN, which sorts above
+// every number, passes > 0 and would win MAX and the percentile; <> 'NaN'
+// drops it on any Postgres, where 'Infinity' parses as numeric only on 14+.
 func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
 	rows, err := c.db.QueryContext(ctx, aggregatePriceStatsQuery, provider, since, cutoff)
 	if err != nil {
@@ -369,6 +370,9 @@ func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory in
 // but old is referenced once, so PG12+ inlines it and that is all the nested
 // loop needs. Saying it on both arms means neither depends on how many times
 // the query below happens to name them.
+//
+// Each arm also drops NaN, which the numeric price column can hold and which
+// sorts above every number, so it would pass the minimum price.
 func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Time, minPrice, minPriorPrice float64) (string, []any) {
 	args := []any{provider, latest, prior, minPrice, minPriorPrice}
 	scope, scopeArgs := moverScope(tcgCategory, len(args)+1)
@@ -377,11 +381,11 @@ func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Tim
 	return `
 		WITH cur AS MATERIALIZED (
 			SELECT ban_id, price FROM prices
-			 WHERE provider=$1 AND date=$2 AND price >= $4 AND price < 'Infinity'
+			 WHERE provider=$1 AND date=$2 AND price >= $4 AND price <> 'NaN'
 		),
 		old AS MATERIALIZED (
 			SELECT ban_id, price FROM prices
-			 WHERE provider=$1 AND date=$3 AND price >= $5 AND price < 'Infinity'
+			 WHERE provider=$1 AND date=$3 AND price >= $5 AND price <> 'NaN'
 		)
 		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
 		       v.tcgp_product_id, v.tcgp_sub_type,
