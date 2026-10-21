@@ -69,6 +69,8 @@ func TestSetMark(t *testing.T) {
 		{"4BB", "Fourth Edition Foreign Black Border", "BB"},
 		{"LEGITA", "Legends Italian", "ITA"},
 		{"4EDALT", "Alternate Fourth Edition", "ALT"},
+		{"CED", "Collectors' Edition", "CED"},
+		{"CEI", "Intl. Collectors' Edition", "CEI"},
 		{"PROMOS", "Promos of Theros", ""},
 	} {
 		got := SetMark(tc.code, tc.name)
