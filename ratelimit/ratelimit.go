@@ -23,18 +23,25 @@ type visitor struct {
 type Limiter struct {
 	sync.RWMutex
 
-	burst    int
-	rate     rate.Limit
-	visitors map[string]*visitor
+	burst       int
+	rate        rate.Limit
+	visitors    map[string]*visitor
+	maxVisitors int
 }
+
+// DefaultMaxVisitors caps the keys a Limiter holds, a few tens of MB at
+// most, so a flood of distinct keys cannot outgrow memory between the
+// janitor's runs.
+const DefaultMaxVisitors = 100_000
 
 // NewLimiter returns a limiter allowing rate r with the given burst for
 // each visitor.
 func NewLimiter(r rate.Limit, burst int) *Limiter {
 	l := &Limiter{
-		rate:     r,
-		burst:    burst,
-		visitors: map[string]*visitor{},
+		rate:        r,
+		burst:       burst,
+		visitors:    map[string]*visitor{},
+		maxVisitors: DefaultMaxVisitors,
 	}
 	// Bound the visitors map: evict entries idle past 30m, checked every 10m.
 	go l.janitor(10*time.Minute, 30*time.Minute)
@@ -53,6 +60,14 @@ func (l *Limiter) Allow(key string) bool {
 		if existing, ok := l.visitors[key]; ok {
 			v = existing
 		} else {
+			// At the cap, drop an arbitrary key: it starts over with a
+			// full burst, which costs less than refusing every new one.
+			if len(l.visitors) >= l.maxVisitors {
+				for k := range l.visitors {
+					delete(l.visitors, k)
+					break
+				}
+			}
 			v = &visitor{Limiter: rate.NewLimiter(l.rate, l.burst)}
 			l.visitors[key] = v
 		}
@@ -82,31 +97,22 @@ func (l *Limiter) janitor(interval, maxAge time.Duration) {
 	}
 }
 
-// IPAddress extracts the caller's IP, trusting the forwarding headers
-// before the socket.
+// IPAddress is the caller's address as the nearest proxy saw it: the last
+// X-Forwarded-For entry, which nginx appends from $remote_addr, skipping
+// private and loopback hops; else the socket. Entries before it are
+// whatever the client sent, so they never pick the key.
 func IPAddress(r *http.Request) (net.IP, error) {
-	// Try headers first
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff != "" {
-		// Take the first IP from the comma list
-		// The first IP is the real client, and the rest are proxies.
-		parts := strings.Split(xff, ",")
-		ipStr := strings.TrimSpace(parts[0])
-		ip := net.ParseIP(ipStr)
-		if ip != nil {
+	entries := forwardedFor(r)
+	for i := len(entries) - 1; i >= 0; i-- {
+		ip := net.ParseIP(entries[i])
+		if ip == nil {
+			break
+		}
+		if !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() {
 			return ip, nil
 		}
 	}
 
-	xrip := strings.TrimSpace(r.Header.Get("X-Real-Ip"))
-	if xrip != "" {
-		ip := net.ParseIP(xrip)
-		if ip != nil {
-			return ip, nil
-		}
-	}
-
-	// Fall back to RemoteAddr (this one *is* ip:port)
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid RemoteAddr: %q", r.RemoteAddr)
@@ -117,4 +123,26 @@ func IPAddress(r *http.Request) (net.IP, error) {
 	}
 
 	return ip, nil
+}
+
+// FirstForwarded is the first X-Forwarded-For entry, or nil. Only a proxy
+// that replaces the header, as the API gateway does, can vouch for it, so
+// read it only for a request that proxy is known to have sent.
+func FirstForwarded(r *http.Request) net.IP {
+	entries := forwardedFor(r)
+	if len(entries) == 0 {
+		return nil
+	}
+	return net.ParseIP(entries[0])
+}
+
+// forwardedFor lists the X-Forwarded-For entries across every header line.
+func forwardedFor(r *http.Request) []string {
+	var entries []string
+	for _, line := range r.Header.Values("X-Forwarded-For") {
+		for part := range strings.SplitSeq(line, ",") {
+			entries = append(entries, strings.TrimSpace(part))
+		}
+	}
+	return entries
 }
