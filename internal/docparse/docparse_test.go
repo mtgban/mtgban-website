@@ -2,8 +2,10 @@ package docparse
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -339,5 +341,100 @@ func TestBannerHeaderReachesNotes(t *testing.T) {
 		if header[at] == "mkm_language" || header[at] == "article_id" {
 			t.Errorf("%s was read as %s", header[at], key)
 		}
+	}
+}
+
+// mergeByScan is MergeIdenticalEntries as it was: every repeat scanned the
+// merged list from the top for its first copy.
+func mergeByScan(entries []Entry) []Entry {
+	var out []Entry
+	seen := map[string]bool{}
+	for _, e := range entries {
+		if e.CardID == "" {
+			out = append(out, e)
+			continue
+		}
+		sku := e.CardID + string(e.OriginalCondition) + e.UnpackedFrom
+		if seen[sku] {
+			for j := range out {
+				if e.CardID == out[j].CardID && e.OriginalCondition == out[j].OriginalCondition &&
+					e.UnpackedFrom == out[j].UnpackedFrom {
+					if out[j].Quantity == 0 {
+						out[j].Quantity++
+					}
+					out[j].Quantity += e.QuantityOrOne()
+					out[j].HasQuantity = true
+					break
+				}
+			}
+			continue
+		}
+		seen[sku] = true
+		out = append(out, e)
+	}
+	return out
+}
+
+func sameMerged(a, b Entry) bool {
+	return a.CardID == b.CardID && a.OriginalCondition == b.OriginalCondition &&
+		a.UnpackedFrom == b.UnpackedFrom && a.Quantity == b.Quantity &&
+		a.HasQuantity == b.HasQuantity && a.Notes == b.Notes &&
+		a.OriginalPrice == b.OriginalPrice && a.Unpacked == b.Unpacked &&
+		a.MismatchError == b.MismatchError
+}
+
+func TestMergeIdenticalEntriesMatchesTheListScan(t *testing.T) {
+	failed := errors.New("no match")
+	const a, b, c = "0b5e2a3c-0000-4000-8000-00000000000a", "0b5e2a3c-0000-4000-8000-00000000000b",
+		"0b5e2a3c-0000-4000-8000-00000000000c"
+	entries := []Entry{
+		{CardID: a, Quantity: 2, HasQuantity: true, Notes: "first"},
+		{MismatchError: failed},
+		{CardID: b, OriginalCondition: mtgban.NM},
+		{CardID: a, Quantity: 3, HasQuantity: true, Notes: "dropped"},
+		{CardID: a, OriginalCondition: mtgban.SP, Quantity: 1, HasQuantity: true},
+		{CardID: b, OriginalCondition: mtgban.NM},
+		{CardID: c, UnpackedFrom: b, Quantity: 1, HasQuantity: true},
+		{CardID: c, Quantity: 4, HasQuantity: true},
+		{MismatchError: failed},
+		{CardID: c, UnpackedFrom: b, Quantity: 2, HasQuantity: true},
+		{CardID: b, Unpacked: true, Quantity: 1, HasQuantity: true},
+		{CardID: a, OriginalCondition: mtgban.SP},
+		{CardID: c, UnpackedFrom: a, Quantity: 1, HasQuantity: true},
+		{CardID: c, Quantity: 0, HasQuantity: false},
+	}
+
+	want := mergeByScan(slices.Clone(entries))
+	got := MergeIdenticalEntries(slices.Clone(entries))
+	if !slices.EqualFunc(got, want, sameMerged) {
+		t.Fatalf("merged\n%+v\nwant\n%+v", got, want)
+	}
+	if len(got) != 9 || got[0].Quantity != 5 || got[2].Quantity != 2 {
+		t.Errorf("unexpected merge %+v", got)
+	}
+}
+
+// A list of distinct ids followed by repeats of the last one made every
+// repeat scan the whole merged list: 950 KB of rows took 29 s of CPU.
+func TestMergeIdenticalEntriesIsLinear(t *testing.T) {
+	const n = 100000
+	entries := make([]Entry, 0, 2*n)
+	for i := range n {
+		entries = append(entries, Entry{CardID: fmt.Sprintf("id%d", i)})
+	}
+	for range n {
+		entries = append(entries, Entry{CardID: fmt.Sprintf("id%d", n-1), Quantity: 1, HasQuantity: true})
+	}
+
+	start := time.Now()
+	merged := MergeIdenticalEntries(entries)
+	elapsed := time.Since(start)
+
+	if len(merged) != n || merged[n-1].Quantity != n+1 {
+		t.Fatalf("merged to %d rows, the last x%d", len(merged), merged[len(merged)-1].Quantity)
+	}
+	// Linear takes tens of milliseconds; the scan took minutes.
+	if elapsed > 5*time.Second {
+		t.Errorf("merging %d rows took %v", len(entries), elapsed)
 	}
 }

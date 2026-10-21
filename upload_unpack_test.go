@@ -614,10 +614,10 @@ func TestUnpackedResultsExportAsOneFile(t *testing.T) {
 // hands back an empty form rather than a short one.
 func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 	hashes, qtys, cond, prices, notes, from, fromQtys := splitRows(
-		"uuid-a\t2\tNM\t1.50\tA Precon\tbox-a\t2\n" +
-			"uuid-b\t1\t\t0\t\t\t\n" +
-			"\n" +
-			"uuid-c\t3\tSP\t9.99\tAnother Precon\tbox-b\t1\n")
+		"uuid-a\t2\tNM\t1.50\tA Precon\tbox-a\t2\n"+
+			"uuid-b\t1\t\t0\t\t\t\n"+
+			"\n"+
+			"uuid-c\t3\tSP\t9.99\tAnother Precon\tbox-b\t1\n", 0)
 
 	if len(hashes) != 3 {
 		t.Fatalf("got %d rows, want 3 (the empty line is not one)", len(hashes))
@@ -639,11 +639,60 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 
 	// A row that lost its trailing fields keeps the ones it has, which is how
 	// a column can be added without breaking a page that predates it.
-	hashes, qtys, cond, prices, notes, from, fromQtys = splitRows("uuid-d\t1\n")
+	hashes, qtys, cond, prices, notes, from, fromQtys = splitRows("uuid-d\t1\n", 0)
 	if len(hashes) != 1 || hashes[0] != "uuid-d" || qtys[0] != "1" || cond[0] != "" ||
 		prices[0] != "" || notes[0] != "" || from[0] != "" || fromQtys[0] != "" {
 		t.Errorf("a short row came back as %v %v %v %v %v %v %v",
 			hashes, qtys, cond, prices, notes, from, fromQtys)
+	}
+}
+
+// postedRows is what readUploadInput makes of a page posting rows back.
+func postedRows(t *testing.T, packed string, maxRows int) uploadInput {
+	t.Helper()
+	form := url.Values{"rows": {packed}}
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatal(err)
+	}
+	return readUploadInput(req, maxRows)
+}
+
+// A page posting its rows back is held to the row cap every other upload
+// has; only the cards an opened product put on the page are over it, as
+// unpacking is, and those stop at the most a share stores.
+func TestPostedRowsStopAtTheRowCap(t *testing.T) {
+	var packed strings.Builder
+	for i := range 1000 {
+		fmt.Fprintf(&packed, "id%d\t1\n", i)
+	}
+	for i := range 600 {
+		fmt.Fprintf(&packed, "card%d\t1\t\t\t\tbox\t1\n", i)
+	}
+
+	in := postedRows(t, packed.String(), MaxUploadEntries)
+	if got, want := len(in.hashes), MaxUploadEntries+600; got != want {
+		t.Fatalf("kept %d rows, want the first %d loose ones and the 600 opened", got, MaxUploadEntries)
+	}
+	for _, f := range [][]string{in.hashesQtys, in.hashesCond, in.hashesPrice, in.hashesNotes,
+		in.hashesFrom, in.hashesFromQtys} {
+		if len(f) != len(in.hashes) {
+			t.Fatalf("a column holds %d rows, the hashes %d", len(f), len(in.hashes))
+		}
+	}
+	if in.hashes[MaxUploadEntries-1] != fmt.Sprintf("id%d", MaxUploadEntries-1) ||
+		in.hashes[MaxUploadEntries] != "card0" || in.hashesFrom[MaxUploadEntries] != "box" {
+		t.Errorf("kept %q then %q from %q", in.hashes[MaxUploadEntries-1],
+			in.hashes[MaxUploadEntries], in.hashesFrom[MaxUploadEntries])
+	}
+
+	packed.Reset()
+	for i := range MaxUploadTotalEntries + 5000 {
+		fmt.Fprintf(&packed, "card%d\t1\t\t\t\tbox\t1\n", i)
+	}
+	if got := len(postedRows(t, packed.String(), MaxUploadEntries).hashes); got != MaxUploadTotalEntries {
+		t.Errorf("kept %d opened cards, want %d", got, MaxUploadTotalEntries)
 	}
 }
 

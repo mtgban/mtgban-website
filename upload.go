@@ -590,7 +590,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanShare = GetParamFromSig(sig, "UserEmail") != "" || (DevMode && !SigCheck)
 
 	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
-	in := readUploadInput(r)
+	in := readUploadInput(r, modes.maxRows)
 	if shared != nil {
 		in = withSharedRows(in, shared.Rows, modes.maxRows)
 	}
@@ -1713,9 +1713,10 @@ type uploadInput struct {
 	shared bool
 }
 
-// readUploadInput reads the list a request carries. A file that came is left
-// open for the caller to close.
-func readUploadInput(r *http.Request) uploadInput {
+// readUploadInput reads the list a request carries, a packed row list cut
+// as splitRows says for maxRows. A file that came is left open for the
+// caller to close.
+func readUploadInput(r *http.Request, maxRows int) uploadInput {
 	// Load a list of uuids from newspaper or search
 	hashes := r.Form["hashes"]
 	hashesQtys := r.Form["hashesQtys"]
@@ -1729,7 +1730,7 @@ func readUploadInput(r *http.Request) uploadInput {
 	packed := r.FormValue("rows")
 	if packed != "" {
 		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes,
-			hashesFrom, hashesFromQtys = splitRows(packed)
+			hashesFrom, hashesFromQtys = splitRows(packed, maxRows)
 	}
 
 	// Load spreadsheet cloud url if present
@@ -1803,7 +1804,7 @@ func knownShareCondition(cond string) bool {
 // and a URL note would become their price link.
 func withSharedRows(in uploadInput, rows string, maxRows int) uploadInput {
 	in.hashes, in.hashesQtys, in.hashesCond, in.hashesPrice, _,
-		in.hashesFrom, in.hashesFromQtys = splitRows(rows)
+		in.hashesFrom, in.hashesFromQtys = splitRows(rows, 0)
 	if maxRows > 0 {
 		for _, f := range []*[]string{&in.hashes, &in.hashesQtys, &in.hashesCond, &in.hashesPrice,
 			&in.hashesFrom, &in.hashesFromQtys} {
@@ -2493,9 +2494,22 @@ func restoreOpenedProducts(entries []UploadEntry) []UploadEntry {
 // The arrays are still read when this is absent: a hash transfer from search
 // or the newspaper posts those, and they are short enough never to have been
 // near the ceiling.
-func splitRows(packed string) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
-	for _, line := range strings.Split(packed, "\n") {
+//
+// Rows are kept the way a file's are, the first maxRows of them when that is
+// positive. The cards an opened product put on the page (a from column) are
+// over that, as unpacking is, and MaxUploadTotalEntries in all, the most a
+// share stores: a 10 MB body is millions of rows.
+func splitRows(packed string, maxRows int) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
+	var own int
+	for packed != "" && len(hashes) < MaxUploadTotalEntries {
+		var line string
+		line, packed, _ = strings.Cut(packed, "\n")
 		if line == "" {
+			continue
+		}
+		// Past the cap, a row with no from column is passed over unsplit.
+		capped := maxRows > 0 && own >= maxRows
+		if capped && strings.Count(line, "\t") < 5 {
 			continue
 		}
 
@@ -2504,6 +2518,12 @@ func splitRows(packed string) (hashes, qtys, cond, prices, notes, from, fromQtys
 		fields := strings.SplitN(line, "\t", 7)
 		for len(fields) < 7 {
 			fields = append(fields, "")
+		}
+		if fields[5] == "" {
+			if capped {
+				continue
+			}
+			own++
 		}
 
 		hashes = append(hashes, fields[0])

@@ -183,8 +183,18 @@ func PartitionEntries(entries []Entry, sealedIDs []string) (singles, sealed, not
 // MergeIdenticalEntries collapses rows with the same card and condition into
 // one entry, accumulating quantities.
 func MergeIdenticalEntries(uploadedData []Entry) []Entry {
+	// Use id + condition to mimic a "sku", and the product it came out of
+	// where there is one: two precons holding the same staple hold one
+	// each, and a view that reads a box at a time has to say so in both.
+	type sku struct {
+		id, from  string
+		condition mtgban.Condition
+	}
+
 	var uploadedDataClean []Entry
-	duplicatedHashes := map[string]bool{}
+	// Where each sku's first row sits in uploadedDataClean, so a repeat
+	// is added to it without scanning the list.
+	firstRow := map[sku]int{}
 
 	for i := range uploadedData {
 		// Preserve empty results (for errors and whatnot)
@@ -193,31 +203,17 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 			continue
 		}
 
-		// Use id + condition to mimic a "sku", and the product it came out of
-		// where there is one: two precons holding the same staple hold one
-		// each, and a view that reads a box at a time has to say so in both.
-		sku := uploadedData[i].CardID + string(uploadedData[i].OriginalCondition) + uploadedData[i].UnpackedFrom
-
-		if duplicatedHashes[sku] {
-			qty := uploadedData[i].QuantityOrOne()
-
-			// Iterate on the already added cards to update the quantity
-			for j := range uploadedDataClean {
-				if uploadedData[i].CardID == uploadedDataClean[j].CardID &&
-					uploadedData[i].OriginalCondition == uploadedDataClean[j].OriginalCondition &&
-					uploadedData[i].UnpackedFrom == uploadedDataClean[j].UnpackedFrom {
-					if uploadedDataClean[j].Quantity == 0 {
-						uploadedDataClean[j].Quantity++
-					}
-					uploadedDataClean[j].Quantity += qty
-					uploadedDataClean[j].HasQuantity = true
-					break
-				}
+		key := sku{uploadedData[i].CardID, uploadedData[i].UnpackedFrom, uploadedData[i].OriginalCondition}
+		if j, found := firstRow[key]; found {
+			if uploadedDataClean[j].Quantity == 0 {
+				uploadedDataClean[j].Quantity++
 			}
+			uploadedDataClean[j].Quantity += uploadedData[i].QuantityOrOne()
+			uploadedDataClean[j].HasQuantity = true
 			continue
 		}
 
-		duplicatedHashes[sku] = true
+		firstRow[key] = len(uploadedDataClean)
 		uploadedDataClean = append(uploadedDataClean, uploadedData[i])
 	}
 
