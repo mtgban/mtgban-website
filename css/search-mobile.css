@@ -624,6 +624,15 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     opacity: 0.5;
 }
 
+/* A store the default search blocklist hides: only this reader's tier sees
+   it. The badges beside the name stay upright. */
+.m-vendor-name.m-vendor-restricted {
+    font-style: italic;
+}
+.m-vendor-restricted > :not(.m-vendor-link) {
+    font-style: normal;
+}
+
 .m-vendor-right {
     display: grid;
     grid-template-columns: 6em 2em 1.4em;

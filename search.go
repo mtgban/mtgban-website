@@ -84,6 +84,10 @@ type SearchEntry struct {
 	ExtraValues map[string]float64
 
 	Locked bool
+
+	// Restricted marks a store the config's default search blocklist hides,
+	// so only a tier that lifts it sees the row.
+	Restricted bool
 }
 
 // marketValue is what a buylist offer is worth on the market: its store
@@ -1902,6 +1906,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 		// per store instead of once per entry
 		info := seller.Info()
 		name := scraperName(info.Shorthand)
+		restricted := slices.Contains(Config().Stores.SearchRetailBlockList, info.Shorthand)
 
 		for _, cardID := range cardIDs {
 			entries, found := inventory[cardID]
@@ -1942,6 +1947,7 @@ func searchSellersNG(cardIDs []string, config SearchConfig) (foundSellers map[st
 					PriceUnit:   quantityUnit(info.QuantityPriority),
 					Country:     Country2flag[info.CountryFlag],
 					ExtraValues: entry.ExtraValues,
+					Restricted:  restricted,
 				}
 				if info.CreditMultiplier > 0 {
 					res.Credit = entry.Price / info.CreditMultiplier
@@ -1975,6 +1981,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 		// in searchSellersNG
 		info := vendor.Info()
 		name := scraperName(info.Shorthand)
+		restricted := slices.Contains(Config().Stores.SearchBuylistBlockList, info.Shorthand)
 
 		for _, cardID := range cardIDs {
 			entries, found := buylist[cardID]
@@ -2011,6 +2018,7 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 					BundleIcon:   icon,
 					PriceUnit:    quantityUnit(info.QuantityPriority),
 					Country:      Country2flag[info.CountryFlag],
+					Restricted:   restricted,
 				}
 
 				foundVendors[cardID][conditions] = append(foundVendors[cardID][conditions], res)

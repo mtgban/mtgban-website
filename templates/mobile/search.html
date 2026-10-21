@@ -397,7 +397,7 @@
                                 </div>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
-                                    <span class="m-vendor-name">
+                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
                                     </span>
                                     <span class="m-vendor-right">
@@ -428,7 +428,7 @@
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
-                                        <span class="m-vendor-name">
+                                        <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
                                             {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
@@ -449,7 +449,7 @@
                                 </details>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
-                                    <span class="m-vendor-name">
+                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
@@ -489,7 +489,7 @@
                                 </div>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
-                                    <span class="m-vendor-name">
+                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
                                     </span>
                                     <span class="m-vendor-right">
@@ -525,7 +525,7 @@
                                 {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
-                                        <span class="m-vendor-name">
+                                        <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
                                             {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                             {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
@@ -565,7 +565,7 @@
                                 </details>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
-                                    <span class="m-vendor-name">
+                                    <span class="m-vendor-name{{if $entry.Restricted}} m-vendor-restricted{{end}}">
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                         {{if eq $conditions "NM"}}{{buylist_badge $entry.Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait $entry.Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause $entry.Shorthand $conditions $card.CKPause $card.CKPauseTip}}{{buylist_pause_wait $entry.Shorthand $conditions $card.CKPauseWait}}
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
