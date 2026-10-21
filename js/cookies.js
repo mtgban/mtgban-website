@@ -1,16 +1,17 @@
 // Search preferences are shared by /search and /sealed, and the custom
 // buylist is set up on /upload but priced into /search too. Other browser
-// preferences belong to the first path segment of the page that edits them.
+// preferences belong to owner, the path of the page that reads them, or
+// the current page's first path segment when no owner is named.
 function routePath() {
     const match = window.location.pathname.match(/^\/[^/]+/);
     return match ? match[0] : '/';
 }
 
-function cookiePath(cname) {
+function cookiePath(cname, owner) {
     if (cname.startsWith('Search') || cname.startsWith('MobileSearch') || cname.startsWith('UploadCustom')) {
         return '/';
     }
-    return routePath();
+    return owner || routePath();
 }
 
 function writeCookie(cname, cvalue, exdays, path) {
@@ -26,16 +27,18 @@ function writeCookie(cname, cvalue, exdays, path) {
     document.cookie = cname + "=" + cvalue + ";" + expires + ";path=" + path + ";SameSite=Strict";
 }
 
-function setCookie(cname, cvalue, exdays) {
-    const path = cookiePath(cname);
+function setCookie(cname, cvalue, exdays, owner) {
+    const path = cookiePath(cname, owner);
     writeCookie(cname, cvalue, exdays, path);
 
-    // Expire the copy at the other path, a legacy root one or a route one
-    // left by an older build, so two values with one name are never sent.
-    const other = path === '/' ? routePath() : '/';
-    if (other !== path) {
-        writeCookie(cname, '', 0, other);
-    }
+    // Expire the copies at the other paths, a legacy root one or one an
+    // older build left at the page it was saved on, so two values with one
+    // name are never sent.
+    ['/', routePath()].forEach(function (other, i, all) {
+        if (other !== path && all.indexOf(other) === i) {
+            writeCookie(cname, '', 0, other);
+        }
+    });
 }
 
 function getCookie(cname) {

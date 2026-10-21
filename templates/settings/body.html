@@ -16,7 +16,7 @@
     </nav>
     <div class="settings-panes">
         {{range .Tabs}}
-        <section class="settings-pane" role="tabpanel" data-tab="{{.}}" hidden>
+        <section class="settings-pane" role="tabpanel" data-tab="{{.}}" data-path="{{index $.TabPaths .}}" hidden>
             {{if eq . "search"}}{{template "settings-tab-search" $}}{{end}}
             {{if eq . "upload"}}{{template "settings-tab-upload" $}}{{end}}
             {{if eq . "arbit"}}{{template "settings-tab-vendors" (dict "Keys" $.ArbitVendorKeys "GridId" "settings-arbit-vendors" "CookieName" "ArbitVendorsList")}}{{end}}

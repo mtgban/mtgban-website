@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"slices"
@@ -167,11 +168,24 @@ func settingsTabs(nav []NavElem, offlineAllowed bool) []string {
 	return tabs
 }
 
+// settingsTabPaths is the path of the page each tab's settings belong to,
+// the first page in nav that opens the tab, for the cookies it keeps there.
+func settingsTabPaths(nav []NavElem) map[string]string {
+	paths := map[string]string{}
+	for _, elem := range nav {
+		if elem.SettingsTab != "" && paths[elem.SettingsTab] == "" {
+			paths[elem.SettingsTab] = elem.Link
+		}
+	}
+	return paths
+}
+
 // settingsModalVars is everything the modal body renders from.
 type settingsModalVars struct {
 	Hash     string
 	Tabs     []string
 	TabNames map[string]string
+	TabPaths map[string]string
 
 	// search
 	SellerKeys    []string
@@ -232,6 +246,7 @@ func settingsModalData(s *site, r *http.Request) settingsModalVars {
 		Hash:               assetHash(),
 		Tabs:               settingsTabs(nav, offlineAllowed),
 		TabNames:           settingsTabNames,
+		TabPaths:           settingsTabPaths(nav),
 		ListingLocked:      sig == "" && SigCheck,
 		OfflineModeAllowed: offlineAllowed,
 		EditionsCategories: ds.editions.AllEditionsCategoriesSorted,
@@ -282,4 +297,20 @@ func (s *site) SettingsModal(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Write(buf.Bytes())
+}
+
+// SettingsValues answers the settings modal, opened on another page, with
+// the named cookies this page keeps at its own path: only a request under
+// that path carries them. Root cookies, the signature among them, are left
+// out, since every page reads those itself.
+func SettingsValues(w http.ResponseWriter, r *http.Request) {
+	values := map[string]string{}
+	for _, name := range r.URL.Query()["name"] {
+		if cookiePath(r, name, false) != "/" {
+			values[name] = readCookie(r, name)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "private, no-store")
+	json.NewEncoder(w).Encode(values)
 }

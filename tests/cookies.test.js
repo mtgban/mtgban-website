@@ -57,3 +57,39 @@ test('route-local cookies use only the first path segment', () => {
 
     expect(writes[0]).toContain('path=/sleepers');
 });
+
+// The settings modal opens every tab on every page, so a tab saved on
+// /search writes its cookie where its own page reads it.
+test('a cookie saved for another page goes to that page and expires the strays', () => {
+    const { api, writes } = loadCookies({ pathname: '/search' });
+
+    api.setCookie('ArbitVendorsList', 'CK,', 1000, '/arbit');
+
+    expect(writes).toHaveLength(3);
+    expect(writes[0]).toContain('ArbitVendorsList=CK,;');
+    expect(writes[0]).toContain('path=/arbit;');
+    expect(writes[1]).toStartWith('ArbitVendorsList=;');
+    expect(writes[1]).toContain('path=/;');
+    expect(writes[2]).toStartWith('ArbitVendorsList=;');
+    expect(writes[2]).toContain('path=/search;');
+});
+
+test('a cookie saved on its own page expires only the root copy', () => {
+    const { api, writes } = loadCookies({ pathname: '/arbit' });
+
+    api.setCookie('ArbitVendorsList', 'CK,', 1000, '/arbit');
+
+    expect(writes).toHaveLength(2);
+    expect(writes[0]).toContain('path=/arbit;');
+    expect(writes[1]).toContain('path=/;');
+});
+
+test('a root cookie stays at the root whatever page owns it', () => {
+    const { api, writes } = loadCookies({ pathname: '/search' });
+
+    api.setCookie('UploadCustomRate', '0.8', 1000, '/upload');
+
+    expect(writes).toHaveLength(2);
+    expect(writes[0]).toContain('path=/;');
+    expect(writes[1]).toContain('path=/search;');
+});
