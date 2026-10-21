@@ -92,6 +92,60 @@
     function addBinding(b) { bindings.push(b); }
     function hasBindings() { return bindings.length > 0; }
 
+    // ============================================================
+    // Each tab's cookies live at the path of the page that reads them,
+    // its pane's data-path. This page cannot read those kept at another
+    // page's path, so the body load fetches them from there.
+    // ============================================================
+    // path -> names this page cannot read, as the bindings claim them
+    let elsewhere = {};
+    // name -> value, fetched from its page's path
+    let fetched = {};
+    // Every tab's page path: an older build may have left a copy of any
+    // tab's cookie at any of them
+    let tabPaths = [];
+
+    // claim returns the path of the page that reads cookieName, noting the
+    // cookie when it lives at another page's path.
+    function claim(cookieName, el) {
+        const pane = el.closest('.settings-pane');
+        const owner = (pane && pane.dataset.path) || routePath();
+        const path = cookiePath(cookieName, owner);
+        if (path !== '/' && path !== routePath()) {
+            (elsewhere[path] = elsewhere[path] || []).push(cookieName);
+        }
+        return owner;
+    }
+
+    function readSetting(cookieName) {
+        return Object.prototype.hasOwnProperty.call(fetched, cookieName) ? fetched[cookieName] : getCookie(cookieName);
+    }
+
+    function writeSetting(cookieName, value, owner) {
+        setCookie(cookieName, value, 1000, owner);
+        const path = cookiePath(cookieName, owner);
+        tabPaths.forEach(function (p) {
+            if (p !== path && p !== '/' && p !== routePath()) writeCookie(cookieName, '', 0, p);
+        });
+        if (Object.prototype.hasOwnProperty.call(fetched, cookieName)) fetched[cookieName] = value;
+    }
+
+    function fetchElsewhere() {
+        fetched = {};
+        return Promise.all(Object.keys(elsewhere).map(function (path) {
+            const names = elsewhere[path];
+            const query = names.map(function (n) { return 'name=' + encodeURIComponent(n); }).join('&');
+            return fetch(path + '/settings-values?' + query, { credentials: 'same-origin' })
+                .then(function (res) {
+                    if (!res.ok) throw new Error(path + ': HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(function (values) {
+                    names.forEach(function (n) { fetched[n] = values[n] || ''; });
+                });
+        }));
+    }
+
     // ─── List (checkbox grid → comma-separated cookie) ───────────
     function readList(containerId) {
         const c = document.getElementById(containerId);
@@ -105,14 +159,15 @@
     function bindList(containerId, cookieName) {
         const c = document.getElementById(containerId);
         if (!c) return;
+        const owner = claim(cookieName, c);
         addBinding({
             load: function () {
-                const items = (getCookie(cookieName) || '').split(',').filter(Boolean);
+                const items = (readSetting(cookieName) || '').split(',').filter(Boolean);
                 c.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
                     cb.checked = items.indexOf(cb.name) >= 0;
                 });
             },
-            save: function () { setCookie(cookieName, readList(containerId), 1000); },
+            save: function () { writeSetting(cookieName, readList(containerId), owner); },
             serialize: function () { return cookieName + '=' + readList(containerId); },
         });
     }
@@ -132,16 +187,17 @@
     function bindListByCookie(cookieName) {
         const grids = document.querySelectorAll('[data-cookie="' + cookieName + '"]');
         if (!grids.length) return;
+        const owner = claim(cookieName, grids[0]);
         addBinding({
             load: function () {
-                const items = (getCookie(cookieName) || '').split(',').filter(Boolean);
+                const items = (readSetting(cookieName) || '').split(',').filter(Boolean);
                 grids.forEach(function (grid) {
                     grid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
                         cb.checked = items.indexOf(cb.name) >= 0;
                     });
                 });
             },
-            save: function () { setCookie(cookieName, readListByCookie(cookieName), 1000); },
+            save: function () { writeSetting(cookieName, readListByCookie(cookieName), owner); },
             serialize: function () { return cookieName + '=' + readListByCookie(cookieName); },
         });
     }
@@ -168,6 +224,7 @@
     function bindPills(containerId, cookieName, fallback) {
         const c = document.getElementById(containerId);
         if (!c) return;
+        const owner = claim(cookieName, c);
         c.addEventListener('click', function (e) {
             const btn = e.target.closest('.settings-pill');
             if (!btn) return;
@@ -178,12 +235,12 @@
         });
         addBinding({
             load: function () {
-                const val = getCookie(cookieName) || fallback || '';
+                const val = readSetting(cookieName) || fallback || '';
                 c.querySelectorAll('.settings-pill').forEach(function (btn) {
                     btn.classList.toggle('active', btn.dataset.val === val);
                 });
             },
-            save: function () { setCookie(cookieName, readPill(containerId), 1000); },
+            save: function () { writeSetting(cookieName, readPill(containerId), owner); },
             serialize: function () { return cookieName + '=' + readPill(containerId); },
         });
     }
@@ -192,13 +249,14 @@
     function bindSelect(cookieName) {
         const sel = document.querySelector('#settings-modal select[data-cookie="' + cookieName + '"]');
         if (!sel) return;
+        const owner = claim(cookieName, sel);
         addBinding({
             // Keep the markup's default selection when the cookie is not set
             load: function () {
-                const val = getCookie(cookieName);
+                const val = readSetting(cookieName);
                 if (val) sel.value = val;
             },
-            save: function () { setCookie(cookieName, sel.value, 1000); },
+            save: function () { writeSetting(cookieName, sel.value, owner); },
             serialize: function () { return cookieName + '=' + sel.value; },
         });
     }
@@ -207,9 +265,10 @@
     function bindText(elementId, cookieName) {
         const el = document.getElementById(elementId);
         if (!el) return;
+        const owner = claim(cookieName, el);
         addBinding({
-            load: function () { el.value = getCookie(cookieName) || el.defaultValue || ''; },
-            save: function () { setCookie(cookieName, el.value, 1000); },
+            load: function () { el.value = readSetting(cookieName) || el.defaultValue || ''; },
+            save: function () { writeSetting(cookieName, el.value, owner); },
             serialize: function () { return cookieName + '=' + el.value; },
         });
     }
@@ -225,9 +284,10 @@
     function bindMiscBitmap(containerId, cookieName, defaults) {
         const c = document.getElementById(containerId);
         if (!c) return;
+        const owner = claim(cookieName, c);
         addBinding({
             load: function () {
-                const raw = getCookie(cookieName);
+                const raw = readSetting(cookieName);
                 const items = (raw === null || raw === '')
                     ? (defaults || [])
                     : raw.split(',').filter(Boolean);
@@ -235,7 +295,7 @@
                     el.checked = items.indexOf(el.dataset.misc) >= 0;
                 });
             },
-            save: function () { setCookie(cookieName, readMisc(c), 1000); },
+            save: function () { writeSetting(cookieName, readMisc(c), owner); },
             serialize: function () { return cookieName + '=' + readMisc(c); },
         });
     }
@@ -245,9 +305,12 @@
         const el = document.getElementById(pickerId);
         if (!el || !window.EditionsPicker) return;
         window.EditionsPicker.init(el);
+        const owner = claim(cookieName, el);
         addBinding({
-            load: function () { window.EditionsPicker.load(el, cookieName); },
-            save: function () { window.EditionsPicker.save(el, cookieName); },
+            load: function () { window.EditionsPicker.load(el, readSetting(cookieName)); },
+            save: function () {
+                writeSetting(cookieName, window.EditionsPicker.serialize(el), owner);
+            },
             serialize: function () {
                 return cookieName + '=' + window.EditionsPicker.serialize(el);
             },
@@ -258,6 +321,12 @@
     function autoWire() {
         // A Retry wires a fresh body; the old one's bindings must go
         bindings.length = 0;
+        elsewhere = {};
+        tabPaths = [];
+        document.querySelectorAll('.settings-pane[data-path]').forEach(function (pane) {
+            const p = pane.dataset.path;
+            if (p && tabPaths.indexOf(p) < 0) tabPaths.push(p);
+        });
         Object.entries(BINDINGS.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
         (BINDINGS.cookieLists || []).forEach(bindListByCookie);
         Object.entries(BINDINGS.pills || {}).forEach(function (e) {
@@ -351,6 +420,8 @@
 
         function fail(message, err) {
             bodyState = 'error';
+            // Nothing a failed body shows may be saved
+            bindings.length = 0;
             body.innerHTML = '<p class="settings-error">' + message +
                 '<button type="button" class="settings-btn" data-role="retry">Retry</button></p>';
             // The latest tab asked for wins, and is used up by this load
@@ -375,7 +446,12 @@
                     fail('Settings could not be set up.', err);
                     return;
                 }
-                bodyState = 'ready';
+                // A tab shown without its page's values would blank them on save
+                return fetchElsewhere().then(function () {
+                    bodyState = 'ready';
+                }, function (err) {
+                    fail('Could not load settings.', err);
+                });
             }, function (err) {
                 fail('Could not load settings.', err);
             });

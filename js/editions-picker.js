@@ -127,8 +127,7 @@
 
     }
 
-    function loadFromCookie(root, cookieName) {
-        const list = getCookie(cookieName);
+    function load(root, list) {
         const items = list ? list.split(',').filter(Boolean) : [];
         root.querySelectorAll('.editions-grid input[type="checkbox"]').forEach(function (cb) {
             cb.checked = items.indexOf(cb.name) >= 0;
@@ -159,14 +158,9 @@
         return names.join(',') + (names.length ? ',' : '');
     }
 
-    function saveToCookie(root, cookieName) {
-        setCookie(cookieName, serialize(root), 1000);
-    }
-
     window.EditionsPicker = {
         init: initPicker,
-        load: loadFromCookie,
-        save: saveToCookie,
+        load: load,
         serialize: serialize,
         refresh: refresh,
     };

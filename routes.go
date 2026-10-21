@@ -49,6 +49,11 @@ func (s *site) mountNav(mux *http.ServeMux, nav *NavElem) {
 	}))
 	mux.Handle(nav.Link, handler)
 
+	// The settings modal on any page reads this page's cookies from here
+	if nav.SettingsTab != "" {
+		mux.Handle(nav.Link+"/settings-values", noSigning(http.HandlerFunc(SettingsValues)))
+	}
+
 	// Add any additional endpoints to it
 	for _, subPage := range nav.SubPages {
 		if !subPage.NoSigning {

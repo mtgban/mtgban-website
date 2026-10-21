@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -178,6 +180,62 @@ func TestSettingsTabOnSubPages(t *testing.T) {
 	}
 }
 
+// Each tab's cookies belong to the page that opens it, whose path the pane
+// carries for settings.js to write them at.
+func TestSettingsTabPathsFollowTheNav(t *testing.T) {
+	var nav []NavElem
+	for _, name := range []string{"Search", "Newspaper", "Sleepers", "Upload", "Global", "Arbit", "Reverse", "Screener"} {
+		nav = append(nav, *ExtraNavs[name])
+	}
+	want := map[string]string{
+		"search":  "/search",
+		"news":    "/newspaper",
+		"sleep":   "/sleepers",
+		"upload":  "/upload",
+		"global":  "/global",
+		"arbit":   "/arbit",
+		"reverse": "/reverse",
+	}
+	if got := settingsTabPaths(nav); !maps.Equal(got, want) {
+		t.Errorf("settingsTabPaths = %v, want %v", got, want)
+	}
+}
+
+// A cookie kept at /arbit reaches only requests under /arbit, so the modal
+// on /search asks /arbit/settings-values for it. Root cookies stay out.
+func TestSettingsValuesAnswersThisPathsCookies(t *testing.T) {
+	mux := http.NewServeMux()
+	s := newSite()
+	for _, nav := range ExtraNavs {
+		s.mountNav(mux, nav)
+	}
+	if _, pattern := mux.Handler(httptest.NewRequest(http.MethodGet, "/screener/settings-values", nil)); pattern == "/screener/settings-values" {
+		t.Error("a page without a settings tab serves settings values")
+	}
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=MTGBAN&name=SearchSellersList", nil)
+	req.AddCookie(&http.Cookie{Name: "ArbitVendorsList", Value: "CK,SCG,"})
+	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: "sig"})
+	req.AddCookie(&http.Cookie{Name: "SearchSellersList", Value: "TCG,"})
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, want 200", rec.Code)
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "private, no-store" {
+		t.Errorf("Cache-Control = %q, want private, no-store", cc)
+	}
+	var got map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"ArbitVendorsList": "CK,SCG,", "GlobalVendorsList": ""}
+	if !maps.Equal(got, want) {
+		t.Errorf("values = %v, want %v", got, want)
+	}
+}
+
 // grantSig mints a valid signature carrying the named grants, for a reader
 // with an email, so gates that check the HMAC (offline mode) see it.
 func grantSig(t *testing.T, grants ...string) string {
@@ -249,6 +307,9 @@ func TestSettingsModalPanesFollowTheSig(t *testing.T) {
 			t.Errorf("panes = %v, want %v", got, want)
 		}
 		for _, id := range []string{
+			`data-tab="arbit" data-path="/arbit"`,
+			`data-tab="upload" data-path="/upload"`,
+			`data-tab="offline" data-path=""`,
 			`id="settings-search-listing"`, // unlocked for a signed reader
 			`id="opt-customseller"`,        // the custom rule's controls
 			`id="offline-img-editions-picker"`,
