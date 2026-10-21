@@ -74,6 +74,8 @@ func TestSetMark(t *testing.T) {
 		{"CMB1", "Mystery Booster Playtest Cards 2019", "2019"},
 		{"CMB2", "Mystery Booster Playtest Cards 2021", "2021"},
 		{"PUMA", "Ultimate Box Topper", "⬒"},
+		{"H1R", "Modern Horizons 1 Timeshifts", "⧗"},
+		{"H2R", "Modern Horizons 2 Timeshifts", "⧗"},
 		{"PROMOS", "Promos of Theros", ""},
 	} {
 		got := SetMark(tc.code, tc.name)
