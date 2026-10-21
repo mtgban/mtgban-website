@@ -590,7 +590,7 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanShare = GetParamFromSig(sig, "UserEmail") != "" || (DevMode && !SigCheck)
 
 	modes := readUploadModes(r, canBuylist, st.magicOnlyExports)
-	in := readUploadInput(r, modes.maxRows)
+	in := readUploadInput(r, modes.maxRows, openableProduct(b))
 	if shared != nil {
 		in = withSharedRows(in, shared.Rows, modes.maxRows)
 	}
@@ -1714,9 +1714,9 @@ type uploadInput struct {
 }
 
 // readUploadInput reads the list a request carries, a packed row list cut
-// as splitRows says for maxRows. A file that came is left open for the
-// caller to close.
-func readUploadInput(r *http.Request, maxRows int) uploadInput {
+// as splitRows says for maxRows and opened. A file that came is left open
+// for the caller to close.
+func readUploadInput(r *http.Request, maxRows int, opened func(uuid string) bool) uploadInput {
 	// Load a list of uuids from newspaper or search
 	hashes := r.Form["hashes"]
 	hashesQtys := r.Form["hashesQtys"]
@@ -1730,7 +1730,7 @@ func readUploadInput(r *http.Request, maxRows int) uploadInput {
 	packed := r.FormValue("rows")
 	if packed != "" {
 		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes,
-			hashesFrom, hashesFromQtys = splitRows(packed, maxRows)
+			hashesFrom, hashesFromQtys = splitRows(packed, maxRows, opened)
 	}
 
 	// Load spreadsheet cloud url if present
@@ -1804,7 +1804,7 @@ func knownShareCondition(cond string) bool {
 // and a URL note would become their price link.
 func withSharedRows(in uploadInput, rows string, maxRows int) uploadInput {
 	in.hashes, in.hashesQtys, in.hashesCond, in.hashesPrice, _,
-		in.hashesFrom, in.hashesFromQtys = splitRows(rows, 0)
+		in.hashesFrom, in.hashesFromQtys = splitRows(rows, 0, nil)
 	if maxRows > 0 {
 		for _, f := range []*[]string{&in.hashes, &in.hashesQtys, &in.hashesCond, &in.hashesPrice,
 			&in.hashesFrom, &in.hashesFromQtys} {
@@ -2496,10 +2496,11 @@ func restoreOpenedProducts(entries []UploadEntry) []UploadEntry {
 // near the ceiling.
 //
 // Rows are kept the way a file's are, the first maxRows of them when that is
-// positive. The cards an opened product put on the page (a from column) are
-// over that, as unpacking is, and MaxUploadTotalEntries in all, the most a
-// share stores: a 10 MB body is millions of rows.
-func splitRows(packed string, maxRows int) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
+// positive. The cards an opened product put on the page are over that, as
+// unpacking is, when opened says their from column names one. The from
+// column is the client's, so anything else counts. MaxUploadTotalEntries in
+// all, the most a share stores: a 10 MB body is millions of rows.
+func splitRows(packed string, maxRows int, opened func(uuid string) bool) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
 	var own int
 	for packed != "" && len(hashes) < MaxUploadTotalEntries {
 		var line string
@@ -2519,7 +2520,7 @@ func splitRows(packed string, maxRows int) (hashes, qtys, cond, prices, notes, f
 		for len(fields) < 7 {
 			fields = append(fields, "")
 		}
-		if fields[5] == "" {
+		if fields[5] == "" || opened == nil || !opened(fields[5]) {
 			if capped {
 				continue
 			}
@@ -2536,6 +2537,24 @@ func splitRows(packed string, maxRows int) (hashes, qtys, cond, prices, notes, f
 	}
 
 	return hashes, qtys, cond, prices, notes, from, fromQtys
+}
+
+// openableProduct reports whether a uuid is a product unpackSealed opens,
+// remembering the answer for each product it is asked about.
+func openableProduct(b *mtgmatcher.Backend) func(uuid string) bool {
+	products := map[string]bool{}
+	return func(uuid string) bool {
+		co, err := b.GetUUID(uuid)
+		if err != nil || !co.Sealed {
+			return false
+		}
+		opens, found := products[uuid]
+		if !found {
+			opens = sealed.HasDecklist(b, co.SetCode, co.UUID)
+			products[uuid] = opens
+		}
+		return opens
+	}
 }
 
 func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]UploadEntry, error) {

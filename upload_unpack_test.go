@@ -617,7 +617,7 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 		"uuid-a\t2\tNM\t1.50\tA Precon\tbox-a\t2\n"+
 			"uuid-b\t1\t\t0\t\t\t\n"+
 			"\n"+
-			"uuid-c\t3\tSP\t9.99\tAnother Precon\tbox-b\t1\n", 0)
+			"uuid-c\t3\tSP\t9.99\tAnother Precon\tbox-b\t1\n", 0, nil)
 
 	if len(hashes) != 3 {
 		t.Fatalf("got %d rows, want 3 (the empty line is not one)", len(hashes))
@@ -639,7 +639,7 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 
 	// A row that lost its trailing fields keeps the ones it has, which is how
 	// a column can be added without breaking a page that predates it.
-	hashes, qtys, cond, prices, notes, from, fromQtys = splitRows("uuid-d\t1\n", 0)
+	hashes, qtys, cond, prices, notes, from, fromQtys = splitRows("uuid-d\t1\n", 0, nil)
 	if len(hashes) != 1 || hashes[0] != "uuid-d" || qtys[0] != "1" || cond[0] != "" ||
 		prices[0] != "" || notes[0] != "" || from[0] != "" || fromQtys[0] != "" {
 		t.Errorf("a short row came back as %v %v %v %v %v %v %v",
@@ -648,7 +648,7 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 }
 
 // postedRows is what readUploadInput makes of a page posting rows back.
-func postedRows(t *testing.T, packed string, maxRows int) uploadInput {
+func postedRows(t *testing.T, packed string, maxRows int, opened func(string) bool) uploadInput {
 	t.Helper()
 	form := url.Values{"rows": {packed}}
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
@@ -656,24 +656,30 @@ func postedRows(t *testing.T, packed string, maxRows int) uploadInput {
 	if err := req.ParseForm(); err != nil {
 		t.Fatal(err)
 	}
-	return readUploadInput(req, maxRows)
+	return readUploadInput(req, maxRows, opened)
 }
 
 // A page posting its rows back is held to the row cap every other upload
-// has; only the cards an opened product put on the page are over it, as
-// unpacking is, and those stop at the most a share stores.
+// has; only the cards a product that opens put on the page are over it, as
+// unpacking is, and those stop at the most a share stores. The from column
+// is the client's, so a value that names no such product is a row like any
+// other.
 func TestPostedRowsStopAtTheRowCap(t *testing.T) {
+	isBox := func(uuid string) bool { return uuid == "box" }
 	var packed strings.Builder
-	for i := range 1000 {
+	for i := range 600 {
+		fmt.Fprintf(&packed, "junk%d\t1\t\t\t\tjunk\t1\n", i)
+	}
+	for i := range 100 {
 		fmt.Fprintf(&packed, "id%d\t1\n", i)
 	}
 	for i := range 600 {
 		fmt.Fprintf(&packed, "card%d\t1\t\t\t\tbox\t1\n", i)
 	}
 
-	in := postedRows(t, packed.String(), MaxUploadEntries)
+	in := postedRows(t, packed.String(), MaxUploadEntries, isBox)
 	if got, want := len(in.hashes), MaxUploadEntries+600; got != want {
-		t.Fatalf("kept %d rows, want the first %d loose ones and the 600 opened", got, MaxUploadEntries)
+		t.Fatalf("kept %d rows, want the first %d and the 600 opened", got, MaxUploadEntries)
 	}
 	for _, f := range [][]string{in.hashesQtys, in.hashesCond, in.hashesPrice, in.hashesNotes,
 		in.hashesFrom, in.hashesFromQtys} {
@@ -681,7 +687,7 @@ func TestPostedRowsStopAtTheRowCap(t *testing.T) {
 			t.Fatalf("a column holds %d rows, the hashes %d", len(f), len(in.hashes))
 		}
 	}
-	if in.hashes[MaxUploadEntries-1] != fmt.Sprintf("id%d", MaxUploadEntries-1) ||
+	if in.hashes[MaxUploadEntries-1] != fmt.Sprintf("junk%d", MaxUploadEntries-1) ||
 		in.hashes[MaxUploadEntries] != "card0" || in.hashesFrom[MaxUploadEntries] != "box" {
 		t.Errorf("kept %q then %q from %q", in.hashes[MaxUploadEntries-1],
 			in.hashes[MaxUploadEntries], in.hashesFrom[MaxUploadEntries])
@@ -691,8 +697,71 @@ func TestPostedRowsStopAtTheRowCap(t *testing.T) {
 	for i := range MaxUploadTotalEntries + 5000 {
 		fmt.Fprintf(&packed, "card%d\t1\t\t\t\tbox\t1\n", i)
 	}
-	if got := len(postedRows(t, packed.String(), MaxUploadEntries).hashes); got != MaxUploadTotalEntries {
+	if got := len(postedRows(t, packed.String(), MaxUploadEntries, isBox).hashes); got != MaxUploadTotalEntries {
 		t.Errorf("kept %d opened cards, want %d", got, MaxUploadTotalEntries)
+	}
+}
+
+// Only a product unpacking would open lets its cards past the cap: not a
+// single card, not a product with nothing listed inside, not an unknown id.
+func TestOpenableProductIsWhatUnpackingOpens(t *testing.T) {
+	skipWithoutDatastore(t)
+	withDeck, withoutDeck := sealedProducts(t)
+	if withDeck == "" {
+		t.Skip("this datastore has no sealed product with a decklist")
+	}
+	opened := openableProduct(backend())
+	if !opened(withDeck) {
+		t.Errorf("%s has a decklist and does not open", withDeck)
+	}
+	if withoutDeck != "" && opened(withoutDeck) {
+		t.Errorf("%s has no decklist and opens", withoutDeck)
+	}
+	for _, id := range []string{"", "junk", backend().GetUUIDs()[0]} {
+		if opened(id) {
+			t.Errorf("%q opens", id)
+		}
+	}
+}
+
+// A free reader's unpacked page holds more rows than the cap, and posting it
+// back - a printing picked, a reload, an export - keeps every one of them.
+func TestUnpackedPagePastTheCapPostsBackWhole(t *testing.T) {
+	skipWithoutDatastore(t)
+	var entries []UploadEntry
+	for _, code := range backend().GetAllSets() {
+		set, err := backend().GetSet(code)
+		if err != nil {
+			continue
+		}
+		for _, product := range set.SealedProduct {
+			if len(entries) <= MaxUploadEntries && sealed.HasDecklist(backend(), code, product.UUID) {
+				entries = append(entries, unpackSealed(backend(), []UploadEntry{{CardID: product.UUID}})...)
+			}
+		}
+	}
+	var packed strings.Builder
+	var cards int
+	for _, entry := range entries {
+		if entry.Unpacked {
+			continue
+		}
+		cards++
+		fmt.Fprintf(&packed, "%s\t%d\t\t0\t%s\t%s\t%d\n", entry.CardID, entry.Quantity,
+			entry.Notes, entry.UnpackedFrom, entry.UnpackedQuantity)
+	}
+	if cards <= MaxUploadEntries {
+		t.Skipf("only %d cards to unpack", cards)
+	}
+
+	in := postedRows(t, packed.String(), MaxUploadEntries, openableProduct(backend()))
+	if len(in.hashes) != cards {
+		t.Fatalf("posting %d unpacked cards back kept %d", cards, len(in.hashes))
+	}
+	loaded, _ := loadHashes(in.hashes, in.hashesQtys, in.hashesCond, in.hashesPrice,
+		in.hashesNotes, in.hashesFrom, in.hashesFromQtys)
+	if got := len(restoreOpenedProducts(loaded)); got != len(entries) {
+		t.Errorf("the page came back as %d rows, want the %d it held", got, len(entries))
 	}
 }
 
