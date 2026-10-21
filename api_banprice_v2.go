@@ -155,17 +155,85 @@ func newV2Store[T mtgban.GenericEntry](name string, record map[string][]T, withQ
 	}
 }
 
+// The derived store the SYP EV fallback reads: a card's trailing Direct
+// average, served only where Direct itself is served and only for SYP
+// cards Direct does not price today.
+const (
+	directHistStore = "TCGDirectHist"
+	directHistName  = "TCG Direct (history)"
+)
+
+// directHistRecord builds the derived store's inventory for one request:
+// the SYP cards with no live Direct price and a history average. A filtered
+// request walks only its own ids rather than the whole SYP list.
+func directHistRecord(direct mtgban.InventoryRecord, syp mtgban.BuylistRecord, ids []string, filtered bool) mtgban.InventoryRecord {
+	if syp == nil {
+		return nil
+	}
+	record := mtgban.InventoryRecord{}
+	add := func(cardID string) {
+		if directPriced(direct[cardID]) {
+			return
+		}
+		if avg, ok := directHistoryFor(cardID); ok {
+			record[cardID] = []mtgban.InventoryEntry{{Conditions: mtgban.NM, Price: avg}}
+		}
+	}
+	if !filtered {
+		for cardID := range syp {
+			add(cardID)
+		}
+		return record
+	}
+	for _, cardID := range ids {
+		if _, listed := syp[cardID]; listed {
+			add(cardID)
+		}
+	}
+	return record
+}
+
+// directPriced reports whether Direct prices a card in a grade sealedev
+// reads, NM or SP.
+func directPriced(entries []mtgban.InventoryEntry) bool {
+	for _, entry := range entries {
+		if (entry.Conditions == mtgban.NM || entry.Conditions == mtgban.SP) && entry.Price > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// sypBuylist is the SYP vendor's buylist, nil when it is not loaded.
+func sypBuylist() mtgban.BuylistRecord {
+	for _, vendor := range GetVendors() {
+		if strings.EqualFold(vendor.Info().Shorthand, "SYP") {
+			return vendor.Buylist()
+		}
+	}
+	return nil
+}
+
 // sellerSectionV2 is the retail section of a request.
 func sellerSectionV2(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, sealed bool) *v2Section {
 	sellers := GetSellers()
 	section := newV2Section(b, mode, filterByEdition, filterByHash, filterByFinish, sealed, sellers)
+	var direct mtgban.InventoryRecord
 	for _, seller := range sellers {
 		info := seller.Info()
+		if strings.EqualFold(info.Shorthand, tcgDirectStore) {
+			direct = seller.Inventory()
+		}
 		if info.SealedMode != sealed || !slices.Contains(enabledStores, info.Shorthand) {
 			continue
 		}
 		withQty := !info.MetadataOnly && !info.NoQuantityInventory
 		section.stores = append(section.stores, newV2Store(info.Shorthand, seller.Inventory(), withQty, !info.MetadataOnly, false, v2Stock(info.Shorthand)))
+	}
+	if !sealed && slices.Contains(enabledStores, tcgDirectStore) {
+		if record := directHistRecord(direct, sypBuylist(), section.cardIDs, section.filtered); len(record) > 0 {
+			section.stores = append(section.stores, newV2Store(directHistStore, record, false, false, false, nil))
+		}
 	}
 	return section
 }
@@ -447,6 +515,15 @@ func v2StoreList(enabledStores []string, filter string) banprice.Stores {
 		entry.Quantities = !info.MetadataOnly && !info.NoQuantityInventory
 		entry.Updated = info.InventoryTimestamp
 		out.Sellers = append(out.Sellers, entry)
+	}
+	// Listed once it can carry a price: a history with cards in it, and the
+	// SYP vendor whose cards it prices.
+	if filter != "sealed" && slices.Contains(enabledStores, tcgDirectStore) && !seen[directHistStore] {
+		if h := directHistoryPtr.Load(); h != nil && len(h.Prices) > 0 && sypBuylist() != nil {
+			loaded := h.Loaded
+			out.Sellers = append(out.Sellers, banprice.Store{Shorthand: directHistStore, Name: directHistName, Index: true, Updated: &loaded})
+			seen[directHistStore] = true
+		}
 	}
 	seen = map[string]bool{}
 	for _, vendor := range GetVendors() {

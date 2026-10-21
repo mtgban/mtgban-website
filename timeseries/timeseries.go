@@ -47,6 +47,10 @@ type PriceRow struct {
 	AbuBuylistPrice                 *float64 `json:"abu_buylist_price"`
 	CoolstuffincBuylistPrice        *float64 `json:"coolstuffinc_buylist_price"`
 	TcgplayerLowSealedExpectedValue *float64 `json:"tcgplayer_low_sealed_expected_value"`
+
+	// Extra holds prices for datasets that have no wide column, keyed by
+	// provider; the long form carries them, the wide upsert ignores them.
+	Extra map[int16]float64 `json:"-"`
 }
 
 // Lookback is a number of days of history to consider.
@@ -62,58 +66,61 @@ func (l Lookback) Since() time.Time {
 	return time.Now().AddDate(0, 0, -l.Days())
 }
 
-// PriceForDataset returns the price column matching a dataset config index.
-func (r PriceRow) PriceForDataset(index int) *float64 {
+// column maps a dataset config index to its wide column, nil when it has none.
+// PriceForDataset, SetPriceForDataset and HasWideColumn all read this one table.
+func (r *PriceRow) column(index int) **float64 {
 	switch index {
 	case 0:
-		return r.CardkingdomRetailPrice
+		return &r.CardkingdomRetailPrice
 	case 1:
-		return r.CardkingdomBuylistPrice
+		return &r.CardkingdomBuylistPrice
 	case 2:
-		return r.TcgplayerLowPrice
+		return &r.TcgplayerLowPrice
 	case 3:
-		return r.TcgplayerMarketPrice
+		return &r.TcgplayerMarketPrice
 	case 4:
-		return r.CardmarketLowPrice
+		return &r.CardmarketLowPrice
 	case 5:
-		return r.CardmarketTrendPrice
+		return &r.CardmarketTrendPrice
 	case 6:
-		return r.StarcitygamesBuylistPrice
+		return &r.StarcitygamesBuylistPrice
 	case 7:
-		return r.AbuBuylistPrice
+		return &r.AbuBuylistPrice
 	case 8:
-		return r.TcgplayerLowSealedExpectedValue
+		return &r.TcgplayerLowSealedExpectedValue
 	case 9:
-		return r.CoolstuffincBuylistPrice
+		return &r.CoolstuffincBuylistPrice
 	default:
 		return nil
 	}
 }
 
+// HasWideColumn reports whether a dataset config index has a product_prices column.
+func HasWideColumn(index int) bool {
+	return (&PriceRow{}).column(index) != nil
+}
+
+// PriceForDataset returns the price column matching a dataset config index.
+func (r PriceRow) PriceForDataset(index int) *float64 {
+	if c := r.column(index); c != nil {
+		return *c
+	}
+	return nil
+}
+
 // SetPriceForDataset sets the price column matching a dataset config index.
 func (r *PriceRow) SetPriceForDataset(index int, price float64) {
-	switch index {
-	case 0:
-		r.CardkingdomRetailPrice = &price
-	case 1:
-		r.CardkingdomBuylistPrice = &price
-	case 2:
-		r.TcgplayerLowPrice = &price
-	case 3:
-		r.TcgplayerMarketPrice = &price
-	case 4:
-		r.CardmarketLowPrice = &price
-	case 5:
-		r.CardmarketTrendPrice = &price
-	case 6:
-		r.StarcitygamesBuylistPrice = &price
-	case 7:
-		r.AbuBuylistPrice = &price
-	case 8:
-		r.TcgplayerLowSealedExpectedValue = &price
-	case 9:
-		r.CoolstuffincBuylistPrice = &price
+	if c := r.column(index); c != nil {
+		*c = &price
 	}
+}
+
+// SetExtra records a price for a dataset with no wide column, keyed by provider.
+func (r *PriceRow) SetExtra(provider int16, price float64) {
+	if r.Extra == nil {
+		r.Extra = map[int16]float64{}
+	}
+	r.Extra[provider] = price
 }
 
 func fmtPrice(p *float64) string {

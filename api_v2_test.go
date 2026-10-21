@@ -748,3 +748,142 @@ func TestPriceAPISkipsNonFinitePrices(t *testing.T) {
 		t.Errorf("v1 = %s, want MP's 0.5 as the price", wire)
 	}
 }
+
+// seedDirectHistory publishes a history for the given uuids and restores the
+// previous snapshot afterwards.
+func seedDirectHistory(t *testing.T, prices map[string]float64) {
+	t.Helper()
+	prev := directHistoryPtr.Load()
+	t.Cleanup(func() { directHistoryPtr.Store(prev) })
+	directHistoryPtr.Store(&directHistory{Prices: prices, Samples: map[string]int{}, Loaded: time.Now()})
+}
+
+func v2MustCard(t *testing.T, b *mtgmatcher.Backend, id string) *mtgmatcher.CardObject {
+	t.Helper()
+	co, err := b.GetUUID(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return co
+}
+
+func TestPriceAPIv2DirectHistoryStore(t *testing.T) {
+	seedV2Scrapers(t)
+	b := v2Backend()
+	// lor-1 is on SYP and Direct prices it; lor-3 is on SYP (added below)
+	// with only an MP Direct listing, a grade sealedev does not read; lor-2
+	// is not on SYP.
+	for _, v := range *vendorsPtr.Load() {
+		if v.Info().Shorthand == "SYP" {
+			v.Buylist().Add("lor-3", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 0.2, Quantity: 1})
+		}
+	}
+	for _, s := range *sellersPtr.Load() {
+		if s.Info().Shorthand == tcgDirectStore {
+			s.Inventory().Add("lor-3", &mtgban.InventoryEntry{Conditions: mtgban.MP, Price: 0.4})
+		}
+	}
+	seedDirectHistory(t, map[string]float64{"lor-1": 9.99, "lor-3": 1.25, "lor-2": 4.44})
+
+	enabled := []string{"CT", tcgDirectStore, "SYP"}
+	section := sellerSectionV2(b, "", enabled, "", nil, "", false)
+	var names []string
+	for _, st := range section.stores {
+		names = append(names, st.name)
+	}
+	if !slices.Contains(names, directHistStore) {
+		t.Fatalf("stores: %v, want %s among them", names, directHistStore)
+	}
+	hist := section.stores[slices.Index(names, directHistStore)]
+	var priced []string
+	for id := range hist.cards {
+		priced = append(priced, id)
+	}
+	slices.Sort(priced)
+	if !slices.Equal(priced, []string{"lor-3"}) {
+		t.Errorf("history prices %v, want only the SYP card without a Direct price", priced)
+	}
+	entries := hist.file(nil, "lor-3", v2MustCard(t, b, "lor-3"))
+	if len(entries) != 1 || entries[0].Price != 1.25 || entries[0].Condition != "" || entries[0].Qty != 0 {
+		t.Errorf("entry: %+v", entries)
+	}
+
+	// A filtered request builds the record over its own ids only.
+	section = sellerSectionV2(b, "", enabled, "", []string{"lor-1"}, "", false)
+	for _, st := range section.stores {
+		if st.name == directHistStore {
+			t.Error("history offered for a filter that leaves out lor-3")
+		}
+	}
+	section = sellerSectionV2(b, "", enabled, "", []string{"lor-3"}, "", false)
+	if !slices.ContainsFunc(section.stores, func(st v2Store) bool { return st.name == directHistStore }) {
+		t.Error("history missing for a filter on lor-3")
+	}
+
+	// Without TCGDirect enabled the store is not offered.
+	section = sellerSectionV2(b, "", []string{"CT", "SYP"}, "", nil, "", false)
+	for _, st := range section.stores {
+		if st.name == directHistStore {
+			t.Error("history offered without TCGDirect")
+		}
+	}
+	// Never on sealed.
+	section = sellerSectionV2(b, "", enabled, "", nil, "", true)
+	for _, st := range section.stores {
+		if st.name == directHistStore {
+			t.Error("history offered on a sealed request")
+		}
+	}
+
+	// The store list follows the same rule.
+	found := false
+	for _, s := range v2StoreList(enabled, "singles").Sellers {
+		if s.Shorthand == directHistStore {
+			found = true
+			if !s.Index || s.Name != directHistName {
+				t.Errorf("listed as %+v", s)
+			}
+			if s.Updated == nil || !s.Updated.Equal(directHistoryPtr.Load().Loaded) {
+				t.Errorf("updated %v, want the snapshot's load time", s.Updated)
+			}
+		}
+	}
+	if !found {
+		t.Error("stores.json does not list the history store")
+	}
+	for _, s := range v2StoreList([]string{"CT", "SYP"}, "singles").Sellers {
+		if s.Shorthand == directHistStore {
+			t.Error("stores.json lists the history store without TCGDirect")
+		}
+	}
+	// Nor before a history with prices is loaded, nor without the SYP
+	// vendor whose cards it prices: either way the store carries nothing.
+	listsHist := func() bool {
+		return slices.ContainsFunc(v2StoreList(enabled, "singles").Sellers, func(s banprice.Store) bool { return s.Shorthand == directHistStore })
+	}
+	loaded := directHistoryPtr.Load()
+	directHistoryPtr.Store(nil)
+	if listsHist() {
+		t.Error("stores.json lists the history store with no history loaded")
+	}
+	directHistoryPtr.Store(&directHistory{Prices: map[string]float64{}, Loaded: time.Now()})
+	if listsHist() {
+		t.Error("stores.json lists the history store with an empty history")
+	}
+	directHistoryPtr.Store(loaded)
+	withSYP := vendorsPtr.Load()
+	var noSYP []mtgban.Vendor
+	for _, v := range *withSYP {
+		if v.Info().Shorthand != "SYP" {
+			noSYP = append(noSYP, v)
+		}
+	}
+	vendorsPtr.Store(&noSYP)
+	if listsHist() {
+		t.Error("stores.json lists the history store with no SYP vendor")
+	}
+	vendorsPtr.Store(withSYP)
+	if !listsHist() {
+		t.Error("stores.json dropped the history store once SYP was back")
+	}
+}
