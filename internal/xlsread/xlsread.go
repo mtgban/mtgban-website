@@ -151,14 +151,17 @@ func workbookStream(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNotXls, err)
 	}
+	// Directory entries are 128 bytes and may all point at one sector chain,
+	// so one Book stream is read at most, and a Workbook one after it: never
+	// more than twice the file in all
 	var found []byte
 	encrypted := false
 	for entry, err := doc.Next(); err == nil; entry, err = doc.Next() {
-		switch entry.Name {
-		case "EncryptedPackage":
+		switch {
+		case entry.Name == "EncryptedPackage":
 			encrypted = true
 			continue
-		case "Workbook", "Book":
+		case entry.Name == "Workbook", entry.Name == "Book" && found == nil:
 		default:
 			continue
 		}
@@ -613,11 +616,25 @@ func (s *segReader) chars(n int, wide bool) (string, error) {
 	var sb strings.Builder
 	units := make([]uint16, 0, min(n, 1024))
 	for n > 0 && s.err == nil {
-		if !s.advance() {
+		if s.si >= len(s.segs) {
 			s.err = errShort
 			break
 		}
 		seg := s.segs[s.si]
+		if s.off >= len(seg) {
+			// The text goes on in the next record, behind an option byte of
+			// its own in BIFF8, even when none of it fit in this one
+			s.si++
+			s.off = 0
+			if s.si >= len(s.segs) {
+				s.err = errShort
+				break
+			}
+			if !s.biff5 {
+				wide = s.u8()&0x01 != 0
+			}
+			continue
+		}
 		if wide {
 			for n > 0 && s.off+1 < len(seg) {
 				units = append(units, binary.LittleEndian.Uint16(seg[s.off:]))
@@ -636,16 +653,8 @@ func (s *segReader) chars(n int, wide bool) (string, error) {
 			units = units[:0]
 		}
 		if n > 0 {
-			s.si++
-			s.off = 0
-			if s.si >= len(s.segs) {
-				s.err = errShort
-				break
-			}
-			if !s.biff5 {
-				// BIFF8 text continues with an option byte of its own
-				wide = s.u8()&0x01 != 0
-			}
+			// A lone byte left over from two-byte text is no character
+			s.off = len(seg)
 		}
 	}
 	if len(units) > 0 {

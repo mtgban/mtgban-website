@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"github.com/mtgban/mtgban-website/internal/xlsread/xlstest"
 )
@@ -421,4 +422,134 @@ func FuzzBIFF(f *testing.F) {
 			t.Fatalf("allocated %d bytes for %d bytes of stream", n, len(stream))
 		}
 	})
+}
+
+// sharedChainContainer is a compound file whose n stream entries, all named
+// name, point at the one sector chain holding stream.
+func sharedChainContainer(n int, name string, stream []byte) []byte {
+	const sector = 512
+	dirSectors := (n + 1 + 3) / 4
+	streamSectors := (len(stream) + sector - 1) / sector
+	fatSectors := 1
+	for (fatSectors+dirSectors+streamSectors+127)/128 > fatSectors {
+		fatSectors++
+	}
+	total := fatSectors + dirSectors + streamSectors
+
+	header := make([]byte, sector)
+	copy(header, oleSignature)
+	binary.LittleEndian.PutUint16(header[24:], 0x3e)
+	binary.LittleEndian.PutUint16(header[26:], 3)
+	binary.LittleEndian.PutUint16(header[28:], 0xfffe)
+	binary.LittleEndian.PutUint16(header[30:], 9)
+	binary.LittleEndian.PutUint16(header[32:], 6)
+	binary.LittleEndian.PutUint32(header[44:], uint32(fatSectors))
+	binary.LittleEndian.PutUint32(header[48:], uint32(fatSectors))
+	binary.LittleEndian.PutUint32(header[56:], 4096)
+	binary.LittleEndian.PutUint32(header[60:], 0xfffffffe)
+	binary.LittleEndian.PutUint32(header[68:], 0xfffffffe)
+	for i := 0; i < 109; i++ {
+		v := uint32(0xffffffff)
+		if i < fatSectors {
+			v = uint32(i)
+		}
+		binary.LittleEndian.PutUint32(header[76+4*i:], v)
+	}
+
+	fat := make([]byte, fatSectors*sector)
+	for i := range fatSectors * 128 {
+		binary.LittleEndian.PutUint32(fat[4*i:], 0xffffffff)
+	}
+	chain := func(start, count int) {
+		for i := 0; i < count; i++ {
+			next := uint32(start + i + 1)
+			if i == count-1 {
+				next = 0xfffffffe
+			}
+			binary.LittleEndian.PutUint32(fat[4*(start+i):], next)
+		}
+	}
+	for i := 0; i < fatSectors; i++ {
+		binary.LittleEndian.PutUint32(fat[4*i:], 0xfffffffd)
+	}
+	chain(fatSectors, dirSectors)
+	chain(fatSectors+dirSectors, streamSectors)
+
+	dir := make([]byte, dirSectors*sector)
+	entry := func(i int, entryName string, kind byte, right, child, start uint32, size uint64) {
+		b := dir[128*i:]
+		units := utf16.Encode([]rune(entryName))
+		for j, u := range units {
+			binary.LittleEndian.PutUint16(b[2*j:], u)
+		}
+		if entryName != "" {
+			binary.LittleEndian.PutUint16(b[64:], uint16(2*len(units)+2))
+		}
+		b[66], b[67] = kind, 1
+		binary.LittleEndian.PutUint32(b[68:], 0xffffffff)
+		binary.LittleEndian.PutUint32(b[72:], right)
+		binary.LittleEndian.PutUint32(b[76:], child)
+		binary.LittleEndian.PutUint32(b[116:], start)
+		binary.LittleEndian.PutUint64(b[120:], size)
+	}
+	entry(0, "Root Entry", 5, 0xffffffff, 1, 0xfffffffe, 0)
+	for i := 1; i <= n; i++ {
+		right := uint32(i + 1)
+		if i == n {
+			right = 0xffffffff
+		}
+		entry(i, name, 2, right, 0xffffffff, uint32(fatSectors+dirSectors), uint64(len(stream)))
+	}
+	for i := n + 1; i < dirSectors*4; i++ {
+		entry(i, "", 0, 0xffffffff, 0xffffffff, 0, 0)
+	}
+
+	out := append(header, fat...)
+	out = append(out, dir...)
+	out = append(out, stream...)
+	return append(out, make([]byte, (total+1)*sector-len(out))...)
+}
+
+// Directory entries cost 128 bytes and may all point at one sector chain, so
+// reading every Book stream made the work quadratic in the file's size: only
+// one stream is read.
+func TestReadsOneWorkbookStream(t *testing.T) {
+	bof5 := xlstest.Record(recBOF, xlstest.U16(0x0500), xlstest.U16(0x0005), make([]byte, 4))
+	stream := append(append(bof5, xlstest.EOF()...), make([]byte, 512<<10)...)
+	data := sharedChainContainer(1000, "Book", stream)
+
+	var err error
+	n := allocated(func() { _, err = Open(data) })
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if n > 16<<20 {
+		t.Errorf("allocated %d MB opening a %d KB file of 1000 Book entries", n>>20, len(data)>>10)
+	}
+}
+
+// When a string's count and flags fill a record exactly, its characters
+// start in the CONTINUE, behind that record's own option byte.
+func TestReadsTextStartingInAContinue(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		cont []byte
+		want string
+	}{
+		{"compressed", append([]byte{0}, 'c'), "c"},
+		{"wide", append([]byte{1}, xlstest.U16('Ω')...), "Ω"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			sst := xlstest.Record(recSST, xlstest.U32(2), xlstest.U32(2),
+				xlstest.U16(2), []byte{0}, []byte("ab"), xlstest.U16(1), []byte{0})
+			sst = append(sst, xlstest.Record(recContinue, tt.cont)...)
+			b := &Book{stream: append(append(xlstest.BOF8(0x0005), sst...), xlstest.EOF()...)}
+			if err := b.parseGlobals(); err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(b.sst, []string{"ab", tt.want}) {
+				t.Errorf("sst %q, want %q", b.sst, []string{"ab", tt.want})
+			}
+		})
+	}
 }
