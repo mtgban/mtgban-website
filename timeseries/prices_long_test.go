@@ -188,3 +188,18 @@ func TestMoverAnchorFastPathQueries(t *testing.T) {
 		t.Errorf("non-magic probe does not carry its category at $3:\n%s", probe)
 	}
 }
+
+// Postgres stores NaN and Infinity in double precision and orders NaN above
+// every number, so both pass `price > 0` and `price >= $n`. The archive can
+// hold either from before snapshots refused them; a reader that aggregates or
+// compares prices has to exclude them itself.
+func TestPriceReadersExcludeNonFinitePrices(t *testing.T) {
+	const finite = "price < 'Infinity'"
+	if !strings.Contains(aggregatePriceStatsQuery, "p."+finite) {
+		t.Errorf("aggregate stats query reads non-finite prices:\n%s", aggregatePriceStatsQuery)
+	}
+	query, _ := buildMoverRowsQuery(ProviderTCGLow, CategoryMagic, time.Now(), time.Now(), 0, 0)
+	if n := strings.Count(query, finite); n != 2 {
+		t.Errorf("movers query excludes non-finite prices on %d of its two arms:\n%s", n, query)
+	}
+}

@@ -351,7 +351,11 @@ func readFailures(series []chartSeries) int {
 // The dates are ISO, so the lexicographic minimum is the chronological one.
 func earliestChartedDate(results map[string]timeseries.ProviderPrices, lb timeseries.Lookback) time.Time {
 	var oldest string
-	for date := range results {
+	for date, pp := range results {
+		// A date holding only NaN or Infinity draws nothing, so it starts no axis.
+		if !hasFinitePrice(pp) {
+			continue
+		}
 		if oldest == "" || date < oldest {
 			oldest = date
 		}
@@ -366,6 +370,16 @@ func earliestChartedDate(results map[string]timeseries.ProviderPrices, lb timese
 	return parsed
 }
 
+// hasFinitePrice reports whether one day's prices hold any a chart can draw.
+func hasFinitePrice(pp timeseries.ProviderPrices) bool {
+	for _, price := range pp {
+		if isFinitePrice(price) {
+			return true
+		}
+	}
+	return false
+}
+
 // chartDatasetsFrom projects a fetched series onto the axis, game-agnostic: one
 // dataset per registry provider that has data, in registry order. Adding a game
 // needs no code here — its providers just show up.
@@ -373,10 +387,13 @@ func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []st
 	// Only providers with data for this card render — that is what makes it
 	// game-agnostic and also drops sealed-vs-single applicability out of config
 	// (e.g. Sealed EV only has data for sealed products, so it only shows there).
+	// A provider whose prices are all NaN or Infinity would draw an empty line.
 	present := map[int16]bool{}
 	for _, pp := range results {
-		for provider := range pp {
-			present[provider] = true
+		for provider, price := range pp {
+			if isFinitePrice(price) {
+				present[provider] = true
+			}
 		}
 	}
 	datasets := make([]Dataset, 0, len(present))

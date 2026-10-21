@@ -144,3 +144,25 @@ func TestSnapshotDropsNonFinitePrices(t *testing.T) {
 		t.Errorf("rows = %+v, want %+v", snapshot.Rows, want)
 	}
 }
+
+// A provider whose archived values in the window are all non-finite draws
+// nothing, so it gets no dataset either: no empty legend entry, no reference
+// to pick. A date holding only such values does not start the axis.
+func TestChartSkipsAProviderWithOnlyNonFinitePrices(t *testing.T) {
+	prev := chartProviders()
+	t.Cleanup(func() { providerRegistry.Store(&prev) })
+	reg := []providerDisplay{{Provider: 1, Name: "Real"}, {Provider: 2, Name: "Broken"}}
+	providerRegistry.Store(&reg)
+
+	results := map[string]timeseries.ProviderPrices{
+		"2026-09-01": {2: math.NaN()},
+		"2026-09-02": {1: 3, 2: math.Inf(1)},
+	}
+	if got := earliestChartedDate(results, timeseries.Lookback(30)).Format("2006-01-02"); got != "2026-09-02" {
+		t.Errorf("earliest = %s, want 2026-09-02, the first date with a finite price", got)
+	}
+	datasets := chartDatasetsFrom(results, []string{"2026-09-01", "2026-09-02"})
+	if len(datasets) != 1 || datasets[0].Name != "Real" {
+		t.Errorf("datasets = %+v, want only Real", datasets)
+	}
+}

@@ -142,15 +142,8 @@ func (c *Client) GetEarliestDateByBanID(ctx context.Context, banID int64, lb Loo
 	return earliest.Time, nil
 }
 
-// GetAggregatePriceStatsLong returns per-card max/min/p90/count of one provider
-// over rows with date >= since, and PriorMax over those before cutoff, keyed by
-// (uuid, foil, etched) so callers do O(1)
-// lookups while iterating a buylist/inventory. Scoped to Magic variants
-// (mtgjson_uuid IS NOT NULL) so a shared provider (3/4) doesn't pull other games'
-// rows (plan 17.3). price > 0 is redundant with the zero-omitting backfill but
-// kept defensive.
-func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
-	rows, err := c.db.QueryContext(ctx, `
+// aggregatePriceStatsQuery is GetAggregatePriceStatsLong's statement.
+const aggregatePriceStatsQuery = `
 		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
 		       MAX(p.price)                                          AS max_price,
 		       MIN(p.price)                                          AS min_price,
@@ -159,9 +152,20 @@ func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16,
 		       COALESCE(MAX(p.price) FILTER (WHERE p.date < $3), 0)  AS prior_max
 		  FROM prices p
 		  JOIN variants v ON v.ban_id = p.ban_id
-		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0
+		 WHERE p.provider = $1 AND p.date >= $2 AND p.price > 0 AND p.price < 'Infinity'
 		   AND v.mtgjson_uuid IS NOT NULL
-		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched`, provider, since, cutoff)
+		 GROUP BY v.mtgjson_uuid, v.is_foil, v.is_etched`
+
+// GetAggregatePriceStatsLong returns per-card max/min/p90/count of one provider
+// over rows with date >= since, and PriorMax over those before cutoff, keyed by
+// (uuid, foil, etched) so callers do O(1)
+// lookups while iterating a buylist/inventory. Scoped to Magic variants
+// (mtgjson_uuid IS NOT NULL) so a shared provider (3/4) doesn't pull other games'
+// rows (plan 17.3). price > 0 is redundant with the zero-omitting backfill but
+// kept defensive; price < 'Infinity' drops the NaN and Infinity rows the
+// archive can hold, which pass > 0 and would win MAX and the percentile.
+func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16, since, cutoff time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
+	rows, err := c.db.QueryContext(ctx, aggregatePriceStatsQuery, provider, since, cutoff)
 	if err != nil {
 		return nil, err
 	}
@@ -373,11 +377,11 @@ func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Tim
 	return `
 		WITH cur AS MATERIALIZED (
 			SELECT ban_id, price FROM prices
-			 WHERE provider=$1 AND date=$2 AND price >= $4
+			 WHERE provider=$1 AND date=$2 AND price >= $4 AND price < 'Infinity'
 		),
 		old AS MATERIALIZED (
 			SELECT ban_id, price FROM prices
-			 WHERE provider=$1 AND date=$3 AND price >= $5
+			 WHERE provider=$1 AND date=$3 AND price >= $5 AND price < 'Infinity'
 		)
 		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
 		       v.tcgp_product_id, v.tcgp_sub_type,
