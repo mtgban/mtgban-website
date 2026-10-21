@@ -553,9 +553,9 @@
                                                             {{end}}
                                                         </span>
                                                     {{else if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                        <a class="store-name dim{{if .Restricted}} store-restricted{{end}}">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                        <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{end}}
                                                     {{if not .Locked}}
                                                     {{if and (eq $conditions "INDEX") $card.Sealed}}
@@ -607,9 +607,9 @@
                                                     {{else}}
                                                         <span class="store-cell">
                                                         {{if eq .URL ""}}
-                                                            <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                            <a class="store-name dim{{if .Restricted}} store-restricted{{end}}">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{else}}
-                                                            <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                            <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{end}}
                                                         {{if $.CanFixSearch}}
                                                             <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=retail&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
@@ -683,9 +683,9 @@
                                                 {{else}}
                                                     <span class="store-cell">
                                                     {{if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
+                                                        <a class="store-name dim{{if .Restricted}} store-restricted{{end}}">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
+                                                        <a class="store-name{{if .Restricted}} store-restricted{{end}}" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>{{if eq $conditions "NM"}}{{buylist_badge .Shorthand $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}{{end}}{{buylist_wait .Shorthand $conditions $card.CKSignal $card.CKSignalTip}}{{buylist_pause_wait .Shorthand $conditions $card.CKPauseWait}}
                                                     {{end}}
                                                     {{if and $.CanFixSearch (ne .Shorthand "AvgCopies")}}
                                                         <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>

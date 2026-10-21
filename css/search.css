@@ -1498,6 +1498,8 @@ html.admin-fix-mode .raw-record { display: inline-block; }
 }
 .price-row .store-name:hover { text-decoration: underline; }
 .price-row .store-name.dim { color: var(--search-text-dim); }
+/* A store the default search blocklist hides: only this reader's tier sees it. */
+.price-row .store-name.store-restricted { font-style: italic; }
 
 /* Right-side grid: consistent price + qty alignment */
 .price-right {
