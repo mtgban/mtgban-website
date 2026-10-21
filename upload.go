@@ -1716,7 +1716,7 @@ type uploadInput struct {
 // readUploadInput reads the list a request carries, a packed row list cut
 // as splitRows says for maxRows and opened. A file that came is left open
 // for the caller to close.
-func readUploadInput(r *http.Request, maxRows int, opened func(uuid string) bool) uploadInput {
+func readUploadInput(r *http.Request, maxRows int, opened func(product, card string) bool) uploadInput {
 	// Load a list of uuids from newspaper or search
 	hashes := r.Form["hashes"]
 	hashesQtys := r.Form["hashesQtys"]
@@ -2497,10 +2497,11 @@ func restoreOpenedProducts(entries []UploadEntry) []UploadEntry {
 //
 // Rows are kept the way a file's are, the first maxRows of them when that is
 // positive. The cards an opened product put on the page are over that, as
-// unpacking is, when opened says their from column names one. The from
-// column is the client's, so anything else counts. MaxUploadTotalEntries in
-// all, the most a share stores: a 10 MB body is millions of rows.
-func splitRows(packed string, maxRows int, opened func(uuid string) bool) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
+// unpacking is, while opened says the product in their from column holds
+// them. The from column is the client's, so anything else counts.
+// MaxUploadTotalEntries in all, the most a share stores: a 10 MB body is
+// millions of rows.
+func splitRows(packed string, maxRows int, opened func(product, card string) bool) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
 	var own int
 	for packed != "" && len(hashes) < MaxUploadTotalEntries {
 		var line string
@@ -2520,7 +2521,7 @@ func splitRows(packed string, maxRows int, opened func(uuid string) bool) (hashe
 		for len(fields) < 7 {
 			fields = append(fields, "")
 		}
-		if fields[5] == "" || opened == nil || !opened(fields[5]) {
+		if fields[5] == "" || opened == nil || !opened(fields[5], fields[0]) {
 			if capped {
 				continue
 			}
@@ -2539,21 +2540,41 @@ func splitRows(packed string, maxRows int, opened func(uuid string) bool) (hashe
 	return hashes, qtys, cond, prices, notes, from, fromQtys
 }
 
-// openableProduct reports whether a uuid is a product unpackSealed opens,
-// remembering the answer for each product it is asked about.
-func openableProduct(b *mtgmatcher.Backend) func(uuid string) bool {
-	products := map[string]bool{}
-	return func(uuid string) bool {
-		co, err := b.GetUUID(uuid)
-		if err != nil || !co.Sealed {
-			return false
+// openedSlots lets a posted card past the row cap once for each copy the
+// product its row names lists, which is what unpacking that product put on
+// the page; a product's decklist is read once, and nil means it does not open.
+type openedSlots struct {
+	decklist func(product string) []string
+	left     map[string]map[string]int
+}
+
+func (s *openedSlots) claim(product, card string) bool {
+	slots, found := s.left[product]
+	if !found {
+		slots = map[string]int{}
+		for _, pick := range s.decklist(product) {
+			slots[pick]++
 		}
-		opens, found := products[uuid]
-		if !found {
-			opens = sealed.HasDecklist(b, co.SetCode, co.UUID)
-			products[uuid] = opens
-		}
-		return opens
+		s.left[product] = slots
+	}
+	if slots[card] == 0 {
+		return false
+	}
+	slots[card]--
+	return true
+}
+
+// openableProduct is openedSlots over the products unpackSealed opens. Only a
+// sealed uuid gets that far, so what it remembers is bounded by the datastore.
+func openableProduct(b *mtgmatcher.Backend) func(product, card string) bool {
+	s := &openedSlots{left: map[string]map[string]int{}, decklist: func(product string) []string {
+		co, _ := b.GetUUID(product)
+		picks, _ := sealed.ProductDecklist(b, co.SetCode, co.UUID)
+		return picks
+	}}
+	return func(product, card string) bool {
+		co, err := b.GetUUID(product)
+		return err == nil && co.Sealed && s.claim(product, card)
 	}
 }
 

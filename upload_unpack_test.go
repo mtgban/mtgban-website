@@ -648,7 +648,7 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 }
 
 // postedRows is what readUploadInput makes of a page posting rows back.
-func postedRows(t *testing.T, packed string, maxRows int, opened func(string) bool) uploadInput {
+func postedRows(t *testing.T, packed string, maxRows int, opened func(product, card string) bool) uploadInput {
 	t.Helper()
 	form := url.Values{"rows": {packed}}
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
@@ -659,25 +659,44 @@ func postedRows(t *testing.T, packed string, maxRows int, opened func(string) bo
 	return readUploadInput(req, maxRows, opened)
 }
 
+// fakeSlots is openedSlots over the decklists given, one copy of each card.
+func fakeSlots(product string, cards int) func(product, card string) bool {
+	var picks []string
+	for i := range cards {
+		picks = append(picks, fmt.Sprintf("card%d", i))
+	}
+	return (&openedSlots{
+		decklist: func(p string) []string {
+			if p == product {
+				return picks
+			}
+			return nil
+		},
+		left: map[string]map[string]int{},
+	}).claim
+}
+
 // A page posting its rows back is held to the row cap every other upload
 // has; only the cards a product that opens put on the page are over it, as
 // unpacking is, and those stop at the most a share stores. The from column
-// is the client's, so a value that names no such product is a row like any
-// other.
+// is the client's, so a row its product does not list, or lists fewer
+// times, is a row like any other.
 func TestPostedRowsStopAtTheRowCap(t *testing.T) {
-	isBox := func(uuid string) bool { return uuid == "box" }
 	var packed strings.Builder
-	for i := range 600 {
+	for i := range 300 {
 		fmt.Fprintf(&packed, "junk%d\t1\t\t\t\tjunk\t1\n", i)
 	}
-	for i := range 100 {
-		fmt.Fprintf(&packed, "id%d\t1\n", i)
+	for i := range 40 {
+		fmt.Fprintf(&packed, "stray%d\t1\t\t\t\tbox\t1\n", i)
 	}
 	for i := range 600 {
 		fmt.Fprintf(&packed, "card%d\t1\t\t\t\tbox\t1\n", i)
 	}
+	for range 100 {
+		packed.WriteString("card0\t1\t\t\t\tbox\t1\n")
+	}
 
-	in := postedRows(t, packed.String(), MaxUploadEntries, isBox)
+	in := postedRows(t, packed.String(), MaxUploadEntries, fakeSlots("box", 600))
 	if got, want := len(in.hashes), MaxUploadEntries+600; got != want {
 		t.Fatalf("kept %d rows, want the first %d and the 600 opened", got, MaxUploadEntries)
 	}
@@ -687,38 +706,80 @@ func TestPostedRowsStopAtTheRowCap(t *testing.T) {
 			t.Fatalf("a column holds %d rows, the hashes %d", len(f), len(in.hashes))
 		}
 	}
-	if in.hashes[MaxUploadEntries-1] != fmt.Sprintf("junk%d", MaxUploadEntries-1) ||
-		in.hashes[MaxUploadEntries] != "card0" || in.hashesFrom[MaxUploadEntries] != "box" {
-		t.Errorf("kept %q then %q from %q", in.hashes[MaxUploadEntries-1],
-			in.hashes[MaxUploadEntries], in.hashesFrom[MaxUploadEntries])
+	// 300 junk rows and 40 strays are 340 of the cap; the box's 600 cards
+	// pass, and ten of its 100 extra copies of card0 fill the cap.
+	if in.hashes[339] != "stray39" || in.hashes[340] != "card0" ||
+		in.hashes[939] != "card599" || in.hashes[940] != "card0" || in.hashes[MaxUploadEntries+599] != "card0" {
+		t.Errorf("kept %q %q %q %q", in.hashes[339], in.hashes[340], in.hashes[939], in.hashes[940])
 	}
 
 	packed.Reset()
 	for i := range MaxUploadTotalEntries + 5000 {
 		fmt.Fprintf(&packed, "card%d\t1\t\t\t\tbox\t1\n", i)
 	}
-	if got := len(postedRows(t, packed.String(), MaxUploadEntries, isBox).hashes); got != MaxUploadTotalEntries {
+	opened := fakeSlots("box", MaxUploadTotalEntries+5000)
+	if got := len(postedRows(t, packed.String(), MaxUploadEntries, opened).hashes); got != MaxUploadTotalEntries {
 		t.Errorf("kept %d opened cards, want %d", got, MaxUploadTotalEntries)
 	}
 }
 
+// A product lets a card past the cap once for each copy its decklist lists,
+// and reads that decklist once.
+func TestOpenedSlotsClaimOnePerCopy(t *testing.T) {
+	var reads int
+	slots := &openedSlots{
+		decklist: func(product string) []string {
+			reads++
+			if product == "box" {
+				return []string{"a", "b", "a"}
+			}
+			return nil
+		},
+		left: map[string]map[string]int{},
+	}
+	for _, tt := range []struct {
+		product, card string
+		want          bool
+	}{
+		{"box", "a", true}, {"box", "b", true}, {"box", "a", true},
+		{"box", "a", false}, {"box", "b", false}, {"box", "c", false},
+		{"junk", "a", false}, {"junk", "a", false},
+	} {
+		if got := slots.claim(tt.product, tt.card); got != tt.want {
+			t.Errorf("claim(%s, %s) = %v, want %v", tt.product, tt.card, got, tt.want)
+		}
+	}
+	if reads != 2 {
+		t.Errorf("read the decklists %d times, want once per product", reads)
+	}
+}
+
 // Only a product unpacking would open lets its cards past the cap: not a
-// single card, not a product with nothing listed inside, not an unknown id.
+// single card, not a product with nothing listed inside, not an unknown id,
+// and not a card the product does not hold.
 func TestOpenableProductIsWhatUnpackingOpens(t *testing.T) {
 	skipWithoutDatastore(t)
 	withDeck, withoutDeck := sealedProducts(t)
 	if withDeck == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	opened := openableProduct(backend())
-	if !opened(withDeck) {
-		t.Errorf("%s has a decklist and does not open", withDeck)
+	co := mustCard(t, withDeck)
+	picks, err := sealed.ProductDecklist(backend(), co.SetCode, withDeck)
+	if err != nil || len(picks) == 0 {
+		t.Fatalf("%s lists %d cards: %v", withDeck, len(picks), err)
 	}
-	if withoutDeck != "" && opened(withoutDeck) {
+	opened := openableProduct(backend())
+	if !opened(withDeck, picks[0]) {
+		t.Errorf("%s holds %s and does not let it past", withDeck, picks[0])
+	}
+	if opened(withDeck, withDeck) {
+		t.Errorf("%s lets itself past as one of its cards", withDeck)
+	}
+	if withoutDeck != "" && opened(withoutDeck, picks[0]) {
 		t.Errorf("%s has no decklist and opens", withoutDeck)
 	}
 	for _, id := range []string{"", "junk", backend().GetUUIDs()[0]} {
-		if opened(id) {
+		if opened(id, picks[0]) {
 			t.Errorf("%q opens", id)
 		}
 	}
