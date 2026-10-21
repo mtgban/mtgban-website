@@ -97,32 +97,41 @@ func (l *Limiter) janitor(interval, maxAge time.Duration) {
 	}
 }
 
-// IPAddress is the caller's address as the nearest proxy saw it: the last
-// X-Forwarded-For entry, which nginx appends from $remote_addr, skipping
-// private and loopback hops; else the socket. Entries before it are
-// whatever the client sent, so they never pick the key.
+// IPAddress is the caller's address as the nearest proxy saw it. Only a
+// loopback or private peer, nginx on 127.0.0.1 or an internal load balancer,
+// is trusted for X-Forwarded-For: then the key is the last entry that is not
+// itself such a hop, the one that proxy appended. Entries before it are
+// whatever the client sent, so they never pick the key. Any other peer is
+// the key itself.
 func IPAddress(r *http.Request) (net.IP, error) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RemoteAddr: %q", r.RemoteAddr)
+	}
+	peer := net.ParseIP(host)
+	if peer == nil {
+		return nil, fmt.Errorf("invalid IP: %q", host)
+	}
+	if !internalHop(peer) {
+		return peer, nil
+	}
+
 	entries := forwardedFor(r)
 	for i := len(entries) - 1; i >= 0; i-- {
 		ip := net.ParseIP(entries[i])
 		if ip == nil {
 			break
 		}
-		if !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() {
+		if !internalHop(ip) {
 			return ip, nil
 		}
 	}
+	return peer, nil
+}
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid RemoteAddr: %q", r.RemoteAddr)
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP: %q", host)
-	}
-
-	return ip, nil
+// internalHop reports whether ip is a proxy's own address, not a client's.
+func internalHop(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
 }
 
 // FirstForwarded is the first X-Forwarded-For entry, or nil. Only a proxy

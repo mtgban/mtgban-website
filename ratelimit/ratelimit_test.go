@@ -66,8 +66,10 @@ func TestIPAddressIgnoresWhatTheClientForwards(t *testing.T) {
 		{"nginx, other spoofed entry", forwarded("127.0.0.1:5000", "203.0.113.2, 198.51.100.7"), "198.51.100.7"},
 		{"spoofed header line", forwarded("127.0.0.1:5000", "203.0.113.3", "198.51.100.7"), "198.51.100.7"},
 		{"internal hop after the peer", forwarded("10.0.0.3:5000", "203.0.113.1, 198.51.100.7, 10.0.0.2"), "198.51.100.7"},
-		{"garbage last entry", forwarded("192.0.2.4:5000", "203.0.113.1, not-an-ip"), "192.0.2.4"},
+		{"garbage last entry", forwarded("10.0.0.3:5000", "203.0.113.1, not-an-ip"), "10.0.0.3"},
 		{"no header", forwarded("192.0.2.4:5000"), "192.0.2.4"},
+		{"public peer, forged header", forwarded("192.0.2.4:5000", "203.0.113.1"), "192.0.2.4"},
+		{"public peer, forged chain", forwarded("192.0.2.4:5000", "203.0.113.1, 10.0.0.2"), "192.0.2.4"},
 	} {
 		ip, err := IPAddress(tc.r)
 		if err != nil || ip.String() != tc.want {

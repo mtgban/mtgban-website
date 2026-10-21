@@ -564,25 +564,30 @@ func noSigning(next http.Handler) http.Handler {
 // apiLimitAddress is the address the API limiter counts r against: the peer
 // the nearest proxy saw, or for a request the API gateway signed, the client
 // the gateway resolved, which it sends as the only X-Forwarded-For entry.
+// An IPv6 address counts as its /64, the block one subscriber holds.
 func apiLimitAddress(r *http.Request) (net.IP, error) {
 	ip, err := ratelimit.IPAddress(r)
 	if err != nil {
 		return nil, err
 	}
 	if client := ratelimit.FirstForwarded(r); client != nil && signedByGateway(r) {
-		return client, nil
+		ip = client
+	}
+	if ip.To4() == nil {
+		ip = ip.Mask(net.CIDRMask(64, 128))
 	}
 	return ip, nil
 }
 
 // signedByGateway reports whether r carries a live signature minted with
-// the gateway's secret.
+// the gateway's secret. The gateway puts sig in the query string, so the
+// body, which this runs before the limiter, is never parsed for it.
 func signedByGateway(r *http.Request) bool {
 	secret := apiGatewaySecret()
 	if secret == "" {
 		return false
 	}
-	v, err := apisig.Decode(r.FormValue("sig"))
+	v, err := apisig.Decode(r.URL.Query().Get("sig"))
 	if err != nil || v.Get("UserEmail") != apiGatewayUser {
 		return false
 	}
