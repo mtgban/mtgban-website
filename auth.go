@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -560,13 +561,41 @@ func noSigning(next http.Handler) http.Handler {
 	})
 }
 
+// apiLimitAddress is the address the API limiter counts r against: the peer
+// the nearest proxy saw, or for a request the API gateway signed, the client
+// the gateway resolved, which it sends as the only X-Forwarded-For entry.
+func apiLimitAddress(r *http.Request) (net.IP, error) {
+	ip, err := ratelimit.IPAddress(r)
+	if err != nil {
+		return nil, err
+	}
+	if client := ratelimit.FirstForwarded(r); client != nil && signedByGateway(r) {
+		return client, nil
+	}
+	return ip, nil
+}
+
+// signedByGateway reports whether r carries a live signature minted with
+// the gateway's secret.
+func signedByGateway(r *http.Request) bool {
+	secret := apiGatewaySecret()
+	if secret == "" {
+		return false
+	}
+	v, err := apisig.Decode(r.FormValue("sig"))
+	if err != nil || v.Get("UserEmail") != apiGatewayUser {
+		return false
+	}
+	return apisig.Verify([]byte(secret), r.Method, signatureLink(), v, OptionalFields, time.Now()) == nil
+}
+
 func enforceAPISigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
 		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
 
-		ip, err := ratelimit.IPAddress(r)
+		ip, err := apiLimitAddress(r)
 		if err != nil {
 			log.Println(err)
 			errorResponse(w, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
