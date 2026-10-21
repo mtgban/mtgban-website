@@ -7,9 +7,22 @@ import (
 	"sort"
 )
 
+// GuideVars is what only the guide page fills and reads.
+type GuideVars struct {
+	// GuidePromos is the loaded game's promo types, as
+	// /api/palette/promos.json serves them, so the promo table names each
+	// type by its label from the first paint.
+	GuidePromos template.JS
+}
+
 func (s *site) Guide(w http.ResponseWriter, r *http.Request) {
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Guide", sig)
+	pageVars.GuidePromos = template.JS("[]")
+	promos := s.datastore().palette.PromosJSON()
+	if len(promos) > 0 {
+		pageVars.GuidePromos = template.JS(promos)
+	}
 	render(w, "guide.html", pageVars)
 }
 
