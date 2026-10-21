@@ -131,6 +131,8 @@ var setMarks = map[string]string{
 	"CMB1":   "2019",
 	"CMB2":   "2021",
 	"PUMA":   "⬒",
+	"H1R":    "⧗",
+	"H2R":    "⧗",
 	"4BB":    "BB",
 	"BCHR":   "BB",
 	"FBB":    "BB",
