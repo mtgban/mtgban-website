@@ -304,6 +304,7 @@ type PageVars struct {
 	// templates read them.
 	AdminVars
 	ArbitVars
+	GuideVars
 	NewsVars
 	SearchVars
 	SleepVars

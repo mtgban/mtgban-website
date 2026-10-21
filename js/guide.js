@@ -98,6 +98,21 @@
         }
         return out.join(NL);
     }
+    // The loaded game's promo types, as /api/palette/promos.json serves them.
+    // A table row with no `short` names one of them by its first value, and
+    // reads as that type's label, with its note after it.
+    var promos = window.__BAN_PROMOS || [];
+    var promoLabels = {};
+    for (var p = 0; p < promos.length; p++) {
+        promoLabels[promos[p].value] = promos[p].label;
+    }
+    function rowText(row) {
+        if (row.short) return row.short;
+        var token = row.value.split('/')[0].trim();
+        var text = promoLabels[token] || token;
+        return row.note ? text + ' (' + row.note + ')' : text;
+    }
+
     // ── Build main content ──
     // Each section's description is a <template data-section> the page
     // renders from templates/partials/guide-*.html.
@@ -161,7 +176,7 @@
                 for (var t = 0; t < item.content.table.length; t++) {
                     var row = item.content.table[t];
                     html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
-                    html += '<td>' + escapeHtml(row.short) + '</td></tr>';
+                    html += '<td>' + escapeHtml(rowText(row)) + '</td></tr>';
                 }
                 html += '</tbody></table>';
             }
@@ -223,80 +238,77 @@
     //
     // The table above lists the predicates the search implements itself, and
     // describes them. The promo types are the datastore's, and every game
-    // declares its own - 129 in Magic, 464 in One Piece - so they are asked
-    // for rather than written down. If the request fails the page keeps the
+    // declares its own - 129 in Magic, 464 in One Piece - so they come from
+    // the page rather than being written down. With none, the page keeps the
     // table it rendered.
     var MAX_PROMOS_LISTED = 50;
-    fetch('/api/palette/promos.json')
-        .then(function(r) { return r.ok ? r.json() : []; })
-        .then(function(promos) {
-            if (!promos || !promos.length) return;
-            var section = document.getElementById('promos');
-            if (!section) return;
+    (function(promos) {
+        if (!promos || !promos.length) return;
+        var section = document.getElementById('promos');
+        if (!section) return;
 
-            var offered = {};
-            for (var o = 0; o < promos.length; o++) {
-                offered[promos[o].value] = true;
-                var alias = promos[o].aliases || [];
-                for (var a = 0; a < alias.length; a++) offered[alias[a]] = true;
-            }
+        var offered = {};
+        for (var o = 0; o < promos.length; o++) {
+            offered[promos[o].value] = true;
+            var alias = promos[o].aliases || [];
+            for (var a = 0; a < alias.length; a++) offered[alias[a]] = true;
+        }
 
-            // The written table describes the predicates the search
-            // implements itself, which every game has, plus promo types that
-            // only Magic has. Drop the rows naming a type the loaded game
-            // does not declare, so the guide stops describing another game.
-            var PREDICATES = { promo: true, altfoil: true };
-            var described = {};
-            var staticRows = section.querySelectorAll('.guide-table tbody tr');
-            for (var i = 0; i < staticRows.length; i++) {
-                var code = staticRows[i].querySelector('code');
-                if (!code) continue;
-                var listed = code.textContent.split('/');
-                var keep = false;
-                for (var j = 0; j < listed.length; j++) {
-                    var name = listed[j].trim();
-                    if (PREDICATES[name] || offered[name]) keep = true;
-                }
-                if (!keep) {
-                    staticRows[i].parentNode.removeChild(staticRows[i]);
-                    continue;
-                }
-                for (var k2 = 0; k2 < listed.length; k2++) {
-                    described[listed[k2].trim()] = true;
-                }
+        // The written table describes the predicates the search
+        // implements itself, which every game has, plus promo types that
+        // only Magic has. Drop the rows naming a type the loaded game
+        // does not declare, so the guide stops describing another game.
+        var PREDICATES = { promo: true, altfoil: true };
+        var described = {};
+        var staticRows = section.querySelectorAll('.guide-table tbody tr');
+        for (var i = 0; i < staticRows.length; i++) {
+            var code = staticRows[i].querySelector('code');
+            if (!code) continue;
+            var listed = code.textContent.split('/');
+            var keep = false;
+            for (var j = 0; j < listed.length; j++) {
+                var name = listed[j].trim();
+                if (PREDICATES[name] || offered[name]) keep = true;
             }
+            if (!keep) {
+                staticRows[i].parentNode.removeChild(staticRows[i]);
+                continue;
+            }
+            for (var k2 = 0; k2 < listed.length; k2++) {
+                described[listed[k2].trim()] = true;
+            }
+        }
 
-            var rows = [];
-            for (var k = 0; k < promos.length && rows.length < MAX_PROMOS_LISTED; k++) {
-                if (described[promos[k].value]) continue;
-                rows.push(promos[k]);
-            }
-            if (!rows.length) return;
+        var rows = [];
+        for (var k = 0; k < promos.length && rows.length < MAX_PROMOS_LISTED; k++) {
+            if (described[promos[k].value]) continue;
+            rows.push(promos[k]);
+        }
+        if (!rows.length) return;
 
-            var html = '<h4 class="guide-examples-heading">Promo types in this game</h4>';
-            html += '<p>' + promos.length + ' in total, commonest first';
-            if (promos.length > rows.length + Object.keys(described).length) {
-                html += ' - type in the palette to reach the rest';
+        var html = '<h4 class="guide-examples-heading">Promo types in this game</h4>';
+        html += '<p>' + promos.length + ' in total, commonest first';
+        if (promos.length > rows.length + Object.keys(described).length) {
+            html += ' - type in the palette to reach the rest';
+        }
+        html += '.</p>';
+        html += '<table class="guide-table">';
+        html += '<thead><tr><th>Option</th><th>Description</th></tr></thead><tbody>';
+        for (var m = 0; m < rows.length; m++) {
+            var value = rows[m].value;
+            if (rows[m].aliases && rows[m].aliases.length) {
+                value += ' / ' + rows[m].aliases.join(' / ');
             }
-            html += '.</p>';
-            html += '<table class="guide-table">';
-            html += '<thead><tr><th>Option</th><th>Description</th></tr></thead><tbody>';
-            for (var m = 0; m < rows.length; m++) {
-                var value = rows[m].value;
-                if (rows[m].aliases && rows[m].aliases.length) {
-                    value += ' / ' + rows[m].aliases.join(' / ');
-                }
-                html += '<tr><td><code>' + escapeHtml(value) + '</code></td>';
-                html += '<td>' + escapeHtml(rows[m].label || rows[m].value)
-                     + ' (' + rows[m].count + ')</td></tr>';
-            }
-            html += '</tbody></table>';
+            html += '<tr><td><code>' + escapeHtml(value) + '</code></td>';
+            html += '<td>' + escapeHtml(rows[m].label || rows[m].value)
+                 + ' (' + rows[m].count + ')</td></tr>';
+        }
+        html += '</tbody></table>';
 
-            var block = document.createElement('div');
-            block.innerHTML = html;
-            section.appendChild(block);
-        })
-        .catch(function() {});
+        var block = document.createElement('div');
+        block.innerHTML = html;
+        section.appendChild(block);
+    })(promos);
 
     // ── Rarities, from the loaded game ──
     //

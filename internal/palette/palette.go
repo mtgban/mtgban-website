@@ -241,6 +241,14 @@ func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
 	serveCached(w, s.snapshot().promos)
 }
 
+// PromosJSON is the promo type list Promos serves, nil before a load.
+func (snap *Snapshot) PromosJSON() []byte {
+	if snap == nil {
+		return nil
+	}
+	return snap.promos
+}
+
 // Finish is one finish the loaded game prints, as the palette lists it.
 type Finish struct {
 	Value   string   `json:"value"`
