@@ -81,6 +81,9 @@ func TestSetMark(t *testing.T) {
 		{"PTC", "Pro Tour Collector Set", "1996"},
 		{"WC97", "World Championship Decks 1997", "1997"},
 		{"WC00", "World Championship Decks 2000", "2000"},
+		{"EVG", "Duel Decks Anthology: Elves vs. Goblins", "A"},
+		{"TGVL", "Duel Decks Anthology: Garruk vs. Liliana Tokens", "A"},
+		{"DD1", "Duel Decks: Elves vs. Goblins", ""},
 		{"PROMOS", "Promos of Theros", ""},
 	} {
 		got := SetMark(tc.code, tc.name)
