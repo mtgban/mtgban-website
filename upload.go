@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/extrame/xls"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/xuri/excelize/v2"
 	"gopkg.in/Iwark/spreadsheet.v2"
@@ -35,6 +34,7 @@ import (
 	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/internal/xlsread"
 	"github.com/mtgban/mtgban-website/manabox"
 	"github.com/mtgban/mtgban-website/moxfield"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -1894,13 +1894,7 @@ func loadUploadEntries(r *http.Request, b *mtgmatcher.Backend, in uploadInput, m
 	} else if in.textArea != "" {
 		uploadedData, err = loadCsv(parser, strings.NewReader(in.textArea), ',', maxRows)
 	} else if in.handler != nil {
-		if strings.HasSuffix(in.handler.Filename, ".xls") {
-			uploadedData, err = loadOldXls(parser, in.file, maxRows)
-		} else if strings.HasSuffix(in.handler.Filename, ".xlsx") {
-			uploadedData, err = loadXlsx(parser, in.file, maxRows)
-		} else {
-			uploadedData, err = loadCsv(parser, in.file, ',', maxRows)
-		}
+		uploadedData, err = loadUploadFile(parser, in.file, in.handler.Filename, maxRows)
 	} else if in.remoteURL != "" {
 		var u *url.URL
 		u, err = url.Parse(in.remoteURL)
@@ -2893,65 +2887,81 @@ func loadSpreadsheet(parser *docparse.Parser, urlPath string, maxRows int) ([]Up
 	return uploadEntries, docName, nil
 }
 
-func loadOldXls(parser *docparse.Parser, reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
-	f, err := xls.OpenReader(reader, "")
+// loadUploadFile reads an uploaded file by its extension, except that a
+// compound file is read as an .xls whatever it is named: excelize must never
+// see one, and an .xls renamed .xlsx still loads.
+func loadUploadFile(parser *docparse.Parser, file io.ReadSeeker, name string, maxRows int) ([]UploadEntry, error) {
+	head := make([]byte, 8)
+	n, err := io.ReadFull(file, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, err
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+
+	switch {
+	case xlsread.IsOLE(head[:n]), strings.HasSuffix(name, ".xls"):
+		return loadOldXls(parser, file, maxRows)
+	case strings.HasSuffix(name, ".xlsx"):
+		return loadXlsx(parser, file, maxRows)
+	}
+	return loadCsv(parser, file, ',', maxRows)
+}
+
+func loadOldXls(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadEntry, error) {
+	// The reader works on the file in memory, which signing caps at
+	// MaxUploadBodySize
+	data, err := io.ReadAll(io.LimitReader(reader, MaxUploadBodySize+1))
 	if err != nil {
 		return nil, err
+	} else if len(data) > MaxUploadBodySize {
+		return nil, errors.New("xls file too large")
+	}
+
+	book, err := xlsread.Open(data)
+	if errors.Is(err, xlsread.ErrEncrypted) {
+		return nil, errors.New("this workbook is password-protected, save it without a password or as .csv")
+	} else if err != nil {
+		return nil, err
+	}
+
+	sheets := book.SheetNames()
+	if len(sheets) == 0 {
+		return nil, errors.New("empty xls file")
 	}
 
 	// Search for the possible main sheet
 	sheetIndex := 0
-	for i := 0; i < f.NumSheets(); i++ {
-		sheet := f.GetSheet(i)
-		if sheet != nil && strings.Contains(strings.ToLower(sheet.Name), "mtgban") {
+	for i, sheet := range sheets {
+		if strings.Contains(strings.ToLower(sheet), "mtgban") {
 			sheetIndex = i
 			break
 		}
 	}
 
-	sheet := f.GetSheet(sheetIndex)
-	if sheet == nil || sheet.MaxRow == 0 {
-		return nil, errors.New("empty xls file")
-	}
-
-	record := make([]string, sheet.Row(0).LastCol())
-	for i := range record {
-		record[i] = sheet.Row(0).Col(i)
-	}
-
-	var i int
-	indexMap, err := parser.ParseHeader(record)
-	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
-		i-- // Parse the first line again
+	// The header and up to maxRows rows after it; a cell past the column cap
+	// refuses the sheet, as loadXlsx refuses it
+	rows, err := book.Rows(sheetIndex, maxRows+1, maxUploadColumns)
+	var wide *xlsread.WideRowError
+	if errors.As(err, &wide) {
+		return nil, wideRowError(wide.Row, wide.Cols)
 	} else if err != nil {
 		return nil, err
 	}
 
-	var uploadEntries []UploadEntry
-	for {
-		i++
-		if i > maxRows || i >= int(sheet.MaxRow) {
-			break
-		} else if len(record) > sheet.Row(i).LastCol() {
-			var res UploadEntry
-			res.MismatchError = errors.New("wrong number of fields")
-			uploadEntries = append(uploadEntries, res)
-			continue
+	n := 0
+	return loadSheetRows(parser, func() ([]string, bool, error) {
+		if n >= len(rows) {
+			return nil, false, nil
 		}
+		n++
+		return rows[n-1], true, nil
+	}, maxRows)
+}
 
-		for j := range record {
-			record[j] = sheet.Row(i).Col(j)
-		}
-
-		res, err := parser.ParseRow(indexMap, record)
-		if err != nil {
-			continue
-		}
-
-		uploadEntries = append(uploadEntries, res)
-	}
-
-	return uploadEntries, nil
+func wideRowError(row, cols int) error {
+	return fmt.Errorf("row %d has %d columns, more than the %d an upload can have", row, cols, maxUploadColumns)
 }
 
 func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadEntry, error) {
@@ -3008,11 +3018,18 @@ func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadE
 			return nil, false, nil
 		}
 		if len(row) > maxUploadColumns {
-			return nil, false, fmt.Errorf("row %d has %d columns, more than the %d an upload can have", sheetRow, len(row), maxUploadColumns)
+			return nil, false, wideRowError(sheetRow, len(row))
 		}
 		return row, true, nil
 	}
 
+	return loadSheetRows(parser, next, maxRows)
+}
+
+// loadSheetRows parses a spreadsheet's header and the rows after it, up to
+// maxRows. next returns the sheet's rows in order, blank ones included, and
+// false once there are no more.
+func loadSheetRows(parser *docparse.Parser, next func() ([]string, bool, error), maxRows int) ([]UploadEntry, error) {
 	header, ok, err := next()
 	if err != nil {
 		return nil, err

@@ -9,7 +9,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
-	github.com/extrame/xls v0.0.1
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/lib/pq v1.12.3
@@ -18,6 +17,7 @@ require (
 	github.com/mtgban/go-cardmarket v0.4.0
 	github.com/mtgban/go-mtgban v0.10.1
 	github.com/mtgban/simplecloud v0.1.1
+	github.com/richardlehane/mscfb v1.0.8
 	github.com/xuri/excelize/v2 v2.11.1-0.20261020033641-611b222fd8f7
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
@@ -67,7 +67,6 @@ require (
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.39.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
-	github.com/extrame/ole2 v0.0.0-20160812065207-d69429661ad7 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -82,7 +81,6 @@ require (
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
 	github.com/mtgban/go-tcgplayer v0.2.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
-	github.com/richardlehane/mscfb v1.0.8 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.2 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect

@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/xuri/excelize/v2"
+
+	"github.com/mtgban/mtgban-website/internal/xlsread/xlstest"
 )
 
 // The parsers log through the site's page logger, which only exists once the
@@ -573,10 +575,118 @@ func TestLoadXlsxRefusesACompoundFile(t *testing.T) {
 	}
 }
 
-// There is no .xls writer in the module graph, so the happy path would need a
-// binary fixture committed alongside these tests. What can be pinned without
-// one is that the reader refuses anything that is not a workbook rather than
-// handing back rows built from noise.
+func buildXls(sheets ...xlstest.Sheet) io.Reader {
+	return bytes.NewReader(xlstest.Workbook(sheets...))
+}
+
+func TestLoadOldXlsReadsWhatTheHeaderNames(t *testing.T) {
+	quietUploadLog(t)
+
+	rows := append([][]string{parserHeader}, parserRows...)
+	entries, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
+	if err != nil {
+		t.Fatalf("loadOldXls: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("read %d rows, want 2", len(entries))
+	}
+	if !entries[0].HasQuantity || entries[0].Quantity != 4 {
+		t.Errorf("quantity = %d, want 4", entries[0].Quantity)
+	}
+	if entries[0].OriginalPrice != 12.50 {
+		t.Errorf("price = %v, want 12.50", entries[0].OriginalPrice)
+	}
+}
+
+func TestLoadOldXlsPrefersTheSheetNamedForUs(t *testing.T) {
+	quietUploadLog(t)
+
+	decoy := [][]string{{"Name", "Edition", "Quantity"}, {"Decoy Card", "Nowhere", "99"}}
+	ours := append([][]string{parserHeader}, parserRows...)
+	entries, err := loadOldXls(newUploadParser(backend()), buildXls(
+		xlstest.Sheet{Name: "Instructions", Rows: decoy},
+		xlstest.Sheet{Name: "MTGBAN List", Rows: ours},
+	), uploadRowLimit)
+	if err != nil {
+		t.Fatalf("loadOldXls: %v", err)
+	}
+	if len(entries) != 2 || entries[0].Quantity != 4 {
+		t.Errorf("entries = %+v, want the two rows of the MTGBAN sheet", entries)
+	}
+}
+
+func TestLoadOldXlsStopsAtTheRowLimit(t *testing.T) {
+	quietUploadLog(t)
+
+	rows := [][]string{{"Name", "Edition", "Quantity"}}
+	for i := 0; i < 50; i++ {
+		rows = append(rows, []string{"Lightning Bolt", "Beta", "1"})
+	}
+	entries, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), 10)
+	if err != nil {
+		t.Fatalf("loadOldXls: %v", err)
+	}
+	if len(entries) > 10 {
+		t.Errorf("read %d rows against a limit of 10", len(entries))
+	}
+}
+
+// extrame/xls handed back a nil row for a blank one, and the loop that read
+// it panicked, so any list with a gap in it failed whole.
+func TestLoadOldXlsReadsPastABlankRow(t *testing.T) {
+	quietUploadLog(t)
+
+	rows := [][]string{parserHeader, parserRows[0], nil, parserRows[1]}
+	entries, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
+	if err != nil {
+		t.Fatalf("loadOldXls: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("read %d rows, want the 2 around the gap", len(entries))
+	}
+}
+
+func TestLoadOldXlsRefusesARowPastTheColumnCap(t *testing.T) {
+	quietUploadLog(t)
+
+	wide := make([]string, maxUploadColumns+1)
+	wide[0], wide[maxUploadColumns] = "Lightning Bolt", "x"
+	rows := [][]string{{"Name", "Edition", "Quantity"}, wide}
+	_, err := loadOldXls(newUploadParser(backend()), buildXls(xlstest.Sheet{Name: "Sheet1", Rows: rows}), uploadRowLimit)
+	if err == nil || !strings.Contains(err.Error(), "row 2 has 257 columns") {
+		t.Errorf("err = %v, want row 2 refused for its width", err)
+	}
+}
+
+// A compound file is an .xls whatever it is called, and excelize, which
+// would hand it to its decryptor, never sees one.
+func TestLoadUploadFileReadsAnXlsByItsContent(t *testing.T) {
+	quietUploadLog(t)
+
+	rows := append([][]string{parserHeader}, parserRows...)
+	data := xlstest.Workbook(xlstest.Sheet{Name: "Sheet1", Rows: rows})
+	for _, name := range []string{"list.xls", "list.xlsx", "list.csv"} {
+		entries, err := loadUploadFile(newUploadParser(backend()), bytes.NewReader(data), name, uploadRowLimit)
+		if err != nil || len(entries) != 2 {
+			t.Errorf("%s: %d entries, err %v, want the 2 rows", name, len(entries), err)
+		}
+	}
+}
+
+// 30 bytes ran extrame/ole2 out of memory: it read past the end of the file
+// without an error and looped on sector 0.
+func TestLoadOldXlsRefusesTheFileThatCrashedTheOldReader(t *testing.T) {
+	quietUploadLog(t)
+
+	data := append(append([]byte{}, oleSignature...), make([]byte, 20)...)
+	data = append(data, 0xfe, 0xff)
+	if _, err := loadOldXls(newUploadParser(backend()), bytes.NewReader(data), uploadRowLimit); err == nil {
+		t.Error("a 30-byte compound file was accepted")
+	}
+}
+
+// Whatever is not a workbook is refused rather than handed back as rows
+// built from noise.
 func TestLoadOldXlsRefusesWhatIsNotAWorkbook(t *testing.T) {
 	quietUploadLog(t)
 
