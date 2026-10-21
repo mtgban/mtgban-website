@@ -121,12 +121,14 @@ func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
 	return data
 }
 
-// setMarks is the variant printings of an older set, which share its keyrune
-// glyph or, like the two Collectors' Editions, the font's fallback where it
-// has none. The list is closed, as none of these lines prints new sets.
+// setMarks tells apart the sets that draw the same keyrune glyph, or the
+// font's fallback where it has none for them. The list is closed, as none of
+// these lines prints new sets.
 var setMarks = map[string]string{
 	"CED":    "CED",
 	"CEI":    "CEI",
+	"CMB1":   "2019",
+	"CMB2":   "2021",
 	"4BB":    "BB",
 	"BCHR":   "BB",
 	"FBB":    "BB",
