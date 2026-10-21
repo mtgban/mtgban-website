@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -450,8 +451,10 @@ type ChartPoint struct {
 
 // MarshalJSON writes a price as a bare number and a gap as null, which is how
 // the value reaches both the template (a JS literal) and the chart API (JSON).
+// NaN and ±Inf have no JSON spelling and would fail the whole chart's encode,
+// so they are written as gaps too.
 func (p ChartPoint) MarshalJSON() ([]byte, error) {
-	if !p.Known {
+	if !p.Known || !isFinitePrice(p.Price) {
 		return []byte("null"), nil
 	}
 	return strconv.AppendFloat(nil, p.Price, 'g', -1, 64), nil
@@ -473,8 +476,8 @@ func (p *ChartPoint) UnmarshalJSON(b []byte) error {
 		text = unquoted
 	}
 	price, err := strconv.ParseFloat(text, 64)
-	if err != nil {
-		// "Number.NaN", or anything else that isn't a price, is a gap.
+	if err != nil || !isFinitePrice(price) {
+		// "Number.NaN", "NaN", or anything else that isn't a price, is a gap.
 		*p = ChartPoint{}
 		return nil
 	}
@@ -490,10 +493,17 @@ func priceAt(results map[string]timeseries.ProviderPrices, label string, provide
 		return ChartPoint{}
 	}
 	price, ok := pp[provider]
-	if !ok {
+	if !ok || !isFinitePrice(price) {
+		// The archive can hold NaN or Infinity from before snapshots refused them.
 		return ChartPoint{}
 	}
 	return ChartPoint{Price: price, Known: true}
+}
+
+// isFinitePrice reports whether a price is neither NaN nor ±Inf, the values a
+// chart cannot draw and the archive must not store.
+func isFinitePrice(price float64) bool {
+	return !math.IsNaN(price) && !math.IsInf(price, 0)
 }
 
 // buildProviderDataset projects one provider's series across the label dates.
@@ -607,7 +617,7 @@ func IsStashingInProgress() bool {
 
 // snapshotPriceFunc receives one scraped price bound for the archive: the card
 // it belongs to, the dataset whose scraper produced it, the observation date,
-// and the price itself (already condition-scaled and known non-zero).
+// and the price itself (already condition-scaled, non-zero and finite).
 type snapshotPriceFunc func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64)
 
 // walkSnapshotPrices visits every price the configured datasets claim from the
@@ -644,7 +654,9 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 					price, _ = strconv.ParseFloat(realRetail, 64)
 				}
 
-				if price == 0 {
+				// ParseFloat reads "NaN" and "Inf", and an older go-mtgban
+				// can hand either over as a price; neither goes in the archive.
+				if price == 0 || !isFinitePrice(price) {
 					continue
 				}
 
@@ -674,7 +686,7 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 
 			for id, entries := range vendor.Buylist() {
 				price := entries[0].BuyPrice * defaultGradeMap[entries[0].Conditions]
-				if price == 0 {
+				if price == 0 || !isFinitePrice(price) {
 					continue
 				}
 
