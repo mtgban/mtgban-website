@@ -3,9 +3,12 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,5 +182,43 @@ func TestAPIRateLimitKeysGatewayRequestsOnTheirClient(t *testing.T) {
 	)
 	if !got[0] || got[1] {
 		t.Errorf("forged gateway signature: allowed %v, want the second limited", got)
+	}
+}
+
+// An IPv6 caller holds a whole /64, so the limiter counts the /64, not each
+// address in it; IPv4 addresses keep a bucket each.
+func TestAPIRateLimitKeysIPv6OnItsSlash64(t *testing.T) {
+	withSigMode(t, false, true)
+	got := apiLimited(t,
+		viaNginx("/api/mtgban/stores.json", "", "2001:db8:1:2::1"),
+		viaNginx("/api/mtgban/stores.json", "", "2001:db8:1:2:aaaa:bbbb:cccc:dddd"),
+		viaNginx("/api/mtgban/stores.json", "", "2001:db8:1:3::1"),
+		viaNginx("/api/mtgban/stores.json", "", "198.51.100.7"),
+		viaNginx("/api/mtgban/stores.json", "", "198.51.100.8"),
+	)
+	if want := []bool{true, false, true, true, true}; !slices.Equal(got, want) {
+		t.Errorf("allowed %v, want %v", got, want)
+	}
+}
+
+// Picking the key reads only the query string: a POST the limiter refuses
+// must not have had its body parsed first.
+func TestAPIRateLimitDoesNotParseTheBodyFirst(t *testing.T) {
+	withSigMode(t, false, true)
+	withAPIUserSecret(t, apiGatewayUser, "gateway-secret")
+	post := func() *http.Request {
+		req := viaNginx("/api/mtgban/stores.json", "203.0.113.1", "198.51.100.7")
+		req.Method = http.MethodPost
+		req.Body = io.NopCloser(strings.NewReader("sig=x&pad=" + strings.Repeat("a", 1<<16)))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		return req
+	}
+	first, refused := post(), post()
+	got := apiLimited(t, first, refused)
+	if !got[0] || got[1] {
+		t.Fatalf("allowed %v, want the second limited", got)
+	}
+	if refused.Form != nil || refused.PostForm != nil {
+		t.Error("the refused request's body was parsed before the limiter")
 	}
 }
