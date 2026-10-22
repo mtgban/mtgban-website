@@ -20,6 +20,16 @@ func TestParseDeckURL(t *testing.T) {
 	}
 }
 
+// A ".." id would put a dot segment in the API path; it is refused before
+// any request is made.
+func TestLoadRefusesDotDot(t *testing.T) {
+	for _, link := range []string{"https://manabox.app/decks/..", "https://manabox.app/decks/%2e%2e"} {
+		if _, _, err := Load(context.Background(), link, 1); err == nil || err.Error() != "invalid ManaBox deck URL" {
+			t.Errorf("Load(%q) = %v, want the invalid deck URL error", link, err)
+		}
+	}
+}
+
 func TestLoadLive(t *testing.T) {
 	if os.Getenv("MANABOX_LIVE") == "" {
 		t.Skip("MANABOX_LIVE not set; skipping live ManaBox test")

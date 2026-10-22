@@ -1,6 +1,9 @@
 package main
 
 import (
+	"net/url"
+	"path"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/mtgban-website/moxfield"
@@ -138,5 +141,100 @@ func TestUpperBound(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("%s: upperBound(%v, %v, %v) = %v, want %v", tt.name, tt.v, tt.floor, tt.floorOn, got, tt.want)
 		}
+	}
+}
+
+// A Moxfield link's fetch is built from its kind and id, so a sub-page
+// fetches its deck, and a path whose id is not one is refused rather than
+// cleaned: "..", encoded or not, would walk the GET anywhere on the proxy.
+func TestMoxfieldURL(t *testing.T) {
+	for _, base := range []string{"https://proxy", "https://proxy/moxfield/"} {
+		for link, want := range map[string]string{
+			"https://moxfield.com/decks/Kq5j7Q8cJE2XyH3xNfZ1Xg": "/decks/Kq5j7Q8cJE2XyH3xNfZ1Xg",
+			"https://www.moxfield.com/decks/abc_-123/":          "/decks/abc_-123",
+			"https://moxfield.com/decks/abc123?foo=bar#x":       "/decks/abc123",
+			"https://moxfield.com/decks/abc123/primer":          "/decks/abc123",
+			"https://moxfield.com/decks/abc123/history/":        "/decks/abc123",
+			"https://moxfield.com/binders/Zz9_-a":               "/binders/Zz9_-a",
+			"https://moxfield.com/collection/Zz9_-a":            "/collection/Zz9_-a",
+		} {
+			u, err := url.Parse(link)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := moxfieldURL(base, u.Path)
+			if err != nil {
+				t.Errorf("moxfieldURL(%q, %q): %v", base, link, err)
+				continue
+			}
+			// What the uploader fetched for the bare deck link before ids
+			// were checked
+			wantURL, _ := url.Parse(base)
+			wantURL.Path = path.Join(wantURL.Path, want)
+			if got != wantURL.String() {
+				t.Errorf("moxfieldURL(%q, %q) = %q, want %q", base, link, got, wantURL)
+			}
+		}
+	}
+
+	for _, link := range []string{
+		"https://moxfield.com/decks/../../../../internal/x",
+		"https://moxfield.com/decks/..",
+		"https://moxfield.com/decks/%2e%2e/%2e%2e/internal",
+		"https://moxfield.com/decks/%2E%2E",
+		"https://moxfield.com/decks/a%3Fx=1",
+		"https://moxfield.com/decks/",
+		"https://moxfield.com/decks",
+		"https://moxfield.com/internal/abc",
+		"https://moxfield.com/",
+		"https://moxfield.com//evil.example/decks/abc",
+	} {
+		u, err := url.Parse(link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := moxfieldURL("https://proxy", u.Path); err == nil {
+			t.Errorf("moxfieldURL(%q) = %q, want an error", link, got)
+		}
+	}
+}
+
+// The sheet id goes into the Sheets API path unescaped, so it must be an id
+// and nothing else: no dot segment, query or fragment.
+func TestSpreadsheetID(t *testing.T) {
+	for link, want := range map[string]string{
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/edit":       "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/edit#gid=0": "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/":           "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9":            "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/edit/":      "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/view":       "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/htmlview":   "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/d/1AbC_-xyz9/copy":       "1AbC_-xyz9",
+		"https://docs.google.com/spreadsheets/u/1/d/1AbC_-xyz9/edit":   "1AbC_-xyz9",
+	} {
+		u, _ := url.Parse(link)
+		got, err := spreadsheetID(u.Path)
+		if err != nil || got != want {
+			t.Errorf("spreadsheetID(%q) = %q, %v, want %q", link, got, err, want)
+		}
+	}
+	for _, link := range []string{
+		"https://docs.google.com/spreadsheets/d/../edit",
+		"https://docs.google.com/spreadsheets/d/%2e%2e/edit",
+		"https://docs.google.com/spreadsheets/d/x%3Ffields=y/edit",
+		"https://docs.google.com/spreadsheets/d/x%23y/edit",
+		"https://docs.google.com/",
+	} {
+		u, _ := url.Parse(link)
+		if got, err := spreadsheetID(u.Path); err == nil {
+			t.Errorf("spreadsheetID(%q) = %q, want an error", link, got)
+		}
+	}
+
+	// A "Publish to web" link carries no id the Sheets API takes, and says so
+	u, _ := url.Parse("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_abc/pubhtml")
+	if got, err := spreadsheetID(u.Path); err == nil || !strings.Contains(err.Error(), "published") {
+		t.Errorf("spreadsheetID(published link) = %q, %v, want an error naming published links", got, err)
 	}
 }

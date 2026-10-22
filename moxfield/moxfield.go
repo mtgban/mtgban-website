@@ -89,13 +89,8 @@ func getMoxDeck(ctx context.Context, deckURL string) (*Deck, error) {
 // Prepare upload entries in the expected format
 func prepareDecklist(deck *Deck, maxRows int) []Item {
 	var items []Item
-	var count int
 	for _, board := range deck.Boards {
 		for _, card := range board.Cards {
-			if count >= maxRows {
-				break
-			}
-
 			// Expand the per-copy printing breakdown when present, so a
 			// deck mixing printings and finishes of one card uploads one
 			// item per printing instead of collapsing into the entry's
@@ -119,15 +114,19 @@ func prepareDecklist(deck *Deck, maxRows int) []Item {
 					Quantity:   card.Quantity,
 				})
 			}
-
-			count++
 		}
 	}
-
-	// Preserve some sort of ordering since boards are maps
+	// Preserve some sort of ordering since boards are maps, and cap the
+	// items after it, so the same deck keeps the same ones
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].sortKey() < items[j].sortKey()
+		if items[i].sortKey() != items[j].sortKey() {
+			return items[i].sortKey() < items[j].sortKey()
+		}
+		return items[i].Quantity < items[j].Quantity
 	})
+	if len(items) > maxRows {
+		items = items[:maxRows]
+	}
 
 	return items
 }

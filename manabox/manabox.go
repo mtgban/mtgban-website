@@ -77,7 +77,8 @@ func Load(ctx context.Context, shareOrURL string, maxRows int) ([]Item, string, 
 		shareID = id
 	}
 	shareID = path.Base(strings.Trim(shareID, "/"))
-	if shareID == "" || shareID == "." {
+	// PathEscape leaves dots alone, so ".." would walk up from /decks/
+	if shareID == "" || shareID == "." || shareID == ".." {
 		return nil, "", errors.New("invalid ManaBox deck URL")
 	}
 

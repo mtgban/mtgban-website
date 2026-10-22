@@ -2571,28 +2571,52 @@ func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]U
 	return uploadEntries, nil
 }
 
+// moxfieldURL builds the proxy URL for a Moxfield deck, binder or
+// collection link from its kind and id alone, so a sub-page such as
+// /decks/<id>/primer fetches the deck. Checking the id is what keeps "..",
+// even encoded, from walking the fetch anywhere on the proxy host.
+func moxfieldURL(proxyBase, link string) (string, error) {
+	parts := strings.Split(link, "/")
+	if len(parts) < 3 || parts[0] != "" || !isURLID(parts[2]) {
+		return "", errors.New("invalid Moxfield deck URL")
+	}
+	switch parts[1] {
+	case "decks", "binders", "collection":
+	default:
+		return "", errors.New("invalid Moxfield deck URL")
+	}
+
+	base, err := url.Parse(proxyBase)
+	if err != nil {
+		return "", errors.New("invalid Moxfield uploader configuration")
+	}
+	base.Path = path.Join(base.Path, parts[1], parts[2])
+	return base.String(), nil
+}
+
+// isURLID reports whether s is a non-empty run of the base64url characters
+// Moxfield and Google Sheets ids are made of.
+func isURLID(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '_', c == '-':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func loadMoxfield(ctx context.Context, b *mtgmatcher.Backend, link string, maxRows int) ([]UploadEntry, string, error) {
 	var uploadEntries []UploadEntry
 
-	deckID := path.Base(link)
-	if deckID == "" {
-		return nil, "", errors.New("invalid Moxfield deck URL")
-	}
-
-	// Build the request URL from the configured proxy base so the host
-	// is provably the trusted config host, never user-influenced.
-	// `link` is the path component of the user-submitted Moxfield URL;
-	// require a clean absolute path so it can't inject a scheme or host
-	// (e.g. via a leading "//" or an embedded "://").
-	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.Contains(link, "://") {
-		return nil, "", errors.New("invalid Moxfield deck URL")
-	}
-	base, err := url.Parse(Infrastructure().Uploader["moxfield"])
+	moxURL, err := moxfieldURL(Infrastructure().Uploader["moxfield"], link)
 	if err != nil {
-		return nil, "", errors.New("invalid Moxfield uploader configuration")
+		return nil, "", err
 	}
-	base.Path = path.Join(base.Path, link)
-	moxURL := base.String()
 
 	items, deckName, err := moxfield.Load(ctx, moxURL, maxRows)
 	if err != nil {
@@ -2819,10 +2843,29 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 	return uploadEntries, collectionName, nil
 }
 
+// spreadsheetID is the id after /d/ in the path of a Google Sheets link,
+// whatever page follows it. It goes into the Sheets API path unescaped.
+func spreadsheetID(urlPath string) (string, error) {
+	parts := strings.Split(strings.Trim(urlPath, "/"), "/")
+	for i := 0; i+1 < len(parts); i++ {
+		// A "Publish to web" link, /d/e/<pubid>/pubhtml, has no id the API takes
+		if parts[i] == "d" && parts[i+1] == "e" {
+			return "", errors.New("published Google Sheets links aren't supported, share the /d/<id>/edit link")
+		}
+		if parts[i] == "d" && isURLID(parts[i+1]) {
+			return parts[i+1], nil
+		}
+	}
+	return "", errors.New("invalid Google Sheets URL")
+}
+
 func loadSpreadsheet(parser *docparse.Parser, urlPath string, maxRows int) ([]UploadEntry, string, error) {
 	service := spreadsheet.NewServiceWithClient(GoogleDocsClient)
 
-	hash := path.Base(strings.TrimSuffix(urlPath, "/edit"))
+	hash, err := spreadsheetID(urlPath)
+	if err != nil {
+		return nil, "", err
+	}
 	spreadsheet, err := service.FetchSpreadsheet(hash)
 	if err != nil {
 		return nil, "", err
