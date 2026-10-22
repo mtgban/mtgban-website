@@ -603,7 +603,7 @@
             var foil = lf === 'foil' || lf === 'altfoil';
             var etched = lf === 'etched';
 
-            var query = name;
+            var query = window.CardRow.queryName(name);
             if (c[3]) query += ' s:' + c[3];
             if (c[4]) query += ' cns:' + c[4];
             if (etched) query += ' f:etched';

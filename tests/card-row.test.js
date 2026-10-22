@@ -77,6 +77,15 @@ test('reads a button inside the mobile card header', () => {
     expect(got.finishTag).toBe('Foil');
 });
 
+// The query searches the name, not the filter its "S:" reads as.
+test('quotes a name the search could read a filter out of', () => {
+    const btn = el({ 'data-card-id': 'uuid-2' }, ['fav-btn']);
+    const row = el({ 'data-card-id': 'uuid-2', 'data-card-name': 'S:P Little Knight', 'data-set-code': 'AGOV', 'data-number': 'AGOV-EN046' }, ['result-header'], [btn]);
+    el({}, ['result'], [row]);
+    expect(load().read(btn).query).toBe('"S:P Little Knight" s:AGOV cns:AGOV-EN046');
+    expect(load().queryName('Dark Ritual')).toBe('Dark Ritual');
+});
+
 test('returns null with no row', () => {
     const btn = el({ 'data-card-id': 'uuid-1' }, ['fav-btn']);
     expect(load().read(btn)).toBeNull();

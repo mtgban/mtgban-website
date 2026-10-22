@@ -69,7 +69,7 @@ window.CardRow = (function () {
             }
         }
 
-        var query = name;
+        var query = queryName(name);
         if (setCode) query += ' s:' + setCode;
         if (number) query += ' cns:' + number;
         if (isEtched) query += ' f:etched';
@@ -97,5 +97,11 @@ window.CardRow = (function () {
         };
     }
 
-    return { read: read };
+    // queryName quotes a name the search could read a filter out of, such
+    // as "S:P Little Knight"; a quoted name searches the same either way.
+    function queryName(name) {
+        return /[:<>]/.test(name) ? '"' + name + '"' : name;
+    }
+
+    return { read: read, queryName: queryName };
 })();
