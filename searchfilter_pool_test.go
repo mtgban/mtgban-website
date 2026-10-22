@@ -267,7 +267,7 @@ func TestParsePoolEmptyValue(t *testing.T) {
 	}
 	// With a filter left, nothing is added.
 	if config := parseSearchOptionsWrapper("in: f:foil"); len(poolFilters(config)) != 0 {
-		t.Errorf("in: f:foil made a pool filter")
+		t.Error("in: f:foil made a pool filter")
 	}
 }
 
