@@ -119,31 +119,26 @@ func TestFinishesCacheFilesShortForms(t *testing.T) {
 	}
 }
 
-// Foil is capitalised throughout. The game's map spells fifteen treatments
-// "X foil" and seven "X Foil"; a list has to pick one, and this is the
-// spelling the finishes a game names itself already use - Cold Foil, Rainbow
-// Foil - so every row reads the same whichever half it came from.
+// Foil is capitalised throughout, the way the finishes a game names itself
+// are spelled - Cold Foil, Rainbow Foil - so every row reads the same
+// whichever half of the list it came from.
 func TestFinishListLabelCapitalisesFoil(t *testing.T) {
 	skipWithoutDatastore(t)
 
 	tests := []struct{ finish, want string }{
-		// The fifteen the game spells lowercase.
+		// Treatments, in the game's own words.
 		{"surgefoil", "Surge Foil"},
 		{"galaxyfoil", "Galaxy Foil"},
 		{"embossed", "Embossed Foil"},
 		{"oilslick", "Oil Slick Foil"},
-		// The seven it already capitalises, unchanged.
 		{"firstplacefoil", "First Place Foil"},
 		{"dragonscalefoil", "Dragon Scale Foil"},
-		// The words are still the game's: only a trailing foil moves, and a
-		// treatment that is not "something foil" keeps its own shape.
+		// A treatment that is not "something foil" keeps its own shape.
 		{"doublerainbow", "Double Rainbow"},
 		{"stepandcompleat", "Step-and-Compleat"},
 		{"neonink", "Neon Ink"},
 		// Not a treatment: the finish rule spells it, as it does for the games
-		// that name their finishes rather than filing them as promo types -
-		// and it already capitalises Foil, which is why this is the spelling
-		// the rest were brought to.
+		// that name their finishes rather than filing them as promo types.
 		{"coldfoil", "Cold Foil"},
 		{"1stedition", "1st Edition"},
 	}

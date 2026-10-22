@@ -657,22 +657,12 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 // A treatment is a promo type on Magic, and the game spells its own promo
 // types better than any rule could - "Double Rainbow", "Step-and-Compleat",
 // "Dragon Scale Foil". PromoTypeLabel title-cases the bare token where it has
-// no spelling of its own, which is worse than the rule below, so it is taken
-// only where it says something.
-//
-// The words are the game's; the capital on Foil is ours. That map spells
-// fifteen of them "X foil" and seven "X Foil", and a list has to pick one -
-// this one is written the way the finishes a game names itself are spelled,
-// Cold Foil and Rainbow Foil, so every row reads the same whichever half of
-// the list it came from. Only a trailing "foil" moves: Double Rainbow and
-// Step-and-Compleat are not "something foil" and keep their own shape.
+// no spelling of its own, which is worse than spellFinish, so it is taken
+// only where it says something. Every other finish is spellFinish's.
 func finishListLabel(b *mtgmatcher.Backend, finish string) string {
 	if slices.Contains(altFoilTags, finish) {
 		label := b.PromoTypeLabel(finish)
 		if label != mtgmatcher.Title(finish) {
-			if strings.HasSuffix(label, " foil") {
-				label = strings.TrimSuffix(label, " foil") + " Foil"
-			}
 			return label
 		}
 	}
