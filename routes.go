@@ -43,6 +43,7 @@ func assetHash() string {
 
 // mountNav serves a page and its sub-pages on mux behind enforceSigning; a
 // NoSigning sub-page gets its own Handle unsigned, never the parent's.
+// Each link is an exact mux pattern, so signing here sees only whole links.
 func (s *site) mountNav(mux *http.ServeMux, nav *NavElem) {
 	handler := enforceSigning(s, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nav.Handle(s, w, r)
