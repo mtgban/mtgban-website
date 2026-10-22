@@ -119,8 +119,9 @@ func TestSplitQueryProtectedText(t *testing.T) {
 		{`s:"Fourth Edition"`, nil, `s:"Fourth Edition"`},
 		{`s:"A B","C D" x`, nil, `s:"A B","C D" x`},
 		{`"S:P Little Knight" s:"Fourth Edition"`, []string{`"S:P Little Knight"`}, " " + protectedMark + "  s:\"Fourth Edition\""},
-		// Unbalanced closes at the end, with the one quote it has.
-		{`"Dark Ritual`, []string{`"Dark Ritual`}, " " + protectedMark + " "},
+		// A quote with no partner is a character, and protects nothing.
+		{`"Dark Ritual`, nil, `"Dark Ritual`},
+		{`"Lightning Bolt s:LEA`, nil, `"Lightning Bolt s:LEA`},
 		// Two spans keep their order.
 		{`"a b" "c d"`, []string{`"a b"`, `"c d"`}, " " + protectedMark + "   " + protectedMark + " "},
 	}
@@ -422,6 +423,9 @@ func TestParseProtectedText(t *testing.T) {
 		{`"Dark Ritual" s:LEA`, "Dark Ritual", []string{"edition"}},
 		{`s:LEA "Dark Ritual"`, "Dark Ritual", []string{"edition"}},
 		{`"S:P Little Knight" s:"Fourth Edition"`, "S:P Little Knight", []string{"edition"}},
+		// A quote with no partner is a character, and the filters after
+		// it stay filters.
+		{`"Lightning Bolt s:LEA`, `"Lightning Bolt`, []string{"edition"}},
 		// In a regexp a quote is a character of the pattern.
 		{`sm:regexp ^"A" Cell`, `^"A" Cell`, nil},
 		{`sm:regexp ^"Ach`, `^"Ach`, nil},
