@@ -817,7 +817,7 @@ Discord answers, without its URL.
 
 One handler, `Admin`, which calls a function of its own for each action,
 tool, editor and table, driving its tabs —
-Dashboard, Usage, Searches, People, Config, Checkpoints, Access,
+Dashboard, Usage, Searches, Alerts, People, Config, Checkpoints, Access,
 Affiliates, Datasets, Infrastructure, Key Overrides, Tools — through
 command dispatch: scraper refresh via
 GitHub Actions dispatch (`refresh`) or direct reload (`reload`, `table`, `tag`),
