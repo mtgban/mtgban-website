@@ -24,9 +24,10 @@ number. `price_parity_test.go` pins that.
   nonfoil, a foil-etched card matches both foil and etched, and an unknown
   finish value matches nothing (`TestFinishPredicateParity`).
 - **Blocklists.** An explicit store list overrides the blocklists; otherwise
-  the blocklists exclude. `storeEligible` encodes it: ALL_ACCESS builds its
-  list from the blocklists at runtime, DEV_ACCESS sees everything, an
-  explicit list bypasses them (`TestStoreEligible`, `TestApiEnabledStores`,
+  the blocklists exclude. `storeEligible` encodes it: ALL_ACCESS builds a
+  list per side at runtime, the sellers from the retail blocklist and the
+  vendors from the buylist one, DEV_ACCESS sees everything, an explicit
+  list bypasses them (`TestStoreEligible`, `TestApiEnabledStores`,
   `TestGetDefaultBlocklists`).
 - **Zero prices.** A zero-priced listing is ignored: the base price is the
   first nonzero entry, and zero entries add no condition or quantity

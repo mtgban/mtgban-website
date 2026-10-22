@@ -54,13 +54,16 @@ type PriceAPIOutput struct {
 }
 
 // apiEnabledStores expands the sig's API store option into the concrete
-// store list. ALL_ACCESS generates it from the search blocklists at runtime
-// (so scrapers added after the sig was issued are picked up), DEV_ACCESS
-// sees everything, and an explicit list is taken as-is, BASE_ACCESS filters
-// anything sealed or outside the main region unless it is metadata-only; a
-// sig's own store list bypasses the blocklists by design.
-func apiEnabledStores(storesOpt string) []string {
-	var enabledStores []string
+// store lists, one per side: the sellers a key prices retail at and the
+// vendors it prices buylist at. ALL_ACCESS generates them at runtime (so
+// scrapers added after the sig was issued are picked up), the sellers from
+// the search retail block list and the vendors from the buylist one, so a
+// store one side's block list names is still served on the other.
+// BASE_ACCESS does the same, then drops anything sealed or outside the main
+// region unless it is metadata-only. DEV_ACCESS sees everything, and an explicit
+// list is taken as-is for both sides: a sig's own store list bypasses the
+// blocklists by design.
+func apiEnabledStores(storesOpt string) (sellers, vendors []string) {
 	switch storesOpt {
 	case "ALL_ACCESS", "DEV_ACCESS", "BASE_ACCESS":
 		var blocklistRetail, blocklistBuylist []string
@@ -68,22 +71,58 @@ func apiEnabledStores(storesOpt string) []string {
 			blocklistRetail = Config().Stores.SearchRetailBlockList
 			blocklistBuylist = Config().Stores.SearchBuylistBlockList
 		}
-		add := func(info mtgban.ScraperInfo, blocklist []string) {
-			if storeEligible(info.Shorthand, nil, blocklist) && !slices.Contains(enabledStores, info.Shorthand) &&
-				(storesOpt != "BASE_ACCESS" || baseAccessStoreEligible(info)) {
-				enabledStores = append(enabledStores, info.Shorthand)
+		for _, seller := range GetSellers() {
+			info := seller.Info()
+			if presetServes(storesOpt, info, blocklistRetail) && !slices.Contains(sellers, info.Shorthand) {
+				sellers = append(sellers, info.Shorthand)
 			}
 		}
-		for _, seller := range GetSellers() {
-			add(seller.Info(), blocklistRetail)
-		}
 		for _, vendor := range GetVendors() {
-			add(vendor.Info(), blocklistBuylist)
+			info := vendor.Info()
+			if presetServes(storesOpt, info, blocklistBuylist) && !slices.Contains(vendors, info.Shorthand) {
+				vendors = append(vendors, info.Shorthand)
+			}
 		}
-	default:
-		enabledStores = strings.Split(storesOpt, ",")
+		return sellers, vendors
 	}
-	return enabledStores
+	stores := strings.Split(storesOpt, ",")
+	return stores, stores
+}
+
+// presetServes reports whether a store preset serves a store on the side
+// whose block list is given: the list must not name it, and BASE_ACCESS
+// also needs it to be one of its stores.
+func presetServes(storesOpt string, info mtgban.ScraperInfo, blocklist []string) bool {
+	if slices.Contains(blocklist, info.Shorthand) {
+		return false
+	}
+	return storesOpt != "BASE_ACCESS" || baseAccessStoreEligible(info)
+}
+
+// apiStoreUnion lists every store either side serves, once, sellers first.
+func apiStoreUnion(sellers, vendors []string) []string {
+	out := slices.Clone(sellers)
+	for _, vendor := range vendors {
+		if !slices.Contains(out, vendor) {
+			out = append(out, vendor)
+		}
+	}
+	return out
+}
+
+// apiPickStores keeps the enabled stores the vendor= parameter names, in
+// its order, answered under the store's own tag, once.
+func apiPickStores(enabled []string, picked string) []string {
+	var out []string
+	for _, filtered := range strings.Split(picked, ",") {
+		for _, tag := range enabled {
+			if strings.EqualFold(tag, filtered) && !slices.Contains(out, tag) {
+				out = append(out, tag)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // baseAccessStoreEligible keeps BASE_ACCESS focused on singles in the main
@@ -237,11 +276,11 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		}
 	}
 
-	enabledStores := apiEnabledStores(storesOpt)
+	enabledSellers, enabledVendors := apiEnabledStores(storesOpt)
 
 	// Endpoint for retrieving the stores shorthands, and in v2 what each is
 	if version == APIVersionV2 && strings.HasPrefix(urlPath, "stores") {
-		stores := v2StoreList(enabledStores, r.FormValue("filter"))
+		stores := v2StoreList(enabledSellers, enabledVendors, r.FormValue("filter"))
 		if strings.HasSuffix(urlPath, ".json") {
 			json.NewEncoder(w).Encode(&stores)
 		} else {
@@ -250,7 +289,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 		return
 	}
 	if strings.HasPrefix(urlPath, "stores") {
-		output := enabledStores
+		output := apiStoreUnion(enabledSellers, enabledVendors)
 		filter := r.FormValue("filter")
 		if filter == "singles" || filter == "sealed" {
 			filtered := []string{}
@@ -259,7 +298,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 					continue
 				}
 				shorthand := seller.Info().Shorthand
-				if slices.Contains(enabledStores, shorthand) && !slices.Contains(filtered, shorthand) {
+				if slices.Contains(enabledSellers, shorthand) && !slices.Contains(filtered, shorthand) {
 					filtered = append(filtered, shorthand)
 				}
 			}
@@ -268,7 +307,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 					continue
 				}
 				shorthand := vendor.Info().Shorthand
-				if slices.Contains(enabledStores, shorthand) && !slices.Contains(filtered, shorthand) {
+				if slices.Contains(enabledVendors, shorthand) && !slices.Contains(filtered, shorthand) {
 					filtered = append(filtered, shorthand)
 				}
 			}
@@ -333,17 +372,8 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	// Filter by user preference, as long as it's listed in the enabled stores
 	filterByVendors := r.FormValue("vendor")
 	if filterByVendors != "" {
-		var newEnabledStores []string
-		for _, filtered := range strings.Split(filterByVendors, ",") {
-			// In any case, answered under the store's own tag, once
-			for _, tag := range enabledStores {
-				if strings.EqualFold(tag, filtered) && !slices.Contains(newEnabledStores, tag) {
-					newEnabledStores = append(newEnabledStores, tag)
-					break
-				}
-			}
-		}
-		enabledStores = newEnabledStores
+		enabledSellers = apiPickStores(enabledSellers, filterByVendors)
+		enabledVendors = apiPickStores(enabledVendors, filterByVendors)
 	}
 
 	filterByEdition := ""
@@ -402,7 +432,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	// Only export conditions when a single store or edition is enabled
 	// or always export them if a list of card is requested
 	// or let user decide in case of DEV_ACCESS
-	if len(enabledStores) == 1 {
+	if len(apiStoreUnion(enabledSellers, enabledVendors)) == 1 {
 		conds = true
 	} else if conds && storesOpt != "DEV_ACCESS" {
 		conds = filterByHash != nil || filterByEdition != ""
@@ -426,17 +456,17 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 	if ((kind == "retail" || kind == "all") && canRetail) || isSealed {
 		dumpType += "retail"
 		if isV2 {
-			retailV2 = sellerSectionV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
+			retailV2 = sellerSectionV2(b, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
-			out.Retail = getSellerPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+			out.Retail = getSellerPrices(b, idOpt, enabledSellers, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
 	if ((kind == "buylist" || kind == "all") && canBuylist) || isSealed {
 		dumpType += "buylist"
 		if isV2 {
-			buylistV2 = vendorSectionV2(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, isSealed)
+			buylistV2 = vendorSectionV2(b, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, isSealed)
 		} else {
-			out.Buylist = getVendorPrices(b, idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
+			out.Buylist = getVendorPrices(b, idOpt, enabledVendors, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 		}
 	}
 

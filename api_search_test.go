@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/banprice"
 )
 
 // plainCard is a card with a plain name that a search path can carry.
@@ -481,13 +482,14 @@ func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
 		}
 	}
 
-	// ALL_ACCESS and BASE_ACCESS keep one list for both sides, as the price
-	// API does: SCG buylisting under the same shorthand keeps it in the list
-	// whichever side's block list names it, on search as on prices.
-	scgBuys := mtgban.BuylistRecord{}
-	scgBuys.Add(id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 1})
+	// ALL_ACCESS and BASE_ACCESS keep a list per side: SCG buylisting under
+	// the same shorthand loses only the side whose block list names it, on
+	// the price API and on search alike.
+	buys := mtgban.BuylistRecord{}
+	buys.Add(id, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 1})
 	publishStores(t, slices.Clone(GetSellers()), append(slices.Clone(GetVendors()),
-		mtgban.NewVendorFromBuylist(scgBuys, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"})))
+		mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
+		mtgban.NewVendorFromBuylist(buys, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"})))
 	v2BuylistStores := func(body []byte) []string {
 		t.Helper()
 		var out PriceAPIOutputV2
@@ -512,19 +514,37 @@ func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
 		Config().Stores.SearchRetailBlockList = blocked.retail
 		Config().Stores.SearchBuylistBlockList = blocked.buylist
 		for _, scope := range []string{"ALL_ACCESS", "BASE_ACCESS"} {
-			label := scope + " with SCG blocked on " + blocked.side
-			priced := v2Stores(get("/api/v2/retail/"+id+".json?id=scryfall", url.Values{}, scope))
-			if !slices.Contains(priced, "SCG") {
-				t.Fatalf("%s: the price API sold at %v, want SCG kept by its buylist", label, priced)
+			var listed banprice.Stores
+			err := json.Unmarshal(get("/api/v2/stores.json", url.Values{}, scope), &listed)
+			if err != nil {
+				t.Fatal(err)
 			}
-			found := v2Stores(get("/api/v2/search/retail/"+url.PathEscape(name)+".json", url.Values{}, scope))
-			if !slices.Equal(found, priced) {
-				t.Errorf("%s: v2 retail search gave %v, the price API %v", label, found, priced)
+			isSCG := func(store banprice.Store) bool { return store.Shorthand == "SCG" }
+			if slices.ContainsFunc(listed.Sellers, isSCG) == (blocked.side == "retail") ||
+				slices.ContainsFunc(listed.Vendors, isSCG) == (blocked.side == "buylist") {
+				t.Errorf("%s with SCG blocked on %s: stores.json listed %+v", scope, blocked.side, listed)
 			}
-			pricedBuy := v2BuylistStores(get("/api/v2/buylist/"+id+".json?id=scryfall", url.Values{}, scope))
-			foundBuy := v2BuylistStores(get("/api/v2/search/buylist/"+url.PathEscape(name)+".json", url.Values{}, scope))
-			if !slices.Equal(foundBuy, pricedBuy) {
-				t.Errorf("%s: v2 buylist search gave %v, the price API %v", label, foundBuy, pricedBuy)
+			for _, side := range []struct {
+				name   string
+				stores func([]byte) []string
+			}{{"retail", v2Stores}, {"buylist", v2BuylistStores}} {
+				label := scope + " with SCG blocked on " + blocked.side + ", " + side.name
+				wantSCG := side.name != blocked.side
+				priced := side.stores(get("/api/v2/"+side.name+"/"+id+".json?id=scryfall", url.Values{}, scope))
+				if !slices.Contains(priced, "CK") {
+					t.Fatalf("%s: the price API gave %v, want CK", label, priced)
+				}
+				if slices.Contains(priced, "SCG") != wantSCG {
+					t.Errorf("%s: the price API gave %v, want SCG %v", label, priced, wantSCG)
+				}
+				found := side.stores(get("/api/v2/search/"+side.name+"/"+url.PathEscape(name)+".json", url.Values{}, scope))
+				if !slices.Equal(found, priced) {
+					t.Errorf("%s: v2 search gave %v, the price API %v", label, found, priced)
+				}
+				body := string(get("/api/mtgban/search/"+side.name+"/"+url.PathEscape(name)+".json", url.Values{}, scope))
+				if !strings.Contains(body, "Card Kingdom") || strings.Contains(body, "Star City Games") != wantSCG {
+					t.Errorf("%s: v1 search gave %s, want SCG %v", label, body, wantSCG)
+				}
 			}
 		}
 	}
