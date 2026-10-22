@@ -42,3 +42,26 @@ test('existingForCard lists the card\'s alerts in create mode only', () => {
     expect(h.existingForCard(existing, 'card-1', '1')).toEqual([]);
     expect(h.existingForCard(null, 'card-1', null)).toEqual([]);
 });
+
+test('lowestPrice is the lowest offer in the condition among the checked stores', () => {
+    const h = load();
+    const stores = [
+        { shorthand: 'CK', prices: { NM: 0.63, SP: 0.5 } },
+        { shorthand: 'CSI', prices: { NM: 0.02 } },
+        { shorthand: 'SCG', prices: {} },
+        { shorthand: 'ABU', prices: null },
+    ];
+    expect(h.lowestPrice(stores, 'NM', [])).toBe(0.02);
+    expect(h.lowestPrice(stores, 'NM', ['ck', 'SCG'])).toBe(0.63);
+    expect(h.lowestPrice(stores, 'SP', [])).toBe(0.5);
+    expect(h.lowestPrice(stores, 'HP', [])).toBe(null);
+    expect(h.lowestPrice(stores, 'NM', ['SCG'])).toBe(null);
+});
+
+test('referenceUsed only for a percentage threshold', () => {
+    const h = load();
+    expect(h.referenceUsed('', '')).toBe(false);
+    expect(h.referenceUsed('abs', 'abs')).toBe(false);
+    expect(h.referenceUsed('pct', '')).toBe(true);
+    expect(h.referenceUsed('abs', 'pct')).toBe(true);
+});

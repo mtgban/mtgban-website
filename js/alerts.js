@@ -132,6 +132,24 @@
 
     function money(v) { return '$' + Number(v).toFixed(2); }
 
+    // lowestPrice is the lowest offer in the condition among the scoped
+    // stores (every store when scope is empty), or null when none has one.
+    function lowestPrice(stores, condition, scope) {
+        var low = null;
+        (stores || []).forEach(function (s) {
+            if (scope && scope.length && !scope.some(function (x) { return x.toUpperCase() === s.shorthand.toUpperCase(); })) return;
+            var p = s.prices && s.prices[condition];
+            if (p && (low === null || p < low)) low = p;
+        });
+        return low;
+    }
+
+    // referenceUsed is whether either threshold is a percentage, the only
+    // thing the reference price is measured for.
+    function referenceUsed(aboveKind, belowKind) {
+        return aboveKind === 'pct' || belowKind === 'pct';
+    }
+
     function toast(text) {
         var el = document.getElementById('alerts-toast');
         if (!el) {
@@ -184,78 +202,85 @@
         setPills('condition', state.condition);
     }
 
+    // Every store on the side is listed, by name, so an alert can watch one
+    // not offering the card yet.
     function renderStores() {
         var host = document.getElementById('alert-stores');
-        var stores = (state.options && state.options.stores) || [];
+        var stores = ((state.options && state.options.stores) || []).slice().sort(function (a, b) {
+            return (a.name || a.shorthand).localeCompare(b.name || b.shorthand);
+        });
         host.innerHTML = '';
         if (!stores.length) {
             var p = document.createElement('p');
             p.className = 'alert-stores-empty';
-            p.textContent = 'No store has an offer for this card right now.';
+            p.textContent = 'No store is available to watch.';
             host.appendChild(p);
             return;
         }
-        var half = Math.ceil(stores.length / 2);
-        [stores.slice(0, half), stores.slice(half)].forEach(function (column) {
-            var col = document.createElement('div');
-            column.forEach(function (s) {
-                var label = document.createElement('label');
-                var box = document.createElement('input');
-                box.type = 'checkbox';
-                box.name = 'stores';
-                box.value = s.shorthand;
-                box.checked = state.stores.some(function (x) { return x.toUpperCase() === s.shorthand.toUpperCase(); });
-                var name = document.createElement('span');
-                name.textContent = s.name || s.shorthand;
-                var price = document.createElement('span');
-                price.className = 'alert-store-price';
-                price.setAttribute('data-shorthand', s.shorthand);
-                label.appendChild(box);
-                label.appendChild(name);
-                label.appendChild(price);
-                col.appendChild(label);
-            });
-            host.appendChild(col);
+        stores.forEach(function (s) {
+            var label = document.createElement('label');
+            label.setAttribute('data-shorthand', s.shorthand);
+            label.title = s.name || s.shorthand;
+            var box = document.createElement('input');
+            box.type = 'checkbox';
+            box.name = 'stores';
+            box.value = s.shorthand;
+            box.checked = state.stores.some(function (x) { return x.toUpperCase() === s.shorthand.toUpperCase(); });
+            var name = document.createElement('span');
+            name.className = 'alert-store-name';
+            name.textContent = s.name || s.shorthand;
+            var price = document.createElement('span');
+            price.className = 'alert-store-price';
+            label.appendChild(box);
+            label.appendChild(name);
+            label.appendChild(price);
+            host.appendChild(label);
         });
         renderStorePrices();
     }
 
-    // The price shown beside each store is the one in the chosen condition.
+    // The price shown beside each store is the one in the chosen condition;
+    // a store without one is dimmed.
     function renderStorePrices() {
         var stores = (state.options && state.options.stores) || [];
         stores.forEach(function (s) {
-            var el = form.querySelector('.alert-store-price[data-shorthand="' + s.shorthand + '"]');
-            if (!el) return;
+            var label = form.querySelector('.alert-stores label[data-shorthand="' + s.shorthand + '"]');
+            if (!label) return;
             var p = s.prices && s.prices[state.condition];
-            el.textContent = p ? money(p) : 'no ' + state.condition + ' offer';
-            el.classList.toggle('alert-dim', !p);
+            label.querySelector('.alert-store-price').textContent = p ? money(p) : '';
+            label.classList.toggle('alert-store-none', !p);
         });
     }
 
-    // One pill per store with an offer in the chosen condition; picking one fills the reference.
-    function renderReferencePicks() {
-        var host = document.getElementById('alert-reference-picks');
+    // The reference is the lowest offer among the checked stores, a store's
+    // own offer, or a typed price; it only counts for a percentage.
+    function renderReference() {
+        var pick = document.getElementById('alert-reference-pick');
+        var input = form.elements.reference_price;
         var stores = (state.options && state.options.stores) || [];
-        host.innerHTML = '';
-        stores.forEach(function (s) {
-            var p = s.prices && s.prices[state.condition];
-            if (!p) return;
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'settings-pill';
-            b.setAttribute('role', 'radio');
-            b.setAttribute('data-value', s.shorthand);
-            b.setAttribute('data-price', p);
-            b.textContent = (s.name || s.shorthand) + ' ' + money(p);
-            host.appendChild(b);
-        });
-        host.hidden = !host.firstChild;
-        setPills('reference_pick', state.referenceStore || '');
-        if (state.referenceStore) {
-            var pick = host.querySelector('.settings-pill.active');
-            if (pick) form.elements.reference_price.value = Number(pick.getAttribute('data-price')).toFixed(2);
-            else state.referenceStore = '';
+        var priced = stores.filter(function (s) { return s.prices && s.prices[state.condition]; });
+        pick.innerHTML = '';
+        var add = function (value, text) {
+            var o = document.createElement('option');
+            o.value = value;
+            o.textContent = text;
+            pick.appendChild(o);
+        };
+        add('', 'Lowest offer');
+        priced.forEach(function (s) { add(s.shorthand, (s.name || s.shorthand) + ' ' + money(s.prices[state.condition])); });
+        add('custom', 'Custom price');
+        var store = priced.filter(function (s) { return s.shorthand === state.referenceStore; })[0];
+        if (state.referenceStore !== 'custom' && !store) state.referenceStore = '';
+        pick.value = state.referenceStore;
+        if (store) {
+            input.value = Number(store.prices[state.condition]).toFixed(2);
+        } else if (state.referenceStore === '') {
+            var low = lowestPrice(stores, state.condition, checkedStores());
+            input.value = low === null ? '' : Number(low).toFixed(2);
         }
+        var used = referenceUsed(state.aboveKind, state.belowKind);
+        pick.disabled = !used;
+        input.disabled = !used;
     }
 
     function describeAlert(a) {
@@ -416,9 +441,9 @@
         renderStores();
         var ref = form.elements.reference_price;
         ref.value = state.reference !== null && state.reference !== undefined ? Number(state.reference).toFixed(2) : '';
-        renderReferencePicks();
         renderThreshold('above', state.aboveKind, state.aboveValue);
         renderThreshold('below', state.belowKind, state.belowValue);
+        renderReference();
         renderDelivery();
         renderNotice();
         renderExisting();
@@ -452,7 +477,9 @@
             state.side = a.side;
             state.condition = a.condition;
             state.stores = a.stores || [];
-            state.reference = a.reference_price;
+            // An alert set on stores offering nothing has no reference.
+            state.reference = a.reference_price || null;
+            state.referenceStore = a.reference_price ? 'custom' : '';
             state.aboveKind = a.above && a.above.kind ? a.above.kind : '';
             state.aboveValue = a.above && a.above.kind ? a.above.value : null;
             state.belowKind = a.below && a.below.kind ? a.below.kind : '';
@@ -512,8 +539,12 @@
         backdrop.classList.remove('open');
     }
 
+    function checkedStores() {
+        return Array.prototype.map.call(form.querySelectorAll('input[name=stores]:checked'), function (el) { return el.value; });
+    }
+
     function readForm() {
-        state.stores = Array.prototype.map.call(form.querySelectorAll('input[name=stores]:checked'), function (el) { return el.value; });
+        state.stores = checkedStores();
         var ref = form.elements.reference_price.value.trim();
         state.reference = ref === '' ? null : parseFloat(ref);
         state.aboveValue = state.aboveKind ? parseFloat(form.elements.above_value.value) : null;
@@ -537,6 +568,10 @@
             setError('Each threshold you turn on needs a number above zero.');
             return;
         }
+        if (referenceUsed(state.aboveKind, state.belowKind) && !(state.reference > 0)) {
+            setError('A percentage needs a reference price: no store you picked has an offer, so type one.');
+            return;
+        }
         var body = {
             card_id: state.cardId,
             side: state.side,
@@ -546,7 +581,7 @@
             below: threshold(state.belowKind, state.belowValue),
             delivery: state.delivery
         };
-        if (state.reference !== null && isFinite(state.reference)) body.reference_price = state.reference;
+        if (referenceUsed(state.aboveKind, state.belowKind) && state.reference !== null && isFinite(state.reference)) body.reference_price = state.reference;
         saveBtn.disabled = true;
         var req = state.alertId ? api('PATCH', '/api/alerts/' + state.alertId, body) : api('POST', '/api/alerts/', body);
         req.then(function () {
@@ -580,18 +615,16 @@
                 state.condition = value;
                 setPills('condition', value);
                 renderStorePrices();
-                renderReferencePicks();
-            } else if (field === 'reference_pick') {
-                state.referenceStore = value;
-                form.elements.reference_price.value = Number(pill.getAttribute('data-price')).toFixed(2);
-                setPills('reference_pick', value);
+                renderReference();
             } else if (field === 'above_kind') {
                 state.aboveKind = value;
                 renderThreshold('above', value, form.elements.above_value.value);
+                renderReference();
                 if (value) form.elements.above_value.focus();
             } else if (field === 'below_kind') {
                 state.belowKind = value;
                 renderThreshold('below', value, form.elements.below_value.value);
+                renderReference();
                 if (value) form.elements.below_value.focus();
             } else if (field === 'delivery') {
                 state.delivery = value;
@@ -994,7 +1027,19 @@
             backdrop.addEventListener('click', close);
             document.addEventListener('keydown', onKeydown);
             form.addEventListener('submit', function (e) { e.preventDefault(); save(); });
-            form.elements.reference_price.addEventListener('input', function () { state.referenceStore = ''; setPills('reference_pick', ''); });
+            form.elements.reference_price.addEventListener('input', function () {
+                state.referenceStore = 'custom';
+                document.getElementById('alert-reference-pick').value = 'custom';
+            });
+            form.addEventListener('change', function (e) {
+                if (e.target.id === 'alert-reference-pick') {
+                    state.referenceStore = e.target.value;
+                    renderReference();
+                    if (state.referenceStore === 'custom') form.elements.reference_price.focus();
+                } else if (e.target.name === 'stores') {
+                    renderReference();
+                }
+            });
         }
         var table = document.querySelector('.alerts-table');
         if (table) table.addEventListener('click', onTableClick);
@@ -1021,5 +1066,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, lowestPrice: lowestPrice, referenceUsed: referenceUsed };
 })();
