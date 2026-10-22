@@ -15,6 +15,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"slices"
 	"sort"
@@ -3028,14 +3029,25 @@ func loadXlsx(parser *docparse.Parser, reader io.Reader, maxRows int) ([]UploadE
 		return nil, errors.New("this is an .xls or a password-protected workbook, save it as .xlsx or .csv")
 	}
 
-	f, err := excelize.OpenReader(br, excelize.Options{
-		UnzipSizeLimit:    xlsxUnzipSizeLimit,
-		UnzipXMLSizeLimit: xlsxUnzipXMLSizeLimit,
-	})
+	// excelize spills a part over UnzipXMLSizeLimit to a temp file and
+	// leaves it behind when the open fails, so each upload gets its own dir.
+	tmpDir, err := os.MkdirTemp("", "xlsx-")
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer os.RemoveAll(tmpDir)
+
+	f, err := excelize.OpenReader(br, excelize.Options{
+		UnzipSizeLimit:    xlsxUnzipSizeLimit,
+		UnzipXMLSizeLimit: xlsxUnzipXMLSizeLimit,
+		TmpDir:            tmpDir,
+	})
+	if f != nil {
+		defer f.Close()
+	}
+	if err != nil {
+		return nil, err
+	}
 
 	sheets := f.GetSheetList()
 	if len(sheets) == 0 {
