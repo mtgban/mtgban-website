@@ -101,6 +101,9 @@ func TestSetMark(t *testing.T) {
 		{"TGK1", "GRN Guild Kit Tokens", "⌂"},
 		{"PS14", "San Diego Comic-Con 2014", "✎"},
 		{"PS18", "San Diego Comic-Con 2018", "✎"},
+		{"WMOM", "MOM Japanese Promo Tokens", "◉"},
+		{"PTDMU", "Dominaria United Southeast Asia Tokens", "◉"},
+		{"WFIN", "FIN Asia WPN Promo Tokens", "◉"},
 		{"PROMOS", "Promos of Theros", ""},
 	} {
 		got := SetMark(tc.code, tc.name)
