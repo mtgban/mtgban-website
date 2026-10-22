@@ -1,8 +1,11 @@
 package tcgcatalog
 
 import (
+	"errors"
+	"io"
 	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 // TestLoad feeds a synthetic tcgdumper dump through the streaming decoder
@@ -60,5 +63,20 @@ func TestLoad(t *testing.T) {
 	}
 	if products["200"] != want {
 		t.Errorf("products[200] = %+v, want %+v", products["200"], want)
+	}
+}
+
+// A dump cut off between two top-level fields, by a read error or an early
+// EOF, is an error rather than a short catalog.
+func TestLoadRejectsTruncated(t *testing.T) {
+	const whole = `{"category":{"categoryId":3},"groups":[],"products":[{"productId":7,"name":"Pikachu"}]}`
+	reset := iotest.ErrReader(errors.New("connection reset"))
+	for name, r := range map[string]io.Reader{
+		"reset after groups": io.MultiReader(strings.NewReader(`{"category":{"categoryId":3},"groups":[]`), reset),
+		"EOF after products": strings.NewReader(whole[:len(whole)-1]),
+	} {
+		if products, _, err := Load(r); err == nil {
+			t.Errorf("%s: loaded %d products, want an error", name, len(products))
+		}
 	}
 }

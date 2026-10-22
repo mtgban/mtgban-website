@@ -348,6 +348,8 @@ func (a Addon) Applies(packageKey string) bool {
 }
 
 // Amount is the charge per billing period for a monthly amount.
+// Callers pass a Monthly from the embedded list, which Validate holds to
+// Monthly > 0 and Count >= 1; the product is not checked for overflow.
 func (iv Interval) Amount(monthly int64) (int64, error) {
 	if iv.Interval == "month" {
 		return monthly * iv.Count, nil

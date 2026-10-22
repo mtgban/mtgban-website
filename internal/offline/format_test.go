@@ -111,3 +111,28 @@ func TestHeaderBytes(t *testing.T) {
 		t.Errorf("header = % x, want % x", data[:6], want)
 	}
 }
+
+// A negative quantity encodes as 0, as a negative price does, rather than
+// as a wrapped uint64.
+func TestEncodeClampsNegativeQuantity(t *testing.T) {
+	data, err := Encode(&SetPayload{
+		SetCode: "SET",
+		Retail: map[string]map[string]*PriceEntry{"u": {"ck": {
+			Regular:    1,
+			Qty:        3,
+			QtyFoil:    -2,
+			Quantities: map[string]int{"NM": -4, "SP": 1},
+		}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := Decode(data)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	e := p.Retail["u"]["ck"]
+	if e.Qty != 3 || e.QtyFoil != 0 || e.Quantities["NM"] != 0 || e.Quantities["SP"] != 1 {
+		t.Errorf("got qty %d, qtyFoil %d, quantities %v; want 3, 0, map[NM:0 SP:1]", e.Qty, e.QtyFoil, e.Quantities)
+	}
+}

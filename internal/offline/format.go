@@ -25,7 +25,7 @@
 //	      if qtymap: uv n, then n x (uv tag index, uv qty)
 //
 //	str = uv byte length + UTF-8 bytes; uv = unsigned varint (encoding/binary);
-//	cents = round(price * 100), negative prices clamp to 0.
+//	cents = round(price * 100); negative prices and quantities clamp to 0.
 //	Everything sorted so encoding is deterministic.
 package offline
 
@@ -93,6 +93,15 @@ func cents(price float64) uint64 {
 		return 0
 	}
 	return uint64(math.Round(price * 100))
+}
+
+// quantity is q as written on the wire; a negative one clamps to 0, as a
+// negative price does, so the browser never reads a wrapped one.
+func quantity(q int) uint64 {
+	if q <= 0 {
+		return 0
+	}
+	return uint64(q)
 }
 
 func dollars(c uint64) float64 {
@@ -243,10 +252,10 @@ func encodeSection(w *writer, section map[string]map[string]*PriceEntry, storeId
 				w.uv(cents(e.Sealed))
 			}
 			if flags&flagBaseQty != 0 {
-				w.uv(uint64(e.Qty))
-				w.uv(uint64(e.QtyFoil))
-				w.uv(uint64(e.QtyEtched))
-				w.uv(uint64(e.QtySealed))
+				w.uv(quantity(e.Qty))
+				w.uv(quantity(e.QtyFoil))
+				w.uv(quantity(e.QtyEtched))
+				w.uv(quantity(e.QtySealed))
 			}
 			if flags&flagCond != 0 {
 				w.uv(tagIdx[e.Cond])
@@ -289,7 +298,7 @@ func writeIntMap(w *writer, m map[string]int, tagIdx map[string]uint64) {
 	w.uv(uint64(len(keys)))
 	for _, k := range keys {
 		w.uv(tagIdx[k])
-		w.uv(uint64(m[k]))
+		w.uv(quantity(m[k]))
 	}
 }
 
@@ -317,6 +326,7 @@ func (r *reader) str() (string, error) {
 }
 
 // Decode unpacks what Encode produced.
+// It reads only this package's own Encode output, never untrusted bytes.
 func Decode(data []byte) (*SetPayload, error) {
 	if len(data) < 6 || !bytes.Equal(data[:4], magic) {
 		return nil, errors.New("bad magic")
