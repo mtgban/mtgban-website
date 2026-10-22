@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"slices"
 	"sync"
 	"time"
 
@@ -25,22 +26,37 @@ type AlertAdminRow struct {
 	alerts.Alert
 }
 
+// AlertStatusCount is how many alerts one status holds, named as the tab
+// prints it.
+type AlertStatusCount struct {
+	Label string
+	Count int
+}
+
+// alertStatusOrder is the order the tab prints the known statuses in;
+// any other status follows them, sorted.
+var alertStatusOrder = []alerts.Status{
+	alerts.StatusActive,
+	alerts.StatusPaused,
+	alerts.StatusOverAllowance,
+	alerts.StatusUndeliverable,
+	alerts.StatusUnresolvable,
+}
+
 // AlertsAdminDashboard is the admin's view of this game's alerts table:
 // the counts, and the newest rows. Failed says a query did not answer.
 type AlertsAdminDashboard struct {
-	Game    string
-	Totals  alerts.AdminTotals
-	Active  int
-	Paused  int
-	Parked  int
-	Buylist int
-	Retail  int
-	Discord int
-	Email   int
-	Rows    []AlertAdminRow
-	Dropped int // alerts past the row cap
-	Failed  bool
-	Loaded  time.Time
+	Game     string
+	Totals   alerts.AdminTotals
+	Statuses []AlertStatusCount
+	Buylist  int
+	Retail   int
+	Discord  int
+	Email    int
+	Rows     []AlertAdminRow
+	Dropped  int // alerts past the row cap
+	Failed   bool
+	Loaded   time.Time
 }
 
 type alertsAdminCacheEntry struct {
@@ -78,9 +94,7 @@ func fetchAlertsDashboard(ctx context.Context, store alertsAdminStore, game stri
 		dash.Failed = true
 	}
 	dash.Totals = totals
-	dash.Active = totals.ByStatus[alerts.StatusActive]
-	dash.Paused = totals.ByStatus[alerts.StatusPaused]
-	dash.Parked = totals.ByStatus[alerts.StatusOverAllowance]
+	dash.Statuses = alertStatusCounts(totals.ByStatus)
 	dash.Buylist = totals.BySide[alerts.SideBuylist]
 	dash.Retail = totals.BySide[alerts.SideRetail]
 	dash.Discord = totals.ByDelivery[alerts.DeliveryDiscord]
@@ -99,6 +113,32 @@ func fetchAlertsDashboard(ctx context.Context, store alertsAdminStore, game stri
 		dash.Dropped = d
 	}
 	return dash
+}
+
+// alertStatusCounts lists every status byStatus holds, the known ones
+// first in alertStatusOrder, and names over_allowance "parked".
+func alertStatusCounts(byStatus map[alerts.Status]int) []AlertStatusCount {
+	var others []alerts.Status
+	for status := range byStatus {
+		if !slices.Contains(alertStatusOrder, status) {
+			others = append(others, status)
+		}
+	}
+	slices.Sort(others)
+
+	var out []AlertStatusCount
+	for _, status := range append(slices.Clone(alertStatusOrder), others...) {
+		n, found := byStatus[status]
+		if !found {
+			continue
+		}
+		label := string(status)
+		if status == alerts.StatusOverAllowance {
+			label = "parked"
+		}
+		out = append(out, AlertStatusCount{Label: label, Count: n})
+	}
+	return out
 }
 
 // ownerPrefix is the first 8 characters of a user hash.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"html/template"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -46,8 +47,12 @@ func TestAlertsDashboardCountsAndPrefixesOwners(t *testing.T) {
 	if dash.Game != "magic-test" || dash.Failed {
 		t.Fatalf("dashboard = %+v", dash)
 	}
-	if dash.Active != 120 || dash.Paused != 20 || dash.Parked != 10 || dash.Buylist != 100 || dash.Retail != 50 || dash.Discord != 140 || dash.Email != 10 {
+	if dash.Buylist != 100 || dash.Retail != 50 || dash.Discord != 140 || dash.Email != 10 {
 		t.Errorf("counts = %+v", dash)
+	}
+	wantStatuses := []AlertStatusCount{{"active", 120}, {"paused", 20}, {"parked", 10}}
+	if !slices.Equal(dash.Statuses, wantStatuses) {
+		t.Errorf("Statuses = %+v, want %+v", dash.Statuses, wantStatuses)
 	}
 	if dash.Dropped != 148 {
 		t.Errorf("Dropped = %d, want 148 (150 alerts, 2 rows)", dash.Dropped)
@@ -82,20 +87,41 @@ func TestAlertsDashboardCachesGoodLoadsOnly(t *testing.T) {
 	}
 }
 
-// The partial renders the counts and rows, the not-configured message with
-// no dashboard, and the failure notice when a query did not answer.
-func TestAdminAlertsPartialRenders(t *testing.T) {
+// renderAdminAlerts renders the Alerts tab's partial with vars.
+func renderAdminAlerts(t *testing.T, vars PageVars) string {
+	t.Helper()
 	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/admin-alerts.html")
 	if err != nil {
 		t.Fatal(err)
 	}
-	render := func(vars PageVars) string {
-		var out strings.Builder
-		if err := tmpl.ExecuteTemplate(&out, "admin-alerts", vars); err != nil {
-			t.Fatal(err)
-		}
-		return out.String()
+	var out strings.Builder
+	err = tmpl.ExecuteTemplate(&out, "admin-alerts", vars)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return out.String()
+}
+
+// The summary prints every status the table holds, the known ones in a
+// fixed order and any other after them, sorted.
+func TestAdminAlertsTabShowsEveryStatus(t *testing.T) {
+	store := &fakeAlertsAdminStore{totals: alerts.AdminTotals{Alerts: 21, Users: 3, ByStatus: map[alerts.Status]int{
+		"zombie": 4, alerts.StatusUnresolvable: 1, alerts.StatusActive: 5,
+		"archived": 6, alerts.StatusUndeliverable: 2, alerts.StatusOverAllowance: 3,
+	}}}
+	dash := fetchAlertsDashboard(context.Background(), store, "magic")
+	out := renderAdminAlerts(t, PageVars{AdminVars: AdminVars{AlertStats: dash}})
+
+	want := "21 alerts from 3 users &middot; active 5, parked 3, undeliverable 2, unresolvable 1, archived 6, zombie 4 &middot;"
+	if !strings.Contains(out, want) {
+		t.Errorf("summary lacks %q:\n%s", want, out)
+	}
+}
+
+// The partial renders the counts and rows, the not-configured message with
+// no dashboard, and the failure notice when a query did not answer.
+func TestAdminAlertsPartialRenders(t *testing.T) {
+	render := func(vars PageVars) string { return renderAdminAlerts(t, vars) }
 
 	out := render(PageVars{})
 	if !strings.Contains(out, "Alerts are not configured on this site") {
@@ -104,7 +130,7 @@ func TestAdminAlertsPartialRenders(t *testing.T) {
 
 	fired := time.Date(2026, 10, 15, 12, 30, 0, 0, time.UTC)
 	dash := &AlertsAdminDashboard{
-		Game: "magic", Totals: alerts.AdminTotals{Alerts: 3, Users: 2}, Active: 2, Paused: 1, Buylist: 3, Discord: 3,
+		Game: "magic", Totals: alerts.AdminTotals{Alerts: 3, Users: 2}, Statuses: []AlertStatusCount{{"active", 2}, {"paused", 1}}, Buylist: 3, Discord: 3,
 		Rows: []AlertAdminRow{{Owner: "01234567", Alert: alerts.Alert{
 			ID: 7, CardID: "card-1", Side: alerts.SideBuylist, Condition: "NM", Stores: []string{"CK", "SCG"},
 			ReferencePrice: 10, Above: alerts.Threshold{Kind: alerts.KindPct, Value: 10}, Delivery: alerts.DeliveryDiscord,
@@ -115,7 +141,7 @@ func TestAdminAlertsPartialRenders(t *testing.T) {
 		Dropped: 2,
 	}
 	out = render(PageVars{AdminVars: AdminVars{AlertStats: dash}})
-	for _, want := range []string{"3 alerts from 2 users", "active 2", "paused 1", "01234567", "Bolt", "LEA #161 nonfoil", "+10%", "2 stores", "2026-10-15 12:30", "no DM channel", "Showing 1 of 3"} {
+	for _, want := range []string{"3 alerts from 2 users &middot; active 2, paused 1 &middot;", "01234567", "Bolt", "LEA #161 nonfoil", "+10%", "2 stores", "2026-10-15 12:30", "no DM channel", "Showing 1 of 3"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("dashboard lacks %q:\n%s", want, out)
 		}
