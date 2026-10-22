@@ -41,6 +41,23 @@ func TestAlertEmbedNamesEveryStoreWithALink(t *testing.T) {
 	}
 }
 
+func TestAlertEmbedWithoutReference(t *testing.T) {
+	a := Alert{
+		CardID: "card-1", Side: SideBuylist, Condition: "NM",
+		Above: Threshold{Kind: KindAbs, Value: 12},
+		Card:  Card{Name: "Lightning Bolt", Set: "LEA", Number: "161", Finish: "nonfoil"},
+	}
+	d := Decision{FireAbove: true, AboveHits: []Quote{{Store: "CK", Price: 12.5}}}
+	e := renderDiscord(Firing{Alert: a, Decision: d, Origin: "https://mtgban.com"}, shorthandLabel)
+	if strings.Contains(e.Description, "reference") {
+		t.Fatalf("description names a reference the alert lacks:\n%s", e.Description)
+	}
+	got := changeText(0, 12.5)
+	if got != "$12.50" {
+		t.Fatalf("changeText(0, 12.5) = %q, want $12.50", got)
+	}
+}
+
 func TestAlertEmbedPctThresholdBelowAndCreatedPrice(t *testing.T) {
 	createdPrice := 9.0
 	a := Alert{

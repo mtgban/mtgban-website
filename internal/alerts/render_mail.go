@@ -152,12 +152,13 @@ func firingRows(f Firing, label func(string) string) []mailRow {
 	return rows
 }
 
-// changeText is "$<reference> to $<hit> (<signed whole percent>%)".
+// changeText is "$<reference> to $<hit> (<signed whole percent>%)", or
+// just the hit for an alert without a reference.
 func changeText(reference, hit float64) string {
-	pct := 0.0
-	if reference != 0 {
-		pct = (hit - reference) / reference * 100
+	if reference == 0 {
+		return money(hit)
 	}
+	pct := (hit - reference) / reference * 100
 	return fmt.Sprintf("%s to %s (%+d%%)", money(reference), money(hit), int(math.Round(pct)))
 }
 

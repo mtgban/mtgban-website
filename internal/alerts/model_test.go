@@ -22,6 +22,24 @@ func TestValidateAcceptsAMinimalAlert(t *testing.T) {
 	}
 }
 
+// An alert on stores offering nothing yet has no reference to default to;
+// dollar thresholds need none and are not held against one.
+func TestValidateAcceptsDollarsWithoutReference(t *testing.T) {
+	a := validAlert()
+	a.ReferencePrice = 0
+	a.Above.Value = 5
+	a.Below = Threshold{Kind: KindAbs, Value: 15}
+	err := a.Validate()
+	if err != nil {
+		t.Fatalf("dollar alert without a reference refused: %v", err)
+	}
+	a.ReferencePrice = 10
+	err = a.Validate()
+	if err != nil {
+		t.Fatalf("dollar alert held against its reference: %v", err)
+	}
+}
+
 func TestValidateRefusals(t *testing.T) {
 	cases := []struct {
 		name string
@@ -32,7 +50,8 @@ func TestValidateRefusals(t *testing.T) {
 		{"bad side", func(a *Alert) { a.Side = "both" }, "side"},
 		{"bad condition", func(a *Alert) { a.Condition = "LP" }, "condition"},
 		{"bad delivery", func(a *Alert) { a.Delivery = "pigeon" }, "delivery"},
-		{"zero reference", func(a *Alert) { a.ReferencePrice = 0 }, "reference"},
+		{"negative reference", func(a *Alert) { a.ReferencePrice = -1 }, "reference"},
+		{"pct without reference", func(a *Alert) { a.ReferencePrice, a.Above = 0, Threshold{Kind: KindPct, Value: 20} }, "reference"},
 		{"negative value", func(a *Alert) { a.Above.Value = -1 }, "value"},
 		{"pct below 100", func(a *Alert) { a.Below = Threshold{Kind: KindPct, Value: 100} }, "below"},
 		{"bad kind", func(a *Alert) { a.Above.Kind = "ratio" }, "kind"},
@@ -41,8 +60,10 @@ func TestValidateRefusals(t *testing.T) {
 		{"rounds to zero", func(a *Alert) { a.Above.Value = 0.004 }, "above zero"},
 		{"infinite value", func(a *Alert) { a.Above.Value = math.Inf(1) }, "finite"},
 		{"too large", func(a *Alert) { a.Above.Value = 1e8 }, "too large"},
-		{"above under reference", func(a *Alert) { a.Above.Value = 5 }, "over the reference"},
-		{"below over reference", func(a *Alert) { a.Below = Threshold{Kind: KindAbs, Value: 15} }, "under the reference"},
+		{"above under reference", func(a *Alert) { a.Above.Value, a.Below = 5, Threshold{Kind: KindPct, Value: 20} }, "over the reference"},
+		{"below over reference", func(a *Alert) {
+			a.Below, a.Above = Threshold{Kind: KindAbs, Value: 15}, Threshold{Kind: KindPct, Value: 20}
+		}, "under the reference"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

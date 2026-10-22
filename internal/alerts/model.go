@@ -278,8 +278,11 @@ func (a *Alert) Validate() error {
 	if err != nil {
 		return err
 	}
+	// Only a percentage needs a reference: an alert on stores offering
+	// nothing yet has none to default to.
 	a.ReferencePrice = roundCents(a.ReferencePrice)
-	if a.ReferencePrice <= 0 {
+	pct := a.Above.Kind == KindPct || a.Below.Kind == KindPct
+	if a.ReferencePrice < 0 || (pct && a.ReferencePrice == 0) {
 		return errors.New("reference price must be above zero")
 	}
 	if !a.Above.Set() && !a.Below.Set() {
@@ -293,10 +296,12 @@ func (a *Alert) Validate() error {
 	if err != nil {
 		return err
 	}
-	if a.Above.Set() && a.Above.Kind == KindAbs && a.Above.Value <= a.ReferencePrice {
+	// A dollar line is held against the reference only beside a percentage,
+	// the one place the dialog shows the reference.
+	if pct && a.Above.Kind == KindAbs && a.Above.Value <= a.ReferencePrice {
 		return errors.New("above must be over the reference")
 	}
-	if a.Below.Set() && a.Below.Kind == KindAbs && a.Below.Value >= a.ReferencePrice {
+	if pct && a.Below.Kind == KindAbs && a.Below.Value >= a.ReferencePrice {
 		return errors.New("below must be under the reference")
 	}
 
