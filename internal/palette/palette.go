@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -129,6 +130,7 @@ var setMarks = map[string]string{
 	"CEI":    "CEI",
 	"CMB1":   "2019",
 	"CMB2":   "2021",
+	"PUMA":   "⬒",
 	"4BB":    "BB",
 	"BCHR":   "BB",
 	"FBB":    "BB",
@@ -136,6 +138,9 @@ var setMarks = map[string]string{
 	"LEGITA": "ITA",
 	"4EDALT": "ALT",
 }
+
+// The mark SetMark gives a promo set, by the end of its name.
+const promoMark = "★"
 
 // SetMark is the mark a set's symbol carries in its corner, by the set's code
 // and name, or "" for none: setMarks, or a star for a promo set, which mostly
@@ -146,9 +151,33 @@ func SetMark(code, name string) string {
 		return mark
 	}
 	if strings.HasSuffix(name, " Promos") {
-		return "★"
+		return promoMark
 	}
 	return ""
+}
+
+var symbolMarks = buildSymbolMarks()
+
+// SymbolMarks is every mark SetMark gives that is one symbol rather than
+// letters, which set-symbol.html draws larger so it reads as large as the
+// letters do. Read only.
+func SymbolMarks() []string {
+	return symbolMarks
+}
+
+func buildSymbolMarks() []string {
+	marks := []string{promoMark}
+	for _, mark := range setMarks {
+		marks = append(marks, mark)
+	}
+	symbols := []string{}
+	for _, mark := range marks {
+		if utf8.RuneCountInString(mark) == 1 && mark[0] >= utf8.RuneSelf {
+			symbols = append(symbols, mark)
+		}
+	}
+	slices.Sort(symbols)
+	return slices.Compact(symbols)
 }
 
 // Promo is a promo type as the palette and the guide offer it: the token an
