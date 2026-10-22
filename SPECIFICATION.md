@@ -172,6 +172,8 @@ Boot sequence (`main()`):
    reverse proxy); graceful shutdown on SIGINT/SIGTERM with a 5 s timeout,
    Discord notify, and `ObservabilityRecorder.Close()`. `/healthz` returns
    200 only when UUIDs + sellers + vendors are loaded.
+   The server allows 20 s for headers, 2 minutes idle and 64 KB of
+   headers, with no body timeout (uploads and exports run long).
 
 ### 2.2 Global state & concurrency model
 

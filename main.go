@@ -816,6 +816,27 @@ func main() {
 	s.serve()
 }
 
+// So a slow (slowloris) or idle client can't hold a connection forever. The
+// biggest headers the site mints, a 3 KB MTGBAN cookie and a 2.3 KB ?sig=,
+// fit 64 KB many times over; nginx in front forwards 8 KB a line at most.
+const (
+	serverReadHeaderTimeout = 20 * time.Second
+	serverIdleTimeout       = 2 * time.Minute
+	serverMaxHeaderBytes    = 64 << 10
+)
+
+// newHTTPServer is the site's listener. No ReadTimeout or WriteTimeout:
+// they cover the body too, and would cut off a slow upload or a long export.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		IdleTimeout:       serverIdleTimeout,
+		MaxHeaderBytes:    serverMaxHeaderBytes,
+	}
+}
+
 // serve answers on the configured port until a signal asks the process to
 // stop, then shuts the server and the background work down.
 func (s *site) serve() {
@@ -824,16 +845,13 @@ func (s *site) serve() {
 	// them through the standard signing middleware (plus the Admin grant)
 	// here instead, and everything else straight to the mux
 	debugHandler := enforceSigning(s, adminOnly(http.DefaultServeMux))
-	srv := &http.Server{
-		Addr: ":" + Config().Port,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/debug") {
-				debugHandler.ServeHTTP(w, r)
-				return
-			}
-			http.DefaultServeMux.ServeHTTP(w, r)
-		}),
-	}
+	srv := newHTTPServer(":"+Config().Port, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/debug") {
+			debugHandler.ServeHTTP(w, r)
+			return
+		}
+		http.DefaultServeMux.ServeHTTP(w, r)
+	}))
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
