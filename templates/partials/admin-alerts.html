@@ -1,7 +1,7 @@
 {{define "admin-alerts"}}
 {{if .AlertStats}}
 <div class="admin-usage-bar">
-    <span class="admin-usage-range">{{.AlertStats.Game}} &middot; {{.AlertStats.Totals.Alerts}} alerts from {{.AlertStats.Totals.Users}} users &middot; active {{.AlertStats.Active}}, paused {{.AlertStats.Paused}}, parked {{.AlertStats.Parked}} &middot; buylist {{.AlertStats.Buylist}}, retail {{.AlertStats.Retail}} &middot; discord {{.AlertStats.Discord}}, email {{.AlertStats.Email}} &middot; loaded <time class="admin-localtime" datetime="{{.AlertStats.Loaded.UTC.Format "2006-01-02T15:04:05Z"}}">{{.AlertStats.Loaded.Format "15:04"}}</time></span>
+    <span class="admin-usage-range">{{.AlertStats.Game}} &middot; {{.AlertStats.Totals.Alerts}} alerts from {{.AlertStats.Totals.Users}} users{{range $i, $s := .AlertStats.Statuses}}{{if $i}},{{else}} &middot;{{end}} {{$s.Label}} {{$s.Count}}{{end}} &middot; buylist {{.AlertStats.Buylist}}, retail {{.AlertStats.Retail}} &middot; discord {{.AlertStats.Discord}}, email {{.AlertStats.Email}} &middot; loaded <time class="admin-localtime" datetime="{{.AlertStats.Loaded.UTC.Format "2006-01-02T15:04:05Z"}}">{{.AlertStats.Loaded.Format "15:04"}}</time></span>
 </div>
 
 {{if .AlertStats.Failed}}
