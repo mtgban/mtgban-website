@@ -428,7 +428,7 @@ func (f arbitRowFilter) keep(e mtgban.ArbitEntry, noQuantity bool) bool {
 func (f arbitRowFilter) within(e mtgban.ArbitEntry, noQuantity bool) bool {
 	l := f.limits
 	return f.keep(e, noQuantity) && e.Spread >= l.MinSpread && e.Difference >= l.MinDiff &&
-		(math.IsNaN(e.Profitability) || e.Profitability >= l.MinProf)
+		e.Profitability >= l.MinProf
 }
 
 // unbounded is the state with the reader's limits dropped, picks and
