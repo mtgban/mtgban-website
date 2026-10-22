@@ -7,6 +7,7 @@
 
 {{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/backpack.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
 
@@ -34,6 +35,10 @@
     <script type="text/javascript" src="/js/upload-presets.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/list-storage.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}" defer></script>
+    {{/* priced is the cards a send from the backpack got results for, which
+         empties it when the send asked to; null when nothing was priced. */}}
+    <script>window.BAN_BACKPACK = {canUpload: true, priced: {{if and .CardHashes (or .UploadEntries .Optimized)}}{{.CardHashes}}{{else}}null{{end}}};</script>
+    <script type="text/javascript" src="/js/backpack.js?hash={{.Hash}}" defer></script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>

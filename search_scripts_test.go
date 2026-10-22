@@ -63,3 +63,31 @@ func TestSearchCarriesTheBackpack(t *testing.T) {
 		}
 	}
 }
+
+// TestUploadHandsTheBackpackItsResults pins what backpack.js reads on Upload:
+// the ids a hashes POST priced, and null on a page without results.
+func TestUploadHandsTheBackpackItsResults(t *testing.T) {
+	rows := []UploadEntry{{CardID: "a"}, {CardID: "b"}}
+	for _, tc := range []struct {
+		name string
+		pv   PageVars
+		want string
+	}{
+		{"the bare form", PageVars{}, `priced: null`},
+		{"a POST that failed", PageVars{WarningMessage: "No card list arrived with that request"}, `priced: null`},
+		{"a file's results", PageVars{UploadVars: UploadVars{UploadEntries: rows}}, `priced: null`},
+		{"the backpack's results", PageVars{CardHashes: []string{"a", "b"}, UploadVars: UploadVars{UploadEntries: rows}}, `priced: ["a","b"]`},
+	} {
+		tc.pv.UserNav = &NavElem{Short: "b"}
+		tc.pv.Metadata = map[string]GenericCard{"a": {}, "b": {}}
+		page := renderPage(t, "upload.html", false, tc.pv)
+		want := `window.BAN_BACKPACK = {canUpload: true, ` + tc.want + `};`
+		gate := strings.Index(page, want)
+		if gate < 0 || gate > strings.Index(page, `src="/js/backpack.js?`) {
+			t.Errorf("%s: %s is missing or after backpack.js", tc.name, want)
+		}
+		if !strings.Contains(page, `/css/backpack.css?`) {
+			t.Errorf("%s: the page does not load backpack.css", tc.name)
+		}
+	}
+}
