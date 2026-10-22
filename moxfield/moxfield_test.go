@@ -2,6 +2,7 @@ package moxfield
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 )
 
@@ -54,5 +55,55 @@ func TestPrepareDecklistExpandsPrintings(t *testing.T) {
 	}
 	if fallback == nil || !fallback.IsFoil || fallback.Quantity != 1 {
 		t.Errorf("entry without printingData should fall back to the representative printing: %+v", fallback)
+	}
+}
+
+// The cap counts the items produced, not the deck entries: one entry with a
+// per-copy breakdown yields an item per printing, and a deck of such entries
+// must still stop at maxRows, as the CSV and sheet uploads do.
+func TestPrepareDecklistCapsProducedRows(t *testing.T) {
+	for _, tc := range []struct {
+		blob    string
+		maxRows int
+	}{
+		// The fuzz seed: one card, three printings, a cap of one
+		{`{"boards":{"main":{"cards":{"a":{"printingData":[{"set":"a","cn":"1"},{"set":"b","cn":"2"},{"set":"c","cn":"3"}]}}}}}`, 1},
+		{`{"boards":{"main":{"cards":{
+			"a":{"printingData":[{"set":"a","cn":"1"},{"set":"a","cn":"2"},{"set":"a","cn":"3"}]},
+			"b":{"printingData":[{"set":"b","cn":"1"},{"set":"b","cn":"2"},{"set":"b","cn":"3"}]}}},
+			"side":{"cards":{"c":{"quantity":1,"card":{"scryfall_id":"x"}},"d":{"quantity":1,"card":{"scryfall_id":"y"}}}}}}`, 4},
+	} {
+		var deck Deck
+		if err := json.Unmarshal([]byte(tc.blob), &deck); err != nil {
+			t.Fatal(err)
+		}
+		if items := prepareDecklist(&deck, tc.maxRows); len(items) != tc.maxRows {
+			t.Errorf("prepareDecklist(maxRows %d) = %d items, want %d", tc.maxRows, len(items), tc.maxRows)
+		}
+	}
+}
+
+// Boards and cards are maps, so which items survive the cap must not depend
+// on iteration order: the same deck keeps the same items every time.
+func TestPrepareDecklistCapIsDeterministic(t *testing.T) {
+	blob := `{"boards":{"main":{"cards":{
+		"a":{"printingData":[{"set":"a","cn":"1"},{"set":"a","cn":"2"},{"set":"a","cn":"3"}]},
+		"b":{"printingData":[{"set":"b","cn":"1"},{"set":"b","cn":"2"}]},
+		"x":{"printingData":[{"set":"a","cn":"1","quantity":5}]},
+		"c":{"quantity":1,"card":{"scryfall_id":"c"}},
+		"d":{"quantity":1,"card":{"scryfall_id":"d"}},
+		"e":{"quantity":1,"card":{"scryfall_id":"e"}}}},
+		"side":{"cards":{"f":{"quantity":1,"card":{"scryfall_id":"f"}},"g":{"quantity":1,"card":{"scryfall_id":"g"}}}}}}`
+	var deck Deck
+	if err := json.Unmarshal([]byte(blob), &deck); err != nil {
+		t.Fatal(err)
+	}
+
+	first := prepareDecklist(&deck, 3)
+	for range 50 {
+		got := prepareDecklist(&deck, 3)
+		if !slices.Equal(got, first) {
+			t.Fatalf("prepareDecklist kept %+v, then %+v", first, got)
+		}
 	}
 }
