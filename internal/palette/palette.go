@@ -207,7 +207,6 @@ var setMarks = map[string]string{
 	"PEWK": "∞",
 	"PSPL": "✺",
 	"PJSC": "◉",
-	"PS18": "✎",
 	"PCBB": "♪",
 	"LMAR": "✪",
 	"PCEL": "✶",
@@ -215,11 +214,31 @@ var setMarks = map[string]string{
 	"WMC":  "⊕",
 	"PSVC": "☼",
 	"P30T": "❂",
+
+	// Promos on their parent set's glyph, named for the event rather than
+	// "Promos", and products reprinting their parent set's cards. A promo
+	// whose parent has its own "Promos" set, starred, gets a symbol of its own.
+	"UGIN":  "⬢",
+	"PXTC":  "▣",
+	"PAL99": "★",
+	"PMPS":  "★",
+	"PRWK":  "★",
+	"PRW2":  "★",
+	"PCMD":  "★",
+	"PHEL":  "★",
+	"PSS1":  "✕",
+	"PTKDF": "▲",
+	"MGB":   "❖",
+	"GK1":   "⌂",
+	"GK2":   "⌂",
+	"TGK1":  "⌂",
+	"TGK2":  "⌂",
 }
 
-// lineMarks marks the lines on Secret Lair's glyph that print a new set every
-// year, by the start of the name each year's set carries.
+// lineMarks marks a line of yearly sets by the start of the name each year's
+// set carries: the ones still printing, and the ones spread across glyphs.
 var lineMarks = map[string]string{
+	"San Diego Comic-Con ":              "✎",
 	"Wizards Play Network ":             "WPN",
 	"MagicFest ":                        "⚑",
 	"Love Your LGS ":                    "♡",
