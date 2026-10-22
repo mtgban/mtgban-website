@@ -15,6 +15,10 @@ func TestValidateACLTable(t *testing.T) {
 	if err := validateACLTable(noAdmin); err == nil {
 		t.Error("table without any Admin tier accepted")
 	}
+	empty := access.Table{"Root": {"Admin": {}}, "Mods": {"Alerts": {"AlertChannels": ""}}}
+	if err := validateACLTable(empty); err == nil {
+		t.Error("table with an empty option accepted")
+	}
 	ok := access.Table{"Root": {"Search": {}, "Admin": {}}, "Mods": {"Search": {}}}
 	if err := validateACLTable(ok); err != nil {
 		t.Errorf("valid table refused: %v", err)

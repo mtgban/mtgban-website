@@ -90,6 +90,7 @@ matches by recipient address. The event has no copy of what was sent.
   at all: `AlertChannels` governs who the evaluator will send to, not
   whether a channel row exists. Writing `AlertChannels` to `none` (never
   an empty string, which signing keeps but verification drops, breaking
-  every signed page for that tier) is how a tier is given no channels.
+  every signed page for that tier, and refused by the admin editors) is
+  how a tier is given no channels.
 - A bounce or complaint is visible on the owner's channel state
   immediately, without waiting for the next login or alert evaluation.
