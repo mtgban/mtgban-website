@@ -285,6 +285,27 @@ func TestLoadCsvRefusesAFileThatIsOnlyASeparator(t *testing.T) {
 	}
 }
 
+// "sep=" naming no separator at all is refused the same way when nothing
+// follows it, and leaves the separator as it was when a header does.
+func TestLoadCsvTakesABareSeparatorLineAsNone(t *testing.T) {
+	quietUploadLog(t)
+
+	if _, err := loadCsv(newUploadParser(backend()), strings.NewReader("sep=\n"), ',', uploadRowLimit); err == nil {
+		t.Error("a file that is only \"sep=\" was accepted")
+	}
+
+	entries, err := loadCsv(newUploadParser(backend()), strings.NewReader("sep=\n"+joinRows(",")), ',', uploadRowLimit)
+	if err != nil {
+		t.Fatalf("loadCsv: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("read %d rows, want 2", len(entries))
+	}
+	if entries[0].OriginalPrice != 12.50 {
+		t.Errorf("price = %v, want 12.50 - the columns were not split", entries[0].OriginalPrice)
+	}
+}
+
 // dyingReader serves a prefix and then fails every read after it, which is how
 // an uploaded file behaves when it is a temp file on a disk that goes away.
 type dyingReader struct {
@@ -459,6 +480,27 @@ func TestLoadXlsxRefusesWhatIsNotAWorkbook(t *testing.T) {
 				t.Error("a file that is not a workbook was accepted")
 			}
 		})
+	}
+}
+
+// A sheet's row ends at its last cell that is not blank, so a blank name in
+// the last column is a row shorter than the header. It is kept, as in a CSV.
+func TestLoadXlsxKeepsARowWithABlankLastCell(t *testing.T) {
+	quietUploadLog(t)
+
+	rows := [][]string{{"Edition", "Quantity", "Name"}, {"Beta", "4", ""}, {"Beta", "1", "Lightning Bolt"}}
+	entries, err := loadXlsx(newUploadParser(backend()), buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}), uploadRowLimit)
+	if err != nil {
+		t.Fatalf("loadXlsx: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("read %d rows, want 2", len(entries))
+	}
+	if entries[0].Quantity != 4 || entries[0].Card.Name != "" {
+		t.Errorf("short row = %+v, want quantity 4 and no name", entries[0])
+	}
+	if entries[1].Card.Name != "Lightning Bolt" {
+		t.Errorf("name after the short row = %q, want Lightning Bolt", entries[1].Card.Name)
 	}
 }
 

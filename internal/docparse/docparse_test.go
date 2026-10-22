@@ -2,6 +2,7 @@ package docparse
 
 import (
 	"errors"
+	"maps"
 	"slices"
 	"testing"
 
@@ -339,5 +340,62 @@ func TestBannerHeaderReachesNotes(t *testing.T) {
 		if header[at] == "mkm_language" || header[at] == "article_id" {
 			t.Errorf("%s was read as %s", header[at], key)
 		}
+	}
+}
+
+// A row shorter than its header keeps the fields it has: a CSV row can stop
+// early, and an xlsx row ends at its last cell that is not blank. The name
+// column past the row's end used to be indexed anyway and panic.
+func TestParseRowKeepsTheFieldsOfAShortRow(t *testing.T) {
+	p := &Parser{}
+	for _, tt := range []struct {
+		name    string
+		header  []string
+		record  []string
+		edition string
+		id      string
+	}{
+		{"name missing", []string{"set", "qty", "name"}, []string{"FZZ", "2"}, "FZZ", ""},
+		{"id kept", []string{"uuid", "qty", "name"}, []string{"FZZ-1", "2"}, "", "FZZ-1"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			indexMap, err := p.ParseHeader(tt.header)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err := p.ParseRow(indexMap, tt.record)
+			if err != nil {
+				t.Fatalf("ParseRow: %v", err)
+			}
+			if res.Card.Name != "" || res.Card.Edition != tt.edition || res.Card.ID != tt.id {
+				t.Errorf("card = %+v, want edition %q and id %q", res.Card, tt.edition, tt.id)
+			}
+			if !res.HasQuantity || res.Quantity != 2 {
+				t.Errorf("quantity = %d (has=%v), want 2", res.Quantity, res.HasQuantity)
+			}
+		})
+	}
+}
+
+// A one-field row in a file with a header ("Total", a note) is read as a
+// decklist line, but only that row: the rows after it still take their name
+// from the column the header named, not column 0.
+func TestParseRowOneFieldRowLeavesTheHeaderAlone(t *testing.T) {
+	p := &Parser{}
+	indexMap, err := p.ParseHeader([]string{"Quantity", "Edition", "Name"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := maps.Clone(indexMap)
+
+	if _, err := p.ParseRow(indexMap, []string{"Total"}); err != nil {
+		t.Fatalf("ParseRow: %v", err)
+	}
+	if !maps.Equal(indexMap, before) {
+		t.Errorf("header map changed to %v, was %v", indexMap, before)
+	}
+	res, _ := p.ParseRow(indexMap, []string{"2", "Beta", "Lightning Bolt"})
+	if res.Card.Name != "Lightning Bolt" {
+		t.Errorf("name after a one-field row = %q, want Lightning Bolt", res.Card.Name)
 	}
 }
