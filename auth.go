@@ -698,8 +698,9 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 		if checkNoAuth {
 			for key, nav := range ExtraNavs {
 				if nav.Link == r.URL.Path || slices.ContainsFunc(nav.SubPages, func(p NavElem) bool {
-					// Check prefix because Link may contain query params
-					return strings.HasPrefix(p.Link, r.URL.Path)
+					// The whole path, without the query params a Link may carry
+					path, _, _ := strings.Cut(p.Link, "?")
+					return path == r.URL.Path
 				}) {
 					_, noAuth := ACL()["Any"][key]
 					if noAuth {
