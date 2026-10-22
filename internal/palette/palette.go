@@ -247,16 +247,21 @@ var lineMarks = map[string]string{
 	"Regional Championship Qualifiers ": "♜",
 }
 
-// The marks SetMark gives by the end of a set's name rather than a table.
-const (
-	promoMark    = "★"
-	showdownMark = "✕"
-)
+// suffixMarks marks a kind of set by the end of its name: a Standard
+// Showdown, and the promo tokens printed for Japan and the rest of Asia.
+var suffixMarks = map[string]string{
+	" Standard Showdown":     "✕",
+	" Japanese Promo Tokens": "◉",
+	" Southeast Asia Tokens": "◉",
+	" Asia WPN Promo Tokens": "◉",
+}
+
+// The mark SetMark gives a promo set, by the end of its name.
+const promoMark = "★"
 
 // SetMark is the mark a set's symbol carries in its corner, by the set's code
-// and name, or "" for none: setMarks, lineMarks, a cross for a Standard
-// Showdown, or a star for a promo set, which mostly shares its parent's glyph
-// too.
+// and name, or "" for none: setMarks, lineMarks, suffixMarks, or a star for a
+// promo set, which mostly shares its parent's glyph too.
 func SetMark(code, name string) string {
 	mark := setMarks[code]
 	if mark != "" {
@@ -267,8 +272,10 @@ func SetMark(code, name string) string {
 			return lineMark
 		}
 	}
-	if strings.HasSuffix(name, " Standard Showdown") {
-		return showdownMark
+	for suffix, suffixMark := range suffixMarks {
+		if strings.HasSuffix(name, suffix) {
+			return suffixMark
+		}
 	}
 	if strings.HasSuffix(name, " Promos") {
 		return promoMark
@@ -286,11 +293,14 @@ func SymbolMarks() []string {
 }
 
 func buildSymbolMarks() []string {
-	marks := []string{promoMark, showdownMark}
+	marks := []string{promoMark}
 	for _, mark := range setMarks {
 		marks = append(marks, mark)
 	}
 	for _, mark := range lineMarks {
+		marks = append(marks, mark)
+	}
+	for _, mark := range suffixMarks {
 		marks = append(marks, mark)
 	}
 	symbols := []string{}
