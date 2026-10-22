@@ -254,12 +254,11 @@ func arbitLess(b *mtgmatcher.Backend, entries []mtgban.ArbitEntry, mode string, 
 		}
 	case "profitability":
 		return func(i, j *mtgban.ArbitEntry) bool {
-			// Profitability is NaN when spread < 0; fall back to raw
-			// spread ordering so the NaN doesn't poison the comparator.
-			if i.Spread < 0 || j.Spread < 0 {
-				return i.Spread > j.Spread
+			// Every row with no profit scores zero, so spread orders them
+			if i.Profitability != j.Profitability {
+				return i.Profitability > j.Profitability
 			}
-			return i.Profitability > j.Profitability
+			return i.Spread > j.Spread
 		}
 	case "diff":
 		return func(i, j *mtgban.ArbitEntry) bool {
