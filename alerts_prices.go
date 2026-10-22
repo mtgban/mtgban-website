@@ -9,13 +9,14 @@ import (
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
 
-// alertStorePrices lists every non-index store outside the blocklist that
-// has a price for the card. Quantity is not asked: SCG and CSI publish none
-// on their buylists.
-func alertStorePrices(cardID string, side alerts.Side, blocklist []string) []alerts.StorePrice {
+// alertStorePrices lists every non-index store of the card's kind (sealed
+// or singles) outside the blocklist, so an alert can watch a store not
+// offering the card yet; those carry no prices. Quantity is not asked:
+// SCG and CSI publish none on their buylists.
+func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []string) []alerts.StorePrice {
 	var out []alerts.StorePrice
 	add := func(info mtgban.ScraperInfo, entries []mtgban.GenericEntry) {
-		if info.MetadataOnly || slices.Contains(blocklist, info.Shorthand) {
+		if info.MetadataOnly || info.SealedMode != sealed || slices.Contains(blocklist, info.Shorthand) {
 			return
 		}
 		prices := map[string]float64{}
@@ -26,9 +27,6 @@ func alertStorePrices(cardID string, side alerts.Side, blocklist []string) []ale
 					prices[string(e.Condition())] = e.Pricing()
 				}
 			}
-		}
-		if len(prices) == 0 {
-			return
 		}
 		out = append(out, alerts.StorePrice{Shorthand: info.Shorthand, Name: scraperName(info.Shorthand), Prices: prices})
 	}

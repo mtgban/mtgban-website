@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
+
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -20,7 +22,7 @@ func (s *site) alertAPIDeps() alerts.APIDeps {
 	return alerts.APIDeps{
 		Identity:    alertsIdentity,
 		Allowance:   alertAllowance,
-		Prices:      alertVisiblePrices,
+		Prices:      s.alertPrices,
 		Resolve:     func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(s.backend(), cardID) },
 		StoreLabel:  alertStoreLabel,
 		Game:        func() string { return string(Config().Game) },
@@ -31,14 +33,21 @@ func (s *site) alertAPIDeps() alerts.APIDeps {
 	}
 }
 
+// alertPrices is alertVisiblePrices on the live datastore.
+func (s *site) alertPrices(cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
+	return alertVisiblePrices(s.backend(), cardID, side, v)
+}
+
 // alertVisiblePrices is a card's store prices on one side, less the
 // stores the ACL values block.
-func alertVisiblePrices(cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
+func alertVisiblePrices(b *mtgmatcher.Backend, cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
+	co, err := b.GetUUID(cardID)
+	sealed := err == nil && co.Sealed
 	retail, buylist := blocklistsFromValues(v)
 	if side == alerts.SideRetail {
-		return alertStorePrices(cardID, side, retail)
+		return alertStorePrices(cardID, sealed, side, retail)
 	}
-	return alertStorePrices(cardID, side, buylist)
+	return alertStorePrices(cardID, sealed, side, buylist)
 }
 
 const alertsUnverifiedMsg = "verify your Patreon email to use alerts"
