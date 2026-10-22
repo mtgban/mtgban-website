@@ -261,14 +261,15 @@
 }
 
 /* ── Dialog ──────────────────────────────────────────────── */
-.settings-modal.alert-modal { width: min(46em, 94vw); }
+.settings-modal.alert-modal { width: min(60em, 94vw); max-height: 94vh; }
+.alert-modal .settings-modal-header { padding: 0.75em 1.25em; }
+.alert-modal .settings-modal-footer { padding: 0.6em 1.25em; }
 .alert-modal .settings-modal-header { display: block; }
 .alert-modal-card {
     margin: 0.2em 0 0;
     color: var(--text-dim);
     font-size: var(--text-md);
 }
-.alert-modal .settings-section-header { cursor: default; }
 .alert-modal-notice {
     margin: 0 0 0.85em;
     padding: 0.7em 1em;
@@ -306,11 +307,17 @@
 .alert-existing-edit:hover,
 .alert-existing-remove:hover { text-decoration: underline; }
 
-.alert-field { margin: 0 0 1em; }
-.alert-field:last-child { margin-bottom: 0; }
+.alert-field { margin: 0 0 0.9em; }
+/* Fields side by side, wrapping under each other when narrow. */
+.alert-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2em;
+}
+.alert-row > .alert-field { flex: 0 1 auto; }
 .alert-field-label {
     display: block;
-    margin: 0 0 0.45em;
+    margin: 0 0 0.4em;
     font-size: var(--text-md);
     font-weight: 600;
     color: var(--normal);
@@ -341,25 +348,46 @@
 .alert-input:disabled { opacity: 0.45; }
 .alert-input-short { width: 9em; }
 
-.alert-ref-picks { margin-top: 0.5em; }
-.alert-ref-picks[hidden] { display: none; }
-.alert-threshold { margin-top: 1em; }
+.alert-label-note {
+    margin-left: 0.5em;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+    font-weight: 400;
+}
 .alert-threshold-controls {
     display: flex;
     align-items: center;
     gap: 0.75em;
 }
+.alert-ref-pick { width: auto; max-width: 22em; font-size: var(--text-md); }
+.alert-ref-pick:disabled { opacity: 0.45; }
 
-/* Store rows: checkbox, name, then the price in the chosen condition. */
+/* Store columns: checkbox, name, then the price in the chosen condition. */
+.alert-stores {
+    column-width: 16em;
+    column-gap: 1.5em;
+    padding: 0.4em 0.75em;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+}
 .alert-stores label {
     display: flex;
     align-items: baseline;
-    gap: 0.5em;
-    padding: 0.3em 0;
+    gap: 0.45em;
+    min-width: 0;
+    break-inside: avoid;
+    padding: 0.15em 0;
     cursor: pointer;
-    font-size: var(--text-lg);
+    font-size: var(--text-md);
 }
-.alert-stores input[type="checkbox"] { flex-shrink: 0; align-self: center; }
+.alert-stores input[type="checkbox"] { flex-shrink: 0; align-self: center; margin: 0; }
+.alert-store-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.alert-stores label.alert-store-none .alert-store-name { color: var(--text-dim); }
 .alert-store-price {
     margin-left: auto;
     color: var(--text-dim);
