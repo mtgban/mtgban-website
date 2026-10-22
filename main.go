@@ -816,8 +816,10 @@ func main() {
 	s.serve()
 }
 
-// So a slow (slowloris) or idle client can't hold a connection forever. The
-// biggest headers the site mints, a 3 KB MTGBAN cookie and a 2.3 KB ?sig=,
+// So a client slow to send its headers (slowloris), or idle between
+// requests, can't hold a connection forever. A body has no deadline here;
+// nginx in front buffers it. The biggest headers the site mints, a 3 KB
+// MTGBAN cookie and a 2.3 KB ?sig=,
 // fit 64 KB many times over; nginx in front forwards 8 KB a line at most.
 const (
 	serverReadHeaderTimeout = 20 * time.Second
