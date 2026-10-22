@@ -280,12 +280,13 @@ func splitQuery(query string) (pools []poolSpan, protected []string, rest string
 			}
 			end := strings.IndexByte(query[i+1:], '"')
 			if end == -1 {
-				protected = append(protected, query[i:])
-				i = len(query)
-			} else {
-				protected = append(protected, query[i:i+1+end+1])
-				i = i + 1 + end + 1
+				// A quote with no partner is a character of the text.
+				sb.WriteByte('"')
+				i++
+				continue
 			}
+			protected = append(protected, query[i:i+1+end+1])
+			i = i + 1 + end + 1
 			sb.WriteString(" " + protectedMark + " ")
 			continue
 		}

@@ -429,6 +429,18 @@ func TestPoolRegexpKeepsQuotes(t *testing.T) {
 	}
 }
 
+// A quote with no partner leaves the filters after it in force: the same
+// cards as the name quoted whole.
+func TestLoneQuoteKeepsFilters(t *testing.T) {
+	skipWithoutDatastore(t)
+
+	lone := mustPoolSearch(t, `"Lightning Bolt s:LEA`)
+	quoted := mustPoolSearch(t, `"Lightning Bolt" s:LEA`)
+	if !slices.Equal(lone, quoted) {
+		t.Errorf("the lone quote gave %v, the quoted name %v", lone, quoted)
+	}
+}
+
 // A dropped in: term never leaves the query with no constraint: one given
 // nothing vanishes, and alone it is a pool holding nothing; a pool nested
 // past maxPoolDepth leaves the pool around it searching the term as a name.
