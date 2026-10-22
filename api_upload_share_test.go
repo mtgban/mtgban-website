@@ -89,6 +89,23 @@ func TestUploadShareAPIStoresTheRows(t *testing.T) {
 	}
 }
 
+// The owner's notes are not kept: the stored rows carry every other field
+// as sent and an empty notes field.
+func TestUploadShareAPIDropsTheNotes(t *testing.T) {
+	withSigMode(t, false, true)
+	store := &fakeShareWriter{}
+	sent := "uuid-1\t2\tNM\t1.50\tbinder 3, my price\tdeck-1\t4\nuuid-2\t1\t\t\thttps://example.com\t\t\nuuid-3\t1"
+	want := "uuid-1\t2\tNM\t1.50\t\tdeck-1\t4\nuuid-2\t1\t\t\t\t\t\nuuid-3\t1"
+	body := `{"rows":"` + strings.ReplaceAll(strings.ReplaceAll(sent, "\t", `\t`), "\n", `\n`) + `"}`
+	code, _ := shareStatus(t, store, shareRequest(t, "Legacy", nextShareEmail(), uploadGrant, body, true))
+	if code != http.StatusCreated || len(store.got) != 1 {
+		t.Fatalf("status %d, stored %+v", code, store.got)
+	}
+	if store.got[0].Rows != want {
+		t.Errorf("stored rows %q, want %q", store.got[0].Rows, want)
+	}
+}
+
 func TestUploadShareAPIRefusals(t *testing.T) {
 	withSigMode(t, false, true)
 	good := `{"rows":"uuid-1\t1\t\t\t\t\t","buylist":false}`
