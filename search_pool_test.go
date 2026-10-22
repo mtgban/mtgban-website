@@ -2,10 +2,14 @@ package main
 
 import (
 	"errors"
+	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
@@ -450,5 +454,78 @@ func TestPoolDroppedTerms(t *testing.T) {
 	}
 	if all := len(backend().GetUUIDs()); len(nest) >= all {
 		t.Errorf("the nest answered %d of %d uuids", len(nest), all)
+	}
+}
+
+// countingSeller counts how often its inventory is read, which a pool
+// naming it as a store does once per resolution.
+type countingSeller struct {
+	mtgban.Seller
+	reads *atomic.Int32
+}
+
+func (s countingSeller) Inventory() mtgban.InventoryRecord {
+	s.reads.Add(1)
+	return s.Seller.Inventory()
+}
+
+// registerCountingSeller files a seller holding uuids under shorthand and
+// returns the count of its inventory reads.
+func registerCountingSeller(t *testing.T, shorthand string, uuids []string) *atomic.Int32 {
+	t.Helper()
+	prev := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prev) })
+
+	now := time.Now()
+	inv := mtgban.InventoryRecord{}
+	for _, uuid := range uuids {
+		inv[uuid] = []mtgban.InventoryEntry{{Price: 5, Conditions: "NM"}}
+	}
+	reads := new(atomic.Int32)
+	seller := countingSeller{
+		Seller: mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{
+			Name: shorthand, Shorthand: shorthand, InventoryTimestamp: &now,
+		}),
+		reads: reads,
+	}
+	next := append(slices.Clone(GetSellers()), seller)
+	sellersPtr.Store(&next)
+	return reads
+}
+
+// A search resolves its pools once, however many ways the fallback reads
+// the name, and an empty pool sends it to no fallback at all.
+func TestPoolResolvedOncePerSearch(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := currentDatastore()
+	if _, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, "confetti", nil, nil, nil)); err == nil {
+		t.Skip("a card is named confetti here; the fallback would not run")
+	}
+	if len(promoTypeMatches(ds.backend, "confetti")) == 0 {
+		t.Skip("no treatment for the fallback to read confetti as")
+	}
+	lea := ds.backend.GetUUIDsInSet("LEA")
+	if len(lea) == 0 {
+		t.Skip("no LEA cards")
+	}
+
+	for _, tc := range []struct {
+		name  string
+		uuids []string
+	}{
+		{"a pool the fallback cannot answer from", lea[:1]},
+		{"an empty pool", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reads := registerCountingSeller(t, "POOLCOUNT", tc.uuids)
+			config := parseSearchOptionsNG(ds.backend, "confetti in:(store:POOLCOUNT)", nil, nil, nil)
+			result := runSearch(httptest.NewRequest("GET", "/search", nil), ds, config)
+			if len(result.keys) != 0 || result.message != NoCardsMessage {
+				t.Fatalf("got %d keys, message %q; want no cards", len(result.keys), result.message)
+			}
+			if reads.Load() != 1 {
+				t.Errorf("pool resolved %d times, want 1", reads.Load())
+			}
+		})
 	}
 }

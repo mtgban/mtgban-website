@@ -1038,14 +1038,22 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 
 	var result searchResults
 
-	// Perform search
-	allKeys, err := searchAndFilter(ds, config)
+	// Perform search, resolving the pools once for it and the fallback both
+	var allKeys []string
+	filters, err := resolvePools(ds, config)
+	if err == nil {
+		config.CardFilters = filters
+		allKeys, err = searchAndFilter(ds, config)
+	}
 	if err != nil {
 		// No card carries the name, so read it another way before giving up.
 		// Only here: further down the results are empty because the cards that
 		// were found carry no listing, which is a fact about stock rather than
-		// an invitation to answer a different question.
-		allKeys = searchFallback(ds, config)
+		// an invitation to answer a different question. An empty pool stays
+		// empty however the name is read.
+		if !errors.Is(err, errEmptyPool) {
+			allKeys = searchFallback(ds, config)
+		}
 		if len(allKeys) == 0 {
 			result.message = NoCardsMessage
 			return result
@@ -2434,7 +2442,8 @@ var errEmptyPool = errors.New("pool holds no cards")
 // filled in from its own search. A new slice: the pinned bar and the
 // fallback share the one on the config. A sub-search that chose no mode
 // inherits sealed or mixed from the outer search, so a pool on the sealed
-// tab names products.
+// tab names products. A resolved pool drops its sub-search, so handing the
+// filters back in runs no sub-search again.
 func resolvePools(ds *datastore, config SearchConfig) ([]FilterElem, error) {
 	filters := slices.Clone(config.CardFilters)
 	for i := range filters {
@@ -2470,6 +2479,7 @@ func resolvePools(ds *datastore, config SearchConfig) ([]FilterElem, error) {
 			return nil, errEmptyPool
 		}
 		filters[i].Members = members
+		filters[i].Pool = nil
 	}
 	return filters, nil
 }
