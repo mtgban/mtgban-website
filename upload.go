@@ -2943,9 +2943,9 @@ func loadSpreadsheet(parser *docparse.Parser, urlPath string, maxRows int) ([]Up
 	return uploadEntries, docName, nil
 }
 
-// loadUploadFile reads an uploaded file by its extension, except that a
-// compound file is read as an .xls whatever it is named: excelize must never
-// see one, and an .xls renamed .xlsx still loads.
+// loadUploadFile reads an uploaded file by its extension, in any case,
+// except that a compound file is read as an .xls whatever it is named:
+// excelize must never see one, and an .xls renamed .xlsx still loads.
 func loadUploadFile(parser *docparse.Parser, file io.ReadSeeker, name string, maxRows int) ([]UploadEntry, error) {
 	head := make([]byte, 8)
 	n, err := io.ReadFull(file, head)
@@ -2956,6 +2956,7 @@ func loadUploadFile(parser *docparse.Parser, file io.ReadSeeker, name string, ma
 		return nil, err
 	}
 
+	name = strings.ToLower(name)
 	switch {
 	case xlsread.IsOLE(head[:n]), strings.HasSuffix(name, ".xls"):
 		return loadOldXls(parser, file, maxRows)
