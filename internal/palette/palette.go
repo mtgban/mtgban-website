@@ -124,7 +124,7 @@ func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
 
 // setMarks tells apart the sets that draw the same keyrune glyph, or the
 // font's fallback where it has none for them. The list is closed, as none of
-// these lines prints new sets.
+// these lines prints new sets; the ones that still do are in lineMarks.
 var setMarks = map[string]string{
 	"CED":    "CED",
 	"CEI":    "CEI",
@@ -172,18 +172,84 @@ var setMarks = map[string]string{
 	"DRKITA": "ITA",
 	"LEGITA": "ITA",
 	"4EDALT": "ALT",
+
+	// Secret Lair's glyph, shared by most promo lines; SLD itself stays
+	// plain. "owl" draws keyrune's judge owl rather than text.
+	"SLX":  "◎",
+	"SLC":  "◷",
+	"SLP":  "✦",
+	"SLU":  "Ω",
+	"DBL":  "⧉",
+	"SCH":  "♛",
+	"Q06":  "♞",
+	"Q07":  "♞",
+	"F11":  "☾",
+	"F12":  "☾",
+	"F13":  "☾",
+	"F14":  "☾",
+	"F15":  "☾",
+	"F16":  "☾",
+	"F17":  "☾",
+	"F18":  "☾",
+	"J12":  "owl",
+	"J13":  "owl",
+	"J14":  "owl",
+	"J15":  "owl",
+	"J16":  "owl",
+	"J17":  "owl",
+	"J18":  "owl",
+	"J19":  "owl",
+	"PPP1": "◈",
+	"G17":  "❖",
+	"CP1":  "↯",
+	"CP2":  "↯",
+	"CP3":  "↯",
+	"PEWK": "∞",
+	"PSPL": "✺",
+	"PJSC": "◉",
+	"PS18": "✎",
+	"PCBB": "♪",
+	"LMAR": "✪",
+	"PCEL": "✶",
+	"HHO":  "❆",
+	"WMC":  "⊕",
+	"PSVC": "☼",
+	"P30T": "❂",
 }
 
-// The mark SetMark gives a promo set, by the end of its name.
-const promoMark = "★"
+// lineMarks marks the lines on Secret Lair's glyph that print a new set every
+// year, by the start of the name each year's set carries.
+var lineMarks = map[string]string{
+	"Wizards Play Network ":             "WPN",
+	"MagicFest ":                        "⚑",
+	"Love Your LGS ":                    "♡",
+	"Lunar New Year ":                   "✿",
+	"Year of the ":                      "✿",
+	"Regional Championship Qualifiers ": "♜",
+}
+
+// The marks SetMark gives by the end of a set's name rather than a table.
+const (
+	promoMark    = "★"
+	showdownMark = "✕"
+)
 
 // SetMark is the mark a set's symbol carries in its corner, by the set's code
-// and name, or "" for none: setMarks, or a star for a promo set, which mostly
-// shares its parent's glyph too.
+// and name, or "" for none: setMarks, lineMarks, a cross for a Standard
+// Showdown, or a star for a promo set, which mostly shares its parent's glyph
+// too.
 func SetMark(code, name string) string {
 	mark := setMarks[code]
 	if mark != "" {
 		return mark
+	}
+	for prefix, lineMark := range lineMarks {
+		if strings.HasPrefix(name, prefix) {
+			return lineMark
+		}
+	}
+	if strings.HasSuffix(name, " Standard Showdown") {
+		return showdownMark
 	}
 	if strings.HasSuffix(name, " Promos") {
 		return promoMark
@@ -201,8 +267,11 @@ func SymbolMarks() []string {
 }
 
 func buildSymbolMarks() []string {
-	marks := []string{promoMark}
+	marks := []string{promoMark, showdownMark}
 	for _, mark := range setMarks {
+		marks = append(marks, mark)
+	}
+	for _, mark := range lineMarks {
 		marks = append(marks, mark)
 	}
 	symbols := []string{}

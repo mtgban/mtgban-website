@@ -34,7 +34,7 @@
      one palette's setMarks lists - carries palette.SetMark as data-mark,
      drawn in the glyph's corner through the ::after keyrune leaves free.
      A symbol mark (palette.SymbolMarks) gets 0.5em, where it reads as large
-     as letters do.
+     as letters do, and "owl" draws keyrune's judge owl.
 
      The rules ride here rather than in a stylesheet because every mobile page
      loads only its own, and this block is the one thing every base includes. */}}
@@ -54,6 +54,7 @@
                      -0.5px 0.5px 0 var(--background), 0 0.5px 0 var(--background), 0.5px 0.5px 0 var(--background);
     }
     .ss:is({{range $i, $mark := symbol_marks}}{{if $i}}, {{end}}[data-mark="{{$mark}}"]{{end}})::after { font-size: 0.5em; }
+    .ss[data-mark="owl"]::after { content: "\e96a"; font: normal 0.55em/1 Keyrune; }
 </style>
 {{end}}
 

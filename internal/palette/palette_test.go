@@ -84,6 +84,16 @@ func TestSetMark(t *testing.T) {
 		{"EVG", "Duel Decks Anthology: Elves vs. Goblins", "A"},
 		{"TGVL", "Duel Decks Anthology: Garruk vs. Liliana Tokens", "A"},
 		{"DD1", "Duel Decks: Elves vs. Goblins", ""},
+		{"SLD", "Secret Lair Drop", ""},
+		{"SLX", "Universes Within", "◎"},
+		{"SLU", "Secret Lair: Ultimate Edition", "Ω"},
+		{"J14", "Judge Gift Cards 2014", "owl"},
+		{"PW24", "Wizards Play Network 2024", "WPN"},
+		{"PF31", "MagicFest 2031", "⚑"},
+		{"PL25", "Year of the Snake 2025", "✿"},
+		{"PLNY", "Lunar New Year 2018", "✿"},
+		{"PRCQ", "Regional Championship Qualifiers 2022", "♜"},
+		{"PSS4", "MKM Standard Showdown", "✕"},
 		{"PROMOS", "Promos of Theros", ""},
 	} {
 		got := SetMark(tc.code, tc.name)
