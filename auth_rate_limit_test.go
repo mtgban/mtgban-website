@@ -185,6 +185,49 @@ func TestAPIRateLimitKeysGatewayRequestsOnTheirClient(t *testing.T) {
 	}
 }
 
+// What App Platform hands the site: the socket on its private ingress, the
+// client in DO-Connecting-IP, and X-Forwarded-For ending with a public hop
+// that many clients share.
+func viaAppPlatform(target, clientXFF, client string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req.RemoteAddr = "10.244.0.9:40000"
+	xff := client + ", 172.70.1.1"
+	if clientXFF != "" {
+		xff = clientXFF + ", " + xff
+	}
+	req.Header.Set("X-Forwarded-For", xff)
+	req.Header.Set("DO-Connecting-IP", client)
+	return req
+}
+
+// With $BAN_CLIENT_IP_HEADER set, each client keeps its own bucket though
+// they share the last X-Forwarded-For hop, and a spoofed first entry still
+// spends the client's.
+func TestAPIRateLimitKeysAppPlatformOnTheConnectingIP(t *testing.T) {
+	withSigMode(t, false, true)
+	t.Setenv("BAN_CLIENT_IP_HEADER", "DO-Connecting-IP")
+	got := apiLimited(t,
+		viaAppPlatform("/api/mtgban/stores.json", "203.0.113.1", "198.51.100.7"),
+		viaAppPlatform("/api/mtgban/stores.json", "203.0.113.2", "198.51.100.7"),
+		viaAppPlatform("/api/mtgban/stores.json", "", "198.51.100.8"),
+	)
+	if want := []bool{true, false, true}; !slices.Equal(got, want) {
+		t.Errorf("allowed %v, want %v", got, want)
+	}
+
+	// Unset, as behind nginx, the header the client sent is ignored.
+	t.Setenv("BAN_CLIENT_IP_HEADER", "")
+	spoofed := func(client string) *http.Request {
+		req := viaNginx("/api/mtgban/stores.json", "", "198.51.100.7")
+		req.Header.Set("DO-Connecting-IP", client)
+		return req
+	}
+	got = apiLimited(t, spoofed("203.0.113.1"), spoofed("203.0.113.2"))
+	if !got[0] || got[1] {
+		t.Errorf("unset: allowed %v, want the second limited", got)
+	}
+}
+
 // An IPv6 caller holds a whole /64, so the limiter counts the /64, not each
 // address in it; IPv4 addresses keep a bucket each.
 func TestAPIRateLimitKeysIPv6OnItsSlash64(t *testing.T) {
