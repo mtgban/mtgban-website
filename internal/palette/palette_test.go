@@ -78,6 +78,9 @@ func TestSetMark(t *testing.T) {
 		{"H2R", "Modern Horizons 2 Timeshifts", "⧗"},
 		{"OC13", "Commander 2013 Oversized", "O"},
 		{"OAFC", "Forgotten Realms Commander Display Commanders", "O"},
+		{"PTC", "Pro Tour Collector Set", "1996"},
+		{"WC97", "World Championship Decks 1997", "1997"},
+		{"WC00", "World Championship Decks 2000", "2000"},
 		{"PROMOS", "Promos of Theros", ""},
 	} {
 		got := SetMark(tc.code, tc.name)
