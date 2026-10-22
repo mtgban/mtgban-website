@@ -2753,7 +2753,13 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 	}
 	defer resp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	return readCollectionPage(parser, resp.Body, maxRows)
+}
+
+// readCollectionPage parses a TCGplayer collection page: its title, and its
+// table's rows under the header the page gives them.
+func readCollectionPage(parser *docparse.Parser, body io.Reader, maxRows int) ([]UploadEntry, string, error) {
+	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
 		return nil, "", err
 	}
@@ -2781,8 +2787,11 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 		}
 
 		record := make([]string, len(header))
+		// Cells past the header have no column to go in
 		s.Find("td").Each(func(i int, se *goquery.Selection) {
-			record[i] = se.Text()
+			if i < len(record) {
+				record[i] = se.Text()
+			}
 		})
 
 		// Look for the tcgplayer Id
@@ -2793,8 +2802,11 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 			tcgID = fields[1]
 		}
 
-		// Override header map and save relevant fields
-		if parser.Backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
+		// Override header map and save relevant fields, where the header has
+		// the columns of the page's own layout; the override is this row's
+		// alone, so a later row with no known id reads the page's header
+		rowMap := indexMap
+		if len(record) > 5 && parser.Backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
 			record[5] = tcgID
 
 			record[2] = "Normal"
@@ -2802,12 +2814,12 @@ func loadCollection(ctx context.Context, parser *docparse.Parser, link string, m
 				record[2] = "Foil"
 			}
 
-			// Update map header
-			indexMap["id"] = 5
-			indexMap["printing"] = 2
+			rowMap = maps.Clone(indexMap)
+			rowMap["id"] = 5
+			rowMap["printing"] = 2
 		}
 
-		res, err := parser.ParseRow(indexMap, record)
+		res, err := parser.ParseRow(rowMap, record)
 		if err != nil {
 			return true
 		}

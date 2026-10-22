@@ -11,8 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/xuri/excelize/v2"
 
+	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/internal/xlsread/xlstest"
 )
 
@@ -777,6 +779,99 @@ func TestLoadCollectionOnlyFetchesATCGplayerCollection(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), "unsupported URL") {
 				t.Errorf("%q failed with %q, which means it got past the guard", tt.link, err)
+			}
+		})
+	}
+}
+
+// collectionPage writes a TCGplayer collection page with the header and rows
+// given, each row's id attribute carrying its TCGplayer product id.
+func collectionPage(header []string, rows map[string][]string, order []string) io.Reader {
+	var b strings.Builder
+	b.WriteString(`<html><head><title>Fuzz's Collection | TCGplayer</title></head><body><div id="collectionContainer"><table><thead><tr>`)
+	for _, th := range header {
+		b.WriteString("<th>" + th + "</th>")
+	}
+	b.WriteString("</tr></thead><tbody>")
+	for _, id := range order {
+		b.WriteString(`<tr id="row_` + id + `">`)
+		for _, td := range rows[id] {
+			b.WriteString("<td>" + td + "</td>")
+		}
+		b.WriteString("</tr>")
+	}
+	b.WriteString("</tbody></table></div></body></html>")
+	return strings.NewReader(b.String())
+}
+
+// A backend that knows one TCGplayer product id, so a row's id attribute is
+// taken over the columns, as it is on a real page.
+func collectionParser() *docparse.Parser {
+	return newUploadParser(&mtgmatcher.Backend{
+		ExternalIdentifiers: map[mtgmatcher.IDSpace]map[string]string{
+			mtgmatcher.IDSpaceTCGplayer: {"1234": "fzz-uuid"},
+		},
+	})
+}
+
+// The page's own layout: the product id goes to column 5 and the finish to
+// column 2, over what the cells said.
+func TestReadCollectionPageTakesTheRowsProductID(t *testing.T) {
+	quietUploadLog(t)
+
+	header := []string{"Name", "Set", "Printing", "Condition", "Quantity", "Notes"}
+	rows := map[string][]string{
+		"1234": {"Lightning Bolt [Foil]", "Beta", "", "NM", "3", "a note"},
+		"9999": {"Counterspell", "Ice Age", "Normal", "LP", "2", "kept"},
+	}
+	entries, name, err := readCollectionPage(collectionParser(), collectionPage(header, rows, []string{"1234", "9999"}), uploadRowLimit)
+	if err != nil {
+		t.Fatalf("readCollectionPage: %v", err)
+	}
+	if name != "Fuzz's Collection" {
+		t.Errorf("collection name = %q", name)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("read %d rows, want 2", len(entries))
+	}
+	if !entries[0].Card.Foil || entries[0].Quantity != 3 {
+		t.Errorf("first row = %+v, want foil and quantity 3", entries[0])
+	}
+	if entries[1].Quantity != 2 || entries[1].OriginalCondition != "SP" {
+		t.Errorf("second row = %+v, want quantity 2 and SP", entries[1])
+	}
+	// The layout is the known product's row only: the next row has no id
+	// column, so its notes are not read as one
+	if entries[1].Card.ID == "kept" {
+		t.Errorf("second row took id %q from the notes column", entries[1].Card.ID)
+	}
+}
+
+// A page is someone else's HTML: a row with more cells than the header, or a
+// header too short for the product-id layout, is read as far as it goes.
+// Either used to index past the row and panic.
+func TestReadCollectionPageReadsARowAsFarAsItGoes(t *testing.T) {
+	quietUploadLog(t)
+
+	for _, tt := range []struct {
+		name string
+		id   string
+		row  []string
+	}{
+		{"more cells than the header", "9999", []string{"Counterspell", "Ice Age", "2", "extra", "and more"}},
+		{"a known product under a short header", "1234", []string{"Counterspell", "Ice Age", "2"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			page := collectionPage([]string{"Name", "Set", "Quantity"}, map[string][]string{tt.id: tt.row}, []string{tt.id})
+			entries, _, err := readCollectionPage(collectionParser(), page, uploadRowLimit)
+			if err != nil {
+				t.Fatalf("readCollectionPage: %v", err)
+			}
+			if len(entries) != 1 {
+				t.Fatalf("read %d rows, want 1", len(entries))
+			}
+			if entries[0].Card.Edition != "Ice Age" || entries[0].Quantity != 2 {
+				t.Errorf("row = %+v, want Ice Age, quantity 2", entries[0])
 			}
 		})
 	}
