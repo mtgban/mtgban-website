@@ -1082,7 +1082,7 @@
 
     <!-- Printing picker overlay -->
     <div id="printing-overlay" class="printing-overlay" onclick="if(event.target===this)window.closePrintingPicker && closePrintingPicker()">
-        <div class="printing-picker">
+        <div class="printing-picker" role="dialog" aria-modal="true" aria-label="Select printing">
             <div class="printing-picker-header">
                 <span class="printing-picker-title">Select printing</span>
                 <button type="button" class="printing-picker-close" onclick="window.closePrintingPicker && closePrintingPicker()">&times;</button>
@@ -1104,7 +1104,7 @@
          page when Publish is pressed, the way the exports read it, so a
          printing picked or a row removed above is what gets served. */}}
     <div id="store-overlay" class="printing-overlay" onclick="if(event.target===this)window.closeStorePrompt && closeStorePrompt()">
-        <div class="printing-picker store-prompt">
+        <div class="printing-picker store-prompt" role="dialog" aria-modal="true" aria-label="Publish as a store">
             <div class="printing-picker-header">
                 <span class="printing-picker-title">Publish as a {{if .IsBuylist}}buylist{{else}}retail{{end}} store</span>
                 <button type="button" class="printing-picker-close" onclick="window.closeStorePrompt && closeStorePrompt()">&times;</button>

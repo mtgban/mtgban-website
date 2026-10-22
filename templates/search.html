@@ -810,7 +810,7 @@
 
 <!-- Lightbox for the card image, used when the screen is too narrow to show
      the sidebar preview (see .qi-view-image / .card-image-modal). -->
-<div class="card-image-modal" id="cardImageModal" onclick="window.hideCardImage && hideCardImage()">
+<div class="card-image-modal" id="cardImageModal" role="dialog" aria-modal="true" aria-label="Card image" onclick="window.hideCardImage && hideCardImage()">
     <img id="cardImageModalImg" src="" alt="Card image">
 </div>
 <script>

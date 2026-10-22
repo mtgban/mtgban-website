@@ -142,7 +142,7 @@
 </nav>
 
 <div class="ban-nav-mobile-overlay" id="mobile-overlay" onclick="this.classList.remove('open'); document.getElementById('mobile-menu').classList.remove('open');"></div>
-<div class="ban-nav-mobile-menu" id="mobile-menu">
+<div class="ban-nav-mobile-menu" id="mobile-menu" role="dialog" aria-modal="true" aria-label="Menu">
     <button class="ban-nav-mobile-close" onclick="this.parentElement.classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open');">&#10005;</button>
     <ul class="ban-nav-mobile-links">
         {{range .Nav}}

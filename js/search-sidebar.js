@@ -189,6 +189,8 @@ function collapsePrintings() {
     // drops the last one - so the id the button points at
     // stays unique.
     dropdown.id = 'printings-overflow';
+    dropdown.setAttribute('role', 'dialog');
+    dropdown.setAttribute('aria-label', 'More editions');
 
     const filter = document.createElement('input');
     filter.type = 'text';

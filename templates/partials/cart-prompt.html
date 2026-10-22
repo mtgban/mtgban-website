@@ -5,7 +5,7 @@
      it is a buylist, are filled in from the button pressed. */}}
 <link rel="stylesheet" type="text/css" href="/css/cart-prompt.css?hash={{.Hash}}">
 <div id="cart-overlay" class="cart-overlay" onclick="if(event.target===this)window.closeCartPrompt && closeCartPrompt()">
-    <div class="cart-panel">
+    <div class="cart-panel" role="dialog" aria-modal="true" aria-label="Load your cart">
         <div class="cart-panel-header">
             <span class="cart-panel-title">Load your <span class="cart-prompt-buylist">buylist</span><span class="cart-prompt-retail">cards</span> at <span class="cart-prompt-store"></span></span>
             <button type="button" class="cart-panel-close" onclick="window.closeCartPrompt && closeCartPrompt()">&times;</button>
