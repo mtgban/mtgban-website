@@ -9,6 +9,14 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
+// localRedirect sends the reader to path on this site. It never reuses the
+// request's URL, which names the client's host when the request line is in
+// absolute form.
+func localRedirect(w http.ResponseWriter, r *http.Request, path string, v url.Values) {
+	target := url.URL{Path: path, RawQuery: v.Encode()}
+	http.Redirect(w, r, target.String(), http.StatusFound)
+}
+
 func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 	b := s.backend()
 	path := strings.TrimPrefix(r.URL.Path, "/go/")
@@ -194,10 +202,7 @@ func (s *site) CardRedirect(w http.ResponseWriter, r *http.Request) {
 	if query != "" {
 		v.Set("q", query)
 	}
-	r.URL.RawQuery = v.Encode()
-	r.URL.Path = "/search"
-
-	http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	localRedirect(w, r, "/search", v)
 }
 
 // sealedSlugSeparators is every run of characters a slug does not keep.
@@ -259,10 +264,7 @@ func (s *site) SealedRedirect(w http.ResponseWriter, r *http.Request) {
 	if query != "" {
 		v.Set("q", query)
 	}
-	r.URL.RawQuery = v.Encode()
-	r.URL.Path = "/sealed"
-
-	http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	localRedirect(w, r, "/sealed", v)
 }
 
 func (s *site) RandomSearch(w http.ResponseWriter, r *http.Request) {
@@ -270,10 +272,7 @@ func (s *site) RandomSearch(w http.ResponseWriter, r *http.Request) {
 
 	v := r.URL.Query()
 	v.Set("q", uuid)
-	r.URL.RawQuery = v.Encode()
-	r.URL.Path = "/search"
-
-	http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	localRedirect(w, r, "/search", v)
 }
 
 func (s *site) RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
@@ -281,8 +280,5 @@ func (s *site) RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
 
 	v := r.URL.Query()
 	v.Set("q", uuid)
-	r.URL.RawQuery = v.Encode()
-	r.URL.Path = "/sealed"
-
-	http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	localRedirect(w, r, "/sealed", v)
 }
