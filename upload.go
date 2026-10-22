@@ -3138,7 +3138,7 @@ func loadCsv(parser *docparse.Parser, reader io.ReadSeeker, comma rune, maxRows 
 	// Support non-standard separator metadata IN the file
 	if len(first) == 1 && strings.Contains(first[0], "sep") {
 		fields := strings.Split(first[0], "=")
-		if len(fields) > 1 {
+		if len(fields) > 1 && fields[1] != "" {
 			csvReader.Comma = rune(fields[1][0])
 		}
 		// Re-read the header

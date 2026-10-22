@@ -420,6 +420,10 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		record[i] = strings.TrimSpace(record[i])
 	}
 
+	// The header's name column, or column 0 for a one-field decklist line;
+	// indexMap is the whole file's and is never written here
+	nameIdx := indexMap["cardName"]
+
 	// Decklist mode
 	if len(record) == 1 {
 		line := record[0]
@@ -477,7 +481,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		line = strings.Replace(line, ">", ")", 1)
 
 		record[0] = line
-		indexMap["cardName"] = 0
+		nameIdx = 0
 	}
 
 	// Load quantity, and skip it if it's present and zero
@@ -523,7 +527,11 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 		res.Card.ID = p.MKMIDToUUID(wholeNumber(record[idx]))
 	}
 
-	res.Card.Name = record[indexMap["cardName"]]
+	// A row can end before its name column, as an xlsx row with a blank
+	// last cell does: it keeps the fields it has, like every other column
+	if nameIdx < len(record) {
+		res.Card.Name = record[nameIdx]
+	}
 	idx, found = indexMap["edition"]
 	if found && idx < len(record) {
 		res.Card.Edition = record[idx]
