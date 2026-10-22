@@ -87,6 +87,20 @@ func validateShareRows(rows string) error {
 	return nil
 }
 
+// withoutShareNotes blanks each packed row's notes, its fifth field: the
+// owner's notes are not for the reader, and a shared link never shows them.
+func withoutShareNotes(rows string) string {
+	lines := strings.Split(rows, "\n")
+	for i, line := range lines {
+		fields := strings.SplitN(line, "\t", 6)
+		if len(fields) > 4 {
+			fields[4] = ""
+			lines[i] = strings.Join(fields, "\t")
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // UploadShareAPI stores the rows of a results page under a short-lived
 // key: POST /api/upload/share.
 func UploadShareAPI(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +160,7 @@ func serveUploadShare(w http.ResponseWriter, r *http.Request, store uploadShareW
 		writeShareError(w, http.StatusTooManyRequests, "too many shares")
 		return
 	}
-	share, err := store.CreateUploadShare(r.Context(), owner, string(Config().Game), body.Rows, body.Buylist, uploadShareTTL)
+	share, err := store.CreateUploadShare(r.Context(), owner, string(Config().Game), withoutShareNotes(body.Rows), body.Buylist, uploadShareTTL)
 	if err != nil {
 		log.Printf("upload share: create failed for %.10s: %v", owner, err)
 		writeShareError(w, http.StatusServiceUnavailable, "sharing unavailable")
