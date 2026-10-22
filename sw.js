@@ -35,6 +35,7 @@ var SHELL_URLS = [
     '/js/settings-shell.js?hash=' + BUILD,
     '/js/settings.js?hash=' + BUILD,
     '/js/tooltips.js?hash=' + BUILD,
+    '/js/search-type-focus.js?hash=' + BUILD,
     '/js/icons.js?hash=' + BUILD,
     '/css/search.css?hash=' + BUILD,
     '/css/offline.css?hash=' + BUILD,
