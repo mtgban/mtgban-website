@@ -33,7 +33,9 @@ func (s *site) alertEvalDeps() alerts.EvalDeps {
 			d.Values = func(userHash, tier string) url.Values {
 				return aclValuesWith(ACL(), idx, userHash, tier)
 			}
-			d.Prices = alertVisiblePrices
+			d.Prices = func(cardID string, side alerts.Side, v url.Values) []alerts.StorePrice {
+				return alertVisiblePrices(b, cardID, side, v)
+			}
 			d.Resolve = func(cardID string) (alerts.Card, bool, bool) { return alertCardSnapshot(b, cardID) }
 			d.Game = string(Config().Game)
 			return d
