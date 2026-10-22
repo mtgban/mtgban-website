@@ -531,9 +531,9 @@ func TestStoreEligible(t *testing.T) {
 }
 
 // TestApiEnabledStores pins how the API turns the sig store option into the
-// store list: ALL_ACCESS applies the search blocklists at runtime but keeps
-// the API-only stores, DEV_ACCESS applies nothing, an explicit list bypasses
-// them entirely, and BASE_ACCESS additionally drops sealed and
+// store lists: ALL_ACCESS applies each side's search blocklist at runtime but
+// keeps the API-only stores, DEV_ACCESS applies nothing, an explicit list
+// bypasses them entirely, and BASE_ACCESS additionally drops sealed and
 // non-main-region stores, except for metadata-only indexes.
 func TestApiEnabledStores(t *testing.T) {
 	regular, foil, _ := parityCards(t)
@@ -551,7 +551,14 @@ func TestApiEnabledStores(t *testing.T) {
 		Config().Stores.APIOnlyStores = prevAPIOnly
 	})
 
-	got := apiEnabledStores("ALL_ACCESS")
+	// Both sides at once; TestSearchAPIKeyScopeMeetsBlockListsAsPrices
+	// pins which side serves a store.
+	enabled := func(opt string) []string {
+		sellers, vendors := apiEnabledStores(opt)
+		return apiStoreUnion(sellers, vendors)
+	}
+
+	got := enabled("ALL_ACCESS")
 	if !slices.Contains(got, "PARITYA") {
 		t.Errorf("ALL_ACCESS should keep the API-only PARITYA, got %v", got)
 	}
@@ -559,16 +566,18 @@ func TestApiEnabledStores(t *testing.T) {
 		t.Errorf("ALL_ACCESS should apply both blocklists, got %v", got)
 	}
 
-	got = apiEnabledStores("DEV_ACCESS")
+	got = enabled("DEV_ACCESS")
 	for _, store := range []string{"PARITYA", "PARITYIDX", "PARITYV"} {
 		if !slices.Contains(got, store) {
 			t.Errorf("DEV_ACCESS should keep %s, got %v", store, got)
 		}
 	}
 
-	got = apiEnabledStores("PARITYIDX,PARITYV")
-	if !slices.Equal(got, []string{"PARITYIDX", "PARITYV"}) {
-		t.Errorf("explicit list should bypass blocklists, got %v", got)
+	explicitSellers, explicitVendors := apiEnabledStores("PARITYIDX,PARITYV")
+	for _, got := range [][]string{explicitSellers, explicitVendors} {
+		if !slices.Equal(got, []string{"PARITYIDX", "PARITYV"}) {
+			t.Errorf("explicit list should bypass blocklists on both sides, got %v", got)
+		}
 	}
 
 	// BASE_ACCESS starts from the same blocklisted set as ALL_ACCESS, then
@@ -597,7 +606,7 @@ func TestApiEnabledStores(t *testing.T) {
 	vendors = append(*vendorsPtr.Load(), euIndexVendor)
 	vendorsPtr.Store(&vendors)
 
-	got = apiEnabledStores("BASE_ACCESS")
+	got = enabled("BASE_ACCESS")
 	if !slices.Contains(got, "PARITYA") {
 		t.Errorf("BASE_ACCESS should keep PARITYA, got %v", got)
 	}
@@ -616,7 +625,7 @@ func TestApiEnabledStores(t *testing.T) {
 		}
 	}
 	for _, opt := range []string{"ALL_ACCESS", "DEV_ACCESS"} {
-		got = apiEnabledStores(opt)
+		got = enabled(opt)
 		if !slices.Contains(got, "PARITYSEALED") || !slices.Contains(got, "PARITYEU") {
 			t.Errorf("%s should keep sealed and non-main-region stores, got %v", opt, got)
 		}

@@ -623,9 +623,9 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	keyScoped := storesOpt != "" && storesOpt != "true" && isAPI
 
 	// A key's scope is its whole store policy, as on the price API: the
-	// store filter below takes apiEnabledStores, which heeds the search
-	// block lists only for ALL_ACCESS and BASE_ACCESS. The rest get the
-	// site's, which hide the API-only stores.
+	// seller and vendor filters below take apiEnabledStores, which heeds
+	// each side's search block list only for ALL_ACCESS and BASE_ACCESS.
+	// The rest get the site's, which hide the API-only stores.
 	var blocklistRetail, blocklistBuylist []string
 	if !keyScoped {
 		blocklistRetail, blocklistBuylist = getDefaultBlocklists(sig)
@@ -714,9 +714,15 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	}
 
 	if keyScoped {
+		sellers, vendors := apiEnabledStores(storesOpt)
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
-			Name:   "store",
-			Values: fixupStoreCodeNG(strings.Join(apiEnabledStores(storesOpt), ",")),
+			Name:          "seller",
+			Values:        fixupStoreCodeNG(strings.Join(sellers, ",")),
+			OnlyForSeller: true,
+		}, FilterStoreElem{
+			Name:          "vendor",
+			Values:        fixupStoreCodeNG(strings.Join(vendors, ",")),
+			OnlyForVendor: true,
 		})
 	}
 

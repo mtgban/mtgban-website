@@ -11,8 +11,8 @@ import (
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
-// enabledStores intersects the optional stores param with every
-// non-blocklisted scraper, mirroring PriceAPI's ALL_ACCESS branch.
+// enabledStores intersects the optional stores param with every store
+// the site's block lists leave on either side, as one list for both.
 func (s *Service) enabledStores(r *http.Request) []string {
 	all := s.deps.EnabledStores()
 	filter := r.FormValue("stores")

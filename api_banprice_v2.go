@@ -415,15 +415,15 @@ func filterV2Finishes(finishes []banprice.Finish, filter string) []banprice.Fini
 	return out
 }
 
-// v2StoreList is the stores among enabledStores, as stores.json lists them.
+// v2StoreList is the enabled sellers and vendors, as stores.json lists them.
 // filter=singles or filter=sealed keeps one kind of store. qty is listed as
 // v2's prices carry it.
-func v2StoreList(enabledStores []string, filter string) banprice.Stores {
-	keep := func(info mtgban.ScraperInfo) bool {
+func v2StoreList(enabledSellers, enabledVendors []string, filter string) banprice.Stores {
+	keep := func(info mtgban.ScraperInfo, enabled []string) bool {
 		if filter == "singles" && info.SealedMode || filter == "sealed" && !info.SealedMode {
 			return false
 		}
-		return slices.Contains(enabledStores, info.Shorthand)
+		return slices.Contains(enabled, info.Shorthand)
 	}
 	store := func(info mtgban.ScraperInfo) banprice.Store {
 		return banprice.Store{
@@ -439,7 +439,7 @@ func v2StoreList(enabledStores []string, filter string) banprice.Stores {
 	seen := map[string]bool{}
 	for _, seller := range GetSellers() {
 		info := seller.Info()
-		if !keep(info) || seen[info.Shorthand] {
+		if !keep(info, enabledSellers) || seen[info.Shorthand] {
 			continue
 		}
 		seen[info.Shorthand] = true
@@ -451,7 +451,7 @@ func v2StoreList(enabledStores []string, filter string) banprice.Stores {
 	seen = map[string]bool{}
 	for _, vendor := range GetVendors() {
 		info := vendor.Info()
-		if !keep(info) || seen[info.Shorthand] {
+		if !keep(info, enabledVendors) || seen[info.Shorthand] {
 			continue
 		}
 		seen[info.Shorthand] = true

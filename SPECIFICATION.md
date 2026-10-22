@@ -705,8 +705,9 @@ unset or unrecognized falls back to the card's own internal uuid, not
 scryfall), `qty`, `conds`, `finish`, `vendor` filter (must be a subset of the
 enabled stores), `tag=names` (full store names instead of shorthands), and
 `filter=singles|sealed` on the `/sets`/`/stores` endpoints. Access scoped by
-sig params `API` (an explicit store list, or `ALL_ACCESS` — expanded from
-live sellers/vendors minus blocklists at request time — or `DEV_ACCESS`) and
+sig params `API` (an explicit store list, for both sides, or `ALL_ACCESS` —
+expanded at request time from the live sellers minus the retail blocklist
+and the live vendors minus the buylist one — or `DEV_ACCESS`) and
 `APImode`; a request with neither `sig` nor `API` falls back to
 `Config.Stores.APIDemoStores` and is refused the full `all`/`retail`/`buylist` dumps,
 by those exact names; it keeps the sealed dump and per-set or per-card
@@ -771,9 +772,10 @@ scope replaces the search block lists, as on the price endpoints
 (`apiEnabledStores`): an explicit list is the whole policy, and
 `ALL_ACCESS`/`BASE_ACCESS` leave out what the config's
 `search_block_list`/`search_buylist_block_list` name, whatever the
-signature's own `SearchDisabled`/`SearchBuylistDisabled` say. Their list
-is one for both sides, so a store one side's block list names stays in it
-when it also trades on the other under the same shorthand.
+signature's own `SearchDisabled`/`SearchBuylistDisabled` say. Each side
+has its list, so a store one side's block list names is still served on
+the other where it trades there under the same shorthand, on the price
+endpoints, `stores.json` and both API searches alike.
 
 A store `stores.api_only_stores` names is the price API's alone: the price
 endpoints, `stores.json` and both API searches serve it to a key whose
