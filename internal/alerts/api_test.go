@@ -618,6 +618,14 @@ func TestAlertsAPICreateListEditDelete(t *testing.T) {
 		t.Fatalf("clear below = %d %s", w.Code, w.Body)
 	}
 
+	// Back to dollars under the stored reference: the dialog does not send
+	// the reference then, so it must not refuse the line.
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"above":{"kind":"abs","value":10}}`, sig))
+	if w.Code != http.StatusOK || store.rows[1].Above.Kind != KindAbs || store.rows[1].Above.Value != 10 {
+		t.Fatalf("dollars under the reference = %d %s", w.Code, w.Body)
+	}
+
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, alertsRequest("PATCH", "/api/alerts/1", `{"above":{},"below":{}}`, sig))
 	if w.Code != http.StatusUnprocessableEntity {

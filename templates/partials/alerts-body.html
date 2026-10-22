@@ -104,7 +104,7 @@
                         {{if gt (len .Stores) 3}}<span class="alert-chip alert-chip-more" title="{{range $i, $s := .Stores}}{{if $i}}, {{end}}{{$s}}{{end}}">+{{len (slice .Stores 3)}}</span>{{end}}
                     {{else}}<span class="alert-dim">any store</span>{{end}}
                 </td>
-                <td class="num" data-label="Reference">${{printf "%.2f" .ReferencePrice}}</td>
+                <td class="num" data-label="Reference">{{if .ReferencePrice}}${{printf "%.2f" .ReferencePrice}}{{else}}<span class="alert-dim">none</span>{{end}}</td>
                 <td class="num" data-label="Above">{{if .Above.Kind}}{{if eq .Above.Kind "pct"}}+{{.Above.Value}}%{{else}}${{printf "%.2f" .Above.Value}}{{end}}{{else}}<span class="alert-dim">off</span>{{end}}</td>
                 <td class="num" data-label="Below">{{if .Below.Kind}}{{if eq .Below.Kind "pct"}}-{{.Below.Value}}%{{else}}${{printf "%.2f" .Below.Value}}{{end}}{{else}}<span class="alert-dim">off</span>{{end}}</td>
                 <td class="num" data-label="Now">
