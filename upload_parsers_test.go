@@ -758,6 +758,21 @@ func TestLoadUploadFileReadsAnXlsByItsContent(t *testing.T) {
 	}
 }
 
+// An extension is matched in any case: LIST.XLSX is a workbook, not a CSV.
+func TestLoadUploadFileReadsAnUppercaseExtension(t *testing.T) {
+	quietUploadLog(t)
+
+	rows := append([][]string{parserHeader}, parserRows...)
+	xlsx, err := io.ReadAll(buildXlsx(t, map[string][][]string{"Sheet1": rows}, []string{"Sheet1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := loadUploadFile(newUploadParser(backend()), bytes.NewReader(xlsx), "LIST.XLSX", uploadRowLimit)
+	if err != nil || len(entries) != 2 {
+		t.Errorf("%d entries, err %v, want the 2 rows", len(entries), err)
+	}
+}
+
 // 30 bytes ran extrame/ole2 out of memory: it read past the end of the file
 // without an error and looped on sector 0.
 func TestLoadOldXlsRefusesTheFileThatCrashedTheOldReader(t *testing.T) {
