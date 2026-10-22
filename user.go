@@ -315,7 +315,7 @@ func userFeatures(s *site, sigParams url.Values, isMobile bool) []UserFeature {
 	}
 	// The settings modal is desktop only.
 	if !isMobile {
-		out = append(out, UserFeature{Name: "Settings", Description: "Your preferences, synced to this account", Link: "/user?settings=1"})
+		out = append(out, UserFeature{Name: "Settings", Description: "Your preferences, mostly saved in this browser", Link: "/user?settings=1"})
 	}
 	if navOffers(s, sigParams, "Alerts") && sigParams.Get("UserEmailUnverified") != "true" {
 		out = append(out, UserFeature{Name: "Price alerts", Description: "Cards you watch, delivered to Discord or email", Link: "/alerts"})
