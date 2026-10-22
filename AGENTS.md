@@ -78,6 +78,8 @@ output, not a claim written here.
   `google_client_secret.json`. Verify with `git status` before any commit.
 - `BAN_SECRET` (env var) keys the HMAC signing; `BAN_CONFIG_PATH` sets the
   default config path.
+  `BAN_CLIENT_IP_HEADER`, set to `DO-Connecting-IP` on the App Platform
+  apps only, names the header the API rate limit reads the client from.
 - Config schema is `ConfigType` in `main.go` (`grep -n "type ConfigType" main.go`
   for the current line, it moves): scraper config (`icons`, `name_override`
   and `stores`), the `stores` section (which stores show where, by
