@@ -42,7 +42,8 @@ no `AlertChannels` property gets `discord` only, for compatibility with a
 cookie signed before the property existed. To give a tier no channels at
 all, set `AlertChannels` to the literal string `none`, never an empty
 string: signing keeps empty values, but verification drops them, which
-breaks every signed page for that tier.
+breaks every signed page for that tier. The admin page's table and grant
+editors refuse one; an `acl.json` written by hand has to keep to it too.
 
 `AlertChannels` is a new signed field, carried in the `MTGBAN` signature
 on the cookie every site shares. Deploy this build to every site before

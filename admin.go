@@ -900,6 +900,7 @@ func adminGrantAdd(r *http.Request, pageVars *PageVars) {
 			}
 		}
 		_, tierExists := ACL()[grantTier]
+		emptyFeature, emptyKey, emptyFound := emptyOption(newGrant.Overrides)
 
 		switch {
 		case !strings.Contains(grantEmail, "@"):
@@ -910,6 +911,8 @@ func adminGrantAdd(r *http.Request, pageVars *PageVars) {
 			pageVars.WarningMessage = "unknown tier: " + grantTier
 		case overridesErr != nil:
 			pageVars.WarningMessage = "invalid overrides JSON: " + overridesErr.Error()
+		case emptyFound:
+			pageVars.WarningMessage = fmt.Sprintf("override %s.%s is an empty string; remove the key, or use none for AlertChannels", emptyFeature, emptyKey)
 		default:
 			err := saveGrants(r.Context(), append(slices.Clone(PatreonGrants()), newGrant))
 			if err != nil {

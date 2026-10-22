@@ -384,11 +384,17 @@ func saveACL(ctx context.Context, table access.Table) error {
 }
 
 // validateACLTable refuses tables that would obviously lock the site out: an
-// empty table grants nothing to anyone, and a table where no tier carries
-// Admin could not be fixed from the admin page again.
+// empty table grants nothing to anyone, an option set to an empty string
+// locks out its tier, and a table where no tier carries Admin could not be
+// fixed from the admin page again.
 func validateACLTable(table access.Table) error {
 	if len(table) == 0 {
 		return errors.New("table is empty")
+	}
+	for tier, features := range table {
+		if feature, key, found := emptyOption(features); found {
+			return fmt.Errorf("tier %s sets %s.%s to an empty string; remove the key, or use none for AlertChannels", tier, feature, key)
+		}
 	}
 	for _, features := range table {
 		if _, found := features["Admin"]; found {
@@ -396,4 +402,17 @@ func validateACLTable(table access.Table) error {
 		}
 	}
 	return errors.New("no tier grants Admin, which would lock the admin page out")
+}
+
+// emptyOption finds an option set to an empty string. Signing keeps it but
+// verification drops it, so every signed page of whoever carries it fails.
+func emptyOption(features map[string]map[string]string) (feature, key string, found bool) {
+	for feature, options := range features {
+		for key, val := range options {
+			if val == "" {
+				return feature, key, true
+			}
+		}
+	}
+	return "", "", false
 }
