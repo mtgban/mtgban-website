@@ -6,6 +6,7 @@
 
     var KEY = "mtgban_backpack";
     var EMPTY_AFTER_KEY = "mtgban_backpack_empty_after";
+    var PENDING_KEY = "mtgban_backpack_pending_clear";
     var MAX = 200;
     var MAX_QTY = 999;
 
@@ -88,15 +89,32 @@
 
     function remove(id) { setQty(id, 0); }
 
-    function clear() {
+    // clear removes the cards ids names, or every card without it.
+    function clear(ids) {
         var list = read();
         var t = now();
-        list.forEach(function (e) { if (!e.del) { e.del = t; e.m = t; } });
+        list.forEach(function (e) { if (!e.del && (!ids || ids.indexOf(e.id) !== -1)) { e.del = t; e.m = t; } });
         save(list);
     }
 
     function emptyAfter() { try { return localStorage.getItem(EMPTY_AFTER_KEY) === "1"; } catch (e) { return false; } }
     function setEmptyAfter(on) { try { localStorage.setItem(EMPTY_AFTER_KEY, on ? "1" : "0"); } catch (e) {} }
+
+    // The ids a send asked to empty after, held in this tab until Upload
+    // shows their results; every send replaces or removes them.
+    function setPending(ids) {
+        try {
+            if (ids) sessionStorage.setItem(PENDING_KEY, JSON.stringify(ids));
+            else sessionStorage.removeItem(PENDING_KEY);
+        } catch (e) {}
+    }
+    function takePending() {
+        try {
+            var s = sessionStorage.getItem(PENDING_KEY);
+            sessionStorage.removeItem(PENDING_KEY);
+            return s ? JSON.parse(s) : null;
+        } catch (e) { return null; }
+    }
 
     // sendForm builds the Upload POST the search sidebar and favorites use,
     // with a quantity beside each card.
@@ -126,9 +144,19 @@
     function send(mode) {
         if (!canUpload() || !live().length) return;
         var form = sendForm(mode);
-        if (emptyAfter()) clear();
+        setPending(emptyAfter() ? ordered().map(function (e) { return e.id; }) : null);
         document.body.appendChild(form);
         form.submit();
+    }
+
+    // clearIfPriced empties the backpack on the Upload page whose results
+    // are the cards a send asked to empty after. Any other Upload page, an
+    // error or the bare form, drops the request and keeps the backpack.
+    function clearIfPriced() {
+        var ban = window.BAN_BACKPACK;
+        if (!ban || !("priced" in ban)) return;
+        var pending = takePending();
+        if (Array.isArray(pending) && Array.isArray(ban.priced) && pending.join(",") === ban.priced.join(",")) clear(pending);
     }
 
     // ---- result rows and the navbar ----
@@ -368,6 +396,7 @@
         document.addEventListener("keydown", onKey);
         window.addEventListener("storage", function (ev) { if (!ev || !ev.key || ev.key === KEY) render(); });
         window.addEventListener("pageshow", function (ev) { if (ev && ev.persisted) render(); });
+        clearIfPriced();
         render();
     }
 

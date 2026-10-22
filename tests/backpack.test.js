@@ -37,10 +37,12 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
+    const sm = pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {};
+    const sessionStorage = { getItem: (k) => (k in sm ? sm[k] : null), setItem: (k, v) => { sm[k] = String(v); }, removeItem: (k) => { delete sm[k]; } };
     const body = el('body'); if (mobile) body.classes.add('mobile');
     const nav = el('button'); nav.setAttribute('id', 'nav-backpack'); nav.hidden = true;
     const navCount = el('span'); navCount.setAttribute('id', 'nav-backpack-count'); navCount.hidden = true; nav.appendChild(navCount);
@@ -55,8 +57,10 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban } = {}) {
         return btn;
     });
     const storageListeners = [];
+    const pageshowListeners = [];
     const window = {
-        localStorage, addEventListener: (ev, fn) => { if (ev === 'storage') storageListeners.push(fn); }, confirm: (msg) => { confirms.push(msg); return true; },
+        localStorage, sessionStorage, confirm: (msg) => { confirms.push(msg); return true; },
+        addEventListener: (ev, fn) => { if (ev === 'storage') storageListeners.push(fn); if (ev === 'pageshow') pageshowListeners.push(fn); },
         location: { pathname: '/search' },
     };
     if (ban) window.BAN_BACKPACK = ban;
@@ -79,11 +83,16 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban } = {}) {
         const row = btn.closest('.result-header'); if (!row) return null;
         return { id: row.getAttribute('data-card-id'), name: row.getAttribute('data-card-name'), set: 'S', edition: 'Set', number: '7', finishTag: '', finishClass: '', img: '', cw: false, t: Date.now() };
     } };
-    new Function('window', 'document', 'localStorage', 'ListStorage',
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'ListStorage',
         listStorage + '; window.ListStorage = ListStorage; ' + source)(
-        window, document, localStorage, undefined);
+        window, document, localStorage, sessionStorage, undefined);
     const stored = () => JSON.parse(m.mtgban_backpack);
-    return { window, document, m, rows, nav, navCount, stored, key, fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })) };
+    const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
+    return {
+        window, document, m, rows, nav, navCount, stored, key, pendingIds,
+        fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
+        firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
+    };
 }
 
 describe('adding', () => {
@@ -346,17 +355,26 @@ describe('sending', () => {
         expect(p.stored().filter((e) => !e.del).length).toBe(2);
     });
 
-    test('Buylist with the switch on empties the backpack before submitting', () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], emptyAfter: '1' });
+    test('Buylist with the switch on keeps the backpack and records the cards sent', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }], emptyAfter: '1' });
         p.nav.click();
         expect(ids['backpack-empty-after'].checked).toBe(true);
-        let clearedAtSubmit = null;
-        submitHook = () => { clearedAtSubmit = p.stored().every((e) => e.del); };
+        let liveAtSubmit = null;
+        submitHook = () => { liveAtSubmit = p.stored().filter((e) => !e.del).length; };
         ids['backpack-send-buylist'].click();
-        expect(clearedAtSubmit).toBe(true);
+        expect(liveAtSubmit).toBe(2);
         expect(submitted[0].children[0].value).toBe('true');
-        expect(submitted[0].children.length).toBe(3);
-        expect(p.stored().every((e) => e.del)).toBe(true);
+        expect(submitted[0].children.length).toBe(5);
+        expect(p.stored().filter((e) => !e.del).length).toBe(2);
+        expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1']);
+    });
+
+    test('a send with the switch off drops an earlier request to empty', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }], pending: ['uuid-1'] });
+        p.nav.click();
+        ids['backpack-send-retail'].click();
+        expect(submitted.length).toBe(1);
+        expect(p.pendingIds()).toBeUndefined();
     });
 
     test('a reader without Upload gets disabled buttons and sends nothing', () => {
@@ -389,5 +407,58 @@ describe('sending', () => {
         sw.checked = true;
         (sw.listeners.change || []).forEach((fn) => fn());
         expect(p.m.mtgban_backpack_empty_after).toBe('1');
+    });
+});
+
+describe('on the Upload page', () => {
+    const store = [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }];
+
+    test('results for the cards sent empty the backpack', () => {
+        const p = page({ store, pending: ['uuid-2', 'uuid-1'], ban: { canUpload: true, priced: ['uuid-2', 'uuid-1'] } });
+        expect(p.stored().every((e) => e.del)).toBe(true);
+        expect(p.navCount.hidden).toBe(true);
+        expect(p.pendingIds()).toBeUndefined();
+    });
+
+    test('a card added after the send stays', () => {
+        const p = page({ store: [...store, { id: 'uuid-3', name: 'C', qty: 1, t: 3, m: 3 }], pending: ['uuid-2', 'uuid-1'], ban: { canUpload: true, priced: ['uuid-2', 'uuid-1'] } });
+        expect(p.stored().filter((e) => !e.del).map((e) => e.id)).toEqual(['uuid-3']);
+        expect(p.navCount.textContent).toBe('1');
+    });
+
+    test('a page without results keeps the backpack and drops the request', () => {
+        const p = page({ store, pending: ['uuid-2', 'uuid-1'], ban: { canUpload: true, priced: null } });
+        expect(p.stored().filter((e) => !e.del).length).toBe(2);
+        expect(p.navCount.textContent).toBe('3');
+        expect(p.pendingIds()).toBeUndefined();
+    });
+
+    test('results for other cards keep the backpack', () => {
+        const p = page({ store, pending: ['uuid-2', 'uuid-1'], ban: { canUpload: true, priced: ['uuid-9'] } });
+        expect(p.stored().filter((e) => !e.del).length).toBe(2);
+        expect(p.pendingIds()).toBeUndefined();
+    });
+
+    test('results with no request to empty keep the backpack', () => {
+        const p = page({ store, ban: { canUpload: true, priced: ['uuid-2', 'uuid-1'] } });
+        expect(p.stored().filter((e) => !e.del).length).toBe(2);
+    });
+
+    test('the search page leaves the request for Upload', () => {
+        const p = page({ store, pending: ['uuid-2', 'uuid-1'], ban: { canUpload: true } });
+        expect(p.stored().filter((e) => !e.del).length).toBe(2);
+        expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1']);
+    });
+
+    test('Back to a cached search page shows the backpack Upload emptied', () => {
+        const p = page({ store, emptyAfter: '1' });
+        p.nav.click();
+        ids['backpack-send-retail'].click();
+        // The Upload page empties the shared store while this one sits in the cache.
+        p.m.mtgban_backpack = JSON.stringify(store.map((e) => ({ ...e, del: 9, m: 9 })));
+        p.firePageshow(true);
+        expect(p.navCount.hidden).toBe(true);
+        expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
+        expect(ids['backpack-send-retail'].disabled).toBe(true);
     });
 });
