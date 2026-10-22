@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"os"
 	"strings"
 	"testing"
 
@@ -584,6 +585,46 @@ func TestLoadXlsxRefusesAWorkbookPastTheUnzipLimit(t *testing.T) {
 	_, err = loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
 	if err == nil || !strings.Contains(err.Error(), "unzip size exceeds") {
 		t.Errorf("err = %v, want the workbook refused for its unpacked size", err)
+	}
+}
+
+// excelize writes a part over the XML limit to a temp file before the open
+// can fail on the rest; a refused workbook leaves nothing on disk.
+func TestLoadXlsxLeavesNoTempFileWhenRefused(t *testing.T) {
+	quietUploadLog(t)
+	dir := t.TempDir()
+	t.Setenv("TMPDIR", dir)
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create("xl/worksheets/sheet1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.CopyN(w, zeros{}, xlsxUnzipXMLSizeLimit+1); err != nil {
+		t.Fatal(err)
+	}
+	w, err = zw.Create("xl/workbook.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("<workbook><sheets><sheet")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = loadXlsx(newUploadParser(backend()), &buf, uploadRowLimit)
+	if err == nil {
+		t.Fatal("loadXlsx read a workbook with a broken workbook.xml")
+	}
+	left, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 0 {
+		t.Errorf("left %d entries in the temp dir, want none: %v", len(left), left)
 	}
 }
 
