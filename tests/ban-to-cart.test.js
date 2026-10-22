@@ -911,6 +911,51 @@ describe('ban-to-cart bookmarklet on Card Trader', () => {
         expect(posts[1].ids).toEqual([1]);
     });
 
+    test('a refusal partway says what was added and leaves only the rest on the page, so a retry adds nothing twice', async () => {
+        const ct = fakeCT({listings: [listing(1, 14, {qty: 9})]});
+        const fetch = ct.fetch;
+        let adds = 0;
+        ct.fetch = async (url, opts) => (url.includes('/cart/add.json') && ++adds === 2 ? {ok: false, status: 503} : fetch(url, opts));
+        const rows = [ctID('14EUR', 'z') + ':1', ctID('15EUR', 'z') + ':2', ctID('16EUR', 'z') + ':1'];
+        const {alerts, page} = await run({...cartPage, hash: '#ban=' + rows.join(',') + '&side=retail', abu: ct});
+        expect(alerts).toEqual(['Card Trader refused the list (503). Added 1 cards to your Card Trader cart, on top of what it held. ' +
+            'The other 2 were not added, and this page now holds only those: click BAN-to-Cart again to load them.']);
+        expect(page.url).toBe('/it-IT/cart/edit#ban=' + encodeURIComponent(rows.slice(1).join(',')) + '&side=retail&v=test');
+        expect(page.reloaded).toBe(false);
+
+        const retry = fakeCT({listings: [listing(1, 14, {qty: 9})]});
+        const again = await run({...cartPage, hash: page.url.slice(page.url.indexOf('#')).replace('&v=test', ''), abu: retry});
+        expect(retry.posts.filter((p) => p.ids).map((p) => p.quantity)).toEqual([2, 1]);
+        expect(again.alerts).toEqual(['Added 2 cards to your Card Trader cart, on top of what it held.']);
+    });
+
+    test('a refusal before anything was added leaves the list as it was', async () => {
+        const ct = fakeCT({listings: [listing(1, 14, {qty: 9})]});
+        ct.fetch = async () => ({ok: false, status: 503});
+        const {alerts, page} = await run({...cartPage, hash: '#ban=' + ctID('14EUR', 'z') + ':1&side=retail', abu: ct});
+        expect(alerts).toEqual(['Card Trader refused the list (503).']);
+        expect(page.url).toBe(null);
+    });
+
+    test('a refusal after rows that added nothing leaves the list as it was', async () => {
+        const ct = fakeCT({listings: [listing(1, 14, {qty: 9})]});
+        ct.fetch = async (url, opts) => (url.includes('/cart/add.json') ? {ok: false, status: 503} : fakeCT({listings: [listing(1, 14, {qty: 9})]}).fetch(url, opts));
+        const rows = [ctID('10EUR', 'z') + ':1', ctID('14EUR', 'z') + ':1'];
+        const {alerts, page} = await run({...cartPage, hash: '#ban=' + rows.join(',') + '&side=retail', abu: ct});
+        expect(alerts).toEqual(['Card Trader refused the list (503).']);
+        expect(page.url).toBe(null);
+    });
+
+    test('a refusal partway still counts the pairs that did not read', async () => {
+        const ct = fakeCT({listings: [listing(1, 14, {qty: 9})]});
+        const fetch = ct.fetch;
+        let adds = 0;
+        ct.fetch = async (url, opts) => (url.includes('/cart/add.json') && ++adds === 2 ? {ok: false, status: 503} : fetch(url, opts));
+        const rows = [ctID('14EUR', 'z') + ':1', ctID('15EUR', 'z') + ':2'];
+        const {alerts} = await run({...cartPage, hash: '#ban=' + rows.join(',') + ',a.b:2&side=retail', abu: ct});
+        expect(alerts[0]).toEndWith('click BAN-to-Cart again to load them. 1 in the list from BAN could not be read and were left out.');
+    });
+
     test('two tabs loading at once take turns', async () => {
         const ct = fakeCT({listings: [listing(1, 14, {qty: 9})]});
         const locks = fakeLocks();

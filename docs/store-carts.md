@@ -408,6 +408,10 @@ POST /<locale>/cart/add.json?quantity=3&product_ids[]=387303611&product_ids[]=44
   the whole cart. It is not told what the cart holds, so a load adds to it,
   and two tabs take turns on `ban-to-cart-ct`. `future_order=1` is what the
   card page's own buttons send.
+- A call refused partway stops the load. The report says what was added
+  before it, and the fragment keeps only the rows from the refused one
+  on, so clicking the loader again on the same page adds the rest and
+  nothing twice; BAN's button would open the whole list again.
 - The cart is kept by Card Trader's session cookie, guests included; the
   page's `csrf-token` goes with each call as `X-CSRF-Token`, and
   `DELETE /<locale>/cart_items/<id>.json` removes a line.
@@ -668,7 +672,8 @@ On SCG it then uploads the list as one CSV, says what BAN left out of it,
 if anything, and opens SCG's review of it.
 On Card Trader it reads each card's live listings in the row's storefront,
 grade, language and finish, hands every one at or under BAN's price to
-Card Trader's add, says what it cut and left out, and reloads the cart.
+Card Trader's add, says what it cut and left out, and reloads the cart;
+stopped partway, it says what it added and leaves only the rest on the page.
 On Mana Pool it asks the optimizer for the list, again with the cards it
 has fewer of cut to that and the ones it has none of left out, adds the
 listings it answers with to the cart, says what it cut and left out, and

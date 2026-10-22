@@ -976,6 +976,16 @@
                 var added = 0;
                 var cut = 0;
                 var none = 0;
+                function report() {
+                    var message = "Added " + added + " cards to your Card Trader cart, on top of what it held.";
+                    if (cut > 0) {
+                        message += " " + cut + " were cut to the copies Card Trader has at or under BAN's price.";
+                    }
+                    if (none > 0) {
+                        message += " " + none + " that Card Trader has none of at or under BAN's price were left out.";
+                    }
+                    return message;
+                }
                 try {
                     for (var i = 0; i < rows.length; i++) {
                         banner.textContent = "BAN: loading cards into your Card Trader cart, " + i + " of " +
@@ -1002,18 +1012,24 @@
                             cut++;
                         }
                     }
+                } catch (err) {
+                    if (added === 0) {
+                        throw err;
+                    }
+                    // A second load of the whole list would add the cards
+                    // before this one again, so the page keeps only the rest
+                    var rest = rows.slice(i);
+                    history.replaceState(null, "", location.pathname + location.search + location.hash.replace(/([#&]ban=)[^&]*/,
+                        "$1" + encodeURIComponent(rest.map(function (id) {
+                            return id + ":" + qty[id];
+                        }).join(","))));
+                    throw new Error(err.message + " " + report() + " The other " + rest.length +
+                        " were not added, and this page now holds only those: click BAN-to-Cart again to load them." + leftOut());
                 } finally {
                     release();
                 }
-                var message = "Added " + added + " cards to your Card Trader cart, on top of what it held.";
-                if (cut > 0) {
-                    message += " " + cut + " were cut to the copies Card Trader has at or under BAN's price.";
-                }
-                if (none > 0) {
-                    message += " " + none + " that Card Trader has none of at or under BAN's price were left out.";
-                }
                 window.removeEventListener("beforeunload", stay);
-                alert(message + leftOut());
+                alert(report() + leftOut());
                 history.replaceState(null, "", location.pathname + location.search);
                 location.reload();
             }
