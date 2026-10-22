@@ -130,5 +130,10 @@ func Load(r io.Reader) (map[string]Entry, *Category, error) {
 			}
 		}
 	}
+	// More is false on a read error as at the closing brace, so read the
+	// brace: a download cut off mid-stream must not load as a short catalog.
+	if _, err := dec.Token(); err != nil {
+		return nil, nil, fmt.Errorf("catalog truncated: %w", err)
+	}
 	return products, &category, nil
 }
