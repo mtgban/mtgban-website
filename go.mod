@@ -17,7 +17,7 @@ require (
 	github.com/mtgban/go-cardmarket v0.5.0
 	github.com/mtgban/go-mtgban v0.11.0
 	github.com/mtgban/simplecloud v0.1.1
-	github.com/richardlehane/mscfb v1.0.8
+	github.com/richardlehane/mscfb v1.0.9
 	github.com/xuri/excelize/v2 v2.11.1-0.20261020033641-611b222fd8f7
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
