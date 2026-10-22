@@ -35,12 +35,12 @@ func TestServePricesCanonicalSetCode(t *testing.T) {
 	s.deps.CanonicalSetCode = func(b *mtgmatcher.Backend, code string) (string, error) {
 		return "NEO", nil
 	}
-	s.deps.BuildSetPayload = func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error) {
+	s.deps.BuildSetPayload = func(b *mtgmatcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error) {
 		gotCode = setCode
 		return &offline.SetPayload{SetCode: setCode, Snapshot: time.Now()}, nil
 	}
 	s.deps.WatermarkSecret = func() []byte { return nil }
-	s.deps.EnabledStores = func() []string { return nil }
+	s.deps.EnabledStores = func() (sellers, vendors []string) { return nil, nil }
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/offline/prices/neo.bin", nil)

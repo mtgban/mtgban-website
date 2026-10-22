@@ -94,14 +94,14 @@ func newSite() *site {
 			return set.Code, nil
 		},
 
-		BuildSetPayload: func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error) {
+		BuildSetPayload: func(b *mtgmatcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error) {
 			set, err := b.GetSet(setCode)
 			if err != nil {
 				return nil, err
 			}
-			retail := getSellerPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
-			buylist := getVendorPrices(b, "", stores, set.Code, nil, "", true, true, false, "")
-			for id, m := range getSellerPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
+			retail := getSellerPrices(b, "", sellers, set.Code, nil, "", true, true, false, "")
+			buylist := getVendorPrices(b, "", vendors, set.Code, nil, "", true, true, false, "")
+			for id, m := range getSellerPrices(b, "", sellers, set.Code, nil, "", true, true, true, "") {
 				if retail[id] == nil {
 					retail[id] = m
 					continue
@@ -110,7 +110,7 @@ func newSite() *site {
 					retail[id][store] = entry
 				}
 			}
-			for id, m := range getVendorPrices(b, "", stores, set.Code, nil, "", true, true, true, "") {
+			for id, m := range getVendorPrices(b, "", vendors, set.Code, nil, "", true, true, true, "") {
 				if buylist[id] == nil {
 					buylist[id] = m
 					continue
@@ -122,22 +122,21 @@ func newSite() *site {
 			return banprice2offline(set.Code, time.Now().UTC(), retail, buylist), nil
 		},
 
-		EnabledStores: func() []string {
-			var all []string
+		EnabledStores: func() (sellers, vendors []string) {
 			retailBlock, buylistBlock := Config().siteRetailBlockList(), Config().siteBuylistBlockList()
 			for _, seller := range GetSellers() {
 				shorthand := seller.Info().Shorthand
-				if !slices.Contains(retailBlock, shorthand) && !slices.Contains(all, shorthand) {
-					all = append(all, shorthand)
+				if !slices.Contains(retailBlock, shorthand) && !slices.Contains(sellers, shorthand) {
+					sellers = append(sellers, shorthand)
 				}
 			}
 			for _, vendor := range GetVendors() {
 				shorthand := vendor.Info().Shorthand
-				if !slices.Contains(buylistBlock, shorthand) && !slices.Contains(all, shorthand) {
-					all = append(all, shorthand)
+				if !slices.Contains(buylistBlock, shorthand) && !slices.Contains(vendors, shorthand) {
+					vendors = append(vendors, shorthand)
 				}
 			}
-			return all
+			return sellers, vendors
 		},
 
 		Sellers: GetSellers,

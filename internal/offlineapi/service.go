@@ -33,12 +33,15 @@ type Deps struct {
 	// unknown. Main provides this by wrapping b.GetSet.
 	CanonicalSetCode func(b *mtgmatcher.Backend, setCode string) (string, error)
 
-	// BuildSetPayload gathers and converts one set's prices for the given
-	// store subset, matched against b (main owns BanPrice and the getters).
-	BuildSetPayload func(b *mtgmatcher.Backend, setCode string, stores []string) (*offline.SetPayload, error)
+	// BuildSetPayload gathers and converts one set's prices, retail from
+	// the given sellers and buylist from the given vendors, matched against
+	// b (main owns BanPrice and the getters).
+	BuildSetPayload func(b *mtgmatcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error)
 
-	// EnabledStores returns all non-blocklisted seller+vendor shorthands.
-	EnabledStores func() []string
+	// EnabledStores returns the non-blocklisted shorthands of each side:
+	// the sellers not on the retail block list and the vendors not on the
+	// buylist one, so a store blocked on one side still ships on the other.
+	EnabledStores func() (sellers, vendors []string)
 
 	Sellers func() []mtgban.Seller
 	Vendors func() []mtgban.Vendor

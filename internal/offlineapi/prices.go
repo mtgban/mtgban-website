@@ -11,17 +11,23 @@ import (
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
-// enabledStores intersects the optional stores param with every store
-// the site's block lists leave on either side, as one list for both.
-func (s *Service) enabledStores(r *http.Request) []string {
-	all := s.deps.EnabledStores()
+// enabledStores narrows each side's non-blocklisted stores to the optional
+// stores param, mirroring PriceAPI's ALL_ACCESS branch.
+func (s *Service) enabledStores(r *http.Request) (sellers, vendors []string) {
+	sellers, vendors = s.deps.EnabledStores()
 	filter := r.FormValue("stores")
 	if filter == "" {
-		return all
+		return sellers, vendors
 	}
+	picked := strings.Split(filter, ",")
+	return pickStores(sellers, picked), pickStores(vendors, picked)
+}
+
+// pickStores keeps the enabled stores that picked names, in picked's order.
+func pickStores(enabled, picked []string) []string {
 	var out []string
-	for _, shorthand := range strings.Split(filter, ",") {
-		if slices.Contains(all, shorthand) {
+	for _, shorthand := range picked {
+		if slices.Contains(enabled, shorthand) {
 			out = append(out, shorthand)
 		}
 	}
@@ -41,9 +47,9 @@ func (s *Service) servePrices(w http.ResponseWriter, r *http.Request, email, res
 	}
 	setCode = canonCode
 
-	stores := s.enabledStores(r)
+	sellers, vendors := s.enabledStores(r)
 
-	payload, err := s.deps.BuildSetPayload(b, setCode, stores)
+	payload, err := s.deps.BuildSetPayload(b, setCode, sellers, vendors)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
