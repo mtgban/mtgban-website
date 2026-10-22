@@ -4,6 +4,9 @@ import { join } from 'path';
 
 const source = readFileSync(join(import.meta.dir, '..', 'js', 'mobile-chart.js'), 'utf8');
 const cookies = readFileSync(join(import.meta.dir, '..', 'js', 'cookies.js'), 'utf8');
+// mobile/search.html loads utils.js, with the escapeHtml the legend writes
+// names with, in its head
+const utils = readFileSync(join(import.meta.dir, '..', 'js', 'utils.js'), 'utf8');
 
 // openDrawer evaluates mobile-chart.js against a stubbed page, opens the chart
 // drawer on one card, and reports every url it fetched, every chart it drew and
@@ -72,7 +75,7 @@ async function openDrawer(answer, cookie = '') {
     const localStorage = { getItem: () => null, setItem() {} };
     const console = { error: (err) => errors.push(err) };
 
-    new Function('window', 'document', 'localStorage', 'fetch', 'Chart', 'console', cookies + '\n' + source)(
+    new Function('window', 'document', 'localStorage', 'fetch', 'Chart', 'console', utils + '\n' + cookies + '\n' + source)(
         window, document, localStorage, fetch, Chart, console);
     window.showChartDrawer('ban:1', false, 'Black Lotus');
     await new Promise((done) => setTimeout(done, 0));
@@ -380,4 +383,15 @@ test('a store hidden on an earlier card stays hidden through a tap on another', 
 
     drawer.legend.buttons[1].tap();
     expect(saved(drawer)).toBe(hiding(BUYLIST));
+});
+
+test('a store name is written into the legend as text', async () => {
+    const name = '<img src=x onerror=alert(1)>';
+    const { legend } = await openDrawer((range) => ({
+        ...priced(range),
+        datasets: [{ name, data: [2, null], color: 'rgb(1, 2, 3)' }],
+    }));
+
+    expect(legend.innerHTML).not.toContain('<img');
+    expect(legend.innerHTML).toContain('&lt;img src=x onerror=alert(1)&gt;</button>');
 });

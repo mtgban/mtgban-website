@@ -348,7 +348,7 @@
             var visible = chart.isDatasetVisible(i);
             html += '<button class="m-chart-legend-item' + (visible ? '' : ' hidden') + '" data-index="' + i + '" style="border-color:' + ds.color + '">';
             html += '<span class="m-chart-legend-dot" style="background:' + ds.color + '"></span>';
-            html += shortName(ds.name);
+            html += escapeHtml(shortName(ds.name));
             html += '</button>';
         });
         container.innerHTML = html;
