@@ -277,8 +277,7 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 				v.Set("msg", "Scheduling a refresh for "+refresh+" in the background...")
 			}
 		}
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		localRedirect(w, r, r.URL.Path, v)
 		return true
 	}
 	reload := r.PostFormValue("reload")
@@ -292,8 +291,7 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		} else {
 			s.pokeAlerts(table)
 		}
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		localRedirect(w, r, r.URL.Path, v)
 		return true
 	}
 
@@ -305,8 +303,7 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		if err != nil {
 			v.Set("msg", "remove of "+removeStore+" error: "+err.Error())
 		}
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		localRedirect(w, r, r.URL.Path, v)
 		return true
 	}
 
@@ -478,8 +475,7 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request) bool {
 		v.Set("html", "invite")
 	}
 	if redirect {
-		r.URL.RawQuery = v.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		localRedirect(w, r, r.URL.Path, v)
 		return true
 	}
 	return false
