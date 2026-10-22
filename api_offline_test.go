@@ -1,12 +1,18 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
 func offlineTestSig(email, offlineFlag string) string {
@@ -74,6 +80,75 @@ func TestOfflineModeReadsOneCheckedSignature(t *testing.T) {
 		email, ok := offlineModeAllowed(r)
 		if ok != tc.want || (ok && email != "a@b.c") {
 			t.Errorf("%s: got (%q, %v), want %v", tc.name, email, ok, tc.want)
+		}
+	}
+}
+
+// A store that sells and buys under one shorthand and is blocked on one side
+// only ships in the offline payload on its other side alone.
+func TestOfflinePricesBlockOneSide(t *testing.T) {
+	withSigMode(t, true, false)
+	withConfigCopy(t)
+	Config().Stores.SearchRetailBlockList = []string{"NORETAIL"}
+	Config().Stores.SearchBuylistBlockList = []string{"NOBUYLIST"}
+
+	s := newSite()
+	s.ds.Store(s.newDatastore(fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01",
+		[][2]string{{"Fixture Card Alpha", "1"}}), time.Now()))
+	const cardID = "FIXTUREA-1"
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+	var sellers []mtgban.Seller
+	var vendors []mtgban.Vendor
+	for _, shorthand := range []string{"NORETAIL", "NOBUYLIST"} {
+		inv := mtgban.InventoryRecord{}
+		inv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 1, URL: "u"})
+		sellers = append(sellers, mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand}))
+		bl := mtgban.BuylistRecord{}
+		bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 1, URL: "u"})
+		vendors = append(vendors, mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{Name: shorthand, Shorthand: shorthand}))
+	}
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&vendors)
+
+	for _, tc := range []struct {
+		query           string
+		retail, buylist []string
+	}{
+		{"", []string{"NOBUYLIST"}, []string{"NORETAIL"}},
+		{"?stores=NORETAIL,NOBUYLIST", []string{"NOBUYLIST"}, []string{"NORETAIL"}},
+		// The one store picked is blocked on buylist, which leaves that side empty.
+		{"?stores=NOBUYLIST", []string{"NOBUYLIST"}, nil},
+	} {
+		target := "/api/offline/prices/FIXTUREA.bin" + tc.query
+		w := httptest.NewRecorder()
+		s.offline.Handle(w, httptest.NewRequest(http.MethodGet, target, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: status %d", target, w.Code)
+		}
+		gr, err := gzip.NewReader(w.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(gr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, err := offline.Decode(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, shorthand := range []string{"NORETAIL", "NOBUYLIST"} {
+			_, retail := payload.Retail[cardID][shorthand]
+			_, buylist := payload.Buylist[cardID][shorthand]
+			if retail != slices.Contains(tc.retail, shorthand) || buylist != slices.Contains(tc.buylist, shorthand) {
+				t.Errorf("%s: %s in retail %v, buylist %v", target, shorthand, retail, buylist)
+			}
 		}
 	}
 }
