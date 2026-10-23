@@ -27,6 +27,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
@@ -771,7 +772,7 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 	// is a url we cannot speak for, so it gets the same answer as a page
 	// that carries no search at all.
 	u, err := url.Parse(r.FormValue("url"))
-	if err != nil || !trustedHostname(u.Host) {
+	if err != nil || !siteorigin.Trusted(u.Host) {
 		oembedError(w, http.StatusNotFound)
 		return
 	}

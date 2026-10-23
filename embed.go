@@ -9,6 +9,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
 
 // Aliases so the search/discord code keeps its historical names.
@@ -157,7 +158,7 @@ func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[st
 // Background work has no request from which to derive an origin, so it uses
 // the public default; HTTP handlers pass their request through here.
 func externalURL(r *http.Request) string {
-	if origin := requestOrigin(r); origin != "" {
+	if origin := siteorigin.Of(r); origin != "" {
 		return origin
 	}
 	// Background jobs do not have a deployment request to identify a game
@@ -166,7 +167,7 @@ func externalURL(r *http.Request) string {
 }
 
 func absoluteURL(r *http.Request, path string) string {
-	if origin := requestOrigin(r); origin != "" {
+	if origin := siteorigin.Of(r); origin != "" {
 		return origin + path
 	}
 	// Do not invent a default host for an untrusted ingress: it could point a

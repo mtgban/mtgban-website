@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -421,7 +422,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	expires, _ := strconv.ParseInt(sigParams.Get("Expires"), 10, 64)
 	msg := ""
 	showPatreonLogin := false
-	origin := requestOrigin(r)
+	origin := siteorigin.Of(r)
 	cookie := ""
 	if r != nil {
 		cookie = readCookie(r, "MTGBAN")

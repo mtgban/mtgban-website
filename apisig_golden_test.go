@@ -29,45 +29,6 @@ const (
 	goldenSigNoExpiry  = "MmcFVf0N2PrK3o8zk9O5YdDqz4g="
 )
 
-func TestRequestOrigin(t *testing.T) {
-	tests := []struct {
-		name, host, proto, want string
-	}{
-		{"forwarded", "onepiece.mtgban.com", "https", "https://onepiece.mtgban.com"},
-		{"forwarded first hop", "onepiece.mtgban.com, attacker.example", "https, http", "https://onepiece.mtgban.com"},
-		{"port", "magic.mtgban.com:8080", "", "http://magic.mtgban.com:8080"},
-		{"untrusted", "attacker.example", "https", ""},
-		{"malformed trusted suffix", "junk onepiece.mtgban.com", "https", ""},
-		{"invalid port", "onepiece.mtgban.com:port", "https", ""},
-		{"invalid proto", "onepiece.mtgban.com", "ftp", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Host = tt.host
-			if tt.proto != "" {
-				req.Header.Set("X-Forwarded-Proto", tt.proto)
-			}
-			if strings.Contains(tt.host, ",") {
-				req.Header.Set("X-Forwarded-Host", tt.host)
-				req.Host = "internal:8080"
-			}
-			if got := requestOrigin(req); got != tt.want {
-				t.Fatalf("requestOrigin = %q, want %q", got, tt.want)
-			}
-		})
-	}
-
-	if got := requestOrigin(nil); got != "" {
-		t.Fatalf("requestOrigin(nil) = %q, want empty", got)
-	}
-
-	req := httptest.NewRequest("GET", "https://onepiece.mtgban.com/", nil)
-	if got := requestOrigin(req); got != "https://onepiece.mtgban.com" {
-		t.Fatalf("host-only HTTPS requestOrigin = %q, want https://onepiece.mtgban.com", got)
-	}
-}
-
 func TestIsSecureRequestRequiresTrustedHost(t *testing.T) {
 	for _, tt := range []struct {
 		name, host, proto string

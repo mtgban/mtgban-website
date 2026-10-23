@@ -15,6 +15,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apiproductlist"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
 
 // apiProducts is the embedded price list, validated by its own package tests.
@@ -127,7 +128,7 @@ func APIStores(w http.ResponseWriter, r *http.Request) {
 
 // apiPlansVars gathers what the page and its configurator need.
 func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
-	origin := requestOrigin(r)
+	origin := siteorigin.Of(r)
 	if origin == "" {
 		origin = DefaultExternalURL
 	}

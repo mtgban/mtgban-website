@@ -25,6 +25,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
 
 // externalUUID resolves an outside identifier without knowing which id space
@@ -1503,7 +1504,7 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 // that label is "mtgban". When the request's origin is not a trusted host it
 // returns no domain and global false, so the cookie stays host-only.
 func cookieDomain(r *http.Request) (domain string, global bool) {
-	origin := requestOrigin(r)
+	origin := siteorigin.Of(r)
 	u, err := url.Parse(origin)
 	if err != nil || u.Hostname() == "" {
 		// Untrusted hosts, including httptest's example.com and a platform's
@@ -1562,13 +1563,13 @@ func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
 // isSecureRequest reports whether the request reached us over HTTPS,
 // accounting for a TLS-terminating proxy that sets X-Forwarded-Proto.
 func isSecureRequest(r *http.Request) bool {
-	if r == nil || !trustedHostname(requestHost(r)) {
+	if r == nil || !siteorigin.Trusted(siteorigin.Host(r)) {
 		return false
 	}
 	if r.TLS != nil {
 		return true
 	}
-	return firstForwardedValue(r.Header.Get("X-Forwarded-Proto")) == "https"
+	return siteorigin.FirstForwarded(r.Header.Get("X-Forwarded-Proto")) == "https"
 }
 
 // dataReady reports whether the datastore and scrapers are loaded enough to
