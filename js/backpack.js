@@ -7,6 +7,8 @@
     var KEY = "mtgban_backpack";
     var EMPTY_AFTER_KEY = "mtgban_backpack_empty_after";
     var PENDING_KEY = "mtgban_backpack_pending_clear";
+    var UNDO_KEY = "mtgban_backpack_undo";
+    var UNDO_MAX = 20;
     // The reader's tier sets the size; the page's base template hands it over.
     var MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 200;
     var MAX_QTY = 999;
@@ -45,6 +47,57 @@
         setTimeout(function () { t.classList.remove("show"); }, 2000);
     }
 
+    // ---- undo ----
+
+    // The tab's undo steps, oldest first: each holds the cards one change
+    // touched as they were before it, {id, gone: true} for one not in.
+    function undoSteps() {
+        try {
+            var s = JSON.parse(sessionStorage.getItem(UNDO_KEY) || "[]");
+            return Array.isArray(s) ? s : [];
+        } catch (e) { return []; }
+    }
+    function saveUndoSteps(steps) {
+        try { sessionStorage.setItem(UNDO_KEY, JSON.stringify(steps.slice(-UNDO_MAX))); } catch (e) {}
+    }
+
+    // remember records the cards ids name in list before a change to them.
+    function remember(list, ids) {
+        var step = ids.map(function (id) {
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].id === id && !list[i].del) return JSON.parse(JSON.stringify(list[i]));
+            }
+            return { id: id, gone: true };
+        });
+        var steps = undoSteps();
+        steps.push(step);
+        saveUndoSteps(steps);
+    }
+
+    // undo puts back the cards the last change touched, stamped now so the
+    // sync merge keeps them over what that change wrote.
+    function undo() {
+        var steps = undoSteps();
+        var step = steps.pop();
+        if (!step) return false;
+        saveUndoSteps(steps);
+        var list = read();
+        var t = now();
+        step.forEach(function (was) {
+            var idx = -1;
+            for (var i = 0; i < list.length; i++) { if (list[i].id === was.id) { idx = i; break; } }
+            if (was.gone) {
+                if (idx >= 0 && !list[idx].del) { list[idx].del = t; list[idx].m = t; }
+                return;
+            }
+            if (idx >= 0) list.splice(idx, 1);
+            was.m = t;
+            list.unshift(was);
+        });
+        save(list);
+        return true;
+    }
+
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one card"); }
 
     // toggleCard takes the row's card out when it is in, else puts one copy in;
@@ -56,10 +109,12 @@
         var idx = -1;
         for (var i = 0; i < list.length; i++) { if (list[i].id === data.id) { idx = i; break; } }
         if (idx >= 0 && !list[idx].del) {
+            remember(list, [data.id]);
             list[idx].del = t;
             list[idx].m = t;
         } else {
             if (live().length >= MAX) { toast("Backpack is full (" + MAX + " cards)"); return false; }
+            remember(list, [data.id]);
             if (idx >= 0) list.splice(idx, 1);
             list.unshift({
                 id: data.id, name: data.name || "", edition: data.edition || "", set: data.set || "",
@@ -76,12 +131,11 @@
         var t = now();
         for (var i = 0; i < list.length; i++) {
             if (list[i].id !== id || list[i].del) continue;
+            var next = Math.min(MAX_QTY, qty);
+            if (qty >= 1 && next === list[i].qty) { if (qty > MAX_QTY) toastCeiling(); return; }
+            remember(list, [id]);
             if (qty < 1) { list[i].del = t; list[i].m = t; }
-            else {
-                var next = Math.min(MAX_QTY, qty);
-                if (next === list[i].qty) { if (qty > MAX_QTY) toastCeiling(); return; }
-                list[i].qty = next; list[i].m = t;
-            }
+            else { list[i].qty = next; list[i].m = t; }
         }
         save(list);
     }
@@ -92,7 +146,10 @@
     function clear(ids) {
         var list = read();
         var t = now();
-        list.forEach(function (e) { if (!e.del && (!ids || ids.indexOf(e.id) !== -1)) { e.del = t; e.m = t; } });
+        var gone = list.filter(function (e) { return !e.del && (!ids || ids.indexOf(e.id) !== -1); });
+        if (!gone.length) return;
+        remember(list, gone.map(function (e) { return e.id; }));
+        gone.forEach(function (e) { e.del = t; e.m = t; });
         save(list);
     }
 
@@ -196,7 +253,7 @@
     // ---- the panel ----
 
     var panel = null, overlay = null, listEl = null, countEl = null, emptyEl = null;
-    var sendRetail = null, sendBuylist = null, emptySwitch = null;
+    var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null;
 
     function text(tag, cls, s) {
         var n = document.createElement(tag);
@@ -253,6 +310,10 @@
         label.append(emptySwitch, text("span", null, "Empty the backpack after sending"));
 
         var actions = text("div", "backpack-actions");
+        undoBtn = text("button", "backpack-btn backpack-btn-plain", "Undo");
+        undoBtn.setAttribute("id", "backpack-undo");
+        undoBtn.setAttribute("type", "button");
+        undoBtn.addEventListener("click", function () { if (undo()) render(); });
         var clearBtn = text("button", "backpack-btn backpack-btn-plain", "Clear");
         clearBtn.setAttribute("id", "backpack-clear");
         clearBtn.setAttribute("type", "button");
@@ -271,7 +332,7 @@
         sendBuylist.setAttribute("id", "backpack-send-buylist");
         sendBuylist.setAttribute("type", "button");
         sendBuylist.addEventListener("click", function () { send("buylist"); });
-        actions.append(clearBtn, sendRetail, sendBuylist);
+        actions.append(undoBtn, clearBtn, sendRetail, sendBuylist);
         if (!canUpload()) {
             sendRetail.setAttribute("title", "Upload needs a higher tier");
             sendBuylist.setAttribute("title", "Upload needs a higher tier");
@@ -334,6 +395,7 @@
         emptyEl.hidden = entries.length > 0;
         sendRetail.disabled = entries.length === 0 || !canUpload();
         sendBuylist.disabled = entries.length === 0 || !canUpload();
+        undoBtn.disabled = undoSteps().length === 0;
     }
 
     function render() {
@@ -389,7 +451,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, toggleCard: toggleCard, setQty: setQty, remove: remove, clear: clear, sendForm: sendForm, count: count, open: open, close: close };
+    window.Backpack = { read: read, toggleCard: toggleCard, setQty: setQty, remove: remove, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");
