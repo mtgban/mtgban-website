@@ -371,6 +371,8 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 	// until writeGrace past the deadline, and Deliver stops at the deadline.
 	wctx, cancel := writeContext(ctx)
 	defer cancel()
+	// timedOut reports the run deadline once, not once per firing it cut.
+	timedOut := false
 	for _, k := range order {
 		dg := digests[k]
 		dg.Others = othersFor(byUser[k.user], dg, stopped)
@@ -391,12 +393,22 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 				sum.skipped++
 				sum.deferred++
 				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "daily email limit reached, will retry"})
+			case errors.Is(res.Err, errNotAttempted):
+				// Never attempted, the run ran out of time: re-armed as read
+				// with no fire time, so the next run sends it at once.
+				if !timedOut {
+					timedOut = true
+					sum.fail(deps, "deliver", res.Err)
+				}
+				sum.skipped++
+				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "run ran out of time, will retry"})
 			case isPermanent(res.Err):
 				deps.logf("alerts: %d refused: %v", id, res.Err)
 				setState(wctx, deps, &sum, rows[id], State{Status: StatusUndeliverable, AboveArmed: f.Decision.AboveArmed, BelowArmed: f.Decision.BelowArmed, LastError: permanentReason(res.Err)})
 			default:
 				sum.fail(deps, fmt.Sprintf("send %d", id), res.Err)
-				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "delivery failed, will retry"})
+				// Re-armed with the fire time stamped: the send gap is the backoff.
+				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "delivery failed, will retry", LastFiredAt: &now})
 			}
 		}
 	}
