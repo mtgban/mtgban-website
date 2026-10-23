@@ -18,6 +18,16 @@ func TestBestStorePrice(t *testing.T) {
 	if !ok || best != 12 {
 		t.Fatalf("scoped best = %v %v", best, ok)
 	}
+	// A picked-only store counts only for an alert that names it.
+	withNet := append(slices.Clone(buylist), StorePrice{Shorthand: "TCGDirectNet", Prices: map[string]float64{"NM": 20}, PickedOnly: true})
+	best, store, _ = bestStorePrice(withNet, SideBuylist, "NM", nil)
+	if best != 14 || store != "SCG" {
+		t.Fatalf("unscoped best = %v %s, want the picked-only store left out", best, store)
+	}
+	best, store, _ = bestStorePrice(withNet, SideBuylist, "NM", []string{"tcgdirectnet"})
+	if best != 20 || store != "TCGDirectNet" {
+		t.Fatalf("named best = %v %s, want the picked-only store", best, store)
+	}
 	_, _, ok = bestStorePrice(buylist, SideBuylist, "PO", nil)
 	if ok {
 		t.Fatal("no PO offer should report ok")

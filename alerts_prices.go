@@ -9,6 +9,11 @@ import (
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
 
+// alertPickedOnlyStores are watched only by an alert that names them.
+// TCGDirectNet is what a card nets sold through TCGplayer Direct, not an
+// offer to buy it, so an alert on every buylist leaves it out.
+var alertPickedOnlyStores = []string{"TCGDirectNet"}
+
 // alertStorePrices lists every non-index store of the card's kind (sealed
 // or singles) outside the blocklist, so an alert can watch a store not
 // offering the card yet; those carry no prices. Quantity is not asked:
@@ -28,7 +33,10 @@ func alertStorePrices(cardID string, sealed bool, side alerts.Side, blocklist []
 				}
 			}
 		}
-		out = append(out, alerts.StorePrice{Shorthand: info.Shorthand, Name: scraperName(info.Shorthand), Prices: prices})
+		out = append(out, alerts.StorePrice{
+			Shorthand: info.Shorthand, Name: scraperName(info.Shorthand), Prices: prices,
+			PickedOnly: slices.Contains(alertPickedOnlyStores, info.Shorthand),
+		})
 	}
 	if side == alerts.SideRetail {
 		for _, seller := range GetSellers() {

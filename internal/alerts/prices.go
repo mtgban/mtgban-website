@@ -11,16 +11,28 @@ type StorePrice struct {
 	Shorthand string             `json:"shorthand"`
 	Name      string             `json:"name"`
 	Prices    map[string]float64 `json:"prices"`
+	// PickedOnly is a store an alert watches only when it names it, not
+	// when it watches every store.
+	PickedOnly bool `json:"picked_only,omitempty"`
+}
+
+// inScope says whether an alert scoped to scope watches p: the stores it
+// names, or with none named every store but the picked-only ones.
+func inScope(p StorePrice, scope []string) bool {
+	if len(scope) == 0 {
+		return !p.PickedOnly
+	}
+	return slices.ContainsFunc(scope, func(s string) bool { return strings.EqualFold(s, p.Shorthand) })
 }
 
 // bestStorePrice is the highest buylist or lowest retail offer in the
-// condition, among the scoped stores (every store when scope is empty).
+// condition, among the stores in scope.
 func bestStorePrice(prices []StorePrice, side Side, condition string, scope []string) (float64, string, bool) {
 	var best float64
 	var store string
 	found := false
 	for _, p := range prices {
-		if len(scope) > 0 && !slices.ContainsFunc(scope, func(s string) bool { return strings.EqualFold(s, p.Shorthand) }) {
+		if !inScope(p, scope) {
 			continue
 		}
 		price, ok := p.Prices[condition]
