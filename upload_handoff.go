@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -8,48 +9,46 @@ import (
 	"strings"
 )
 
-// HandoffOrigins are the sites allowed to hand a card list to the upload
-// page. A browser extension reading a storefront cannot post the list here
-// itself: the upload needs the session, this cookie is same-site, and a
-// request made from another origin arrives without it. What it can do is open
-// this page - a normal top-level navigation, so the session comes along - and
-// pass the rows to it window to window.
+// handoffOrigins returns the sites allowed to hand a card list to the upload
+// page, each with the name its results are headed with, from the
+// infrastructure file's handoff_origins.
 //
-// This page is what receives them. It exists so an extension does not have to
-// drive the upload form itself, reaching into a picker and pressing a button
-// that were built for a person: the shape of that form is ours to change, and
-// anything outside this repository copying it would break the next time it
-// did.
+// A site opening the page cannot post the list to /upload itself: the upload
+// needs the session, this cookie is same-site, and a request made from another
+// origin arrives without it. What it can do is open this page - a normal
+// top-level navigation, so the session comes along - and pass the rows to it
+// window to window. That keeps the shape of the upload form ours to change.
 //
 // What an origin here is granted is narrow but real: it can cause a card list
 // of its choosing to be priced in the session of whoever opened the page, and
 // the answer is what they are shown. The rows are submitted as soon as they
 // arrive - there is no step where they are looked over first - so an allowed
-// origin decides what gets valued, not what it is worth.
+// origin decides what gets valued, not what it is worth. Nothing beyond that:
+// the page does not read the session, does not answer with what it holds, and
+// changes nothing that outlasts the request.
 //
-// Nothing beyond that. The page does not read the session, does not answer
-// with what it holds, and changes nothing that outlasts the request.
-//
-// It is readable signed out, which is how somebody who has only ever seen
-// the extension gets told what this site is. Being read is all that grants:
-// a reader whose signature does not carry the Upload grant is not received
-// at all - the page says why and stays silent - so an origin here cannot
-// hand a list to somebody who has no way to price one.
-//
-// The bare cardmarket.com is deliberately not here. It redirects to the
-// www host before a page loads, so a content script never runs on it and
-// no message ever arrives from it - and this list is what an origin is
-// granted the above by. Widening it for a host that only ever redirects
-// away would be surface bought for nothing.
-var HandoffOrigins = []string{
-	"https://www.cardmarket.com",
+// An entry that is not a bare https scheme and host is left out: one reached
+// over http could be anyone on the way, and one with a path would never equal
+// what a message reports.
+func handoffOrigins() map[string]string {
+	origins := map[string]string{}
+	for origin, name := range Infrastructure().HandoffOrigins {
+		if validHandoffOrigin(origin) {
+			origins[origin] = name
+		}
+	}
+	return origins
 }
 
-// What to call each of those in the results heading. Keyed the same way
-// HandoffOrigins is, so an origin added to one and forgotten in the other
-// shows up as a list from nowhere rather than as a wrong name.
-var handoffNames = map[string]string{
-	"https://www.cardmarket.com": "Cardmarket",
+// validHandoffOrigin reports whether origin is an https scheme and a host,
+// nothing more.
+func validHandoffOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil &&
+		origin == parsed.Scheme+"://"+parsed.Host
 }
 
 // uploadSourceFrom names the storefront a handed-over list was read from,
@@ -58,7 +57,7 @@ var handoffNames = map[string]string{
 // The name is derived here rather than sent. The heading is rendered and
 // the same string is written to the upload log, and a name chosen by
 // whoever posted the form would be a name in both. What crosses is a URL,
-// and only one whose origin is on the list above - anything else is a
+// and only one whose origin handoffOrigins allows - anything else is a
 // posted list like any other and says so.
 func uploadSourceFrom(raw string) (name string, link string) {
 	if raw == "" {
@@ -70,15 +69,15 @@ func uploadSourceFrom(raw string) (name string, link string) {
 	}
 
 	origin := parsed.Scheme + "://" + parsed.Host
-	if !slices.Contains(HandoffOrigins, origin) {
+	name, found := handoffOrigins()[origin]
+	if !found {
 		return "", ""
 	}
-	name = handoffNames[origin]
 	if name == "" {
-		return "", ""
+		name = parsed.Host
 	}
 
-	// The seller, where the path names one: Cardmarket files an offers page
+	// The seller, where the path names one, as Cardmarket's offers pages do
 	// under /<language>/<Game>/Users/<seller>/Offers/... A list read from
 	// somewhere else on the same site is still from that site, so a missing
 	// seller loses the name and not the heading.
@@ -94,7 +93,7 @@ func uploadSourceFrom(raw string) (name string, link string) {
 	// https://user:pass@www.cardmarket.com/... passes the check above and
 	// parsed.String() would put those credentials straight into the href on
 	// the results page. Nothing that gets this far should carry any - only
-	// an allowed origin's URL is accepted, and the extension sends
+	// an allowed origin's URL is accepted, and a sender passes its own
 	// location.href - but the heading is not the place to find out.
 	clean := url.URL{
 		Scheme:   parsed.Scheme,
@@ -143,7 +142,7 @@ func uploadQuery(shared bool, hashes []string, textArea, handedFrom, remoteURL, 
 	return filename, ""
 }
 
-// UploadHandoff renders the page an extension hands a card list to.
+// UploadHandoff renders the page another site hands a card list to.
 //
 // It carries no list of its own. The rows arrive after it loads, from the
 // window that opened it, and the form is submitted from here - same origin,
@@ -163,7 +162,7 @@ func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav(s, r, "Upload", sig)
 	pageVars.Title = "Receiving a card list"
-	pageVars.HandoffOrigins = HandoffOrigins
+	pageVars.HandoffOrigins = slices.Sorted(maps.Keys(handoffOrigins()))
 
 	canUpload, _ := strconv.ParseBool(GetParamFromSig(sig, "Upload"))
 	if DevMode && !SigCheck {

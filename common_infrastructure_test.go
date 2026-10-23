@@ -202,6 +202,26 @@ func TestAdminInfrastructureEditorSaves(t *testing.T) {
 	}
 }
 
+// The editor refuses a handoff origin the upload handoff would ignore, so a
+// typo is heard about rather than leaving a sender silently refused.
+func TestAdminInfrastructureEditorRefusesABadHandoffOrigin(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "infrastructure.json")
+	withInfrastructureConfig(t, path)
+
+	pv := postInfrastructureEditor(`{"handoff_origins": {"https://www.cardmarket.com/": "Cardmarket"}}`)
+	if pv.WarningMessage == "" || pv.InfoMessage != "" {
+		t.Errorf("reported %q / %q, want it refused", pv.InfoMessage, pv.WarningMessage)
+	}
+
+	pv = postInfrastructureEditor(`{"handoff_origins": {"https://www.cardmarket.com": "Cardmarket", "https://sender.example": ""}}`)
+	if pv.WarningMessage != "" {
+		t.Errorf("a valid origin list was refused: %q", pv.WarningMessage)
+	}
+	if Infrastructure().HandoffOrigins["https://www.cardmarket.com"] != "Cardmarket" {
+		t.Errorf("published %+v, want the saved origins", infrastructureFile())
+	}
+}
+
 // The editor refuses null, and a file that takes from every peer a bucket
 // key, a Patreon client or secret, or a database setting the running file
 // holds, leaving the file as it was. A save that keeps them goes through,

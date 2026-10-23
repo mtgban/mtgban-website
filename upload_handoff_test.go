@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -45,7 +46,7 @@ func TestHandoffNamesItsOrigins(t *testing.T) {
 func TestHandoffPostsToTheUpload(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
-		HandoffOrigins: HandoffOrigins,
+		HandoffOrigins: testHandoffOrigins,
 	})
 
 	for _, want := range []string{
@@ -70,7 +71,7 @@ func TestHandoffPostsToTheUpload(t *testing.T) {
 func TestHandoffSpinsWhileItWaits(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
-		HandoffOrigins: HandoffOrigins,
+		HandoffOrigins: testHandoffOrigins,
 	})
 
 	if !strings.Contains(page, `class="handoff-spinner"`) {
@@ -101,22 +102,43 @@ func TestHandoffWithNoOriginsTakesNothing(t *testing.T) {
 	}
 }
 
-// TestHandoffOriginsAreHTTPS pins what the list is allowed to hold. An origin
-// reached over http could be anyone on the way.
-func TestHandoffOriginsAreHTTPS(t *testing.T) {
-	if len(HandoffOrigins) == 0 {
-		t.Fatal("no origins configured")
+// testHandoffOrigins is what the pages here render with; withHandoffOrigins
+// is what the server is configured with.
+var testHandoffOrigins = []string{"https://www.cardmarket.com"}
+
+// withHandoffOrigins configures the handoff origins for one test, restoring
+// the config after.
+func withHandoffOrigins(t *testing.T, origins map[string]string) {
+	t.Helper()
+	withConfigCopy(t)
+	Config().HandoffOrigins = origins
+}
+
+// TestHandoffOriginsAreBareHTTPS pins what the configured list may hold. An
+// origin reached over http could be anyone on the way, and one with a path
+// would never equal what a message reports and would silently refuse
+// everything.
+func TestHandoffOriginsAreBareHTTPS(t *testing.T) {
+	withHandoffOrigins(t, map[string]string{
+		"https://www.cardmarket.com":      "Cardmarket",
+		"https://sender.example":          "",
+		"https://sender.example:8443":     "",
+		"http://plain.example":            "Plain",
+		"https://path.example/":           "Path",
+		"https://path.example/upload":     "Path",
+		"https://user@creds.example":      "Creds",
+		"www.cardmarket.com":              "Bare",
+		"https://sender.example?query=no": "Query",
+	})
+
+	got := handoffOrigins()
+	want := map[string]string{
+		"https://www.cardmarket.com":  "Cardmarket",
+		"https://sender.example":      "",
+		"https://sender.example:8443": "",
 	}
-	for _, origin := range HandoffOrigins {
-		if !strings.HasPrefix(origin, "https://") {
-			t.Errorf("origin %q is not https", origin)
-		}
-		// An origin is a scheme and a host, nothing more: a trailing path
-		// would never equal what a message reports and would silently refuse
-		// everything.
-		if strings.Count(origin, "/") != 2 {
-			t.Errorf("origin %q is not a bare scheme and host", origin)
-		}
+	if !maps.Equal(got, want) {
+		t.Errorf("origins = %v, want %v", got, want)
 	}
 }
 
@@ -130,7 +152,7 @@ func TestHandoffOriginsAreHTTPS(t *testing.T) {
 func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
-		HandoffOrigins: HandoffOrigins,
+		HandoffOrigins: testHandoffOrigins,
 		InfoMessage:    ErrMsg,
 	})
 
@@ -189,6 +211,11 @@ func TestHandoffDoesNotAskASignedInReaderToLogIn(t *testing.T) {
 // is what it is by the time it reaches the upload handler and not where it
 // came from. These name the difference.
 func TestUploadSourceFrom(t *testing.T) {
+	withHandoffOrigins(t, map[string]string{
+		"https://www.cardmarket.com": "Cardmarket",
+		"https://sender.example":     "",
+	})
+
 	tests := []struct {
 		name string
 		raw  string
@@ -221,6 +248,11 @@ func TestUploadSourceFrom(t *testing.T) {
 	}, {
 		// The whole point of deriving the name here: a host nobody allowed
 		// cannot put words in the heading, or in the upload log beside it.
+		name: "an allowed origin with no name is headed with its host",
+		raw:  "https://sender.example/lists/42",
+		want: "sender.example",
+		link: "https://sender.example/lists/42",
+	}, {
 		name: "an origin that was never allowed names nothing",
 		raw:  "https://example.test/en/Magic/Users/Nobody/Offers/Singles",
 	}, {
@@ -250,23 +282,13 @@ func TestUploadSourceFrom(t *testing.T) {
 	}
 }
 
-// An origin allowed to hand rows over but never given a name would show up
-// as a list from nowhere, which reads as a bug rather than as the omission
-// it is.
-func TestEveryHandoffOriginHasAName(t *testing.T) {
-	for _, origin := range HandoffOrigins {
-		if handoffNames[origin] == "" {
-			t.Errorf("%s is allowed to hand over a list but has no name", origin)
-		}
-	}
-}
-
 // The results heading is chosen by which arm of uploadQuery the request
 // lands in, and a handed-over list is told from a pasted one by nothing
 // else. These pin the order, so a refactor that moves the paste path has
 // to move this with it.
 func TestUploadQuery(t *testing.T) {
 	const offers = "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles"
+	withHandoffOrigins(t, map[string]string{"https://www.cardmarket.com": "Cardmarket"})
 
 	tests := []struct {
 		name       string
@@ -433,7 +455,7 @@ func TestHandoffDocumentsItself(t *testing.T) {
 	for _, told := range []string{"", ErrMsg} {
 		page := renderPage(t, "upload_handoff.html", false, PageVars{
 			UserNav:        &NavElem{Short: "b"},
-			HandoffOrigins: HandoffOrigins,
+			HandoffOrigins: testHandoffOrigins,
 			InfoMessage:    told,
 		})
 
@@ -442,7 +464,7 @@ func TestHandoffDocumentsItself(t *testing.T) {
 		}
 		// Where a list may come from is a fact about this deployment, so it
 		// is printed rather than described.
-		for _, origin := range HandoffOrigins {
+		for _, origin := range testHandoffOrigins {
 			if !strings.Contains(page, origin) {
 				t.Errorf("InfoMessage=%q: the guide does not name %s", told, origin)
 			}
@@ -474,7 +496,7 @@ func TestHandoffDocumentsItself(t *testing.T) {
 func TestHandoffGuideNamesColumnsTheParserReads(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
-		HandoffOrigins: HandoffOrigins,
+		HandoffOrigins: testHandoffOrigins,
 	})
 
 	tables := regexp.MustCompile(`(?s)<table class="handoff-cols">(.*?)</table>`).FindAllStringSubmatch(page, -1)
@@ -612,7 +634,7 @@ func TestGuideNamesTheFieldsTheScriptReads(t *testing.T) {
 
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
-		HandoffOrigins: HandoffOrigins,
+		HandoffOrigins: testHandoffOrigins,
 	})
 	table := regexp.MustCompile(`(?s)<table class="handoff-fields">(.*?)</table>`).FindStringSubmatch(page)
 	if table == nil {
@@ -704,7 +726,7 @@ func TestHandoffClosesWhatItOpens(t *testing.T) {
 	for _, told := range []string{"", ErrMsg} {
 		page := renderPage(t, "upload_handoff.html", false, PageVars{
 			UserNav:        &NavElem{Short: "b"},
-			HandoffOrigins: HandoffOrigins,
+			HandoffOrigins: testHandoffOrigins,
 			InfoMessage:    told,
 		})
 

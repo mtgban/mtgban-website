@@ -340,7 +340,9 @@ save, and each has an admin tab that edits it (§5.9):
 - `infrastructure_path`: the infrastructure settings,
   `internal/infrastructure.Config` — `bucket_keys`, `google_credentials`
   (the credentials file's path), `patreon`, `uploader` (the Moxfield and
-  Collectr endpoints), `sql_config`, `user_state_config`,
+  Collectr endpoints), `handoff_origins` (the sites `/upload/handoff`
+  takes a card list from, each with the name its results are headed
+  with), `sql_config`, `user_state_config`,
   `observability_config` and `new_newspaper_sql_config`. The config may
   set any of these keys itself, and its value wins (`Over`); code reads the
   result through `Infrastructure()`. A path in the config's own bucket is

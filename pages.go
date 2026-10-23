@@ -335,8 +335,7 @@ type PageVars struct {
 	GatewayURL string
 
 	// HandoffOrigins are the sites the upload handoff page will take a card
-	// list from. It reads them rather than naming one itself, so the list
-	// lives in Go where it can be tested.
+	// list from, the infrastructure file's handoff_origins.
 	HandoffOrigins []string
 
 	Title          string
