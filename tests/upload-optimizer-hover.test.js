@@ -37,6 +37,7 @@ function load() {
     };
     const document = {
         querySelectorAll: () => [],
+        addEventListener: () => {},
         getElementById: (id) => ({ hoverImage: image, hoverWrap: wrap })[id],
     };
     const optTableOut = new Function('window', 'document', 'wireLoadLists', source + '\nreturn optTableOut;')(

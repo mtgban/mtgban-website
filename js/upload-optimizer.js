@@ -36,4 +36,41 @@ function toggleAllOptRows(masterCheckbox) {
     });
 }
 
+// updateOptTotals recounts a store's cards, copies and total from the rows
+// still ticked, in its header and in its entry in the list above the stores.
+function updateOptTotals(section) {
+    var cards = 0;
+    var qty = 0;
+    var total = 0;
+    section.querySelectorAll('tr[data-load-idx]').forEach(function(tr) {
+        if (tr.classList.contains('opt-removed')) return;
+        var q = parseInt(tr.dataset.loadQty, 10) || 1;
+        cards++;
+        qty += q;
+        total += (parseFloat(tr.dataset.optPrice) || 0) * q;
+    });
+    // As the template's plural writes it
+    var stats = cards + (cards === 1 ? ' card' : ' cards') + (qty !== cards ? ' (' + qty + ' total)' : '');
+    var sum = '$ ' + total.toFixed(2);
+
+    var places = [[section.querySelector('.opt-count'), section.querySelector('.opt-total')]];
+    document.querySelectorAll('.opt-toc-item').forEach(function(item) {
+        if (item.getAttribute('href') === '#' + section.id) {
+            places.push([item.querySelector('.toc-stats'), item.querySelector('.toc-total')]);
+        }
+    });
+    places.forEach(function(p) {
+        if (p[0]) p[0].textContent = stats;
+        if (p[1]) p[1].textContent = sum;
+    });
+}
+
+// After the row's own handler has marked it, as wireLoadLists does
+document.addEventListener('change', function(e) {
+    var section = e.target.closest && e.target.closest('.opt-store');
+    if (section) {
+        updateOptTotals(section);
+    }
+});
+
 wireLoadLists({section: '.opt-store', removed: 'opt-removed'});
