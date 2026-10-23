@@ -115,9 +115,9 @@ func withHandoffOrigins(t *testing.T, origins map[string]string) {
 }
 
 // TestHandoffOriginsAreBareHTTPS pins what the configured list may hold. An
-// origin reached over http could be anyone on the way, and one with a path
-// would never equal what a message reports and would silently refuse
-// everything.
+// origin reached over http could be anyone on the way, and one with a path,
+// capitals, a default port or a trailing dot would never equal what a
+// message reports and would silently refuse everything.
 func TestHandoffOriginsAreBareHTTPS(t *testing.T) {
 	withHandoffOrigins(t, map[string]string{
 		"https://www.cardmarket.com":      "Cardmarket",
@@ -129,6 +129,9 @@ func TestHandoffOriginsAreBareHTTPS(t *testing.T) {
 		"https://user@creds.example":      "Creds",
 		"www.cardmarket.com":              "Bare",
 		"https://sender.example?query=no": "Query",
+		"https://WWW.Cardmarket.com":      "Upper",
+		"https://www.cardmarket.com:443":  "Port",
+		"https://www.cardmarket.com.":     "Dot",
 	})
 
 	got := handoffOrigins()
@@ -245,13 +248,13 @@ func TestUploadSourceFrom(t *testing.T) {
 		want: "Cardmarket",
 		link: "https://www.cardmarket.com/en/Magic/Products/Singles/Urzas-Legacy",
 	}, {
-		// The whole point of deriving the name here: a host nobody allowed
-		// cannot put words in the heading, or in the upload log beside it.
 		name: "an allowed origin with no name is headed with its host",
 		raw:  "https://sender.example/lists/42",
 		want: "sender.example",
 		link: "https://sender.example/lists/42",
 	}, {
+		// The whole point of deriving the name here: a host nobody allowed
+		// cannot put words in the heading, or in the upload log beside it.
 		name: "an origin that was never allowed names nothing",
 		raw:  "https://example.test/en/Magic/Users/Nobody/Offers/Singles",
 	}, {
