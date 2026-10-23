@@ -658,6 +658,32 @@ func TestRunAlertEvaluationUsesEachUsersValues(t *testing.T) {
 	}
 }
 
+// TestRunAlertEvaluationBuildsValuesOncePerUser proves the alert loop reads
+// the values the allowance loop built rather than asking deps.Values again
+// for every alert.
+func TestRunAlertEvaluationBuildsValuesOncePerUser(t *testing.T) {
+	first := activeAlert()
+	second := activeAlert()
+	second.ID, second.CardID = 8, "card-2"
+
+	store := newFakeEvalStore(first, second)
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
+	calls := map[string]int{}
+	deps.Values = func(userHash, _ string) url.Values {
+		calls[userHash]++
+		return url.Values{"Alerts": {"true"}, "AlertsMax": {"5"}}
+	}
+	runEvaluation(context.Background(), deps, buylistOnly)
+
+	if len(dd.sent) != 2 {
+		t.Fatalf("sent = %d, want both alerts", len(dd.sent))
+	}
+	if calls["u"] != 1 {
+		t.Fatalf("Values called %d times for u, want 1", calls["u"])
+	}
+}
+
 func TestRunAlertEvaluationParksStaleContacts(t *testing.T) {
 	stale := activeAlert()
 	stale.Contact.UpdatedAt = evalNow.Add(-40 * 24 * time.Hour)
