@@ -82,6 +82,91 @@ func GetVendors() []mtgban.Vendor {
 	return *p
 }
 
+// storeIndex is the by-shorthand lookup over one pair of snapshots, keyed
+// both exactly and in lower case so each lookup keeps the match the scan it
+// replaced made. It is derived from the snapshots on the first lookup after
+// either changes, rather than rebuilt where they are published: the tests
+// store a snapshot from two hundred places, and a stale index there would
+// pass as a missing store.
+type storeIndex struct {
+	sellers  *[]mtgban.Seller
+	vendors  *[]mtgban.Vendor
+	nSellers int
+	nVendors int
+	// seller and vendor are keyed by the exact shorthand, sellerFold and
+	// vendorFold by its lower case.
+	seller     map[string]mtgban.Seller
+	vendor     map[string]mtgban.Vendor
+	sellerFold map[string]mtgban.Seller
+	vendorFold map[string]mtgban.Vendor
+}
+
+var storeIndexPtr atomic.Pointer[storeIndex]
+
+// currentStoreIndex returns the index for the snapshots as published now,
+// building it when either moved. Two callers racing the build publish the
+// same answer, so the last store wins harmlessly.
+func currentStoreIndex() *storeIndex {
+	sellers, vendors := sellersPtr.Load(), vendorsPtr.Load()
+	nSellers, nVendors := 0, 0
+	if sellers != nil {
+		nSellers = len(*sellers)
+	}
+	if vendors != nil {
+		nVendors = len(*vendors)
+	}
+	idx := storeIndexPtr.Load()
+	if idx != nil && idx.sellers == sellers && idx.vendors == vendors &&
+		idx.nSellers == nSellers && idx.nVendors == nVendors {
+		return idx
+	}
+	idx = &storeIndex{
+		sellers: sellers, vendors: vendors, nSellers: nSellers, nVendors: nVendors,
+		seller:     make(map[string]mtgban.Seller, nSellers),
+		vendor:     make(map[string]mtgban.Vendor, nVendors),
+		sellerFold: make(map[string]mtgban.Seller, nSellers),
+		vendorFold: make(map[string]mtgban.Vendor, nVendors),
+	}
+	// First wins on a duplicate, as the scans this replaces did.
+	for i := range nSellers {
+		seller := (*sellers)[i]
+		key := seller.Info().Shorthand
+		if _, dup := idx.seller[key]; !dup {
+			idx.seller[key] = seller
+		}
+		key = strings.ToLower(key)
+		if _, dup := idx.sellerFold[key]; !dup {
+			idx.sellerFold[key] = seller
+		}
+	}
+	for i := range nVendors {
+		vendor := (*vendors)[i]
+		key := vendor.Info().Shorthand
+		if _, dup := idx.vendor[key]; !dup {
+			idx.vendor[key] = vendor
+		}
+		key = strings.ToLower(key)
+		if _, dup := idx.vendorFold[key]; !dup {
+			idx.vendorFold[key] = vendor
+		}
+	}
+	storeIndexPtr.Store(idx)
+	return idx
+}
+
+// scraperInfo returns the loaded store with exactly this shorthand, seller
+// first, as the scans it replaces did.
+func scraperInfo(shorthand string) (mtgban.ScraperInfo, bool) {
+	idx := currentStoreIndex()
+	if seller, ok := idx.seller[shorthand]; ok {
+		return seller.Info(), true
+	}
+	if vendor, ok := idx.vendor[shorthand]; ok {
+		return vendor.Info(), true
+	}
+	return mtgban.ScraperInfo{}, false
+}
+
 type ScraperConfig struct {
 	Icons        map[string]string `json:"icons"`
 	NameOverride map[string]string `json:"name_override"`

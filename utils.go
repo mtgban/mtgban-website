@@ -819,24 +819,22 @@ func findCredit(shorthand string) float64 {
 	return 0
 }
 
-// Look up a seller and return its inventory
+// Look up a seller by shorthand, case-insensitively, and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
-	for _, seller := range GetSellers() {
-		if strings.EqualFold(seller.Info().Shorthand, shorthand) {
-			return seller.Inventory(), nil
-		}
+	seller, ok := currentStoreIndex().sellerFold[strings.ToLower(shorthand)]
+	if !ok {
+		return nil, errors.New("seller not found")
 	}
-	return nil, errors.New("seller not found")
+	return seller.Inventory(), nil
 }
 
-// Look up a vendor and return its buylist
+// Look up a vendor by shorthand, case-insensitively, and return its buylist
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
-	for _, vendor := range GetVendors() {
-		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
-			return vendor.Buylist(), nil
-		}
+	vendor, ok := currentStoreIndex().vendorFold[strings.ToLower(shorthand)]
+	if !ok {
+		return nil, errors.New("vendor not found")
 	}
-	return nil, errors.New("vendor not found")
+	return vendor.Buylist(), nil
 }
 
 // Look up a seller with its name and return its inventory
@@ -1746,45 +1744,23 @@ func getTCGSimulationIQR(productID string) float64 {
 
 // Return the full display name displayed from the input shorthand
 func scraperName(shorthand string) string {
-	for _, seller := range GetSellers() {
-		if shorthand == seller.Info().Shorthand {
-			name := seller.Info().Name
-			override, found := Config().ScraperConfig.NameOverride[seller.Info().Name]
-			if found {
-				name = override
-			}
-			return name
-		}
+	info, ok := scraperInfo(shorthand)
+	if !ok {
+		// If nothing is found, check if there is a custom override for the shorthand itself
+		return Config().ScraperConfig.NameOverride[shorthand]
 	}
-	for _, vendor := range GetVendors() {
-		if shorthand == vendor.Info().Shorthand {
-			name := vendor.Info().Name
-			override, found := Config().ScraperConfig.NameOverride[vendor.Info().Name]
-			if found {
-				name = override
-			}
-			return name
-		}
+	override, found := Config().ScraperConfig.NameOverride[info.Name]
+	if found {
+		return override
 	}
-
-	// If nothing is found, check if there is a custom override for the shorthand itself
-	return Config().ScraperConfig.NameOverride[shorthand]
+	return info.Name
 }
 
 // isSealedScraper says whether the loaded store with this shorthand trades
 // sealed product rather than singles.
 func isSealedScraper(shorthand string) bool {
-	for _, seller := range GetSellers() {
-		if seller.Info().Shorthand == shorthand {
-			return seller.Info().SealedMode
-		}
-	}
-	for _, vendor := range GetVendors() {
-		if vendor.Info().Shorthand == shorthand {
-			return vendor.Info().SealedMode
-		}
-	}
-	return false
+	info, _ := scraperInfo(shorthand)
+	return info.SealedMode
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
