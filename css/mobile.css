@@ -484,12 +484,6 @@ body.mobile:has(.m-home) .m-nav-home {
     min-height: 0;
 }
 
-.m-home-login-btn.account {
-    background: var(--surface-2);
-    color: var(--activetext);
-    border: 1px solid var(--border-moderate);
-}
-
 .m-home-login-btn.discord {
     background: rgba(88, 101, 242, 0.15);
     color: #5865f2;
