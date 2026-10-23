@@ -425,7 +425,7 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	origin := siteorigin.Of(r)
 	cookie := ""
 	if r != nil {
-		cookie = readCookie(r, signatureCookie)
+		cookie = cookieSignature(r)
 	}
 	cookieParams := sigParams
 	if cookie != sig {

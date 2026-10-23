@@ -3,19 +3,21 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 const jsDir = join(import.meta.dir, '..', 'js');
+const templatesDir = join(import.meta.dir, '..', 'templates');
 
-function sources(dir) {
+function sources(dir, extension) {
     return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
         const path = join(dir, entry.name);
-        if (entry.isDirectory()) return sources(path);
-        return entry.name.endsWith('.js') ? [path] : [];
+        if (entry.isDirectory()) return sources(path, extension);
+        return entry.name.endsWith(extension) ? [path] : [];
     });
 }
 
 // The signature cookie is not readable from a page; what its scripts gate on
-// is rendered on <html> by the server.
+// is rendered on <html> by the server. Inline scripts count too.
 test('no script reads the signature cookie under either name', () => {
-    const readers = sources(jsDir).filter((path) => /(?:MTGBAN|BAN_SIG)=|getCookie\(\s*['"](?:MTGBAN|BAN_SIG)['"]/.test(readFileSync(path, 'utf8')));
+    const scripts = [...sources(jsDir, '.js'), ...sources(templatesDir, '.html')];
+    const readers = scripts.filter((path) => /(?:MTGBAN|BAN_SIG)=|getCookie\(\s*['"](?:MTGBAN|BAN_SIG)['"]/.test(readFileSync(path, 'utf8')));
     expect(readers).toEqual([]);
 });
 

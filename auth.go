@@ -193,27 +193,40 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 	return apisig.Sign(key, data)
 }
 
-// unverifiedSignature is the request's signature, the BAN_SIG cookie or else
-// ?sig=, checked for nothing but its expiry. It is what the checks below
-// start from; anything that acts on a grant reads verifiedSignature or
-// verifiedRequestSignature instead.
+// unverifiedSignature is the request's signature, the cookie's (see
+// cookieSignature) or else ?sig=, checked for nothing but its expiry. It is
+// what the checks below start from; anything that acts on a grant reads
+// verifiedSignature or verifiedRequestSignature instead.
 func unverifiedSignature(r *http.Request) string {
-	sig := readCookie(r, signatureCookie)
+	sig := cookieSignature(r)
 
 	querySig := r.FormValue("sig")
 	if sig == "" && querySig != "" {
 		sig = querySig
 	}
 
-	exp := GetParamFromSig(sig, "Expires")
-	if exp == "" {
-		return ""
-	}
-	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || expires < time.Now().Unix() {
+	if !signatureUnexpired(sig) {
 		return ""
 	}
 
+	return sig
+}
+
+// signatureUnexpired says whether sig carries an Expires still ahead.
+func signatureUnexpired(sig string) bool {
+	expires, err := strconv.ParseInt(GetParamFromSig(sig, "Expires"), 10, 64)
+	return err == nil && expires >= time.Now().Unix()
+}
+
+// cookieSignature is the signature the request's cookies carry: BAN_SIG,
+// unless that is absent or has run out and the legacy cookie is there to
+// read instead. All of the legacy fallback goes in the cleanup.
+func cookieSignature(r *http.Request) string {
+	sig := readCookie(r, signatureCookie)
+	legacy := readCookie(r, legacySignatureCookie)
+	if legacy != "" && !signatureUnexpired(sig) {
+		return legacy
+	}
 	return sig
 }
 
@@ -302,7 +315,30 @@ const signatureCookieDays = 31
 // Put signature in cookies for a month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	expires := time.Now().Add(signatureCookieDays * 24 * time.Hour)
-	setCookie(w, r, signatureCookie, sig, expires, true)
+	http.SetCookie(w, signatureCookieFor(r, signatureCookie, sig, expires))
+}
+
+// migrateSignatureCookie finishes the move off the legacy cookie for a reader
+// whose cookie signature checks out: it is written as BAN_SIG when it was
+// read from the legacy cookie, and the legacy cookie is expired either way.
+// Only a page navigation does it. A script's fetch for JSON asks for
+// something else, and the answer may sit in a shared cache, which must not
+// hold a Set-Cookie carrying a reader's signature; the fallback serves it.
+func migrateSignatureCookie(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet || !strings.Contains(r.Header.Get("Accept"), "text/html") {
+		return
+	}
+	if readCookie(r, legacySignatureCookie) == "" {
+		return
+	}
+	sig := verifiedSignature(r)
+	if sig == "" {
+		return
+	}
+	if readCookie(r, signatureCookie) != sig {
+		putSignatureInCookies(w, r, sig)
+	}
+	clearSignatureCookie(w, r, legacySignatureCookie)
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
@@ -320,8 +356,9 @@ func adminOnly(next http.Handler) http.Handler {
 	})
 }
 
-// withSignatureCookie is r carrying sig as its BAN_SIG cookie, in place of
-// any the request came with.
+// withSignatureCookie is r carrying sig as its BAN_SIG cookie, in place of the
+// one the request came with. cookieSignature prefers it to a legacy cookie
+// left beside it.
 func withSignatureCookie(r *http.Request, sig string) *http.Request {
 	out := r.Clone(r.Context())
 	out.Header.Del("Cookie")
@@ -345,6 +382,8 @@ func noSigning(next http.Handler) http.Handler {
 		_, signed := signatureIsValid(querySig)
 		if signed {
 			putSignatureInCookies(w, r, querySig)
+		} else {
+			migrateSignatureCookie(w, r)
 		}
 
 		next.ServeHTTP(w, r)
@@ -562,6 +601,8 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 			// Handlers read the cookie first: give them the signature checked
 			// here, not one the request carried beside it.
 			r = withSignatureCookie(r, querySig)
+		} else {
+			migrateSignatureCookie(w, r)
 		}
 
 		switch r.Method {

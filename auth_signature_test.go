@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -179,12 +181,222 @@ func TestOnlyACheckedSignatureIsKeptAsTheCookie(t *testing.T) {
 			wrapper.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/limited?sig="+url.QueryEscape(sig), nil))
 			kept := false
 			for _, c := range rec.Result().Cookies() {
-				kept = kept || c.Name == "BAN_SIG"
+				if c.Name != "BAN_SIG" {
+					continue
+				}
+				kept = true
+				if !c.HttpOnly || c.SameSite != http.SameSiteLaxMode {
+					t.Errorf("%s: kept the cookie with HttpOnly %v and SameSite %v, want HttpOnly and Lax", name, c.HttpOnly, c.SameSite)
+				}
 			}
 			if kept != want {
 				t.Errorf("%s: kept the cookie %v for a signature that checks out %v", name, kept, want)
 			}
 		}
+	}
+}
+
+// cookieExpires is the date a cookie lasts to, which comes off the clock.
+var cookieExpires = regexp.MustCompile(`Expires=[^;]+`)
+
+// navigationAccept is what a browser asks for when it loads a page.
+const navigationAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
+// A reader still holding the signature under its old cookie name is served
+// as before and moved over, by either wrapper: the signature is written
+// under the new name and the old cookie expired with the scope it was set
+// in. With both names there the new one wins, and the old is only expired,
+// unless the new one has run out.
+func TestLegacySignatureCookieMovesToTheNewName(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+
+	mint := func(email string, expires time.Time) string {
+		return signedAs(t, url.Values{"UserEmail": {email}, "UserTier": {"Test"}}, expires)
+	}
+	valid := mint("a@example.com", time.Now().Add(time.Hour))
+	other := mint("b@example.com", time.Now().Add(time.Hour))
+	expired := mint("a@example.com", time.Now().Add(-time.Hour))
+	v := parseSig(valid)
+	v.Set("Signature", "AAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	forged := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+
+	stored := func(sig string) string {
+		return "BAN_SIG=" + sig + "; Path=/; Domain=mtgban.com; Expires=DATE; HttpOnly; Secure; SameSite=Lax"
+	}
+	const expiredOld = "MTGBAN=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+
+	for _, tc := range []struct {
+		name    string
+		cookies []*http.Cookie
+		query   string
+		want    []string
+		seen    string
+	}{
+		{"only the old cookie", []*http.Cookie{{Name: "MTGBAN", Value: valid}},
+			"", []string{stored(valid), expiredOld}, valid},
+		{"both names, the new one wins", []*http.Cookie{{Name: "BAN_SIG", Value: valid}, {Name: "MTGBAN", Value: other}},
+			"", []string{expiredOld}, valid},
+		{"only the new cookie", []*http.Cookie{{Name: "BAN_SIG", Value: valid}},
+			"", nil, valid},
+		{"a new cookie that has run out beside a good old one", []*http.Cookie{{Name: "BAN_SIG", Value: expired}, {Name: "MTGBAN", Value: valid}},
+			"", []string{stored(valid), expiredOld}, valid},
+		{"an old cookie that does not check out", []*http.Cookie{{Name: "MTGBAN", Value: forged}},
+			"", nil, ""},
+		{"an old cookie that has run out", []*http.Cookie{{Name: "MTGBAN", Value: expired}},
+			"", nil, ""},
+		{"a link's signature beside an old cookie", []*http.Cookie{{Name: "MTGBAN", Value: other}},
+			valid, []string{stored(valid)}, valid},
+		{"a link's signature and nothing else", nil,
+			valid, []string{stored(valid)}, valid},
+	} {
+		for wrapperName, wrap := range map[string]func(http.Handler) http.Handler{
+			"noSigning":      noSigning,
+			"enforceSigning": func(next http.Handler) http.Handler { return enforceSigning(testSite, next) },
+		} {
+			t.Run(wrapperName+"/"+tc.name, func(t *testing.T) {
+				UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
+				seen := ""
+				handler := wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					seen = verifiedRequestSignature(r)
+				}))
+
+				target := "http://magic.mtgban.com/data/prices/"
+				if tc.query != "" {
+					target += "?sig=" + url.QueryEscape(tc.query)
+				}
+				req := cookieTestRequest(target, "https")
+				req.Header.Set("Accept", navigationAccept)
+				for _, c := range tc.cookies {
+					req.AddCookie(c)
+				}
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+
+				var got []string
+				for _, line := range rec.Header().Values("Set-Cookie") {
+					got = append(got, cookieExpires.ReplaceAllString(line, "Expires=DATE"))
+				}
+				if !slices.Equal(got, tc.want) {
+					t.Errorf("Set-Cookie = %q, want %q", got, tc.want)
+				}
+				if seen != tc.seen {
+					t.Errorf("the handler read %q, want %q", seen, tc.seen)
+				}
+				for _, c := range rec.Result().Cookies() {
+					if c.Name != "BAN_SIG" {
+						continue
+					}
+					left := time.Until(c.Expires)
+					if left < 31*24*time.Hour-time.Minute || left > 31*24*time.Hour+time.Minute {
+						t.Errorf("BAN_SIG lasts %v, want 31 days", left)
+					}
+				}
+			})
+		}
+	}
+}
+
+// Only a page navigation moves the cookie. A script's fetch for JSON may be
+// answered from a shared cache, which must not be handed a Set-Cookie
+// carrying a reader's signature; it is served through the old cookie as is.
+func TestLegacySignatureCookieMovesOnlyOnANavigation(t *testing.T) {
+	signingEnabled(t, true)
+	savedLimiter := UserRateLimiter
+	t.Cleanup(func() { UserRateLimiter = savedLimiter })
+
+	valid := signedAs(t, url.Values{"UserEmail": {"a@example.com"}, "UserTier": {"Test"}}, time.Now().Add(time.Hour))
+	moved := []string{
+		"BAN_SIG=" + valid + "; Path=/; Domain=mtgban.com; Expires=DATE; HttpOnly; Secure; SameSite=Lax",
+		"MTGBAN=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+	}
+
+	for _, tc := range []struct {
+		name   string
+		method string
+		accept string
+		want   []string
+	}{
+		{"a page navigation", http.MethodGet, navigationAccept, moved},
+		{"a script's fetch for JSON", http.MethodGet, "application/json", nil},
+		{"a script's fetch for anything", http.MethodGet, "*/*", nil},
+		{"a form posted from a page", http.MethodPost, navigationAccept, nil},
+	} {
+		for wrapperName, wrap := range map[string]func(http.Handler) http.Handler{
+			"noSigning":      noSigning,
+			"enforceSigning": func(next http.Handler) http.Handler { return enforceSigning(testSite, next) },
+		} {
+			t.Run(wrapperName+"/"+tc.name, func(t *testing.T) {
+				UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
+				seen := ""
+				handler := wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					seen = verifiedSignature(r)
+				}))
+
+				req := cookieTestRequest("http://magic.mtgban.com/data/prices/", "https")
+				req.Method = tc.method
+				req.Header.Set("Accept", tc.accept)
+				req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: valid})
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+
+				var got []string
+				for _, line := range rec.Header().Values("Set-Cookie") {
+					got = append(got, cookieExpires.ReplaceAllString(line, "Expires=DATE"))
+				}
+				if !slices.Equal(got, tc.want) {
+					t.Errorf("Set-Cookie = %q, want %q", got, tc.want)
+				}
+				if tc.method == http.MethodGet && seen != valid {
+					t.Errorf("the handler read %q, want the old cookie's signature", seen)
+				}
+			})
+		}
+	}
+}
+
+// Logging out drops the signature under both names, whatever the same
+// request's migration just wrote: the last word on each is a clear, with the
+// scope the cookie was set in.
+func TestLogoutClearsBothSignatureCookies(t *testing.T) {
+	signingEnabled(t, true)
+	valid := signedAs(t, url.Values{"UserEmail": {"a@example.com"}, "UserTier": {"Test"}}, time.Now().Add(time.Hour))
+	const (
+		clearNew = "BAN_SIG=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+		clearOld = "MTGBAN=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+	)
+
+	for name, cookies := range map[string][]*http.Cookie{
+		"no cookie":  nil,
+		"new name":   {{Name: "BAN_SIG", Value: valid}},
+		"old name":   {{Name: "MTGBAN", Value: valid}},
+		"both names": {{Name: "BAN_SIG", Value: valid}, {Name: "MTGBAN", Value: valid}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := cookieTestRequest("http://magic.mtgban.com/?errmsg=logout", "https")
+			req.Header.Set("Accept", navigationAccept)
+			for _, c := range cookies {
+				req.AddCookie(c)
+			}
+			rec := httptest.NewRecorder()
+			noSigning(http.HandlerFunc(testSite.Home)).ServeHTTP(rec, req)
+			if rec.Code != http.StatusFound {
+				t.Fatalf("status = %d, want a redirect", rec.Code)
+			}
+
+			last := map[string]string{}
+			for _, line := range rec.Header().Values("Set-Cookie") {
+				cookieName, _, _ := strings.Cut(line, "=")
+				last[cookieName] = line
+			}
+			if last["BAN_SIG"] != clearNew || last["MTGBAN"] != clearOld {
+				t.Errorf("last Set-Cookie per name = %q, want %q and %q", last, clearNew, clearOld)
+			}
+			if cookies == nil && !slices.Equal(rec.Header().Values("Set-Cookie"), []string{clearNew, clearOld}) {
+				t.Errorf("Set-Cookie = %q, want both clears and nothing else", rec.Header().Values("Set-Cookie"))
+			}
+		})
 	}
 }
 

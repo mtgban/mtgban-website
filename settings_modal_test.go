@@ -197,7 +197,8 @@ func TestSettingsTabPathsFollowTheNav(t *testing.T) {
 }
 
 // A cookie kept at /arbit reaches only requests under /arbit, so the modal
-// on /search asks /arbit/settings-values for it. Root cookies stay out.
+// on /search asks /arbit/settings-values for it. Root cookies stay out, the
+// HttpOnly signature and session ones among them.
 func TestSettingsValuesAnswersThisPathsCookies(t *testing.T) {
 	mux := http.NewServeMux()
 	s := newSite()
@@ -209,9 +210,11 @@ func TestSettingsValuesAnswersThisPathsCookies(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=BAN_SIG&name=SearchSellersList", nil)
+		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=BAN_SESSION&name=BAN_SIG&name=MTGBAN&name=SearchSellersList", nil)
 	req.AddCookie(&http.Cookie{Name: "ArbitVendorsList", Value: "CK,SCG,"})
+	req.AddCookie(&http.Cookie{Name: "BAN_SESSION", Value: "id"})
 	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: "sig"})
+	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: "sig"})
 	req.AddCookie(&http.Cookie{Name: "SearchSellersList", Value: "TCG,"})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
