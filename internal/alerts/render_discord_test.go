@@ -290,3 +290,16 @@ func TestDiscordDelivererPacesBetweenSends(t *testing.T) {
 		t.Fatalf("second DM after %s, err %v, sent %v", time.Since(start), err, sender.sent)
 	}
 }
+
+func TestDiscordDelivererStopsAtTheDeadline(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	sender := &fakeSender{}
+	got := NewDiscordDeliverer(sender, 0).Deliver(ctx, discordDigest(7, 8), Channel{Address: "d9"}, shorthandLabel)
+	if len(got) != 2 || !errors.Is(got[0].Err, errNotAttempted) || !errors.Is(got[1].Err, context.Canceled) || len(sender.sent) != 0 {
+		t.Fatalf("deliveries = %+v, sent %v", got, sender.sent)
+	}
+	if isPermanent(got[0].Err) {
+		t.Fatal("a deadline must read as a retry, not a refusal")
+	}
+}

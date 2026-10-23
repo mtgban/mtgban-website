@@ -253,3 +253,39 @@ func TestMailDelivererRenderErrorFailsClosed(t *testing.T) {
 		t.Fatalf("results = %+v, want a render error", results)
 	}
 }
+
+func TestMailDelivererDoneContextSendsNothing(t *testing.T) {
+	fm := &fakeMailer{id: "msg-1"}
+	m := testDeliverer(t, fm, 0)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	results := m.Deliver(ctx, digestFixture(2), Channel{Address: "user@example.com"}, func(s string) string { return s })
+
+	if len(fm.sent) != 0 {
+		t.Fatalf("Send called %d times, want 0", len(fm.sent))
+	}
+	if len(results) != 2 || !errors.Is(results[0].Err, errNotAttempted) || !errors.Is(results[1].Err, context.Canceled) {
+		t.Fatalf("results = %+v", results)
+	}
+}
+
+func TestMailDelivererReserveCutByTheDeadlineIsNotAttempted(t *testing.T) {
+	fm := &fakeMailer{id: "msg-1"}
+	m := testDeliverer(t, fm, 0)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m.Reserve = func(ctx context.Context, _ string, _ time.Time, _ int) (int64, bool, error) {
+		cancel()
+		return 0, false, ctx.Err()
+	}
+
+	results := m.Deliver(ctx, digestFixture(1), Channel{Address: "user@example.com"}, func(s string) string { return s })
+
+	if len(fm.sent) != 0 {
+		t.Fatalf("Send called %d times, want 0", len(fm.sent))
+	}
+	if len(results) != 1 || !errors.Is(results[0].Err, errNotAttempted) || !errors.Is(results[0].Err, context.Canceled) {
+		t.Fatalf("results = %+v", results)
+	}
+}

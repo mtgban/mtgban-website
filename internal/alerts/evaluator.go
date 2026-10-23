@@ -21,6 +21,9 @@ const (
 	// contactMaxAge is how long a login keeps the evaluator trusting a
 	// contact's tier: a billing cycle.
 	contactMaxAge = 31 * 24 * time.Hour
+	// releaseTimeout bounds a store write made once its request or run is
+	// gone, so a stalled database cannot hold the goroutine for good.
+	releaseTimeout = 10 * time.Second
 	// unverifiedChannelMaxAge is how long an unverified user-entered
 	// address is kept before it is pruned.
 	unverifiedChannelMaxAge = 7 * 24 * time.Hour
@@ -32,6 +35,30 @@ const (
 
 // ErrDailyLimit is a deliverer holding a firing back for the user's daily cap.
 var ErrDailyLimit = errors.New("alerts: daily email limit reached")
+
+// writeGrace is how long past the run deadline the event and state writes
+// that follow a delivery may still land. A var so a test can shorten it.
+var writeGrace = time.Minute
+
+// writeContext is ctx with its deadline moved writeGrace later and its
+// cancellation dropped; a ctx with no deadline is handed back as it is.
+func writeContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	dl, ok := ctx.Deadline()
+	if !ok {
+		return ctx, func() {}
+	}
+	return context.WithDeadline(context.WithoutCancel(ctx), dl.Add(writeGrace))
+}
+
+// errNotAttempted is a deliverer's answer for a firing it never tried
+// because ctx was done first, wrapped around ctx's own error. A send cut
+// mid-request is not this: the provider may have accepted it.
+var errNotAttempted = errors.New("alerts: run out of time before the send")
+
+// notAttempted is errNotAttempted carrying ctx's error.
+func notAttempted(ctx context.Context) error {
+	return fmt.Errorf("%w: %w", errNotAttempted, ctx.Err())
+}
 
 // Deliverer sends a user's firings on one channel and reports per firing.
 type Deliverer interface {
@@ -339,6 +366,11 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 	// mailIDs is the distinct provider message ids seen this run, across
 	// users and channels, so a digest of several firings counts as one mail.
 	mailIDs := map[string]bool{}
+	// A side ClaimFire disarmed owes its event and state whatever the run
+	// deadline says, or the crossing is never reported: the writes run on
+	// until writeGrace past the deadline, and Deliver stops at the deadline.
+	wctx, cancel := writeContext(ctx)
+	defer cancel()
 	for _, k := range order {
 		dg := digests[k]
 		dg.Others = othersFor(byUser[k.user], dg, stopped)
@@ -346,7 +378,7 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		for _, f := range dg.Firings {
 			id := f.Alert.ID
 			res := resultFor(results, id)
-			recordEvents(ctx, deps, &sum, id, f.Decision, now, res.Err, res.MessageID)
+			recordEvents(wctx, deps, &sum, id, f.Decision, now, res.Err, res.MessageID)
 			switch {
 			case res.Err == nil:
 				sum.sent++
@@ -354,17 +386,17 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 					mailIDs[res.MessageID] = true
 				}
 				// Delivered: stamp the fire time that starts the send gap.
-				setState(ctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Decision.AboveArmed, BelowArmed: f.Decision.BelowArmed, LastFiredAt: &now})
+				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Decision.AboveArmed, BelowArmed: f.Decision.BelowArmed, LastFiredAt: &now})
 			case errors.Is(res.Err, ErrDailyLimit):
 				sum.skipped++
 				sum.deferred++
-				setState(ctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "daily email limit reached, will retry"})
+				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "daily email limit reached, will retry"})
 			case isPermanent(res.Err):
 				deps.logf("alerts: %d refused: %v", id, res.Err)
-				setState(ctx, deps, &sum, rows[id], State{Status: StatusUndeliverable, AboveArmed: f.Decision.AboveArmed, BelowArmed: f.Decision.BelowArmed, LastError: permanentReason(res.Err)})
+				setState(wctx, deps, &sum, rows[id], State{Status: StatusUndeliverable, AboveArmed: f.Decision.AboveArmed, BelowArmed: f.Decision.BelowArmed, LastError: permanentReason(res.Err)})
 			default:
 				sum.fail(deps, fmt.Sprintf("send %d", id), res.Err)
-				setState(ctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "delivery failed, will retry"})
+				setState(wctx, deps, &sum, rows[id], State{Status: StatusActive, AboveArmed: f.Alert.AboveArmed, BelowArmed: f.Alert.BelowArmed, LastError: "delivery failed, will retry"})
 			}
 		}
 	}
