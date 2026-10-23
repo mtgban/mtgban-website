@@ -723,6 +723,97 @@
         runRowAction(id, action);
     }
 
+    // ── Sorting the list on /alerts ─────────────────────────
+    // The pick is kept per device in localStorage as "field:dir". The
+    // server lists newest first, which also breaks every sort's ties.
+    var SORT_KEY = 'alertsSort';
+    var SORT_DEFAULT = 'created:desc';
+    var SORT_FIELDS = ['created', 'name', 'now', 'fired', 'status', 'side'];
+    var STATUS_RANK = { active: 0, paused: 1, over_allowance: 2, undeliverable: 3, unresolvable: 4 };
+
+    // parseSort reads a "field:dir" value, falling back to the server's
+    // order for one it does not know.
+    function parseSort(value) {
+        var parts = String(value || '').split(':');
+        if (parts.length !== 2 || SORT_FIELDS.indexOf(parts[0]) < 0 || (parts[1] !== 'asc' && parts[1] !== 'desc')) {
+            parts = SORT_DEFAULT.split(':');
+        }
+        return { field: parts[0], dir: parts[1] };
+    }
+
+    function loadSort() {
+        try { return parseSort(window.localStorage.getItem(SORT_KEY)); } catch (e) { return parseSort(''); }
+    }
+
+    function saveSort(sort) {
+        try { window.localStorage.setItem(SORT_KEY, sort.field + ':' + sort.dir); } catch (e) {}
+    }
+
+    // alertSortData is what a row's data-* attributes say it sorts by;
+    // now and fired are null when the row has no offer or never fired.
+    function alertSortData(tr) {
+        var num = function (name) {
+            var v = tr.getAttribute(name);
+            return v === null || v === '' ? null : Number(v);
+        };
+        return {
+            id: num('data-id'),
+            name: tr.getAttribute('data-name') || '',
+            side: tr.getAttribute('data-side') || '',
+            status: tr.getAttribute('data-status') || '',
+            now: num('data-now'),
+            created: num('data-created') || 0,
+            fired: num('data-fired'),
+        };
+    }
+
+    function sortValue(row, field) {
+        if (field === 'status') return row.status in STATUS_RANK ? STATUS_RANK[row.status] : 5;
+        return row[field];
+    }
+
+    // sortAlerts returns rows in sort's order; a row without a value for
+    // the field goes last whichever way it runs.
+    function sortAlerts(rows, sort) {
+        return rows.slice().sort(function (a, b) {
+            var x = sortValue(a, sort.field), y = sortValue(b, sort.field);
+            if (x === null && y !== null) return 1;
+            if (y === null && x !== null) return -1;
+            var c = 0;
+            if (typeof x === 'string') c = x.localeCompare(y, undefined, { sensitivity: 'base', numeric: true });
+            else if (x !== null) c = x - y;
+            if (c) return sort.dir === 'desc' ? -c : c;
+            return (b.created - a.created) || (b.id - a.id);
+        });
+    }
+
+    function applySort(sort) {
+        var body = document.querySelector('.alerts-table tbody');
+        if (!body) return;
+        var rows = Array.prototype.map.call(body.querySelectorAll('tr.alert-row'), function (tr) {
+            var d = alertSortData(tr);
+            d.tr = tr;
+            return d;
+        });
+        sortAlerts(rows, sort).forEach(function (d) { body.appendChild(d.tr); });
+    }
+
+    function initSort() {
+        var pick = document.getElementById('alerts-sort');
+        if (!pick) return;
+        var sort = loadSort();
+        pick.value = sort.field + ':' + sort.dir;
+        pick.closest('.alerts-sort').hidden = false;
+        applySort(sort);
+        pick.addEventListener('change', function () {
+            var picked = parseSort(pick.value);
+            saveSort(picked);
+            applySort(picked);
+        });
+    }
+
+    window.alertsSort = { parseSort: parseSort, loadSort: loadSort, saveSort: saveSort, alertSortData: alertSortData, sortAlerts: sortAlerts };
+
     // ── Channels box (#alerts-channels on /alerts) ──────────
 
     var channelsRows = [];
@@ -1060,6 +1151,7 @@
         if (table) table.addEventListener('click', onTableClick);
         var deleteAll = document.querySelector('.alerts-delete-all');
         if (deleteAll) deleteAll.addEventListener('click', onDeleteAllClick);
+        initSort();
         markExistingBells();
 
         var channelsBox = channelsHost();

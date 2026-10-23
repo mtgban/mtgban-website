@@ -14,6 +14,25 @@
     <div class="alerts-heading">
         <h2>Your alerts</h2>
         <span class="alerts-count">{{len .Alerts}} of {{.Allowance}}</span>
+        {{if gt (len .Alerts) 1}}
+        {{/* js/alerts.js shows it and sorts the rows by their data-* values. */}}
+        <label class="alerts-sort" hidden>Sort
+            <select class="alert-input" id="alerts-sort">
+                <option value="created:desc">Newest first</option>
+                <option value="created:asc">Oldest first</option>
+                <option value="name:asc">Card, A to Z</option>
+                <option value="name:desc">Card, Z to A</option>
+                <option value="now:desc">Now, highest first</option>
+                <option value="now:asc">Now, lowest first</option>
+                <option value="fired:desc">Fired most recently</option>
+                <option value="fired:asc">Fired longest ago</option>
+                <option value="status:asc">Status, active first</option>
+                <option value="status:desc">Status, problems first</option>
+                <option value="side:asc">Buylist first</option>
+                <option value="side:desc">Retail first</option>
+            </select>
+        </label>
+        {{end}}
         {{if .Alerts}}<button type="button" class="settings-btn alert-btn-danger alerts-delete-all" data-action="delete-all">Delete all</button>{{end}}
     </div>
     {{if not .Alerts}}
@@ -88,7 +107,7 @@
         <tbody>
         {{$allowed := .Allowed}}
         {{range .Alerts}}
-            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}" data-delivery="{{.Delivery}}">
+            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}" data-delivery="{{.Delivery}}" data-name="{{.Card.Name}}" data-status="{{.Status}}" data-now="{{if .Current}}{{printf "%.2f" (mulf .Current 1)}}{{end}}" data-created="{{.CreatedAt.Unix}}" data-fired="{{with .LastEvent}}{{.FiredAt.Unix}}{{end}}">
                 <td class="alert-card">
                     <a href="/search?q={{.CardID}}">{{.Card.Name}}</a>
                     <span class="alert-meta">{{.Card.Set}} #{{.Card.Number}} {{.Card.Finish}}</span>
