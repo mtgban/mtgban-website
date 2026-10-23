@@ -9,18 +9,28 @@ import (
 	"github.com/mtgban/mtgban-website/internal/alerts"
 )
 
-type discordAlertSender struct{}
+// discordAlertSender DMs through the bot session; channels is the DM
+// channel id by user, filled as the run goes, since discordgo caches none
+// and each run builds its own sender on one goroutine.
+type discordAlertSender struct {
+	channels map[string]string
+}
 
-// Send opens (or reuses) the DM channel and posts the embed.
-func (discordAlertSender) Send(discordUserID string, embed *discordgo.MessageEmbed) error {
+// Send opens the DM channel, once per user per run, and posts the embed.
+func (s *discordAlertSender) Send(discordUserID string, embed *discordgo.MessageEmbed) error {
 	if dg == nil {
 		return errors.New("discord session not connected")
 	}
-	ch, err := dg.UserChannelCreate(discordUserID)
-	if err != nil {
-		return err
+	id, ok := s.channels[discordUserID]
+	if !ok {
+		ch, err := dg.UserChannelCreate(discordUserID)
+		if err != nil {
+			return err
+		}
+		id = ch.ID
+		s.channels[discordUserID] = id
 	}
-	_, err = dg.ChannelMessageSendEmbed(ch.ID, embed)
+	_, err := dg.ChannelMessageSendEmbed(id, embed)
 	return err
 }
 
@@ -37,7 +47,7 @@ func liveAlertSender(send bool) alerts.DiscordSender {
 	if DevMode && !send {
 		return logAlertSender{}
 	}
-	return discordAlertSender{}
+	return &discordAlertSender{channels: map[string]string{}}
 }
 
 // alertStoreLabel is the store name, or its shorthand when it is not loaded.
