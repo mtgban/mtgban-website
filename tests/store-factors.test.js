@@ -212,6 +212,24 @@ test('render draws one row per saved store, sorted, with the right fields enable
     expect(discountOf(r[0]).getAttribute('min') || discountOf(r[0]).min).toBeDefined();
 });
 
+test('the store list splits into Singles and Sealed groups, sealed names marked, only when a sealed store is listed', () => {
+    const labels = (select) => select.children.map((g) => [g.getAttribute('label'), g.children.map((o) => o.value)]);
+    const sealed = [STORES[0], STORES[1], { k: 'CKSealed', n: 'Card Kingdom', r: true, b: true, s: true }];
+    const { SF, container } = loadEditor(sealed, { CKSealed: { discount: 5 } });
+    SF.render(container, SF.read());
+    const select = selectOf(rows(container)[0]);
+    expect(labels(select)).toEqual([['Singles', ['CK', 'TCG']], ['Sealed', ['CKSealed']]]);
+    const selected = select.children.flatMap((g) => g.children.filter((o) => o.selected).map((o) => o.value));
+    expect(selected).toEqual(['CKSealed']);
+    expect(select.children[1].children[0].textContent).toBe('Card Kingdom (Sealed)');
+    expect(select.children[0].children[0].textContent).toBe('Card Kingdom');
+
+    const flat = loadEditor(STORES, { CK: { discount: 5 } });
+    flat.SF.render(flat.container, flat.SF.read());
+    const options = selectOf(rows(flat.container)[0]).children;
+    expect(options.map((o) => o.tagName)).toEqual(['OPTION', 'OPTION', 'OPTION']);
+});
+
 test('collect reads the rows back through normalize', () => {
     const { SF, container } = loadEditor(STORES, { CK: { discount: 10, credit: 85 } });
     SF.render(container, SF.read());
