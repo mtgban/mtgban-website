@@ -66,7 +66,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
             <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
                 <input id="searchbox" class="landing-search" type="text" name="q"
                        placeholder="Search for a card or product..."
-                       maxlength="1000" autofocus autocapitalize="none"
+                       maxlength="1000" autofocus autocapitalize="none" autocorrect="off"
                        data-autocomplete="false"
                        onFocus="this.setSelectionRange(0, this.value.length)">
                 {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
