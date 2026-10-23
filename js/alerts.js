@@ -132,16 +132,17 @@
 
     function money(v) { return '$' + Number(v).toFixed(2); }
 
-    // lowestPrice is the lowest offer in the condition among the scoped
-    // stores (every store when scope is empty), or null when none has one.
-    function lowestPrice(stores, condition, scope) {
-        var low = null;
+    // bestPrice is the lowest retail or highest buylist offer in the
+    // condition among the scoped stores (every store when scope is empty),
+    // or null when none has one, as the server's bestStorePrice picks it.
+    function bestPrice(stores, side, condition, scope) {
+        var best = null;
         (stores || []).forEach(function (s) {
             if (scope && scope.length && !scope.some(function (x) { return x.toUpperCase() === s.shorthand.toUpperCase(); })) return;
             var p = s.prices && s.prices[condition];
-            if (p && (low === null || p < low)) low = p;
+            if (p && (best === null || (side === 'buylist' ? p > best : p < best))) best = p;
         });
-        return low;
+        return best;
     }
 
     // referenceUsed is whether either threshold is a percentage, the only
@@ -252,7 +253,7 @@
         });
     }
 
-    // The reference is the lowest offer among the checked stores, a store's
+    // The reference is the best offer among the checked stores, a store's
     // own offer, or a typed price; it only counts for a percentage.
     function renderReference() {
         var pick = document.getElementById('alert-reference-pick');
@@ -266,7 +267,7 @@
             o.textContent = text;
             pick.appendChild(o);
         };
-        add('', 'Lowest offer');
+        add('', state.side === 'buylist' ? 'Highest offer' : 'Lowest offer');
         priced.forEach(function (s) { add(s.shorthand, (s.name || s.shorthand) + ' ' + money(s.prices[state.condition])); });
         add('custom', 'Custom price');
         var store = priced.filter(function (s) { return s.shorthand === state.referenceStore; })[0];
@@ -275,8 +276,8 @@
         if (store) {
             input.value = Number(store.prices[state.condition]).toFixed(2);
         } else if (state.referenceStore === '') {
-            var low = lowestPrice(stores, state.condition, checkedStores());
-            input.value = low === null ? '' : Number(low).toFixed(2);
+            var best = bestPrice(stores, state.side, state.condition, checkedStores());
+            input.value = best === null ? '' : Number(best).toFixed(2);
         }
         var used = referenceUsed(state.aboveKind, state.belowKind);
         pick.disabled = !used;
@@ -1066,5 +1067,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, lowestPrice: lowestPrice, referenceUsed: referenceUsed };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, bestPrice: bestPrice, referenceUsed: referenceUsed };
 })();
