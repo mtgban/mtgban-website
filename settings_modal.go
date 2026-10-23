@@ -22,17 +22,14 @@ func searchSettingsKeys() (sellers, vendors []string) {
 	return sortKeysByScraperName(filterSellers(shown)), sortKeysByScraperName(filterVendors(shown))
 }
 
-// arbitBlockedVendors is the reader's ArbitDisabledVendors grant, or the
-// config block list when the grant is absent; NONE clears it. The stores
-// only the price API serves are blocked whatever the grant says.
+// arbitBlockedVendors is the reader's ArbitDisabledVendors grant; NONE, or
+// no grant, blocks nothing. The stores only the price API serves are blocked
+// whatever the grant says.
 func arbitBlockedVendors(sig string) []string {
 	var blocked []string
 	blocklistVendorsOpt := GetParamFromSig(sig, "ArbitDisabledVendors")
 	switch blocklistVendorsOpt {
-	case "":
-		// Clipped: callers append the cookie's vendors to it
-		blocked = slices.Clip(Config().Stores.ArbitBlockVendors)
-	case "NONE":
+	case "", "NONE":
 	default:
 		blocked = strings.Split(blocklistVendorsOpt, ",")
 	}

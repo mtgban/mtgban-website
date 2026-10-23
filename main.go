@@ -147,7 +147,6 @@ type ConfigType struct {
 // StoresConfig says which stores show where, by shorthand.
 type StoresConfig struct {
 	APIDemoStores          []string `json:"api_demo_stores"`
-	ArbitBlockVendors      []string `json:"arbit_block_vendors"`
 	SearchRetailBlockList  []string `json:"search_block_list"`
 	SearchBuylistBlockList []string `json:"search_buylist_block_list"`
 	APIOnlyStores          []string `json:"api_only_stores"`
