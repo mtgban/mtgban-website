@@ -37,11 +37,11 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, session } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
-    const sm = pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {};
+    const sm = session || (pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {});
     const sessionStorage = { getItem: (k) => (k in sm ? sm[k] : null), setItem: (k, v) => { sm[k] = String(v); }, removeItem: (k) => { delete sm[k]; } };
     const body = el('body'); if (mobile) body.classes.add('mobile');
     const nav = el('button'); nav.setAttribute('id', 'nav-backpack'); nav.hidden = true;
@@ -90,7 +90,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max 
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
-        window, document, m, rows, nav, navCount, stored, key, pendingIds,
+        window, document, m, sm, rows, nav, navCount, stored, key, pendingIds,
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
     };
@@ -374,6 +374,93 @@ describe('the panel', () => {
         const panel = open(p);
         expect(panel.classes.has('backpack-sheet')).toBe(true);
         expect(panel.classes.has('m-drawer')).toBe(false);
+    });
+});
+
+describe('undo', () => {
+    function open(p) { p.nav.click(); return ids['backpack-panel']; }
+    const live = (p) => p.stored().filter((e) => !e.del);
+
+    test('undoing a tap that added a card takes it out again', () => {
+        const p = page();
+        p.window.toggleBackpack(p.rows[0]);
+        expect(p.window.Backpack.undo()).toBe(true);
+        expect(live(p)).toEqual([]);
+        p.window.renderBackpack();
+        expect(p.rows[0].classes.has('active')).toBe(false);
+    });
+
+    test('undoing a tap that took a card out brings back its copies', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 4, t: 1, m: 1 }] });
+        p.window.toggleBackpack(p.rows[0]);
+        p.window.Backpack.undo();
+        expect(live(p).map((e) => [e.id, e.qty, e.t])).toEqual([['uuid-1', 4, 1]]);
+    });
+
+    test('quantity changes and removals step back one at a time', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        p.window.Backpack.setQty('uuid-1', 3);
+        p.window.Backpack.remove('uuid-1');
+        p.window.Backpack.undo();
+        expect(live(p).map((e) => e.qty)).toEqual([3]);
+        p.window.Backpack.undo();
+        expect(live(p).map((e) => e.qty)).toEqual([2]);
+        expect(p.window.Backpack.undo()).toBe(false);
+    });
+
+    test('a change that changes nothing leaves no step', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        p.window.Backpack.setQty('uuid-1', 2);
+        p.window.Backpack.clear(['nope']);
+        expect(p.window.Backpack.undo()).toBe(false);
+    });
+
+    test('undoing a Clear brings back every card', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 2, t: 3, m: 3 }, { id: 'b', name: 'B', qty: 1, t: 2, m: 2 }, { id: 'c', name: 'C', qty: 5, t: 1, m: 1 }] });
+        p.window.Backpack.clear();
+        p.window.Backpack.undo();
+        expect(live(p).map((e) => [e.id, e.qty]).sort()).toEqual([['a', 2], ['b', 1], ['c', 5]]);
+        expect(p.window.Backpack.read().filter((e) => !e.del).sort((x, y) => y.t - x.t).map((e) => e.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    test('a restored card is stamped after the removal, so the sync merge keeps it', async () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        p.window.toggleBackpack(p.rows[0]);
+        const removed = p.stored()[0].m;
+        await new Promise((r) => setTimeout(r, 2));
+        p.window.Backpack.undo();
+        const e = p.stored()[0];
+        expect(e.del).toBeUndefined();
+        expect(e.m).toBeGreaterThan(removed);
+    });
+
+    test('the steps outlive a page load in the same tab', () => {
+        const first = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        first.window.toggleBackpack(first.rows[0]);
+        const next = page({ store: first.stored(), session: first.sm });
+        next.window.Backpack.undo();
+        expect(live(next).map((e) => e.qty)).toEqual([2]);
+    });
+
+    test('only the last 20 steps are kept', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }] });
+        for (let q = 2; q <= 30; q++) p.window.Backpack.setQty('uuid-1', q);
+        let n = 0;
+        while (p.window.Backpack.undo()) n++;
+        expect(n).toBe(20);
+        expect(live(p)[0].qty).toBe(10);
+    });
+
+    test('the panel Undo button is off until there is a step, and takes it back', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        const panel = open(p);
+        expect(ids['backpack-undo'].disabled).toBe(true);
+        panel.querySelectorAll('.backpack-remove')[0].click();
+        expect(ids['backpack-undo'].disabled).toBe(false);
+        ids['backpack-undo'].click();
+        expect(panel.querySelectorAll('.backpack-qty')[0].textContent).toBe('2');
+        expect(p.navCount.textContent).toBe('2');
+        expect(ids['backpack-undo'].disabled).toBe(true);
     });
 });
 
