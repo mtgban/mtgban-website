@@ -23,7 +23,7 @@ async function flushAfterWrite(key, value) {
     const storage = new Storage();
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const window = { addEventListener() {}, Storage, localStorage: storage };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const writes = [];
     // The GET answers as for a visitor, so nothing hydrates; a PATCH lands.
     const fetch = (url, opts) => {

@@ -3,6 +3,8 @@
     'use strict';
 
     var PREF = 'offline_mode';
+    // Whether the last ordinary page rendered the SearchOfflineMode flag
+    var AVAILABLE_PREF = 'offline_available';
     // Roaming csv pref -> IDB meta array key (sync() reads the IDB copy and passes it to the worker)
     var SEL_PREFS = {
         offline_stores: 'storesSel',
@@ -22,11 +24,19 @@
         try { localStorage.removeItem(k); } catch (e) {}
     }
 
-    // The MTGBAN cookie is base64 over url.Values; SearchOfflineMode is an ACL flag.
+    // The cached /offline shell is rendered without credentials, so its own
+    // flag says nothing about the reader.
+    function onShell() { return !!document.getElementById('offline-banner'); }
+
+    // SearchOfflineMode is an ACL flag; the server renders it on <html>. The
+    // shell takes the flag the last ordinary page left behind.
     function available() {
-        try {
-            return new URLSearchParams(atob(getCookie('MTGBAN'))).get('SearchOfflineMode') === 'true';
-        } catch (e) { return false; }
+        if (document.documentElement.dataset.offlineMode === 'true') return true;
+        return onShell() && readPref(AVAILABLE_PREF) === 'true';
+    }
+
+    if (!onShell()) {
+        writePref(AVAILABLE_PREF, document.documentElement.dataset.offlineMode === 'true' ? 'true' : 'false');
     }
 
     function enabled() { return readPref(PREF) === 'true'; }

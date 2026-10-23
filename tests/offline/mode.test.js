@@ -3,29 +3,71 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // Load the shipped module with stubbed window/document; DOM/network wiring stays inert.
-function loadOfflineMode(cookie = '', win = {}, globals = {}) {
+function loadOfflineMode(offlineMode = 'false', win = {}, globals = {}, page = {}) {
     const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-mode.js'), 'utf8');
-    const cookies = readFileSync(join(import.meta.dir, '..', '..', 'js', 'cookies.js'), 'utf8');
     const doc = {
-        cookie,
+        documentElement: { dataset: { offlineMode } },
         readyState: 'complete',
         addEventListener: () => {},
         dispatchEvent: () => {},
         getElementById: () => null,
+        ...page,
     };
     const names = Object.keys(globals);
-    new Function('window', 'document', ...names, cookies + '\n' + src)(win, doc, ...names.map((n) => globals[n]));
+    new Function('window', 'document', ...names, src)(win, doc, ...names.map((n) => globals[n]));
     return win.OfflineMode;
 }
 
 const OfflineMode = loadOfflineMode();
 
-// The flag rides in the signed MTGBAN cookie: base64 over url.Values.
-test('available reads SearchOfflineMode out of the MTGBAN cookie', () => {
-    const signed = (values) => 'theme=dark; MTGBAN=' + encodeURIComponent(btoa(values));
-    expect(loadOfflineMode(signed('UserTier=Pioneer&SearchOfflineMode=true')).available()).toBe(true);
-    expect(loadOfflineMode(signed('UserTier=Pioneer')).available()).toBe(false);
-    expect(loadOfflineMode('theme=dark').available()).toBe(false);
+// The server renders the SearchOfflineMode ACL flag on <html>.
+test('available reads the flag the server rendered on the html element', () => {
+    expect(loadOfflineMode('true').available()).toBe(true);
+    expect(loadOfflineMode('false').available()).toBe(false);
+    expect(loadOfflineMode('').available()).toBe(false);
+});
+
+// A Storage over a Map, for the pref the shell reads back.
+function memoryStorage(initial = {}) {
+    const values = new Map(Object.entries(initial));
+    return {
+        values,
+        getItem: (k) => (values.has(k) ? values.get(k) : null),
+        setItem: (k, v) => { values.set(k, String(v)); },
+        removeItem: (k) => { values.delete(k); },
+    };
+}
+
+const shell = { getElementById: (id) => (id === 'offline-banner' ? {} : null) };
+
+// The cached /offline shell is rendered without credentials, so it carries a
+// false flag whoever opens it.
+test('the shell is available to a reader whose last ordinary page had the flag', () => {
+    const offline = (stored) => loadOfflineMode('false', {}, {
+        localStorage: memoryStorage(stored === undefined ? {} : { offline_available: stored }),
+    }, shell).available();
+    expect(offline('true')).toBe(true);
+    expect(offline('false')).toBe(false);
+    expect(offline(undefined)).toBe(false);
+});
+
+test('an ordinary page ignores the remembered flag', () => {
+    const localStorage = memoryStorage({ offline_available: 'true' });
+    expect(loadOfflineMode('false', {}, { localStorage }).available()).toBe(false);
+});
+
+test('an ordinary page remembers the flag it was rendered with, the shell does not', () => {
+    const localStorage = memoryStorage();
+    loadOfflineMode('true', {}, { localStorage });
+    expect(localStorage.getItem('offline_available')).toBe('true');
+    // The shell reads it and leaves it, whatever its own flag says
+    loadOfflineMode('false', {}, { localStorage }, shell);
+    expect(localStorage.getItem('offline_available')).toBe('true');
+    // A reader who lost the flag has it overwritten by the next ordinary page
+    loadOfflineMode('false', {}, { localStorage });
+    expect(localStorage.getItem('offline_available')).toBe('false');
+    loadOfflineMode('true', {}, { localStorage }, shell);
+    expect(localStorage.getItem('offline_available')).toBe('false');
 });
 
 // --- Storage line sync-status text ---
@@ -73,7 +115,7 @@ async function guardedDuring(opts) {
         removeEventListener: (type, fn) => { if (type === 'beforeunload') listeners.delete(fn); },
     };
     const posted = [];
-    const OfflineMode = loadOfflineMode('', win, {
+    const OfflineMode = loadOfflineMode('false', win, {
         localStorage: { getItem: (k) => (k === 'offline_mode' ? 'true' : null) },
         OfflineDB: { getMeta: () => Promise.resolve([]) },
         Worker: class { postMessage(m) { posted.push(m); } },
@@ -106,7 +148,7 @@ test('an image sync asked for during a price refresh runs after it', async () =>
         addEventListener: (type, fn) => { if (type === 'beforeunload') listeners.add(fn); },
         removeEventListener: (type, fn) => { if (type === 'beforeunload') listeners.delete(fn); },
     };
-    const OfflineMode = loadOfflineMode('', win, {
+    const OfflineMode = loadOfflineMode('false', win, {
         localStorage: { getItem: (k) => (k === 'offline_mode' ? 'true' : null) },
         OfflineDB: anyDB,
         Worker: class { constructor() { worker = this; } postMessage(m) { posted.push(m); } },
@@ -132,7 +174,7 @@ test('a pause drops an image sync still queued behind a price refresh', async ()
     const events = [];
     let worker;
     const anyDB = new Proxy({}, { get: () => () => Promise.resolve([]) });
-    const OfflineMode = loadOfflineMode('', { addEventListener: () => {}, removeEventListener: () => {} }, {
+    const OfflineMode = loadOfflineMode('false', { addEventListener: () => {}, removeEventListener: () => {} }, {
         localStorage: { getItem: (k) => (k === 'offline_mode' ? 'true' : null) },
         OfflineDB: anyDB,
         Worker: class { constructor() { worker = this; } postMessage(m) { posted.push(m); } },

@@ -21,7 +21,7 @@ async function reconcileBackpack(local, server, clean, max) {
     const rendered = [];
     const window = { addEventListener() {}, renderBackpack: () => rendered.push(m.mtgban_backpack) };
     if (max) window.BAN_BACKPACK_MAX = max;
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const state = { version: 3, favorites: [], recents: [], preferences: {}, backpack: server };
     const puts = [];
     const writes = [];

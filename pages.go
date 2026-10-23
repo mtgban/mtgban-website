@@ -334,6 +334,14 @@ type PageVars struct {
 	// js/backpack.js and js/user-state.js on every page that syncs it.
 	BackpackMax int
 
+	// What the page's scripts gate on, rendered on <html> because a script
+	// cannot read the signature cookie: that the request carried one, and
+	// that it names SearchOfflineMode. Neither is verified; they only show
+	// or hide things, and a request that acts on a grant checks the
+	// signature itself.
+	ScriptSignedIn    bool
+	ScriptOfflineMode bool
+
 	IsMobile bool
 
 	// GatewayURL is the API gateway's origin, for links to its account and admin pages.
@@ -414,6 +422,14 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 	msg := ""
 	showPatreonLogin := false
 	origin := requestOrigin(r)
+	cookie := ""
+	if r != nil {
+		cookie = readCookie(r, "MTGBAN")
+	}
+	cookieParams := sigParams
+	if cookie != sig {
+		cookieParams = parseSig(cookie)
+	}
 	if sig != "" {
 		if expires < time.Now().Unix() {
 			msg = ErrMsgExpired
@@ -444,6 +460,9 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		UserTier: strings.ToLower(sigParams.Get("UserTier")),
 
 		BackpackMax: backpackMaxFromValues(sigParams),
+
+		ScriptSignedIn:    cookie != "",
+		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true",
 	}
 
 	if Config().Game != DefaultGame {
