@@ -10,6 +10,7 @@ import (
 
 	"github.com/mtgban/mtgban-website/apihandoff"
 	"github.com/mtgban/mtgban-website/internal/pledge"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
 
 // Messages the handoff pages show instead of redirecting.
@@ -65,7 +66,7 @@ const patreonAuthorizeURL = "https://www.patreon.com/oauth2/authorize"
 // token is minted from Patreon's answer in finishAPIHandoff, never from the
 // site's cookie, which travels in links and scripts can read.
 func (s *site) apiHandoff(w http.ResponseWriter, r *http.Request, purpose string) {
-	origin := requestOrigin(r)
+	origin := siteorigin.Of(r)
 	patreonConfig := Infrastructure().Patreon
 	clientID := patreonConfig.Client[patreonConfig.Source]
 	nonce := ""
@@ -247,5 +248,5 @@ func trustedReturnTo(raw string) bool {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return false
 	}
-	return trustedHostname(u.Host)
+	return siteorigin.Trusted(u.Host)
 }

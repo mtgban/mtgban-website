@@ -8,6 +8,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -63,5 +64,5 @@ func alertsIdentity(r *http.Request) (c alerts.Caller, status int, msg string) {
 	if v.Get("UserEmailUnverified") == "true" {
 		return c, http.StatusForbidden, alertsUnverifiedMsg
 	}
-	return alerts.Caller{UserHash: userstate.HashEmail(email), Tier: v.Get("UserTier"), Values: v, Origin: requestOrigin(r)}, http.StatusOK, ""
+	return alerts.Caller{UserHash: userstate.HashEmail(email), Tier: v.Get("UserTier"), Values: v, Origin: siteorigin.Of(r)}, http.StatusOK, ""
 }

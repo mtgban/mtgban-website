@@ -18,6 +18,7 @@ import (
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/pledge"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -50,101 +51,12 @@ var Pledge = pledge.New(pledge.Hooks{
 	},
 })
 
-// requestOrigin returns the public origin for this request. The proxy must
-// overwrite the forwarded headers before they reach the application; the
-// hostname check prevents an arbitrary Host value from becoming a redirect or
-// OAuth target.
-func requestOrigin(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-
-	scheme := firstForwardedValue(r.Header.Get("X-Forwarded-Proto"))
-	if scheme == "" {
-		scheme = "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-	}
-	if scheme != "http" && scheme != "https" {
-		return ""
-	}
-
-	host := requestHost(r)
-	if !trustedHostname(host) {
-		return ""
-	}
-
-	return scheme + "://" + host
-}
-
-func firstForwardedValue(value string) string {
-	// The edge must strip/overwrite client-supplied values, or prepend its own
-	// value. An edge that appends instead leaves the client in control of the
-	// first hop, so that proxy contract must be enforced outside the app.
-	if comma := strings.IndexByte(value, ','); comma >= 0 {
-		value = value[:comma]
-	}
-	return strings.TrimSpace(value)
-}
-
-func requestHost(r *http.Request) string {
-	host := firstForwardedValue(r.Header.Get("X-Forwarded-Host"))
-	if host == "" {
-		host = r.Host
-	}
-	return host
-}
-
-// trustedHostname reports whether a host belongs to this site: localhost in
-// dev, or an mtgban.com host in production. Matched on the hostname exactly
-// (dropping any :port) and by suffix rather than substring, so a spoofed
-// "…mtgban.com.evil.tld" can't slip through.
-func trustedHostname(host string) bool {
-	name, ok := validHostname(firstForwardedValue(host))
-	if !ok {
-		return false
-	}
-	return name == "localhost" || name == "mtgban.com" || strings.HasSuffix(name, ".mtgban.com")
-}
-
-func validHostname(host string) (string, bool) {
-	if strings.Count(host, ":") == 1 {
-		name, port, _ := strings.Cut(host, ":")
-		if port == "" {
-			return "", false
-		}
-		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
-			return "", false
-		}
-		host = name
-	} else if strings.Contains(host, ":") {
-		return "", false
-	}
-
-	host = strings.TrimSuffix(strings.ToLower(host), ".")
-	if host == "" {
-		return "", false
-	}
-	for _, label := range strings.Split(host, ".") {
-		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-			return "", false
-		}
-		for _, char := range label {
-			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
-				return "", false
-			}
-		}
-	}
-	return host, true
-}
-
 // patreonTimeout is how long a login or a handoff waits on Patreon, its
 // token exchange and lookups together.
 const patreonTimeout = 10 * time.Second
 
 func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
-	origin := requestOrigin(r)
+	origin := siteorigin.Of(r)
 	if origin == "" {
 		http.Error(w, "invalid host", http.StatusBadRequest)
 		return

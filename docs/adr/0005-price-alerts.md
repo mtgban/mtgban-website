@@ -60,7 +60,7 @@ each for all of them.
    before `acl.json` grants either.
 7. **A DM links to the site its alert was saved on.** The evaluator has
    no request to take a host from, so create and edit save the request's
-   origin on the alert (`requestOrigin`, which trusts only `mtgban.com`,
+   origin on the alert (`siteorigin.Of`, which trusts only `mtgban.com`,
    its subdomains and `localhost`). No deployment has to be told its own
    address.
 

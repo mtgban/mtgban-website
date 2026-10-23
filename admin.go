@@ -31,6 +31,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/jobs"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
+	"github.com/mtgban/mtgban-website/internal/siteorigin"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/simplecloud"
 
@@ -233,7 +234,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 // crossSitePost reports whether r changes state from another site's page.
 // GET, HEAD and OPTIONS never do. The browser's Sec-Fetch-Site says where a
 // form came from; without it, Origin has to be this site's own, scheme and
-// public host as requestOrigin reads them behind the proxy, or on a host it
+// public host as siteorigin.Of reads them behind the proxy, or on a host it
 // does not know, a dev box, the request's own. A request with neither, as
 // curl sends, passes.
 func crossSitePost(r *http.Request) bool {
@@ -249,7 +250,7 @@ func crossSitePost(r *http.Request) bool {
 	if origin == "" {
 		return false
 	}
-	own := requestOrigin(r)
+	own := siteorigin.Of(r)
 	if own != "" {
 		return !strings.EqualFold(origin, own)
 	}
