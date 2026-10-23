@@ -25,9 +25,33 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+// backpackError is the error a backpack is refused with, "" when it is a
+// list holding at most limit live cards: the entries without a del stamp,
+// as js/list-storage.js counts them.
+func backpackError(raw json.RawMessage, limit int) string {
+	var list []struct {
+		Del any `json:"del"`
+	}
+	err := json.Unmarshal(raw, &list)
+	if err != nil {
+		return "bad body"
+	}
+	live := 0
+	for _, e := range list {
+		if e.Del == nil || e.Del == false || e.Del == 0.0 || e.Del == "" {
+			live++
+		}
+	}
+	if live > limit {
+		return "backpack is full"
+	}
+	return ""
+}
+
 // ServeAPI handles GET/PUT on /api/userstate/ and PATCH on /{section} for an
-// already-authenticated email; a nil db is 503.
-func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) {
+// already-authenticated email, whose backpack may hold backpackMax cards; a
+// nil db is 503.
+func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string, backpackMax int) {
 	if !apiLimiter.Allow(email) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many requests"})
 		return
@@ -77,6 +101,13 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) 
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
 			return
 		}
+		if body.Backpack != nil {
+			msg := backpackError(body.Backpack, backpackMax)
+			if msg != "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
+				return
+			}
+		}
 		result, conflict, err := db.Put(ctx, hash, body, body.Version)
 		if err != nil {
 			log.Printf("userstate: PUT failed for %.10s: %v", hash, err)
@@ -105,6 +136,13 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) 
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
 			return
+		}
+		if section == "backpack" {
+			msg := backpackError(body.Data, backpackMax)
+			if msg != "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
+				return
+			}
 		}
 		result, conflict, err := db.Patch(ctx, hash, section, body.Data, body.Version)
 		if err != nil {

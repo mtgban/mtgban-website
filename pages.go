@@ -119,6 +119,7 @@ var OptionalFields = []string{
 	"APImode",
 	"SleepersCYOA",
 	"SearchOfflineMode",
+	"SearchBackpackMax",
 	"AlertsMax",
 	"AlertChannels",
 }
@@ -329,6 +330,10 @@ type PageVars struct {
 	UserTier string
 	Hash     string
 
+	// BackpackMax is how many cards the reader's backpack holds, for
+	// js/backpack.js and js/user-state.js on every page that syncs it.
+	BackpackMax int
+
 	IsMobile bool
 
 	// GatewayURL is the API gateway's origin, for links to its account and admin pages.
@@ -437,6 +442,8 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		// Read off the signature that is already parsed above, so the navbar
 		// can wear the tier without asking anybody
 		UserTier: strings.ToLower(sigParams.Get("UserTier")),
+
+		BackpackMax: backpackMaxFromValues(sigParams),
 	}
 
 	if Config().Game != DefaultGame {

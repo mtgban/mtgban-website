@@ -131,6 +131,8 @@ func aclFlagLabel(flag, value string) (string, bool) {
 		return count("Price charts back %d day", "Price charts back %d days")
 	case "SearchOfflineMode":
 		return on("Offline mode")
+	case "SearchBackpackMax":
+		return count("Backpack of %d card", "Backpack of %d cards")
 	case "SearchDisabled":
 		return listLabel(value, "Every retail store shown", "Some retail stores hidden")
 	case "SearchBuylistDisabled":
