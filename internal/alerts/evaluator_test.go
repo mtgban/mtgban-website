@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -45,11 +44,6 @@ type fakeEvalStore struct {
 	disabledSince int
 	// disabledUntil is the upper bound ChannelsDisabledSince was last asked for.
 	disabledUntil time.Time
-	// queues counts QueueUnscopedRearmOnce calls; queueErr fails them.
-	queues   int
-	queueErr error
-	// rearm is the alerts queued for a fresh startArmed.
-	rearm map[int64]bool
 }
 
 func newFakeEvalStore(rows ...ActiveAlert) *fakeEvalStore {
@@ -241,20 +235,6 @@ func (f *fakeEvalStore) PruneUnverifiedChannels(context.Context, time.Time) (int
 	return 0, nil
 }
 
-func (f *fakeEvalStore) QueueUnscopedRearmOnce(context.Context, string) (int64, error) {
-	f.queues++
-	return 0, f.queueErr
-}
-
-func (f *fakeEvalStore) RearmQueued(context.Context, string) (map[int64]bool, error) {
-	return maps.Clone(f.rearm), nil
-}
-
-func (f *fakeEvalStore) DropRearm(_ context.Context, id int64) error {
-	delete(f.rearm, id)
-	return nil
-}
-
 func (f *fakeEvalStore) ChannelsDisabledSince(_ context.Context, _, until time.Time) (int, error) {
 	f.calls++
 	f.disabledUntil = until
@@ -434,69 +414,6 @@ func TestRunAlertEvaluationPickedOnlyStore(t *testing.T) {
 	runEvaluation(context.Background(), deps(store, dd), buylistOnly)
 	if !slices.Equal(dd.ids(), []int64{7}) || store.events[0].Store != "TCGDirectNet" {
 		t.Fatalf("named alert sent %v, events %+v", dd.ids(), store.events)
-	}
-}
-
-// staleStateStore loses every SetState, as an edit or pause between the
-// listing and the write does.
-type staleStateStore struct{ *fakeEvalStore }
-
-func (staleStateStore) SetState(context.Context, int64, time.Time, State) (bool, error) {
-	return false, nil
-}
-
-func TestRunAlertEvaluationRearmsQueuedAlerts(t *testing.T) {
-	var quotes []StorePrice
-	run := func(store *fakeEvalStore, dd *fakeDeliverer) {
-		d := evalDeps(store, dd, 0)
-		d.Prices = func(string, Side, url.Values) []StorePrice { return quotes }
-		runEvaluation(context.Background(), d, buylistOnly)
-		// The next run sees what this one wrote.
-		for i, r := range store.rows {
-			if st, ok := store.states[r.ID]; ok {
-				store.rows[i].AboveArmed, store.rows[i].BelowArmed = st.AboveArmed, st.BelowArmed
-			}
-		}
-	}
-	net := StorePrice{Shorthand: "TCGDirectNet", Prices: map[string]float64{"NM": 13}, PickedOnly: true}
-
-	// Disarmed while TCG Direct (net) was in scope, now the only quote: with
-	// nothing in scope it re-arms, as a new alert would, and fires nothing.
-	a := activeAlert()
-	a.AboveArmed = false
-	store := newFakeEvalStore(a)
-	store.rearm = map[int64]bool{7: true}
-	dd := &fakeDeliverer{}
-	quotes = []StorePrice{net}
-	run(store, dd)
-	if len(dd.sent) != 0 || !store.states[7].AboveArmed || store.rearm[7] {
-		t.Fatalf("rearm run: sent %v, state %+v, still queued %v", dd.ids(), store.states[7], store.rearm[7])
-	}
-	// A real store then buying past the line fires it.
-	quotes = []StorePrice{net, {Shorthand: "CK", Prices: map[string]float64{"NM": 13}}}
-	run(store, dd)
-	if !slices.Equal(dd.ids(), []int64{7}) {
-		t.Fatalf("real offer past the line sent %v", dd.ids())
-	}
-
-	// A write that loses to an edit or a pause keeps the alert queued.
-	stale := newFakeEvalStore(activeAlert())
-	stale.rearm = map[int64]bool{7: true}
-	d := evalDeps(stale, &fakeDeliverer{}, 0)
-	d.Store = staleStateStore{stale}
-	d.Prices = func(string, Side, url.Values) []StorePrice { return []StorePrice{net} }
-	runEvaluation(context.Background(), d, buylistOnly)
-	if !stale.rearm[7] {
-		t.Fatal("an alert whose rearm was not written left the queue")
-	}
-
-	// Queued with a real store already past the line: it waits, unfired.
-	store = newFakeEvalStore(activeAlert())
-	store.rearm = map[int64]bool{7: true}
-	dd = &fakeDeliverer{}
-	run(store, dd)
-	if len(dd.sent) != 0 || store.states[7].AboveArmed || !store.states[7].BelowArmed {
-		t.Fatalf("past the line: sent %v, state %+v", dd.ids(), store.states[7])
 	}
 }
 

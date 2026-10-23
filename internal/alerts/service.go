@@ -38,9 +38,6 @@ type Service struct {
 	lastPrune time.Time
 	// lastRun is the previous run's start, zero before the first run.
 	lastRun time.Time
-	// queued is set once QueueUnscopedRearmOnce has run; only the evaluator
-	// loop reads or writes it.
-	queued bool
 }
 
 // NewService constructs a Service evaluating store's alerts with deps and
@@ -216,18 +213,6 @@ func (s *Service) runPending(ctx context.Context, deps EvalDeps) {
 		deps.logf("alerts: not ready, waiting for the datastore and prices")
 		deps.report("waiting for the datastore and prices", "")
 		return
-	}
-	if !s.queued {
-		n, err := deps.Store.QueueUnscopedRearmOnce(ctx, deps.Game)
-		if err != nil {
-			deps.logf("alerts: %v", err)
-			deps.report("waiting to queue alerts on every store for re-arming", err.Error())
-			return
-		}
-		if n > 0 {
-			deps.logf("alerts: queued %d buylist alerts on every store for re-arming", n)
-		}
-		s.queued = true
 	}
 	sides := s.takePending()
 	if len(sides) == 0 {
