@@ -26,12 +26,9 @@
         'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets'
     ];
 
-    // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.
-    function isSignedIn() {
-        return /(?:^|;\s*)MTGBAN=/.test(document.cookie);
-    }
-
-    var signedIn = isSignedIn();
+    // The server renders whether the request carried the auth cookie; that is
+    // a cheap signed-in gate, not a check of the signature.
+    var signedIn = document.documentElement.dataset.signedIn === 'true';
 
     // Local-only bookkeeping keys (never synced).
     var DIRTY_KEY = 'mtgban_userstate_dirty';

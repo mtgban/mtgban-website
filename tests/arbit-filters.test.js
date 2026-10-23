@@ -265,7 +265,7 @@ function deviceUserState() {
     const window = { addEventListener() {} };
     const source = readFileSync(new URL('../js/user-state.js', import.meta.url), 'utf8');
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
-        window, { cookie: '', readyState: 'complete', addEventListener() {} }, fakeStorage(), fakeStorage(), null, { mtime: () => 0 });
+        window, { documentElement: { dataset: { signedIn: 'false' } }, readyState: 'complete', addEventListener() {} }, fakeStorage(), fakeStorage(), null, { mtime: () => 0 });
     return window.UserState;
 }
 
@@ -290,7 +290,7 @@ async function mergedFilters(local, server, dirty = true) {
     const window = { addEventListener() {} };
     const fetch = () => Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
-        window, { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} }, storage, fakeStorage(), fetch,
+        window, { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} }, storage, fakeStorage(), fetch,
         { mtime: (x) => x.m || x.t || 0, tombstones: () => [] }, () => 0, () => {});
     for (let i = 0; i < 20; i++) await Promise.resolve();
     return { local: storage, userState: window.UserState };

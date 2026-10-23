@@ -281,7 +281,7 @@
     // the query itself; the page sends nothing but the text.
     function sendPopularVote(q) {
         if (window.location.pathname === '/sealed') return;
-        if (!/(?:^|;\s*)MTGBAN=/.test(document.cookie || '')) return;
+        if (document.documentElement.dataset.signedIn !== 'true') return;
         var nav = window.navigator;
         if (!nav || typeof nav.sendBeacon !== 'function') return;
         var body = new URLSearchParams();

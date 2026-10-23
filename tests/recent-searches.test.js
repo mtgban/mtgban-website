@@ -41,7 +41,7 @@ test('multi-result sealed recents retain the sealed route', () => {
 
 // Drives recent-searches.js through one results-page load and reports what
 // it sent to the vote beacon. pending is what the search form submitted.
-function runResultsPage({pathname = '/search', pending = 'black lotus', found = true, cookie = 'MTGBAN=abc'} = {}) {
+function runResultsPage({pathname = '/search', pending = 'black lotus', found = true, signedIn = true} = {}) {
     const events = {};
     const values = new Map();
     if (pending !== null) values.set('mtgban_pending_search', pending);
@@ -55,7 +55,7 @@ function runResultsPage({pathname = '/search', pending = 'black lotus', found = 
     };
     const document = {
         readyState: 'loading',
-        cookie,
+        documentElement: {dataset: {signedIn: String(signedIn)}},
         addEventListener: (type, handler) => { events[type] = handler; },
         getElementById: () => null,
         querySelector: () => null,
@@ -92,6 +92,6 @@ test('a sealed search sends no vote', () => {
     expect(runResultsPage({pathname: '/sealed'})).toEqual([]);
 });
 
-test('a visitor without the cookie sends no vote', () => {
-    expect(runResultsPage({cookie: ''})).toEqual([]);
+test('a visitor the page renders as signed out sends no vote', () => {
+    expect(runResultsPage({signedIn: false})).toEqual([]);
 });

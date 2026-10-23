@@ -26,7 +26,7 @@ async function hydrateWith(preferences) {
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const seen = [];
     const window = { addEventListener() {}, UploadPresets: { refresh: () => seen.push(m.mtgban_upload_presets) } };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const res = { status: 200, ok: true, json: () => Promise.resolve({ version: 3, favorites: [], recents: [], preferences }) };
     const fetch = () => Promise.resolve(res);
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
@@ -48,7 +48,7 @@ async function reconcilePresets(local, server) {
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const window = { addEventListener() {} };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_upload_presets: JSON.stringify(server) } };
     const puts = [];
     const fetch = (url, opts) => {
@@ -98,7 +98,7 @@ test('hydrate hands the synced arbitrage filters to the page', async () => {
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const seen = [];
     const window = { addEventListener() {}, ArbitFilters: { refresh: () => seen.push(m.mtgban_arbit_filters) } };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const filters = JSON.stringify({ arbit: { q: 'f=1&minsell=2', t: 9 } });
     const res = { status: 200, ok: true, json: () => Promise.resolve({ version: 3, favorites: [], recents: [], preferences: { mtgban_arbit_filters: filters } }) };
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
@@ -113,7 +113,7 @@ async function reconcileArbit(local, server) {
     const m = { mtgban_userstate_dirty: '1', mtgban_arbit_filters: JSON.stringify(local) };
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_arbit_filters: JSON.stringify(server) } };
     const puts = [];
     const fetch = (url, opts) => {
@@ -152,7 +152,7 @@ async function reconcileArbitPresets(local, server) {
     const m = { mtgban_userstate_dirty: '1', mtgban_arbit_presets: JSON.stringify(local) };
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const state = { version: 3, favorites: [], recents: [], preferences: { mtgban_arbit_presets: JSON.stringify(server) } };
     const puts = [];
     const fetch = (url, opts) => {
@@ -181,7 +181,7 @@ test('a sync response\'s Date sets the clock the saved filters are stamped with'
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const window = { addEventListener() {} };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     // The server's clock an hour behind this device's
     const server = new Date(Date.now() - 60 * 60 * 1000).toUTCString();
     const res = {
@@ -201,7 +201,7 @@ function clockAt(skew, at) {
     const m = { mtgban_userstate_clock: JSON.stringify({ skew, at }) };
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const window = { addEventListener() {} };
-    const document = { cookie: '', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'false' } }, readyState: 'complete', addEventListener() {} };
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
         window, document, storage, {}, () => Promise.reject(new Error('no fetch')), { mtime: () => 0 });
     return window.UserState.now() - Date.now();
@@ -226,7 +226,7 @@ async function clockAfterTrip(rtt, held, jump = 0, after = 0, asleep = 0) {
     const m = { mtgban_userstate_clock: JSON.stringify({ skew: held, at: clock.t - 1000 }) };
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const window = { addEventListener() {} };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const date = new Date(clock.t + rtt / 2).toUTCString();
     const fetch = () => {
         clock.t += rtt;
@@ -348,7 +348,7 @@ async function hydrateBehind(preferences) {
     const m = {};
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
-    const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const date = new Date(Date.now() - 60 * 60 * 1000).toUTCString();
     const patches = [];
     const fetch = (url, opts) => {
@@ -412,7 +412,7 @@ async function syncDevice(server, device) {
     };
     const timers = [];
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', 'Date', source)(
-        { addEventListener() {} }, { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} }, storage,
+        { addEventListener() {} }, { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} }, storage,
         { getItem: () => null, setItem() {} }, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] },
         (fn) => timers.push(fn), () => {}, FakeDate);
     for (let i = 0; i < 20; i++) await Promise.resolve();
