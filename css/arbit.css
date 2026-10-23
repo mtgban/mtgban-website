@@ -590,6 +590,8 @@ button.arb-filter-reset:disabled {
     overflow-x: auto;
     margin-bottom: 24px;
 }
+/* A folded store keeps its header and hides its cards */
+.arb-section.folded .arb-table-wrap { display: none; }
 
 .arb-table { width: 100%; border-collapse: collapse; font-size: var(--text-md); }
 
