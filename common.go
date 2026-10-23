@@ -136,12 +136,16 @@ func saveInfrastructure(ctx context.Context, value infrastructure.Config) error 
 // next load), a Patreon client or secret (login breaks), or a database's
 // settings (a restart opens none).
 // Dropping one of those is an edit to the file itself, not the editor's.
-// It also refuses a handoff origin that handoffOrigins would leave out.
+// It also refuses a handoff origin that handoffOrigins would leave out, or
+// whose seller segment no single path segment can equal.
 func validateInfrastructure(value, running infrastructure.Config) error {
 	var problems []string
 	for _, origin := range slices.Sorted(maps.Keys(value.HandoffOrigins)) {
 		if !validHandoffOrigin(origin) {
 			problems = append(problems, "handoff origin "+origin+" is not a bare https scheme and host")
+		}
+		if strings.Contains(value.HandoffOrigins[origin].Seller, "/") {
+			problems = append(problems, "handoff origin "+origin+" has a seller segment with a /")
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(running.BucketKeys)) {

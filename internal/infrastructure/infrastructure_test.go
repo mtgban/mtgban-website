@@ -14,7 +14,7 @@ func TestOverReplacesWholeKeys(t *testing.T) {
 		BucketKeys:          map[string]BucketKey{"mtgban-datastore": {AccessKey: "file"}},
 		GoogleCredentials:   "file.json",
 		Uploader:            map[string]string{"moxfield": "https://file"},
-		HandoffOrigins:      map[string]string{"https://www.cardmarket.com": "Cardmarket"},
+		HandoffOrigins:      map[string]HandoffOrigin{"https://www.cardmarket.com": {Name: "Cardmarket"}},
 		ObservabilityConfig: &timeseries.SQLConfig{DBName: "file_obs"},
 	}
 	own := Config{
@@ -26,7 +26,7 @@ func TestOverReplacesWholeKeys(t *testing.T) {
 	if got.BucketKeys["mtgban-datastore"].AccessKey != "file" || got.GoogleCredentials != "file.json" || got.SQLConfig.DBName != "file_prices" {
 		t.Errorf("unset keys %+v, want the file's", got)
 	}
-	if got.HandoffOrigins["https://www.cardmarket.com"] != "Cardmarket" {
+	if got.HandoffOrigins["https://www.cardmarket.com"].Name != "Cardmarket" {
 		t.Errorf("handoff origins %v, want the file's", got.HandoffOrigins)
 	}
 	if len(got.Uploader) != 1 || got.Uploader["collectr"] != "https://own" {

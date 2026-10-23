@@ -208,16 +208,21 @@ func TestAdminInfrastructureEditorRefusesABadHandoffOrigin(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "infrastructure.json")
 	withInfrastructureConfig(t, path)
 
-	pv := postInfrastructureEditor(`{"handoff_origins": {"https://www.cardmarket.com/": "Cardmarket"}}`)
-	if pv.WarningMessage == "" || pv.InfoMessage != "" {
-		t.Errorf("reported %q / %q, want it refused", pv.InfoMessage, pv.WarningMessage)
+	for _, origins := range []string{
+		`{"https://www.cardmarket.com/": {"name": "Cardmarket"}}`,
+		`{"https://www.cardmarket.com": {"name": "Cardmarket", "seller": "en/Users"}}`,
+	} {
+		pv := postInfrastructureEditor(`{"handoff_origins": ` + origins + `}`)
+		if pv.WarningMessage == "" || pv.InfoMessage != "" {
+			t.Errorf("%s: reported %q / %q, want it refused", origins, pv.InfoMessage, pv.WarningMessage)
+		}
 	}
 
-	pv = postInfrastructureEditor(`{"handoff_origins": {"https://www.cardmarket.com": "Cardmarket", "https://sender.example": ""}}`)
+	pv := postInfrastructureEditor(`{"handoff_origins": {"https://www.cardmarket.com": {"name": "Cardmarket", "seller": "Users"}, "https://sender.example": {}}}`)
 	if pv.WarningMessage != "" {
 		t.Errorf("a valid origin list was refused: %q", pv.WarningMessage)
 	}
-	if Infrastructure().HandoffOrigins["https://www.cardmarket.com"] != "Cardmarket" {
+	if Infrastructure().HandoffOrigins["https://www.cardmarket.com"].Name != "Cardmarket" {
 		t.Errorf("published %+v, want the saved origins", infrastructureFile())
 	}
 }
