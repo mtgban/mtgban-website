@@ -356,9 +356,7 @@ func arbit(s *site, ds *datastore, w http.ResponseWriter, r *http.Request, rever
 		allowlistSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
 			return !info.MetadataOnly
 		})
-	} else if allowlistSellersOpt == "" {
-		allowlistSellers = Config().Stores.ArbitDefaultSellers
-	} else {
+	} else if allowlistSellersOpt != "" {
 		allowlistSellers = strings.Split(allowlistSellersOpt, ",")
 	}
 	// No store only the price API serves is a source, whatever the grant says
