@@ -97,6 +97,40 @@ func tcgplayerSharedProductIDs() map[string]bool {
 	return shared
 }
 
+// manapoolLinkFor spells the address Mana Pool files a printing under: its set
+// and its number as printed, with the finish in the query rather than in the
+// path.
+func manapoolLinkFor(co *mtgmatcher.CardObject) string {
+	finish := "nonfoil"
+	if co.Etched {
+		finish = "etched"
+	} else if co.Foil {
+		finish = "foil"
+	}
+	return fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
+		strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
+}
+
+// manapoolLinkPrintings are the printings each Mana Pool address answers to.
+// More than one is a set filing a card in two languages under one number -
+// F16 #10 in English and in German - which an address naming no language
+// cannot tell apart.
+func manapoolLinkPrintings() map[string]map[string]bool {
+	printings := map[string]map[string]bool{}
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
+		if err != nil || co.Sealed || co.Number == "" {
+			continue
+		}
+		link := manapoolLinkFor(co)
+		if printings[link] == nil {
+			printings[link] = map[string]bool{}
+		}
+		printings[link][co.UUID] = true
+	}
+	return printings
+}
+
 // A store link the bot answers has to name the printing it points at, or name
 // nothing: the website link built from it is the reader's next click, and one
 // that lands on a different card is worse than one that is not offered.
@@ -111,6 +145,7 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 	skipWithoutDatastore(t)
 
 	shared := tcgplayerSharedProductIDs()
+	answering := manapoolLinkPrintings()
 
 	var checkedTCG, checkedMP, sharedTCG int
 	for _, uuid := range backend().GetUUIDs() {
@@ -136,17 +171,8 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 			}
 		}
 
-		// Mana Pool files a card under its set and its number as printed,
-		// and names the finish in the query rather than in the path.
 		if co.Number != "" {
-			finish := "nonfoil"
-			if co.Etched {
-				finish = "etched"
-			} else if co.Foil {
-				finish = "foil"
-			}
-			link := fmt.Sprintf("https://manapool.com/card/%s/%s/a-card?conditions=NM&finish=%s",
-				strings.ToLower(co.SetCode), strings.ToLower(co.Number), finish)
+			link := manapoolLinkFor(co)
 			checkedMP++
 			reply := checkForLinks(backend(), discordGuildID(), link)
 			got := offeredPrinting(t, reply)
@@ -160,7 +186,9 @@ func TestCheckForLinksResolvesTheProductItNames(t *testing.T) {
 					continue
 				}
 				t.Errorf("%s %s #%s: %s offered no printing", co.Name, co.SetCode, co.Number, link)
-			} else if got != co.UUID {
+			} else if !answering[link][got] {
+				// Any printing the address answers to is the right card
+				// under the right name, so it is not asked to pick one.
 				t.Errorf("%s offers %s, want %s %s #%s (%s)",
 					link, got, co.Name, co.SetCode, co.Number, co.UUID)
 			} else if !strings.HasSuffix(reply.Title, title) {
