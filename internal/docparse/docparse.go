@@ -257,7 +257,7 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 
 	// Parse the header to understand where these fields are
 	for i, field := range first {
-		field = strings.ToLower(field)
+		field = strings.ToLower(strings.TrimSpace(field))
 		switch {
 		// This should cover "uuid", "identifier", and so on
 		// "key" is the uuid column of the mtgban inventory/cart CSV export
@@ -279,7 +279,7 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 			if !found {
 				indexMap["mkmID"] = i
 			}
-		case (strings.Contains(field, "name") && !strings.Contains(field, "edition") && !strings.Contains(field, "set") && !strings.Contains(field, "expansion") && !strings.Contains(field, "folder")) || field == "card":
+		case (strings.Contains(field, "name") && !strings.Contains(field, "edition") && !strings.Contains(field, "set") && !strings.Contains(field, "expansion") && !strings.Contains(field, "folder") && !strings.Contains(field, "list")) || field == "card":
 			_, found := indexMap["cardName"]
 			if !found {
 				indexMap["cardName"] = i
