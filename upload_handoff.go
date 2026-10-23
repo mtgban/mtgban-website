@@ -53,6 +53,9 @@ func validHandoffOrigin(origin string) bool {
 		parsed.Port() != "443" && !strings.HasSuffix(parsed.Hostname(), ".")
 }
 
+// cardmarketOrigin is the one sender whose URLs name a seller.
+const cardmarketOrigin = "https://www.cardmarket.com"
+
 // uploadSourceFrom names the site a handed-over list was read from,
 // for the results heading, along with the link back to it.
 //
@@ -79,12 +82,12 @@ func uploadSourceFrom(raw string) (name string, link string) {
 		name = parsed.Host
 	}
 
-	// The seller, where the path names one, as Cardmarket's offers pages do
+	// The seller, where a Cardmarket path names one, as its offers pages do
 	// under /<language>/<Game>/Users/<seller>/Offers/... A list read from
 	// somewhere else on the same site is still from that site, so a missing
 	// seller loses the name and not the heading.
 	parts := strings.Split(parsed.Path, "/")
-	for i := 0; i+1 < len(parts); i++ {
+	for i := 0; origin == cardmarketOrigin && i+1 < len(parts); i++ {
 		if parts[i] == "Users" && parts[i+1] != "" {
 			name += " - " + parts[i+1]
 			break
