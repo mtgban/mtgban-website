@@ -253,6 +253,12 @@ func TestUploadSourceFrom(t *testing.T) {
 		want: "sender.example",
 		link: "https://sender.example/lists/42",
 	}, {
+		// Only Cardmarket's URLs are read for a seller.
+		name: "another sender's path names no seller",
+		raw:  "https://sender.example/en/Magic/Users/Nobody/Offers/Singles",
+		want: "sender.example",
+		link: "https://sender.example/en/Magic/Users/Nobody/Offers/Singles",
+	}, {
 		// The whole point of deriving the name here: a host nobody allowed
 		// cannot put words in the heading, or in the upload log beside it.
 		name: "an origin that was never allowed names nothing",
