@@ -124,11 +124,11 @@ var FilterOptConfig = map[string]FilterOpt{
 		Title: "only SYP",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
+			// Looked up once: the filter runs per card per scraper, and the
+			// lookup scans every vendor. A missing SYP is a nil map, on
+			// which nothing is listed.
+			syp, _ := findVendorBuylist("SYP")
 			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
-				syp, err := findVendorBuylist("SYP")
-				if err != nil {
-					return 0, true
-				}
 				_, onSypList := syp[co.UUID]
 				if !onSypList {
 					return 0, true
@@ -146,8 +146,8 @@ var FilterOptConfig = map[string]FilterOpt{
 		Title: "only Stocks",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
+			inv, _ := findSellerInventory("STKS")
 			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
-				inv, _ := findSellerInventory("STKS")
 				_, onStocks := inv[co.UUID]
 				if !onStocks {
 					return 0, true
