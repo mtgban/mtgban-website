@@ -146,5 +146,12 @@
     {{end}}
 {{end}}
 </div>
+{{/* The links the channels box draws, handed to js/alerts.js as values
+     rather than read back out of the DOM: a page attribute is text the
+     script would have to trust as a URL. Both the desktop and the mobile
+     page include this body, so both set them. */}}
+<script type="text/javascript">
+    window.BAN_ALERTS = { inviteURL: {{.InviteURL}}, unsubscribeURL: {{.UnsubscribeURL}} };
+</script>
 {{end}}
 {{end}}
