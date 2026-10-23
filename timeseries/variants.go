@@ -56,37 +56,138 @@ type TCGVariant struct {
 	SubType    string
 }
 
-// variantCache maps a normalized variant identity to its ban_id. It is shared by
-// the 12h stash cron (via the admin button too) and the daily tcgcsv ingest,
-// which can run at once, so access is concurrency-safe. Misses mint the variant
-// with INSERT ... ON CONFLICT DO NOTHING so cross-process races resolve to one row.
-type variantCache struct {
-	magic sync.Map // MagicVariant -> int64
-	tcg   sync.Map // TCGVariant   -> int64
+// variantIndex is one warm pass's view of the variants table. It is built
+// whole, published once and never written again, so a read is a pointer load
+// and a map lookup with no lock: ~20ns against ~90ns through an RWMutex when
+// eight readers contend, on the path that stamps a ban_id onto every rendered
+// card.
+type variantIndex struct {
+	magic map[MagicVariant]int64
+	tcg   map[TCGVariant]int64
 	// tcgByProduct maps a TCGplayer product id to its canonical ban_id (the
 	// "Normal" sub-type, else the smallest ban_id), so a rendered non-Magic card
 	// resolves its ban_id from memory by product id alone — the read-path analogue
 	// of magic's uuid-keyed lookup, with no per-card DB round-trip. Mirrors
 	// LookupTCGBanID's precedence.
-	tcgByProduct sync.Map // int (product id) -> int64
+	tcgByProduct map[int]int64
 	// tcgSubTypesByProduct maps a TCGplayer product id to every sub-type it is
 	// priced under and that sub-type's ban_id. One product covers all of a card's
 	// finishes (Lorcana's "Normal" / "Cold Foil" / "Holofoil", Riftbound's
 	// "Normal" / "Foil"), so a caller that knows which finish it is rendering
 	// needs the whole set to pick its own row instead of the canonical one.
-	// Warm-time only, like tcgByProduct: the maps are built once and never
-	// mutated, so readers can use them without copying.
-	tcgSubTypesByProduct sync.Map // int (product id) -> map[string]int64
-	// byBanID is the reverse of the maps above: what a ban_id is. Built whole
-	// by the warm pass and published in one store, so a read is a pointer load
-	// and needs no lock - and a re-warm swaps a new map in rather than mutating
-	// the one readers hold.
+	tcgSubTypesByProduct map[int]map[string]int64
+	// byBanID is the reverse of the maps above: what a ban_id is.
 	//
 	// It is worth its memory because a miss is not a millisecond, it is a
 	// round-trip: ~50MB on a Magic deployment (VariantInfo is 80 bytes plus a
 	// uuid, times ~390k rows) against ~60ms per lookup when the app and the
 	// archive are in different regions, on the hottest path the site has.
-	byBanID atomic.Pointer[map[int64]VariantInfo]
+	byBanID map[int64]VariantInfo
+}
+
+// variantCache maps a normalized variant identity to its ban_id. It is shared by
+// the 12h stash cron (via the admin button too), the daily tcgcsv ingest and
+// every page that stamps a ban_id onto a rendered card. The warm pass publishes
+// a whole variantIndex; a variant minted since then goes in the small overlay
+// behind the mutex, which only a miss on the index consults, and the next warm
+// drops from the overlay the variants it read back from the table. Misses mint
+// the variant with INSERT ... ON CONFLICT DO NOTHING so cross-process races
+// resolve to one row.
+type variantCache struct {
+	warm atomic.Pointer[variantIndex]
+
+	mu          sync.RWMutex
+	mintedMagic map[MagicVariant]int64
+	mintedTCG   map[TCGVariant]int64
+}
+
+func (vc *variantCache) magicBanID(v MagicVariant) (int64, bool) {
+	if idx := vc.warm.Load(); idx != nil {
+		if id, ok := idx.magic[v]; ok {
+			return id, true
+		}
+	}
+	vc.mu.RLock()
+	id, ok := vc.mintedMagic[v]
+	vc.mu.RUnlock()
+	return id, ok
+}
+
+func (vc *variantCache) setMagicBanID(v MagicVariant, id int64) {
+	vc.mu.Lock()
+	if vc.mintedMagic == nil {
+		vc.mintedMagic = map[MagicVariant]int64{}
+	}
+	vc.mintedMagic[v] = id
+	vc.mu.Unlock()
+}
+
+func (vc *variantCache) tcgBanID(v TCGVariant) (int64, bool) {
+	if idx := vc.warm.Load(); idx != nil {
+		if id, ok := idx.tcg[v]; ok {
+			return id, true
+		}
+	}
+	vc.mu.RLock()
+	id, ok := vc.mintedTCG[v]
+	vc.mu.RUnlock()
+	return id, ok
+}
+
+func (vc *variantCache) setTCGBanID(v TCGVariant, id int64) {
+	vc.mu.Lock()
+	if vc.mintedTCG == nil {
+		vc.mintedTCG = map[TCGVariant]int64{}
+	}
+	vc.mintedTCG[v] = id
+	vc.mu.Unlock()
+}
+
+func (vc *variantCache) productBanID(productID int) (int64, bool) {
+	idx := vc.warm.Load()
+	if idx == nil {
+		return 0, false
+	}
+	id, ok := idx.tcgByProduct[productID]
+	return id, ok
+}
+
+func (vc *variantCache) productSubTypes(productID int) (map[string]int64, bool) {
+	idx := vc.warm.Load()
+	if idx == nil {
+		return nil, false
+	}
+	m, ok := idx.tcgSubTypesByProduct[productID]
+	return m, ok
+}
+
+func (vc *variantCache) variant(banID int64) (VariantInfo, bool) {
+	idx := vc.warm.Load()
+	if idx == nil {
+		return VariantInfo{}, false
+	}
+	v, ok := idx.byBanID[banID]
+	return v, ok
+}
+
+// publish swaps in a warm pass's index, so a reader sees either the previous
+// warm or this one, never a half-built one, and drops from the overlay what
+// the index now holds. A mint the warm did not read - filed after its SELECT
+// began, or outside its scope - stays, so the overlay is bounded by those.
+func (vc *variantCache) publish(idx *variantIndex) {
+	vc.mu.Lock()
+	vc.warm.Store(idx)
+	for v := range vc.mintedMagic {
+		if _, ok := idx.magic[v]; ok {
+			delete(vc.mintedMagic, v)
+		}
+	}
+	for v := range vc.mintedTCG {
+		if _, ok := idx.tcg[v]; ok {
+			delete(vc.mintedTCG, v)
+		}
+	}
+	vc.mu.Unlock()
 }
 
 // VariantScope names the slice of the variants table a process actually uses.
@@ -159,6 +260,8 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 		banID  int64
 		normal bool
 	}
+	magic := map[MagicVariant]int64{}
+	tcg := map[TCGVariant]int64{}
 	byProduct := map[int]tcgBest{}
 	subTypesByProduct := map[int]map[string]int64{}
 	byBanID := map[int64]VariantInfo{}
@@ -182,16 +285,16 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 			TCGSubType: subType.String,
 		}
 		if uuid.Valid {
-			c.variants.magic.Store(MagicVariant{
+			magic[MagicVariant{
 				MtgjsonUUID: uuid.String, IsFoil: isFoil, IsEtched: isEtched,
 				IsAlt: isAlt, Language: language,
-			}, banID)
+			}] = banID
 			counts.Magic++
 		} else if prodID.Valid {
-			c.variants.tcg.Store(TCGVariant{
+			tcg[TCGVariant{
 				CategoryID: int(catID.Int64), ProductID: int(prodID.Int64),
 				SubType: subType.String,
-			}, banID)
+			}] = banID
 			counts.TCG++
 
 			pid := int(prodID.Int64)
@@ -214,15 +317,14 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 	if err := rows.Err(); err != nil {
 		return VariantCounts{}, err
 	}
+	canonical := make(map[int]int64, len(byProduct))
 	for pid, best := range byProduct {
-		c.variants.tcgByProduct.Store(pid, best.banID)
+		canonical[pid] = best.banID
 	}
-	for pid, subTypes := range subTypesByProduct {
-		c.variants.tcgSubTypesByProduct.Store(pid, subTypes)
-	}
-	// One store, after the scan: readers either see the previous map or this
-	// one, never a half-built one.
-	c.variants.byBanID.Store(&byBanID)
+	c.variants.publish(&variantIndex{
+		magic: magic, tcg: tcg, tcgByProduct: canonical,
+		tcgSubTypesByProduct: subTypesByProduct, byBanID: byBanID,
+	})
 	return counts, nil
 }
 
@@ -233,11 +335,7 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 // (new product, or an unwarmed cache) returns ok=false and the caller falls back
 // to the game-native id.
 func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
-	if id, ok := c.variants.tcgByProduct.Load(productID); ok {
-		banID, isInt := id.(int64)
-		return banID, isInt
-	}
-	return 0, false
+	return c.variants.productBanID(productID)
 }
 
 // CachedTCGSubTypeBanIDs returns every sub-type a product is priced under and
@@ -247,11 +345,7 @@ func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
 // one. The returned map is shared and must not be modified. A miss (new product,
 // unwarmed cache) returns ok=false.
 func (c *Client) CachedTCGSubTypeBanIDs(productID int) (map[string]int64, bool) {
-	if m, ok := c.variants.tcgSubTypesByProduct.Load(productID); ok {
-		byType, isMap := m.(map[string]int64)
-		return byType, isMap
-	}
-	return nil, false
+	return c.variants.productSubTypes(productID)
 }
 
 // LookupTCGSubTypeBanIDs is CachedTCGSubTypeBanIDs against the DB, for the
@@ -287,10 +381,8 @@ func (c *Client) LookupTCGSubTypeBanIDs(ctx context.Context, productID int) (map
 // concurrent callers and other processes converge on one row.
 func (c *Client) ResolveMagicBanID(ctx context.Context, v MagicVariant) (int64, error) {
 	v = v.normalized()
-	if id, ok := c.variants.magic.Load(v); ok {
-		if banID, isInt := id.(int64); isInt {
-			return banID, nil
-		}
+	if banID, ok := c.variants.magicBanID(v); ok {
+		return banID, nil
 	}
 	// Insert-returning on a fresh variant (one round-trip); on conflict it returns
 	// no rows and we fetch the existing id in a second, separately-committed
@@ -315,7 +407,7 @@ func (c *Client) ResolveMagicBanID(ctx context.Context, v MagicVariant) (int64, 
 	if err != nil {
 		return 0, fmt.Errorf("resolve magic ban_id %+v: %w", v, err)
 	}
-	c.variants.magic.Store(v, banID)
+	c.variants.setMagicBanID(v, banID)
 	return banID, nil
 }
 
@@ -343,10 +435,8 @@ func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, b
 	// The warm pass read this exact row; ask it before crossing the network.
 	// A miss - a variant minted since the warm, or a client that never warmed -
 	// falls through to the query.
-	if warmed := c.variants.byBanID.Load(); warmed != nil {
-		if v, ok := (*warmed)[banID]; ok {
-			return v, true, nil
-		}
+	if v, ok := c.variants.variant(banID); ok {
+		return v, true, nil
 	}
 
 	v := VariantInfo{BanID: banID}
@@ -423,12 +513,7 @@ func (c *Client) LookupTCGBanID(ctx context.Context, productID int) (VariantInfo
 // cache once with WarmVariantCache. A miss (new printing, or an unwarmed cache)
 // returns ok=false and the caller falls back to the uuid path.
 func (c *Client) CachedMagicBanID(v MagicVariant) (int64, bool) {
-	v = v.normalized()
-	if id, ok := c.variants.magic.Load(v); ok {
-		banID, isInt := id.(int64)
-		return banID, isInt
-	}
-	return 0, false
+	return c.variants.magicBanID(v.normalized())
 }
 
 // A non-Magic ban_id is computed from the variant rather than drawn from the
@@ -494,10 +579,8 @@ func TCGBanID(v TCGVariant) (int64, bool) {
 // ResolveTCGBanID returns the ban_id for a non-Magic variant, filing the
 // variant under its TCGBanID if it is new.
 func (c *Client) ResolveTCGBanID(ctx context.Context, v TCGVariant) (int64, error) {
-	if id, ok := c.variants.tcg.Load(v); ok {
-		if cached, isInt := id.(int64); isInt {
-			return cached, nil
-		}
+	if cached, ok := c.variants.tcgBanID(v); ok {
+		return cached, nil
 	}
 	ids, err := c.EnsureTCGVariants(ctx, []TCGVariant{v})
 	if err != nil {
@@ -525,11 +608,9 @@ func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TC
 	var subTypes []string
 	var derived []sql.NullInt64
 	for _, v := range vs {
-		if id, ok := c.variants.tcg.Load(v); ok {
-			if banID, isInt := id.(int64); isInt {
-				out[v] = banID
-				continue
-			}
+		if banID, ok := c.variants.tcgBanID(v); ok {
+			out[v] = banID
+			continue
 		}
 		banID, ok := TCGBanID(v)
 		cats = append(cats, int64(v.CategoryID))
@@ -575,7 +656,7 @@ func (c *Client) EnsureTCGVariants(ctx context.Context, vs []TCGVariant) (map[TC
 		if err := rows.Scan(&banID, &v.CategoryID, &v.ProductID, &v.SubType); err != nil {
 			return nil, err
 		}
-		c.variants.tcg.Store(v, banID)
+		c.variants.setTCGBanID(v, banID)
 		out[v] = banID
 	}
 	return out, rows.Err()

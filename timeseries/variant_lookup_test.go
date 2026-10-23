@@ -21,8 +21,7 @@ func TestLookupVariantAnswersFromTheWarmedMap(t *testing.T) {
 	c := &Client{db: db}
 
 	want := VariantInfo{BanID: 13456, MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsFoil: true}
-	warmed := map[int64]VariantInfo{want.BanID: want}
-	c.variants.byBanID.Store(&warmed)
+	c.variants.publish(&variantIndex{byBanID: map[int64]VariantInfo{want.BanID: want}})
 
 	got, ok, err := c.LookupVariant(context.Background(), want.BanID)
 	if err != nil || !ok {
@@ -50,7 +49,7 @@ func TestLookupVariantWithoutAWarmPass(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 	c := &Client{db: db}
 
-	if c.variants.byBanID.Load() != nil {
+	if c.variants.warm.Load() != nil {
 		t.Fatal("a fresh client should carry no warmed map")
 	}
 	if _, ok, err := c.LookupVariant(context.Background(), 1); ok || err == nil {

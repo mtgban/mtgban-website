@@ -173,3 +173,45 @@ func TestTCGSubTypeCodesStayPut(t *testing.T) {
 		t.Error("a sub-type code was renumbered")
 	}
 }
+
+// A variant minted after the warm pass answers from the overlay; the next
+// warm drops from the overlay what it read from the table and keeps what it
+// did not, so a mint that landed mid-warm is not minted twice.
+func TestVariantCacheMintsBetweenWarms(t *testing.T) {
+	var vc variantCache
+	warmed := MagicVariant{MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79"}
+	minted := MagicVariant{MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsFoil: true}
+	unread := MagicVariant{MtgjsonUUID: "7c3ea479-e463-58e7-b1b0-b217c77dae79", IsEtched: true}
+
+	if _, ok := vc.magicBanID(minted); ok {
+		t.Fatal("an empty cache answered")
+	}
+	vc.setMagicBanID(minted, 2)
+	if id, ok := vc.magicBanID(minted); !ok || id != 2 {
+		t.Fatalf("minted before any warm = %d/%v, want 2", id, ok)
+	}
+
+	vc.publish(&variantIndex{magic: map[MagicVariant]int64{warmed: 1}})
+	if id, ok := vc.magicBanID(warmed); !ok || id != 1 {
+		t.Fatalf("warmed = %d/%v, want 1", id, ok)
+	}
+	if id, ok := vc.magicBanID(minted); !ok || id != 2 {
+		t.Fatalf("mint the warm did not read = %d/%v, want 2 kept", id, ok)
+	}
+
+	vc.setMagicBanID(minted, 2)
+	if id, ok := vc.magicBanID(minted); !ok || id != 2 {
+		t.Fatalf("minted after the warm = %d/%v, want 2", id, ok)
+	}
+	vc.setMagicBanID(unread, 3)
+	vc.publish(&variantIndex{magic: map[MagicVariant]int64{warmed: 1, minted: 2}})
+	if id, ok := vc.magicBanID(minted); !ok || id != 2 {
+		t.Fatalf("re-warmed mint = %d/%v, want 2", id, ok)
+	}
+	if id, ok := vc.magicBanID(unread); !ok || id != 3 {
+		t.Fatalf("mint absent from the index = %d/%v, want 3 kept", id, ok)
+	}
+	if len(vc.mintedMagic) != 1 {
+		t.Errorf("overlay holds %d entries after a warm, want only the unread mint", len(vc.mintedMagic))
+	}
+}
