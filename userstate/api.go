@@ -12,8 +12,9 @@ import (
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
-// maxBody is the server-side cap on a sync payload.
-const maxBody = 512 * 1024
+// maxBody is the server-side cap on a sync payload, nginx's default
+// client_max_body_size, so a body the droplets pass is one this takes.
+const maxBody = 1 << 20
 
 // apiLimiter throttles /api/userstate/ separately from page rendering.
 var apiLimiter = ratelimit.NewLimiter(10, 5) // 10 req/s, burst 5
