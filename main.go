@@ -831,6 +831,11 @@ func (s *site) serve() {
 			}
 			http.DefaultServeMux.ServeHTTP(w, r)
 		}),
+		// The App Platform apps face clients directly, with no nginx to
+		// close a connection that never sends its headers or goes quiet.
+		// No WriteTimeout: a full dump or /api/load runs for minutes.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
 	}
 
 	done := make(chan os.Signal, 1)
