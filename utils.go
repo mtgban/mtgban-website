@@ -52,10 +52,12 @@ var Country2flag = map[string]string{
 }
 
 func cookiePath(r *http.Request, cookieName string, global bool) string {
-	// BAN_SIG is the authentication cookie and must remain available to every
+	// The signature and session cookies must remain available to every
 	// route, even when an untrusted host forces global domain scoping off.
-	// The custom buylist is set up on /upload and priced into /search.
-	if cookieName == signatureCookie || global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
+	// A root cookie is also one SettingsValues never hands back to a script,
+	// which is what keeps these HttpOnly cookies out of it. The custom
+	// buylist is set up on /upload and priced into /search.
+	if cookieName == signatureCookie || cookieName == legacySignatureCookie || cookieName == sessionCookie || global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
 		return "/"
 	}
 	if r == nil || r.URL == nil {
@@ -1523,8 +1525,43 @@ func cookieDomain(r *http.Request) (domain string, global bool) {
 }
 
 // signatureCookie holds the reader's signature, on the parent domain so every
-// site reads it.
+// site reads it. Scripts cannot read it; the page tells them what they need.
 const signatureCookie = "BAN_SIG"
+
+// legacySignatureCookie is the name BAN_SIG went by before. A reader's copy
+// lasts at most signatureCookieDays past the deploy that renamed it, so it is
+// read when BAN_SIG is absent or has run out, moved to BAN_SIG on first use
+// and cleared at logout. All three can go 31 days after that deploy:
+// 2026-11-23, for one on 2026-10-23.
+const legacySignatureCookie = "MTGBAN"
+
+// signatureCookieFor is the cookie called name holding value until expires,
+// on the parent domain so any site reads it. Every set and clear of the
+// signature comes from here, since a browser drops a cookie only when name,
+// domain and path all match. Secure always: the sites run over HTTPS, and
+// Chrome and Firefox keep a Secure cookie on http://localhost too; Safari
+// does not, so a local run there needs https or another browser. Lax lets it
+// ride a top-level navigation from a link.
+func signatureCookieFor(r *http.Request, name, value string, expires time.Time) *http.Cookie {
+	domain, _ := cookieDomain(r)
+	return &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Domain:   domain,
+		Path:     "/",
+		Expires:  expires,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+// clearSignatureCookie drops the signature cookie called name.
+func clearSignatureCookie(w http.ResponseWriter, r *http.Request, name string) {
+	cookie := signatureCookieFor(r, name, "", time.Time{})
+	cookie.MaxAge = -1
+	http.SetCookie(w, cookie)
+}
 
 // sessionCookie holds only the id of a reader's renewal session. Scripts
 // cannot read it, so a signature that leaks through a script, a link or a

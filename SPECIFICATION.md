@@ -390,8 +390,12 @@ default), and an HMAC-SHA1 `Signature` over
 signature checks (`enforceAPISigning`) look up a per-user secret in
 `Config.APIUserSecrets` first, falling back to `BAN_SECRET` — page
 signatures always use `BAN_SECRET` only. It is stored in the `BAN_SIG`
-cookie (31 days, shared across `*.mtgban.com`, **not** HttpOnly) and/or
-passed as `?sig=`. `GetParamFromSig()` extracts individual grants, read off
+cookie (31 days, shared across `*.mtgban.com`, HttpOnly, `SameSite=Lax`,
+always written by `signatureCookieFor`) and/or passed as `?sig=`. A reader
+who still holds only the `MTGBAN` cookie it replaced is served from that and
+moved to `BAN_SIG` on their next page load (`migrateSignatureCookie`); that
+fallback is removed 31 days after the rename's deploy. `GetParamFromSig()`
+extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the
 cookie. The API handoff (`/api-login`, `/api-trial`) reads no signature at

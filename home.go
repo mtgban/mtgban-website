@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"strings"
-	"time"
 )
 
 // Handler for / renders the home.html page
@@ -20,7 +19,8 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 		message = ErrMsg
 	case "logout":
 		// Invalidate the current cookie
-		setCookie(w, r, signatureCookie, "", time.Now(), true)
+		clearSignatureCookie(w, r, signatureCookie)
+		clearSignatureCookie(w, r, legacySignatureCookie)
 
 		http.Redirect(w, r, "/", http.StatusFound)
 		return

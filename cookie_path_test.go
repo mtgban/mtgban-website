@@ -25,8 +25,10 @@ func TestCookiePath(t *testing.T) {
 		{"ReverseVendorsList", "/reverse", false, "/reverse"},
 		{"UploadOptimizerOpts", "/upload", false, "/upload"},
 		{"UploadCustomRate", "/upload", false, "/"},
-		{"BAN_SIG", "/auth", true, "/"},
+		{"GlobalPref", "/auth", true, "/"},
 		{"BAN_SIG", "/auth", false, "/"},
+		{"MTGBAN", "/auth", false, "/"},
+		{"BAN_SESSION", "/auth", false, "/"},
 		{"MobileSearchLayout", "/sealed", false, "/"},
 		{"Unknown", "/", false, "/"},
 	}
@@ -83,14 +85,14 @@ func TestSetCookieExpiresLegacyRootCopy(t *testing.T) {
 func TestAuthCookieStaysRootScopedOnUntrustedHost(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "http://raw.example.invalid/auth", nil)
-	setCookie(recorder, req, "BAN_SIG", "sig", time.Now().Add(time.Hour), true)
+	putSignatureInCookies(recorder, req, "sig")
 
 	setCookies := recorder.Header().Values("Set-Cookie")
 	if len(setCookies) != 1 {
 		t.Fatalf("got %d Set-Cookie headers, want one auth cookie without legacy expiry", len(setCookies))
 	}
-	if !strings.Contains(setCookies[0], "Path=/;") {
-		t.Errorf("auth Set-Cookie = %q, want Path=/", setCookies[0])
+	if !strings.Contains(setCookies[0], "Path=/;") || strings.Contains(setCookies[0], "Domain=") {
+		t.Errorf("auth Set-Cookie = %q, want Path=/ and no Domain", setCookies[0])
 	}
 }
 
@@ -115,14 +117,17 @@ func TestSetCookieHeaders(t *testing.T) {
 		proto  string
 		want   []string
 	}{
-		{"parent domain", "BAN_SIG", true, "http://magic.mtgban.com/auth", "https",
-			[]string{"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
-		{"bare domain", "BAN_SIG", true, "http://mtgban.com/auth", "https",
-			[]string{"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
-		{"untrusted host", "BAN_SIG", true, "http://raw.example.invalid/auth", "",
-			[]string{"BAN_SIG=sig; Path=/; " + exp + "; SameSite=Strict"}},
-		{"localhost", "BAN_SIG", true, "http://localhost:8080/auth", "",
-			[]string{"BAN_SIG=sig; Path=/; " + exp}},
+		{"parent domain", "GlobalPref", true, "http://magic.mtgban.com/auth", "https",
+			[]string{"GlobalPref=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
+		{"bare domain", "GlobalPref", true, "http://mtgban.com/auth", "https",
+			[]string{"GlobalPref=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
+		{"untrusted host", "GlobalPref", true, "http://raw.example.invalid/auth", "",
+			[]string{
+				"GlobalPref=sig; Path=/auth; " + exp + "; SameSite=Strict",
+				"GlobalPref=sig; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; SameSite=Strict",
+			}},
+		{"localhost", "GlobalPref", true, "http://localhost:8080/auth", "",
+			[]string{"GlobalPref=sig; Path=/; " + exp}},
 		{"first party", "NewspaperList", false, "http://magic.mtgban.com/newspaper", "https",
 			[]string{
 				"NewspaperList=sig; Path=/newspaper; " + exp + "; Secure; SameSite=Strict",
@@ -184,6 +189,65 @@ func TestSessionCookieHeaders(t *testing.T) {
 			cleared := recorder.Result().Cookies()
 			if len(cleared) != 1 || cleared[0].Name != sessionCookie || cleared[0].MaxAge != -1 {
 				t.Errorf("clear parsed as %v, want %s with MaxAge -1", cleared, sessionCookie)
+			}
+		})
+	}
+}
+
+func TestSignatureCookieHeaders(t *testing.T) {
+	expires := time.Date(2030, time.January, 2, 3, 4, 5, 0, time.UTC)
+	const exp = "Expires=Wed, 02 Jan 2030 03:04:05 GMT"
+	for _, tc := range []struct {
+		name      string
+		target    string
+		proto     string
+		wantSet   string
+		wantClear string
+	}{
+		{"parent domain", "http://magic.mtgban.com/auth", "https",
+			"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SIG=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"bare domain", "http://mtgban.com/auth", "https",
+			"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SIG=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"plain http", "http://magic.mtgban.com/auth", "",
+			"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SIG=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"untrusted host", "http://raw.example.invalid/auth", "https",
+			"BAN_SIG=sig; Path=/; " + exp + "; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SIG=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"localhost", "http://localhost:8080/auth", "",
+			"BAN_SIG=sig; Path=/; " + exp + "; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SIG=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := cookieTestRequest(tc.target, tc.proto)
+
+			recorder := httptest.NewRecorder()
+			http.SetCookie(recorder, signatureCookieFor(req, signatureCookie, "sig", expires))
+			got := recorder.Header().Values("Set-Cookie")
+			if len(got) != 1 || got[0] != tc.wantSet {
+				t.Errorf("set Set-Cookie = %q, want %q", got, tc.wantSet)
+			}
+			set := recorder.Result().Cookies()
+
+			wantLegacy := strings.Replace(tc.wantClear, signatureCookie+"=", legacySignatureCookie+"=", 1)
+			for name, want := range map[string]string{signatureCookie: tc.wantClear, legacySignatureCookie: wantLegacy} {
+				recorder = httptest.NewRecorder()
+				clearSignatureCookie(recorder, req, name)
+				got = recorder.Header().Values("Set-Cookie")
+				if len(got) != 1 || got[0] != want {
+					t.Errorf("clear %s Set-Cookie = %q, want %q", name, got, want)
+				}
+				cleared := recorder.Result().Cookies()
+				if len(cleared) != 1 || cleared[0].Name != name || cleared[0].MaxAge != -1 {
+					t.Errorf("clear parsed as %v, want %s with MaxAge -1", cleared, name)
+					continue
+				}
+				// A browser drops a cookie only when Domain and Path match
+				if len(set) != 1 || cleared[0].Domain != set[0].Domain || cleared[0].Path != set[0].Path {
+					t.Errorf("clear of %s scoped %q %q, the set %v", name, cleared[0].Domain, cleared[0].Path, set)
+				}
 			}
 		})
 	}
