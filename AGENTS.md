@@ -88,7 +88,7 @@ output, not a claim written here.
   files of their own, which deployments may share, are named by path:
   `infrastructure_path`
   (bucket keys, Google and Patreon credentials, uploader endpoints, the
-  SQL databases; `internal/infrastructure`, and a key the config sets
+  upload handoff's origins, the SQL databases; `internal/infrastructure`, and a key the config sets
   itself wins), `acl_path` (tier → page → flags), `patreon_grants_path`,
   `affiliates_path` and `datasets_path` (the chart datasets). The admin
   page edits each of them. The store list comes from listing

@@ -1,7 +1,7 @@
 // Package infrastructure holds the settings every deployment uses alike,
 // filed once beside the configs rather than copied into each: the bucket
-// keys, the Google and Patreon credentials, the uploader endpoints and the
-// databases. A deployment's own config can still set any of them, and its
+// keys, the Google and Patreon credentials, the uploader endpoints, the
+// sites allowed to hand the upload a card list, and the databases. A deployment's own config can still set any of them, and its
 // value wins.
 package infrastructure
 
@@ -15,10 +15,14 @@ import (
 // Config is the infrastructure settings file, under the keys a deployment's config
 // uses for the same settings.
 type Config struct {
-	BucketKeys            map[string]BucketKey  `json:"bucket_keys,omitempty"`
-	GoogleCredentials     string                `json:"google_credentials,omitempty"`
-	Patreon               Patreon               `json:"patreon"`
-	Uploader              map[string]string     `json:"uploader,omitempty"`
+	BucketKeys        map[string]BucketKey `json:"bucket_keys,omitempty"`
+	GoogleCredentials string               `json:"google_credentials,omitempty"`
+	Patreon           Patreon              `json:"patreon"`
+	Uploader          map[string]string    `json:"uploader,omitempty"`
+	// HandoffOrigins maps each site allowed to hand /upload/handoff a card
+	// list to the name its results are headed with; an empty name heads
+	// them with the host.
+	HandoffOrigins        map[string]string     `json:"handoff_origins,omitempty"`
 	SQLConfig             *timeseries.SQLConfig `json:"sql_config,omitempty"`
 	UserStateConfig       *userstate.SQLConfig  `json:"user_state_config,omitempty"`
 	ObservabilityConfig   *timeseries.SQLConfig `json:"observability_config,omitempty"`
@@ -52,6 +56,9 @@ func (own Config) Over(base Config) Config {
 	}
 	if own.Uploader != nil {
 		base.Uploader = own.Uploader
+	}
+	if own.HandoffOrigins != nil {
+		base.HandoffOrigins = own.HandoffOrigins
 	}
 	base.SQLConfig = cmp.Or(own.SQLConfig, base.SQLConfig)
 	base.UserStateConfig = cmp.Or(own.UserStateConfig, base.UserStateConfig)
