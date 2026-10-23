@@ -294,6 +294,36 @@ body.has-scope .m-page:has(.m-search-bar-sticky) {
     text-overflow: ellipsis;
 }
 
+/* The product's contents under the set line, two lines at most. */
+.m-card-contents {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--greytext);
+}
+.m-card-contents a {
+    color: inherit;
+    text-decoration: none;
+}
+.m-card-contents-sep {
+    margin: 0 0.3em;
+    opacity: 0.6;
+}
+.m-card-contents-price {
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+.m-card-contents-more {
+    display: inline-block;
+    margin-left: 0;
+    font-size: 0.75rem;
+    color: var(--activetext);
+    white-space: nowrap;
+}
+
 .m-card-badges {
     flex-shrink: 0;
     display: flex;

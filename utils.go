@@ -520,8 +520,12 @@ type GenericCard struct {
 	Sealed      bool
 	Booster     bool
 	HasDeck     bool
-	Flag        string
-	LangTag     string
+	// Contents is a sealed product's short contents list, filled on the
+	// search page only; ContentsMore is how many entries it leaves off.
+	Contents     []ContentLine
+	ContentsMore int
+	Flag         string
+	LangTag      string
 
 	Rarity            string
 	RarityColor       template.CSS

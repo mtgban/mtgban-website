@@ -452,6 +452,12 @@
                                             - <a href="/sealed?q=container:{{$card.UUID}}">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
                                         {{end}}
                                     </span>
+                                    {{if $card.Contents}}
+                                    <div class="result-contents">
+                                        {{range $i, $line := $card.Contents}}{{if $i}}<span class="result-contents-sep">·</span>{{end}}{{if $line.Link}}<a href="{{$line.Link}}">{{end}}{{if $line.Count}}{{$line.Count}}x {{end}}{{$line.Name}}{{if $line.Link}}</a>{{end}}{{if $line.Price}} <span class="result-contents-price" title="TCG Market">${{printf "%.2f" $line.Price}}</span>{{end}}{{end}}
+                                        <a class="result-contents-more" href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"'>{{if $card.ContentsMore}}+{{$card.ContentsMore}} more{{else}}Contents{{end}}</a>
+                                    </div>
+                                    {{end}}
                                 </div>
                                 <div class="result-quick-icons">
                                     <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis-vertical"></i></button>
