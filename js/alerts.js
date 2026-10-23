@@ -133,16 +133,28 @@
     function money(v) { return '$' + Number(v).toFixed(2); }
 
     // bestPrice is the lowest retail or highest buylist offer in the
-    // condition among the scoped stores (every store when scope is empty),
-    // or null when none has one, as the server's bestStorePrice picks it.
+    // condition among the scoped stores (every store but the picked-only
+    // ones when scope is empty), or null when none has one, as the server's
+    // bestStorePrice picks it.
     function bestPrice(stores, side, condition, scope) {
         var best = null;
         (stores || []).forEach(function (s) {
-            if (scope && scope.length && !scope.some(function (x) { return x.toUpperCase() === s.shorthand.toUpperCase(); })) return;
+            if (scope && scope.length) {
+                if (!scope.some(function (x) { return x.toUpperCase() === s.shorthand.toUpperCase(); })) return;
+            } else if (s.picked_only) {
+                return;
+            }
             var p = s.prices && s.prices[condition];
             if (p && (best === null || (side === 'buylist' ? p > best : p < best))) best = p;
         });
         return best;
+    }
+
+    // storesNote is the hint beside the store list, naming the picked-only
+    // stores that watching every store leaves out.
+    function storesNote(stores) {
+        var left = (stores || []).filter(function (s) { return s.picked_only; }).map(function (s) { return s.name || s.shorthand; });
+        return 'leave all unchecked to watch every one' + (left.length ? ' but ' + left.join(', ') : '');
     }
 
     // referenceUsed is whether either threshold is a percentage, the only
@@ -210,6 +222,8 @@
         var stores = ((state.options && state.options.stores) || []).slice().sort(function (a, b) {
             return (a.name || a.shorthand).localeCompare(b.name || b.shorthand);
         });
+        var note = document.querySelector('#alert-stores-label .alert-label-note');
+        if (note) note.textContent = storesNote(stores);
         host.innerHTML = '';
         if (!stores.length) {
             var p = document.createElement('p');
@@ -1067,5 +1081,5 @@
 
     window.openAlertModal = open;
     window.closeAlertModal = close;
-    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, bestPrice: bestPrice, referenceUsed: referenceUsed };
+    window.alertsChannels = { channelState: channelState, allowedChannels: allowedChannels, channelButtons: channelButtons, channelNote: channelNote, emailLines: emailLines, deliveryOptions: deliveryOptions, deliveryAllowed: deliveryAllowed, alertsConfig: alertsConfig, deleteAllPrompt: deleteAllPrompt, deletedNote: deletedNote, existingForCard: existingForCard, bestPrice: bestPrice, storesNote: storesNote, referenceUsed: referenceUsed };
 })();

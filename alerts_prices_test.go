@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -60,5 +61,17 @@ func TestAlertStorePricesSkipsIndexBlockedAndOtherKind(t *testing.T) {
 	retail := alertStorePrices("card-1", false, alerts.SideRetail, nil)
 	if len(retail) != 1 || retail[0].Prices["HP"] != 8 {
 		t.Fatalf("retail = %+v", retail)
+	}
+}
+
+func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
+	alertTestStores(t)
+	net := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 15}}}
+	vendors := append(slices.Clip(GetVendors()), mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "TCGDirectNet", Name: "TCG Direct (net)"}))
+	vendorsPtr.Store(&vendors)
+	for _, s := range alertStorePrices("card-1", false, alerts.SideBuylist, nil) {
+		if s.PickedOnly != (s.Shorthand == "TCGDirectNet") {
+			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
+		}
 	}
 }

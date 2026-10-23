@@ -67,6 +67,31 @@ func TestRunPendingWaitsUntilReady(t *testing.T) {
 	}
 }
 
+func TestRunPendingQueuesRearmOnceFirst(t *testing.T) {
+	store := newFakeEvalStore(activeAlert())
+	store.queueErr = errors.New("connection refused")
+	dd := &fakeDeliverer{}
+	deps := evalDeps(store, dd, 13)
+	s := liveService(deps)
+	s.RequestEvaluate(SideBuylist)
+
+	// Until the queue is in nothing is evaluated, and the side stays queued.
+	s.runPending(context.Background(), deps)
+	if store.queues != 1 || len(dd.sent) != 0 {
+		t.Fatalf("failed queue: %d calls, sent %v", store.queues, dd.ids())
+	}
+	store.queueErr = nil
+	s.runPending(context.Background(), deps)
+	if store.queues != 2 || len(dd.sent) != 1 {
+		t.Fatalf("queue then run: %d calls, sent %v", store.queues, dd.ids())
+	}
+	s.RequestEvaluate(SideBuylist)
+	s.runPending(context.Background(), deps)
+	if store.queues != 2 {
+		t.Fatalf("queue ran again: %d calls", store.queues)
+	}
+}
+
 func TestServicePrunesAtMostHourly(t *testing.T) {
 	s := liveService(EvalDeps{})
 	if !s.pruneDue(evalNow) || s.pruneDue(evalNow.Add(59*time.Minute)) {
