@@ -58,6 +58,10 @@
 
 .backpack-overlay.open { display: block; }
 
+/* The open panel is modal, so the page behind it holds still: a wheel over
+   a list too short to scroll would otherwise pass to the page. */
+html:has(.backpack-panel.open) { overflow: hidden; }
+
 .backpack-panel {
     position: fixed;
     top: 0;
