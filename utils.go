@@ -1771,6 +1771,22 @@ func scraperName(shorthand string) string {
 	return Config().ScraperConfig.NameOverride[shorthand]
 }
 
+// isSealedScraper says whether the loaded store with this shorthand trades
+// sealed product rather than singles.
+func isSealedScraper(shorthand string) bool {
+	for _, seller := range GetSellers() {
+		if seller.Info().Shorthand == shorthand {
+			return seller.Info().SealedMode
+		}
+	}
+	for _, vendor := range GetVendors() {
+		if vendor.Info().Shorthand == shorthand {
+			return vendor.Info().SealedMode
+		}
+	}
+	return false
+}
+
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(keys []string) []string {

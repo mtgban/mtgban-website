@@ -438,3 +438,29 @@ func TestStoreFactorOptionsSkipsIndexes(t *testing.T) {
 		t.Errorf("got %s, want CK only", got)
 	}
 }
+
+func TestStoreFactorOptionsSealedLast(t *testing.T) {
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "CKSealed", Name: "Card Kingdom", SealedMode: true}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "CK", Name: "Card Kingdom"}),
+		mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}),
+	}
+	sellersPtr.Store(&sellers)
+
+	var list []struct {
+		K string `json:"k"`
+		S bool   `json:"s"`
+	}
+	got := storeFactorOptions([]string{"CKSealed", "TCG", "CK"}, nil)
+	if err := json.Unmarshal([]byte(got), &list); err != nil {
+		t.Fatalf("not JSON: %v\n%s", err, got)
+	}
+	if len(list) != 3 || list[0].K != "CK" || list[1].K != "TCG" || list[2].K != "CKSealed" {
+		t.Fatalf("order %s, want CK, TCG, CKSealed", got)
+	}
+	if list[0].S || list[1].S || !list[2].S {
+		t.Errorf("sealed flags wrong: %s", got)
+	}
+}

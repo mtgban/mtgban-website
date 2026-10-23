@@ -170,11 +170,25 @@
         var row = el('div', 'store-factors-row');
         var select = el('select', 'store-factors-store');
         select.setAttribute('aria-label', 'Store');
+        // Singles and sealed stores can share a name, so each gets a group,
+        // and a sealed name says so where the closed select shows it alone
+        var grouped = list.some(function (s) { return s.s; });
+        var groups = {};
         list.forEach(function (s) {
-            var opt = el('option', '', s.n);
+            var opt = el('option', '', s.s ? s.n + ' (Sealed)' : s.n);
             opt.value = s.k;
             if (s.k === key) opt.selected = true;
-            select.appendChild(opt);
+            if (!grouped) {
+                select.appendChild(opt);
+                return;
+            }
+            var label = s.s ? 'Sealed' : 'Singles';
+            if (!groups[label]) {
+                groups[label] = el('optgroup');
+                groups[label].setAttribute('label', label);
+                select.appendChild(groups[label]);
+            }
+            groups[label].appendChild(opt);
         });
         select.value = key;
         var discount = numberInput('store-factors-discount', DISCOUNT, 'Discount %', entry.discount);

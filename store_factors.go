@@ -191,13 +191,15 @@ func (e SearchEntry) RetailTip() string {
 }
 
 // storeFactorOptions lists the stores the adjustments editor offers, each
-// with its name and the sides it has, as JSON for a data attribute.
+// with its name, the sides it has and whether it is a sealed store, singles
+// stores first, as JSON for a data attribute.
 func storeFactorOptions(sellers, vendors []string) string {
 	type option struct {
-		Key   string `json:"k"`
-		Name  string `json:"n"`
-		Sells bool   `json:"r"`
-		Buys  bool   `json:"b"`
+		Key    string `json:"k"`
+		Name   string `json:"n"`
+		Sells  bool   `json:"r"`
+		Buys   bool   `json:"b"`
+		Sealed bool   `json:"s,omitempty"`
 	}
 	byKey := map[string]*option{}
 	var keys []string
@@ -208,7 +210,7 @@ func storeFactorOptions(sellers, vendors []string) string {
 			if name == "" {
 				name = shorthand
 			}
-			o = &option{Key: shorthand, Name: name}
+			o = &option{Key: shorthand, Name: name, Sealed: isSealedScraper(shorthand)}
 			byKey[shorthand] = o
 			keys = append(keys, shorthand)
 		}
@@ -232,6 +234,9 @@ func storeFactorOptions(sellers, vendors []string) string {
 		list = append(list, *byKey[k])
 	}
 	sort.SliceStable(list, func(i, j int) bool {
+		if list[i].Sealed != list[j].Sealed {
+			return !list[i].Sealed
+		}
 		a, b := strings.ToLower(list[i].Name), strings.ToLower(list[j].Name)
 		if a != b {
 			return a < b
