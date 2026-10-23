@@ -473,44 +473,48 @@
     }
 
     // ── Loading ──────────────────────────────────────────────
+    //
+    // Each loader writes the state it was handed, not the module's: an open
+    // over one still loading replaces `state`, and the first open's answers
+    // must land in its own, abandoned state rather than the new card's.
 
-    function loadOptions() {
-        var url = '/api/alerts/options?card=' + encodeURIComponent(state.cardId) + '&side=' + encodeURIComponent(state.side);
-        if (state.stores.length) url += '&keep=' + encodeURIComponent(state.stores.join(','));
-        return api('GET', url).then(function (opts) { state.options = opts; });
+    function loadOptions(s) {
+        var url = '/api/alerts/options?card=' + encodeURIComponent(s.cardId) + '&side=' + encodeURIComponent(s.side);
+        if (s.stores.length) url += '&keep=' + encodeURIComponent(s.stores.join(','));
+        return api('GET', url).then(function (opts) { s.options = opts; });
     }
 
-    function loadExisting() {
-        return api('GET', '/api/alerts/').then(function (list) { state.existing = list || []; });
+    function loadExisting(s) {
+        return api('GET', '/api/alerts/').then(function (list) { s.existing = list || []; });
     }
 
-    function loadAlert() {
+    function loadAlert(s) {
         return api('GET', '/api/alerts/').then(function (list) {
-            var a = (list || []).filter(function (x) { return String(x.id) === String(state.alertId); })[0];
+            var a = (list || []).filter(function (x) { return String(x.id) === String(s.alertId); })[0];
             if (!a) throw new Error('That alert no longer exists.');
-            state.cardId = a.card_id;
-            state.side = a.side;
-            state.condition = a.condition;
-            state.stores = a.stores || [];
+            s.cardId = a.card_id;
+            s.side = a.side;
+            s.condition = a.condition;
+            s.stores = a.stores || [];
             // An alert set on stores offering nothing has no reference.
-            state.reference = a.reference_price || null;
-            state.referenceStore = a.reference_price ? 'custom' : '';
-            state.aboveKind = a.above && a.above.kind ? a.above.kind : '';
-            state.aboveValue = a.above && a.above.kind ? a.above.value : null;
-            state.belowKind = a.below && a.below.kind ? a.below.kind : '';
-            state.belowValue = a.below && a.below.kind ? a.below.value : null;
-            state.delivery = a.delivery || 'discord';
+            s.reference = a.reference_price || null;
+            s.referenceStore = a.reference_price ? 'custom' : '';
+            s.aboveKind = a.above && a.above.kind ? a.above.kind : '';
+            s.aboveValue = a.above && a.above.kind ? a.above.value : null;
+            s.belowKind = a.below && a.below.kind ? a.below.kind : '';
+            s.belowValue = a.below && a.below.kind ? a.below.value : null;
+            s.delivery = a.delivery || 'discord';
         });
     }
 
     // loadDeliveryChannels fetches the live channel states for the Delivery
-    // control; a failure leaves state.channels null, falling back to
+    // control; a failure leaves s.channels null, falling back to
     // discord_linked for Discord and hiding Email as unusable.
-    function loadDeliveryChannels() {
+    function loadDeliveryChannels(s) {
         return api('GET', '/api/alerts/channels').then(function (rows) {
-            state.channels = rows || [];
+            s.channels = rows || [];
         }).catch(function () {
-            state.channels = null;
+            s.channels = null;
         });
     }
 
@@ -536,9 +540,17 @@
         modal.classList.add('open');
         backdrop.classList.add('open');
         document.getElementById('alert-modal-card').textContent = 'Loading';
-        var load = state.alertId ? loadAlert().then(loadOptions) : loadOptions().then(loadExisting);
-        load = load.then(loadDeliveryChannels);
-        load.then(render).catch(function (err) {
+        // Only the latest open draws: s stops being `state` once another
+        // open replaces it, and its answers then go nowhere.
+        var s = state;
+        var load = s.alertId
+            ? loadAlert(s).then(function () { return loadOptions(s); })
+            : loadOptions(s).then(function () { return loadExisting(s); });
+        load = load.then(function () { return loadDeliveryChannels(s); });
+        load.then(function () {
+            if (s === state) render();
+        }).catch(function (err) {
+            if (s !== state) return;
             document.getElementById('alert-modal-card').textContent = '';
             setError(err.message);
         });
@@ -625,7 +637,12 @@
                 readForm();
                 state.side = value;
                 setPills('side', value);
-                loadOptions().then(render).catch(function (err) { setError(err.message); });
+                var s = state;
+                loadOptions(s).then(function () {
+                    if (s === state) render();
+                }).catch(function (err) {
+                    if (s === state) setError(err.message);
+                });
             } else if (field === 'condition') {
                 state.condition = value;
                 setPills('condition', value);
