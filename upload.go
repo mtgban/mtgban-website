@@ -56,6 +56,9 @@ const (
 	// upload's file among it. ParseMultipartForm only decides what stays in
 	// memory, and spills the rest to disk.
 	MaxUploadBodySize = 10 << 20
+	// maxPackedRows caps the rows a page posts back packed into one field,
+	// above what unpacking a full Pro upload legitimately expands to.
+	maxPackedRows = 4 * MaxUploadTotalEntries
 
 	ProfitabilityConstant = 2
 )
@@ -662,10 +665,13 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Warn when the input was cut at the row cap. Checked before the merge
+	// Warn when the input was cut at a row cap. Checked before the merge
 	// below (which can shrink the count back under the cap), unlike the old
-	// matched-singles check that missed most real truncations.
-	if len(uploadedData) >= modes.maxRows {
+	// matched-singles check that missed most real truncations. The hash
+	// paths say when they cut; the loaders all stop at maxRows.
+	if in.rowsCap > 0 {
+		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", in.rowsCap)
+	} else if len(in.hashes) == 0 && len(uploadedData) >= modes.maxRows {
 		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", modes.maxRows)
 	}
 
@@ -1712,6 +1718,8 @@ type uploadInput struct {
 	fileErr        error
 	// shared is set when the rows came from a share link.
 	shared bool
+	// rowsCap is the cap the rows were cut at, 0 when they were not.
+	rowsCap int
 }
 
 // readUploadInput reads the list a request carries. A file that came is left
@@ -1728,9 +1736,14 @@ func readUploadInput(r *http.Request) uploadInput {
 	// A page of results posts its rows packed into one field instead, for the
 	// reason splitRows gives.
 	packed := r.FormValue("rows")
+	var rowsCap int
 	if packed != "" {
+		var cut bool
 		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes,
-			hashesFrom, hashesFromQtys = splitRows(packed)
+			hashesFrom, hashesFromQtys, cut = splitRows(packed)
+		if cut {
+			rowsCap = maxPackedRows
+		}
 	}
 
 	// Load spreadsheet cloud url if present
@@ -1757,6 +1770,7 @@ func readUploadInput(r *http.Request) uploadInput {
 		file:           file,
 		handler:        handler,
 		fileErr:        err,
+		rowsCap:        rowsCap,
 	}
 }
 
@@ -1803,13 +1817,18 @@ func knownShareCondition(cond string) bool {
 // unknown condition is blanked: the reader's CSV copies both as they are,
 // and a URL note would become their price link.
 func withSharedRows(in uploadInput, rows string, maxRows int) uploadInput {
+	var cut bool
 	in.hashes, in.hashesQtys, in.hashesCond, in.hashesPrice, _,
-		in.hashesFrom, in.hashesFromQtys = splitRows(rows)
+		in.hashesFrom, in.hashesFromQtys, cut = splitRows(rows)
+	if cut {
+		in.rowsCap = maxPackedRows
+	}
 	if maxRows > 0 {
 		for _, f := range []*[]string{&in.hashes, &in.hashesQtys, &in.hashesCond, &in.hashesPrice,
 			&in.hashesFrom, &in.hashesFromQtys} {
 			if len(*f) > maxRows {
 				*f = (*f)[:maxRows]
+				in.rowsCap = maxRows
 			}
 		}
 	}
@@ -2494,10 +2513,18 @@ func restoreOpenedProducts(entries []UploadEntry) []UploadEntry {
 // The arrays are still read when this is absent: a hash transfer from search
 // or the newspaper posts those, and they are short enough never to have been
 // near the ceiling.
-func splitRows(packed string) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
-	for _, line := range strings.Split(packed, "\n") {
+//
+// The rows stop at maxPackedRows, and cut says when they did: only the
+// body cap bounded them, about 250k lines, and the hash path has no row
+// cap of its own.
+func splitRows(packed string) (hashes, qtys, cond, prices, notes, from, fromQtys []string, cut bool) {
+	for line := range strings.SplitSeq(packed, "\n") {
 		if line == "" {
 			continue
+		}
+		if len(hashes) >= maxPackedRows {
+			cut = true
+			break
 		}
 
 		// Positional, and short lines are padded: a column added here is a
@@ -2516,7 +2543,7 @@ func splitRows(packed string) (hashes, qtys, cond, prices, notes, from, fromQtys
 		fromQtys = append(fromQtys, fields[6])
 	}
 
-	return hashes, qtys, cond, prices, notes, from, fromQtys
+	return hashes, qtys, cond, prices, notes, from, fromQtys, cut
 }
 
 func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]UploadEntry, error) {
