@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	// registers the postgres driver database/sql opens by name
 	_ "github.com/lib/pq"
@@ -57,7 +58,8 @@ func (c SQLConfig) dsn(port int) string {
 		sslMode = "disable"
 	}
 	// lib/pq takes the token after "key=" as its value, so a key with an
-	// empty value would swallow the one behind it: those stay out.
+	// empty value would swallow the one behind it: those stay out, and
+	// dsnValue quotes a value the tokenizer would otherwise cut short.
 	parts := make([]string, 0, 7)
 	for _, kv := range [...][2]string{
 		{"host", c.Host},
@@ -71,9 +73,25 @@ func (c SQLConfig) dsn(port int) string {
 		if kv[1] == "" {
 			continue
 		}
-		parts = append(parts, kv[0]+"="+kv[1])
+		parts = append(parts, kv[0]+"="+dsnValue(kv[1]))
 	}
 	return strings.Join(parts, " ")
+}
+
+// dsnEscaper writes a value the way lib/pq reads it back inside single
+// quotes, where a backslash escapes the character after it.
+var dsnEscaper = strings.NewReplacer(`\`, `\\`, `'`, `\'`)
+
+// dsnValue is v as a lib/pq DSN value: bare when the tokenizer reads it
+// whole, and single-quoted when a space, quote or backslash would end or
+// escape part of it.
+func dsnValue(v string) string {
+	for _, r := range v {
+		if unicode.IsSpace(r) || r == '\'' || r == '\\' {
+			return "'" + dsnEscaper.Replace(v) + "'"
+		}
+	}
+	return v
 }
 
 // Client wraps a Postgres connection pool for the timeseries price table.
