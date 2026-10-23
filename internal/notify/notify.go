@@ -6,12 +6,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
 )
+
+// client posts every message. Pooled, so the Discord connection is reused
+// across posts, and timed out, so a stalled Discord cannot hold a goroutine
+// (and a staleness check's lock) for longer than this.
+var client = &http.Client{
+	Transport: cleanhttp.DefaultPooledTransport(),
+	Timeout:   15 * time.Second,
+}
 
 // maxContent is the most content a Discord message may carry; Discord
 // refuses a longer one outright. It counts characters, which a cut at this
@@ -53,7 +64,7 @@ func Send(hook, kind, message string, dev bool) error {
 		return err
 	}
 
-	resp, err := cleanhttp.DefaultClient().Post(hook, "application/json", bytes.NewReader(reqBody))
+	resp, err := client.Post(hook, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		// A *url.Error's text quotes the URL it was posting to.
 		var urlErr *url.Error
@@ -63,6 +74,9 @@ func Send(hook, kind, message string, dev bool) error {
 		log.Printf("notify: %s post failed: %s", kind, err)
 		return err
 	}
+	// Read to the end, or the pooled connection is dropped: a refusal
+	// carries a body.
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 	resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
 		log.Printf("notify: %s post refused: %s", kind, resp.Status)

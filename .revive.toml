@@ -39,7 +39,7 @@ warningCode = 1
 # validates. Naming them keeps a real dropped error visible among them.
 [rule.unhandled-error]
   arguments = ["fmt.Fprint.*", "fmt.Print.*", "strings.Builder.*",
-               "bytes.Buffer.*", "io.Writer.Write", "io.Closer.Close", "os.File.Close",
+               "bytes.Buffer.*", "io.Copy", "io.Writer.Write", "io.Closer.Close", "os.File.Close",
                "os.Setenv", "encoding/csv.Writer.Write",
                "net/http.ResponseWriter.Write", "net/http.Request.ParseForm",
                "net/http.Request.ParseMultipartForm",
