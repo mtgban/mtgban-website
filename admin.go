@@ -270,7 +270,11 @@ func (s *site) adminActions(w http.ResponseWriter, r *http.Request, pageVars *Pa
 		if !found {
 			v.Set("msg", refresh+" not found")
 		} else {
-			err := sendGithubAction(Config().Game, refresh)
+			// Two status queries and the dispatch, each a GitHub round
+			// trip, inside the admin's POST.
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			err := sendGithubAction(ctx, Config().Game, refresh)
+			cancel()
 			if err != nil {
 				v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
 			} else {
@@ -1082,12 +1086,12 @@ func subViewsOf(all []observability.PathAgg) []observability.PathAgg {
 	return out
 }
 
-func isBusyGithubAction(wf bantoolWorkflow) (bool, error) {
-	totProgres, err := queryGithubAction(wf.File, "in_progress")
+func isBusyGithubAction(ctx context.Context, wf bantoolWorkflow) (bool, error) {
+	totProgres, err := queryGithubAction(ctx, wf.File, "in_progress")
 	if err != nil {
 		return false, errors.New("cannot retrieve in_progress status")
 	}
-	totQueue, err := queryGithubAction(wf.File, "queued")
+	totQueue, err := queryGithubAction(ctx, wf.File, "queued")
 	if err != nil {
 		return false, errors.New("cannot retrieve queued status")
 	}
@@ -1097,10 +1101,10 @@ func isBusyGithubAction(wf bantoolWorkflow) (bool, error) {
 	return false, nil
 }
 
-func queryGithubAction(file, state string) (int, error) {
+func queryGithubAction(ctx context.Context, file, state string) (int, error) {
 	url := workflowURL + file + "/runs?status=" + state
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -1127,10 +1131,10 @@ func queryGithubAction(file, state string) (int, error) {
 	return payload.TotalCount, nil
 }
 
-func sendGithubAction(game mtgmatcher.Game, store string) error {
+func sendGithubAction(ctx context.Context, game mtgmatcher.Game, store string) error {
 	wf := newBantoolWorkflow(game, store)
 
-	busy, err := isBusyGithubAction(wf)
+	busy, err := isBusyGithubAction(ctx, wf)
 	if err != nil {
 		return err
 	}
@@ -1139,7 +1143,7 @@ func sendGithubAction(game mtgmatcher.Game, store string) error {
 	}
 
 	payload := strings.NewReader(`{"event_type":"` + wf.EventType + `"}`)
-	req, err := http.NewRequest(http.MethodPost, dispatchURL, payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, dispatchURL, payload)
 	if err != nil {
 		return err
 	}
