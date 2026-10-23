@@ -22,7 +22,7 @@ function forbidden(stage) {
     return err;
 }
 
-// Same-origin credentials carry the MTGBAN cookie; 403 means lapsed access.
+// Same-origin credentials carry the BAN_SIG cookie; 403 means lapsed access.
 function fetchChecked(url, stage, opts) {
     var options = Object.assign({ credentials: 'same-origin' }, opts);
     return fetch(url, options).then(function(resp) {

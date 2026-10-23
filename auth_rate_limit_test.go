@@ -55,7 +55,7 @@ func TestUserRateLimitGivesAnInviteItsOwnBucket(t *testing.T) {
 	for i := range UserRequestBurst + 2 {
 		req := httptest.NewRequest(http.MethodGet, "/limited", nil)
 		req.Header.Set("X-Forwarded-For", fmt.Sprintf("198.51.100.%d", i))
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: invite})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: invite})
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 	}
 	if reached != UserRequestBurst {
@@ -78,7 +78,7 @@ func TestUserRateLimitKeepsAForgedEmailOutOfItsOwnersBucket(t *testing.T) {
 	}))
 	serve := func(sig string) {
 		req := httptest.NewRequest(http.MethodGet, "/limited", nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 	}
 

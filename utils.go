@@ -52,10 +52,10 @@ var Country2flag = map[string]string{
 }
 
 func cookiePath(r *http.Request, cookieName string, global bool) string {
-	// MTGBAN is the authentication cookie and must remain available to every
+	// BAN_SIG is the authentication cookie and must remain available to every
 	// route, even when an untrusted host forces global domain scoping off.
 	// The custom buylist is set up on /upload and priced into /search.
-	if cookieName == "MTGBAN" || global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
+	if cookieName == signatureCookie || global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
 		return "/"
 	}
 	if r == nil || r.URL == nil {
@@ -1521,6 +1521,10 @@ func cookieDomain(r *http.Request) (domain string, global bool) {
 	}
 	return domain, true
 }
+
+// signatureCookie holds the reader's signature, on the parent domain so every
+// site reads it.
+const signatureCookie = "BAN_SIG"
 
 // sessionCookie holds only the id of a reader's renewal session. Scripts
 // cannot read it, so a signature that leaks through a script, a link or a

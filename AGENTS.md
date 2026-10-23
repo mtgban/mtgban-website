@@ -255,7 +255,7 @@ commit to this repo can complete on its own.
    (`finishConfig`, `generateAPIKey`). Never write into `Config()` outside
    tests.
 
-2. **Stateless auth.** Permissions live entirely in the signed `MTGBAN`
+2. **Stateless auth.** Permissions live entirely in the signed `BAN_SIG`
    cookie / `?sig=` (an HMAC-signed query string). There is no session store
    or user DB. Read grants via `GetParamFromSig()` off `verifiedSignature()`
    (or `verifiedRequestSignature()` where `?sig=` comes first), never off the

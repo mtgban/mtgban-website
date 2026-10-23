@@ -209,9 +209,9 @@ func TestSettingsValuesAnswersThisPathsCookies(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=MTGBAN&name=SearchSellersList", nil)
+		"/arbit/settings-values?name=ArbitVendorsList&name=GlobalVendorsList&name=BAN_SIG&name=SearchSellersList", nil)
 	req.AddCookie(&http.Cookie{Name: "ArbitVendorsList", Value: "CK,SCG,"})
-	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: "sig"})
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: "sig"})
 	req.AddCookie(&http.Cookie{Name: "SearchSellersList", Value: "TCG,"})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -256,7 +256,7 @@ func fetchSettingsModal(t *testing.T, sig string) string {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/settings/modal", nil)
 	if sig != "" {
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 	}
 	rec := httptest.NewRecorder()
 	testSite.SettingsModal(rec, req)
@@ -367,7 +367,7 @@ func TestSettingsModalDataLocksListingWhenUnsigned(t *testing.T) {
 	if v := settingsModalData(testSite, req); !v.ListingLocked {
 		t.Error("ListingLocked false for an unsigned request")
 	}
-	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: grantSig(t, "Search")})
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: grantSig(t, "Search")})
 	if v := settingsModalData(testSite, req); v.ListingLocked {
 		t.Error("ListingLocked true for a signed request")
 	}

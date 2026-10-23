@@ -389,7 +389,7 @@ default), and an HMAC-SHA1 `Signature` over
 `METHOD + Expires + BaseURL + encoded-params` keyed by `BAN_SECRET`; API
 signature checks (`enforceAPISigning`) look up a per-user secret in
 `Config.APIUserSecrets` first, falling back to `BAN_SECRET` — page
-signatures always use `BAN_SECRET` only. It is stored in the `MTGBAN`
+signatures always use `BAN_SECRET` only. It is stored in the `BAN_SIG`
 cookie (31 days, shared across `*.mtgban.com`, **not** HttpOnly) and/or
 passed as `?sig=`. `GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`

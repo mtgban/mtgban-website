@@ -31,7 +31,7 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	req.Host = "mtgban.com"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	if sig != "" {
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 	}
 	rec := httptest.NewRecorder()
 	testSite.APIPlans(rec, req)

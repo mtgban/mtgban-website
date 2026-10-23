@@ -193,12 +193,12 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 	return apisig.Sign(key, data)
 }
 
-// unverifiedSignature is the request's signature, the MTGBAN cookie or else
+// unverifiedSignature is the request's signature, the BAN_SIG cookie or else
 // ?sig=, checked for nothing but its expiry. It is what the checks below
 // start from; anything that acts on a grant reads verifiedSignature or
 // verifiedRequestSignature instead.
 func unverifiedSignature(r *http.Request) string {
-	sig := readCookie(r, "MTGBAN")
+	sig := readCookie(r, signatureCookie)
 
 	querySig := r.FormValue("sig")
 	if sig == "" && querySig != "" {
@@ -294,7 +294,7 @@ func verifiedRequestSignature(r *http.Request) string {
 	return sig
 }
 
-// signatureCookieDays is how long the MTGBAN cookie keeps a signature, and so
+// signatureCookieDays is how long the BAN_SIG cookie keeps a signature, and so
 // the longest an invite link may last: one that outlived its cookie would be
 // dropped by the browser while still valid.
 const signatureCookieDays = 31
@@ -302,7 +302,7 @@ const signatureCookieDays = 31
 // Put signature in cookies for a month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	expires := time.Now().Add(signatureCookieDays * 24 * time.Hour)
-	setCookie(w, r, "MTGBAN", sig, expires, true)
+	setCookie(w, r, signatureCookie, sig, expires, true)
 }
 
 // adminOnly hides the wrapped handler from signatures that do not carry
@@ -320,17 +320,17 @@ func adminOnly(next http.Handler) http.Handler {
 	})
 }
 
-// withSignatureCookie is r carrying sig as its MTGBAN cookie, in place of
+// withSignatureCookie is r carrying sig as its BAN_SIG cookie, in place of
 // any the request came with.
 func withSignatureCookie(r *http.Request, sig string) *http.Request {
 	out := r.Clone(r.Context())
 	out.Header.Del("Cookie")
 	for _, c := range r.Cookies() {
-		if c.Name != "MTGBAN" {
+		if c.Name != signatureCookie {
 			out.AddCookie(c)
 		}
 	}
-	out.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+	out.AddCookie(&http.Cookie{Name: signatureCookie, Value: sig})
 	return out
 }
 

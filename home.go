@@ -20,7 +20,7 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 		message = ErrMsg
 	case "logout":
 		// Invalidate the current cookie
-		setCookie(w, r, "MTGBAN", "", time.Now(), true)
+		setCookie(w, r, signatureCookie, "", time.Now(), true)
 
 		http.Redirect(w, r, "/", http.StatusFound)
 		return

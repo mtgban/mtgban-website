@@ -38,7 +38,7 @@ func voteRequest(method, sig, q string) *http.Request {
 	r := httptest.NewRequest(method, "/api/popular/vote", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if sig != "" {
-		r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 	}
 	return r
 }

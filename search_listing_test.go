@@ -93,7 +93,7 @@ func TestListingPriorityNeedsASignature(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(uuid), nil)
 			req.AddCookie(&http.Cookie{Name: "SearchListingPriority", Value: "prices"})
 			if tc.sig != "" {
-				req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: tc.sig})
+				req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: tc.sig})
 			}
 			rec := httptest.NewRecorder()
 			testSite.Search(rec, req)

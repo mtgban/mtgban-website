@@ -213,7 +213,7 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 		}
 		req := httptest.NewRequest(http.MethodGet, target, nil)
 		if cookie != "" {
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 		}
 		// The API limiter is shared and keyed on the address.
 		requests++
@@ -259,7 +259,7 @@ func TestSearchAPIKeepsToTheKeysStores(t *testing.T) {
 	// The site's own export is not a key, and keeps every store it shows.
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(name)+".csv", nil)
-	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 	rec := httptest.NewRecorder()
 	testSite.SearchExport(rec, req)
 	if !strings.Contains(rec.Body.String(), "Star City Games") {
@@ -326,7 +326,7 @@ func TestSearchAPIKeysReachAPIOnlyStores(t *testing.T) {
 		{"/search?q=" + url.QueryEscape(name), testSite.Search},
 	} {
 		req := httptest.NewRequest(http.MethodGet, page.target, nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 		rec := httptest.NewRecorder()
 		page.serve(rec, req)
 		body := rec.Body.String()
@@ -469,7 +469,7 @@ func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
 			{"/search?q=" + url.QueryEscape(name), testSite.Search},
 		} {
 			req := httptest.NewRequest(http.MethodGet, page.target, nil)
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 			rec := httptest.NewRecorder()
 			page.serve(rec, req)
 			body := rec.Body.String()
@@ -574,7 +574,7 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query, sortMode, saved string) []string {
 		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(query)+".csv?id=mtgjson&sort="+sortMode, nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		if saved != "" {
 			req.AddCookie(&http.Cookie{Name: "SearchDefaultSort", Value: saved})
 		}
@@ -635,7 +635,7 @@ func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
 	exported := func(query string) []string {
 		req := httptest.NewRequest(http.MethodGet, "/search/export/retail/"+url.PathEscape(query)+".csv?id=mtgjson", nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		rec := httptest.NewRecorder()
 		testSite.SearchExport(rec, req)
 		var ids []string

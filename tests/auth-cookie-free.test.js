@@ -14,8 +14,8 @@ function sources(dir) {
 
 // The signature cookie is not readable from a page; what its scripts gate on
 // is rendered on <html> by the server.
-test('no script reads the MTGBAN cookie', () => {
-    const readers = sources(jsDir).filter((path) => /MTGBAN=|getCookie\(\s*['"]MTGBAN['"]/.test(readFileSync(path, 'utf8')));
+test('no script reads the signature cookie under either name', () => {
+    const readers = sources(jsDir).filter((path) => /(?:MTGBAN|BAN_SIG)=|getCookie\(\s*['"](?:MTGBAN|BAN_SIG)['"]/.test(readFileSync(path, 'utf8')));
     expect(readers).toEqual([]);
 });
 
