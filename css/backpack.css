@@ -24,8 +24,8 @@
 .result-quick-icons .pack-btn.active { color: var(--dodgerblue); }
 
 /* Doubled with .pack-btn so the result row's span rules (size, colour) lose. */
-.pack-btn .pack-btn-count,
-.pack-btn .pack-btn-count:hover {
+.pack-btn .pack-btn-tick,
+.pack-btn .pack-btn-tick:hover {
     position: absolute;
     top: -0.2rem;
     right: -0.3rem;
@@ -41,9 +41,9 @@
     text-align: center;
 }
 
-/* In the phone's actions menu the count trails the label instead. */
-.m-actions-pack.pack-btn .pack-btn-count,
-.m-actions-pack.pack-btn .pack-btn-count:hover {
+/* In the phone's actions menu the tick trails the label instead. */
+.m-actions-pack.pack-btn .pack-btn-tick,
+.m-actions-pack.pack-btn .pack-btn-tick:hover {
     position: static;
     margin-left: auto;
 }
