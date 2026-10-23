@@ -16,6 +16,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apihandoff"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/patreon"
 )
 
@@ -85,7 +86,7 @@ func patreonRedirect(t *testing.T, rec *httptest.ResponseRecorder) (*url.URL, *h
 
 // handoffFinish runs the callback's handoff half for the reader Patreon named,
 // with nonce in this browser's cookie (none when empty).
-func handoffFinish(t *testing.T, state handoffState, nonce string, user *PatreonUserData, tier string, tierErr error) *httptest.ResponseRecorder {
+func handoffFinish(t *testing.T, state handoffState, nonce string, user *pledge.User, tier string, tierErr error) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/auth?code=x", nil)
 	if nonce != "" {
@@ -111,7 +112,7 @@ func gatewayToken(t *testing.T, rec *httptest.ResponseRecorder, path string) (ap
 	return claims, loc
 }
 
-var ann = &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
+var ann = &pledge.User{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
 
 // A handoff starts at Patreon whatever the site cookie says, signed in or
 // not: it asks for the scopes the tier needs, and keeps a nonce in a cookie
@@ -119,7 +120,7 @@ var ann = &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example", Em
 func TestAPIHandoffStartsAtPatreon(t *testing.T) {
 	setGatewaySecret(t, "handoff-secret")
 	handoffSetup(t)
-	mallory := sign("Legacy", &PatreonUserData{Email: "mallory@example.com", FullName: "Mallory", EmailVerified: true}, nil, DefaultSignatureDuration)
+	mallory := sign("Legacy", &pledge.User{Email: "mallory@example.com", FullName: "Mallory", EmailVerified: true}, nil, DefaultSignatureDuration)
 
 	for _, tc := range []struct {
 		handler http.HandlerFunc
@@ -227,17 +228,17 @@ func TestAPIHandoffFinishesOnlyWhatThisBrowserStarted(t *testing.T) {
 func TestAPIHandoffRefusals(t *testing.T) {
 	setGatewaySecret(t, "handoff-secret")
 	logged := handoffSetup(t)
-	unconfirmed := &PatreonUserData{Email: "ann@example.com", FullName: "Ann"}
+	unconfirmed := &pledge.User{Email: "ann@example.com", FullName: "Ann"}
 	for name, tc := range map[string]struct {
 		purpose string
-		user    *PatreonUserData
+		user    *pledge.User
 		tier    string
 		tierErr error
 		want    string
 		outcome string
 	}{
 		"unconfirmed email":    {apihandoff.PurposeLogin, unconfirmed, "Legacy", nil, ErrMsgAPIEmailUnconfirmed, `email="ann@example.com" tier="Legacy" outcome=unverified email`},
-		"no email":             {apihandoff.PurposeLogin, &PatreonUserData{EmailVerified: true}, "Legacy", nil, ErrMsgAPIHandoffNoEmail, "outcome=no email"},
+		"no email":             {apihandoff.PurposeLogin, &pledge.User{EmailVerified: true}, "Legacy", nil, ErrMsgAPIHandoffNoEmail, "outcome=no email"},
 		"a trial, no tier":     {apihandoff.PurposeTrial, ann, "", nil, ErrMsgAPITrialPledge, `purpose=trial email="ann@example.com" tier="" outcome=no tier`},
 		"a login, no tier":     {apihandoff.PurposeLogin, ann, "", nil, ErrMsgAPILoginPledge, `purpose=login email="ann@example.com" tier="" outcome=no tier`},
 		"a login":              {apihandoff.PurposeLogin, ann, "Legacy", nil, "", `purpose=login email="ann@example.com" tier="Legacy" outcome=ok`},
@@ -421,7 +422,7 @@ func TestAPIHandoffLogsOneLineWhateverItIsSent(t *testing.T) {
 	forged := "\nhandoff: purpose=login email=x tier=Vintage outcome=ok"
 	state := handoffStatePrefix + url.Values{"p": {apihandoff.PurposeLogin + forged}, "n": {"n1"}}.Encode()
 	identity := patreonAnswer(`{"data":{"attributes":{"email":"ann@example.com\nx","full_name":"Ann\nhandoff: purpose=login email=x tier=Vintage outcome=ok","is_email_verified":true}}}`)
-	_, err := getUserIDs(context.Background(), &patreon.Client{Client: &http.Client{Transport: identity}})
+	_, err := Pledge.UserIDs(context.Background(), &patreon.Client{Client: &http.Client{Transport: identity}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +431,7 @@ func TestAPIHandoffLogsOneLineWhateverItIsSent(t *testing.T) {
 	req.Host = "mtgban.com"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	testSite.Auth(httptest.NewRecorder(), req)
-	handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", &PatreonUserData{Email: "ann@example.com" + forged, EmailVerified: true}, "Legacy", nil)
+	handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", &pledge.User{Email: "ann@example.com" + forged, EmailVerified: true}, "Legacy", nil)
 
 	lines := strings.Split(strings.TrimSuffix(logged.String(), "\n"), "\n")
 	if len(lines) != 3 || !strings.HasPrefix(lines[1], "handoff: purpose=unknown ") {
@@ -461,9 +462,9 @@ func TestAPIHandoffTellsARefusedTierLookupFromNoPledge(t *testing.T) {
 		http.StatusNotFound:     ErrMsgAPILoginPledge,
 	} {
 		client := &patreon.Client{Client: &http.Client{Transport: patreonStatus(code)}}
-		_, err := getUserTier(ctx, client, "m1")
+		_, err := Pledge.UserTier(ctx, client, "m1")
 		var tierErr error
-		if patreonDidNotAnswer(ctx, err) {
+		if pledge.DidNotAnswer(ctx, err) {
 			tierErr = err
 		}
 		rec := handoffFinish(t, handoffState{purpose: apihandoff.PurposeLogin, nonce: "n1"}, "n1", ann, "", tierErr)
@@ -495,7 +496,7 @@ func TestPatreonDidNotAnswer(t *testing.T) {
 		"cut short":         {context.Background(), fmt.Errorf("cannot decode membership data: %w", fmt.Errorf("%w: unexpected EOF", patreon.ErrUnreadable)), true},
 		"answered in time":  {expired, nil, false},
 	} {
-		got := patreonDidNotAnswer(tc.ctx, tc.err)
+		got := pledge.DidNotAnswer(tc.ctx, tc.err)
 		if got != tc.want {
 			t.Errorf("%s: %v, want %v", name, got, tc.want)
 		}

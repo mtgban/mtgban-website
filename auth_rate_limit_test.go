@@ -14,6 +14,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/mtgban-website/apisig"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/ratelimit"
 	"golang.org/x/time/rate"
 )
@@ -81,7 +82,7 @@ func TestUserRateLimitKeepsAForgedEmailOutOfItsOwnersBucket(t *testing.T) {
 		handler.ServeHTTP(httptest.NewRecorder(), req)
 	}
 
-	ann := &PatreonUserData{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
+	ann := &pledge.User{Email: "ann@example.com", FullName: "Ann", EmailVerified: true}
 	forged := url.Values{"UserEmail": {"ann@example.com"}, "Expires": {"99999999999"}, "Signature": {"forged"}}
 	for range UserRequestBurst + 1 {
 		serve(base64.StdEncoding.EncodeToString([]byte(forged.Encode())))

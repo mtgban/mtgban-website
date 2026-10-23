@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
@@ -191,7 +192,7 @@ func TestOnlyACheckedSignatureIsKeptAsTheCookie(t *testing.T) {
 // alerts read the flag, and deleting it breaks the HMAC like any other edit.
 func TestTheUnconfirmedFlagIsSigned(t *testing.T) {
 	signingEnabled(t, true)
-	flagged := sign("Legacy", &PatreonUserData{Email: "victim@example.com", FullName: "Mallory"}, nil, DefaultSignatureDuration)
+	flagged := sign("Legacy", &pledge.User{Email: "victim@example.com", FullName: "Mallory"}, nil, DefaultSignatureDuration)
 	v := parseSig(flagged)
 	if v.Get("UserEmailUnverified") != "true" {
 		t.Fatal("an unconfirmed email was not flagged")

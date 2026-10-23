@@ -11,6 +11,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apiproductlist"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 )
 
 func apiPlansPage(t *testing.T, sig string) string {
@@ -84,7 +85,7 @@ func TestAPIPlansRendersCatalog(t *testing.T) {
 }
 
 func TestAPIPlansTrialButtonNeedsPledgeAndSecret(t *testing.T) {
-	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
+	user := &pledge.User{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
 
 	setGatewaySecret(t, "")
 	if strings.Contains(apiPlansPage(t, sign("Legacy", user, nil, DefaultSignatureDuration)), `href="/api-trial`) {
@@ -159,7 +160,7 @@ func TestAPIPlansManageLinkUsesTheHandoffWhenSignedIn(t *testing.T) {
 	if !strings.Contains(anon, `href="https://api.example/account"`) {
 		t.Error("anonymous reader should be sent to the gateway login")
 	}
-	user := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
+	user := &pledge.User{Email: "ann@example.com", FullName: "Ann Example", EmailVerified: true}
 	signed := apiPlansPage(t, sign("", user, nil, DefaultSignatureDuration))
 	if !strings.Contains(signed, `href="/api-login?return_to=https%3a%2f%2fmtgban.com%2fapi-plans"`) {
 		t.Error("signed-in reader should be sent through the Patreon handoff")
@@ -172,7 +173,7 @@ func TestAPIPlansManageLinkUsesTheHandoffWhenSignedIn(t *testing.T) {
 // The gateway signs in whoever the email names, so Patreon must have confirmed it.
 func TestAPIPlansUnverifiedEmailKeepsTheGatewayLink(t *testing.T) {
 	setGatewaySecret(t, "s")
-	unverified := &PatreonUserData{Email: "ann@example.com", FullName: "Ann Example"}
+	unverified := &pledge.User{Email: "ann@example.com", FullName: "Ann Example"}
 	body := apiPlansPage(t, sign("Legacy", unverified, nil, DefaultSignatureDuration))
 	if !strings.Contains(body, `href="https://api.example/account"`) {
 		t.Error("an unverified email should be sent to the gateway account page")

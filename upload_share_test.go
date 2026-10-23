@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -152,7 +153,7 @@ func openShare(t *testing.T, rd uploadShareReader) *httptest.ResponseRecorder {
 	LogPages = map[string]*log.Logger{"Upload": log.New(io.Discard, "", 0)}
 
 	r := httptest.NewRequest(http.MethodGet, "/upload?share="+goodShareKey, nil)
-	user := &PatreonUserData{FullName: "A", Email: nextShareEmail(), EmailVerified: true}
+	user := &pledge.User{FullName: "A", Email: nextShareEmail(), EmailVerified: true}
 	r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sign("Pioneer", user, map[string]map[string]string{"Upload": {}}, time.Hour)})
 	rec := httptest.NewRecorder()
 	newSite().Upload(rec, r)

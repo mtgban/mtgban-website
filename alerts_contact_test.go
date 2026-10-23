@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -46,7 +47,7 @@ func (r *recordedContacts) DeleteChannel(_ context.Context, userHash string, kin
 
 func TestRecordAlertContactHashesTheBareEmail(t *testing.T) {
 	rec := &recordedContacts{}
-	user := &PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
+	user := &pledge.User{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
 	err := recordAlertContact(context.Background(), rec, user, "Legacy", true, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -67,16 +68,16 @@ func TestRecordAlertContactWritesChannelsPerACL(t *testing.T) {
 	discordOnly := []alerts.ChannelKind{alerts.ChannelDiscord}
 	cases := []struct {
 		name      string
-		user      PatreonUserData
+		user      pledge.User
 		channels  []alerts.ChannelKind
 		wantKinds []alerts.ChannelKind
 		wantDel   int
 	}{
-		{"discord and email allowed", PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}, email, email, 0},
-		{"email not allowed", PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}, discordOnly, discordOnly, 0},
-		{"no channels listed", PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}, nil, discordOnly, 0},
-		{"discord unknown", PatreonUserData{Email: "a@b.com", EmailVerified: true}, email, []alerts.ChannelKind{alerts.ChannelEmail}, 0},
-		{"discord unlinked", PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordKnown: true}, email, []alerts.ChannelKind{alerts.ChannelEmail}, 1},
+		{"discord and email allowed", pledge.User{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}, email, email, 0},
+		{"email not allowed", pledge.User{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}, discordOnly, discordOnly, 0},
+		{"no channels listed", pledge.User{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}, nil, discordOnly, 0},
+		{"discord unknown", pledge.User{Email: "a@b.com", EmailVerified: true}, email, []alerts.ChannelKind{alerts.ChannelEmail}, 0},
+		{"discord unlinked", pledge.User{Email: "a@b.com", EmailVerified: true, DiscordKnown: true}, email, []alerts.ChannelKind{alerts.ChannelEmail}, 1},
 	}
 	for _, tc := range cases {
 		rec := &recordedContacts{}
@@ -116,9 +117,9 @@ func TestRecordAlertContactWritesChannelsPerACL(t *testing.T) {
 func TestRecordAlertContactNoChannelsWithoutAlertsOrVerification(t *testing.T) {
 	all := []alerts.ChannelKind{alerts.ChannelDiscord, alerts.ChannelEmail}
 	rec := &recordedContacts{}
-	user := &PatreonUserData{Email: "a@b.com", EmailVerified: false, DiscordID: "77", DiscordKnown: true}
+	user := &pledge.User{Email: "a@b.com", EmailVerified: false, DiscordID: "77", DiscordKnown: true}
 	_ = recordAlertContact(context.Background(), rec, user, "Legacy", true, all)
-	user = &PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
+	user = &pledge.User{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
 	_ = recordAlertContact(context.Background(), rec, user, "Legacy", false, all)
 	if len(rec.channels) != 0 || len(rec.deleted) != 0 {
 		t.Fatalf("channels written: %+v deleted %+v", rec.channels, rec.deleted)
@@ -129,7 +130,7 @@ func TestRecordAlertContactNoChannelsWithoutAlertsOrVerification(t *testing.T) {
 // the Discord id off this row, and the evaluator reads the tier.
 func TestRecordAlertContactNotAllowedWritesTheContactOnly(t *testing.T) {
 	rec := &recordedContacts{}
-	user := &PatreonUserData{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
+	user := &pledge.User{Email: "a@b.com", EmailVerified: true, DiscordID: "77", DiscordKnown: true}
 	err := recordAlertContact(context.Background(), rec, user, "Legacy", false, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +149,7 @@ func TestRecordAlertContactNotAllowedWritesTheContactOnly(t *testing.T) {
 
 func TestRecordAlertContactSkipsUnverified(t *testing.T) {
 	rec := &recordedContacts{}
-	user := &PatreonUserData{Email: "a@b.com", EmailVerified: false, DiscordID: "77", DiscordKnown: true}
+	user := &pledge.User{Email: "a@b.com", EmailVerified: false, DiscordID: "77", DiscordKnown: true}
 	err := recordAlertContact(context.Background(), rec, user, "Legacy", true, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +160,7 @@ func TestRecordAlertContactSkipsUnverified(t *testing.T) {
 }
 
 func TestRecordAlertContactSkipsWithoutStore(t *testing.T) {
-	err := recordAlertContact(context.Background(), nil, &PatreonUserData{Email: "a@b.com"}, "Legacy", true, nil)
+	err := recordAlertContact(context.Background(), nil, &pledge.User{Email: "a@b.com"}, "Legacy", true, nil)
 	if err != nil {
 		t.Fatalf("nil recorder should be a no-op, got %v", err)
 	}
@@ -185,7 +186,7 @@ func TestPatreonUserFromDataLinked(t *testing.T) {
 		Discord *patreon.SocialConnection `json:"discord"`
 	}{Discord: &patreon.SocialConnection{UserID: "77"}}
 
-	got := patreonUserFromData(&userData)
+	got := pledge.UserFromData(&userData)
 	if got.Email != "a@b.com" {
 		t.Fatalf("email = %q, want lowercased", got.Email)
 	}
@@ -200,7 +201,7 @@ func TestPatreonUserFromDataAbsentDiscord(t *testing.T) {
 	userData.Data.Attributes.Email = "a@b.com"
 	userData.Data.Attributes.IsEmailVerified = true
 
-	got := patreonUserFromData(&userData)
+	got := pledge.UserFromData(&userData)
 	if got.DiscordKnown || got.DiscordID != "" {
 		t.Fatalf("unexpected %+v", got)
 	}

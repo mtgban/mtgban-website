@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mtgban/mtgban-website/internal/alerts"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -19,7 +20,7 @@ type contactRecorder interface {
 // contact row for every verified login (the evaluator reads its tier, the
 // Account page its Discord id), channels only where the tier grants
 // alerts. The Patreon email is written only when email is among them.
-func recordAlertContact(ctx context.Context, rec contactRecorder, userData *PatreonUserData, tier string, allowed bool, channels []alerts.ChannelKind) error {
+func recordAlertContact(ctx context.Context, rec contactRecorder, userData *pledge.User, tier string, allowed bool, channels []alerts.ChannelKind) error {
 	// An unverified login never touches the contact row.
 	if rec == nil || userData == nil || !userData.EmailVerified {
 		return nil
