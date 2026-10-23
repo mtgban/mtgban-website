@@ -1466,27 +1466,9 @@ func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value 
 
 // Set a cookie in the response with no expiration at its route path.
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
-	origin := requestOrigin(r)
-	u, err := url.Parse(origin)
-	if err != nil || u.Hostname() == "" {
-		// Untrusted hosts, including httptest's example.com and a platform's
-		// raw ingress hostname, may still use host-only cookies. Never widen
-		// those cookies to a parent domain derived from an untrusted Host.
-		u = &url.URL{Scheme: "http"}
-		if r != nil {
-			u.Host = r.Host
-		}
-		global = false
-	}
-
 	domain := ""
 	if global {
-		domain = u.Hostname()
-		fields := strings.Split(domain, ".")
-		// Guard against hostname being "mtgban.com"
-		if fields[0] != "mtgban" {
-			domain = strings.Join(fields[1:], ".")
-		}
+		domain, global = cookieDomain(r)
 	}
 
 	cookie := http.Cookie{
@@ -1514,6 +1496,29 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 		legacy.MaxAge = -1
 		http.SetCookie(w, &legacy)
 	}
+}
+
+// cookieDomain returns the Domain that shares a cookie across the sites of
+// the parent domain: the request's hostname without its first label, unless
+// that label is "mtgban". When the request's origin is not a trusted host it
+// returns no domain and global false, so the cookie stays host-only.
+func cookieDomain(r *http.Request) (domain string, global bool) {
+	origin := requestOrigin(r)
+	u, err := url.Parse(origin)
+	if err != nil || u.Hostname() == "" {
+		// Untrusted hosts, including httptest's example.com and a platform's
+		// raw ingress hostname, may still use host-only cookies. Never widen
+		// those cookies to a parent domain derived from an untrusted Host.
+		return "", false
+	}
+
+	domain = u.Hostname()
+	fields := strings.Split(domain, ".")
+	// Guard against hostname being "mtgban.com"
+	if fields[0] != "mtgban" {
+		domain = strings.Join(fields[1:], ".")
+	}
+	return domain, true
 }
 
 // isSecureRequest reports whether the request reached us over HTTPS,
