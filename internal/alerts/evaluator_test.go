@@ -479,11 +479,13 @@ func TestRunAlertEvaluationRetriesOtherSendErrors(t *testing.T) {
 	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
 
 	st := store.states[7]
-	if st.Status != StatusActive || !st.AboveArmed || !st.BelowArmed || st.LastError != "delivery failed, will retry" || st.LastFiredAt != nil {
+	if st.Status != StatusActive || !st.AboveArmed || !st.BelowArmed || st.LastError != "delivery failed, will retry" || st.LastFiredAt == nil || !st.LastFiredAt.Equal(evalNow) {
 		t.Fatalf("state = %+v", st)
 	}
-	if store.armed[7] != [2]bool{true, true} || !store.fired[7].IsZero() {
-		t.Fatalf("retry must restore the flags and leave the fire time unset: armed=%v fired=%v", store.armed[7], store.fired[7])
+	// The flags come back and the fire time is stamped, so the send gap
+	// holds the retry off rather than every reload retrying at once.
+	if store.armed[7] != [2]bool{true, true} || !store.fired[7].Equal(evalNow) {
+		t.Fatalf("retry must restore the flags and stamp the fire time: armed=%v fired=%v", store.armed[7], store.fired[7])
 	}
 	if len(store.events) != 1 || store.events[0].Delivered || store.events[0].Error == "" {
 		t.Fatalf("events = %+v", store.events)
@@ -795,19 +797,67 @@ func TestRunAlertEvaluationWritesLandPastTheRunDeadline(t *testing.T) {
 	}
 }
 
+// TestRunAlertEvaluationDeadlineRetriesAtOnce proves a firing the run
+// deadline cut keeps its flags with no fire time, so the next pass sends
+// it rather than waiting out the send gap.
+func TestRunAlertEvaluationDeadlineRetriesAtOnce(t *testing.T) {
+	store := newFakeEvalStore(activeAlert())
+	dd := &fakeDeliverer{err: fmt.Errorf("%w: %w", errNotAttempted, context.DeadlineExceeded)}
+	deps := evalDeps(store, dd, 13)
+	sum := runEvaluation(context.Background(), deps, buylistOnly)
+
+	st := store.states[7]
+	if st.Status != StatusActive || !st.AboveArmed || !st.BelowArmed || st.LastError != "run ran out of time, will retry" || st.LastFiredAt != nil {
+		t.Fatalf("state = %+v", st)
+	}
+	if sum.err == nil || sum.skipped != 1 || len(store.events) != 1 || store.events[0].Delivered {
+		t.Fatalf("summary = %+v events = %+v", sum, store.events)
+	}
+
+	dd.err = nil
+	runEvaluation(context.Background(), deps, buylistOnly)
+	st = store.states[7]
+	if !slices.Equal(store.claims, []int64{7, 7}) || st.LastError != "" || st.LastFiredAt == nil {
+		t.Fatalf("next pass did not send: claims=%v state=%+v", store.claims, st)
+	}
+}
+
+// TestRunAlertEvaluationCutSendKeepsTheGap proves a send the deadline cut
+// mid-request, which the provider may have accepted, stamps the fire
+// time like any other failure rather than going out again next run.
+func TestRunAlertEvaluationCutSendKeepsTheGap(t *testing.T) {
+	store := newFakeEvalStore(activeAlert())
+	dd := &fakeDeliverer{err: fmt.Errorf("mailer: resend: Post: %w", context.DeadlineExceeded)}
+	runEvaluation(context.Background(), evalDeps(store, dd, 13), buylistOnly)
+
+	st := store.states[7]
+	if st.LastError != "delivery failed, will retry" || st.LastFiredAt == nil || !st.LastFiredAt.Equal(evalNow) {
+		t.Fatalf("state = %+v", st)
+	}
+}
+
 func TestRunAlertEvaluationRetriesOnTheNextPass(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
 	dd := &fakeDeliverer{err: errors.New("dial tcp")}
 	deps := evalDeps(store, dd, 13)
 	runEvaluation(context.Background(), deps, buylistOnly)
 	dd.err = nil
+
+	// A pass inside the send gap leaves the failure alone.
+	runEvaluation(context.Background(), deps, buylistOnly)
+	if len(dd.sent) != 1 || !slices.Equal(store.claims, []int64{7}) {
+		t.Fatalf("a failed send retried at once: sent=%v claims=%v", dd.sent, store.claims)
+	}
+
+	later := evalNow.Add(minGap + time.Minute)
+	deps.Now = func() time.Time { return later }
 	runEvaluation(context.Background(), deps, buylistOnly)
 
 	if len(dd.sent) != 2 || !slices.Equal(store.claims, []int64{7, 7}) {
-		t.Fatalf("second pass did not retry: sent=%v claims=%v", dd.sent, store.claims)
+		t.Fatalf("pass after the gap did not retry: sent=%v claims=%v", dd.sent, store.claims)
 	}
 	st := store.states[7]
-	if st.LastError != "" || st.LastFiredAt == nil || !st.LastFiredAt.Equal(evalNow) || store.armed[7] != [2]bool{false, true} {
+	if st.LastError != "" || st.LastFiredAt == nil || !st.LastFiredAt.Equal(later) || store.armed[7] != [2]bool{false, true} {
 		t.Fatalf("delivered retry left state %+v armed=%v", st, store.armed[7])
 	}
 	if len(store.events) != 2 || store.events[0].Delivered || !store.events[1].Delivered {
