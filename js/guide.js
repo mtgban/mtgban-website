@@ -187,7 +187,9 @@
                 html += '<div class="guide-examples">';
                 for (var e = 0; e < item.content.examples.length; e++) {
                     var ex = item.content.examples[e];
-                    html += '<div class="guide-example">';
+                    // A searchable example carries its index, and gets its copy
+                    // button once the HTML is in the DOM, below.
+                    html += ex.palette ? '<div class="guide-example">' : '<div class="guide-example" data-example="' + e + '">';
                     if (ex.palette) {
                         // Palette-only recipe: render as plain code, not a search link, no copy.
                         html += '<span class="guide-example-query guide-example-palette">' + escapeHtml(ex.query) + '</span>';
@@ -195,9 +197,6 @@
                     } else {
                         html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '">' + escapeHtml(ex.query) + '</a>';
                         html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
-                        html += '<button class="guide-example-copy" onclick="copySnippet(this, \'' + escapeJs(ex.query) + '\')" title="Copy to clipboard">';
-                        html += '<i data-lucide="copy"></i>';
-                        html += '</button>';
                     }
                     html += '</div>';
                 }
@@ -212,6 +211,22 @@
             section.innerHTML = html;
             if (desc) {
                 section.querySelector('.guide-section-desc').appendChild(desc.content.cloneNode(true));
+            }
+            // Copy button on every searchable example. The query is handed to
+            // the listener as a value: in an onclick attribute a quote in it
+            // (name:"Lightning Bolt") ends the attribute early.
+            var examples = section.querySelectorAll('.guide-example[data-example]');
+            for (var xi = 0; xi < examples.length; xi++) {
+                (function (div) {
+                    var query = item.content.examples[Number(div.getAttribute('data-example'))].query;
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'guide-example-copy';
+                    btn.title = 'Copy to clipboard';
+                    btn.innerHTML = '<i data-lucide="copy"></i>';
+                    btn.onclick = function () { copySnippet(btn, query); };
+                    div.appendChild(btn);
+                })(examples[xi]);
             }
             // Copy button on every code block.
             var pres = section.querySelectorAll('pre');
@@ -536,10 +551,6 @@
                   .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    function escapeJs(str) {
-        return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-    }
-
     // Render the live store-shorthand reference from the registered scrapers.
     function buildStoresTable(stores) {
         if (!stores || !stores.length) return '';
@@ -565,23 +576,36 @@
     }
 })();
 
+// copySnippet puts text on the clipboard and says so. The clipboard API
+// refuses when the page lacks permission; the selection fallback then has
+// its turn, and the toast shows only for a copy that happened.
 function copySnippet(btn, text) {
     if (navigator.clipboard) {
-        navigator.clipboard.writeText(text);
-    } else {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
+        navigator.clipboard.writeText(text).then(showCopied, function () {
+            if (copyBySelection(text)) showCopied();
+        });
+        return;
     }
+    if (copyBySelection(text)) showCopied();
+}
+
+function copyBySelection(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+}
+
+function showCopied() {
     var toast = document.getElementById('cp-toast');
-    if (toast) {
-        toast.textContent = 'Copied!';
-        toast.classList.add('show');
-        setTimeout(function() {
-            toast.classList.remove('show');
-        }, 1500);
-    }
+    if (!toast) return;
+    toast.textContent = 'Copied!';
+    toast.classList.add('show');
+    setTimeout(function() {
+        toast.classList.remove('show');
+    }, 1500);
 }
