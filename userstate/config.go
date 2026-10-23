@@ -84,6 +84,12 @@ func NewClient(cfg SQLConfig) (*Client, error) {
 	if _, err := db.Exec(createUploadSharesSQL); err != nil {
 		log.Println("userstate: upload shares unavailable:", err)
 	}
+	// Non-fatal for the same reason: losing this table loses only
+	// Patreon session renewal.
+	_, err = db.Exec(createPatreonSessionsSQL)
+	if err != nil {
+		log.Println("userstate: patreon sessions unavailable:", err)
+	}
 
 	return &Client{db: db}, nil
 }

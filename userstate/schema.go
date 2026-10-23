@@ -27,6 +27,28 @@ CREATE TABLE IF NOT EXISTS upload_shares (
 );
 CREATE INDEX IF NOT EXISTS upload_shares_expires ON upload_shares (expires_at)`
 
+// createPatreonSessionsSQL is the table a Patreon login's refresh token
+// lives in, one row per login; additive, so a later start applies it to an
+// existing database. The token and the session id are stored as they are:
+// a refresh token redeems only with the client secret, which lives in the
+// infrastructure config, and a session id renews only beside its reader's
+// signature, which the database never holds. lease names the holder of the
+// current renewal, so a holder that outlived its lease cannot commit; it is
+// null until the first lease, so an empty fence matches nothing.
+const createPatreonSessionsSQL = `
+CREATE TABLE IF NOT EXISTS patreon_sessions (
+    session_id    TEXT PRIMARY KEY,
+    email_hash    TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    lease         TEXT,
+    first_login   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_renewed  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    renew_after   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at    TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS patreon_sessions_email ON patreon_sessions (email_hash);
+CREATE INDEX IF NOT EXISTS patreon_sessions_expires ON patreon_sessions (expires_at)`
+
 // The table predates the backpack where this runs, so the column is added
 // to an existing one too; ALTER needs the table owner, so NewClient runs it
 // only when backpackColumnSQL finds no column.
