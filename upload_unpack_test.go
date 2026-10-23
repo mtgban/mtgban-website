@@ -613,7 +613,7 @@ func TestUnpackedResultsExportAsOneFile(t *testing.T) {
 // values a row, and the form parser counts values: it stops at 10,000 and
 // hands back an empty form rather than a short one.
 func TestSplitRowsUnpacksTheRowList(t *testing.T) {
-	hashes, qtys, cond, prices, notes, from, fromQtys := splitRows(
+	hashes, qtys, cond, prices, notes, from, fromQtys, cut := splitRows(
 		"uuid-a\t2\tNM\t1.50\tA Precon\tbox-a\t2\n" +
 			"uuid-b\t1\t\t0\t\t\t\n" +
 			"\n" +
@@ -621,6 +621,9 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 
 	if len(hashes) != 3 {
 		t.Fatalf("got %d rows, want 3 (the empty line is not one)", len(hashes))
+	}
+	if cut {
+		t.Error("three rows came back as cut")
 	}
 	if hashes[0] != "uuid-a" || qtys[0] != "2" || cond[0] != "NM" ||
 		prices[0] != "1.50" || notes[0] != "A Precon" {
@@ -639,11 +642,32 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 
 	// A row that lost its trailing fields keeps the ones it has, which is how
 	// a column can be added without breaking a page that predates it.
-	hashes, qtys, cond, prices, notes, from, fromQtys = splitRows("uuid-d\t1\n")
+	hashes, qtys, cond, prices, notes, from, fromQtys, _ = splitRows("uuid-d\t1\n")
 	if len(hashes) != 1 || hashes[0] != "uuid-d" || qtys[0] != "1" || cond[0] != "" ||
 		prices[0] != "" || notes[0] != "" || from[0] != "" || fromQtys[0] != "" {
 		t.Errorf("a short row came back as %v %v %v %v %v %v %v",
 			hashes, qtys, cond, prices, notes, from, fromQtys)
+	}
+}
+
+// The packed rows stop at maxPackedRows and say so: only the body cap
+// bounded them before, and the hash path cuts nothing on its own.
+func TestSplitRowsStopsAtTheRowCap(t *testing.T) {
+	packed := strings.Repeat("uuid\t1\n", maxPackedRows+5)
+	hashes, qtys, cond, prices, notes, from, fromQtys, cut := splitRows(packed)
+	if !cut {
+		t.Error("the cut rows did not say so")
+	}
+	if _, _, _, _, _, _, _, cut := splitRows(strings.Repeat("uuid\t1\n", maxPackedRows)); cut {
+		t.Error("rows that fit exactly came back as cut")
+	}
+	for name, got := range map[string][]string{
+		"hashes": hashes, "qtys": qtys, "cond": cond, "prices": prices,
+		"notes": notes, "from": from, "fromQtys": fromQtys,
+	} {
+		if len(got) != maxPackedRows {
+			t.Errorf("%s: got %d rows, want %d", name, len(got), maxPackedRows)
+		}
 	}
 }
 

@@ -87,9 +87,13 @@ func TestWithSharedRowsCutsAtTheCap(t *testing.T) {
 	if !slices.Equal(in.hashes, []string{"u1", "u2"}) || !slices.Equal(in.hashesQtys, []string{"1", "2"}) {
 		t.Fatalf("kept %v %v, want the first two rows", in.hashes, in.hashesQtys)
 	}
+	if in.rowsCap != 2 {
+		t.Errorf("rowsCap is %d, want the cap the rows were cut at", in.rowsCap)
+	}
 	for _, cap := range []int{0, -1} {
-		if got := withSharedRows(uploadInput{}, rows, cap); len(got.hashes) != 5 || len(got.hashesFromQtys) != 5 {
-			t.Errorf("cap %d cut the rows to %d", cap, len(got.hashes))
+		got := withSharedRows(uploadInput{}, rows, cap)
+		if len(got.hashes) != 5 || len(got.hashesFromQtys) != 5 || got.rowsCap != 0 {
+			t.Errorf("cap %d cut the rows to %d (rowsCap %d)", cap, len(got.hashes), got.rowsCap)
 		}
 	}
 	if !in.shared {
