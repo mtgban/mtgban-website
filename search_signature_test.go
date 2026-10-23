@@ -36,7 +36,7 @@ func TestSearchKeepsBlockedStoresFromAForgedGrant(t *testing.T) {
 	search := func(sig string) string {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, "/search?q="+url.QueryEscape(name), nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		rec := httptest.NewRecorder()
 		testSite.Search(rec, req)
 		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Card Kingdom") {

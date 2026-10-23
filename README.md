@@ -45,7 +45,7 @@ string: signing keeps empty values, but verification drops them, which
 breaks every signed page for that tier. The admin page's table and grant
 editors refuse one; an `acl.json` written by hand has to keep to it too.
 
-`AlertChannels` is a new signed field, carried in the `MTGBAN` signature
+`AlertChannels` is a new signed field, carried in the `BAN_SIG` signature
 on the cookie every site shares. Deploy this build to every site before
 any tier in the shared `acl.json` sets it: a build that predates the field
 rejects a signature carrying it, so a login on an updated site would sign

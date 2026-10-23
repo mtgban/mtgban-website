@@ -404,7 +404,7 @@ func TestHandoffHandlerAsksBeforeItReceives(t *testing.T) {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, "/upload/handoff", nil)
 		if sig != "" {
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		}
 		rec := httptest.NewRecorder()
 		testSite.UploadHandoff(rec, req)

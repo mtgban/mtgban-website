@@ -54,7 +54,7 @@ func shareRequest(t *testing.T, tier, email string, grants map[string]map[string
 	}
 	if tier != "" {
 		user := &pledge.User{FullName: "A", Email: email, EmailVerified: true}
-		r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sign(tier, user, grants, time.Hour)})
+		r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sign(tier, user, grants, time.Hour)})
 	}
 	return r
 }

@@ -25,8 +25,8 @@ func TestCookiePath(t *testing.T) {
 		{"ReverseVendorsList", "/reverse", false, "/reverse"},
 		{"UploadOptimizerOpts", "/upload", false, "/upload"},
 		{"UploadCustomRate", "/upload", false, "/"},
-		{"MTGBAN", "/auth", true, "/"},
-		{"MTGBAN", "/auth", false, "/"},
+		{"BAN_SIG", "/auth", true, "/"},
+		{"BAN_SIG", "/auth", false, "/"},
 		{"MobileSearchLayout", "/sealed", false, "/"},
 		{"Unknown", "/", false, "/"},
 	}
@@ -83,7 +83,7 @@ func TestSetCookieExpiresLegacyRootCopy(t *testing.T) {
 func TestAuthCookieStaysRootScopedOnUntrustedHost(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "http://raw.example.invalid/auth", nil)
-	setCookie(recorder, req, "MTGBAN", "sig", time.Now().Add(time.Hour), true)
+	setCookie(recorder, req, "BAN_SIG", "sig", time.Now().Add(time.Hour), true)
 
 	setCookies := recorder.Header().Values("Set-Cookie")
 	if len(setCookies) != 1 {
@@ -115,14 +115,14 @@ func TestSetCookieHeaders(t *testing.T) {
 		proto  string
 		want   []string
 	}{
-		{"parent domain", "MTGBAN", true, "http://magic.mtgban.com/auth", "https",
-			[]string{"MTGBAN=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
-		{"bare domain", "MTGBAN", true, "http://mtgban.com/auth", "https",
-			[]string{"MTGBAN=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
-		{"untrusted host", "MTGBAN", true, "http://raw.example.invalid/auth", "",
-			[]string{"MTGBAN=sig; Path=/; " + exp + "; SameSite=Strict"}},
-		{"localhost", "MTGBAN", true, "http://localhost:8080/auth", "",
-			[]string{"MTGBAN=sig; Path=/; " + exp}},
+		{"parent domain", "BAN_SIG", true, "http://magic.mtgban.com/auth", "https",
+			[]string{"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
+		{"bare domain", "BAN_SIG", true, "http://mtgban.com/auth", "https",
+			[]string{"BAN_SIG=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
+		{"untrusted host", "BAN_SIG", true, "http://raw.example.invalid/auth", "",
+			[]string{"BAN_SIG=sig; Path=/; " + exp + "; SameSite=Strict"}},
+		{"localhost", "BAN_SIG", true, "http://localhost:8080/auth", "",
+			[]string{"BAN_SIG=sig; Path=/; " + exp}},
 		{"first party", "NewspaperList", false, "http://magic.mtgban.com/newspaper", "https",
 			[]string{
 				"NewspaperList=sig; Path=/newspaper; " + exp + "; Secure; SameSite=Strict",

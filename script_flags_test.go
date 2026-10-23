@@ -43,7 +43,7 @@ func TestHTMLCarriesTheScriptFlags(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req.AddCookie(&http.Cookie{Name: "MobileView", Value: strconv.FormatBool(mobile)})
 				if c.cookie != "" {
-					req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: c.cookie})
+					req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: c.cookie})
 				}
 				rec := httptest.NewRecorder()
 				handler.ServeHTTP(rec, req)

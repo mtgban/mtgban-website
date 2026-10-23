@@ -50,7 +50,7 @@ func (s *site) APILogin(w http.ResponseWriter, r *http.Request) {
 // handoffCookie holds the nonce a handoff's OAuth state carries, so the
 // callback finishes only a handoff this browser started: without it, a code
 // from somebody else's Patreon account would sign this reader in as them.
-const handoffCookie = "MTGBAN_HANDOFF"
+const handoffCookie = "BAN_HANDOFF"
 
 // handoffWindow is how long a reader has on Patreon's pages to approve.
 const handoffWindow = 10 * time.Minute

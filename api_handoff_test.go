@@ -60,7 +60,7 @@ func handoffStart(t *testing.T, handler http.HandlerFunc, path, cookie string) *
 	req.Host = "mtgban.com"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	if cookie != "" {
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 	}
 	rec := httptest.NewRecorder()
 	handler(rec, req)

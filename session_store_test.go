@@ -486,7 +486,7 @@ func TestUploadPublishGateReadsItsOwnGrant(t *testing.T) {
 		form.Set("store_shorthand", shorthand)
 		req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		rec := httptest.NewRecorder()
 		testSite.Upload(rec, req)
 		return rec

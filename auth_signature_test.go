@@ -105,7 +105,7 @@ func TestSignatureIsValid(t *testing.T) {
 func emailFromCookie(t *testing.T, sig string) string {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/upload/handoff", nil)
-	req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 	return signedUserEmail(req)
 }
 
@@ -179,7 +179,7 @@ func TestOnlyACheckedSignatureIsKeptAsTheCookie(t *testing.T) {
 			wrapper.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/limited?sig="+url.QueryEscape(sig), nil))
 			kept := false
 			for _, c := range rec.Result().Cookies() {
-				kept = kept || c.Name == "MTGBAN"
+				kept = kept || c.Name == "BAN_SIG"
 			}
 			if kept != want {
 				t.Errorf("%s: kept the cookie %v for a signature that checks out %v", name, kept, want)

@@ -59,7 +59,7 @@ func TestMobileChartRangeFollowsTheTier(t *testing.T) {
 			// included, and needs no stores to do it.
 			req := httptest.NewRequest(http.MethodGet, "/search?q=zzzznotacard", nil)
 			req.AddCookie(&http.Cookie{Name: "MobileView", Value: "true"})
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 			rec := httptest.NewRecorder()
 			testSite.Search(rec, req)
 

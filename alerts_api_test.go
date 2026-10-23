@@ -23,7 +23,7 @@ func devSig(email, tier string) string {
 func alertsRequest(method, path, sig string) *http.Request {
 	r := httptest.NewRequest(method, path, nil)
 	if sig != "" {
-		r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 	}
 	return r
 }

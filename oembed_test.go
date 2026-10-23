@@ -152,7 +152,7 @@ func TestOEmbedQuotesWhatAnyReaderSees(t *testing.T) {
 	} {
 		req := httptest.NewRequest(http.MethodGet, probe.target, nil)
 		if probe.cookie != "" {
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: probe.cookie})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: probe.cookie})
 		}
 		req.AddCookie(&http.Cookie{Name: "SearchStoreFactors", Value: "SHOWNIDX:50:"})
 		w := httptest.NewRecorder()
@@ -220,7 +220,7 @@ func TestOEmbedLeavesOutTheCustomBuylist(t *testing.T) {
 	forged := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("Expires=%d&UploadCustom=true", expires.Unix())))
 	withCookies := func(req *http.Request, sig string) *http.Request {
 		for name, value := range map[string]string{
-			"MTGBAN":            sig,
+			"BAN_SIG":           sig,
 			"SearchMiscOpts":    "skipEmpty",
 			"UploadCustomOpts":  "enabled",
 			"UploadCustomRate":  "0.5",

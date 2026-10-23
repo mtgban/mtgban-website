@@ -49,7 +49,7 @@ func TestPageHitLabelsTheCheckedTier(t *testing.T) {
 
 	for sig, want := range map[string]string{signed: "Legacy", forged: "Any"} {
 		req := httptest.NewRequest(http.MethodGet, "/newspaper", nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		if got := pageHitEvent(req).Tier; got != want {
 			t.Errorf("tier %q, want %q", got, want)
 		}

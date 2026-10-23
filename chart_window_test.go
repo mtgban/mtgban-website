@@ -81,7 +81,7 @@ func TestChartLookbackIgnoresAnUnsignedGrant(t *testing.T) {
 
 	// And in the cookie, the way the page's own fetch would carry it.
 	r = httptest.NewRequest("GET", "/data/chart/ban:1", nil)
-	r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: forged})
+	r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: forged})
 	if _, maxDays := chartWindow(verifiedRequestSignature(r), 0); maxDays != 30 {
 		t.Errorf("a forged cookie signature bought %d days, want the 30-day fallback", maxDays)
 	}

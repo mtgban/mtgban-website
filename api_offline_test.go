@@ -42,7 +42,7 @@ func TestOfflineModeAllowed(t *testing.T) {
 	for _, tt := range tests {
 		r := httptest.NewRequest("GET", "/api/offline/manifest.json", nil)
 		if tt.sig != "" {
-			r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: tt.sig})
+			r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: tt.sig})
 		}
 		email, ok := offlineModeAllowed(r)
 		if ok != tt.want || (tt.want && email != tt.email) {
@@ -75,7 +75,7 @@ func TestOfflineModeReadsOneCheckedSignature(t *testing.T) {
 		}
 		r := httptest.NewRequest(http.MethodGet, target, nil)
 		if tc.cookie != "" {
-			r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: tc.cookie})
+			r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: tc.cookie})
 		}
 		email, ok := offlineModeAllowed(r)
 		if ok != tc.want || (ok && email != "a@b.c") {

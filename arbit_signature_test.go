@@ -34,7 +34,7 @@ func TestArbitReadsGrantsOnlyOffAVerifiedSignature(t *testing.T) {
 
 	page := func(sig string) string {
 		req := httptest.NewRequest(http.MethodGet, "/arbit", nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 		rec := httptest.NewRecorder()
 		testSite.Arbit(rec, req)
 		return rec.Body.String()
@@ -83,7 +83,7 @@ func TestEnforceSigningHandsOnTheSignatureItChecked(t *testing.T) {
 	}
 	serve := func(h http.Handler, target, querySig, cookie string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, target+"?sig="+url.QueryEscape(querySig), nil)
-		req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: cookie})
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		return rec
@@ -103,7 +103,7 @@ func TestEnforceSigningHandsOnTheSignatureItChecked(t *testing.T) {
 
 	// The raw card API checks the Admin grant itself too.
 	raw := httptest.NewRequest(http.MethodGet, "/search/raw/card-a", nil)
-	raw.AddCookie(&http.Cookie{Name: "MTGBAN", Value: forge("Admin", "true")})
+	raw.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: forge("Admin", "true")})
 	rawRec := httptest.NewRecorder()
 	testSite.RawCardAPI(rawRec, raw)
 	if rawRec.Code != http.StatusForbidden {
@@ -154,7 +154,7 @@ func TestOpenPagesDrawTheNavFromACheckedSignature(t *testing.T) {
 	} {
 		page := func(sig string) *httptest.ResponseRecorder {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
-			req.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sig})
+			req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
 			rec := httptest.NewRecorder()
 			handler(rec, req)
 			return rec

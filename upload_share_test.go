@@ -154,7 +154,7 @@ func openShare(t *testing.T, rd uploadShareReader) *httptest.ResponseRecorder {
 
 	r := httptest.NewRequest(http.MethodGet, "/upload?share="+goodShareKey, nil)
 	user := &pledge.User{FullName: "A", Email: nextShareEmail(), EmailVerified: true}
-	r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sign("Pioneer", user, map[string]map[string]string{"Upload": {}}, time.Hour)})
+	r.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sign("Pioneer", user, map[string]map[string]string{"Upload": {}}, time.Hour)})
 	rec := httptest.NewRecorder()
 	newSite().Upload(rec, r)
 	return rec
