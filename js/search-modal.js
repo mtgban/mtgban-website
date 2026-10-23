@@ -23,10 +23,14 @@
     // Tag every same-origin link to /search or /sealed (including bare ?q=...)
     // with modal=1 and the active chart roster, so clicking around inside the
     // modal keeps the iframe in modal mode instead of escaping to a full page.
+    // Each anchor remembers the href it was last looked at with, whatever it
+    // links to: the observer below runs this on each mutation, over every
+    // anchor on the page, and only an href set since is looked at again.
     function decorate() {
         document.querySelectorAll('a[href]').forEach(function(a) {
-            if (a.dataset.modalDecorated === '1') return;
             var raw = a.getAttribute('href');
+            if (a.dataset.modalDecorated === raw) return;
+            a.dataset.modalDecorated = raw;
             if (!raw) return;
             if (raw.charAt(0) === '#') return;
             if (a.target === '_blank') return;
@@ -43,7 +47,7 @@
             }
             url.searchParams.set('modal', '1');
             a.href = url.toString();
-            a.dataset.modalDecorated = '1';
+            a.dataset.modalDecorated = a.getAttribute('href');
         });
     }
     decorate();
