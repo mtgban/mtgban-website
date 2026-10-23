@@ -43,7 +43,7 @@ test('existingForCard lists the card\'s alerts in create mode only', () => {
     expect(h.existingForCard(null, 'card-1', null)).toEqual([]);
 });
 
-test('lowestPrice is the lowest offer in the condition among the checked stores', () => {
+test('bestPrice is the best offer on the side in the condition among the checked stores', () => {
     const h = load();
     const stores = [
         { shorthand: 'CK', prices: { NM: 0.63, SP: 0.5 } },
@@ -51,11 +51,15 @@ test('lowestPrice is the lowest offer in the condition among the checked stores'
         { shorthand: 'SCG', prices: {} },
         { shorthand: 'ABU', prices: null },
     ];
-    expect(h.lowestPrice(stores, 'NM', [])).toBe(0.02);
-    expect(h.lowestPrice(stores, 'NM', ['ck', 'SCG'])).toBe(0.63);
-    expect(h.lowestPrice(stores, 'SP', [])).toBe(0.5);
-    expect(h.lowestPrice(stores, 'HP', [])).toBe(null);
-    expect(h.lowestPrice(stores, 'NM', ['SCG'])).toBe(null);
+    expect(h.bestPrice(stores, 'retail', 'NM', [])).toBe(0.02);
+    expect(h.bestPrice(stores, 'retail', 'NM', ['ck', 'SCG'])).toBe(0.63);
+    expect(h.bestPrice(stores, 'retail', 'SP', [])).toBe(0.5);
+    expect(h.bestPrice(stores, 'retail', 'HP', [])).toBe(null);
+    expect(h.bestPrice(stores, 'retail', 'NM', ['SCG'])).toBe(null);
+    // A buylist's best offer is its highest, as the server defaults it.
+    expect(h.bestPrice(stores, 'buylist', 'NM', [])).toBe(0.63);
+    expect(h.bestPrice(stores, 'buylist', 'NM', ['CSI'])).toBe(0.02);
+    expect(h.bestPrice(stores, 'buylist', 'HP', [])).toBe(null);
 });
 
 test('referenceUsed only for a percentage threshold', () => {
