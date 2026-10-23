@@ -1,8 +1,8 @@
 // Receives a card list from the window that opened this page and uploads it.
 //
-// A browser extension reading a storefront cannot post a list to the upload
-// itself: the upload needs the session, this site's cookie is same-site, and a
-// request made from another origin arrives without it. What it can do is open
+// Another site holding a card list cannot post it to the upload itself: the
+// upload needs the session, this site's cookie is same-site, and a request
+// made from another origin arrives without it. What it can do is open
 // this page - an ordinary top-level navigation, so the session comes along -
 // and hand the rows over window to window. This submits them from here, which
 // is why they carry the session.
@@ -22,7 +22,7 @@
         return;
     }
 
-    // Opened by an extension, so a list is on its way. The guide is for a
+    // Opened by another window, so a list is on its way. The guide is for a
     // page nobody handed anything to, and this reader - taken or turned
     // away - already has the one line above it that is about them.
     var opener = window.opener;
@@ -34,9 +34,9 @@
 
     // A reader with no signature, or whose tier does not carry the Upload
     // grant. The page has already said so; what matters here is that it
-    // stays silent. An extension that heard this one announce itself would
-    // hand over a list nothing can price - and on the storefronts this is
-    // built for, gathering that list is minutes of somebody's afternoon.
+    // stays silent. A sender that heard this one announce itself would
+    // hand over a list nothing can price - and gathering that list can be
+    // minutes of somebody's afternoon.
     if (root.getAttribute("data-can-upload") !== "true") {
         return;
     }
@@ -69,7 +69,7 @@
         }
     }
 
-    // Opened by hand rather than by an extension: there is nobody to ask,
+    // Opened by hand rather than by a sender: there is nobody to ask,
     // and the page is already showing the guide that says what it is for.
     if (!handed) {
         return;
@@ -152,10 +152,9 @@
 
     // listFrom reads whichever of the two shapes a hand-over came in.
     //
-    // Text is the older one and what the Cardmarket extension sends: a CSV
-    // or a decklist, parsed at the far end exactly as a paste would be. It
-    // arrives as "csv" or as "text"; the first name is the one already in
-    // the wild and is not going anywhere.
+    // Text is a CSV or a decklist, parsed at the far end exactly as a paste
+    // would be. It arrives as "csv" or as "text"; senders already in the
+    // wild use the first, so both stay.
     //
     // Cards is the other: a list of objects naming a uuid, a quantity, a
     // condition and whatever else is known, for a sender that has resolved

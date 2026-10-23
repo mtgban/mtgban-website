@@ -106,7 +106,7 @@ describe('asking for the rows', () => {
 
     test('it says nothing at all when the page cannot upload', () => {
         // The page has already said why. What matters here is the silence:
-        // an extension that heard this one announce itself would hand over
+        // a sender that heard this one announce itself would hand over
         // a list nothing can price, and gathering that list is minutes of
         // somebody's afternoon.
         const opener = {closed: false};
@@ -118,7 +118,7 @@ describe('asking for the rows', () => {
     });
 
     test('turned away with a list in hand, it shows only why', () => {
-        // The reader came from the extension to price a list, and what they
+        // The reader came from another site to price a list, and what they
         // need is the line saying how to get in - not a manual for the
         // endpoint underneath it.
         const {elements, sent} = loadHandoff({opener: {closed: false}, canUpload: false});

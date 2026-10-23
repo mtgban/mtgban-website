@@ -3,7 +3,7 @@
      first time it opens. */}}
 {{define "icons"}}<!-- no lucide: this page has no icons -->{{end}}
 
-{{define "title"}}Receiving a card list - MTGBAN{{end}}
+{{define "title"}}Card list handoff - MTGBAN{{end}}
 
 {{define "extra-css"}}<link rel="stylesheet" type="text/css" href="/css/handoff.css?hash={{.Hash}}">{{end}}
 
@@ -22,10 +22,10 @@
 <div class="legal" id="handoff"
      data-handoff-origins="{{jsonArray .HandoffOrigins}}"
      data-can-upload="{{if $receiving}}true{{else}}false{{end}}">
-    <h1>Receiving a card list</h1>
+    <h1>Card list handoff</h1>
 
     {{if $receiving}}
-    <!-- Hidden until the script finds somebody to receive a list from, so
+    <!-- Hidden until the script finds a sender to receive a list from, so
          that a page opened by hand shows the guide rather than a line
          waiting for something that is never coming. -->
     <p id="handoff-status" class="handoff-status" hidden>
@@ -69,7 +69,7 @@
     {{if $receiving}}
     <!-- Submitted from here rather than from whoever sent the rows. This
          page is the site's own, so the upload is same-origin and carries the
-         session; a request made from the extension's page would not. -->
+         session; a request made from the sender's page would not. -->
     <form id="handoff-form" method="post" action="/upload" hidden>
         <textarea id="handoff-rows" name="textArea"></textarea>
         <!-- Where the rows were read, so the results can say so instead of
@@ -84,39 +84,69 @@
          documentation of this endpoint there is, so it says what reaches
          it and in what shape rather than only what it is for. -->
     <div id="handoff-guide">
-        {{if $receiving}}<p class="handoff-idle">Nothing was handed to this page.</p>{{end}}
+        {{if $receiving}}<p class="handoff-idle">No card list was handed to this page, so here is how to hand one over.</p>{{end}}
 
-        <h2>What this page is for</h2>
+        <h2>Loading cards into MTGBAN from anywhere</h2>
         <p>
-            This page does not hold a card list of its own. A browser
-            extension reads the offers on a storefront, opens this page, and
-            hands the rows over window to window; the page posts them to the
-            <a href="/upload">Uploader</a>, which prices them against every
-            store MTGBAN follows. It carries the session that way, which a
-            request made from the extension's own origin could not.
+            This is the documentation for the card list handoff: the way
+            another site, app or tool loads a list of cards into MTGBAN for
+            whoever is using it. The cards land in the
+            <a href="/upload">Uploader</a>, priced against every store
+            MTGBAN follows, in the reader's own session - nobody has to
+            export a file and upload it by hand.
         </p>
         <p>
-            {{if .HandoffOrigins}}A list can be handed over from {{range $i, $origin := .HandoffOrigins}}{{if $i}}, {{end}}<code>{{$origin}}</code>{{end}}, and from nowhere else.{{else}}No site is currently allowed to hand a list over.{{end}}
-            To price a list yourself, paste or upload it at
+            Use it to add a "Price it on MTGBAN" button to a storefront, a
+            collection tracker, a deck builder, or anything else that holds
+            a card list. To price a list yourself, paste or upload it at
             <a href="/upload">/upload</a> - the formats below are the
             same ones that page takes.
         </p>
 
+        <h2>Who can hand a list over</h2>
+        <p>
+            {{if .HandoffOrigins}}A list is taken from {{range $i, $origin := .HandoffOrigins}}{{if $i}}, {{end}}<code>{{$origin}}</code>{{end}}, and from nowhere else.{{else}}No site is currently allowed to hand a list over.{{end}}
+            A sender is allowed by its origin, since a list is priced the
+            moment it arrives. To hand lists over from your own site, ask
+            on <a href="/discord">Discord</a> to have its origin added.
+        </p>
+        <p>
+            The reader needs an MTGBAN account whose tier includes the
+            Uploader. Anyone else is told so on this page, and no list is
+            taken from them.
+        </p>
+
         <h2>Handing a list over</h2>
         <p>
-            This page announces itself to the window that opened it, then
-            waits for as long as it takes. It takes one list and no more,
-            it listens only to the window that opened it, and only to a
-            message from an allowed origin above.
+            Open this page with <code>window.open</code> from the page that
+            holds the list, then send the list with
+            <code>postMessage</code>. A plain form POST to
+            <a href="/upload">/upload</a> from another site would arrive
+            without the reader's session; a page opened like this has it,
+            and posts the list from here.
         </p>
-<pre class="handoff-example">// this page, once it is listening
+        <p>
+            Once it is listening, this page announces itself to the window
+            that opened it, then waits for as long as it takes. It takes one
+            list and no more, and it listens only to the window that opened
+            it, and only to a message from an allowed origin.
+        </p>
+<pre class="handoff-example">// the sender opens this page, and sends the list once it is listening
+const ban = window.open("https://mtgban.com/upload/handoff");
+window.addEventListener("message", (event) =&gt; {
+  if (event.source === ban &amp;&amp; event.data.type === "mtgban-handoff-ready") {
+    ban.postMessage(list, event.origin);
+  }
+});
+
+// this page, once it is listening
 { type: "mtgban-handoff-ready" }
 
-// the opener, in reply - either a list as text&hellip;
+// the list, in reply - either as text&hellip;
 { type: "mtgban-handoff-rows",
   text: "4 Rift Bolt\n1 Lightning Bolt (2ED) *F*\n",
   rows: 2,
-  source: "https://www.cardmarket.com/en/Magic/Users/&hellip;" }
+  source: "https://cards.example/lists/42" }
 
 // &hellip;or the same cards, already resolved
 { type: "mtgban-handoff-rows",
@@ -124,17 +154,15 @@
     { id: "6f4b4e4a-&hellip;", quantity: 2, condition: "NM", foil: false },
     { name: "Rift Bolt", edition: "TSP", number: "148", quantity: 1 }
   ],
-  source: "https://www.cardmarket.com/en/Magic/Users/&hellip;" }</pre>
+  source: "https://cards.example/lists/42" }</pre>
         <p>
             <code>text</code> is anything described below - a CSV, a
             spreadsheet's worth of tab separated columns, a decklist. It is
-            also accepted as <code>csv</code>, which is the name the
-            Cardmarket extension has always sent and which is not going
-            anywhere.
+            also accepted as <code>csv</code>.
         </p>
         <p>
-            <code>cards</code> is for a sender that has resolved its cards
-            already and should not have to write a CSV by hand to say so.
+            <code>cards</code> is for a sender that knows its cards already
+            and should not have to write a CSV to say so.
             Each entry names any of the fields below; the page writes them
             into the columns described further down, so the two shapes are
             read by exactly the same parser at the far end.
@@ -162,7 +190,8 @@
             the upload runs; a <code>cards</code> list counts itself and
             does not need it. <code>source</code> is the page the list was
             read from, kept only when it belongs to the origin that sent
-            the message, and used to name the results.
+            the message; the results are headed with the sender's name and
+            link back to it.
         </p>
 
         <h2>What a list looks like</h2>
@@ -255,13 +284,14 @@
             printing is used.
         </p>
 
-        <h2>And what an extension sends</h2>
+        <h2>A full example</h2>
         <p>
-            The same thing, with the columns filled in. This is a Cardmarket
-            seller's offers as the extension writes them:
+            A list with an identifier, the columns filled in, and a column
+            nothing reads, which is ignored:
         </p>
-<pre class="handoff-example">mcm_id,card_name,edition,condition,foil,quantity,price_usd,mkm_language,article_id,mkm_notes
-265854,Thornwind Faeries,Urza's Legacy,NM,,3,0.06,English,1234567,https://www.cardmarket.com/...</pre>
+<pre class="handoff-example">scryfall_id,card_name,edition,number,condition,foil,quantity,price,notes,shelf
+,Thornwind Faeries,Urza's Legacy,,NM,,3,0.06,https://cards.example/item/1,B2
+6f4b4e4a-&hellip;,Lightning Bolt,,,SP,yes,1,2.50,,A1</pre>
         <p>
             Up to {{uploadLimit}} rows at a time - {{uploadProLimit}}
             with the Optimizer - and {{uploadMaxMB}}&nbsp;MB of file.
