@@ -47,18 +47,16 @@
 
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one card"); }
 
-    // add puts one more copy of the row's card in; a removed card comes back
-    // as one copy.
-    function add(data) {
+    // toggleCard takes the row's card out when it is in, else puts one copy in;
+    // the panel's controls set how many.
+    function toggleCard(data) {
         if (!data || !data.id) return false;
         var list = read();
         var t = now();
         var idx = -1;
         for (var i = 0; i < list.length; i++) { if (list[i].id === data.id) { idx = i; break; } }
         if (idx >= 0 && !list[idx].del) {
-            var next = Math.min(MAX_QTY, (list[idx].qty || 1) + 1);
-            if (next === list[idx].qty) { toastCeiling(); return false; }
-            list[idx].qty = next;
+            list[idx].del = t;
             list[idx].m = t;
         } else {
             if (live().length >= MAX) { toast("Backpack is full (" + MAX + " cards)"); return false; }
@@ -164,13 +162,15 @@
 
     function markRows() {
         var by = {};
-        live().forEach(function (e) { by[e.id] = e.qty || 1; });
+        live().forEach(function (e) { by[e.id] = true; });
         document.querySelectorAll(".pack-btn").forEach(function (b) {
-            var id = b.getAttribute("data-card-id");
-            var qty = by[id];
-            b.classList.toggle("active", !!qty);
-            var span = b.querySelector(".pack-btn-count");
-            if (span) { span.textContent = qty ? String(qty) : ""; span.hidden = !qty; }
+            var on = !!by[b.getAttribute("data-card-id")];
+            b.classList.toggle("active", on);
+            b.setAttribute("title", on ? "Remove from backpack" : "Add to backpack");
+            var tick = b.querySelector(".pack-btn-tick");
+            if (tick) tick.hidden = !on;
+            var label = b.querySelector(".pack-btn-label");
+            if (label) label.textContent = on ? "Remove from backpack" : "Add to backpack";
         });
     }
 
@@ -183,14 +183,14 @@
         if (span) { span.textContent = String(c.copies); span.hidden = c.copies === 0; }
     }
 
-    window.addToBackpack = function (btn) {
+    window.toggleBackpack = function (btn) {
         var data = window.CardRow && window.CardRow.read ? window.CardRow.read(btn) : null;
         if (!data || !data.id) {
             var id = btn.getAttribute("data-card-id");
             if (!id) return;
             data = { id: id, name: "" };
         }
-        if (add(data)) render();
+        if (toggleCard(data)) render();
     };
 
     // ---- the panel ----
@@ -389,7 +389,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, clear: clear, sendForm: sendForm, count: count, open: open, close: close };
+    window.Backpack = { read: read, toggleCard: toggleCard, setQty: setQty, remove: remove, clear: clear, sendForm: sendForm, count: count, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");

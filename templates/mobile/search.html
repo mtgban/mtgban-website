@@ -257,7 +257,7 @@
                     {{range $card.Treatments}}<a class="m-badge treatment" href="?q=is:{{.}}" onclick="event.stopPropagation()">{{index $card.PromoLabels .}}</a>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
-                    <button type="button" class="m-pack-btn pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.addToBackpack && addToBackpack(this);" title="Add to backpack"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
+                    <button type="button" class="m-pack-btn pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleBackpack && toggleBackpack(this);" title="Add to backpack"><i data-lucide="backpack"></i><span class="pack-btn-tick" hidden>✓</span></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); window.showChartDrawer && showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
                     <button class="m-actions-btn" onclick="event.stopPropagation(); window.toggleActionsMenu && toggleActionsMenu(this);" title="More actions"><i data-lucide="more-vertical"></i></button>
                 </div>
@@ -268,8 +268,8 @@
                 <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleFavorite && toggleFavorite(this); window.closeActionsMenus && closeActionsMenus();">
                     <i data-lucide="star"></i><span>Favorite</span>
                 </button>
-                <button type="button" class="m-actions-item m-actions-pack pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.addToBackpack && addToBackpack(this); window.closeActionsMenus && closeActionsMenus();">
-                    <i data-lucide="backpack"></i><span>Add to backpack</span><span class="pack-btn-count" hidden></span>
+                <button type="button" class="m-actions-item m-actions-pack pack-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.toggleBackpack && toggleBackpack(this); window.closeActionsMenus && closeActionsMenus();">
+                    <i data-lucide="backpack"></i><span class="pack-btn-label">Add to backpack</span><span class="pack-btn-tick" hidden>✓</span>
                 </button>
                 {{if $.CanAlerts}}
                 <button type="button" class="m-actions-item m-actions-alert" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); window.closeActionsMenus && closeActionsMenus(); window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'});">
