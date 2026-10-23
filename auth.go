@@ -94,6 +94,14 @@ func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 	return patreonUserFromData(userData), nil
 }
 
+// The two ways getUserTier finds no tier title in an answer that otherwise
+// decodes: a pledge entitling no tier, and one entitling a tier the answer
+// does not name.
+var (
+	errNoEntitledTier = errors.New("no entitled tier")
+	errUntitledTier   = errors.New("empty tier title")
+)
+
 func getUserTier(ctx context.Context, client *patreon.Client, userID string) (string, error) {
 	membershipData, err := client.GetMembershipData(ctx, userID)
 	if err != nil {
@@ -123,7 +131,10 @@ func getUserTier(ctx context.Context, client *patreon.Client, userID string) (st
 	}
 
 	if tierTitle == "" {
-		return "", errors.New("empty tier title")
+		if len(membershipData.Data.Relationships.CurrentlyEntitledTiers.Data) == 0 {
+			return "", errNoEntitledTier
+		}
+		return "", errUntitledTier
 	}
 
 	return tierTitle, nil
@@ -297,36 +308,10 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tierTitle := ""
-	var overrides map[string]map[string]string
-	// If user is in the allowed list, load the tier from here
-	grant, found := indexGrants(PatreonGrants()).find(userstate.HashEmail(userData.Email))
-	if found {
-		tierTitle = grant.Tier
-		overrides = grant.Overrides
-		LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
-	}
-
-	// Else, load the tier from the API
+	tierTitle, overrides, granted, verdict, err := resolveTier(patreonCtx, client, userData)
 	var tierErr error
-	if tierTitle == "" {
-		foundTitle, err := getUserTier(patreonCtx, client, userData.MembershipID)
-		if err != nil {
-			LogPages["Admin"].Println("getUserTier error", err)
-		}
-		if patreonDidNotAnswer(patreonCtx, err) {
-			tierErr = err
-		}
-		switch foundTitle {
-		case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
-			tierTitle = "Pioneer"
-		case "MODERN", "MODERN (Early Adopters)":
-			tierTitle = "Modern"
-		case "LEGACY", "LEGACY (Early Adopters)":
-			tierTitle = "Legacy"
-		case "VINTAGE", "VINTAGE (Early Adopters)", "TYPE ONE":
-			tierTitle = "Vintage"
-		}
+	if verdict == tierUnknown && patreonDidNotAnswer(patreonCtx, err) {
+		tierErr = err
 	}
 
 	if isHandoff {
@@ -335,8 +320,8 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle error
-	if tierTitle == "" {
-		LogPages["Admin"].Println("getUserTier returned an empty tier")
+	if verdict != tierEntitled {
+		LogPages["Admin"].Printf("auth: no tier for %q: verdict=%v err=%v", userData.Email, verdict, err)
 		http.Redirect(w, r, "/?errmsg=TierNotFound", http.StatusFound)
 		return
 	}
@@ -354,7 +339,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	// A grant's tier is not stored: the evaluator reads a live grant's own,
 	// and a revoked one must not leave its tier behind until the next login.
 	contactTier := tierTitle
-	if found && grant.Tier != "" {
+	if granted {
 		contactTier = ""
 	}
 	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -374,6 +359,86 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect, we're done here
 	http.Redirect(w, r, redir, http.StatusFound)
+}
+
+// tierVerdict is what the tier lookup says about a reader's pledge.
+type tierVerdict int
+
+const (
+	// tierUnknown is no usable answer, from Patreon or in its shape. It
+	// must never be read as a cancellation.
+	tierUnknown tierVerdict = iota
+	tierEntitled
+	// tierNotEntitled is Patreon answering that nothing is pledged.
+	tierNotEntitled
+)
+
+func (v tierVerdict) String() string {
+	switch v {
+	case tierEntitled:
+		return "entitled"
+	case tierNotEntitled:
+		return "not entitled"
+	}
+	return "unknown"
+}
+
+// resolveTier is the site tier of a reader Patreon just identified, with the
+// overrides of the grant behind it, if any, and whether a grant named the
+// tier; overrides come back only with tierEntitled. A grant naming a tier
+// decides it without Patreon's membership answer; otherwise the answer
+// does, and only a reader with no membership, or one entitling no tier, is
+// tierNotEntitled. An identity naming nobody is tierUnknown, and so is any
+// refusal of a membership the identity named, a 404 included: a verdict
+// that is unknown never extends a session, so it can keep one alive only
+// until its signature runs out on its own. err is what made a tierUnknown
+// verdict.
+func resolveTier(ctx context.Context, client *patreon.Client, user *PatreonUserData) (tier string, overrides map[string]map[string]string, granted bool, verdict tierVerdict, err error) {
+	if user.UserID == "" || user.Email == "" {
+		return "", nil, false, tierUnknown, errors.New("identity answer names no user")
+	}
+
+	// If user is in the allowed list, load the tier from here
+	grant, found := indexGrants(PatreonGrants()).find(userstate.HashEmail(user.Email))
+	if found {
+		overrides = grant.Overrides
+		LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
+		if grant.Tier != "" {
+			return grant.Tier, overrides, true, tierEntitled, nil
+		}
+	}
+
+	if user.MembershipID == "" {
+		return "", nil, false, tierNotEntitled, nil
+	}
+
+	// Else, load the tier from the API
+	title, err := getUserTier(ctx, client, user.MembershipID)
+	if err != nil {
+		LogPages["Admin"].Println("getUserTier error", err)
+	}
+	if errors.Is(err, errNoEntitledTier) {
+		return "", nil, false, tierNotEntitled, nil
+	}
+	if err != nil {
+		return "", nil, false, tierUnknown, err
+	}
+
+	switch title {
+	case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
+		tier = "Pioneer"
+	case "MODERN", "MODERN (Early Adopters)":
+		tier = "Modern"
+	case "LEGACY", "LEGACY (Early Adopters)":
+		tier = "Legacy"
+	case "VINTAGE", "VINTAGE (Early Adopters)", "TYPE ONE":
+		tier = "Vintage"
+	default:
+		// A tier Patreon renamed or added is not a cancelled pledge
+		LogPages["Admin"].Printf("resolveTier: unexpected tier title %q", title)
+		return "", nil, false, tierUnknown, fmt.Errorf("unexpected tier title %q", title)
+	}
+	return tier, overrides, false, tierEntitled, nil
 }
 
 func authRedirect(state string) string {
