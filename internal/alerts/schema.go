@@ -97,15 +97,4 @@ CREATE TABLE IF NOT EXISTS alert_confirm_sends (
     PRIMARY KEY (user_hash, address)
 );
 CREATE INDEX IF NOT EXISTS alert_confirm_sends_by_address ON alert_confirm_sends (address, sent_at);
-
-CREATE TABLE IF NOT EXISTS alert_migrations (
-    name        TEXT NOT NULL,
-    game        TEXT NOT NULL,
-    applied_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (name, game)
-);
-
-CREATE TABLE IF NOT EXISTS alert_rearm (
-    alert_id  BIGINT PRIMARY KEY REFERENCES alerts(id) ON DELETE CASCADE
-);
 `

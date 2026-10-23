@@ -59,9 +59,6 @@ type EvalStore interface {
 	PruneEvents(ctx context.Context, before time.Time) (int64, error)
 	PruneUnverifiedChannels(ctx context.Context, before time.Time) (int64, error)
 	ChannelsDisabledSince(ctx context.Context, since, until time.Time) (int, error)
-	QueueUnscopedRearmOnce(ctx context.Context, game string) (int64, error)
-	RearmQueued(ctx context.Context, game string) (map[int64]bool, error)
-	DropRearm(ctx context.Context, id int64) error
 }
 
 // EvalDeps is everything one evaluation run reads or writes.
@@ -232,11 +229,6 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		return sum
 	}
 	sum.active = len(active)
-	rearm, err := deps.Store.RearmQueued(ctx, deps.Game)
-	if err != nil {
-		sum.fail(deps, "rearm queue", err)
-		return sum
-	}
 
 	type key struct {
 		user string
@@ -273,21 +265,6 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 			if ok {
 				quotes = append(quotes, Quote{Store: p.Shorthand, Price: price})
 			}
-		}
-		// Queued for a fresh start: armed as if just created, firing nothing.
-		if rearm[a.ID] {
-			best, ok := bestQuote(a.Side, quotes)
-			above, below := startArmed(a.Alert, best, ok)
-			// An edit or pause since the listing kept the write out; the
-			// alert stays queued for the run that finds it active again.
-			wrote, err := deps.Store.SetState(ctx, a.ID, a.UpdatedAt, State{Status: StatusActive, AboveArmed: above, BelowArmed: below})
-			if err == nil && wrote {
-				err = deps.Store.DropRearm(ctx, a.ID)
-			}
-			if err != nil {
-				sum.fail(deps, "rearm", err)
-			}
-			continue
 		}
 		d := Evaluate(a.Alert, quotes, now, minGap)
 		if !d.FireAbove && !d.FireBelow {
