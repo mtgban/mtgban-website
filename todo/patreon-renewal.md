@@ -2,7 +2,8 @@
 
 > **2026-09-14 spot check:** nothing below is built yet — `patreon.RefreshAuthToken`
 > doesn't exist (only `GetAuthToken`), and no `Renewal`/`FirstLogin` fields or
-> `resolveTier()`/`renew_window_days` config knobs exist anywhere. The
+> `renew_window_days` config knob exists anywhere; the tier lookup it asks for
+> is now `Pledge.Resolve` in `internal/pledge` (#1081, #1084). The
 > premise is still exactly accurate: `DefaultSignatureDuration` is still 11
 > days (`main.go`) and the `MTGBAN` cookie is still set for 31 days
 > (`auth.go`) — the 11-day-logout problem this plans to fix is still live.
@@ -86,10 +87,10 @@ carries `Renewal`:
 2. POST the refresh grant (new `patreon.RefreshAuthToken`, mirror of
    `GetAuthToken`), context timeout ~5s. One slow request per user per
    ~8 days is the entire latency budget.
-3. On success: `getUserIDs` with the new access token, resolve the tier
+3. On success: `Pledge.UserIDs` with the new access token, resolve the tier
    through the same logic `Auth()` uses today — grants list first, then
-   `getUserTier` + the title mapping (refactor that block into a shared
-   `resolveTier()` so the two paths cannot drift). Re-`sign()` with a
+   `Pledge.UserTier` + the title mapping (now one `Pledge.Resolve` in
+   `internal/pledge`, so the two paths cannot drift). Re-`sign()` with a
    fresh 11-day expiry, the **new rotated** refresh token, and the old
    `FirstLogin`; `putSignatureInCookies` (which also pushes the cookie
    out another 31 days). Serve the current request with the old sig —
@@ -154,7 +155,7 @@ same sig; two browsers do not.
 
 ### 5. Rollout (the delicate part)
 
-1. **Phase 0** — refactor only: extract `resolveTier()` from `Auth()`,
+1. **Phase 0** — refactor only: `Pledge.Resolve` (done: #1081, #1084),
    add `patreon.RefreshAuthToken` + the AES helpers, full test
    coverage. No behavior change.
 2. **Phase 1** — capture: new logins carry `Renewal`/`FirstLogin`.

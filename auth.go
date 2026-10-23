@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/internal/access"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -41,121 +41,14 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, UserRequestBurst)
 
-type PatreonUserData struct {
-	UserID        string
-	MembershipID  string
-	FullName      string
-	Email         string
-	EmailVerified bool
-	DiscordID     string
-	// DiscordKnown is true when this login's Patreon answer had an opinion
-	// (linked or explicitly unlinked) on the Discord id.
-	DiscordKnown bool
-}
-
-// patreonUserFromData maps a decoded Patreon identity answer to what the
-// site keeps. Pure, so it's testable without a Patreon client.
-func patreonUserFromData(userData *patreon.UserData) *PatreonUserData {
-	// Look for the membership id of the user and this account
-	membershipID := ""
-	for _, memberData := range userData.Data.Relationships.Memberships.Data {
-		if memberData.Type == "member" {
-			membershipID = memberData.ID
-			break
-		}
-	}
-
-	discordID, discordKnown := userData.DiscordUserID()
-
-	return &PatreonUserData{
-		UserID:        userData.Data.IDV1,
-		MembershipID:  membershipID,
-		FullName:      userData.Data.Attributes.FullName,
-		Email:         strings.ToLower(userData.Data.Attributes.Email),
-		EmailVerified: userData.Data.Attributes.IsEmailVerified,
-		DiscordID:     discordID,
-		DiscordKnown:  discordKnown,
-	}
-}
-
-func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
-	userData, err := client.GetUserData(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve user data: %w", err)
-	}
-
-	LogPages["Admin"].Printf("getUserIds: email=%q name=%q memberships=%d",
-		userData.Data.Attributes.Email, userData.Data.Attributes.FullName,
-		len(userData.Data.Relationships.Memberships.Data))
-	if len(userData.Errors) > 0 {
-		return nil, fmt.Errorf("user data error: %q", userData.Errors)
-	}
-
-	return patreonUserFromData(userData), nil
-}
-
-// The two ways getUserTier finds no tier title in an answer that otherwise
-// decodes: a pledge entitling no tier, and one entitling a tier the answer
-// does not name.
-var (
-	errNoEntitledTier = errors.New("no entitled tier")
-	errUntitledTier   = errors.New("empty tier title")
-)
-
-func getUserTier(ctx context.Context, client *patreon.Client, userID string) (string, error) {
-	membershipData, err := client.GetMembershipData(ctx, userID)
-	if err != nil {
-		return "", fmt.Errorf("cannot decode membership data: %w", err)
-	}
-
-	LogPages["Admin"].Println("getUserTier:", membershipData)
-	if len(membershipData.Errors) > 0 {
-		return "", fmt.Errorf("user data error: %q", membershipData.Errors)
-	}
-
-	// Look for the tier id of the user
-	tierID := ""
-	for _, tierData := range membershipData.Data.Relationships.CurrentlyEntitledTiers.Data {
-		if tierData.Type == "tier" {
-			tierID = tierData.ID
-			break
-		}
-	}
-
-	// Get a human-readable name for the tier
-	tierTitle := ""
-	for _, tierData := range membershipData.Included {
-		if tierData.Type == "tier" && tierID == tierData.ID {
-			tierTitle = tierData.Attributes.Title
-		}
-	}
-
-	if tierTitle == "" {
-		if len(membershipData.Data.Relationships.CurrentlyEntitledTiers.Data) == 0 {
-			return "", errNoEntitledTier
-		}
-		return "", errUntitledTier
-	}
-
-	return tierTitle, nil
-}
-
-// patreonDidNotAnswer tells a lookup Patreon never answered, for the request
-// failing, the deadline running out, Patreon failing or refusing it (5xx,
-// 429, 401, 403) or an answer that does not decode, from one whose answer
-// named no tier.
-func patreonDidNotAnswer(ctx context.Context, err error) bool {
-	var netErr *url.Error
-	var statusErr *patreon.StatusError
-	if errors.As(err, &statusErr) {
-		switch statusErr.StatusCode {
-		case http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
-			return true
-		}
-		return statusErr.StatusCode >= 500
-	}
-	return err != nil && (errors.As(err, &netErr) || errors.Is(err, patreon.ErrUnreadable) || ctx.Err() != nil)
-}
+// Pledge resolves a Patreon login into a reader and a site tier, reading this
+// deployment's grant list and admin log; see internal/pledge.
+var Pledge = pledge.New(pledge.Hooks{
+	Log: func() *log.Logger { return LogPages["Admin"] },
+	GrantFor: func(email string) (access.Grant, bool) {
+		return indexGrants(PatreonGrants()).find(userstate.HashEmail(email))
+	},
+})
 
 // requestOrigin returns the public origin for this request. The proxy must
 // overwrite the forwarded headers before they reach the application; the
@@ -297,7 +190,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	client := patreon.NewPatreonClient(patreonCtx, tokens.AccessToken)
 
 	// Retrieve information about the user who just authenticated
-	userData, err := getUserIDs(patreonCtx, client)
+	userData, err := Pledge.UserIDs(patreonCtx, client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
 		if isHandoff {
@@ -308,9 +201,9 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tierTitle, overrides, granted, verdict, err := resolveTier(patreonCtx, client, userData)
+	tierTitle, overrides, granted, verdict, err := Pledge.Resolve(patreonCtx, client, userData)
 	var tierErr error
-	if verdict == tierUnknown && patreonDidNotAnswer(patreonCtx, err) {
+	if verdict == pledge.Unknown && pledge.DidNotAnswer(patreonCtx, err) {
 		tierErr = err
 	}
 
@@ -320,7 +213,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle error
-	if verdict != tierEntitled {
+	if verdict != pledge.Entitled {
 		LogPages["Admin"].Printf("auth: no tier for %q: verdict=%v err=%v", userData.Email, verdict, err)
 		http.Redirect(w, r, "/?errmsg=TierNotFound", http.StatusFound)
 		return
@@ -359,86 +252,6 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect, we're done here
 	http.Redirect(w, r, redir, http.StatusFound)
-}
-
-// tierVerdict is what the tier lookup says about a reader's pledge.
-type tierVerdict int
-
-const (
-	// tierUnknown is no usable answer, from Patreon or in its shape. It
-	// must never be read as a cancellation.
-	tierUnknown tierVerdict = iota
-	tierEntitled
-	// tierNotEntitled is Patreon answering that nothing is pledged.
-	tierNotEntitled
-)
-
-func (v tierVerdict) String() string {
-	switch v {
-	case tierEntitled:
-		return "entitled"
-	case tierNotEntitled:
-		return "not entitled"
-	}
-	return "unknown"
-}
-
-// resolveTier is the site tier of a reader Patreon just identified, with the
-// overrides of the grant behind it, if any, and whether a grant named the
-// tier; overrides come back only with tierEntitled. A grant naming a tier
-// decides it without Patreon's membership answer; otherwise the answer
-// does, and only a reader with no membership, or one entitling no tier, is
-// tierNotEntitled. An identity naming nobody is tierUnknown, and so is any
-// refusal of a membership the identity named, a 404 included: a verdict
-// that is unknown never extends a session, so it can keep one alive only
-// until its signature runs out on its own. err is what made a tierUnknown
-// verdict.
-func resolveTier(ctx context.Context, client *patreon.Client, user *PatreonUserData) (tier string, overrides map[string]map[string]string, granted bool, verdict tierVerdict, err error) {
-	if user.UserID == "" || user.Email == "" {
-		return "", nil, false, tierUnknown, errors.New("identity answer names no user")
-	}
-
-	// If user is in the allowed list, load the tier from here
-	grant, found := indexGrants(PatreonGrants()).find(userstate.HashEmail(user.Email))
-	if found {
-		overrides = grant.Overrides
-		LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
-		if grant.Tier != "" {
-			return grant.Tier, overrides, true, tierEntitled, nil
-		}
-	}
-
-	if user.MembershipID == "" {
-		return "", nil, false, tierNotEntitled, nil
-	}
-
-	// Else, load the tier from the API
-	title, err := getUserTier(ctx, client, user.MembershipID)
-	if err != nil {
-		LogPages["Admin"].Println("getUserTier error", err)
-	}
-	if errors.Is(err, errNoEntitledTier) {
-		return "", nil, false, tierNotEntitled, nil
-	}
-	if err != nil {
-		return "", nil, false, tierUnknown, err
-	}
-
-	switch title {
-	case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
-		tier = "Pioneer"
-	case "MODERN", "MODERN (Early Adopters)":
-		tier = "Modern"
-	case "LEGACY", "LEGACY (Early Adopters)":
-		tier = "Legacy"
-	case "VINTAGE", "VINTAGE (Early Adopters)", "TYPE ONE":
-		tier = "Vintage"
-	default:
-		// A tier Patreon renamed or added is not a cancelled pledge
-		LogPages["Admin"].Printf("resolveTier: unexpected tier title %q", title)
-		return "", nil, false, tierUnknown, fmt.Errorf("unexpected tier title %q", title)
-	}
-	return tier, overrides, false, tierEntitled, nil
 }
 
 func authRedirect(state string) string {
@@ -1058,7 +871,7 @@ func aclValues(tier string, overrides map[string]map[string]string) url.Values {
 // invite link for however long it was cut for. There is no unexpiring answer -
 // signatureIsValid refuses a sig whose Expires will not parse as readily as
 // one whose Expires has passed.
-func sign(tierTitle string, userData *PatreonUserData, overrides map[string]map[string]string, duration time.Duration) string {
+func sign(tierTitle string, userData *pledge.User, overrides map[string]map[string]string, duration time.Duration) string {
 	v := aclValues(tierTitle, overrides)
 	if userData != nil {
 		v.Set("UserName", userData.FullName)

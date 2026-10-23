@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/mtgban-website/internal/pledge"
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
@@ -52,7 +53,7 @@ func shareRequest(t *testing.T, tier, email string, grants map[string]map[string
 		r.Header.Set("X-Requested-With", "fetch")
 	}
 	if tier != "" {
-		user := &PatreonUserData{FullName: "A", Email: email, EmailVerified: true}
+		user := &pledge.User{FullName: "A", Email: email, EmailVerified: true}
 		r.AddCookie(&http.Cookie{Name: "MTGBAN", Value: sign(tier, user, grants, time.Hour)})
 	}
 	return r

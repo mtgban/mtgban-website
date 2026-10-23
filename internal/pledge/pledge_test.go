@@ -1,4 +1,4 @@
-package main
+package pledge
 
 import (
 	"context"
@@ -39,34 +39,37 @@ func entitledTo(title string) string {
 	return fmt.Sprintf(`{"data":{"relationships":{"currently_entitled_tiers":{"data":[{"id":"t1","type":"tier"}]}}},"included":[{"id":"t1","type":"tier","attributes":{"title":%q}}]}`, title)
 }
 
-// resolveTierSetup serves grants (none when empty) to the grant lookup, and
-// the admin log to a builder.
-func resolveTierSetup(t *testing.T, grants string) *strings.Builder {
+// resolverSetup returns a Resolver that serves grants (none when empty) to
+// the grant lookup, and the admin log it writes to as a builder.
+func resolverSetup(t *testing.T, grants string) (*Resolver, *strings.Builder) {
 	t.Helper()
 	if grants == "" {
 		grants = "[]"
 	}
-	savedAccess := Access
-	t.Cleanup(func() { Access = savedAccess })
 	files := map[string]string{"acl": `{}`, "grants": grants}
-	Access = access.New(access.Hooks{
+	list := access.New(access.Hooks{
 		Open: func(_ context.Context, path string) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader(files[path])), nil
 		},
 	})
-	err := Access.Load(context.Background(), access.Sources{TablePath: "acl", GrantsPath: "grants"})
+	err := list.Load(context.Background(), access.Sources{TablePath: "acl", GrantsPath: "grants"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if LogPages == nil {
-		LogPages = map[string]*log.Logger{}
-	}
-	savedLog := LogPages["Admin"]
-	t.Cleanup(func() { LogPages["Admin"] = savedLog })
 	var logged strings.Builder
-	LogPages["Admin"] = log.New(&logged, "", 0)
-	return &logged
+	adminLog := log.New(&logged, "", 0)
+	return New(Hooks{
+		Log: func() *log.Logger { return adminLog },
+		GrantFor: func(email string) (access.Grant, bool) {
+			for _, grant := range list.Grants() {
+				if strings.EqualFold(grant.Email, email) {
+					return grant, true
+				}
+			}
+			return access.Grant{}, false
+		},
+	}), &logged
 }
 
 const (
@@ -82,7 +85,7 @@ var annOverrides = map[string]map[string]string{"Alerts": {"AlertsMax": "5"}}
 // unknown, and the last never reads as a cancellation: a tier the answer does
 // not name, a title the site does not know, an error in the answer, a refusal
 // or a failure all leave the reader's pledge in doubt.
-func TestResolveTier(t *testing.T) {
+func TestResolve(t *testing.T) {
 	type tierTest struct {
 		name       string
 		grants     string
@@ -96,62 +99,62 @@ func TestResolveTier(t *testing.T) {
 		tier       string
 		overrides  map[string]map[string]string
 		granted    bool // a grant named the tier
-		verdict    tierVerdict
-		noAnswer   bool   // patreonDidNotAnswer of the error
+		verdict    Verdict
+		noAnswer   bool   // DidNotAnswer of the error
 		logged     string // a line the admin log must carry once
 	}
 	tests := []tierTest{
 		{name: "a grant decides without a lookup", grants: grantWithTier, membership: "m1",
-			tier: "Vintage", overrides: annOverrides, granted: true, verdict: tierEntitled},
+			tier: "Vintage", overrides: annOverrides, granted: true, verdict: Entitled},
 		{name: "a grant needs no membership", grants: grantWithTier,
-			tier: "Vintage", overrides: annOverrides, granted: true, verdict: tierEntitled},
+			tier: "Vintage", overrides: annOverrides, granted: true, verdict: Entitled},
 		{name: "a grant without a tier takes the pledge's", grants: grantWithoutTier, membership: "m1",
-			status: 200, body: entitledTo("MODERN"), calls: 1, tier: "Modern", overrides: annOverrides, verdict: tierEntitled},
-		{name: "a grant without a tier or a pledge", grants: grantWithoutTier, verdict: tierNotEntitled},
+			status: 200, body: entitledTo("MODERN"), calls: 1, tier: "Modern", overrides: annOverrides, verdict: Entitled},
+		{name: "a grant without a tier or a pledge", grants: grantWithoutTier, verdict: NotEntitled},
 		{name: "another reader's grant", grants: grantOfSomeoneElse, status: 200, body: entitledTo("LEGACY"),
-			membership: "m1", calls: 1, tier: "Legacy", verdict: tierEntitled},
-		{name: "no membership", verdict: tierNotEntitled},
-		{name: "no user id", grants: grantWithTier, membership: "m1", noUserID: true, verdict: tierUnknown},
-		{name: "no email", membership: "m1", noEmail: true, verdict: tierUnknown},
-		{name: "no email beside a grant with none", grants: grantWithoutEmail, membership: "m1", noEmail: true, verdict: tierUnknown},
+			membership: "m1", calls: 1, tier: "Legacy", verdict: Entitled},
+		{name: "no membership", verdict: NotEntitled},
+		{name: "no user id", grants: grantWithTier, membership: "m1", noUserID: true, verdict: Unknown},
+		{name: "no email", membership: "m1", noEmail: true, verdict: Unknown},
+		{name: "no email beside a grant with none", grants: grantWithoutEmail, membership: "m1", noEmail: true, verdict: Unknown},
 		{name: "no entitled tier", membership: "m1", status: 200,
 			body:  `{"data":{"relationships":{"currently_entitled_tiers":{"data":[]}}}}`,
-			calls: 1, verdict: tierNotEntitled},
+			calls: 1, verdict: NotEntitled},
 		{name: "an entitled tier that is no tier", membership: "m1", status: 200,
 			body:  `{"data":{"relationships":{"currently_entitled_tiers":{"data":[{"id":"t1","type":"reward"}]}}}}`,
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "an untitled tier", membership: "m1", status: 200,
 			body:  `{"data":{"relationships":{"currently_entitled_tiers":{"data":[{"id":"t1","type":"tier"}]}}}}`,
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "a tier titled as another", membership: "m1", status: 200,
 			body:  `{"data":{"relationships":{"currently_entitled_tiers":{"data":[{"id":"t1","type":"tier"}]}}},"included":[{"id":"t2","type":"tier","attributes":{"title":"LEGACY"}}]}`,
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "a tier with an empty title", membership: "m1", status: 200, body: entitledTo(""),
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "a title the site does not know", membership: "m1", status: 200, body: entitledTo("TYPE TWO"),
-			calls: 1, verdict: tierUnknown, logged: `unexpected tier title "TYPE TWO"`},
+			calls: 1, verdict: Unknown, logged: `unexpected tier title "TYPE TWO"`},
 		{name: "an error in the answer", membership: "m1", status: 200,
 			body:  `{"errors":[{"code_name":"refused"}]}`,
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "an error beside a tier", membership: "m1", status: 200,
 			body:  strings.Replace(entitledTo("LEGACY"), `{"data"`, `{"errors":[{"code_name":"refused"}],"data"`, 1),
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "no such member", membership: "m1", status: http.StatusNotFound, body: `{"errors":[{}]}`,
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "a bad request", membership: "m1", status: http.StatusBadRequest, body: `{}`,
-			calls: 1, verdict: tierUnknown},
+			calls: 1, verdict: Unknown},
 		{name: "a refused token", membership: "m1", status: http.StatusUnauthorized, body: `{}`,
-			calls: 1, verdict: tierUnknown, noAnswer: true},
+			calls: 1, verdict: Unknown, noAnswer: true},
 		{name: "a forbidden token", membership: "m1", status: http.StatusForbidden, body: `{}`,
-			calls: 1, verdict: tierUnknown, noAnswer: true},
+			calls: 1, verdict: Unknown, noAnswer: true},
 		{name: "too many requests", membership: "m1", status: http.StatusTooManyRequests, body: `{}`,
-			calls: 1, verdict: tierUnknown, noAnswer: true},
+			calls: 1, verdict: Unknown, noAnswer: true},
 		{name: "an edge's 503", membership: "m1", status: http.StatusServiceUnavailable, body: `<html>`,
-			calls: 1, verdict: tierUnknown, noAnswer: true},
+			calls: 1, verdict: Unknown, noAnswer: true},
 		{name: "no connection", membership: "m1", netErr: errors.New("connection refused"),
-			calls: 1, verdict: tierUnknown, noAnswer: true},
+			calls: 1, verdict: Unknown, noAnswer: true},
 		{name: "an answer cut short", membership: "m1", status: 200, body: `{"data":`,
-			calls: 1, verdict: tierUnknown, noAnswer: true},
+			calls: 1, verdict: Unknown, noAnswer: true},
 	}
 	for title, tier := range map[string]string{
 		"PIONEER":                  "Pioneer",
@@ -166,15 +169,15 @@ func TestResolveTier(t *testing.T) {
 		"TYPE ONE":                 "Vintage",
 	} {
 		tests = append(tests, tierTest{name: "the title " + title, membership: "m1", status: 200,
-			body: entitledTo(title), calls: 1, tier: tier, verdict: tierEntitled})
+			body: entitledTo(title), calls: 1, tier: tier, verdict: Entitled})
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			logged := resolveTierSetup(t, tc.grants)
+			res, logged := resolverSetup(t, tc.grants)
 			transport := &tierPatreon{status: tc.status, body: tc.body, err: tc.netErr}
 			client := &patreon.Client{Client: &http.Client{Transport: transport}}
-			user := &PatreonUserData{UserID: "u1", MembershipID: tc.membership, FullName: "Ann Example", Email: "ann@example.com", EmailVerified: true}
+			user := &User{UserID: "u1", MembershipID: tc.membership, FullName: "Ann Example", Email: "ann@example.com", EmailVerified: true}
 			if tc.noUserID {
 				user.UserID = ""
 			}
@@ -183,7 +186,7 @@ func TestResolveTier(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			tier, overrides, granted, verdict, err := resolveTier(ctx, client, user)
+			tier, overrides, granted, verdict, err := res.Resolve(ctx, client, user)
 
 			calls := transport.calls.Load()
 			if calls != tc.calls {
@@ -201,11 +204,11 @@ func TestResolveTier(t *testing.T) {
 			if !maps.EqualFunc(overrides, tc.overrides, maps.Equal) {
 				t.Errorf("overrides %v, want %v", overrides, tc.overrides)
 			}
-			if (err != nil) != (tc.verdict == tierUnknown) {
+			if (err != nil) != (tc.verdict == Unknown) {
 				t.Errorf("error %v with verdict %d, want one only for an unknown verdict", err, verdict)
 			}
-			if tc.verdict == tierUnknown && patreonDidNotAnswer(ctx, err) != tc.noAnswer {
-				t.Errorf("patreonDidNotAnswer(%v) is %v, want %v", err, !tc.noAnswer, tc.noAnswer)
+			if tc.verdict == Unknown && DidNotAnswer(ctx, err) != tc.noAnswer {
+				t.Errorf("DidNotAnswer(%v) is %v, want %v", err, !tc.noAnswer, tc.noAnswer)
 			}
 			if tc.logged != "" && strings.Count(logged.String(), tc.logged) != 1 {
 				t.Errorf("admin log %q, want %q on one line", logged.String(), tc.logged)

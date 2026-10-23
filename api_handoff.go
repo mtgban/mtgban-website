@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mtgban/mtgban-website/apihandoff"
+	"github.com/mtgban/mtgban-website/internal/pledge"
 )
 
 // Messages the handoff pages show instead of redirecting.
@@ -134,7 +135,7 @@ var handoffPaths = map[string]string{
 // finishAPIHandoff mints the gateway token for the reader Patreon just named,
 // with the tier the site would give them, once the nonce shows this browser
 // started the handoff. tierErr is why Patreon gave no answer for the tier.
-func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, user *PatreonUserData, tier string, tierErr error) {
+func (s *site) finishAPIHandoff(w http.ResponseWriter, r *http.Request, state handoffState, user *pledge.User, tier string, tierErr error) {
 	// One use: whatever happens next, this handoff is spent
 	spendHandoffCookie(w, r, state)
 
