@@ -100,6 +100,26 @@ func TestParseHeaderMtgbanExport(t *testing.T) {
 	}
 }
 
+// A collection export can name its folder before the card: "List Name" is
+// a name too, and taking the first one priced every row as the folder.
+func TestParseHeaderListNameIsNotTheCard(t *testing.T) {
+	p := &Parser{}
+	header := []string{"List Type", "List Name", "Collection", "Format", "Board", "Quantity", "Card Name", "Set Code", "Set Name", "Card Number", "Condition", "Printing", "Rarity", "Language", "Price Bought"}
+	indexMap, err := p.ParseHeader(header)
+	if err != nil {
+		t.Fatalf("ParseHeader: %v", err)
+	}
+	want := map[string]int{
+		"cardName": 6, "edition": 7, "variant": 9, "conditions": 10,
+		"printing": 11, "price": 14, "quantity": 5,
+	}
+	for field, idx := range want {
+		if got, found := indexMap[field]; !found || got != idx {
+			t.Errorf("%s = %d (found %v), want %d", field, got, found, idx)
+		}
+	}
+}
+
 func TestGetQuantity(t *testing.T) {
 	for _, tc := range []struct {
 		in   string
