@@ -9,11 +9,13 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mtgban/mtgban-website/internal/docparse"
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 )
 
 // TestHandoffNamesItsOrigins pins that the page carries the origins the server
@@ -108,7 +110,7 @@ var testHandoffOrigins = []string{"https://www.cardmarket.com"}
 
 // withHandoffOrigins configures the handoff origins for one test, restoring
 // the config after.
-func withHandoffOrigins(t *testing.T, origins map[string]string) {
+func withHandoffOrigins(t *testing.T, origins map[string]infrastructure.HandoffOrigin) {
 	t.Helper()
 	withConfigCopy(t)
 	Config().HandoffOrigins = origins
@@ -119,28 +121,28 @@ func withHandoffOrigins(t *testing.T, origins map[string]string) {
 // capitals, a default port or a trailing dot would never equal what a
 // message reports and would silently refuse everything.
 func TestHandoffOriginsAreBareHTTPS(t *testing.T) {
-	withHandoffOrigins(t, map[string]string{
-		"https://www.cardmarket.com":      "Cardmarket",
-		"https://sender.example":          "",
-		"https://sender.example:8443":     "",
-		"http://plain.example":            "Plain",
-		"https://path.example/":           "Path",
-		"https://path.example/upload":     "Path",
-		"https://user@creds.example":      "Creds",
-		"www.cardmarket.com":              "Bare",
-		"https://sender.example?query=no": "Query",
-		"https://WWW.Cardmarket.com":      "Upper",
-		"https://www.cardmarket.com:443":  "Port",
-		"https://www.cardmarket.com.":     "Dot",
+	withHandoffOrigins(t, map[string]infrastructure.HandoffOrigin{
+		"https://www.cardmarket.com":      {},
+		"https://sender.example":          {},
+		"https://sender.example:8443":     {},
+		"http://plain.example":            {},
+		"https://path.example/":           {},
+		"https://path.example/upload":     {},
+		"https://user@creds.example":      {},
+		"www.cardmarket.com":              {},
+		"https://sender.example?query=no": {},
+		"https://WWW.Cardmarket.com":      {},
+		"https://www.cardmarket.com:443":  {},
+		"https://www.cardmarket.com.":     {},
 	})
 
-	got := handoffOrigins()
-	want := map[string]string{
-		"https://www.cardmarket.com":  "Cardmarket",
-		"https://sender.example":      "",
-		"https://sender.example:8443": "",
+	got := slices.Sorted(maps.Keys(handoffOrigins()))
+	want := []string{
+		"https://sender.example",
+		"https://sender.example:8443",
+		"https://www.cardmarket.com",
 	}
-	if !maps.Equal(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("origins = %v, want %v", got, want)
 	}
 }
@@ -213,9 +215,10 @@ func TestHandoffDoesNotAskASignedInReaderToLogIn(t *testing.T) {
 // is what it is by the time it reaches the upload handler and not where it
 // came from. These name the difference.
 func TestUploadSourceFrom(t *testing.T) {
-	withHandoffOrigins(t, map[string]string{
-		"https://www.cardmarket.com": "Cardmarket",
-		"https://sender.example":     "",
+	withHandoffOrigins(t, map[string]infrastructure.HandoffOrigin{
+		"https://www.cardmarket.com": {Name: "Cardmarket", Seller: "Users"},
+		"https://sender.example":     {},
+		"https://shop.example":       {Seller: "sellers"},
 	})
 
 	tests := []struct {
@@ -253,11 +256,21 @@ func TestUploadSourceFrom(t *testing.T) {
 		want: "sender.example",
 		link: "https://sender.example/lists/42",
 	}, {
-		// Only Cardmarket's URLs are read for a seller.
-		name: "another sender's path names no seller",
+		// The seller segment is the origin's own.
+		name: "an origin with no seller segment names no seller",
 		raw:  "https://sender.example/en/Magic/Users/Nobody/Offers/Singles",
 		want: "sender.example",
 		link: "https://sender.example/en/Magic/Users/Nobody/Offers/Singles",
+	}, {
+		name: "an origin's own segment names its seller",
+		raw:  "https://shop.example/sellers/Someone/list",
+		want: "shop.example - Someone",
+		link: "https://shop.example/sellers/Someone/list",
+	}, {
+		name: "and another origin's segment does not",
+		raw:  "https://shop.example/Users/Someone/list",
+		want: "shop.example",
+		link: "https://shop.example/Users/Someone/list",
 	}, {
 		// The whole point of deriving the name here: a host nobody allowed
 		// cannot put words in the heading, or in the upload log beside it.
@@ -296,7 +309,9 @@ func TestUploadSourceFrom(t *testing.T) {
 // to move this with it.
 func TestUploadQuery(t *testing.T) {
 	const offers = "https://www.cardmarket.com/en/Magic/Users/Lemhast/Offers/Singles"
-	withHandoffOrigins(t, map[string]string{"https://www.cardmarket.com": "Cardmarket"})
+	withHandoffOrigins(t, map[string]infrastructure.HandoffOrigin{
+		"https://www.cardmarket.com": {Name: "Cardmarket", Seller: "Users"},
+	})
 
 	tests := []struct {
 		name       string

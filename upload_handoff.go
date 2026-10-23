@@ -1,16 +1,19 @@
 package main
 
 import (
+	"cmp"
 	"maps"
 	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mtgban/mtgban-website/internal/infrastructure"
 )
 
 // handoffOrigins returns the sites allowed to hand a card list to the upload
-// page, each with the name its results are headed with, from the
+// page, each with how its results are headed, from the
 // infrastructure file's handoff_origins.
 //
 // A site opening the page cannot post the list to /upload itself: the upload
@@ -30,11 +33,11 @@ import (
 // An entry that is not a bare https scheme and host is left out: one reached
 // over http could be anyone on the way, and one with a path would never equal
 // what a message reports.
-func handoffOrigins() map[string]string {
-	origins := map[string]string{}
-	for origin, name := range Infrastructure().HandoffOrigins {
+func handoffOrigins() map[string]infrastructure.HandoffOrigin {
+	origins := map[string]infrastructure.HandoffOrigin{}
+	for origin, entry := range Infrastructure().HandoffOrigins {
 		if validHandoffOrigin(origin) {
-			origins[origin] = name
+			origins[origin] = entry
 		}
 	}
 	return origins
@@ -52,9 +55,6 @@ func validHandoffOrigin(origin string) bool {
 		origin == parsed.Scheme+"://"+parsed.Host && origin == strings.ToLower(origin) &&
 		parsed.Port() != "443" && !strings.HasSuffix(parsed.Hostname(), ".")
 }
-
-// cardmarketOrigin is the one sender whose URLs name a seller.
-const cardmarketOrigin = "https://www.cardmarket.com"
 
 // uploadSourceFrom names the site a handed-over list was read from,
 // for the results heading, along with the link back to it.
@@ -74,21 +74,18 @@ func uploadSourceFrom(raw string) (name string, link string) {
 	}
 
 	origin := parsed.Scheme + "://" + parsed.Host
-	name, found := handoffOrigins()[origin]
+	entry, found := handoffOrigins()[origin]
 	if !found {
 		return "", ""
 	}
-	if name == "" {
-		name = parsed.Host
-	}
+	name = cmp.Or(entry.Name, parsed.Host)
 
-	// The seller, where a Cardmarket path names one, as its offers pages do
-	// under /<language>/<Game>/Users/<seller>/Offers/... A list read from
-	// somewhere else on the same site is still from that site, so a missing
-	// seller loses the name and not the heading.
+	// The seller, where the entry says which segment names one. A list read
+	// from somewhere else on the same site is still from that site, so a
+	// missing seller loses the name and not the heading.
 	parts := strings.Split(parsed.Path, "/")
-	for i := 0; origin == cardmarketOrigin && i+1 < len(parts); i++ {
-		if parts[i] == "Users" && parts[i+1] != "" {
+	for i := 0; entry.Seller != "" && i+1 < len(parts); i++ {
+		if parts[i] == entry.Seller && parts[i+1] != "" {
 			name += " - " + parts[i+1]
 			break
 		}
