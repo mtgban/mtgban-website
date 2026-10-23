@@ -71,15 +71,16 @@ test('the pushed entries carry only the synced fields', async () => {
     expect(pushed[0].sellPrice).toBeUndefined();
 });
 
-test('the merge caps the backpack at 200 live entries, newest first', async () => {
+test('the merge caps the backpack at 100 live entries, newest first', async () => {
     const local = [];
     for (let i = 0; i < 150; i++) local.push(entry('l' + i, 1, 1000 + i));
     const server = [];
-    for (let i = 0; i < 100; i++) server.push(entry('s' + i, 1, 2000 + i));
+    for (let i = 0; i < 60; i++) server.push(entry('s' + i, 1, 2000 + i));
     const { pushed } = await reconcileBackpack(local, server);
     const live = pushed.filter((e) => !e.del);
-    expect(live.length).toBe(200);
-    expect(live.some((e) => e.id === 's99')).toBe(true);
+    expect(live.length).toBe(100);
+    expect(live.some((e) => e.id === 's59')).toBe(true);
+    expect(live.some((e) => e.id === 'l149')).toBe(true);
     expect(live.some((e) => e.id === 'l0')).toBe(false);
 });
 
@@ -110,14 +111,14 @@ test('a clean hydrate stores the server backpack, re-renders and pushes nothing'
 test('a Clear of more than 50 cards stays cleared through a reconcile', async () => {
     const now = Date.now();
     const local = [], server = [];
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 100; i++) {
         local.push(entry('c' + i, 1, now - 1000, { del: now - 10 - i, m: now - 10 - i }));
         server.push(entry('c' + i, 1, now - 1000));
     }
     const { pushed, stored } = await reconcileBackpack(local, server);
     expect(pushed.filter((e) => !e.del)).toHaveLength(0);
     // Every tombstone stays local, so a failed push cannot bring cards back.
-    expect(stored).toHaveLength(120);
+    expect(stored).toHaveLength(100);
     expect(stored.filter((e) => !e.del)).toHaveLength(0);
 });
 

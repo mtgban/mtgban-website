@@ -10,7 +10,7 @@
     var UNDO_KEY = "mtgban_backpack_undo";
     var UNDO_MAX = 20;
     // The reader's tier sets the size; the page's base template hands it over.
-    var MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 200;
+    var MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 100;
     var MAX_QTY = 999;
 
     // read drops entries without a string id and holds each qty to 1..999.
