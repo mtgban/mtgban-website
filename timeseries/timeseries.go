@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// NormalizeUUID strips the _f, _e, and language suffixes that mtgmatcher
-// appends for foil/etched/language variants, returning a clean UUID
-// suitable for Postgres. A standard UUID is 36 characters; anything
-// appended after that (e.g. _jpn, _ita, _alt, _f, _e) is stripped.
+// NormalizeUUID strips the suffixes mtgmatcher appends for a printing's
+// finishes and for its copies, returning a clean UUID suitable for Postgres.
+// A standard UUID is 36 characters; anything appended after that (e.g. _f,
+// _e, _alt) is stripped.
 func NormalizeUUID(uuid string) string {
 	if len(uuid) > 36 {
 		uuid = uuid[:36]
