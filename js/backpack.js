@@ -7,7 +7,8 @@
     var KEY = "mtgban_backpack";
     var EMPTY_AFTER_KEY = "mtgban_backpack_empty_after";
     var PENDING_KEY = "mtgban_backpack_pending_clear";
-    var MAX = 200;
+    // The reader's tier sets the size; the page's base template hands it over.
+    var MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 200;
     var MAX_QTY = 999;
 
     // read drops entries without a string id and holds each qty to 1..999.

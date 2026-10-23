@@ -37,7 +37,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
@@ -64,6 +64,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending } = {
         location: { pathname: '/search' },
     };
     if (ban) window.BAN_BACKPACK = ban;
+    if (max) window.BAN_BACKPACK_MAX = max;
     const docListeners = {};
     const document = {
         body, readyState: 'complete', addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); },
@@ -138,6 +139,18 @@ describe('adding', () => {
         p.window.addToBackpack(p.rows[0]);
         expect(p.stored().filter((e) => !e.del).length).toBe(200);
         expect(toast.textContent).toBe('Backpack is full (200 cards)');
+    });
+
+    test('a tier backpack size moves the cap', () => {
+        const store = [];
+        for (let i = 0; i < 200; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
+        const p = page({ store, max: 201 });
+        const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.stored().filter((e) => !e.del).length).toBe(201);
+        p.window.addToBackpack(p.rows[1]);
+        expect(p.stored().filter((e) => !e.del).length).toBe(201);
+        expect(toast.textContent).toBe('Backpack is full (201 cards)');
     });
 
     test('a live card past the cap still increments', () => {

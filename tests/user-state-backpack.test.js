@@ -12,14 +12,15 @@ function realListStorage() {
 
 // Runs user-state.js signed in with a local backpack against a server copy,
 // and returns the backpack the reconcile PUT pushes; clean leaves the dirty
-// flag unset.
-async function reconcileBackpack(local, server, clean) {
+// flag unset; max stands in for the tier's backpack size.
+async function reconcileBackpack(local, server, clean, max) {
     const m = clean ? {} : { mtgban_userstate_dirty: '1' };
     if (local) m.mtgban_backpack = JSON.stringify(local);
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
     const rendered = [];
     const window = { addEventListener() {}, renderBackpack: () => rendered.push(m.mtgban_backpack) };
+    if (max) window.BAN_BACKPACK_MAX = max;
     const document = { cookie: 'MTGBAN=x', readyState: 'complete', addEventListener() {} };
     const state = { version: 3, favorites: [], recents: [], preferences: {}, backpack: server };
     const puts = [];
@@ -80,6 +81,15 @@ test('the merge caps the backpack at 200 live entries, newest first', async () =
     expect(live.length).toBe(200);
     expect(live.some((e) => e.id === 's99')).toBe(true);
     expect(live.some((e) => e.id === 'l0')).toBe(false);
+});
+
+test('a larger tier size keeps every card through the merge', async () => {
+    const local = [];
+    for (let i = 0; i < 150; i++) local.push(entry('l' + i, 1, 1000 + i));
+    const server = [];
+    for (let i = 0; i < 100; i++) server.push(entry('s' + i, 1, 2000 + i));
+    const { pushed } = await reconcileBackpack(local, server, false, 500);
+    expect(pushed.filter((e) => !e.del)).toHaveLength(250);
 });
 
 test('a reconcile adopts the server backpack', async () => {

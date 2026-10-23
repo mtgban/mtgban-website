@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -19,15 +21,35 @@ func userStateIdentity(email string) string {
 	return email + "\x00" + string(Config().Game)
 }
 
+// defaultBackpackMax is how many cards the backpack holds where the tier sets
+// no SearchBackpackMax, and maxBackpackMax the most a tier can set: at about
+// 365 bytes a card, that many cards and as many tombstones still fit the
+// userstate sync body's 512 KB beside the other sections.
+const (
+	defaultBackpackMax = 200
+	maxBackpackMax     = 600
+)
+
+// backpackMaxFromValues reads SearchBackpackMax off signed ACL values, held
+// to maxBackpackMax.
+func backpackMaxFromValues(v url.Values) int {
+	n, err := strconv.Atoi(v.Get("SearchBackpackMax"))
+	if err != nil || n < 1 {
+		return defaultBackpackMax
+	}
+	return min(n, maxBackpackMax)
+}
+
 // UserStateAPI authenticates the caller from their signed cookie/sig, then
 // delegates request handling to the userstate package.
 func UserStateAPI(w http.ResponseWriter, r *http.Request) {
-	email := signedUserEmail(r)
+	v := parseSig(verifiedRequestSignature(r))
+	email := v.Get("UserEmail")
 	if email == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "not signed in"})
 		return
 	}
-	userstate.ServeAPI(w, r, UserStateDB, userStateIdentity(email))
+	userstate.ServeAPI(w, r, UserStateDB, userStateIdentity(email), backpackMaxFromValues(v))
 }

@@ -12,7 +12,7 @@
     var FAVORITES_KEY = 'mtgban_favorites';
     var RECENTS_KEY = 'mtgban_recent_searches';
     var BACKPACK_KEY = 'mtgban_backpack';
-    var BACKPACK_MAX = 200;
+    var BACKPACK_MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 200;
     var PRESETS_KEY = 'mtgban_upload_presets';
     var ARBIT_KEY = 'mtgban_arbit_filters';
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
