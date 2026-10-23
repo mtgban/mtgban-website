@@ -1,3 +1,6 @@
 # Transient run logs and Python cache from executing the migration.
 *.log
 __pycache__/
+
+# Id lists downloaded from B2 to run a migration.
+*.tsv
