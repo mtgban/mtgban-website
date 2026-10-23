@@ -417,6 +417,10 @@ var gameBadgeMap = map[mtgmatcher.Game]string{
 // fully-built map.
 var newspaperUUIDsPtr atomic.Pointer[map[string]struct{}]
 
+// newspaperCaching is set while cacheNewspaper runs, so a datastore reload
+// landing beside the cron's run does not query the newspaper twice over.
+var newspaperCaching atomic.Bool
+
 // GetNewspaperUUIDs returns the current set of UUIDs that appear in the
 // newspaper spike-score pages. The returned map is shared and MUST NOT be
 // modified by callers. Returns nil before the first successful cache run.
@@ -504,8 +508,24 @@ func (s *site) cacheNewspaper() {
 	if SkipNewspaper {
 		return
 	}
+	if !newspaperCaching.CompareAndSwap(false, true) {
+		return
+	}
+	defer newspaperCaching.Store(false)
 
-	b := s.backend()
+	// A reload landing during a run loses the guard, so the run goes again
+	// when the datastore moved under it, against the one it has now.
+	for {
+		b := s.backend()
+		s.cacheNewspaperWith(b)
+		if s.backend() == b {
+			return
+		}
+	}
+}
+
+// cacheNewspaperWith refreshes every newspaper page, matching rows through b.
+func (s *site) cacheNewspaperWith(b *mtgmatcher.Backend) {
 	log.Println("Caching Newspaper data")
 
 	newspaperUUIDs := map[string]struct{}{}
