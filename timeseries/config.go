@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	// registers the postgres driver database/sql opens by name
@@ -54,10 +56,24 @@ func (c SQLConfig) dsn(port int) string {
 	if sslMode == "" {
 		sslMode = "disable"
 	}
-	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s binary_parameters=yes",
-		c.Host, port, c.User, c.Password, c.DBName, sslMode,
-	)
+	// lib/pq takes the token after "key=" as its value, so a key with an
+	// empty value would swallow the one behind it: those stay out.
+	parts := make([]string, 0, 7)
+	for _, kv := range [...][2]string{
+		{"host", c.Host},
+		{"port", strconv.Itoa(port)},
+		{"user", c.User},
+		{"password", c.Password},
+		{"dbname", c.DBName},
+		{"sslmode", sslMode},
+		{"binary_parameters", "yes"},
+	} {
+		if kv[1] == "" {
+			continue
+		}
+		parts = append(parts, kv[0]+"="+kv[1])
+	}
+	return strings.Join(parts, " ")
 }
 
 // Client wraps a Postgres connection pool for the timeseries price table.
