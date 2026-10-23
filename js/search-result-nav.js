@@ -110,8 +110,9 @@
             var pointerHandled = hoverRowUnderPointer();
             // Find the last header that is stuck (rect.top ≈ sticky position)
             var stuckIdx = -1;
+            var off = stickyOffset();
             for (var i = headers.length - 1; i >= 0; i--) {
-                if (headers[i].getBoundingClientRect().top <= stickyOffset() + 2) {
+                if (headers[i].getBoundingClientRect().top <= off + 2) {
                     stuckIdx = i;
                     break;
                 }
