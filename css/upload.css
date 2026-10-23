@@ -1749,3 +1749,7 @@ tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
     gap: 8px;
     margin-top: 16px;
 }
+
+/* A folded store keeps its header and hides the column labels and cards */
+.opt-store.folded tbody,
+.opt-store.folded thead tr + tr { display: none; }

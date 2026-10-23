@@ -253,7 +253,7 @@
 
         {{$hasCart := false}}
         {{range $i, $arb := .Arb}}
-            <div class="arb-section">
+            <div class="arb-section" data-fold>
             <span class="anchor" id="{{.Name}}"></span>
             <div class="arb-section-header">
                 <div class="arb-section-nav">
@@ -413,6 +413,7 @@
                     {{end}}
 
                 </div>
+                <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards"><i data-lucide="chevron-up"></i></button>
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
@@ -569,6 +570,7 @@
 </div>
 
 <script type="text/javascript" src="/js/load-lists.js?hash={{$.Hash}}" defer></script>
+<script type="text/javascript" src="/js/section-fold.js?hash={{$.Hash}}" defer></script>
 <script>
 function toggleArbitRow(checkbox) {
     var row = checkbox.closest('tr');

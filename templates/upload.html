@@ -872,7 +872,7 @@
             {{$entries := index $.Optimized .}}
             {{if $entries}}
                 {{$total := index $.OptimizedTotals .}}
-                <div class="opt-store" id="opt-{{.}}">
+                <div class="opt-store" id="opt-{{.}}" data-fold>
                     <table class="opt-table" onmouseout="window.optTableOut && optTableOut(this, event)">
                     <colgroup><col><col><col><col><col><col><col></colgroup>
                     <thead><tr><td class="opt-store-head" colspan="7">
@@ -1017,6 +1017,7 @@
                         {{$qty := index $.OptimizedQuantities $scraperKey}}
                         <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
+                        <button type="button" class="section-fold" aria-expanded="true" title="Hide these cards"><i data-lucide="chevron-up"></i></button>
                     </div>
                     </td></tr>
                         <tr>
@@ -1078,6 +1079,7 @@
     <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
     <script type="text/javascript" src="/js/load-lists.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/upload-optimizer.js?hash={{.Hash}}" defer></script>
+    <script type="text/javascript" src="/js/section-fold.js?hash={{.Hash}}" defer></script>
     {{end}}
 
     <!-- Printing picker overlay -->

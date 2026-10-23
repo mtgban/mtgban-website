@@ -1898,3 +1898,26 @@ table.tiers td div {
         animation: none !important;
     }
 }
+
+/* === Store fold button (upload optimizer, arbit) === */
+.section-fold {
+    padding: 2px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    transition: all 0.15s;
+}
+.section-fold:hover {
+    background: var(--accent-muted);
+    color: var(--ainfo);
+}
+/* Sized before lucide swaps the <i> for an <svg>, so the header never shifts. */
+.section-fold svg,
+.section-fold i[data-lucide] {
+    width: 16px; height: 16px;
+    transition: transform 0.15s;
+}
+.folded .section-fold svg { transform: rotate(180deg); }
