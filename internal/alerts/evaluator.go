@@ -215,9 +215,13 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 		return sum
 	}
 	sum.users = len(users)
+	// valuesByUser keeps each user's ACL values for the alert loop below,
+	// built once here rather than once per alert.
+	valuesByUser := make(map[string]url.Values, len(users))
 	for _, c := range users {
 		lapsed := now.Sub(c.UpdatedAt) > contactMaxAge
 		values := deps.Values(c.UserHash, c.Tier)
+		valuesByUser[c.UserHash] = values
 		allowance := deps.Allowance(values)
 		if lapsed {
 			allowance = 0
@@ -283,8 +287,12 @@ func runEvaluation(ctx context.Context, deps EvalDeps, sides []Side) evalSummary
 			sum.skipped++
 			continue
 		}
+		values, ok := valuesByUser[a.Contact.UserHash]
+		if !ok {
+			values = deps.Values(a.Contact.UserHash, a.Contact.Tier)
+		}
 		var quotes []Quote
-		for _, p := range deps.Prices(a.CardID, a.Side, deps.Values(a.Contact.UserHash, a.Contact.Tier)) {
+		for _, p := range deps.Prices(a.CardID, a.Side, values) {
 			if !inScope(p, a.Stores) {
 				continue
 			}
