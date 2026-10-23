@@ -150,11 +150,18 @@
     })();
     function sectionForKey(key) { return KEY_TO_SECTION[key] || null; }
 
+    // payloadForSection is what a PATCH sends for the section, or null for a
+    // favorites or recents value that does not parse: an unreadable local
+    // copy must not replace the server's.
     function payloadForSection(section) {
-        if (section === 'favorites') return JSON.parse(readLocal(FAVORITES_KEY, '[]')).map(trimFavorite);
-        if (section === 'recents') return JSON.parse(readLocal(RECENTS_KEY, '[]')).map(trimRecent);
+        if (section === 'favorites') return parsedList(FAVORITES_KEY, trimFavorite);
+        if (section === 'recents') return parsedList(RECENTS_KEY, trimRecent);
         if (section === 'backpack') return localBackpack().map(trimBackpack);
         return buildPreferences();
+    }
+
+    function parsedList(key, trim) {
+        try { return JSON.parse(readLocal(key, '[]')).map(trim); } catch (e) { return null; }
     }
 
     // Card art on recent searches is owned by the device: recent-searches.js
@@ -242,7 +249,10 @@
     // PATCH one section; keepalive lets it outlive navigation.
     // Resolves true when the write (or its reconcile) landed.
     function patchSection(section, keepalive) {
-        var payloadJSON = JSON.stringify(payloadForSection(section));
+        var payload = payloadForSection(section);
+        // Nothing readable to send: the section is settled, not retried.
+        if (payload === null) return Promise.resolve(true);
+        var payloadJSON = JSON.stringify(payload);
         // Content already on the server: succeed without a request.
         if (fpMatches(section, payloadJSON)) return Promise.resolve(true);
         var body = '{"data":' + payloadJSON + ',"version":' + version + '}';
