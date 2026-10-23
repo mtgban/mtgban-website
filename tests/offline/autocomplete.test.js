@@ -160,3 +160,28 @@ test("closing the spaces does not match an unrelated name", () => {
     expect(highlight("Blue-Eyed Silver Zombie", "counterspell")).toBe(null);
     expect(highlight("Blue-Eyed Silver Zombie", "eyed silver")).toBe(null);
 });
+
+// Punctuation folds away on both sides, but a typed comma says the name goes
+// on past one: "Saheeli," is not a way of asking for "Saheeli Rai".
+test("a typed comma is part of what has to match", () => {
+    expect(highlight("Saheeli Rai", "saheeli,")).toBeNull();
+    expect(highlight("Saheeli, Sublime Artificer", "saheeli,"))
+        .toBe("[Saheeli], Sublime Artificer");
+    expect(highlight("Saheeli, Sublime Artificer", "saheeli, sub"))
+        .toBe("[Saheeli, Sub]lime Artificer");
+    expect(highlight("Saheeli, Sublime Artificer", "saheeli,sub"))
+        .toBe("[Saheeli, Sub]lime Artificer");
+    expect(highlight("The Ur-Dragon", "the ur,")).toBeNull();
+});
+
+test("a typed comma is matched past a skipped prefix too", () => {
+    expect(highlight("Secret Lair Drop Saheeli Rai", "saheeli,")).toBeNull();
+    expect(highlight("Secret Lair Drop Saheeli, Sublime Artificer", "saheeli,"))
+        .toBe("Secret Lair Drop [Saheeli], Sublime Artificer");
+});
+
+test("a comma left out still finds the name that has one", () => {
+    expect(highlight("Saheeli, Sublime Artificer", "saheeli sub"))
+        .toBe("[Saheeli, Sub]lime Artificer");
+    expect(highlight("Saheeli Rai", "saheeli")).toBe("[Saheeli] Rai");
+});

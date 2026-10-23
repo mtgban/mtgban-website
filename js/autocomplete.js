@@ -95,6 +95,17 @@ function __acSquash(folded) {
 var __acSkippableFolded = __acSkippablePrefixes.map(__acFold);
 var __acSkippableSquashed = __acSkippableFolded.map(__acSquash);
 
+/* Letters, digits and commas alone. A typed comma is the one punctuation
+ * mark that narrows the list: "Saheeli," means the name goes on past one,
+ * as "Saheeli, Sublime Artificer" does and "Saheeli Rai" does not. */
+function __acCommaFold(text) {
+    return text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N},]/gu, "")
+        .toUpperCase();
+}
+
 /* The typed text, prepared once a keystroke rather than once a name. */
 function __acQuery(typed) {
     var folded = __acFold(typed);
@@ -103,7 +114,17 @@ function __acQuery(typed) {
         upper: typed.toUpperCase(),
         folded: folded,
         squashed: __acSquash(folded),
+        commas: typed.indexOf(",") >= 0 ? __acCommaFold(typed) : "",
     };
+}
+
+/* Whether the name has the typed commas where they were typed, read from
+ * where the match begins; true when none was typed. */
+function __acCommasMatch(name, span, query) {
+    if (!query.commas) {
+        return true;
+    }
+    return __acCommaFold(name.slice(span.start)).lastIndexOf(query.commas, 0) === 0;
 }
 
 /* Where the typed text matches within a folded name, or -1: at the front, or
@@ -145,9 +166,11 @@ function __acMatchSpan(name, foldedName, query, squashedName) {
         return { start: 0, end: query.raw.length };
     }
 
+    var span;
     var offset = __acMatchOffset(foldedName, query.folded, __acSkippableFolded);
     if (offset >= 0) {
-        return __acOriginalSpan(name, offset, query.folded.length, false);
+        span = __acOriginalSpan(name, offset, query.folded.length, false);
+        return __acCommasMatch(name, span, query) ? span : null;
     }
 
     /* Nothing matched with the spaces where they fell, so try again with them
@@ -158,7 +181,8 @@ function __acMatchSpan(name, foldedName, query, squashedName) {
     if (offset < 0) {
         return null;
     }
-    return __acOriginalSpan(name, offset, query.squashed.length, true);
+    span = __acOriginalSpan(name, offset, query.squashed.length, true);
+    return __acCommasMatch(name, span, query) ? span : null;
 }
 
 /* Turn a span of the folded name back into a span of the name itself, which is
