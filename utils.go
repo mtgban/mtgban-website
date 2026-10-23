@@ -1466,6 +1466,14 @@ func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value 
 
 // Set a cookie in the response with no expiration at its route path.
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
+	// The signature, the one global cookie, is Lax so a link from another
+	// site (Patreon's login redirect among them) arrives signed in; the
+	// preferences stay first party only.
+	sameSite := http.SameSiteStrictMode
+	if global {
+		sameSite = http.SameSiteLaxMode
+	}
+
 	origin := requestOrigin(r)
 	u, err := url.Parse(origin)
 	if err != nil || u.Hostname() == "" {
@@ -1497,12 +1505,8 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 		Value:   value,
 		// Only mark Secure when the site itself is served over HTTPS,
 		// otherwise the cookie would be dropped during local HTTP dev.
-		Secure: isSecureRequest(r),
-	}
-
-	if !global {
-		// Enforce first party cookies only
-		cookie.SameSite = http.SameSiteStrictMode
+		Secure:   isSecureRequest(r),
+		SameSite: sameSite,
 	}
 	http.SetCookie(w, &cookie)
 	if cookie.Path != "/" {
