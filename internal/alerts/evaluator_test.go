@@ -194,8 +194,11 @@ func (f *fakeEvalStore) ClaimFire(_ context.Context, id int64, seen time.Time, w
 
 // SetState writes only rows whose current status is active and updated_at
 // is as listed.
-func (f *fakeEvalStore) SetState(_ context.Context, id int64, seen time.Time, st State) (bool, error) {
+func (f *fakeEvalStore) SetState(ctx context.Context, id int64, seen time.Time, st State) (bool, error) {
 	f.calls++
+	if ctx.Err() != nil {
+		return false, ctx.Err()
+	}
 	if f.status[id] != StatusActive || !f.row(id).UpdatedAt.Equal(seen) {
 		return false, nil
 	}
@@ -217,8 +220,11 @@ func (f *fakeEvalStore) ParkForNoAddress(ctx context.Context, h string, id int64
 	return f.SetState(ctx, id, seen, st)
 }
 
-func (f *fakeEvalStore) AddEvent(_ context.Context, e Event) error {
+func (f *fakeEvalStore) AddEvent(ctx context.Context, e Event) error {
 	f.calls++
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	f.events = append(f.events, e)
 	return nil
 }
@@ -257,6 +263,8 @@ type fakeDeliverer struct {
 	parkTo []string
 	// messageID, when set, is the provider id a successful delivery reports.
 	messageID string
+	// delay is how long each Deliver takes, ignoring ctx like a send in flight.
+	delay time.Duration
 }
 
 func (f *fakeDeliverer) NotifyPark(_ context.Context, ch Channel, n ParkNotice) error {
@@ -268,6 +276,7 @@ func (f *fakeDeliverer) NotifyPark(_ context.Context, ch Channel, n ParkNotice) 
 func (f *fakeDeliverer) Kind() ChannelKind { return f.kind }
 
 func (f *fakeDeliverer) Deliver(_ context.Context, d Digest, ch Channel, _ func(string) string) []Delivery {
+	time.Sleep(f.delay)
 	f.digests = append(f.digests, d)
 	f.channels = append(f.channels, ch)
 	var out []Delivery
@@ -750,6 +759,42 @@ func TestRunAlertEvaluationPrunesAtMostHourly(t *testing.T) {
 
 // A temporary send failure must not start the send gap: the next pass, still
 // across the line, tries the DM again.
+// TestRunAlertEvaluationWritesLandInsideTheRunDeadline proves the writes
+// after a delivery are bounded by the run deadline plus writeGrace, not by
+// a budget that starts when delivery does: a delivery longer than the
+// grace but inside the deadline still records its event and state.
+func TestRunAlertEvaluationWritesLandInsideTheRunDeadline(t *testing.T) {
+	grace := writeGrace
+	writeGrace = 10 * time.Millisecond
+	t.Cleanup(func() { writeGrace = grace })
+
+	store := newFakeEvalStore(activeAlert())
+	dd := &fakeDeliverer{delay: 50 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	sum := runEvaluation(ctx, evalDeps(store, dd, 13), buylistOnly)
+
+	st := store.states[7]
+	if sum.err != nil || st.LastFiredAt == nil || len(store.events) != 1 || !store.events[0].Delivered {
+		t.Fatalf("writes lost inside the deadline: err=%v state=%+v events=%+v", sum.err, st, store.events)
+	}
+}
+
+// TestRunAlertEvaluationWritesLandPastTheRunDeadline proves a delivery
+// that outlives the run deadline still gets its writes within the grace.
+func TestRunAlertEvaluationWritesLandPastTheRunDeadline(t *testing.T) {
+	store := newFakeEvalStore(activeAlert())
+	dd := &fakeDeliverer{delay: 50 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	sum := runEvaluation(ctx, evalDeps(store, dd, 13), buylistOnly)
+
+	st := store.states[7]
+	if sum.err != nil || st.LastFiredAt == nil || len(store.events) != 1 {
+		t.Fatalf("writes lost past the deadline: err=%v state=%+v events=%+v", sum.err, st, store.events)
+	}
+}
+
 func TestRunAlertEvaluationRetriesOnTheNextPass(t *testing.T) {
 	store := newFakeEvalStore(activeAlert())
 	dd := &fakeDeliverer{err: errors.New("dial tcp")}

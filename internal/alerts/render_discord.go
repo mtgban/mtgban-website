@@ -49,10 +49,15 @@ func NewDiscordDeliverer(s DiscordSender, pace time.Duration) Deliverer {
 
 func (d *discordDeliverer) Kind() ChannelKind { return ChannelDiscord }
 
-// Deliver DMs each firing to the channel's Discord id.
-func (d *discordDeliverer) Deliver(_ context.Context, dg Digest, ch Channel, label func(string) string) []Delivery {
+// Deliver DMs each firing to the channel's Discord id; once ctx is done
+// the rest fail as not attempted, so the next run sends them.
+func (d *discordDeliverer) Deliver(ctx context.Context, dg Digest, ch Channel, label func(string) string) []Delivery {
 	out := make([]Delivery, 0, len(dg.Firings))
 	for _, f := range dg.Firings {
+		if ctx.Err() != nil {
+			out = append(out, Delivery{AlertID: f.Alert.ID, Err: notAttempted(ctx)})
+			continue
+		}
 		err := d.notify(ch.Address, renderDiscord(f, label))
 		out = append(out, Delivery{AlertID: f.Alert.ID, Err: err})
 	}

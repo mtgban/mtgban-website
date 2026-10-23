@@ -785,7 +785,9 @@ func (a *API) mailConfirm(ctx context.Context, w http.ResponseWriter, c Caller, 
 // releaseConfirm frees an address claimed at claimedAt for another mail
 // at once, even once the request is gone.
 func (a *API) releaseConfirm(ctx context.Context, c Caller, address string, claimedAt time.Time) {
-	err := a.deps.Store.ReleaseConfirmSend(context.WithoutCancel(ctx), c.UserHash, address, claimedAt)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), releaseTimeout)
+	defer cancel()
+	err := a.deps.Store.ReleaseConfirmSend(ctx, c.UserHash, address, claimedAt)
 	if err != nil {
 		log.Printf("alerts: release confirm send: %v", err)
 	}

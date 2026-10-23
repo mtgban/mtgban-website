@@ -40,6 +40,10 @@ func (m *MailDeliverer) Deliver(ctx context.Context, d Digest, ch Channel, label
 	if m.Mailer == nil || m.Templates.HTML == nil || m.Templates.Text == nil {
 		return mailResults(d, errMailNotConfigured)
 	}
+	// Checked before Reserve and Send: a mail cut in flight stays sent.
+	if ctx.Err() != nil {
+		return mailResults(d, notAttempted(ctx))
+	}
 	image := m.Image
 	if image == nil {
 		image = func(string) string { return "" }
@@ -78,6 +82,10 @@ func (m *MailDeliverer) sendCounted(ctx context.Context, userHash string, msg ma
 	if m.Reserve != nil {
 		id, ok, err := m.Reserve(ctx, userHash, m.now(), m.Ceiling)
 		if err != nil {
+			if ctx.Err() != nil {
+				// Cut before Send: nothing went out, the next run tries again.
+				return "", errors.Join(notAttempted(ctx), err)
+			}
 			return "", err
 		}
 		if !ok {
@@ -88,7 +96,9 @@ func (m *MailDeliverer) sendCounted(ctx context.Context, userHash string, msg ma
 	id, err := m.Mailer.Send(ctx, msg)
 	if mailer.Refused(err) && m.Reserve != nil && m.Release != nil {
 		// A mail that did not go out does not count, even once ctx is gone.
-		releaseErr := m.Release(context.WithoutCancel(ctx), reserved)
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), releaseTimeout)
+		defer cancel()
+		releaseErr := m.Release(rctx, reserved)
 		if releaseErr != nil {
 			err = errors.Join(err, releaseErr)
 		}
