@@ -361,7 +361,7 @@ sharing the price database re-read it (access_notify.go).
 `timeseries_config` holds `long_form_writes` (§5.6) and `checkpoints_path`
 (§2.3). The `stores` section (`StoresConfig`) says which stores show where,
 by shorthand: `api_demo_stores` (what an unsigned API request gets, §5.7),
-`arbit_block_vendors`, `search_block_list`,
+`search_block_list`,
 `search_buylist_block_list`, `sleepers_block_list`,
 `upload_sealed_block_list`, `global_allow_list`, `global_probe_list`, and
 `api_only_stores`, the stores only the price API serves.

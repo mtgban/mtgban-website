@@ -12,9 +12,9 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-// A reader's cookie vendors join the config's blocklist for their own request.
-// Appended in place, they landed in the spare capacity a JSON decode usually
-// leaves, the same slots every other request appends into.
+// A reader's cookie vendors join the blocklist for their own request, never
+// the spare capacity of the config's API-only list it starts from, the same
+// slots every other request appends into.
 func TestArbitBlocksCookieVendorsPerRequest(t *testing.T) {
 	// DevMode so render reads templates from disk
 	withSigMode(t, true, false)
@@ -26,10 +26,10 @@ func TestArbitBlocksCookieVendorsPerRequest(t *testing.T) {
 		t.Cleanup(func() { delete(LogPages, "Arbitrage") })
 	}
 	seedReverseScrapers(t, "card-a")
-	prev := Config().Stores.ArbitBlockVendors
-	t.Cleanup(func() { Config().Stores.ArbitBlockVendors = prev })
-	Config().Stores.ArbitBlockVendors = append(make([]string, 0, 4), "CONFIG_VENDOR")
-	array := Config().Stores.ArbitBlockVendors[:cap(Config().Stores.ArbitBlockVendors)]
+	prev := Config().Stores.APIOnlyStores
+	t.Cleanup(func() { Config().Stores.APIOnlyStores = prev })
+	Config().Stores.APIOnlyStores = append(make([]string, 0, 4), "APIONLY")
+	array := Config().Stores.APIOnlyStores[:cap(Config().Stores.APIOnlyStores)]
 
 	// The /reverse menu lists every vendor the blocklist lets through
 	reverseMenu := func(cookie string) string {
@@ -46,8 +46,8 @@ func TestArbitBlocksCookieVendorsPerRequest(t *testing.T) {
 	if strings.Contains(reverseMenu("REVBUY"), entry) {
 		t.Error("the cookie's vendor is still in the menu")
 	}
-	if !slices.Equal(array, []string{"CONFIG_VENDOR", "", "", ""}) {
-		t.Errorf("a request wrote its vendors into the config's blocklist: %q", array)
+	if !slices.Equal(array, []string{"APIONLY", "", "", ""}) {
+		t.Errorf("a request wrote its vendors into the config's API-only list: %q", array)
 	}
 }
 

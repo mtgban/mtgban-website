@@ -110,13 +110,8 @@ func TestGlobalVendorKeysListTheProbeSellers(t *testing.T) {
 	}
 }
 
-// The grant replaces the config block list, NONE clears it, and with no
-// grant the config list stands.
+// The grant is the block list; NONE, or no grant, blocks nothing.
 func TestArbitBlockedVendorsReadsTheGrant(t *testing.T) {
-	prev := Config().Stores.ArbitBlockVendors
-	t.Cleanup(func() { Config().Stores.ArbitBlockVendors = prev })
-	Config().Stores.ArbitBlockVendors = []string{"CONFIG_VENDOR"}
-
 	cases := []struct {
 		name string
 		sig  string
@@ -124,7 +119,7 @@ func TestArbitBlockedVendorsReadsTheGrant(t *testing.T) {
 	}{
 		{"NONE clears the list", testSig(map[string]string{"ArbitDisabledVendors": "NONE"}), nil},
 		{"the grant's vendors", testSig(map[string]string{"ArbitDisabledVendors": "ZZA,ZZB"}), []string{"ZZA", "ZZB"}},
-		{"no sig reads the config", "", []string{"CONFIG_VENDOR"}},
+		{"no grant blocks nothing", "", nil},
 	}
 	for _, c := range cases {
 		if got := arbitBlockedVendors(c.sig); !slices.Equal(got, c.want) {
