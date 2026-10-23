@@ -46,6 +46,11 @@ func TestArbitReadsGrantsOnlyOffAVerifiedSignature(t *testing.T) {
 	if strings.Contains(page(forged), seller) {
 		t.Error("a forged ArbitEnabled=ALL listed the seller")
 	}
+	// The page alone grants no sources: those come from ArbitEnabled only.
+	pageOnly := signedAs(t, url.Values{"UserEmail": {"reader@example.com"}, "UserTier": {"Test"}, "Arbit": {"true"}}, time.Now().Add(time.Hour))
+	if strings.Contains(page(pageOnly), seller) {
+		t.Error("a signature with no ArbitEnabled listed the seller")
+	}
 }
 
 // A valid signature in ?sig= gets a request past enforceSigning, which
