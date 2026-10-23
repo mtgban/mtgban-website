@@ -41,14 +41,16 @@ func handoffOrigins() map[string]string {
 }
 
 // validHandoffOrigin reports whether origin is an https scheme and a host,
-// nothing more.
+// nothing more, spelled the way a browser reports it: lowercase, with no
+// default port and no trailing dot.
 func validHandoffOrigin(origin string) bool {
 	parsed, err := url.Parse(origin)
 	if err != nil {
 		return false
 	}
 	return parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil &&
-		origin == parsed.Scheme+"://"+parsed.Host
+		origin == parsed.Scheme+"://"+parsed.Host && origin == strings.ToLower(origin) &&
+		parsed.Port() != "443" && !strings.HasSuffix(parsed.Hostname(), ".")
 }
 
 // uploadSourceFrom names the site a handed-over list was read from,
