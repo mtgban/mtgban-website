@@ -140,6 +140,55 @@ func TestSetCookieHeaders(t *testing.T) {
 	}
 }
 
+func TestSessionCookieHeaders(t *testing.T) {
+	const maxAge = 31 * 24 * time.Hour
+	for _, tc := range []struct {
+		name      string
+		target    string
+		proto     string
+		wantSet   string
+		wantClear string
+	}{
+		{"parent domain", "http://magic.mtgban.com/auth", "https",
+			"BAN_SESSION=id; Path=/; Domain=mtgban.com; Max-Age=2678400; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SESSION=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"bare domain", "http://mtgban.com/auth", "https",
+			"BAN_SESSION=id; Path=/; Domain=mtgban.com; Max-Age=2678400; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SESSION=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"plain http", "http://magic.mtgban.com/auth", "",
+			"BAN_SESSION=id; Path=/; Domain=mtgban.com; Max-Age=2678400; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SESSION=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"untrusted host", "http://raw.example.invalid/auth", "https",
+			"BAN_SESSION=id; Path=/; Max-Age=2678400; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SESSION=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+		{"localhost", "http://localhost:8080/auth", "",
+			"BAN_SESSION=id; Path=/; Max-Age=2678400; HttpOnly; Secure; SameSite=Lax",
+			"BAN_SESSION=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := cookieTestRequest(tc.target, tc.proto)
+
+			recorder := httptest.NewRecorder()
+			setSessionCookie(recorder, req, "id", maxAge)
+			got := recorder.Header().Values("Set-Cookie")
+			if len(got) != 1 || got[0] != tc.wantSet {
+				t.Errorf("set Set-Cookie = %q, want %q", got, tc.wantSet)
+			}
+
+			recorder = httptest.NewRecorder()
+			clearSessionCookie(recorder, req)
+			got = recorder.Header().Values("Set-Cookie")
+			if len(got) != 1 || got[0] != tc.wantClear {
+				t.Errorf("clear Set-Cookie = %q, want %q", got, tc.wantClear)
+			}
+			cleared := recorder.Result().Cookies()
+			if len(cleared) != 1 || cleared[0].Name != sessionCookie || cleared[0].MaxAge != -1 {
+				t.Errorf("clear parsed as %v, want %s with MaxAge -1", cleared, sessionCookie)
+			}
+		})
+	}
+}
+
 func TestBaseTemplatesLoadCookiesOnce(t *testing.T) {
 	for _, path := range []string{"templates/base.html", "templates/mobile/base-mobile.html"} {
 		t.Run(path, func(t *testing.T) {

@@ -1521,6 +1521,44 @@ func cookieDomain(r *http.Request) (domain string, global bool) {
 	return domain, true
 }
 
+// sessionCookie holds only the id of a reader's renewal session. Scripts
+// cannot read it, so a signature that leaks through a script, a link or a
+// log cannot renew itself.
+const sessionCookie = "BAN_SESSION"
+
+// sessionCookieFor is the session cookie holding value for maxAge seconds,
+// on the parent domain so any site may renew. The set and the clear both
+// come from here, since a browser drops a cookie only when name, domain and
+// path all match. Secure always: the sites run over HTTPS, and Chrome and
+// Firefox keep a Secure cookie on http://localhost too; Safari does not,
+// so a local run there needs https or another browser.
+func sessionCookieFor(r *http.Request, value string, maxAge int) *http.Cookie {
+	domain, _ := cookieDomain(r)
+	return &http.Cookie{
+		Name:     sessionCookie,
+		Value:    value,
+		Domain:   domain,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   true,
+		// Lax, so the cookie rides a top-level navigation from a link
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+// setSessionCookie binds the browser to the renewal session sessionID for
+// maxAge, which must be at least a second: a shorter one would write a
+// cookie the browser keeps only until it closes.
+func setSessionCookie(w http.ResponseWriter, r *http.Request, sessionID string, maxAge time.Duration) {
+	http.SetCookie(w, sessionCookieFor(r, sessionID, int(maxAge.Seconds())))
+}
+
+// clearSessionCookie drops the session cookie.
+func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, sessionCookieFor(r, "", -1))
+}
+
 // isSecureRequest reports whether the request reached us over HTTPS,
 // accounting for a TLS-terminating proxy that sets X-Forwarded-Proto.
 func isSecureRequest(r *http.Request) bool {
