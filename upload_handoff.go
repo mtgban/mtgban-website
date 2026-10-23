@@ -51,7 +51,7 @@ func validHandoffOrigin(origin string) bool {
 		origin == parsed.Scheme+"://"+parsed.Host
 }
 
-// uploadSourceFrom names the storefront a handed-over list was read from,
+// uploadSourceFrom names the site a handed-over list was read from,
 // for the results heading, along with the link back to it.
 //
 // The name is derived here rather than sent. The heading is rendered and
@@ -161,7 +161,7 @@ func (s *site) UploadHandoff(w http.ResponseWriter, r *http.Request) {
 	signed := sig != ""
 
 	pageVars := genPageNav(s, r, "Upload", sig)
-	pageVars.Title = "Receiving a card list"
+	pageVars.Title = "Card list handoff"
 	pageVars.HandoffOrigins = slices.Sorted(maps.Keys(handoffOrigins()))
 
 	canUpload, _ := strconv.ParseBool(GetParamFromSig(sig, "Upload"))

@@ -25,7 +25,7 @@ import (
 func TestHandoffNamesItsOrigins(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
-		Title:          "Receiving a card list",
+		Title:          "Card list handoff",
 		HandoffOrigins: []string{"https://www.cardmarket.com"},
 	})
 
@@ -42,7 +42,7 @@ func TestHandoffNamesItsOrigins(t *testing.T) {
 
 // TestHandoffPostsToTheUpload pins that the rows go to the upload handler from
 // this page, which is what makes them carry the session: a request made from
-// the extension's own origin would arrive without the cookie.
+// the sender's own origin would arrive without the cookie.
 func TestHandoffPostsToTheUpload(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
@@ -145,10 +145,9 @@ func TestHandoffOriginsAreBareHTTPS(t *testing.T) {
 // TestHandoffTakesNothingItCannotPrice pins what a reader without the
 // Upload grant is shown, and what is not on the page for them.
 //
-// The form is the part that matters. Gathering a list is minutes of
-// somebody's afternoon on the storefronts this is built for, and a page
-// that took one only to have /upload refuse it at the far end would spend
-// all of that before saying no.
+// The form is the part that matters. Gathering a list can be minutes of
+// somebody's afternoon, and a page that took one only to have /upload
+// refuse it at the far end would spend all of that before saying no.
 func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:        &NavElem{Short: "b"},
@@ -165,7 +164,7 @@ func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
 		t.Error("the page does not say why it is not taking the list")
 	}
 	// The script reads this to decide whether to announce itself at all,
-	// which is what keeps an extension from handing rows to a page that
+	// which is what keeps a sender from handing rows to a page that
 	// cannot do anything with them.
 	if !strings.Contains(page, `data-can-upload="false"`) {
 		t.Error("the page does not tell its own script to stay quiet")
@@ -173,7 +172,7 @@ func TestHandoffTakesNothingItCannotPrice(t *testing.T) {
 }
 
 // The invitation is the point of serving this page signed out at all: it is
-// where somebody arrives who has only ever seen the extension.
+// where somebody arrives who has only ever seen the site that sent them.
 func TestHandoffInvitesAReaderWithNoSignature(t *testing.T) {
 	page := renderPage(t, "upload_handoff.html", false, PageVars{
 		UserNav:      &NavElem{Short: "b"},
