@@ -38,6 +38,22 @@
     font-size: var(--text-md);
     font-variant-numeric: tabular-nums;
 }
+.alerts-sort {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: var(--text-sm);
+}
+.alerts-sort[hidden] { display: none; }
+.alerts-sort .alert-input {
+    width: auto;
+    padding: 0.3em 0.5em;
+    font-size: var(--text-sm);
+}
+/* The sort takes the free space when it is there, the button otherwise. */
+.alerts-sort:not([hidden]) + .alerts-delete-all { margin-left: 0; }
 .alerts-delete-all {
     margin-left: auto;
     align-self: center;

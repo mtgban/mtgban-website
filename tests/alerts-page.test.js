@@ -5,14 +5,28 @@ const source = readFileSync(new URL('../js/alerts.js', import.meta.url), 'utf8')
 
 // Loads js/alerts.js as tests/alerts-channels.test.js does: a stub window
 // and document, so the IIFE registers its listener and exports its helpers.
-function load() {
-    const window = {};
+function load(window = {}) {
     const document = {
         addEventListener: function () {},
         getElementById: function () { return null; },
     };
     new Function('window', 'document', source)(window, document);
     return window.alertsChannels;
+}
+
+function loadSort(window = {}) {
+    load(window);
+    return window.alertsSort;
+}
+
+// memoryStorage is the slice of localStorage the sort reads and writes.
+function memoryStorage() {
+    const items = {};
+    return {
+        items,
+        getItem: k => (k in items ? items[k] : null),
+        setItem: (k, v) => { items[k] = String(v); },
+    };
 }
 
 test('deleteAllPrompt names the count and warns it is final', () => {
@@ -82,4 +96,85 @@ test('referenceUsed only for a percentage threshold', () => {
     expect(h.referenceUsed('abs', 'abs')).toBe(false);
     expect(h.referenceUsed('pct', '')).toBe(true);
     expect(h.referenceUsed('abs', 'pct')).toBe(true);
+});
+
+test('parseSort takes a known field and direction, else the server order', () => {
+    const h = loadSort();
+    expect(h.parseSort('name:asc')).toEqual({ field: 'name', dir: 'asc' });
+    expect(h.parseSort('fired:desc')).toEqual({ field: 'fired', dir: 'desc' });
+    for (const v of [null, '', 'name', 'name:up', 'price:asc', 'name:asc:x']) {
+        expect(h.parseSort(v)).toEqual({ field: 'created', dir: 'desc' });
+    }
+});
+
+test('the sort is saved and read back through localStorage', () => {
+    const storage = memoryStorage();
+    const h = loadSort({ localStorage: storage });
+    expect(h.loadSort()).toEqual({ field: 'created', dir: 'desc' });
+    h.saveSort({ field: 'now', dir: 'asc' });
+    expect(storage.items.alertsSort).toBe('now:asc');
+    expect(h.loadSort()).toEqual({ field: 'now', dir: 'asc' });
+    storage.items.alertsSort = 'bogus';
+    expect(h.loadSort()).toEqual({ field: 'created', dir: 'desc' });
+});
+
+test('the sort falls back to the server order when storage throws', () => {
+    const window = {};
+    Object.defineProperty(window, 'localStorage', { get() { throw new Error('denied'); } });
+    const h = loadSort(window);
+    expect(h.loadSort()).toEqual({ field: 'created', dir: 'desc' });
+    expect(() => h.saveSort({ field: 'name', dir: 'asc' })).not.toThrow();
+    const broken = { getItem() { throw new Error('quota'); }, setItem() { throw new Error('quota'); } };
+    const g = loadSort({ localStorage: broken });
+    expect(g.loadSort()).toEqual({ field: 'created', dir: 'desc' });
+    expect(() => g.saveSort({ field: 'name', dir: 'asc' })).not.toThrow();
+});
+
+test('alertSortData reads the row attributes, empty ones as null', () => {
+    const h = loadSort();
+    const attrs = {
+        'data-id': '7', 'data-name': 'Mox Opal', 'data-side': 'buylist', 'data-status': 'paused',
+        'data-now': '12.50', 'data-created': '1700000000', 'data-fired': '',
+    };
+    const tr = { getAttribute: k => (k in attrs ? attrs[k] : null) };
+    expect(h.alertSortData(tr)).toEqual({
+        id: 7, name: 'Mox Opal', side: 'buylist', status: 'paused',
+        now: 12.5, created: 1700000000, fired: null,
+    });
+});
+
+// The server's order: newest first.
+const ROWS = [
+    { id: 5, name: 'mox opal', side: 'retail', status: 'active', now: 80, created: 500, fired: null },
+    { id: 4, name: 'Black Lotus', side: 'buylist', status: 'unresolvable', now: null, created: 400, fired: 40 },
+    { id: 3, name: 'Card 10', side: 'buylist', status: 'paused', now: 5, created: 300, fired: 90 },
+    { id: 2, name: 'Card 9', side: 'retail', status: 'over_allowance', now: 80, created: 200, fired: null },
+    { id: 1, name: 'Mox Opal', side: 'buylist', status: 'active', now: 0.25, created: 100, fired: 60 },
+];
+
+function ids(h, field, dir) {
+    return h.sortAlerts(ROWS, { field, dir }).map(r => r.id);
+}
+
+test('sortAlerts orders each field both ways, ties in the server order', () => {
+    const h = loadSort();
+    expect(ids(h, 'created', 'desc')).toEqual([5, 4, 3, 2, 1]);
+    expect(ids(h, 'created', 'asc')).toEqual([1, 2, 3, 4, 5]);
+    // Case-blind, numbers by value; the two Mox Opals keep the server order.
+    expect(ids(h, 'name', 'asc')).toEqual([4, 2, 3, 5, 1]);
+    expect(ids(h, 'name', 'desc')).toEqual([5, 1, 3, 2, 4]);
+    expect(ids(h, 'side', 'asc')).toEqual([4, 3, 1, 5, 2]);
+    expect(ids(h, 'side', 'desc')).toEqual([5, 2, 4, 3, 1]);
+    expect(ids(h, 'status', 'asc')).toEqual([5, 1, 3, 2, 4]);
+    expect(ids(h, 'status', 'desc')).toEqual([4, 2, 3, 5, 1]);
+});
+
+test('sortAlerts puts a row with no offer or no firing last either way', () => {
+    const h = loadSort();
+    expect(ids(h, 'now', 'desc')).toEqual([5, 2, 3, 1, 4]);
+    expect(ids(h, 'now', 'asc')).toEqual([1, 3, 5, 2, 4]);
+    expect(ids(h, 'fired', 'desc')).toEqual([3, 1, 4, 5, 2]);
+    expect(ids(h, 'fired', 'asc')).toEqual([4, 1, 3, 5, 2]);
+    // The input is left as it was.
+    expect(ROWS.map(r => r.id)).toEqual([5, 4, 3, 2, 1]);
 });
