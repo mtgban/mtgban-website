@@ -153,14 +153,14 @@ describe('adding', () => {
         expect(e.qty).toBe(1);
     });
 
-    test('the cap refuses the 201st card with a toast', () => {
+    test('the cap refuses the 101st card with a toast', () => {
         const store = [];
-        for (let i = 0; i < 200; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
+        for (let i = 0; i < 100; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store });
         const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
         p.window.toggleBackpack(p.rows[0]);
-        expect(p.stored().filter((e) => !e.del).length).toBe(200);
-        expect(toast.textContent).toBe('Backpack is full (200 cards)');
+        expect(p.stored().filter((e) => !e.del).length).toBe(100);
+        expect(toast.textContent).toBe('Backpack is full (100 cards)');
     });
 
     test('a tier backpack size moves the cap', () => {
@@ -177,7 +177,7 @@ describe('adding', () => {
 
     test('a live card in a full backpack still comes out', () => {
         const store = [];
-        for (let i = 0; i < 200; i++) store.push({ id: i === 0 ? 'uuid-1' : 'c' + i, name: 'c', qty: 1, t: i, m: i });
+        for (let i = 0; i < 100; i++) store.push({ id: i === 0 ? 'uuid-1' : 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store });
         p.window.toggleBackpack(p.rows[0]);
         expect(p.stored().find((e) => e.id === 'uuid-1').del).toBeDefined();
@@ -311,13 +311,13 @@ describe('the panel', () => {
         expect(p.document.activeElement).toBe(p.nav);
     });
 
-    test('a Clear of 120 cards keeps a tombstone for each', () => {
+    test('a Clear of a full backpack keeps a tombstone for each card', () => {
         const store = [];
-        for (let i = 0; i < 120; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
+        for (let i = 0; i < 100; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store });
         open(p);
         ids['backpack-clear'].click();
-        expect(p.stored()).toHaveLength(120);
+        expect(p.stored()).toHaveLength(100);
         expect(p.stored().every((e) => e.del)).toBe(true);
     });
 

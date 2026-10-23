@@ -24,10 +24,10 @@ func userStateIdentity(email string) string {
 // defaultBackpackMax is how many cards the backpack holds where the tier sets
 // no SearchBackpackMax, and maxBackpackMax the most a tier can set: at about
 // 365 bytes a card, that many cards and as many tombstones still fit the
-// userstate sync body's 512 KB beside the other sections.
+// userstate sync body's 1 MB beside the other sections.
 const (
-	defaultBackpackMax = 200
-	maxBackpackMax     = 600
+	defaultBackpackMax = 100
+	maxBackpackMax     = 1000
 )
 
 // backpackMaxFromValues reads SearchBackpackMax off signed ACL values, held
