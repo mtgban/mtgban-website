@@ -356,15 +356,16 @@ func TestLegacySignatureCookieMovesOnlyOnANavigation(t *testing.T) {
 	}
 }
 
-// Logging out drops the signature under both names, whatever the same
-// request's migration just wrote: the last word on each is a clear, with the
-// scope the cookie was set in.
+// Logging out drops the signature under both names and the renewal session,
+// whatever the same request's migration just wrote: the last word on each is
+// a clear, with the scope the cookie was set in.
 func TestLogoutClearsBothSignatureCookies(t *testing.T) {
 	signingEnabled(t, true)
 	valid := signedAs(t, url.Values{"UserEmail": {"a@example.com"}, "UserTier": {"Test"}}, time.Now().Add(time.Hour))
 	const (
-		clearNew = "BAN_SIG=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
-		clearOld = "MTGBAN=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+		clearNew     = "BAN_SIG=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+		clearOld     = "MTGBAN=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+		clearSession = "BAN_SESSION=; Path=/; Domain=mtgban.com; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
 	)
 
 	for name, cookies := range map[string][]*http.Cookie{
@@ -390,11 +391,11 @@ func TestLogoutClearsBothSignatureCookies(t *testing.T) {
 				cookieName, _, _ := strings.Cut(line, "=")
 				last[cookieName] = line
 			}
-			if last["BAN_SIG"] != clearNew || last["MTGBAN"] != clearOld {
-				t.Errorf("last Set-Cookie per name = %q, want %q and %q", last, clearNew, clearOld)
+			if last["BAN_SIG"] != clearNew || last["MTGBAN"] != clearOld || last["BAN_SESSION"] != clearSession {
+				t.Errorf("last Set-Cookie per name = %q, want %q, %q and %q", last, clearNew, clearOld, clearSession)
 			}
-			if cookies == nil && !slices.Equal(rec.Header().Values("Set-Cookie"), []string{clearNew, clearOld}) {
-				t.Errorf("Set-Cookie = %q, want both clears and nothing else", rec.Header().Values("Set-Cookie"))
+			if cookies == nil && !slices.Equal(rec.Header().Values("Set-Cookie"), []string{clearSession, clearNew, clearOld}) {
+				t.Errorf("Set-Cookie = %q, want the three clears and nothing else", rec.Header().Values("Set-Cookie"))
 			}
 		})
 	}
