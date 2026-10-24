@@ -50,11 +50,30 @@ func PatreonGrants() []PatreonGrant {
 // what the others are read with; one failing does not stop the others.
 func loadCommonConfig(ctx context.Context) error {
 	infrastructureErr := loadInfrastructure(ctx)
-	err := Access.Load(ctx, access.Sources{
+	err := loadAccess(ctx, access.Sources{
 		TablePath:  Config().ACLPath,
 		GrantsPath: Config().PatreonGrantsPath,
 	})
 	return errors.Join(infrastructureErr, err, loadAffiliates(ctx), loadDatasets(ctx))
+}
+
+// loadAccess reads the access table and the grant list from their paths. The
+// first load, at startup, has no readers to make stale; the admin's reload
+// after it stamps a changed table and pokes a changed grant's reader as a save
+// does, since a file edited in the bucket itself sends no NOTIFY.
+func loadAccess(ctx context.Context, sources access.Sources) error {
+	before, grantsBefore := ACL(), PatreonGrants()
+	err := Access.Load(ctx, sources)
+	if err != nil {
+		return err
+	}
+	if before != nil {
+		stampACLIfChanged(before)
+	}
+	if grantsBefore != nil {
+		pokeGrantees(grantsBefore, PatreonGrants())
+	}
+	return nil
 }
 
 // infrastructurePtr holds the infrastructure_path file as last read or
@@ -372,10 +391,14 @@ func saveDatasets(ctx context.Context, value []DatasetConfig) error {
 // that changed.
 
 func saveGrants(ctx context.Context, grants []PatreonGrant) error {
+	before := PatreonGrants()
 	err := Access.SaveGrants(ctx, grants)
 	if err != nil {
 		return err
 	}
+	// The saver skips its own NOTIFY, so on this site the save is what sees
+	// the edit
+	pokeGrantees(before, grants)
 	if Config().PatreonGrantsPath != "" {
 		notifyAccessReload(ctx, grantsReloadChannel)
 	}
@@ -383,10 +406,14 @@ func saveGrants(ctx context.Context, grants []PatreonGrant) error {
 }
 
 func saveACL(ctx context.Context, table access.Table) error {
+	before := ACL()
 	err := Access.SaveTable(ctx, table)
 	if err != nil {
 		return err
 	}
+	// The saver skips its own NOTIFY, so on this site the save is what sees
+	// the edit
+	stampACLIfChanged(before)
 	if Config().ACLPath != "" {
 		notifyAccessReload(ctx, aclReloadChannel)
 	}

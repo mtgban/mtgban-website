@@ -124,3 +124,85 @@ func TestPokeSetIsSafeToShare(t *testing.T) {
 		t.Errorf("%d entries after eight readers poked, want 8", len(pokes.at))
 	}
 }
+
+// A reader's signature wants renewing when it was issued before the reader's
+// poke, or before the access table changed, and says which asked.
+func TestPokeSetWantsAStaleOrPokedReader(t *testing.T) {
+	renewalConfig(t, renewalBlock, "client-id")
+	hash := userstate.HashEmail("reader@example.com")
+	stamp := time.Now().Add(-day).Truncate(time.Second)
+
+	pokes := newPokeSet()
+	if pokes.wants(hash, time.Now().Add(-100*day)) != "" {
+		t.Error("a reader nobody poked wants renewing with no stamp set")
+	}
+
+	pokes.stampACL(stamp)
+	for _, tc := range []struct {
+		name   string
+		issued time.Time
+		want   string
+	}{
+		{"issued before the stamp", stamp.Add(-time.Hour), "acl"},
+		{"issued a nanosecond before the stamp", stamp.Add(-time.Nanosecond), "acl"},
+		{"issued at the stamp", stamp, ""},
+		{"issued after the stamp", stamp.Add(time.Hour), ""},
+		{"minted just now", time.Now(), ""},
+		{"issued long before the stamp", stamp.Add(-30 * day), "acl"},
+	} {
+		got := pokes.wants(hash, tc.issued)
+		if got != tc.want {
+			t.Errorf("%s: wants %q, want %q", tc.name, got, tc.want)
+		}
+	}
+
+	// A poke asks for its reader's signatures issued before it, and is the
+	// cause named when the stamp asks for them too
+	pokes.poke(hash)
+	if pokes.wants(hash, time.Now().Add(-time.Minute)) != "poke" || pokes.wants(hash, stamp.Add(-time.Hour)) != "poke" {
+		t.Error("a poke does not ask for the reader's signatures issued before it")
+	}
+	if pokes.wants(hash, time.Now().Add(time.Minute)) != "" || pokes.wants(userstate.HashEmail("other@example.com"), stamp.Add(time.Hour)) != "" {
+		t.Error("a poke asks for a signature issued after it, or for another reader's")
+	}
+	if pokes.wants(userstate.HashEmail("other@example.com"), stamp.Add(-time.Hour)) != "acl" {
+		t.Error("the stamp stopped asking for another reader's old signature")
+	}
+}
+
+// The stamp does not age out: a signature issued before it is stale however
+// old it is, and the next stamp replaces the last.
+func TestPokeSetStampDoesNotAge(t *testing.T) {
+	renewalConfig(t, renewalBlock, "client-id")
+	hash := userstate.HashEmail("reader@example.com")
+	pokes := newPokeSet()
+
+	pokes.stampACL(time.Now().Add(-100 * day))
+	if pokes.wants(hash, time.Now().Add(-101*day)) != "acl" || pokes.wants(hash, time.Now().Add(-99*day)) != "" {
+		t.Error("a stamp of 100 days ago does not ask for exactly the signatures issued before it")
+	}
+
+	later := time.Now().Add(-time.Hour).Truncate(time.Second)
+	pokes.stampACL(later)
+	if pokes.wants(hash, later.Add(-time.Minute)) != "acl" || pokes.wants(hash, later.Add(time.Minute)) != "" {
+		t.Error("the next stamp does not replace the last")
+	}
+
+	// A poke sweeps lapsed pokes and leaves the stamp
+	pokes.poke(userstate.HashEmail("other@example.com"))
+	if pokes.wants(hash, later.Add(-time.Minute)) != "acl" {
+		t.Error("a poke cleared the stamp")
+	}
+}
+
+// With renewal off there is no age window, but the stamp is what it was: it
+// has no window of its own.
+func TestPokeSetStampNeedsNoWindow(t *testing.T) {
+	renewalConfig(t, infrastructure.PatreonRenewal{GraceDays: 3}, "client-id")
+	pokes := newPokeSet()
+	pokes.stampACL(time.Now())
+
+	if pokes.wants(userstate.HashEmail("reader@example.com"), time.Now().Add(-day)) != "acl" {
+		t.Error("the stamp does not ask for an older signature without after_days")
+	}
+}

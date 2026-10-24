@@ -123,8 +123,17 @@ without the reader.
   falls back to the age window; a poke that meets Patreon's silence stays,
   and is tried again once the hour's backoff is up.
 - A tier change, and an ACL or grant edit, reach an active reader at
-  the next renewal, or at once through **Refresh now** on the account
-  page.
+  the next page load, not the next renewal. The webhook pokes the
+  tier change; a grant edit pokes its grantee; an access table that
+  differs from the one it replaces, saved here, reloaded after a peer's
+  save or by the admin's config reload, stamps the poke set, and every
+  signature issued before the stamp renews on its next request, since
+  its page flags were baked in from the old table. A start or a deploy
+  stamps nothing, and neither does a reload that finds the same table,
+  as the listener's does after every reconnect. After an ACL edit every
+  active reader costs one Patreon round trip, spread over the days they
+  come back and serialised per email by the lease. **Refresh now** on
+  the account page does the same on demand.
 - A renewal on one device renews the token every device's row holds,
   under the email's lease, so no row is left with the token Patreon just
   rotated away. The renewal lease and commit are therefore per email,

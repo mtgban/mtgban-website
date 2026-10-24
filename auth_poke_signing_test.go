@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"html"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -114,10 +117,10 @@ func TestSigningPokeRenewsWhateverTheSignatureHasLeft(t *testing.T) {
 	rig.wantRenewed(rig.serve(rig.request(http.MethodGet, "/data/prices/x", browser(old, session)...), true), old, session)
 }
 
-// A poke lifts the age check and nothing else: where the signature or its
-// session could not renew on age, they cannot on a poke, nothing is set, and
-// the poke waits for a request that can.
-func TestSigningPokeCannotRenewWhatAgeCannot(t *testing.T) {
+// A poke or a stamp lifts the age check and nothing else: where the signature
+// or its session could not renew on age, they cannot on either, nothing is set,
+// and a poke waits for a request that can.
+func TestSigningPokeAndStampCannotRenewWhatAgeCannot(t *testing.T) {
 	young := 1 * day
 	readers := func(rig *renewalRig, age time.Duration) string { return rig.sig("Legacy", age) }
 	invite := func(_ *renewalRig, age time.Duration) string {
@@ -135,41 +138,47 @@ func TestSigningPokeCannotRenewWhatAgeCannot(t *testing.T) {
 		{"a signature past the end of grace_days", 14*day + time.Hour, readers, true, false},
 		{"an invite, which names nobody", young, invite, true, false},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			rig := newRenewalRig(t, renewalBlock)
-			pokes := freshPokes(t)
-			session := rig.session("")
-			pokes.poke(rig.hash)
-			// An invite names no reader, so nothing legitimate pokes it; this is
-			// what a hash of no email would be
-			pokes.poke(userstate.HashEmail(""))
-			sig := tc.sig(rig, tc.age)
+		for _, lift := range []string{"a poke", "a stamp"} {
+			t.Run(lift+", "+tc.name, func(t *testing.T) {
+				rig := newRenewalRig(t, renewalBlock)
+				pokes := freshPokes(t)
+				session := rig.session("")
+				if lift == "a poke" {
+					pokes.poke(rig.hash)
+					// A hash of no email is what an invite would be poked by; nothing
+					// legitimate pokes it
+					pokes.poke(userstate.HashEmail(""))
+				} else {
+					pokes.stampACL(time.Now())
+				}
+				sig := tc.sig(rig, tc.age)
 
-			cookies := browser(sig, "")
-			if tc.session {
-				cookies = browser(sig, session)
-			}
-			target := "/limited"
-			if tc.query {
-				target += "?sig=" + url.QueryEscape(sig)
-				cookies = browser("", session)
-			}
-			got := rig.serve(rig.request(http.MethodGet, target, cookies...), false)
+				cookies := browser(sig, "")
+				if tc.session {
+					cookies = browser(sig, session)
+				}
+				target := "/limited"
+				if tc.query {
+					target += "?sig=" + url.QueryEscape(sig)
+					cookies = browser("", session)
+				}
+				got := rig.serve(rig.request(http.MethodGet, target, cookies...), false)
 
-			if rig.stub.calls() != 0 {
-				t.Errorf("%d refreshes, want none", rig.stub.calls())
-			}
-			if setCookies(got.rec)[sessionCookie] != nil {
-				t.Errorf("Set-Cookie %q, want the session cookie left alone", got.rec.Header().Values("Set-Cookie"))
-			}
-			if !pokes.poked(rig.hash) {
-				t.Error("the poke was spent on a request that renewed nothing")
-			}
-			rows := rig.rows()
-			if len(rows) != 1 || rows[0].token != "refresh-0" || rig.restingFor(session) > 0 {
-				t.Errorf("rows %+v, want the session untouched", rows)
-			}
-		})
+				if rig.stub.calls() != 0 {
+					t.Errorf("%d refreshes, want none", rig.stub.calls())
+				}
+				if setCookies(got.rec)[sessionCookie] != nil {
+					t.Errorf("Set-Cookie %q, want the session cookie left alone", got.rec.Header().Values("Set-Cookie"))
+				}
+				if lift == "a poke" && !pokes.poked(rig.hash) {
+					t.Error("the poke was spent on a request that renewed nothing")
+				}
+				rows := rig.rows()
+				if len(rows) != 1 || rows[0].token != "refresh-0" || rig.restingFor(session) > 0 {
+					t.Errorf("rows %+v, want the session untouched", rows)
+				}
+			})
+		}
 	}
 }
 
@@ -372,5 +381,235 @@ func TestRefreshNowAnswersAPoke(t *testing.T) {
 	rig.wantUntouched(rig.page(browser(fresh.Value, session)...), fresh.Value)
 	if rig.stub.calls() != 1 || !pokes.poked(rig.hash) {
 		t.Errorf("%d refreshes for the refreshed signature, poked %v; want still 1 and the poke kept", rig.stub.calls(), pokes.poked(rig.hash))
+	}
+}
+
+// An edit of the access table reaches a reader on their next request: the
+// signature, young as it is, is renewed from the table as it is now, the page
+// flag the edit turned on comes with it, and the renewed signature, issued
+// after the edit, is left alone.
+func TestSigningRenewsAfterAnACLEdit(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	freshPokes(t)
+	files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[]`)
+	session := rig.session("")
+	young := rig.sig("Legacy", 1*day)
+	if GetParamFromSig(young, "Upload") != "" {
+		t.Fatal("the signature was minted with the flag the edit is to turn on")
+	}
+
+	// Nothing edited
+	rig.wantUntouched(rig.page(browser(young, session)...), young)
+
+	files.set("acl", `{"Legacy":{"Search":{},"Upload":{}}}`)
+	err := reloadACL(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := rig.page(browser(young, session)...)
+	fresh := rig.wantRenewed(got, young, session)
+	if GetParamFromSig(got.sig, "Upload") != "true" || GetParamFromSig(fresh, "Upload") != "true" {
+		t.Errorf("the page was served with Upload %q and the cookie got %q, want the flag the edit turned on", GetParamFromSig(got.sig, "Upload"), GetParamFromSig(fresh, "Upload"))
+	}
+	if !strings.Contains(rig.logged.String(), "cause=acl verdict=entitled") {
+		t.Errorf("admin log %q does not tell the cause", rig.logged.String())
+	}
+
+	rig.wantUntouched(rig.page(browser(fresh, session)...), fresh)
+	if rig.stub.calls() != 1 {
+		t.Errorf("%d refreshes, want 1 for the edit", rig.stub.calls())
+	}
+}
+
+// The stamp asks for the signatures issued before it and no others, however
+// young or old they are, and an age that is due renews for its age.
+func TestSigningStampRenewsOnlyWhatWasIssuedBeforeIt(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		age   time.Duration
+		cause string // none when the signature is left alone
+	}{
+		{"issued after the edit", 1 * day, ""},
+		{"issued a minute after the edit", 2*day - time.Minute, ""},
+		{"issued a minute before the edit", 2*day + time.Minute, "acl"},
+		{"issued a week before the edit", 7 * day, "acl"},
+		{"due for its age as well", 9 * day, "due"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			session := rig.session("")
+			old := rig.sig("Legacy", tc.age)
+			pokes.stampACL(time.Now().Add(-2 * day))
+
+			got := rig.page(browser(old, session)...)
+			if tc.cause == "" {
+				rig.wantUntouched(got, old)
+				if rig.stub.calls() != 0 || rig.restingFor(session) > 0 {
+					t.Errorf("%d refreshes, session resting %.0fs; want none and a session left alone", rig.stub.calls(), rig.restingFor(session))
+				}
+				return
+			}
+			rig.wantRenewed(got, old, session)
+			if !strings.Contains(rig.logged.String(), "cause="+tc.cause+" verdict=entitled") {
+				t.Errorf("admin log %q, want cause=%s", rig.logged.String(), tc.cause)
+			}
+		})
+	}
+}
+
+// While Patreon gives no answer the sessions rest an hour, and the requests
+// inside the hour cost Patreon nothing, edit or no edit.
+func TestSigningStampWithPatreonDownRestsTheSessions(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	pokes := freshPokes(t)
+	rig.stub.token = &stubAnswer{http.StatusInternalServerError, `{"errors":[{"title":"boom"}]}`}
+	session := rig.session("")
+	young := rig.sig("Legacy", 1*day)
+	pokes.stampACL(time.Now())
+
+	rig.wantUntouched(rig.page(browser(young, session)...), young)
+	wait := rig.restingFor(session)
+	if wait < 59*60 || wait > 61*60 {
+		t.Errorf("sessions rest %.0fs, want an hour", wait)
+	}
+	for range 3 {
+		rig.wantUntouched(rig.page(browser(young, session)...), young)
+	}
+	if rig.stub.calls() != 1 {
+		t.Errorf("%d refreshes inside the backoff, want the 1 that found Patreon down", rig.stub.calls())
+	}
+}
+
+// A grant edit reaches the grantee on their next request, whichever way the
+// site came to know of it, and their neighbours are left alone: the tier and
+// the flags come from the grant as it is now.
+func TestSigningRenewsAGrantedReaderWhoseGrantChanged(t *testing.T) {
+	for _, via := range []string{"a reload", "a save"} {
+		t.Run(via, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			rig.stub.membership = false
+			grants := func(tier string) string {
+				return `[` + grantFor(rig.user.Email, tier) + `,` + grantFor("neighbour@example.com", "Legacy") + `]`
+			}
+			files := loadAccessFiles(t, `{"Legacy":{"Search":{}},"Vintage":{"Search":{},"Upload":{}}}`, grants("Legacy"))
+			session := rig.session("")
+			young := rig.sig("Legacy", 1*day)
+			rig.wantUntouched(rig.page(browser(young, session)...), young)
+
+			var err error
+			if via == "a reload" {
+				files.set("grants", grants("Vintage"))
+				err = reloadGrants(t.Context())
+			} else {
+				edited := slices.Clone(PatreonGrants())
+				edited[0].Tier = "Vintage"
+				err = saveGrants(t.Context(), edited)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(pokes.at) != 1 || !pokes.poked(rig.hash) {
+				t.Fatalf("poke set %v, want only the grantee", pokes.at)
+			}
+
+			got := rig.page(browser(young, session)...)
+			fresh := rig.wantRenewed(got, young, session)
+			if GetParamFromSig(fresh, "UserTier") != "Vintage" || GetParamFromSig(fresh, "Upload") != "true" || GetParamFromSig(got.sig, "UserTier") != "Vintage" {
+				t.Errorf("renewed at %q with Upload %q, want the grant's Vintage tier and its flags", GetParamFromSig(fresh, "UserTier"), GetParamFromSig(fresh, "Upload"))
+			}
+			if !strings.Contains(rig.logged.String(), "cause=poke verdict=entitled") {
+				t.Errorf("admin log %q does not tell the cause", rig.logged.String())
+			}
+			if rig.stub.memberCalls != 0 {
+				t.Errorf("%d membership calls for a grant, want none", rig.stub.memberCalls)
+			}
+		})
+	}
+}
+
+// Each renewal says in its line what asked for it, whatever Patreon answered.
+func TestRenewalLogsWhatAskedForIt(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		age     time.Duration
+		poke    bool
+		stamp   bool
+		refresh bool
+		stub    func(*patreonStub)
+		want    string // cause=… verdict=…
+	}{
+		{"an age that is due", 9 * day, false, false, false, nil, "cause=due verdict=entitled"},
+		{"a signature that ran out within grace", 11*day + 2*time.Hour, false, false, false, nil, "cause=grace verdict=entitled"},
+		{"a poke", 1 * day, true, false, false, nil, "cause=poke verdict=entitled"},
+		{"an edit of the access table", 3 * day, false, true, false, nil, "cause=acl verdict=entitled"},
+		{"a poke and an edit", 3 * day, true, true, false, nil, "cause=poke verdict=entitled"},
+		{"a poke and an age that is due", 9 * day, true, false, false, nil, "cause=due verdict=entitled"},
+		{"Refresh now", 1 * day, false, false, true, nil, "cause=refresh verdict=entitled"},
+		{"a poke Patreon does not answer", 1 * day, true, false, false, func(p *patreonStub) { p.token = &stubAnswer{500, `{}`} }, "cause=poke verdict=unknown"},
+		{"an edit when nothing is pledged", 3 * day, false, true, false, func(p *patreonStub) { p.title = "" }, "cause=acl verdict=not entitled"},
+		{"a poke with a refresh token Patreon refuses", 1 * day, true, false, false, func(p *patreonStub) { p.token = &stubAnswer{401, `{"error":"invalid_grant"}`} }, "cause=poke verdict=invalid_grant"},
+		{"Refresh now when nothing is pledged", 1 * day, false, false, true, func(p *patreonStub) { p.title = "" }, "cause=refresh verdict=not entitled"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			if tc.stub != nil {
+				tc.stub(rig.stub)
+			}
+			session := rig.session("")
+			old := rig.sig("Legacy", tc.age)
+			if tc.poke {
+				pokes.poke(rig.hash)
+			}
+			if tc.stamp {
+				pokes.stampACL(time.Now().Add(-2 * day))
+			}
+
+			if tc.refresh {
+				rig.account("refresh", browser(old, session)...)
+			} else {
+				rig.page(browser(old, session)...)
+			}
+			var renewals []string
+			for _, line := range strings.Split(rig.logged.String(), "\n") {
+				if strings.HasPrefix(line, "renew: ") {
+					renewals = append(renewals, line)
+				}
+			}
+			if len(renewals) != 1 || !strings.Contains(renewals[0], tc.want) {
+				t.Errorf("admin log %q, want one renew line with %q", rig.logged.String(), tc.want)
+			}
+		})
+	}
+}
+
+// The line that says a reader's email moved carries the cause as well, so
+// every line of a renewal does.
+func TestRenewalLogsWhatAskedForItWhenTheEmailMoved(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	pokes := freshPokes(t)
+	rig.stub.email = fmt.Sprintf("moved-%d@example.com", time.Now().UnixNano())
+	t.Cleanup(func() {
+		// t.Context() is already canceled when a cleanup runs
+		_, err := rig.db.DeletePatreonSessions(context.Background(), userstate.HashEmail(rig.stub.email))
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	session := rig.session("")
+	pokes.poke(rig.hash)
+
+	rig.page(browser(rig.sig("Legacy", 1*day), session)...)
+	var renewals []string
+	for _, line := range strings.Split(rig.logged.String(), "\n") {
+		if strings.HasPrefix(line, "renew: ") {
+			renewals = append(renewals, line)
+		}
+	}
+	if len(renewals) != 2 || !strings.Contains(renewals[0], "cause=poke email changed from") || !strings.Contains(renewals[1], "cause=poke verdict=entitled") {
+		t.Errorf("renew lines %q, want the move and the verdict each with cause=poke", renewals)
 	}
 }

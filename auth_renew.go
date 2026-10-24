@@ -82,32 +82,44 @@ func graceSignature(r *http.Request, sig, querySig string) url.Values {
 }
 
 // renewDue renews the signature of the request signing is serving when
-// decideRenewal says it is due, or when its reader was poked after it was
-// issued and decideRenewal skipped it for its age alone, and reports what the
+// decideRenewal says it is due, or when it is stale in a way only the site
+// knows (its reader was poked, or the access table changed after it was
+// issued) and decideRenewal skipped it for its age alone, and reports what the
 // request goes on with: the new signature, or refused when the reader's pledge
-// is gone and they are logged out. values and signed are the cookie's signature as signing read
-// it, expired or not, and whether this host wrote it; cookieBorne says it
-// came from the cookie, not ?sig=.
+// is gone and they are logged out. values and signed are the cookie's
+// signature as signing read it, expired or not, and whether this host wrote it;
+// cookieBorne says it came from the cookie, not ?sig=.
 func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Values, signed, cookieBorne bool) (sig string, refused bool) {
 	expires, _ := strconv.ParseInt(values.Get("Expires"), 10, 64)
 	ends := time.Unix(expires, 0)
 	now := time.Now()
 	hasSession := readCookie(r, sessionCookie) != ""
 	cfg := Infrastructure().PatreonRenewal
-	if decideRenewal(signed, ends, now, cookieBorne, hasSession, cfg) == renewalSkip {
-		// A poke lifts the age check and nothing else: the signature is still
-		// this host's, in the cookie, naming a reader beside their session, and
-		// not past the end of grace
+
+	var cause string
+	switch decideRenewal(signed, ends, now, cookieBorne, hasSession, cfg) {
+	case renewalDue:
+		cause = "due"
+	case renewalGrace:
+		cause = "grace"
+	default:
+		// A poke or a stamp lifts the age check and nothing else: the signature
+		// is still this host's, in the cookie, naming a reader beside their
+		// session, and not past the end of grace
 		email := values.Get("UserEmail")
 		eligible := signed && cookieBorne && hasSession && email != "" && cfg.AfterDays > 0 && now.Sub(ends) <= cfg.Grace()
-		if !eligible || Pokes.wants(userstate.HashEmail(email), ends.Add(-DefaultSignatureDuration)) == "" {
+		if !eligible {
+			return "", false
+		}
+		cause = Pokes.wants(userstate.HashEmail(email), ends.Add(-DefaultSignatureDuration))
+		if cause == "" {
 			return "", false
 		}
 	}
 	if !renewalEnabled() {
 		return "", false
 	}
-	return s.renewSignature(w, r, values, 0)
+	return s.renewSignature(w, r, values, 0, cause)
 }
 
 // The waits of a renewal: how long it holds the sessions of an email, how
@@ -124,6 +136,7 @@ const (
 // renewal is one attempt to renew a reader's signature, and the line the
 // admin log tells it by. It holds no token.
 type renewal struct {
+	cause   string // what asked for it: due, grace, poke, acl or refresh
 	session string // the BAN_SESSION value
 	email   string
 	hash    string // userstate.HashEmail(email)
@@ -134,12 +147,12 @@ type renewal struct {
 	started time.Time
 }
 
-// log writes the attempt's line: who, how old their signature is, what
-// Patreon said, and how long it took. The session is cut short, enough to
-// tell attempts apart and no use to anyone holding the log.
+// log writes the attempt's line: who, how old their signature is, what asked
+// for the renewal, what Patreon said, and how long it took. The session is cut
+// short, enough to tell attempts apart and no use to anyone holding the log.
 func (rn *renewal) log(verdict string, cause error) {
-	LogPages["Admin"].Printf("renew: session=%.8s email=%q age=%.1fd verdict=%s err=%v elapsed=%s",
-		rn.session, rn.email, rn.age.Hours()/24, verdict, cause, time.Since(rn.started).Round(time.Millisecond))
+	LogPages["Admin"].Printf("renew: session=%.8s email=%q age=%.1fd cause=%s verdict=%s err=%v elapsed=%s",
+		rn.session, rn.email, rn.age.Hours()/24, rn.cause, verdict, cause, time.Since(rn.started).Round(time.Millisecond))
 }
 
 // lease claims the email's sessions for this renewal and returns the refresh
@@ -227,7 +240,7 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 		rn.log("unknown", fmt.Errorf("rekey: %w", err))
 		return false
 	}
-	LogPages["Admin"].Printf("renew: session=%.8s email changed from %q to %q", rn.session, rn.email, user.Email)
+	LogPages["Admin"].Printf("renew: session=%.8s cause=%s email changed from %q to %q", rn.session, rn.cause, rn.email, user.Email)
 	return true
 }
 
@@ -247,9 +260,10 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 // Patreon may already have rotated. rest is how long the email's sessions
 // rest once the renewal commits: zero for a due renewal, whose new signature
 // is not due again for after_days; Refresh now rests them, so a reader cannot
-// press Patreon per request.
-func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url.Values, rest time.Duration) (sig string, refused bool) {
+// press Patreon per request. cause is what asked for the renewal, for the log.
+func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url.Values, rest time.Duration, cause string) (sig string, refused bool) {
 	rn := renewal{
+		cause:   cause,
 		session: readCookie(r, sessionCookie),
 		email:   values.Get("UserEmail"),
 		tier:    values.Get("UserTier"),
