@@ -299,7 +299,7 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 	switch r.PostFormValue("action") {
 	case "refresh":
 		if email != "" && renewalEnabled() {
-			s.renewSignature(w, r, values, renewalRefreshRest)
+			s.renewSignature(w, r, values, renewalRefreshRest, "refresh")
 		}
 		http.Redirect(w, r, "/user", http.StatusSeeOther)
 	case "logout-everywhere":

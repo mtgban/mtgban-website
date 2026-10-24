@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+
+	"github.com/mtgban/mtgban-website/internal/access"
+	"github.com/mtgban/mtgban-website/userstate"
 )
 
 // Deployments that split the access table, the grant list, the affiliate
@@ -61,6 +64,48 @@ func notifyPoke(ctx context.Context, hash string) {
 	}
 }
 
+// reloadACL re-reads the access table. A table that differs from the one it
+// replaces stamps the poke set, so every signature issued before now renews on
+// its next request; one that does not, as when the listener reconnects and
+// re-reads every value, stamps nothing.
+func reloadACL(ctx context.Context) error {
+	before := ACL()
+	err := Access.ReloadTable(ctx)
+	if err != nil {
+		return err
+	}
+	stampACLIfChanged(before)
+	return nil
+}
+
+// stampACLIfChanged stamps the poke set when the live access table is not
+// before, the one it replaced.
+func stampACLIfChanged(before access.Table) {
+	if !before.Equal(ACL()) {
+		Pokes.stampACL(time.Now())
+	}
+}
+
+// reloadGrants re-reads the grant list and pokes the grantees whose grant
+// changed.
+func reloadGrants(ctx context.Context) error {
+	before := PatreonGrants()
+	err := Access.ReloadGrants(ctx)
+	if err != nil {
+		return err
+	}
+	pokeGrantees(before, PatreonGrants())
+	return nil
+}
+
+// pokeGrantees pokes each reader whose grant differs between before and after,
+// so their next request renews onto the tier and overrides it now gives.
+func pokeGrantees(before, after []PatreonGrant) {
+	for _, email := range access.GrantsChanged(before, after) {
+		Pokes.poke(userstate.HashEmail(email))
+	}
+}
+
 // skipAccessNotification reports whether a notification needs no reload:
 // only the sender's own, and only when instance names can actually tell the
 // deployments apart. A nil notification is lib/pq reporting a reconnect -
@@ -98,10 +143,10 @@ func startAccessReloadListener() {
 	}
 	reloads := map[string]func(context.Context) error{}
 	if Config().ACLPath != "" {
-		reloads[aclReloadChannel] = Access.ReloadTable
+		reloads[aclReloadChannel] = reloadACL
 	}
 	if Config().PatreonGrantsPath != "" {
-		reloads[grantsReloadChannel] = Access.ReloadGrants
+		reloads[grantsReloadChannel] = reloadGrants
 	}
 	if Config().AffiliatesPath != "" {
 		reloads[affiliatesReloadChannel] = loadAffiliates

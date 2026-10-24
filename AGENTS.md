@@ -151,7 +151,7 @@ output, not a claim written here.
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
 | `auth_renew.go` | Renewing a signature from its Patreon session inside the signing middleware: `decideRenewal`, the poke that lifts its age check, the lease-refresh-commit sequence, `renewalEnabled` (`docs/adr/0008-patreon-session-renewal.md`) |
-| `auth_poke.go` | The set of readers whose next request renews whatever their signature's age (`Pokes`): an in-memory map of email hashes, filled on every site by the `patreon_poke` NOTIFY (`access_notify.go`) (`docs/adr/0008-patreon-session-renewal.md`) |
+| `auth_poke.go` | The set of readers whose next request renews whatever their signature's age (`Pokes`): an in-memory map of email hashes, filled on every site by the `patreon_poke` NOTIFY (`access_notify.go`) and by grant edits, plus the moment the access table last changed, which asks the same of every signature issued before it (`docs/adr/0008-patreon-session-renewal.md`) |
 | `auth_webhook.go` | Patreon's member webhook (`POST /webhook/patreon`): checks the HMAC-MD5 signature of the raw body, reads the member's email and pokes it here and, through `patreon_poke`, on every other site (`docs/adr/0008-patreon-session-renewal.md`) |
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
@@ -167,7 +167,7 @@ output, not a claim written here.
 | `user.go`, `discord_users.go` | The Account page (`/user`): the reader's tier, email and Discord link, their personal feature links, and the tier table built from the ACL; the bot lookup that names a Discord id, cached |
 | `api*.go` | Price API, batch prices, chart/suggest/userstate APIs, the upload share link (api_upload_share.go), CSV exports |
 | `admin.go`, `admin_searches.go`, `admin_alerts.go`, `discord.go` | Admin panel + commands, with the Searches tab's vote ranking and the Alerts tab's view of the alerts table each in its own file; Discord bot |
-| `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them; per-bucket B2 keys |
+| `common.go`, `access_notify.go`, `buckets.go` | The access table, grants and affiliates shared across deployments and the Postgres NOTIFY that reloads them (a changed table or grant list, saved or reloaded, stamps or pokes the readers it makes stale); per-bucket B2 keys |
 | `overrides.go`, `session_store.go` | Admin fixes: per-store uuid remaps, and stores published from an upload |
 | `jobs.go`, `staleness.go`, `recover.go`, `telemetry.go` | Background-job registry and health, the cron schedule (`startCrons`), the stale-data alarm, panic recovery and reporting, page-visit recording |
 | `upload_handoff.go`, `tcgcsv_service.go` | The page other sites hand a card list to; the tcgcsv ingest wired into the site |

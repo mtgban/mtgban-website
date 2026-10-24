@@ -417,7 +417,9 @@ email Patreon's webhook poked (`POST /webhook/patreon`, §4) renews on their nex
 request whatever the signature's age, but not past `grace_days`: the poke is
 kept in memory on every site, a `patreon_poke` NOTIFY carries it to the peers,
 a signature issued after it is left alone, so each of the reader's devices
-renews once, and it lapses after `after_days`. The Account
+renews once, and it lapses after `after_days`. An edit of the
+access table or of a grant renews its readers the same way (§3.3). Each renewal
+logs `cause=due|grace|poke|acl|refresh` beside its verdict. The Account
 page (`user.go`) POSTs two actions to itself, each ending in a redirect:
 Refresh now runs the same renewal without the age check, and Log out
 everywhere deletes every session of the signature cookie's email and clears
@@ -442,6 +444,19 @@ inside the signature. Tiers follow Magic format names, but only four exist
 internally: Pioneer → Modern → Legacy → Vintage (longer chart lookback, more
 stores, higher limits) — there is no separate `Standard` tier; Patreon's own
 "Standard" membership is bucketed into `Pioneer` by `Auth()`.
+
+The page flags of a signature are baked in from the table when it is minted,
+so an edit reaches nobody until their signature is. A save (`saveACL`), or a
+reload after a peer's (`reloadACL`), that leaves a table different from the one
+it replaces stamps the poke set (`Pokes.stampACL`), and `renewDue` renews every
+cookie-borne signature issued before the stamp on its next request, within the
+same limits as a poke. A grant edit (`saveGrants`, `reloadGrants`) pokes each
+grantee whose tier or overrides changed (`access.GrantsChanged`); their name and
+category are admin labels no signature carries. The admin's config reload
+(`loadAccess`) stamps and pokes the same way, since a file edited in the bucket
+itself sends no NOTIFY. The startup load and a reload that finds the same table
+stamp nothing: a deploy restarts nine sites, and the listener re-reads every
+value after each reconnect.
 
 ### 3.4 Middleware tiers (auth.go)
 

@@ -16,6 +16,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -36,6 +39,60 @@ type Grant struct {
 
 // Table is the tier -> feature -> option access table.
 type Table map[string]map[string]map[string]string
+
+// Equal reports whether t and other give the same options to the same pages of
+// the same tiers. A nil table and an empty one are equal.
+func (t Table) Equal(other Table) bool {
+	return maps.EqualFunc(t, other, equalFeatures)
+}
+
+// equalFeatures compares two feature -> option -> value maps: one tier's slice
+// of a Table, or a grant's Overrides.
+func equalFeatures(a, b map[string]map[string]string) bool {
+	return maps.EqualFunc(a, b, maps.Equal)
+}
+
+// GrantsChanged returns the emails whose grant differs between before and
+// after, sorted: one added, one removed, or one whose Tier or Overrides
+// changed, which is all a signature carries of a grant. Name and Category are
+// labels for the admin page, so a change to them reports nothing, and neither
+// does the order of the list. An email is compared lowercased and trimmed, and
+// its first grant decides, as when a reader's grant is looked up.
+func GrantsChanged(before, after []Grant) []string {
+	was, now := grantsByEmail(before), grantsByEmail(after)
+	var emails []string
+	for email, grant := range was {
+		next, found := now[email]
+		if !found || grant.Tier != next.Tier || !equalFeatures(grant.Overrides, next.Overrides) {
+			emails = append(emails, email)
+		}
+	}
+	for email := range now {
+		_, found := was[email]
+		if !found {
+			emails = append(emails, email)
+		}
+	}
+	slices.Sort(emails)
+	return emails
+}
+
+// grantsByEmail keys the grants that name somebody by their lowercased,
+// trimmed email, the first of an email winning.
+func grantsByEmail(grants []Grant) map[string]Grant {
+	byEmail := make(map[string]Grant, len(grants))
+	for _, grant := range grants {
+		email := strings.ToLower(strings.TrimSpace(grant.Email))
+		if email == "" {
+			continue
+		}
+		_, found := byEmail[email]
+		if !found {
+			byEmail[email] = grant
+		}
+	}
+	return byEmail
+}
 
 // Hooks is the deployment-owned half: how a path reaches its backend.
 // Credentials live with the caller.
