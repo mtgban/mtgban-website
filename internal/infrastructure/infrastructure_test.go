@@ -169,3 +169,53 @@ func TestOverPatreonRenewalReplacesTheWholeBlock(t *testing.T) {
 		t.Errorf("block %+v, want the file's", got)
 	}
 }
+
+// The secret decodes from the file's key, and stays out of the file the
+// editor writes back while it is unset.
+func TestPatreonWebhookSecretDecodes(t *testing.T) {
+	var file Config
+	err := json.Unmarshal([]byte(`{"patreon_webhook_secret": "hook-secret"}`), &file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file.PatreonWebhookSecret != "hook-secret" {
+		t.Errorf("secret %q, want the file's", file.PatreonWebhookSecret)
+	}
+
+	out, err := json.Marshal(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var again Config
+	err = json.Unmarshal(out, &again)
+	if err != nil || again.PatreonWebhookSecret != "hook-secret" {
+		t.Errorf("secret written back as %s reads as %q (%v), want it kept", out, again.PatreonWebhookSecret, err)
+	}
+
+	out, err = json.Marshal(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "patreon_webhook_secret") {
+		t.Errorf("an unset secret is written: %s", out)
+	}
+}
+
+// A deployment that sets the secret keeps its own, and one that leaves it out
+// takes the file's.
+func TestOverPatreonWebhookSecret(t *testing.T) {
+	file := Config{PatreonWebhookSecret: "file-secret"}
+
+	got := Config{PatreonWebhookSecret: "own-secret"}.Over(file).PatreonWebhookSecret
+	if got != "own-secret" {
+		t.Errorf("secret %q, want the deployment's own", got)
+	}
+	got = Config{}.Over(file).PatreonWebhookSecret
+	if got != "file-secret" {
+		t.Errorf("secret %q, want the file's", got)
+	}
+	got = Config{}.Over(Config{}).PatreonWebhookSecret
+	if got != "" {
+		t.Errorf("secret %q, want none", got)
+	}
+}

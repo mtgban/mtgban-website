@@ -20,7 +20,10 @@ type Config struct {
 	GoogleCredentials string               `json:"google_credentials,omitempty"`
 	Patreon           Patreon              `json:"patreon"`
 	PatreonRenewal    PatreonRenewal       `json:"patreon_renewal,omitzero"`
-	Uploader          map[string]string    `json:"uploader,omitempty"`
+	// PatreonWebhookSecret is the secret Patreon signs its webhook deliveries
+	// with. The webhook route answers 404 while it is empty.
+	PatreonWebhookSecret string            `json:"patreon_webhook_secret,omitempty"`
+	Uploader             map[string]string `json:"uploader,omitempty"`
 	// HandoffOrigins maps each site allowed to hand /upload/handoff a card
 	// list to how its results are headed.
 	HandoffOrigins        map[string]HandoffOrigin `json:"handoff_origins,omitempty"`
@@ -121,6 +124,7 @@ func (own Config) Over(base Config) Config {
 		base.Patreon = own.Patreon
 	}
 	base.PatreonRenewal = cmp.Or(own.PatreonRenewal, base.PatreonRenewal)
+	base.PatreonWebhookSecret = cmp.Or(own.PatreonWebhookSecret, base.PatreonWebhookSecret)
 	if own.Uploader != nil {
 		base.Uploader = own.Uploader
 	}
