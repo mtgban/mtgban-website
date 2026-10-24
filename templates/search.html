@@ -505,7 +505,11 @@
                                          preview is hidden; opens the card art in a lightbox. */}}
                                     <button type="button" class="qi-view-image" title="View image" onclick="window.showCardImageFromBtn && showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
                                     <button class="fav-btn" data-card-id="{{$cardId}}" onclick="window.toggleFavorite && toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
-                                    <button type="button" class="pack-btn" data-card-id="{{$cardId}}" onclick="window.toggleBackpack && toggleBackpack(this)" title="Add to backpack"><i data-lucide="backpack"></i><span class="pack-btn-tick" hidden>✓</span></button>
+                                    {{/* The minus pops up below the backpack on hover, once the card is in. */}}
+                                    <div class="pack-wrap">
+                                        <button type="button" class="pack-btn" data-card-id="{{$cardId}}" onclick="window.addToBackpack && addToBackpack(this)" title="Add to backpack"><i data-lucide="backpack"></i><span class="pack-btn-count" hidden></span></button>
+                                        <button type="button" class="pack-minus-btn" data-card-id="{{$cardId}}" onclick="window.takeFromBackpack && takeFromBackpack(this)" title="Remove from backpack" hidden><i data-lucide="circle-minus"></i></button>
+                                    </div>
                                     {{if $.CanAlerts}}<button type="button" class="alert-link" data-card-id="{{$cardId}}" onclick="window.openAlertModal && openAlertModal({cardId: this.getAttribute('data-card-id'), side: 'buylist'})" title="Set a price alert"><i data-lucide="bell"></i></button>{{end}}
                                     </div>
                                 </div>

@@ -47,13 +47,16 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const nav = el('button'); nav.setAttribute('id', 'nav-backpack'); nav.hidden = true;
     const navCount = el('span'); navCount.setAttribute('id', 'nav-backpack-count'); navCount.hidden = true; nav.appendChild(navCount);
     body.appendChild(nav);
-    // Two result rows, each with a button carrying the card id.
+    // Two result rows, each with an add and a minus button carrying the card id.
+    const minus = [];
     const rows = ['uuid-1', 'uuid-2'].map((id) => {
         const row = el('div'); row.classes.add('result-header');
         Object.entries({ 'data-card-id': id, 'data-card-name': 'Card ' + id, 'data-set-code': 'S', 'data-edition': 'Set', 'data-number': '7', 'data-image-url': '', 'data-finish-tag': '', 'data-finish-class': '', 'data-treatments': '', 'data-has-warning': 'false' }).forEach(([k, v]) => row.setAttribute(k, v));
         const btn = el('button'); btn.classes.add('pack-btn'); btn.setAttribute('data-card-id', id);
-        const tick = el('span'); tick.classes.add('pack-btn-tick'); tick.hidden = true; tick.textContent = '✓'; btn.appendChild(tick);
-        row.appendChild(btn); body.appendChild(row);
+        const count = el('span'); count.classes.add('pack-btn-count'); count.hidden = true; btn.appendChild(count);
+        const less = el('button'); less.classes.add('pack-minus-btn'); less.setAttribute('data-card-id', id); less.hidden = true;
+        row.append(btn, less); body.appendChild(row);
+        minus.push(less);
         return btn;
     });
     const storageListeners = [];
@@ -90,64 +93,72 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
-        window, document, m, sm, rows, nav, navCount, stored, key, pendingIds,
+        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds,
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
     };
 }
 
 describe('adding', () => {
-    test('the first click creates an entry with qty 1 and ticks the row and navbar', () => {
+    test('the first click creates an entry with qty 1 and marks the row and navbar', () => {
         const p = page();
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         const live = p.stored().filter((e) => !e.del);
         expect(live.length).toBe(1);
         expect(live[0].qty).toBe(1);
         expect(live[0].m).toBe(live[0].t);
         expect(p.rows[0].classes.has('active')).toBe(true);
+        expect(p.rows[0].children[0].textContent).toBe('1');
         expect(p.rows[0].children[0].hidden).toBe(false);
-        expect(p.rows[0].getAttribute('title')).toBe('Remove from backpack');
+        expect(p.rows[0].getAttribute('title')).toBe('Add another copy');
         expect(p.nav.hidden).toBe(false);
         expect(p.navCount.textContent).toBe('1');
         expect(p.navCount.hidden).toBe(false);
     });
 
-    test('a second click takes the card out and bumps m', async () => {
+    test('a second click adds a copy and bumps m', async () => {
         const p = page();
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         const before = p.stored()[0].m;
         await new Promise((r) => setTimeout(r, 2));
-        p.window.toggleBackpack(p.rows[0]);
-        expect(p.stored()[0].del).toBe(p.stored()[0].m);
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.stored()[0].qty).toBe(2);
         expect(p.stored()[0].m).toBeGreaterThan(before);
-        expect(p.rows[0].classes.has('active')).toBe(false);
-        expect(p.rows[0].children[0].hidden).toBe(true);
-        expect(p.rows[0].getAttribute('title')).toBe('Add to backpack');
-        expect(p.navCount.hidden).toBe(true);
+        expect(p.rows[0].children[0].textContent).toBe('2');
+        expect(p.navCount.textContent).toBe('2');
     });
 
-    test('a click takes out every copy the panel set', () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'x', qty: 4, t: 1, m: 1 }] });
-        expect(p.rows[0].classes.has('active')).toBe(true);
-        p.window.toggleBackpack(p.rows[0]);
-        expect(p.window.Backpack.count()).toEqual({ copies: 0, cards: 0 });
+    test('a click at 999 toasts without writing', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'x', qty: 999, t: 1, m: 1 }] });
+        const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
+        const before = p.m.mtgban_backpack;
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(toast.textContent).toBe('999 copies is the most for one card');
     });
 
-    test('the phone menu item says which way it goes', () => {
+    test('the phone menu item says it adds another copy once the card is in', () => {
         const p = page();
         const item = el('button'); item.classes.add('pack-btn'); item.setAttribute('data-card-id', 'uuid-1');
         const label = el('span'); label.classes.add('pack-btn-label'); label.textContent = 'Add to backpack'; item.appendChild(label);
         p.rows[0].parentNode.appendChild(item);
-        p.window.toggleBackpack(item);
-        expect(label.textContent).toBe('Remove from backpack');
+        p.window.addToBackpack(item);
+        expect(label.textContent).toBe('Add another copy');
         expect(p.rows[0].classes.has('active')).toBe(true);
-        p.window.toggleBackpack(item);
-        expect(label.textContent).toBe('Add to backpack');
+    });
+
+    test('the collapsed desktop menu label follows the title', () => {
+        const p = page();
+        const label = el('span'); label.classes.add('qi-label'); label.textContent = 'Remove from backpack'; p.minus[0].appendChild(label);
+        p.window.addToBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one copy');
+        expect(label.textContent).toBe('Remove one copy');
     });
 
     test('re-adding a removed card gives a live entry with qty 1', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'x', qty: 4, t: 1, m: 2, del: 2 }] });
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         const e = p.stored().find((x) => x.id === 'uuid-1');
         expect(e.del).toBeUndefined();
         expect(e.qty).toBe(1);
@@ -158,7 +169,7 @@ describe('adding', () => {
         for (let i = 0; i < 100; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store });
         const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         expect(p.stored().filter((e) => !e.del).length).toBe(100);
         expect(toast.textContent).toBe('Backpack is full (100 cards)');
     });
@@ -168,19 +179,19 @@ describe('adding', () => {
         for (let i = 0; i < 200; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store, max: 201 });
         const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         expect(p.stored().filter((e) => !e.del).length).toBe(201);
-        p.window.toggleBackpack(p.rows[1]);
+        p.window.addToBackpack(p.rows[1]);
         expect(p.stored().filter((e) => !e.del).length).toBe(201);
         expect(toast.textContent).toBe('Backpack is full (201 cards)');
     });
 
-    test('a live card in a full backpack still comes out', () => {
+    test('a card already in a full backpack still takes another copy', () => {
         const store = [];
         for (let i = 0; i < 100; i++) store.push({ id: i === 0 ? 'uuid-1' : 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store });
-        p.window.toggleBackpack(p.rows[0]);
-        expect(p.stored().find((e) => e.id === 'uuid-1').del).toBeDefined();
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.stored().find((e) => e.id === 'uuid-1').qty).toBe(2);
     });
 
     test('the 999 ceiling toasts without writing', () => {
@@ -207,14 +218,14 @@ describe('adding', () => {
     test('the fallback entry for a button outside a row has an empty name', () => {
         const p = page();
         const btn = el('button'); btn.setAttribute('data-card-id', 'loose'); btn.setAttribute('title', 'Add to backpack');
-        p.window.toggleBackpack(btn);
+        p.window.addToBackpack(btn);
         expect(p.stored()[0].name).toBe('');
     });
 
     test('stamps come from the UserState clock when there is one', () => {
         const p = page();
         p.window.UserState = { now: () => 12345 };
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         expect(p.stored()[0].t).toBe(12345);
         expect(p.stored()[0].m).toBe(12345);
     });
@@ -223,6 +234,37 @@ describe('adding', () => {
         const p = page({ store: [{ name: 'broken', qty: 1, t: 1, m: 1 }, { id: 'uuid-2', name: 'ok', qty: 2, t: 1, m: 1 }] });
         expect(p.window.Backpack.count()).toEqual({ copies: 2, cards: 1 });
         expect(p.rows[1].children[0].hidden).toBe(false);
+    });
+});
+
+describe('the minus button', () => {
+    test('shows only for a card in the backpack', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }] });
+        expect(p.minus[0].hidden).toBe(false);
+        expect(p.minus[0].getAttribute('title')).toBe('Remove from backpack');
+        expect(p.minus[1].hidden).toBe(true);
+    });
+
+    test('takes one copy out, then the card at 1', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one copy');
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(p.stored()[0].qty).toBe(1);
+        expect(p.rows[0].children[0].textContent).toBe('1');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove from backpack');
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(p.stored()[0].del).toBeDefined();
+        expect(p.minus[0].hidden).toBe(true);
+        expect(p.rows[0].classes.has('active')).toBe(false);
+        expect(p.rows[0].children[0].hidden).toBe(true);
+        expect(p.rows[0].getAttribute('title')).toBe('Add to backpack');
+        expect(p.navCount.hidden).toBe(true);
+    });
+
+    test('a card not in the backpack writes nothing', () => {
+        const p = page();
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(p.stored()).toEqual([]);
     });
 });
 
@@ -383,18 +425,25 @@ describe('undo', () => {
 
     test('undoing a tap that added a card takes it out again', () => {
         const p = page();
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         expect(p.window.Backpack.undo()).toBe(true);
         expect(live(p)).toEqual([]);
         p.window.renderBackpack();
         expect(p.rows[0].classes.has('active')).toBe(false);
     });
 
-    test('undoing a tap that took a card out brings back its copies', () => {
+    test('undoing a tap that added a copy takes just that copy out', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 4, t: 1, m: 1 }] });
-        p.window.toggleBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
         p.window.Backpack.undo();
         expect(live(p).map((e) => [e.id, e.qty, e.t])).toEqual([['uuid-1', 4, 1]]);
+    });
+
+    test('undoing the minus that took the last copy brings the card back', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }] });
+        p.window.takeFromBackpack(p.minus[0]);
+        p.window.Backpack.undo();
+        expect(live(p).map((e) => [e.id, e.qty, e.t])).toEqual([['uuid-1', 1, 1]]);
     });
 
     test('quantity changes and removals step back one at a time', () => {
@@ -424,8 +473,8 @@ describe('undo', () => {
     });
 
     test('a restored card is stamped after the removal, so the sync merge keeps it', async () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
-        p.window.toggleBackpack(p.rows[0]);
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }] });
+        p.window.takeFromBackpack(p.minus[0]);
         const removed = p.stored()[0].m;
         await new Promise((r) => setTimeout(r, 2));
         p.window.Backpack.undo();
@@ -436,7 +485,7 @@ describe('undo', () => {
 
     test('the steps outlive a page load in the same tab', () => {
         const first = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
-        first.window.toggleBackpack(first.rows[0]);
+        first.window.addToBackpack(first.rows[0]);
         const next = page({ store: first.stored(), session: first.sm });
         next.window.Backpack.undo();
         expect(live(next).map((e) => e.qty)).toEqual([2]);

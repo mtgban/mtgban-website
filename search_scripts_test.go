@@ -56,7 +56,7 @@ func TestSearchCarriesTheBackpack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, want := range append(wants, `toggleBackpack(this)`) {
+		for _, want := range append(wants, `addToBackpack(this)`, `takeFromBackpack(this)`) {
 			if !strings.Contains(string(src), want) {
 				t.Errorf("%s is missing %s", tmpl, want)
 			}
