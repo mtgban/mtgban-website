@@ -346,6 +346,8 @@ save, and each has an admin tab that edits it (§5.9):
   (the credentials file's path), `patreon`, `patreon_renewal` (when a
   signature renews, `after_days` and `grace_days`; the session lifetime,
   `max_session_days`; `clear_on_negative`; `renew_timeout_seconds`),
+  `patreon_webhook_secret` (the secret Patreon signs its webhook with;
+  `/webhook/patreon` answers 404 while it is empty),
   `uploader` (the Moxfield and Collectr endpoints), `handoff_origins`
   (the sites `/upload/handoff` takes a card list from, each `{"name",
   "seller"}`: the name its results are headed with, and the path segment
@@ -500,6 +502,12 @@ running build's `?hash=`, `no-cache` at another build's, a day with none,
 `no-store` in dev or a build without a commit, where `sw.js` also goes to the
 network first), the hash (`assetHash`: the commit, plus the start time in dev)
 baked into template asset URLs for cache-busting;
+`POST /webhook/patreon` (`PatreonWebhook`, auth_webhook.go), Patreon's member
+webhook behind `noSigning`: 404 until `patreon_webhook_secret` is set, 401
+unless `X-Patreon-Signature` is the hex HMAC-MD5 of the raw body (the one place
+MD5 is used, because it is what Patreon computes), and otherwise 200 after
+poking the delivery's `data.attributes.email` here and on the peers (§3.2),
+the rest of the body unread;
 `/go/{r|i|b}/{store}/{hash}` affiliate redirects, or the 2-segment
 `/go/{store}/{hash}` short form defaulting to retail (redirect.go), resolved
 via mtgjson UUID or an external id (scryfall/tcg product id); `/card/<set>/
