@@ -87,8 +87,9 @@ output, not a claim written here.
   serves), `timeseries_config`, Discord, API secrets. Settings kept in
   files of their own, which deployments may share, are named by path:
   `infrastructure_path`
-  (bucket keys, Google and Patreon credentials, uploader endpoints, the
-  upload handoff's origins, the SQL databases; `internal/infrastructure`, and a key the config sets
+  (bucket keys, Google and Patreon credentials, the Patreon session
+  lifetime, uploader endpoints, the upload handoff's origins, the SQL
+  databases; `internal/infrastructure`, and a key the config sets
   itself wins), `acl_path` (tier → page → flags), `patreon_grants_path`,
   `affiliates_path` and `datasets_path` (the chart datasets). The admin
   page edits each of them. The store list comes from listing
@@ -255,15 +256,19 @@ commit to this repo can complete on its own.
    (`finishConfig`, `generateAPIKey`). Never write into `Config()` outside
    tests.
 
-2. **Stateless auth.** Permissions live entirely in the signed `BAN_SIG`
-   cookie / `?sig=` (an HMAC-signed query string). There is no session store
-   or user DB. Read grants via `GetParamFromSig()` off `verifiedSignature()`
-   (or `verifiedRequestSignature()` where `?sig=` comes first), never off the
-   raw cookie: a page the ACL opens to everyone is reached with no check in
-   front of it. Don't introduce server-side session state. The signature
-   is never an identity outside the site: the API handoff asks Patreon who
-   the reader is (`docs/adr/0006-api-handoff-asks-patreon.md`), and why a
-   new signed field must not ride on every login is in
+2. **Authorisation lives in the signed cookie.** Permissions live entirely
+   in the signed `BAN_SIG` cookie / `?sig=` (an HMAC-signed query string),
+   read with no database work. Read grants via `GetParamFromSig()` off
+   `verifiedSignature()` (or `verifiedRequestSignature()` where `?sig=`
+   comes first), never off the raw cookie: a page the ACL opens to everyone
+   is reached with no check in front of it. The server keeps one thing, a
+   `patreon_sessions` row per login holding only the refresh token that
+   mints the next cookie, bound to the browser by the HttpOnly
+   `BAN_SESSION` cookie (`docs/adr/0008-patreon-session-renewal.md`); a
+   request is never authorised from it. The signature is never an identity
+   outside the site: the API handoff asks Patreon who the reader is
+   (`docs/adr/0006-api-handoff-asks-patreon.md`), and why a new signed
+   field must not ride on every login is in
    `docs/adr/0001-api-handoff-email-check.md`.
 
 3. **Card identity goes through `mtgmatcher`.** Resolve cards through the

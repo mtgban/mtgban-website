@@ -339,7 +339,8 @@ save, and each has an admin tab that edits it (§5.9):
 
 - `infrastructure_path`: the infrastructure settings,
   `internal/infrastructure.Config` — `bucket_keys`, `google_credentials`
-  (the credentials file's path), `patreon`, `uploader` (the Moxfield and
+  (the credentials file's path), `patreon`, `patreon_renewal` (the
+  session lifetime, `max_session_days`), `uploader` (the Moxfield and
   Collectr endpoints), `handoff_origins` (the sites `/upload/handoff`
   takes a card list from, each `{"name", "seller"}`: the name its
   results are headed with, and the path segment its URLs name a seller
@@ -394,8 +395,11 @@ cookie (31 days, shared across `*.mtgban.com`, HttpOnly, `SameSite=Lax`,
 always written by `signatureCookieFor`) and/or passed as `?sig=`. A reader
 who still holds only the `MTGBAN` cookie it replaced is served from that and
 moved to `BAN_SIG` on their next page load (`migrateSignatureCookie`); that
-fallback is removed 31 days after the rename's deploy. `GetParamFromSig()`
-extracts individual grants, read off
+fallback is removed 31 days after the rename's deploy. A login also stores
+its Patreon refresh token in a `patreon_sessions` row of the `user_state`
+database, which the HttpOnly `BAN_SESSION` cookie names; logout deletes the
+row, and a daily job prunes those past `max_session_days` (ADR-0008).
+`GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the
 cookie. The API handoff (`/api-login`, `/api-trial`) reads no signature at
@@ -1010,7 +1014,8 @@ staleness alarm's map and messages, from 15 minutes after startup.
 1. **Immutable snapshot swapping** over locking for all hot data
    (scrapers, newspaper cache, editions) — readers never block.
 2. **Stateless requests**: all user state is in the signed cookie or
-   client-side storage; the server holds no sessions.
+   client-side storage; the server holds one `patreon_sessions` row per
+   login, which only the renewal reads (ADR-0008).
 3. **Capability-based auth**: the HMAC signature *is* the permission set;
    handlers read flags from it rather than consulting a user database.
 4. **Storage abstraction** via `simplecloud` URL schemes (file/B2/HTTP)
