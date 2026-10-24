@@ -33,8 +33,8 @@ const (
 )
 
 // GetAuthToken exchanges an OAuth authorization code for a token; a status
-// outside 2xx is a *StatusError, and a body that does not decode
-// ErrUnreadable.
+// outside 2xx is a *StatusError, or the *GrantError wrapping it where the body
+// names an OAuth error, and a body that does not decode ErrUnreadable.
 func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code string) (*AuthToken, error) {
 	if clientID == "" || secret == "" {
 		return nil, errors.New("missing client or secret information")
@@ -47,6 +47,33 @@ func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code strin
 		"redirect_uri":  {redirectURI + "/auth"},
 		"code":          {code},
 	})
+}
+
+// RefreshAuthToken trades a refresh token for a new token pair. Patreon keeps
+// one pair per user and client, so the answer replaces it: the access token
+// and the refresh token sent are dead from then on, and so is any other copy
+// of them. A refresh token Patreon does not honour is a *GrantError coded
+// InvalidGrant, any other status outside 2xx a *StatusError, and a 2xx answer
+// without either token ErrUnreadable.
+func RefreshAuthToken(ctx context.Context, clientID, secret, refreshToken string) (*AuthToken, error) {
+	if clientID == "" || secret == "" || refreshToken == "" {
+		return nil, errors.New("missing client, secret or refresh token information")
+	}
+
+	tokens, err := postToken(ctx, url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {clientID},
+		"client_secret": {secret},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if tokens.RefreshToken == "" {
+		return nil, fmt.Errorf("%w: refresh answer without a refresh token", ErrUnreadable)
+	}
+
+	return tokens, nil
 }
 
 // postToken sends one grant to the token endpoint and reads its answer,
@@ -66,6 +93,10 @@ func postToken(ctx context.Context, grant url.Values) (*AuthToken, error) {
 
 	var tokens AuthToken
 	err = decodeAnswer(resp, &tokens)
+	var statusErr *StatusError
+	if errors.As(err, &statusErr) {
+		return nil, grantRefusal(statusErr)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +106,25 @@ func postToken(ctx context.Context, grant url.Values) (*AuthToken, error) {
 	}
 
 	return &tokens, nil
+}
+
+// grantRefusal is a refused token answer as the caller can tell it: a
+// *GrantError when the status is 400 or 401 and the body is an object with a
+// non-empty "error" string, else the *StatusError itself.
+func grantRefusal(statusErr *StatusError) error {
+	if statusErr.StatusCode != http.StatusBadRequest && statusErr.StatusCode != http.StatusUnauthorized {
+		return statusErr
+	}
+
+	var refusal struct {
+		Error string `json:"error"`
+	}
+	err := json.Unmarshal([]byte(statusErr.Body), &refusal)
+	if err != nil || refusal.Error == "" {
+		return statusErr
+	}
+
+	return &GrantError{Code: refusal.Error, Status: statusErr}
 }
 
 // tokenHTTPClient is the client the token calls go through: the one ctx
@@ -214,6 +264,27 @@ const statusBodyLimit = 512
 
 func (e *StatusError) Error() string {
 	return fmt.Sprintf("patreon answered %d %s: %q", e.StatusCode, http.StatusText(e.StatusCode), e.Body)
+}
+
+// InvalidGrant is the GrantError code of a refresh token Patreon does not
+// honour: spent, replaced by a later refresh, or revoked.
+const InvalidGrant = "invalid_grant"
+
+// GrantError is the token endpoint refusing a grant: a 400 or 401 whose body
+// is an OAuth error object. It unwraps to the answer's *StatusError.
+type GrantError struct {
+	// Code is the body's "error" value, such as InvalidGrant
+	Code   string
+	Status *StatusError
+}
+
+func (e *GrantError) Error() string {
+	return fmt.Sprintf("patreon refused the grant %q: %v", e.Code, e.Status)
+}
+
+// Unwrap returns the answer's StatusError.
+func (e *GrantError) Unwrap() error {
+	return e.Status
 }
 
 // ErrUnreadable is a 2xx answer whose body is not the JSON asked for: cut

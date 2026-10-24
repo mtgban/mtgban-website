@@ -1,0 +1,7 @@
+{
+ "token_type": "Bearer",
+ "access_token": "redacted-rotated-access-token",
+ "expires_in": 353103063,
+ "refresh_token": "redacted-rotated-refresh-token",
+ "scope": "campaigns.members w:identity.clients identity w:campaigns.benefits w:campaigns.lives campaigns campaigns.lives identity.memberships campaigns.webhook campaigns.posts w:campaigns.posts identity[email] campaigns.members.address w:campaigns.apps apps.tiers w:campaigns.webhook campaigns.members[email]"
+}
