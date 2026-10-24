@@ -211,6 +211,10 @@ The dominant pattern is **immutable snapshots behind atomic pointers**:
   reload reads the running port and paths it keeps under `configMu` too,
   so they are the ones a save it waited on set.
 - Affiliate data sits behind `affiliatesMu`/`affiliatesPtr`.
+- The poke set (`Pokes`, auth_poke.go) is a plain map of email hashes behind
+  an `RWMutex`, built once: the readers whose next request renews their
+  signature whatever its age (§3.2). An entry lasts `after_days` and is
+  swept by the next poke; no goroutine keeps it.
 
 **Panics.** A panic in a handler behind one of the three signing wrappers
 is recovered by `recoverPanic` (auth.go): `reportPanic` (recover.go) logs
@@ -359,7 +363,9 @@ save, and each has an admin tab that edits it (§5.9):
   nothing charts.
 
 Saving one sends a Postgres NOTIFY on that file's channel, and the peers
-sharing the price database re-read it (access_notify.go).
+sharing the price database re-read it (access_notify.go). The same listener
+hears `patreon_poke`, whose payload is the email hash of a reader to poke
+(§3.2) rather than a file to re-read, and which no instance name skips.
 
 `timeseries_config` holds `long_form_writes` (§5.6) and `checkpoints_path`
 (§2.3). The `stores` section (`StoresConfig`) says which stores show where,

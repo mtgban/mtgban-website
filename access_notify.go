@@ -29,6 +29,11 @@ const (
 	infrastructureReloadChannel = "infrastructure_reload"
 )
 
+// patreonPokeChannel carries the webhook's pokes (auth_webhook.go) to the
+// peers. It is not a file to re-read: the payload is the email hash of the
+// reader to poke, so the sender's instance name plays no part in it.
+const patreonPokeChannel = "patreon_poke"
+
 // notifyAccessReload tells the peer deployments to re-read the file behind
 // the channel. Best effort: the save it follows already succeeded, so a
 // failure here only delays the peers until their next reload and is just
@@ -55,10 +60,24 @@ func skipAccessNotification(n *pq.Notification, instanceName string) bool {
 	return n.Extra != "" && n.Extra == instanceName
 }
 
+// takePoke pokes the reader a patreon_poke notification names, and says
+// whether n was one. A nil notification is lib/pq reporting a reconnect, which
+// pokes nothing: the age window catches a poke the dropped connection missed.
+func takePoke(n *pq.Notification) bool {
+	if n == nil || n.Channel != patreonPokeChannel {
+		return false
+	}
+	if n.Extra != "" {
+		Pokes.poke(n.Extra)
+	}
+	return true
+}
+
 // startAccessReloadListener subscribes to the reload channel of every value
 // this deployment reads from its own file and keeps that value in sync with
-// the peers' saves. It needs the shared database to listen on, and skips any
-// value with no path configured: there is nothing to reload.
+// the peers' saves, and to the channel the webhook's pokes arrive on. It needs
+// the shared database to listen on, and skips any value with no path
+// configured: there is nothing to reload.
 func startAccessReloadListener() {
 	sqlConfig := Infrastructure().SQLConfig
 	if sqlConfig == nil {
@@ -80,9 +99,6 @@ func startAccessReloadListener() {
 	if Config().InfrastructurePath != "" {
 		reloads[infrastructureReloadChannel] = loadInfrastructure
 	}
-	if len(reloads) == 0 {
-		return
-	}
 
 	// The listener holds its own connection outside PricesArchiveDB's pool:
 	// LISTEN is per-session, and lib/pq reconnects and re-subscribes this one
@@ -101,11 +117,20 @@ func startAccessReloadListener() {
 			return
 		}
 	}
+	err := listener.Listen(patreonPokeChannel)
+	if err != nil {
+		log.Println("access reload: listen failed, Patreon pokes won't be picked up:", err)
+		listener.Close()
+		return
+	}
 
 	go func() {
 		for {
 			select {
 			case n := <-listener.Notify:
+				if takePoke(n) {
+					continue
+				}
 				if skipAccessNotification(n, Config().InstanceName) {
 					continue
 				}
@@ -133,7 +158,7 @@ func startAccessReloadListener() {
 			}
 		}
 	}()
-	log.Println("access reload: listening for", len(reloads), "channels")
+	log.Println("access reload: listening for", len(reloads)+1, "channels")
 }
 
 func runAccessReload(channel, source string, reload func(context.Context) error) {
