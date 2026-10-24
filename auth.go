@@ -143,29 +143,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 // cookie names, when the site has a database and the token is not empty.
 // A row that cannot be written is logged and the login goes on without it.
 func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state string, user *pledge.User, tier string, overrides map[string]map[string]string, granted bool, refreshToken string) {
-	// Sign our base URL with our tier and other data
-	sig := sign(tier, user, overrides, DefaultSignatureDuration)
-
-	// Whether this tier grants alerts at all, computed once rather than
-	// re-parsing the signature just signed.
-	allowed := alertContactAllowed(tier, overrides)
-	channels := alertContactChannels(tier, overrides)
-
-	// A grant's tier is not stored: the evaluator reads a live grant's own,
-	// and a revoked one must not leave its tier behind until the next login.
-	contactTier := tier
-	if granted {
-		contactTier = ""
-	}
-	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-	err := recordAlertContact(alertCtx, s.alertContacts(), user, contactTier, allowed, channels)
-	if err != nil {
-		LogPages["Admin"].Println("recordAlertContact", err)
-	}
-
-	// Keep it secret. Keep it safe.
-	putSignatureInCookies(w, r, sig)
+	s.signReaderIn(w, r, user, tier, overrides, granted)
 
 	// The row that lets the site renew this signature later. Without one the
 	// login still works and simply never renews. A browser logging in again
@@ -197,6 +175,36 @@ func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state str
 
 	// Redirect, we're done here
 	http.Redirect(w, r, redir, http.StatusFound)
+}
+
+// signReaderIn signs the reader whose pledge gives tier into the BAN_SIG
+// cookie, after recording what the login learned about them for alerts, and
+// returns the signature. A login and a renewal both end here.
+func (s *site) signReaderIn(w http.ResponseWriter, r *http.Request, user *pledge.User, tier string, overrides map[string]map[string]string, granted bool) string {
+	// Sign our base URL with our tier and other data
+	sig := sign(tier, user, overrides, DefaultSignatureDuration)
+
+	// Whether this tier grants alerts at all, computed once rather than
+	// re-parsing the signature just signed.
+	allowed := alertContactAllowed(tier, overrides)
+	channels := alertContactChannels(tier, overrides)
+
+	// A grant's tier is not stored: the evaluator reads a live grant's own,
+	// and a revoked one must not leave its tier behind until the next login.
+	contactTier := tier
+	if granted {
+		contactTier = ""
+	}
+	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	err := recordAlertContact(alertCtx, s.alertContacts(), user, contactTier, allowed, channels)
+	if err != nil {
+		LogPages["Admin"].Println("recordAlertContact", err)
+	}
+
+	// Keep it secret. Keep it safe.
+	putSignatureInCookies(w, r, sig)
+	return sig
 }
 
 func authRedirect(state string) string {
@@ -291,6 +299,16 @@ func signatureIsValid(sig string) (url.Values, bool) {
 		return v, true
 	}
 
+	expires, err := strconv.ParseInt(v.Get("Expires"), 10, 64)
+	if err != nil || !signatureMatches(v) || expires < time.Now().Unix() {
+		return v, false
+	}
+	return v, true
+}
+
+// signatureMatches says whether v carries the HMAC this host writes over its
+// signed fields, whether or not it has run out.
+func signatureMatches(v url.Values) bool {
 	q := url.Values{}
 	for _, optional := range SignedFields {
 		if val := v.Get(optional); val != "" {
@@ -298,14 +316,9 @@ func signatureIsValid(sig string) (url.Values, bool) {
 		}
 	}
 
-	exp := v.Get("Expires")
-	data := fmt.Sprintf("GET%s%s%s", exp, signatureLink(), q.Encode())
+	data := fmt.Sprintf("GET%s%s%s", v.Get("Expires"), signatureLink(), q.Encode())
 	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
-	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || !hmac.Equal([]byte(valid), []byte(v.Get("Signature"))) || expires < time.Now().Unix() {
-		return v, false
-	}
-	return v, true
+	return hmac.Equal([]byte(valid), []byte(v.Get("Signature")))
 }
 
 // signedUserEmail returns the UserEmail off verifiedRequestSignature, else "".
@@ -682,6 +695,12 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 		// cannot spend somebody else's.
 		limitKey := ""
 		checked, ok := signatureIsValid(sig)
+		// A cookie signature that ran out within grace_days is not sig any
+		// more, but it still names its reader, to count and to renew.
+		expired := graceSignature(r, sig, querySig)
+		if expired != nil {
+			checked, ok = expired, true
+		}
 		if ok {
 			limitKey = checked.Get("UserEmail")
 			if limitKey == "" {
@@ -691,6 +710,20 @@ func signing(s *site, next http.Handler, script bool) http.Handler {
 		if !UserRateLimiter.Allow(limitKey) && r.URL.Path != "/admin" {
 			signingRefusal{status: http.StatusTooManyRequests, title: "Too Many Requests", msg: ErrMsgUseAPI}.write(w, r, s, sig, script)
 			return
+		}
+
+		// A signature due for renewal is renewed here, and this request goes
+		// on under the new one.
+		renewed, refused := s.renewDue(w, r, checked, ok, querySig == "")
+		if refused {
+			// The pledge is gone: logged out, with the way back in
+			ref := signingRefusal{status: http.StatusUnauthorized, title: "Unauthorized", msg: ErrMsgExpired, login: true}
+			ref.write(w, withSignatureCookie(r, ""), s, "", script)
+			return
+		}
+		if renewed != "" {
+			sig = renewed
+			r = withSignatureCookie(r, renewed)
 		}
 
 		raw, err := base64.StdEncoding.DecodeString(sig)

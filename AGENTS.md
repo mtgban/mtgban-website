@@ -150,6 +150,7 @@ output, not a claim written here.
 | `templates.go` | The template `FuncMap` — the helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
+| `auth_renew.go` | Renewing a signature from its Patreon session inside the signing middleware: `decideRenewal`, the lease-refresh-commit sequence, `renewalEnabled` (`docs/adr/0008-patreon-session-renewal.md`) |
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
 | `arbit.go`, `sleep.go` | Arbitrage (arbit/global/reverse) and sleeper scoring |

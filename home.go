@@ -31,11 +31,7 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 				LogPages["Admin"].Println("DeletePatreonSession", err)
 			}
 		}
-		clearSessionCookie(w, r)
-
-		// Invalidate the current cookie
-		clearSignatureCookie(w, r, signatureCookie)
-		clearSignatureCookie(w, r, legacySignatureCookie)
+		clearLoginCookies(w, r)
 
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
