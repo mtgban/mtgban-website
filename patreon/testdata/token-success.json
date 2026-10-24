@@ -1,0 +1,7 @@
+{
+ "token_type": "Bearer",
+ "access_token": "redacted-access-token-xxxxxxxxxxxxxxxxxxxxx",
+ "expires_in": 353103131,
+ "refresh_token": "redacted-refresh-token-xxxxxxxxxxxxxxxxxxxx",
+ "scope": "campaigns.posts identity[email] campaigns campaigns.members.address w:campaigns.webhook apps.tiers w:campaigns.benefits campaigns.webhook identity campaigns.lives w:campaigns.lives w:identity.clients identity.memberships w:campaigns.posts campaigns.members[email] w:campaigns.apps campaigns.members"
+}

@@ -32,39 +32,60 @@ const (
 	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
 )
 
-// GetAuthToken exchanges an OAuth authorization code for a token.
+// GetAuthToken exchanges an OAuth authorization code for a token; a status
+// outside 2xx is a *StatusError, and a body that does not decode
+// ErrUnreadable.
 func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code string) (*AuthToken, error) {
 	if clientID == "" || secret == "" {
 		return nil, errors.New("missing client or secret information")
 	}
 
-	payload := url.Values{
+	return postToken(ctx, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {clientID},
 		"client_secret": {secret},
 		"redirect_uri":  {redirectURI + "/auth"},
 		"code":          {code},
-	}.Encode()
+	})
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, PatreonTokenURL, strings.NewReader(payload))
+// postToken sends one grant to the token endpoint and reads its answer,
+// typed as GetAuthToken documents.
+func postToken(ctx context.Context, grant url.Values) (*AuthToken, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, PatreonTokenURL, strings.NewReader(grant.Encode()))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	resp, err := tokenHTTPClient(ctx).Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	var tokens AuthToken
-	err = json.NewDecoder(resp.Body).Decode(&tokens)
+	err = decodeAnswer(resp, &tokens)
 	if err != nil {
 		return nil, err
 	}
 
+	if tokens.AccessToken == "" {
+		return nil, fmt.Errorf("%w: token answer without an access token", ErrUnreadable)
+	}
+
 	return &tokens, nil
+}
+
+// tokenHTTPClient is the client the token calls go through: the one ctx
+// carries under oauth2.HTTPClient, which NewPatreonClient also takes its
+// transport from, else a clean one.
+func tokenHTTPClient(ctx context.Context) *http.Client {
+	client, ok := ctx.Value(oauth2.HTTPClient).(*http.Client)
+	if ok {
+		return client
+	}
+	return cleanhttp.DefaultClient()
 }
 
 // Client reads the Patreon API on behalf of one logged-in user.
@@ -118,7 +139,8 @@ type UserData struct {
 }
 
 // GetUserData retrieves the current user and an id for each of their
-// memberships - only what the token can see is reported.
+// memberships - only what the token can see is reported. A status outside
+// 2xx is a *StatusError, and a body that does not decode ErrUnreadable.
 func (c *Client) GetUserData(ctx context.Context) (*UserData, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, PatreonIdentityURL, http.NoBody)
 	if err != nil {
@@ -131,7 +153,7 @@ func (c *Client) GetUserData(ctx context.Context) (*UserData, error) {
 	defer resp.Body.Close()
 
 	var userData UserData
-	err = json.NewDecoder(resp.Body).Decode(&userData)
+	err = decodeAnswer(resp, &userData)
 	if err != nil {
 		return nil, err
 	}
@@ -212,16 +234,29 @@ func (c *Client) GetMembershipData(ctx context.Context, userID string) (*Members
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, statusBodyLimit))
-		return nil, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
-	}
 
 	var membershipData MembershipData
-	err = json.NewDecoder(resp.Body).Decode(&membershipData)
+	err = decodeAnswer(resp, &membershipData)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrUnreadable, err)
+		return nil, err
 	}
 
 	return &membershipData, nil
+}
+
+// decodeAnswer reads one Patreon answer into v: a status outside 2xx is a
+// *StatusError, read before the body, which an edge serves as HTML, and a 2xx
+// body that does not decode ErrUnreadable.
+func decodeAnswer(resp *http.Response, v any) error {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, statusBodyLimit))
+		return &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	err := json.NewDecoder(resp.Body).Decode(v)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrUnreadable, err)
+	}
+
+	return nil
 }
