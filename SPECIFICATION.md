@@ -404,7 +404,11 @@ With `patreon_renewal.after_days` set, `signing` renews a cookie-borne
 signature that old, or one that ran out within `grace_days`, from the
 session its `BAN_SESSION` cookie names: it leases every session of the
 email, asks Patreon through the refresh token, stores the rotated one,
-and serves the request on the new signature (`auth_renew.go`).
+and serves the request on the new signature (`auth_renew.go`). The Account
+page (`user.go`) POSTs two actions to itself, each ending in a redirect:
+Refresh now runs the same renewal without the age check, and Log out
+everywhere deletes every session of the signature cookie's email and clears
+this browser's cookies.
 `GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the

@@ -246,6 +246,9 @@ type UserVars struct {
 	Discord    DiscordStatus
 	Features   []UserFeature
 	Tiers      []TierSummary
+	// CanRefresh is whether the page offers Refresh now: the site renews
+	// signatures and this browser holds the session to renew from.
+	CanRefresh bool
 }
 
 // UserFeature is one personal feature the reader's tier grants.
@@ -260,13 +263,61 @@ const discordLookupTimeout = 2 * time.Second
 // User serves the Account page: the tier table for everyone, the reader's
 // own account and features when signed in.
 func (s *site) User(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		s.writeAccountAction(w, r)
+		return
+	}
 	sig := verifiedSignature(r)
 	pageVars := genPageNav(s, r, "Account", sig)
 	pageVars.User = &UserVars{}
 	if pageVars.ErrorMessage == "" {
 		pageVars.User = s.userVars(r.Context(), parseSig(sig), pageVars.IsMobile)
+		pageVars.User.CanRefresh = pageVars.User.SignedIn && renewalEnabled() && readCookie(r, sessionCookie) != ""
 	}
 	render(w, "user.html", pageVars)
+}
+
+// writeAccountAction answers a POST to the Account page with a redirect,
+// whatever it does. Refresh now renews the signature this browser holds from
+// the session its BAN_SESSION cookie names, as a due signature would be, only
+// without waiting for its age, and rests the sessions for renewalRefreshRest so
+// that a second press asks Patreon nothing; Log out everywhere ends every session of the
+// reader's email and clears this browser's cookies. Both act on the reader
+// the signature cookie names, never on a ?sig= or a form field.
+func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
+	// A form on another site's page is refused before it is read
+	if crossSitePost(r) {
+		http.Error(w, "cross-site form refused", http.StatusForbidden)
+		return
+	}
+
+	values, signed := signatureIsValid(cookieSignature(r))
+	email := ""
+	if signed {
+		email = values.Get("UserEmail")
+	}
+	switch r.PostFormValue("action") {
+	case "refresh":
+		if email != "" && renewalEnabled() {
+			s.renewSignature(w, r, values, renewalRefreshRest)
+		}
+		http.Redirect(w, r, "/user", http.StatusSeeOther)
+	case "logout-everywhere":
+		// With the database down the cookies go anyway, and the sessions
+		// wait for the prune or the next press
+		if email != "" && UserStateDB != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			_, err := UserStateDB.DeletePatreonSessions(ctx, userstate.HashEmail(email))
+			cancel()
+			if err != nil {
+				LogPages["Admin"].Println("DeletePatreonSessions", err)
+			}
+		}
+		clearLoginCookies(w, r)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	default:
+		http.Redirect(w, r, "/user", http.StatusSeeOther)
+	}
 }
 
 // userVars reads the reader off the signed values and builds the page.

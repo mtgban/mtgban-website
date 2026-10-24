@@ -53,6 +53,19 @@
         </dl>
     </section>
 
+    <div class="user-actions">
+        {{if .CanRefresh}}
+        <form method="post" action="/user">
+            <input type="hidden" name="action" value="refresh">
+            <button class="page-action" type="submit" title="Ask Patreon again for your tier and sign you in anew">Refresh now</button>
+        </form>
+        {{end}}
+        <form method="post" action="/user">
+            <input type="hidden" name="action" value="logout-everywhere">
+            <button class="page-action" type="submit" title="End your sign-in on every device">Log out everywhere</button>
+        </form>
+    </div>
+
     <h2 class="user-section-title">Your features</h2>
     {{if .Features}}
     <div class="user-features">

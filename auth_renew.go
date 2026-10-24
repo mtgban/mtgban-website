@@ -98,12 +98,14 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 }
 
 // The waits of a renewal: how long it holds the sessions of an email, how
-// long they rest after an answer from Patreon that settled nothing, and how
-// long each database call may take.
+// long they rest after an answer from Patreon that settled nothing, how long
+// each database call may take, and how long they rest after Refresh now, so
+// that a reader cannot press Patreon per request.
 const (
-	renewalLease     = time.Minute
-	renewalBackoff   = time.Hour
-	renewalDBTimeout = 2 * time.Second
+	renewalLease       = time.Minute
+	renewalBackoff     = time.Hour
+	renewalDBTimeout   = 2 * time.Second
+	renewalRefreshRest = 5 * time.Minute
 )
 
 // renewal is one attempt to renew a reader's signature, and the line the
