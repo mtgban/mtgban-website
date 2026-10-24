@@ -1418,6 +1418,9 @@
     position: relative;
     z-index: 1;
 }
+/* A wrapped name starts each line under the first, the icon centred beside it */
+.opt-name-cell { display: flex; align-items: center; gap: 0.4em; }
+.opt-name-text { min-width: 0; }
 .opt-set { color: var(--text-dim); font-size: var(--text-sm); }
 .opt-offer, .opt-loaded { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); text-align: center; white-space: nowrap; }
 .opt-offer .offer { display: inline-block; min-width: 5em; text-align: right; color: var(--asuccess); }
