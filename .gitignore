@@ -30,6 +30,9 @@ cache_*
 # API product list (exempt from the *.json ignore above)
 !apiproductlist/products.json
 
+# Patreon answer fixtures (exempt from the *.json ignore above)
+!patreon/testdata/*.json
+
 # The Lighthouse runner's manifest (exempt from the *.json ignore above)
 !scripts/lighthouse/package.json
 scripts/lighthouse/node_modules/

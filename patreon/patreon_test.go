@@ -6,8 +6,14 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2"
 )
 
 // identityResponse is Patreon's documented User example, in the v2 envelope,
@@ -140,5 +146,175 @@ func TestMembershipStatusIsTyped(t *testing.T) {
 		if !errors.Is(err, ErrUnreadable) {
 			t.Errorf("200 %q: %v, want ErrUnreadable", body, err)
 		}
+	}
+}
+
+// fixture reads a body recorded from Patreon, with its tokens and ids
+// replaced, from testdata.
+func fixture(t *testing.T, name string) string {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
+// endpoint is a test server that answers every request with code and body,
+// keeping what the last request sent.
+type endpoint struct {
+	server *httptest.Server
+	code   int
+	body   string
+
+	method      string
+	path        string
+	contentType string
+	form        url.Values
+}
+
+func serveAnswer(t *testing.T, code int, body string) *endpoint {
+	t.Helper()
+	e := &endpoint{code: code, body: body}
+	e.server = httptest.NewServer(e)
+	t.Cleanup(e.server.Close)
+	return e
+}
+
+func (e *endpoint) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	e.method = r.Method
+	e.path = r.URL.Path
+	e.contentType = r.Header.Get("Content-Type")
+	r.ParseForm()
+	e.form = r.PostForm
+	w.WriteHeader(e.code)
+	w.Write([]byte(e.body))
+}
+
+// via is a transport that sends every request to the test server, whatever
+// address it names.
+type via struct {
+	server *httptest.Server
+}
+
+func (v via) RoundTrip(req *http.Request) (*http.Response, error) {
+	target, err := url.Parse(v.server.URL)
+	if err != nil {
+		return nil, err
+	}
+	req = req.Clone(req.Context())
+	req.URL.Scheme = target.Scheme
+	req.URL.Host = target.Host
+	return v.server.Client().Transport.RoundTrip(req)
+}
+
+// client is an HTTP client that reaches the test server.
+func (e *endpoint) client() *http.Client {
+	return &http.Client{Transport: via{e.server}}
+}
+
+// ctx is a context whose token calls reach the test server.
+func (e *endpoint) ctx() context.Context {
+	return context.WithValue(context.Background(), oauth2.HTTPClient, e.client())
+}
+
+// The code exchange sends the authorization_code grant to the token endpoint
+// and reads every key of the recorded answer.
+func TestGetAuthTokenReadsTheRecordedAnswer(t *testing.T) {
+	e := serveAnswer(t, http.StatusOK, fixture(t, "token-success.json"))
+	tokens, err := GetAuthToken(e.ctx(), "the-client", "the-secret", "https://mtgban.test", "the-code")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {"the-client"},
+		"client_secret": {"the-secret"},
+		"redirect_uri":  {"https://mtgban.test/auth"},
+		"code":          {"the-code"},
+	}
+	if e.method != http.MethodPost || e.path != "/api/oauth2/token" || e.contentType != "application/x-www-form-urlencoded" || e.form.Encode() != want.Encode() {
+		t.Errorf("sent %s %s %q %v, want a form POST of %v to /api/oauth2/token", e.method, e.path, e.contentType, e.form, want)
+	}
+	if tokens.TokenType != "Bearer" || tokens.AccessToken != "redacted-access-token-xxxxxxxxxxxxxxxxxxxxx" ||
+		tokens.RefreshToken != "redacted-refresh-token-xxxxxxxxxxxxxxxxxxxx" || tokens.Expires != 353103131 {
+		t.Errorf("read %+v from the recorded answer", tokens)
+	}
+	if !strings.Contains(tokens.Scope, "identity.memberships") || !strings.Contains(tokens.Scope, "campaigns.members") {
+		t.Errorf("scope = %q, want the recorded scopes", tokens.Scope)
+	}
+}
+
+// A refused exchange is a StatusError even when its body is JSON, which used
+// to decode into an empty AuthToken with no error; a 2xx body that is not the
+// token answer, an access token missing included, is ErrUnreadable.
+func TestGetAuthTokenStatusIsTyped(t *testing.T) {
+	for name, tc := range map[string]struct {
+		code int
+		body string
+	}{
+		"an OAuth error body": {http.StatusUnauthorized, `{"error":"invalid_grant"}`},
+		"a throttle":          {http.StatusTooManyRequests, fixture(t, "membership-throttled.json")},
+		"an edge's 502":       {http.StatusBadGateway, "<html>502 Bad Gateway</html>"},
+	} {
+		e := serveAnswer(t, tc.code, tc.body)
+		tokens, err := GetAuthToken(e.ctx(), "the-client", "the-secret", "https://mtgban.test", "the-code")
+		var statusErr *StatusError
+		if !errors.As(err, &statusErr) || statusErr.StatusCode != tc.code || statusErr.Body != tc.body || tokens != nil {
+			t.Errorf("%s: %+v, %v, want a StatusError %d holding the body", name, tokens, err, tc.code)
+		}
+	}
+	for _, body := range []string{`{"access_token":"a`, "<html>ok</html>", "", `{}`, `{"token_type":"Bearer","refresh_token":"r","expires_in":60}`, `{"access_token":"","refresh_token":"r"}`} {
+		e := serveAnswer(t, http.StatusOK, body)
+		tokens, err := GetAuthToken(e.ctx(), "the-client", "the-secret", "https://mtgban.test", "the-code")
+		if !errors.Is(err, ErrUnreadable) || tokens != nil {
+			t.Errorf("200 %q: %+v, %v, want ErrUnreadable", body, tokens, err)
+		}
+	}
+}
+
+// Missing credentials stop the exchange before a request is made.
+func TestGetAuthTokenNeedsCredentials(t *testing.T) {
+	e := serveAnswer(t, http.StatusOK, fixture(t, "token-success.json"))
+	_, err := GetAuthToken(e.ctx(), "", "the-secret", "https://mtgban.test", "the-code")
+	if err == nil || e.method != "" {
+		t.Errorf("no client id: %v after a %q request, want an error and no request", err, e.method)
+	}
+}
+
+// An identity answer outside 2xx is a StatusError, the recorded 401 among
+// them, which used to decode into a UserData carrying its errors; a 2xx body
+// that does not decode is ErrUnreadable.
+func TestGetUserDataStatusIsTyped(t *testing.T) {
+	for name, tc := range map[string]struct {
+		code int
+		body string
+	}{
+		"a dead token":  {http.StatusUnauthorized, fixture(t, "identity-unauthorized.json")},
+		"a throttle":    {http.StatusTooManyRequests, fixture(t, "membership-throttled.json")},
+		"an edge's 502": {http.StatusBadGateway, "<html>502 Bad Gateway</html>"},
+	} {
+		e := serveAnswer(t, tc.code, tc.body)
+		c := &Client{Client: e.client()}
+		userData, err := c.GetUserData(context.Background())
+		var statusErr *StatusError
+		if !errors.As(err, &statusErr) || statusErr.StatusCode != tc.code || statusErr.Body != tc.body || userData != nil {
+			t.Errorf("%s: %+v, %v, want a StatusError %d holding the body", name, userData, err, tc.code)
+		}
+	}
+	for _, body := range []string{`{"data":{"attrib`, "<html>ok</html>"} {
+		e := serveAnswer(t, http.StatusOK, body)
+		c := &Client{Client: e.client()}
+		_, err := c.GetUserData(context.Background())
+		if !errors.Is(err, ErrUnreadable) {
+			t.Errorf("200 %q: %v, want ErrUnreadable", body, err)
+		}
+	}
+	e := serveAnswer(t, http.StatusOK, identityResponse)
+	c := &Client{Client: e.client()}
+	userData, err := c.GetUserData(context.Background())
+	if err != nil || userData.Data.Attributes.Email != "patron@example.com" {
+		t.Errorf("200: %+v, %v, want the identity", userData, err)
 	}
 }
