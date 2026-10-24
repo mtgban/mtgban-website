@@ -400,6 +400,11 @@ fallback is removed 31 days after the rename's deploy. A login also stores
 its Patreon refresh token in a `patreon_sessions` row of the `user_state`
 database, which the HttpOnly `BAN_SESSION` cookie names; logout deletes the
 row, and a daily job prunes those past `max_session_days` (ADR-0008).
+With `patreon_renewal.after_days` set, `signing` renews a cookie-borne
+signature that old, or one that ran out within `grace_days`, from the
+session its `BAN_SESSION` cookie names: it leases every session of the
+email, asks Patreon through the refresh token, stores the rotated one,
+and serves the request on the new signature (`auth_renew.go`).
 `GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the

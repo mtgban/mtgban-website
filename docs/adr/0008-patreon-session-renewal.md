@@ -1,6 +1,6 @@
 # ADR-0008: The site renews a Patreon session itself
 
-**Status:** Accepted (this PR stores, deletes and prunes the row; the renewal and its knobs follow)
+**Status:** Accepted (the renewal ships off: it runs once `patreon_renewal.after_days` is set)
 **Date:** 2026-10-23
 **Deciders:** Vittorio Giovara
 **Amends:** AGENTS.md invariant 2 ("stateless auth"); ADR-0005's "the site keeps no Patreon tokens"
@@ -67,8 +67,10 @@ without the reader.
    OK, no membership or no entitled tier, no grant): delete the row,
    clear both cookies, log the reader out now (`clear_on_negative`).
    *Unknown* (any transport, status, shape or title failure): keep
-   everything, back off an hour. Unknown never extends a session; it
-   can only keep one until the signature runs out on its own.
+   everything, back off an hour, and store the token a refresh that went
+   through already rotated to, since the old one is dead. Unknown never
+   extends a session; it can only keep one until the signature runs out
+   on its own.
 6. **Refresh token at rest: plain text.** It redeems only with the
    client secret, which lives in the infrastructure config; a session
    id renews only beside its reader's signature, which the database

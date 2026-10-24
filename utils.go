@@ -1601,6 +1601,14 @@ func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, sessionCookieFor(r, "", -1))
 }
 
+// clearLoginCookies drops everything a login set: the session cookie and the
+// signature under both of its names.
+func clearLoginCookies(w http.ResponseWriter, r *http.Request) {
+	clearSessionCookie(w, r)
+	clearSignatureCookie(w, r, signatureCookie)
+	clearSignatureCookie(w, r, legacySignatureCookie)
+}
+
 // isSecureRequest reports whether the request reached us over HTTPS,
 // accounting for a TLS-terminating proxy that sets X-Forwarded-Proto.
 func isSecureRequest(r *http.Request) bool {

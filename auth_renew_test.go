@@ -13,7 +13,6 @@ import (
 // inputs each end it on their own.
 func TestDecideRenewal(t *testing.T) {
 	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
-	const day = 24 * time.Hour
 	block := infrastructure.PatreonRenewal{AfterDays: 8, GraceDays: 3}
 
 	for _, tc := range []struct {
