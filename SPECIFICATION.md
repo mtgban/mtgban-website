@@ -524,8 +524,9 @@ network first), the hash (`assetHash`: the commit, plus the start time in dev)
 baked into template asset URLs for cache-busting;
 `POST /webhook/patreon` (`PatreonWebhook`, auth_webhook.go), Patreon's member
 webhook behind `noSigning`: 404 until `patreon_webhook_secret` is set, 401
-unless `X-Patreon-Signature` is the hex HMAC-MD5 of the raw body (the one place
-MD5 is used, because it is what Patreon computes), and otherwise 200 after
+unless `X-Patreon-Signature` is the hex HMAC-MD5 of the raw body
+(`patreon.WebhookSigned`, the one place MD5 is used, because it is what Patreon
+computes), and otherwise 200 after
 poking the delivery's `data.attributes.email` here and on the peers (§3.2),
 the rest of the body unread;
 `/go/{r|i|b}/{store}/{hash}` affiliate redirects, or the 2-segment
