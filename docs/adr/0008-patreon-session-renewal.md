@@ -112,6 +112,16 @@ without the reader.
 - A cancelled pledge is noticed at the next renewal (~day 8 at the
   default) rather than at expiry; with the webhook (Phase 5) at the next
   page load.
+- Patreon's webhook (`POST /webhook/patreon`) turns that into
+  revocation within one page load. A delivery whose signature checks out
+  *pokes* the member's email in memory on every site (a Postgres NOTIFY
+  carries the hash), and a poked reader's next request renews whatever
+  the signature's age. The body's own verdict is never read: the renewal
+  asks Patreon who is entitled, so one path decides, and the portal's
+  test deliveries, which call a deleted pledge active, could not mislead
+  it. A poke a restarting site missed, or one that outlives `after_days`,
+  falls back to the age window; a poke that meets Patreon's silence stays,
+  and is tried again once the hour's backoff is up.
 - A tier change, and an ACL or grant edit, reach an active reader at
   the next renewal, or at once through **Refresh now** on the account
   page.

@@ -82,16 +82,29 @@ func graceSignature(r *http.Request, sig, querySig string) url.Values {
 }
 
 // renewDue renews the signature of the request signing is serving when
-// decideRenewal says it is due, and reports what the request goes on with:
-// the new signature, or refused when the reader's pledge is gone and they are
-// logged out. values and signed are the cookie's signature as signing read
+// decideRenewal says it is due, or when its reader was poked after it was
+// issued and decideRenewal skipped it for its age alone, and reports what the
+// request goes on with: the new signature, or refused when the reader's pledge
+// is gone and they are logged out. values and signed are the cookie's signature as signing read
 // it, expired or not, and whether this host wrote it; cookieBorne says it
 // came from the cookie, not ?sig=.
 func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Values, signed, cookieBorne bool) (sig string, refused bool) {
 	expires, _ := strconv.ParseInt(values.Get("Expires"), 10, 64)
+	ends := time.Unix(expires, 0)
+	now := time.Now()
 	hasSession := readCookie(r, sessionCookie) != ""
-	decision := decideRenewal(signed, time.Unix(expires, 0), time.Now(), cookieBorne, hasSession, Infrastructure().PatreonRenewal)
-	if decision == renewalSkip || !renewalEnabled() {
+	cfg := Infrastructure().PatreonRenewal
+	if decideRenewal(signed, ends, now, cookieBorne, hasSession, cfg) == renewalSkip {
+		// A poke lifts the age check and nothing else: the signature is still
+		// this host's, in the cookie, naming a reader beside their session, and
+		// not past the end of grace
+		email := values.Get("UserEmail")
+		eligible := signed && cookieBorne && hasSession && email != "" && cfg.AfterDays > 0 && now.Sub(ends) <= cfg.Grace()
+		if !eligible || Pokes.wants(userstate.HashEmail(email), ends.Add(-DefaultSignatureDuration)) == "" {
+			return "", false
+		}
+	}
+	if !renewalEnabled() {
 		return "", false
 	}
 	return s.renewSignature(w, r, values, 0)
@@ -225,7 +238,9 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 // which case the sessions rest for an hour and the signature runs out on its
 // own. A refresh token Patreon no longer honours ends every session of the
 // email and the browser's cookie, and refused is true only when Patreon says
-// nothing is pledged and clear_on_negative logged the reader out.
+// nothing is pledged and clear_on_negative logged the reader out. A renewed
+// signature is issued after its reader's poke and is left alone; the reader's
+// other devices renew at their own next request.
 //
 // The calls to Patreon run under renew_timeout_seconds with no database
 // connection held, and a reader who navigates away does not cancel a refresh
