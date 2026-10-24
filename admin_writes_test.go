@@ -126,6 +126,9 @@ func TestAdminRefusesCrossSitePosts(t *testing.T) {
 		{"mtgban.com", "", "https://mtgban.com", "same-site", http.StatusForbidden},
 		{"mtgban.com", "", "https://mtgban.com", "", http.StatusOK},
 		{"mtgban.com", "", "https://mtgban.com", "same-origin", http.StatusOK},
+		{"mtg.ban.cards", "", "https://mtg.ban.cards", "", http.StatusOK},
+		{"mtg.ban.cards", "", "https://www.mtgban.com", "", http.StatusForbidden},
+		{"mtg.ban.cards", "", "https://ban.cards.evil.example", "", http.StatusForbidden},
 		// Behind a proxy that names its upstream as Host
 		{"backend:8080", "mtgban.com", "https://mtgban.com", "", http.StatusOK},
 		{"127.0.0.1:8080", "", "http://127.0.0.1:8080", "", http.StatusOK},
