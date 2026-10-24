@@ -154,6 +154,8 @@ github.com/mtgban/go-cardmarket v0.5.0 h1:cpU4/PzkTlujNDLKHH1TFlLZq2gc8QMPlr8781
 github.com/mtgban/go-cardmarket v0.5.0/go.mod h1:RR9QJ8GSJ5Fj04sw2hw7FWGKHwqVEA3HdFbc6lDVDNE=
 github.com/mtgban/go-mtgban v0.11.0 h1:mi3+7iKRv0tq58sA+ZCINIj5/AHjgWz9Ggp5aDPUqMY=
 github.com/mtgban/go-mtgban v0.11.0/go.mod h1:nN5nyVxbrR0q2zF6loViSg6HJdiaCAd2X9gU6MLLqZY=
+github.com/mtgban/go-mtgban v0.11.1-0.20261023224945-deaddc48b55c h1:n91E8/q0Nro8fqJlb0jbjF6N//k+dVpoq/VN0RgXAbk=
+github.com/mtgban/go-mtgban v0.11.1-0.20261023224945-deaddc48b55c/go.mod h1:nN5nyVxbrR0q2zF6loViSg6HJdiaCAd2X9gU6MLLqZY=
 github.com/mtgban/go-tcgplayer v0.2.0 h1:n9/vE9yHDhJk0jI0xWddQaJxKlOOzUyfZJ4JJN+ubhc=
 github.com/mtgban/go-tcgplayer v0.2.0/go.mod h1:R27t98OFgcBtz4SnKqoOvYx31UNZi1tGWmH1Hmu/SYI=
 github.com/mtgban/simplecloud v0.1.1 h1:lSQUKMsV2YyGTIFJ+graatpLcbdkSpOXtL30EBOqAk8=
