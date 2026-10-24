@@ -156,14 +156,23 @@ func ProcessEmbedSearchResultsVendors(b *mtgmatcher.Backend, foundVendors map[st
 // externalURL is the origin this site is reachable at: what an oEmbed
 // consumer records as the provider, and what an embed's price links point at.
 // Background work has no request from which to derive an origin, so it uses
-// the public default; HTTP handlers pass their request through here.
+// this game's public host; HTTP handlers pass their request through here.
 func externalURL(r *http.Request) string {
 	if origin := siteorigin.Of(r); origin != "" {
 		return origin
 	}
-	// Background jobs do not have a deployment request to identify a game
-	// host, so they use the site's single public identity.
-	return DefaultExternalURL
+	return publicOrigin()
+}
+
+// publicOrigin is this deployment's own public origin, for a caller with no
+// trusted request to take one from: the public default for Magic, and
+// <game>.mtgban.com for every other game.
+func publicOrigin() string {
+	game := Config().Game
+	if game == mtgmatcher.GameMagic {
+		return DefaultExternalURL
+	}
+	return "https://" + string(game) + ".mtgban.com"
 }
 
 func absoluteURL(r *http.Request, path string) string {

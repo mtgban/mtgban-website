@@ -130,7 +130,7 @@ func APIStores(w http.ResponseWriter, r *http.Request) {
 func apiPlansVars(r *http.Request, sig string) *APIPlansVars {
 	origin := siteorigin.Of(r)
 	if origin == "" {
-		origin = DefaultExternalURL
+		origin = publicOrigin()
 	}
 	invite := r.FormValue("invite")
 	change := r.FormValue("change") == "1"
