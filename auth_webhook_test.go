@@ -16,6 +16,7 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/mtgban/mtgban-website/internal/poke"
+	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -81,7 +82,7 @@ func newWebhookRig(t *testing.T) *webhookRig {
 
 // deliver posts body signed under the rig's secret.
 func (rig *webhookRig) deliver(event string, body []byte) *httptest.ResponseRecorder {
-	return serveWebhook(webhookRequest(event, patreonSignature(rig.secret, body), body))
+	return serveWebhook(webhookRequest(event, patreon.WebhookSignature(rig.secret, body), body))
 }
 
 // wantNothingPoked fails if anyone is poked.
@@ -148,10 +149,10 @@ func TestPatreonWebhookRefusesADeliveryItCannotVerify(t *testing.T) {
 		{"a wrong signature", func(*webhookRig) string { return strings.Repeat("ab", 16) }, body},
 		{"no signature header", func(*webhookRig) string { return "" }, body},
 		{"a signature that is not hex", func(*webhookRig) string { return "not-a-signature" }, body},
-		{"a signature cut short", func(rig *webhookRig) string { return patreonSignature(rig.secret, body)[:30] }, body},
-		{"a body signed under another secret", func(*webhookRig) string { return patreonSignature("another-secret", body) }, body},
-		{"a signature of another body", func(rig *webhookRig) string { return patreonSignature(rig.secret, []byte("{}")) }, body},
-		{"a body changed after signing", func(rig *webhookRig) string { return patreonSignature(rig.secret, body) }, append([]byte(" "), body...)},
+		{"a signature cut short", func(rig *webhookRig) string { return patreon.WebhookSignature(rig.secret, body)[:30] }, body},
+		{"a body signed under another secret", func(*webhookRig) string { return patreon.WebhookSignature("another-secret", body) }, body},
+		{"a signature of another body", func(rig *webhookRig) string { return patreon.WebhookSignature(rig.secret, []byte("{}")) }, body},
+		{"a body changed after signing", func(rig *webhookRig) string { return patreon.WebhookSignature(rig.secret, body) }, append([]byte(" "), body...)},
 		{"a SHA-256 signature", func(rig *webhookRig) string { return sha256Signed(rig.secret, body) }, body},
 		{"a body that is not JSON", func(*webhookRig) string { return strings.Repeat("ab", 16) }, []byte("<html>")},
 	} {
@@ -175,32 +176,13 @@ func TestPatreonWebhookRefusesADeliveryItCannotVerify(t *testing.T) {
 	}
 }
 
-// The signature is the hex HMAC-MD5 of the body: RFC 2202's test case 2, whose
-// answer no test here computes.
-func TestPatreonSignatureIsHMACMD5(t *testing.T) {
-	const vector = "750c783e6ab0b503eaa86e310a5db738"
-	body := []byte("what do ya want for nothing?")
-	if !patreonSignatureMatches("Jefe", body, vector) {
-		t.Error("the HMAC-MD5 of RFC 2202's second case does not verify")
-	}
-	if !patreonSignatureMatches("Jefe", body, strings.ToUpper(vector)) {
-		t.Error("the same signature in capitals does not verify")
-	}
-	if patreonSignatureMatches("Jefe", body, vector[:30]) || patreonSignatureMatches("Jefe", body, "") || patreonSignatureMatches("Jefa", body, vector) {
-		t.Error("a short, empty or other-keyed signature verifies")
-	}
-	if patreonSignature("Jefe", body) != vector {
-		t.Errorf("the signer gives %s, want RFC 2202's %s", patreonSignature("Jefe", body), vector)
-	}
-}
-
 // Only a POST is a delivery.
 func TestPatreonWebhookAnswersOnlyPosts(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete, http.MethodHead} {
 		t.Run(method, func(t *testing.T) {
 			rig := newWebhookRig(t)
 			body := webhookFixture(t, "webhook-pledge-update.json")
-			req := webhookRequest("members:pledge:update", patreonSignature(rig.secret, body), body)
+			req := webhookRequest("members:pledge:update", patreon.WebhookSignature(rig.secret, body), body)
 			req.Method = method
 
 			rec := serveWebhook(req)
@@ -221,8 +203,8 @@ func TestPatreonWebhookIsOffWithoutASecret(t *testing.T) {
 	body := webhookFixture(t, "webhook-pledge-update.json")
 
 	for name, req := range map[string]*http.Request{
-		"signed under the empty key": webhookRequest("members:pledge:update", patreonSignature("", body), body),
-		"signed under a secret":      webhookRequest("members:pledge:update", patreonSignature("hook-secret", body), body),
+		"signed under the empty key": webhookRequest("members:pledge:update", patreon.WebhookSignature("", body), body),
+		"signed under a secret":      webhookRequest("members:pledge:update", patreon.WebhookSignature("hook-secret", body), body),
 		"unsigned":                   webhookRequest("members:pledge:update", "", body),
 		"a GET":                      httptest.NewRequest(http.MethodGet, "/webhook/patreon", nil),
 	} {
@@ -320,7 +302,7 @@ func TestPatreonWebhookRefusesABodyPastTheCap(t *testing.T) {
 func TestPatreonWebhookRefusesAFormPost(t *testing.T) {
 	rig := newWebhookRig(t)
 	form := []byte("data=1&sig=x")
-	req := webhookRequest("members:pledge:update", patreonSignature(rig.secret, []byte("data=1")), form)
+	req := webhookRequest("members:pledge:update", patreon.WebhookSignature(rig.secret, []byte("data=1")), form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	rec := serveWebhook(req)
