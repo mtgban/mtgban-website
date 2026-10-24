@@ -339,12 +339,13 @@ save, and each has an admin tab that edits it (§5.9):
 
 - `infrastructure_path`: the infrastructure settings,
   `internal/infrastructure.Config` — `bucket_keys`, `google_credentials`
-  (the credentials file's path), `patreon`, `patreon_renewal` (the
-  session lifetime, `max_session_days`), `uploader` (the Moxfield and
-  Collectr endpoints), `handoff_origins` (the sites `/upload/handoff`
-  takes a card list from, each `{"name", "seller"}`: the name its
-  results are headed with, and the path segment its URLs name a seller
-  after), `sql_config`, `user_state_config`,
+  (the credentials file's path), `patreon`, `patreon_renewal` (when a
+  signature renews, `after_days` and `grace_days`; the session lifetime,
+  `max_session_days`; `clear_on_negative`; `renew_timeout_seconds`),
+  `uploader` (the Moxfield and Collectr endpoints), `handoff_origins`
+  (the sites `/upload/handoff` takes a card list from, each `{"name",
+  "seller"}`: the name its results are headed with, and the path segment
+  its URLs name a seller after), `sql_config`, `user_state_config`,
   `observability_config` and `new_newspaper_sql_config`. The config may
   set any of these keys itself, and its value wins (`Over`); code reads the
   result through `Infrastructure()`. A path in the config's own bucket is

@@ -55,15 +55,41 @@ type Patreon struct {
 	Secret map[string]string `json:"secret"`
 }
 
-// PatreonRenewal is how long the site keeps a reader's Patreon session.
+// PatreonRenewal is how the site keeps a reader's Patreon session and renews
+// their signature from it. Renewal is off while AfterDays is 0.
 type PatreonRenewal struct {
+	// AfterDays is the age a signature reaches before the next request
+	// renews it; 0 turns renewal off.
+	AfterDays int `json:"after_days,omitempty"`
+	// GraceDays is how long after a signature ran out its reader's cookie
+	// may still renew it; 0 means never.
+	GraceDays int `json:"grace_days,omitempty"`
 	// MaxSessionDays caps a session from the login that made it; 0 means
 	// DefaultMaxSessionDays.
 	MaxSessionDays int `json:"max_session_days,omitempty"`
+	// ClearOnNegative logs a reader out when Patreon says nothing is
+	// pledged any more; without it that answer is treated as no answer.
+	ClearOnNegative bool `json:"clear_on_negative,omitempty"`
+	// RenewTimeoutSeconds bounds the Patreon calls of one renewal; 0 means
+	// DefaultRenewTimeoutSeconds.
+	RenewTimeoutSeconds int `json:"renew_timeout_seconds,omitempty"`
 }
 
 // DefaultMaxSessionDays is the cap MaxSessionDays 0 stands for.
 const DefaultMaxSessionDays = 90
+
+// DefaultRenewTimeoutSeconds is the wait RenewTimeoutSeconds 0 stands for.
+const DefaultRenewTimeoutSeconds = 5
+
+// After is the age at which a signature is renewed.
+func (p PatreonRenewal) After() time.Duration {
+	return time.Duration(p.AfterDays) * 24 * time.Hour
+}
+
+// Grace is how long after it ran out a signature may still be renewed.
+func (p PatreonRenewal) Grace() time.Duration {
+	return time.Duration(p.GraceDays) * 24 * time.Hour
+}
 
 // MaxSession is how long a session lasts from its login.
 func (p PatreonRenewal) MaxSession() time.Duration {
@@ -72,6 +98,15 @@ func (p PatreonRenewal) MaxSession() time.Duration {
 		days = DefaultMaxSessionDays
 	}
 	return time.Duration(days) * 24 * time.Hour
+}
+
+// RenewTimeout is how long one renewal waits on Patreon.
+func (p PatreonRenewal) RenewTimeout() time.Duration {
+	seconds := p.RenewTimeoutSeconds
+	if seconds <= 0 {
+		seconds = DefaultRenewTimeoutSeconds
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // Over returns base with every key own sets replaced by own's, whole: a
