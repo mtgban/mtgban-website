@@ -44,3 +44,37 @@ func TestOf(t *testing.T) {
 		t.Fatalf("host-only HTTPS Of = %q, want https://onepiece.mtgban.com", got)
 	}
 }
+
+// A host is the site's own when it is an apex or under one; a lookalike, a
+// bare TLD and a host of another site are not.
+func TestTrustedAndApex(t *testing.T) {
+	for _, tt := range []struct {
+		host string
+		apex string // empty when not an apex host
+		ok   bool
+	}{
+		{"www.mtgban.com", "mtgban.com", true},
+		{"mtgban.com", "mtgban.com", true},
+		{"lorcana.mtgban.com:8080", "mtgban.com", true},
+		{"MTG.BAN.CARDS.", "ban.cards", true},
+		{"mtg.ban.cards", "ban.cards", true},
+		{"ban.cards", "ban.cards", true},
+		{"localhost", "", true},
+		{"localhost:8080", "", true},
+		{"mtgban.com.evil.tld", "", false},
+		{"ban.cards.evil.tld", "", false},
+		{"xban.cards", "", false},
+		{"notmtgban.com", "", false},
+		{"cards", "", false},
+		{"attacker.example", "", false},
+		{"mtg.ban.cards:port", "", false},
+		{"", "", false},
+	} {
+		if got := Trusted(tt.host); got != tt.ok {
+			t.Errorf("Trusted(%q) = %v, want %v", tt.host, got, tt.ok)
+		}
+		if got := Apex(tt.host); got != tt.apex {
+			t.Errorf("Apex(%q) = %q, want %q", tt.host, got, tt.apex)
+		}
+	}
+}

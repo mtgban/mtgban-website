@@ -1502,9 +1502,10 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 }
 
 // cookieDomain returns the Domain that shares a cookie across the sites of
-// the parent domain: the request's hostname without its first label, unless
-// that label is "mtgban". When the request's origin is not a trusted host it
-// returns no domain and global false, so the cookie stays host-only.
+// one apex: mtgban.com for www.mtgban.com, ban.cards for mtg.ban.cards, and
+// none on localhost, where the cookie stays on the host. When the request's
+// origin is not a trusted host it returns no domain and global false, so the
+// cookie stays host-only there too.
 func cookieDomain(r *http.Request) (domain string, global bool) {
 	origin := siteorigin.Of(r)
 	u, err := url.Parse(origin)
@@ -1514,14 +1515,7 @@ func cookieDomain(r *http.Request) (domain string, global bool) {
 		// those cookies to a parent domain derived from an untrusted Host.
 		return "", false
 	}
-
-	domain = u.Hostname()
-	fields := strings.Split(domain, ".")
-	// Guard against hostname being "mtgban.com"
-	if fields[0] != "mtgban" {
-		domain = strings.Join(fields[1:], ".")
-	}
-	return domain, true
+	return siteorigin.Apex(u.Hostname()), true
 }
 
 // signatureCookie holds the reader's signature, on the parent domain so every

@@ -43,6 +43,38 @@ func TestCookiePath(t *testing.T) {
 	}
 }
 
+// A login cookie is shared under the apex of the host it was set on, stays on
+// the host for a dev box, and is never widened for a host that is not ours.
+func TestCookieDomainIsTheApex(t *testing.T) {
+	for _, tt := range []struct {
+		host, forwardedHost string
+		domain              string
+		global              bool
+	}{
+		{"www.mtgban.com", "", "mtgban.com", true},
+		{"mtgban.com", "", "mtgban.com", true},
+		{"lorcana.mtgban.com", "", "mtgban.com", true},
+		{"mtg.ban.cards", "", "ban.cards", true},
+		{"ban.cards", "", "ban.cards", true},
+		{"backend:8080", "pokemon.ban.cards", "ban.cards", true},
+		{"localhost:8080", "", "", true},
+		{"example.com", "", "", false},
+		{"mtgban.com.evil.example", "", "", false},
+		{"xban.cards", "", "", false},
+	} {
+		req := httptest.NewRequest("GET", "/auth", nil)
+		req.Host = tt.host
+		req.Header.Set("X-Forwarded-Proto", "https")
+		if tt.forwardedHost != "" {
+			req.Header.Set("X-Forwarded-Host", tt.forwardedHost)
+		}
+		domain, global := cookieDomain(req)
+		if domain != tt.domain || global != tt.global {
+			t.Errorf("cookieDomain(%s via %q) = %q, %v; want %q, %v", tt.host, tt.forwardedHost, domain, global, tt.domain, tt.global)
+		}
+	}
+}
+
 func TestSetCookieUsesRequestPath(t *testing.T) {
 	for _, tc := range []struct {
 		name string

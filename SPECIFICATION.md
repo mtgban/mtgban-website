@@ -400,7 +400,8 @@ default), and an HMAC-SHA1 `Signature` over
 signature checks (`enforceAPISigning`) look up a per-user secret in
 `Config.APIUserSecrets` first, falling back to `BAN_SECRET` — page
 signatures always use `BAN_SECRET` only. It is stored in the `BAN_SIG`
-cookie (31 days, shared across `*.mtgban.com`, HttpOnly, `SameSite=Lax`,
+cookie (31 days, shared across the sites of its apex, `*.mtgban.com` or
+`*.ban.cards`, HttpOnly, `SameSite=Lax`,
 always written by `signatureCookieFor`) and/or passed as `?sig=`. A reader
 who still holds only the `MTGBAN` cookie it replaced is served from that and
 moved to `BAN_SIG` on their next page load (`migrateSignatureCookie`); that

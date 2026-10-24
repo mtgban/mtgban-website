@@ -60,16 +60,38 @@ func Host(r *http.Request) string {
 	return host
 }
 
-// Trusted reports whether a host belongs to this site: localhost in
-// dev, or an mtgban.com host in production. Matched on the hostname exactly
-// (dropping any :port) and by suffix rather than substring, so a spoofed
-// "…mtgban.com.evil.tld" can't slip through.
+// apexes are the domains the sites are served under: each site is a
+// subdomain of one of them, and every site under one apex shares its cookies.
+// mtgban.com is also the signing host, the constant link in every signature.
+var apexes = []string{"mtgban.com", "ban.cards"}
+
+// Trusted reports whether a host belongs to this site: localhost in dev, or
+// an apex or one of its subdomains in production. Matched on the hostname
+// exactly (dropping any :port) and by suffix rather than substring, so a
+// spoofed "…mtgban.com.evil.tld" can't slip through.
 func Trusted(host string) bool {
 	name, ok := validHostname(FirstForwarded(host))
 	if !ok {
 		return false
 	}
-	return name == "localhost" || name == "mtgban.com" || strings.HasSuffix(name, ".mtgban.com")
+	return name == "localhost" || Apex(name) != ""
+}
+
+// Apex is the apex domain a trusted host belongs to, the Domain its cookies
+// are shared under: "mtgban.com" for www.mtgban.com, "ban.cards" for
+// mtg.ban.cards. It is empty for localhost and for any host that is not the
+// site's own.
+func Apex(host string) string {
+	name, ok := validHostname(FirstForwarded(host))
+	if !ok {
+		return ""
+	}
+	for _, apex := range apexes {
+		if name == apex || strings.HasSuffix(name, "."+apex) {
+			return apex
+		}
+	}
+	return ""
 }
 
 func validHostname(host string) (string, bool) {
