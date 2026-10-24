@@ -7,6 +7,7 @@ package infrastructure
 
 import (
 	"cmp"
+	"time"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -18,6 +19,7 @@ type Config struct {
 	BucketKeys        map[string]BucketKey `json:"bucket_keys,omitempty"`
 	GoogleCredentials string               `json:"google_credentials,omitempty"`
 	Patreon           Patreon              `json:"patreon"`
+	PatreonRenewal    PatreonRenewal       `json:"patreon_renewal,omitzero"`
 	Uploader          map[string]string    `json:"uploader,omitempty"`
 	// HandoffOrigins maps each site allowed to hand /upload/handoff a card
 	// list to how its results are headed.
@@ -53,6 +55,25 @@ type Patreon struct {
 	Secret map[string]string `json:"secret"`
 }
 
+// PatreonRenewal is how long the site keeps a reader's Patreon session.
+type PatreonRenewal struct {
+	// MaxSessionDays caps a session from the login that made it; 0 means
+	// DefaultMaxSessionDays.
+	MaxSessionDays int `json:"max_session_days,omitempty"`
+}
+
+// DefaultMaxSessionDays is the cap MaxSessionDays 0 stands for.
+const DefaultMaxSessionDays = 90
+
+// MaxSession is how long a session lasts from its login.
+func (p PatreonRenewal) MaxSession() time.Duration {
+	days := p.MaxSessionDays
+	if days <= 0 {
+		days = DefaultMaxSessionDays
+	}
+	return time.Duration(days) * 24 * time.Hour
+}
+
 // Over returns base with every key own sets replaced by own's, whole: a
 // deployment overrides a key by setting it in its config, and inherits
 // it by leaving it out.
@@ -64,6 +85,7 @@ func (own Config) Over(base Config) Config {
 	if own.Patreon.Source != "" || own.Patreon.Client != nil || own.Patreon.Secret != nil {
 		base.Patreon = own.Patreon
 	}
+	base.PatreonRenewal = cmp.Or(own.PatreonRenewal, base.PatreonRenewal)
 	if own.Uploader != nil {
 		base.Uploader = own.Uploader
 	}
