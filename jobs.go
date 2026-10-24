@@ -12,19 +12,20 @@ import (
 // The site's background jobs, as the admin dashboard and the staleness alarm
 // name them.
 const (
-	jobStash          = "Price stash"
-	jobSetAnalysis    = "Set analysis"
-	jobNewspaper      = "Newspaper cache"
-	jobCKSignals      = "CK signals"
-	jobTCGListings    = "TCG listings"
-	jobOffline        = "Offline refresh"
-	jobTCGCSVPrices   = "TCGCSV prices"
-	jobTCGCSVProducts = "TCGCSV products"
-	jobCheckpoints    = "Checkpoints"
-	jobStaleness      = "Staleness check"
-	jobAlerts         = "Alert evaluation"
-	jobPopular        = "Popular searches"
-	jobUploadShares   = "Upload shares"
+	jobStash           = "Price stash"
+	jobSetAnalysis     = "Set analysis"
+	jobNewspaper       = "Newspaper cache"
+	jobCKSignals       = "CK signals"
+	jobTCGListings     = "TCG listings"
+	jobOffline         = "Offline refresh"
+	jobTCGCSVPrices    = "TCGCSV prices"
+	jobTCGCSVProducts  = "TCGCSV products"
+	jobCheckpoints     = "Checkpoints"
+	jobStaleness       = "Staleness check"
+	jobAlerts          = "Alert evaluation"
+	jobPopular         = "Popular searches"
+	jobUploadShares    = "Upload shares"
+	jobPatreonSessions = "Patreon sessions"
 )
 
 // backgroundJobs records every run of the jobs above.
@@ -61,10 +62,16 @@ func checkJobHealth() {
 	announceStaleChanges(changes)
 }
 
-// startCrons schedules the background refreshes. The library runs each job
-// on a bare goroutine, where a panic would end the process: tracked reports
-// it instead, and the job runs again at its next time.
+// startCrons schedules the background refreshes and starts them.
 func (s *site) startCrons() {
+	s.scheduleCrons().Start()
+}
+
+// scheduleCrons registers the background refreshes on a scheduler it leaves
+// stopped. The library runs each job on a bare goroutine, where a panic
+// would end the process: tracked reports it instead, and the job runs again
+// at its next time.
+func (s *site) scheduleCrons() *cron.Cron {
 	c := cron.New()
 	// addJob schedules fn at spec as the background job name, whose runs
 	// and schedule the admin dashboard and the staleness alarm read.
@@ -141,6 +148,8 @@ func (s *site) startCrons() {
 	// Expired upload shares are already misses; this reclaims their rows.
 	if UserStateDB != nil {
 		addJob("10 5 * * *", jobUploadShares, pruneUploadShares)
+		// Reclaim the rows of sessions past their cap.
+		addJob("15 5 * * *", jobPatreonSessions, prunePatreonSessions)
 	}
 
 	// Alarm on a store whose retail or buylist data has gone stale (see
@@ -150,5 +159,5 @@ func (s *site) startCrons() {
 	// And on a background job turning bad, the same way.
 	c.AddFunc("0 * * * *", recovered("cron checkJobHealth", checkJobHealth))
 
-	c.Start()
+	return c
 }

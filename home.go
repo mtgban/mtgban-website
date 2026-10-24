@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // Handler for / renders the home.html page
@@ -18,6 +20,19 @@ func (s *site) Home(w http.ResponseWriter, r *http.Request) {
 	case "UserNotFound", "TierNotFound":
 		message = ErrMsg
 	case "logout":
+		// Drop the renewal session this browser holds. With the database
+		// down the cookie goes anyway and the row waits for the prune.
+		sessionID := readCookie(r, sessionCookie)
+		if sessionID != "" && UserStateDB != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			err := UserStateDB.DeletePatreonSession(ctx, sessionID)
+			cancel()
+			if err != nil {
+				LogPages["Admin"].Println("DeletePatreonSession", err)
+			}
+		}
+		clearSessionCookie(w, r)
+
 		// Invalidate the current cookie
 		clearSignatureCookie(w, r, signatureCookie)
 		clearSignatureCookie(w, r, legacySignatureCookie)

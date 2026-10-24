@@ -139,7 +139,9 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 // finishSiteLogin signs in the reader Patreon just named, whose pledge gives
 // tier: it signs their signature into the cookies and sends them on to where
 // state says the login began. refreshToken is the one Patreon issued with
-// the login.
+// the login; it is kept in a patreon_sessions row, which the BAN_SESSION
+// cookie names, when the site has a database and the token is not empty.
+// A row that cannot be written is logged and the login goes on without it.
 func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state string, user *pledge.User, tier string, overrides map[string]map[string]string, granted bool, refreshToken string) {
 	// Sign our base URL with our tier and other data
 	sig := sign(tier, user, overrides, DefaultSignatureDuration)
@@ -164,6 +166,29 @@ func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state str
 
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, r, sig)
+
+	// The row that lets the site renew this signature later. Without one the
+	// login still works and simply never renews. A browser logging in again
+	// replaces the row its cookie names once the new one is written, so a
+	// failed insert leaves it the row it had and logout always reaches one.
+	if UserStateDB != nil && refreshToken != "" {
+		sessionCtx, cancelSession := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancelSession()
+		maxAge := Infrastructure().PatreonRenewal.MaxSession()
+		sessionID, err := UserStateDB.CreatePatreonSession(sessionCtx, userstate.HashEmail(user.Email), refreshToken, maxAge)
+		if err != nil {
+			LogPages["Admin"].Println("CreatePatreonSession", err)
+		} else {
+			setSessionCookie(w, r, sessionID, signatureCookieDays*24*time.Hour)
+			previous := readCookie(r, sessionCookie)
+			if previous != "" {
+				err = UserStateDB.DeletePatreonSession(sessionCtx, previous)
+				if err != nil {
+					LogPages["Admin"].Println("DeletePatreonSession", err)
+				}
+			}
+		}
+	}
 
 	// Redirect to the URL indicated in this query param, or go to homepage.
 	// Drop a stale error from the page that started the login flow now that
@@ -324,6 +349,23 @@ const signatureCookieDays = 31
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	expires := time.Now().Add(signatureCookieDays * 24 * time.Hour)
 	http.SetCookie(w, signatureCookieFor(r, signatureCookie, sig, expires))
+}
+
+// prunePatreonSessions deletes the sessions past their cap; nothing to do
+// without a client.
+func prunePatreonSessions() {
+	if UserStateDB == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	n, err := UserStateDB.PrunePatreonSessions(ctx)
+	if err != nil {
+		log.Println("patreon sessions: prune:", err)
+		backgroundJobs.Report(jobPatreonSessions, "", err.Error())
+		return
+	}
+	backgroundJobs.Report(jobPatreonSessions, fmt.Sprintf("%d pruned", n), "")
 }
 
 // migrateSignatureCookie finishes the move off the legacy cookie for a reader
