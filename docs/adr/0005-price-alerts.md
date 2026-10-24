@@ -15,7 +15,8 @@ DM through the bot when one fires.
 
 Two facts shape everything below. The evaluator runs in the background, so
 it has no cookie to read a user's grants from and cannot ask Patreon
-either: the site keeps no Patreon tokens (AGENTS.md invariant 2). And every
+either: the site keeps no Patreon tokens (AGENTS.md invariant 2; ADR-0008
+amends that, but the evaluator still reads none). And every
 game shares one login: the `MTGBAN` cookie sits on `mtgban.com`, every site
 signs against the same link, and `acl.json` and the grants are one file
 each for all of them.

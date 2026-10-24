@@ -1,0 +1,138 @@
+# ADR-0008: The site renews a Patreon session itself
+
+**Status:** Accepted (this PR stores, deletes and prunes the row; the renewal and its knobs follow)
+**Date:** 2026-10-23
+**Deciders:** Vittorio Giovara
+**Amends:** AGENTS.md invariant 2 ("stateless auth"); ADR-0005's "the site keeps no Patreon tokens"
+
+## Context
+
+A Patreon login mints a `BAN_SIG` signature good for 11 days
+(`DefaultSignatureDuration`) in a cookie that lives 31 days. When the
+signature runs out the reader is logged out and has to go through
+Patreon again, whether or not their pledge still stands. `/auth`
+receives a refresh token with every login and throws it away.
+
+Patreon's refresh grant lets the site mint a new access token at any
+time, server to server, and rotates the pair: using a refresh token
+invalidates the old one. So the site can renew a signature without the
+reader doing anything, if it keeps the refresh token somewhere.
+
+The signature is the wrong place. It is verified field by field by each
+build's own list (`SignedFields`), so a field added to every login
+breaks every older build on the one `Domain=mtgban.com` cookie that
+nine sites share, during every rollout and rollback (ADR-0001). Scripts
+can read it, every subdomain gets it, and `?sig=` links, `/go/`
+redirects and panic logs carry it (ADR-0006). A credential does not
+belong in it.
+
+The site has, since ADR-0005, a Postgres database (`user_state`) that
+every deployment shares, with a create-only schema recipe and a
+5-connection pool.
+
+## Decision
+
+Authorisation stays in the signed cookie, read with no database work.
+The database holds only what lets the server mint the next cookie
+without the reader.
+
+1. **One `patreon_sessions` row per login**, keyed by the game-agnostic
+   `HashEmail`, holding the refresh token, the login time, and a
+   renewal lease. Created by the login beside the signature, replacing
+   the row the browser's cookie already names; deleted by logout; pruned
+   past `max_session_days`. Patreon keeps one refresh
+   token per account and client (probed 2026-10-23: a second login
+   returns the pair the first holds, and a refresh rotates it for both),
+   so every row of an email carries the same token and moves together.
+2. **An HttpOnly `BAN_SESSION` cookie** names the row. Renewal needs
+   both an HMAC-valid signature naming an email and this cookie whose
+   row carries that email's hash. A signature on its own — leaked
+   through a script, a link or a log, or planted by `?sig=` — cannot
+   renew and runs out as it does today.
+3. **The signature's shape does not change.** A renewed signature is
+   what a login mints, with a later `Expires` and the tier Patreon
+   reports now. Every build verifies it; an older build simply never
+   renews.
+4. **Renewal is lazy and leased.** Inside the signing middleware, once
+   a signature is older than `after_days`, the request leases every row
+   of the email, its own among them, with one `UPDATE … RETURNING` (safe
+   through a transaction pooler, holding no connection across Patreon),
+   refreshes, re-resolves the tier through `Pledge.Resolve`, stores the
+   rotated token on all of those rows *before* signing, and serves the
+   same request on the new signature. Another request, tab, device, site
+   or port that loses the lease serves on the old signature; its row has
+   the new token all the same.
+5. **Patreon's answer decides, three ways.** *Entitled*: re-sign, with
+   whatever tier Patreon reports, up or down. *Not entitled* (identity
+   OK, no membership or no entitled tier, no grant): delete the row,
+   clear both cookies, log the reader out now (`clear_on_negative`).
+   *Unknown* (any transport, status, shape or title failure): keep
+   everything, back off an hour. Unknown never extends a session; it
+   can only keep one until the signature runs out on its own.
+6. **Refresh token at rest: plain text.** It redeems only with the
+   client secret, which lives in the infrastructure config; a session
+   id renews only beside its reader's signature, which the database
+   never holds.
+
+## Options considered
+
+### Refresh token inside the signature
+
+| Dimension | Assessment |
+|---|---|
+| Rollout | Two signed fields on every login: breaks every older build on the shared cookie; rollback logs readers out (ADR-0001's rejected pattern) |
+| Exposure | The token travels wherever the signature does: scripts, URLs, logs |
+| Multi-device | Each device holds a copy; rotation kills the others' |
+| Storage | None |
+
+### One row per email
+
+| Dimension | Assessment |
+|---|---|
+| Binding | Renewal keyed by the signature's email alone: any leaked signature renews itself to the cap |
+| Multi-device | One token, which fits Patreon's one pair per account, but one id too: logging out on one device logs out all |
+| Storage | Simplest |
+
+### One row per login + HttpOnly cookie, chosen
+
+| Dimension | Assessment |
+|---|---|
+| Rollout | No signed field; deploy in any order |
+| Exposure | A leaked signature dies at its own expiry; stealing the HttpOnly cookie needs device or TLS compromise |
+| Multi-device | Independent rows for binding and logout; one lease and one commit per email keep them on the one pair Patreon issues |
+| Storage | One small table, create-only, pruned |
+
+## Consequences
+
+- A paying reader who visits at least every `after_days` is never logged
+  out. A reader absent longer than the signature plus `grace_days` logs
+  in again.
+- A cancelled pledge is noticed at the next renewal (~day 8 at the
+  default) rather than at expiry; with the webhook (Phase 5) at the next
+  page load.
+- A tier change, and an ACL or grant edit, reach an active reader at
+  the next renewal, or at once through **Refresh now** on the account
+  page.
+- A renewal on one device renews the token every device's row holds,
+  under the email's lease, so no row is left with the token Patreon just
+  rotated away. The renewal lease and commit are therefore per email,
+  not per row.
+- **Log out everywhere** deletes every row for the email: no device can
+  renew; signatures already issued run to their own `Expires`.
+- `recordAlertContact` runs on every entitled renewal, so alerts no
+  longer park for a reader who never re-logs in.
+- A Patreon outage costs each near-expiry session one bounded wait per
+  hour; nobody is logged out by it.
+- The API handoff is untouched: it still asks Patreon through a
+  redirect and never reads the session row (decision recorded in the
+  plan; a stolen `BAN_SESSION` must not become a gateway login).
+
+## Action items
+
+1. [ ] Deploy Phase 1 to all nine sites in any order; rows accrue as
+   readers log in.
+2. [ ] Enable `after_days` on one site (its own config overrides the
+   infrastructure file); watch verdict rates; then everywhere.
+3. [ ] `clear_on_negative` once the not-entitled rate looks like churn.
+4. [ ] `grace_days`, if kept at 3.
+5. [ ] Register the webhook URL at Patreon (Phase 5).
