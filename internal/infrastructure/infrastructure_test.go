@@ -107,3 +107,65 @@ func TestOverPatreonRenewal(t *testing.T) {
 		t.Errorf("patreon renewal %+v, want the file's", got)
 	}
 }
+
+// Every key of the block decodes, and the durations come off the day counts.
+func TestPatreonRenewalDecodesEveryKnob(t *testing.T) {
+	var file Config
+	err := json.Unmarshal([]byte(`{"patreon_renewal": {
+		"after_days": 8, "grace_days": 3, "max_session_days": 60,
+		"clear_on_negative": true, "renew_timeout_seconds": 7}}`), &file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := file.PatreonRenewal
+	want := PatreonRenewal{AfterDays: 8, GraceDays: 3, MaxSessionDays: 60, ClearOnNegative: true, RenewTimeoutSeconds: 7}
+	if got != want {
+		t.Errorf("block %+v, want %+v", got, want)
+	}
+	if got.After() != 8*24*time.Hour || got.Grace() != 3*24*time.Hour || got.RenewTimeout() != 7*time.Second {
+		t.Errorf("after %v, grace %v, timeout %v; want 8 days, 3 days, 7s", got.After(), got.Grace(), got.RenewTimeout())
+	}
+
+	out, err := json.Marshal(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var again Config
+	err = json.Unmarshal(out, &again)
+	if err != nil || again.PatreonRenewal != want {
+		t.Errorf("block written back as %s reads as %+v (%v), want %+v", out, again.PatreonRenewal, err, want)
+	}
+}
+
+// A block that names nothing renews nothing, and a timeout that names no time
+// waits five seconds.
+func TestPatreonRenewalZeroValues(t *testing.T) {
+	var zero PatreonRenewal
+	if zero.After() != 0 || zero.Grace() != 0 {
+		t.Errorf("an empty block renews after %v with %v grace, want neither", zero.After(), zero.Grace())
+	}
+	for _, seconds := range []int{0, -3} {
+		got := PatreonRenewal{RenewTimeoutSeconds: seconds}.RenewTimeout()
+		if got != 5*time.Second {
+			t.Errorf("renew_timeout_seconds %d waits %v, want 5s", seconds, got)
+		}
+	}
+	if DefaultRenewTimeoutSeconds != 5 {
+		t.Errorf("default timeout %d, want 5", DefaultRenewTimeoutSeconds)
+	}
+}
+
+// A deployment that sets any of the block replaces the file's whole, the
+// knobs it leaves out included.
+func TestOverPatreonRenewalReplacesTheWholeBlock(t *testing.T) {
+	file := Config{PatreonRenewal: PatreonRenewal{AfterDays: 8, GraceDays: 3, ClearOnNegative: true, RenewTimeoutSeconds: 9}}
+
+	got := Config{PatreonRenewal: PatreonRenewal{AfterDays: 1}}.Over(file).PatreonRenewal
+	if got != (PatreonRenewal{AfterDays: 1}) {
+		t.Errorf("block %+v, want the deployment's own after_days alone", got)
+	}
+	got = Config{}.Over(file).PatreonRenewal
+	if got != file.PatreonRenewal {
+		t.Errorf("block %+v, want the file's", got)
+	}
+}
