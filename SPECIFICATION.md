@@ -412,7 +412,12 @@ With `patreon_renewal.after_days` set, `signing` renews a cookie-borne
 signature that old, or one that ran out within `grace_days`, from the
 session its `BAN_SESSION` cookie names: it leases every session of the
 email, asks Patreon through the refresh token, stores the rotated one,
-and serves the request on the new signature (`auth_renew.go`). The Account
+and serves the request on the new signature (`auth_renew.go`). A reader whose
+email Patreon's webhook poked (`POST /webhook/patreon`, §4) renews on their next
+request whatever the signature's age, but not past `grace_days`: the poke is
+kept in memory on every site, a `patreon_poke` NOTIFY carries it to the peers,
+a signature issued after it is left alone, so each of the reader's devices
+renews once, and it lapses after `after_days`. The Account
 page (`user.go`) POSTs two actions to itself, each ending in a redirect:
 Refresh now runs the same renewal without the age check, and Log out
 everywhere deletes every session of the signature cookie's email and clears
