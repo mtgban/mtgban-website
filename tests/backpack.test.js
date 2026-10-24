@@ -134,7 +134,7 @@ describe('adding', () => {
         const before = p.m.mtgban_backpack;
         p.window.addToBackpack(p.rows[0]);
         expect(p.m.mtgban_backpack).toBe(before);
-        expect(toast.textContent).toBe('999 copies is the most for one card');
+        expect(toast.textContent).toBe('999 copies is the most for one product');
     });
 
     test('the phone menu item says it adds another copy once the card is in', () => {
@@ -164,14 +164,14 @@ describe('adding', () => {
         expect(e.qty).toBe(1);
     });
 
-    test('the cap refuses the 101st card with a toast', () => {
+    test('the cap refuses the 101st product with a toast', () => {
         const store = [];
         for (let i = 0; i < 100; i++) store.push({ id: 'c' + i, name: 'c', qty: 1, t: i, m: i });
         const p = page({ store });
         const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
         p.window.addToBackpack(p.rows[0]);
         expect(p.stored().filter((e) => !e.del).length).toBe(100);
-        expect(toast.textContent).toBe('Backpack is full (100 cards)');
+        expect(toast.textContent).toBe('Backpack is full (100 products)');
     });
 
     test('a tier backpack size moves the cap', () => {
@@ -183,7 +183,7 @@ describe('adding', () => {
         expect(p.stored().filter((e) => !e.del).length).toBe(201);
         p.window.addToBackpack(p.rows[1]);
         expect(p.stored().filter((e) => !e.del).length).toBe(201);
-        expect(toast.textContent).toBe('Backpack is full (201 cards)');
+        expect(toast.textContent).toBe('Backpack is full (201 products)');
     });
 
     test('a card already in a full backpack still takes another copy', () => {
@@ -200,7 +200,7 @@ describe('adding', () => {
         const before = p.m.mtgban_backpack;
         p.window.Backpack.setQty('uuid-1', 1000);
         expect(p.m.mtgban_backpack).toBe(before);
-        expect(toast.textContent).toBe('999 copies is the most for one card');
+        expect(toast.textContent).toBe('999 copies is the most for one product');
     });
 
     test('a stored string qty counts as a number and steps up', () => {
@@ -278,7 +278,7 @@ describe('the panel', () => {
         expect(p.nav.getAttribute('aria-expanded')).toBe('true');
         const names = panel.querySelectorAll('.backpack-row-name').map((n) => n.textContent);
         expect(names).toEqual(['New', 'Old']);
-        expect(ids['backpack-count'].textContent).toBe('3 copies of 2 cards');
+        expect(ids['backpack-count'].textContent).toBe('3 copies of 2 products');
         expect(ids['backpack-send-retail'].disabled).toBe(false);
     });
 
@@ -293,7 +293,7 @@ describe('the panel', () => {
         expect(p.stored().filter((e) => !e.del).length).toBe(0);
         expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
         expect(ids['backpack-send-retail'].disabled).toBe(true);
-        expect(ids['backpack-empty'].textContent).toBe('Add cards from any search with the backpack button.');
+        expect(ids['backpack-empty'].textContent).toBe('Add products from any search with the backpack button.');
     });
 
     test('plus at the 999 ceiling toasts without writing', () => {
@@ -303,7 +303,7 @@ describe('the panel', () => {
         const before = p.m.mtgban_backpack;
         panel.querySelectorAll('.backpack-plus')[0].click();
         expect(p.m.mtgban_backpack).toBe(before);
-        expect(toast.textContent).toBe('999 copies is the most for one card');
+        expect(toast.textContent).toBe('999 copies is the most for one product');
         expect(panel.querySelectorAll('.backpack-qty')[0].textContent).toBe('999');
     });
 
