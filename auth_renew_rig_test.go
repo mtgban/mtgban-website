@@ -317,6 +317,15 @@ func (rig *renewalRig) request(method, target string, cookies ...*http.Cookie) *
 	return rig.stub.reach(req)
 }
 
+// form is a form posted from this site's own page, holding cookies.
+func (rig *renewalRig) form(target string, fields url.Values, cookies ...*http.Cookie) *http.Request {
+	req := rig.request(http.MethodPost, target, cookies...)
+	req.Body = io.NopCloser(strings.NewReader(fields.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	return req
+}
+
 // browser is the cookies a reader's browser holds: a signature and a
 // session, either left out when empty.
 func browser(sig, session string) []*http.Cookie {
