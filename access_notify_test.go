@@ -74,8 +74,8 @@ func TestTakePoke(t *testing.T) {
 		if tc.pokedBy != "" {
 			want = 1
 		}
-		if len(pokes.at) != want || (want == 1 && !pokes.poked(tc.pokedBy)) {
-			t.Errorf("%s: set %v, want %d entry for %q", tc.name, pokes.at, want, tc.pokedBy)
+		if pokes.Len() != want || (want == 1 && !pokes.Poked(tc.pokedBy, time.Now(), pokeWindow())) {
+			t.Errorf("%s: set %v, want %d entry for %q", tc.name, pokes.Len(), want, tc.pokedBy)
 		}
 	}
 }
@@ -162,29 +162,29 @@ func TestReloadACLStampsOnlyAChangedTable(t *testing.T) {
 
 	// The file as it was: the reconnect case
 	err := reloadACL(context.Background())
-	if err != nil || !pokes.aclChanged.IsZero() {
-		t.Fatalf("reload of an unchanged table: err %v, stamp %v; want no stamp", err, pokes.aclChanged)
+	if err != nil || !pokes.ACLChanged().IsZero() {
+		t.Fatalf("reload of an unchanged table: err %v, stamp %v; want no stamp", err, pokes.ACLChanged())
 	}
 
 	// The same table written another way
 	files.set("acl", `{ "Legacy": { "Search": {} } }`)
 	err = reloadACL(context.Background())
-	if err != nil || !pokes.aclChanged.IsZero() {
-		t.Fatalf("reload of a table spaced differently: err %v, stamp %v; want no stamp", err, pokes.aclChanged)
+	if err != nil || !pokes.ACLChanged().IsZero() {
+		t.Fatalf("reload of a table spaced differently: err %v, stamp %v; want no stamp", err, pokes.ACLChanged())
 	}
 
 	files.set("acl", `{"Legacy":{"Search":{},"Upload":{}}}`)
 	before := time.Now().Truncate(time.Second)
 	err = reloadACL(context.Background())
-	stamp := pokes.aclChanged
+	stamp := pokes.ACLChanged()
 	if err != nil || stamp.Before(before) || time.Since(stamp) > time.Minute {
 		t.Fatalf("reload of a changed table: err %v, stamp %v; want it stamped now", err, stamp)
 	}
 
 	// Read again, it is the table it is
 	err = reloadACL(context.Background())
-	if err != nil || !pokes.aclChanged.Equal(stamp) {
-		t.Errorf("a second reload: err %v, stamp %v then %v; want the stamp left as it was", err, stamp, pokes.aclChanged)
+	if err != nil || !pokes.ACLChanged().Equal(stamp) {
+		t.Errorf("a second reload: err %v, stamp %v then %v; want the stamp left as it was", err, stamp, pokes.ACLChanged())
 	}
 }
 
@@ -196,8 +196,8 @@ func TestReloadACLThatFailsStampsNothing(t *testing.T) {
 	files.set("acl", "")
 
 	err := reloadACL(context.Background())
-	if err == nil || !pokes.aclChanged.IsZero() || len(ACL()) != 1 {
-		t.Errorf("err %v, stamp %v, table %v; want an error, no stamp, the old table kept", err, pokes.aclChanged, ACL())
+	if err == nil || !pokes.ACLChanged().IsZero() || len(ACL()) != 1 {
+		t.Errorf("err %v, stamp %v, table %v; want an error, no stamp, the old table kept", err, pokes.ACLChanged(), ACL())
 	}
 }
 
@@ -206,6 +206,7 @@ func TestReloadACLThatFailsStampsNothing(t *testing.T) {
 // after it is an edit like a save: a changed table stamps, a changed grant
 // pokes its reader, and the same files again leave the stamp as it was.
 func TestLoadStampsOnlyAChangeAfterTheFirst(t *testing.T) {
+	renewalConfig(t, renewalBlock, "client-id")
 	pokes := freshPokes(t)
 	sources := access.Sources{TablePath: "acl", GrantsPath: "grants"}
 	files := &accessFiles{files: map[string]string{"acl": `{"Legacy":{"Search":{}}}`, "grants": `[` + grantFor("a@example.com", "Legacy") + `]`}}
@@ -215,8 +216,8 @@ func TestLoadStampsOnlyAChangeAfterTheFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !pokes.aclChanged.IsZero() || len(pokes.at) != 0 {
-		t.Fatalf("the first load stamped %v and poked %v", pokes.aclChanged, pokes.at)
+	if !pokes.ACLChanged().IsZero() || pokes.Len() != 0 {
+		t.Fatalf("the first load stamped %v and poked %v", pokes.ACLChanged(), pokes.Len())
 	}
 
 	files.set("acl", `{"Legacy":{"Search":{},"Upload":{}},"Vintage":{"Search":{}}}`)
@@ -229,15 +230,15 @@ func TestLoadStampsOnlyAChangeAfterTheFirst(t *testing.T) {
 	if len(ACL()) != 2 || PatreonGrants()[0].Tier != "Vintage" {
 		t.Fatalf("the load did not bring the changed files: %v %v", ACL(), PatreonGrants())
 	}
-	stamp := pokes.aclChanged
-	_, poked := pokes.at[userstate.HashEmail("a@example.com")]
-	if stamp.Before(before) || !poked || len(pokes.at) != 1 {
-		t.Errorf("a reload of changed files stamped %v and poked %v, want a stamp now and the grantee alone", stamp, pokes.at)
+	stamp := pokes.ACLChanged()
+	poked := pokes.Poked(userstate.HashEmail("a@example.com"), time.Now(), pokeWindow())
+	if stamp.Before(before) || !poked || pokes.Len() != 1 {
+		t.Errorf("a reload of changed files stamped %v and poked %v, want a stamp now and the grantee alone", stamp, pokes.Len())
 	}
 
 	err = loadAccess(context.Background(), sources)
-	if err != nil || !pokes.aclChanged.Equal(stamp) {
-		t.Errorf("a reload of the same files: err %v, stamp %v then %v; want the stamp left as it was", err, stamp, pokes.aclChanged)
+	if err != nil || !pokes.ACLChanged().Equal(stamp) {
+		t.Errorf("a reload of the same files: err %v, stamp %v then %v; want the stamp left as it was", err, stamp, pokes.ACLChanged())
 	}
 }
 
@@ -248,13 +249,13 @@ func TestSaveACLStampsOnlyAChangedTable(t *testing.T) {
 	files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[]`)
 
 	err := saveACL(context.Background(), access.Table{"Legacy": {"Search": {}}})
-	if err != nil || !pokes.aclChanged.IsZero() {
-		t.Fatalf("save of the same table: err %v, stamp %v; want no stamp", err, pokes.aclChanged)
+	if err != nil || !pokes.ACLChanged().IsZero() {
+		t.Fatalf("save of the same table: err %v, stamp %v; want no stamp", err, pokes.ACLChanged())
 	}
 
 	before := time.Now().Truncate(time.Second)
 	err = saveACL(context.Background(), access.Table{"Legacy": {"Search": {}, "Upload": {}}})
-	stamp := pokes.aclChanged
+	stamp := pokes.ACLChanged()
 	if err != nil || stamp.Before(before) || time.Since(stamp) > time.Minute {
 		t.Fatalf("save of a changed table: err %v, stamp %v; want it stamped now", err, stamp)
 	}
@@ -263,8 +264,8 @@ func TestSaveACLStampsOnlyAChangedTable(t *testing.T) {
 	}
 
 	err = saveACL(context.Background(), ACL())
-	if err != nil || !pokes.aclChanged.Equal(stamp) {
-		t.Errorf("a second save of it: err %v, stamp %v then %v; want the stamp left as it was", err, stamp, pokes.aclChanged)
+	if err != nil || !pokes.ACLChanged().Equal(stamp) {
+		t.Errorf("a second save of it: err %v, stamp %v then %v; want the stamp left as it was", err, stamp, pokes.ACLChanged())
 	}
 }
 
@@ -275,8 +276,8 @@ func TestSaveACLThatFailsStampsNothing(t *testing.T) {
 	Access = access.New(access.Hooks{})
 
 	err := saveACL(context.Background(), access.Table{"Legacy": {"Search": {}, "Upload": {}}})
-	if err == nil || !pokes.aclChanged.IsZero() {
-		t.Errorf("err %v, stamp %v; want an error and no stamp", err, pokes.aclChanged)
+	if err == nil || !pokes.ACLChanged().IsZero() {
+		t.Errorf("err %v, stamp %v; want an error and no stamp", err, pokes.ACLChanged())
 	}
 }
 
@@ -291,26 +292,26 @@ func TestReloadGrantsPokesOnlyTheGranteesWhoseGrantChanged(t *testing.T) {
 
 	// Nothing changed: the reconnect case
 	err := reloadGrants(context.Background())
-	if err != nil || len(pokes.at) != 0 {
-		t.Fatalf("reload of an unchanged list: err %v, poked %v; want nobody", err, pokes.at)
+	if err != nil || pokes.Len() != 0 {
+		t.Fatalf("reload of an unchanged list: err %v, poked %v; want nobody", err, pokes.Len())
 	}
 
 	// One tier changed, and a label
 	files.set("grants", `[`+grantFor("a@example.com", "Legacy")+`,`+grantFor("b@example.com", "Vintage")+`,`+
 		`{"email":"c@example.com","name":"Renamed","category":"mod","tier":"Legacy"}]`)
 	err = reloadGrants(context.Background())
-	if err != nil || len(pokes.at) != 1 || !pokes.poked(b) || pokes.poked(a) || pokes.poked(c) {
-		t.Fatalf("reload with b's tier changed: err %v, poked %v; want only b", err, pokes.at)
+	if err != nil || pokes.Len() != 1 || !pokes.Poked(b, time.Now(), pokeWindow()) || pokes.Poked(a, time.Now(), pokeWindow()) || pokes.Poked(c, time.Now(), pokeWindow()) {
+		t.Fatalf("reload with b's tier changed: err %v, poked %v; want only b", err, pokes.Len())
 	}
-	if !pokes.aclChanged.IsZero() {
+	if !pokes.ACLChanged().IsZero() {
 		t.Error("a grant edit stamped the access table")
 	}
 
 	// One grant removed, one added
 	files.set("grants", `[`+grantFor("b@example.com", "Vintage")+`,`+grantFor("c@example.com", "Legacy")+`,`+grantFor("d@example.com", "Legacy")+`]`)
 	err = reloadGrants(context.Background())
-	if err != nil || !pokes.poked(a) || !pokes.poked(userstate.HashEmail("d@example.com")) || len(pokes.at) != 3 {
-		t.Errorf("reload with a removed and d added: err %v, poked %v; want a, b and d", err, pokes.at)
+	if err != nil || !pokes.Poked(a, time.Now(), pokeWindow()) || !pokes.Poked(userstate.HashEmail("d@example.com"), time.Now(), pokeWindow()) || pokes.Len() != 3 {
+		t.Errorf("reload with a removed and d added: err %v, poked %v; want a, b and d", err, pokes.Len())
 	}
 }
 
@@ -322,8 +323,8 @@ func TestReloadGrantsThatFailsPokesNobody(t *testing.T) {
 	files.set("grants", "")
 
 	err := reloadGrants(context.Background())
-	if err == nil || len(pokes.at) != 0 || len(PatreonGrants()) != 1 {
-		t.Errorf("err %v, poked %v, list %v; want an error, nobody and the list kept", err, pokes.at, PatreonGrants())
+	if err == nil || pokes.Len() != 0 || len(PatreonGrants()) != 1 {
+		t.Errorf("err %v, poked %v, list %v; want an error, nobody and the list kept", err, pokes.Len(), PatreonGrants())
 	}
 }
 
@@ -336,20 +337,20 @@ func TestSaveGrantsPokesTheGrantee(t *testing.T) {
 	a, b := userstate.HashEmail("a@example.com"), userstate.HashEmail("B@Example.com")
 
 	err := saveGrants(context.Background(), PatreonGrants())
-	if err != nil || len(pokes.at) != 0 {
-		t.Fatalf("save of the same list: err %v, poked %v; want nobody", err, pokes.at)
+	if err != nil || pokes.Len() != 0 {
+		t.Fatalf("save of the same list: err %v, poked %v; want nobody", err, pokes.Len())
 	}
 
 	err = saveGrants(context.Background(), append(PatreonGrants()[:1:1], PatreonGrant{Email: "B@Example.com", Tier: "Vintage"}))
-	if err != nil || len(pokes.at) != 1 || !pokes.poked(b) {
-		t.Fatalf("save with b granted: err %v, poked %v; want only b", err, pokes.at)
+	if err != nil || pokes.Len() != 1 || !pokes.Poked(b, time.Now(), pokeWindow()) {
+		t.Fatalf("save with b granted: err %v, poked %v; want only b", err, pokes.Len())
 	}
 	if !strings.Contains(files.get("grants"), "Vintage") {
 		t.Errorf("the file holds %q, want the saved list", files.get("grants"))
 	}
 
 	err = saveGrants(context.Background(), PatreonGrants()[1:])
-	if err != nil || !pokes.poked(a) || len(pokes.at) != 2 {
-		t.Errorf("save with a revoked: err %v, poked %v; want a and b", err, pokes.at)
+	if err != nil || !pokes.Poked(a, time.Now(), pokeWindow()) || pokes.Len() != 2 {
+		t.Errorf("save with a revoked: err %v, poked %v; want a and b", err, pokes.Len())
 	}
 }

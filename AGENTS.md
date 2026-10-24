@@ -150,8 +150,7 @@ output, not a claim written here.
 | `templates.go` | The template `FuncMap` — the helper funcs templates call by name |
 | `load.go` | Scraper loading from B2; atomic seller/vendor snapshot swapping |
 | `auth.go` | Patreon OAuth, HMAC signature sign/verify, the 3 middleware wrappers |
-| `auth_renew.go` | Renewing a signature from its Patreon session inside the signing middleware: `decideRenewal`, the poke that lifts its age check, the lease-refresh-commit sequence, `renewalEnabled` (`docs/adr/0008-patreon-session-renewal.md`) |
-| `auth_poke.go` | The set of readers whose next request renews whatever their signature's age (`Pokes`): an in-memory map of email hashes, filled on every site by the `patreon_poke` NOTIFY (`access_notify.go`) and by grant edits, plus the moment the access table last changed, which asks the same of every signature issued before it (`docs/adr/0008-patreon-session-renewal.md`) |
+| `auth_renew.go` | Renewing a signature from its Patreon session inside the signing middleware: `decideRenewal`, the lease-refresh-commit sequence, `renewalEnabled`, and `Pokes`, the `internal/poke` set of what lifts the age check: the readers the `patreon_poke` NOTIFY (`access_notify.go`) and grant edits poked, and the moment the access table last changed (`docs/adr/0008-patreon-session-renewal.md`) |
 | `auth_webhook.go` | Patreon's member webhook (`POST /webhook/patreon`): checks the HMAC-MD5 signature of the raw body, reads the member's email and pokes it here and, through `patreon_poke`, on every other site (`docs/adr/0008-patreon-session-renewal.md`) |
 | `search.go`, `searchfilter.go` | Search execution and the query-language parser/filters |
 | `upload.go` | Bulk-upload parsing (CSV/XLS/XLSX/Sheets/Moxfield/TCG) + optimizer |
