@@ -31,7 +31,7 @@ func TestSigningRenewsAPokedReaderOnTheNextRequest(t *testing.T) {
 		t.Fatalf("%d refreshes for a signature nobody poked, want none", rig.stub.calls())
 	}
 
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 	got := rig.page(browser(young, session)...)
 	fresh := rig.wantRenewed(got, young, session)
 	tier := GetParamFromSig(got.sig, "UserTier")
@@ -43,8 +43,8 @@ func TestSigningRenewsAPokedReaderOnTheNextRequest(t *testing.T) {
 	}
 
 	rig.wantUntouched(rig.page(browser(fresh, session)...), fresh)
-	if rig.stub.calls() != 1 || !pokes.poked(rig.hash) {
-		t.Errorf("%d refreshes for the renewed signature, poked %v; want still 1 and the poke kept for the other devices", rig.stub.calls(), pokes.poked(rig.hash))
+	if rig.stub.calls() != 1 || !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
+		t.Errorf("%d refreshes for the renewed signature, poked %v; want still 1 and the poke kept for the other devices", rig.stub.calls(), pokes.Poked(rig.hash, time.Now(), pokeWindow()))
 	}
 }
 
@@ -56,7 +56,7 @@ func TestSigningPokeRenewsEveryDeviceOnce(t *testing.T) {
 	rig.stub.title = "VINTAGE"
 	laptop, phone := rig.session(""), rig.session("")
 	onLaptop, onPhone := rig.sig("Legacy", 1*day), rig.sig("Legacy", 2*day)
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	freshLaptop := rig.wantRenewed(rig.page(browser(onLaptop, laptop)...), onLaptop, laptop)
 	freshPhone := rig.wantRenewed(rig.page(browser(onPhone, phone)...), onPhone, phone)
@@ -80,10 +80,10 @@ func TestSigningPokeOfAnotherReaderRenewsNobodyElse(t *testing.T) {
 	young := rig.sig("Legacy", 1*day)
 	stranger := sessionReader(t, rig.db, "stranger")
 
-	pokes.poke(userstate.HashEmail(stranger.Email))
+	pokes.Poke(userstate.HashEmail(stranger.Email), time.Now(), pokeWindow())
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
-	if rig.stub.calls() != 0 || !pokes.poked(userstate.HashEmail(stranger.Email)) {
-		t.Errorf("%d refreshes, stranger poked %v; want none and the stranger's poke kept", rig.stub.calls(), pokes.poked(userstate.HashEmail(stranger.Email)))
+	if rig.stub.calls() != 0 || !pokes.Poked(userstate.HashEmail(stranger.Email), time.Now(), pokeWindow()) {
+		t.Errorf("%d refreshes, stranger poked %v; want none and the stranger's poke kept", rig.stub.calls(), pokes.Poked(userstate.HashEmail(stranger.Email), time.Now(), pokeWindow()))
 	}
 }
 
@@ -102,17 +102,17 @@ func TestSigningPokeRenewsWhateverTheSignatureHasLeft(t *testing.T) {
 		"about to run out":    11*day - time.Minute,
 		"ran out an hour ago": 11*day + time.Hour,
 	} {
-		pokes.poke(rig.hash)
+		pokes.Poke(rig.hash, time.Now(), pokeWindow())
 		old := rig.sig("Legacy", age)
 		got := rig.page(browser(old, session)...)
 		rig.wantRenewed(got, old, session)
 	}
 
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 	old := rig.sig("Legacy", 1*day)
 	rig.wantRenewed(rig.serve(rig.request(http.MethodPost, "/upload", browser(old, session)...), false), old, session)
 
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 	old = rig.sig("Legacy", 1*day)
 	rig.wantRenewed(rig.serve(rig.request(http.MethodGet, "/data/prices/x", browser(old, session)...), true), old, session)
 }
@@ -144,12 +144,12 @@ func TestSigningPokeAndStampCannotRenewWhatAgeCannot(t *testing.T) {
 				pokes := freshPokes(t)
 				session := rig.session("")
 				if lift == "a poke" {
-					pokes.poke(rig.hash)
+					pokes.Poke(rig.hash, time.Now(), pokeWindow())
 					// A hash of no email is what an invite would be poked by; nothing
 					// legitimate pokes it
-					pokes.poke(userstate.HashEmail(""))
+					pokes.Poke(userstate.HashEmail(""), time.Now(), pokeWindow())
 				} else {
-					pokes.stampACL(time.Now())
+					pokes.StampACL(time.Now())
 				}
 				sig := tc.sig(rig, tc.age)
 
@@ -170,7 +170,7 @@ func TestSigningPokeAndStampCannotRenewWhatAgeCannot(t *testing.T) {
 				if setCookies(got.rec)[sessionCookie] != nil {
 					t.Errorf("Set-Cookie %q, want the session cookie left alone", got.rec.Header().Values("Set-Cookie"))
 				}
-				if lift == "a poke" && !pokes.poked(rig.hash) {
+				if lift == "a poke" && !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
 					t.Error("the poke was spent on a request that renewed nothing")
 				}
 				rows := rig.rows()
@@ -187,7 +187,7 @@ func TestSigningPokeDoesNotRenewASignatureThatDoesNotCheckOut(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	pokes := freshPokes(t)
 	session := rig.session("")
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	got := rig.page(browser(tampered(rig.sig("Legacy", 1*day)), session)...)
 	if got.reached || len(got.rec.Header().Values("Set-Cookie")) != 0 || rig.stub.calls() != 0 {
@@ -210,7 +210,7 @@ func TestSigningPokeNeedsEveryPieceOfRenewal(t *testing.T) {
 			rig := newRenewalRig(t, renewalBlock)
 			pokes := freshPokes(t)
 			session := rig.session("")
-			pokes.poke(rig.hash)
+			pokes.Poke(rig.hash, time.Now(), pokeWindow())
 			young := rig.sig("Legacy", 1*day)
 			switch tc.turn {
 			case "block":
@@ -241,7 +241,7 @@ func TestSigningPokeThatLapsedRenewsNothing(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	pokes := freshPokes(t)
 	session := rig.session("")
-	pokes.at[rig.hash] = time.Now().Add(-8*day - time.Minute)
+	pokes.Poke(rig.hash, time.Now().Add(-8*day-time.Minute), pokeWindow())
 	young := rig.sig("Legacy", 1*day)
 
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
@@ -259,10 +259,10 @@ func TestSigningPokeSurvivesPatreonBeingDown(t *testing.T) {
 	rig.stub.token = &stubAnswer{http.StatusInternalServerError, `{"errors":[{"title":"boom"}]}`}
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
-	if !pokes.poked(rig.hash) {
+	if !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
 		t.Fatal("the poke went while Patreon was down")
 	}
 	wait := rig.restingFor(session)
@@ -271,8 +271,8 @@ func TestSigningPokeSurvivesPatreonBeingDown(t *testing.T) {
 	}
 
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
-	if rig.stub.calls() != 1 || !pokes.poked(rig.hash) {
-		t.Errorf("%d refreshes inside the backoff, poked %v; want 1 and the poke kept", rig.stub.calls(), pokes.poked(rig.hash))
+	if rig.stub.calls() != 1 || !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
+		t.Errorf("%d refreshes inside the backoff, poked %v; want 1 and the poke kept", rig.stub.calls(), pokes.Poked(rig.hash, time.Now(), pokeWindow()))
 	}
 
 	// The hour is up and Patreon is back
@@ -295,15 +295,15 @@ func TestSigningPokeSurvivesALostLease(t *testing.T) {
 	pokes := freshPokes(t)
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	_, _, leased, err := rig.db.LeasePatreonSessions(t.Context(), session, rig.hash, time.Minute)
 	if err != nil || !leased {
 		t.Fatalf("lease: %v %v", leased, err)
 	}
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
-	if rig.stub.calls() != 0 || !pokes.poked(rig.hash) {
-		t.Errorf("%d refreshes, poked %v; want none and the poke kept", rig.stub.calls(), pokes.poked(rig.hash))
+	if rig.stub.calls() != 0 || !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
+		t.Errorf("%d refreshes, poked %v; want none and the poke kept", rig.stub.calls(), pokes.Poked(rig.hash, time.Now(), pokeWindow()))
 	}
 }
 
@@ -317,7 +317,7 @@ func TestSigningPokeAfterAPledgeDeleteLogsTheReaderOut(t *testing.T) {
 	here := rig.session("")
 	elsewhere := rig.session("")
 	young := rig.sig("Legacy", 1*day)
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	req := rig.request(http.MethodGet, "/limited", browser(young, here)...)
 	got := rig.serve(req, false)
@@ -339,8 +339,8 @@ func TestSigningPokeAfterAPledgeDeleteLogsTheReaderOut(t *testing.T) {
 	if got.reached || !strings.Contains(got.rec.Body.String(), html.EscapeString(ErrMsgExpired)) || len(rig.rows()) != 0 {
 		t.Errorf("the other device: reached %v, logged out %v, rows %+v; want it logged out too", got.reached, strings.Contains(got.rec.Body.String(), html.EscapeString(ErrMsgExpired)), rig.rows())
 	}
-	if rig.stub.calls() != 2 || !pokes.poked(rig.hash) {
-		t.Errorf("%d refreshes, poked %v; want one per device and the poke kept", rig.stub.calls(), pokes.poked(rig.hash))
+	if rig.stub.calls() != 2 || !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
+		t.Errorf("%d refreshes, poked %v; want one per device and the poke kept", rig.stub.calls(), pokes.Poked(rig.hash, time.Now(), pokeWindow()))
 	}
 	rig.wantNoTokens()
 }
@@ -353,11 +353,11 @@ func TestSigningPokeAfterAPledgeDeleteWithoutClearOnNegativeKeepsTheReader(t *te
 	rig.stub.title = ""
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
-	if !pokes.poked(rig.hash) || rig.restingFor(session) < 59*60 {
-		t.Errorf("poked %v, resting %.0fs; want the poke kept and an hour's rest", pokes.poked(rig.hash), rig.restingFor(session))
+	if !pokes.Poked(rig.hash, time.Now(), pokeWindow()) || rig.restingFor(session) < 59*60 {
+		t.Errorf("poked %v, resting %.0fs; want the poke kept and an hour's rest", pokes.Poked(rig.hash, time.Now(), pokeWindow()), rig.restingFor(session))
 	}
 }
 
@@ -369,7 +369,7 @@ func TestRefreshNowAnswersAPoke(t *testing.T) {
 	pokes := freshPokes(t)
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	rec := rig.account("refresh", browser(young, session)...)
 	wantRedirect(t, rec, "/user")
@@ -379,8 +379,8 @@ func TestRefreshNowAnswersAPoke(t *testing.T) {
 	}
 
 	rig.wantUntouched(rig.page(browser(fresh.Value, session)...), fresh.Value)
-	if rig.stub.calls() != 1 || !pokes.poked(rig.hash) {
-		t.Errorf("%d refreshes for the refreshed signature, poked %v; want still 1 and the poke kept", rig.stub.calls(), pokes.poked(rig.hash))
+	if rig.stub.calls() != 1 || !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
+		t.Errorf("%d refreshes for the refreshed signature, poked %v; want still 1 and the poke kept", rig.stub.calls(), pokes.Poked(rig.hash, time.Now(), pokeWindow()))
 	}
 }
 
@@ -441,7 +441,7 @@ func TestSigningStampRenewsOnlyWhatWasIssuedBeforeIt(t *testing.T) {
 			pokes := freshPokes(t)
 			session := rig.session("")
 			old := rig.sig("Legacy", tc.age)
-			pokes.stampACL(time.Now().Add(-2 * day))
+			pokes.StampACL(time.Now().Add(-2 * day))
 
 			got := rig.page(browser(old, session)...)
 			if tc.cause == "" {
@@ -467,7 +467,7 @@ func TestSigningStampWithPatreonDownRestsTheSessions(t *testing.T) {
 	rig.stub.token = &stubAnswer{http.StatusInternalServerError, `{"errors":[{"title":"boom"}]}`}
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
-	pokes.stampACL(time.Now())
+	pokes.StampACL(time.Now())
 
 	rig.wantUntouched(rig.page(browser(young, session)...), young)
 	wait := rig.restingFor(session)
@@ -511,8 +511,8 @@ func TestSigningRenewsAGrantedReaderWhoseGrantChanged(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(pokes.at) != 1 || !pokes.poked(rig.hash) {
-				t.Fatalf("poke set %v, want only the grantee", pokes.at)
+			if pokes.Len() != 1 || !pokes.Poked(rig.hash, time.Now(), pokeWindow()) {
+				t.Fatalf("%d poked, want only the grantee", pokes.Len())
 			}
 
 			got := rig.page(browser(young, session)...)
@@ -562,10 +562,10 @@ func TestRenewalLogsWhatAskedForIt(t *testing.T) {
 			session := rig.session("")
 			old := rig.sig("Legacy", tc.age)
 			if tc.poke {
-				pokes.poke(rig.hash)
+				pokes.Poke(rig.hash, time.Now(), pokeWindow())
 			}
 			if tc.stamp {
-				pokes.stampACL(time.Now().Add(-2 * day))
+				pokes.StampACL(time.Now().Add(-2 * day))
 			}
 
 			if tc.refresh {
@@ -600,7 +600,7 @@ func TestRenewalLogsWhatAskedForItWhenTheEmailMoved(t *testing.T) {
 		}
 	})
 	session := rig.session("")
-	pokes.poke(rig.hash)
+	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
 	rig.page(browser(rig.sig("Legacy", 1*day), session)...)
 	var renewals []string

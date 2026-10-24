@@ -91,7 +91,7 @@ func PatreonWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hash := userstate.HashEmail(email)
-	Pokes.poke(hash)
+	Pokes.Poke(hash, time.Now(), pokeWindow())
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 	defer cancel()
 	notifyPoke(ctx, hash)

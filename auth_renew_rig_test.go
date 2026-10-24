@@ -21,6 +21,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/pledge"
+	"github.com/mtgban/mtgban-website/internal/poke"
 	"github.com/mtgban/mtgban-website/ratelimit"
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -479,4 +480,14 @@ func installAccess(t *testing.T, table, grants string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// freshPokes gives the test a poke set of its own, and puts back the one it
+// found.
+func freshPokes(t *testing.T) *poke.Set {
+	t.Helper()
+	saved := Pokes
+	t.Cleanup(func() { Pokes = saved })
+	Pokes = poke.New()
+	return Pokes
 }

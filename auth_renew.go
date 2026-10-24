@@ -11,6 +11,7 @@ import (
 
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
 	"github.com/mtgban/mtgban-website/internal/pledge"
+	"github.com/mtgban/mtgban-website/internal/poke"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -23,6 +24,19 @@ func renewalEnabled() bool {
 	infra := Infrastructure()
 	clientID := infra.Patreon.Client[infra.Patreon.Source]
 	return infra.PatreonRenewal.AfterDays > 0 && UserStateDB != nil && SigCheck && clientID != ""
+}
+
+// Pokes is what makes a signature stale before its age does, kept by this
+// process: the readers Patreon's webhook named, directly on the site that
+// received the delivery and through the patreon_poke NOTIFY on the others, the
+// grantees a grant edit changed, and the moment the access table last changed
+// (access_notify.go, common.go). A poke lasts pokeWindow.
+var Pokes = poke.New()
+
+// pokeWindow is how long a poke lasts: after_days, when the age check would
+// have renewed the reader anyway.
+func pokeWindow() time.Duration {
+	return Infrastructure().PatreonRenewal.After()
 }
 
 // renewalDecision is what signing does about a signature that may be due.
@@ -111,7 +125,7 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 		if !eligible {
 			return "", false
 		}
-		cause = Pokes.wants(userstate.HashEmail(email), ends.Add(-DefaultSignatureDuration))
+		cause = Pokes.Wants(userstate.HashEmail(email), ends.Add(-DefaultSignatureDuration), now, pokeWindow())
 		if cause == "" {
 			return "", false
 		}

@@ -82,7 +82,7 @@ func reloadACL(ctx context.Context) error {
 // before, the one it replaced.
 func stampACLIfChanged(before access.Table) {
 	if !before.Equal(ACL()) {
-		Pokes.stampACL(time.Now())
+		Pokes.StampACL(time.Now())
 	}
 }
 
@@ -102,7 +102,7 @@ func reloadGrants(ctx context.Context) error {
 // so their next request renews onto the tier and overrides it now gives.
 func pokeGrantees(before, after []PatreonGrant) {
 	for _, email := range access.GrantsChanged(before, after) {
-		Pokes.poke(userstate.HashEmail(email))
+		Pokes.Poke(userstate.HashEmail(email), time.Now(), pokeWindow())
 	}
 }
 
@@ -126,7 +126,7 @@ func takePoke(n *pq.Notification) bool {
 		return false
 	}
 	if n.Extra != "" {
-		Pokes.poke(n.Extra)
+		Pokes.Poke(n.Extra, time.Now(), pokeWindow())
 	}
 	return true
 }

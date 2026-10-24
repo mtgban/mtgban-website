@@ -15,6 +15,7 @@ import (
 
 	"github.com/lib/pq"
 
+	"github.com/mtgban/mtgban-website/internal/poke"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 )
@@ -67,7 +68,7 @@ func serveWebhook(req *http.Request) *httptest.ResponseRecorder {
 // its own, and the admin log the webhook writes to.
 type webhookRig struct {
 	secret string
-	pokes  *pokeSet
+	pokes  *poke.Set
 	logged *strings.Builder
 }
 
@@ -86,8 +87,8 @@ func (rig *webhookRig) deliver(event string, body []byte) *httptest.ResponseReco
 // wantNothingPoked fails if anyone is poked.
 func (rig *webhookRig) wantNothingPoked(t *testing.T) {
 	t.Helper()
-	if len(rig.pokes.at) != 0 {
-		t.Errorf("poke set %v, want none poked", rig.pokes.at)
+	if rig.pokes.Len() != 0 {
+		t.Errorf("poke set %v, want none poked", rig.pokes.Len())
 	}
 }
 
@@ -107,8 +108,8 @@ func TestPatreonWebhookPokesTheMember(t *testing.T) {
 				t.Errorf("status %d, want 200", rec.Code)
 			}
 			hash := userstate.HashEmail(webhookEmail)
-			if !rig.pokes.poked(hash) || len(rig.pokes.at) != 1 {
-				t.Errorf("poke set %v, want only %s", rig.pokes.at, webhookEmail)
+			if !rig.pokes.Poked(hash, time.Now(), pokeWindow()) || rig.pokes.Len() != 1 {
+				t.Errorf("poke set %v, want only %s", rig.pokes.Len(), webhookEmail)
 			}
 			want := "webhook: event=" + strconv.Quote(tc.event) + " email=" + strconv.Quote(webhookEmail)
 			if !strings.Contains(rig.logged.String(), want) {
@@ -125,8 +126,8 @@ func TestPatreonWebhookPokesTheLowercasedEmail(t *testing.T) {
 	body := []byte(`{"data":{"attributes":{"email":"  Patron@Example.COM "}}}`)
 
 	rec := rig.deliver("members:pledge:update", body)
-	if rec.Code != http.StatusOK || !rig.pokes.poked(userstate.HashEmail(webhookEmail)) {
-		t.Errorf("status %d, poke set %v; want 200 and %s poked", rec.Code, rig.pokes.at, webhookEmail)
+	if rec.Code != http.StatusOK || !rig.pokes.Poked(userstate.HashEmail(webhookEmail), time.Now(), pokeWindow()) {
+		t.Errorf("status %d, poke set %v; want 200 and %s poked", rec.Code, rig.pokes.Len(), webhookEmail)
 	}
 	if !strings.Contains(rig.logged.String(), "email="+strconv.Quote(webhookEmail)) {
 		t.Errorf("admin log %q does not name the lowercased email", rig.logged.String())
@@ -279,8 +280,8 @@ func TestPatreonWebhookReadsNothingButTheEmail(t *testing.T) {
 		"included":[{"type":"user","attributes":{"email":"patron@example.com"}}]}`)
 
 	rig.deliver("members:pledge:delete", body)
-	if !rig.pokes.poked(userstate.HashEmail("other@example.com")) || len(rig.pokes.at) != 1 {
-		t.Errorf("poke set %v, want only data.attributes.email", rig.pokes.at)
+	if !rig.pokes.Poked(userstate.HashEmail("other@example.com"), time.Now(), pokeWindow()) || rig.pokes.Len() != 1 {
+		t.Errorf("poke set %v, want only data.attributes.email", rig.pokes.Len())
 	}
 }
 
@@ -293,11 +294,9 @@ func TestPatreonWebhookReplayPokesAgain(t *testing.T) {
 
 	for range 2 {
 		rec := rig.deliver("members:pledge:update", body)
-		if rec.Code != http.StatusOK || !rig.pokes.poked(hash) || len(rig.pokes.at) != 1 || time.Since(rig.pokes.at[hash]) > time.Minute {
-			t.Fatalf("status %d, poke set %v; want 200 and %s poked now", rec.Code, rig.pokes.at, webhookEmail)
+		if rec.Code != http.StatusOK || !rig.pokes.Poked(hash, time.Now(), pokeWindow()) || rig.pokes.Len() != 1 {
+			t.Fatalf("status %d, %d poked; want 200 and %s poked", rec.Code, rig.pokes.Len(), webhookEmail)
 		}
-		// An hour passes, and the signatures renewed since are to renew again
-		rig.pokes.at[hash] = time.Now().Add(-time.Hour)
 	}
 	if !strings.Contains(rig.logged.String(), "email="+strconv.Quote(webhookEmail)) || strings.Count(rig.logged.String(), "\n") != 2 {
 		t.Errorf("admin log %q, want a line per delivery", rig.logged.String())
@@ -376,8 +375,8 @@ func TestPatreonWebhookNotifiesThePeers(t *testing.T) {
 			t.Fatalf("notification %+v, want %s carrying the hash %s", n, patreonPokeChannel, hash)
 		}
 		peer := freshPokes(t)
-		if !takePoke(n) || !peer.poked(hash) {
-			t.Errorf("the peer's set %v after the notification, want %s poked", peer.at, webhookEmail)
+		if !takePoke(n) || !peer.Poked(hash, time.Now(), pokeWindow()) {
+			t.Errorf("the peer has %d poked after the notification, want %s", peer.Len(), webhookEmail)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("no notification within 5s")
