@@ -133,23 +133,31 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 
 	LogPages["Admin"].Printf("auth: email=%q tier=%q", userData.Email, tierTitle)
 
+	s.finishSiteLogin(w, r, r.FormValue("state"), userData, tierTitle, overrides, granted, tokens.RefreshToken)
+}
+
+// finishSiteLogin signs in the reader Patreon just named, whose pledge gives
+// tier: it signs their signature into the cookies and sends them on to where
+// state says the login began. refreshToken is the one Patreon issued with
+// the login.
+func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state string, user *pledge.User, tier string, overrides map[string]map[string]string, granted bool, refreshToken string) {
 	// Sign our base URL with our tier and other data
-	sig := sign(tierTitle, userData, overrides, DefaultSignatureDuration)
+	sig := sign(tier, user, overrides, DefaultSignatureDuration)
 
 	// Whether this tier grants alerts at all, computed once rather than
 	// re-parsing the signature just signed.
-	allowed := alertContactAllowed(tierTitle, overrides)
-	channels := alertContactChannels(tierTitle, overrides)
+	allowed := alertContactAllowed(tier, overrides)
+	channels := alertContactChannels(tier, overrides)
 
 	// A grant's tier is not stored: the evaluator reads a live grant's own,
 	// and a revoked one must not leave its tier behind until the next login.
-	contactTier := tierTitle
+	contactTier := tier
 	if granted {
 		contactTier = ""
 	}
 	alertCtx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	err = recordAlertContact(alertCtx, s.alertContacts(), userData, contactTier, allowed, channels)
+	err := recordAlertContact(alertCtx, s.alertContacts(), user, contactTier, allowed, channels)
 	if err != nil {
 		LogPages["Admin"].Println("recordAlertContact", err)
 	}
@@ -160,7 +168,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	// Redirect to the URL indicated in this query param, or go to homepage.
 	// Drop a stale error from the page that started the login flow now that
 	// authentication succeeded.
-	redir := authRedirect(r.FormValue("state"))
+	redir := authRedirect(state)
 
 	// Redirect, we're done here
 	http.Redirect(w, r, redir, http.StatusFound)
