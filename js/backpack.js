@@ -98,7 +98,7 @@
         return true;
     }
 
-    function toastCeiling() { toast(MAX_QTY + " copies is the most for one card"); }
+    function toastCeiling() { toast(MAX_QTY + " copies is the most for one product"); }
 
     // add puts one more copy of the row's card in; a removed card comes back
     // as one copy.
@@ -115,7 +115,7 @@
             list[idx].qty = next;
             list[idx].m = t;
         } else {
-            if (live().length >= MAX) { toast("Backpack is full (" + MAX + " cards)"); return false; }
+            if (live().length >= MAX) { toast("Backpack is full (" + MAX + " products)"); return false; }
             remember(list, [data.id]);
             if (idx >= 0) list.splice(idx, 1);
             list.unshift({
@@ -320,7 +320,7 @@
 
         listEl = text("div", "backpack-list");
         listEl.setAttribute("id", "backpack-list");
-        emptyEl = text("p", "backpack-empty", "Add cards from any search with the backpack button.");
+        emptyEl = text("p", "backpack-empty", "Add products from any search with the backpack button.");
         emptyEl.setAttribute("id", "backpack-empty");
 
         var footer = text("div", "backpack-footer");
@@ -405,7 +405,7 @@
     }
 
     function countLine(c) {
-        return c.copies + (c.copies === 1 ? " copy" : " copies") + " of " + c.cards + (c.cards === 1 ? " card" : " cards");
+        return c.copies + (c.copies === 1 ? " copy" : " copies") + " of " + c.cards + (c.cards === 1 ? " product" : " products");
     }
 
     function renderPanel() {
