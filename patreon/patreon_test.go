@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -316,5 +317,166 @@ func TestGetUserDataStatusIsTyped(t *testing.T) {
 	userData, err := c.GetUserData(context.Background())
 	if err != nil || userData.Data.Attributes.Email != "patron@example.com" {
 		t.Errorf("200: %+v, %v, want the identity", userData, err)
+	}
+}
+
+// The refresh sends the refresh_token grant to the token endpoint and reads
+// every key of the recorded answer.
+func TestRefreshAuthTokenReadsTheRecordedAnswer(t *testing.T) {
+	e := serveAnswer(t, http.StatusOK, fixture(t, "refresh-success.json"))
+	tokens, err := RefreshAuthToken(e.ctx(), "the-client", "the-secret", "the-refresh-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {"the-refresh-token"},
+		"client_id":     {"the-client"},
+		"client_secret": {"the-secret"},
+	}
+	if e.method != http.MethodPost || e.path != "/api/oauth2/token" || e.contentType != "application/x-www-form-urlencoded" || e.form.Encode() != want.Encode() {
+		t.Errorf("sent %s %s %q %v, want a form POST of %v to /api/oauth2/token", e.method, e.path, e.contentType, e.form, want)
+	}
+	if tokens.TokenType != "Bearer" || tokens.AccessToken != "redacted-rotated-access-token" ||
+		tokens.RefreshToken != "redacted-rotated-refresh-token" || tokens.Expires != 353103063 {
+		t.Errorf("read %+v from the recorded answer", tokens)
+	}
+	if !strings.Contains(tokens.Scope, "identity.memberships") || !strings.Contains(tokens.Scope, "campaigns.members") {
+		t.Errorf("scope = %q, want the recorded scopes", tokens.Scope)
+	}
+}
+
+// A spent refresh token is a GrantError coded invalid_grant, on the 401 that
+// was recorded and on the RFC's 400, and the StatusError under it is still
+// there to find, however far the error is wrapped.
+func TestRefreshAuthTokenInvalidGrant(t *testing.T) {
+	body := fixture(t, "refresh-invalid-grant.json")
+	for _, code := range []int{http.StatusUnauthorized, http.StatusBadRequest} {
+		e := serveAnswer(t, code, body)
+		tokens, err := RefreshAuthToken(e.ctx(), "the-client", "the-secret", "the-refresh-token")
+		wrapped := fmt.Errorf("renew: %w", err)
+		var grantErr *GrantError
+		if !errors.As(wrapped, &grantErr) || grantErr.Code != InvalidGrant || tokens != nil {
+			t.Errorf("%d: %+v, %v, want a GrantError coded %q", code, tokens, err, InvalidGrant)
+			continue
+		}
+		var statusErr *StatusError
+		if !errors.As(wrapped, &statusErr) || statusErr.StatusCode != code || statusErr.Body != body {
+			t.Errorf("%d: %v, want the StatusError under the GrantError", code, err)
+		}
+		if !strings.Contains(err.Error(), `"invalid_grant"`) || !strings.Contains(err.Error(), http.StatusText(code)) {
+			t.Errorf("%d: %q, want the code and the status in the message", code, err.Error())
+		}
+	}
+}
+
+// Every other refusal stays a plain StatusError: the recorded dead-token and
+// throttle answers, an OAuth error under another status, and a 400 or 401
+// whose body is not an object with an error string.
+func TestRefreshAuthTokenOtherRefusalsAreStatusErrors(t *testing.T) {
+	for name, tc := range map[string]struct {
+		code int
+		body string
+	}{
+		"a JSON:API 401":        {http.StatusUnauthorized, fixture(t, "identity-unauthorized.json")},
+		"a throttle":            {http.StatusTooManyRequests, fixture(t, "membership-throttled.json")},
+		"invalid_grant on 403":  {http.StatusForbidden, `{"error":"invalid_grant"}`},
+		"an OAuth error on 500": {http.StatusInternalServerError, `{"error":"server_error"}`},
+		"an edge's 502":         {http.StatusBadGateway, "<html>502 Bad Gateway</html>"},
+		"a 503":                 {http.StatusServiceUnavailable, ""},
+		"an empty error":        {http.StatusBadRequest, `{"error":""}`},
+		"an error list":         {http.StatusBadRequest, `{"error":["invalid_grant"]}`},
+		"an HTML 400":           {http.StatusBadRequest, "<html>400</html>"},
+		"an empty 401":          {http.StatusUnauthorized, ""},
+	} {
+		e := serveAnswer(t, tc.code, tc.body)
+		tokens, err := RefreshAuthToken(e.ctx(), "the-client", "the-secret", "the-refresh-token")
+		var statusErr *StatusError
+		var grantErr *GrantError
+		if !errors.As(err, &statusErr) || statusErr.StatusCode != tc.code || statusErr.Body != tc.body || tokens != nil {
+			t.Errorf("%s: %+v, %v, want a StatusError %d holding the body", name, tokens, err, tc.code)
+		}
+		if errors.As(err, &grantErr) {
+			t.Errorf("%s: %v, want no GrantError", name, err)
+		}
+	}
+}
+
+// A 2xx answer that is not a token pair is never a success: cut short, not
+// JSON, empty, or missing either token.
+func TestRefreshAuthTokenUnreadableAnswers(t *testing.T) {
+	for name, body := range map[string]string{
+		"cut short":              `{"access_token":"a`,
+		"html":                   "<html>ok</html>",
+		"nothing":                "",
+		"an empty object":        `{}`,
+		"no refresh token":       `{"token_type":"Bearer","access_token":"a","expires_in":60}`,
+		"no access token":        `{"token_type":"Bearer","refresh_token":"r","expires_in":60}`,
+		"an empty access token":  `{"access_token":"","refresh_token":"r"}`,
+		"an empty refresh token": `{"access_token":"a","refresh_token":""}`,
+	} {
+		e := serveAnswer(t, http.StatusOK, body)
+		tokens, err := RefreshAuthToken(e.ctx(), "the-client", "the-secret", "the-refresh-token")
+		var statusErr *StatusError
+		if !errors.Is(err, ErrUnreadable) || errors.As(err, &statusErr) || tokens != nil {
+			t.Errorf("%s: %+v, %v, want ErrUnreadable", name, tokens, err)
+		}
+	}
+}
+
+// failing is a transport that never reaches Patreon.
+type failing struct {
+	err error
+}
+
+func (f failing) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, f.err
+}
+
+// A request that never gets an answer is neither a refusal nor an unreadable
+// answer, and the cause stays in the chain.
+func TestRefreshAuthTokenTransportErrors(t *testing.T) {
+	errNoRoute := errors.New("no route to host")
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{Transport: failing{errNoRoute}})
+	tokens, err := RefreshAuthToken(ctx, "the-client", "the-secret", "the-refresh-token")
+	var statusErr *StatusError
+	if !errors.Is(err, errNoRoute) || errors.As(err, &statusErr) || errors.Is(err, ErrUnreadable) || tokens != nil {
+		t.Errorf("%+v, %v, want the transport's error", tokens, err)
+	}
+
+	e := serveAnswer(t, http.StatusOK, fixture(t, "refresh-success.json"))
+	ctx, cancel := context.WithCancel(e.ctx())
+	cancel()
+	_, err = RefreshAuthToken(ctx, "the-client", "the-secret", "the-refresh-token")
+	if !errors.Is(err, context.Canceled) || e.method != "" {
+		t.Errorf("%v after a %q request, want context.Canceled and no request", err, e.method)
+	}
+}
+
+// Without a client, secret or refresh token no request is made.
+func TestRefreshAuthTokenNeedsCredentials(t *testing.T) {
+	e := serveAnswer(t, http.StatusOK, fixture(t, "refresh-success.json"))
+	for name, args := range map[string][3]string{
+		"no client":        {"", "the-secret", "the-refresh-token"},
+		"no secret":        {"the-client", "", "the-refresh-token"},
+		"no refresh token": {"the-client", "the-secret", ""},
+	} {
+		_, err := RefreshAuthToken(e.ctx(), args[0], args[1], args[2])
+		if err == nil || e.method != "" {
+			t.Errorf("%s: %v after a %q request, want an error and no request", name, err, e.method)
+		}
+	}
+}
+
+// The code exchange refuses with the same typing, a GrantError over its
+// StatusError.
+func TestGetAuthTokenOAuthErrorIsAGrantError(t *testing.T) {
+	e := serveAnswer(t, http.StatusBadRequest, `{"error":"invalid_grant"}`)
+	_, err := GetAuthToken(e.ctx(), "the-client", "the-secret", "https://mtgban.test", "the-code")
+	var grantErr *GrantError
+	var statusErr *StatusError
+	if !errors.As(err, &grantErr) || grantErr.Code != InvalidGrant || !errors.As(err, &statusErr) || statusErr.StatusCode != http.StatusBadRequest {
+		t.Errorf("%v, want a GrantError over a StatusError 400", err)
 	}
 }
