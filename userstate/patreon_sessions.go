@@ -3,9 +3,7 @@ package userstate
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"time"
 )
@@ -42,70 +40,106 @@ func (c *Client) CreatePatreonSession(ctx context.Context, emailHash, refreshTok
 	return id, nil
 }
 
-// LeasePatreonSession claims the right to renew a session for lease and
-// returns its refresh token with the fence that commit and defer need. It
-// is one UPDATE: leased is false, with no error, when the session is
-// unknown, belongs to another email hash, is past its expiry, or is already
-// leased or backing off.
-func (c *Client) LeasePatreonSession(ctx context.Context, sessionID, emailHash string, lease time.Duration) (refreshToken, fence string, leased bool, err error) {
+// Patreon keeps one refresh token per account and client, so every session
+// of an email hash carries the same one and a renewal moves them together:
+// the lease, the commit and the deferral below each act on all of an email
+// hash's sessions.
+
+// LeasePatreonSessions claims the right to renew the Patreon account behind
+// sessionID's email hash for lease, and returns its refresh token with the
+// fence that commit and defer need. It is one UPDATE over every live session
+// of the email hash: leased is false, with no error, when sessionID is
+// unknown, belongs to another email hash or is past its expiry, or when any
+// live session of the email hash is already leased or backing off. The token
+// is that of the session renewed last.
+func (c *Client) LeasePatreonSessions(ctx context.Context, sessionID, emailHash string, lease time.Duration) (refreshToken, fence string, leased bool, err error) {
 	fence, err = newPatreonSessionID()
 	if err != nil {
 		return "", "", false, fmt.Errorf("userstate: lease fence: %w", err)
 	}
-	err = c.db.QueryRowContext(ctx, `
+	// renew_after is tested on the rows being updated as well as through
+	// NOT EXISTS: a concurrent lease that committed first leaves the rows
+	// this statement waited for with a renew_after the subquery, which
+	// reads the table as it was when the statement began, does not see.
+	rows, err := c.db.QueryContext(ctx, `
 		UPDATE patreon_sessions
 		   SET renew_after = now() + make_interval(secs => $3), lease = $4
-		 WHERE session_id = $1 AND email_hash = $2 AND renew_after <= now() AND expires_at > now()
-		RETURNING refresh_token`,
-		sessionID, emailHash, lease.Seconds(), fence,
-	).Scan(&refreshToken)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", false, nil
-	}
+		 WHERE email_hash = $2 AND expires_at > now() AND renew_after <= now()
+		   AND EXISTS (SELECT 1 FROM patreon_sessions
+		                WHERE session_id = $1 AND email_hash = $2 AND expires_at > now())
+		   AND NOT EXISTS (SELECT 1 FROM patreon_sessions
+		                    WHERE email_hash = $2 AND expires_at > now() AND renew_after > now())
+		RETURNING refresh_token, last_renewed`,
+		sessionID, emailHash, lease.Seconds(), fence)
 	if err != nil {
 		return "", "", false, err
+	}
+	defer rows.Close()
+	var newest time.Time
+	for rows.Next() {
+		var token string
+		var renewed time.Time
+		err = rows.Scan(&token, &renewed)
+		if err != nil {
+			return "", "", false, err
+		}
+		if !leased || renewed.After(newest) {
+			refreshToken, newest, leased = token, renewed, true
+		}
+	}
+	err = rows.Err()
+	if err != nil {
+		return "", "", false, err
+	}
+	if !leased {
+		return "", "", false, nil
 	}
 	return refreshToken, fence, true, nil
 }
 
-// CommitPatreonSession stores the refresh token a renewal returned and
-// makes the session leasable again. stored is false when the session was
-// deleted meanwhile, or when fence is not the current lease's: a holder that
-// outlived its lease must not overwrite a token a later holder rotated, and
-// the caller must not act on a renewal the reader has revoked.
-func (c *Client) CommitPatreonSession(ctx context.Context, sessionID, fence, refreshToken string) (stored bool, err error) {
+// CommitPatreonSessions stores the refresh token a renewal returned on every
+// session of the email hash, one created after the lease included, and makes
+// them leasable again after rest, at once when rest is zero. rows is 0 when
+// fence is no longer held: the sessions were deleted meanwhile, or the lease
+// ran out and was taken over. A holder that outlived its lease must not
+// overwrite a token a later holder rotated, and the caller must not act on a
+// renewal the reader has revoked.
+func (c *Client) CommitPatreonSessions(ctx context.Context, emailHash, fence, refreshToken string, rest time.Duration) (rows int64, err error) {
 	res, err := c.db.ExecContext(ctx, `
 		UPDATE patreon_sessions
-		   SET refresh_token = $3, last_renewed = now(), renew_after = now()
-		 WHERE session_id = $1 AND lease = $2`,
-		sessionID, fence, refreshToken)
+		   SET refresh_token = $3, last_renewed = now(), renew_after = now() + make_interval(secs => $4), lease = NULL
+		 WHERE email_hash = $1
+		   AND EXISTS (SELECT 1 FROM patreon_sessions WHERE email_hash = $1 AND lease = $2)`,
+		emailHash, fence, refreshToken, rest.Seconds())
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	return n == 1, nil
+	return res.RowsAffected()
 }
 
-// DeferPatreonSession holds a session back from renewal for until, when
-// fence is still the current lease's.
-func (c *Client) DeferPatreonSession(ctx context.Context, sessionID, fence string, until time.Duration) error {
+// DeferPatreonSessions holds every session of the email hash back from
+// renewal for until, when fence is still held. A renewal whose refresh went
+// through before it learned nothing usable passes the token Patreon rotated
+// to, which is stored with the deferral since the old one is dead; empty
+// leaves the stored token as it is.
+func (c *Client) DeferPatreonSessions(ctx context.Context, emailHash, fence, refreshToken string, until time.Duration) error {
 	_, err := c.db.ExecContext(ctx, `
 		UPDATE patreon_sessions
-		   SET renew_after = now() + make_interval(secs => $3)
-		 WHERE session_id = $1 AND lease = $2`,
-		sessionID, fence, until.Seconds())
+		   SET renew_after = now() + make_interval(secs => $3),
+		       refresh_token = COALESCE(NULLIF($4, ''), refresh_token),
+		       last_renewed = CASE WHEN $4 = '' THEN last_renewed ELSE now() END
+		 WHERE email_hash = $1
+		   AND EXISTS (SELECT 1 FROM patreon_sessions WHERE email_hash = $1 AND lease = $2)`,
+		emailHash, fence, until.Seconds(), refreshToken)
 	return err
 }
 
-// RekeyPatreonSession moves a session to another email hash, for a Patreon
-// account whose email changed.
-func (c *Client) RekeyPatreonSession(ctx context.Context, sessionID, emailHash string) error {
+// RekeyPatreonSessions moves every session of an email hash to another, for
+// a Patreon account whose email changed.
+func (c *Client) RekeyPatreonSessions(ctx context.Context, emailHash, newEmailHash string) error {
 	_, err := c.db.ExecContext(ctx,
-		`UPDATE patreon_sessions SET email_hash = $2 WHERE session_id = $1`,
-		sessionID, emailHash)
+		`UPDATE patreon_sessions SET email_hash = $2 WHERE email_hash = $1`,
+		emailHash, newEmailHash)
 	return err
 }
 
