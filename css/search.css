@@ -2185,7 +2185,6 @@ body.modal-embed .cp-overlay {
     /* The favorite button and the alert link match the others (their base
        rules are more specific and lay them out for the inline icon row). */
     .result-quick-icons .qi-actions > .fav-btn,
-    .result-quick-icons .qi-actions > .pack-btn,
     .result-quick-icons .qi-actions > .alert-link {
         display: grid;
         grid-template-columns: 24px 1fr;
@@ -2808,6 +2807,7 @@ body.modal-embed .cp-overlay {
 
 .result-quick-icons .fav-btn,
 .result-quick-icons .pack-btn,
+.result-quick-icons .pack-minus-btn,
 .result-quick-icons .alert-link {
     background: transparent;
     border: none;
@@ -2829,6 +2829,8 @@ body.modal-embed .cp-overlay {
 .result-quick-icons .fav-btn i[data-lucide],
 .result-quick-icons .pack-btn svg,
 .result-quick-icons .pack-btn i[data-lucide],
+.result-quick-icons .pack-minus-btn svg,
+.result-quick-icons .pack-minus-btn i[data-lucide],
 .result-quick-icons .alert-link svg,
 .result-quick-icons .alert-link i[data-lucide] {
     display: block;
@@ -2838,6 +2840,7 @@ body.modal-embed .cp-overlay {
 
 .result-quick-icons .fav-btn:hover,
 .result-quick-icons .pack-btn:hover,
+.result-quick-icons .pack-minus-btn:hover,
 .result-quick-icons .alert-link:hover {
     color: var(--normal);
 }
@@ -2857,6 +2860,58 @@ body.modal-embed .cp-overlay {
 
 .result-quick-icons .alert-link.active svg {
     fill: var(--darkeryellow, gold);
+}
+
+/* The backpack's minus pops up below it while the pointer is over either,
+   or the keyboard is on one, so the row never reflows. */
+.result-quick-icons .pack-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.result-quick-icons .pack-wrap > .pack-minus-btn {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    padding: 0.25em;
+    background: var(--search-surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: var(--radius-sm, 6px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.result-quick-icons .pack-wrap:hover > .pack-minus-btn:not([hidden]),
+.result-quick-icons .pack-wrap:has(:focus-visible) > .pack-minus-btn:not([hidden]) {
+    display: inline-flex;
+}
+
+/* In the collapsed menu the pair is two plain rows, the minus once the card
+   is in; after the rules above so it wins their ties. */
+@container search-results (width <= 560px) {
+    .result-quick-icons .qi-actions > .pack-wrap { display: contents; }
+    .result-quick-icons .qi-actions .pack-wrap > .pack-btn,
+    .result-quick-icons .qi-actions .pack-wrap > .pack-minus-btn:not([hidden]) {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        align-items: center;
+        justify-items: center;
+        gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 10px;
+        border-radius: var(--radius-sm, 6px);
+    }
+    .result-quick-icons .qi-actions .pack-wrap > .pack-minus-btn:not([hidden]) {
+        position: static;
+        transform: none;
+        background: none;
+        border: none;
+        box-shadow: none;
+    }
+    .result-quick-icons .qi-actions .pack-wrap > button:hover { background: var(--search-row-hover); }
 }
 
 /* === Pin button on landing items === */

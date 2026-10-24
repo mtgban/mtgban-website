@@ -100,17 +100,19 @@
 
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one card"); }
 
-    // toggleCard takes the row's card out when it is in, else puts one copy in;
-    // the panel's controls set how many.
-    function toggleCard(data) {
+    // add puts one more copy of the row's card in; a removed card comes back
+    // as one copy.
+    function add(data) {
         if (!data || !data.id) return false;
         var list = read();
         var t = now();
         var idx = -1;
         for (var i = 0; i < list.length; i++) { if (list[i].id === data.id) { idx = i; break; } }
         if (idx >= 0 && !list[idx].del) {
+            var next = Math.min(MAX_QTY, list[idx].qty + 1);
+            if (next === list[idx].qty) { toastCeiling(); return false; }
             remember(list, [data.id]);
-            list[idx].del = t;
+            list[idx].qty = next;
             list[idx].m = t;
         } else {
             if (live().length >= MAX) { toast("Backpack is full (" + MAX + " cards)"); return false; }
@@ -217,17 +219,28 @@
 
     // ---- result rows and the navbar ----
 
+    // describe sets a button's title and the text labels the phone menu and
+    // the collapsed desktop menu give it.
+    function describe(b, s) {
+        b.setAttribute("title", s);
+        b.querySelectorAll(".pack-btn-label, .qi-label").forEach(function (n) { n.textContent = s; });
+    }
+
     function markRows() {
         var by = {};
-        live().forEach(function (e) { by[e.id] = true; });
+        live().forEach(function (e) { by[e.id] = e.qty; });
         document.querySelectorAll(".pack-btn").forEach(function (b) {
-            var on = !!by[b.getAttribute("data-card-id")];
-            b.classList.toggle("active", on);
-            b.setAttribute("title", on ? "Remove from backpack" : "Add to backpack");
-            var tick = b.querySelector(".pack-btn-tick");
-            if (tick) tick.hidden = !on;
-            var label = b.querySelector(".pack-btn-label");
-            if (label) label.textContent = on ? "Remove from backpack" : "Add to backpack";
+            var qty = by[b.getAttribute("data-card-id")];
+            b.classList.toggle("active", !!qty);
+            describe(b, qty ? "Add another copy" : "Add to backpack");
+            var span = b.querySelector(".pack-btn-count");
+            if (span) { span.textContent = qty ? String(qty) : ""; span.hidden = !qty; }
+        });
+        // The minus shows only for a card in the backpack.
+        document.querySelectorAll(".pack-minus-btn").forEach(function (b) {
+            var qty = by[b.getAttribute("data-card-id")];
+            b.hidden = !qty;
+            describe(b, qty > 1 ? "Remove one copy" : "Remove from backpack");
         });
     }
 
@@ -240,14 +253,24 @@
         if (span) { span.textContent = String(c.copies); span.hidden = c.copies === 0; }
     }
 
-    window.toggleBackpack = function (btn) {
+    window.addToBackpack = function (btn) {
         var data = window.CardRow && window.CardRow.read ? window.CardRow.read(btn) : null;
         if (!data || !data.id) {
             var id = btn.getAttribute("data-card-id");
             if (!id) return;
             data = { id: id, name: "" };
         }
-        if (toggleCard(data)) render();
+        if (add(data)) render();
+    };
+
+    // takeFromBackpack takes one copy of the button's card out, the last one
+    // with the card.
+    window.takeFromBackpack = function (btn) {
+        var id = btn.getAttribute("data-card-id");
+        var e = live().filter(function (x) { return x.id === id; })[0];
+        if (!e) return;
+        setQty(id, e.qty - 1);
+        render();
     };
 
     // ---- the panel ----
@@ -451,7 +474,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, toggleCard: toggleCard, setQty: setQty, remove: remove, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
+    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");

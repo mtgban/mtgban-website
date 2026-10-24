@@ -10,7 +10,7 @@
         var actions = group.querySelector('.qi-actions');
         if (!toggle || !actions) return;
 
-        actions.querySelectorAll(':scope > a, :scope > span, :scope > button').forEach(function (el) {
+        actions.querySelectorAll(':scope > a, :scope > span, :scope > button, :scope > .pack-wrap > button').forEach(function (el) {
             var title = el.getAttribute('title');
             if (!title || el.querySelector('.qi-label')) return;
             var label = document.createElement('span');
