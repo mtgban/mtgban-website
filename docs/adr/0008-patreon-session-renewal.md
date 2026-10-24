@@ -157,7 +157,9 @@ without the reader.
 3. [ ] `clear_on_negative` once the not-entitled rate looks like churn.
 4. [ ] `grace_days`, if kept at 3.
 5. [ ] Register the webhook at Patreon (Phase 5): the URL
-   `https://www.mtgban.com/webhook/patreon`, the triggers
+   `https://mtg.ban.cards/webhook/patreon`, the triggers
    `members:pledge:create`, `members:pledge:update` and
    `members:pledge:delete`, and the secret it generates filed in
-   `infrastructure.json` as `patreon_webhook_secret`.
+   `infrastructure.json` as `patreon_webhook_secret`. Register it once the
+   magic droplet serves `mtg.ban.cards` itself: a host that redirects loses
+   deliveries, since a webhook sender need not follow a redirect.

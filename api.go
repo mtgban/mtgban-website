@@ -512,19 +512,22 @@ type OpenSearchURL struct {
 	Template string `xml:"template,attr"`
 }
 
+// OpenSearchDesc describes this site's search to the browser's search bar,
+// at the origin the request reached it by, so each game's host names its own
+// search; a request from a host that is not ours gets this game's public one.
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
-	host := string(Config().Game)
-	gameName := mtgmatcher.Title(host)
+	gameName := mtgmatcher.Title(string(Config().Game))
+	base := externalURL(r)
 
 	images := []OpenSearchImage{
 		{
-			Text:   "https://mtgban.com/img/favicon/favicon.ico",
+			Text:   base + "/img/favicon/favicon.ico",
 			Width:  "32",
 			Height: "32",
 			Type:   "image/x-icon",
 		},
 		{
-			Text:   "https://mtgban.com/img/favicon/apple-touch-icon.png",
+			Text:   base + "/img/favicon/apple-touch-icon.png",
 			Width:  "120",
 			Height: "120",
 			Type:   "image/png",
@@ -536,17 +539,17 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 			Method:   "get",
 			Rel:      "results",
 			Type:     "text/html",
-			Template: "https://" + host + ".mtgban.com/search?q={searchTerms}",
+			Template: base + "/search?q={searchTerms}",
 		},
 		{
 			Rel:      "self",
 			Type:     "application/opensearchdescription+xml",
-			Template: "https://" + host + ".mtgban.com/api/opensearch.xml",
+			Template: base + "/api/opensearch.xml",
 		},
 		{
 			Rel:      "suggestions",
 			Type:     "application/json",
-			Template: "http://" + host + ".mtgban.com/api/suggest?q={searchTerms}",
+			Template: base + "/api/suggest?q={searchTerms}",
 		},
 	}
 
