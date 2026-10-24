@@ -168,6 +168,9 @@ func (s *site) registerRoutes() {
 	http.Handle("/api/alerts/", noSigning(s.alerts.API()))
 	// Resend's webhook: the Svix signature is the credential.
 	http.Handle("/alerts/mail-events", noSigning(http.HandlerFunc(s.AlertsMailEvents)))
+	// Patreon's member webhook: the signature is the credential, and it
+	// answers 404 until the deployment has a secret to check it with.
+	http.Handle("/webhook/patreon", noSigning(http.HandlerFunc(PatreonWebhook)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(s.LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(s.LoadFromCloud)))

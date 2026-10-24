@@ -48,6 +48,19 @@ func notifyAccessReload(ctx context.Context, channel string) {
 	}
 }
 
+// notifyPoke tells the peer deployments to poke the reader with the given
+// email hash. Best effort: the sender's own set already has the poke, so a
+// failure here only leaves the peers to the age window and is just logged.
+func notifyPoke(ctx context.Context, hash string) {
+	if PricesArchiveDB == nil {
+		return
+	}
+	err := PricesArchiveDB.Notify(ctx, patreonPokeChannel, hash)
+	if err != nil {
+		log.Printf("patreon poke: notify failed: %v", err)
+	}
+}
+
 // skipAccessNotification reports whether a notification needs no reload:
 // only the sender's own, and only when instance names can actually tell the
 // deployments apart. A nil notification is lib/pq reporting a reconnect -
