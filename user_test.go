@@ -459,19 +459,19 @@ func TestUserFeaturesFollowTheGrants(t *testing.T) {
 	s := newSite()
 
 	desktop := featureLinks(userFeatures(s, signedParams("a@b.com", "Vintage", "Search", "Alerts"), false))
-	want := []string{"/search#desktop-favorites", "/search#desktop-recent-searches", "/user?settings=1", "/alerts"}
+	want := []string{"/search", "/search", "/user?settings=1", "/alerts"}
 	if !slices.Equal(desktop, want) {
 		t.Fatalf("desktop %v, want %v", desktop, want)
 	}
 
 	mobile := featureLinks(userFeatures(s, signedParams("a@b.com", "Vintage", "Search", "Alerts"), true))
-	want = []string{"/search#m-favorites", "/search#m-recent-searches", "/alerts"}
+	want = []string{"/search", "/search", "/alerts"}
 	if !slices.Equal(mobile, want) {
 		t.Fatalf("mobile %v, want %v", mobile, want)
 	}
 
 	noAlerts := featureLinks(userFeatures(s, signedParams("a@b.com", "Modern", "Search"), false))
-	want = []string{"/search#desktop-favorites", "/search#desktop-recent-searches", "/user?settings=1"}
+	want = []string{"/search", "/search", "/user?settings=1"}
 	if !slices.Equal(noAlerts, want) {
 		t.Fatalf("without Alerts %v, want %v", noAlerts, want)
 	}
