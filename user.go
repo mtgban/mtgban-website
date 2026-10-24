@@ -299,20 +299,16 @@ func (s *site) userVars(ctx context.Context, sigParams url.Values, isMobile bool
 }
 
 // userFeatures lists the personal features the signed reader's tier
-// grants, with the link each device lands on; nobody for an anonymous one.
+// grants; nobody for an anonymous one.
 func userFeatures(s *site, sigParams url.Values, isMobile bool) []UserFeature {
 	if sigParams.Get("UserEmail") == "" {
 		return nil
 	}
 	var out []UserFeature
 	if navOffers(s, sigParams, "Search") {
-		favorites, recents := "/search#desktop-favorites", "/search#desktop-recent-searches"
-		if isMobile {
-			favorites, recents = "/search#m-favorites", "/search#m-recent-searches"
-		}
 		out = append(out,
-			UserFeature{Name: "Favorites", Description: "Cards you starred, with their best prices", Link: favorites},
-			UserFeature{Name: "Recent searches", Description: "What you looked up lately, on every device you sign in on", Link: recents},
+			UserFeature{Name: "Favorites", Description: "Cards you starred, with their best prices", Link: "/search"},
+			UserFeature{Name: "Recent searches", Description: "What you looked up lately, on every device you sign in on", Link: "/search"},
 		)
 	}
 	// The settings modal is desktop only.
