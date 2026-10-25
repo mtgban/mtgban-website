@@ -15,6 +15,9 @@
 -- cards under is_alt. It is safe to run again, so a run that lands first can be
 -- repeated once the deploy is out. still_alt then counts only the copies'
 -- variants.
+--
+-- 10_alt_copy_prices.sql then sorts out the prices the copies and their
+-- originals filed on each other's variants.
 
 BEGIN;
 
