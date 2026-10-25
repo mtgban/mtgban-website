@@ -1,3 +1,5 @@
+\echo 'Retired: a one-off repair that has already run against production. See retired/README.md.'
+\quit
 -- is_alt on a Magic variant marks the Alternate Fourth Edition copy
 -- ("<uuid>_alt") and nothing else. Every other is_alt variant was filed for
 -- mtgjson's isAlternative, which already has a uuid of its own, so this clears
