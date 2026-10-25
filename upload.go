@@ -1041,7 +1041,7 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			if factor > 0 {
 				profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+factor)
 				if row.qty > 1 {
-					profitability *= math.Sqrt(float64(row.qty))
+					profitability *= math.Pow(float64(row.qty), 0.25)
 				}
 			}
 		}
