@@ -76,7 +76,7 @@ func newSite() *site {
 
 		Sellers:      GetSellers,
 		Vendors:      GetVendors,
-		HiddenStores: func() []string { return Config().Stores.APIOnlyStores },
+		HiddenStores: requestBlocklists,
 	}
 
 	s.offline = offlineapi.NewService(offlineapi.Deps{
