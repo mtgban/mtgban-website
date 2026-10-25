@@ -186,8 +186,9 @@ func TestRefreshNowActsOnlyOnTheBrowsersOwnCookies(t *testing.T) {
 	})
 }
 
-// Refresh now with a refresh token Patreon refuses for good ends the session,
-// and the page says to log in again rather than to try again.
+// Refresh now from a session that can never renew again, its refresh token
+// refused by Patreon for good or its row gone, says to log in again rather
+// than to try again.
 func TestRefreshNowSaysWhenTheSessionEnded(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	rig.stub.token = &stubAnswer{http.StatusUnauthorized, `{"error":"invalid_grant"}`}
@@ -198,6 +199,11 @@ func TestRefreshNowSaysWhenTheSessionEnded(t *testing.T) {
 	wantRedirect(t, rec, "/user?refreshed=ended")
 	if rows := rig.rows(); len(rows) != 0 {
 		t.Errorf("rows %+v, want the session gone", rows)
+	}
+	// The browser still holding the cookie of the row that went
+	wantRedirect(t, rig.account("refresh", browser(young, session)...), "/user?refreshed=ended")
+	if rig.stub.calls() != 1 {
+		t.Errorf("%d refreshes, want the one Patreon refused", rig.stub.calls())
 	}
 	page := httptest.NewRecorder()
 	noSigning(http.HandlerFunc(rig.site.User)).ServeHTTP(page, rig.request(http.MethodGet, "/user?refreshed=ended", browser(young, "")...))
