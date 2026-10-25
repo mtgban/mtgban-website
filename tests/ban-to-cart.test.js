@@ -1378,12 +1378,16 @@ describe('ban-to-cart bookmarklet on Hareruya', () => {
     });
 });
 
-// fakeCK stands in for Card Kingdom's store cart: an add sets a product and
-// style's quantity (0 removes it), answers above the stock with 400 and how
-// many there are, and answers a product it does not have with a message.
-function fakeCK({cart = {}, unknown = [], stock = {}} = {}) {
+// fakeCK stands in for Card Kingdom's store cart: the deck builder's add
+// sets each product and style it is sent, answering with a redirect, and
+// skips one asked above the stock, above the available count sent with it,
+// or that CK does not have. The cart's own add sets one (0 removes it),
+// answers above the stock with 400 and how many there are, and answers a
+// product it does not have with a message.
+function fakeCK({cart = {}, unknown = [], stock = {}, builderStatus = null} = {}) {
     const lines = {...cart};
     const posts = [];
+    const builds = [];
     const fetch = async (url, opts = {}) => {
         if (!opts.method) {
             const lineitems = Object.entries(lines).map(([key, qty]) => {
@@ -1391,6 +1395,28 @@ function fakeCK({cart = {}, unknown = [], stock = {}} = {}) {
                 return {product_id: +id, style, qty};
             });
             return {ok: true, status: 200, json: async () => ({lineitems})};
+        }
+        if (url === '/api/builder/addMultiple') {
+            if (builderStatus) {
+                return {ok: false, status: builderStatus, type: 'basic'};
+            }
+            const form = new URLSearchParams(opts.body.toString());
+            const sent = [];
+            for (const [name, value] of form) {
+                const m = /^qty\[(\d+)\]\[(\w+)\]$/.exec(name);
+                if (!m) {
+                    continue;
+                }
+                const key = m[1] + '-' + m[2];
+                const qty = +value;
+                sent.push([key, qty]);
+                const available = +form.get('available[' + m[1] + '][' + m[2] + ']');
+                if (!unknown.includes(key) && qty <= available && qty <= (stock[key] ?? Infinity)) {
+                    lines[key] = qty;
+                }
+            }
+            builds.push(sent);
+            return {ok: false, status: 0, type: 'opaqueredirect'};
         }
         const body = JSON.parse(opts.body);
         const key = body.product_id + '-' + body.style;
@@ -1408,35 +1434,46 @@ function fakeCK({cart = {}, unknown = [], stock = {}} = {}) {
         }
         return {ok: true, status: 200, json: async () => ({})};
     };
-    return {fetch, posts, lines};
+    return {fetch, posts, builds, lines};
 }
 
 describe('ban-to-cart bookmarklet on Card Kingdom', () => {
     const ck = {host: 'www.cardkingdom.com', path: '/cart'};
 
-    test('each card goes in by product and style, setting its quantity', async () => {
+    test('the cards go in one builder add, by product and style, setting each quantity', async () => {
         const fake = fakeCK({cart: {'10190-EX': 3}});
-        const {alerts, page, posts} = await run({...ck, hash: '#ban=10190-NM%3a1%2c10190-EX%3a2&side=retail', abu: fake});
-        expect(posts).toEqual([['10190-NM', 1], ['10190-EX', 2]]);
+        const {alerts, page} = await run({...ck, hash: '#ban=10190-NM%3a1%2c10190-EX%3a2&side=retail', abu: fake});
+        expect(fake.builds).toEqual([[['10190-NM', 1], ['10190-EX', 2]]]);
+        expect(fake.posts).toEqual([]);
         expect(fake.lines).toEqual({'10190-NM': 1, '10190-EX': 2});
         expect(alerts[0]).toBe('Loaded 2 cards into your Card Kingdom cart.');
         expect(page.url).toBe('/cart');
         expect(page.reloaded).toBe(true);
     });
 
-    test('a card above the stock goes again at what CK has, and none left is reported', async () => {
+    test('a card the builder leaves out goes again alone, at what CK has, and none left is reported', async () => {
         const fake = fakeCK({stock: {'10190-VG': 2, '26018-G': 0}, unknown: ['999-NM']});
-        const {alerts, posts} = await run({...ck, hash: '#ban=10190-VG:5,26018-G:1,999-NM:1&side=retail', abu: fake});
-        expect(posts).toEqual([['10190-VG', 5], ['10190-VG', 2], ['26018-G', 1], ['999-NM', 1]]);
-        expect(fake.lines).toEqual({'10190-VG': 2});
-        expect(alerts[0]).toBe('Loaded 1 cards into your Card Kingdom cart. 2 were not taken by Card Kingdom.');
+        const {alerts} = await run({...ck, hash: '#ban=10190-VG:5,26018-G:1,999-NM:1,10190-NM:1&side=retail', abu: fake});
+        expect(fake.builds).toEqual([[['10190-VG', 5], ['26018-G', 1], ['999-NM', 1], ['10190-NM', 1]]]);
+        expect(fake.posts).toEqual([['10190-VG', 5], ['10190-VG', 2], ['26018-G', 1], ['999-NM', 1]]);
+        expect(fake.lines).toEqual({'10190-VG': 2, '10190-NM': 1});
+        expect(alerts[0]).toBe('Loaded 2 cards into your Card Kingdom cart. 2 were not taken by Card Kingdom.');
     });
 
-    test('a long list goes in one add per card', async () => {
+    test('a long list goes in builder adds of 100 cards', async () => {
         const fake = fakeCK();
-        const {alerts} = await run({...ck, hash: '#ban=' + list(25).replace(/(\d+):/g, '$1-NM:') + '&side=retail', abu: fake});
-        expect(fake.posts).toHaveLength(25);
-        expect(alerts[0]).toBe('Loaded 25 cards into your Card Kingdom cart.');
+        const {alerts} = await run({...ck, hash: '#ban=' + list(250).replace(/(\d+):/g, '$1-NM:') + '&side=retail', abu: fake});
+        expect(fake.builds.map((sent) => sent.length)).toEqual([100, 100, 50]);
+        expect(fake.posts).toEqual([]);
+        expect(alerts[0]).toBe('Loaded 250 cards into your Card Kingdom cart.');
+    });
+
+    test('a builder add CK answers with an error stops the load', async () => {
+        const fake = fakeCK({builderStatus: 500});
+        const {alerts, page} = await run({...ck, hash: '#ban=10190-NM:1&side=retail', abu: fake});
+        expect(alerts).toEqual(['Card Kingdom refused the list (500).']);
+        expect(fake.posts).toEqual([]);
+        expect(page.reloaded).toBe(false);
     });
 });
 

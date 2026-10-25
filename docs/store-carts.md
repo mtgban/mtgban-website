@@ -3,9 +3,10 @@
 Neither ABU Games nor Cool Stuff Inc has a decklist or CSV import for its
 buylist, and neither has a partner import like Card Kingdom's
 `sellcart/partner_import`. Both have the cart call their own pages make,
-and both calls take a list. MTG Mint Card and Card Kingdom's store have the
-same kind of call, one card at a time, and so does Manaleak, after a read
-of the card's page; Hareruya has both: a form that takes a whole store
+and both calls take a list, as does the add Card Kingdom's deck builder
+makes to its store cart. MTG Mint Card has the same kind of call, one card
+at a time, and so does Manaleak, after a read of the card's page;
+Hareruya has both: a form that takes a whole store
 list, and one call per card for its buylist. Mana Pool's public optimizer
 takes a whole list and answers with the listings to put in its cart, and
 Card Trader's add takes every listing of a card a buyer could have and
@@ -21,7 +22,8 @@ against a guest cart and SCG and Mint against a real account on
 2026-10-09, Card Kingdom against a guest cart on 2026-10-10, and Mint's
 store, Mana Pool, Manaleak and Card Trader against a guest cart on
 2026-10-13, and Game Nerdz and Vegas Singles against a guest cart on
-2026-10-14.
+2026-10-14. Card Kingdom's builder add was measured against a guest cart
+and a real account on 2026-10-25.
 
 ## ABU: the calls
 
@@ -531,12 +533,14 @@ The site shows no button for this cart for now; see "What the site does".
 Card Kingdom's buylist already takes a whole list through
 `sellcart/partner_import`. Its store has no such import: its deck builder
 (`/builder`, where the upload page's other CK button posts the names) is a
-search, and the user picks each printing there. The store cart's own add
-call takes one card, by product id and grade:
+search, and the user picks each printing there. The form the builder's
+results then post, though, takes any number of cards by product id and
+grade, and the store cart's own add takes one:
 
 ```
-POST /api/cart/add   {"product_id": 10190, "style": "EX", "quantity": 2}
-GET  /api/cart       {"lineitems": [{"product_id": 10190, "style": "EX", "qty": 2}, ...]}
+POST /api/builder/addMultiple   qty[10190][EX]=2&available[10190][EX]=2&dest=/cart
+POST /api/cart/add              {"product_id": 10190, "style": "EX", "quantity": 2}
+GET  /api/cart                  {"lineitems": [{"product_id": 10190, "style": "EX", "qty": 2}, ...]}
 ```
 
 - The product id is the printing's CK id, which go-mtgban's `cardkingdom`
@@ -545,17 +549,34 @@ GET  /api/cart       {"lineitems": [{"product_id": 10190, "style": "EX", "qty": 
   `<product id>-<style>`, for the `CK` split alone: sealed rows carry no CK
   id, and a graded slab's add was never measured, so `CKSealed` and
   `CKGraded` splits get no button.
-- An add sets the quantity, and 0 removes the row. Above the stock it
-  answers 400 `MaxQuantityExceeded` with how many there are, and the
-  bookmarklet sends the card again at that. A product it does not have
+- The builder's add sets each quantity it is sent and answers with a
+  redirect to the cart page. It skips, without a word, a card asked above
+  the stock, one asked above the `available` count sent beside it, and a
+  product CK does not have; a card sent with no `available` count is
+  skipped too, and a quantity of 0 removes nothing. The bookmarklet sends
+  the quantity as the count, reads the cart back, and sends each card left
+  short through the cart's own add.
+- The cart's own add sets the quantity, and 0 removes the row. Above the
+  stock it answers 400 `MaxQuantityExceeded` with how many there are, and
+  the bookmarklet sends the card again at that. A product it does not have
   answers 200 with a message.
 - The cart is kept by CK's cookies, guests included. No token is needed.
+- On 2026-10-10 a load through the cart's own add logged a signed-in user
+  out. On a signed-in Chrome account on 2026-10-25 nothing did: opening the
+  cart link with the partner query, from BAN or not, reading the cart, the
+  builder's add, ten of the cart's own adds back to back, and the old
+  loader's whole run and reload. Firefox was not tried, and the builder's
+  add still falls back to the cart's own add, so a repeat report starts
+  with a signed-in Firefox load, its network panel open, to find the
+  response that ends the session.
 
 | Sent | Result |
 |---|---|
-| 30 cards from the published dump, across the four grades | 38 s, all 30 at the asked quantity |
-| an add | 0.4 to 2.5 s |
-| two cards in one body | 422 |
+| 300 cards from the published dump in one builder add | 18 s, all 300 at the asked quantity |
+| 4 cards in one builder add | 1 s |
+| 30 cards from the published dump through the cart's own add, across the four grades | 38 s, all 30 at the asked quantity |
+| a cart add | 0.4 to 2.5 s |
+| two cards in one cart add body | 422 |
 
 ## SCG: the CSV import
 
@@ -712,7 +733,8 @@ Hareruya and Card Kingdom it:
    form per 50 cards setting every quantity, so a card the page left out
    still ends at the list's; it stops before sending anything when the
    link's `side=retail` and the cart page disagree; on Card Kingdom, one
-   add per card, 10 to a chunk, again at the stock where CK has fewer;
+   builder add per 100 cards, then the cart's own add for each card it
+   left short, again at the stock where CK has fewer;
 4. on ABU's 422, reads the cart back and tries each row missing from it
    alone until ABU refuses one, the id it does not know, then resends the
    rest; ABU's store also leaves out rows it has none of, so the first
