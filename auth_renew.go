@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
@@ -139,20 +140,85 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 
 // The waits of a renewal: how long it holds the sessions of an account, how
 // long they rest after an answer from Patreon that settled nothing, how long
-// each database call may take, and how long they rest after Refresh now, so
-// that a reader cannot press Patreon per request.
+// each database call may take, how long a signature just renewed is kept
+// here, so that a request already on its way with it is served the new one
+// rather than renewing it again, and how long the sessions rest after Refresh
+// now, so that a reader cannot press Patreon per request.
 const (
 	renewalLease       = time.Minute
 	renewalBackoff     = time.Hour
 	renewalDBTimeout   = 2 * time.Second
+	renewalSettle      = time.Minute
 	renewalRefreshRest = 5 * time.Minute
 )
+
+// sessionRests is when each session this process saw refused a lease may
+// next ask for one, so that a reader whose sessions rest, or whose session is
+// filed under another email (someone else's, or their own changed one) or
+// client, costs the database nothing per request; and, for each
+// signature it just renewed, keyed by settledKey, the signature it renewed
+// to, which a request already on its way with the old one is served on.
+type sessionRests struct {
+	mu      sync.Mutex
+	entries map[string]sessionRest
+}
+
+// sessionRest is one entry of sessionRests: until when it holds, and the
+// signature a settled one renewed to.
+type sessionRest struct {
+	until   time.Time
+	renewed string
+}
+
+// restingSessions is this process's sessionRests.
+var restingSessions = newSessionRests()
+
+func newSessionRests() *sessionRests {
+	return &sessionRests{entries: map[string]sessionRest{}}
+}
+
+// settledKey names a session together with the signature values describe,
+// by the HMAC that signature carries.
+func settledKey(session string, values url.Values) string {
+	return session + " " + values.Get("Signature")
+}
+
+// resting says whether session may not ask for a lease at now.
+func (sr *sessionRests) resting(session string, now time.Time) bool {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	return now.Before(sr.entries[session].until)
+}
+
+// renewedTo is the signature the one settledKey names was renewed to, while
+// that renewal is settling.
+func (sr *sessionRests) renewedTo(settled string, now time.Time) (string, bool) {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	entry := sr.entries[settled]
+	return entry.renewed, entry.renewed != "" && now.Before(entry.until)
+}
+
+// rest keeps key from asking for a lease until until, with renewed the
+// signature it was renewed to when it is a settledKey, and forgets the
+// entries whose rest is over.
+func (sr *sessionRests) rest(key, renewed string, until, now time.Time) {
+	sr.mu.Lock()
+	defer sr.mu.Unlock()
+	for other, entry := range sr.entries {
+		if !now.Before(entry.until) {
+			delete(sr.entries, other)
+		}
+	}
+	sr.entries[key] = sessionRest{until: until, renewed: renewed}
+}
 
 // renewal is one attempt to renew a reader's signature, and the line the
 // admin log tells it by. It holds no token.
 type renewal struct {
 	cause   string // what asked for it: due, grace, poke, acl or refresh
 	session string // the BAN_SESSION value
+	settled string // settledKey of the session and the signature it renews
 	email   string
 	hash    string // userstate.HashEmail(email)
 	client  string // the Patreon client this site refreshes through
@@ -173,9 +239,15 @@ func (rn *renewal) log(verdict string, cause error) {
 
 // lease claims the account's sessions for this renewal and returns the
 // refresh token they hold. It is false when another request, device or site
-// holds them or they are backing off, the session is not this email's or
-// this client's or is past its cap, or the database cannot say.
-func (rn *renewal) lease(base context.Context) (token string, leased bool) {
+// holds them or they are resting, the session is not this email's, this
+// client's or is past its cap, or the database cannot say. A session that is
+// gone has its cookie cleared, and one that rests or is filed elsewhere is not
+// asked again until the rest or the backoff is over, so none costs the
+// database a statement per request.
+func (rn *renewal) lease(base context.Context, w http.ResponseWriter, r *http.Request) (token string, leased bool) {
+	if restingSessions.resting(rn.session, rn.started) {
+		return "", false
+	}
 	ctx, cancel := context.WithTimeout(base, renewalDBTimeout)
 	defer cancel()
 	token, fence, leased, err := UserStateDB.LeasePatreonSessions(ctx, rn.session, rn.hash, rn.client, renewalLease)
@@ -183,8 +255,25 @@ func (rn *renewal) lease(base context.Context) (token string, leased bool) {
 		rn.log("unknown", fmt.Errorf("lease: %w", err))
 		return "", false
 	}
-	rn.fence = fence
-	return token, leased
+	if leased {
+		rn.fence = fence
+		return token, true
+	}
+	standing, wait, err := UserStateDB.PatreonSessionStanding(ctx, rn.session, rn.hash, rn.client)
+	switch {
+	case err != nil:
+		rn.log("unknown", fmt.Errorf("standing: %w", err))
+	case standing == userstate.SessionGone:
+		clearSessionCookie(w, r)
+		rn.log("session gone", nil)
+	case standing == userstate.SessionElsewhere:
+		restingSessions.rest(rn.session, "", rn.started.Add(renewalBackoff), rn.started)
+	case wait > renewalLease:
+		// A wait no longer than a lease is another renewal's, which ends as
+		// soon as that one commits, so only a backoff or a rest is kept
+		restingSessions.rest(rn.session, "", rn.started.Add(wait), rn.started)
+	}
+	return "", false
 }
 
 // hold backs the account's sessions off for renewalBackoff after an answer
@@ -197,6 +286,7 @@ func (rn *renewal) hold(base context.Context, refreshToken, verdict string, caus
 	if err != nil {
 		LogPages["Admin"].Println("DeferPatreonSessions", err)
 	}
+	restingSessions.rest(rn.session, "", time.Now().Add(renewalBackoff), time.Now())
 	rn.log(verdict, cause)
 }
 
@@ -288,11 +378,20 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 	source := infra.Patreon.Source
 	rn.client = infra.Patreon.Client[source]
 	rn.hash = userstate.HashEmail(rn.email)
+	rn.settled = settledKey(rn.session, values)
 	expires, _ := strconv.ParseInt(values.Get("Expires"), 10, 64)
 	rn.age = rn.started.Sub(time.Unix(expires, 0).Add(-DefaultSignatureDuration))
 	base := context.WithoutCancel(r.Context())
 
-	token, leased := rn.lease(base)
+	// A request that left before the renewal of its signature answered is
+	// served on the signature that renewal minted
+	renewed, settled := restingSessions.renewedTo(rn.settled, rn.started)
+	if settled {
+		putSignatureInCookies(w, r, renewed)
+		return renewed, false
+	}
+
+	token, leased := rn.lease(base, w, r)
 	if !leased {
 		return "", false
 	}
@@ -326,6 +425,7 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 		}
 		sig = s.signReaderIn(w, r, user, tier, overrides, granted)
 		setSessionCookie(w, r, rn.session, signatureCookieDays*24*time.Hour)
+		restingSessions.rest(rn.settled, sig, time.Now().Add(renewalSettle), time.Now())
 		rn.log(fmt.Sprintf("entitled tier=%s->%s", rn.tier, tier), nil)
 		return sig, false
 	case verdict == pledge.NotEntitled && infra.PatreonRenewal.ClearOnNegative:

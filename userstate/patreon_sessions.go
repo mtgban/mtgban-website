@@ -3,7 +3,9 @@ package userstate
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -65,8 +67,8 @@ func (c *Client) CreatePatreonSession(ctx context.Context, login PatreonLogin, a
 // emailHash issued to clientID. It is one UPDATE over every live session of
 // the account under the client: leased is false, with no error, when the
 // session is not such a one, or when any live session of the account is
-// already leased or backing off. The token is that of the session renewed
-// last.
+// already leased or resting; PatreonSessionStanding says which. The token is
+// that of the session renewed last.
 func (c *Client) LeasePatreonSessions(ctx context.Context, sessionID, emailHash, clientID string, lease time.Duration) (refreshToken, fence string, leased bool, err error) {
 	fence, err = newPatreonSessionID()
 	if err != nil {
@@ -112,6 +114,46 @@ func (c *Client) LeasePatreonSessions(ctx context.Context, sessionID, emailHash,
 		return "", "", false, nil
 	}
 	return refreshToken, fence, true, nil
+}
+
+// PatreonSessionStanding is why a session could not be leased.
+type PatreonSessionStanding int
+
+const (
+	// SessionGone is no live session at all: it was deleted or pruned.
+	SessionGone PatreonSessionStanding = iota
+	// SessionElsewhere is a live session of another email hash, as the
+	// reader's other devices' are once a renewal filed the sessions under
+	// a changed email, or one whose token another Patreon client issued.
+	SessionElsewhere
+	// SessionResting is a live session whose account is leased or resting.
+	SessionResting
+)
+
+// PatreonSessionStanding says why LeasePatreonSessions refused sessionID,
+// and for SessionResting how long until the account's sessions may be
+// leased again, zero when they may be now.
+func (c *Client) PatreonSessionStanding(ctx context.Context, sessionID, emailHash, clientID string) (PatreonSessionStanding, time.Duration, error) {
+	var ours bool
+	var wait float64
+	err := c.db.QueryRowContext(ctx, `
+		SELECT own.email_hash = $2 AND own.client_id = $3,
+		       COALESCE((SELECT extract(epoch FROM max(o.renew_after) - now()) FROM patreon_sessions o
+		                  WHERE o.patreon_user = own.patreon_user AND o.client_id = own.client_id
+		                    AND o.expires_at > now()), 0)
+		  FROM patreon_sessions own
+		 WHERE own.session_id = $1 AND own.expires_at > now()`,
+		sessionID, emailHash, clientID).Scan(&ours, &wait)
+	if errors.Is(err, sql.ErrNoRows) {
+		return SessionGone, 0, nil
+	}
+	if err != nil {
+		return SessionGone, 0, err
+	}
+	if !ours {
+		return SessionElsewhere, 0, nil
+	}
+	return SessionResting, max(time.Duration(wait*float64(time.Second)), 0), nil
 }
 
 // CommitPatreonSessions stores the refresh token a renewal returned on every

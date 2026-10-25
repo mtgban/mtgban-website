@@ -271,6 +271,7 @@ func newRenewalRig(t *testing.T, block infrastructure.PatreonRenewal) *renewalRi
 	savedLimiter := UserRateLimiter
 	t.Cleanup(func() { UserRateLimiter = savedLimiter })
 	UserRateLimiter = ratelimit.NewLimiter(1000, 1000)
+	forgetRests(t)
 
 	// The reader's rows are cleared by a client of its own, since a test may
 	// close the one the site uses.
@@ -496,6 +497,16 @@ func installAccess(t *testing.T, table, grants string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// forgetRests gives the test a process that has seen no session refuse a
+// lease, as another site or a restart would be, and puts back the one it
+// found.
+func forgetRests(t *testing.T) {
+	t.Helper()
+	saved := restingSessions
+	t.Cleanup(func() { restingSessions = saved })
+	restingSessions = newSessionRests()
 }
 
 // freshPokes gives the test a poke set of its own, and puts back the one it

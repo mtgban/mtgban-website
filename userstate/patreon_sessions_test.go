@@ -597,7 +597,53 @@ func TestPatreonSessionLeaseIsBoundToItsClient(t *testing.T) {
 	if err != nil || leased {
 		t.Fatalf("lease under another client: leased %v err %v, want false, nil", leased, err)
 	}
+	standing, _, err := c.PatreonSessionStanding(ctx, id, h, "client-2")
+	if err != nil || standing != SessionElsewhere {
+		t.Fatalf("standing under another client = %v, %v; want SessionElsewhere", standing, err)
+	}
 	wantLease(t, c, id, h, "token-1", true)
+}
+
+// PatreonSessionStanding tells a session that is gone from one that rests,
+// and how long the rest has to run.
+func TestPatreonSessionStanding(t *testing.T) {
+	c := testClient(t)
+	h := freshSessionOwner(t, c, "")
+	stranger := freshSessionOwner(t, c, "-stranger")
+	ctx := context.Background()
+
+	id := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
+	other := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
+	expired := mustCreatePatreonSession(t, c, h, "token-1", -time.Second)
+	foreign := mustCreatePatreonSession(t, c, stranger, "token-s", time.Hour)
+	for name, tc := range map[string]struct {
+		id, hash string
+		want     PatreonSessionStanding
+	}{
+		"an unknown id":          {"no-such-session", h, SessionGone},
+		"one past its expiry":    {expired, h, SessionGone},
+		"another email's":        {foreign, h, SessionElsewhere},
+		"one under another hash": {id, stranger, SessionElsewhere},
+	} {
+		standing, _, err := c.PatreonSessionStanding(ctx, tc.id, tc.hash, testPatreonClient)
+		if err != nil || standing != tc.want {
+			t.Errorf("%s: standing %v, %v; want %v", name, standing, err, tc.want)
+		}
+	}
+
+	standing, wait, err := c.PatreonSessionStanding(ctx, id, h, testPatreonClient)
+	if err != nil || standing != SessionResting || wait != 0 {
+		t.Errorf("a due session: standing %v wait %v err %v, want SessionResting, 0", standing, wait, err)
+	}
+	fence := wantLease(t, c, other, h, "token-1", true)
+	err = c.DeferPatreonSessions(ctx, fence, "", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	standing, wait, err = c.PatreonSessionStanding(ctx, id, h, testPatreonClient)
+	if err != nil || standing != SessionResting || wait < 59*time.Minute || wait > time.Hour {
+		t.Errorf("a session of a resting account: standing %v wait %v err %v, want SessionResting, an hour", standing, wait, err)
+	}
 }
 
 // A revocation deletes the account's sessions holding the token Patreon
@@ -697,6 +743,10 @@ func TestPatreonSessionClosedPoolReturnsErrors(t *testing.T) {
 	_, err = c.RevokePatreonSessions(ctx, "fence", "token")
 	if err == nil {
 		t.Fatal("RevokePatreonSessions on a closed pool returned nil")
+	}
+	_, _, err = c.PatreonSessionStanding(ctx, "id", h, testPatreonClient)
+	if err == nil {
+		t.Fatal("PatreonSessionStanding on a closed pool returned nil")
 	}
 }
 
