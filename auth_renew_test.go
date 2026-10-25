@@ -9,8 +9,9 @@ import (
 )
 
 // Whether a signature renews comes down to how old it is against after_days
-// and, once it ran out, how long ago against grace_days; the other four
-// inputs each end it on their own.
+// and, once it ran out, how long ago against grace_days; one too young to
+// renew on its age is young, for a poke or a stamp to renew, with or without
+// a session. The other inputs each end it on their own.
 func TestDecideRenewal(t *testing.T) {
 	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
 	block := infrastructure.PatreonRenewal{AfterDays: 8, GraceDays: 3}
@@ -24,9 +25,9 @@ func TestDecideRenewal(t *testing.T) {
 		cfg     infrastructure.PatreonRenewal
 		want    renewalDecision
 	}{
-		{"just minted", 11 * day, true, true, true, block, renewalSkip},
-		{"a week old", 4 * day, true, true, true, block, renewalSkip},
-		{"a second short of after_days", 3*day + time.Second, true, true, true, block, renewalSkip},
+		{"just minted", 11 * day, true, true, true, block, renewalYoung},
+		{"a week old", 4 * day, true, true, true, block, renewalYoung},
+		{"a second short of after_days", 3*day + time.Second, true, true, true, block, renewalYoung},
 		{"exactly after_days old", 3 * day, true, true, true, block, renewalDue},
 		{"a day from running out", day, true, true, true, block, renewalDue},
 		{"a second from running out", time.Second, true, true, true, block, renewalDue},
@@ -43,6 +44,10 @@ func TestDecideRenewal(t *testing.T) {
 		{"from ?sig=, in grace", -day, true, false, true, block, renewalSkip},
 		{"no session cookie, due", day, true, true, false, block, renewalSkip},
 		{"no session cookie, in grace", -day, true, true, false, block, renewalSkip},
+		{"no session cookie, young", 4 * day, true, true, false, block, renewalYoung},
+		{"not written by this host, young", 4 * day, false, true, true, block, renewalSkip},
+		{"from ?sig=, young", 4 * day, true, false, true, block, renewalSkip},
+		{"after_days 0, young", 4 * day, true, true, true, infrastructure.PatreonRenewal{GraceDays: 3}, renewalSkip},
 
 		{"after_days 0, due", day, true, true, true, infrastructure.PatreonRenewal{GraceDays: 3}, renewalSkip},
 		{"after_days 0, in grace", -day, true, true, true, infrastructure.PatreonRenewal{GraceDays: 3}, renewalSkip},
@@ -51,8 +56,8 @@ func TestDecideRenewal(t *testing.T) {
 		{"grace_days 0, a second past", -time.Second, true, true, true, infrastructure.PatreonRenewal{AfterDays: 8}, renewalSkip},
 
 		{"daily, a day old", 10 * day, true, true, true, infrastructure.PatreonRenewal{AfterDays: 1}, renewalDue},
-		{"daily, a second short", 10*day + time.Second, true, true, true, infrastructure.PatreonRenewal{AfterDays: 1}, renewalSkip},
-		{"after_days past the signature's life, running out", time.Second, true, true, true, infrastructure.PatreonRenewal{AfterDays: 12, GraceDays: 3}, renewalSkip},
+		{"daily, a second short", 10*day + time.Second, true, true, true, infrastructure.PatreonRenewal{AfterDays: 1}, renewalYoung},
+		{"after_days past the signature's life, running out", time.Second, true, true, true, infrastructure.PatreonRenewal{AfterDays: 12, GraceDays: 3}, renewalYoung},
 		{"after_days past the signature's life, a day past", -day, true, true, true, infrastructure.PatreonRenewal{AfterDays: 12, GraceDays: 3}, renewalGrace},
 	} {
 		got := decideRenewal(tc.signed, now.Add(tc.expires), now, tc.cookie, tc.session, tc.cfg)

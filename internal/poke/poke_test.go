@@ -18,7 +18,7 @@ func TestPokeAsksForWhatWasIssuedBeforeIt(t *testing.T) {
 	set := New()
 	reader, other := "reader", "other"
 
-	if set.Poked(reader, time.Now(), window) || set.Wants(reader, time.Now().Add(-day), time.Now(), window) != "" {
+	if set.Poked(reader, time.Now(), window) || set.Wants(reader, "", time.Now().Add(-day), time.Now(), window) != "" {
 		t.Error("a reader nobody poked is poked")
 	}
 	set.Poke(reader, time.Now(), window)
@@ -40,12 +40,12 @@ func TestPokeAsksForWhatWasIssuedBeforeIt(t *testing.T) {
 		{"issued in the poke's second", at, ""},
 		{"issued after the poke", at.Add(time.Minute), ""},
 	} {
-		got := set.Wants(reader, tc.issued, time.Now(), window)
+		got := set.Wants(reader, "", tc.issued, time.Now(), window)
 		if got != tc.want {
 			t.Errorf("%s: wants %q, want %q", tc.name, got, tc.want)
 		}
 	}
-	if set.Wants(other, at.Add(-day), time.Now(), window) != "" {
+	if set.Wants(other, "", at.Add(-day), time.Now(), window) != "" {
 		t.Error("a poke asks for another reader's signature")
 	}
 
@@ -67,7 +67,7 @@ func TestPokeAgesOutAfterTheWindow(t *testing.T) {
 	if set.Poked(lapsed, time.Now(), window) || !set.Poked(lasting, time.Now(), window) {
 		t.Errorf("lapsed poked %v, lasting poked %v; want only the one inside the window", set.Poked(lapsed, time.Now(), window), set.Poked(lasting, time.Now(), window))
 	}
-	if set.Wants(lapsed, time.Now().Add(-30*day), time.Now(), window) != "" || set.Wants(lasting, time.Now().Add(-30*day), time.Now(), window) != "poke" {
+	if set.Wants(lapsed, "", time.Now().Add(-30*day), time.Now(), window) != "" || set.Wants(lasting, "", time.Now().Add(-30*day), time.Now(), window) != "poke" {
 		t.Error("a lapsed poke still asks for its reader's old signature, or a lasting one does not")
 	}
 	if set.Len() != 2 {
@@ -85,7 +85,7 @@ func TestPokeAgesOutAfterTheWindow(t *testing.T) {
 func TestPokeKeepsNothingWithoutAWindow(t *testing.T) {
 	set := New()
 	set.Poke("reader", time.Now(), 0)
-	if set.Poked("reader", time.Now(), 0) || set.Wants("reader", time.Now().Add(-day), time.Now(), 0) != "" {
+	if set.Poked("reader", time.Now(), 0) || set.Wants("reader", "", time.Now().Add(-day), time.Now(), 0) != "" {
 		t.Error("a poke is kept with no window")
 	}
 }
@@ -101,7 +101,8 @@ func TestSetIsSafeToShare(t *testing.T) {
 			for range 200 {
 				set.Poke(hash, time.Now(), window)
 				set.Poked(hash, time.Now(), window)
-				set.Wants(hash, time.Now().Add(-day), time.Now(), window)
+				set.Wants(hash, "", time.Now().Add(-day), time.Now(), window)
+				set.Reminted(hash, time.Now().Add(day), time.Now())
 				set.StampACL(time.Now())
 				set.ACLChanged()
 			}
@@ -118,7 +119,7 @@ func TestSetIsSafeToShare(t *testing.T) {
 func TestWantsAStaleOrPokedReader(t *testing.T) {
 	stamp := time.Now().Add(-day).Truncate(time.Second)
 	set := New()
-	if set.Wants("reader", time.Now().Add(-100*day), time.Now(), window) != "" || !set.ACLChanged().IsZero() {
+	if set.Wants("reader", "", time.Now().Add(-100*day), time.Now(), window) != "" || !set.ACLChanged().IsZero() {
 		t.Error("a reader nobody poked wants renewing with no stamp set")
 	}
 
@@ -138,7 +139,7 @@ func TestWantsAStaleOrPokedReader(t *testing.T) {
 		{"minted just now", time.Now(), ""},
 		{"issued long before the stamp", stamp.Add(-30 * day), "acl"},
 	} {
-		got := set.Wants("reader", tc.issued, time.Now(), window)
+		got := set.Wants("reader", "", tc.issued, time.Now(), window)
 		if got != tc.want {
 			t.Errorf("%s: wants %q, want %q", tc.name, got, tc.want)
 		}
@@ -147,13 +148,13 @@ func TestWantsAStaleOrPokedReader(t *testing.T) {
 	// A poke asks for its reader's signatures issued before it, and is the
 	// cause named when the stamp asks for them too
 	set.Poke("reader", time.Now(), window)
-	if set.Wants("reader", time.Now().Add(-time.Minute), time.Now(), window) != "poke" || set.Wants("reader", stamp.Add(-time.Hour), time.Now(), window) != "poke" {
+	if set.Wants("reader", "", time.Now().Add(-time.Minute), time.Now(), window) != "poke" || set.Wants("reader", "", stamp.Add(-time.Hour), time.Now(), window) != "poke" {
 		t.Error("a poke does not ask for the reader's signatures issued before it")
 	}
-	if set.Wants("reader", time.Now().Add(time.Minute), time.Now(), window) != "" || set.Wants("other", stamp.Add(time.Hour), time.Now(), window) != "" {
+	if set.Wants("reader", "", time.Now().Add(time.Minute), time.Now(), window) != "" || set.Wants("other", "", stamp.Add(time.Hour), time.Now(), window) != "" {
 		t.Error("a poke asks for a signature issued after it, or for another reader's")
 	}
-	if set.Wants("other", stamp.Add(-time.Hour), time.Now(), window) != "acl" {
+	if set.Wants("other", "", stamp.Add(-time.Hour), time.Now(), window) != "acl" {
 		t.Error("the stamp stopped asking for another reader's old signature")
 	}
 }
@@ -164,19 +165,19 @@ func TestStampDoesNotAge(t *testing.T) {
 	set := New()
 
 	set.StampACL(time.Now().Add(-100 * day))
-	if set.Wants("reader", time.Now().Add(-101*day), time.Now(), window) != "acl" || set.Wants("reader", time.Now().Add(-99*day), time.Now(), window) != "" {
+	if set.Wants("reader", "", time.Now().Add(-101*day), time.Now(), window) != "acl" || set.Wants("reader", "", time.Now().Add(-99*day), time.Now(), window) != "" {
 		t.Error("a stamp of 100 days ago does not ask for exactly the signatures issued before it")
 	}
 
 	later := time.Now().Add(-time.Hour).Truncate(time.Second)
 	set.StampACL(later)
-	if set.Wants("reader", later.Add(-time.Minute), time.Now(), window) != "acl" || set.Wants("reader", later.Add(time.Minute), time.Now(), window) != "" {
+	if set.Wants("reader", "", later.Add(-time.Minute), time.Now(), window) != "acl" || set.Wants("reader", "", later.Add(time.Minute), time.Now(), window) != "" {
 		t.Error("the next stamp does not replace the last")
 	}
 
 	// A poke sweeps lapsed pokes and leaves the stamp
 	set.Poke("other", time.Now(), window)
-	if set.Wants("reader", later.Add(-time.Minute), time.Now(), window) != "acl" || !set.ACLChanged().Equal(later) {
+	if set.Wants("reader", "", later.Add(-time.Minute), time.Now(), window) != "acl" || !set.ACLChanged().Equal(later) {
 		t.Error("a poke cleared the stamp")
 	}
 }
@@ -185,7 +186,32 @@ func TestStampDoesNotAge(t *testing.T) {
 func TestStampNeedsNoWindow(t *testing.T) {
 	set := New()
 	set.StampACL(time.Now())
-	if set.Wants("reader", time.Now().Add(-day), time.Now(), 0) != "acl" {
+	if set.Wants("reader", "", time.Now().Add(-day), time.Now(), 0) != "acl" {
 		t.Error("the stamp does not ask for an older signature without a window")
+	}
+}
+
+// A signature re-signed under the table now is not asked for again, though
+// its Expires reads as issued before the stamp, until the next stamp; one
+// that ran out is forgotten at the next re-sign.
+func TestStampSkipsWhatWasReminted(t *testing.T) {
+	set := New()
+	set.StampACL(time.Now())
+	issued := time.Now().Add(-day)
+
+	set.Reminted("fresh", time.Now().Add(10*day), time.Now())
+	if set.Wants("reader", "fresh", issued, time.Now(), window) != "" || set.Wants("reader", "stale", issued, time.Now(), window) != "acl" {
+		t.Error("the stamp asks for a re-signed signature, or not for one that was not")
+	}
+
+	set.Reminted("ran-out", time.Now().Add(-time.Minute), time.Now().Add(-2*time.Minute))
+	set.Reminted("another", time.Now().Add(10*day), time.Now())
+	if _, kept := set.reminted["ran-out"]; kept {
+		t.Error("a re-signed signature that ran out was kept")
+	}
+
+	set.StampACL(time.Now().Add(time.Second))
+	if set.Wants("reader", "fresh", issued, time.Now(), window) != "acl" {
+		t.Error("a signature re-signed under the last table is not asked for after the next stamp")
 	}
 }
