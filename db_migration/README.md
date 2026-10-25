@@ -7,8 +7,9 @@ price)` table, with a `providers` lookup, in place of the two wide price tables
 
 The site reads and writes only the long tables for Magic; nothing touches
 `product_prices` any more. The tcgcsv ingest still writes
-`tcgplayer_nonmagic_product_prices` and takes its dates from it. The tools that backfilled the long tables
-from the wide ones are in `retired/` and must not run again; its README says
+`tcgplayer_nonmagic_product_prices` and takes its dates from it. Everything
+that has already run against production, the backfill tools and the one-off
+repairs alike, is in `retired/` as text and must not run again; its README says
 why.
 
 ## A fresh database
@@ -26,9 +27,3 @@ the plan for D1-D10.
 For psql, set `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE` from the
 `sql_config` block of `../config.json` (the deployed configs keep it in
 `infrastructure.json`).
-
-## One-off repairs
-
-- `09_alt_copies.sql`, then `10_alt_copy_prices.sql`: file `is_alt` only on the
-  Alternate Fourth Edition copies, and put back the prices those copies and
-  their 4ED originals filed on each other's variants. Both ran on 2026-10-25.

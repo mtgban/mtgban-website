@@ -1,3 +1,5 @@
+\echo 'Retired: a one-off repair that has already run against production. See retired/README.md.'
+\quit
 -- Puts back the prices that the Alternate Fourth Edition copies and their 4ED
 -- originals filed on each other's variants, in two windows:
 --   2025-07-01 to 2025-09-30: 4ED prices on the copies' variants;

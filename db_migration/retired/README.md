@@ -1,4 +1,12 @@
-# Retired backfill tools
+# Retired scripts
+
+Everything here has done its one job against production and is kept as the
+record of it. Each is text that stops on its first line, so none runs by
+accident. To run one on purpose, copy it back into `db_migration/` under its
+old name, drop the stop line, and first read every step against the tables as
+they are now.
+
+## Backfill tools
 
 These built the long tables (`variants`, `prices`) from the wide
 `product_prices` and `tcgplayer_nonmagic_product_prices`, and checked the two
@@ -7,18 +15,21 @@ they have nothing left to do, and each would now do harm:
 
 | File | What it did | Run today |
 |---|---|---|
-| `backfill.py.txt` | The checkpointed driver: schema, variants, price chunks | Re-mints the variants `09_alt_copies.sql` folded and refills them |
+| `backfill.py.txt` | The checkpointed driver: schema, variants, price chunks | Re-mints the variants 09 folded and refills them |
 | `08_catchup.sql.txt` | Re-mint variants and re-insert a recent window | The same, from `since` on |
-| `07_verify.sql.txt` | Per-provider parity of the long tables against the wide ones | Reports the rows 09 and `10_alt_copy_prices.sql` moved as differences |
+| `07_verify.sql.txt` | Per-provider parity of the long tables against the wide ones | Reports the rows 09 and 10 moved as differences |
 
 The wide rows written before 09 carry mtgjson's `isAlternative` in `is_alt`,
 where the long tables now hold it only on the Alternate Fourth Edition copies,
 so anything rebuilt from them brings the old split back.
 
-They are kept as text, each stopping on its first line, so none runs by
-accident. To run one on purpose, copy it back into `db_migration/` under its
-old name, drop the stop line, and first read every step against the tables as
-they are now.
+## One-off repairs
+
+| File | What it did | Ran |
+|---|---|---|
+| `09_alt_copies.sql.txt` | Kept `is_alt` only on the 378 Alternate Fourth Edition copies, folding every other `is_alt` variant into its plain twin | 2026-10-25 |
+| `10_alt_copy_prices.sql.txt` | Put back the prices the copies and their 4ED originals filed on each other's variants | 2026-10-25 |
+| `11_wide_only_prices.sql.txt` | Copied in the 385,857 Magic prices only `product_prices` held (2026-08-27 and six from September 2026) | with #1118 |
 
 ## How the backfill worked
 

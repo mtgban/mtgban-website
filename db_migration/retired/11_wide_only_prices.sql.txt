@@ -1,0 +1,63 @@
+\echo 'Retired: a one-off repair that has already run against production. See retired/README.md.'
+\quit
+-- Copies into the long tables the Magic prices only product_prices holds. A
+-- key-by-key comparison of the two (card, finish, language, day, store) on
+-- 2026-10-25 found 385,851 of them on 2026-08-27, whose long write kept only
+-- Cardmarket's, and six on days in September 2026. Every other day matched.
+--
+-- Each price goes to the card's plain variant: Cardmarket is the only store
+-- that prices the Alternate Fourth Edition copies, and none of these is
+-- Cardmarket's. Where the wide table holds a day twice, on an isAlternative row
+-- and its plain twin, the plain one wins, as in 09_alt_copies.sql. A day the
+-- long table already has is left alone, so it is safe to run again.
+
+BEGIN;
+
+CREATE TEMP TABLE wide_only ON COMMIT DROP AS
+SELECT DISTINCT ON (pp.mtgjson_uuid, pp.is_foil, pp.is_etched, coalesce(nullif(pp.language, 'English'), ''), pp.date, x.provider)
+       pp.mtgjson_uuid, pp.is_foil, pp.is_etched,
+       coalesce(nullif(pp.language, 'English'), '') AS language,
+       pp.date, x.provider, x.price
+  FROM public.product_prices pp
+  CROSS JOIN LATERAL (VALUES (1::int2, pp.cardkingdom_retail_price), (2::int2, pp.cardkingdom_buylist_price),
+                             (3::int2, pp.tcgplayer_low_price), (4::int2, pp.tcgplayer_market_price),
+                             (10::int2, pp.starcitygames_buylist_price), (11::int2, pp.abu_buylist_price),
+                             (12::int2, pp.coolstuffinc_buylist_price),
+                             (13::int2, pp.tcgplayer_low_sealed_expected_value)) x(provider, price)
+ WHERE x.price > 0
+   AND (pp.date = '2026-08-27'
+        OR (pp.mtgjson_uuid, pp.is_foil, pp.date, x.provider) IN (VALUES
+            ('9f0e035f-da39-568b-a52c-46d8916325af'::uuid, false, DATE '2026-09-16', 3::int2),
+            ('a76aee54-556a-5fa3-85db-f64f603edcdb'::uuid, true,  DATE '2026-09-20', 12::int2),
+            ('5a40cfb7-dff2-566a-ba89-81d2b0ab172a'::uuid, false, DATE '2026-09-23', 3::int2),
+            ('2aa30fc8-a5e4-5dea-9646-e12291369e25'::uuid, false, DATE '2026-09-23', 3::int2),
+            ('7db8e2a5-7f1f-5d61-a0fd-9f842d9cc8d9'::uuid, false, DATE '2026-09-26', 1::int2),
+            ('7db8e2a5-7f1f-5d61-a0fd-9f842d9cc8d9'::uuid, false, DATE '2026-09-26', 3::int2)))
+ ORDER BY pp.mtgjson_uuid, pp.is_foil, pp.is_etched, coalesce(nullif(pp.language, 'English'), ''),
+          pp.date, x.provider, pp.is_alt;
+
+-- The insert below joins on the plain variant, so a price without one would
+-- be dropped without a word: refuse instead.
+DO $$
+DECLARE
+    missing bigint;
+BEGIN
+    SELECT count(*) INTO missing
+      FROM wide_only w
+     WHERE NOT EXISTS (SELECT 1 FROM public.variants v
+                        WHERE v.mtgjson_uuid = w.mtgjson_uuid AND v.is_foil = w.is_foil
+                          AND v.is_etched = w.is_etched AND v.language = w.language AND NOT v.is_alt);
+    IF missing > 0 THEN
+        RAISE EXCEPTION '% wide-only prices have no plain variant to land on', missing;
+    END IF;
+END $$;
+
+INSERT INTO public.prices (ban_id, date, provider, price)
+SELECT v.ban_id, w.date, w.provider, w.price
+  FROM wide_only w
+  JOIN public.variants v
+    ON v.mtgjson_uuid = w.mtgjson_uuid AND v.is_foil = w.is_foil
+   AND v.is_etched = w.is_etched AND v.language = w.language AND NOT v.is_alt
+    ON CONFLICT (ban_id, date, provider) DO NOTHING;
+
+COMMIT;
