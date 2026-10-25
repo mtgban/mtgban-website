@@ -403,7 +403,8 @@ func (st arbitState) applied(m arbitMode) map[string]bool {
 // say for the columns the table shows. The engine's own MinPrice and
 // MinBuyPrice read other prices: Mismatch applies MinPrice to both sides,
 // and Arbit drops a whole card on its NM buy price before picking the
-// condition a row shows.
+// condition a row shows. Its MinProfitability cuts on the raw score, where
+// the table shows it rounded.
 type arbitRowFilter struct {
 	limits arbitLimits
 	global bool
@@ -411,7 +412,7 @@ type arbitRowFilter struct {
 
 // keep reports whether a row is within the limits. A seller publishing no
 // quantities, as Mana Pool does, has none to hold to a minimum: the engine
-// exempts it too.
+// exempts it too. Profit is held at the two decimals the table shows.
 func (f arbitRowFilter) keep(e mtgban.ArbitEntry, noQuantity bool) bool {
 	buy := e.BuylistEntry.BuyPrice
 	if f.global {
@@ -420,15 +421,21 @@ func (f arbitRowFilter) keep(e mtgban.ArbitEntry, noQuantity bool) bool {
 	l := f.limits
 	return e.InventoryEntry.Price >= l.MinSell && e.InventoryEntry.Price <= l.MaxSell &&
 		buy >= l.MinBuy && buy <= l.MaxBuy && e.Spread <= l.MaxSpread &&
-		(noQuantity || float64(e.Quantity) >= l.MinQty)
+		(noQuantity || float64(e.Quantity) >= l.MinQty) && shownProfit(e.Profitability) >= l.MinProf
+}
+
+// shownProfit is a profitability rounded as the table prints it, through
+// the same formatter, which rounds a half to even.
+func shownProfit(p float64) float64 {
+	v, _ := strconv.ParseFloat(strconv.FormatFloat(p, 'f', 2, 64), 64)
+	return v
 }
 
 // within reports whether a row is within the limits, the ones the engine
 // applies included, for rows drawn without the reader's.
 func (f arbitRowFilter) within(e mtgban.ArbitEntry, noQuantity bool) bool {
 	l := f.limits
-	return f.keep(e, noQuantity) && e.Spread >= l.MinSpread && e.Difference >= l.MinDiff &&
-		e.Profitability >= l.MinProf
+	return f.keep(e, noQuantity) && e.Spread >= l.MinSpread && e.Difference >= l.MinDiff
 }
 
 // unbounded is the state with the reader's limits dropped, picks and
@@ -459,7 +466,6 @@ func (st arbitState) apply(b *mtgmatcher.Backend, m arbitMode) (*mtgban.ArbitOpt
 	opts := &mtgban.ArbitOpts{
 		MinSpread:             l.MinSpread,
 		MinDiff:               l.MinDiff,
-		MinProfitability:      l.MinProf,
 		ProfitabilityConstant: ProfConst,
 	}
 	switch {

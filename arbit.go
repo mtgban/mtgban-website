@@ -762,7 +762,7 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 			return !rows.keep(res, seller.Info().NoQuantityInventory)
 		})
 		if !pageVars.GlobalMode && seller.Info().Shorthand == tcgDirectStore {
-			arbit = rankDirectAsOneCopy(arbit, opts.MinProfitability)
+			arbit = rankDirectAsOneCopy(arbit, rows.limits.MinProf)
 		}
 		if len(arbit) == 0 {
 			continue

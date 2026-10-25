@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"net/http/httptest"
 	"net/url"
@@ -269,6 +270,47 @@ func TestArbitRowFilter(t *testing.T) {
 		if rows.keep(row, tt.noQuantity) != tt.keep {
 			t.Errorf("%q (global=%v, no quantities=%v) keeps the row: %v, want %v",
 				tt.query, tt.global, tt.noQuantity, !tt.keep, tt.keep)
+		}
+	}
+}
+
+// TestArbitMinProfitAsShown holds the profit minimum to the value the table
+// prints: a trade scoring 0.18994 shows as 0.19, so a minimum of 0.19 keeps
+// it, run through the engine and the row filter as the page runs it.
+func TestArbitMinProfitAsShown(t *testing.T) {
+	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{
+		"card": {Card: mtgmatcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
+	}}
+	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
+		"card": {{Conditions: "NM", BuyPrice: 0.98, Quantity: 5}},
+	}, mtgban.ScraperInfo{Name: "vendor"})
+	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+		"card": {{Conditions: "NM", Price: 0.3305, Quantity: 3}},
+	}, mtgban.ScraperInfo{Name: "seller"})
+	for _, tt := range []struct {
+		query string
+		keep  bool
+	}{
+		{"minprof=0.19", true},
+		{"minprof=0.2", false},
+	} {
+		opts, rows := parseArbitQuery(t, tt.query).apply(b, arbitMode{})
+		arbit := slices.DeleteFunc(mtgban.Arbit(b, opts, vendor, seller), func(e mtgban.ArbitEntry) bool {
+			return !rows.keep(e, false)
+		})
+		if (len(arbit) == 1) != tt.keep {
+			t.Errorf("%q keeps %d rows, want the trade kept: %v", tt.query, len(arbit), tt.keep)
+		}
+		for _, e := range arbit {
+			if e.Profitability >= 0.19 || fmt.Sprintf("%.2f", e.Profitability) != "0.19" {
+				t.Errorf("the trade scores %v, want just under the 0.19 it shows as", e.Profitability)
+			}
+		}
+	}
+	for _, p := range []float64{0.125, 0.135, 0.18994} {
+		got := fmt.Sprintf("%.2f", shownProfit(p))
+		if got != fmt.Sprintf("%.2f", p) {
+			t.Errorf("%v is held at %s, want the %.2f the table prints", p, got, p)
 		}
 	}
 }
