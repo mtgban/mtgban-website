@@ -108,12 +108,13 @@ only the long tables whatever the config says. A config may still carry
 `long_form_reads`; it is ignored, and can be dropped once no deployment runs a
 build that still reads it.
 
-## 5. Drop the legacy write path (follow-up PR, not this branch)
+## 5. Drop the legacy write path
 
-Once reads are trusted on long form: stop writing the wide `product_prices` /
-`tcgplayer_nonmagic_product_prices`, delete `PriceForDataset` /
-`SetPriceForDataset`, and drop the `index` field from datasets (provider fully replaces it). The old
-tables can then be archived/dropped when you're ready.
+The snapshot writes only the long tables, so nothing writes `product_prices`
+and it can be archived or dropped. Still to go:
+`tcgplayer_nonmagic_product_prices`, which the tcgcsv ingest writes and takes
+its dates from, and the `index` field of datasets, which the screener and the
+buylist metrics still key on.
 
 ## 6. Validate + finalize the FK
 

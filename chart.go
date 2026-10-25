@@ -22,9 +22,9 @@ import (
 )
 
 type TimeseriesConfig struct {
-	// LongFormWrites dual-writes each snapshot into the new long tables
-	// (variants + prices) alongside the legacy wide tables. Charts and
-	// analytics read only the long tables. See db_migration/.
+	// LongFormWrites makes the tcgcsv ingest write the long tables (variants +
+	// prices) as well as its own wide one. Charts and analytics read only the
+	// long tables, and the snapshot writes nothing else. See db_migration/.
 	LongFormWrites bool `json:"long_form_writes"`
 
 	// CheckpointsPath is the curated checkpoints document a game other than
@@ -45,11 +45,10 @@ type DatasetConfig struct {
 	OnlySealed bool   `json:"only_sealed,omitempty"`
 }
 
-// longFormWrites reports whether this deployment's snapshot lands in the long
-// prices table. The flag is the Magic cutover, deployment by deployment; a
-// non-Magic game is not part of that cutover because it never had
-// the legacy path to cut over from — its card ids are not uuids, so the wide
-// table cannot hold a single one of its rows.
+// longFormWrites reports whether this deployment's tcgcsv ingest writes the
+// long prices table. A Magic deployment opts in with the flag. A non-Magic one
+// always does: its charts read only the long table, and its snapshot leaves the
+// TCGplayer series to the ingest (tcgcsvOwnedProviders).
 //
 // An unset game is the default one, the same reading datastoreGame and the rest
 // of the site give it, so it is compared through that rather than against the
@@ -560,8 +559,8 @@ var defaultGradeMap = map[mtgban.Condition]float64{
 // snapshotDate returns now's date when ts falls on "today" or "tomorrow"
 // relative to now, otherwise ts's own calendar date. Scrapers that straddle
 // midnight (or run slightly ahead of the server clock) get collapsed onto
-// today's row so the COALESCE merge in UpsertRows can fold their columns
-// together, while genuinely stale scrapes keep their true observation date.
+// today's rows, while genuinely stale scrapes keep their true observation
+// date.
 func snapshotDate(ts time.Time, now time.Time) string {
 	today := now.Format("2006-01-02")
 	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
@@ -583,27 +582,6 @@ func magicVariant(co *mtgmatcher.CardObject) timeseries.MagicVariant {
 		IsAlt:       strings.Contains(co.UUID, "_alt"),
 		Language:    co.Language,
 	}
-}
-
-// getRow returns the accumulator row for a card's variant on a date, creating
-// it if needed. The key matches the unique index on product_prices: (date,
-// mtgjson_uuid, is_foil, is_etched, language, is_alt).
-func getRow(accumulated map[string]*timeseries.PriceRow, card *mtgmatcher.CardObject, date string) *timeseries.PriceRow {
-	v := magicVariant(card)
-	key := date + "|" + v.MtgjsonUUID + "|" + strconv.FormatBool(v.IsFoil) + "|" + strconv.FormatBool(v.IsEtched) + "|" + strconv.FormatBool(v.IsAlt) + "|" + v.Language
-	row, ok := accumulated[key]
-	if !ok {
-		row = &timeseries.PriceRow{
-			Date:        date,
-			MtgjsonUUID: v.MtgjsonUUID,
-			IsFoil:      v.IsFoil,
-			IsEtched:    v.IsEtched,
-			IsAlt:       v.IsAlt,
-			Language:    &v.Language,
-		}
-		accumulated[key] = row
-	}
-	return row
 }
 
 // stashingInProgress gates concurrent invocations of stashInTimeseries
@@ -628,9 +606,8 @@ type snapshotPriceFunc func(card *mtgmatcher.CardObject, config DatasetConfig, d
 // decide only what to key the result on.
 //
 // Two scrapers can feed one dataset, so a card and dataset can be visited more
-// than once. The later visit is the one that counts, which is what both storage
-// paths get for free: one overwrites a column, the other dedupes keeping the
-// last row.
+// than once. The later visit is the one that counts: the upsert dedupes keeping
+// the last row.
 func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPriceFunc) {
 	// Collect retail prices from sellers. A store published from an upload
 	// lives in memory only, whatever dataset its shorthand happens to name.
@@ -701,15 +678,57 @@ func walkSnapshotPrices(b *mtgmatcher.Backend, start time.Time, visit snapshotPr
 	}
 }
 
-// stashNonMagicTimeseries takes a non-Magic deployment's snapshot straight into
-// the long prices table, keyed by ban_id.
-//
-// The legacy wide table is not a fallback here, it is the bug: its
-// mtgjson_uuid column is a Postgres uuid, and a game that numbers its cards
-// hands us "1459" or "808_f", so every batch came back 22P02 and the whole
-// snapshot was lost. That is why a non-Magic deployment charted only the
-// TCGplayer metrics the tcgcsv ingest writes on its own, whatever else its
-// config listed. Long form keys on a ban_id, which every game has.
+// stashMagicTimeseries takes a Magic deployment's snapshot into the long prices
+// table, under the ban_id of each card's magicVariant. A printing with no
+// variant row yet gets one from ResolveMagicBanID.
+func stashMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start time.Time) {
+	// A miss costs a round-trip to file the variant, so warm the cache first.
+	if err := warmVariantCache(ctx); err != nil {
+		ServerNotify("timeseries", fmt.Sprintf("snapshot aborted, could not warm the variant cache: %s", err))
+		backgroundJobs.Report(jobStash, "", fmt.Sprintf("could not warm the variant cache: %s", err))
+		return
+	}
+
+	// A variant that failed to file is not retried for each dataset pricing it,
+	// so an outage logs once per variant.
+	failed := map[timeseries.MagicVariant]error{}
+	snapshot := collectMagicSnapshot(b, start, func(v timeseries.MagicVariant) (int64, error) {
+		err, seen := failed[v]
+		if seen {
+			return 0, err
+		}
+		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, v)
+		if err != nil {
+			log.Println("snapshot: resolve ban_id:", err)
+			failed[v] = err
+		}
+		return banID, err
+	})
+	writeSnapshot(ctx, start, snapshot)
+}
+
+// collectMagicSnapshot walks the served scrapers into long price rows, keyed on
+// the ban_id banIDFor gives each card's variant. A Magic snapshot keeps its
+// TCGplayer series, since the tcgcsv ingest covers only other games.
+func collectMagicSnapshot(b *mtgmatcher.Backend, start time.Time, banIDFor func(timeseries.MagicVariant) (int64, error)) longSnapshot {
+	var snapshot longSnapshot
+	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
+		var banID int64
+		if snapshot.stores(config) {
+			id, err := banIDFor(magicVariant(card))
+			if err != nil {
+				snapshot.ResolveErrors++
+				return
+			}
+			banID = id
+		}
+		snapshot.add(banID, config, date, price)
+	})
+	return snapshot
+}
+
+// stashNonMagicTimeseries takes a non-Magic deployment's snapshot into the long
+// prices table, keyed by ban_id.
 //
 // A card whose printing has no variant row yet gets one, under the ban_id its
 // product, finish and category compute to (timeseries.TCGBanID). The sub-type
@@ -757,9 +776,13 @@ func stashNonMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start t
 		snapshot.refile(missing, filed)
 	}
 
+	writeSnapshot(ctx, start, snapshot)
+}
+
+// writeSnapshot upserts a snapshot's rows and reports how it went.
+func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) {
 	// UpsertLongPrices dedupes on (ban_id, date, provider) keeping the last
-	// write, which is the same last-wins the wide path gets from overwriting a
-	// column on an accumulated row.
+	// write, the last-wins walkSnapshotPrices promises.
 	upserted, err := PricesArchiveDB.UpsertLongPrices(ctx, snapshot.Rows, 0)
 	if err != nil {
 		ServerNotify("timeseries", fmt.Sprintf("long-form upsert error: %s", err))
@@ -772,8 +795,11 @@ func stashNonMagicTimeseries(ctx context.Context, b *mtgmatcher.Backend, start t
 	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d upserted%s",
 		time.Since(start), upserted, snapshot.skipped()))
 	var problem string
-	if len(snapshot.Rows) == 0 {
+	switch {
+	case len(snapshot.Rows) == 0:
 		problem = "found no prices to stash"
+	case snapshot.ResolveErrors > 0:
+		problem = fmt.Sprintf("could not file a variant for %d prices", snapshot.ResolveErrors)
 	}
 	backgroundJobs.Report(jobStash, fmt.Sprintf("%d rows written", upserted), problem)
 }
@@ -837,7 +863,7 @@ func tcgcsvOwnsTCGSeries() bool {
 // The resolver runs only for a price the snapshot will store: the real one
 // files a variant for every card it misses, and a price declined to the
 // ingest or to a missing provider id should not file one.
-func collectNonMagicSnapshot(b *mtgmatcher.Backend, start time.Time, banIDFor func(*mtgmatcher.CardObject) int64) nonMagicSnapshot {
+func collectNonMagicSnapshot(b *mtgmatcher.Backend, start time.Time, banIDFor func(*mtgmatcher.CardObject) int64) longSnapshot {
 	snapshot := newNonMagicSnapshot()
 	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
 		var banID int64
@@ -851,8 +877,8 @@ func collectNonMagicSnapshot(b *mtgmatcher.Backend, start time.Time, banIDFor fu
 
 // newNonMagicSnapshot builds the accumulator for one snapshot, declining up
 // front whichever providers another writer owns.
-func newNonMagicSnapshot() nonMagicSnapshot {
-	var s nonMagicSnapshot
+func newNonMagicSnapshot() longSnapshot {
+	var s longSnapshot
 	if tcgcsvOwnsTCGSeries() {
 		s.tcgcsvOwns = tcgcsvOwnedProviders
 	}
@@ -876,9 +902,9 @@ func tcgVariantForCard(co *mtgmatcher.CardObject, categoryID int) (timeseries.TC
 	return timeseries.TCGVariant{}, false
 }
 
-// nonMagicSnapshot accumulates a non-Magic snapshot's long price rows, along
-// with the two reasons a scraped price can fail to become one.
-type nonMagicSnapshot struct {
+// longSnapshot accumulates a snapshot's long price rows, along with the reasons
+// a scraped price can fail to become one.
+type longSnapshot struct {
 	Rows []timeseries.LongPrice
 
 	// tcgcsvOwns are the provider ids to leave to the tcgcsv ingest, empty when
@@ -893,6 +919,10 @@ type nonMagicSnapshot struct {
 	// how much of the walk another writer already covers.
 	NoProvider, NoVariant, TCGCSVOwned int
 
+	// ResolveErrors counts Magic prices whose variant the database failed to
+	// file, a fault of its own: the card is known, the write was not.
+	ResolveErrors int
+
 	// NewVariants counts the cache misses that came back under their derived
 	// id: the printings this snapshot filed, give or take one another writer
 	// filed since the warm.
@@ -903,7 +933,7 @@ type nonMagicSnapshot struct {
 // the table actually filed it under, which is the same id unless the row
 // already existed and the cache missed it. A variant the table did not file
 // drops its rows into NoVariant, since the FK would refuse them.
-func (s *nonMagicSnapshot) refile(derived, filed map[timeseries.TCGVariant]int64) {
+func (s *longSnapshot) refile(derived, filed map[timeseries.TCGVariant]int64) {
 	actual := make(map[int64]int64, len(derived))
 	for v, banID := range derived {
 		actual[banID] = filed[v]
@@ -927,13 +957,13 @@ func (s *nonMagicSnapshot) refile(derived, filed map[timeseries.TCGVariant]int64
 
 // stores reports whether a price from this dataset becomes a row, the
 // declines add counts coming first.
-func (s *nonMagicSnapshot) stores(config DatasetConfig) bool {
+func (s *longSnapshot) stores(config DatasetConfig) bool {
 	return config.Provider != 0 && !slices.Contains(s.tcgcsvOwns, config.Provider)
 }
 
 // add records one scraped price against the ban_id resolved for its card, or
 // counts why it was not stored. A zero banID means no variant.
-func (s *nonMagicSnapshot) add(banID int64, config DatasetConfig, date string, price float64) {
+func (s *longSnapshot) add(banID int64, config DatasetConfig, date string, price float64) {
 	if config.Provider == 0 {
 		// buildProviderRegistry already named this dataset at startup; the
 		// count is how much of the snapshot the omission cost.
@@ -954,7 +984,7 @@ func (s *nonMagicSnapshot) add(banID int64, config DatasetConfig, date string, p
 }
 
 // skipped is the tail of the completion notice, empty when nothing was skipped.
-func (s *nonMagicSnapshot) skipped() string {
+func (s *longSnapshot) skipped() string {
 	var out string
 	if s.NewVariants > 0 {
 		out += fmt.Sprintf(", %d new variants", s.NewVariants)
@@ -967,6 +997,9 @@ func (s *nonMagicSnapshot) skipped() string {
 	}
 	if s.TCGCSVOwned > 0 {
 		out += fmt.Sprintf(", %d left to the tcgcsv ingest", s.TCGCSVOwned)
+	}
+	if s.ResolveErrors > 0 {
+		out += fmt.Sprintf(", %d whose variant could not be filed", s.ResolveErrors)
 	}
 	return out
 }
@@ -989,57 +1022,13 @@ func (s *site) stashInTimeseries() {
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
 
-	// A non-Magic deployment cannot use the wide table at all, so it takes its
-	// own snapshot path rather than writing one and dual-writing the other.
+	// Magic keys its variants on the mtgjson uuid, every other game on a
+	// TCGplayer product.
 	if datastoreGame() != DefaultGame {
 		stashNonMagicTimeseries(context.Background(), b, start)
 		return
 	}
-
-	// Accumulate all prices into a single row per (date, uuid, foil, etched).
-	accumulated := map[string]*timeseries.PriceRow{}
-	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
-		row := getRow(accumulated, card, date)
-		row.SetPriceForDataset(config.Index, price)
-	})
-
-	// Upsert all accumulated rows in batches
-	rows := make([]timeseries.PriceRow, 0, len(accumulated))
-	for _, row := range accumulated {
-		rows = append(rows, *row)
-	}
-
-	upserted, err := PricesArchiveDB.UpsertRows(context.Background(), rows, 500)
-	var errCount int
-	if err != nil {
-		errCount = len(rows) - upserted
-		ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
-	}
-
-	// Dual-write the same snapshot into the long form (variants + prices).
-	// Best-effort: a long-form failure is logged but does not fail the stash,
-	// since the legacy wide upsert above already persisted this snapshot.
-	var problem string
-	if Config().TimeseriesConfig.LongFormWrites {
-		if n, lerr := stashLongForm(context.Background(), accumulated); lerr != nil {
-			ServerNotify("timeseries", fmt.Sprintf("long-form dual-write error: %s", lerr))
-			problem = fmt.Sprintf("failed the long-form write: %s", lerr)
-		} else {
-			log.Printf("long-form dual-write: %d price rows", n)
-		}
-	}
-
-	SetLastStashUpdate(time.Now())
-	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
-	ServerNotify("timeseries", msg)
-
-	switch {
-	case err != nil:
-		problem = fmt.Sprintf("failed to write %d of %d rows: %s", errCount, len(rows), err)
-	case len(rows) == 0:
-		problem = "found no prices to stash"
-	}
-	backgroundJobs.Report(jobStash, fmt.Sprintf("%d rows written", upserted), problem)
+	stashMagicTimeseries(context.Background(), b, start)
 }
 
 // variantCacheScope is the slice of the shared variants table this process can
@@ -1096,47 +1085,4 @@ func warmVariantCache(ctx context.Context) error {
 	}
 	log.Printf("variant cache warmed: %d magic, %d non-magic", counts.Magic, counts.TCG)
 	return nil
-}
-
-// stashLongForm mirrors the accumulated wide rows into the long prices table. It
-// warms the variant cache once, resolves each row's ban_id (minting new
-// printings on the fly), and emits one LongPrice per set provider column with a
-// positive price (zeros are omitted, matching the backfill). Returns the number
-// of price rows upserted.
-func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
-	if err := warmVariantCache(ctx); err != nil {
-		return 0, fmt.Errorf("warm variant cache: %w", err)
-	}
-	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
-	for _, row := range accumulated {
-		lang := ""
-		if row.Language != nil {
-			lang = *row.Language
-		}
-		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, timeseries.MagicVariant{
-			MtgjsonUUID: row.MtgjsonUUID,
-			IsFoil:      row.IsFoil,
-			IsEtched:    row.IsEtched,
-			IsAlt:       row.IsAlt,
-			Language:    lang,
-		})
-		if err != nil {
-			log.Println("long-form: resolve ban_id:", err)
-			continue
-		}
-		for _, ds := range Datasets() {
-			if ds.Provider == 0 {
-				continue
-			}
-			if p := row.PriceForDataset(ds.Index); p != nil && *p > 0 {
-				longRows = append(longRows, timeseries.LongPrice{
-					BanID:    banID,
-					Date:     row.Date,
-					Provider: ds.Provider,
-					Price:    *p,
-				})
-			}
-		}
-	}
-	return PricesArchiveDB.UpsertLongPrices(ctx, longRows, 0)
 }

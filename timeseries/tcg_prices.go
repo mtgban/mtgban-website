@@ -13,9 +13,9 @@ import (
 var tcgSchemaSQL string
 
 // TCGPriceRow is a single row of the tcgplayer_nonmagic_product_prices table: one game's price for a
-// TCGplayer product and printing sub-type on a given day. Unlike PriceRow,
-// which is keyed by mtgjson uuid, this is keyed by TCGplayer product id so it
-// can hold games (Lorcana, Pokemon, ...) whose cards have no mtgjson uuid.
+// TCGplayer product and printing sub-type on a given day. It is keyed by
+// TCGplayer product id so it can hold games (Lorcana, Pokemon, ...) whose cards
+// have no mtgjson uuid.
 //
 // Price fields are *float64 so a missing value (TCGCSV reported null) stays
 // distinct from a genuine 0.00.
@@ -253,10 +253,9 @@ func dedupeTCGPriceRows(rows []TCGPriceRow) []TCGPriceRow {
 }
 
 // buildTCGUpsertQuery builds a multi-VALUES upsert for one batch. Price columns
-// are overwritten from the incoming row (not COALESCE-merged like
-// product_prices): TCGCSV is the single authoritative source per
-// (date, product, sub-type), so re-ingesting a day should reflect exactly what
-// the archive reports.
+// are overwritten from the incoming row, not COALESCE-merged: TCGCSV is the
+// single authoritative source per (date, product, sub-type), so re-ingesting a
+// day should reflect exactly what the archive reports.
 func buildTCGUpsertQuery(batch []TCGPriceRow) (string, []any) {
 	valueClauses := make([]string, 0, len(batch))
 	args := make([]any, 0, len(batch)*tcgColsPerRow)

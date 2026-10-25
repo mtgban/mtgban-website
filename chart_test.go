@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -581,6 +582,34 @@ func TestFetchRosterPricesSurvivesAPanickingRead(t *testing.T) {
 	}
 }
 
+// A variant the database fails to file is its own count, not the catalog gap
+// NoVariant reports, and the price it carried is dropped.
+func TestCollectMagicSnapshotCountsResolveErrors(t *testing.T) {
+	ids := nRealUUIDs(t, 2)
+	filed, failing := ids[0], ids[1]
+
+	keepScrapers(t)
+	withDatasets(t, []DatasetConfig{
+		{Retail: []string{"ZZMKM"}, PublicName: "Cardmarket Trend", Provider: timeseries.ProviderMKMTrend},
+	})
+	now := time.Now()
+	serve([]mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{filed: 1, failing: 2}, now)}, nil)
+
+	snapshot := collectMagicSnapshot(backend(), now, func(v timeseries.MagicVariant) (int64, error) {
+		if v.MtgjsonUUID == timeseries.NormalizeUUID(failing) {
+			return 0, errors.New("connection reset")
+		}
+		return 7, nil
+	})
+	want := []timeseries.LongPrice{{BanID: 7, Date: now.Format("2006-01-02"), Provider: timeseries.ProviderMKMTrend, Price: 1}}
+	if !slices.Equal(snapshot.Rows, want) {
+		t.Errorf("rows = %+v, want %+v", snapshot.Rows, want)
+	}
+	if snapshot.ResolveErrors != 1 || snapshot.NoVariant != 0 {
+		t.Errorf("ResolveErrors = %d, NoVariant = %d, want 1 and 0", snapshot.ResolveErrors, snapshot.NoVariant)
+	}
+}
+
 // TestMagicVariantAltCopy pins that the Alternate Fourth Edition copy and the
 // printing it copies file under two variants, and that mtgjson's own
 // isAlternative flag, which every flagged card's uuid already carries, does not.
@@ -594,20 +623,30 @@ func TestMagicVariantAltCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	accumulated := map[string]*timeseries.PriceRow{}
-	getRow(accumulated, original, "2026-10-25").SetPriceForDataset(4, 4.34)
-	getRow(accumulated, copied, "2026-10-25").SetPriceForDataset(4, 285.01)
-	if len(accumulated) != 2 {
-		t.Fatalf("got %d rows for %s and its copy, want 2", len(accumulated), original.UUID)
+	keepScrapers(t)
+	withDatasets(t, []DatasetConfig{
+		{Retail: []string{"ZZMKM"}, PublicName: "Cardmarket Trend", Provider: timeseries.ProviderMKMTrend},
+	})
+	now := time.Now()
+	serve([]mtgban.Seller{serveSellerN("ZZMKM", map[string]float64{original.UUID: 4.34, copied.UUID: 285.01}, now)}, nil)
+
+	snapshot := collectMagicSnapshot(backend(), now, func(v timeseries.MagicVariant) (int64, error) {
+		if v.MtgjsonUUID != original.UUID {
+			t.Errorf("variant uuid = %s, want %s", v.MtgjsonUUID, original.UUID)
+		}
+		if v.IsAlt {
+			return 2, nil
+		}
+		return 1, nil
+	})
+	slices.SortFunc(snapshot.Rows, func(a, b timeseries.LongPrice) int { return int(a.BanID - b.BanID) })
+	date := now.Format("2006-01-02")
+	want := []timeseries.LongPrice{
+		{BanID: 1, Date: date, Provider: timeseries.ProviderMKMTrend, Price: 4.34},
+		{BanID: 2, Date: date, Provider: timeseries.ProviderMKMTrend, Price: 285.01},
 	}
-	for _, row := range accumulated {
-		want := 4.34
-		if row.IsAlt {
-			want = 285.01
-		}
-		if got := row.PriceForDataset(4); got == nil || *got != want {
-			t.Errorf("is_alt=%v row priced %v, want %v", row.IsAlt, got, want)
-		}
+	if !slices.Equal(snapshot.Rows, want) {
+		t.Errorf("rows = %+v, want %+v", snapshot.Rows, want)
 	}
 
 	for _, uuid := range backend().GetUUIDs() {

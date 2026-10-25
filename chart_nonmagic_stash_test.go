@@ -55,7 +55,7 @@ func TestLongFormGatesForNonMagic(t *testing.T) {
 // A dataset with a provider id and a card with a variant produce one row per
 // visit, carrying the config's provider rather than its legacy column index.
 func TestNonMagicSnapshotAddStoresOneRowPerProvider(t *testing.T) {
-	var s nonMagicSnapshot
+	var s longSnapshot
 	mkm := DatasetConfig{PublicName: "Cardmarket Low", Index: 4, Provider: timeseries.ProviderMKMLow}
 	csi := DatasetConfig{PublicName: "Cool Stuff Inc Buylist", Index: 9, Provider: timeseries.ProviderCSIBuylist}
 
@@ -78,7 +78,7 @@ func TestNonMagicSnapshotAddStoresOneRowPerProvider(t *testing.T) {
 // can a card whose product the tcgcsv ingest has not minted a variant for. The
 // two are counted apart because they need different fixes.
 func TestNonMagicSnapshotAddCountsSkipsSeparately(t *testing.T) {
-	var s nonMagicSnapshot
+	var s longSnapshot
 	noProvider := DatasetConfig{PublicName: "Star City Games Buylist", Index: 6}
 	scg := DatasetConfig{PublicName: "Star City Games Buylist", Index: 6, Provider: timeseries.ProviderSCGBuylist}
 
@@ -106,7 +106,7 @@ func TestNonMagicSnapshotAddCountsSkipsSeparately(t *testing.T) {
 // A clean snapshot says nothing about skips, so the completion notice reads as
 // one sentence rather than trailing empty clauses.
 func TestNonMagicSnapshotSkippedSilentWhenClean(t *testing.T) {
-	var s nonMagicSnapshot
+	var s longSnapshot
 	s.add(1, DatasetConfig{Provider: timeseries.ProviderTCGLow}, "2026-09-24", 1)
 	if got := s.skipped(); got != "" {
 		t.Errorf("skipped() = %q, want empty", got)
@@ -117,7 +117,7 @@ func TestNonMagicSnapshotSkippedSilentWhenClean(t *testing.T) {
 // a column on the accumulated row; here both rows are emitted and the upsert's
 // dedupe keeps the last, so the last writer has to be last in the slice.
 func TestNonMagicSnapshotKeepsLastWriteLast(t *testing.T) {
-	var s nonMagicSnapshot
+	var s longSnapshot
 	low := DatasetConfig{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow}
 	s.add(7, low, "2026-09-24", 1)
 	s.add(7, low, "2026-09-24", 2)
@@ -187,7 +187,7 @@ func TestTCGCSVOwnsTCGSeries(t *testing.T) {
 // The ingest covers the whole category, so it keeps them and the snapshot counts
 // what it handed over rather than reporting it as a fault.
 func TestNonMagicSnapshotLeavesTCGSeriesToTheIngest(t *testing.T) {
-	s := nonMagicSnapshot{tcgcsvOwns: tcgcsvOwnedProviders}
+	s := longSnapshot{tcgcsvOwns: tcgcsvOwnedProviders}
 	low := DatasetConfig{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow}
 	mid := DatasetConfig{PublicName: "TCGplayer Mid", Provider: timeseries.ProviderTCGMid}
 	mkm := DatasetConfig{PublicName: "Cardmarket Low", Provider: timeseries.ProviderMKMLow}
@@ -217,7 +217,7 @@ func TestNonMagicSnapshotLeavesTCGSeriesToTheIngest(t *testing.T) {
 // owns, and counting it as one would send an operator after a catalog gap for a
 // series the snapshot was never going to write. The ownership check comes first.
 func TestNonMagicSnapshotDeclinesBeforeResolvingAVariant(t *testing.T) {
-	s := nonMagicSnapshot{tcgcsvOwns: tcgcsvOwnedProviders}
+	s := longSnapshot{tcgcsvOwns: tcgcsvOwnedProviders}
 	s.add(0, DatasetConfig{PublicName: "TCGplayer Low", Provider: timeseries.ProviderTCGLow}, "2026-09-26", 10)
 
 	if s.NoVariant != 0 {
@@ -361,7 +361,7 @@ func TestNonMagicSnapshotRefile(t *testing.T) {
 	}
 
 	low := DatasetConfig{Provider: timeseries.ProviderMKMLow}
-	var s nonMagicSnapshot
+	var s longSnapshot
 	s.add(77, low, "2026-10-01", 1)
 	s.add(derived[fresh], low, "2026-10-01", 2)
 	s.add(derived[stale], low, "2026-10-01", 3)

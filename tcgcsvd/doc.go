@@ -50,9 +50,9 @@ never stored, so the config file is the single place that decides what we carry.
 	  ]
 	}
 
-Magic is deliberately absent: its prices are keyed by mtgjson uuid in
-product_prices and come from a different pipeline entirely. Categories 21, 69
-and 70 are junk per the tcgcsv FAQ and should never be listed.
+Magic is deliberately absent: the Magic snapshot writes its long rows, keyed by
+mtgjson uuid, from a different pipeline entirely. Categories 21, 69 and 70 are
+junk per the tcgcsv FAQ and should never be listed.
 
 The -categories flag (Service.SelectGames) narrows a single backfill run to a
 subset of the configured games, for when one game has a hole and re-fetching the
