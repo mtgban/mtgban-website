@@ -625,3 +625,22 @@ func TestUserPageRendersOnMobileBase(t *testing.T) {
 		t.Fatal("mobile render lacks the mobile base or the tier table")
 	}
 }
+
+// The Links strip draws Account from the nav's own entry, which every reader
+// has, signed in or not, and carries its data-tool so a layout that pinned it
+// to the bar can rebuild it.
+func TestNavbarLinksAccountFromTheNav(t *testing.T) {
+	const button = `class="tools-quick-btn" href="/user" title="Account" data-tool="account"`
+	for _, sig := range []string{"", tierSig("Pioneer")} {
+		pv := genPageNav(testSite, nil, "Search", sig)
+		if out := renderPage(t, "search.html", false, pv); !strings.Contains(out, button) {
+			t.Errorf("sig %q: the Links strip lacks the Account button", sig)
+		}
+	}
+
+	pv := genPageNav(testSite, nil, "Search", "")
+	pv.Nav = slices.DeleteFunc(pv.Nav, func(n NavElem) bool { return n.Name == "Account" })
+	if out := renderPage(t, "search.html", false, pv); strings.Contains(out, `title="Account"`) {
+		t.Error("the Links strip links Account for a nav without it")
+	}
+}

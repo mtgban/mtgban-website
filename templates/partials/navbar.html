@@ -77,11 +77,11 @@
             <a class="tools-quick-btn" href="/discord" title="Discord">
                 <img src="/img/misc/discord.png" alt="Discord">Discord
             </a>
-            {{if .UserNav}}
-            <a class="tools-quick-btn" href="/user" title="Account">
+            {{range .Nav}}{{if eq .Name "Account"}}
+            <a class="tools-quick-btn" href="{{.Link}}" title="Account" data-tool="{{slug .Name}}" data-icon="{{.Short}}" data-desc="{{.Description}}">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Account
             </a>
-            {{end}}
+            {{end}}{{end}}
             <span class="tools-quick-spacer"></span>
             <button class="tools-quick-btn ban-theme-toggle" id="theme-toggle" type="button" title="Toggle theme">
                 <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -210,8 +210,10 @@
 
     // Build a lookup of every navigable entry by reading whatever
     // version of it the server happened to render (nav button for
-    // Search/Sealed via data-attrs, tile for everything else via
-    // children). Skip when we've already harvested an entry.
+    // Search/Sealed and the Links strip's Account via data-attrs, tile
+    // for everything else via children). Skip when we've already
+    // harvested an entry. A Links strip entry can be pinned to the bar
+    // but is never made a tile: the strip already lists it.
     var info = {};
     function read(el) {
         var tool = el.getAttribute('data-tool');
@@ -230,11 +232,12 @@
                 icon: decode(el.getAttribute('data-icon')),
                 desc: decode(el.getAttribute('data-desc')),
                 href: el.getAttribute('href') || '#',
-                admin: false
+                admin: false,
+                quick: el.classList.contains('tools-quick-btn')
             };
         }
     }
-    document.querySelectorAll('.nav2-sections .nav2-section-btn:not(.is-tools), #tools-grid .tools-tile').forEach(read);
+    document.querySelectorAll('.nav2-sections .nav2-section-btn:not(.is-tools), #tools-grid .tools-tile, .tools-quick [data-tool]').forEach(read);
 
     function mkSection(tool) {
         var e = info[tool]; if (!e) return null;
@@ -248,7 +251,7 @@
         return a;
     }
     function mkTile(tool) {
-        var e = info[tool]; if (!e) return null;
+        var e = info[tool]; if (!e || e.quick) return null;
         var a = document.createElement('a');
         a.className = 'tools-tile' + (e.admin ? ' is-admin' : '');
         a.setAttribute('data-tool', tool);
