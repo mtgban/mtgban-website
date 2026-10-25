@@ -373,7 +373,7 @@ func TestRefreshNowAnswersAPoke(t *testing.T) {
 	pokes.Poke(rig.hash, aSecondAgo(), pokeWindow())
 
 	rec := rig.account("refresh", browser(young, session)...)
-	wantRedirect(t, rec, "/user")
+	wantRedirect(t, rec, "/user?refreshed=yes")
 	fresh := setCookies(rec)[signatureCookie]
 	if fresh == nil || fresh.Value == young || rig.stub.calls() != 1 {
 		t.Fatalf("Refresh now set %v after %d refreshes, want a new signature from one", fresh, rig.stub.calls())
