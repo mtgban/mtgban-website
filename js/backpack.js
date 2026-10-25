@@ -219,10 +219,12 @@
 
     // ---- result rows and the navbar ----
 
-    // describe sets a button's title and the text labels the phone menu and
-    // the collapsed desktop menu give it.
+    // describe sets a button's title, its accessible name, which the copy
+    // count it shows would otherwise become, and the text labels the phone
+    // menu and the collapsed desktop menu give it.
     function describe(b, s) {
         b.setAttribute("title", s);
+        b.setAttribute("aria-label", s);
         b.querySelectorAll(".pack-btn-label, .qi-label").forEach(function (n) { n.textContent = s; });
     }
 
