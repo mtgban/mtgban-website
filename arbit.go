@@ -29,8 +29,7 @@ const (
 	MinSpreadNegative = -30
 	MinDiffNegative   = -100
 
-	ProfConst       = 2
-	ProfConstGlobal = 10
+	ProfConst = 10
 
 	DefaultSortingOption = "profitability"
 
