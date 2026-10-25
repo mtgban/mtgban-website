@@ -156,6 +156,26 @@ describe('adding', () => {
         expect(label.textContent).toBe('Remove one copy');
     });
 
+    test('the add and minus buttons are named by their action, not the count they show', () => {
+        const p = page();
+        expect(p.rows[0].getAttribute('aria-label')).toBe('Add to backpack');
+        p.window.addToBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.rows[0].children[0].textContent).toBe('2');
+        expect(p.rows[0].getAttribute('aria-label')).toBe('Add another copy');
+        expect(p.minus[0].getAttribute('aria-label')).toBe('Remove one copy');
+    });
+
+    test('the phone menu items carry the same names as their labels', () => {
+        const p = page();
+        const item = el('button'); item.classes.add('pack-btn'); item.setAttribute('data-card-id', 'uuid-1');
+        const less = el('button'); less.classes.add('pack-minus-btn'); less.setAttribute('data-card-id', 'uuid-1');
+        p.rows[0].parentNode.append(item, less);
+        p.window.addToBackpack(item);
+        expect(item.getAttribute('aria-label')).toBe('Add another copy');
+        expect(less.getAttribute('aria-label')).toBe('Remove from backpack');
+    });
+
     test('re-adding a removed card gives a live entry with qty 1', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'x', qty: 4, t: 1, m: 2, del: 2 }] });
         p.window.addToBackpack(p.rows[0]);
