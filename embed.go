@@ -197,24 +197,20 @@ func oembedError(w http.ResponseWriter, status int) {
 // sellerReference names a reference seller and its price for a card, or
 // nothing at all where this site does not carry that seller.
 func sellerReference(cardID, shorthand string) (string, float64) {
-	for _, seller := range GetSellers() {
-		if !strings.EqualFold(seller.Info().Shorthand, shorthand) {
-			continue
-		}
-		return seller.Info().Name, price4seller(cardID, shorthand)
+	seller, found := currentStoreIndex().sellerFold[strings.ToLower(shorthand)]
+	if !found {
+		return "", 0
 	}
-	return "", 0
+	return seller.Info().Name, price4seller(cardID, shorthand)
 }
 
 // vendorReference is sellerReference for a buylist. Card Kingdom answers to
 // the same shorthand on both sides, so asking the wrong one reads a retail
 // price out under a buylist label.
 func vendorReference(cardID, shorthand string) (string, float64) {
-	for _, vendor := range GetVendors() {
-		if !strings.EqualFold(vendor.Info().Shorthand, shorthand) {
-			continue
-		}
-		return vendor.Info().Name, price4vendor(cardID, shorthand)
+	vendor, found := currentStoreIndex().vendorFold[strings.ToLower(shorthand)]
+	if !found {
+		return "", 0
 	}
-	return "", 0
+	return vendor.Info().Name, price4vendor(cardID, shorthand)
 }

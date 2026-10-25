@@ -250,10 +250,6 @@ func storeFactorOptions(sellers, vendors []string) string {
 // metadataOnly says whether a loaded seller is a reference index, not a
 // store a user buys from.
 func metadataOnly(shorthand string) bool {
-	for _, seller := range GetSellers() {
-		if seller.Info().Shorthand == shorthand {
-			return seller.Info().MetadataOnly
-		}
-	}
-	return false
+	seller, found := currentStoreIndex().seller[shorthand]
+	return found && seller.Info().MetadataOnly
 }

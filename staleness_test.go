@@ -135,8 +135,8 @@ func TestCheckStalenessTracksTransitionsOverRepeatedChecks(t *testing.T) {
 
 	// ZZSTALE loads fresh data: the next check must flip it back and notify
 	// exactly once more, for the recovery.
-	sellers = []mtgban.Seller{inventoryOf("ZZSTALE", 1, time.Now()), inventoryOf("ZZFRESH", 1, fresh)}
-	sellersPtr.Store(&sellers)
+	recovered := []mtgban.Seller{inventoryOf("ZZSTALE", 1, time.Now()), inventoryOf("ZZFRESH", 1, fresh)}
+	sellersPtr.Store(&recovered)
 	checkStaleness()
 	if staleAlarmState.stale["ZZSTALE/retail"] {
 		t.Fatal("check after a fresh load still reads ZZSTALE/retail as stale")
@@ -480,8 +480,8 @@ func TestAReturnAfterADropIsAnnouncedOnce(t *testing.T) {
 	sellersPtr.Store(&sellers)
 	checkStaleness()
 
-	sellers = []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	sellersPtr.Store(&sellers)
+	back := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
+	sellersPtr.Store(&back)
 	checkStaleness()
 
 	// One check's lines go out as one message
@@ -523,8 +523,8 @@ func TestARefusedDropLineKeepsTheStaleRow(t *testing.T) {
 		*notices = append(*notices, message)
 		return nil
 	}
-	sellers = []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
-	sellersPtr.Store(&sellers)
+	back := []mtgban.Seller{inventoryOf("ZZFRESH", 1, time.Now()), inventoryOf("ZZOLD", 1, time.Now())}
+	sellersPtr.Store(&back)
 	checkStaleness()
 
 	if len(*notices) != 2 || !strings.Contains((*notices)[1], "(ZZOLD) is fresh again") {

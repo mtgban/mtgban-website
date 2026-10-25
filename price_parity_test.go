@@ -597,14 +597,14 @@ func TestApiEnabledStores(t *testing.T) {
 	euIndexSeller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU Index", Shorthand: "PARITYEUIDX", CountryFlag: "EU", MetadataOnly: true,
 	})
-	sellers = append(*sellersPtr.Load(), euIndexSeller)
-	sellersPtr.Store(&sellers)
+	withIndexSeller := append(slices.Clone(*sellersPtr.Load()), euIndexSeller)
+	sellersPtr.Store(&withIndexSeller)
 
 	euIndexVendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{
 		Name: "Parity EU Vendor Index", Shorthand: "PARITYEUVIDX", CountryFlag: "EU", MetadataOnly: true,
 	})
-	vendors = append(*vendorsPtr.Load(), euIndexVendor)
-	vendorsPtr.Store(&vendors)
+	withIndexVendor := append(slices.Clone(*vendorsPtr.Load()), euIndexVendor)
+	vendorsPtr.Store(&withIndexVendor)
 
 	got = enabled("BASE_ACCESS")
 	if !slices.Contains(got, "PARITYA") {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -89,22 +90,23 @@ func TestStoreIndexCaseOnlyCollision(t *testing.T) {
 }
 
 // A snapshot stored anywhere, the tests included, is seen by the next lookup,
-// whether it is a new slice or the same variable grown in place.
+// and one that drops a store takes it out of the index.
 func TestStoreIndexFollowsTheSnapshot(t *testing.T) {
 	storeIndexFixture(t)
 	if _, err := findSellerInventory("TCG"); err == nil {
 		t.Fatal("TCG should not be loaded yet")
 	}
 
-	sellers := append(GetSellers(), mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}))
-	sellersPtr.Store(&sellers)
+	withTCG := append(slices.Clone(GetSellers()), mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "TCG", Name: "TCGplayer"}))
+	sellersPtr.Store(&withTCG)
 	if got := scraperName("TCG"); got != "TCGplayer" {
 		t.Errorf("after a new snapshot, scraperName(TCG) = %q", got)
 	}
 
-	sellers = append(sellers, mtgban.NewSellerFromInventory(mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: "SCG", Name: "Star City Games"}))
-	if got := scraperName("SCG"); got != "Star City Games" {
-		t.Errorf("after the same variable grew, scraperName(SCG) = %q", got)
+	withoutTCG := slices.Clone(withTCG[:len(withTCG)-1])
+	sellersPtr.Store(&withoutTCG)
+	if got := scraperName("TCG"); got != "" {
+		t.Errorf("after a snapshot without it, scraperName(TCG) = %q", got)
 	}
 
 	sellersPtr.Store(nil)
