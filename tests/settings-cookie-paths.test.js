@@ -73,7 +73,7 @@ function matches(n, sel) {
 const checkbox = name => el('input', { type: 'checkbox', name });
 
 // The body /api/settings/modal returns: the Arbitrage tab's grid, the
-// Upload tab with a /upload cookie and a root one, and a Search tab whose
+// Upload tab with two /upload cookies and a root one, and a Search tab whose
 // cookies are all root ones.
 function bodyFixture() {
     return [
@@ -82,6 +82,7 @@ function bodyFixture() {
         ]),
         el('section', { class: 'settings-pane', 'data-tab': 'upload', 'data-path': '/upload' }, [
             el('input', { id: 'opt-margin', type: 'text', value: '10' }),
+            el('div', { id: 'settings-upload-checks' }, ['lowval', 'highval'].map(k => el('input', { type: 'checkbox', 'data-misc': k }))),
             el('select', { 'data-cookie': 'UploadCustomBuyer', value: 'TCGLow' }),
         ]),
         el('section', { class: 'settings-pane', 'data-tab': 'arbit', 'data-path': '/arbit' }, [
@@ -159,7 +160,7 @@ test('a tab opened on another page loads the values its own page reads', async (
     expect(m.fetches.sort()).toEqual([
         '/api/settings/modal',
         '/arbit/settings-values?name=ArbitVendorsList',
-        '/upload/settings-values?name=UploadMargin',
+        '/upload/settings-values?name=UploadMargin&name=UploadOptimizerOpts',
     ]);
     expect(m.find('input[name="CK"]').checked).toBe(true);
     expect(m.find('input[name="SCG"]').checked).toBe(false);
@@ -198,7 +199,7 @@ test('on its own page a tab reads its cookies there and fetches nothing', async 
         values: { '/upload': {} },
     });
 
-    expect(m.fetches.sort()).toEqual(['/api/settings/modal', '/upload/settings-values?name=UploadMargin']);
+    expect(m.fetches.sort()).toEqual(['/api/settings/modal', '/upload/settings-values?name=UploadMargin&name=UploadOptimizerOpts']);
     expect(m.find('input[name="SCG"]').checked).toBe(true);
 });
 
@@ -210,4 +211,18 @@ test('a page whose values cannot be fetched fails the load', async () => {
     expect(m.find('[data-role="save"]').disabled).toBe(true);
     await m.save();
     expect(m.writes).toHaveLength(0);
+});
+
+test('unticking every option saves a value that does not bring the defaults back', async () => {
+    const m = await openModal({
+        pathname: '/upload',
+        cookie: '',
+        values: { '/arbit': { ArbitVendorsList: '' } },
+    });
+    expect(m.find('[data-misc="lowval"]').checked).toBe(true);
+    m.find('[data-misc="lowval"]').checked = false;
+    await m.save();
+
+    const saved = m.writes.find(w => w.startsWith('UploadOptimizerOpts=') && !w.startsWith('UploadOptimizerOpts=;'));
+    expect(saved).toStartWith('UploadOptimizerOpts=,;');
 });

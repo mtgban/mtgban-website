@@ -277,6 +277,15 @@ test('apply writes the settings cookies, sets mode and tab, ticks stores and rep
     expect(cookies.enabledVendors).toBe('CK');
 });
 
+test('apply with every flag off writes a cookie that does not read as unset', () => {
+    const doc = fakeDoc({ mode: 'false', tab: 'singles' });
+    const win = { reloadSelect() {}, selectTab() {} };
+    const { P, cookies } = loadPresets({ win });
+    P.apply({ id: 'p', name: 'n', opts: P.canonical({ mode: 'false', tab: 'singles', stores: [] }) }, doc);
+    expect(cookies.UploadOptimizerOpts).toBe(',');
+    expect(P.fromState({ mode: 'false', tab: 'singles' }, n => cookies[n]).lowval).toBeUndefined();
+});
+
 test('apply treats the mode as retail when the buylist radio is disabled, and leaves stores alone', () => {
     const doc = fakeDoc({ mode: 'false', tab: 'singles', canBuylist: false });
     const calls = [];

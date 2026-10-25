@@ -286,7 +286,9 @@
         container.querySelectorAll('[data-misc]:checked').forEach(function (el) {
             names.push(el.dataset.misc);
         });
-        return names.join(',') + (names.length ? ',' : '');
+        // Always end in a comma: an empty cookie reads as never set, which
+        // brings the defaults back when every box was unticked.
+        return names.join(',') + ',';
     }
     function bindMiscBitmap(containerId, cookieName, defaults) {
         const c = document.getElementById(containerId);

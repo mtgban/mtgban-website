@@ -168,3 +168,27 @@ func TestOptimizerCardCount(t *testing.T) {
 		}
 	}
 }
+
+// An emptied option list is saved as a lone comma, which must not read as
+// a cookie never set: that would bring the default options back.
+func TestHasUploadOptCookie(t *testing.T) {
+	for _, tc := range []struct {
+		cookie string
+		want   bool
+	}{
+		{"", true},
+		{",", false},
+		{"highval,", false},
+		{"lowval,", true},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/upload", nil)
+		if tc.cookie != "" {
+			req.AddCookie(&http.Cookie{Name: "UploadOptimizerOpts", Value: tc.cookie})
+		}
+		req.ParseForm()
+		got := hasUploadOpt(req, "lowval")
+		if got != tc.want {
+			t.Errorf("cookie %q: lowval = %v, want %v", tc.cookie, got, tc.want)
+		}
+	}
+}

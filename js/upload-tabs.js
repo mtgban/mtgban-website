@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function migrateUploadPrefs() {
     ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
         if (localStorage.getItem(k) === 'true') bits.push(k);
     });
-    setCookie('UploadOptimizerOpts', bits.join(',') + (bits.length ? ',' : ''), 1000);
+    setCookie('UploadOptimizerOpts', bits.join(',') + ',', 1000);
     var textMap = {
         percspread: 'UploadPercSpread',
         percspreadmax: 'UploadPercSpreadMax',
