@@ -26,8 +26,8 @@ func TestPokeAsksForWhatWasIssuedBeforeIt(t *testing.T) {
 		t.Errorf("after one poke: reader %v, other %v, %d entries; want the reader alone", set.Poked(reader, time.Now(), window), set.Poked(other, time.Now(), window), set.Len())
 	}
 	at := set.at[reader]
-	if !at.Equal(at.Truncate(time.Second)) || time.Since(at) > time.Minute {
-		t.Errorf("poked at %v, want now to the second", at)
+	if !at.Equal(at.Truncate(time.Second)) || !at.After(time.Now().Add(-time.Second)) || time.Until(at) > time.Second {
+		t.Errorf("poked at %v, want now rounded up to the second", at)
 	}
 
 	for _, tc := range []struct {
@@ -37,7 +37,8 @@ func TestPokeAsksForWhatWasIssuedBeforeIt(t *testing.T) {
 	}{
 		{"issued a day before the poke", at.Add(-day), "poke"},
 		{"issued a nanosecond before the poke", at.Add(-time.Nanosecond), "poke"},
-		{"issued in the poke's second", at, ""},
+		{"issued in the second before the poke's, which the poke rounded up", at.Add(-time.Second), "poke"},
+		{"issued at the poke", at, ""},
 		{"issued after the poke", at.Add(time.Minute), ""},
 	} {
 		got := set.Wants(reader, "", tc.issued, time.Now(), window)
@@ -123,10 +124,11 @@ func TestWantsAStaleOrPokedReader(t *testing.T) {
 		t.Error("a reader nobody poked wants renewing with no stamp set")
 	}
 
-	set.StampACL(stamp)
-	if !set.ACLChanged().Equal(stamp) {
-		t.Errorf("stamped %v, want %v", set.ACLChanged(), stamp)
+	set.StampACL(stamp.Add(400 * time.Millisecond))
+	if !set.ACLChanged().Equal(stamp.Add(time.Second)) {
+		t.Errorf("stamped %v, want %v, rounded up", set.ACLChanged(), stamp.Add(time.Second))
 	}
+	stamp = set.ACLChanged()
 	for _, tc := range []struct {
 		name   string
 		issued time.Time
@@ -134,6 +136,7 @@ func TestWantsAStaleOrPokedReader(t *testing.T) {
 	}{
 		{"issued before the stamp", stamp.Add(-time.Hour), "acl"},
 		{"issued a nanosecond before the stamp", stamp.Add(-time.Nanosecond), "acl"},
+		{"minted in the stamp's second, before the edit", stamp.Add(-time.Second), "acl"},
 		{"issued at the stamp", stamp, ""},
 		{"issued after the stamp", stamp.Add(time.Hour), ""},
 		{"minted just now", time.Now(), ""},
@@ -171,6 +174,7 @@ func TestStampDoesNotAge(t *testing.T) {
 
 	later := time.Now().Add(-time.Hour).Truncate(time.Second)
 	set.StampACL(later)
+	later = set.ACLChanged()
 	if set.Wants("reader", "", later.Add(-time.Minute), time.Now(), window) != "acl" || set.Wants("reader", "", later.Add(time.Minute), time.Now(), window) != "" {
 		t.Error("the next stamp does not replace the last")
 	}

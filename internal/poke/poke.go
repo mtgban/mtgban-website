@@ -14,8 +14,9 @@ import (
 // window. A poke lasts the window the caller gives, after_days on the site,
 // when that window would have renewed the reader anyway, and the next poke
 // sweeps the ones that lapsed; the table's moment lasts as long as the Set.
-// Both are kept to the second, the resolution a signature's Expires has, so a
-// renewal in their second is issued at them rather than before them.
+// Both are kept to the second, the resolution a signature's Expires has, and
+// rounded up, so a signature minted earlier in their second reads as issued
+// before them.
 type Set struct {
 	mu         sync.RWMutex
 	at         map[string]time.Time // the reader's email hash -> when poked
@@ -32,6 +33,11 @@ func New() *Set {
 	return &Set{at: map[string]time.Time{}, reminted: map[string]time.Time{}}
 }
 
+// ceilSecond is t rounded up to the second.
+func ceilSecond(t time.Time) time.Time {
+	return t.Truncate(time.Second).Add(time.Second)
+}
+
 // Poke marks the reader with the given email hash as poked at at, and drops the
 // pokes older than window.
 func (s *Set) Poke(hash string, at time.Time, window time.Duration) {
@@ -42,7 +48,7 @@ func (s *Set) Poke(hash string, at time.Time, window time.Duration) {
 			delete(s.at, other)
 		}
 	}
-	s.at[hash] = at.Truncate(time.Second)
+	s.at[hash] = ceilSecond(at)
 }
 
 // Poked says whether the reader with the given email hash was poked within
@@ -51,7 +57,7 @@ func (s *Set) Poked(hash string, now time.Time, window time.Duration) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	at, found := s.at[hash]
-	return found && now.Sub(at) < window
+	return found && window > 0 && now.Sub(at) < window
 }
 
 // Len is how many readers are poked, lapsed or not.
@@ -68,7 +74,7 @@ func (s *Set) Len() int {
 func (s *Set) StampACL(now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.aclChanged = now.Truncate(time.Second)
+	s.aclChanged = ceilSecond(now)
 	s.reminted = map[string]time.Time{}
 }
 
@@ -86,8 +92,8 @@ func (s *Set) Reminted(signature string, expires, now time.Time) {
 	s.reminted[signature] = expires
 }
 
-// ACLChanged is when the access table last changed, to the second, or zero
-// when it has not since the Set was made.
+// ACLChanged is when the access table last changed, rounded up to the
+// second, or zero when it has not since the Set was made.
 func (s *Set) ACLChanged() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -100,15 +106,17 @@ func (s *Set) ACLChanged() time.Time {
 // after it was issued, "acl" when the access table changed after it was
 // issued and it was not re-signed since, nothing otherwise. It reads nothing
 // but its arguments. Moments are kept to the second, the resolution Expires
-// has: a signature minted in the same second as the edit reads as issued at it
-// and waits for its age, and one renewed in that second is not renewed again.
+// has, and rounded up: a signature minted in the same second as the edit
+// reads as issued before it, so one minted under the old state is never
+// missed, at the cost of renewing once more one minted in that second after
+// it.
 func (s *Set) Wants(hash, signature string, issued, now time.Time, window time.Duration) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	at, found := s.at[hash]
 	_, reminted := s.reminted[signature]
 	switch {
-	case found && now.Sub(at) < window && issued.Before(at):
+	case found && window > 0 && now.Sub(at) < window && issued.Before(at):
 		return "poke"
 	case issued.Before(s.aclChanged) && !reminted:
 		return "acl"
