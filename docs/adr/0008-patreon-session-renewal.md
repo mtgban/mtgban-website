@@ -64,7 +64,10 @@ without the reader.
    rotated token on all of those rows *before* signing, and serves the
    same request on the new signature. Another request, tab, device, site
    or port that loses the lease serves on the old signature; its row has
-   the new token all the same.
+   the new token all the same. A request of the same browser that
+   reaches the site after the renewal answered, still carrying the
+   signature it renewed, is served on the new one; one that arrives
+   while the renewal runs is served as any request that lost the lease.
 5. **Patreon's answer decides, three ways.** *Entitled*: re-sign, with
    whatever tier Patreon reports, up or down. *Not entitled* (identity
    OK, no membership or no entitled tier, no grant): delete the row,
@@ -142,12 +145,17 @@ without the reader.
   under the account's lease, so no row is left with the token Patreon just
   rotated away. The renewal lease and commit are therefore per account,
   not per row.
+- After a reader changes their Patreon email, the renewal files their
+  sessions under the new one. Their other devices, whose signatures
+  still name the old email, stop renewing and log in again when the
+  signature runs out.
 - **Log out everywhere** deletes every row for the email: no device can
   renew; signatures already issued run to their own `Expires`.
 - `recordAlertContact` runs on every entitled renewal, so alerts no
   longer park for a reader who never re-logs in.
 - A Patreon outage costs each near-expiry session one bounded wait per
-  hour; nobody is logged out by it.
+  hour, and a session that rests costs the database nothing until its
+  rest is over; nobody is logged out by it.
 - The API handoff is untouched: it still asks Patreon through a
   redirect and never reads the session row (decision recorded in the
   plan; a stolen `BAN_SESSION` must not become a gateway login).

@@ -113,7 +113,7 @@ func TestSigningPokeRenewsWhateverTheSignatureHasLeft(t *testing.T) {
 	rig.wantRenewed(rig.serve(rig.request(http.MethodPost, "/upload", browser(old, session)...), false), old, session)
 
 	pokes.Poke(rig.hash, time.Now(), pokeWindow())
-	old = rig.sig("Legacy", 1*day)
+	old = rig.sig("Legacy", 2*day)
 	rig.wantRenewed(rig.serve(rig.request(http.MethodGet, "/data/prices/x", browser(old, session)...), true), old, session)
 }
 
@@ -281,6 +281,7 @@ func TestSigningPokeSurvivesPatreonBeingDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	forgetRests(t)
 	fresh := rig.wantRenewed(rig.page(browser(young, session)...), young, session)
 	rig.wantUntouched(rig.page(browser(fresh, session)...), fresh)
 	if rig.stub.calls() != 2 {

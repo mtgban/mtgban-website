@@ -259,10 +259,13 @@ func TestLogOutEverywhereEndsEverySessionOfTheEmail(t *testing.T) {
 		t.Errorf("the stranger holds %d sessions, want their one", len(rows))
 	}
 
-	// Another device carries on to its own end, and cannot renew
+	// Another device carries on to its own end, and cannot renew: its
+	// session cookie names nothing now and goes, and without it the
+	// device asks nothing more
 	old := rig.sig("Legacy", 9*day)
-	elsewhere := rig.page(browser(old, "the-other-devices-session")...)
-	rig.wantUntouched(elsewhere, old)
+	req = rig.request(http.MethodGet, "/limited", browser(old, "the-other-devices-session")...)
+	rig.wantSessionDropped(rig.serve(req, false), req, old)
+	rig.wantUntouched(rig.page(browser(old, "")...), old)
 	if rig.stub.calls() != 0 {
 		t.Errorf("%d refreshes after Log out everywhere, want none", rig.stub.calls())
 	}

@@ -119,7 +119,7 @@ func TestSigningRenewalGrantBeforePledge(t *testing.T) {
 
 	installAccess(t, `{}`, `[]`)
 	rig.stub.membership = true
-	old = rig.sig("Vintage", 9*day)
+	old = rig.sig("Vintage", 10*day)
 	fresh = rig.wantRenewed(rig.page(browser(old, session)...), old, session)
 	tier = GetParamFromSig(fresh, "UserTier")
 	if tier != "Legacy" {
@@ -441,7 +441,7 @@ func TestSigningRenewsASignatureThatRanOutWithinGrace(t *testing.T) {
 	rig.wantRenewed(got, old, session)
 
 	// So does a script's fetch
-	again := rig.sig("Legacy", 11*day+2*time.Hour)
+	again := rig.sig("Legacy", 11*day+3*time.Hour)
 	data := rig.serve(rig.request(http.MethodGet, "/data/prices/x", browser(again, session)...), true)
 	rig.wantRenewed(data, again, session)
 }
@@ -503,7 +503,14 @@ func TestSigningGraceLeavesTodaysBehaviourWhereItCannotRenew(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got := rig.page(browser(rig.sig("Legacy", expired), id)...)
+		// The cookie of a session past its cap names nothing, and goes
+		req := rig.request(http.MethodGet, "/limited", browser(rig.sig("Legacy", expired), id)...)
+		got := rig.serve(req, false)
+		cookies := got.rec.Result().Cookies()
+		if len(cookies) != 1 || cookies[0].Name != sessionCookie || cookies[0].MaxAge >= 0 {
+			t.Errorf("Set-Cookie %q, want the session cookie cleared and nothing else", got.rec.Header().Values("Set-Cookie"))
+		}
+		got.rec.Header().Del("Set-Cookie")
 		if !loggedOut(got) || rig.stub.calls() != 0 {
 			t.Errorf("today's page %v after %d refreshes, want it with none", loggedOut(got), rig.stub.calls())
 		}
@@ -647,7 +654,6 @@ func TestSigningRenewalNeedsTheSessionToBeTheSignatures(t *testing.T) {
 	}{
 		{"another reader's signature", sign("Legacy", stranger, nil, DefaultSignatureDuration-9*day), session, false},
 		{"no session cookie, the old shape of login", due, "", false},
-		{"a session nobody holds", due, "not-a-session-id", false},
 		{"a signature that does not check out", tampered(due), session, true},
 	} {
 		got := rig.page(browser(tc.sig, tc.session)...)
@@ -661,6 +667,13 @@ func TestSigningRenewalNeedsTheSessionToBeTheSignatures(t *testing.T) {
 			continue
 		}
 		rig.wantUntouched(got, tc.sig)
+	}
+
+	// A session nobody holds cannot renew, and its cookie goes
+	req := rig.request(http.MethodGet, "/limited", browser(due, "not-a-session-id")...)
+	rig.wantSessionDropped(rig.serve(req, false), req, due)
+	if rig.stub.calls() != 0 {
+		t.Errorf("a session nobody holds: %d refreshes, want none", rig.stub.calls())
 	}
 
 	// A signature written under another secret
@@ -685,7 +698,7 @@ func TestSigningRenewsOnAPostAndOnADataRoute(t *testing.T) {
 	post := rig.serve(rig.request(http.MethodPost, "/upload", browser(old, session)...), false)
 	rig.wantRenewed(post, old, session)
 
-	old = rig.sig("Legacy", 9*day)
+	old = rig.sig("Legacy", 10*day)
 	data := rig.serve(rig.request(http.MethodGet, "/data/prices/x", browser(old, session)...), true)
 	rig.wantRenewed(data, old, session)
 }
@@ -746,11 +759,13 @@ func TestSigningRenewalLeaseOutlivesItsHolderForAMinute(t *testing.T) {
 		t.Errorf("%d refreshes while another request held the lease, want none", rig.stub.calls())
 	}
 
-	// The holder is gone and its minute is up
+	// The holder is gone and its minute is up, here as on the site that
+	// remembered the refusal
 	_, err = rig.db.DB().ExecContext(t.Context(), `UPDATE patreon_sessions SET renew_after = now() - interval '1 second' WHERE session_id = $1`, session)
 	if err != nil {
 		t.Fatal(err)
 	}
+	forgetRests(t)
 	rig.wantRenewed(rig.page(browser(old, session)...), old, session)
 }
 
@@ -890,6 +905,139 @@ func TestSigningLeavesAYoungSignatureAlone(t *testing.T) {
 	rig.wantUntouched(rig.page(browser(old, session)...), old)
 	if rig.stub.calls() != 0 || rig.restingFor(session) > 0 {
 		t.Errorf("%d refreshes, session resting %.0fs; want none and a session left alone", rig.stub.calls(), rig.restingFor(session))
+	}
+}
+
+// A request already on its way with the signature just renewed, due or run
+// out within grace, is served on the signature that renewal minted, and does
+// not ask Patreon again.
+func TestSigningRenewalServesARequestInFlightTheNewSignature(t *testing.T) {
+	for name, age := range map[string]time.Duration{"due": 9 * day, "within grace": 11*day + 2*time.Hour} {
+		t.Run(name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			session := rig.session("")
+			old := rig.sig("Legacy", age)
+
+			fresh := rig.wantRenewed(rig.page(browser(old, session)...), old, session)
+			sibling := rig.page(browser(old, session)...)
+			cookie := setCookies(sibling.rec)[signatureCookie]
+			if !sibling.reached || sibling.sig != fresh || cookie == nil || cookie.Value != fresh {
+				t.Errorf("the request in flight reached %v on the new signature %v, cookie %v; want it served and set the new one", sibling.reached, sibling.sig == fresh, cookie != nil && cookie.Value == fresh)
+			}
+			if rig.stub.calls() != 1 {
+				t.Errorf("%d refreshes, want the one", rig.stub.calls())
+			}
+		})
+	}
+}
+
+// A request that arrives while its signature's renewal is still running loses
+// the lease and is served as such a request is: a due signature on itself, one
+// run out within grace logged out. Only one arriving after the renewal answered
+// is served the new signature.
+func TestSigningRenewalServesARequestDuringItAsALostLease(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		age    time.Duration
+		served bool
+	}{
+		{"due", 9 * day, true},
+		{"within grace", 11*day + 2*time.Hour, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			session := rig.session("")
+			old := rig.sig("Legacy", tc.age)
+			var during *served
+			rig.stub.beforeToken = func() { during = rig.page(browser(old, session)...) }
+
+			rig.wantRenewed(rig.page(browser(old, session)...), old, session)
+			if during == nil || during.reached != tc.served || len(during.rec.Result().Cookies()) != 0 {
+				t.Fatalf("the request during the renewal: %+v, want reached %v with no cookie set", during, tc.served)
+			}
+			if tc.served && during.sig != old {
+				t.Error("a due request during the renewal was not served on its own signature")
+			}
+			if rig.stub.calls() != 1 {
+				t.Errorf("%d refreshes, want the one", rig.stub.calls())
+			}
+		})
+	}
+}
+
+// After a renewal files the sessions under a changed email, the reader's other
+// devices, whose signatures name the old one, cannot renew: they are served on
+// what they have, and are not asked about again for an hour.
+func TestSigningRenewalLeavesTheOtherDevicesOfAChangedEmail(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	spare := openUserStateClient(t)
+	rig.stub.email = fmt.Sprintf("moved-%d@example.com", time.Now().UnixNano())
+	newHash := userstate.HashEmail(rig.stub.email)
+	t.Cleanup(func() {
+		// t.Context() is already canceled when a cleanup runs
+		_, err := spare.DeletePatreonSessions(context.Background(), newHash)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	laptop, phone := rig.session(""), rig.session("")
+	onLaptop, onPhone := rig.sig("Legacy", 9*day), rig.sig("Legacy", 10*day)
+
+	rig.wantRenewed(rig.page(browser(onLaptop, laptop)...), onLaptop, laptop)
+	rig.wantUntouched(rig.page(browser(onPhone, phone)...), onPhone)
+	rig.db.Close()
+	before := rig.logged.String()
+	rig.wantUntouched(rig.page(browser(onPhone, phone)...), onPhone)
+	if rig.logged.String() != before || rig.stub.calls() != 1 {
+		t.Errorf("the phone asked again after %d refreshes: %q", rig.stub.calls(), strings.TrimPrefix(rig.logged.String(), before))
+	}
+}
+
+// A device refused while another renewal holds the lease is not kept from
+// asking again: once that renewal commits, it renews at its next request.
+func TestSigningRenewalAsksAgainOnceAnotherRenewalCommits(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	laptop, phone := rig.session(""), rig.session("")
+	onPhone := rig.sig("Legacy", 9*day)
+
+	_, fence, leased, err := rig.db.LeasePatreonSessions(t.Context(), laptop, rig.hash, "client-id", time.Minute)
+	if err != nil || !leased {
+		t.Fatalf("lease: %v %v", leased, err)
+	}
+	rig.wantUntouched(rig.page(browser(onPhone, phone)...), onPhone)
+
+	// The laptop's renewal commits the token Patreon rotated to
+	rig.stub.spend("refresh-laptop")
+	_, err = rig.db.CommitPatreonSessions(t.Context(), fence, rig.hash, "refresh-laptop", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rig.wantRenewed(rig.page(browser(onPhone, phone)...), onPhone, phone)
+}
+
+// A session whose account rests is not asked about again until the rest is
+// over: a due reader costs the database one lease and one look per rest,
+// not one per request.
+func TestSigningRenewalRemembersASessionThatRests(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	spare := openUserStateClient(t)
+	session := rig.session("")
+	old := rig.sig("Legacy", 9*day)
+	_, err := rig.db.DB().ExecContext(t.Context(), `UPDATE patreon_sessions SET renew_after = now() + interval '1 hour' WHERE session_id = $1`, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rig.wantUntouched(rig.page(browser(old, session)...), old)
+	// The database is gone: a request that asked it would log the failure
+	rig.db.Close()
+	before := rig.logged.String()
+	rig.wantUntouched(rig.page(browser(old, session)...), old)
+	if rig.logged.String() != before {
+		t.Errorf("a resting session asked the database again: %q", strings.TrimPrefix(rig.logged.String(), before))
+	}
+	if rows := sessionRowsOf(t, spare, rig.hash); len(rows) != 1 {
+		t.Errorf("rows %+v, want the session kept", rows)
 	}
 }
 
