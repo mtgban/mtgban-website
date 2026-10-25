@@ -84,12 +84,18 @@ func TestLongFormLive(t *testing.T) {
 		liveSentinelUUID).Scan(&banBaseJa); err != nil {
 		t.Fatalf("insert same-uuid ja variant: %v", err)
 	}
+	// An Alternate Fourth Edition copy keeps its original's uuid.
+	banBaseAlt, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: liveSentinelUUID, IsAlt: true})
+	if err != nil {
+		t.Fatalf("ResolveMagicBanID alt: %v", err)
+	}
 
 	// --- upsert + overwrite in place ---
 	rows := []LongPrice{
 		{BanID: banBase, Date: "2024-02-08", Provider: liveSentinelProvider, Price: 5.00},
 		{BanID: banBase, Date: "2024-02-20", Provider: liveSentinelProvider, Price: 7.00},
 		{BanID: banBaseJa, Date: "2024-02-20", Provider: liveSentinelProvider, Price: 99.00}, // canonical must ignore
+		{BanID: banBaseAlt, Date: "2024-02-01", Provider: liveSentinelProvider, Price: 500.00},
 	}
 	if _, err := c.UpsertLongPrices(ctx, rows, 0); err != nil {
 		t.Fatalf("UpsertLongPrices: %v", err)
@@ -101,7 +107,7 @@ func TestLongFormLive(t *testing.T) {
 	}
 
 	// --- HGetAllLong: canonical (lang='') series only ---
-	hist, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
+	hist, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
 	if err != nil {
 		t.Fatalf("HGetAllLong: %v", err)
 	}
@@ -111,11 +117,21 @@ func TestLongFormLive(t *testing.T) {
 	if got := hist["2024-02-08"][liveSentinelProvider]; got != 5.00 {
 		t.Errorf("HGetAllLong 2024-02-08 = %v, want 5.00", got)
 	}
+	if _, ok := hist["2024-02-01"]; ok {
+		t.Error("HGetAllLong read the alt copy's 2024-02-01 row")
+	}
+	histAlt, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, true, Lookback(3650))
+	if err != nil {
+		t.Fatalf("HGetAllLong alt: %v", err)
+	}
+	if len(histAlt) != 1 || histAlt["2024-02-01"][liveSentinelProvider] != 500.00 {
+		t.Errorf("HGetAllLong alt = %v, want only 2024-02-01 at 500.00", histAlt)
+	}
 
 	// The read goes through the statement cache, which is what keeps its
 	// hundred-partition plan from being rebuilt per call. A second read must
 	// answer the same and must not add a second entry for the same text.
-	histAgain, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
+	histAgain, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
 	if err != nil {
 		t.Fatalf("HGetAllLong (second): %v", err)
 	}
@@ -127,7 +143,7 @@ func TestLongFormLive(t *testing.T) {
 	}
 
 	// --- GetEarliestDateLong: MIN across all matching ban_ids ---
-	earliest, err := c.GetEarliestDateLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
+	earliest, err := c.GetEarliestDateLong(ctx, liveSentinelUUID, false, false, false, Lookback(3650))
 	if err != nil {
 		t.Fatalf("GetEarliestDateLong: %v", err)
 	}
@@ -146,12 +162,20 @@ func TestLongFormLive(t *testing.T) {
 	if !ok {
 		t.Fatalf("no aggregate stats for sentinel; got %d keys", len(stats))
 	}
-	// Grouped by (uuid, foil, etched) ACROSS language (matching the legacy
+	// Grouped by (uuid, foil, etched, alt) ACROSS language (matching the legacy
 	// GetAggregatePriceStats), so the same-uuid Japanese row (99.00) is included
 	// alongside the base 5.00 and 8.00: max 99, min 5, count 3. Only the
 	// 2024-02-08 row is before the cutoff: prior max 5.
 	if s.Max != 99.00 || s.Min != 5.00 || s.Count != 3 || s.PriorMax != 5.00 {
 		t.Errorf("stats = %+v, want max 99 min 5 count 3 prior max 5", s)
+	}
+	// The alt copy is its own card, so its 500.00 stays out of the above.
+	sAlt, ok := stats[AggregatePriceKey{MtgjsonUUID: liveSentinelUUID, IsAlt: true}]
+	if !ok {
+		t.Fatalf("no aggregate stats for the sentinel's alt copy; got %d keys", len(stats))
+	}
+	if sAlt.Max != 500.00 || sAlt.Min != 500.00 || sAlt.Count != 1 || sAlt.PriorMax != 500.00 {
+		t.Errorf("alt stats = %+v, want max 500 min 500 count 1 prior max 500", sAlt)
 	}
 
 	// --- GetMoversLong: 2024-02-08 -> 2024-02-20 for the sentinel ---

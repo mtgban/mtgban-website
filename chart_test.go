@@ -580,3 +580,45 @@ func TestFetchRosterPricesSurvivesAPanickingRead(t *testing.T) {
 		t.Errorf("source = %q, want the read", source)
 	}
 }
+
+// TestMagicVariantAltCopy pins that the Alternate Fourth Edition copy and the
+// printing it copies file under two variants, and that mtgjson's own
+// isAlternative flag, which every flagged card's uuid already carries, does not.
+func TestMagicVariantAltCopy(t *testing.T) {
+	original, err := backend().GetUUID("1b3a28ad-41ca-587a-9feb-5f40154976da")
+	if err != nil {
+		t.Skip("mtgmatcher data not loaded; skipping")
+	}
+	copied, err := backend().GetUUID(original.UUID + "_alt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accumulated := map[string]*timeseries.PriceRow{}
+	getRow(accumulated, original, "2026-10-25").SetPriceForDataset(4, 4.34)
+	getRow(accumulated, copied, "2026-10-25").SetPriceForDataset(4, 285.01)
+	if len(accumulated) != 2 {
+		t.Fatalf("got %d rows for %s and its copy, want 2", len(accumulated), original.UUID)
+	}
+	for _, row := range accumulated {
+		want := 4.34
+		if row.IsAlt {
+			want = 285.01
+		}
+		if got := row.PriceForDataset(4); got == nil || *got != want {
+			t.Errorf("is_alt=%v row priced %v, want %v", row.IsAlt, got, want)
+		}
+	}
+
+	for _, uuid := range backend().GetUUIDs() {
+		co, err := backend().GetUUID(uuid)
+		if err != nil || !co.IsAlternative || strings.Contains(uuid, "_alt") {
+			continue
+		}
+		if magicVariant(co).IsAlt {
+			t.Errorf("%s is filed as an _alt copy for mtgjson's isAlternative", uuid)
+		}
+		return
+	}
+	t.Error("no card carries mtgjson's isAlternative")
+}

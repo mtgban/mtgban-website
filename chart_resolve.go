@@ -16,7 +16,8 @@ var errChartIDNotFound = errors.New("chart id not found")
 // chartTarget is a resolved, game-agnostic chart identity. The read mode is:
 //   - BanID != 0: chart this exact variant via HGetAllByBanID (a ban: id, or a
 //     resolved TCGplayer product). Precise about language/finish/alt/sub-type.
-//   - BanID == 0: canonical uuid path via (UUID, Foil, Etched) through HGetAllLong.
+//   - BanID == 0: canonical uuid path via (UUID, Foil, Etched, Alt) through
+//     HGetAllLong.
 //
 // Datasets are derived from whichever providers have data (see getChartDatasets),
 // so the target carries no game flag or provider list — a new game just works.
@@ -25,6 +26,7 @@ type chartTarget struct {
 	UUID   string // mtgjson uuid, for the canonical path and display
 	Foil   bool
 	Etched bool
+	Alt    bool // the Alternate Fourth Edition copy, for the canonical path
 	Name   string
 	// Label names this printing on a roster chart, where two printings of
 	// one card share a Name.
@@ -153,7 +155,7 @@ func matcherTarget(ctx context.Context, b *mtgmatcher.Backend, id string) (*char
 		// the canonical resolution HGetAllLong does in SQL); a cold cache / unknown
 		// product leaves BanID 0 and the canonical uuid path takes over.
 		return &chartTarget{
-			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
+			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Alt: magicVariant(co).IsAlt, Name: co.Name,
 			Label:    co.String(),
 			BanID:    resolveBanIDForCard(ctx, co),
 			SearchID: searchID,
@@ -188,10 +190,7 @@ func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 	if PricesArchiveDB == nil {
 		return 0
 	}
-	if banID, ok := PricesArchiveDB.CachedMagicBanID(timeseries.MagicVariant{
-		MtgjsonUUID: co.UUID, IsFoil: co.Foil, IsEtched: co.Etched,
-		IsAlt: co.IsAlternative, Language: co.Language,
-	}); ok {
+	if banID, ok := PricesArchiveDB.CachedMagicBanID(magicVariant(co)); ok {
 		return banID
 	}
 	if pid, ok := tcgProductID(co); ok {
@@ -324,7 +323,7 @@ func targetFromTCGID(ctx context.Context, b *mtgmatcher.Backend, tcgID int) (*ch
 	if matched, err := b.MatchID(idStr); err == nil {
 		if co, err := b.GetUUID(matched); err == nil {
 			return &chartTarget{
-				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
+				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Alt: magicVariant(co).IsAlt, Name: co.Name,
 				Label:    co.String(),
 				BanID:    resolveBanIDForCard(ctx, co),
 				SearchID: matched,
