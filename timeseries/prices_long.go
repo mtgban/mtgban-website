@@ -9,8 +9,7 @@ import (
 )
 
 // LongPrice is one row of the long prices table: a single provider's price for a
-// variant (ban_id) on a day. It replaces the wide, one-column-per-provider
-// PriceRow — each provider is its own row, so there is no COALESCE merge.
+// variant (ban_id) on a day.
 type LongPrice struct {
 	BanID    int64
 	Date     string
@@ -140,6 +139,30 @@ func (c *Client) GetEarliestDateByBanID(ctx context.Context, banID int64, lb Loo
 		return boundary, err
 	}
 	return earliest.Time, nil
+}
+
+// AggregatePriceKey identifies a card variant in an aggregate result map.
+// Language is intentionally omitted: we aggregate across it. IsAlt is kept,
+// since the Alternate Fourth Edition copy shares its original's uuid.
+type AggregatePriceKey struct {
+	MtgjsonUUID string
+	IsFoil      bool
+	IsEtched    bool
+	IsAlt       bool
+}
+
+// AggregatePriceStats holds per-card summary statistics of one price column
+// over a date window: max, min, discrete 90th percentile, and the count of
+// rows that contributed to them. Computed from rows where the column is
+// strictly positive, so Count is the number of buying days. PriorMax is the
+// max over the window's days before the caller's cutoff, 0 when there are
+// none, so a price above everything before today tells apart from a tie.
+type AggregatePriceStats struct {
+	Max      float64
+	Min      float64
+	P90      float64
+	Count    int64
+	PriorMax float64
 }
 
 // GetAggregatePriceStatsLong returns per-card max/min/p90/count of one provider

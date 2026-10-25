@@ -721,29 +721,26 @@ built separately, by `newEditionsSnapshot()` as part of a datastore load
 
 ### 5.6 Charts (`chart.go`, `chart_resolve.go`, `api_chart.go`, `timeseries/`, `db_migration/`)
 
-`timeseries` is a PostgreSQL client, currently spanning two schemas at once.
-The legacy wide table `product_prices` is keyed `(date, mtgjson_uuid, is_foil,
-is_etched, language, is_alt)` with ~10 nullable per-source price columns (CK
-retail/buylist, TCG market/low, MKM low/trend, SCG/ABU/CSI buylist, TCG
-sealed EV), COALESCE-merged in 500-row batch upserts. A "long form" redesign
-(`db_migration/`, in-progress cutover) is being built alongside it without
-touching the old tables: a 13-row `providers` lookup, a `variants` table (one
-row per printing — Magic keyed by `mtgjson_uuid`, non-Magic by TCGplayer
+`timeseries` is a PostgreSQL client over the long tables (`db_migration/`): a
+13-row `providers` lookup, a `variants` table (one row per printing: Magic
+keyed by `(mtgjson_uuid, is_foil, is_etched, is_alt, language)`, where
+`is_alt` marks the Alternate Fourth Edition copies, and non-Magic by TCGplayer
 product + sub-type), and a date-partitioned `prices(ban_id, date, provider,
-price)` table with one row per provider instead of a COALESCE merge.
-Charts, buylist metrics and the screener read only the long tables;
-`Config.TimeseriesConfig.LongFormWrites` switches each deployment's writes
-onto them (per the cutover plan).
+price)` table with one row per provider. Charts, buylist metrics and the
+screener read only these. The wide Magic table `product_prices` is still in the
+database, but nothing reads or writes it. The non-Magic wide table
+`tcgplayer_nonmagic_product_prices` is still written by the tcgcsv ingest,
+which takes its resume and freshness dates from it, and
+`Config.TimeseriesConfig.LongFormWrites` makes that ingest write the long
+tables too.
 
 `stashInTimeseries()` (cron `0 */12 * * *`, §2.1) snapshots current prices
 twice daily, normalizing non-NM conditions up via grade multipliers
-(`defaultGradeMap`: NM 1×, SP 1.25×, MP 1.67×, HP 2.5×, PO 4×), and — when
-`LongFormWrites` is on — best-effort dual-writes the same snapshot into the
-long tables via `stashLongForm()`. That path resolves every row through
-`ResolveMagicBanID`. A non-Magic deployment skips the wide table, which
-cannot hold its card ids, and writes the long tables whatever the flags say
-(`stashNonMagicTimeseries`). Its ban_ids are not drawn from the identity
-sequence: a new non-Magic variant is filed under `timeseries.TCGBanID`,
+(`defaultGradeMap`: NM 1×, SP 1.25×, MP 1.67×, HP 2.5×, PO 4×), into the long
+tables: a Magic deployment through `stashMagicTimeseries`, which resolves each
+card's `magicVariant` with `ResolveMagicBanID`, and any other through
+`stashNonMagicTimeseries`. A non-Magic deployment's ban_ids are not drawn
+from the identity sequence: a new non-Magic variant is filed under `timeseries.TCGBanID`,
 `category<<40 | product<<8 | sub-type code`, by the snapshot and the tcgcsv
 ingest alike (`EnsureTCGVariants`). Variants filed before that keep their
 sequence ids, so existing `ban:<n>` links and price rows stand; Magic still

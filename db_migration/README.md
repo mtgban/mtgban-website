@@ -5,8 +5,9 @@ Implements `~/Desktop/card_prices_redesign_plan.md`: one identity space
 price)` table, with a `providers` lookup, in place of the two wide price tables
 (`product_prices`, `tcgplayer_nonmagic_product_prices`).
 
-The site reads only the long tables. The stash still writes `product_prices`
-alongside them, and nothing reads it. The tools that backfilled the long tables
+The site reads and writes only the long tables for Magic; nothing touches
+`product_prices` any more. The tcgcsv ingest still writes
+`tcgplayer_nonmagic_product_prices` and takes its dates from it. The tools that backfilled the long tables
 from the wide ones are in `retired/` and must not run again; its README says
 why.
 
