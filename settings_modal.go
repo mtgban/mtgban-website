@@ -303,7 +303,7 @@ func (s *site) SettingsModal(w http.ResponseWriter, r *http.Request) {
 func SettingsValues(w http.ResponseWriter, r *http.Request) {
 	values := map[string]string{}
 	for _, name := range r.URL.Query()["name"] {
-		if cookiePath(r, name, false) != "/" {
+		if cookiePath(r, name) != "/" {
 			values[name] = readCookie(r, name)
 		}
 	}
