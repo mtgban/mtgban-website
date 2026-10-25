@@ -5,6 +5,10 @@ behind two config flags, so the cutover is a sequence of config flips with a
 verify gate between each. The legacy wide path stays intact until the end, so
 every step is reversible by flipping the flag back.
 
+The cutover is complete: reads moved to the long tables on 2026-10-02. Steps 2 to
+4 are kept as the record of how; the scripts they name are in `retired/` and must
+not run again (see `retired/README.md`).
+
 ## 1. Config and datasets file additions (NOT in git)
 
 Add a `provider` id to every entry of the datasets file the config names in
@@ -46,9 +50,8 @@ The index→provider mapping (plan 17.5):
 ```
 
 A deployment that ran dual-write with the field missing left gaps in `prices` for
-every provider it skipped. Re-run `08_catchup.sql` with `-v since=<first
-dual-write day>` after fixing the datasets file; it is idempotent and fills only
-the missing (ban_id, date, provider) rows.
+every provider it skipped, which `retired/08_catchup.sql.txt` filled from
+`product_prices` after the datasets file was fixed.
 
 The tcgcsv (non-Magic) ingest writes providers 3/4/5/6/7 — columns low/market/
 mid/high/direct_low — and the chart renders whichever of those the datasets file
@@ -79,19 +82,20 @@ rows match the legacy ones for the latest date:
 
 ```sql
 -- Magic: legacy non-null,>0 cells vs long rows for the latest date, per provider.
--- (Same shape as 07_verify.sql, scoped to the newest date.)
+-- (Same shape as retired/07_verify.sql.txt, scoped to the newest date.)
 ```
 
-Re-run `07_verify.sql` (full history) as the primary gate; it already compares
-per-provider counts across the whole table. Spot-check a handful of cards' charts.
+Re-run `retired/07_verify.sql.txt` (full history) as the primary gate; it
+already compares per-provider counts across the whole table. Spot-check a handful
+of cards' charts.
 
 **Closing backfill drift.** The initial backfill runs alongside the live crons, so
 the long tables lag behind by the rows product_prices gained since the variants
 snapshot (verification shows this as a small negative per-provider diff — e.g. new
 printings minted on the backfill's start day). Once dual-write is on this stops
-growing; to close the one-time gap, run `08_catchup.sql` (re-mints new variants +
-re-inserts the recent window with ON CONFLICT DO NOTHING). Re-run `07_verify.sql`
-after — the diffs should go to 0.
+growing; to close the one-time gap, run `retired/08_catchup.sql.txt` (re-mints
+new variants + re-inserts the recent window with ON CONFLICT DO NOTHING). Re-run
+`retired/07_verify.sql.txt` after; the diffs should go to 0.
 
 ## 4. Flip reads (`long_form_reads: true`), deploy
 
