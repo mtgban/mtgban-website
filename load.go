@@ -85,14 +85,13 @@ func GetVendors() []mtgban.Vendor {
 // storeIndex is the by-shorthand lookup over one pair of snapshots, keyed
 // both exactly and in lower case so each lookup keeps the match the scan it
 // replaced made. It is derived from the snapshots on the first lookup after
-// either changes, rather than rebuilt where they are published: the tests
-// store a snapshot from two hundred places, and a stale index there would
-// pass as a missing store.
+// either pointer changes, rather than rebuilt where they are published: the
+// tests store a snapshot from two hundred places, and a stale index there
+// would pass as a missing store. A published snapshot is never changed in
+// place, so its pointer alone says whether the index still holds.
 type storeIndex struct {
-	sellers  *[]mtgban.Seller
-	vendors  *[]mtgban.Vendor
-	nSellers int
-	nVendors int
+	sellers *[]mtgban.Seller
+	vendors *[]mtgban.Vendor
 	// seller and vendor are keyed by the exact shorthand, sellerFold and
 	// vendorFold by its lower case.
 	seller     map[string]mtgban.Seller
@@ -108,28 +107,28 @@ var storeIndexPtr atomic.Pointer[storeIndex]
 // same answer, so the last store wins harmlessly.
 func currentStoreIndex() *storeIndex {
 	sellers, vendors := sellersPtr.Load(), vendorsPtr.Load()
-	nSellers, nVendors := 0, 0
-	if sellers != nil {
-		nSellers = len(*sellers)
-	}
-	if vendors != nil {
-		nVendors = len(*vendors)
-	}
 	idx := storeIndexPtr.Load()
-	if idx != nil && idx.sellers == sellers && idx.vendors == vendors &&
-		idx.nSellers == nSellers && idx.nVendors == nVendors {
+	if idx != nil && idx.sellers == sellers && idx.vendors == vendors {
 		return idx
 	}
+	var sellerList []mtgban.Seller
+	if sellers != nil {
+		sellerList = *sellers
+	}
+	var vendorList []mtgban.Vendor
+	if vendors != nil {
+		vendorList = *vendors
+	}
 	idx = &storeIndex{
-		sellers: sellers, vendors: vendors, nSellers: nSellers, nVendors: nVendors,
-		seller:     make(map[string]mtgban.Seller, nSellers),
-		vendor:     make(map[string]mtgban.Vendor, nVendors),
-		sellerFold: make(map[string]mtgban.Seller, nSellers),
-		vendorFold: make(map[string]mtgban.Vendor, nVendors),
+		sellers:    sellers,
+		vendors:    vendors,
+		seller:     make(map[string]mtgban.Seller, len(sellerList)),
+		vendor:     make(map[string]mtgban.Vendor, len(vendorList)),
+		sellerFold: make(map[string]mtgban.Seller, len(sellerList)),
+		vendorFold: make(map[string]mtgban.Vendor, len(vendorList)),
 	}
 	// First wins on a duplicate, as the scans this replaces did.
-	for i := range nSellers {
-		seller := (*sellers)[i]
+	for _, seller := range sellerList {
 		key := seller.Info().Shorthand
 		if _, dup := idx.seller[key]; !dup {
 			idx.seller[key] = seller
@@ -139,8 +138,7 @@ func currentStoreIndex() *storeIndex {
 			idx.sellerFold[key] = seller
 		}
 	}
-	for i := range nVendors {
-		vendor := (*vendors)[i]
+	for _, vendor := range vendorList {
 		key := vendor.Info().Shorthand
 		if _, dup := idx.vendor[key]; !dup {
 			idx.vendor[key] = vendor

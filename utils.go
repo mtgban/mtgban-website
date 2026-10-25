@@ -811,14 +811,13 @@ func errorResponse(w http.ResponseWriter, status int, msg string) {
 	}{Error: msg})
 }
 
-// Return the CreditMultiplier for any given vendor
+// Return the CreditMultiplier for any given vendor, by shorthand in any case
 func findCredit(shorthand string) float64 {
-	for _, vendor := range GetVendors() {
-		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
-			return vendor.Info().CreditMultiplier
-		}
+	vendor, found := currentStoreIndex().vendorFold[strings.ToLower(shorthand)]
+	if !found {
+		return 0
 	}
-	return 0
+	return vendor.Info().CreditMultiplier
 }
 
 // Look up a seller by shorthand, case-insensitively, and return its inventory

@@ -539,11 +539,9 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 					break
 				}
 
-				for _, vendor := range GetVendors() {
-					if vendor.Info().Shorthand == v[0] {
-						source = vendor
-						break
-					}
+				vendor, found := currentStoreIndex().vendor[v[0]]
+				if found {
+					source = vendor
 				}
 			} else {
 				if !slices.Contains(allowlistSellers, v[0]) {
@@ -552,15 +550,13 @@ func scraperCompare(ds *datastore, w http.ResponseWriter, r *http.Request, pageV
 					break
 				}
 
-				for _, seller := range GetSellers() {
-					if seller.Info().Shorthand == v[0] {
-						source = seller
-						// Global prices against Direct; its stock caps no
-						// trade there.
-						if !pageVars.GlobalMode {
-							source = withDirectStock(seller)
-						}
-						break
+				seller, found := currentStoreIndex().seller[v[0]]
+				if found {
+					source = seller
+					// Global prices against Direct; its stock caps no
+					// trade there.
+					if !pageVars.GlobalMode {
+						source = withDirectStock(seller)
 					}
 				}
 			}
