@@ -102,8 +102,8 @@ func (res *Resolver) UserIDs(ctx context.Context, client *patreon.Client) (*User
 }
 
 // The two ways UserTier finds no tier title in an answer that otherwise
-// decodes: a pledge entitling no tier, and one entitling a tier the answer
-// does not name.
+// decodes: a pledge entitling no tier, or only Patreon's free tier, and one
+// entitling a tier the answer does not name.
 var (
 	errNoEntitledTier = errors.New("no entitled tier")
 	errUntitledTier   = errors.New("empty tier title")
@@ -122,13 +122,25 @@ func (res *Resolver) UserTier(ctx context.Context, client *patreon.Client, userI
 		return "", fmt.Errorf("user data error: %q", membershipData.Errors)
 	}
 
-	// Look for the tier id of the user
+	// Look for the tier id of the user, past a tier the answer says costs
+	// nothing: a free membership pledges nothing, whatever its title
 	tierID := ""
+	tiers, free := 0, 0
 	for _, tierData := range membershipData.Data.Relationships.CurrentlyEntitledTiers.Data {
-		if tierData.Type == "tier" {
-			tierID = tierData.ID
-			break
+		if tierData.Type != "tier" {
+			continue
 		}
+		tiers++
+		if freeTier(membershipData, tierData.ID) {
+			free++
+			continue
+		}
+		if tierID == "" {
+			tierID = tierData.ID
+		}
+	}
+	if tiers > 0 && free == tiers {
+		return "", errNoEntitledTier
 	}
 
 	// Get a human-readable name for the tier
@@ -147,6 +159,18 @@ func (res *Resolver) UserTier(ctx context.Context, client *patreon.Client, userI
 	}
 
 	return tierTitle, nil
+}
+
+// freeTier says whether the membership answer names the tier id as one that
+// costs nothing. A tier whose cost the answer leaves out is not free.
+func freeTier(membershipData *patreon.MembershipData, id string) bool {
+	for _, tierData := range membershipData.Included {
+		if tierData.Type == "tier" && tierData.ID == id {
+			amount := tierData.Attributes.AmountCents
+			return amount != nil && *amount == 0
+		}
+	}
+	return false
 }
 
 // DidNotAnswer tells a lookup Patreon never answered, for the request

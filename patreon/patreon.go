@@ -29,7 +29,7 @@ const (
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,is_email_verified,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
 	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
-	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
+	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title%2Camount_cents"
 )
 
 // GetAuthToken exchanges an OAuth authorization code for a token; a status
@@ -245,6 +245,9 @@ type MembershipData struct {
 	Included []struct {
 		Attributes struct {
 			Title string `json:"title"`
+			// AmountCents is what the tier costs, nil when the answer
+			// does not say: Patreon's free tier costs 0
+			AmountCents *int `json:"amount_cents"`
 		} `json:"attributes"`
 		ID   string `json:"id"`
 		Type string `json:"type"`
