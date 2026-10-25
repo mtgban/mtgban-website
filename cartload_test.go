@@ -406,6 +406,19 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		t.Error("CSI's deck builder button is not told apart from its cart's")
 	}
 
+	// CK the same, its buylist import aside
+	ckBuy := renderArbit(t, PageVars{
+		ScraperShort: "CK",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: rows}},
+	})
+	if strings.Count(ckBuy, ">Load at Card Kingdom<") != 1 || strings.Contains(ckBuy, ">Load at CK<") {
+		t.Error("want one Load at Card Kingdom, the cart's, and no Load at CK")
+	}
+	if !strings.Contains(ckBuy, ">Deck builder at CK<") {
+		t.Error("CK's deck builder button is not told apart from its cart's")
+	}
+
 	// Mint's store cart asks for what the buylist takes, or as many as Mint
 	// has where it names no amount; the buylist cart keeps the row's own
 	mintRows := []mtgban.ArbitEntry{rows[0], {
