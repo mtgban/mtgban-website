@@ -249,7 +249,7 @@
 
     function applyCookies(opts) {
         var flags = FLAG_KEYS.filter(function (k) { return opts[k] === 'true'; });
-        setCookie('UploadOptimizerOpts', flags.join(',') + (flags.length ? ',' : ''), 1000);
+        setCookie('UploadOptimizerOpts', flags.join(',') + ',', 1000);
         TEXTS.forEach(function (t) { setCookie(t[1], opts[t[0]] == null ? t[2] : opts[t[0]], 1000); });
         if (opts.custombuylist === 'true') {
             setCookie('UploadCustomOpts', 'enabled,', 1000);
