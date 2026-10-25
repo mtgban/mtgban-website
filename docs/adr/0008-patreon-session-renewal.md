@@ -70,8 +70,9 @@ without the reader.
    while the renewal runs is served as any request that lost the lease.
 5. **Patreon's answer decides, three ways.** *Entitled*: re-sign, with
    whatever tier Patreon reports, up or down. *Not entitled* (identity
-   OK, no membership or no entitled tier, no grant): delete the row,
-   clear both cookies, log the reader out now (`clear_on_negative`).
+   OK, no membership, no entitled tier or only the free one, no grant):
+   delete the row, clear both cookies, log the reader out now
+   (`clear_on_negative`).
    *Unknown* (any transport, status, shape or title failure): keep
    everything, back off an hour, and store the token a refresh that went
    through already rotated to, since the old one is dead. Unknown never
