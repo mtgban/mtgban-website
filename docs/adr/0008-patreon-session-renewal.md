@@ -123,13 +123,15 @@ without the reader.
 - Patreon's webhook (`POST /webhook/patreon`) turns that into
   revocation within one page load. A delivery whose signature checks out
   *pokes* the member's email in memory on every site (a Postgres NOTIFY
-  carries the hash), and a poked reader's next request renews whatever
+  carries the hash and the sender's name, which the sender skips), and a
+  poked reader's next request renews whatever
   the signature's age. The body's own verdict is never read: the renewal
   asks Patreon who is entitled, so one path decides, and the portal's
   test deliveries, which call a deleted pledge active, could not mislead
-  it. A poke a restarting site missed, or one that outlives `after_days`,
-  falls back to the age window; a poke that meets Patreon's silence stays,
-  and is tried again once the hour's backoff is up.
+  it. A poke a restarting site missed, or one a site still on a build
+  that reads the bare hash misreads during a deploy, or one that outlives
+  `after_days`, falls back to the age window; a poke that meets Patreon's
+  silence stays, and is tried again once the hour's backoff is up.
 - A tier change, and an ACL or grant edit, reach an active reader at
   the next page load, not the next renewal. The webhook pokes the
   tier change; a grant edit pokes its grantee; an access table that

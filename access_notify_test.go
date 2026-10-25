@@ -43,8 +43,9 @@ func TestSkipAccessNotification(t *testing.T) {
 	}
 }
 
-// A patreon_poke notification pokes the reader its payload names, whoever
-// sent it, and is not a reload: the listener has nothing else to do with it.
+// A patreon_poke notification pokes the reader its payload names, unless this
+// site sent it or it names no email hash, and is not a reload: the listener
+// has nothing else to do with it.
 func TestTakePoke(t *testing.T) {
 	renewalConfig(t, renewalBlock, "client-id")
 	savedName := Config().InstanceName
@@ -58,9 +59,12 @@ func TestTakePoke(t *testing.T) {
 		taken   bool
 		pokedBy string
 	}{
-		{"a poke", &pq.Notification{Channel: patreonPokeChannel, Extra: hash}, true, hash},
-		// The payload is a hash, so the skip of a reload's own sender does not apply
-		{"a poke whose payload is this instance's name", &pq.Notification{Channel: patreonPokeChannel, Extra: "magic"}, true, "magic"},
+		{"a peer's poke", &pq.Notification{Channel: patreonPokeChannel, Extra: hash + " lorcana"}, true, hash},
+		{"a poke from an unnamed sender", &pq.Notification{Channel: patreonPokeChannel, Extra: hash + " "}, true, hash},
+		{"a poke carrying the hash alone", &pq.Notification{Channel: patreonPokeChannel, Extra: hash}, true, hash},
+		{"this site's own poke", &pq.Notification{Channel: patreonPokeChannel, Extra: hash + " magic"}, true, ""},
+		{"a poke naming no hash", &pq.Notification{Channel: patreonPokeChannel, Extra: "magic"}, true, ""},
+		{"a poke naming an upper-case hash", &pq.Notification{Channel: patreonPokeChannel, Extra: strings.ToUpper(hash) + " lorcana"}, true, ""},
 		{"a poke naming nobody", &pq.Notification{Channel: patreonPokeChannel}, true, ""},
 		{"a reload carrying the same payload", &pq.Notification{Channel: grantsReloadChannel, Extra: hash}, false, ""},
 		{"a reconnect", nil, false, ""},

@@ -353,9 +353,13 @@ func TestPatreonWebhookNotifiesThePeers(t *testing.T) {
 	hash := userstate.HashEmail(webhookEmail)
 	select {
 	case n := <-listener.Notify:
-		if n == nil || n.Channel != patreonPokeChannel || n.Extra != hash {
-			t.Fatalf("notification %+v, want %s carrying the hash %s", n, patreonPokeChannel, hash)
+		if n == nil || n.Channel != patreonPokeChannel || n.Extra != hash+" "+Config().InstanceName {
+			t.Fatalf("notification %+v, want %s carrying the hash %s and the sender", n, patreonPokeChannel, hash)
 		}
+		// The notification reaches a peer, which goes by another name
+		savedName := Config().InstanceName
+		t.Cleanup(func() { Config().InstanceName = savedName })
+		Config().InstanceName = "a-peer"
 		peer := freshPokes(t)
 		if !takePoke(n) || !peer.Poked(hash, time.Now(), pokeWindow()) {
 			t.Errorf("the peer has %d poked after the notification, want %s", peer.Len(), webhookEmail)

@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -34,7 +36,8 @@ const (
 
 // patreonPokeChannel carries the webhook's pokes (auth_webhook.go) to the
 // peers. It is not a file to re-read: the payload is the email hash of the
-// reader to poke, so the sender's instance name plays no part in it.
+// reader to poke, then a space and the sender's instance name, by which the
+// sender skips its own.
 const patreonPokeChannel = "patreon_poke"
 
 // notifyAccessReload tells the peer deployments to re-read the file behind
@@ -58,7 +61,7 @@ func notifyPoke(ctx context.Context, hash string) {
 	if PricesArchiveDB == nil {
 		return
 	}
-	err := PricesArchiveDB.Notify(ctx, patreonPokeChannel, hash)
+	err := PricesArchiveDB.Notify(ctx, patreonPokeChannel, hash+" "+Config().InstanceName)
 	if err != nil {
 		log.Printf("patreon poke: notify failed: %v", err)
 	}
@@ -121,15 +124,26 @@ func skipAccessNotification(n *pq.Notification, instanceName string) bool {
 // takePoke pokes the reader a patreon_poke notification names, and says
 // whether n was one. A nil notification is lib/pq reporting a reconnect, which
 // pokes nothing: the age window catches a poke the dropped connection missed.
+// The sender's own notification pokes nothing either, since the delivery
+// poked its set already and a later poke would renew once more a reader who
+// renewed in between; nor does a payload that names no email hash.
 func takePoke(n *pq.Notification) bool {
 	if n == nil || n.Channel != patreonPokeChannel {
 		return false
 	}
-	if n.Extra != "" {
-		Pokes.Poke(n.Extra, time.Now(), pokeWindow())
+	hash, from, _ := strings.Cut(n.Extra, " ")
+	if from != "" && from == Config().InstanceName {
+		return true
+	}
+	if emailHashPattern.MatchString(hash) {
+		Pokes.Poke(hash, time.Now(), pokeWindow())
 	}
 	return true
 }
+
+// emailHashPattern is what userstate.HashEmail returns: SHA-256 in lower-case
+// hex.
+var emailHashPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // startAccessReloadListener subscribes to the reload channel of every value
 // this deployment reads from its own file and keeps that value in sync with
