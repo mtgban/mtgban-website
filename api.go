@@ -790,7 +790,7 @@ func writeSearchCSV(w http.ResponseWriter, r *http.Request, s *site, ds *datasto
 	result := runSearch(r, ds, config)
 	sortSearchKeys(r, ds, result.keys, result.odds, readSearchSort(r, config))
 
-	setCSVDownloadHeaders(w, "mtgban_search.csv")
+	setCSVDownloadHeaders(w, "ban_search.csv")
 	var results map[string]map[string]*BanPrice
 	if retail {
 		results = banPricesFromRows(b, result.keys, result.sellers, "", tagName, true, true, false)
