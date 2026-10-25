@@ -139,7 +139,7 @@ func (s *site) renderShared(w http.ResponseWriter, r *http.Request, status int, 
 }
 
 // sharedRows reads a favorites column the way the owner's pane shows it:
-// tombstones out, pinned first, newest first, at most
+// tombstones out, pinned first by pin time, then newest first, at most
 // sharedListCap rows. Unreadable JSON is an empty list. A row whose id names
 // no card is dropped, and the rest are drawn from b: the owner's synced
 // text and art would reach every visitor, and Merge would copy them.
@@ -168,6 +168,10 @@ func sharedRows(b *mtgmatcher.Backend, raw json.RawMessage) []sharedFavorite {
 				return -1
 			}
 			return 1
+		}
+		byPin := cmp.Compare(pinStamp(b.Pinned), pinStamp(a.Pinned))
+		if byPin != 0 {
+			return byPin
 		}
 		return cmp.Compare(b.T, a.T)
 	})
@@ -205,6 +209,25 @@ func sharedCard(b *mtgmatcher.Backend, id string) sharedFavorite {
 		CW:          card.HasContentWarning,
 		Query:       genQuery(co),
 	}
+}
+
+// pinStamp is a pinned value as the pane's sort subtracts it: a number is
+// itself, true is 1, anything else 0.
+func pinStamp(raw json.RawMessage) float64 {
+	var v any
+	err := json.Unmarshal(raw, &v)
+	if err != nil {
+		return 0
+	}
+	switch v := v.(type) {
+	case float64:
+		return v
+	case bool:
+		if v {
+			return 1
+		}
+	}
+	return 0
 }
 
 // jsonTruthy reads a JSON value the way the pane's JS does: absent, null,

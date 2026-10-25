@@ -233,14 +233,15 @@ func TestFavoritesSharedEmptyAndCapped(t *testing.T) {
 }
 
 // sharedRows reads the shape the browser syncs: pinned and del may be a
-// number, true, false, null or absent.
+// number, true, false, null or absent. Pinned rows order by pin time, newest
+// first, as the pane's pinnedFirst does, whenever each was added.
 func TestSharedRowsReadsTheSyncShape(t *testing.T) {
-	ids := sharedIDs(t, 6)
+	ids := sharedIDs(t, 7)
 	letter := map[string]string{}
 	for i, id := range ids {
 		letter[id] = string(rune('a' + i))
 	}
-	raw := strings.NewReplacer("ID_A", ids[0], "ID_B", ids[1], "ID_C", ids[2], "ID_D", ids[3], "ID_E", ids[4], "ID_G", ids[5]).Replace(`[
+	raw := strings.NewReplacer("ID_A", ids[0], "ID_B", ids[1], "ID_C", ids[2], "ID_D", ids[3], "ID_E", ids[4], "ID_F", ids[5], "ID_G", ids[6]).Replace(`[
 		{"id":"ID_A","t":5,"pinned":false,"del":null},
 		{"id":"ID_B","t":6,"pinned":true},
 		{"id":"ID_C","t":7,"del":false},
@@ -248,6 +249,7 @@ func TestSharedRowsReadsTheSyncShape(t *testing.T) {
 		{"id":"ID_E","t":9,"del":0},
 		{"id":"","t":10},
 		{"id":"not-a-card","t":11},
+		{"id":"ID_F","t":1,"pinned":1800000000000},
 		{"id":"ID_G","t":12.5,"pinned":1700000000000}
 	]`)
 	rows := sharedRows(backend(), json.RawMessage(raw))
@@ -255,7 +257,7 @@ func TestSharedRowsReadsTheSyncShape(t *testing.T) {
 	for _, r := range rows {
 		got = append(got, letter[r.ID])
 	}
-	want := []string{"f", "b", "e", "c", "a"}
+	want := []string{"f", "g", "b", "e", "c", "a"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("rows = %v, want %v", got, want)
 	}
