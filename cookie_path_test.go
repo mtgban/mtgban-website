@@ -11,33 +11,31 @@ import (
 
 func TestCookiePath(t *testing.T) {
 	tests := []struct {
-		name   string
-		path   string
-		global bool
-		want   string
+		name string
+		path string
+		want string
 	}{
-		{"SearchSellersList", "/search", false, "/"},
-		{"SearchVendorsList", "/sealed", false, "/"},
-		{"NewspaperList", "/newspaper?page=syp", false, "/newspaper"},
-		{"BanNewspaperPref", "/newspaper?page=syp", false, "/newspaper"},
-		{"SleepersEditionList", "/sleepers/bulk", false, "/sleepers"},
-		{"ArbitVendorsList", "/arbit", false, "/arbit"},
-		{"ReverseVendorsList", "/reverse", false, "/reverse"},
-		{"UploadOptimizerOpts", "/upload", false, "/upload"},
-		{"UploadCustomRate", "/upload", false, "/"},
-		{"GlobalPref", "/auth", true, "/"},
-		{"BAN_SIG", "/auth", false, "/"},
-		{"MTGBAN", "/auth", false, "/"},
-		{"BAN_SESSION", "/auth", false, "/"},
-		{"MobileSearchLayout", "/sealed", false, "/"},
-		{"Unknown", "/", false, "/"},
+		{"SearchSellersList", "/search", "/"},
+		{"SearchVendorsList", "/sealed", "/"},
+		{"NewspaperList", "/newspaper?page=syp", "/newspaper"},
+		{"BanNewspaperPref", "/newspaper?page=syp", "/newspaper"},
+		{"SleepersEditionList", "/sleepers/bulk", "/sleepers"},
+		{"ArbitVendorsList", "/arbit", "/arbit"},
+		{"ReverseVendorsList", "/reverse", "/reverse"},
+		{"UploadOptimizerOpts", "/upload", "/upload"},
+		{"UploadCustomRate", "/upload", "/"},
+		{"BAN_SIG", "/auth", "/"},
+		{"MTGBAN", "/auth", "/"},
+		{"BAN_SESSION", "/auth", "/"},
+		{"MobileSearchLayout", "/sealed", "/"},
+		{"Unknown", "/", "/"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "https://onepiece.mtgban.com"+tt.path, nil)
-			if got := cookiePath(req, tt.name, tt.global); got != tt.want {
-				t.Fatalf("cookiePath(%q, %q, %v) = %q, want %q", tt.name, tt.path, tt.global, got, tt.want)
+			if got := cookiePath(req, tt.name); got != tt.want {
+				t.Fatalf("cookiePath(%q, %q) = %q, want %q", tt.name, tt.path, got, tt.want)
 			}
 		})
 	}
@@ -49,18 +47,17 @@ func TestCookieDomainIsTheApex(t *testing.T) {
 	for _, tt := range []struct {
 		host, forwardedHost string
 		domain              string
-		global              bool
 	}{
-		{"www.mtgban.com", "", "mtgban.com", true},
-		{"mtgban.com", "", "mtgban.com", true},
-		{"lorcana.mtgban.com", "", "mtgban.com", true},
-		{"mtg.ban.cards", "", "ban.cards", true},
-		{"ban.cards", "", "ban.cards", true},
-		{"backend:8080", "pokemon.ban.cards", "ban.cards", true},
-		{"localhost:8080", "", "", true},
-		{"example.com", "", "", false},
-		{"mtgban.com.evil.example", "", "", false},
-		{"xban.cards", "", "", false},
+		{"www.mtgban.com", "", "mtgban.com"},
+		{"mtgban.com", "", "mtgban.com"},
+		{"lorcana.mtgban.com", "", "mtgban.com"},
+		{"mtg.ban.cards", "", "ban.cards"},
+		{"ban.cards", "", "ban.cards"},
+		{"backend:8080", "pokemon.ban.cards", "ban.cards"},
+		{"localhost:8080", "", ""},
+		{"example.com", "", ""},
+		{"mtgban.com.evil.example", "", ""},
+		{"xban.cards", "", ""},
 	} {
 		req := httptest.NewRequest("GET", "/auth", nil)
 		req.Host = tt.host
@@ -68,9 +65,9 @@ func TestCookieDomainIsTheApex(t *testing.T) {
 		if tt.forwardedHost != "" {
 			req.Header.Set("X-Forwarded-Host", tt.forwardedHost)
 		}
-		domain, global := cookieDomain(req)
-		if domain != tt.domain || global != tt.global {
-			t.Errorf("cookieDomain(%s via %q) = %q, %v; want %q, %v", tt.host, tt.forwardedHost, domain, global, tt.domain, tt.global)
+		domain := cookieDomain(req)
+		if domain != tt.domain {
+			t.Errorf("cookieDomain(%s via %q) = %q, want %q", tt.host, tt.forwardedHost, domain, tt.domain)
 		}
 	}
 }
@@ -89,7 +86,7 @@ func TestSetCookieUsesRequestPath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "https://onepiece.mtgban.com"+tc.path, nil)
 			recorder := httptest.NewRecorder()
-			setCookie(recorder, req, tc.name, "value", time.Now().Add(time.Hour), false)
+			setCookie(recorder, req, tc.name, "value", time.Now().Add(time.Hour))
 			if got := recorder.Header().Get("Set-Cookie"); !strings.Contains(got, "Path="+tc.want+";") {
 				t.Fatalf("Set-Cookie = %q, want Path=%s", got, tc.want)
 			}
@@ -100,7 +97,7 @@ func TestSetCookieUsesRequestPath(t *testing.T) {
 func TestSetCookieExpiresLegacyRootCopy(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "https://onepiece.mtgban.com/newspaper", nil)
-	setCookie(recorder, req, "NewspaperList", "value", time.Now().Add(time.Hour), false)
+	setCookie(recorder, req, "NewspaperList", "value", time.Now().Add(time.Hour))
 
 	setCookies := recorder.Header().Values("Set-Cookie")
 	if len(setCookies) != 2 {
@@ -144,23 +141,18 @@ func TestSetCookieHeaders(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		cookie string
-		global bool
 		target string
 		proto  string
 		want   []string
 	}{
-		{"parent domain", "GlobalPref", true, "http://magic.mtgban.com/auth", "https",
-			[]string{"GlobalPref=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
-		{"bare domain", "GlobalPref", true, "http://mtgban.com/auth", "https",
-			[]string{"GlobalPref=sig; Path=/; Domain=mtgban.com; " + exp + "; Secure"}},
-		{"untrusted host", "GlobalPref", true, "http://raw.example.invalid/auth", "",
+		{"untrusted host", "NewspaperList", "http://raw.example.invalid/newspaper", "",
 			[]string{
-				"GlobalPref=sig; Path=/auth; " + exp + "; SameSite=Strict",
-				"GlobalPref=sig; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; SameSite=Strict",
+				"NewspaperList=sig; Path=/newspaper; " + exp + "; SameSite=Strict",
+				"NewspaperList=sig; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; SameSite=Strict",
 			}},
-		{"localhost", "GlobalPref", true, "http://localhost:8080/auth", "",
-			[]string{"GlobalPref=sig; Path=/; " + exp}},
-		{"first party", "NewspaperList", false, "http://magic.mtgban.com/newspaper", "https",
+		{"localhost", "SearchSellersList", "http://localhost:8080/search", "",
+			[]string{"SearchSellersList=sig; Path=/; " + exp + "; SameSite=Strict"}},
+		{"first party", "NewspaperList", "http://magic.mtgban.com/newspaper", "https",
 			[]string{
 				"NewspaperList=sig; Path=/newspaper; " + exp + "; Secure; SameSite=Strict",
 				"NewspaperList=sig; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; Max-Age=0; Secure; SameSite=Strict",
@@ -168,7 +160,7 @@ func TestSetCookieHeaders(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			setCookie(recorder, cookieTestRequest(tc.target, tc.proto), tc.cookie, "sig", expires, tc.global)
+			setCookie(recorder, cookieTestRequest(tc.target, tc.proto), tc.cookie, "sig", expires)
 			got := recorder.Header().Values("Set-Cookie")
 			if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
 				t.Fatalf("Set-Cookie = %q, want %q", got, tc.want)

@@ -51,13 +51,12 @@ var Country2flag = map[string]string{
 	"GB": "🇬🇧",
 }
 
-func cookiePath(r *http.Request, cookieName string, global bool) string {
+func cookiePath(r *http.Request, cookieName string) string {
 	// The signature and session cookies must remain available to every
-	// route, even when an untrusted host forces global domain scoping off.
-	// A root cookie is also one SettingsValues never hands back to a script,
+	// route. A root cookie is also one SettingsValues never hands back to a script,
 	// which is what keeps these HttpOnly cookies out of it. The custom
 	// buylist is set up on /upload and priced into /search.
-	if cookieName == signatureCookie || cookieName == legacySignatureCookie || cookieName == sessionCookie || global || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
+	if cookieName == signatureCookie || cookieName == legacySignatureCookie || cookieName == sessionCookie || strings.HasPrefix(cookieName, "Search") || strings.HasPrefix(cookieName, "MobileSearch") || strings.HasPrefix(cookieName, "UploadCustom") {
 		return "/"
 	}
 	if r == nil || r.URL == nil {
@@ -1464,30 +1463,20 @@ func (o searchMiscOpts) has(opt string) bool {
 // There is no forever in cookies, so pick a really large interval
 func setForeverCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
-	setCookie(w, r, cookieName, value, tenYears, false)
+	setCookie(w, r, cookieName, value, tenYears)
 }
 
-// Set a cookie in the response with no expiration at its route path.
-func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time, global bool) {
-	domain := ""
-	if global {
-		domain, global = cookieDomain(r)
-	}
-
+// setCookie sets a first-party cookie on this host at its route path.
+func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string, expires time.Time) {
 	cookie := http.Cookie{
 		Name:    cookieName,
-		Domain:  domain,
-		Path:    cookiePath(r, cookieName, global),
+		Path:    cookiePath(r, cookieName),
 		Expires: expires,
 		Value:   value,
 		// Only mark Secure when the site itself is served over HTTPS,
 		// otherwise the cookie would be dropped during local HTTP dev.
-		Secure: isSecureRequest(r),
-	}
-
-	if !global {
-		// Enforce first party cookies only
-		cookie.SameSite = http.SameSiteStrictMode
+		Secure:   isSecureRequest(r),
+		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(w, &cookie)
 	if cookie.Path != "/" {
@@ -1504,18 +1493,18 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string,
 // cookieDomain returns the Domain that shares a cookie across the sites of
 // one apex: mtgban.com for www.mtgban.com, ban.cards for mtg.ban.cards, and
 // none on localhost, where the cookie stays on the host. When the request's
-// origin is not a trusted host it returns no domain and global false, so the
-// cookie stays host-only there too.
-func cookieDomain(r *http.Request) (domain string, global bool) {
+// origin is not a trusted host it returns no domain, so the cookie stays
+// host-only there too.
+func cookieDomain(r *http.Request) string {
 	origin := siteorigin.Of(r)
 	u, err := url.Parse(origin)
 	if err != nil || u.Hostname() == "" {
 		// Untrusted hosts, including httptest's example.com and a platform's
 		// raw ingress hostname, may still use host-only cookies. Never widen
 		// those cookies to a parent domain derived from an untrusted Host.
-		return "", false
+		return ""
 	}
-	return siteorigin.Apex(u.Hostname()), true
+	return siteorigin.Apex(u.Hostname())
 }
 
 // signatureCookie holds the reader's signature, on the parent domain so every
@@ -1537,11 +1526,10 @@ const legacySignatureCookie = "MTGBAN"
 // does not, so a local run there needs https or another browser. Lax lets it
 // ride a top-level navigation from a link.
 func signatureCookieFor(r *http.Request, name, value string, expires time.Time) *http.Cookie {
-	domain, _ := cookieDomain(r)
 	return &http.Cookie{
 		Name:     name,
 		Value:    value,
-		Domain:   domain,
+		Domain:   cookieDomain(r),
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
@@ -1569,11 +1557,10 @@ const sessionCookie = "BAN_SESSION"
 // Firefox keep a Secure cookie on http://localhost too; Safari does not,
 // so a local run there needs https or another browser.
 func sessionCookieFor(r *http.Request, value string, maxAge int) *http.Cookie {
-	domain, _ := cookieDomain(r)
 	return &http.Cookie{
 		Name:     sessionCookie,
 		Value:    value,
-		Domain:   domain,
+		Domain:   cookieDomain(r),
 		Path:     "/",
 		MaxAge:   maxAge,
 		HttpOnly: true,
