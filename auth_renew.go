@@ -144,12 +144,18 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 // here, so that a request already on its way with it is served the new one
 // rather than renewing it again, and how long the sessions rest after Refresh
 // now, so that a reader cannot press Patreon per request.
+// The token refresh has a wait of its own, longer than renew_timeout_seconds
+// allows the lookups: an answer given up on after Patreon rotated the token
+// loses the token. Both fit inside the lease, renewalLookupMax bounding
+// renew_timeout_seconds.
 const (
-	renewalLease       = time.Minute
-	renewalBackoff     = time.Hour
-	renewalDBTimeout   = 2 * time.Second
-	renewalSettle      = time.Minute
-	renewalRefreshRest = 5 * time.Minute
+	renewalLease          = time.Minute
+	renewalBackoff        = time.Hour
+	renewalDBTimeout      = 2 * time.Second
+	renewalSettle         = time.Minute
+	renewalRefreshRest    = 5 * time.Minute
+	renewalRefreshTimeout = 20 * time.Second
+	renewalLookupMax      = 30 * time.Second
 )
 
 // sessionRests is when each session this process saw refused a lease may
@@ -356,12 +362,14 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 // signature is issued after its reader's poke and is left alone; the reader's
 // other devices renew at their own next request.
 //
-// The calls to Patreon run under renew_timeout_seconds with no database
-// connection held, and a reader who navigates away does not cancel a refresh
-// Patreon may already have rotated. rest is how long the account's sessions
-// rest once the renewal commits: zero for a due renewal, whose new signature
-// is not due again for after_days; Refresh now rests them, so a reader cannot
-// press Patreon per request. cause is what asked for the renewal, for the log.
+// The calls to Patreon run with no database connection held: the refresh
+// under renewalRefreshTimeout, the lookups after it under
+// renew_timeout_seconds, and a reader who navigates away does not cancel a
+// refresh Patreon may already have rotated. rest is how long the account's
+// sessions rest once the renewal commits: none for one asked for by
+// the signature, whose new one is not due again for after_days; Refresh now
+// rests them, so a reader cannot press Patreon per request. cause is what
+// asked for the renewal, for the log.
 func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url.Values, rest time.Duration, cause string) (sig string, refused bool) {
 	rn := renewal{
 		cause:   cause,
@@ -396,9 +404,9 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 		return "", false
 	}
 
-	patreonCtx, cancel := context.WithTimeout(base, infra.PatreonRenewal.RenewTimeout())
-	defer cancel()
-	tokens, err := patreon.RefreshAuthToken(patreonCtx, rn.client, infra.Patreon.Secret[source], token)
+	refreshCtx, cancelRefresh := context.WithTimeout(base, renewalRefreshTimeout)
+	defer cancelRefresh()
+	tokens, err := patreon.RefreshAuthToken(refreshCtx, rn.client, infra.Patreon.Secret[source], token)
 	var grant *patreon.GrantError
 	if errors.As(err, &grant) && grant.Code == patreon.InvalidGrant {
 		if rn.revoke(base, token, err) {
@@ -411,6 +419,8 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 		return "", false
 	}
 
+	patreonCtx, cancel := context.WithTimeout(base, min(infra.PatreonRenewal.RenewTimeout(), renewalLookupMax))
+	defer cancel()
 	client := patreon.NewPatreonClient(patreonCtx, tokens.AccessToken)
 	user, err := Pledge.UserIDs(patreonCtx, client)
 	if err != nil {

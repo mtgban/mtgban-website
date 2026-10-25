@@ -155,7 +155,11 @@ without the reader.
   longer park for a reader who never re-logs in.
 - A Patreon outage costs each near-expiry session one bounded wait per
   hour, and a session that rests costs the database nothing until its
-  rest is over; nobody is logged out by it.
+  rest is over; nobody is logged out by it. A refresh whose answer is
+  lost after Patreon rotated the token loses that token, so the refresh
+  waits longer than the lookups do; a session left holding a dead token
+  stops renewing, and its reader logs in again when the signature runs
+  out.
 - The API handoff is untouched: it still asks Patreon through a
   redirect and never reads the session row (decision recorded in the
   plan; a stolen `BAN_SESSION` must not become a gateway login).

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
@@ -156,9 +157,18 @@ func saveInfrastructure(ctx context.Context, value infrastructure.Config) error 
 // settings (a restart opens none).
 // Dropping one of those is an edit to the file itself, not the editor's.
 // It also refuses a handoff origin that handoffOrigins would leave out, or
-// whose seller segment no single path segment can equal.
+// whose seller segment no single path segment can equal, and a renewal block
+// that cannot work: an after_days no signature lives to reach, or a
+// renew_timeout_seconds longer than the lookups may take inside the lease.
 func validateInfrastructure(value, running infrastructure.Config) error {
 	var problems []string
+	renewal := value.PatreonRenewal
+	if renewal.After() >= DefaultSignatureDuration {
+		problems = append(problems, fmt.Sprintf("patreon_renewal.after_days %d is not under the %d days a signature lasts", renewal.AfterDays, int(DefaultSignatureDuration/(24*time.Hour))))
+	}
+	if time.Duration(renewal.RenewTimeoutSeconds)*time.Second > renewalLookupMax {
+		problems = append(problems, fmt.Sprintf("patreon_renewal.renew_timeout_seconds %d is over %d", renewal.RenewTimeoutSeconds, int(renewalLookupMax/time.Second)))
+	}
 	for _, origin := range slices.Sorted(maps.Keys(value.HandoffOrigins)) {
 		if !validHandoffOrigin(origin) {
 			problems = append(problems, "handoff origin "+origin+" is not a bare https scheme and host")
