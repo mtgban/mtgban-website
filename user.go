@@ -252,6 +252,28 @@ type UserVars struct {
 	// CanEndSessions is whether the page offers Log out everywhere: the site
 	// keeps sessions and this browser holds one.
 	CanEndSessions bool
+	// RefreshNote says what the last Refresh now did, empty before one.
+	RefreshNote string
+}
+
+// refreshNotes are the notes the Account page shows after Refresh now, by
+// the refreshed value its redirect carries.
+var refreshNotes = map[string]string{
+	"yes":   "Refreshed: your tier is the one Patreon reports now",
+	"no":    "Not refreshed: try again in a few minutes",
+	"ended": "Not refreshed: this sign-in has ended, log in again to keep it renewing",
+}
+
+// clearsSession says whether the response clears the BAN_SESSION cookie, as
+// a renewal does when the session can never renew again.
+func clearsSession(w http.ResponseWriter) bool {
+	sent := http.Response{Header: w.Header()}
+	for _, c := range sent.Cookies() {
+		if c.Name == sessionCookie && c.MaxAge < 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // UserFeature is one personal feature the reader's tier grants.
@@ -278,6 +300,7 @@ func (s *site) User(w http.ResponseWriter, r *http.Request) {
 		hasSession := pageVars.User.SignedIn && readCookie(r, sessionCookie) != ""
 		pageVars.User.CanRefresh = hasSession && renewalEnabled()
 		pageVars.User.CanEndSessions = hasSession && UserStateDB != nil
+		pageVars.User.RefreshNote = refreshNotes[r.FormValue("refreshed")]
 	}
 	render(w, "user.html", pageVars)
 }
@@ -285,9 +308,9 @@ func (s *site) User(w http.ResponseWriter, r *http.Request) {
 // writeAccountAction answers a POST to the Account page with a redirect,
 // whatever it does. Refresh now renews the signature this browser holds from
 // the session its BAN_SESSION cookie names, as a due signature would be, only
-// without waiting for its age, and rests the sessions for renewalRefreshRest
-// so that a second press asks Patreon nothing. Log out everywhere ends every
-// session of the reader's email when
+// without waiting for its age, rests the sessions for renewalRefreshRest so
+// that a second press asks Patreon nothing, and says on the page whether it
+// renewed. Log out everywhere ends every session of the reader's email when
 // this browser holds one of them, and clears this browser's cookies either
 // way: a signature alone, which links and logs can leak, ends nobody else's
 // sessions. Both act on the reader the signature cookie names, never on a
@@ -306,10 +329,19 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.PostFormValue("action") {
 	case "refresh":
+		where := "/user?refreshed=no"
 		if email != "" && renewalEnabled() {
-			s.renewSignature(w, r, values, renewalRefreshRest, "refresh")
+			sig, refused := s.renewSignature(w, r, values, renewalRefreshRest, "refresh")
+			switch {
+			case refused:
+				where = "/user"
+			case sig != "":
+				where = "/user?refreshed=yes"
+			case clearsSession(w):
+				where = "/user?refreshed=ended"
+			}
 		}
-		http.Redirect(w, r, "/user", http.StatusSeeOther)
+		http.Redirect(w, r, where, http.StatusSeeOther)
 	case "logout-everywhere":
 		// With the database down the cookies go anyway, and the sessions
 		// wait for the prune or the next press

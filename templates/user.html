@@ -67,6 +67,7 @@
         </form>
         {{end}}
     </div>
+    {{if .RefreshNote}}<p class="user-note" role="status">{{.RefreshNote}}</p>{{end}}
 
     <h2 class="user-section-title">Your features</h2>
     {{if .Features}}

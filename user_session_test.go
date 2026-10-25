@@ -39,7 +39,7 @@ func wantRedirect(t *testing.T, rec *httptest.ResponseRecorder, where string) {
 // Refresh now renews the signature the browser holds without waiting for its
 // age, from the session the browser's own cookie names: the reader gets the
 // tier Patreon reports now, a new signature and the session for another 31
-// days, and is sent back to the page.
+// days, and is sent back to the page, which says it renewed.
 func TestRefreshNowRenewsTheBrowsersOwnSession(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	rig.stub.title = "VINTAGE"
@@ -48,7 +48,7 @@ func TestRefreshNowRenewsTheBrowsersOwnSession(t *testing.T) {
 	young := rig.sig("Pioneer", 1*day)
 
 	rec := rig.account("refresh", browser(young, session)...)
-	wantRedirect(t, rec, "/user")
+	wantRedirect(t, rec, "/user?refreshed=yes")
 	set := setCookies(rec)
 	if len(rec.Result().Cookies()) != 2 || set[signatureCookie] == nil || set[sessionCookie] == nil {
 		t.Fatalf("Set-Cookie %q, want %s and %s", rec.Header().Values("Set-Cookie"), signatureCookie, sessionCookie)
@@ -87,9 +87,11 @@ func TestRefreshNowTwiceAtOnceAsksPatreonOnce(t *testing.T) {
 
 	renewed := 0
 	for _, rec := range recs {
-		wantRedirect(t, rec, "/user")
 		if len(rec.Result().Cookies()) == 2 {
 			renewed++
+			wantRedirect(t, rec, "/user?refreshed=yes")
+		} else {
+			wantRedirect(t, rec, "/user?refreshed=no")
 		}
 	}
 	if renewed != 1 || rig.stub.calls() != 1 {
@@ -102,21 +104,21 @@ func TestRefreshNowTwiceAtOnceAsksPatreonOnce(t *testing.T) {
 // else's session picks nobody.
 // A second press of Refresh now inside the rest the first left behind asks
 // Patreon nothing: the sessions are resting, so the lease refuses it, and the
-// reader is sent back to the page as they are.
+// reader is sent back to the page as they are, which says so.
 func TestRefreshNowTwiceInARowAsksPatreonOnce(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	session := rig.session("")
 	young := rig.sig("Legacy", 1*day)
 
 	first := rig.account("refresh", browser(young, session)...)
-	wantRedirect(t, first, "/user")
+	wantRedirect(t, first, "/user?refreshed=yes")
 	if len(first.Result().Cookies()) != 2 {
 		t.Fatalf("first press set %v, want the new signature and session", first.Header()["Set-Cookie"])
 	}
 	renewed := setCookies(first)[signatureCookie].Value
 
 	second := rig.account("refresh", browser(renewed, session)...)
-	wantRedirect(t, second, "/user")
+	wantRedirect(t, second, "/user?refreshed=no")
 	if len(second.Result().Cookies()) != 0 || rig.stub.calls() != 1 {
 		t.Errorf("second press set %v after %d refreshes, want nothing and one refresh", second.Header()["Set-Cookie"], rig.stub.calls())
 	}
@@ -139,7 +141,7 @@ func TestRefreshNowActsOnlyOnTheBrowsersOwnCookies(t *testing.T) {
 
 	t.Run("a ?sig= with no cookie", func(t *testing.T) {
 		req := rig.form("/user?sig="+url.QueryEscape(young), url.Values{"action": {"refresh"}}, browser("", session)...)
-		wantRedirect(t, rig.accountFrom(req), "/user")
+		wantRedirect(t, rig.accountFrom(req), "/user?refreshed=no")
 		if rig.stub.calls() != 0 {
 			t.Errorf("%d refreshes for a ?sig=, want none", rig.stub.calls())
 		}
@@ -147,7 +149,7 @@ func TestRefreshNowActsOnlyOnTheBrowsersOwnCookies(t *testing.T) {
 	t.Run("a form field naming a session or a reader", func(t *testing.T) {
 		fields := url.Values{"action": {"refresh"}, "session": {strangerSession}, "session_id": {strangerSession}, "email": {stranger.Email}, "email_hash": {userstate.HashEmail(stranger.Email)}}
 		rec := rig.accountFrom(rig.form("/user", fields, browser(young, session)...))
-		wantRedirect(t, rec, "/user")
+		wantRedirect(t, rec, "/user?refreshed=yes")
 		for _, row := range sessionRowsOf(t, rig.db, userstate.HashEmail(stranger.Email)) {
 			if row.token != "refresh-stranger" {
 				t.Errorf("the stranger's session was renewed: %+v", row)
@@ -161,7 +163,7 @@ func TestRefreshNowActsOnlyOnTheBrowsersOwnCookies(t *testing.T) {
 	})
 	t.Run("a session that is not the signature's", func(t *testing.T) {
 		before := rig.stub.calls()
-		wantRedirect(t, rig.account("refresh", browser(young, strangerSession)...), "/user")
+		wantRedirect(t, rig.account("refresh", browser(young, strangerSession)...), "/user?refreshed=no")
 		if rig.stub.calls() != before {
 			t.Error("a session of another reader was renewed behind this reader's signature")
 		}
@@ -177,11 +179,31 @@ func TestRefreshNowActsOnlyOnTheBrowsersOwnCookies(t *testing.T) {
 	t.Run("a signature that does not check out", func(t *testing.T) {
 		before := rig.stub.calls()
 		forged := tampered(young)
-		wantRedirect(t, rig.account("refresh", browser(forged, session)...), "/user")
+		wantRedirect(t, rig.account("refresh", browser(forged, session)...), "/user?refreshed=no")
 		if rig.stub.calls() != before {
 			t.Error("a forged signature was renewed")
 		}
 	})
+}
+
+// Refresh now with a refresh token Patreon refuses for good ends the session,
+// and the page says to log in again rather than to try again.
+func TestRefreshNowSaysWhenTheSessionEnded(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	rig.stub.token = &stubAnswer{http.StatusUnauthorized, `{"error":"invalid_grant"}`}
+	session := rig.session("")
+	young := rig.sig("Legacy", 1*day)
+
+	rec := rig.account("refresh", browser(young, session)...)
+	wantRedirect(t, rec, "/user?refreshed=ended")
+	if rows := rig.rows(); len(rows) != 0 {
+		t.Errorf("rows %+v, want the session gone", rows)
+	}
+	page := httptest.NewRecorder()
+	noSigning(http.HandlerFunc(rig.site.User)).ServeHTTP(page, rig.request(http.MethodGet, "/user?refreshed=ended", browser(young, "")...))
+	if !strings.Contains(page.Body.String(), refreshNotes["ended"]) {
+		t.Error("the page does not say the sign-in ended")
+	}
 }
 
 // Where the site does not renew, the button is not on the page and a POST
@@ -192,7 +214,7 @@ func TestRefreshNowIsAbsentWhereRenewalIsOff(t *testing.T) {
 	young := rig.sig("Legacy", 1*day)
 
 	rec := rig.account("refresh", browser(young, session)...)
-	wantRedirect(t, rec, "/user")
+	wantRedirect(t, rec, "/user?refreshed=no")
 	if len(rec.Result().Cookies()) != 0 || rig.stub.calls() != 0 {
 		t.Errorf("Set-Cookie %q after %d refreshes, want none", rec.Header().Values("Set-Cookie"), rig.stub.calls())
 	}
@@ -207,7 +229,8 @@ func TestRefreshNowIsAbsentWhereRenewalIsOff(t *testing.T) {
 }
 
 // The page offers Refresh now and Log out everywhere to a signed-in browser
-// that holds a session, where the site renews, and not otherwise.
+// that holds a session, where the site renews, and not otherwise; and says
+// what the last Refresh now did.
 func TestAccountPageOffersRefreshNowToABrowserWithASession(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	session := rig.session("")
@@ -228,6 +251,21 @@ func TestAccountPageOffersRefreshNowToABrowserWithASession(t *testing.T) {
 		}
 		if offered := strings.Contains(rec.Body.String(), `value="logout-everywhere"`); offered != tc.want {
 			t.Errorf("%s: Log out everywhere offered %v, want %v", name, offered, tc.want)
+		}
+	}
+
+	for query, want := range map[string]string{
+		"?refreshed=yes":   refreshNotes["yes"],
+		"?refreshed=no":    refreshNotes["no"],
+		"?refreshed=ended": refreshNotes["ended"],
+		"":                 "",
+		"?refreshed=x":     "",
+	} {
+		rec := httptest.NewRecorder()
+		noSigning(http.HandlerFunc(rig.site.User)).ServeHTTP(rec, rig.request(http.MethodGet, "/user"+query, browser(young, session)...))
+		shown := strings.Contains(rec.Body.String(), `role="status"`)
+		if shown != (want != "") || (want != "" && !strings.Contains(rec.Body.String(), want)) {
+			t.Errorf("/user%s: note shown %v, want %q", query, shown, want)
 		}
 	}
 }
