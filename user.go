@@ -249,6 +249,9 @@ type UserVars struct {
 	// CanRefresh is whether the page offers Refresh now: the site renews
 	// signatures and this browser holds the session to renew from.
 	CanRefresh bool
+	// CanEndSessions is whether the page offers Log out everywhere: the site
+	// keeps sessions and this browser holds one.
+	CanEndSessions bool
 }
 
 // UserFeature is one personal feature the reader's tier grants.
@@ -272,7 +275,9 @@ func (s *site) User(w http.ResponseWriter, r *http.Request) {
 	pageVars.User = &UserVars{}
 	if pageVars.ErrorMessage == "" {
 		pageVars.User = s.userVars(r.Context(), parseSig(sig), pageVars.IsMobile)
-		pageVars.User.CanRefresh = pageVars.User.SignedIn && renewalEnabled() && readCookie(r, sessionCookie) != ""
+		hasSession := pageVars.User.SignedIn && readCookie(r, sessionCookie) != ""
+		pageVars.User.CanRefresh = hasSession && renewalEnabled()
+		pageVars.User.CanEndSessions = hasSession && UserStateDB != nil
 	}
 	render(w, "user.html", pageVars)
 }
@@ -280,10 +285,13 @@ func (s *site) User(w http.ResponseWriter, r *http.Request) {
 // writeAccountAction answers a POST to the Account page with a redirect,
 // whatever it does. Refresh now renews the signature this browser holds from
 // the session its BAN_SESSION cookie names, as a due signature would be, only
-// without waiting for its age, and rests the sessions for renewalRefreshRest so
-// that a second press asks Patreon nothing; Log out everywhere ends every session of the
-// reader's email and clears this browser's cookies. Both act on the reader
-// the signature cookie names, never on a ?sig= or a form field.
+// without waiting for its age, and rests the sessions for renewalRefreshRest
+// so that a second press asks Patreon nothing. Log out everywhere ends every
+// session of the reader's email when
+// this browser holds one of them, and clears this browser's cookies either
+// way: a signature alone, which links and logs can leak, ends nobody else's
+// sessions. Both act on the reader the signature cookie names, never on a
+// ?sig= or a form field.
 func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 	// A form on another site's page is refused before it is read
 	if crossSitePost(r) {
@@ -305,12 +313,13 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 	case "logout-everywhere":
 		// With the database down the cookies go anyway, and the sessions
 		// wait for the prune or the next press
-		if email != "" && UserStateDB != nil {
+		session := readCookie(r, sessionCookie)
+		if email != "" && session != "" && UserStateDB != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-			_, err := UserStateDB.DeletePatreonSessions(ctx, userstate.HashEmail(email))
+			_, err := UserStateDB.DeletePatreonSessionsFor(ctx, session, userstate.HashEmail(email))
 			cancel()
 			if err != nil {
-				LogPages["Admin"].Println("DeletePatreonSessions", err)
+				LogPages["Admin"].Println("DeletePatreonSessionsFor", err)
 			}
 		}
 		clearLoginCookies(w, r)

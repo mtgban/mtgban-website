@@ -425,8 +425,9 @@ access table or of a grant renews its readers the same way (§3.3). Each renewal
 logs `cause=due|grace|poke|acl|refresh` beside its verdict. The Account
 page (`user.go`) POSTs two actions to itself, each ending in a redirect:
 Refresh now runs the same renewal without the age check, and Log out
-everywhere deletes every session of the signature cookie's email and clears
-this browser's cookies.
+everywhere, offered to a browser holding a session, deletes every session
+of the signature cookie's email when that session is one of them, and
+clears this browser's cookies.
 `GetParamFromSig()` extracts individual grants, read off
 `verifiedSignature()` (cookie first) or `verifiedRequestSignature()` (`?sig=`
 first); `enforceSigning` hands the handler the `?sig=` it checked as the

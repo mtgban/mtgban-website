@@ -60,10 +60,12 @@
             <button class="page-action" type="submit" title="Ask Patreon again for your tier and sign you in anew">Refresh now</button>
         </form>
         {{end}}
+        {{if .CanEndSessions}}
         <form method="post" action="/user">
             <input type="hidden" name="action" value="logout-everywhere">
             <button class="page-action" type="submit" title="End your sign-in on every device">Log out everywhere</button>
         </form>
+        {{end}}
     </div>
 
     <h2 class="user-section-title">Your features</h2>

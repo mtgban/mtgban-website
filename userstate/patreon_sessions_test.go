@@ -535,6 +535,30 @@ func TestDeletePatreonSessionsRemovesOneEmailsRows(t *testing.T) {
 	wantLease(t, c, kept, other, "token-c", true)
 }
 
+// A reader ends every session of their email only through one of them.
+func TestDeletePatreonSessionsForNeedsOneOfThem(t *testing.T) {
+	c := testClient(t)
+	h := freshSessionOwner(t, c, "")
+	other := freshSessionOwner(t, c, "-other")
+	ctx := context.Background()
+
+	a := mustCreatePatreonSession(t, c, h, "token-a", time.Hour)
+	mustCreatePatreonSession(t, c, h, "token-b", time.Hour)
+	foreign := mustCreatePatreonSession(t, c, other, "token-c", time.Hour)
+
+	for name, id := range map[string]string{"an unknown session": "no-such-session", "another email's": foreign} {
+		n, err := c.DeletePatreonSessionsFor(ctx, id, h)
+		if err != nil || n != 0 {
+			t.Errorf("%s: deleted %d, %v; want none", name, n, err)
+		}
+	}
+	n, err := c.DeletePatreonSessionsFor(ctx, a, h)
+	if err != nil || n != 2 {
+		t.Fatalf("DeletePatreonSessionsFor = %d, %v; want 2, nil", n, err)
+	}
+	wantLease(t, c, foreign, other, "token-c", true)
+}
+
 // A Patreon account whose email changed takes all its sessions along when
 // a renewal commits under the new email.
 func TestPatreonSessionCommitFilesTheSessionsUnderANewEmail(t *testing.T) {

@@ -196,7 +196,7 @@ func TestRefreshNowIsAbsentWhereRenewalIsOff(t *testing.T) {
 	if len(rec.Result().Cookies()) != 0 || rig.stub.calls() != 0 {
 		t.Errorf("Set-Cookie %q after %d refreshes, want none", rec.Header().Values("Set-Cookie"), rig.stub.calls())
 	}
-	user := &UserVars{SignedIn: true, Email: "a@b.com", Tiers: tierSummaries(newSite(), fixtureACL(), "")}
+	user := &UserVars{SignedIn: true, Email: "a@b.com", CanEndSessions: true, Tiers: tierSummaries(newSite(), fixtureACL(), "")}
 	if out := renderUserPage(t, pageVarsFor(user)); strings.Contains(out, `value="refresh"`) || !strings.Contains(out, `value="logout-everywhere"`) {
 		t.Error("the page offers Refresh now, or withholds Log out everywhere, without renewal")
 	}
@@ -206,8 +206,8 @@ func TestRefreshNowIsAbsentWhereRenewalIsOff(t *testing.T) {
 	}
 }
 
-// The page offers Refresh now to a signed-in browser that holds a session,
-// where the site renews, and not otherwise.
+// The page offers Refresh now and Log out everywhere to a signed-in browser
+// that holds a session, where the site renews, and not otherwise.
 func TestAccountPageOffersRefreshNowToABrowserWithASession(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	session := rig.session("")
@@ -225,6 +225,9 @@ func TestAccountPageOffersRefreshNowToABrowserWithASession(t *testing.T) {
 		noSigning(http.HandlerFunc(rig.site.User)).ServeHTTP(rec, rig.request(http.MethodGet, "/user", tc.cookies...))
 		if offered := strings.Contains(rec.Body.String(), `value="refresh"`); offered != tc.want || rec.Code != http.StatusOK {
 			t.Errorf("%s: status %d, Refresh now offered %v, want %v", name, rec.Code, offered, tc.want)
+		}
+		if offered := strings.Contains(rec.Body.String(), `value="logout-everywhere"`); offered != tc.want {
+			t.Errorf("%s: Log out everywhere offered %v, want %v", name, offered, tc.want)
 		}
 	}
 }
@@ -273,7 +276,8 @@ func TestLogOutEverywhereEndsEverySessionOfTheEmail(t *testing.T) {
 
 // Log out everywhere deletes the rows of the reader the browser's signature
 // names and no other: not one a ?sig= names, and nothing at all for a
-// signature that does not check out.
+// signature that does not check out, or one that comes without a session of
+// its reader, as a signature leaked through a link or a log would.
 func TestLogOutEverywhereNamesTheReaderBySignatureCookieAlone(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	session := rig.session("")
@@ -298,6 +302,28 @@ func TestLogOutEverywhereNamesTheReaderBySignatureCookieAlone(t *testing.T) {
 			t.Errorf("Set-Cookie %q, want this browser's cookies cleared all the same", rec.Header().Values("Set-Cookie"))
 		}
 	})
+	stranger := sessionReader(t, rig.db, "stranger")
+	strangerSession, err := rig.db.CreatePatreonSession(t.Context(), loginOf(stranger, "refresh-stranger"), 0, 90*day)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, cookies := range map[string][]*http.Cookie{
+		"a signature with no session":        browser(young, ""),
+		"a signature with a stranger's":      browser(young, strangerSession),
+		"a signature with a session unknown": browser(young, "not-a-session-id"),
+	} {
+		rec := rig.account("logout-everywhere", cookies...)
+		wantRedirect(t, rec, "/")
+		if rows := rig.rows(); len(rows) != 1 {
+			t.Errorf("%s: rows %+v, want the reader's session kept", name, rows)
+		}
+		if rows := sessionRowsOf(t, rig.db, userstate.HashEmail(stranger.Email)); len(rows) != 1 {
+			t.Errorf("%s: the stranger holds %d sessions, want their one", name, len(rows))
+		}
+		if len(rec.Result().Cookies()) != 3 {
+			t.Errorf("%s: Set-Cookie %q, want this browser's cookies cleared all the same", name, rec.Header().Values("Set-Cookie"))
+		}
+	}
 }
 
 // With the database down the browser is logged out all the same, and the
