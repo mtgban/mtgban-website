@@ -499,7 +499,7 @@ func TestSigningGraceLeavesTodaysBehaviourWhereItCannotRenew(t *testing.T) {
 	})
 	t.Run("a session past max_session_days", func(t *testing.T) {
 		rig := newRenewalRig(t, renewalBlock)
-		id, err := rig.db.CreatePatreonSession(t.Context(), rig.hash, "refresh-0", -time.Second)
+		id, err := rig.db.CreatePatreonSession(t.Context(), loginOf(rig.user, "refresh-0"), 0, -time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -737,7 +737,7 @@ func TestSigningRenewalLeaseOutlivesItsHolderForAMinute(t *testing.T) {
 	session := rig.session("")
 	old := rig.sig("Legacy", 9*day)
 
-	_, _, leased, err := rig.db.LeasePatreonSessions(t.Context(), session, rig.hash, time.Minute)
+	_, _, leased, err := rig.db.LeasePatreonSessions(t.Context(), session, rig.hash, "client-id", time.Minute)
 	if err != nil || !leased {
 		t.Fatalf("lease: %v %v", leased, err)
 	}
@@ -891,4 +891,27 @@ func TestSigningLeavesAYoungSignatureAlone(t *testing.T) {
 	if rig.stub.calls() != 0 || rig.restingFor(session) > 0 {
 		t.Errorf("%d refreshes, session resting %.0fs; want none and a session left alone", rig.stub.calls(), rig.restingFor(session))
 	}
+}
+
+// A refresh token Patreon refused ends only the sessions that hold it: one
+// that another renewal left holding a live token stays, and renews.
+func TestSigningRenewalRevokesOnlyTheDeadToken(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	live := rig.session("")
+	dead := rig.session("refresh-dead")
+	old := rig.sig("Legacy", 9*day)
+
+	req := rig.request(http.MethodGet, "/limited", browser(old, dead)...)
+	rig.wantSessionDropped(rig.serve(req, false), req, old)
+	rows := rig.rows()
+	if len(rows) != 1 || rows[0].id != live {
+		t.Fatalf("rows %+v, want only the session holding the live token", rows)
+	}
+
+	// The lease the refusal took runs out, and the other device renews
+	_, err := rig.db.DB().ExecContext(t.Context(), `UPDATE patreon_sessions SET renew_after = now() WHERE session_id = $1`, live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rig.wantRenewed(rig.page(browser(old, live)...), old, live)
 }

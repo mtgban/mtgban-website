@@ -293,7 +293,7 @@ func (rig *renewalRig) session(token string) string {
 	if token == "" {
 		token = rig.stub.liveToken()
 	}
-	id, err := rig.db.CreatePatreonSession(rig.t.Context(), rig.hash, token, 90*day)
+	id, err := rig.db.CreatePatreonSession(rig.t.Context(), loginOf(rig.user, token), 0, 90*day)
 	if err != nil {
 		rig.t.Fatalf("CreatePatreonSession: %v", err)
 	}
@@ -405,6 +405,22 @@ func (rig *renewalRig) wantUntouched(got *served, old string) {
 	cookies := got.rec.Header().Values("Set-Cookie")
 	if len(cookies) != 0 {
 		rig.t.Errorf("Set-Cookie %q, want none", cookies)
+	}
+}
+
+// wantSessionDropped fails unless the request was served on old and the
+// response cleared the session cookie, as a login sets it, and set nothing
+// else.
+func (rig *renewalRig) wantSessionDropped(got *served, req *http.Request, old string) {
+	rig.t.Helper()
+	if !got.reached || got.sig != old {
+		rig.t.Errorf("handler reached %v and read the old signature: %v", got.reached, got.sig == old)
+	}
+	cleared := setCookies(got.rec)[sessionCookie]
+	want := sessionCookieFor(req, "", -1)
+	if len(got.rec.Result().Cookies()) != 1 || cleared == nil || cleared.MaxAge >= 0 || cleared.Value != "" ||
+		cleared.Domain != want.Domain || cleared.Path != want.Path || !cleared.HttpOnly || !cleared.Secure || cleared.SameSite != want.SameSite {
+		rig.t.Errorf("Set-Cookie %q, want the session cookie cleared and nothing else", got.rec.Header().Values("Set-Cookie"))
 	}
 }
 

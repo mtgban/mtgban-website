@@ -32,14 +32,18 @@ CREATE INDEX IF NOT EXISTS upload_shares_expires ON upload_shares (expires_at)`
 // existing database. The token and the session id are stored as they are:
 // a refresh token redeems only with the client secret, which lives in the
 // infrastructure config, and a session id renews only beside its reader's
-// signature, which the database never holds. lease names the holder of the
-// current renewal, set on every session of an email hash together, so a
-// holder that outlived its lease cannot commit; it is null again once the
-// renewal commits, so an empty fence matches nothing.
+// signature, which the database never holds. patreon_user and client_id
+// name the Patreon account and the client its token was issued to: Patreon
+// keeps one token per pair, so the sessions of a pair renew together. lease
+// names the holder of the current renewal, set on every session of the pair
+// together, so a holder that outlived its lease cannot commit; it is null
+// again once the renewal commits, so an empty fence matches nothing.
 const createPatreonSessionsSQL = `
 CREATE TABLE IF NOT EXISTS patreon_sessions (
     session_id    TEXT PRIMARY KEY,
     email_hash    TEXT NOT NULL,
+    patreon_user  TEXT NOT NULL,
+    client_id     TEXT NOT NULL,
     refresh_token TEXT NOT NULL,
     lease         TEXT,
     first_login   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -48,6 +52,7 @@ CREATE TABLE IF NOT EXISTS patreon_sessions (
     expires_at    TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS patreon_sessions_email ON patreon_sessions (email_hash);
+CREATE INDEX IF NOT EXISTS patreon_sessions_account ON patreon_sessions (patreon_user, client_id);
 CREATE INDEX IF NOT EXISTS patreon_sessions_expires ON patreon_sessions (expires_at)`
 
 // The table predates the backpack where this runs, so the column is added

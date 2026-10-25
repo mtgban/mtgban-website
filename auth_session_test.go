@@ -79,6 +79,7 @@ func captureAdminLog(t *testing.T) *strings.Builder {
 func sessionReader(t *testing.T, db *userstate.Client, name string) *pledge.User {
 	t.Helper()
 	user := &pledge.User{
+		UserID:        fmt.Sprintf("patreon-%s-%d", name, time.Now().UnixNano()),
 		Email:         fmt.Sprintf("%s-%d@example.com", name, time.Now().UnixNano()),
 		FullName:      "Session " + name,
 		EmailVerified: true,
@@ -95,6 +96,17 @@ func sessionReader(t *testing.T, db *userstate.Client, name string) *pledge.User
 		})
 	}
 	return user
+}
+
+// loginOf is the session row a login of user leaves holding token, issued
+// to the client the tests configure.
+func loginOf(user *pledge.User, token string) userstate.PatreonLogin {
+	return userstate.PatreonLogin{
+		EmailHash:    userstate.HashEmail(user.Email),
+		PatreonUser:  user.UserID,
+		ClientID:     "client-id",
+		RefreshToken: token,
+	}
 }
 
 // siteRequest is a browser's request for path on mtgban.com.
@@ -116,7 +128,11 @@ func siteLogin(t *testing.T, state string, user *pledge.User, refreshToken strin
 		req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 	}
 	rec := httptest.NewRecorder()
-	testSite.finishSiteLogin(rec, req, state, user, "Legacy", nil, false, refreshToken)
+	testSite.finishSiteLogin(rec, req, state, user, "Legacy", nil, false, patreonLogin{
+		clientID:     "client-id",
+		refreshToken: refreshToken,
+		exchanged:    time.Now(),
+	})
 	return rec
 }
 
@@ -435,13 +451,13 @@ func TestPrunePatreonSessionsKeepsLiveSessions(t *testing.T) {
 	expired := sessionReader(t, db, "expired")
 	live := sessionReader(t, db, "live")
 	_, err := db.DB().ExecContext(t.Context(), `
-		INSERT INTO patreon_sessions (session_id, email_hash, refresh_token, expires_at)
-		VALUES ('expired-session-id', $1, 'refresh-expired', now() - interval '1 hour')`,
+		INSERT INTO patreon_sessions (session_id, email_hash, patreon_user, client_id, refresh_token, expires_at)
+		VALUES ('expired-session-id', $1, 'patreon-expired', 'client-id', 'refresh-expired', now() - interval '1 hour')`,
 		userstate.HashEmail(expired.Email))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.CreatePatreonSession(t.Context(), userstate.HashEmail(live.Email), "refresh-live", time.Hour)
+	_, err = db.CreatePatreonSession(t.Context(), loginOf(live, "refresh-live"), 0, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
