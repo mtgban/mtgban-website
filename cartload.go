@@ -127,10 +127,10 @@ var cartAffiliates = map[string]func(code, page string) string{
 	"CSI": func(code, page string) string {
 		return withQuery(page, url.Values{"utm_referrer": {code}})
 	},
-	// Mana Pool's own ref query, as its product links carry it
 	"CT": func(code, page string) string {
 		return withQuery(page, url.Values{"share_code": {code}})
 	},
+	// Mana Pool's own ref query, as its product links carry it
 	"MP": func(code, page string) string {
 		return withQuery(page, url.Values{"ref": {code}})
 	},
