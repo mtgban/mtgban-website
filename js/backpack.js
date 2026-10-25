@@ -266,13 +266,19 @@
     };
 
     // takeFromBackpack takes one copy of the button's card out, the last one
-    // with the card.
+    // with the card. Taking the last hides the minus, so a focused minus hands
+    // focus to the add button beside it.
     window.takeFromBackpack = function (btn) {
         var id = btn.getAttribute("data-card-id");
         var e = live().filter(function (x) { return x.id === id; })[0];
         if (!e) return;
+        var focused = document.activeElement === btn;
         setQty(id, e.qty - 1);
         render();
+        if (!focused || !btn.hidden || !btn.parentNode) return;
+        btn.parentNode.querySelectorAll(".pack-btn").forEach(function (add) {
+            if (add.getAttribute("data-card-id") === id) add.focus();
+        });
     };
 
     // ---- the panel ----

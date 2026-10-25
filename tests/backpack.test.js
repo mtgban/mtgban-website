@@ -281,6 +281,23 @@ describe('the minus button', () => {
         expect(p.navCount.hidden).toBe(true);
     });
 
+    test('taking the last copy with the minus focused moves focus to the add button', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        p.minus[0].focus();
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(p.document.activeElement).toBe(p.minus[0]);
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(p.minus[0].hidden).toBe(true);
+        expect(p.document.activeElement).toBe(p.rows[0]);
+    });
+
+    test('taking the last copy leaves focus alone when the minus did not have it', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }] });
+        p.rows[1].focus();
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(p.document.activeElement).toBe(p.rows[1]);
+    });
+
     test('a card not in the backpack writes nothing', () => {
         const p = page();
         p.window.takeFromBackpack(p.minus[0]);
