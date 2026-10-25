@@ -1282,7 +1282,7 @@ func redirectToSCGMassEntry(w http.ResponseWriter, r *http.Request, b *mtgmatche
 // imports, listing the cards hashes names. When it fails it drops the
 // download headers, so the caller can answer with a page instead.
 func writeTagCSV(w http.ResponseWriter, b *mtgmatcher.Backend, hashTag string, hashes, hashesQtys, hashesCond []string) error {
-	setCSVDownloadHeaders(w, "mtgban_"+strings.ToLower(hashTag)+".csv")
+	setCSVDownloadHeaders(w, "ban_"+strings.ToLower(hashTag)+".csv")
 	csvWriter := csv.NewWriter(w)
 
 	var err error
@@ -1351,7 +1351,7 @@ func redirectToCardConduit(w http.ResponseWriter, r *http.Request, b *mtgmatcher
 // writeDeckboxCSV answers with the cards as a Deckbox import. When it fails
 // it drops the download headers, so the caller can answer with a page.
 func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry) error {
-	setCSVDownloadHeaders(w, "mtgban_deckbox.csv")
+	setCSVDownloadHeaders(w, "ban_deckbox.csv")
 	csvWriter := csv.NewWriter(w)
 
 	err := deckboxIDConvert(b, csvWriter, uploadedData)
@@ -1364,7 +1364,7 @@ func writeDeckboxCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData 
 // writeTCGplayerCSV answers with the cards as a TCGplayer import. When it
 // fails it drops the download headers, so the caller can answer with a page.
 func writeTCGplayerCSV(w http.ResponseWriter, b *mtgmatcher.Backend, uploadedData []UploadEntry, multiplier, maxQty int) error {
-	setCSVDownloadHeaders(w, "mtgban_tcgplayer.csv")
+	setCSVDownloadHeaders(w, "ban_tcgplayer.csv")
 	csvWriter := csv.NewWriter(w)
 
 	var ids, qtys, conds []string
@@ -2108,7 +2108,7 @@ func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st u
 // place the CSV index prices the reader keeps enabled. When it fails it drops
 // the download headers, so the caller can answer with a page.
 func writePricesCSV(w http.ResponseWriter, r *http.Request, b *mtgmatcher.Backend, st uploadSettings, selected uploadStores, ids uploadIDs, prices uploadPrices, uploadedData []UploadEntry) error {
-	csvName := "mtgban_prices"
+	csvName := "ban_prices"
 	if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
 		csvName += "_" + scope
 	}

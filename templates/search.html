@@ -387,7 +387,7 @@
                                 maxDays: {{.MaxLookbackDays}},
                                 ids: {{.ChartIDsCSV}},
                                 references: {{.ChartReferences}},
-                                downloadName: {{if .IsMultiChart}}'mtgban-chart.png'{{else}}{{$card := (index $.Metadata .ChartID)}}'{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png'{{end}}
+                                downloadName: {{if .IsMultiChart}}'ban_chart.png'{{else}}{{$card := (index $.Metadata .ChartID)}}'{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png'{{end}}
                             };
                         </script>
                         <script type="text/javascript" src="/js/search-chart.js?hash={{.Hash}}" defer></script>
