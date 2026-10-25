@@ -239,6 +239,21 @@ func (c *Client) DeletePatreonSessions(ctx context.Context, emailHash string) (i
 	return res.RowsAffected()
 }
 
+// DeletePatreonSessionsFor removes every session of emailHash when sessionID
+// is one of them, and says how many went: a reader ends all their sessions
+// only from a browser holding one.
+func (c *Client) DeletePatreonSessionsFor(ctx context.Context, sessionID, emailHash string) (int64, error) {
+	res, err := c.db.ExecContext(ctx, `
+		DELETE FROM patreon_sessions
+		 WHERE email_hash = $2
+		   AND EXISTS (SELECT 1 FROM patreon_sessions WHERE session_id = $1 AND email_hash = $2)`,
+		sessionID, emailHash)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // PrunePatreonSessions deletes expired sessions and says how many went.
 func (c *Client) PrunePatreonSessions(ctx context.Context) (int64, error) {
 	res, err := c.db.ExecContext(ctx, `DELETE FROM patreon_sessions WHERE expires_at <= now()`)

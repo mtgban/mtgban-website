@@ -157,8 +157,10 @@ without the reader.
   sessions under the new one. Their other devices, whose signatures
   still name the old email, stop renewing and log in again when the
   signature runs out.
-- **Log out everywhere** deletes every row for the email: no device can
-  renew; signatures already issued run to their own `Expires`.
+- **Log out everywhere** deletes every row for the email, asked from a
+  browser whose `BAN_SESSION` names one of them, so a leaked signature
+  cannot end the reader's sessions: no device can renew; signatures
+  already issued run to their own `Expires`.
 - `recordAlertContact` runs on every entitled renewal, so alerts no
   longer park for a reader who never re-logs in.
 - A Patreon outage costs each near-expiry session one bounded wait per
