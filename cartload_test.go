@@ -316,6 +316,18 @@ func TestCartLoadButtons(t *testing.T) {
 		t.Error("CSI's deck builder button is not told apart from its cart's")
 	}
 
+	ck := renderUpload(t, PageVars{UploadVars: UploadVars{
+		Optimized:       map[string][]OptimizedUploadEntry{"CK": entries},
+		OptimizedKeys:   []string{"CK"},
+		OptimizedTotals: map[string]float64{"CK": 1},
+	}})
+	if strings.Count(ck, ">Load at Card Kingdom<") != 1 || strings.Contains(ck, ">Load at CK<") {
+		t.Error("want one Load at Card Kingdom, the cart's, and no Load at CK")
+	}
+	if !strings.Contains(ck, ">Deck builder at CK<") || !strings.Contains(ck, `value="Deck builder at CK"`) {
+		t.Error("CK's deck builder button is not told apart from its cart's")
+	}
+
 	for _, key := range []string{"MKM", "SCG", "CKGraded", "CKSealed"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
