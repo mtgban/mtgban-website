@@ -264,18 +264,6 @@ var refreshNotes = map[string]string{
 	"ended": "Not refreshed: this sign-in has ended, log in again to keep it renewing",
 }
 
-// clearsSession says whether the response clears the BAN_SESSION cookie, as
-// a renewal does when the session can never renew again.
-func clearsSession(w http.ResponseWriter) bool {
-	sent := http.Response{Header: w.Header()}
-	for _, c := range sent.Cookies() {
-		if c.Name == sessionCookie && c.MaxAge < 0 {
-			return true
-		}
-	}
-	return false
-}
-
 // UserFeature is one personal feature the reader's tier grants.
 type UserFeature struct {
 	Name, Description, Link string
@@ -331,13 +319,13 @@ func (s *site) writeAccountAction(w http.ResponseWriter, r *http.Request) {
 	case "refresh":
 		where := "/user?refreshed=no"
 		if email != "" && renewalEnabled() {
-			sig, refused := s.renewSignature(w, r, values, renewalRefreshRest, "refresh")
-			switch {
-			case refused:
+			_, outcome := s.renewSignature(w, r, values, renewalRefreshRest, "refresh")
+			switch outcome {
+			case renewalRefused:
 				where = "/user"
-			case sig != "":
+			case renewalRenewed:
 				where = "/user?refreshed=yes"
-			case clearsSession(w):
+			case renewalEnded:
 				where = "/user?refreshed=ended"
 			}
 		}
