@@ -295,7 +295,7 @@ func TestSigningRenewalNeverActsOnAnAnswerThatSettlesNothing(t *testing.T) {
 		token, identity, member *stubAnswer
 		title                   string
 		closed                  bool
-		timeoutSeconds          int
+		slowIdentity            bool
 	}{
 		{name: "refresh 500", token: &stubAnswer{500, `{"errors":[{"title":"boom"}]}`}},
 		{name: "refresh 429", token: &stubAnswer{429, `{"errors":[{"code_name":"RequestThrottled"}]}`}},
@@ -305,7 +305,7 @@ func TestSigningRenewalNeverActsOnAnAnswerThatSettlesNothing(t *testing.T) {
 		{name: "refresh without a refresh token", token: &stubAnswer{200, `{"access_token":"a","token_type":"Bearer"}`}},
 		{name: "refresh refused for another reason", token: &stubAnswer{401, `{"error":"invalid_client"}`}},
 		{name: "refresh unreachable", closed: true},
-		{name: "refresh too slow", timeoutSeconds: 1},
+		{name: "identity too slow", slowIdentity: true},
 		{name: "identity 401", identity: &stubAnswer{401, `{"errors":[{"title":"Unauthorized"}]}`}},
 		{name: "identity 403", identity: &stubAnswer{403, `{}`}},
 		{name: "identity 500", identity: &stubAnswer{500, ``}},
@@ -320,13 +320,17 @@ func TestSigningRenewalNeverActsOnAnAnswerThatSettlesNothing(t *testing.T) {
 		{name: "a tier title the site does not know", title: "SOMETHING NEW"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rig := newRenewalRig(t, infrastructure.PatreonRenewal{AfterDays: 8, GraceDays: 3, ClearOnNegative: true, RenewTimeoutSeconds: tc.timeoutSeconds})
+			block := renewalBlock
+			if tc.slowIdentity {
+				block.RenewTimeoutSeconds = 1
+			}
+			rig := newRenewalRig(t, block)
 			rig.stub.token, rig.stub.identity, rig.stub.member = tc.token, tc.identity, tc.member
 			if tc.title != "" {
 				rig.stub.title = tc.title
 			}
-			if tc.timeoutSeconds > 0 {
-				rig.stub.delay = 1500 * time.Millisecond
+			if tc.slowIdentity {
+				rig.stub.identityDelay = 1500 * time.Millisecond
 			}
 			session := rig.session("")
 			elsewhere := rig.session("")
@@ -905,6 +909,24 @@ func TestSigningLeavesAYoungSignatureAlone(t *testing.T) {
 	rig.wantUntouched(rig.page(browser(old, session)...), old)
 	if rig.stub.calls() != 0 || rig.restingFor(session) > 0 {
 		t.Errorf("%d refreshes, session resting %.0fs; want none and a session left alone", rig.stub.calls(), rig.restingFor(session))
+	}
+}
+
+// The refresh waits longer than renew_timeout_seconds gives the lookups: an
+// answer given up on after Patreon rotated the token would leave the
+// sessions holding a dead one.
+func TestSigningRenewalWaitsOutASlowRefresh(t *testing.T) {
+	block := renewalBlock
+	block.RenewTimeoutSeconds = 1
+	rig := newRenewalRig(t, block)
+	rig.stub.delay = 1500 * time.Millisecond
+	session := rig.session("")
+	old := rig.sig("Legacy", 9*day)
+
+	rig.wantRenewed(rig.page(browser(old, session)...), old, session)
+	rows := rig.rows()
+	if len(rows) != 1 || rows[0].token != rig.stub.liveToken() || rig.stub.liveToken() == "refresh-0" {
+		t.Errorf("rows %+v with Patreon honouring %q, want the session holding the rotated token", rows, rig.stub.liveToken())
 	}
 }
 

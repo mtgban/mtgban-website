@@ -227,10 +227,11 @@ func TestAdminInfrastructureEditorRefusesABadHandoffOrigin(t *testing.T) {
 	}
 }
 
-// The editor refuses null, and a file that takes from every peer a bucket
-// key, a Patreon client or secret, or a database setting the running file
-// holds, leaving the file as it was. A save that keeps them goes through,
-// and says when a change it made waits for a restart.
+// The editor refuses null, a file that takes from every peer a bucket key, a
+// Patreon client or secret, or a database setting the running file holds,
+// and a renewal block that cannot work, leaving the file as it was. A save
+// that keeps them goes through, and says when a change it made waits for a
+// restart.
 func TestAdminInfrastructureEditorRefusesWhatBreaksPeers(t *testing.T) {
 	const running = `{
 		"bucket_keys": {
@@ -248,7 +249,8 @@ func TestAdminInfrastructureEditorRefusesWhatBreaksPeers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Each one drops a single thing the running file holds
+	// Each one drops a single thing the running file holds, or sets a
+	// renewal knob out of range
 	drops := []string{`null`, `{}`}
 	for _, edit := range [][2]string{
 		{`,
@@ -260,6 +262,8 @@ func TestAdminInfrastructureEditorRefusesWhatBreaksPeers(t *testing.T) {
 		{`"secret": {"ban": "s"}`, `"secret": {"ban": ""}`},
 		{`"sql_config": {"host": "db", "dbname": "prices"}`, `"sql_config": {}`},
 		{`"user_state_config": {"host": "db", "dbname": "state"}`, `"user_state_config": {}`},
+		{`"sql_config"`, `"patreon_renewal": {"after_days": 11}, "sql_config"`},
+		{`"sql_config"`, `"patreon_renewal": {"after_days": 8, "renew_timeout_seconds": 31}, "sql_config"`},
 	} {
 		dropped := strings.Replace(running, edit[0], edit[1], 1)
 		if dropped == running {
@@ -288,6 +292,7 @@ func TestAdminInfrastructureEditorRefusesWhatBreaksPeers(t *testing.T) {
 			"mtgban-images": {"access_key": "ik", "access_secret": "is"}
 		},
 		"patreon": {"source": "ban", "client": {"ban": "c"}, "secret": {"ban": "s"}},
+		"patreon_renewal": {"after_days": 10, "renew_timeout_seconds": 30},
 		"uploader": {"moxfield": "https://proxy"},
 		"sql_config": {"host": "db", "dbname": "prices"},
 		"user_state_config": {"host": "db", "dbname": "state"}

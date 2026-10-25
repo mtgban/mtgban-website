@@ -53,6 +53,8 @@ type patreonStub struct {
 	// delay is how long the token answer takes; beforeToken runs before it
 	delay       time.Duration
 	beforeToken func()
+	// identityDelay is how long the identity answer takes
+	identityDelay time.Duration
 
 	mu            sync.Mutex
 	live          string   // the refresh token Patreon honours
@@ -95,7 +97,7 @@ func (p *patreonStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/api/oauth2/token":
 		p.serveToken(w, r)
 	case r.URL.Path == "/api/oauth2/v2/identity":
-		p.serveIdentity(w)
+		p.serveIdentity(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/oauth2/v2/members/"):
 		p.serveMember(w)
 	default:
@@ -145,11 +147,15 @@ func (p *patreonStub) serveToken(w http.ResponseWriter, r *http.Request) {
 	reply(w, stubAnswer{http.StatusOK, body})
 }
 
-func (p *patreonStub) serveIdentity(w http.ResponseWriter) {
+func (p *patreonStub) serveIdentity(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.identityCalls++
-	canned := p.identity
+	canned, delay := p.identity, p.identityDelay
 	p.mu.Unlock()
+	time.Sleep(delay)
+	if r.Context().Err() != nil {
+		return
+	}
 	if canned != nil {
 		reply(w, *canned)
 		return
