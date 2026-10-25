@@ -9,8 +9,11 @@
 --
 -- This script re-mints any new variants and re-inserts the recent window into
 -- prices with ON CONFLICT DO NOTHING, so only the missing rows are added. It is
--- idempotent and safe to re-run. Set :since to comfortably before the backfill
--- start (default 2026-07-01 covers the whole drift window as of the migration).
+-- idempotent and safe to re-run until 09_alt_copies.sql has run, but not after:
+-- product_prices rows from before that deploy carry isAlternative in is_alt, so
+-- it would re-mint the variants 09 folds. Set :since to comfortably before the
+-- backfill start (default 2026-07-01 covers the whole drift window as of the
+-- migration).
 --
 --   psql ... -v since=2026-07-01 -f 08_catchup.sql
 --

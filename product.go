@@ -1019,10 +1019,12 @@ func buylistMetrics(b *mtgmatcher.Backend, store string, reducers map[string]buy
 			continue
 		}
 
+		v := magicVariant(co)
 		stats, ok := statsByCard[timeseries.AggregatePriceKey{
-			MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
-			IsFoil:      co.Foil,
-			IsEtched:    co.Etched,
+			MtgjsonUUID: v.MtgjsonUUID,
+			IsFoil:      v.IsFoil,
+			IsEtched:    v.IsEtched,
+			IsAlt:       v.IsAlt,
 		}]
 		if !ok {
 			continue

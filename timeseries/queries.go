@@ -127,11 +127,13 @@ func (c *Client) upsertBatch(ctx context.Context, batch []PriceRow) (int, error)
 }
 
 // AggregatePriceKey identifies a card variant in an aggregate result map.
-// Language and is_alt are intentionally omitted: we aggregate across them.
+// Language is intentionally omitted: we aggregate across it. IsAlt is kept,
+// since the Alternate Fourth Edition copy shares its original's uuid.
 type AggregatePriceKey struct {
 	MtgjsonUUID string
 	IsFoil      bool
 	IsEtched    bool
+	IsAlt       bool
 }
 
 // AggregatePriceStats holds per-card summary statistics of one price column

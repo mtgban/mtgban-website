@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -265,10 +266,10 @@ func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lo
 		return nil, nil
 	}
 
-	results, err := PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+	results, err := PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, target.Alt, lb)
 	if err != nil {
-		log.Printf("chart: uuid %s foil=%t etched=%t (%s): %v",
-			target.UUID, target.Foil, target.Etched, target.Name, err)
+		log.Printf("chart: uuid %s foil=%t etched=%t alt=%t (%s): %v",
+			target.UUID, target.Foil, target.Etched, target.Alt, target.Name, err)
 		return nil, err
 	}
 	return results, nil
@@ -571,24 +572,34 @@ func snapshotDate(ts time.Time, now time.Time) string {
 	return tsDay
 }
 
-// getRow returns the accumulator row for a card variant, creating it if
-// needed. The dedup key must match the Postgres unique index on
-// product_prices: (date, mtgjson_uuid, is_foil, is_etched, language, is_alt).
-// Without NormalizeUUID + isAlt, two distinct mtgmatcher UUIDs (e.g. a base
-// and its "_alt" sibling) collapse into the same conflict bucket on insert
-// and Postgres rejects the whole batch.
-func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil bool, isEtched bool, isAlt bool, language string, date string) *timeseries.PriceRow {
-	uuid = timeseries.NormalizeUUID(uuid)
-	key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched) + "|" + strconv.FormatBool(isAlt) + "|" + language
+// magicVariant is the variant a Magic card's prices are filed under. The uuid
+// column holds mtgjson's 36 characters, so is_alt is what tells the
+// Alternate Fourth Edition copy ("<uuid>_alt") from the printing it copies.
+func magicVariant(co *mtgmatcher.CardObject) timeseries.MagicVariant {
+	return timeseries.MagicVariant{
+		MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
+		IsFoil:      co.Foil,
+		IsEtched:    co.Etched,
+		IsAlt:       strings.Contains(co.UUID, "_alt"),
+		Language:    co.Language,
+	}
+}
+
+// getRow returns the accumulator row for a card's variant on a date, creating
+// it if needed. The key matches the unique index on product_prices: (date,
+// mtgjson_uuid, is_foil, is_etched, language, is_alt).
+func getRow(accumulated map[string]*timeseries.PriceRow, card *mtgmatcher.CardObject, date string) *timeseries.PriceRow {
+	v := magicVariant(card)
+	key := date + "|" + v.MtgjsonUUID + "|" + strconv.FormatBool(v.IsFoil) + "|" + strconv.FormatBool(v.IsEtched) + "|" + strconv.FormatBool(v.IsAlt) + "|" + v.Language
 	row, ok := accumulated[key]
 	if !ok {
 		row = &timeseries.PriceRow{
 			Date:        date,
-			MtgjsonUUID: uuid,
-			IsFoil:      isFoil,
-			IsEtched:    isEtched,
-			IsAlt:       isAlt,
-			Language:    &language,
+			MtgjsonUUID: v.MtgjsonUUID,
+			IsFoil:      v.IsFoil,
+			IsEtched:    v.IsEtched,
+			IsAlt:       v.IsAlt,
+			Language:    &v.Language,
 		}
 		accumulated[key] = row
 	}
@@ -988,7 +999,7 @@ func (s *site) stashInTimeseries() {
 	// Accumulate all prices into a single row per (date, uuid, foil, etched).
 	accumulated := map[string]*timeseries.PriceRow{}
 	walkSnapshotPrices(b, start, func(card *mtgmatcher.CardObject, config DatasetConfig, date string, price float64) {
-		row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
+		row := getRow(accumulated, card, date)
 		row.SetPriceForDataset(config.Index, price)
 	})
 
