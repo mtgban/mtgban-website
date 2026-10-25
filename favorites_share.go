@@ -23,27 +23,34 @@ type SharedVars struct {
 	SharedSignedIn bool
 }
 
-// sharedFavorite is one row of a shared list: the fields the owner's pane
-// syncs (trimFavorite in user-state.js) that the page shows or Merge copies.
-// pinned and del arrive as whatever the browser held, a time or a bool.
-// img and cw are the datastore's for the row's id, never the owner's.
+// sharedEntry is what a shared row takes from the owner's synced list
+// (trimFavorite in user-state.js): which card, when it was added, and its
+// pin and tombstone, which arrive as whatever the browser held, a time or a
+// bool.
+type sharedEntry struct {
+	ID     string          `json:"id"`
+	T      float64         `json:"t"`
+	Pinned json.RawMessage `json:"pinned,omitempty"`
+	Del    json.RawMessage `json:"del,omitempty"`
+}
+
+// sharedFavorite is one row of a shared list as the page shows it and Merge
+// copies it, in the shape the pane keeps. Every field is the datastore's for
+// the row's id, never the owner's.
 type sharedFavorite struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Set         string          `json:"set"`
-	Edition     string          `json:"edition"`
-	Number      string          `json:"number"`
-	Foil        bool            `json:"foil"`
-	Etched      bool            `json:"etched"`
-	FinishTag   string          `json:"finishTag"`
-	FinishClass string          `json:"finishClass"`
-	Treatments  []string        `json:"treatments"`
-	Img         string          `json:"img"`
-	CW          bool            `json:"cw"`
-	Query       string          `json:"query"`
-	T           float64         `json:"t"`
-	Pinned      json.RawMessage `json:"pinned,omitempty"`
-	Del         json.RawMessage `json:"del,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Set         string   `json:"set"`
+	Edition     string   `json:"edition"`
+	Number      string   `json:"number"`
+	Foil        bool     `json:"foil"`
+	Etched      bool     `json:"etched"`
+	FinishTag   string   `json:"finishTag"`
+	FinishClass string   `json:"finishClass"`
+	Treatments  []string `json:"treatments"`
+	Img         string   `json:"img"`
+	CW          bool     `json:"cw"`
+	Query       string   `json:"query"`
 }
 
 // sharedFavoritesStore is what the page reads: the owner's favorites behind
@@ -132,29 +139,31 @@ func (s *site) renderShared(w http.ResponseWriter, r *http.Request, status int, 
 }
 
 // sharedRows reads a favorites column the way the owner's pane shows it:
-// tombstones and nameless entries out, pinned first, newest first, at most
-// sharedListCap rows. Unreadable JSON is an empty list. The art comes from
-// b, not the owner: a synced img reaches every visitor as an <img src>.
+// tombstones out, pinned first, newest first, at most
+// sharedListCap rows. Unreadable JSON is an empty list. A row whose id names
+// no card is dropped, and the rest are drawn from b: the owner's synced
+// text and art would reach every visitor, and Merge would copy them.
 func sharedRows(b *mtgmatcher.Backend, raw json.RawMessage) []sharedFavorite {
-	var all []sharedFavorite
-	if err := json.Unmarshal(raw, &all); err != nil {
+	var all []sharedEntry
+	err := json.Unmarshal(raw, &all)
+	if err != nil {
 		log.Println("favorites share: list:", err)
 		return nil
 	}
-	var rows []sharedFavorite
-	for _, f := range all {
-		if jsonTruthy(f.Del) || f.ID == "" || f.Name == "" {
+	var live []sharedEntry
+	for _, e := range all {
+		if jsonTruthy(e.Del) {
 			continue
 		}
-		f.Img, f.CW = "", false
-		if co, err := b.GetUUID(f.ID); err == nil {
-			f.Img = cmp.Or(co.Images["thumbnail"], co.Images["full"])
-			f.CW = co.Card.HasContentWarning
+		_, err := b.GetUUID(e.ID)
+		if err != nil {
+			continue
 		}
-		rows = append(rows, f)
+		live = append(live, e)
 	}
-	slices.SortStableFunc(rows, func(a, b sharedFavorite) int {
-		if pa, pb := jsonTruthy(a.Pinned), jsonTruthy(b.Pinned); pa != pb {
+	slices.SortStableFunc(live, func(a, b sharedEntry) int {
+		pa, pb := jsonTruthy(a.Pinned), jsonTruthy(b.Pinned)
+		if pa != pb {
 			if pa {
 				return -1
 			}
@@ -162,10 +171,40 @@ func sharedRows(b *mtgmatcher.Backend, raw json.RawMessage) []sharedFavorite {
 		}
 		return cmp.Compare(b.T, a.T)
 	})
-	if len(rows) > sharedListCap {
-		rows = rows[:sharedListCap]
+	if len(live) > sharedListCap {
+		live = live[:sharedListCap]
+	}
+	rows := make([]sharedFavorite, 0, len(live))
+	for _, e := range live {
+		rows = append(rows, sharedCard(b, e.ID))
 	}
 	return rows
+}
+
+// sharedCard is the row for a card id the way search shows the card, and
+// the query its result links to.
+func sharedCard(b *mtgmatcher.Backend, id string) sharedFavorite {
+	card := uuid2card(b, id, false)
+	co, _ := b.GetUUID(id)
+	treatments := make([]string, 0, len(card.Treatments))
+	for _, promoType := range card.Treatments {
+		treatments = append(treatments, card.PromoLabels[promoType])
+	}
+	return sharedFavorite{
+		ID:          id,
+		Name:        card.Name,
+		Set:         card.SetCode,
+		Edition:     card.Edition,
+		Number:      card.Number,
+		Foil:        card.Foil,
+		Etched:      card.Etched,
+		FinishTag:   card.FinishTag,
+		FinishClass: card.FinishClass,
+		Treatments:  treatments,
+		Img:         cmp.Or(card.ImageURL, card.FullImageURL),
+		CW:          card.HasContentWarning,
+		Query:       genQuery(co),
+	}
 }
 
 // jsonTruthy reads a JSON value the way the pane's JS does: absent, null,
