@@ -1369,11 +1369,23 @@
         };
     }
 
-    // ckStore loads Card Kingdom's store cart, kept by its cookies, one card
-    // per call keyed by <product id>-<style>, setting each quantity. Above
-    // the stock CK answers with how many it has, and the card goes again at
-    // that.
+    // ckStore loads Card Kingdom's store cart, kept by its cookies, through
+    // its deck builder's add, which sets every <product id>-<style> of a
+    // chunk in one call. A card that add leaves out, above the stock, goes
+    // again alone, and CK answers that one with how many it has.
     function ckStore() {
+        async function lines() {
+            var resp = await fetch("/api/cart?v=" + Date.now());
+            if (!resp.ok) {
+                throw new Error("Card Kingdom could not read your cart (" + resp.status + ").");
+            }
+            var body = await resp.json();
+            var found = {};
+            ((body.cart || body).lineitems || []).forEach(function (line) {
+                found[line.product_id + "-" + line.style] = line.qty;
+            });
+            return found;
+        }
         async function add(id, qty) {
             var parts = id.split("-");
             var resp = await fetch("/api/cart/add", {
@@ -1400,23 +1412,33 @@
                 return true;
             },
             maxLines: 0,
-            // An add takes 0.4 to 2.5 s
-            chunkSize: 10,
+            // The builder's add takes 300 cards in about 18 s
+            chunkSize: 100,
             cartIDs: async function () {
-                var resp = await fetch("/api/cart?v=" + Date.now());
-                if (!resp.ok) {
-                    throw new Error("Card Kingdom could not read your cart (" + resp.status + ").");
-                }
-                var body = await resp.json();
-                return ((body.cart || body).lineitems || []).map(function (line) {
-                    return line.product_id + "-" + line.style;
-                });
+                return Object.keys(await lines());
             },
-            // CK answers a product it does not have with a message, and the
-            // card is reported as not taken
+            // The builder's add skips a card asked above the available count
+            // sent with it, so the count is the quantity. It skips a product
+            // CK does not have without a word too, and that card is reported
+            // as not taken.
             send: async function (chunk, qty) {
+                var body = new URLSearchParams({dest: "/cart"});
+                chunk.forEach(function (id) {
+                    var parts = id.split("-");
+                    var card = "[" + parts[0] + "][" + parts[1] + "]";
+                    body.append("qty" + card, String(qty[id]));
+                    body.append("available" + card, String(qty[id]));
+                });
+                // It answers with a redirect to the cart page, not followed
+                var resp = await fetch("/api/builder/addMultiple", {method: "POST", body: body, redirect: "manual"});
+                if (resp.type !== "opaqueredirect" && !resp.ok) {
+                    throw new Error("Card Kingdom refused the list (" + resp.status + ").");
+                }
+                var now = await lines();
                 for (var i = 0; i < chunk.length; i++) {
-                    await add(chunk[i], qty[chunk[i]]);
+                    if (now[chunk[i]] !== qty[chunk[i]]) {
+                        await add(chunk[i], qty[chunk[i]]);
+                    }
                 }
                 return true;
             }
