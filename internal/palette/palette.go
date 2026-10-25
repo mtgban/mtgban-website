@@ -34,9 +34,9 @@ type Service struct {
 	// endpoint.
 	Sellers func() []mtgban.Seller
 	Vendors func() []mtgban.Vendor
-	// HiddenStores returns the stores the stores endpoint leaves out, nil
-	// for none.
-	HiddenStores func() []string
+	// HiddenStores returns the sellers and vendors the stores endpoint
+	// leaves out for the request's reader, nil for none.
+	HiddenStores func(r *http.Request) (sellers, vendors []string)
 
 	// PromoAliases returns the shorthands a promo type also answers to, so
 	// the endpoint can offer them beside the type itself.
@@ -730,15 +730,17 @@ type StoresResponse struct {
 // Stores returns seller and vendor shorthand lists.
 func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=600")
+	// The list depends on the reader's signature, which the browser's
+	// cache does not key on, so it is fetched afresh every time.
+	w.Header().Set("Cache-Control", "private, no-cache")
 
 	out := StoresResponse{
 		Sellers: []Store{},
 		Vendors: []Store{},
 	}
-	var hidden []string
+	var hiddenSellers, hiddenVendors []string
 	if s.HiddenStores != nil {
-		hidden = s.HiddenStores()
+		hiddenSellers, hiddenVendors = s.HiddenStores(r)
 	}
 	seen := map[string]bool{}
 	for _, seller := range s.Sellers() {
@@ -746,7 +748,7 @@ func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		info := seller.Info()
-		if seen["s:"+info.Shorthand] || slices.Contains(hidden, info.Shorthand) {
+		if seen["s:"+info.Shorthand] || slices.Contains(hiddenSellers, info.Shorthand) {
 			continue
 		}
 		seen["s:"+info.Shorthand] = true
@@ -763,7 +765,7 @@ func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		info := vendor.Info()
-		if seen["v:"+info.Shorthand] || slices.Contains(hidden, info.Shorthand) {
+		if seen["v:"+info.Shorthand] || slices.Contains(hiddenVendors, info.Shorthand) {
 			continue
 		}
 		seen["v:"+info.Shorthand] = true

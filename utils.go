@@ -1628,6 +1628,12 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 	return blocklistsFromValues(parseSig(sig))
 }
 
+// requestBlocklists is getDefaultBlocklists for the request's verified
+// signature.
+func requestBlocklists(r *http.Request) ([]string, []string) {
+	return getDefaultBlocklists(verifiedSignature(r))
+}
+
 // blocklistsFromValues reads the store blocklists off ACL values, as
 // sigBlocklists does, plus the stores only the price API serves, blocked
 // whatever the values say.
