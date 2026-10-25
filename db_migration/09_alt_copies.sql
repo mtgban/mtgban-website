@@ -7,7 +7,7 @@
 -- The 378 Fourth Edition printings the copies are made from keep theirs: their
 -- is_alt variants hold the copies' own prices. The list is every 4ED card mtgjson
 -- numbers without a dagger, the ones go-mtgban copies. Only the long tables are
--- touched. Do not re-run 08_catchup.sql after this: it reads is_alt off
+-- touched. Do not run retired/08_catchup.sql.txt after this: it reads is_alt off
 -- product_prices, whose rows from before the deploy carry isAlternative, and
 -- would bring the folded variants back.
 --

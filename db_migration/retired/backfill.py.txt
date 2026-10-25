@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+raise SystemExit("Retired: it rebuilds the long tables from product_prices and would undo 09 and 10. See retired/README.md.")
 """Checkpointed driver for the card_prices redesign backfill.
 
 Every unit of work is recorded in migration.progress. Each price chunk runs as a

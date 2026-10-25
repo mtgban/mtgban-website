@@ -1,72 +1,33 @@
-# card_prices redesign — migration workspace
+# card_prices long tables
 
-Implements `~/Desktop/card_prices_redesign_plan.md`: collapses the two wide price
-tables (`product_prices`, `tcgplayer_nonmagic_product_prices`) into a unified
-identity space (`variants`) + a long, date-partitioned `prices(ban_id, date,
-provider, price)` table, with a `providers` lookup.
+Implements `~/Desktop/card_prices_redesign_plan.md`: one identity space
+(`variants`) and a long, date-partitioned `prices(ban_id, date, provider,
+price)` table, with a `providers` lookup, in place of the two wide price tables
+(`product_prices`, `tcgplayer_nonmagic_product_prices`).
 
-**Build-alongside:** the old tables are never altered. Reads stay on them until
-the Go rewrite (task #7) cuts over. Rollback = point code back at the old tables.
+The site reads only the long tables. The stash still writes `product_prices`
+alongside them, and nothing reads it. The tools that backfilled the long tables
+from the wide ones are in `retired/` and must not run again; its README says
+why.
 
-## Checkpointing / resume
-
-All progress lives in the DB, in schema `migration`:
-- `migration.progress` — one row per unit of work (`phase`, `chunk_key`, `status`).
-- `migration.status` — per-phase rollup view.
-
-Every price chunk runs as a **single atomic statement** (the INSERT and its
-`status='done'` update commit together). So killing the driver — or a network
-drop — mid-chunk rolls the whole chunk back; nothing is half-written. Re-running
-the same command skips `done` chunks and resumes. Idempotent by construction.
-
-### To resume after a disconnect
-```bash
-cd db_migration
-python3 backfill.py status     # see where we are
-python3 backfill.py prices     # resume; re-runs any pending/running/error chunks
-```
-
-## Order of operations
+## A fresh database
 
 | # | Command | What it does | Cost |
 |---|---------|--------------|------|
-| 1 | `python3 backfill.py schema` | Apply `01_schema.sql` + `02_seed_providers.sql` (idempotent) | instant |
-| 2 | `python3 backfill.py variants` | Build Magic + non-Magic `variants` (2 full scans) | ~10-40 min |
-| 3 | `python3 backfill.py estimate` | Sample-based size/row estimate | seconds |
-| 4 | `python3 backfill.py prices` | Backfill all price chunks (resumable) | hours |
-| 5 | `psql -f 05_indexes.sql` | PK + `(provider,date)` index + FKs (ban_id FK NOT VALID) | long |
-| 6 | `psql -f 06_validate_fk.sql` | VALIDATE ban_id FK (off-peak) | medium |
-| 7 | `psql -f 07_verify.sql` | Per-provider parity: source cells == prices rows | heavy |
+| 1 | `psql -f 01_schema.sql` | providers, variants (+partial UKs, identity CHECK), prices (partitioned, no PK/indexes yet) | instant |
+| 2 | `psql -f 02_seed_providers.sql` | 13-provider seed | instant |
+| 3 | `psql -f 05_indexes.sql` | PK + `(provider,date)` index + FKs (ban_id FK NOT VALID) | long on a loaded table |
+| 4 | `psql -f 06_validate_fk.sql` | VALIDATE ban_id FK (off-peak) | medium |
 
-`psql` connection: driver reads `../config.json` `sql_config`, so a local config
-needs it inline (the deployed configs keep it in `infrastructure.json`). For raw
-psql, set `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE` from that block.
+`PK (ban_id, date, provider)`, monthly range partitions, `ban_id` bigint. See
+the plan for D1-D10.
 
-## Key facts (measured 2026-07-27)
+For psql, set `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE/PGSSLMODE` from the
+`sql_config` block of `../config.json` (the deployed configs keep it in
+`infrastructure.json`).
 
-- Magic `product_prices`: ~161M rows, 2020-09 → 2026-07 (~71 months), 35 GB.
-- Non-Magic: **~145M rows** (NOT the 2.97M the plan's stale `reltuples` implied),
-  2024-02 → 2026-07, LIST-partitioned by category across ~10 categories.
-- Full backfill ≈ **1.23B price rows ≈ 157 GB** (heap ~59 + PK ~49 + 2nd idx ~49).
-- `cat_1` partition is empty (droppable); `prices_default` catches strays.
+## One-off repairs
 
-## Decisions (from plan section 0)
-
-Full backfill of **both** Magic and non-Magic. Zeros/nulls omitted (`price > 0`).
-Providers 3/4 (TCGLow/TCGMarket) shared across Magic+non-Magic. `ban_id` bigint.
-PK `(ban_id, date, provider)`; monthly range partitions. See the plan for D1-D10.
-
-## Chunking
-
-- Magic: one chunk per **month** (`product_prices` has an index on `date`).
-- Non-Magic: one chunk per **(category, month)** — the table is partitioned by
-  `category_id` with an index on `(category_id, date)`, so a date-only filter
-  would scan every partition. `cat<id>-YYYY-MM`.
-
-## Files
-
-- `01_schema.sql` — providers, variants (+partial UKs, identity CHECK), prices
-  (partitioned, no PK/indexes yet), `migration.progress` + `migration.status`.
-- `02_seed_providers.sql` — 13-provider seed.
-- `backfill.py` — the checkpointed driver (all commands above).
-- `05_indexes.sql` / `06_validate_fk.sql` / `07_verify.sql` — post-load steps.
+- `09_alt_copies.sql`, then `10_alt_copy_prices.sql`: file `is_alt` only on the
+  Alternate Fourth Edition copies, and put back the prices those copies and
+  their 4ED originals filed on each other's variants. Both ran on 2026-10-25.

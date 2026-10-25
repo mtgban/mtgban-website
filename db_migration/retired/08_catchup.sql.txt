@@ -1,3 +1,5 @@
+\echo 'Retired: it rebuilds the long tables from product_prices and would undo 09 and 10. See retired/README.md.'
+\quit
 -- Reconciliation catch-up (run at cutover, before flipping reads).
 --
 -- The backfill is a point-in-time snapshot, but the live crons keep writing to

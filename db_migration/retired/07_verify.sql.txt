@@ -1,3 +1,5 @@
+\echo 'Retired: it checks the long tables against product_prices, which 09 and 10 made differ on purpose. See retired/README.md.'
+\quit
 -- Backfill parity verification (plan 7.5 / 17.10). Heavy: full scans of both
 -- source tables + one scan of prices. Run after the backfill completes.
 -- Providers 3/4 are shared, so the new-side counts are scoped to Magic vs
