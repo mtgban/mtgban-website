@@ -80,6 +80,24 @@
         var tb = b.getAttribute('data-tool');
         paintSlot(a, tb);
         paintSlot(b, ta);
+        [a, b].forEach(function(s) {
+            if (isTile(s) && inLinksStrip(s.getAttribute('data-tool'))) s.remove();
+        });
+    }
+
+    // inLinksStrip says whether the Links strip lists tool, as it does
+    // Account: such an entry may be pinned to the bar but is never a tile,
+    // since the strip lists it already and the restore script would drop it.
+    function inLinksStrip(tool) {
+        return !!document.querySelector('.tools-quick [data-tool="' + tool + '"]');
+    }
+
+    // demote moves a section button's entry into the grid, or only off the
+    // bar for one the Links strip lists.
+    function demote(btn) {
+        var tool = btn.getAttribute('data-tool');
+        if (!inLinksStrip(tool)) grid.appendChild(createTile(tool));
+        btn.remove();
     }
 
     function createTile(tool) {
@@ -257,9 +275,7 @@
         if (!dragged || !isNavBtn(dragged)) return;
         if (onTargetSlot(e.target)) return;
         e.preventDefault();
-        var tool = dragged.getAttribute('data-tool');
-        grid.appendChild(createTile(tool));
-        dragged.remove();
+        demote(dragged);
         clearIndicators();
         saveLayout();
     });
@@ -283,9 +299,7 @@
             if (!dragged || !isNavBtn(dragged)) return;
             e.preventDefault();
             e.stopPropagation();
-            var tool = dragged.getAttribute('data-tool');
-            grid.appendChild(createTile(tool));
-            dragged.remove();
+            demote(dragged);
             clearIndicators();
             saveLayout();
         });
