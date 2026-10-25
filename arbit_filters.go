@@ -467,8 +467,6 @@ func (st arbitState) apply(b *mtgmatcher.Backend, m arbitMode) (*mtgban.ArbitOpt
 		opts.MaxSpread = MaxSpreadGlobal
 		opts.MaxPriceRatio = MaxPriceRatio
 		opts.Editions = FilteredEditions
-	case m.Sealed && !m.Global:
-		opts.ProfitabilityConstant = ProfConstGlobal
 	}
 
 	if !m.Sealed {

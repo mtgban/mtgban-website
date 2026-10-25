@@ -43,8 +43,8 @@ func TestArbitDefaultsMatchToday(t *testing.T) {
 	}{
 		{"arbit", arbitMode{}, 10, 0, 0, ProfConst, 0, 0, false, false},
 		{"reverse", arbitMode{Reverse: true}, 10, 0, 0, ProfConst, 0, 0, false, false},
-		{"sealed arbit", arbitMode{Sealed: true}, -30, 0, math.Inf(-1), ProfConstGlobal, 0, 0, false, false},
-		{"sealed reverse", arbitMode{Reverse: true, Sealed: true}, -30, 0, math.Inf(-1), ProfConstGlobal, 0, 0, false, false},
+		{"sealed arbit", arbitMode{Sealed: true}, -30, 0, math.Inf(-1), ProfConst, 0, 0, false, false},
+		{"sealed reverse", arbitMode{Reverse: true, Sealed: true}, -30, 0, math.Inf(-1), ProfConst, 0, 0, false, false},
 		{"global", arbitMode{Global: true}, 200, 1000, 5, ProfConst, 1, 1, true, true},
 		{"global with AnySpread", arbitMode{Global: true, AnySpread: true}, 50, 1000, 5, ProfConst, 1, 1, true, true},
 		{"global sealed", arbitMode{Global: true, Sealed: true}, 10, 0, 1, ProfConst, 0, 0, true, false},
