@@ -86,8 +86,24 @@ function cartLink(href, items, rows, qtys) {
         quantities[id] += parseInt(qtys ? qtys[r.idx] : r.qty, 10);
     });
     var pairs = ids.map(function(id) { return id + ':' + quantities[id]; });
-    href = href.replace(/([#&]ban=)[^&]*/, '$1' + pairs.join(',')).replace(/&skip=\d*/, '');
-    return skipped > 0 ? href + '&skip=' + skipped : href;
+    var page = cartPage(href);
+    var list = page.replace(/([#&]ban=)[^&]*/, '$1' + pairs.join(',')).replace(/&skip=\d*/, '');
+    if (skipped > 0) {
+        list += '&skip=' + skipped;
+    }
+    if (page === href) {
+        return list;
+    }
+    var outer = new URL(href);
+    outer.searchParams.set('u', list);
+    return outer.href;
+}
+
+// cartPage is the cart page a link opens, list and all: the link itself, or
+// the u query of SCG's partner redirector, which carries the list inside it.
+function cartPage(href) {
+    var page = new URL(href).searchParams.get('u');
+    return page && page.indexOf('#') >= 0 ? page : href;
 }
 
 // rebuildLoadLists rewrites every list in section from its ticked rows.
@@ -113,7 +129,7 @@ function rebuildLoadLists(section, removedClass) {
         // A cart left with no row the store lists has no button, as the
         // server gives none to such a split
         if (format === 'cart') {
-            el.closest('.cart-load').hidden = /[#&]ban=(&|$)/.test(el.href);
+            el.closest('.cart-load').hidden = /[#&]ban=(&|$)/.test(cartPage(el.href));
         }
     });
 

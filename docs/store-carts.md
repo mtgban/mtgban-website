@@ -638,8 +638,14 @@ the section's, as `scraperCompare` picks its seller.
   the store's own links from us are (`cartAffiliates`), so the cart it fills
   is credited the same way: Card Kingdom's `partner` and `utm_*` query,
   Mint's `utm_*` query, CSI's `utm_referrer`, and SCG's partner redirector,
-  `goto.starcitygames.com/c/<code>/…?u=<page>`, which lands on the sell site
-  with the fragment intact.
+  `goto.starcitygames.com/c/<code>/…?u=<page>`, with the fragment inside
+  `u`: the redirector puts its own query before it, and a privacy tool
+  that skips the redirect and opens `u` alone gets the list too. The
+  redirector answers 400 past about 8,000 characters, so a link that
+  would run past 7,000 (`scgRedirectMax`, a couple of hundred rows)
+  keeps the list after it instead, where a tool that skips the redirect
+  loses it.
+  `js/load-lists.js` rewrites the list inside `u` as rows are unticked.
 - Pressing the button first shows a panel (`js/cart-prompt.js`, from the
   `cart-prompt` partial both pages share), named for the store and side
   pressed, holding the loader to drag to the bookmarks bar:
