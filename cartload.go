@@ -134,14 +134,27 @@ var cartAffiliates = map[string]func(code, page string) string{
 	"MP": func(code, page string) string {
 		return withQuery(page, url.Values{"ref": {code}})
 	},
-	// Through the partner redirector, which keeps the fragment
+	// Through the partner redirector, with the list inside its u query: a
+	// privacy tool that skips the redirect opens u alone. The redirector
+	// refuses a link past about 8 KB, so a longer list goes after it.
 	"SCG": func(code, page string) string {
-		return fmt.Sprintf(starcitygames.PartnerProductURL, url.PathEscape(code)) + "?u=" + url.QueryEscape(page)
+		redirect := fmt.Sprintf(starcitygames.PartnerProductURL, url.PathEscape(code)) + "?u="
+		link := redirect + url.QueryEscape(page)
+		target, list, found := strings.Cut(page, "#")
+		if len(link) <= scgRedirectMax || !found {
+			return link
+		}
+		return redirect + url.QueryEscape(target) + "#" + list
 	},
 }
 
-// affiliated is the cart page as a store's links from us carry it, where an
-// affiliate code is configured for the store.
+// scgRedirectMax is the longest link SCG's partner redirector is sent with
+// the list inside it, under the 8,000 or so characters past which it answers
+// 400, with room for the longest SKUs.
+const scgRedirectMax = 7000
+
+// affiliated is the cart page, its fragment included, as a store's links
+// from us carry it, where an affiliate code is configured for the store.
 func affiliated(prefix, page string) string {
 	credit, found := cartAffiliates[prefix]
 	code := Affiliates().Codes[prefix]
@@ -228,9 +241,9 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 		if rows == "" {
 			return cartLoad{}
 		}
-		link := affiliated(cs.prefix, page) + "#ban=" + rows + "&v=" + cartVersion()
+		page += "#ban=" + rows + "&v=" + cartVersion()
 		if !buylist {
-			link += "&side=retail"
+			page += "&side=retail"
 		}
 		// Rows with no item the loader can take, for it to say were left out
 		skipped := 0
@@ -240,9 +253,9 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 			}
 		}
 		if skipped > 0 {
-			link += "&skip=" + strconv.Itoa(skipped)
+			page += "&skip=" + strconv.Itoa(skipped)
 		}
-		return cartLoad{Store: cs.name, Link: link, Items: strings.Join(items, ",")}
+		return cartLoad{Store: cs.name, Link: affiliated(cs.prefix, page), Items: strings.Join(items, ",")}
 	}
 	return cartLoad{}
 }

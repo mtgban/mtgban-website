@@ -156,6 +156,33 @@ describe('load lists', () => {
         expect(link.box.hidden).toBe(false);
     });
 
+    test("a cart link through SCG's redirector keeps the list inside its u query", () => {
+        const page = 'https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2,SGL-B1:1&v=abc';
+        const href = 'https://goto.starcitygames.com/c/123/3052179/37198?u=' + encodeURIComponent(page);
+        const link = cartButton(href, 'SGL-A1,,SGL-B1');
+        const loaded = loadPage({lists: [link]});
+        loaded.untick(0);
+        const u = new URL(link.href);
+        expect(u.origin + u.pathname).toBe('https://goto.starcitygames.com/c/123/3052179/37198');
+        expect(u.hash).toBe('');
+        expect(u.searchParams.get('u')).toBe('https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-B1:3&v=abc&skip=1');
+        loaded.untick(2);
+        expect(link.box.hidden).toBe(true);
+        loaded.tick(0);
+        loaded.tick(2);
+        expect(link.href).toBe(href);
+        expect(link.box.hidden).toBe(false);
+    });
+
+    test("a cart link too long for SCG's redirector keeps the list after it", () => {
+        const href = 'https://goto.starcitygames.com/c/123/3052179/37198?u=' +
+            encodeURIComponent('https://sellyourcards.starcitygames.com/mtg/uploads') + '#ban=SGL-A1:2,SGL-B1:3&v=abc';
+        const link = cartButton(href, 'SGL-A1,,SGL-B1');
+        const loaded = loadPage({lists: [link]});
+        loaded.untick(0);
+        expect(link.href).toBe(href.replace('SGL-A1:2,', '') + '&skip=1');
+    });
+
     test('a hashes form disables only the unticked row, even for a repeated card', () => {
         const inputs = [
             {name: 'tag', value: 'SCGRetail'},

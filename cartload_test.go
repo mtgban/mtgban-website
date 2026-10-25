@@ -649,7 +649,8 @@ func TestCartLoadAffiliates(t *testing.T) {
 		{"MP", false, "https://manapool.com/cart?ref=banmp#ban="},
 		{"CT1DR", false, "https://www.cardtrader.com/cart/edit?share_code=banct#ban="},
 		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
-		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="},
+		// The list rides inside u, where a tool that skips the redirect finds it
+		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads%23ban%3DSGL-A1%3A2%26v%3D"},
 		// A store with no affiliate query keeps its plain page
 		{"ABUGames", true, "https://abugames.com/cartview/buylist#ban="},
 	} {
@@ -657,9 +658,21 @@ func TestCartLoadAffiliates(t *testing.T) {
 		if !strings.HasPrefix(got, tc.want) {
 			t.Errorf("%s link = %q, want it to start %q", tc.key, got, tc.want)
 		}
+		// The affiliate query keeps the whole fragment after it
+		if !strings.HasSuffix(got, cartVersion()) && !strings.HasSuffix(got, "side=retail") {
+			t.Errorf("%s link = %q lost the end of its list", tc.key, got)
+		}
 	}
 
-	got := affiliated("CK", "https://www.cardkingdom.com/cart")
+	// A list too long for SCG's redirector goes after it
+	long := "https://sellyourcards.starcitygames.com/mtg/uploads#ban=" + strings.Repeat("SGL-MTG-PRM-PRE_OGW_063-ENF1:1,", 300) + "&v=abc"
+	got := affiliated("SCG", long)
+	want := "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="
+	if !strings.HasPrefix(got, want) || !strings.HasSuffix(got, "&v=abc") {
+		t.Errorf("long SCG link = %.200q..., want it to start %q", got, want)
+	}
+
+	got = affiliated("CK", "https://www.cardkingdom.com/cart")
 	if got != "https://www.cardkingdom.com/cart?partner=ban&utm_campaign=ban&utm_medium=affiliate&utm_source=ban" {
 		t.Errorf("CK link = %q", got)
 	}
