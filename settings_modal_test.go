@@ -234,6 +234,41 @@ func TestSettingsValuesAnswersThisPathsCookies(t *testing.T) {
 	}
 }
 
+// No settings-values route hands a script the signature or the session,
+// whichever path it is asked at: their path is the root, which the endpoint
+// never answers for.
+func TestSettingsValuesNeverAnswerTheLoginCookies(t *testing.T) {
+	mux := http.NewServeMux()
+	s := newSite()
+	for _, nav := range ExtraNavs {
+		s.mountNav(mux, nav)
+	}
+	login := []string{signatureCookie, legacySignatureCookie, sessionCookie}
+	query := url.Values{"name": login}
+	served := 0
+	for _, nav := range ExtraNavs {
+		if nav.SettingsTab == "" {
+			continue
+		}
+		served++
+		req := httptest.NewRequest(http.MethodGet, nav.Link+"/settings-values?"+query.Encode(), nil)
+		for _, name := range login {
+			req.AddCookie(&http.Cookie{Name: name, Value: "secret"})
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: status %d, want 200", nav.Link, rec.Code)
+		}
+		if strings.Contains(rec.Body.String(), "secret") {
+			t.Errorf("%s/settings-values answered %s", nav.Link, rec.Body.String())
+		}
+	}
+	if served == 0 {
+		t.Fatal("no page serves settings values")
+	}
+}
+
 // grantSig mints a valid signature carrying the named grants, for a reader
 // with an email, so gates that check the HMAC (offline mode) see it.
 func grantSig(t *testing.T, grants ...string) string {
