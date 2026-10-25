@@ -528,8 +528,6 @@ POST /en/cart/update       qty[27947]=1&qty[27948]=2&qty[436375]=1
 
 ## Card Kingdom: the store cart
 
-The site shows no button for this cart for now; see "What the site does".
-
 Card Kingdom's buylist already takes a whole list through
 `sellcart/partner_import`. Its store has no such import: its deck builder
 (`/builder`, where the upload page's other CK button posts the names) is a
@@ -605,13 +603,11 @@ uploads page offers takes the whole list and prices it itself:
 Each store split the upload optimizer lists gets a "Load at" button where
 the store's cart can take it: ABU's, CSI's, Strike Zone's, Hareruya's,
 Mint's, Manaleak's and Game Nerdz's buylist and store splits, Mana Pool's
-store split, Card Trader's three store splits, and SCG's and Vegas Singles'
-buylist splits. CSI's store button sits beside its deck builder
-button, and Mana Pool's beside its mass entry button, both of which post
-only names. SCG's
-store side and CK's buylist already have their own imports. Card Kingdom's
-store split gets no button for now, though the bookmarklet still fills its
-cart: a load logged a signed-in user out, and the cause is not known yet. The arbit and reverse pages give
+store split, Card Trader's three store splits, Card Kingdom's store split,
+and SCG's and Vegas Singles' buylist splits. CSI's and Card Kingdom's store
+buttons sit beside their deck builder buttons, and Mana Pool's beside its
+mass entry button, all of which post only names. SCG's store side and
+CK's buylist already have their own imports. The arbit and reverse pages give
 each section the same buttons: "Load at" for the store it buys from and
 "Load buylist at" for the store it sells to, each row in the condition the
 store sells it in (`cartLoadForArbit`). Mint's feed caps its stock at

@@ -207,8 +207,8 @@ func TestCartRows(t *testing.T) {
 		// Each condition its own class in the store, one class on the buylist
 		{"HA", false, "27947:3,27948:1"},
 		{"HA", true, "356866:4"},
-		// Card Kingdom's store cart has no button for now
-		{"CK", false, ""},
+		{"CK", false, "10190-NM:3,10190-EX:1"},
+		// Only CK's own split, not its sealed or graded ones
 		{"CKSealed", false, ""},
 		{"CKGraded", false, ""},
 	} {
@@ -276,6 +276,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"SZ", false, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Strike Zone"`},
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
 		{"HA", false, `href="https://www.hareruyamtg.com/en/cart#ban=27947:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya"`},
+		{"CK", false, `href="https://www.cardkingdom.com/cart#ban=10190-NM:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Card Kingdom"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -315,7 +316,7 @@ func TestCartLoadButtons(t *testing.T) {
 		t.Error("CSI's deck builder button is not told apart from its cart's")
 	}
 
-	for _, key := range []string{"MKM", "SCG", "CK", "CKGraded", "CKSealed"} {
+	for _, key := range []string{"MKM", "SCG", "CKGraded", "CKSealed"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
 			OptimizedKeys:   []string{key},
@@ -644,6 +645,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 		buylist bool
 		want    string
 	}{
+		{"CK", false, "https://www.cardkingdom.com/cart?partner=ban&utm_campaign=ban&utm_medium=affiliate&utm_source=ban#ban="},
 		{"MMC", true, "https://www.mtgmintcard.com/buylist-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"MMC", false, "https://www.mtgmintcard.com/shopping-cart?utm_campaign=banmint&utm_medium=referral&utm_source=banmint#ban="},
 		{"MP", false, "https://manapool.com/cart?ref=banmp#ban="},

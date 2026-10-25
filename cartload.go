@@ -43,9 +43,7 @@ var cartStores = []cartStore{
 	// Card Trader buys nothing; its store cart is filled from the listings
 	// live at load time
 	{"CT", "Card Trader", "", "https://www.cardtrader.com/cart/edit"},
-	// Card Kingdom's store cart, https://www.cardkingdom.com/cart, gets no
-	// button until a load that logs a signed-in user out is explained
-	{"CK", "Card Kingdom", "", ""},
+	{"CK", "Card Kingdom", "", "https://www.cardkingdom.com/cart"},
 }
 
 // cartRetailIDs name a store row the way a store's cart takes it, for a store
