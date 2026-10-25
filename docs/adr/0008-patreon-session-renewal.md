@@ -135,13 +135,15 @@ without the reader.
   tier change; a grant edit pokes its grantee; an access table that
   differs from the one it replaces, saved here, reloaded after a peer's
   save or by the admin's config reload, stamps the poke set, and every
-  signature issued before the stamp renews on its next request, since
-  its page flags were baked in from the old table. A start or a deploy
-  stamps nothing, and neither does a reload that finds the same table,
-  as the listener's does after every reconnect. After an ACL edit every
-  active reader costs one Patreon round trip, spread over the days they
-  come back and serialised per account by the lease. **Refresh now** on
-  the account page does the same on demand.
+  signature issued before the stamp is re-signed on its next request,
+  since its page flags were baked in from the old table. The edit
+  changes nothing Patreon knows, so the re-sign asks it nothing: it
+  keeps the reader, the tier and the `Expires` the signature had and
+  takes the flags of the table now, so an ACL save costs no Patreon
+  call and extends no session. A start or a deploy stamps nothing, and
+  neither does a reload that finds the same table, as the listener's
+  does after every reconnect. **Refresh now** on the account page
+  renews from Patreon on demand.
 - A renewal on one device renews the token every device's row holds,
   under the account's lease, so no row is left with the token Patreon just
   rotated away. The renewal lease and commit are therefore per account,

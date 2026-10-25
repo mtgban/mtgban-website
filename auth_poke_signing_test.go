@@ -385,47 +385,77 @@ func TestRefreshNowAnswersAPoke(t *testing.T) {
 	}
 }
 
+// wantReminted fails unless the request was served on a signature re-signed
+// from old under the access table now: the same reader, tier and Expires, set
+// alone in the cookie, with Patreon not asked; the same signature, where the
+// table gives the same flags. It returns the new signature.
+func (rig *renewalRig) wantReminted(got *served, old string) string {
+	rig.t.Helper()
+	set := setCookies(got.rec)
+	fresh := set[signatureCookie]
+	if len(got.rec.Result().Cookies()) != 1 || fresh == nil {
+		rig.t.Fatalf("Set-Cookie %q, want %s alone", got.rec.Header().Values("Set-Cookie"), signatureCookie)
+	}
+	_, valid := signatureIsValid(fresh.Value)
+	if !valid || !got.reached || got.sig != fresh.Value {
+		rig.t.Errorf("cookie valid %v, handler reached %v on it %v; want a valid signature served", valid, got.reached, got.sig == fresh.Value)
+	}
+	for _, key := range []string{"Expires", "UserEmail", "UserName", "UserTier"} {
+		if GetParamFromSig(fresh.Value, key) != GetParamFromSig(old, key) {
+			rig.t.Errorf("%s %q, want the old signature's %q", key, GetParamFromSig(fresh.Value, key), GetParamFromSig(old, key))
+		}
+	}
+	if rig.stub.calls() != 0 {
+		rig.t.Errorf("%d refreshes, want Patreon left alone", rig.stub.calls())
+	}
+	return fresh.Value
+}
+
 // An edit of the access table reaches a reader on their next request: the
-// signature, young as it is, is renewed from the table as it is now, the page
-// flag the edit turned on comes with it, and the renewed signature, issued
-// after the edit, is left alone.
-func TestSigningRenewsAfterAnACLEdit(t *testing.T) {
-	rig := newRenewalRig(t, renewalBlock)
-	freshPokes(t)
-	files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[]`)
-	session := rig.session("")
-	young := rig.sig("Legacy", 1*day)
-	if GetParamFromSig(young, "Upload") != "" {
-		t.Fatal("the signature was minted with the flag the edit is to turn on")
-	}
+// signature, young as it is, is re-signed under the table as it is now, the
+// page flag the edit turned on comes with it, nothing else changes, and the
+// re-signed signature is left alone. A browser with no session is reached
+// too, since nothing is asked of Patreon.
+func TestSigningReSignsAfterAnACLEdit(t *testing.T) {
+	for name, withSession := range map[string]bool{"with a session": true, "without one": false} {
+		t.Run(name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			freshPokes(t)
+			files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[]`)
+			session := ""
+			if withSession {
+				session = rig.session("")
+			}
+			young := rig.sig("Legacy", 1*day)
+			if GetParamFromSig(young, "Upload") != "" {
+				t.Fatal("the signature was minted with the flag the edit is to turn on")
+			}
 
-	// Nothing edited
-	rig.wantUntouched(rig.page(browser(young, session)...), young)
+			// Nothing edited
+			rig.wantUntouched(rig.page(browser(young, session)...), young)
 
-	files.set("acl", `{"Legacy":{"Search":{},"Upload":{}}}`)
-	err := reloadACL(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
+			files.set("acl", `{"Legacy":{"Search":{},"Upload":{}}}`)
+			err := reloadACL(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	got := rig.page(browser(young, session)...)
-	fresh := rig.wantRenewed(got, young, session)
-	if GetParamFromSig(got.sig, "Upload") != "true" || GetParamFromSig(fresh, "Upload") != "true" {
-		t.Errorf("the page was served with Upload %q and the cookie got %q, want the flag the edit turned on", GetParamFromSig(got.sig, "Upload"), GetParamFromSig(fresh, "Upload"))
-	}
-	if !strings.Contains(rig.logged.String(), "cause=acl verdict=entitled") {
-		t.Errorf("admin log %q does not tell the cause", rig.logged.String())
-	}
-
-	rig.wantUntouched(rig.page(browser(fresh, session)...), fresh)
-	if rig.stub.calls() != 1 {
-		t.Errorf("%d refreshes, want 1 for the edit", rig.stub.calls())
+			got := rig.page(browser(young, session)...)
+			fresh := rig.wantReminted(got, young)
+			if GetParamFromSig(fresh, "Upload") != "true" {
+				t.Errorf("the page was served with Upload %q, want the flag the edit turned on", GetParamFromSig(fresh, "Upload"))
+			}
+			if !strings.Contains(rig.logged.String(), "cause=acl verdict=reminted") {
+				t.Errorf("admin log %q does not tell the cause", rig.logged.String())
+			}
+			rig.wantUntouched(rig.page(browser(fresh, session)...), fresh)
+		})
 	}
 }
 
 // The stamp asks for the signatures issued before it and no others, however
 // young or old they are, and an age that is due renews for its age.
-func TestSigningStampRenewsOnlyWhatWasIssuedBeforeIt(t *testing.T) {
+func TestSigningStampReSignsOnlyWhatWasIssuedBeforeIt(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		age   time.Duration
@@ -445,24 +475,27 @@ func TestSigningStampRenewsOnlyWhatWasIssuedBeforeIt(t *testing.T) {
 			pokes.StampACL(time.Now().Add(-2 * day))
 
 			got := rig.page(browser(old, session)...)
-			if tc.cause == "" {
+			switch tc.cause {
+			case "":
 				rig.wantUntouched(got, old)
 				if rig.stub.calls() != 0 || rig.restingFor(session) > 0 {
 					t.Errorf("%d refreshes, session resting %.0fs; want none and a session left alone", rig.stub.calls(), rig.restingFor(session))
 				}
-				return
-			}
-			rig.wantRenewed(got, old, session)
-			if !strings.Contains(rig.logged.String(), "cause="+tc.cause+" verdict=entitled") {
-				t.Errorf("admin log %q, want cause=%s", rig.logged.String(), tc.cause)
+			case "acl":
+				rig.wantReminted(got, old)
+			default:
+				rig.wantRenewed(got, old, session)
+				if !strings.Contains(rig.logged.String(), "cause="+tc.cause+" verdict=entitled") {
+					t.Errorf("admin log %q, want cause=%s", rig.logged.String(), tc.cause)
+				}
 			}
 		})
 	}
 }
 
-// While Patreon gives no answer the sessions rest an hour, and the requests
-// inside the hour cost Patreon nothing, edit or no edit.
-func TestSigningStampWithPatreonDownRestsTheSessions(t *testing.T) {
+// An edit of the access table asks Patreon nothing, so Patreon being down
+// neither keeps the edit from the reader nor rests their sessions.
+func TestSigningStampReSignsWithPatreonDown(t *testing.T) {
 	rig := newRenewalRig(t, renewalBlock)
 	pokes := freshPokes(t)
 	rig.stub.token = &stubAnswer{http.StatusInternalServerError, `{"errors":[{"title":"boom"}]}`}
@@ -470,16 +503,30 @@ func TestSigningStampWithPatreonDownRestsTheSessions(t *testing.T) {
 	young := rig.sig("Legacy", 1*day)
 	pokes.StampACL(time.Now())
 
-	rig.wantUntouched(rig.page(browser(young, session)...), young)
-	wait := rig.restingFor(session)
-	if wait < 59*60 || wait > 61*60 {
-		t.Errorf("sessions rest %.0fs, want an hour", wait)
+	fresh := rig.wantReminted(rig.page(browser(young, session)...), young)
+	if rig.restingFor(session) > 0 {
+		t.Errorf("sessions rest %.0fs, want them left alone", rig.restingFor(session))
 	}
-	for range 3 {
-		rig.wantUntouched(rig.page(browser(young, session)...), young)
+	rig.wantUntouched(rig.page(browser(fresh, session)...), fresh)
+}
+
+// A reader both poked and behind an edit of the access table, in a browser
+// with no session to renew from, is re-signed for the edit all the same.
+func TestSigningStampReSignsAPokedReaderWithoutASession(t *testing.T) {
+	rig := newRenewalRig(t, renewalBlock)
+	pokes := freshPokes(t)
+	files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[]`)
+	young := rig.sig("Legacy", 1*day)
+	pokes.Poke(rig.hash, time.Now().Add(-time.Hour), pokeWindow())
+	files.set("acl", `{"Legacy":{"Search":{},"Upload":{}}}`)
+	err := reloadACL(t.Context())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if rig.stub.calls() != 1 {
-		t.Errorf("%d refreshes inside the backoff, want the 1 that found Patreon down", rig.stub.calls())
+
+	fresh := rig.wantReminted(rig.page(browser(young, "")...), young)
+	if GetParamFromSig(fresh, "Upload") != "true" {
+		t.Errorf("re-signed with Upload %q, want the flag the edit turned on", GetParamFromSig(fresh, "Upload"))
 	}
 }
 
@@ -545,12 +592,12 @@ func TestRenewalLogsWhatAskedForIt(t *testing.T) {
 		{"an age that is due", 9 * day, false, false, false, nil, "cause=due verdict=entitled"},
 		{"a signature that ran out within grace", 11*day + 2*time.Hour, false, false, false, nil, "cause=grace verdict=entitled"},
 		{"a poke", 1 * day, true, false, false, nil, "cause=poke verdict=entitled"},
-		{"an edit of the access table", 3 * day, false, true, false, nil, "cause=acl verdict=entitled"},
+		{"an edit of the access table", 3 * day, false, true, false, nil, "cause=acl verdict=reminted"},
 		{"a poke and an edit", 3 * day, true, true, false, nil, "cause=poke verdict=entitled"},
 		{"a poke and an age that is due", 9 * day, true, false, false, nil, "cause=due verdict=entitled"},
 		{"Refresh now", 1 * day, false, false, true, nil, "cause=refresh verdict=entitled"},
 		{"a poke Patreon does not answer", 1 * day, true, false, false, func(p *patreonStub) { p.token = &stubAnswer{500, `{}`} }, "cause=poke verdict=unknown"},
-		{"an edit when nothing is pledged", 3 * day, false, true, false, func(p *patreonStub) { p.title = "" }, "cause=acl verdict=not entitled"},
+		{"an edit, whatever Patreon would say", 3 * day, false, true, false, func(p *patreonStub) { p.title = "" }, "cause=acl verdict=reminted"},
 		{"a poke with a refresh token Patreon refuses", 1 * day, true, false, false, func(p *patreonStub) { p.token = &stubAnswer{401, `{"error":"invalid_grant"}`} }, "cause=poke verdict=invalid_grant"},
 		{"Refresh now when nothing is pledged", 1 * day, false, false, true, func(p *patreonStub) { p.title = "" }, "cause=refresh verdict=not entitled"},
 	} {

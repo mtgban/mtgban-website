@@ -20,11 +20,16 @@ type Set struct {
 	mu         sync.RWMutex
 	at         map[string]time.Time // the reader's email hash -> when poked
 	aclChanged time.Time
+	// reminted is the signatures re-signed under the access table since it
+	// last changed, by the HMAC each carries, with when each runs out: a
+	// re-signed signature keeps its Expires, so its age cannot tell it from
+	// the one it replaced.
+	reminted map[string]time.Time
 }
 
 // New returns an empty Set.
 func New() *Set {
-	return &Set{at: map[string]time.Time{}}
+	return &Set{at: map[string]time.Time{}, reminted: map[string]time.Time{}}
 }
 
 // Poke marks the reader with the given email hash as poked at at, and drops the
@@ -57,12 +62,28 @@ func (s *Set) Len() int {
 }
 
 // StampACL records that the access table changed at now. Every signature
-// issued before it renews on its next request, since the page flags it carries
-// were baked in from the old table.
+// issued before it is re-signed on its next request, since the page flags it
+// carries were baked in from the old table, and the ones re-signed under the
+// table it replaces are forgotten.
 func (s *Set) StampACL(now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.aclChanged = now.Truncate(time.Second)
+	s.reminted = map[string]time.Time{}
+}
+
+// Reminted records that the signature carrying the HMAC signature was
+// re-signed under the current access table and runs out at expires, and
+// forgets those that ran out by now.
+func (s *Set) Reminted(signature string, expires, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for other, end := range s.reminted {
+		if !now.Before(end) {
+			delete(s.reminted, other)
+		}
+	}
+	s.reminted[signature] = expires
 }
 
 // ACLChanged is when the access table last changed, to the second, or zero
@@ -74,20 +95,22 @@ func (s *Set) ACLChanged() time.Time {
 }
 
 // Wants says what asks the signature of the reader with the given email hash,
-// issued at issued, to renew at now whatever its age: "poke" when the reader
-// was poked within window before now and after it was issued, "acl" when the
-// access table changed after it was issued, nothing otherwise. It reads nothing
+// carrying the HMAC signature and issued at issued, to renew at now whatever
+// its age: "poke" when the reader was poked within window before now and
+// after it was issued, "acl" when the access table changed after it was
+// issued and it was not re-signed since, nothing otherwise. It reads nothing
 // but its arguments. Moments are kept to the second, the resolution Expires
 // has: a signature minted in the same second as the edit reads as issued at it
 // and waits for its age, and one renewed in that second is not renewed again.
-func (s *Set) Wants(hash string, issued, now time.Time, window time.Duration) string {
+func (s *Set) Wants(hash, signature string, issued, now time.Time, window time.Duration) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	at, found := s.at[hash]
+	_, reminted := s.reminted[signature]
 	switch {
 	case found && now.Sub(at) < window && issued.Before(at):
 		return "poke"
-	case issued.Before(s.aclChanged):
+	case issued.Before(s.aclChanged) && !reminted:
 		return "acl"
 	}
 	return ""
