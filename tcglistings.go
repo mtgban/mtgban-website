@@ -404,7 +404,7 @@ func withDirectStock(seller mtgban.Seller) mtgban.Seller {
 	return &directStockSeller{Seller: seller}
 }
 
-// rankDirectAsOneCopy takes back the sqrt(quantity) profitability go-mtgban
+// rankDirectAsOneCopy takes back the quantity^(1/4) profitability go-mtgban
 // gives a trade, for trades bought from TCGplayer Direct, and drops those that
 // cleared minProfitability on it alone. Direct's stock caps the trade but
 // ranks it no higher, so a card the scrape did not see ranks as one it did.
@@ -412,7 +412,7 @@ func rankDirectAsOneCopy(arbit []mtgban.ArbitEntry, minProfitability float64) []
 	out := arbit[:0]
 	for _, res := range arbit {
 		if res.Quantity > 1 {
-			res.Profitability /= math.Sqrt(float64(res.Quantity))
+			res.Profitability /= math.Pow(float64(res.Quantity), 0.25)
 		}
 		if res.Profitability < minProfitability {
 			continue
