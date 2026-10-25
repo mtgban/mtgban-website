@@ -412,8 +412,9 @@ row, and a daily job prunes those past `max_session_days` (ADR-0008).
 With `patreon_renewal.after_days` set, `signing` renews a cookie-borne
 signature that old, or one that ran out within `grace_days`, from the
 session its `BAN_SESSION` cookie names: it leases every session of the
-email, asks Patreon through the refresh token, stores the rotated one,
-and serves the request on the new signature (`auth_renew.go`). A reader whose
+Patreon account under this client, asks Patreon through the refresh token,
+stores the rotated one, and serves the request on the new signature
+(`auth_renew.go`). A token Patreon refuses ends the sessions holding it. A reader whose
 email Patreon's webhook poked (`POST /webhook/patreon`, §4) renews on their next
 request whatever the signature's age, but not past `grace_days`: the poke is
 kept in memory on every site, a `patreon_poke` NOTIFY carries it to the peers,

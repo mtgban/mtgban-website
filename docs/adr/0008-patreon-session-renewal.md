@@ -37,13 +37,15 @@ The database holds only what lets the server mint the next cookie
 without the reader.
 
 1. **One `patreon_sessions` row per login**, keyed by the game-agnostic
-   `HashEmail`, holding the refresh token, the login time, and a
-   renewal lease. Created by the login beside the signature, replacing
+   `HashEmail`, holding the Patreon user and client the refresh token was
+   issued to, the token, the login time, and a renewal lease. Created by
+   the login beside the signature, dated from its code exchange, replacing
    the row the browser's cookie already names; deleted by logout; pruned
    past `max_session_days`. Patreon keeps one refresh
    token per account and client (probed 2026-10-23: a second login
    returns the pair the first holds, and a refresh rotates it for both),
-   so every row of an email carries the same token and moves together.
+   so every row of an account under one client carries the same token and
+   moves together.
 2. **An HttpOnly `BAN_SESSION` cookie** names the row. Renewal needs
    both an HMAC-valid signature naming an email and this cookie whose
    row carries that email's hash. A signature on its own — leaked
@@ -55,7 +57,8 @@ without the reader.
    renews.
 4. **Renewal is lazy and leased.** Inside the signing middleware, once
    a signature is older than `after_days`, the request leases every row
-   of the email, its own among them, with one `UPDATE … RETURNING` (safe
+   of the account under this client, its own among them, with one
+   `UPDATE … RETURNING` (safe
    through a transaction pooler, holding no connection across Patreon),
    refreshes, re-resolves the tier through `Pledge.Resolve`, stores the
    rotated token on all of those rows *before* signing, and serves the
@@ -70,7 +73,8 @@ without the reader.
    everything, back off an hour, and store the token a refresh that went
    through already rotated to, since the old one is dead. Unknown never
    extends a session; it can only keep one until the signature runs out
-   on its own.
+   on its own. A refresh token Patreon refuses (`invalid_grant`) ends the
+   rows holding it; a row another renewal left holding a live one stays.
 6. **Refresh token at rest: plain text.** It redeems only with the
    client secret, which lives in the infrastructure config; a session
    id renews only beside its reader's signature, which the database
@@ -101,7 +105,7 @@ without the reader.
 |---|---|
 | Rollout | No signed field; deploy in any order |
 | Exposure | A leaked signature dies at its own expiry; stealing the HttpOnly cookie needs device or TLS compromise |
-| Multi-device | Independent rows for binding and logout; one lease and one commit per email keep them on the one pair Patreon issues |
+| Multi-device | Independent rows for binding and logout; one lease and one commit per account and client keep them on the one pair Patreon issues |
 | Storage | One small table, create-only, pruned |
 
 ## Consequences
@@ -132,11 +136,11 @@ without the reader.
   stamps nothing, and neither does a reload that finds the same table,
   as the listener's does after every reconnect. After an ACL edit every
   active reader costs one Patreon round trip, spread over the days they
-  come back and serialised per email by the lease. **Refresh now** on
+  come back and serialised per account by the lease. **Refresh now** on
   the account page does the same on demand.
 - A renewal on one device renews the token every device's row holds,
-  under the email's lease, so no row is left with the token Patreon just
-  rotated away. The renewal lease and commit are therefore per email,
+  under the account's lease, so no row is left with the token Patreon just
+  rotated away. The renewal lease and commit are therefore per account,
   not per row.
 - **Log out everywhere** deletes every row for the email: no device can
   renew; signatures already issued run to their own `Expires`.

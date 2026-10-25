@@ -297,7 +297,7 @@ func TestSigningPokeSurvivesALostLease(t *testing.T) {
 	young := rig.sig("Legacy", 1*day)
 	pokes.Poke(rig.hash, time.Now(), pokeWindow())
 
-	_, _, leased, err := rig.db.LeasePatreonSessions(t.Context(), session, rig.hash, time.Minute)
+	_, _, leased, err := rig.db.LeasePatreonSessions(t.Context(), session, rig.hash, "client-id", time.Minute)
 	if err != nil || !leased {
 		t.Fatalf("lease: %v %v", leased, err)
 	}

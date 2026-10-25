@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -136,7 +137,7 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 	return s.renewSignature(w, r, values, 0, cause)
 }
 
-// The waits of a renewal: how long it holds the sessions of an email, how
+// The waits of a renewal: how long it holds the sessions of an account, how
 // long they rest after an answer from Patreon that settled nothing, how long
 // each database call may take, and how long they rest after Refresh now, so
 // that a reader cannot press Patreon per request.
@@ -154,7 +155,8 @@ type renewal struct {
 	session string // the BAN_SESSION value
 	email   string
 	hash    string // userstate.HashEmail(email)
-	fence   string // set once the email's sessions are leased
+	client  string // the Patreon client this site refreshes through
+	fence   string // set once the account's sessions are leased
 	tier    string // the signature's tier before
 	age     time.Duration
 	rest    time.Duration // how long the sessions rest once this renewal commits
@@ -169,14 +171,14 @@ func (rn *renewal) log(verdict string, cause error) {
 		rn.session, rn.email, rn.age.Hours()/24, rn.cause, verdict, cause, time.Since(rn.started).Round(time.Millisecond))
 }
 
-// lease claims the email's sessions for this renewal and returns the refresh
-// token they hold. It is false when another request, device or site holds
-// them or they are backing off, the session is not this email's or is past
-// its cap, or the database cannot say.
+// lease claims the account's sessions for this renewal and returns the
+// refresh token they hold. It is false when another request, device or site
+// holds them or they are backing off, the session is not this email's or
+// this client's or is past its cap, or the database cannot say.
 func (rn *renewal) lease(base context.Context) (token string, leased bool) {
 	ctx, cancel := context.WithTimeout(base, renewalDBTimeout)
 	defer cancel()
-	token, fence, leased, err := UserStateDB.LeasePatreonSessions(ctx, rn.session, rn.hash, renewalLease)
+	token, fence, leased, err := UserStateDB.LeasePatreonSessions(ctx, rn.session, rn.hash, rn.client, renewalLease)
 	if err != nil {
 		rn.log("unknown", fmt.Errorf("lease: %w", err))
 		return "", false
@@ -185,39 +187,41 @@ func (rn *renewal) lease(base context.Context) (token string, leased bool) {
 	return token, leased
 }
 
-// hold backs the email's sessions off for renewalBackoff after an answer
+// hold backs the account's sessions off for renewalBackoff after an answer
 // that settled nothing, leaving the signature as it is. refreshToken is the
 // one Patreon rotated to when the refresh went through, else empty.
 func (rn *renewal) hold(base context.Context, refreshToken, verdict string, cause error) {
 	ctx, cancel := context.WithTimeout(base, renewalDBTimeout)
 	defer cancel()
-	err := UserStateDB.DeferPatreonSessions(ctx, rn.hash, rn.fence, refreshToken, renewalBackoff)
+	err := UserStateDB.DeferPatreonSessions(ctx, rn.fence, refreshToken, renewalBackoff)
 	if err != nil {
 		LogPages["Admin"].Println("DeferPatreonSessions", err)
 	}
 	rn.log(verdict, cause)
 }
 
-// revoke deletes every session of the email: Patreon refused the one token
-// they all hold for good, so none of them can renew.
-func (rn *renewal) revoke(base context.Context, cause error) {
+// revoke deletes the account's sessions holding token, which Patreon refused
+// for good, and says whether this browser's was among them. A session that
+// holds another token is left to try it.
+func (rn *renewal) revoke(base context.Context, token string, cause error) (ownGone bool) {
 	ctx, cancel := context.WithTimeout(base, renewalDBTimeout)
 	defer cancel()
-	_, err := UserStateDB.DeletePatreonSessions(ctx, rn.hash)
+	gone, err := UserStateDB.RevokePatreonSessions(ctx, rn.fence, token)
 	if err != nil {
-		LogPages["Admin"].Println("DeletePatreonSessions", err)
+		LogPages["Admin"].Println("RevokePatreonSessions", err)
 	}
 	rn.log(patreon.InvalidGrant, cause)
+	return slices.Contains(gone, rn.session)
 }
 
 // endSession is the database half of logging out a reader whose pledge is
 // gone: this browser's session is deleted. The token Patreon rotated to goes
-// on all of the email's sessions first, so the others hold a live one and
+// on all of the account's sessions first, so the others hold a live one and
 // learn the same at their own renewal.
 func (rn *renewal) endSession(base context.Context, refreshToken string) {
 	ctx, cancel := context.WithTimeout(base, renewalDBTimeout)
 	defer cancel()
-	_, err := UserStateDB.CommitPatreonSessions(ctx, rn.hash, rn.fence, refreshToken, 0)
+	_, err := UserStateDB.CommitPatreonSessions(ctx, rn.fence, rn.hash, refreshToken, 0)
 	if err != nil {
 		LogPages["Admin"].Println("CommitPatreonSessions", err)
 	}
@@ -228,14 +232,15 @@ func (rn *renewal) endSession(base context.Context, refreshToken string) {
 	rn.log("not entitled", nil)
 }
 
-// commit stores the token Patreon rotated to on every session of the email,
-// and moves them to the email Patreon reports now when the reader changed it.
-// It is false when the signature must not be re-issued: the sessions are gone
-// (the reader logged out everywhere meanwhile), or the database failed.
+// commit stores the token Patreon rotated to on every session of the
+// account, filed under the email Patreon reports now when the reader changed
+// it. It is false when the signature must not be re-issued: the sessions are
+// gone (the reader logged out everywhere meanwhile), or the database failed.
 func (rn *renewal) commit(base context.Context, refreshToken string, user *pledge.User) bool {
 	ctx, cancel := context.WithTimeout(base, renewalDBTimeout)
 	defer cancel()
-	rows, err := UserStateDB.CommitPatreonSessions(ctx, rn.hash, rn.fence, refreshToken, rn.rest)
+	newHash := userstate.HashEmail(user.Email)
+	rows, err := UserStateDB.CommitPatreonSessions(ctx, rn.fence, newHash, refreshToken, rn.rest)
 	if err != nil {
 		rn.hold(base, refreshToken, "unknown", fmt.Errorf("commit: %w", err))
 		return false
@@ -244,17 +249,9 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 		rn.log("sessions gone", nil)
 		return false
 	}
-
-	newHash := userstate.HashEmail(user.Email)
-	if newHash == rn.hash {
-		return true
+	if newHash != rn.hash {
+		LogPages["Admin"].Printf("renew: session=%.8s cause=%s email changed from %q to %q", rn.session, rn.cause, rn.email, user.Email)
 	}
-	err = UserStateDB.RekeyPatreonSessions(ctx, rn.hash, newHash)
-	if err != nil {
-		rn.log("unknown", fmt.Errorf("rekey: %w", err))
-		return false
-	}
-	LogPages["Admin"].Printf("renew: session=%.8s cause=%s email changed from %q to %q", rn.session, rn.cause, rn.email, user.Email)
 	return true
 }
 
@@ -271,7 +268,7 @@ func (rn *renewal) commit(base context.Context, refreshToken string, user *pledg
 //
 // The calls to Patreon run under renew_timeout_seconds with no database
 // connection held, and a reader who navigates away does not cancel a refresh
-// Patreon may already have rotated. rest is how long the email's sessions
+// Patreon may already have rotated. rest is how long the account's sessions
 // rest once the renewal commits: zero for a due renewal, whose new signature
 // is not due again for after_days; Refresh now rests them, so a reader cannot
 // press Patreon per request. cause is what asked for the renewal, for the log.
@@ -287,6 +284,9 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 	if rn.session == "" || rn.email == "" {
 		return "", false
 	}
+	infra := Infrastructure()
+	source := infra.Patreon.Source
+	rn.client = infra.Patreon.Client[source]
 	rn.hash = userstate.HashEmail(rn.email)
 	expires, _ := strconv.ParseInt(values.Get("Expires"), 10, 64)
 	rn.age = rn.started.Sub(time.Unix(expires, 0).Add(-DefaultSignatureDuration))
@@ -297,15 +297,14 @@ func (s *site) renewSignature(w http.ResponseWriter, r *http.Request, values url
 		return "", false
 	}
 
-	infra := Infrastructure()
-	source := infra.Patreon.Source
 	patreonCtx, cancel := context.WithTimeout(base, infra.PatreonRenewal.RenewTimeout())
 	defer cancel()
-	tokens, err := patreon.RefreshAuthToken(patreonCtx, infra.Patreon.Client[source], infra.Patreon.Secret[source], token)
+	tokens, err := patreon.RefreshAuthToken(patreonCtx, rn.client, infra.Patreon.Secret[source], token)
 	var grant *patreon.GrantError
 	if errors.As(err, &grant) && grant.Code == patreon.InvalidGrant {
-		rn.revoke(base, err)
-		clearSessionCookie(w, r)
+		if rn.revoke(base, token, err) {
+			clearSessionCookie(w, r)
+		}
 		return "", false
 	}
 	if err != nil {

@@ -2,6 +2,7 @@ package userstate
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -24,9 +25,19 @@ func freshSessionOwner(t *testing.T, c *Client, label string) string {
 	return h
 }
 
+// testPatreonClient is the Patreon client the sessions below are issued to.
+const testPatreonClient = "client-1"
+
+// mustCreatePatreonSession is a login of the Patreon account the email hash
+// h names, holding token.
 func mustCreatePatreonSession(t *testing.T, c *Client, h, token string, maxAge time.Duration) string {
 	t.Helper()
-	id, err := c.CreatePatreonSession(context.Background(), h, token, maxAge)
+	return mustCreateLogin(t, c, PatreonLogin{EmailHash: h, PatreonUser: "patreon-" + h, ClientID: testPatreonClient, RefreshToken: token}, maxAge)
+}
+
+func mustCreateLogin(t *testing.T, c *Client, login PatreonLogin, maxAge time.Duration) string {
+	t.Helper()
+	id, err := c.CreatePatreonSession(context.Background(), login, 0, maxAge)
 	if err != nil {
 		t.Fatalf("CreatePatreonSession: %v", err)
 	}
@@ -42,7 +53,7 @@ func wantLease(t *testing.T, c *Client, id, h string, token string, leased bool)
 
 func wantLeaseFor(t *testing.T, c *Client, id, h string, lease time.Duration, token string, leased bool) string {
 	t.Helper()
-	got, fence, ok, err := c.LeasePatreonSessions(context.Background(), id, h, lease)
+	got, fence, ok, err := c.LeasePatreonSessions(context.Background(), id, h, testPatreonClient, lease)
 	if err != nil {
 		t.Fatalf("LeasePatreonSessions: %v", err)
 	}
@@ -109,13 +120,13 @@ func TestPatreonSessionLifecycle(t *testing.T) {
 	wantLease(t, c, id, h, "", false)
 	wantLease(t, c, other, h, "", false)
 
-	rows, err := c.CommitPatreonSessions(ctx, h, fence, "token-2", 0)
+	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
 	if err != nil || rows != 2 {
 		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", rows, err)
 	}
 	fence = wantLease(t, c, other, h, "token-2", true)
 
-	err = c.DeferPatreonSessions(ctx, h, fence, "", time.Hour)
+	err = c.DeferPatreonSessions(ctx, fence, "", time.Hour)
 	if err != nil {
 		t.Fatalf("DeferPatreonSessions: %v", err)
 	}
@@ -172,7 +183,7 @@ func TestPatreonSessionCommitWritesEveryRowIncludingALaterOne(t *testing.T) {
 	late := mustCreatePatreonSession(t, c, h, "token-0", time.Hour)
 	wantLease(t, c, late, h, "", false)
 
-	rows, err := c.CommitPatreonSessions(ctx, h, fence, "token-2", 0)
+	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
 	if err != nil || rows != 3 {
 		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 3, nil", rows, err)
 	}
@@ -188,7 +199,7 @@ func TestPatreonSessionCommitWritesEveryRowIncludingALaterOne(t *testing.T) {
 	}
 
 	// The fence is spent
-	rows, err = c.CommitPatreonSessions(ctx, h, fence, "token-3", 0)
+	rows, err = c.CommitPatreonSessions(ctx, fence, h, "token-3", 0)
 	if err != nil || rows != 0 {
 		t.Fatalf("second commit: rows=%d err=%v, want 0, nil", rows, err)
 	}
@@ -211,7 +222,7 @@ func TestPatreonSessionCommitCanRestTheSessions(t *testing.T) {
 	second := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
 	fence := wantLease(t, c, first, h, "token-1", true)
 
-	rows, err := c.CommitPatreonSessions(ctx, h, fence, "token-2", 5*time.Minute)
+	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 5*time.Minute)
 	if err != nil || rows != 2 {
 		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", rows, err)
 	}
@@ -235,7 +246,7 @@ func TestPatreonSessionCommitOfDeletedSessionsStaysDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows, err := c.CommitPatreonSessions(ctx, h, fence, "token-2", 0)
+	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
 	if err != nil || rows != 0 {
 		t.Fatalf("commit of deleted sessions: rows=%d err=%v, want 0, nil", rows, err)
 	}
@@ -255,7 +266,7 @@ func TestPatreonSessionDeferHoldsEveryRowBack(t *testing.T) {
 	untouched := mustCreatePatreonSession(t, c, stranger, "token-s", time.Hour)
 
 	fence := wantLease(t, c, a, h, "token-1", true)
-	err := c.DeferPatreonSessions(ctx, h, fence, "", time.Hour)
+	err := c.DeferPatreonSessions(ctx, fence, "", time.Hour)
 	if err != nil {
 		t.Fatalf("DeferPatreonSessions: %v", err)
 	}
@@ -280,7 +291,7 @@ func TestPatreonSessionDeferHoldsEveryRowBack(t *testing.T) {
 	}
 	ageSession(t, c, a, time.Hour)
 	fence = wantLease(t, c, b, h, "token-1", true)
-	err = c.DeferPatreonSessions(ctx, h, fence, "token-2", time.Hour)
+	err = c.DeferPatreonSessions(ctx, fence, "token-2", time.Hour)
 	if err != nil {
 		t.Fatalf("DeferPatreonSessions with a token: %v", err)
 	}
@@ -309,13 +320,13 @@ func TestPatreonSessionStaleLeaseCannotCommitOrDefer(t *testing.T) {
 	stale := wantLeaseFor(t, c, id, h, -time.Second, "token-1", true)
 	current := wantLease(t, c, other, h, "token-1", true)
 
-	rows, err := c.CommitPatreonSessions(ctx, h, stale, "stale", 0)
+	rows, err := c.CommitPatreonSessions(ctx, stale, h, "stale", 0)
 	if err != nil || rows != 0 {
 		t.Fatalf("stale commit: rows=%d err=%v, want 0, nil", rows, err)
 	}
 	// The stale deferral must not push sessions the current holder holds
 	// back, nor store its token.
-	err = c.DeferPatreonSessions(ctx, h, stale, "stale", time.Hour)
+	err = c.DeferPatreonSessions(ctx, stale, "stale", time.Hour)
 	if err != nil {
 		t.Fatalf("stale defer: %v", err)
 	}
@@ -323,7 +334,7 @@ func TestPatreonSessionStaleLeaseCannotCommitOrDefer(t *testing.T) {
 	if st.token != "token-1" || st.wait > 61 {
 		t.Errorf("a stale deferral moved a session: %+v", st)
 	}
-	rows, err = c.CommitPatreonSessions(ctx, h, current, "token-2", 0)
+	rows, err = c.CommitPatreonSessions(ctx, current, h, "token-2", 0)
 	if err != nil || rows != 2 {
 		t.Fatalf("current commit: rows=%d err=%v, want 2, nil", rows, err)
 	}
@@ -337,11 +348,11 @@ func TestPatreonSessionEmptyFenceCommitsNothing(t *testing.T) {
 	ctx := context.Background()
 
 	id := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
-	rows, err := c.CommitPatreonSessions(ctx, h, "", "forged", 0)
+	rows, err := c.CommitPatreonSessions(ctx, "", h, "forged", 0)
 	if err != nil || rows != 0 {
 		t.Fatalf("empty-fence commit: rows=%d err=%v, want 0, nil", rows, err)
 	}
-	err = c.DeferPatreonSessions(ctx, h, "", "forged", time.Hour)
+	err = c.DeferPatreonSessions(ctx, "", "forged", time.Hour)
 	if err != nil {
 		t.Fatalf("empty-fence defer: %v", err)
 	}
@@ -406,7 +417,7 @@ func TestPatreonSessionLeaseGoesToOneOfManyCallers(t *testing.T) {
 	leased := make([]bool, callers)
 	for i := range leased {
 		wg.Go(func() {
-			_, _, ok, err := c.LeasePatreonSessions(context.Background(), ids[i%len(ids)], h, time.Minute)
+			_, _, ok, err := c.LeasePatreonSessions(context.Background(), ids[i%len(ids)], h, testPatreonClient, time.Minute)
 			if err != nil {
 				t.Errorf("LeasePatreonSessions: %v", err)
 			}
@@ -453,13 +464,13 @@ func TestPatreonSessionLeaseThatWaitedFindsTheSessionsLeased(t *testing.T) {
 	}
 	answered := make(chan answer)
 	go func() {
-		_, _, leased, err := c.LeasePatreonSessions(ctx, id, h, time.Minute)
+		_, _, leased, err := c.LeasePatreonSessions(ctx, id, h, testPatreonClient, time.Minute)
 		answered <- answer{leased, err}
 	}()
 	// Wait for the lease to block on the rows the transaction holds
 	for range 200 {
 		var waiting int
-		err = c.db.QueryRow(`SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%RETURNING refresh_token, last_renewed%'`).Scan(&waiting)
+		err = c.db.QueryRow(`SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%RETURNING s.refresh_token, s.last_renewed%'`).Scan(&waiting)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -524,27 +535,144 @@ func TestDeletePatreonSessionsRemovesOneEmailsRows(t *testing.T) {
 	wantLease(t, c, kept, other, "token-c", true)
 }
 
-// A Patreon account whose email changed takes all its sessions along.
-func TestRekeyPatreonSessions(t *testing.T) {
+// A Patreon account whose email changed takes all its sessions along when
+// a renewal commits under the new email.
+func TestPatreonSessionCommitFilesTheSessionsUnderANewEmail(t *testing.T) {
 	c := testClient(t)
 	h := freshSessionOwner(t, c, "")
 	renamed := freshSessionOwner(t, c, "-renamed")
 	stranger := freshSessionOwner(t, c, "-stranger")
+	ctx := context.Background()
 
 	a := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
 	b := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
 	kept := mustCreatePatreonSession(t, c, stranger, "token-s", time.Hour)
-	err := c.RekeyPatreonSessions(context.Background(), h, renamed)
-	if err != nil {
-		t.Fatalf("RekeyPatreonSessions: %v", err)
+	fence := wantLease(t, c, a, h, "token-1", true)
+	rows, err := c.CommitPatreonSessions(ctx, fence, renamed, "token-2", 0)
+	if err != nil || rows != 2 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", rows, err)
 	}
 	wantLease(t, c, a, h, "", false)
-	wantLease(t, c, a, renamed, "token-1", true)
-	st := stateOf(t, c, b)
-	if st.lease == "" {
-		t.Error("the second session did not move with the first")
-	}
+	wantLease(t, c, b, renamed, "token-2", true)
 	wantLease(t, c, kept, stranger, "token-s", true)
+}
+
+// Two Patreon accounts under one email hash, one that changed its email to
+// an address the other gave up, hold two tokens, and neither's renewal leases,
+// commits or holds back the other's sessions.
+func TestPatreonSessionLeaseIsBoundToItsAccount(t *testing.T) {
+	c := testClient(t)
+	h := freshSessionOwner(t, c, "")
+	ctx := context.Background()
+
+	mine := mustCreateLogin(t, c, PatreonLogin{EmailHash: h, PatreonUser: "patreon-mine", ClientID: testPatreonClient, RefreshToken: "token-mine"}, time.Hour)
+	theirs := mustCreateLogin(t, c, PatreonLogin{EmailHash: h, PatreonUser: "patreon-theirs", ClientID: testPatreonClient, RefreshToken: "token-theirs"}, time.Hour)
+	ageSession(t, c, mine, time.Hour)
+
+	fence := wantLease(t, c, mine, h, "token-mine", true)
+	st := stateOf(t, c, theirs)
+	if st.lease != "" || st.wait > 0 {
+		t.Errorf("another account's session was leased: %+v", st)
+	}
+	err := c.DeferPatreonSessions(ctx, fence, "token-mine-2", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st = stateOf(t, c, theirs)
+	if st.token != "token-theirs" || st.wait > 0 {
+		t.Errorf("another account's session was held back: %+v", st)
+	}
+	wantLease(t, c, theirs, h, "token-theirs", true)
+}
+
+// A session another Patreon client issued is never leased under this one,
+// whose refresh would spend a token it cannot redeem.
+func TestPatreonSessionLeaseIsBoundToItsClient(t *testing.T) {
+	c := testClient(t)
+	h := freshSessionOwner(t, c, "")
+	ctx := context.Background()
+
+	id := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
+	_, _, leased, err := c.LeasePatreonSessions(ctx, id, h, "client-2", time.Minute)
+	if err != nil || leased {
+		t.Fatalf("lease under another client: leased %v err %v, want false, nil", leased, err)
+	}
+	wantLease(t, c, id, h, "token-1", true)
+}
+
+// A revocation deletes the account's sessions holding the token Patreon
+// refused, leaves one holding another to be tried, and does nothing once a
+// renewal that won the refresh has committed.
+func TestPatreonSessionRevokeDeletesTheDeadTokensSessions(t *testing.T) {
+	c := testClient(t)
+	h := freshSessionOwner(t, c, "")
+	stranger := freshSessionOwner(t, c, "-stranger")
+	ctx := context.Background()
+
+	dead := mustCreatePatreonSession(t, c, h, "token-dead", time.Hour)
+	alsoDead := mustCreatePatreonSession(t, c, h, "token-dead", time.Hour)
+	live := mustCreatePatreonSession(t, c, h, "token-live", time.Hour)
+	ageSession(t, c, live, time.Hour)
+	kept := mustCreatePatreonSession(t, c, stranger, "token-dead", time.Hour)
+
+	fence := wantLease(t, c, dead, h, "token-dead", true)
+	gone, err := c.RevokePatreonSessions(ctx, fence, "token-dead")
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(gone)
+	want := []string{dead, alsoDead}
+	slices.Sort(want)
+	if !slices.Equal(gone, want) {
+		t.Errorf("revoked %q, want %q", gone, want)
+	}
+	if st := stateOf(t, c, live); st.token != "token-live" {
+		t.Errorf("the session holding another token: %+v, want it kept", st)
+	}
+	if st := stateOf(t, c, kept); st.token != "token-dead" {
+		t.Errorf("another email's session: %+v, want it kept", st)
+	}
+
+	// A renewal that won the refresh committed and cleared the fence, so a
+	// refusal reaching its loser afterwards revokes nothing
+	_, err = c.db.Exec(`UPDATE patreon_sessions SET renew_after = now() WHERE session_id = $1`, live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spent := wantLease(t, c, live, h, "token-live", true)
+	_, err = c.CommitPatreonSessions(ctx, spent, h, "token-next", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, err = c.RevokePatreonSessions(ctx, spent, "token-next")
+	if err != nil || len(gone) != 0 {
+		t.Errorf("revocation after the commit: %q, %v; want nothing", gone, err)
+	}
+	if st := stateOf(t, c, live); st.token != "token-next" {
+		t.Errorf("session after the commit: %+v, want token-next", st)
+	}
+}
+
+// A login dated from its code exchange is older than a renewal another
+// device committed while the login finished, so the lease takes the token
+// that renewal rotated to, not the one the login brought.
+func TestPatreonSessionLoginIsDatedFromItsExchange(t *testing.T) {
+	c := testClient(t)
+	h := freshSessionOwner(t, c, "")
+	ctx := context.Background()
+
+	device := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
+	fence := wantLease(t, c, device, h, "token-1", true)
+	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
+	if err != nil || rows != 1 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v", rows, err)
+	}
+	// The login exchanged its code, and got token-1, before that commit
+	late, err := c.CreatePatreonSession(ctx, PatreonLogin{EmailHash: h, PatreonUser: "patreon-" + h, ClientID: testPatreonClient, RefreshToken: "token-1"}, 10*time.Second, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantLease(t, c, late, h, "token-2", true)
 }
 
 // A closed pool answers every call with an error, never a panic.
@@ -554,17 +682,21 @@ func TestPatreonSessionClosedPoolReturnsErrors(t *testing.T) {
 	ctx := context.Background()
 	h := HashEmail(t.Name() + "@example.com")
 
-	_, _, leased, err := c.LeasePatreonSessions(ctx, "id", h, time.Minute)
+	_, _, leased, err := c.LeasePatreonSessions(ctx, "id", h, testPatreonClient, time.Minute)
 	if err == nil || leased {
 		t.Fatalf("LeasePatreonSessions on a closed pool: leased %v err %v", leased, err)
 	}
-	_, err = c.CommitPatreonSessions(ctx, h, "fence", "token", 0)
+	_, err = c.CommitPatreonSessions(ctx, "fence", h, "token", 0)
 	if err == nil {
 		t.Fatal("CommitPatreonSessions on a closed pool returned nil")
 	}
-	err = c.DeferPatreonSessions(ctx, h, "fence", "", time.Hour)
+	err = c.DeferPatreonSessions(ctx, "fence", "", time.Hour)
 	if err == nil {
 		t.Fatal("DeferPatreonSessions on a closed pool returned nil")
+	}
+	_, err = c.RevokePatreonSessions(ctx, "fence", "token")
+	if err == nil {
+		t.Fatal("RevokePatreonSessions on a closed pool returned nil")
 	}
 }
 

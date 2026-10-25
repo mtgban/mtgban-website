@@ -87,6 +87,7 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 	source := patreonConfig.Source
 	clientID := patreonConfig.Client[source]
 	secret := patreonConfig.Secret[source]
+	exchanged := time.Now()
 	tokens, err := patreon.GetAuthToken(patreonCtx, clientID, secret, origin, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
@@ -133,27 +134,45 @@ func (s *site) Auth(w http.ResponseWriter, r *http.Request) {
 
 	LogPages["Admin"].Printf("auth: email=%q tier=%q", userData.Email, tierTitle)
 
-	s.finishSiteLogin(w, r, r.FormValue("state"), userData, tierTitle, overrides, granted, tokens.RefreshToken)
+	s.finishSiteLogin(w, r, r.FormValue("state"), userData, tierTitle, overrides, granted, patreonLogin{
+		clientID:     clientID,
+		refreshToken: tokens.RefreshToken,
+		exchanged:    exchanged,
+	})
+}
+
+// patreonLogin is the refresh token a login's code exchange returned, the
+// client it was issued to, and when the exchange began.
+type patreonLogin struct {
+	clientID     string
+	refreshToken string
+	exchanged    time.Time
 }
 
 // finishSiteLogin signs in the reader Patreon just named, whose pledge gives
 // tier: it signs their signature into the cookies and sends them on to where
-// state says the login began. refreshToken is the one Patreon issued with
-// the login; it is kept in a patreon_sessions row, which the BAN_SESSION
-// cookie names, when the site has a database and the token is not empty.
+// state says the login began. The refresh token login holds is kept in a
+// patreon_sessions row, which the BAN_SESSION cookie names, when the site has
+// a database and the token is not empty, dated from the exchange so that a
+// token another device's renewal rotated to meanwhile is the newer one.
 // A row that cannot be written is logged and the login goes on without it.
-func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state string, user *pledge.User, tier string, overrides map[string]map[string]string, granted bool, refreshToken string) {
+func (s *site) finishSiteLogin(w http.ResponseWriter, r *http.Request, state string, user *pledge.User, tier string, overrides map[string]map[string]string, granted bool, login patreonLogin) {
 	s.signReaderIn(w, r, user, tier, overrides, granted)
 
 	// The row that lets the site renew this signature later. Without one the
 	// login still works and simply never renews. A browser logging in again
 	// replaces the row its cookie names once the new one is written, so a
 	// failed insert leaves it the row it had and logout always reaches one.
-	if UserStateDB != nil && refreshToken != "" {
+	if UserStateDB != nil && login.refreshToken != "" {
 		sessionCtx, cancelSession := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancelSession()
 		maxAge := Infrastructure().PatreonRenewal.MaxSession()
-		sessionID, err := UserStateDB.CreatePatreonSession(sessionCtx, userstate.HashEmail(user.Email), refreshToken, maxAge)
+		sessionID, err := UserStateDB.CreatePatreonSession(sessionCtx, userstate.PatreonLogin{
+			EmailHash:    userstate.HashEmail(user.Email),
+			PatreonUser:  user.UserID,
+			ClientID:     login.clientID,
+			RefreshToken: login.refreshToken,
+		}, time.Since(login.exchanged), maxAge)
 		if err != nil {
 			LogPages["Admin"].Println("CreatePatreonSession", err)
 		} else {

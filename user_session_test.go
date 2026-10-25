@@ -132,7 +132,7 @@ func TestRefreshNowActsOnlyOnTheBrowsersOwnCookies(t *testing.T) {
 	young := rig.sig("Legacy", 1*day)
 
 	stranger := sessionReader(t, rig.db, "stranger")
-	strangerSession, err := rig.db.CreatePatreonSession(t.Context(), userstate.HashEmail(stranger.Email), "refresh-stranger", 90*day)
+	strangerSession, err := rig.db.CreatePatreonSession(t.Context(), loginOf(stranger, "refresh-stranger"), 0, 90*day)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestLogOutEverywhereEndsEverySessionOfTheEmail(t *testing.T) {
 
 	stranger := sessionReader(t, rig.db, "stranger")
 	strangerHash := userstate.HashEmail(stranger.Email)
-	_, err := rig.db.CreatePatreonSession(t.Context(), strangerHash, "refresh-stranger", 90*day)
+	_, err := rig.db.CreatePatreonSession(t.Context(), loginOf(stranger, "refresh-stranger"), 0, 90*day)
 	if err != nil {
 		t.Fatal(err)
 	}
