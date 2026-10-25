@@ -141,8 +141,11 @@ without the reader.
   takes the flags of the table now, so an ACL save costs no Patreon
   call and extends no session. A start or a deploy stamps nothing, and
   neither does a reload that finds the same table, as the listener's
-  does after every reconnect. **Refresh now** on the account page
-  renews from Patreon on demand.
+  does after every reconnect. Pokes and the stamp are kept to the
+  second and rounded up, so a signature minted under the old state in
+  their own second is not missed; one minted after them in that second
+  renews once more. **Refresh now** on the account page renews from
+  Patreon on demand.
 - A renewal on one device renews the token every device's row holds,
   under the account's lease, so no row is left with the token Patreon just
   rotated away. The renewal lease and commit are therefore per account,

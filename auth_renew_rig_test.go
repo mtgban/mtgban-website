@@ -515,6 +515,14 @@ func forgetRests(t *testing.T) {
 	restingSessions = newSessionRests()
 }
 
+// aSecondAgo is when the tests poke a reader. The poke set rounds a poke up to
+// the second, so a signature minted in the poke's own second reads as issued
+// before it and renews once more; a poke a second back leaves the renewal it
+// asks for alone, as one that lands a second or more later does on the site.
+func aSecondAgo() time.Time {
+	return time.Now().Add(-time.Second)
+}
+
 // freshPokes gives the test a poke set of its own, and puts back the one it
 // found.
 func freshPokes(t *testing.T) *poke.Set {
