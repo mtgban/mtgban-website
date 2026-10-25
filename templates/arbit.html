@@ -289,9 +289,11 @@
                         <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                             <input type="hidden" name="c" data-load-list="ck" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
-                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
+                            {{/* CK's cart has a Load at button of its own below, which the
+                                 cart loader's messages name, so this one says what it opens */}}
+                            <a class="arb-load-btn builder" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Deck builder at {{$sourceKey}}</a>
                             <noscript>
-                                <input type="submit" value="Load at {{$sourceKey}}"/>
+                                <input type="submit" value="Deck builder at {{$sourceKey}}"/>
                             </noscript>
                         </form>
                     {{else if eq $sourceKey "CSI"}}
