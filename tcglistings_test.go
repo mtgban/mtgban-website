@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -409,19 +410,51 @@ func sameInventory(a, b mtgban.InventoryRecord) bool {
 // enough only on its stock.
 func TestRankDirectAsOneCopy(t *testing.T) {
 	arbit := []mtgban.ArbitEntry{
-		{CardID: "stocked", Quantity: 4, Profitability: 6},
+		{CardID: "stocked", Quantity: 16, Profitability: 6},
 		{CardID: "single", Quantity: 1, Profitability: 3},
-		{CardID: "thin", Quantity: 4, Profitability: 4},
+		{CardID: "thin", Quantity: 16, Profitability: 4},
 	}
 	got := rankDirectAsOneCopy(arbit, 2.5)
 	if len(got) != 2 || got[0].CardID != "stocked" || got[1].CardID != "single" {
 		t.Fatalf("kept %+v, want stocked and single", got)
 	}
-	if got[0].Profitability != 3 || got[0].Quantity != 4 {
-		t.Errorf("stocked: profitability %v quantity %d, want 3 and the trade's 4", got[0].Profitability, got[0].Quantity)
+	if got[0].Profitability != 3 || got[0].Quantity != 16 {
+		t.Errorf("stocked: profitability %v quantity %d, want 3 and the trade's 16", got[0].Profitability, got[0].Quantity)
 	}
 	if got[1].Profitability != 3 {
 		t.Errorf("single: profitability %v, want 3 untouched", got[1].Profitability)
+	}
+}
+
+// TestRankDirectAsOneCopyUndoesArbit runs one trade through go-mtgban for
+// one copy and for nine, so the divisor here follows whatever weight Arbit
+// gives quantity.
+func TestRankDirectAsOneCopyUndoesArbit(t *testing.T) {
+	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{
+		"card": {Card: mtgmatcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
+	}}
+	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
+		"card": {{Conditions: "NM", BuyPrice: 15, Quantity: 20}},
+	}, mtgban.ScraperInfo{Name: "vendor"})
+	var scores []float64
+	for _, qty := range []int{1, 9} {
+		seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{
+			"card": {{Conditions: "NM", Price: 10, Quantity: qty}},
+		}, mtgban.ScraperInfo{Name: "seller"})
+		arbit := mtgban.Arbit(b, &mtgban.ArbitOpts{ProfitabilityConstant: ProfConst}, vendor, seller)
+		if len(arbit) != 1 {
+			t.Fatalf("%d copies: Arbit returned %d entries, want 1", qty, len(arbit))
+		}
+		scores = append(scores, arbit[0].Profitability)
+		if qty > 1 {
+			arbit = rankDirectAsOneCopy(arbit, 0)
+			if math.Abs(arbit[0].Profitability-scores[0]) > 1e-9 {
+				t.Errorf("%d copies rank at %v, want one copy's %v", qty, arbit[0].Profitability, scores[0])
+			}
+		}
+	}
+	if scores[1] <= scores[0] {
+		t.Fatalf("Arbit scored nine copies %v, one %v: it no longer weighs quantity", scores[1], scores[0])
 	}
 }
 
