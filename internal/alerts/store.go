@@ -1080,14 +1080,22 @@ func (s *Store) Get(ctx context.Context, id int64, userHash string) (Alert, bool
 }
 
 // Update writes the user-editable columns, the armed state and the origin
-// it is given.
+// it is given, and clears an active alert's error. One parked keeps its
+// reason, which is what restores it later: a working address for an email
+// alert parked as undeliverable, an allowed channel for one parked by its
+// channel. An undeliverable alert moved to another channel is active again,
+// for the evaluator to park anew if that one is missing too.
 func (s *Store) Update(ctx context.Context, a Alert) (bool, error) {
 	ak, av := nullKind(a.Above)
 	bk, bv := nullKind(a.Below)
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE alerts SET condition = $3, stores = $4, reference_price = $5,
 			above_kind = $6, above_value = $7, below_kind = $8, below_value = $9, delivery = $10,
-			above_armed = $11, below_armed = $12, origin = $13, last_error = '', updated_at = now()
+			above_armed = $11, below_armed = $12, origin = $13,
+			status = CASE WHEN status = 'undeliverable' AND delivery <> $10 THEN 'active' ELSE status END,
+			last_error = CASE WHEN status = 'active' OR (status = 'undeliverable' AND delivery <> $10) THEN ''
+				ELSE last_error END,
+			updated_at = now()
 		WHERE id = $1 AND user_hash = $2`,
 		a.ID, a.UserHash, a.Condition, pq.Array(a.Stores), a.ReferencePrice, ak, av, bk, bv, a.Delivery,
 		a.AboveArmed, a.BelowArmed, a.Origin)
