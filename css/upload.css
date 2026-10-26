@@ -1432,6 +1432,7 @@
    linkable page); this small symbol still opens the alternate source. */
 .opt-loaded .opt-altlink { margin-left: 4px; font-size: var(--text-xs); text-decoration: none; opacity: 0.6; }
 .opt-loaded .opt-altlink:hover { opacity: 1; }
+.opt-loaded .loaded-qty { display: inline-block; min-width: 2.5em; text-align: left; padding-left: 6px; color: var(--text-dim); font-size: var(--text-sm); }
 .opt-offer .opt-icons,
 .opt-loaded .opt-icons { display: inline-block; width: 2em; text-align: left; padding-left: 6px; }
 .opt-spread { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); font-weight: 600; text-align: right; white-space: nowrap; }

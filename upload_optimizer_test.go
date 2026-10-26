@@ -208,3 +208,25 @@ func TestOptimizerSortsSetsByEdition(t *testing.T) {
 		t.Errorf("no %s", want)
 	}
 }
+
+// TestOptimizerShowsTheLoadedQuantity puts the quantity beside the loaded
+// price, with no price too, and sorts the cell on the price alone.
+func TestOptimizerShowsTheLoadedQuantity(t *testing.T) {
+	for _, tc := range []struct {
+		entry OptimizedUploadEntry
+		want  string
+	}{
+		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `<td class="opt-loaded" data-sort="5.00">`},
+		{OptimizedUploadEntry{CardID: "a", Price: 5, Quantity: 3}, `</a></span><span class="loaded-qty">&times;3</span>`},
+		{OptimizedUploadEntry{CardID: "a", Quantity: 4}, `<span class="loaded"></span><span class="loaded-qty">&times;4</span>`},
+		{OptimizedUploadEntry{CardID: "a"}, `<span class="loaded"></span><span class="loaded-qty"></span>`},
+	} {
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{
+			Optimized:     map[string][]OptimizedUploadEntry{"CK": {tc.entry}},
+			OptimizedKeys: []string{"CK"},
+		}})
+		if !strings.Contains(out, tc.want) {
+			t.Errorf("%+v: no %s", tc.entry, tc.want)
+		}
+	}
+}

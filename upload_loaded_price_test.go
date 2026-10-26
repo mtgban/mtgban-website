@@ -89,7 +89,7 @@ func TestTheOptimizerLinksTheLoadedPriceToo(t *testing.T) {
 		t.Fatalf("reading upload.html: %v", err)
 	}
 
-	cell := regexp.MustCompile(`(?s)<td class="opt-loaded">.*?</td>`).FindString(string(page))
+	cell := regexp.MustCompile(`(?s)<td class="opt-loaded"[^>]*>.*?</td>`).FindString(string(page))
 	if cell == "" {
 		t.Fatal("the optimizer has no loaded-price cell")
 	}
