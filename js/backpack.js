@@ -326,19 +326,25 @@
     }
 
     // takeRowsFromBackpack takes the copies a store section's ticked rows
-    // list out of the backpack, once they have been sent to that store.
-    // Taking the last hides the button, so a focused one hands focus to the
-    // section's fold button.
+    // list out of the backpack, once they have been sent to that store and
+    // the reader confirms it. Taking the last hides the button, so a focused
+    // one hands focus to the section's fold button.
     window.takeRowsFromBackpack = function (btn) {
         var section = btn.closest(".opt-store");
         if (!section) return;
-        var focused = document.activeElement === btn;
-        var copies = take(picked(section));
-        if (!copies) return;
-        render();
-        toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from the backpack");
-        var fold = section.querySelector(".section-fold");
-        if (focused && btn.hidden && fold) fold.focus();
+        var doTake = function () {
+            var focused = document.activeElement === btn;
+            var copies = take(picked(section));
+            if (!copies) return;
+            render();
+            toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from the backpack");
+            var fold = section.querySelector(".section-fold");
+            if (focused && btn.hidden && fold) fold.focus();
+        };
+        var ask = "Remove this store's ticked cards from the backpack?";
+        // The dialog hands focus back to the button before it calls doTake
+        if (typeof window.confirmDialog === "function") window.confirmDialog(ask, doTake, { confirmLabel: "Remove" });
+        else if (window.confirm(ask)) doTake();
     };
 
     // ---- the panel ----
