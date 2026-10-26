@@ -687,3 +687,26 @@ func TestRefusesADirectoryPastTheCap(t *testing.T) {
 		})
 	}
 }
+
+// Each string asked how many bytes were left by adding up every record after
+// it, so empty strings followed by as many empty CONTINUE records took time
+// by their product: 8s for 40,000 of each.
+func TestReadsSharedStringsBeforeManyContinues(t *testing.T) {
+	const n = 40000
+	stream := append(xlstest.BOF8(0x0005), xlstest.SST(make([]string, n))...)
+	for range n {
+		stream = append(stream, xlstest.Record(recContinue)...)
+	}
+	b := &Book{stream: append(stream, xlstest.EOF()...)}
+	start := time.Now()
+	err := b.parseGlobals()
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("took %v", d)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.sst) != n {
+		t.Errorf("read %d shared strings, want %d", len(b.sst), n)
+	}
+}

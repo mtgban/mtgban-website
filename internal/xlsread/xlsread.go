@@ -343,7 +343,11 @@ func (r *records) continued(first []byte) [][]byte {
 
 // text reads across segs the way this workbook's version stores text.
 func (b *Book) text(segs [][]byte) *segReader {
-	return &segReader{segs: segs, biff5: b.biff5, cp1252: b.cp1252}
+	tail := make([]int, len(segs)+1)
+	for i := len(segs) - 1; i >= 0; i-- {
+		tail[i] = tail[i+1] + len(segs[i])
+	}
+	return &segReader{segs: segs, tail: tail, biff5: b.biff5, cp1252: b.cp1252}
 }
 
 func (b *Book) parseGlobals() error {
@@ -615,7 +619,10 @@ var cp1252 = [32]uint16{
 // split across a boundary restarts with a fresh option byte; anything else
 // carries on as plain bytes, as BIFF5 text does too.
 type segReader struct {
-	segs   [][]byte
+	segs [][]byte
+	// tail[i] is the length of segs[i:], so remaining costs the same
+	// however many CONTINUE records follow
+	tail   []int
 	si     int
 	off    int
 	err    error
@@ -626,11 +633,7 @@ type segReader struct {
 var errShort = errors.New("short read")
 
 func (s *segReader) remaining() int {
-	n := 0
-	for i := s.si; i < len(s.segs); i++ {
-		n += len(s.segs[i])
-	}
-	return n - s.off
+	return s.tail[s.si] - s.off
 }
 
 func (s *segReader) advance() bool {
