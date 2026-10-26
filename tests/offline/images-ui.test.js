@@ -133,3 +133,92 @@ test('buildDoneMessage reports missing editions and failed images together', () 
         'Image sync finished. (2 editions have no images yet; 7 editions failed and retry on the next sync)'
     );
 });
+
+// --- Sync Images Now on a fresh page ---
+
+function el() {
+    return {
+        dataset: {}, hidden: false, disabled: false, textContent: '', style: {},
+        listeners: {},
+        addEventListener(type, fn) { this.listeners[type] = fn; },
+        querySelector() { return el(); },
+        querySelectorAll() { return []; },
+    };
+}
+
+// Opens the settings body on a page where the selection was saved earlier,
+// with the image states rows already in IndexedDB. ids.fire hands the page
+// a message from the sync worker.
+async function openSettings(saved, states) {
+    const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-images-ui.js'), 'utf8');
+    const ids = {
+        'offline-img-editions-picker': el(),
+        'offline-img-estimate': el(),
+        'offline-img-sync-btn': el(),
+        'offline-img-pause-btn': el(),
+        'offline-img-progress': el(),
+    };
+    const win = {
+        OfflineImages,
+        EditionsPicker: { init() {}, refresh() {}, serialize: () => saved.join(',') },
+        OfflineDB: {
+            getMeta: async () => ({ images }),
+            getAllRows: async () => states,
+            setMeta: async () => {},
+        },
+        OfflineMode: { available: () => true, enabled: () => true, sync() {} },
+    };
+    const listeners = {};
+    const doc = {
+        addEventListener: (type, fn) => { listeners[type] = fn; },
+        getElementById: (id) => ids[id] || null,
+    };
+    const storage = { getItem: () => saved.join(','), setItem() {} };
+    new Function('window', 'document', 'localStorage', src)(win, doc, storage);
+    win.OfflineImagesUI.init();
+    await tick();
+    ids.fire = async (msg) => {
+        listeners['offline:sync-message']({ detail: msg });
+        await tick();
+    };
+    return ids;
+}
+
+function tick() {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+test('Sync Images Now is offered on a fresh page while the selection has images to fetch', async () => {
+    const done = (code, h) => ({ code, hash: h, done: true });
+    for (const [name, states, want] of [
+        ['never synced', [], false],
+        ['paused partway', [done('NEO', 'aaaa'), { code: 'MID', hash: 'bbbb', done: false }], false],
+        ['an edition published since', [done('NEO', 'aaaa')], false],
+        ['everything downloaded', [done('NEO', 'aaaa'), done('MID', 'bbbb')], true],
+    ]) {
+        const ids = await openSettings(['NEO', 'MID'], states);
+        expect([name, ids['offline-img-sync-btn'].disabled]).toEqual([name, want]);
+    }
+});
+
+test('Sync Images Now is offered once the picker changes', async () => {
+    const ids = await openSettings(['NEO'], [{ code: 'NEO', hash: 'aaaa', done: true }]);
+    expect(ids['offline-img-sync-btn'].disabled).toBe(true);
+    ids['offline-img-editions-picker'].listeners.change();
+    expect(ids['offline-img-sync-btn'].disabled).toBe(false);
+});
+
+test('Sync Images Now stays offered after a sync that left images to fetch', async () => {
+    const states = [{ code: 'NEO', hash: 'aaaa', done: true }, { code: 'MID', hash: 'bbbb', done: true }];
+    const ids = await openSettings(['NEO', 'MID'], states);
+    const btn = ids['offline-img-sync-btn'];
+    ids['offline-img-editions-picker'].listeners.change();
+    for (const [name, midDone, want] of [['paused on MID', false, false], ['everything downloaded', true, true]]) {
+        btn.listeners.click();
+        await tick();
+        expect([name, btn.disabled]).toEqual([name, true]);
+        states[1].done = midDone;
+        await ids.fire({ type: 'done', images: true, imgMissing: [], imgFailed: 0 });
+        expect([name, btn.disabled]).toEqual([name, want]);
+    }
+});

@@ -7,9 +7,11 @@
     var imagesMap = null;
     var syncing = false;
     var pauseRequested = false;
-    // Set by a click in the picker, cleared by a sync that got everything:
-    // until then there is nothing new to download
+    // Set by a click in the picker, cleared by a sync
     var touched = false;
+    // Whether the selection still has images to download: ones published
+    // since, a paused sync, a failed edition. Page-load syncs skip images
+    var pending = false;
     var syncSelectedCount = 0;
 
     function $(id) { return document.getElementById(id); }
@@ -57,6 +59,7 @@
         return window.OfflineDB.getMeta('manifest').then(function (m) {
             imagesMap = (m && m.images) || {};
             renderEstimates();
+            refreshPending().catch(function () {});
         }).catch(function () {
             imagesMap = {};
             renderEstimates();
@@ -99,7 +102,14 @@
     }
 
     function paintSyncBtn(codes) {
-        syncBtn.disabled = syncing || !touched || codes.length === 0;
+        syncBtn.disabled = syncing || !(touched || pending) || codes.length === 0;
+    }
+
+    function refreshPending() {
+        return imgStates().then(function (states) {
+            pending = window.OfflineImages.computeWorkList(imagesMap || {}, selectedCodes(), states).work.length > 0;
+            renderEstimates();
+        });
     }
 
     function imgStates() {
@@ -165,10 +175,11 @@
             syncing = false;
             pauseBtn.hidden = true;
             labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount, msg.imgFailed || 0);
-            // A pause or a failed image leaves work for the button to resume
-            if (!pauseRequested && !msg.imgFailed) touched = false;
+            touched = false;
             pauseRequested = false;
             renderEstimates();
+            // A pause or a failed image leaves work for the button to resume
+            refreshPending().catch(function () {});
         } else if (msg.type === 'error' && syncing) {
             syncing = false;
             pauseBtn.hidden = true;
