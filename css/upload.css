@@ -1369,6 +1369,8 @@
 .opt-btn.remove:hover { background: rgba(248,81,73,0.2); }
 .opt-btn.csv { background: var(--surface-3); color: var(--activetext); border: 1px solid var(--border-moderate); }
 .opt-btn.csv:hover { color: var(--normal); }
+/* The display above outranks [hidden]'s own */
+.opt-btn[hidden] { display: none; }
 
 .opt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 /* The store header and the column labels stick as one block, so the labels

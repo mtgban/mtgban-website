@@ -24,7 +24,7 @@ function el(tag) {
         click() { (this.listeners.click || []).forEach((fn) => fn({ preventDefault() {}, stopPropagation() {} })); },
         focus() { if (currentDoc) currentDoc.activeElement = this; },
         closest(sel) { let n = this; while (n) { if (n.matches(sel)) return n; n = n.parentNode; } return null; },
-        matches(sel) { return sel.split(',').some((s) => { s = s.trim(); return s.startsWith('.') ? this.classes.has(s.slice(1)) : s.startsWith('#') ? this.attrs.id === s.slice(1) : this.tag === s; }); },
+        matches(sel) { return sel.split(',').some((s) => { s = s.trim(); return s.startsWith('.') ? this.classes.has(s.slice(1)) : s.startsWith('#') ? this.attrs.id === s.slice(1) : s.includes('[') ? this.tag === s.split('[')[0] && s.slice(s.indexOf('[') + 1, -1) in this.attrs : this.tag === s; }); },
         querySelector(sel) { return this.querySelectorAll(sel)[0] || null; },
         querySelectorAll(sel) { const out = []; const walk = (n) => { n.children.forEach((c) => { if (c.matches(sel)) out.push(c); walk(c); }); }; walk(this); return out; },
         submit() { submitted.push(this); if (submitHook) submitHook(); },
@@ -37,7 +37,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, session } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, session, sections = [] } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
@@ -58,6 +58,20 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
         row.append(btn, less); body.appendChild(row);
         minus.push(less);
         return btn;
+    });
+    // Upload optimizer sections, each a take button and rows of [id, qty, unticked].
+    const optSections = sections.map((rows) => {
+        const section = el('div'); section.classes.add('opt-store');
+        const take = el('button'); take.classes.add('pack-take-btn'); take.hidden = true;
+        const fold = el('button'); fold.classes.add('section-fold');
+        section.append(take, fold);
+        rows.forEach(([id, qty, unticked]) => {
+            const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-load-qty', String(qty));
+            if (unticked) tr.classes.add('opt-removed');
+            section.appendChild(tr);
+        });
+        body.appendChild(section);
+        return { section, take, fold, rows: section.children.filter((c) => c.tag === 'tr') };
     });
     const storageListeners = [];
     const pageshowListeners = [];
@@ -93,7 +107,8 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const stored = () => JSON.parse(m.mtgban_backpack);
     const pendingIds = () => (sm.mtgban_backpack_pending_clear === undefined ? undefined : JSON.parse(sm.mtgban_backpack_pending_clear));
     return {
-        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds,
+        window, document, m, sm, rows, minus, nav, navCount, stored, key, pendingIds, optSections,
+        fireChange: (target) => (docListeners.change || []).forEach((fn) => fn({ target })),
         fireStorage: (key = 'mtgban_backpack') => storageListeners.forEach((fn) => fn({ key })),
         firePageshow: (persisted) => pageshowListeners.forEach((fn) => fn({ persisted })),
     };
@@ -668,5 +683,78 @@ describe('on the Upload page', () => {
         expect(p.navCount.hidden).toBe(true);
         expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
         expect(ids['backpack-send-retail'].disabled).toBe(true);
+    });
+});
+
+describe('taking an Upload store section out', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.qty]);
+
+    test('shows only while a ticked row is a card in the backpack', () => {
+        const p = page({
+            store: [{ id: 'a', name: 'A', qty: 2, t: 1, m: 1 }],
+            sections: [[['a', 1], ['b', 1]], [['b', 1]], [['a', 1, true]]],
+        });
+        expect(p.optSections.map((s) => s.take.hidden)).toEqual([false, true, true]);
+    });
+
+    test('ticking and unticking a row shows and hides it', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        const s = p.optSections[0];
+        s.rows[0].classes.add('opt-removed');
+        p.fireChange(s.rows[0]);
+        expect(s.take.hidden).toBe(true);
+        s.rows[0].classes.delete('opt-removed');
+        p.fireChange(s.rows[0]);
+        expect(s.take.hidden).toBe(false);
+    });
+
+    test('takes the ticked rows\' copies out and leaves the rest', () => {
+        const p = page({
+            store: [{ id: 'a', name: 'A', qty: 4, t: 3, m: 3 }, { id: 'b', name: 'B', qty: 1, t: 2, m: 2 }, { id: 'c', name: 'C', qty: 2, t: 1, m: 1 }],
+            sections: [[['a', 1], ['a', 2], ['b', 3], ['c', 2, true], ['x', 1]]],
+        });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(live(p)).toEqual([['a', 1], ['c', 2]]);
+        expect(ids['backpack-toast'].textContent).toBe('Removed 4 copies from the backpack');
+    });
+
+    test('hides every section once none of its cards is left', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['a', 1]], [['a', 1]]] });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(p.optSections.map((s) => s.take.hidden)).toEqual([true, true]);
+        expect(p.navCount.hidden).toBe(true);
+    });
+
+    test('taking the last with the button focused moves focus to the fold button', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        const s = p.optSections[0];
+        s.take.focus();
+        p.window.takeRowsFromBackpack(s.take);
+        expect(p.document.activeElement).toBe(s.fold);
+    });
+
+    test('a take that leaves the button up keeps focus on it', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 3, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        const s = p.optSections[0];
+        s.take.focus();
+        p.window.takeRowsFromBackpack(s.take);
+        expect(s.take.hidden).toBe(false);
+        expect(p.document.activeElement).toBe(s.take);
+    });
+
+    test('one undo puts the whole section back', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 3, t: 2, m: 2 }, { id: 'b', name: 'B', qty: 1, t: 1, m: 1 }], sections: [[['a', 1], ['b', 1]]] });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(p.window.Backpack.undo()).toBe(true);
+        expect(live(p).sort()).toEqual([['a', 3], ['b', 1]]);
+        expect(p.window.Backpack.undo()).toBe(false);
+    });
+
+    test('a section with nothing in the backpack writes nothing', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['b', 1]]] });
+        const before = p.m.mtgban_backpack;
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(p.window.Backpack.undo()).toBe(false);
     });
 });

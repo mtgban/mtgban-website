@@ -144,6 +144,25 @@
 
     function remove(id) { setQty(id, 0); }
 
+    // take takes counts[id] copies of each card out as one undo step, the
+    // card itself once none is left, and says how many copies went.
+    function take(counts) {
+        var list = read();
+        var t = now();
+        var hit = list.filter(function (e) { return !e.del && counts[e.id] > 0; });
+        if (!hit.length) return 0;
+        remember(list, hit.map(function (e) { return e.id; }));
+        var copies = 0;
+        hit.forEach(function (e) {
+            var n = Math.min(e.qty, counts[e.id]);
+            copies += n;
+            if (n === e.qty) e.del = t; else e.qty -= n;
+            e.m = t;
+        });
+        save(list);
+        return copies;
+    }
+
     // clear removes the cards ids names, or every card without it.
     function clear(ids) {
         var list = read();
@@ -279,6 +298,47 @@
         btn.parentNode.querySelectorAll(".pack-btn").forEach(function (add) {
             if (add.getAttribute("data-card-id") === id) add.focus();
         });
+    };
+
+    // ---- the Upload optimizer ----
+
+    // picked adds up the copies of each card in a store section's ticked
+    // rows; a card has a row per condition.
+    function picked(section) {
+        var counts = {};
+        section.querySelectorAll("tr[data-opt-id]").forEach(function (tr) {
+            if (tr.classList.contains("opt-removed")) return;
+            var id = tr.getAttribute("data-opt-id");
+            counts[id] = (counts[id] || 0) + (parseInt(tr.getAttribute("data-load-qty"), 10) || 1);
+        });
+        return counts;
+    }
+
+    // markSections shows a section's button while one of its ticked rows is
+    // a card in the backpack.
+    function markSections() {
+        var by = {};
+        live().forEach(function (e) { by[e.id] = true; });
+        document.querySelectorAll(".pack-take-btn").forEach(function (b) {
+            var section = b.closest(".opt-store");
+            b.hidden = !section || !Object.keys(picked(section)).some(function (id) { return by[id]; });
+        });
+    }
+
+    // takeRowsFromBackpack takes the copies a store section's ticked rows
+    // list out of the backpack, once they have been sent to that store.
+    // Taking the last hides the button, so a focused one hands focus to the
+    // section's fold button.
+    window.takeRowsFromBackpack = function (btn) {
+        var section = btn.closest(".opt-store");
+        if (!section) return;
+        var focused = document.activeElement === btn;
+        var copies = take(picked(section));
+        if (!copies) return;
+        render();
+        toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from the backpack");
+        var fold = section.querySelector(".section-fold");
+        if (focused && btn.hidden && fold) fold.focus();
     };
 
     // ---- the panel ----
@@ -431,6 +491,7 @@
 
     function render() {
         markRows();
+        markSections();
         markNav();
         renderPanel();
     }
@@ -482,12 +543,16 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
+    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");
         if (nav) nav.addEventListener("click", toggle);
         document.addEventListener("keydown", onKey);
+        // After the row's own handler has marked it, as upload-optimizer.js counts it
+        document.addEventListener("change", function (ev) {
+            if (ev.target && ev.target.closest && ev.target.closest(".opt-store")) markSections();
+        });
         window.addEventListener("storage", function (ev) { if (!ev || !ev.key || ev.key === KEY) render(); });
         window.addEventListener("pageshow", function (ev) { if (ev && ev.persisted) render(); });
         clearIfPriced();
