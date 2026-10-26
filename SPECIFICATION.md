@@ -454,13 +454,17 @@ so an edit reaches nobody until their signature is. A save (`saveACL`), or a
 reload after a peer's (`reloadACL`), that leaves a table different from the one
 it replaces stamps the poke set (`Pokes.StampACL`), and `renewDue` re-signs
 every cookie-borne signature issued before the stamp on its next request
-(`remintSignature`): the same reader, tier and `Expires`, the grant's
-overrides as they are now, and the flags of the table now, with nothing asked
-of Patreon and no session needed. The poke set remembers each re-signed
-signature until the next stamp, since its `Expires` reads as issued before
-it. A grant edit (`saveGrants`, `reloadGrants`) pokes each
-grantee whose tier or overrides changed (`access.GrantsChanged`); their name and
-category are admin labels no signature carries. The admin's config reload
+(`remintSignature`): the same reader and `Expires`, the tier the grant names
+now or else the one it carried, the grant's overrides as they are now, and
+the flags of the table now, with nothing asked of Patreon and no session
+needed. A signature old enough to renew, or poked, goes to Patreon first and
+is re-signed (`resignStale`) when that renewal does not come; one that ran
+out is not, and renewal off (`after_days` 0) re-signs nothing. The poke set
+remembers each re-signed signature, since its `Expires` reads as issued
+before the stamp. A grant edit (`saveGrants`, `reloadGrants`) pokes and stamps
+(`Pokes.StampGrant`) each grantee whose tier or overrides changed
+(`access.GrantsChanged`); their name and category are admin labels no
+signature carries. The admin's config reload
 (`loadAccess`) stamps and pokes the same way, since a file edited in the bucket
 itself sends no NOTIFY. The startup load and a reload that finds the same table
 stamp nothing: a deploy restarts nine sites, and the listener re-reads every

@@ -101,11 +101,14 @@ func reloadGrants(ctx context.Context) error {
 	return nil
 }
 
-// pokeGrantees pokes each reader whose grant differs between before and after,
-// so their next request renews onto the tier and overrides it now gives.
+// pokeGrantees pokes and stamps each reader whose grant differs between
+// before and after, so their next request renews onto the tier and overrides
+// it now gives, or is re-signed with them where Patreon cannot renew it.
 func pokeGrantees(before, after []PatreonGrant) {
 	for _, email := range access.GrantsChanged(before, after) {
-		Pokes.Poke(userstate.HashEmail(email), time.Now(), pokeWindow())
+		hash := userstate.HashEmail(email)
+		Pokes.Poke(hash, time.Now(), pokeWindow())
+		Pokes.StampGrant(hash, time.Now(), DefaultSignatureDuration)
 	}
 }
 

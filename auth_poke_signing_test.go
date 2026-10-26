@@ -687,3 +687,112 @@ func TestSigningStaleInTheEditsOwnSecond(t *testing.T) {
 		}
 	})
 }
+
+// wantResigned fails unless the request was served on a signature re-signed
+// from old, with the same reader and Expires and the tier and flag given, and
+// a request on it is left alone. It returns the new signature.
+func (rig *renewalRig) wantResigned(got *served, old, session, tier, flag string) string {
+	rig.t.Helper()
+	fresh := setCookies(got.rec)[signatureCookie]
+	if fresh == nil {
+		rig.t.Fatalf("Set-Cookie %q, want a re-signed %s", got.rec.Header().Values("Set-Cookie"), signatureCookie)
+	}
+	_, valid := signatureIsValid(fresh.Value)
+	if !valid || !got.reached || got.sig != fresh.Value {
+		rig.t.Errorf("cookie valid %v, handler reached %v on it %v; want a valid signature served", valid, got.reached, got.sig == fresh.Value)
+	}
+	for _, key := range []string{"Expires", "UserEmail", "UserName"} {
+		if GetParamFromSig(fresh.Value, key) != GetParamFromSig(old, key) {
+			rig.t.Errorf("%s %q, want the old signature's %q", key, GetParamFromSig(fresh.Value, key), GetParamFromSig(old, key))
+		}
+	}
+	if GetParamFromSig(fresh.Value, "UserTier") != tier || GetParamFromSig(fresh.Value, flag) != "true" {
+		rig.t.Errorf("re-signed at %q with %s %q, want %q and the flag", GetParamFromSig(fresh.Value, "UserTier"), flag, GetParamFromSig(fresh.Value, flag), tier)
+	}
+	again := rig.page(browser(fresh.Value, session)...)
+	if setCookies(again.rec)[signatureCookie] != nil || again.sig != fresh.Value {
+		rig.t.Error("the re-signed signature was re-signed again")
+	}
+	return fresh.Value
+}
+
+// An edit of the access table reaches a reader Patreon does not renew: one
+// old enough to renew with no session to renew from, one due or poked whose
+// renewal Patreon does not answer. Each is re-signed here; one that ran out
+// is not, since its Expires is kept.
+func TestSigningReSignsAnEditPatreonDoesNotRenew(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		age     time.Duration
+		session bool
+		poked   bool
+		resign  bool
+	}{
+		{"old enough, with no session", 9 * day, false, false, true},
+		{"due, with Patreon down", 9 * day, true, false, true},
+		{"poked, with Patreon down", 1 * day, true, true, true},
+		{"run out, with Patreon down", 12 * day, true, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			files := loadAccessFiles(t, `{"Legacy":{"Search":{}}}`, `[]`)
+			rig.stub.token = &stubAnswer{http.StatusInternalServerError, `{"errors":[{"title":"boom"}]}`}
+			session := ""
+			if tc.session {
+				session = rig.session("")
+			}
+			old := rig.sig("Legacy", tc.age)
+			if tc.poked {
+				pokes.Poke(rig.hash, aSecondAgo(), pokeWindow())
+			}
+			files.set("acl", `{"Legacy":{"Search":{},"Upload":{}}}`)
+			err := reloadACL(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := rig.page(browser(old, session)...)
+			if !tc.resign {
+				if setCookies(got.rec)[signatureCookie] != nil {
+					t.Errorf("Set-Cookie %q, want no signature for one that ran out", got.rec.Header().Values("Set-Cookie"))
+				}
+				return
+			}
+			rig.wantResigned(got, old, session, "Legacy", "Upload")
+			if !strings.Contains(rig.logged.String(), "cause=acl verdict=reminted") {
+				t.Errorf("admin log %q does not tell the cause", rig.logged.String())
+			}
+		})
+	}
+}
+
+// A grant edit reaches a grantee Patreon does not renew, with no session or
+// with Patreon down: re-signed here at the tier and with the flags the grant
+// gives now.
+func TestSigningReSignsAGrantEditPatreonDoesNotRenew(t *testing.T) {
+	for name, withSession := range map[string]bool{"with no session": false, "with Patreon down": true} {
+		t.Run(name, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			freshPokes(t)
+			rig.stub.token = &stubAnswer{http.StatusInternalServerError, `{"errors":[{"title":"boom"}]}`}
+			files := loadAccessFiles(t, `{"Legacy":{"Search":{}},"Vintage":{"Search":{},"Upload":{}}}`,
+				`[`+grantFor(rig.user.Email, "Legacy")+`]`)
+			session := ""
+			if withSession {
+				session = rig.session("")
+			}
+			young := rig.sig("Legacy", 1*day)
+			files.set("grants", `[`+grantFor(rig.user.Email, "Vintage")+`]`)
+			err := reloadGrants(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rig.wantResigned(rig.page(browser(young, session)...), young, session, "Vintage", "Upload")
+			if !strings.Contains(rig.logged.String(), "cause=grant verdict=reminted") {
+				t.Errorf("admin log %q does not tell the cause", rig.logged.String())
+			}
+		})
+	}
+}

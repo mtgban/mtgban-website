@@ -134,15 +134,21 @@ without the reader.
   silence stays, and is tried again once the hour's backoff is up.
 - A tier change, and an ACL or grant edit, reach an active reader at
   the next page load, not the next renewal. The webhook pokes the
-  tier change; a grant edit pokes its grantee; an access table that
-  differs from the one it replaces, saved here, reloaded after a peer's
-  save or by the admin's config reload, stamps the poke set, and every
-  signature issued before the stamp is re-signed on its next request,
-  since its page flags were baked in from the old table. The edit
-  changes nothing Patreon knows, so the re-sign asks it nothing: it
-  keeps the reader, the tier and the `Expires` the signature had and
-  takes the flags of the table now, so an ACL save costs no Patreon
-  call and extends no session. A start or a deploy stamps nothing, and
+  tier change; a grant edit pokes and stamps its grantee; an access
+  table that differs from the one it replaces, saved here, reloaded
+  after a peer's save or by the admin's config reload, stamps the poke
+  set, and every signature issued before the stamp is re-signed on its
+  next request, since its page flags were baked in from the old table.
+  The edit changes nothing Patreon knows, so the re-sign asks it
+  nothing: it keeps the reader and the `Expires` the signature had,
+  takes the flags of the table now and the overrides and any tier the
+  grant names now, so an ACL save costs no Patreon call and extends no
+  session. A young signature is re-signed at once; an older one, or a
+  poked one, is renewed from Patreon, and re-signed whenever that
+  renewal does not come, for want of a session or an answer. A grant
+  that stops naming a tier keeps the one it gave until Patreon is
+  asked, since only the pledge can say what follows it. Renewal off
+  (`after_days` 0) re-signs nothing. A start or a deploy stamps nothing, and
   neither does a reload that finds the same table, as the listener's
   does after every reconnect. Pokes and the stamp are kept to the
   second and rounded up, so a signature minted under the old state in

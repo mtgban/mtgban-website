@@ -219,3 +219,45 @@ func TestStampSkipsWhatWasReminted(t *testing.T) {
 		t.Error("a signature re-signed under the last table is not asked for after the next stamp")
 	}
 }
+
+// A grant's stamp asks for its grantee's signatures issued before it and no
+// one else's, names itself unless the table changed later, and is answered by
+// a re-sign made after it, not by one made before.
+func TestGrantStampAsksForItsGranteeAlone(t *testing.T) {
+	set := New()
+	edit := time.Now().Add(-time.Hour)
+	set.StampGrant("grantee", edit, 11*day)
+	before, after := edit.Add(-day), edit.Add(time.Minute)
+
+	if set.Wants("grantee", "sig", before, time.Now(), window) != "grant" {
+		t.Error("the grant's stamp does not ask for its grantee's older signature")
+	}
+	if set.Wants("grantee", "sig", after, time.Now(), window) != "" || set.Wants("other", "sig", before, time.Now(), window) != "" {
+		t.Error("the grant's stamp asks for a newer signature, or for another reader's")
+	}
+
+	set.Reminted("resigned-before", time.Now().Add(day), edit.Add(-time.Minute))
+	set.Reminted("resigned-after", time.Now().Add(day), time.Now())
+	if set.Wants("grantee", "resigned-before", before, time.Now(), window) != "grant" || set.Wants("grantee", "resigned-after", before, time.Now(), window) != "" {
+		t.Error("a re-sign before the grant's edit answered it, or one after did not")
+	}
+
+	set.StampACL(time.Now())
+	if set.Wants("grantee", "sig", before, time.Now(), window) != "acl" {
+		t.Error("a later edit of the table is not the cause named")
+	}
+}
+
+// A grant's stamp is kept as long as a signature lasts, then dropped at the
+// next grant edit.
+func TestGrantStampAgesOut(t *testing.T) {
+	set := New()
+	set.StampGrant("old", time.Now().Add(-12*day), 11*day)
+	set.StampGrant("new", time.Now(), 11*day)
+	if _, kept := set.grants["old"]; kept {
+		t.Error("a grant stamp older than a signature lasts was kept")
+	}
+	if _, kept := set.grants["new"]; !kept {
+		t.Error("the new grant stamp was not kept")
+	}
+}
