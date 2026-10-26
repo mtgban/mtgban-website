@@ -334,6 +334,87 @@ func TestUpdateRearmsAndSetStatus(t *testing.T) {
 	}
 }
 
+// TestUpdateKeepsTheParkReason covers an edit to an email alert parked for
+// want of an address: it stays parked for that reason, so the address that
+// later arrives restores it with the rest.
+func TestUpdateKeepsTheParkReason(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	id := parkedEmailAlert(t, s, h, "card-1", ParkNoAddress)
+	edit, _, err := s.Get(ctx, id, h)
+	must(t, err)
+	edit.Above = Threshold{Kind: KindAbs, Value: 20}
+	ok, err := s.Update(ctx, edit)
+	if err != nil || !ok {
+		t.Fatalf("Update: ok=%v err=%v", ok, err)
+	}
+	got, _, _ := s.Get(ctx, id, h)
+	if got.Status != StatusUndeliverable || got.LastError != ParkNoAddress {
+		t.Fatalf("edited parked alert: status %s, last_error %q", got.Status, got.LastError)
+	}
+	now := time.Now()
+	must(t, s.UpsertChannel(ctx, Channel{UserHash: h, Kind: ChannelEmail, Address: "pat@example.com", Source: SourcePatreon, VerifiedAt: &now}))
+	if st := alertStatus(t, s, h, id); st != StatusActive {
+		t.Fatalf("status %s after an address arrived, want active", st)
+	}
+}
+
+// TestUpdateToAnotherChannelUnparks covers an email alert parked
+// undeliverable and edited to deliver by Discord: no address will restore
+// it now, so the edit makes it active for the evaluator to judge afresh.
+func TestUpdateToAnotherChannelUnparks(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	id := parkedEmailAlert(t, s, h, "card-1", ParkBounced)
+	edit, _, err := s.Get(ctx, id, h)
+	must(t, err)
+	edit.Delivery = DeliveryDiscord
+	ok, err := s.Update(ctx, edit)
+	if err != nil || !ok {
+		t.Fatalf("Update: ok=%v err=%v", ok, err)
+	}
+	got, _, _ := s.Get(ctx, id, h)
+	if got.Status != StatusActive || got.LastError != "" {
+		t.Fatalf("parked alert moved to Discord: status %s, last_error %q", got.Status, got.LastError)
+	}
+}
+
+// TestUpdateKeepsTheChannelPark covers an edit to an alert parked for a
+// channel the tier no longer allows: it stays parked by its channel, so
+// allowing the channel again restores it.
+func TestUpdateKeepsTheChannelPark(t *testing.T) {
+	s := testStore(t)
+	h := freshUser(t, s)
+	seedContact(t, s, h)
+	ctx := context.Background()
+	a := sample(h)
+	a.Delivery = DeliveryEmail
+	created, err := s.Create(ctx, a)
+	must(t, err)
+	_, err = s.MarkChannelDisallowed(ctx, h, "magic", []ChannelKind{ChannelDiscord})
+	must(t, err)
+	edit, _, err := s.Get(ctx, created.ID, h)
+	must(t, err)
+	edit.Above = Threshold{Kind: KindAbs, Value: 20}
+	ok, err := s.Update(ctx, edit)
+	if err != nil || !ok {
+		t.Fatalf("Update: ok=%v err=%v", ok, err)
+	}
+	got, _, _ := s.Get(ctx, created.ID, h)
+	if got.Status != StatusOverAllowance || got.LastError != channelParkReason {
+		t.Fatalf("edited channel-parked alert: status %s, last_error %q", got.Status, got.LastError)
+	}
+	moved, err := s.MarkChannelDisallowed(ctx, h, "magic", []ChannelKind{ChannelDiscord, ChannelEmail})
+	must(t, err)
+	if len(moved) != 1 || moved[0].Status != StatusActive {
+		t.Fatalf("allowing the channel again moved %+v, want the alert active", moved)
+	}
+}
+
 func TestEventsLastPerAlert(t *testing.T) {
 	s := testStore(t)
 	h := freshUser(t, s)
