@@ -79,3 +79,34 @@ func TestAdminDashboardShowsStaleBadgeAndBanner(t *testing.T) {
 		t.Error("the page-top banner is missing or miscounts the stale store")
 	}
 }
+
+// A dump that names no time leaves its store's timestamp nil: the row says
+// so, and the rest of the page renders.
+func TestAdminDashboardShowsAStoreWithNoTimestamp(t *testing.T) {
+	withSigMode(t, true, false)
+
+	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
+	prevIdx := scraperIndexPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+		scraperIndexPtr.Store(prevIdx)
+	})
+
+	seller := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"uuid-0": {{Price: 1}}}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
+	sellers := []mtgban.Seller{seller}
+	var noVendors []mtgban.Vendor
+	sellersPtr.Store(&sellers)
+	vendorsPtr.Store(&noVendors)
+	scraperIndexPtr.Store(buildScraperIndex(map[string]map[string][]string{
+		"cardkingdom": {"retail": {"CK"}},
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	req.Host = "mtgban.com"
+	rec := httptest.NewRecorder()
+	testSite.Admin(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Stale (1):") {
+		t.Errorf("status %d, or the banner does not count the store with no timestamp", rec.Code)
+	}
+}
