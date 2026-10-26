@@ -394,3 +394,36 @@ func productsSharingAName(b *mtgmatcher.Backend) (string, []int) {
 	}
 	return "", nil
 }
+
+// The archive files every printing under mtgjson's 36-character uuid, and the
+// copies the matcher makes of a printing under their original's, told apart
+// by is_alt or language. Each one's ban_id charts it, so the table and the
+// legend have to name that same printing, copy or original.
+func TestMagicTargetNamesThePrinting(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+	checked := 0
+	for _, id := range b.GetUUIDs() {
+		co, err := b.GetUUID(id)
+		if err != nil || co.Sealed || magicVariant(co).MtgjsonUUID == co.UUID {
+			continue
+		}
+		original, err := b.GetUUID(magicVariant(co).MtgjsonUUID)
+		if err != nil {
+			continue
+		}
+		for _, want := range []*mtgmatcher.CardObject{co, original} {
+			mv := magicVariant(want)
+			vi := timeseries.VariantInfo{BanID: 7, MtgjsonUUID: mv.MtgjsonUUID, IsFoil: mv.IsFoil, IsEtched: mv.IsEtched,
+				IsAlt: mv.IsAlt, Language: *timeseries.NormalizeLanguage(&mv.Language)}
+			got := magicTarget(b, vi.BanID, vi)
+			if got.SearchID != want.UUID || got.Label != want.String() {
+				t.Errorf("SearchID %q, Label %q; want %q, %q", got.SearchID, got.Label, want.UUID, want.String())
+			}
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no printing filed under another uuid in the datastore")
+	}
+}
