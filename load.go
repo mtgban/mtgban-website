@@ -662,6 +662,10 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 	if len(inv) == 0 {
 		return nil, errors.New("new inventory has no entries")
 	}
+	// The age checks below, the staleness alarm and every stash read it
+	if seller.Info().InventoryTimestamp == nil {
+		return nil, errors.New("new inventory names no time")
+	}
 
 	if i < 0 {
 		// A store back from a drop is held to the size it had then
@@ -743,6 +747,9 @@ func buildNextVendors(current []mtgban.Vendor, vendor mtgban.Vendor, i int) ([]m
 	// and takes the hotlist down with it.
 	if len(bl) == 0 {
 		return nil, errors.New("new buylist has no entries")
+	}
+	if vendor.Info().BuylistTimestamp == nil {
+		return nil, errors.New("new buylist names no time")
 	}
 
 	if i < 0 {

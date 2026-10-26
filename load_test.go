@@ -540,3 +540,24 @@ func TestLoadScrapersNGLeavesOutADumpPastDropAfter(t *testing.T) {
 		t.Errorf("served %d sellers and %d vendors, want SCG alone, ABU's 8-day-old buylist left out", len(GetSellers()), len(GetVendors()))
 	}
 }
+
+// A dump that names no time is refused on both sides, first registration or
+// not: the age check of the next one, the staleness alarm and the stash all
+// read it.
+func TestBuildNextRejectsAnUndatedDump(t *testing.T) {
+	now := time.Now()
+	undatedInv := mtgban.NewSellerFromInventory(mtgban.InventoryRecord{"uuid-0": {{Price: 1}}}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
+	undatedBl := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{"uuid-0": {{BuyPrice: 1}}}, mtgban.ScraperInfo{Name: "CK", Shorthand: "CK"})
+	if _, err := buildNextSellers(nil, undatedInv, -1); err == nil {
+		t.Error("an undated inventory registered")
+	}
+	if _, err := buildNextSellers([]mtgban.Seller{inventoryOf("CK", 1, now)}, undatedInv, 0); err == nil {
+		t.Error("an undated inventory replaced a dated one")
+	}
+	if _, err := buildNextVendors(nil, undatedBl, -1); err == nil {
+		t.Error("an undated buylist registered")
+	}
+	if _, err := buildNextVendors([]mtgban.Vendor{buylistOf("CK", 1, now)}, undatedBl, 0); err == nil {
+		t.Error("an undated buylist replaced a dated one")
+	}
+}
