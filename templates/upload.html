@@ -1015,6 +1015,8 @@
                                 <input type="submit" value="TCGplayer CSV"/>
                             </noscript>
                         </form>
+                        {{/* Shown by backpack.js while a ticked row is a card in the backpack */}}
+                        <button type="button" class="opt-btn remove pack-take-btn" hidden onclick="window.takeRowsFromBackpack && takeRowsFromBackpack(this)">Remove from backpack</button>
                         </div>
                         {{$qty := index $.OptimizedQuantities $scraperKey}}
                         <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
