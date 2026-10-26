@@ -1371,6 +1371,8 @@
 .opt-btn.csv:hover { color: var(--normal); }
 /* The display above outranks [hidden]'s own */
 .opt-btn[hidden] { display: none; }
+.pack-take-btn { padding-left: 8px; padding-right: 8px; }
+.pack-take-btn svg { width: 15px; height: 15px; vertical-align: -3px; }
 
 .opt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 /* The store header and the column labels stick as one block, so the labels

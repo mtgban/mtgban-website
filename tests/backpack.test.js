@@ -750,6 +750,30 @@ describe('taking an Upload store section out', () => {
         expect(p.window.Backpack.undo()).toBe(false);
     });
 
+    test('asks before taking, and a no takes nothing', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        const before = p.m.mtgban_backpack;
+        p.window.confirm = (msg) => { confirms.push(msg); return false; };
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(confirms).toEqual(["Remove this store's ticked cards from the backpack?"]);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(p.optSections[0].take.hidden).toBe(false);
+    });
+
+    test('asks through confirmDialog when the page has it', () => {
+        const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        const asked = [];
+        let ok = null;
+        p.window.confirmDialog = (msg, onOk, opts) => { asked.push([msg, opts.confirmLabel]); ok = onOk; };
+        const before = p.m.mtgban_backpack;
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(asked).toEqual([["Remove this store's ticked cards from the backpack?", 'Remove']]);
+        expect(confirms).toEqual([]);
+        expect(p.m.mtgban_backpack).toBe(before);
+        ok();
+        expect(live(p)).toEqual([]);
+    });
+
     test('a section with nothing in the backpack writes nothing', () => {
         const p = page({ store: [{ id: 'a', name: 'A', qty: 1, t: 1, m: 1 }], sections: [[['b', 1]]] });
         const before = p.m.mtgban_backpack;

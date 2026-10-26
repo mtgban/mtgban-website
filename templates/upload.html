@@ -20,13 +20,14 @@
      on a click - copyShareLink's tick - can still be a placeholder, since by
      then lucide is long loaded and nothing is waiting on it.
 
-     Sized by the caller: .res-mode-btn svg, .res-mode-upsell svg and
-     .upload-share-link svg in upload.css. */}}
+     Sized by the caller: .res-mode-btn svg, .res-mode-upsell svg,
+     .upload-share-link svg and .pack-take-btn svg in upload.css. */}}
 {{define "upload-icon"}}<svg class="lucide lucide-{{.}}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     {{- if eq . "arrow-left-right"}}<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>
     {{- else if eq . "lock"}}<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
     {{- else if eq . "share-2"}}<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>
     {{- else if eq . "package-open"}}<path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/>
+    {{- else if eq . "backpack"}}<path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 10h8"/><path d="M8 18h8"/><path d="M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
     {{- end}}</svg>{{end}}
 
 {{define "content"}}
@@ -38,6 +39,7 @@
     {{/* priced is the cards a send from the backpack got results for, which
          empties it when the send asked to; null when nothing was priced. */}}
     <script>window.BAN_BACKPACK = {canUpload: true, priced: {{if and .CardHashes (or .UploadEntries .Optimized)}}{{.CardHashes}}{{else}}null{{end}}};</script>
+    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}" defer></script>
     <script type="text/javascript" src="/js/backpack.js?hash={{.Hash}}" defer></script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard upload-wide">
@@ -1016,7 +1018,7 @@
                             </noscript>
                         </form>
                         {{/* Shown by backpack.js while a ticked row is a card in the backpack */}}
-                        <button type="button" class="opt-btn remove pack-take-btn" hidden onclick="window.takeRowsFromBackpack && takeRowsFromBackpack(this)">Remove from backpack</button>
+                        <button type="button" class="opt-btn remove pack-take-btn" hidden title="Remove from backpack" aria-label="Remove from backpack" onclick="window.takeRowsFromBackpack && takeRowsFromBackpack(this)">{{template "upload-icon" "backpack"}}</button>
                         </div>
                         {{$qty := index $.OptimizedQuantities $scraperKey}}
                         <span class="opt-count">{{plural (len $entries) "card"}}{{if ne $qty (len $entries)}} ({{$qty}} total){{end}}</span>
