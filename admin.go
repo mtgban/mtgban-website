@@ -798,7 +798,7 @@ func adminScraperTable(kind string, now time.Time, pageVars *PageVars) {
 
 		lastUpdate := ""
 		ts := scraper.updated
-		if !ts.IsZero() {
+		if ts != nil && !ts.IsZero() {
 			lastUpdate = ts.UTC().Format(time.RFC3339)
 		}
 
