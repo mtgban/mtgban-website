@@ -1044,7 +1044,7 @@
                                     <div class="opt-name-text"><a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.Reserved}}<span class="rl-badge" title="Reserved List">RL</span>{{end}}{{buylist_badge $scraperKey $card.HotlistStore $card.HotlistNew $card.HotlistNewTip}}
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}</div>
                                 </div></td>
-                                <td class="opt-set">
+                                <td class="opt-set" data-sort="{{$card.Edition}}&#9;{{$card.Name}}">
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Edition" $card.Edition "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Symbol" $card.SetSymbol "Size" 20 "Class" ""}} {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
                                 </td>
                                 <td>{{$ckTip := buylist_title "CK" (grade "NM") "" $card.GoodBuylist $card.HighestBuylist $card.CKFacts $card.CKSignalTip}}<div class="bl-info"{{if $ckTip}} title="{{plain_tip $ckTip}}" data-tip="{{$ckTip}}"{{end}}>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true $card.CKSignal}}{{buylist_ck $card.CKSignal}}</div></td>
