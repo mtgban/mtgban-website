@@ -351,24 +351,29 @@ func targetFromBanID(ctx context.Context, b *mtgmatcher.Backend, banID int64) (*
 		return nil, errChartIDNotFound
 	}
 	if vi.IsMagic() {
-		t := &chartTarget{
-			BanID:  banID,
-			UUID:   vi.MtgjsonUUID,
-			Foil:   vi.IsFoil,
-			Etched: vi.IsEtched,
-			// The uuid, kept on the finish the ban_id names.
-			SearchID: magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched),
-		}
-		// Display name comes from mtgmatcher, read off the finish's own id so
-		// the label names it (the chart uses BanID for data).
-		co, err := b.GetUUID(t.SearchID)
-		if err == nil {
-			t.Name = co.Name
-			t.Label = co.String()
-		}
-		return t, nil
+		return magicTarget(b, banID, vi), nil
 	}
 	return nonMagicTarget(ctx, b, vi), nil
+}
+
+// magicTarget builds a Magic chart target for a ban_id's variant.
+func magicTarget(b *mtgmatcher.Backend, banID int64, vi timeseries.VariantInfo) *chartTarget {
+	t := &chartTarget{
+		BanID:  banID,
+		UUID:   vi.MtgjsonUUID,
+		Foil:   vi.IsFoil,
+		Etched: vi.IsEtched,
+		// The uuid, kept on the finish the ban_id names.
+		SearchID: magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched),
+	}
+	// Display name comes from mtgmatcher, read off the finish's own id so
+	// the label names it (the chart uses BanID for data).
+	co, err := b.GetUUID(t.SearchID)
+	if err == nil {
+		t.Name = co.Name
+		t.Label = co.String()
+	}
+	return t
 }
 
 // nonMagicTarget builds a non-Magic chart target, resolving the display name from
