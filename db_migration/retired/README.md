@@ -30,6 +30,8 @@ so anything rebuilt from them brings the old split back.
 | `09_alt_copies.sql.txt` | Kept `is_alt` only on the 378 Alternate Fourth Edition copies, folding every other `is_alt` variant into its plain twin | 2026-10-25 |
 | `10_alt_copy_prices.sql.txt` | Put back the prices the copies and their 4ED originals filed on each other's variants | 2026-10-25 |
 | `11_wide_only_prices.sql.txt` | Copied in the 385,857 Magic prices only `product_prices` held (2026-08-27 and six from September 2026) | with #1118 |
+| `12_native_language.sql.txt` | Folded the empty-language variant of 1,668 printings native to another language into their language variant, the one the stash writes | 2026-10-26 |
+| `13_foil_only_cards.sql.txt` | Moved the backfill's nonfoil prices of 13,376 foil-only and etched-only cards onto their foil or etched variant | 2026-10-26 |
 
 ## How the backfill worked
 

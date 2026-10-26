@@ -1,0 +1,50 @@
+\echo 'Retired: a one-off repair that has already run against production. See retired/README.md.'
+\quit
+-- Folds the empty-language variant of 1668 printings native to a language other
+-- than English into their language variant, the one the stash files them
+-- under. The backfill had filed them under no language up to 2026-07-20, so
+-- most carry both, and the chart, which prefers the empty language, read the
+-- backfill's and stopped there.
+--
+-- The empty variant's rows go to the language variant, and win on a day both
+-- hold; then the empty variant goes. The list is the datastore's of
+-- 2026-10-26: each uuid with the language of its own printing, so a language
+-- copy ("<uuid>_jpn") of an English printing is not in it. It is safe to run
+-- again.
+
+BEGIN;
+
+CREATE TEMP TABLE native_lang (mtgjson_uuid uuid, language text) ON COMMIT DROP;
+-- The list is b2://mtgban-newspaper/db_migration/12_native_language.csv.
+\copy native_lang FROM '12_native_language.csv' WITH (FORMAT csv)
+
+CREATE TEMP TABLE native_pairs ON COMMIT DROP AS
+SELECT l.ban_id AS lang_id, b.ban_id AS blank_id
+  FROM native_lang n
+  JOIN public.variants l ON l.mtgjson_uuid = n.mtgjson_uuid AND l.language = n.language
+  JOIN public.variants b
+    ON b.mtgjson_uuid = l.mtgjson_uuid AND b.is_foil = l.is_foil AND b.is_etched = l.is_etched
+   AND b.is_alt = l.is_alt AND b.language = '';
+ANALYZE native_pairs;
+
+SELECT count(*) AS to_fold FROM native_pairs;
+
+WITH moved AS (
+    INSERT INTO public.prices (ban_id, date, provider, price)
+    SELECT np.lang_id, p.date, p.provider, p.price
+      FROM native_pairs np
+      JOIN public.prices p ON p.ban_id = np.blank_id
+    ON CONFLICT (ban_id, date, provider) DO UPDATE SET price = EXCLUDED.price
+     WHERE prices.price IS DISTINCT FROM EXCLUDED.price
+    RETURNING 1)
+SELECT count(*) AS moved_or_replaced FROM moved;
+
+WITH gone AS (
+    DELETE FROM public.prices p USING native_pairs np
+     WHERE p.ban_id = np.blank_id
+    RETURNING 1)
+SELECT count(*) AS deleted FROM gone;
+
+DELETE FROM public.variants v USING native_pairs np WHERE v.ban_id = np.blank_id;
+
+COMMIT;

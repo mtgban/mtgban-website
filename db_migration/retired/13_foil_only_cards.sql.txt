@@ -1,0 +1,77 @@
+\echo 'Retired: a one-off repair that has already run against production. See retired/README.md.'
+\quit
+-- Moves the prices of 13376 foil-only and etched-only cards off their
+-- nonfoil variant onto the foil or etched one, the variant the stash and the
+-- chart use for them. The backfill filed them nonfoil up to 2026-07-20, and
+-- so did the Redis import, from the cards' plain keys.
+--
+-- Rows after 2026-07-20 stay: the stash writes nonfoil only while the
+-- datastore lists the finish. So do rows inside a card's window, the days a
+-- foil ("_f") key of the card existed beside the plain one, which then priced
+-- the nonfoil (827 cards). A row whose new variant already holds that day
+-- is dropped, and an emptied nonfoil variant goes. The list is the
+-- datastore's of 2026-10-26, with the windows read off the Redis keys.
+--
+-- It is one statement, so it holds one connection through the pooler, and each
+-- month commits on its own: a stopped run keeps what it did and a re-run
+-- carries on.
+
+DO $$
+DECLARE
+    m date;
+    taken bigint;
+    kept bigint;
+    n bigint;
+BEGIN
+    DROP TABLE IF EXISTS pg_temp.foil_only, pg_temp.fo_pairs;
+    CREATE TEMP TABLE foil_only (mtgjson_uuid uuid, is_foil bool, is_etched bool, win_from date, win_to date);
+    -- The rows are b2://mtgban-newspaper/db_migration/13_foil_only_cards.csv,
+    -- spliced in here as VALUES, since a DO block cannot \copy.
+    INSERT INTO foil_only VALUES
+  ('<mtgjson_uuid>', <is_foil>, <is_etched>, <win_from or NULL>, <win_to or NULL>);
+
+    INSERT INTO public.variants (mtgjson_uuid, is_foil, is_etched, is_alt, language)
+    SELECT DISTINCT f.mtgjson_uuid, fo.is_foil, fo.is_etched, f.is_alt, f.language
+      FROM foil_only fo
+      JOIN public.variants f ON f.mtgjson_uuid = fo.mtgjson_uuid AND NOT f.is_foil AND NOT f.is_etched
+    ON CONFLICT (mtgjson_uuid, is_foil, is_etched, is_alt, language) WHERE mtgjson_uuid IS NOT NULL DO NOTHING;
+
+    CREATE TEMP TABLE fo_pairs AS
+    SELECT f.ban_id AS from_id, t.ban_id AS to_id, fo.win_from, fo.win_to
+      FROM foil_only fo
+      JOIN public.variants f ON f.mtgjson_uuid = fo.mtgjson_uuid AND NOT f.is_foil AND NOT f.is_etched
+      JOIN public.variants t
+        ON t.mtgjson_uuid = f.mtgjson_uuid AND t.is_foil = fo.is_foil AND t.is_etched = fo.is_etched
+       AND t.is_alt = f.is_alt AND t.language = f.language;
+    CREATE INDEX ON fo_pairs (from_id);
+    ANALYZE fo_pairs;
+    SELECT count(*) INTO n FROM fo_pairs;
+    RAISE NOTICE 'nonfoil variants %', n;
+    COMMIT;
+
+    FOR m IN SELECT generate_series(DATE '2020-09-01', DATE '2026-07-01', INTERVAL '1 month')::date LOOP
+        WITH src AS (
+            DELETE FROM public.prices p USING fo_pairs fp
+             WHERE p.ban_id = fp.from_id
+               AND p.date >= m AND p.date < (m + INTERVAL '1 month')::date AND p.date <= DATE '2026-07-20'
+               AND (fp.win_from IS NULL OR p.date NOT BETWEEN fp.win_from AND fp.win_to)
+            RETURNING fp.to_id, p.date, p.provider, p.price),
+        ins AS (
+            INSERT INTO public.prices (ban_id, date, provider, price)
+            SELECT * FROM src
+            ON CONFLICT (ban_id, date, provider) DO NOTHING
+            RETURNING 1)
+        SELECT (SELECT count(*) FROM src), (SELECT count(*) FROM ins) INTO taken, kept;
+        RAISE NOTICE '% taken % moved % dropped % at %', to_char(m, 'YYYY-MM'), taken, kept, taken - kept, clock_timestamp()::time(0);
+        COMMIT;
+    END LOOP;
+
+    WITH gone AS (
+        DELETE FROM public.variants v USING fo_pairs fp
+         WHERE v.ban_id = fp.from_id
+           AND NOT EXISTS (SELECT 1 FROM public.prices p WHERE p.ban_id = v.ban_id)
+        RETURNING 1)
+    SELECT count(*) INTO n FROM gone;
+    RAISE NOTICE 'emptied variants deleted %', n;
+    DROP TABLE pg_temp.foil_only, pg_temp.fo_pairs;
+END $$;
