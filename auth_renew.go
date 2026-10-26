@@ -106,12 +106,13 @@ func graceSignature(r *http.Request, sig, querySig string) url.Values {
 // renewDue renews the signature of the request signing is serving when
 // decideRenewal says it is due, or when it is young and stale in a way only
 // the site knows: its reader was poked, which renews it from Patreon as a due
-// one, or the access table changed after it was issued, which re-signs it
-// here (remintSignature). It reports what the request goes on with: the new
-// signature, or refused when the reader's pledge is gone and they are logged
-// out. values and signed are the cookie's signature as signing read it,
-// expired or not, and whether this host wrote it; cookieBorne says it came
-// from the cookie, not ?sig=.
+// one, or the access table or the reader's grant changed after it was issued,
+// which re-signs it here (remintSignature). An edit is re-signed here too
+// whenever Patreon does not renew the signature, however old it is. It reports
+// what the request goes on with: the new signature, or refused when the
+// reader's pledge is gone and they are logged out. values and signed are the
+// cookie's signature as signing read it, expired or not, and whether this host
+// wrote it; cookieBorne says it came from the cookie, not ?sig=.
 func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Values, signed, cookieBorne bool) (sig string, refused bool) {
 	expires, _ := strconv.ParseInt(values.Get("Expires"), 10, 64)
 	ends := time.Unix(expires, 0)
@@ -138,20 +139,43 @@ func (s *site) renewDue(w http.ResponseWriter, r *http.Request, values url.Value
 			window = 0
 		}
 		cause = Pokes.Wants(userstate.HashEmail(email), values.Get("Signature"), ends.Add(-DefaultSignatureDuration), now, window)
-		if cause == "acl" {
-			return s.remintSignature(w, r, values, ends), false
+		if cause == "acl" || cause == "grant" {
+			return s.remintSignature(w, r, values, ends, cause), false
 		}
 		if cause == "" {
 			return "", false
 		}
 	default:
+		// Old enough to renew, but with no session to renew from
+		if cfg.AfterDays > 0 && signed && cookieBorne {
+			return s.resignStale(w, r, values, ends, now), false
+		}
 		return "", false
 	}
 	if !renewalEnabled() {
-		return "", false
+		return s.resignStale(w, r, values, ends, now), false
 	}
 	sig, outcome := s.renewSignature(w, r, values, 0, cause)
+	if outcome == renewalNotRenewed || outcome == renewalEnded {
+		return s.resignStale(w, r, values, ends, now), false
+	}
 	return sig, outcome == renewalRefused
+}
+
+// resignStale re-signs the signature here (remintSignature) when the access
+// table or the reader's grant changed after it was issued and it has not run
+// out, and returns it; "" when nothing asks for it.
+func (s *site) resignStale(w http.ResponseWriter, r *http.Request, values url.Values, ends, now time.Time) string {
+	email := values.Get("UserEmail")
+	if email == "" || !now.Before(ends) {
+		return ""
+	}
+	// No window: a poke renews from Patreon, which did not
+	cause := Pokes.Wants(userstate.HashEmail(email), values.Get("Signature"), ends.Add(-DefaultSignatureDuration), now, 0)
+	if cause != "acl" && cause != "grant" {
+		return ""
+	}
+	return s.remintSignature(w, r, values, ends, cause)
 }
 
 // renewalOutcome is what a renewal came to.
@@ -171,26 +195,35 @@ const (
 )
 
 // remintSignature re-signs a reader's signature, as values describe it,
-// under the access table now: the tier, name and email it carries, the
-// overrides the reader's grant gives now, and the Expires it had, so that an
-// edit of the table never extends a session. Patreon is not asked, since the
-// edit changes nothing it knows. The poke set remembers the new signature,
-// which its age cannot tell from the old one.
-func (s *site) remintSignature(w http.ResponseWriter, r *http.Request, values url.Values, ends time.Time) string {
+// under the access table now: the name and email it carries, the tier the
+// reader's grant names now or else the one it carries, the overrides the
+// grant gives now, and the Expires it had, so that an edit never extends a
+// session. Patreon is not asked, since the edit changes nothing it knows; a
+// grant that stops naming a tier leaves the one it gave until Patreon is.
+// The poke set remembers the new signature, which its age cannot tell from
+// the old one. cause is what asked for it, for the log.
+func (s *site) remintSignature(w http.ResponseWriter, r *http.Request, values url.Values, ends time.Time, cause string) string {
+	// Taken before the grants are read: a grant edit landing between the two
+	// reads as after this re-sign, which the next request then repeats
+	at := time.Now()
 	user := &pledge.User{
 		FullName:      values.Get("UserName"),
 		Email:         values.Get("UserEmail"),
 		EmailVerified: values.Get("UserEmailUnverified") != "true",
 	}
+	tier := values.Get("UserTier")
 	var overrides map[string]map[string]string
 	grant, found := indexGrants(PatreonGrants()).find(userstate.HashEmail(user.Email))
 	if found {
 		overrides = grant.Overrides
+		if grant.Tier != "" {
+			tier = grant.Tier
+		}
 	}
-	sig := sign(values.Get("UserTier"), user, overrides, time.Until(ends))
-	Pokes.Reminted(parseSig(sig).Get("Signature"), ends, time.Now())
+	sig := sign(tier, user, overrides, time.Until(ends))
+	Pokes.Reminted(parseSig(sig).Get("Signature"), ends, at)
 	putSignatureInCookies(w, r, sig)
-	LogPages["Admin"].Printf("renew: email=%q cause=acl verdict=reminted", user.Email)
+	LogPages["Admin"].Printf("renew: email=%q cause=%s verdict=reminted", user.Email, cause)
 	return sig
 }
 
