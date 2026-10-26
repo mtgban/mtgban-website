@@ -610,6 +610,29 @@ func TestCollectMagicSnapshotCountsResolveErrors(t *testing.T) {
 	}
 }
 
+// TestMagicVariantLanguage pins that a printing in its uuid's own language
+// files under no language, as the scrapers price it, while a language copy of
+// an English printing keeps its own.
+func TestMagicVariantLanguage(t *testing.T) {
+	native, err := backend().GetUUID("37311e65-2dff-5101-92bc-0adff04bd7eb")
+	if err != nil {
+		t.Skip("mtgmatcher data not loaded; skipping")
+	}
+	if native.Language != "Japanese" {
+		t.Fatalf("%s is %s, want a Japanese printing", native.UUID, native.Language)
+	}
+	if got := magicVariant(native).Language; got != "" {
+		t.Errorf("native printing language = %q, want none", got)
+	}
+	copied, err := backend().GetUUID("217a093a-8dbe-53e9-b6a1-67c4df48b5ec_jpn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := magicVariant(copied).Language; got != "Japanese" {
+		t.Errorf("language copy language = %q, want Japanese", got)
+	}
+}
+
 // TestMagicVariantAltCopy pins that the Alternate Fourth Edition copy and the
 // printing it copies file under two variants, and that mtgjson's own
 // isAlternative flag, which every flagged card's uuid already carries, does not.

@@ -573,14 +573,21 @@ func snapshotDate(ts time.Time, now time.Time) string {
 
 // magicVariant is the variant a Magic card's prices are filed under. The uuid
 // column holds mtgjson's 36 characters, so is_alt is what tells the
-// Alternate Fourth Edition copy ("<uuid>_alt") from the printing it copies.
+// Alternate Fourth Edition copy ("<uuid>_alt") from the printing it copies,
+// and language what tells a language copy ("<uuid>_jpn") from its original.
+// A printing in its own uuid's language files under none, whatever it is.
 func magicVariant(co *mtgmatcher.CardObject) timeseries.MagicVariant {
+	uuid := timeseries.NormalizeUUID(co.UUID)
+	var language string
+	if strings.TrimSuffix(strings.TrimSuffix(co.UUID[len(uuid):], "_f"), "_e") != "" {
+		language = co.Language
+	}
 	return timeseries.MagicVariant{
-		MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
+		MtgjsonUUID: uuid,
 		IsFoil:      co.Foil,
 		IsEtched:    co.Etched,
 		IsAlt:       strings.Contains(co.UUID, "_alt"),
-		Language:    co.Language,
+		Language:    language,
 	}
 }
 
