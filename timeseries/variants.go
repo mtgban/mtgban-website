@@ -429,6 +429,13 @@ type VariantInfo struct {
 // IsMagic reports whether the variant is a Magic printing (has an mtgjson uuid).
 func (v VariantInfo) IsMagic() bool { return v.MtgjsonUUID != "" }
 
+// Names reports whether the variant is the one the archive files m under.
+func (v VariantInfo) Names(m MagicVariant) bool {
+	return m.normalized() == MagicVariant{
+		MtgjsonUUID: v.MtgjsonUUID, IsFoil: v.IsFoil, IsEtched: v.IsEtched, IsAlt: v.IsAlt, Language: v.Language,
+	}
+}
+
 // LookupVariant returns the identity for a ban_id, ok=false if no such variant.
 // Used to chart/display a ban: id and to route Magic vs non-Magic handling.
 func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, bool, error) {

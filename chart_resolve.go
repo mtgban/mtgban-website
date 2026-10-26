@@ -358,13 +358,18 @@ func targetFromBanID(ctx context.Context, b *mtgmatcher.Backend, banID int64) (*
 
 // magicTarget builds a Magic chart target for a ban_id's variant.
 func magicTarget(b *mtgmatcher.Backend, banID int64, vi timeseries.VariantInfo) *chartTarget {
+	uuid, found := variantPrinting(b, vi)
+	if !found {
+		uuid = magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched)
+	}
 	t := &chartTarget{
 		BanID:  banID,
 		UUID:   vi.MtgjsonUUID,
 		Foil:   vi.IsFoil,
 		Etched: vi.IsEtched,
-		// The uuid, kept on the finish the ban_id names.
-		SearchID: magicFinishSearchID(b, vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched),
+		Alt:    vi.IsAlt,
+		// The printing the ban_id names, on its finish.
+		SearchID: uuid,
 	}
 	// Display name comes from mtgmatcher, read off the finish's own id so
 	// the label names it (the chart uses BanID for data).
@@ -374,6 +379,24 @@ func magicTarget(b *mtgmatcher.Backend, banID int64, vi timeseries.VariantInfo) 
 		t.Label = co.String()
 	}
 	return t
+}
+
+// variantPrinting is the matcher's id for the printing the archive files as
+// vi. The archive keeps mtgjson's 36 characters and tells the copies the
+// matcher makes of a printing from their original by is_alt or language, so
+// it is looked for among the printings of the original's name.
+func variantPrinting(b *mtgmatcher.Backend, vi timeseries.VariantInfo) (string, bool) {
+	co, err := b.GetUUID(vi.MtgjsonUUID)
+	if err != nil {
+		return "", false
+	}
+	for _, id := range b.Hashes[mtgmatcher.Normalize(co.Name)] {
+		printing, err := b.GetUUID(id)
+		if err == nil && vi.Names(magicVariant(printing)) {
+			return id, true
+		}
+	}
+	return "", false
 }
 
 // nonMagicTarget builds a non-Magic chart target, resolving the display name from
