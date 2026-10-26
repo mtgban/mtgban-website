@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/base64"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -46,14 +48,7 @@ func TestAdminDemoKeyExpiresForTheDemoUser(t *testing.T) {
 		tool := form.Get("tool")
 		rec := httptest.NewRecorder()
 		testSite.Admin(rec, adminRequest(http.MethodPost, form))
-		if rec.Code != http.StatusFound {
-			t.Fatalf("status %d", rec.Code)
-		}
-		loc, err := url.Parse(rec.Header().Get("Location"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := loc.Query().Get("msg")
+		key := mintedKey(t, rec)
 		blob, err := base64.StdEncoding.DecodeString(key)
 		if err != nil {
 			t.Fatalf("%s did not mint a key: %q", tool, key)
@@ -79,17 +74,7 @@ func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	testSite.Admin(rec, adminRequest(http.MethodPost, url.Values{"tool": {"newKey"}, "user": {user}, "duration": {""}}))
-	if rec.Code != http.StatusFound {
-		t.Fatalf("status %d", rec.Code)
-	}
-	loc, err := url.Parse(rec.Header().Get("Location"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := loc.Query().Get("msg")
-	if strings.HasPrefix(key, "error: ") {
-		t.Fatalf("newKey failed: %s", key)
-	}
+	key := mintedKey(t, rec)
 	blob, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
 		t.Fatalf("minted key is not base64: %v", err)
@@ -101,6 +86,23 @@ func TestAdminNewKeyDefaultsABlankDuration(t *testing.T) {
 	if claims.Get("Expires") == "" {
 		t.Errorf("a blank duration minted a permanent key: %v", claims)
 	}
+}
+
+// mintedKey is the API key a newKey or demokey POST answered with. It is
+// on the page itself, never in a redirect's URL, and the page is not cached.
+func mintedKey(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "" {
+		t.Fatalf("answered %d to %q, want the page", rec.Code, rec.Header().Get("Location"))
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("Cache-Control %q, want no-store", cc)
+	}
+	m := regexp.MustCompile(`New key: <input value="([^"]*)"`).FindStringSubmatch(rec.Body.String())
+	if m == nil {
+		t.Fatal("no key on the page")
+	}
+	return html.UnescapeString(m[1])
 }
 
 // adminRequest is method to the admin page from this site, with form in a
@@ -169,8 +171,8 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 		{url.Values{"tool": {"snapshot"}}, "msg", "Stashing is already in progress"},
 		{url.Values{"tool": {"tcgcsv"}}, "msg", "Ingesting latest TCGCSV prices"},
 		{url.Values{"tool": {"server"}}, "msg", "Restarting the server"},
-		{url.Values{"tool": {"newKey"}, "user": {"ops@example.com"}, "duration": {"30"}}, "html", "textfield"},
-		{url.Values{"tool": {"demokey"}}, "html", "textfield"},
+		{url.Values{"tool": {"newKey"}, "user": {"ops@example.com"}, "duration": {"30"}}, "", "New key: "},
+		{url.Values{"tool": {"demokey"}}, "", "New key: "},
 		{url.Values{"refresh": {"zz-unknown"}}, "msg", "zz-unknown not found"},
 		{url.Values{"reload": {"zz-unknown"}, "table": {"retail"}, "tag": {"ZZ"}}, "msg", "reload of zz-unknown error"},
 	}
@@ -210,6 +212,13 @@ func TestAdminActionsRunOnlyFromASameSitePost(t *testing.T) {
 		req.Header.Set("Origin", "https://mtgban.com")
 		rec := httptest.NewRecorder()
 		s.Admin(rec, req)
+		// No key: the result is on the page the POST answers
+		if action.key == "" {
+			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), action.want) {
+				t.Errorf("%s: a same-site POST answered %d without %q on the page", action.form.Encode(), rec.Code, action.want)
+			}
+			continue
+		}
 		loc, err := url.Parse(rec.Header().Get("Location"))
 		if rec.Code != http.StatusFound || err != nil {
 			t.Errorf("%s: a same-site POST answered %d to %q, want a redirect", action.form.Encode(), rec.Code, rec.Header().Get("Location"))

@@ -145,9 +145,6 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 	// token is matched rather than shown, so the label is this code's to
 	// write and not something a query string can put on the page.
 	switch r.FormValue("html") {
-	case "textfield":
-		pageVars.SelectableField = true
-		pageVars.SelectableLabel = "New key"
 	case "invite":
 		pageVars.SelectableField = true
 		pageVars.SelectableLabel = "Invite link"
@@ -157,7 +154,7 @@ func (s *site) Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.adminTools(w, r) {
+	if s.adminTools(w, r, &pageVars) {
 		return
 	}
 
@@ -355,8 +352,9 @@ var restartServer = func() {
 // any, and reports whether it answered with a redirect. Every tool but
 // invite changes something, so it is named in a POST's body; an invite
 // link is minted for the admin's own page and saved nowhere, so a GET's
-// query can ask for one.
-func (s *site) adminTools(w http.ResponseWriter, r *http.Request) bool {
+// query can ask for one. A new API key is put on the page the POST
+// answers rather than in a redirect, so no URL, history or log holds it.
+func (s *site) adminTools(w http.ResponseWriter, r *http.Request, pageVars *PageVars) bool {
 	tool := r.PostFormValue("tool")
 	if r.FormValue("tool") == "invite" {
 		tool = "invite"
@@ -432,9 +430,6 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request) bool {
 		go restartServer()
 
 	case "newKey", "demokey":
-		v = url.Values{}
-		redirect = true
-
 		user := r.PostFormValue("user")
 		if user == "" {
 			user = DefaultAPIDemoUser
@@ -450,13 +445,14 @@ func (s *site) adminTools(w http.ResponseWriter, r *http.Request) bool {
 		}
 
 		key, err := generateAPIKey(r.Context(), user, time.Duration(duration)*24*time.Hour)
-		msg := key
 		if err != nil {
-			msg = "error: " + err.Error()
+			pageVars.InfoMessage = "error: " + err.Error()
+			break
 		}
-
-		v.Set("msg", msg)
-		v.Set("html", "textfield")
+		w.Header().Set("Cache-Control", "no-store")
+		pageVars.InfoMessage = key
+		pageVars.SelectableField = true
+		pageVars.SelectableLabel = "New key"
 
 	case "invite":
 		v = url.Values{}
