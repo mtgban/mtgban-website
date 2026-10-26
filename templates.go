@@ -450,6 +450,7 @@ var funcMap = template.FuncMap{
 	},
 	"cart_load":        cartLoadFor,
 	"cart_load_arbit":  cartLoadForArbit,
+	"cart_sends":       cartSendsFor,
 	"cart_stores_in":   cartStoresIn,
 	"cart_bookmarklet": cartBookmarklet,
 	"isSussy": func(m map[string]float64, s string) bool {
