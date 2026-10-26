@@ -74,3 +74,34 @@ document.addEventListener('change', function(e) {
 });
 
 wireLoadLists({section: '.opt-store', removed: 'opt-removed'});
+
+// A row's send menu opens under its button, or over it in the lower part of
+// the window, and closes on a pick, before the cart panel can open, or on a
+// scroll, which would leave it behind its row.
+document.addEventListener('beforetoggle', function(e) {
+    var menu = e.target;
+    if (!menu.classList || !menu.classList.contains('opt-send-menu') || e.newState !== 'open') return;
+    var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
+    if (!btn) return;
+    var r = btn.getBoundingClientRect();
+    menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+    if (r.bottom > window.innerHeight * 0.6) {
+        menu.style.top = 'auto';
+        menu.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+    } else {
+        menu.style.top = (r.bottom + 4) + 'px';
+        menu.style.bottom = 'auto';
+    }
+}, true);
+
+document.addEventListener('click', function(e) {
+    var menu = e.target.closest && e.target.closest('.opt-send-menu');
+    if (menu && e.target.closest('a')) menu.hidePopover();
+});
+
+// Captured, so a scroll inside any container closes it too
+document.addEventListener('scroll', function() {
+    document.querySelectorAll('.opt-send-menu:popover-open').forEach(function(menu) {
+        menu.hidePopover();
+    });
+}, {capture: true, passive: true});

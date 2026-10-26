@@ -868,6 +868,10 @@
             {{end}}
         </div>
 
+        {{if .IsBuylist}}
+        {{/* The cart on every row's send button, drawn once */}}
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="opt-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/><circle cx="18" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></symbol></svg>
+        {{end}}
         {{range $i, $key := .OptimizedKeys}}
             {{$scraperKey := .}}
             {{$sourceKey := .}}
@@ -875,7 +879,7 @@
             {{if $entries}}
                 {{$total := index $.OptimizedTotals .}}
                 <div class="opt-store" id="opt-{{.}}" data-fold>
-                    <table class="opt-table" onmouseout="window.optTableOut && optTableOut(this, event)">
+                    <table class="opt-table"{{if $.IsBuylist}} data-sends{{end}} onmouseout="window.optTableOut && optTableOut(this, event)">
                     <colgroup><col><col><col><col><col><col><col></colgroup>
                     <thead><tr><td class="opt-store-head" colspan="7">
                     <div class="opt-store-header">
@@ -1061,7 +1065,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
-                                <td class="c"><input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
+                                <td class="c">{{if $.IsBuylist}}{{with cart_sends $.ScraperKeys $scraperEntries $row}}<button type="button" class="opt-send-btn" popovertarget="opt-send-{{$scraperKey}}-{{$n}}" title="Load this card at a buylist" aria-label="Load this card at a buylist"><svg aria-hidden="true"><use href="#opt-send-icon"/></svg></button><div class="opt-send-menu" id="opt-send-{{$scraperKey}}-{{$n}}" popover><div class="opt-send-title">Load this card at</div>{{range .}}<a href="{{.Link}}" target="_blank" rel="noopener" data-store="{{.Store}}" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">{{.Store}}<span>$ {{printf "%.2f" .Price}}</span></a>{{end}}</div>{{end}}{{end}}<input type="checkbox" checked autocomplete="off" class="opt-row-check" onchange="window.toggleOptRow && toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
@@ -1101,7 +1105,7 @@
         </div>
     </div>
 
-    {{if cart_stores_in .OptimizedKeys .IsBuylist}}
+    {{if or (cart_stores_in .OptimizedKeys .IsBuylist) (and .IsBuylist (cart_stores_in .ScraperKeys true))}}
     {{template "cart-prompt" .}}
     {{end}}
 

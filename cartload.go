@@ -258,6 +258,33 @@ func cartLoadFor(key string, buylist bool, entries []OptimizedUploadEntry) cartL
 	return cartLoad{}
 }
 
+// cartSend is one store in an optimizer row's send menu: the store's name,
+// its buylist cart page with the row's card alone in the fragment, and what
+// the split it was found under offers for the card.
+type cartSend struct {
+	Store string
+	Link  string
+	Price float64
+}
+
+// cartSendsFor is an optimizer row's send menu: one entry per store among
+// the page's splits, in their order, whose buylist cart the bookmarklet
+// fills and that lists an id for the row's card. A store with several
+// splits is named once, under its first; prices holds each split's offer.
+func cartSendsFor(keys []string, prices map[string]float64, entry OptimizedUploadEntry) []cartSend {
+	var sends []cartSend
+	seen := map[string]bool{}
+	for _, key := range keys {
+		load := cartLoadFor(key, true, []OptimizedUploadEntry{entry})
+		if load.Link == "" || seen[load.Store] {
+			continue
+		}
+		seen[load.Store] = true
+		sends = append(sends, cartSend{Store: load.Store, Link: load.Link, Price: prices[key]})
+	}
+	return sends
+}
+
 // cartAsksMost are the splits whose feed does not give their stock: Mint's
 // caps it at 8, and Card Trader's is gone by the time a listing is loaded,
 // which is filled from every listing at or under the price BAN shows. Mana

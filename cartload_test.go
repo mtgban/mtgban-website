@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -336,6 +337,67 @@ func TestCartLoadButtons(t *testing.T) {
 		}})
 		if strings.Contains(out, `id="cart-overlay"`) {
 			t.Errorf("a retail page with only a %s split carries the cart panel", key)
+		}
+	}
+}
+
+// A buylist row's send menu lists each of the page's stores whose buylist
+// cart takes the card, once and in the page's order, each with the row's
+// card alone; a card no cart takes, or a retail row, gets no menu.
+func TestCartSendMenu(t *testing.T) {
+	stubCartStores(t)
+	keys := []string{"MKM", "ABUGames", "CSI", "ABUGames", "SCG"}
+	prices := map[string]float64{"ABUGames": 3, "CSI": 2.5, "SCG": 2, "MKM": 9}
+	sends := cartSendsFor(keys, prices, OptimizedUploadEntry{CardID: "card-a", Quantity: 2})
+	var got []string
+	for _, send := range sends {
+		got = append(got, send.Store+" "+strconv.FormatFloat(send.Price, 'f', -1, 64)+" "+send.Link)
+	}
+	want := []string{
+		"ABU 3 https://abugames.com/cartview/buylist#ban=101:2&v=" + cartVersion(),
+		"CSI 2.5 https://www.coolstuffinc.com/buylist_cart.php#ban=601:2&v=" + cartVersion(),
+		"SCG 2 https://sellyourcards.starcitygames.com/mtg/uploads#ban=SGL-A1:2&v=" + cartVersion(),
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	for _, tc := range []struct {
+		buylist bool
+		cardID  string
+		menu    int
+	}{
+		{true, "card-a", 1},
+		{true, "card-z", 0},
+		{false, "card-a", 0},
+	} {
+		out := renderUpload(t, PageVars{UploadVars: UploadVars{
+			IsBuylist:       tc.buylist,
+			ScraperKeys:     keys,
+			ResultPrices:    map[string]map[string]float64{tc.cardID: prices},
+			Optimized:       map[string][]OptimizedUploadEntry{"MKM": {{CardID: tc.cardID, Quantity: 2}}},
+			OptimizedKeys:   []string{"MKM"},
+			OptimizedTotals: map[string]float64{"MKM": 1},
+		}})
+		if strings.Count(out, `class="opt-send-menu"`) != tc.menu {
+			t.Errorf("%s, buylist %v: want %d menus", tc.cardID, tc.buylist, tc.menu)
+		}
+		// The column the button sits in is widened on a buylist table
+		if strings.Contains(out, `<table class="opt-table" data-sends`) != tc.buylist {
+			t.Errorf("%s, buylist %v: the table is not marked for the wider column", tc.cardID, tc.buylist)
+		}
+		if tc.menu == 0 {
+			continue
+		}
+		link := `<a href="https://abugames.com/cartview/buylist#ban=101:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="ABU" data-buylist="true" onclick="return window.openCartPrompt ? openCartPrompt(this) : true">ABU<span>$ 3.00</span></a>`
+		if !strings.Contains(out, link) {
+			t.Errorf("no %s", link)
+		}
+		if !strings.Contains(out, `popovertarget="opt-send-MKM-0"`) || !strings.Contains(out, `id="opt-send-MKM-0" popover>`) {
+			t.Error("the button does not open its row's menu")
+		}
+		if !strings.Contains(out, `id="cart-overlay"`) {
+			t.Error("no cart panel for the menu's links")
 		}
 	}
 }
