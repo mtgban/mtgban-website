@@ -1061,6 +1061,10 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 		}
 	}
 
+	if config.SkipSealed {
+		allKeys = withoutSealed(b, allKeys)
+	}
+
 	// Limit results to avoid hogging the website with large queries
 	if len(allKeys) > MaxSearchTotalResults {
 		result.total = len(allKeys)
@@ -1113,6 +1117,19 @@ func runSearch(r *http.Request, ds *datastore, config SearchConfig) searchResult
 	result.odds = dropOdds(b, config)
 
 	return result
+}
+
+// withoutSealed returns keys without the sealed products, in a new slice.
+func withoutSealed(b *mtgmatcher.Backend, keys []string) []string {
+	var out []string
+	for _, key := range keys {
+		co, err := b.GetUUID(key)
+		if err == nil && co.Sealed {
+			continue
+		}
+		out = append(out, key)
+	}
+	return out
 }
 
 // fillSearchResults puts the cards found on the page: the page of them with

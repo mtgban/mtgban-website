@@ -21,6 +21,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/banprice"
+	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
 // plainCard is a card with a plain name that a search path can carry.
@@ -661,5 +662,71 @@ func TestSiteExportServesNoJSON(t *testing.T) {
 	testSite.SearchExport(rec, httptest.NewRequest(http.MethodGet, "/search/export/retail/Shock.json", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("a JSON export = %d, want 404", rec.Code)
+	}
+}
+
+// A key sold no sealed mode reads no sealed product off a search, whatever
+// the path: a sealed UUID reaches the CK Sealed prices from /retail/ too.
+func TestSearchAPIKeepsSealedToTheSealedMode(t *testing.T) {
+	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
+	box := "FIXTUREA-box"
+	b.UUIDs[box] = &mtgmatcher.CardObject{
+		Card:   mtgmatcher.Card{UUID: box, Name: "Fixture Booster Box", SetCode: "FIXTUREA"},
+		Sealed: true,
+	}
+	s := newSite()
+	s.ds.Store(s.newDatastore(b, time.Now()))
+
+	sealed := mtgban.InventoryRecord{}
+	sealed.Add(box, &mtgban.InventoryEntry{Price: 99, Quantity: 1})
+	publishStores(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(sealed, mtgban.ScraperInfo{Shorthand: "CKSealed", Name: "Card Kingdom Sealed", SealedMode: true}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CKBL", Name: "Card Kingdom Buylist"}),
+	})
+	signingEnabled(t, false)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+	// A limiter of its own, so no other test's requests or -count can trip it
+	prevLimiter := APIRateLimiter
+	t.Cleanup(func() { APIRateLimiter = prevLimiter })
+	APIRateLimiter = ratelimit.NewLimiter(1000, 1000)
+
+	mux := http.NewServeMux()
+	mux.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
+	mux.Handle("/api/v2/search/", enforceAPISigning(http.HandlerFunc(s.SearchAPI)))
+	get := func(modes, target string) string {
+		t.Helper()
+		key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+			API: "ALL_ACCESS",
+			Fields: url.Values{
+				"APImode":           {modes},
+				"SearchDownloadCSV": {"true"},
+				"UserEmail":         {"plan@example.com"},
+			},
+			Expires: time.Now().Add(time.Hour).Unix(),
+		})
+		sep := "?"
+		if strings.Contains(target, "?") {
+			sep = "&"
+		}
+		req := httptest.NewRequest(http.MethodGet, target+sep+"sig="+url.QueryEscape(key), nil)
+		req.RemoteAddr = "192.0.2.240:1234"
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		return rec.Body.String()
+	}
+
+	for _, target := range []string{
+		"/api/v2/search/retail/" + box + ".json?id=ban",
+		"/api/mtgban/search/retail/" + box + ".json?id=mtgjson",
+		"/api/mtgban/search/retail/" + box + ".csv",
+	} {
+		// Only a sealed row names the product; the body echoes no query
+		if body := get("retail,buylist,sealed", target); !strings.Contains(body, box) {
+			t.Errorf("%s: a key sold sealed read no price\n%s", target, body)
+		}
+		if body := get("retail,buylist", target); strings.Contains(body, box) {
+			t.Errorf("%s: a key without sealed read the sealed price\n%s", target, body)
+		}
 	}
 }
