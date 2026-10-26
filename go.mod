@@ -15,7 +15,7 @@ require (
 	github.com/mackerelio/go-osstat v0.2.8
 	github.com/mileusna/useragent v1.3.5
 	github.com/mtgban/go-cardmarket v0.5.0
-	github.com/mtgban/go-mtgban v0.12.0
+	github.com/mtgban/go-mtgban v0.12.1
 	github.com/mtgban/simplecloud v0.1.1
 	github.com/richardlehane/mscfb v1.0.9
 	github.com/xuri/excelize/v2 v2.11.1-0.20261020033641-611b222fd8f7
