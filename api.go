@@ -686,10 +686,17 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 		}
 	}
 
+	// A key sold without sealed reads no sealed product, whatever the path:
+	// a sealed UUID or a contents: query reaches them from /retail/ too
+	config.SkipSealed = !canAccessMode(enabledModes, "sealed")
+
 	// Perform search; the download runs the page's own further down
 	var allKeys []string
 	if !isCSV {
 		allKeys, _ = searchAndFilter(ds, config)
+		if config.SkipSealed {
+			allKeys = withoutSealed(b, allKeys)
+		}
 		sortSearchKeys(r, ds, allKeys, dropOdds(b, config), readSearchSort(r, config))
 		if len(allKeys) > MaxSearchTotalResults {
 			allKeys = allKeys[:MaxSearchTotalResults]
@@ -699,7 +706,7 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	canRetail := canAccessMode(enabledModes, "retail")
 	canBuylist := canAccessMode(enabledModes, "buylist")
 	// A key sold without sealed reads none, as on the price API
-	if isSealed && !canAccessMode(enabledModes, "sealed") {
+	if isSealed && config.SkipSealed {
 		canRetail, canBuylist = false, false
 	}
 
