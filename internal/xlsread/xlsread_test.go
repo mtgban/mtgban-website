@@ -553,3 +553,137 @@ func TestReadsTextStartingInAContinue(t *testing.T) {
 		})
 	}
 }
+
+// nestedContainer is a compound file whose directory is one chain of
+// storages, each the only child of the one before, entries deep. The
+// directory starts at sector at, past the header's 109 FAT sectors when at
+// is large enough, so the DIFAT is read to follow it.
+func nestedContainer(sectorSize, entries, at int) []byte {
+	le := binary.LittleEndian
+	per := sectorSize / 4
+	dirSectors := (entries*128 + sectorSize - 1) / sectorSize
+	total := at + dirSectors
+	fatSectors := (total + per - 1) / per
+	if at <= fatSectors || fatSectors-109 > per-1 {
+		panic("nestedContainer: no room for the FAT")
+	}
+
+	out := make([]byte, (total+1)*sectorSize)
+	sector := func(i int) []byte { return out[(i+1)*sectorSize : (i+2)*sectorSize] }
+	fat := func(i int, v uint32) { le.PutUint32(sector(i / per)[4*(i%per):], v) }
+
+	copy(out, oleSignature)
+	major, shift := uint16(3), uint16(9)
+	if sectorSize == 4096 {
+		major, shift = 4, 12
+	}
+	le.PutUint16(out[24:], 0x3e)
+	le.PutUint16(out[26:], major)
+	le.PutUint16(out[28:], 0xfffe)
+	le.PutUint16(out[30:], shift)
+	le.PutUint16(out[32:], 6)
+	le.PutUint32(out[44:], uint32(fatSectors))
+	le.PutUint32(out[48:], uint32(at))
+	le.PutUint32(out[56:], 4096)
+	le.PutUint32(out[60:], 0xfffffffe)
+	le.PutUint32(out[68:], 0xfffffffe)
+	for i := range 109 {
+		v := uint32(0xffffffff)
+		if i < fatSectors {
+			v = uint32(i)
+		}
+		le.PutUint32(out[76+4*i:], v)
+	}
+
+	for i := range fatSectors * per {
+		fat(i, 0xffffffff)
+	}
+	for i := range fatSectors {
+		fat(i, 0xfffffffd)
+	}
+	if fatSectors > 109 {
+		// The rest of the FAT is listed in one DIFAT sector, right after it
+		d := sector(fatSectors)
+		for j := range per - 1 {
+			v := uint32(0xffffffff)
+			if 109+j < fatSectors {
+				v = uint32(109 + j)
+			}
+			le.PutUint32(d[4*j:], v)
+		}
+		le.PutUint32(d[sectorSize-4:], 0xfffffffe)
+		le.PutUint32(out[68:], uint32(fatSectors))
+		le.PutUint32(out[72:], 1)
+		fat(fatSectors, 0xfffffffc)
+	}
+	for i := range dirSectors {
+		next := uint32(at + i + 1)
+		if i == dirSectors-1 {
+			next = 0xfffffffe
+		}
+		fat(at+i, next)
+	}
+
+	for i := range entries {
+		e := sector(at + i*128/sectorSize)[i*128%sectorSize:]
+		le.PutUint16(e[0:], 'a')
+		le.PutUint16(e[64:], 4)
+		e[66], e[67] = 1, 1 // a storage, black
+		if i == 0 {
+			e[66] = 5 // the root
+		}
+		child := uint32(i + 1)
+		if i == entries-1 {
+			child = 0xffffffff
+		}
+		le.PutUint32(e[68:], 0xffffffff)
+		le.PutUint32(e[72:], 0xffffffff)
+		le.PutUint32(e[76:], child)
+		le.PutUint32(e[116:], 0xfffffffe)
+	}
+	return out
+}
+
+// cutFATContainer is nestedContainer 2048 deep with its directory starting
+// at sector 512, whose FAT entry sits in a FAT sector at the end of the file
+// cut short after that entry. mscfb reads just the entry.
+func cutFATContainer() []byte {
+	const sectorSize = 512
+	data := nestedContainer(sectorSize, 2048, 640)
+	sector := func(i int) []byte { return data[(i+1)*sectorSize : (i+2)*sectorSize] }
+	copy(sector(512), sector(640))
+	binary.LittleEndian.PutUint32(data[48:], 512)
+	// FAT sector 4 holds sector 512's entry, which leads on to 641
+	binary.LittleEndian.PutUint32(data[76+4*4:], uint32(len(data)/sectorSize-1))
+	return append(data, xlstest.U32(641)...)
+}
+
+// mscfb copies a storage's path into every storage inside it, so storages
+// nested one inside the next cost memory by their depth squared: a 1MB file
+// allocated 539MB. Past maxDirEntries the directory is refused unread.
+func TestRefusesADirectoryPastTheCap(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		data []byte
+		want error
+	}{
+		{"2048 deep", nestedContainer(512, 2048, 8), ErrCorrupt},
+		{"1056 deep in 4096-byte sectors", nestedContainer(4096, 1056, 2), ErrCorrupt},
+		{"1025 deep past the DIFAT", nestedContainer(512, 1025, 14000), ErrCorrupt},
+		{"2048 deep behind a cut FAT sector", cutFATContainer(), ErrCorrupt},
+		// At the cap the directory is read, and holds no workbook
+		{"1024 deep", nestedContainer(512, 1024, 8), ErrNotXls},
+		{"1024 deep past the DIFAT", nestedContainer(512, 1024, 14000), ErrNotXls},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var err error
+			n := allocated(func() { _, err = Open(tt.data) })
+			if !errors.Is(err, tt.want) {
+				t.Errorf("err %v, want %v", err, tt.want)
+			}
+			if n > 64*uint64(len(tt.data))+4<<20 {
+				t.Errorf("allocated %d MB for a %d KB file", n>>20, len(tt.data)>>10)
+			}
+		})
+	}
+}

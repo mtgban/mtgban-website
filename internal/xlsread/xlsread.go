@@ -190,7 +190,8 @@ func workbookStream(data []byte) ([]byte, error) {
 
 // checkCFBHeader refuses a compound file whose header counts more sectors
 // of any kind than the file holds. mscfb sizes slices from these counts
-// before reading anything, and every sector a valid file counts exists.
+// before reading anything, and every sector a valid file counts exists. It
+// refuses a directory past maxDirEntries too.
 func checkCFBHeader(data []byte) error {
 	if len(data) < 512 || !IsOLE(data) {
 		return ErrNotXls
@@ -210,7 +211,78 @@ func checkCFBHeader(data []byte) error {
 			return fmt.Errorf("%w: sector count exceeds the file", ErrCorrupt)
 		}
 	}
+	return checkDirectory(data, sectorSize)
+}
+
+// maxDirEntries caps the compound file's directory. mscfb gives each
+// storage its own copy of its parent's path, so storages nested one inside
+// the next cost memory by their depth squared; a workbook holds a few dozen.
+const maxDirEntries = 1024
+
+// maxRegSect is the highest sector number; those above it mark a chain's
+// end, a free sector or the FAT's own.
+const maxRegSect = 0xfffffffa
+
+// checkDirectory follows the directory's sector chain through the FAT, as
+// mscfb will, and refuses one longer than maxDirEntries entries. A chain
+// that leaves the file is left for mscfb to refuse.
+func checkDirectory(data []byte, sectorSize int) error {
+	limit := maxDirEntries * 128 / sectorSize
+	sector := binary.LittleEndian.Uint32(data[48:52])
+	for n := 1; sector <= maxRegSect; n++ {
+		if n > limit {
+			return fmt.Errorf("%w: directory too large", ErrCorrupt)
+		}
+		next, ok := fatEntry(data, sectorSize, sector)
+		if !ok {
+			return nil
+		}
+		sector = next
+	}
 	return nil
+}
+
+// fatEntry reads the FAT's entry for a sector, the next one in its chain.
+// The header lists the first 109 FAT sectors and the DIFAT chain the rest.
+func fatEntry(data []byte, sectorSize int, sector uint32) (uint32, bool) {
+	if uint64(sector) >= uint64(len(data)/sectorSize) {
+		return 0, false
+	}
+	per := uint32(sectorSize / 4)
+	idx := sector / per
+	var fat uint32
+	if idx < 109 {
+		fat = binary.LittleEndian.Uint32(data[76+4*idx:])
+	} else {
+		difat := binary.LittleEndian.Uint32(data[68:72])
+		for idx -= 109; ; idx -= per - 1 {
+			d, ok := sectorBytes(data, sectorSize, difat)
+			if !ok {
+				return 0, false
+			}
+			if idx < per-1 {
+				fat = binary.LittleEndian.Uint32(d[4*idx:])
+				break
+			}
+			difat = binary.LittleEndian.Uint32(d[sectorSize-4:])
+		}
+	}
+	// Only the entry has to be in the file, as only it is read by mscfb
+	off := (uint64(fat)+1)*uint64(sectorSize) + 4*uint64(sector%per)
+	if off+4 > uint64(len(data)) {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint32(data[off:]), true
+}
+
+// sectorBytes is one sector of the file, the header taking the room of the
+// first.
+func sectorBytes(data []byte, sectorSize int, sector uint32) ([]byte, bool) {
+	start := (uint64(sector) + 1) * uint64(sectorSize)
+	if start+uint64(sectorSize) > uint64(len(data)) {
+		return nil, false
+	}
+	return data[start : start+uint64(sectorSize)], true
 }
 
 const (
