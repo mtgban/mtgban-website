@@ -192,3 +192,19 @@ func TestHasUploadOptCookie(t *testing.T) {
 		}
 	}
 }
+
+// TestOptimizerSortsSetsByEdition sorts the Set column on the edition's
+// name and then the card's, not on the set code the cell shows first.
+func TestOptimizerSortsSetsByEdition(t *testing.T) {
+	out := renderUpload(t, PageVars{
+		Metadata: cardMetadata{"a": {Name: "Counterspell", Edition: "Seventh Edition", SetCode: "7ED"}},
+		UploadVars: UploadVars{
+			Optimized:     map[string][]OptimizedUploadEntry{"CK": {{CardID: "a", Quantity: 1}}},
+			OptimizedKeys: []string{"CK"},
+		},
+	})
+	want := `<td class="opt-set" data-sort="Seventh Edition&#9;Counterspell">`
+	if !strings.Contains(out, want) {
+		t.Errorf("no %s", want)
+	}
+}
