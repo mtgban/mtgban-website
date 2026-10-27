@@ -18,6 +18,74 @@
     text-align: center;
 }
 
+/* The switcher under the navbar button, on hover or keyboard focus, while
+   there are backpacks to pick from. */
+.nav2-backpack-wrap { position: relative; display: flex; }
+.nav2-backpack-wrap:has(> .nav2-backpack[hidden]) { display: none; }
+
+.nav2-backpack-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 250;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 12em;
+    max-width: 18em;
+    padding: 4px;
+    background: var(--surface-1);
+    color: var(--normal);
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-md, 10px);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
+    visibility: hidden;
+    opacity: 0;
+    /* a short grace on leaving, so a cursor crossing the gap keeps it */
+    transition: opacity 0.12s ease 0.15s, visibility 0s linear 0.27s;
+}
+/* bridges the gap so the hover holds from the button to the menu */
+.nav2-backpack-menu::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: -7px;
+    height: 7px;
+}
+.nav2-backpack-menu[hidden] { display: none; }
+@media (hover: hover) {
+    .nav2-backpack-wrap:hover .nav2-backpack-menu {
+        visibility: visible;
+        opacity: 1;
+        transition-delay: 0s;
+    }
+}
+.nav2-backpack-wrap:has(:focus-visible) .nav2-backpack-menu {
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+}
+/* the open panel already shows its tabs */
+html:has(.backpack-panel.open) .nav2-backpack-menu { display: none; }
+
+.nav2-backpack-pick {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.4em 0.6em;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--greytext);
+    font: inherit;
+    font-size: 0.9em;
+    text-align: left;
+    cursor: pointer;
+}
+.nav2-backpack-pick:hover { background: var(--surface-3, var(--navbackground)); color: var(--normal); }
+.nav2-backpack-pick.active { color: var(--normal); font-weight: 600; box-shadow: inset 2px 0 0 var(--dodgerblue); }
+.nav2-backpack-pick-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav2-backpack-pick-count { opacity: 0.7; font-variant-numeric: tabular-nums; }
+
 .pack-btn { position: relative; }
 
 .pack-btn.active,

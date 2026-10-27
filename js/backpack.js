@@ -457,6 +457,40 @@
         var c = count();
         var span = document.getElementById("nav-backpack-count");
         if (span) { span.textContent = String(c.copies); span.hidden = c.copies === 0; }
+        // Named by aria-label, which hides the badge, so the name carries it
+        btn.setAttribute("aria-label", c.copies ? "Backpack, " + c.copies + (c.copies === 1 ? " copy" : " copies") : "Backpack");
+        markNavMenu(btn);
+    }
+
+    // markNavMenu fills the switcher the navbar button shows on hover while
+    // there are backpacks to pick from: picking one sends the result rows'
+    // buttons there, without opening the panel. Its title would cover it, so
+    // markNav's aria-label names the button; a rebuild keeps a focused pick.
+    function markNavMenu(btn) {
+        var menu = document.getElementById("nav-backpack-menu");
+        if (!menu) return;
+        var list = tabs(), cur = active();
+        var focused = document.activeElement && document.activeElement.parentNode === menu ? document.activeElement.getAttribute("data-pack") : null;
+        menu.hidden = list.length < 2;
+        if (menu.hidden) btn.setAttribute("title", "Backpack"); else btn.removeAttribute("title");
+        while (menu.children.length) menu.children[0].remove();
+        if (menu.hidden) return;
+        var copies = {};
+        live().forEach(function (e) { copies[e.pack] = (copies[e.pack] || 0) + e.qty; });
+        list.forEach(function (t) {
+            var on = t.pack === cur;
+            var b = text("button", "nav2-backpack-pick" + (on ? " active" : ""));
+            b.setAttribute("type", "button");
+            b.setAttribute("aria-pressed", on ? "true" : "false");
+            b.setAttribute("data-pack", String(t.pack));
+            b.append(text("span", "nav2-backpack-pick-name", t.name), text("span", "nav2-backpack-pick-count", String(copies[t.pack] || 0)));
+            b.addEventListener("click", function () {
+                setActive(t.pack);
+                render();
+            });
+            menu.appendChild(b);
+            if (focused === String(t.pack)) b.focus();
+        });
     }
 
     window.addToBackpack = function (btn) {

@@ -17,6 +17,7 @@ function el(tag) {
         },
         setAttribute(n, v) { this.attrs[n] = String(v); if (n === 'id') ids[v] = this; if (n === 'class') String(v).split(/\s+/).filter(Boolean).forEach((c) => this.classes.add(c)); },
         getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; },
+        removeAttribute(n) { delete this.attrs[n]; },
         appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
         append(...cs) { cs.forEach((c) => this.appendChild(c)); },
         remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); },
@@ -38,7 +39,7 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [] } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     if (active) m.mtgban_backpack_active = String(active);
@@ -50,6 +51,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     const nav = el('button'); nav.setAttribute('id', 'nav-backpack'); nav.hidden = true;
     const navCount = el('span'); navCount.setAttribute('id', 'nav-backpack-count'); navCount.hidden = true; nav.appendChild(navCount);
     body.appendChild(nav);
+    if (navMenu) { const menu = el('div'); menu.setAttribute('id', 'nav-backpack-menu'); menu.hidden = true; body.appendChild(menu); }
     // Two result rows, each with an add and a minus button carrying the card id.
     const minus = [];
     const rows = ['uuid-1', 'uuid-2'].map((id) => {
@@ -133,6 +135,12 @@ describe('adding', () => {
         expect(p.nav.hidden).toBe(false);
         expect(p.navCount.textContent).toBe('1');
         expect(p.navCount.hidden).toBe(false);
+        expect(p.nav.getAttribute('aria-label')).toBe('Backpack, 1 copy');
+    });
+
+    test('an empty backpack names the navbar button without a count', () => {
+        const p = page();
+        expect(p.nav.getAttribute('aria-label')).toBe('Backpack');
     });
 
     test('a second click adds a copy and bumps m', async () => {
@@ -1309,5 +1317,60 @@ describe('taking an Upload store section out', () => {
         p.window.takeRowsFromBackpack(p.optSections[0].take);
         expect(p.m.mtgban_backpack).toBe(before);
         expect(p.window.Backpack.undo()).toBe(false);
+    });
+});
+
+describe('the navbar switcher', () => {
+    const menu = () => ids['nav-backpack-menu'];
+    const picks = () => menu().children.map((b) => b.children[0].textContent + ':' + b.children[1].textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : ''));
+    const two = [{ id: 'uuid-1', name: 'One', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'Two', pack: 2, qty: 3, t: 2, m: 2 }];
+
+    test('one backpack shows no switcher and keeps the title', () => {
+        const p = page({ store: two.slice(0, 1), tabs: 3, navMenu: true });
+        expect(menu().hidden).toBe(true);
+        expect(menu().children).toEqual([]);
+        expect(p.nav.getAttribute('title')).toBe('Backpack');
+    });
+
+    test('two backpacks list each with its copies, the active one pressed', () => {
+        const p = page({ store: two, tabs: 2, navMenu: true, tabList: [{ pack: 1, name: 'Trades' }, { pack: 2 }] });
+        expect(menu().hidden).toBe(false);
+        expect(picks()).toEqual(['Trades:2*', 'Backpack 2:3']);
+        expect(p.nav.getAttribute('title')).toBe(null);
+        expect(p.nav.getAttribute('aria-label')).toBe('Backpack, 2 copies');
+    });
+
+    test('picking one sends the search buttons there without opening the panel', () => {
+        const p = page({ store: two, tabs: 2, navMenu: true });
+        expect(p.rows[0].classes.has('active')).toBe(true);
+        menu().children[1].focus();
+        menu().children[1].click();
+        expect(p.m.mtgban_backpack_active).toBe('2');
+        expect(picks()).toEqual(['Backpack 1:2', 'Backpack 2:3*']);
+        expect(p.rows[0].classes.has('active')).toBe(false);
+        expect(p.rows[1].classes.has('active')).toBe(true);
+        expect(p.navCount.textContent).toBe('3');
+        expect(ids['backpack-panel']).toBe(undefined);
+        expect(p.document.activeElement).toBe(menu().children[1]);
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.stored().find((e) => e.id === 'uuid-1' && e.pack === 2).qty).toBe(1);
+    });
+
+    test('a re-render from another tab keeps the focused pick focused', () => {
+        const p = page({ store: two, tabs: 2, navMenu: true });
+        menu().children[1].focus();
+        const before = menu().children[1];
+        p.m.mtgban_backpack_active = '2';
+        p.fireStorage('mtgban_backpack_active');
+        expect(menu().children[1]).not.toBe(before);
+        expect(p.document.activeElement).toBe(menu().children[1]);
+        expect(picks()).toEqual(['Backpack 1:2', 'Backpack 2:3*']);
+    });
+
+    test('a backpack added in the panel joins the switcher', () => {
+        const p = page({ store: two.slice(0, 1), tabs: 3, navMenu: true });
+        p.window.Backpack.addTab();
+        p.window.renderBackpack();
+        expect(picks()).toEqual(['Backpack 1:2', 'Backpack 2:0*']);
     });
 });
