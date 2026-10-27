@@ -180,7 +180,9 @@ var filteredEditions = []string{
 }
 
 func parseMessage(ds *datastore, content string, sealed bool) (*EmbedSearchResult, string) {
-	// Clean up query, no blocklist because we only need keys
+	// Clean up query, no blocklist because we only need keys. Without the
+	// numbers snapshot: a bare number would leave no name for the check
+	// below, where as an id it embeds its product.
 	config := parseSearchOptionsNG(ds.backend, content, nil, nil, nil)
 	query := config.CleanQuery
 

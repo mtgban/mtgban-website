@@ -29,7 +29,7 @@ func TestSearchScopeAddsFilters(t *testing.T) {
 
 	for _, typed := range []string{"is:foil", "is:nonfoil"} {
 		config := parseForTest(t, typed)
-		applySearchScope(&config, scopeFilters(currentDatastore(), "s:sos"))
+		applySearchScope(&config, scopeFilters(currentDatastore(), "s:sos", false))
 
 		names := filterNames(config.CardFilters)
 		if !slices.Contains(names, "edition") {
@@ -58,7 +58,7 @@ func TestSearchScopeKeepsBothSides(t *testing.T) {
 		t.Run(tt.typed+" + "+tt.pinned, func(t *testing.T) {
 			config := parseForTest(t, tt.typed)
 			before := len(config.CardFilters)
-			pinned := scopeFilters(currentDatastore(), tt.pinned)
+			pinned := scopeFilters(currentDatastore(), tt.pinned, false)
 			applySearchScope(&config, pinned)
 
 			if len(config.CardFilters) != before+len(pinned) {
@@ -77,7 +77,7 @@ func TestSearchScopeIgnoresNames(t *testing.T) {
 
 	config := parseForTest(t, "is:foil")
 	before := len(config.CardFilters)
-	applySearchScope(&config, scopeFilters(currentDatastore(), "abrade"))
+	applySearchScope(&config, scopeFilters(currentDatastore(), "abrade", false))
 
 	if len(config.CardFilters) != before {
 		t.Errorf("a name in the pinned bar changed the search: %v", filterNames(config.CardFilters))
@@ -96,7 +96,7 @@ func TestSearchScopeSkipsPassthroughModes(t *testing.T) {
 		config := parseForTest(t, "is:foil")
 		config.SearchMode = mode
 		before := len(config.CardFilters)
-		applySearchScope(&config, scopeFilters(currentDatastore(), "s:sos"))
+		applySearchScope(&config, scopeFilters(currentDatastore(), "s:sos", false))
 
 		if len(config.CardFilters) != before {
 			t.Errorf("%s mode was narrowed by the pinned bar: %v", mode, filterNames(config.CardFilters))
@@ -219,7 +219,7 @@ func TestSearchScopeSurvivesReaderOptions(t *testing.T) {
 
 	for _, opts := range [][]string{nil, {"hidePromos"}, {"hidePrelPack"}} {
 		config := parseSearchOptionsNG(backend(), "s:soa", nil, nil, opts)
-		applySearchScope(&config, scopeFilters(currentDatastore(), "is:foil"))
+		applySearchScope(&config, scopeFilters(currentDatastore(), "is:foil", false))
 
 		var applied bool
 		for _, filter := range config.CardFilters {
@@ -253,7 +253,7 @@ func TestScopeIgnoredIsWhatTheBarSays(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.scope, func(t *testing.T) {
-			got := len(scopeFilters(currentDatastore(), tt.scope)) == 0 && tt.scope != ""
+			got := len(scopeFilters(currentDatastore(), tt.scope, false)) == 0 && tt.scope != ""
 			if got != tt.ignored {
 				t.Errorf("%q: ignored=%v, want %v", tt.scope, got, tt.ignored)
 			}

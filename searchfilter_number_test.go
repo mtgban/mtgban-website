@@ -1,6 +1,8 @@
 package main
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -135,5 +137,179 @@ func TestCollectorNumberWithTotal(t *testing.T) {
 					tt.query, tt.number, tt.total, !skip, tt.want)
 			}
 		})
+	}
+}
+
+// TestBareNumberAgreesWithTheSeed checks bareNumberFilters against Magic's
+// catalog; TestBareNumberInEveryGame does the same for the other games.
+func TestBareNumberAgreesWithTheSeed(t *testing.T) {
+	skipWithoutDatastore(t)
+	checkBareNumbersAgreeWithSeed(t, testSite.datastore())
+}
+
+// checkBareNumbersAgreeWithSeed reads every number the catalog carries alone
+// and checks that bareNumberFilters takes it as its cn:/cns: term parses, and
+// exactly when searchAndFilter's number seed finds a card for that term.
+func checkBareNumbersAgreeWithSeed(t *testing.T, ds *datastore) {
+	t.Helper()
+	b := ds.backend
+	var checked, failed int
+	for _, index := range []map[string][]string{ds.numbers.loose, ds.numbers.strict} {
+		for number := range index {
+			if !writtenAsNumber(number) || typesSetTotal(number) {
+				continue
+			}
+			checked++
+			got := bareNumberFilters(b, ds.numbers, number)
+			var want []FilterElem
+			term := numberTerm(b, number)
+			_, named := b.SearchEquals(number)
+			if term != "" && named != nil {
+				parsed := parseSearchOptionsNG(b, term, nil, nil, nil).CardFilters
+				uuids, _ := numberSeedUUIDs(ds.numbers, parsed)
+				if len(uuids) != 0 {
+					want = parsed
+				}
+			}
+			same := len(got) == len(want) && (len(got) == 0 ||
+				got[0].Name == want[0].Name && slices.Equal(got[0].Values, want[0].Values))
+			if !same {
+				failed++
+				if failed <= 10 {
+					t.Errorf("%q reads as %+v, its term %q as %+v", number, got, term, want)
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no numbers checked")
+	}
+	if failed > 0 {
+		t.Errorf("%d of %d numbers disagree", failed, checked)
+	}
+}
+
+// A number typed alone is a collector number: "123" reaches what cn:123
+// does, though 123 is a TCGplayer product id too, which id:123 still reaches.
+// A number no card carries is still read as the id it can be.
+func TestBareNumberIsACollectorNumber(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+	search := func(config SearchConfig) []string {
+		t.Helper()
+		keys, err := searchAndFilter(ds, config)
+		if err != nil {
+			t.Fatalf("%q: %v", config.CleanQuery, err)
+		}
+		slices.Sort(keys)
+		return keys
+	}
+	typed := func(query, scope string) []string {
+		t.Helper()
+		config := parseSearchQuery(ds, query, nil, nil, nil)
+		applySearchScope(&config, scopeFilters(ds, scope, false))
+		return search(config)
+	}
+
+	for _, tt := range []struct{ query, scope, as string }{
+		{"123", "", "cn:123"},
+		{"#123", "", "cn:123"},
+		{"0123", "", "cn:123"},
+		{"17a", "", "cns:17a"},
+		{"1★", "", "cns:1★"},
+		{"123*", "", "cn:123 f:foil"},
+		{"s:mmq 123", "", "s:mmq cn:123"},
+		{"123", "s:LTR", "s:ltr cn:123"},
+		{"", "123", "cn:123"},
+	} {
+		want := typed(tt.as, "")
+		if len(want) == 0 {
+			t.Fatalf("%q reaches nothing", tt.as)
+		}
+		if got := typed(tt.query, tt.scope); !slices.Equal(got, want) {
+			t.Errorf("%q pinned %q reaches %d cards, %q reaches %d", tt.query, tt.scope, len(got), tt.as, len(want))
+		}
+	}
+
+	// A pinned number no card carries is no filter, which the bar reports.
+	if len(ds.numbers.loose["99999"]) != 0 {
+		t.Fatal("a card carries 99999")
+	}
+	if pinned := scopeFilters(ds, "99999", false); pinned != nil {
+		t.Errorf("pinned 99999 is %+v, want no filter", pinned)
+	}
+
+	// A TCGplayer id that is also a collector number, and one that is not.
+	var carried, uncarried string
+	for _, uuid := range ds.backend.GetUUIDs() {
+		co, err := ds.backend.GetUUID(uuid)
+		if err != nil || slices.Contains(filteredEditions, co.SetCode) {
+			continue
+		}
+		id := co.Identifiers["tcgplayerProductId"]
+		if id == "" || ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, id) != uuid {
+			continue
+		}
+		numbered := len(ds.numbers.loose[id]) != 0 || len(ds.numbers.strict[id]) != 0
+		if numbered && carried == "" {
+			carried = id
+		} else if !numbered && uncarried == "" {
+			uncarried = id
+		}
+	}
+	if carried == "" || uncarried == "" {
+		t.Fatalf("no TCGplayer ids to check: %q %q", carried, uncarried)
+	}
+
+	if config := parseSearchQuery(ds, carried, nil, nil, nil); config.SearchMode == "hashing" {
+		t.Errorf("%q is read as a TCGplayer id, not a collector number", carried)
+	}
+	idlookup := parseSearchQuery(ds, "id:"+carried, nil, nil, nil)
+	if len(idlookup.CardFilters) != 1 || idlookup.CardFilters[0].Name != "idlookup" {
+		t.Errorf("id:%s is not an id lookup: %+v", carried, idlookup.CardFilters)
+	}
+	uuid := ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, uncarried)
+	if config := parseSearchQuery(ds, uncarried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{uuid}) {
+		t.Errorf("%q reaches %v, want the TCGplayer id's %s", uncarried, config.UUIDs, uuid)
+	}
+
+	// A sealed search reads a number that is no id as words of a product's
+	// name, though cards carry it as their collector number.
+	var word string
+	for _, uuid := range ds.backend.GetSealedUUIDs() {
+		co, err := ds.backend.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+		for _, field := range strings.Fields(co.Name) {
+			if word == "" && writtenAsNumber(field) && len(ds.numbers.loose[field]) != 0 &&
+				externalUUID(ds.backend, field) == "" {
+				word = field
+			}
+		}
+	}
+	if word == "" {
+		t.Fatal("no sealed product names a number a card carries")
+	}
+	sealed := parseSearchPage(ds, word, true, nil, nil, nil)
+	sealed.SearchMode = "sealed"
+	if keys, err := searchAndFilter(ds, sealed); err != nil || len(keys) == 0 {
+		t.Errorf("sealed %q reaches no product: %v", word, err)
+	}
+	if pinned := scopeFilters(ds, word, true); pinned != nil {
+		t.Errorf("sealed pinned %q is %+v, want no filter", word, pinned)
+	}
+
+	// Without the snapshot a number is an id or a name, and the bot embeds
+	// the product its id names.
+	carriedUUID := ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, carried)
+	if config := parseSearchOptionsNG(ds.backend, carried, nil, nil, nil); !slices.Equal(config.UUIDs, []string{carriedUUID}) {
+		t.Errorf("%q without the snapshot reaches %v, want the TCGplayer id's %s", carried, config.UUIDs, carriedUUID)
+	}
+	if config := parseSearchOptionsNG(ds.backend, "17a", nil, nil, nil); config.CleanQuery != "17a" || len(config.CardFilters) != 0 {
+		t.Errorf("17a without the snapshot is %q %+v, want a name", config.CleanQuery, config.CardFilters)
+	}
+	if res, msg := parseMessage(ds, carried, false); res == nil || res.Invalid || res.CardID != carriedUUID {
+		t.Errorf("the bot reads %q as %+v %q, want its product %s", carried, res, msg, carriedUUID)
 	}
 }
