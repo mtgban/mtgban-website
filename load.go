@@ -610,11 +610,8 @@ func loadScraper(bucket simplecloud.Reader, game mtgmatcher.Game, name, kind, sh
 var errDroppedDump = errors.New("dump is undated, past DropAfter or no newer than when the store was dropped")
 
 // updateSellers installs the seller over its registered slot, answering with
-// the refusal where buildNextSellers turns the swap down. The caller is what
-// carries the answer back to whoever asked for the load - the reload
-// endpoint used to write its "ok" before this decision was made, so a
-// refused install was invisible to the workflow that pinged it and only the
-// notification channel knew.
+// the refusal where buildNextSellers turns the swap down. It posts nothing:
+// the caller reports the answer, once, to whoever asked for the load.
 func updateSellers(scraper mtgban.Scraper) error {
 	seller := applyInventoryOverrides(scraper.(mtgban.Seller))
 
@@ -639,14 +636,11 @@ func updateSellers(scraper mtgban.Scraper) error {
 
 	next, err := buildNextSellers(current, seller, sellerIndex)
 	if err != nil {
-		msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
-		ServerNotify("refresh", msg, true)
 		return err
 	}
 	sellersPtr.Store(&next)
 
-	msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
-	ServerNotify("refresh", msg)
+	log.Printf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	return nil
 }
 
@@ -727,14 +721,11 @@ func updateVendors(scraper mtgban.Scraper) error {
 
 	next, err := buildNextVendors(current, vendor, vendorIndex)
 	if err != nil {
-		msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
-		ServerNotify("refresh", msg, true)
 		return err
 	}
 	vendorsPtr.Store(&next)
 
-	msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
-	ServerNotify("refresh", msg)
+	log.Printf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
 	return nil
 }
 
