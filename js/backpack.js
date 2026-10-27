@@ -12,6 +12,9 @@
     var ACTIVE_KEY = "mtgban_backpack_active";
     var TABS_KEY = "mtgban_backpack_tabs";
     var NAME_MAX = 40;
+    // A dragged panel row carries its key under this type, which only the
+    // backpack tabs take.
+    var DRAG_TYPE = "application/x-mtgban-backpack";
     var UNDO_MAX = 20;
     // The reader's tier sets each backpack's size and how many backpacks
     // they keep; the page's base template hands both over.
@@ -271,27 +274,48 @@
 
     // setCond moves the entry k names to grade cond, keeping its copies and
     // its place; when the card already holds that grade the copies join it.
-    function setCond(k, cond) {
+    function setCond(k, cond) { relocate(k, cond, 0); }
+
+    // moveTo moves the entry k names, every copy, to backpack p; when p holds
+    // the card in that grade the copies join it.
+    function moveTo(k, p) { return relocate(k, "", p); }
+
+    // relocate moves the entry k names to grade cond in backpack p, each
+    // left as it is when not given, keeping its copies and its place. A new
+    // entry in another backpack needs room there, and copies joining one
+    // must stay within 999; says whether it moved.
+    function relocate(k, cond, p) {
         var list = read();
         var i = find(list, k);
-        if (i < 0 || list[i].del || list[i].cond === cond) return;
+        if (i < 0 || list[i].del) return false;
         var e = list[i];
-        var to = key({ id: e.id, cond: cond, pack: e.pack });
+        cond = cond || e.cond;
+        p = p || e.pack;
+        if (cond === e.cond && p === e.pack) return false;
+        var to = key({ id: e.id, cond: cond, pack: p });
         var j = find(list, to);
+        var joining = j >= 0 && !list[j].del;
+        if (!joining && p !== e.pack && inPack(p).length >= MAX) {
+            toast(packName(p) + " is full (" + MAX + " products)");
+            return false;
+        }
+        if (joining && list[j].qty + e.qty > MAX_QTY) { toastCeiling(); return false; }
         var t = now();
         remember(list, [k, to]);
         if (j >= 0 && !list[j].del) {
-            list[j].qty = Math.min(MAX_QTY, list[j].qty + e.qty);
+            list[j].qty += e.qty;
             list[j].m = t;
         } else {
             var moved = JSON.parse(JSON.stringify(e));
             moved.cond = cond;
+            moved.pack = p;
             moved.m = t;
             if (j >= 0) list.splice(j, 1);
             list.unshift(moved);
         }
         e.del = t; e.m = t;
         save(list);
+        return true;
     }
 
     // addCond adds one copy of the card k names in grade cond, a grade the
@@ -655,9 +679,17 @@
         return o;
     }
 
+    // moveCard moves the entry k names to backpack p and says so.
+    function moveCard(k, p) {
+        if (!moveTo(k, p)) return;
+        render();
+        toast("Moved to " + packName(p));
+    }
+
     // condSelect moves the entry to a grade, or adds the card in one more,
-    // never offering the grades its other entries hold.
-    function condSelect(e, held) {
+    // never offering the grades its other entries hold, or moves it to one
+    // of the other backpacks.
+    function condSelect(e, held, others) {
         var sel = text("select", "backpack-cond");
         sel.setAttribute("aria-label", "Condition");
         CONDS.forEach(function (c) {
@@ -670,10 +702,21 @@
             free.forEach(function (c) { group.appendChild(option("+" + c, "Also as " + c, COND_NAMES[c])); });
             sel.appendChild(group);
         }
+        if (others.length) {
+            var to = text("optgroup");
+            to.setAttribute("label", "Move to");
+            others.forEach(function (t) { to.appendChild(option("@" + t.pack, t.name, "Move every copy to " + t.name)); });
+            sel.appendChild(to);
+        }
         sel.value = e.cond;
         sel.addEventListener("change", function () {
             var v = sel.value;
             sel.value = e.cond;
+            if (v.charAt(0) === "@") {
+                moveCard(key(e), parseInt(v.slice(1), 10));
+                focusTab(active());
+                return;
+            }
             var adding = v.charAt(0) === "+";
             if (adding) addCond(key(e), v.slice(1)); else setCond(key(e), v);
             render();
@@ -690,10 +733,19 @@
         });
     }
 
-    function row(e, held) {
+    function row(e, held, others) {
         var r = text("div", "backpack-row");
         r.setAttribute("data-card-id", e.id);
         r.setAttribute("data-key", key(e));
+        if (others.length) {
+            r.setAttribute("draggable", "true");
+            r.addEventListener("dragstart", function (ev) {
+                ev.dataTransfer.setData(DRAG_TYPE, key(e));
+                ev.dataTransfer.effectAllowed = "move";
+                r.classList.add("dragging");
+            });
+            r.addEventListener("dragend", function () { r.classList.remove("dragging"); });
+        }
         var art = text("div", "backpack-row-art" + (e.cw ? " blurred" : ""));
         if (e.img) {
             var img = document.createElement("img");
@@ -719,7 +771,7 @@
         plus.setAttribute("type", "button");
         plus.setAttribute("aria-label", "One more");
         plus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) + 1); render(); });
-        ctl.append(condSelect(e, held), minus, qty, plus);
+        ctl.append(condSelect(e, held, others), minus, qty, plus);
 
         r.append(art, body, ctl);
         return r;
@@ -744,6 +796,7 @@
             b.setAttribute("data-pack", String(t.pack));
             b.setAttribute("title", on ? "Rename" : t.name);
             b.append(text("span", "backpack-tab-name", t.name), text("span", "backpack-tab-count", String(copies[t.pack] || 0)));
+            if (!on) dropOn(b, t.pack);
             b.addEventListener("click", function () {
                 if (on) { rename(b, t); return; }
                 setActive(t.pack);
@@ -776,6 +829,25 @@
             add.addEventListener("click", function () { if (addTab()) { render(); focusTab(active()); } });
             stripEl.appendChild(add);
         }
+    }
+
+    // dropOn lets a panel row dragged onto tab b move to backpack p.
+    function dropOn(b, p) {
+        var ours = function (ev) { return ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types, DRAG_TYPE) !== -1; };
+        b.addEventListener("dragover", function (ev) {
+            if (!ours(ev)) return;
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = "move";
+            b.classList.add("drop-target");
+        });
+        b.addEventListener("dragleave", function () { b.classList.remove("drop-target"); });
+        b.addEventListener("drop", function (ev) {
+            if (!ours(ev)) return;
+            ev.preventDefault();
+            // A refused move renders nothing, so the outline goes here
+            b.classList.remove("drop-target");
+            moveCard(ev.dataTransfer.getData(DRAG_TYPE), p);
+        });
     }
 
     function focusTab(p) {
@@ -833,8 +905,10 @@
         while (listEl.children.length) listEl.children[0].remove();
         var grades = {};
         entries.forEach(function (e) { (grades[e.id] = grades[e.id] || []).push(e.cond); });
+        var cur = active();
+        var others = tabs().filter(function (t) { return t.pack !== cur; });
         entries.forEach(function (e) {
-            listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; })));
+            listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; }), others));
         });
         renderTabs();
         var c = count();
@@ -899,7 +973,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
+    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, moveTo: moveTo, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");

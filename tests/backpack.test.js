@@ -700,6 +700,102 @@ describe('taking from the backpack a send came from', () => {
     });
 });
 
+describe('moving cards between backpacks', () => {
+    function open(p) { p.nav.click(); return ids['backpack-panel']; }
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.pack, e.id, e.cond, e.qty]).sort();
+    const rowsOf = () => ids['backpack-list'].children;
+    const tabsOf = () => ids['backpack-tabs'].children.filter((b) => b.classes.has('backpack-tab'));
+    const fire = (n, type, ev) => (n.listeners[type] || []).forEach((fn) => fn(ev));
+    const pick = (sel, v) => { sel.value = v; fire(sel, 'change'); };
+    const moves = (sel) => sel.children.filter((g) => g.tag === 'optgroup' && g.getAttribute('label') === 'Move to').flatMap((g) => g.children.map((o) => o.value + ':' + o.textContent));
+    const transfer = (types = []) => ({ types, data: {}, setData(t, v) { this.data[t] = v; this.types = [t]; }, getData(t) { return this.data[t]; } });
+    const dragEvent = (dt) => ({ dataTransfer: dt, prevented: false, preventDefault() { this.prevented = true; } });
+    const tabList = [{ pack: 1 }, { pack: 2, name: 'Trades' }, { pack: 3 }];
+    const store = [{ id: 'uuid-1', name: 'One', qty: 2, t: 2, m: 2 }, { id: 'uuid-2', name: 'Two', cond: 'SP', qty: 1, t: 1, m: 1 }, { id: 'uuid-1', name: 'One', pack: 2, qty: 3, t: 1, m: 1 }];
+
+    test('one backpack has nothing to move to', () => {
+        const p = page({ store: store.slice(0, 2) });
+        open(p);
+        expect(rowsOf()[0].getAttribute('draggable')).toBeNull();
+        expect(moves(rowsOf()[0].querySelector('.backpack-cond'))).toEqual([]);
+    });
+
+    test('the dropdown moves every copy to another backpack, joining what is there', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const sel = rowsOf()[0].querySelector('.backpack-cond');
+        expect(moves(sel)).toEqual(['@2:Trades', '@3:Backpack 3']);
+        pick(sel, '@2');
+        expect(live(p)).toEqual([[1, 'uuid-2', 'SP', 1], [2, 'uuid-1', 'NM', 5]]);
+        expect(ids['backpack-toast'].textContent).toBe('Moved to Trades');
+        expect(tabsOf().map((b) => b.children[1].textContent)).toEqual(['1', '5', '0']);
+        expect(p.m.mtgban_backpack_active).toBeUndefined();
+        expect(p.document.activeElement).toBe(tabsOf()[0]);
+    });
+
+    test('a row dragged onto another tab moves there', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const row = rowsOf()[1];
+        expect(row.getAttribute('draggable')).toBe('true');
+        const dt = transfer();
+        fire(row, 'dragstart', dragEvent(dt));
+        expect(row.classes.has('dragging')).toBe(true);
+        const target = tabsOf()[2];
+        const over = dragEvent(dt);
+        fire(target, 'dragover', over);
+        expect(over.prevented).toBe(true);
+        expect(target.classes.has('drop-target')).toBe(true);
+        fire(target, 'drop', dragEvent(dt));
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 3], [3, 'uuid-2', 'SP', 1]]);
+        expect(ids['backpack-toast'].textContent).toBe('Moved to Backpack 3');
+    });
+
+    test('a tab takes no other drag, and the open tab takes none', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const over = dragEvent(transfer(['text/plain']));
+        fire(tabsOf()[1], 'dragover', over);
+        expect(over.prevented).toBe(false);
+        expect(tabsOf()[0].listeners.dragover).toBeUndefined();
+    });
+
+    test('a full backpack refuses a new card but takes more copies of one it holds', () => {
+        const full = [{ id: 'a', pack: 2, qty: 1, t: 1, m: 1 }, { id: 'uuid-1', pack: 2, qty: 997, t: 1, m: 1 }];
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 2, m: 2 }, { id: 'uuid-2', qty: 1, t: 1, m: 1 }, ...full], max: 2, tabs: 2, tabList });
+        expect(p.window.Backpack.moveTo('uuid-2', 2)).toBe(false);
+        expect(ids['backpack-toast'].textContent).toBe('Trades is full (2 products)');
+        expect(p.window.Backpack.moveTo('uuid-1', 2)).toBe(true);
+        expect(live(p)).toEqual([[1, 'uuid-2', 'NM', 1], [2, 'a', 'NM', 1], [2, 'uuid-1', 'NM', 999]]);
+    });
+
+    test('a move that would pass 999 copies is refused with the ceiling', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 2, m: 2 }, { id: 'uuid-1', pack: 2, qty: 998, t: 1, m: 1 }], tabs: 2, tabList });
+        const before = p.m.mtgban_backpack;
+        expect(p.window.Backpack.moveTo('uuid-1', 2)).toBe(false);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(ids['backpack-toast'].textContent).toBe('999 copies is the most for one product');
+    });
+
+    test('a refused drop clears the tab\'s outline', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 2, m: 2 }, { id: 'uuid-1', pack: 2, qty: 998, t: 1, m: 1 }], tabs: 2, tabList });
+        open(p);
+        const dt = transfer();
+        fire(rowsOf()[0], 'dragstart', dragEvent(dt));
+        const target = tabsOf()[1];
+        fire(target, 'dragover', dragEvent(dt));
+        fire(target, 'drop', dragEvent(dt));
+        expect(target.classes.has('drop-target')).toBe(false);
+    });
+
+    test('undo puts a moved card back where it was', () => {
+        const p = page({ store, tabs: 3, tabList });
+        p.window.Backpack.moveTo('uuid-2|SP', 3);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [1, 'uuid-2', 'SP', 1], [2, 'uuid-1', 'NM', 3]]);
+    });
+});
+
 describe('the condition dropdown', () => {
     function open(p) { p.nav.click(); return ids['backpack-panel']; }
     const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty]).sort();
@@ -785,11 +881,11 @@ describe('the condition dropdown', () => {
     });
 
     test('moving into a grade the card already holds adds the copies to it', () => {
-        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', cond: 'SP', qty: 998, t: 1, m: 1 }] });
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', cond: 'SP', qty: 997, t: 1, m: 1 }] });
         p.window.Backpack.setCond('uuid-1', 'SP');
         expect(live(p)).toEqual([['uuid-1', 'SP', 999]]);
         p.window.Backpack.undo();
-        expect(live(p)).toEqual([['uuid-1', 'NM', 2], ['uuid-1', 'SP', 998]]);
+        expect(live(p)).toEqual([['uuid-1', 'NM', 2], ['uuid-1', 'SP', 997]]);
     });
 
     test('Tab moves through the dropdown inside the panel', () => {
