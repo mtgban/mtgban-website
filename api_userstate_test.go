@@ -84,3 +84,48 @@ func TestSearchBackpackMaxIsAnACLProperty(t *testing.T) {
 		t.Errorf("legacy backpack = %d, want %d", got, defaultBackpackMax)
 	}
 }
+
+// SearchBackpackTabs is 1 where unset or not a count, and never so many
+// that the backpacks together pass what one sync body carries.
+func TestBackpackTabsFromValues(t *testing.T) {
+	cases := []struct {
+		tabs, size string
+		want       int
+	}{
+		{"", "", 1},
+		{"3", "", 3},
+		{"50", "", maxBackpackMax / defaultBackpackMax},
+		{"3", "400", 2},
+		{"3", "1000", 1},
+		{"0", "", 1},
+		{"lots", "", 1},
+	}
+	for _, tc := range cases {
+		v := url.Values{}
+		if tc.tabs != "" {
+			v.Set("SearchBackpackTabs", tc.tabs)
+		}
+		if tc.size != "" {
+			v.Set("SearchBackpackMax", tc.size)
+		}
+		got := backpackTabsFromValues(v)
+		if got != tc.want {
+			t.Errorf("backpackTabsFromValues(%q, %q) = %d, want %d", tc.tabs, tc.size, got, tc.want)
+		}
+	}
+}
+
+// SearchBackpackTabs must be signed, and the Search entry must carry it to
+// the values.
+func TestSearchBackpackTabsIsAnACLProperty(t *testing.T) {
+	if !slices.Contains(OptionalFields, "SearchBackpackTabs") {
+		t.Fatal("OptionalFields lacks SearchBackpackTabs")
+	}
+	table := access.Table{"Admin": {"Search": {"SearchBackpackTabs": "4"}}, "Legacy": {"Search": {}}}
+	if got := backpackTabsFromValues(aclValuesIn(table, "Admin", nil)); got != 4 {
+		t.Errorf("admin backpacks = %d, want 4", got)
+	}
+	if got := backpackTabsFromValues(aclValuesIn(table, "Legacy", nil)); got != 1 {
+		t.Errorf("legacy backpacks = %d, want 1", got)
+	}
+}

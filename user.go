@@ -72,7 +72,14 @@ func tierPages(s *site, entry map[string]map[string]string) []TierPage {
 		}
 		page := TierPage{Name: nav.Name, Description: nav.Description}
 		for _, flag := range slices.Sorted(maps.Keys(flags)) {
-			if label, ok := aclFlagLabel(flag, flags[flag]); ok {
+			value := flags[flag]
+			if flag == "SearchBackpackTabs" {
+				// The tabs a reader gets are clamped by the backpack's size
+				value = strconv.Itoa(backpackTabsFromValues(url.Values{
+					flag: {value}, "SearchBackpackMax": {flags["SearchBackpackMax"]},
+				}))
+			}
+			if label, ok := aclFlagLabel(flag, value); ok {
 				page.Perks = append(page.Perks, label)
 			}
 		}
@@ -133,6 +140,13 @@ func aclFlagLabel(flag, value string) (string, bool) {
 		return on("Offline mode")
 	case "SearchBackpackMax":
 		return count("Backpack of %d card", "Backpack of %d cards")
+	case "SearchBackpackTabs":
+		// Every tier keeps one backpack
+		n, _ := strconv.Atoi(value)
+		if n <= 1 {
+			return "", false
+		}
+		return count("Up to %d backpack", "Up to %d backpacks")
 	case "SearchDisabled":
 		return listLabel(value, "Every retail store shown", "Some retail stores hidden")
 	case "SearchBuylistDisabled":
