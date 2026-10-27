@@ -21,13 +21,15 @@ func userStateIdentity(email string) string {
 	return email + "\x00" + string(Config().Game)
 }
 
-// defaultBackpackMax is how many cards the backpack holds where the tier sets
-// no SearchBackpackMax, and maxBackpackMax the most a tier can set: at about
-// 365 bytes a card, that many cards and as many tombstones still fit the
-// userstate sync body's 1 MB beside the other sections.
+// defaultBackpackMax is how many cards a backpack holds where the tier sets
+// no SearchBackpackMax, maxBackpackMax the most a tier can set, and
+// maxBackpackTotal the most a reader's backpacks hold together: gzipped,
+// that many cards and as many removed ones still fit the userstate sync
+// body's 1 MB beside the other sections.
 const (
 	defaultBackpackMax = 100
 	maxBackpackMax     = 1000
+	maxBackpackTotal   = 5000
 )
 
 // backpackMaxFromValues reads SearchBackpackMax off signed ACL values, held
@@ -42,13 +44,13 @@ func backpackMaxFromValues(v url.Values) int {
 
 // backpackTabsFromValues reads SearchBackpackTabs off signed ACL values: 1
 // where unset, and never so many that the backpacks' cards together pass
-// maxBackpackMax, which is what one sync body carries.
+// maxBackpackTotal.
 func backpackTabsFromValues(v url.Values) int {
 	n, err := strconv.Atoi(v.Get("SearchBackpackTabs"))
 	if err != nil || n < 1 {
 		return 1
 	}
-	return max(1, min(n, maxBackpackMax/backpackMaxFromValues(v)))
+	return max(1, min(n, maxBackpackTotal/backpackMaxFromValues(v)))
 }
 
 // UserStateAPI authenticates the caller from their signed cookie/sig, then
