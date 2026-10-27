@@ -440,7 +440,7 @@
         }
         notice.hidden = !text;
         notice.textContent = text;
-        saveBtn.disabled = !!text;
+        saveBtn.disabled = !!text || state.optionsSide !== state.side;
     }
 
     function render() {
@@ -479,9 +479,16 @@
     // must land in its own, abandoned state rather than the new card's.
 
     function loadOptions(s) {
-        var url = '/api/alerts/options?card=' + encodeURIComponent(s.cardId) + '&side=' + encodeURIComponent(s.side);
+        var seq = ++s.optionsSeq;
+        var side = s.side;
+        var url = '/api/alerts/options?card=' + encodeURIComponent(s.cardId) + '&side=' + encodeURIComponent(side);
         if (s.stores.length) url += '&keep=' + encodeURIComponent(s.stores.join(','));
-        return api('GET', url).then(function (opts) { s.options = opts; });
+        // Only the latest request's answer is kept: a side toggled since asked again.
+        return api('GET', url).then(function (opts) {
+            if (s.optionsSeq !== seq) return;
+            s.options = opts;
+            s.optionsSide = side;
+        });
     }
 
     function loadExisting(s) {
@@ -527,6 +534,8 @@
             side: opts.side === 'retail' ? 'retail' : 'buylist',
             alertId: opts.alertId || null,
             options: null,
+            optionsSeq: 0,
+            optionsSide: '',
             condition: 'NM',
             stores: [],
             reference: null,
@@ -586,6 +595,8 @@
     }
 
     function save() {
+        // The form shows the other side's options until this side's load.
+        if (state.optionsSide !== state.side) return;
         readForm();
         if (!state.aboveKind && !state.belowKind) {
             setError('Turn on at least one threshold.');
@@ -637,11 +648,22 @@
                 readForm();
                 state.side = value;
                 setPills('side', value);
+                // Save waits for this side's options; see renderNotice.
+                saveBtn.disabled = true;
                 var s = state;
-                loadOptions(s).then(function () {
-                    if (s === state) render();
+                var load = loadOptions(s);
+                var seq = s.optionsSeq;
+                load.then(function () {
+                    if (s === state && s.optionsSeq === seq) render();
                 }).catch(function (err) {
-                    if (s === state) setError(err.message);
+                    if (s !== state || s.optionsSeq !== seq) return;
+                    // Back to the side the form shows, so the toggle can be retried.
+                    if (s.optionsSide) {
+                        s.side = s.optionsSide;
+                        setPills('side', s.side);
+                        renderNotice();
+                    }
+                    setError(err.message);
                 });
             } else if (field === 'condition') {
                 state.condition = value;
