@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path"
 	"strings"
@@ -236,5 +238,20 @@ func TestSpreadsheetID(t *testing.T) {
 	u, _ := url.Parse("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_abc/pubhtml")
 	if got, err := spreadsheetID(u.Path); err == nil || !strings.Contains(err.Error(), "published") {
 		t.Errorf("spreadsheetID(published link) = %q, %v, want an error naming published links", got, err)
+	}
+}
+
+// An export lifts the row cap only for a reader it runs for: one it refuses
+// falls through to the priced page, which keeps the tier's cap.
+func TestUploadModesExportsLiftTheCapWhereTheyRun(t *testing.T) {
+	for _, field := range []string{"tcgplayer_csv", "deckbox", "download"} {
+		r := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(field+"=true"))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if got := readUploadModes(r, false, true).maxRows; got != MaxUploadEntries {
+			t.Errorf("%s without buylist access: maxRows = %d, want %d", field, got, MaxUploadEntries)
+		}
+		if got := readUploadModes(r, true, true).maxRows; got != MaxUploadTotalEntries {
+			t.Errorf("%s with buylist access: maxRows = %d, want %d", field, got, MaxUploadTotalEntries)
+		}
 	}
 }

@@ -1882,9 +1882,10 @@ func readUploadModes(r *http.Request, canBuylist, magicOnlyExports bool) uploadM
 	// Allow a larger upload limit if set, if dev, or if it's an external call.
 	// UploadPublish carries no row-count privilege of its own - a store
 	// published site-wide is capped the same as any other upload unless the
-	// publisher separately holds UploadOptimizer/UploadNoLimit too.
+	// publisher separately holds UploadOptimizer/UploadNoLimit too. An export
+	// lifts it only where it runs, since a refused one falls through to the page.
 	noLimitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
+	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || ((deckbox || tcgpCSV || download) && canBuylist)
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
