@@ -334,18 +334,27 @@ describe('the panel', () => {
         expect(ids['backpack-send-retail'].disabled).toBe(false);
     });
 
-    test('plus, minus and remove change the store; minus at 1 removes', () => {
+    test('plus and minus change the store; minus at 1 removes', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }] });
         const panel = open(p);
+        expect(panel.querySelectorAll('.backpack-remove')).toEqual([]);
         panel.querySelectorAll('.backpack-plus')[1].click();   // A (second row, older)
         expect(p.stored().find((e) => e.id === 'uuid-1').qty).toBe(3);
         panel.querySelectorAll('.backpack-minus')[0].click();  // B at 1
         expect(p.stored().find((e) => e.id === 'uuid-2').del).toBeDefined();
-        panel.querySelectorAll('.backpack-remove')[0].click(); // A is the only row now
+        for (let i = 0; i < 3; i++) panel.querySelectorAll('.backpack-minus')[0].click(); // A is the only row now
         expect(p.stored().filter((e) => !e.del).length).toBe(0);
         expect(ids['backpack-list'].querySelectorAll('.backpack-row').length).toBe(0);
         expect(ids['backpack-send-retail'].disabled).toBe(true);
         expect(ids['backpack-empty'].textContent).toBe('Add products from any search with the backpack button.');
+    });
+
+    test('the minus is named Remove when it would take the last copy', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        const panel = open(p);
+        expect(panel.querySelectorAll('.backpack-minus')[0].getAttribute('aria-label')).toBe('One fewer');
+        panel.querySelectorAll('.backpack-minus')[0].click();
+        expect(panel.querySelectorAll('.backpack-minus')[0].getAttribute('aria-label')).toBe('Remove');
     });
 
     test('plus at the 999 ceiling toasts without writing', () => {
@@ -553,14 +562,15 @@ describe('undo', () => {
     });
 
     test('the panel Undo button is off until there is a step, and takes it back', () => {
-        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }] });
         const panel = open(p);
         expect(ids['backpack-undo'].disabled).toBe(true);
-        panel.querySelectorAll('.backpack-remove')[0].click();
+        panel.querySelectorAll('.backpack-minus')[0].click();
+        expect(panel.querySelectorAll('.backpack-row')).toEqual([]);
         expect(ids['backpack-undo'].disabled).toBe(false);
         ids['backpack-undo'].click();
-        expect(panel.querySelectorAll('.backpack-qty')[0].textContent).toBe('2');
-        expect(p.navCount.textContent).toBe('2');
+        expect(panel.querySelectorAll('.backpack-qty')[0].textContent).toBe('1');
+        expect(p.navCount.textContent).toBe('1');
         expect(ids['backpack-undo'].disabled).toBe(true);
     });
 });

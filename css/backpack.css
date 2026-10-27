@@ -105,7 +105,6 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-count { flex: 1; font-size: 0.9em; opacity: 0.8; }
 
 .backpack-close,
-.backpack-remove,
 .backpack-plus,
 .backpack-minus {
     border: 1px solid var(--border-moderate);
