@@ -792,8 +792,8 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 	}
 
 	SetLastStashUpdate(time.Now())
-	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d upserted%s",
-		time.Since(start), upserted, snapshot.skipped()))
+	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d prices collected, %d new or changed%s",
+		time.Since(start), len(snapshot.Rows), upserted, snapshot.skipped()))
 	var problem string
 	switch {
 	case len(snapshot.Rows) == 0:
@@ -801,7 +801,7 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 	case snapshot.ResolveErrors > 0:
 		problem = fmt.Sprintf("could not file a variant for %d prices", snapshot.ResolveErrors)
 	}
-	backgroundJobs.Report(jobStash, fmt.Sprintf("%d rows written", upserted), problem)
+	backgroundJobs.Report(jobStash, fmt.Sprintf("%d prices collected, %d new or changed", len(snapshot.Rows), upserted), problem)
 }
 
 // tcgcsvOwnedProviders are the provider ids the tcgcsv ingest writes from

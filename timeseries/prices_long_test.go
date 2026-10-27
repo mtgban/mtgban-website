@@ -37,7 +37,7 @@ func TestBuildLongUpsertQuery(t *testing.T) {
 	if len(args) != len(batch)*longColsPerRow {
 		t.Fatalf("args len = %d, want %d", len(args), len(batch)*longColsPerRow)
 	}
-	if !strings.Contains(q, "ON CONFLICT (ban_id, date, provider) DO UPDATE SET price = EXCLUDED.price") {
+	if !strings.Contains(q, "ON CONFLICT (ban_id, date, provider) DO UPDATE SET price = EXCLUDED.price WHERE prices.price IS DISTINCT FROM EXCLUDED.price") {
 		t.Errorf("missing conflict clause: %s", q)
 	}
 	if !strings.Contains(q, "($1,$2,$3,$4)") || !strings.Contains(q, "($5,$6,$7,$8)") {
