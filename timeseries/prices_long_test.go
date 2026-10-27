@@ -92,6 +92,16 @@ func TestMoverQueriesShareGameScope(t *testing.T) {
 	}
 }
 
+// A mover row is keyed by (uuid, foil, etched), and an Alternate Fourth
+// Edition copy shares its original's uuid, so the copy's move would be shown
+// as the original's.
+func TestMagicMoversLeaveAltCopiesOut(t *testing.T) {
+	scope, _ := moverScope(CategoryMagic, 1)
+	if !strings.Contains(scope, "NOT v.is_alt") {
+		t.Errorf("Magic mover scope keeps the is_alt copies: %q", scope)
+	}
+}
+
 // The anchors used to aggregate: max(date) over a join has to visit every price
 // row the provider holds, across every monthly partition, before it can name
 // the largest - so a screener page paid two full scans before it read a single

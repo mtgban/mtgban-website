@@ -79,7 +79,7 @@ func TestFilterScreenerRowsComputesChange(t *testing.T) {
 }
 
 func TestFilterScreenerRowsDedup(t *testing.T) {
-	// Same (uuid, foil, etched) twice (e.g. is_alt variants): keep one.
+	// Same (uuid, foil, etched) twice, which the movers scope never returns: keep one.
 	rows := []screenerRow{
 		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "a", Current: 100, Prior: 50}},
 		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "a", Current: 100, Prior: 50}},

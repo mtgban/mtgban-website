@@ -216,14 +216,15 @@ const CategoryMagic = 1
 // find, and a `($1 AND ...) OR (NOT $1 AND ...)` cannot be read that way.
 //
 // CategoryMagic selects the Magic rows, keyed by mtgjson uuid and restricted to
-// canonical English variants (empty language), so each (uuid, foil, etched,
-// is_alt) is a single ban_id and cur vs prior compare the same printing (plan
+// canonical English variants (empty language) that are not an Alternate Fourth
+// Edition copy (is_alt, which shares its original's uuid), so each (uuid, foil,
+// etched) is a single ban_id and cur vs prior compare the same printing (plan
 // 17.2). Any other category selects that TCGplayer category's rows, which have
 // no mtgjson uuid and are keyed by their product + sub-type - already one
 // ban_id per identity.
 func moverScope(tcgCategory, next int) (string, []any) {
 	if tcgCategory == CategoryMagic {
-		return "v.mtgjson_uuid IS NOT NULL AND v.language=''", nil
+		return "v.mtgjson_uuid IS NOT NULL AND v.language='' AND NOT v.is_alt", nil
 	}
 	return fmt.Sprintf("v.mtgjson_uuid IS NULL AND v.tcgp_category_id = $%d", next), []any{tcgCategory}
 }
