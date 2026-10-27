@@ -99,7 +99,7 @@
     }
     // A Clear tombstones every card, so keep as many tombstones as cards.
     function save(list) {
-        var kept = ListStorage.capBackpack(list, MAX, MAX * TABS);
+        var kept = ListStorage.capBackpack(list, MAX, MAX * TABS).map(function (e) { return e.del ? ListStorage.backpackGone(e) : e; });
         ListStorage.save(KEY, kept, kept.length, MAX * TABS);
     }
     // full says, with a toast, when backpack p or all of them together have

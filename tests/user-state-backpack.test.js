@@ -26,15 +26,22 @@ async function reconcileBackpack(local, server, clean, max, tabs, extra) {
     const state = { version: 3, favorites: [], recents: [], preferences: {}, backpack: server };
     const puts = [];
     const writes = [];
-    const fetch = (url, opts) => {
+    const encodings = [];
+    const fetch = async (url, opts) => {
         if (opts && (opts.method === 'PUT' || opts.method === 'PATCH')) writes.push(opts.method);
-        if (opts && opts.method === 'PUT') puts.push(JSON.parse(opts.body));
-        return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
+        if (opts && opts.method === 'PUT') {
+            const gzipped = opts.headers['Content-Encoding'] === 'gzip';
+            encodings.push(gzipped ? 'gzip' : 'plain');
+            const text = gzipped ? await new Response(opts.body.stream().pipeThrough(new DecompressionStream('gzip'))).text() : opts.body;
+            puts.push(JSON.parse(text));
+        }
+        return { status: 200, ok: true, json: () => Promise.resolve(state) };
     };
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
         window, document, storage, session, fetch, realListStorage());
-    for (let i = 0; i < 20; i++) await Promise.resolve();
-    return { pushed: puts.length ? puts[0].backpack : null, prefs: puts.length ? puts[0].preferences : null, stored: JSON.parse(m.mtgban_backpack), rendered, writes, m };
+    // A big body is compressed first, which takes a few turns of the loop.
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+    return { pushed: puts.length ? puts[0].backpack : null, prefs: puts.length ? puts[0].preferences : null, stored: JSON.parse(m.mtgban_backpack), rendered, writes, encodings, m };
 }
 
 const entry = (id, qty, m, extra) => Object.assign({ id, name: 'N ' + id, edition: 'E', set: 'S', number: '1', finishTag: '', finishClass: '', img: '', cw: false, qty, t: m, m }, extra);
@@ -166,4 +173,23 @@ test('the backpack names sync as a preference', async () => {
     const tabs = JSON.stringify([{ pack: 1, name: 'Trades' }, { pack: 2 }]);
     const { prefs } = await reconcileBackpack([entry('a', 1, 10)], [], false, 0, 0, { mtgban_backpack_tabs: tabs });
     expect(prefs.mtgban_backpack_tabs).toBe(tabs);
+});
+
+test('a big backpack is pushed gzipped and a small one plain', async () => {
+    const big = [];
+    for (let i = 0; i < 300; i++) big.push(entry('b' + i, 1, 1000 + i, { img: 'https://cards.scryfall.io/normal/front/a/b/' + i + '.jpg' }));
+    const gz = await reconcileBackpack(big, [], false, 1000);
+    expect(gz.encodings).toEqual(['gzip']);
+    expect(gz.pushed.filter((e) => !e.del)).toHaveLength(300);
+    const plain = await reconcileBackpack([entry('a', 1, 10)], []);
+    expect(plain.encodings).toEqual(['plain']);
+});
+
+test('a removed entry is pushed and kept with only what names and orders it', async () => {
+    const now = Date.now();
+    const gone = entry('a', 2, now - 5, { cond: 'SP', pack: 2, del: now - 5 });
+    const { pushed, stored } = await reconcileBackpack([gone, entry('b', 1, now - 1)], []);
+    const want = { id: 'a', cond: 'SP', pack: 2, t: now - 5, m: now - 5, del: now - 5 };
+    expect(pushed.find((e) => e.id === 'a')).toEqual(want);
+    expect(stored.find((e) => e.id === 'a')).toEqual(want);
 });

@@ -254,6 +254,21 @@
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
 
+    // A body past GZIP_OVER goes gzipped where the browser can, so a full
+    // backpack stays under the server's 1 MB cap. Resolves to the fetch
+    // options' headers and body. The 5000-card ceiling assumes
+    // CompressionStream (Safari 16.4, Firefox 113): plain, nginx refuses a
+    // body past about 2000 cards and as many removed ones.
+    var GZIP_OVER = 32 * 1024;
+    function encodeBody(body) {
+        var plain = { headers: { 'Content-Type': 'application/json' }, body: body };
+        if (body.length < GZIP_OVER || typeof CompressionStream !== 'function') return Promise.resolve(plain);
+        var gz = new Blob([body]).stream().pipeThrough(new CompressionStream('gzip'));
+        return new Response(gz).blob().then(function(blob) {
+            return { headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' }, body: blob };
+        }, function() { return plain; });
+    }
+
     // PATCH one section; keepalive lets it outlive navigation.
     // Resolves true when the write (or its reconcile) landed.
     function patchSection(section, keepalive) {
@@ -270,12 +285,13 @@
             keepalive = size <= keepaliveLeft;
             if (keepalive) keepaliveLeft -= size;
         }
-        var sent = performance.now();
-        var req = fetch(BASE + section, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: body,
-            keepalive: keepalive === true
+        // A keepalive body is under 64 KiB already, and is sent at once:
+        // the page may be gone before a compression settles.
+        var sent;
+        var encoded = keepalive === true ? Promise.resolve({ headers: { 'Content-Type': 'application/json' }, body: body }) : encodeBody(body);
+        var req = encoded.then(function(enc) {
+            sent = performance.now();
+            return fetch(BASE + section, { method: 'PATCH', headers: enc.headers, body: enc.body, keepalive: keepalive === true });
         });
         if (keepalive) {
             var settle = function() { keepaliveLeft += size; };
@@ -349,7 +365,7 @@
         try {
             rawSetItem(FAVORITES_KEY, JSON.stringify(mergedFavs));
             rawSetItem(RECENTS_KEY, JSON.stringify(mergedRecents));
-            rawSetItem(BACKPACK_KEY, JSON.stringify(mergedPack));
+            rawSetItem(BACKPACK_KEY, JSON.stringify(mergedPack.map(function(e) { return e.del ? ListStorage.backpackGone(e) : e; })));
             Object.keys(mergedPrefs).forEach(function(k) {
                 if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(mergedPrefs[k]));
             });
@@ -391,11 +407,10 @@
             backpack: mergedPack.map(trimBackpack),
             preferences: mergedPrefs, version: version
         });
-        var sent = performance.now();
-        return fetch(BASE, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: body
+        var sent;
+        return encodeBody(body).then(function(enc) {
+            sent = performance.now();
+            return fetch(BASE, { method: 'PUT', headers: enc.headers, body: enc.body });
         }).then(function(r) {
             noteServerClock(r, sent);
             if (r.status === 409) {
@@ -638,7 +653,9 @@
     function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
 
     // The backpack syncs identity and the count; prices stay on the page.
+    // A removed entry keeps only what names it and orders it in a merge.
     function trimBackpack(e) {
+        if (e.del) return ListStorage.backpackGone(e);
         return {
             id: e.id, cond: e.cond, pack: e.pack, qty: e.qty, t: e.t, m: e.m, del: e.del,
             name: e.name, edition: e.edition, set: e.set, number: e.number,
