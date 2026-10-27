@@ -207,6 +207,70 @@ func TestLoadFromCloudReportsADroppedDumpAsSkipped(t *testing.T) {
 	}
 }
 
+// A reload whose buylist is refused says so once: the reload's own @here
+// notice, with nothing posted from the install it refused.
+func TestLoadFromCloudPostsARefusalOnce(t *testing.T) {
+	signingEnabled(t, false)
+	withLocalDumpsBucket(t, "magic")
+	posts := serverWebhook(t)
+
+	now := time.Now()
+	vendors := []mtgban.Vendor{buylistOf("CK", 300, now.Add(-time.Hour))}
+	vendorsPtr.Store(&vendors)
+	writeSellerDump(t, filepath.Join("magic", "cardkingdom", "retail", "CK.json.xz"), inventoryOf("CK", 3, now))
+	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/load/cardkingdom?sig="+apiLoadSig(t, "cardkingdom"), nil)
+	w := httptest.NewRecorder()
+	testSite.LoadFromCloud(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, body = %s, want the refusal", w.Code, w.Body.String())
+	}
+
+	got := postsWithin(posts, time.Second)
+	if len(got) != 1 || !strings.HasPrefix(got[0], "@here Server reloaded cardkingdom, 1 did not load: buylist/CK: new buylist is missing too many entries") {
+		t.Errorf("posts = %q, want the one reload notice naming the refusal", got)
+	}
+}
+
+// The reload after an override save has no caller to report to, so it posts
+// its own refusal, once.
+func TestOverrideReloadPostsARefusalOnce(t *testing.T) {
+	withLocalDumpsBucket(t, "magic")
+	posts := serverWebhook(t)
+
+	now := time.Now()
+	vendors := []mtgban.Vendor{buylistOf("CK", 300, now.Add(-time.Hour))}
+	vendorsPtr.Store(&vendors)
+	writeVendorDump(t, filepath.Join("magic", "cardkingdom", "buylist", "CK.json.xz"), buylistOf("CK", 3, now))
+	updateScraperIndexStore("cardkingdom", map[string][]string{"buylist": {"CK"}})
+
+	testSite.reloadOverriddenScrapers(map[string]struct{}{"CK": {}})
+
+	got := postsWithin(posts, time.Second)
+	if len(got) != 1 || got[0] != "@here override reload cardkingdom/buylist/CK: new buylist is missing too many entries" {
+		t.Errorf("posts = %q, want the one override notice naming the refusal", got)
+	}
+	if len(GetVendors()[0].Buylist()) != 300 {
+		t.Errorf("served buylist has %d entries, want the old 300", len(GetVendors()[0].Buylist()))
+	}
+}
+
+// postsWithin collects what reaches the webhook for d. Notices go out from
+// goroutines of their own, in no set order.
+func postsWithin(posts <-chan string, d time.Duration) []string {
+	var got []string
+	wait := time.After(d)
+	for {
+		select {
+		case post := <-posts:
+			got = append(got, post)
+		case <-wait:
+			return got
+		}
+	}
+}
+
 // A datastore ping while a reload runs is queued behind it, and the reply
 // names the running reload's start.
 func TestLoadDatastoreQueuesBehindTheRunningReload(t *testing.T) {

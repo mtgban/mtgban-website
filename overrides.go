@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -195,8 +196,13 @@ func (s *site) reloadOverriddenScrapers(shorthands map[string]struct{}) {
 					go func(bucket simplecloud.Reader, game mtgmatcher.Game, name, kind, shorthand string) {
 						defer recoverJob("override reload " + name + "/" + kind + "/" + shorthand)
 						err := loadScraperWithRetry(bucket, game, name, kind, shorthand)
-						if err != nil {
+						if errors.Is(err, errDroppedDump) {
 							log.Printf("override reload %s/%s/%s: %v", name, kind, shorthand, err)
+							return
+						}
+						if err != nil {
+							// No other caller reports this reload's refusal
+							ServerNotify("refresh", fmt.Sprintf("override reload %s/%s/%s: %v", name, kind, shorthand, err), true)
 							return
 						}
 						s.pokeAlerts(kind)
