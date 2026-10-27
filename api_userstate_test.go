@@ -94,9 +94,10 @@ func TestBackpackTabsFromValues(t *testing.T) {
 	}{
 		{"", "", 1},
 		{"3", "", 3},
-		{"50", "", maxBackpackMax / defaultBackpackMax},
-		{"3", "400", 2},
-		{"3", "1000", 1},
+		{"60", "", maxBackpackTotal / defaultBackpackMax},
+		{"20", "400", 12},
+		{"9", "1000", 5},
+		{"3", "1000", 3},
 		{"0", "", 1},
 		{"lots", "", 1},
 	}

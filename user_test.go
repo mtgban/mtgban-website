@@ -651,20 +651,20 @@ func TestNavbarLinksAccountFromTheNav(t *testing.T) {
 // size has clamped them, not the number the ACL asked for.
 func TestTierPagesClampTheBackpacks(t *testing.T) {
 	pages := tierPages(newSite(), map[string]map[string]string{
-		"Search": {"SearchBackpackMax": "500", "SearchBackpackTabs": "5"},
+		"Search": {"SearchBackpackMax": "1000", "SearchBackpackTabs": "9"},
 	})
 	if len(pages) != 1 {
 		t.Fatalf("pages %+v", pages)
 	}
-	want := []string{"Backpack of 500 cards", "Up to 2 backpacks"}
+	want := []string{"Backpack of 1000 cards", "Up to 5 backpacks"}
 	if !slices.Equal(pages[0].Perks, want) {
 		t.Errorf("perks %v, want %v", pages[0].Perks, want)
 	}
 	one := tierPages(newSite(), map[string]map[string]string{
-		"Search": {"SearchBackpackMax": "1000", "SearchBackpackTabs": "3"},
+		"Search": {"SearchBackpackMax": "1000", "SearchBackpackTabs": "1"},
 	})
 	want = []string{"Backpack of 1000 cards"}
 	if !slices.Equal(one[0].Perks, want) {
-		t.Errorf("clamped to one: perks %v, want %v", one[0].Perks, want)
+		t.Errorf("one backpack: perks %v, want %v", one[0].Perks, want)
 	}
 }
