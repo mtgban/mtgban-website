@@ -40,6 +40,17 @@ func backpackMaxFromValues(v url.Values) int {
 	return min(n, maxBackpackMax)
 }
 
+// backpackTabsFromValues reads SearchBackpackTabs off signed ACL values: 1
+// where unset, and never so many that the backpacks' cards together pass
+// maxBackpackMax, which is what one sync body carries.
+func backpackTabsFromValues(v url.Values) int {
+	n, err := strconv.Atoi(v.Get("SearchBackpackTabs"))
+	if err != nil || n < 1 {
+		return 1
+	}
+	return max(1, min(n, maxBackpackMax/backpackMaxFromValues(v)))
+}
+
 // UserStateAPI authenticates the caller from their signed cookie/sig, then
 // delegates request handling to the userstate package.
 func UserStateAPI(w http.ResponseWriter, r *http.Request) {

@@ -188,6 +188,8 @@ func TestACLFlagLabels(t *testing.T) {
 		{"AnyExperimentsEnabled", "true", "Experimental stores included", true},
 		{"AnySpread", "true", "Spread view", true},
 		{"SleepersCYOA", "true", "Pick your own store pairing", true},
+		{"SearchBackpackTabs", "3", "Up to 3 backpacks", true},
+		{"SearchBackpackTabs", "1", "", false},
 		{"AlertsMax", "5", "Up to 5 alerts", true},
 		{"AlertsMax", "1", "Up to 1 alert", true},
 		{"AlertsMax", "0", "", false},
@@ -642,5 +644,27 @@ func TestNavbarLinksAccountFromTheNav(t *testing.T) {
 	pv.Nav = slices.DeleteFunc(pv.Nav, func(n NavElem) bool { return n.Name == "Account" })
 	if out := renderPage(t, "search.html", false, pv); strings.Contains(out, `title="Account"`) {
 		t.Error("the Links strip links Account for a nav without it")
+	}
+}
+
+// The Account page shows the backpacks a tier gets once the backpack's
+// size has clamped them, not the number the ACL asked for.
+func TestTierPagesClampTheBackpacks(t *testing.T) {
+	pages := tierPages(newSite(), map[string]map[string]string{
+		"Search": {"SearchBackpackMax": "500", "SearchBackpackTabs": "5"},
+	})
+	if len(pages) != 1 {
+		t.Fatalf("pages %+v", pages)
+	}
+	want := []string{"Backpack of 500 cards", "Up to 2 backpacks"}
+	if !slices.Equal(pages[0].Perks, want) {
+		t.Errorf("perks %v, want %v", pages[0].Perks, want)
+	}
+	one := tierPages(newSite(), map[string]map[string]string{
+		"Search": {"SearchBackpackMax": "1000", "SearchBackpackTabs": "3"},
+	})
+	want = []string{"Backpack of 1000 cards"}
+	if !slices.Equal(one[0].Perks, want) {
+		t.Errorf("clamped to one: perks %v, want %v", one[0].Perks, want)
 	}
 }

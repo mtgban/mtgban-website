@@ -121,6 +121,7 @@ var OptionalFields = []string{
 	"SleepersCYOA",
 	"SearchOfflineMode",
 	"SearchBackpackMax",
+	"SearchBackpackTabs",
 	"AlertsMax",
 	"AlertChannels",
 }
@@ -340,9 +341,11 @@ type PageVars struct {
 	UserTier string
 	Hash     string
 
-	// BackpackMax is how many cards the reader's backpack holds, for
-	// js/backpack.js and js/user-state.js on every page that syncs it.
-	BackpackMax int
+	// BackpackMax is how many cards each of the reader's backpacks holds,
+	// and BackpackTabs how many backpacks they may keep, for js/backpack.js
+	// and js/user-state.js on every page that syncs them.
+	BackpackMax  int
+	BackpackTabs int
 
 	// What the page's scripts gate on, rendered on <html> because a script
 	// cannot read the signature cookie: that the request carried one, and
@@ -469,7 +472,8 @@ func genPageNav(s *site, r *http.Request, activeTab, sig string) PageVars {
 		// can wear the tier without asking anybody
 		UserTier: strings.ToLower(sigParams.Get("UserTier")),
 
-		BackpackMax: backpackMaxFromValues(sigParams),
+		BackpackMax:  backpackMaxFromValues(sigParams),
+		BackpackTabs: backpackTabsFromValues(sigParams),
 
 		ScriptSignedIn:    cookie != "",
 		ScriptOfflineMode: cookieParams.Get("SearchOfflineMode") == "true",
