@@ -34,7 +34,10 @@ psql -v apply=1 -f user_state.sql   # user_state_config
 Without `-v apply=1` a script reports what it would change and rolls back.
 Each runs in one transaction and is safe to repeat: a second run finds nothing
 to move. Repeat `prices.sql` if the old build wrote prices after a run. No
-restart is needed, since a re-keyed variant keeps its `ban_id`.
+restart is needed, since a re-keyed variant keeps its `ban_id`, but each site
+names it by its old id until its variant index is warmed again: after
+`prices.sql`, run a snapshot from the admin page rather than wait for the
+next one, up to 12 hours away.
 
 ## The map
 
