@@ -334,6 +334,8 @@
 
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
+            {{/* Open whichever side has offers when the default one has none. */}}
+            {{$buyersTab := or (and $defaultBuyers $hasBuyers) (not $hasSellers)}}
 
             {{/* Resolve the active condition view for this card: user preference, falling back to NM if unavailable. */}}
             {{$sellerConds := (index $.FoundSellers $cardId)}}
@@ -374,8 +376,8 @@
             {{/* Seller/Buyer tab toggle */}}
             {{if not $expanded}}
             <div class="m-tabs" data-card="{{$cardId}}">
-                {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab{{if or $defaultBuyers (not $hasSellers)}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+                {{if $hasSellers}}<button class="m-tab{{if not $buyersTab}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab{{if $buyersTab}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
             {{end}}
 
@@ -384,7 +386,7 @@
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
-            <div class="m-tab-panel{{if or $expanded (not $defaultBuyers)}} active{{end}}" id="sellers-{{$cardId}}">
+            <div class="m-tab-panel{{if or $expanded (not $buyersTab)}} active{{end}}" id="sellers-{{$cardId}}">
                 {{/* The index rows come first and are references: market prices,
                      and on a sealed product the simulated expected values. What
                      follows them is offers. Expanded there is no tab bar naming
@@ -488,7 +490,7 @@
 
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
-            <div class="m-tab-panel{{if or $expanded $defaultBuyers (not $hasSellers)}} active{{end}}" id="buyers-{{$cardId}}">
+            <div class="m-tab-panel{{if or $expanded $buyersTab}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$headed := false}}
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
