@@ -487,6 +487,11 @@ func dedupeLongPrices(rows []LongPrice) []LongPrice {
 // UpsertLongPrices inserts/overwrites long price rows in one transaction,
 // batched under the parameter cap. Each provider is its own row, so this is a
 // plain per-row overwrite — no COALESCE merge. No-op on a read-only client.
+//
+// A row already holding the same price is left alone, so the count returned is
+// the rows inserted or changed. Every snapshot re-covers days it already wrote,
+// and rewriting an unchanged price would still leave a dead row version and a
+// new entry in each index.
 func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSize int) (int, error) {
 	if c.readOnly || len(rows) == 0 {
 		return 0, nil
@@ -527,7 +532,8 @@ func buildLongUpsertQuery(batch []LongPrice) (string, []any) {
 	}
 	q := `INSERT INTO prices (ban_id, date, provider, price) VALUES ` +
 		strings.Join(valueClauses, ",") +
-		` ON CONFLICT (ban_id, date, provider) DO UPDATE SET price = EXCLUDED.price`
+		` ON CONFLICT (ban_id, date, provider) DO UPDATE SET price = EXCLUDED.price` +
+		` WHERE prices.price IS DISTINCT FROM EXCLUDED.price`
 	return q, args
 }
 

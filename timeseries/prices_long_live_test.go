@@ -102,8 +102,12 @@ func TestLongFormLive(t *testing.T) {
 	}
 	// Overwrite the 2024-02-20 base price; count must not grow.
 	rows[1].Price = 8.00
-	if _, err := c.UpsertLongPrices(ctx, []LongPrice{rows[1]}, 0); err != nil {
-		t.Fatalf("re-upsert: %v", err)
+	if n, err := c.UpsertLongPrices(ctx, []LongPrice{rows[1]}, 0); err != nil || n != 1 {
+		t.Fatalf("re-upsert = %d, %v; want 1 changed row", n, err)
+	}
+	// The same price again leaves the row alone.
+	if n, err := c.UpsertLongPrices(ctx, []LongPrice{rows[1]}, 0); err != nil || n != 0 {
+		t.Fatalf("unchanged re-upsert = %d, %v; want 0 rows", n, err)
 	}
 
 	// --- HGetAllLong: canonical (lang='') series only ---
