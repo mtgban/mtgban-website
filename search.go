@@ -1600,18 +1600,7 @@ func notifyFromSearch(r *http.Request, query string, roster chartRoster, start t
 		source = "chart page"
 		notifyTitle = "chart"
 	} else {
-		u, err := url.Parse(r.Referer())
-		if err != nil {
-			log.Println(err)
-			source = "n/a"
-		} else {
-			if strings.Contains(u.Host, "mtgban") {
-				source = u.Path
-			} else {
-				// Avoid automatic URL expansion in Discord
-				source = fmt.Sprintf("<%s>", u.String())
-			}
-		}
+		source = refererSource(r.Referer())
 	}
 	user := GetParamFromSig(sig, "UserEmail")
 	if user == "" {
@@ -1620,6 +1609,23 @@ func notifyFromSearch(r *http.Request, query string, roster chartRoster, start t
 	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, user, time.Since(start))
 	UserNotify(notifyTitle, msg)
 	LogPages["Search"].Println(msg)
+}
+
+// refererSource names where a search came from for the search log: the path
+// alone for one of the site's own pages, whose query may hold a share id, or
+// the whole link of another site's.
+func refererSource(referer string) string {
+	u, err := url.Parse(referer)
+	if err != nil {
+		log.Println(err)
+		return "n/a"
+	}
+	// Trusted reads a forwarded header's first entry, so a comma is not ours.
+	if !strings.Contains(u.Host, ",") && siteorigin.Trusted(u.Host) {
+		return u.Path
+	}
+	// Avoid automatic URL expansion in Discord
+	return fmt.Sprintf("<%s>", u.String())
 }
 
 // fillChartPage fills a chart page for the roster: the display query, the
