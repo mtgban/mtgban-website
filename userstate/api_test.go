@@ -1,8 +1,11 @@
 package userstate
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -94,6 +97,48 @@ func TestBackpackErrorCapsTheTotal(t *testing.T) {
 	}
 	if got := backpackError(two, 1, 2); got != "" {
 		t.Errorf("two cards in two backpacks of one, two allowed: %q", got)
+	}
+}
+
+// A sync body may come gzipped, and is held to maxBody as sent and to
+// maxDecoded once unpacked.
+func TestDecodeBodyTakesGzip(t *testing.T) {
+	gz := func(s string) *bytes.Buffer {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		zw.Write([]byte(s))
+		zw.Close()
+		return &buf
+	}
+	cases := []struct {
+		name    string
+		body    io.Reader
+		gzipped bool
+		ok      bool
+	}{
+		{"plain", strings.NewReader(`{"data":"x"}`), false, true},
+		{"gzipped", gz(`{"data":"x"}`), true, true},
+		{"gzipped past maxDecoded", gz(`{"data":"` + strings.Repeat("x", maxDecoded) + `"}`), true, false},
+		{"plain past maxBody", strings.NewReader(`{"data":"` + strings.Repeat("x", maxBody) + `"}`), false, false},
+		{"not gzip", strings.NewReader(`{"data":"x"}`), true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPatch, "/api/userstate/backpack", tc.body)
+			if tc.gzipped {
+				req.Header.Set("Content-Encoding", "gzip")
+			}
+			var got struct {
+				Data string `json:"data"`
+			}
+			err := decodeBody(httptest.NewRecorder(), req, &got)
+			if (err == nil) != tc.ok {
+				t.Fatalf("err = %v, want ok %v", err, tc.ok)
+			}
+			if tc.ok && got.Data != "x" {
+				t.Errorf("data = %q", got.Data)
+			}
+		})
 	}
 }
 
