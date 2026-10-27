@@ -117,6 +117,50 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     padding: 0.25em 0.5em;
 }
 
+.backpack-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0.5em 1.25em;
+    border-bottom: 1px solid var(--border-subtle);
+    /* a long row of tabs scrolls sideways rather than wrapping */
+    overflow-x: auto;
+}
+
+.backpack-tabs[hidden] { display: none; }
+
+.backpack-tab,
+.backpack-tab-del,
+.backpack-tab-add,
+.backpack-tab-field {
+    flex: none;
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    border-radius: 0.4em;
+    font-size: 0.9em;
+    line-height: 1.2;
+    padding: 0.3em 0.6em;
+}
+
+.backpack-tab,
+.backpack-tab-del,
+.backpack-tab-add { cursor: pointer; }
+
+.backpack-tab {
+    display: inline-flex;
+    gap: 0.4em;
+    max-width: 12em;
+}
+
+.backpack-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.backpack-tab-count { opacity: 0.7; }
+
+.backpack-tab.active { border-color: var(--dodgerblue); font-weight: 600; }
+
+.backpack-tab-field { width: 10em; }
+
 .backpack-list {
     flex: 1;
     overflow-y: auto;
@@ -254,5 +298,6 @@ body.mobile .backpack-panel .m-drawer-handle span {
 
 body.mobile.light-theme .backpack-panel .m-drawer-handle span { background: rgba(0, 0, 0, 0.2); }
 
-/* iOS zooms into a select under 16px */
-body.mobile .backpack-cond { font-size: 16px; }
+/* iOS zooms into a field under 16px */
+body.mobile .backpack-cond,
+body.mobile .backpack-tab-field { font-size: 16px; }

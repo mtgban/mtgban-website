@@ -9,6 +9,8 @@
     var PENDING_KEY = "mtgban_backpack_pending_clear";
     var UNDO_KEY = "mtgban_backpack_undo";
     var ACTIVE_KEY = "mtgban_backpack_active";
+    var TABS_KEY = "mtgban_backpack_tabs";
+    var NAME_MAX = 40;
     var UNDO_MAX = 20;
     // The reader's tier sets each backpack's size and how many backpacks
     // they keep; the page's base template hands both over.
@@ -31,8 +33,12 @@
     }
     // An entry is one card in one grade in one backpack; key names it.
     var key = ListStorage.backpackKey;
-    // idOf is the card a key names.
+    // idOf is the card a key names, and packOf its backpack.
     function idOf(k) { return String(k).split("/").pop().split("|")[0]; }
+    function packOf(k) {
+        var cut = String(k).indexOf("/");
+        return cut < 0 ? 1 : ListStorage.backpackPack({ pack: k.slice(0, cut) });
+    }
     function find(list, k) {
         for (var i = 0; i < list.length; i++) { if (key(list[i]) === k) return i; }
         return -1;
@@ -40,10 +46,38 @@
     // now stamps on the server's clock when user-state.js has one.
     function now() { return window.UserState && typeof window.UserState.now === "function" ? window.UserState.now() : Date.now(); }
     function live() { return read().filter(ListStorage.isLive); }
-    // active is the backpack the search buttons and the panel act on.
-    function active() {
-        try { return ListStorage.backpackPack({ pack: localStorage.getItem(ACTIVE_KEY) }); } catch (e) { return 1; }
+    // tabs lists the backpacks in strip order, each {pack, name}: the synced
+    // list, backpack 1 alone when there is none, then any backpack holding
+    // cards the list does not name, so no card is out of reach.
+    function tabs() {
+        var saved;
+        try { saved = JSON.parse(localStorage.getItem(TABS_KEY) || "[]"); } catch (e) { saved = []; }
+        if (!Array.isArray(saved) || !saved.length) saved = [{ pack: 1 }];
+        var out = [], seen = {};
+        saved.forEach(function (t) {
+            var p = t && ListStorage.backpackPack(t);
+            if (!p || seen[p]) return;
+            seen[p] = true;
+            out.push({ pack: p, name: String(t.name || "").slice(0, NAME_MAX) || "Backpack " + p });
+        });
+        live().map(function (e) { return e.pack; }).sort(function (a, b) { return a - b; }).forEach(function (p) {
+            if (seen[p]) return;
+            seen[p] = true;
+            out.push({ pack: p, name: "Backpack " + p });
+        });
+        return out;
     }
+    function saveTabs(list) { try { localStorage.setItem(TABS_KEY, JSON.stringify(list)); } catch (e) {} }
+
+    // active is the backpack the search buttons and the panel act on, the
+    // first tab when the one last picked is gone.
+    function active() {
+        var p;
+        try { p = ListStorage.backpackPack({ pack: localStorage.getItem(ACTIVE_KEY) }); } catch (e) { p = 1; }
+        var list = tabs();
+        return list.some(function (t) { return t.pack === p; }) ? p : list[0].pack;
+    }
+    function setActive(p) { try { localStorage.setItem(ACTIVE_KEY, String(p)); } catch (e) {} }
     function inPack(p) { return live().filter(function (e) { return e.pack === p; }); }
     // ordered is backpack p's order in the panel, the active one's by
     // default, newest first and a card's grades best first, which the
@@ -87,7 +121,8 @@
     // ---- undo ----
 
     // The tab's undo steps, oldest first: each holds the entries one change
-    // touched as they were before it, {k, gone: true} for one not in.
+    // touched as they were before it, {k, gone: true} for one not in, and
+    // {tabs} for the backpack list when the change was to it.
     function undoSteps() {
         try {
             var s = JSON.parse(sessionStorage.getItem(UNDO_KEY) || "[]");
@@ -98,20 +133,23 @@
         try { sessionStorage.setItem(UNDO_KEY, JSON.stringify(steps.slice(-UNDO_MAX))); } catch (e) {}
     }
 
-    // remember records the entries keys name in list before a change to them.
-    function remember(list, keys) {
+    // remember records the entries keys name in list before a change to
+    // them, and the backpack list when given it.
+    function remember(list, keys, tabsBefore) {
         var step = keys.map(function (k) {
             var i = find(list, k);
             if (i >= 0 && !list[i].del) return JSON.parse(JSON.stringify(list[i]));
             return { k: k, gone: true };
         });
+        if (tabsBefore) step.push({ tabs: tabsBefore });
         var steps = undoSteps();
         steps.push(step);
         saveUndoSteps(steps);
     }
 
     // undo puts back the cards the last change touched, stamped now so the
-    // sync merge keeps them over what that change wrote.
+    // sync merge keeps them over what that change wrote, and opens the
+    // backpack they are in.
     function undo() {
         var steps = undoSteps();
         var step = steps.pop();
@@ -119,8 +157,12 @@
         saveUndoSteps(steps);
         var list = read();
         var t = now();
+        var pack = 0;
         step.forEach(function (was) {
-            var idx = find(list, was.k || key(was));
+            if (was.tabs) { saveTabs(was.tabs); return; }
+            var k = was.k || key(was);
+            pack = pack || packOf(k);
+            var idx = find(list, k);
             if (was.gone) {
                 if (idx >= 0 && !list[idx].del) { list[idx].del = t; list[idx].m = t; }
                 return;
@@ -130,7 +172,41 @@
             list.unshift(was);
         });
         save(list);
+        if (pack) setActive(pack);
         return true;
+    }
+
+    // addTab opens a new, empty backpack under the lowest number free.
+    function addTab() {
+        var list = tabs();
+        if (list.length >= TABS) return false;
+        var p = 1;
+        while (list.some(function (t) { return t.pack === p; })) p++;
+        list.push({ pack: p, name: "Backpack " + p });
+        saveTabs(list);
+        setActive(p);
+        return true;
+    }
+
+    // renameTab names backpack p; a blank name keeps the one it has.
+    function renameTab(p, name) {
+        name = String(name || "").trim().slice(0, NAME_MAX);
+        if (!name) return;
+        saveTabs(tabs().map(function (t) { return t.pack === p ? { pack: t.pack, name: name } : t; }));
+    }
+
+    // deleteTab drops backpack p and its cards as one undo step; the last
+    // backpack stays.
+    function deleteTab(p) {
+        var before = tabs();
+        if (before.length < 2) return;
+        var list = read();
+        var t = now();
+        var gone = list.filter(function (e) { return !e.del && e.pack === p; });
+        remember(list, gone.map(key), before);
+        gone.forEach(function (e) { e.del = t; e.m = t; });
+        save(list);
+        saveTabs(before.filter(function (x) { return x.pack !== p; }));
     }
 
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one product"); }
@@ -455,7 +531,7 @@
 
     // ---- the panel ----
 
-    var panel = null, overlay = null, listEl = null, countEl = null, emptyEl = null;
+    var panel = null, overlay = null, stripEl = null, listEl = null, countEl = null, emptyEl = null;
     var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null;
 
     function text(tag, cls, s) {
@@ -497,6 +573,11 @@
         closeBtn.setAttribute("aria-label", "Close");
         closeBtn.addEventListener("click", close);
         header.append(title, countEl, closeBtn);
+
+        stripEl = text("div", "backpack-tabs");
+        stripEl.setAttribute("id", "backpack-tabs");
+        stripEl.setAttribute("role", "tablist");
+        stripEl.setAttribute("aria-label", "Backpacks");
 
         listEl = text("div", "backpack-list");
         listEl.setAttribute("id", "backpack-list");
@@ -544,7 +625,7 @@
         }
         footer.append(label, actions);
 
-        panel.append(header, listEl, emptyEl, footer);
+        panel.append(header, stripEl, listEl, emptyEl, footer);
         document.body.append(overlay, panel);
     }
 
@@ -627,6 +708,104 @@
         return r;
     }
 
+    // renderTabs draws the strip: a tab per backpack with its copies, a ×
+    // on the open one while there are others, and a + while the tier allows
+    // more. One backpack and no room for another shows no strip.
+    function renderTabs() {
+        var list = tabs(), cur = active();
+        while (stripEl.children.length) stripEl.children[0].remove();
+        stripEl.hidden = TABS < 2 && list.length < 2;
+        var copies = {};
+        live().forEach(function (e) { copies[e.pack] = (copies[e.pack] || 0) + e.qty; });
+        list.forEach(function (t, i) {
+            var on = t.pack === cur;
+            var b = text("button", "backpack-tab" + (on ? " active" : ""));
+            b.setAttribute("type", "button");
+            b.setAttribute("role", "tab");
+            b.setAttribute("aria-selected", on ? "true" : "false");
+            b.setAttribute("tabindex", on ? "0" : "-1");
+            b.setAttribute("data-pack", String(t.pack));
+            b.setAttribute("title", on ? "Rename" : t.name);
+            b.append(text("span", "backpack-tab-name", t.name), text("span", "backpack-tab-count", String(copies[t.pack] || 0)));
+            b.addEventListener("click", function () {
+                if (on) { rename(b, t); return; }
+                setActive(t.pack);
+                render();
+                focusTab(t.pack);
+            });
+            b.addEventListener("keydown", function (ev) {
+                var step = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+                if (!step) return;
+                ev.preventDefault();
+                var next = list[(i + step + list.length) % list.length];
+                setActive(next.pack);
+                render();
+                focusTab(next.pack);
+            });
+            stripEl.appendChild(b);
+            if (on && list.length > 1) {
+                var del = text("button", "backpack-tab-del", "×");
+                del.setAttribute("type", "button");
+                del.setAttribute("aria-label", "Delete " + t.name);
+                del.addEventListener("click", function () { askDelete(t); });
+                stripEl.appendChild(del);
+            }
+        });
+        if (list.length < TABS) {
+            var add = text("button", "backpack-tab-add", "+");
+            add.setAttribute("type", "button");
+            add.setAttribute("id", "backpack-tab-add");
+            add.setAttribute("aria-label", "Add a backpack");
+            add.addEventListener("click", function () { if (addTab()) { render(); focusTab(active()); } });
+            stripEl.appendChild(add);
+        }
+    }
+
+    function focusTab(p) {
+        Array.prototype.forEach.call(stripEl.children, function (b) {
+            if (b.getAttribute("data-pack") === String(p)) b.focus();
+        });
+    }
+
+    // rename swaps the open tab for a field: Enter or leaving it saves,
+    // Escape keeps the name.
+    function rename(b, t) {
+        var field = document.createElement("input");
+        field.type = "text";
+        field.setAttribute("class", "backpack-tab-field");
+        field.setAttribute("aria-label", "Backpack name");
+        field.setAttribute("maxlength", String(NAME_MAX));
+        field.value = t.name;
+        var done = false;
+        var finish = function (save) {
+            if (done) return;
+            done = true;
+            if (save) renameTab(t.pack, field.value);
+            render();
+            focusTab(t.pack);
+        };
+        field.addEventListener("keydown", function (ev) {
+            if (ev.key !== "Enter" && ev.key !== "Escape") return;
+            ev.preventDefault();
+            // Escape here cancels the rename, not the panel
+            ev.stopPropagation();
+            finish(ev.key === "Enter");
+        });
+        field.addEventListener("blur", function () { finish(true); });
+        b.replaceWith(field);
+        field.focus();
+        if (field.select) field.select();
+    }
+
+    function askDelete(t) {
+        var doDelete = function () { deleteTab(t.pack); render(); focusTab(active()); };
+        var cards = inPack(t.pack).length;
+        if (!cards) { doDelete(); return; }
+        var ask = "Delete " + t.name + " and its " + cards + (cards === 1 ? " product?" : " products?");
+        if (typeof window.confirmDialog === "function") window.confirmDialog(ask, doDelete, { anchor: panel, confirmLabel: "Delete" });
+        else if (window.confirm(ask)) doDelete();
+    }
+
     function countLine(c) {
         return c.copies + (c.copies === 1 ? " copy" : " copies") + " of " + c.cards + (c.cards === 1 ? " product" : " products");
     }
@@ -640,6 +819,7 @@
         entries.forEach(function (e) {
             listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; })));
         });
+        renderTabs();
         var c = count();
         countEl.textContent = countLine(c);
         emptyEl.hidden = entries.length > 0;
@@ -702,7 +882,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
+    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, tabs: tabs, addTab: addTab, renameTab: renameTab, deleteTab: deleteTab, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");
@@ -712,7 +892,7 @@
         document.addEventListener("change", function (ev) {
             if (ev.target && ev.target.closest && ev.target.closest(".opt-store")) markSections();
         });
-        window.addEventListener("storage", function (ev) { if (!ev || !ev.key || ev.key === KEY) render(); });
+        window.addEventListener("storage", function (ev) { if (!ev || !ev.key || ev.key === KEY || ev.key === ACTIVE_KEY || ev.key === TABS_KEY) render(); });
         window.addEventListener("pageshow", function (ev) { if (ev && ev.persisted) render(); });
         clearIfPriced();
         render();

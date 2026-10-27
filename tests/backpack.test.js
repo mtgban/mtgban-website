@@ -20,6 +20,7 @@ function el(tag) {
         appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
         append(...cs) { cs.forEach((c) => this.appendChild(c)); },
         remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((c) => c !== this); },
+        replaceWith(n) { const p = this.parentNode; if (!p) return; n.parentNode = p; p.children[p.children.indexOf(this)] = n; this.parentNode = null; },
         addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); },
         click() { (this.listeners.click || []).forEach((fn) => fn({ preventDefault() {}, stopPropagation() {} })); },
         focus() { if (currentDoc) currentDoc.activeElement = this; },
@@ -37,10 +38,11 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, session, sections = [] } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [] } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     if (active) m.mtgban_backpack_active = String(active);
+    if (tabList) m.mtgban_backpack_tabs = JSON.stringify(tabList);
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const sm = session || (pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {});
     const sessionStorage = { getItem: (k) => (k in sm ? sm[k] : null), setItem: (k, v) => { sm[k] = String(v); }, removeItem: (k) => { delete sm[k]; } };
@@ -428,7 +430,7 @@ describe('numbered backpacks', () => {
     });
 
     test('the add starts a card in the active backpack beside another backpack\'s copy', () => {
-        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }], tabs: 2, active: 2 });
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }], tabs: 2, active: 2, tabList: [{ pack: 1 }, { pack: 2 }] });
         expect(p.rows[0].classes.has('active')).toBe(false);
         p.window.addToBackpack(p.rows[0]);
         expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 1]]);
@@ -437,7 +439,7 @@ describe('numbered backpacks', () => {
     test('each backpack fills on its own', () => {
         const store = [];
         for (let i = 0; i < 3; i++) store.push({ id: 'c' + i, qty: 1, t: i, m: i }, { id: 'd' + i, pack: 2, qty: 1, t: i, m: i });
-        const p = page({ store, max: 3, tabs: 3, active: 3 });
+        const p = page({ store, max: 3, tabs: 3, active: 3, tabList: [{ pack: 1 }, { pack: 2 }, { pack: 3 }] });
         p.window.addToBackpack(p.rows[0]);
         expect(p.stored().filter((e) => !e.del)).toHaveLength(7);
         const full = page({ store, max: 3, tabs: 3, active: 2 });
@@ -500,6 +502,154 @@ describe('numbered backpacks', () => {
         const p = page({ store: two, tabs: 2, active: 2, sections: [[['uuid-1', 2, false, 'NM']]] });
         p.window.takeRowsFromBackpack(p.optSections[0].take);
         expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 3], [2, 'uuid-2', 'NM', 1]]);
+    });
+});
+
+describe('the backpack tabs', () => {
+    function open(p) { p.nav.click(); return ids['backpack-panel']; }
+    const strip = () => ids['backpack-tabs'];
+    const tabsOf = () => strip().children.filter((b) => b.classes.has('backpack-tab'));
+    const labels = () => tabsOf().map((b) => b.children[0].textContent + ':' + b.children[1].textContent + (b.getAttribute('aria-selected') === 'true' ? '*' : ''));
+    const names = () => ids['backpack-list'].querySelectorAll('.backpack-row-name').map((n) => n.textContent);
+    const keydown = (n, key) => { const ev = { key, prevented: false, stopped: false, preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }; (n.listeners.keydown || []).forEach((fn) => fn(ev)); return ev; };
+    const two = [{ id: 'uuid-1', name: 'One', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'Two', pack: 2, qty: 3, t: 2, m: 2 }];
+
+    test('one backpack and no room for another shows no strip', () => {
+        open(page({ store: two.slice(0, 1) }));
+        expect(strip().hidden).toBe(true);
+    });
+
+    test('a tier with room shows the one backpack and a +', () => {
+        open(page({ store: two.slice(0, 1), tabs: 3 }));
+        expect(strip().hidden).toBe(false);
+        expect(strip().getAttribute('role')).toBe('tablist');
+        expect(labels()).toEqual(['Backpack 1:2*']);
+        expect(ids['backpack-tab-add'].getAttribute('aria-label')).toBe('Add a backpack');
+    });
+
+    test('+ opens an empty backpack the search add then fills', () => {
+        const p = page({ store: two.slice(0, 1), tabs: 2 });
+        open(p);
+        ids['backpack-tab-add'].click();
+        expect(labels()).toEqual(['Backpack 1:2', 'Backpack 2:0*']);
+        expect(names()).toEqual([]);
+        expect(strip().children.some((b) => b.classes.has('backpack-tab-add'))).toBe(false);
+        expect(p.document.activeElement).toBe(tabsOf()[1]);
+        p.window.addToBackpack(p.rows[1]);
+        expect(labels()).toEqual(['Backpack 1:2', 'Backpack 2:1*']);
+        expect(p.navCount.textContent).toBe('1');
+        expect(p.stored().find((e) => e.id === 'uuid-2').pack).toBe(2);
+    });
+
+    test('picking a tab shows its backpack and moves the search buttons to it', () => {
+        const p = page({ store: two, tabs: 2 });
+        open(p);
+        expect(names()).toEqual(['One']);
+        tabsOf()[1].click();
+        expect(names()).toEqual(['Two']);
+        expect(labels()).toEqual(['Backpack 1:2', 'Backpack 2:3*']);
+        expect(p.m.mtgban_backpack_active).toBe('2');
+        expect(p.rows[0].classes.has('active')).toBe(false);
+        expect(p.rows[1].children[0].textContent).toBe('3');
+        expect(p.navCount.textContent).toBe('3');
+    });
+
+    test('the arrow keys move along the tabs', () => {
+        const p = page({ store: two, tabs: 3 });
+        open(p);
+        expect(keydown(tabsOf()[0], 'ArrowRight').prevented).toBe(true);
+        expect(p.m.mtgban_backpack_active).toBe('2');
+        expect(p.document.activeElement).toBe(tabsOf()[1]);
+        keydown(tabsOf()[1], 'ArrowRight');
+        expect(p.m.mtgban_backpack_active).toBe('1');
+        keydown(tabsOf()[0], 'ArrowLeft');
+        expect(p.m.mtgban_backpack_active).toBe('2');
+    });
+
+    test('a backpack with cards the synced list lacks still has a tab', () => {
+        open(page({ store: two, tabs: 1, tabList: [{ pack: 1, name: 'Trades' }] }));
+        expect(strip().hidden).toBe(false);
+        expect(labels()).toEqual(['Trades:2*', 'Backpack 2:3']);
+        expect(strip().children.some((b) => b.classes.has('backpack-tab-add'))).toBe(false);
+    });
+
+    test('clicking the open tab renames it; Enter saves and Escape keeps the name', () => {
+        const p = page({ store: two, tabs: 2 });
+        open(p);
+        tabsOf()[0].click();
+        let field = strip().children[0];
+        expect(field.getAttribute('aria-label')).toBe('Backpack name');
+        expect(p.document.activeElement).toBe(field);
+        field.value = '  Trade binder  ';
+        keydown(field, 'Enter');
+        expect(labels()[0]).toBe('Trade binder:2*');
+        expect(JSON.parse(p.m.mtgban_backpack_tabs)).toEqual([{ pack: 1, name: 'Trade binder' }, { pack: 2, name: 'Backpack 2' }]);
+        expect(p.document.activeElement).toBe(tabsOf()[0]);
+        tabsOf()[0].click();
+        field = strip().children[0];
+        field.value = 'Nope';
+        const ev = keydown(field, 'Escape');
+        expect(ev.stopped).toBe(true);
+        expect(labels()[0]).toBe('Trade binder:2*');
+        expect(ids['backpack-panel'].classes.has('open')).toBe(true);
+    });
+
+    test('leaving the field saves, and a blank or long name is held', () => {
+        const p = page({ store: two, tabs: 2 });
+        open(p);
+        tabsOf()[0].click();
+        let field = strip().children[0];
+        field.value = 'x'.repeat(50);
+        (field.listeners.blur || []).forEach((fn) => fn());
+        expect(labels()[0]).toBe('x'.repeat(40) + ':2*');
+        tabsOf()[0].click();
+        field = strip().children[0];
+        field.value = '   ';
+        keydown(field, 'Enter');
+        expect(labels()[0]).toBe('x'.repeat(40) + ':2*');
+    });
+
+    test('deleting a backpack with cards asks, drops it and its cards, and undo brings both back', () => {
+        const p = page({ store: two, tabs: 2, active: 2, tabList: [{ pack: 1 }, { pack: 2, name: 'Trades' }] });
+        open(p);
+        const del = strip().children.find((b) => b.classes.has('backpack-tab-del'));
+        expect(del.getAttribute('aria-label')).toBe('Delete Trades');
+        del.click();
+        expect(confirms).toEqual(['Delete Trades and its 1 product?']);
+        expect(labels()).toEqual(['Backpack 1:2*']);
+        expect(p.stored().find((e) => e.id === 'uuid-2').del).toBeDefined();
+        ids['backpack-undo'].click();
+        expect(labels()).toEqual(['Backpack 1:2', 'Trades:3*']);
+        expect(names()).toEqual(['Two']);
+    });
+
+    test('an empty backpack goes without asking, and the last one has no ×', () => {
+        const p = page({ store: two.slice(0, 1), tabs: 2, active: 2, tabList: [{ pack: 1 }, { pack: 2 }] });
+        open(p);
+        strip().children.find((b) => b.classes.has('backpack-tab-del')).click();
+        expect(confirms).toEqual([]);
+        expect(labels()).toEqual(['Backpack 1:2*']);
+        expect(strip().children.some((b) => b.classes.has('backpack-tab-del'))).toBe(false);
+    });
+
+    test('undo opens the backpack its step changed', () => {
+        const p = page({ store: two, tabs: 2 });
+        open(p);
+        p.window.Backpack.setQty('2/uuid-2', 9);
+        expect(names()).toEqual(['One']);
+        ids['backpack-undo'].click();
+        expect(labels()).toEqual(['Backpack 1:2', 'Backpack 2:3*']);
+    });
+
+    test('another window changing the tabs re-renders', () => {
+        const p = page({ store: two, tabs: 2 });
+        open(p);
+        p.m.mtgban_backpack_active = '2';
+        p.fireStorage('mtgban_backpack_active');
+        expect(names()).toEqual(['Two']);
+        p.m.mtgban_backpack_tabs = JSON.stringify([{ pack: 1, name: 'A' }, { pack: 2, name: 'B' }]);
+        p.fireStorage('mtgban_backpack_tabs');
+        expect(labels()).toEqual(['A:2', 'B:3*']);
     });
 });
 

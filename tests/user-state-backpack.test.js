@@ -13,8 +13,8 @@ function realListStorage() {
 // Runs user-state.js signed in with a local backpack against a server copy,
 // and returns the backpack the reconcile PUT pushes; clean leaves the dirty
 // flag unset; max stands in for the tier's backpack size.
-async function reconcileBackpack(local, server, clean, max, tabs) {
-    const m = clean ? {} : { mtgban_userstate_dirty: '1' };
+async function reconcileBackpack(local, server, clean, max, tabs, extra) {
+    const m = Object.assign(clean ? {} : { mtgban_userstate_dirty: '1' }, extra);
     if (local) m.mtgban_backpack = JSON.stringify(local);
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const session = { getItem: () => null, setItem() {}, removeItem() {} };
@@ -34,7 +34,7 @@ async function reconcileBackpack(local, server, clean, max, tabs) {
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
         window, document, storage, session, fetch, realListStorage());
     for (let i = 0; i < 20; i++) await Promise.resolve();
-    return { pushed: puts.length ? puts[0].backpack : null, stored: JSON.parse(m.mtgban_backpack), rendered, writes, m };
+    return { pushed: puts.length ? puts[0].backpack : null, prefs: puts.length ? puts[0].preferences : null, stored: JSON.parse(m.mtgban_backpack), rendered, writes, m };
 }
 
 const entry = (id, qty, m, extra) => Object.assign({ id, name: 'N ' + id, edition: 'E', set: 'S', number: '1', finishTag: '', finishClass: '', img: '', cw: false, qty, t: m, m }, extra);
@@ -160,4 +160,10 @@ test('the merge caps the backpacks together at size times allowance', async () =
     const local = [entry('a', 1, 1000), entry('b', 1, 1001, { pack: 2 }), entry('c', 1, 1002, { pack: 3 })];
     const { pushed } = await reconcileBackpack(local, [], false, 1, 2);
     expect(pushed.filter((e) => !e.del).map((e) => e.id).sort()).toEqual(['b', 'c']);
+});
+
+test('the backpack names sync as a preference', async () => {
+    const tabs = JSON.stringify([{ pack: 1, name: 'Trades' }, { pack: 2 }]);
+    const { prefs } = await reconcileBackpack([entry('a', 1, 10)], [], false, 0, 0, { mtgban_backpack_tabs: tabs });
+    expect(prefs.mtgban_backpack_tabs).toBe(tabs);
 });
