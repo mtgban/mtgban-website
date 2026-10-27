@@ -7,6 +7,7 @@
     var KEY = "mtgban_backpack";
     var EMPTY_AFTER_KEY = "mtgban_backpack_empty_after";
     var PENDING_KEY = "mtgban_backpack_pending_clear";
+    var SENT_KEY = "mtgban_backpack_sent";
     var UNDO_KEY = "mtgban_backpack_undo";
     var ACTIVE_KEY = "mtgban_backpack_active";
     var TABS_KEY = "mtgban_backpack_tabs";
@@ -78,6 +79,17 @@
         return list.some(function (t) { return t.pack === p; }) ? p : list[0].pack;
     }
     function setActive(p) { try { localStorage.setItem(ACTIVE_KEY, String(p)); } catch (e) {} }
+
+    // sentPack is, on the Upload page showing a send's cards, the backpack
+    // that send came from, which the page takes from whatever tab is open.
+    var sentPack = 0;
+    function source() { return sentPack || active(); }
+    function packName(p) {
+        var list = tabs();
+        if (list.length < 2) return "the backpack";
+        var t = list.filter(function (x) { return x.pack === p; })[0];
+        return t ? t.name : "the backpack";
+    }
     function inPack(p) { return live().filter(function (e) { return e.pack === p; }); }
     // ordered is backpack p's order in the panel, the active one's by
     // default, newest first and a card's grades best first, which the
@@ -385,6 +397,7 @@
         if (!canUpload() || !ordered().length) return;
         var form = sendForm(mode);
         setPending(emptyAfter() ? ordered().map(key) : null);
+        try { sessionStorage.setItem(SENT_KEY, JSON.stringify({ pack: active(), ids: ordered().map(function (e) { return e.id; }) })); } catch (e) {}
         document.body.appendChild(form);
         form.submit();
     }
@@ -395,6 +408,9 @@
     function clearIfPriced() {
         var ban = window.BAN_BACKPACK;
         if (!ban || !("priced" in ban)) return;
+        var sent = null;
+        try { sent = JSON.parse(sessionStorage.getItem(SENT_KEY) || "null"); } catch (e) {}
+        if (sent && Array.isArray(sent.ids) && Array.isArray(ban.priced) && sent.ids.join(",") === ban.priced.join(",")) sentPack = ListStorage.backpackPack(sent);
         var pending = takePending();
         if (!Array.isArray(pending) || !Array.isArray(ban.priced)) return;
         var ids = pending.map(idOf);
@@ -503,12 +519,12 @@
         live().forEach(function (e) { by[key(e)] = true; });
         document.querySelectorAll(".pack-take-btn").forEach(function (b) {
             var section = b.closest(".opt-store");
-            b.hidden = !section || !Object.keys(picked(section, active())).some(function (k) { return by[k]; });
+            b.hidden = !section || !Object.keys(picked(section, source())).some(function (k) { return by[k]; });
         });
     }
 
     // takeRowsFromBackpack takes the copies a store section's ticked rows
-    // list out of the backpack, once they have been sent to that store and
+    // list out of the backpack they came from, once sent to that store and
     // the reader confirms it. Taking the last hides the button, so a focused
     // one hands focus to the section's fold button.
     window.takeRowsFromBackpack = function (btn) {
@@ -516,14 +532,15 @@
         if (!section) return;
         var doTake = function () {
             var focused = document.activeElement === btn;
-            var copies = take(picked(section, active()));
+            var p = source();
+            var copies = take(picked(section, p));
             if (!copies) return;
             render();
-            toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from the backpack");
+            toast("Removed " + copies + (copies === 1 ? " copy" : " copies") + " from " + packName(p));
             var fold = section.querySelector(".section-fold");
             if (focused && btn.hidden && fold) fold.focus();
         };
-        var ask = "Remove this store's ticked cards from the backpack?";
+        var ask = "Remove this store's ticked cards from " + packName(source()) + "?";
         // The dialog hands focus back to the button before it calls doTake
         if (typeof window.confirmDialog === "function") window.confirmDialog(ask, doTake, { confirmLabel: "Remove" });
         else if (window.confirm(ask)) doTake();
