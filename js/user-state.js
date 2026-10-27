@@ -13,6 +13,7 @@
     var RECENTS_KEY = 'mtgban_recent_searches';
     var BACKPACK_KEY = 'mtgban_backpack';
     var BACKPACK_MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 100;
+    var BACKPACK_TABS = window.BAN_BACKPACK_TABS > 0 ? window.BAN_BACKPACK_TABS : 1;
     var PRESETS_KEY = 'mtgban_upload_presets';
     var ARBIT_KEY = 'mtgban_arbit_filters';
     var ARBIT_PRESETS_KEY = 'mtgban_arbit_presets';
@@ -323,7 +324,8 @@
         if (!serverState) return Promise.resolve(false);
         var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
         var mergedRecents = mergeList(localRecents(), serverState.recents || [], recentId, 15);
-        var mergedPack = mergeList(localBackpack(), serverState.backpack || [], ListStorage.backpackKey, BACKPACK_MAX, BACKPACK_MAX);
+        // BACKPACK_MAX is each backpack's size, so the cap goes per backpack.
+        var mergedPack = ListStorage.capBackpack(mergeList(localBackpack(), serverState.backpack || [], ListStorage.backpackKey, 0, BACKPACK_MAX * BACKPACK_TABS), BACKPACK_MAX, BACKPACK_MAX * BACKPACK_TABS);
         var mergedPrefs = mergePrefs(buildPreferences(), serverState.preferences || {});
         // Must run before the write below: it reads the pre-merge local copies.
         mergedRecents = keepRecentArt(mergedRecents);
@@ -622,7 +624,7 @@
     // The backpack syncs identity and the count; prices stay on the page.
     function trimBackpack(e) {
         return {
-            id: e.id, cond: e.cond, qty: e.qty, t: e.t, m: e.m, del: e.del,
+            id: e.id, cond: e.cond, pack: e.pack, qty: e.qty, t: e.t, m: e.m, del: e.del,
             name: e.name, edition: e.edition, set: e.set, number: e.number,
             finishTag: e.finishTag, finishClass: e.finishClass, img: e.img, cw: e.cw
         };

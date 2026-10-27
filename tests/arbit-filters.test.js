@@ -291,7 +291,7 @@ async function mergedFilters(local, server, dirty = true) {
     const fetch = () => Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
         window, { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} }, storage, fakeStorage(), fetch,
-        { mtime: (x) => x.m || x.t || 0, tombstones: () => [] }, () => 0, () => {});
+        { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list }, () => 0, () => {});
     for (let i = 0; i < 20; i++) await Promise.resolve();
     return { local: storage, userState: window.UserState };
 }

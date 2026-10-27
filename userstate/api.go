@@ -29,33 +29,55 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 // backpackError is the error a backpack is refused with, "" when it is a
-// list holding at most limit live cards: the entries without a del stamp,
-// as js/list-storage.js counts them.
-func backpackError(raw json.RawMessage, limit int) string {
+// list holding at most limit live cards in each of its backpacks and limit
+// times tabs in all: the entries without a del stamp, by pack, as
+// js/list-storage.js counts them.
+func backpackError(raw json.RawMessage, limit, tabs int) string {
 	var list []struct {
-		Del any `json:"del"`
+		Del  any `json:"del"`
+		Pack any `json:"pack"`
 	}
 	err := json.Unmarshal(raw, &list)
 	if err != nil {
 		return "bad body"
 	}
-	live := 0
+	live := map[int]int{}
+	total := 0
 	for _, e := range list {
 		if e.Del == nil || e.Del == false || e.Del == 0.0 || e.Del == "" {
-			live++
+			live[backpackPack(e.Pack)]++
+			total++
 		}
 	}
-	if live > limit {
+	if total > limit*tabs {
 		return "backpack is full"
+	}
+	for _, n := range live {
+		if n > limit {
+			return "backpack is full"
+		}
 	}
 	return ""
 }
 
+// backpackPack is the backpack an entry's pack names, 1 for anything that
+// is not a number above 1, as js/list-storage.js reads it.
+func backpackPack(v any) int {
+	n := 0
+	switch p := v.(type) {
+	case float64:
+		n = int(p)
+	case string:
+		n, _ = strconv.Atoi(p)
+	}
+	return max(n, 1)
+}
+
 // ServeAPI handles GET/PUT on /api/userstate/, PATCH on /{section} and
-// GET/POST/DELETE on /share for an already-authenticated email, whose
-// backpack may hold backpackMax cards; a nil db is 503. game is the site's,
-// which a new share is made for.
-func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game string, backpackMax int) {
+// GET/POST/DELETE on /share for an already-authenticated email, who may
+// keep backpackTabs backpacks of backpackMax cards each; a nil db is 503.
+// game is the site's, which a new share is made for.
+func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game string, backpackMax, backpackTabs int) {
 	if !apiLimiter.Allow(email) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many requests"})
 		return
@@ -110,7 +132,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			return
 		}
 		if body.Backpack != nil {
-			msg := backpackError(body.Backpack, backpackMax)
+			msg := backpackError(body.Backpack, backpackMax, backpackTabs)
 			if msg != "" {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 				return
@@ -146,7 +168,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			return
 		}
 		if section == "backpack" {
-			msg := backpackError(body.Data, backpackMax)
+			msg := backpackError(body.Data, backpackMax, backpackTabs)
 			if msg != "" {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg})
 				return
