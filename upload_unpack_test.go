@@ -52,7 +52,7 @@ func TestUnpackSealedCarriesTheQuantityInside(t *testing.T) {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
 
-	out := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 3, HasQuantity: true}})
+	out, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 3, HasQuantity: true}})
 	for _, entry := range out {
 		if entry.Unpacked {
 			continue
@@ -76,7 +76,7 @@ func TestUnpackSealedHoldsOnlyWhatCameOutOfTheBoxes(t *testing.T) {
 	}
 	loose := backend().GetUUIDs()[0]
 
-	out := unpackSealed(backend(), []UploadEntry{
+	out, _ := unpackSealed(backend(), []UploadEntry{
 		{CardID: loose, Quantity: 1, HasQuantity: true},
 		{CardID: booster, Quantity: 1, HasQuantity: true},
 		{CardID: "", Quantity: 1},
@@ -119,7 +119,7 @@ func TestUnpackSealedKeepsTheProductAsAGhost(t *testing.T) {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
 
-	out := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	out, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 	if len(out) < 2 {
 		t.Fatalf("got %d rows, want the product and its contents", len(out))
 	}
@@ -153,9 +153,10 @@ func TestUnpackSealedAddsUpThroughTheMerge(t *testing.T) {
 		t.Skipf("the chosen product does not open: %v", err)
 	}
 
-	merged := docparse.MergeIdenticalEntries(unpackSealed(backend(), []UploadEntry{
+	unpacked, _ := unpackSealed(backend(), []UploadEntry{
 		{CardID: productUUID, Quantity: 2, HasQuantity: true},
-	}))
+	})
+	merged := docparse.MergeIdenticalEntries(unpacked)
 
 	// Two of the product is two of everything in it, however the decklist
 	// spreads them across rows.
@@ -281,7 +282,7 @@ func TestUnpackOfferRetiresItself(t *testing.T) {
 	if unpackableSealed(backend(), entries) != 1 {
 		t.Fatal("the offer is not made for a product that can be opened")
 	}
-	unpacked := unpackSealed(backend(), entries)
+	unpacked, _ := unpackSealed(backend(), entries)
 	if got := unpackableSealed(backend(), unpacked); got != 0 {
 		t.Errorf("the offer is still made %d times after being taken", got)
 	}
@@ -289,7 +290,7 @@ func TestUnpackOfferRetiresItself(t *testing.T) {
 	// And a second pass hands the list back rather than a second helping of
 	// contents: the product is marked, and the cards it became are not
 	// products.
-	again := unpackSealed(backend(), unpacked)
+	again, _ := unpackSealed(backend(), unpacked)
 	if len(again) != len(unpacked) {
 		t.Errorf("unpacking twice turned %d rows into %d", len(unpacked), len(again))
 	}
@@ -305,7 +306,7 @@ func TestUnpackSealedLeavesAListWithNothingToOpen(t *testing.T) {
 		{CardID: booster, Quantity: 1, HasQuantity: true},
 	}
 
-	out := unpackSealed(backend(), entries)
+	out, _ := unpackSealed(backend(), entries)
 	if len(out) != len(entries) {
 		t.Fatalf("a list with nothing to open came back with %d of its %d rows", len(out), len(entries))
 	}
@@ -357,7 +358,7 @@ func TestUnpackSealedNamesTheProductEachCardCameFrom(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	out, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 	for _, entry := range out {
 		if entry.Unpacked {
 			continue
@@ -419,7 +420,7 @@ func TestUnpackedSectionsGatherEachProduct(t *testing.T) {
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	entries, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	sections := buildUnpackedSections(entries, map[string]*unpackedTally{})
 	if len(sections) != 1 {
@@ -514,7 +515,7 @@ func TestUnpackedResultsRenderASectionPerProduct(t *testing.T) {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
 	product := mustCard(t, sealed)
-	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	entries, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	pageVars := PageVars{
 		UploadVars: UploadVars{
@@ -782,7 +783,7 @@ func TestUnpackedPageSurvivesItsOwnRoundTrip(t *testing.T) {
 
 	// What the page holds after an unpack, and what it posts back: the cards,
 	// each naming the product it came out of. The products are not rows.
-	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 2, HasQuantity: true}})
+	entries, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 2, HasQuantity: true}})
 	var packed strings.Builder
 	for _, entry := range entries {
 		if entry.Unpacked {
@@ -820,7 +821,7 @@ func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	entries, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	pageVars := PageVars{
 		UploadVars: UploadVars{
@@ -877,7 +878,7 @@ func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
 	if sealed == "" {
 		t.Skip("this datastore has no sealed product with a decklist")
 	}
-	entries := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	entries, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
 
 	pageVars := PageVars{
 		UploadVars: UploadVars{
@@ -912,5 +913,40 @@ func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
 	flat.SinglesEntries = entries[1:]
 	if out := renderUpload(t, flat); !strings.Contains(out, "window.BAN_UPLOAD_TABS = {unpacked: false}") {
 		t.Error("an ordinary result no longer follows the preference")
+	}
+}
+
+// Opening stops at the posted rows' own cap: a list of precons each opening
+// into its whole decklist would otherwise grow without bound.
+func TestUnpackSealedStopsAtTheRowCap(t *testing.T) {
+	skipWithoutDatastore(t)
+	product, _ := sealedProducts(t)
+	if product == "" {
+		t.Skip("this datastore has no sealed product with a decklist")
+	}
+	co, err := backend().GetUUID(product)
+	if err != nil {
+		t.Fatal(err)
+	}
+	picks, err := sealed.ProductDecklist(backend(), co.SetCode, co.UUID)
+	if err != nil || len(picks) == 0 {
+		t.Fatalf("no decklist for %s: %v", product, err)
+	}
+
+	entries := make([]UploadEntry, maxPackedRows/(1+len(picks))+2)
+	for i := range entries {
+		entries[i] = UploadEntry{CardID: product, Quantity: 1, HasQuantity: true}
+	}
+	out, cut := unpackSealed(backend(), entries)
+	if !cut {
+		t.Error("a list opening past the cap did not say it was cut")
+	}
+	if len(out) > maxPackedRows {
+		t.Errorf("opened into %d rows, past the cap of %d", len(out), maxPackedRows)
+	}
+
+	_, cut = unpackSealed(backend(), entries[:1])
+	if cut {
+		t.Error("one product said it was cut")
 	}
 }

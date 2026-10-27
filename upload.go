@@ -680,7 +680,11 @@ func (s *site) Upload(w http.ResponseWriter, r *http.Request) {
 	// Before the merge, so a card that turns up twice - loose and inside a box
 	// - is added up by the rule that merges any other repeated row.
 	if r.FormValue("unpack") == "true" {
-		uploadedData = unpackSealed(b, uploadedData)
+		var cut bool
+		uploadedData, cut = unpackSealed(b, uploadedData)
+		if cut && pageVars.WarningMessage == "" {
+			pageVars.WarningMessage = fmt.Sprintf("Products opened up to the first %d entries", maxPackedRows)
+		}
 	}
 
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
@@ -2392,9 +2396,10 @@ func unpackableSealed(b *mtgmatcher.Backend, entries []UploadEntry) int {
 // it. Duplicates are left to MergeIdenticalEntries, which the caller runs next
 // and which already knows how to add a card to itself - two precons sharing a
 // staple hold two of it.
-func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) []UploadEntry {
-	var out []UploadEntry
-
+//
+// The rows stop at maxPackedRows, as a posted list does, and cut says when a
+// product was left closed for it.
+func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) (out []UploadEntry, cut bool) {
 	for _, entry := range entries {
 		co, err := b.GetUUID(entry.CardID)
 		if entry.CardID == "" || entry.Unpacked || err != nil || !co.Sealed ||
@@ -2405,6 +2410,10 @@ func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) []UploadEntry {
 		picks, err := sealed.ProductDecklist(b, co.SetCode, co.UUID)
 		if err != nil || len(picks) == 0 {
 			continue
+		}
+		if len(out)+1+len(picks) > maxPackedRows {
+			cut = true
+			break
 		}
 
 		qty := entry.Quantity
@@ -2440,10 +2449,10 @@ func unpackSealed(b *mtgmatcher.Backend, entries []UploadEntry) []UploadEntry {
 	// - or none that can be opened - would otherwise come back empty, which
 	// answers a question nobody asked.
 	if len(out) == 0 {
-		return entries
+		return entries, cut
 	}
 
-	return out
+	return out, cut
 }
 
 // withoutOpenedProducts drops the products an unpacked list opened, leaving
