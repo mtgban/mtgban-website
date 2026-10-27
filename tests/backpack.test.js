@@ -653,6 +653,45 @@ describe('the backpack tabs', () => {
     });
 });
 
+describe('taking from the backpack a send came from', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.pack, e.id, e.qty]).sort();
+    const store = [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', pack: 2, qty: 3, t: 2, m: 2 }];
+    const tabList = [{ pack: 1 }, { pack: 2, name: 'Trades' }];
+
+    // sent sends backpack 2 and returns the session the Upload page opens with.
+    function sent() {
+        const p = page({ store, tabs: 2, active: 2, tabList });
+        p.nav.click();
+        ids['backpack-send-retail'].click();
+        return p.sm;
+    }
+
+    test('the Upload page showing the send takes from its backpack, whatever tab is open', () => {
+        const session = sent();
+        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        expect(p.optSections[0].take.hidden).toBe(false);
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(confirms).toEqual(["Remove this store's ticked cards from Trades?"]);
+        expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
+        expect(ids['backpack-toast'].textContent).toBe('Removed 1 copy from Trades');
+    });
+
+    test('a page posting itself back still takes from the backpack sent', () => {
+        const session = sent();
+        page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] } });
+        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(live(p)).toEqual([[1, 'uuid-1', 2], [2, 'uuid-1', 2]]);
+    });
+
+    test('an Upload page of other cards takes from the open backpack', () => {
+        const session = sent();
+        const p = page({ store, tabs: 2, active: 1, tabList, session, ban: { canUpload: true, priced: ['uuid-1', 'uuid-9'] }, sections: [[['uuid-1', 1, false, 'NM']]] });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(live(p)).toEqual([[1, 'uuid-1', 1], [2, 'uuid-1', 3]]);
+    });
+});
+
 describe('the condition dropdown', () => {
     function open(p) { p.nav.click(); return ids['backpack-panel']; }
     const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty]).sort();
