@@ -460,6 +460,10 @@ func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
+		// Bounded as signing bounds it: FormValue parses a multipart body
+		// whole, spilling past memory to disk.
+		r.Body = http.MaxBytesReader(w, r.Body, MaxUploadBodySize)
+
 		querySig := r.FormValue("sig")
 		_, signed := signatureIsValid(querySig)
 		if signed {

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"html"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -503,6 +505,44 @@ func TestEveryDataRouteRefusesWithAStatus(t *testing.T) {
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://mtgban.com"+p+"?sig="+expired, nil))
 		if rec.Code != http.StatusUnauthorized || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
 			t.Errorf("%s: %d %q, want 401 and a JSON error", p, rec.Code, rec.Header().Get("Content-Type"))
+		}
+	}
+}
+
+// An unsigned route bounds its body as a signed one does: a multipart post
+// past MaxUploadBodySize does not parse, rather than spilling whole to disk,
+// while one under it still does.
+func TestNoSigningBoundsTheBody(t *testing.T) {
+	for _, tc := range []struct {
+		size  int
+		parse bool
+	}{
+		{1 << 10, true},
+		{MaxUploadBodySize + 1, false},
+	} {
+		var body bytes.Buffer
+		mw := multipart.NewWriter(&body)
+		part, err := mw.CreateFormFile("f", "big.bin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = part.Write(bytes.Repeat([]byte("x"), tc.size))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = mw.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/patreon", &body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		var fileErr error
+		noSigning(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _, fileErr = r.FormFile("f")
+		})).ServeHTTP(httptest.NewRecorder(), req)
+		if (fileErr == nil) != tc.parse {
+			t.Errorf("a %d-byte file: parsed %v, want %v (%v)", tc.size, fileErr == nil, tc.parse, fileErr)
 		}
 	}
 }
