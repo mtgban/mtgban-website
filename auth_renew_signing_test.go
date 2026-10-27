@@ -6,6 +6,7 @@ import (
 	"html"
 	"maps"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"slices"
 	"strings"
@@ -793,6 +794,41 @@ func TestSigningRenewalStopsWhenTheSessionsAreGone(t *testing.T) {
 	}
 	if !strings.Contains(rig.logged.String(), "verdict=sessions gone") {
 		t.Errorf("admin log %q does not say the sessions were gone", rig.logged.String())
+	}
+}
+
+// A reader who logs out here while their renewal waits on Patreon is not
+// signed in again, though another device's session still holds the lease,
+// nor re-signed for an access table or grant edit the signature predates;
+// the other session takes the token Patreon rotated to.
+func TestSigningRenewalStopsWhenItsOwnSessionIsGone(t *testing.T) {
+	for _, edit := range []string{"none", "acl", "grant"} {
+		t.Run(edit, func(t *testing.T) {
+			rig := newRenewalRig(t, renewalBlock)
+			pokes := freshPokes(t)
+			switch edit {
+			case "acl":
+				pokes.StampACL(time.Now())
+			case "grant":
+				pokes.StampGrant(rig.hash, time.Now(), DefaultSignatureDuration)
+			}
+			session := rig.session("")
+			other := rig.session("")
+			old := rig.sig("Legacy", 9*day)
+			rig.stub.beforeToken = func() {
+				logout := httptest.NewRecorder()
+				rig.site.Home(logout, rig.request(http.MethodGet, "/?errmsg=logout", browser(old, session)...))
+			}
+
+			rig.wantUntouched(rig.page(browser(old, session)...), old)
+			rows := rig.rows()
+			if len(rows) != 1 || rows[0].id != other || rows[0].token != rig.stub.liveToken() {
+				t.Errorf("rows %+v, want only the other device's, holding %s", rows, rig.stub.liveToken())
+			}
+			if !strings.Contains(rig.logged.String(), "verdict=session gone") {
+				t.Errorf("admin log %q does not say this browser's session was gone", rig.logged.String())
+			}
+		})
 	}
 }
 

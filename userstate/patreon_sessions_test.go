@@ -120,9 +120,9 @@ func TestPatreonSessionLifecycle(t *testing.T) {
 	wantLease(t, c, id, h, "", false)
 	wantLease(t, c, other, h, "", false)
 
-	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
-	if err != nil || rows != 2 {
-		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
+	if err != nil || len(ids) != 2 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", len(ids), err)
 	}
 	fence = wantLease(t, c, other, h, "token-2", true)
 
@@ -183,9 +183,9 @@ func TestPatreonSessionCommitWritesEveryRowIncludingALaterOne(t *testing.T) {
 	late := mustCreatePatreonSession(t, c, h, "token-0", time.Hour)
 	wantLease(t, c, late, h, "", false)
 
-	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
-	if err != nil || rows != 3 {
-		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 3, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
+	if err != nil || len(ids) != 3 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 3, nil", len(ids), err)
 	}
 	for _, id := range []string{first, second, late} {
 		st := stateOf(t, c, id)
@@ -199,9 +199,9 @@ func TestPatreonSessionCommitWritesEveryRowIncludingALaterOne(t *testing.T) {
 	}
 
 	// The fence is spent
-	rows, err = c.CommitPatreonSessions(ctx, fence, h, "token-3", 0)
-	if err != nil || rows != 0 {
-		t.Fatalf("second commit: rows=%d err=%v, want 0, nil", rows, err)
+	ids, err = c.CommitPatreonSessions(ctx, fence, h, "token-3", 0)
+	if err != nil || len(ids) != 0 {
+		t.Fatalf("second commit: rows=%d err=%v, want 0, nil", len(ids), err)
 	}
 	st = stateOf(t, c, late)
 	if st.token != "token-2" {
@@ -222,9 +222,9 @@ func TestPatreonSessionCommitCanRestTheSessions(t *testing.T) {
 	second := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
 	fence := wantLease(t, c, first, h, "token-1", true)
 
-	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 5*time.Minute)
-	if err != nil || rows != 2 {
-		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 5*time.Minute)
+	if err != nil || len(ids) != 2 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", len(ids), err)
 	}
 	for _, id := range []string{first, second} {
 		st := stateOf(t, c, id)
@@ -246,9 +246,9 @@ func TestPatreonSessionCommitOfDeletedSessionsStaysDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
-	if err != nil || rows != 0 {
-		t.Fatalf("commit of deleted sessions: rows=%d err=%v, want 0, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
+	if err != nil || len(ids) != 0 {
+		t.Fatalf("commit of deleted sessions: rows=%d err=%v, want 0, nil", len(ids), err)
 	}
 	wantLease(t, c, id, h, "", false)
 }
@@ -320,9 +320,9 @@ func TestPatreonSessionStaleLeaseCannotCommitOrDefer(t *testing.T) {
 	stale := wantLeaseFor(t, c, id, h, -time.Second, "token-1", true)
 	current := wantLease(t, c, other, h, "token-1", true)
 
-	rows, err := c.CommitPatreonSessions(ctx, stale, h, "stale", 0)
-	if err != nil || rows != 0 {
-		t.Fatalf("stale commit: rows=%d err=%v, want 0, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, stale, h, "stale", 0)
+	if err != nil || len(ids) != 0 {
+		t.Fatalf("stale commit: rows=%d err=%v, want 0, nil", len(ids), err)
 	}
 	// The stale deferral must not push sessions the current holder holds
 	// back, nor store its token.
@@ -334,9 +334,9 @@ func TestPatreonSessionStaleLeaseCannotCommitOrDefer(t *testing.T) {
 	if st.token != "token-1" || st.wait > 61 {
 		t.Errorf("a stale deferral moved a session: %+v", st)
 	}
-	rows, err = c.CommitPatreonSessions(ctx, current, h, "token-2", 0)
-	if err != nil || rows != 2 {
-		t.Fatalf("current commit: rows=%d err=%v, want 2, nil", rows, err)
+	ids, err = c.CommitPatreonSessions(ctx, current, h, "token-2", 0)
+	if err != nil || len(ids) != 2 {
+		t.Fatalf("current commit: rows=%d err=%v, want 2, nil", len(ids), err)
 	}
 	wantLease(t, c, id, h, "token-2", true)
 }
@@ -348,9 +348,9 @@ func TestPatreonSessionEmptyFenceCommitsNothing(t *testing.T) {
 	ctx := context.Background()
 
 	id := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
-	rows, err := c.CommitPatreonSessions(ctx, "", h, "forged", 0)
-	if err != nil || rows != 0 {
-		t.Fatalf("empty-fence commit: rows=%d err=%v, want 0, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, "", h, "forged", 0)
+	if err != nil || len(ids) != 0 {
+		t.Fatalf("empty-fence commit: rows=%d err=%v, want 0, nil", len(ids), err)
 	}
 	err = c.DeferPatreonSessions(ctx, "", "forged", time.Hour)
 	if err != nil {
@@ -572,9 +572,9 @@ func TestPatreonSessionCommitFilesTheSessionsUnderANewEmail(t *testing.T) {
 	b := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
 	kept := mustCreatePatreonSession(t, c, stranger, "token-s", time.Hour)
 	fence := wantLease(t, c, a, h, "token-1", true)
-	rows, err := c.CommitPatreonSessions(ctx, fence, renamed, "token-2", 0)
-	if err != nil || rows != 2 {
-		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, fence, renamed, "token-2", 0)
+	if err != nil || len(ids) != 2 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v, want 2, nil", len(ids), err)
 	}
 	wantLease(t, c, a, h, "", false)
 	wantLease(t, c, b, renamed, "token-2", true)
@@ -733,9 +733,9 @@ func TestPatreonSessionLoginIsDatedFromItsExchange(t *testing.T) {
 
 	device := mustCreatePatreonSession(t, c, h, "token-1", time.Hour)
 	fence := wantLease(t, c, device, h, "token-1", true)
-	rows, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
-	if err != nil || rows != 1 {
-		t.Fatalf("CommitPatreonSessions: rows=%d err=%v", rows, err)
+	ids, err := c.CommitPatreonSessions(ctx, fence, h, "token-2", 0)
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("CommitPatreonSessions: rows=%d err=%v", len(ids), err)
 	}
 	// The login exchanged its code, and got token-1, before that commit
 	late, err := c.CreatePatreonSession(ctx, PatreonLogin{EmailHash: h, PatreonUser: "patreon-" + h, ClientID: testPatreonClient, RefreshToken: "token-1"}, 10*time.Second, time.Hour)

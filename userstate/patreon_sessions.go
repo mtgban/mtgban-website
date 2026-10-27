@@ -159,22 +159,34 @@ func (c *Client) PatreonSessionStanding(ctx context.Context, sessionID, emailHas
 // CommitPatreonSessions stores the refresh token a renewal returned on every
 // session of the account fence leased, one created after the lease included,
 // files them under emailHash, the reader's email as Patreon reports it now,
-// and makes them leasable again after rest, at once when rest is zero. rows
-// is 0 when fence is no longer held: the sessions were deleted meanwhile, or
-// the lease ran out and was taken over. A holder that outlived its lease
-// must not overwrite a token a later holder rotated, and the caller must not
-// act on a renewal the reader has revoked.
-func (c *Client) CommitPatreonSessions(ctx context.Context, fence, emailHash, refreshToken string, rest time.Duration) (rows int64, err error) {
-	res, err := c.db.ExecContext(ctx, `
+// makes them leasable again after rest, at once when rest is zero, and
+// returns their ids. None come back when fence is no longer held: the
+// sessions were deleted meanwhile, or the lease ran out and was taken over.
+// A holder that outlived its lease must not overwrite a token a later holder
+// rotated, and the caller must not act on a renewal whose own session the
+// reader has ended.
+func (c *Client) CommitPatreonSessions(ctx context.Context, fence, emailHash, refreshToken string, rest time.Duration) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, `
 		UPDATE patreon_sessions
 		   SET refresh_token = $3, email_hash = $2, last_renewed = now(),
 		       renew_after = now() + make_interval(secs => $4), lease = NULL
-		 WHERE (patreon_user, client_id) IN (SELECT patreon_user, client_id FROM patreon_sessions WHERE lease = $1)`,
+		 WHERE (patreon_user, client_id) IN (SELECT patreon_user, client_id FROM patreon_sessions WHERE lease = $1)
+		RETURNING session_id`,
 		fence, emailHash, refreshToken, rest.Seconds())
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return res.RowsAffected()
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		err = rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // DeferPatreonSessions holds every session of the account fence leased back
