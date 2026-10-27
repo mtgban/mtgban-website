@@ -823,6 +823,8 @@ type EntryRule struct {
 	// Finish holds fixupFinishNG values and is applied through the same
 	// finish predicate the search filters use
 	Finish []string
+	// SkipSets holds the set codes the rule never prices
+	SkipSets []string
 
 	MinPrice float64
 	Rate     float64
@@ -858,6 +860,9 @@ func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]m
 	rate := 1.0
 	for _, rule := range rules {
 		if len(rule.Finish) > 0 && applyCardFilter(b, "finish", rule.Finish, co) {
+			return
+		}
+		if slices.Contains(rule.SkipSets, co.SetCode) {
 			return
 		}
 		if entries[base].Pricing() < rule.MinPrice {
