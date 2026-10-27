@@ -147,6 +147,9 @@ func (s *Service) backfill(ctx context.Context, games []tcgcsv.GameConfig, from,
 	if err := s.store.EnsureTCGSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.store.EnsurePriceDatesSchema(ctx); err != nil {
+		return err
+	}
 	if err := s.ensurePartitions(ctx, games); err != nil {
 		return err
 	}
@@ -409,6 +412,9 @@ func (s *Service) IngestLatest(ctx context.Context) error {
 		return errors.New("tcgcsv: price database is read-only; nothing would be written")
 	}
 	if err := s.store.EnsureTCGSchema(ctx); err != nil {
+		return err
+	}
+	if err := s.store.EnsurePriceDatesSchema(ctx); err != nil {
 		return err
 	}
 	if err := s.ensurePartitions(ctx, s.games); err != nil {
