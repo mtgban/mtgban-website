@@ -3,9 +3,11 @@
 package userstate
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,6 +19,25 @@ import (
 // maxBody is the server-side cap on a sync payload, nginx's default
 // client_max_body_size, so a body the droplets pass is one this takes.
 const maxBody = 1 << 20
+
+// maxDecoded caps a gzipped body once unpacked: a backpack's 5000 cards and
+// as many removed ones come to about 2.3 MB.
+const maxDecoded = 8 << 20
+
+// decodeBody decodes a JSON body of at most maxBody bytes as sent, which a
+// client may gzip (Content-Encoding: gzip) to fit a full backpack under it.
+func decodeBody(w http.ResponseWriter, r *http.Request, v any) error {
+	var body io.Reader = http.MaxBytesReader(w, r.Body, maxBody)
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		zr, err := gzip.NewReader(body)
+		if err != nil {
+			return err
+		}
+		defer zr.Close()
+		body = http.MaxBytesReader(w, zr, maxDecoded)
+	}
+	return json.NewDecoder(body).Decode(v)
+}
 
 // apiLimiter throttles /api/userstate/ separately from page rendering.
 var apiLimiter = ratelimit.NewLimiter(10, 5) // 10 req/s, burst 5
@@ -127,7 +148,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			return
 		}
 		var body State
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&body); err != nil {
+		if err := decodeBody(w, r, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
 			return
 		}
@@ -163,7 +184,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			Data    json.RawMessage `json:"data"`
 			Version int64           `json:"version"`
 		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&body); err != nil {
+		if err := decodeBody(w, r, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
 			return
 		}
