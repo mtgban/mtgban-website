@@ -26,10 +26,12 @@ async function flushAfterWrite(key, value) {
     const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const writes = [];
     // The GET answers as for a visitor, so nothing hydrates; a PATCH lands.
-    const fetch = (url, opts) => {
+    const fetch = async (url, opts) => {
         if (opts && opts.method === 'PATCH') {
-            writes.push({ url, body: JSON.parse(opts.body) });
-            return Promise.resolve({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) });
+            const gzipped = opts.headers['Content-Encoding'] === 'gzip';
+            const text = gzipped ? await new Response(opts.body.stream().pipeThrough(new DecompressionStream('gzip'))).text() : opts.body;
+            writes.push({ url, gzipped, body: JSON.parse(text) });
+            return { status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) };
         }
         return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
     };
@@ -42,9 +44,13 @@ async function flushAfterWrite(key, value) {
     storage.setItem(key, value);
     expect(timers.length).toBe(1);
     timers[0]();
-    for (let i = 0; i < 20; i++) await Promise.resolve();
+    // A big body is compressed first, which takes a few turns of the loop.
+    for (let i = 0; i < 10; i++) await turn();
     return { writes, m };
 }
+
+// turn waits one turn of the event loop, past the script's stubbed timers.
+const turn = () => new Promise((r) => globalThis.setTimeout(r, 0));
 
 test('a favorites value that does not parse is not sent, and the flush settles', async () => {
     const { writes, m } = await flushAfterWrite('mtgban_favorites', '{not json');
@@ -102,7 +108,7 @@ async function keepaliveOnHide(values, later = [], hold = false) {
         for (const [key, value] of Object.entries(next)) storage.setItem(key, value);
         document.visibilityState = 'hidden';
         listeners.visibilitychange();
-        for (let i = 0; i < 20; i++) await Promise.resolve();
+        for (let i = 0; i < 10; i++) await turn();
     }
     return sent;
 }
@@ -132,3 +138,10 @@ function backpackOf(n) {
     }
     return pack;
 }
+
+test('a big backpack goes gzipped, a small one plain', async () => {
+    const big = await flushAfterWrite('mtgban_backpack', JSON.stringify(backpackOf(400)));
+    expect(big.writes.map((w) => [w.url, w.gzipped, w.body.data.length])).toEqual([['/api/userstate/backpack', true, 400]]);
+    const small = await flushAfterWrite('mtgban_backpack', JSON.stringify(backpackOf(2)));
+    expect(small.writes.map((w) => w.gzipped)).toEqual([false]);
+});

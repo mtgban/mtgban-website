@@ -71,6 +71,12 @@ var ListStorage = (function() {
         return (p > 1 ? p + "/" : "") + e.id + (c === "NM" ? "" : "|" + c);
     }
 
+    // backpackGone is what a removed backpack entry keeps: what names it,
+    // and the stamps a merge orders it by.
+    function backpackGone(e) {
+        return { id: e.id, cond: e.cond, pack: e.pack, t: e.t, m: e.m, del: e.del };
+    }
+
     // capBackpack keeps a backpack list's live entries, newest first, at
     // most max in each backpack and total in all, and its tombstones after.
     function capBackpack(list, max, total) {
@@ -90,6 +96,7 @@ var ListStorage = (function() {
         backpackCond: backpackCond,
         backpackKey: backpackKey,
         backpackPack: backpackPack,
+        backpackGone: backpackGone,
         capBackpack: capBackpack,
         isLive: isLive,
         mtime: mtime,

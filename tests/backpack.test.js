@@ -233,6 +233,14 @@ describe('adding', () => {
         expect(p.stored().find((e) => e.id === 'uuid-1').qty).toBe(2);
     });
 
+    test('a removed entry is stored with only what names and orders it', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', edition: 'E', img: 'x', qty: 2, t: 1, m: 1 }] });
+        p.window.Backpack.remove('uuid-1');
+        expect(Object.keys(p.stored()[0]).sort()).toEqual(['cond', 'del', 'id', 'm', 'pack', 't']);
+        p.window.Backpack.undo();
+        expect(p.stored()[0].name).toBe('A');
+    });
+
     test('the 999 ceiling toasts without writing', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'x', qty: 999, t: 1, m: 1 }] });
         const toast = el('div'); toast.setAttribute('id', 'desktop-fav-toast'); p.document.body.appendChild(toast);
