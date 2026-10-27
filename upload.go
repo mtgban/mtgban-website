@@ -2048,7 +2048,7 @@ func fetchUploadPrices(r *http.Request, b *mtgmatcher.Backend, blMode bool, st u
 			customBuylist = slices.Contains(customOpts, "enabled")
 		}
 		if st.canUploadCustom && customBuylist {
-			var rule EntryRule
+			rule := EntryRule{SkipSets: customBuylistSkipSets}
 			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
 				rule.MinPrice = v
 			}
