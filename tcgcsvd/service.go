@@ -23,6 +23,7 @@ type Store interface {
 	EnsureTCGSchema(ctx context.Context) error
 	EnsureTCGProductsSchema(ctx context.Context) error
 	EnsureTCGCategoryPartition(ctx context.Context, categoryID int) error
+	EnsurePriceDatesSchema(ctx context.Context) error
 	GetTCGLatestDate(ctx context.Context, categoryID int) (time.Time, bool, error)
 	UpsertTCGPrices(ctx context.Context, rows []timeseries.TCGPriceRow, batchSize int) (int, error)
 	UpsertTCGProducts(ctx context.Context, products []timeseries.TCGProduct, batchSize int) (int, error)

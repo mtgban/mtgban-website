@@ -2,6 +2,8 @@ package timeseries
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 )
@@ -32,9 +34,14 @@ func TestLongFormLive(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 
+	if err := c.EnsurePriceDatesSchema(ctx); err != nil {
+		t.Fatalf("EnsurePriceDatesSchema: %v", err)
+	}
+
 	cleanup := func() {
 		// prices first (FK -> providers, variants), then variants, then provider.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid IN ($1,$2) OR tcgp_category_id=$3`,
 			liveSentinelUUID, liveSentinelUUIDAlt, liveSentinelCatLong)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, liveSentinelProvider)
@@ -291,8 +298,13 @@ func TestMoversLongGameScopingLive(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 
+	if err := c.EnsurePriceDatesSchema(ctx); err != nil {
+		t.Fatalf("EnsurePriceDatesSchema: %v", err)
+	}
+
 	cleanup := func() {
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, scopeSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, scopeSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid=$1 OR tcgp_category_id=$2`,
 			scopeSentinelUUID, scopeSentinelCat)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, scopeSentinelProvider)
@@ -369,6 +381,40 @@ func TestMoversLongGameScopingLive(t *testing.T) {
 	if got := movers[0]; got.MtgjsonUUID != scopeSentinelUUID || got.Current != 10.00 || got.Prior != 5.00 {
 		t.Errorf("magic mover = %+v, want uuid %s current 10 prior 5", got, scopeSentinelUUID)
 	}
+
+	// The anchors come from the days the upsert filed, each under its own game.
+	rs, err := c.db.QueryContext(ctx, `
+		SELECT category || ' ' || to_char(date, 'YYYY-MM-DD') FROM price_dates
+		 WHERE provider=$1 ORDER BY 1`, scopeSentinelProvider)
+	if err != nil {
+		t.Fatalf("read price_dates: %v", err)
+	}
+	defer rs.Close()
+	var filed []string
+	for rs.Next() {
+		var day string
+		if err := rs.Scan(&day); err != nil {
+			t.Fatalf("scan price_dates: %v", err)
+		}
+		filed = append(filed, day)
+	}
+	want := []string{
+		"1 " + magicPrior, "1 " + magicCur,
+		fmt.Sprintf("%d %s", scopeSentinelCat, tcgPrior), fmt.Sprintf("%d %s", scopeSentinelCat, tcgCur),
+	}
+	if !slices.Equal(filed, want) {
+		t.Errorf("price_dates = %v, want %v", filed, want)
+	}
+
+	// A game with no rows under the provider, and a window reaching back past
+	// a game's first day, come back empty instead of searching the provider's
+	// whole history for a day that is not there.
+	if movers, err := c.GetMoversLong(ctx, scopeSentinelProvider, 7, 0, 0, scopeSentinelCat+1); err != nil || movers != nil {
+		t.Errorf("game without rows: movers = %+v, err = %v, want none", movers, err)
+	}
+	if movers, err := c.GetMoversLong(ctx, scopeSentinelProvider, 30, 0, 0, scopeSentinelCat); err != nil || movers != nil {
+		t.Errorf("window past the first day: movers = %+v, err = %v, want none", movers, err)
+	}
 }
 
 // Sentinels for the derived-id test. 8191 is the largest category TCGBanID
@@ -394,8 +440,13 @@ func TestEnsureTCGVariantsLive(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 
+	if err := c.EnsurePriceDatesSchema(ctx); err != nil {
+		t.Fatalf("EnsurePriceDatesSchema: %v", err)
+	}
+
 	cleanup := func() {
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, derivedSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, derivedSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE tcgp_category_id IN ($1,$2)`,
 			derivedSentinelCat, derivedSentinelCatOver)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, derivedSentinelProvider)
