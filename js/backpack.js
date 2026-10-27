@@ -13,18 +13,31 @@
     var MAX = window.BAN_BACKPACK_MAX > 0 ? window.BAN_BACKPACK_MAX : 100;
     var MAX_QTY = 999;
 
-    // read drops entries without a string id and holds each qty to 1..999.
+    var CONDS = ListStorage.backpackConds;
+
+    // read drops entries without a string id, holds each qty to 1..999 and
+    // gives each a grade, NM when it has none.
     function read() {
         return ListStorage.read(KEY).filter(function (e) { return e && typeof e.id === "string" && e.id !== ""; }).map(function (e) {
             e.qty = Math.max(1, Math.min(MAX_QTY, parseInt(e.qty, 10) || 1));
+            e.cond = ListStorage.backpackCond(e);
             return e;
         });
+    }
+    // An entry is one card in one grade; key names it.
+    var key = ListStorage.backpackKey;
+    function find(list, k) {
+        for (var i = 0; i < list.length; i++) { if (key(list[i]) === k) return i; }
+        return -1;
     }
     // now stamps on the server's clock when user-state.js has one.
     function now() { return window.UserState && typeof window.UserState.now === "function" ? window.UserState.now() : Date.now(); }
     function live() { return read().filter(ListStorage.isLive); }
-    // ordered is the panel's order, newest first, which the Upload list follows.
-    function ordered() { return live().sort(function (a, b) { return (b.t || 0) - (a.t || 0); }); }
+    // ordered is the panel's order, newest first and a card's grades best
+    // first, which the Upload list follows.
+    function ordered() {
+        return live().sort(function (a, b) { return (b.t || 0) - (a.t || 0) || CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); });
+    }
     // A Clear tombstones every card, so keep as many tombstones as cards.
     function save(list) { ListStorage.save(KEY, list, MAX, MAX); }
 
@@ -49,8 +62,8 @@
 
     // ---- undo ----
 
-    // The tab's undo steps, oldest first: each holds the cards one change
-    // touched as they were before it, {id, gone: true} for one not in.
+    // The tab's undo steps, oldest first: each holds the entries one change
+    // touched as they were before it, {id, cond, gone: true} for one not in.
     function undoSteps() {
         try {
             var s = JSON.parse(sessionStorage.getItem(UNDO_KEY) || "[]");
@@ -61,13 +74,13 @@
         try { sessionStorage.setItem(UNDO_KEY, JSON.stringify(steps.slice(-UNDO_MAX))); } catch (e) {}
     }
 
-    // remember records the cards ids name in list before a change to them.
-    function remember(list, ids) {
-        var step = ids.map(function (id) {
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].id === id && !list[i].del) return JSON.parse(JSON.stringify(list[i]));
-            }
-            return { id: id, gone: true };
+    // remember records the entries keys name in list before a change to them.
+    function remember(list, keys) {
+        var step = keys.map(function (k) {
+            var i = find(list, k);
+            if (i >= 0 && !list[i].del) return JSON.parse(JSON.stringify(list[i]));
+            var cut = k.lastIndexOf("|");
+            return cut < 0 ? { id: k, gone: true } : { id: k.slice(0, cut), cond: k.slice(cut + 1), gone: true };
         });
         var steps = undoSteps();
         steps.push(step);
@@ -84,8 +97,7 @@
         var list = read();
         var t = now();
         step.forEach(function (was) {
-            var idx = -1;
-            for (var i = 0; i < list.length; i++) { if (list[i].id === was.id) { idx = i; break; } }
+            var idx = find(list, key(was));
             if (was.gone) {
                 if (idx >= 0 && !list[idx].del) { list[idx].del = t; list[idx].m = t; }
                 return;
@@ -100,14 +112,13 @@
 
     function toastCeiling() { toast(MAX_QTY + " copies is the most for one product"); }
 
-    // add puts one more copy of the row's card in; a removed card comes back
-    // as one copy.
+    // add puts one more NM copy of the row's card in; a removed card comes
+    // back as one copy.
     function add(data) {
         if (!data || !data.id) return false;
         var list = read();
         var t = now();
-        var idx = -1;
-        for (var i = 0; i < list.length; i++) { if (list[i].id === data.id) { idx = i; break; } }
+        var idx = find(list, data.id);
         if (idx >= 0 && !list[idx].del) {
             var next = Math.min(MAX_QTY, list[idx].qty + 1);
             if (next === list[idx].qty) { toastCeiling(); return false; }
@@ -121,40 +132,41 @@
             list.unshift({
                 id: data.id, name: data.name || "", edition: data.edition || "", set: data.set || "",
                 number: data.number || "", finishTag: data.finishTag || "", finishClass: data.finishClass || "",
-                img: data.img || "", cw: !!data.cw, qty: 1, t: t, m: t
+                img: data.img || "", cw: !!data.cw, cond: "NM", qty: 1, t: t, m: t
             });
         }
         save(list);
         return true;
     }
 
-    function setQty(id, qty) {
+    // setQty sets the copies of the entry k names; below one removes it.
+    function setQty(k, qty) {
         var list = read();
         var t = now();
         for (var i = 0; i < list.length; i++) {
-            if (list[i].id !== id || list[i].del) continue;
+            if (key(list[i]) !== k || list[i].del) continue;
             var next = Math.min(MAX_QTY, qty);
             if (qty >= 1 && next === list[i].qty) { if (qty > MAX_QTY) toastCeiling(); return; }
-            remember(list, [id]);
+            remember(list, [k]);
             if (qty < 1) { list[i].del = t; list[i].m = t; }
             else { list[i].qty = next; list[i].m = t; }
         }
         save(list);
     }
 
-    function remove(id) { setQty(id, 0); }
+    function remove(k) { setQty(k, 0); }
 
-    // take takes counts[id] copies of each card out as one undo step, the
-    // card itself once none is left, and says how many copies went.
+    // take takes counts[key] copies of each entry out as one undo step, the
+    // entry itself once none is left, and says how many copies went.
     function take(counts) {
         var list = read();
         var t = now();
-        var hit = list.filter(function (e) { return !e.del && counts[e.id] > 0; });
+        var hit = list.filter(function (e) { return !e.del && counts[key(e)] > 0; });
         if (!hit.length) return 0;
-        remember(list, hit.map(function (e) { return e.id; }));
+        remember(list, hit.map(key));
         var copies = 0;
         hit.forEach(function (e) {
-            var n = Math.min(e.qty, counts[e.id]);
+            var n = Math.min(e.qty, counts[key(e)]);
             copies += n;
             if (n === e.qty) e.del = t; else e.qty -= n;
             e.m = t;
@@ -163,13 +175,13 @@
         return copies;
     }
 
-    // clear removes the cards ids names, or every card without it.
-    function clear(ids) {
+    // clear removes the entries keys names, or every entry without it.
+    function clear(keys) {
         var list = read();
         var t = now();
-        var gone = list.filter(function (e) { return !e.del && (!ids || ids.indexOf(e.id) !== -1); });
+        var gone = list.filter(function (e) { return !e.del && (!keys || keys.indexOf(key(e)) !== -1); });
         if (!gone.length) return;
-        remember(list, gone.map(function (e) { return e.id; }));
+        remember(list, gone.map(key));
         gone.forEach(function (e) { e.del = t; e.m = t; });
         save(list);
     }
@@ -177,11 +189,11 @@
     function emptyAfter() { try { return localStorage.getItem(EMPTY_AFTER_KEY) === "1"; } catch (e) { return false; } }
     function setEmptyAfter(on) { try { localStorage.setItem(EMPTY_AFTER_KEY, on ? "1" : "0"); } catch (e) {} }
 
-    // The ids a send asked to empty after, held in this tab until Upload
-    // shows their results; every send replaces or removes them.
-    function setPending(ids) {
+    // The entries a send asked to empty after, by key, held in this tab
+    // until Upload shows their results; every send replaces or removes them.
+    function setPending(keys) {
         try {
-            if (ids) sessionStorage.setItem(PENDING_KEY, JSON.stringify(ids));
+            if (keys) sessionStorage.setItem(PENDING_KEY, JSON.stringify(keys));
             else sessionStorage.removeItem(PENDING_KEY);
         } catch (e) {}
     }
@@ -221,7 +233,7 @@
     function send(mode) {
         if (!canUpload() || !live().length) return;
         var form = sendForm(mode);
-        setPending(emptyAfter() ? ordered().map(function (e) { return e.id; }) : null);
+        setPending(emptyAfter() ? ordered().map(key) : null);
         document.body.appendChild(form);
         form.submit();
     }
@@ -233,7 +245,9 @@
         var ban = window.BAN_BACKPACK;
         if (!ban || !("priced" in ban)) return;
         var pending = takePending();
-        if (Array.isArray(pending) && Array.isArray(ban.priced) && pending.join(",") === ban.priced.join(",")) clear(pending);
+        if (!Array.isArray(pending) || !Array.isArray(ban.priced)) return;
+        var ids = pending.map(function (k) { return String(k).split("|")[0]; });
+        if (ids.join(",") === ban.priced.join(",")) clear(pending);
     }
 
     // ---- result rows and the navbar ----
@@ -247,21 +261,25 @@
         b.querySelectorAll(".pack-btn-label, .qi-label").forEach(function (n) { n.textContent = s; });
     }
 
+    // markRows marks each card's buttons, which add and take NM copies: the
+    // count is the NM copies, and a card held only in other grades shows no
+    // minus and words the add for NM.
     function markRows() {
-        var by = {};
-        live().forEach(function (e) { by[e.id] = e.qty; });
+        var nm = {}, other = {};
+        live().forEach(function (e) { if (e.cond === "NM") nm[e.id] = e.qty; else other[e.id] = true; });
         document.querySelectorAll(".pack-btn").forEach(function (b) {
-            var qty = by[b.getAttribute("data-card-id")];
-            b.classList.toggle("active", !!qty);
-            describe(b, qty ? "Add another copy" : "Add to backpack");
+            var id = b.getAttribute("data-card-id");
+            var qty = nm[id], grade = other[id] ? " NM" : "";
+            b.classList.toggle("active", !!(qty || other[id]));
+            describe(b, qty ? "Add another" + grade + " copy" : other[id] ? "Add an NM copy" : "Add to backpack");
             var span = b.querySelector(".pack-btn-count");
             if (span) { span.textContent = qty ? String(qty) : ""; span.hidden = !qty; }
         });
-        // The minus shows only for a card in the backpack.
         document.querySelectorAll(".pack-minus-btn").forEach(function (b) {
-            var qty = by[b.getAttribute("data-card-id")];
+            var id = b.getAttribute("data-card-id");
+            var qty = nm[id];
             b.hidden = !qty;
-            describe(b, qty > 1 ? "Remove one copy" : "Remove from backpack");
+            describe(b, qty > 1 ? "Remove one" + (other[id] ? " NM" : "") + " copy" : other[id] ? "Remove the NM copy" : "Remove from backpack");
         });
     }
 
@@ -284,12 +302,12 @@
         if (add(data)) render();
     };
 
-    // takeFromBackpack takes one copy of the button's card out, the last one
-    // with the card. Taking the last hides the minus, so a focused minus hands
-    // focus to the add button beside it.
+    // takeFromBackpack takes one NM copy of the button's card out, the last
+    // one with the entry. Taking the last hides the minus, so a focused minus
+    // hands focus to the add button beside it.
     window.takeFromBackpack = function (btn) {
         var id = btn.getAttribute("data-card-id");
-        var e = live().filter(function (x) { return x.id === id; })[0];
+        var e = live().filter(function (x) { return key(x) === id; })[0];
         if (!e) return;
         var focused = document.activeElement === btn;
         setQty(id, e.qty - 1);
@@ -318,7 +336,7 @@
     // a card in the backpack.
     function markSections() {
         var by = {};
-        live().forEach(function (e) { by[e.id] = true; });
+        live().forEach(function (e) { by[key(e)] = true; });
         document.querySelectorAll(".pack-take-btn").forEach(function (b) {
             var section = b.closest(".opt-store");
             b.hidden = !section || !Object.keys(picked(section)).some(function (id) { return by[id]; });
@@ -463,12 +481,12 @@
         var minus = text("button", "backpack-minus", "−");
         minus.setAttribute("type", "button");
         minus.setAttribute("aria-label", (e.qty || 1) > 1 ? "One fewer" : "Remove");
-        minus.addEventListener("click", function () { setQty(e.id, (e.qty || 1) - 1); render(); });
+        minus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) - 1); render(); });
         var qty = text("span", "backpack-qty", String(e.qty || 1));
         var plus = text("button", "backpack-plus", "+");
         plus.setAttribute("type", "button");
         plus.setAttribute("aria-label", "One more");
-        plus.addEventListener("click", function () { setQty(e.id, (e.qty || 1) + 1); render(); });
+        plus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) + 1); render(); });
         ctl.append(minus, qty, plus);
 
         r.append(art, body, ctl);

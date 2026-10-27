@@ -320,6 +320,90 @@ describe('the minus button', () => {
     });
 });
 
+describe('grades', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty]);
+
+    test('an entry stored without a grade reads as NM, keyed by the bare id', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', cond: 'bogus', qty: 1, t: 1, m: 1 }] });
+        expect(p.window.Backpack.read().map((e) => e.cond)).toEqual(['NM', 'NM']);
+        p.window.Backpack.setQty('uuid-1', 3);
+        expect(p.stored()[0].qty).toBe(3);
+    });
+
+    test('the same card in two grades is two entries', () => {
+        const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 1, t: 1, m: 1 }] });
+        p.window.Backpack.setQty('uuid-1|SP', 5);
+        expect(live(p)).toEqual([['uuid-1', 'SP', 5], ['uuid-1', 'NM', 1]]);
+        p.window.Backpack.remove('uuid-1');
+        expect(live(p)).toEqual([['uuid-1', 'SP', 5]]);
+        expect(p.window.Backpack.count()).toEqual({ copies: 5, cards: 1 });
+    });
+
+    test('the panel lists a card\'s grades best first', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A HP', cond: 'HP', qty: 1, t: 5, m: 5 }, { id: 'uuid-2', name: 'B', qty: 1, t: 9, m: 9 }, { id: 'uuid-1', name: 'A SP', cond: 'SP', qty: 1, t: 5, m: 5 }] });
+        p.nav.click();
+        const rows = ids['backpack-panel'].querySelectorAll('.backpack-row-name').map((n) => n.textContent);
+        expect(rows).toEqual(['B', 'A SP', 'A HP']);
+        const form = p.window.Backpack.sendForm('retail');
+        expect(form.children.filter((i) => i.name === 'hashes').map((i) => i.value)).toEqual(['uuid-2', 'uuid-1', 'uuid-1']);
+    });
+
+    test('the search add puts an NM copy in beside another grade', () => {
+        const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }] });
+        p.window.addToBackpack(p.rows[0]);
+        p.window.addToBackpack(p.rows[0]);
+        expect(live(p).sort()).toEqual([['uuid-1', 'NM', 2], ['uuid-1', 'SP', 2]]);
+    });
+
+    test('a card held only in another grade shows an active add with no count and no minus', () => {
+        const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }] });
+        expect(p.rows[0].classes.has('active')).toBe(true);
+        expect(p.rows[0].children[0].hidden).toBe(true);
+        expect(p.rows[0].getAttribute('title')).toBe('Add an NM copy');
+        expect(p.minus[0].hidden).toBe(true);
+    });
+
+    test('beside another grade the buttons count and name NM copies', () => {
+        const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 3, t: 1, m: 1 }] });
+        expect(p.rows[0].children[0].textContent).toBe('3');
+        expect(p.rows[0].getAttribute('title')).toBe('Add another NM copy');
+        expect(p.minus[0].getAttribute('title')).toBe('Remove one NM copy');
+        p.window.Backpack.setQty('uuid-1', 1);
+        p.window.renderBackpack();
+        expect(p.minus[0].getAttribute('title')).toBe('Remove the NM copy');
+    });
+
+    test('the search minus takes NM copies only', () => {
+        const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 1, t: 1, m: 1 }] });
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(live(p)).toEqual([['uuid-1', 'SP', 2]]);
+        p.window.takeFromBackpack(p.minus[0]);
+        expect(live(p)).toEqual([['uuid-1', 'SP', 2]]);
+        expect(p.minus[0].hidden).toBe(true);
+    });
+
+    test('undo puts back a removed grade and takes out an added one', () => {
+        const p = page({ store: [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }] });
+        p.window.addToBackpack(p.rows[0]);
+        p.window.Backpack.remove('uuid-1|SP');
+        p.window.Backpack.undo();
+        expect(live(p).sort()).toEqual([['uuid-1', 'NM', 1], ['uuid-1', 'SP', 2]]);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([['uuid-1', 'SP', 2]]);
+    });
+
+    test('a send to empty after records keys, and Upload clears just those', () => {
+        const store = [{ id: 'uuid-1', cond: 'SP', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', qty: 1, t: 1, m: 1 }, { id: 'uuid-2', qty: 1, t: 2, m: 2 }];
+        const p = page({ store, emptyAfter: '1' });
+        p.nav.click();
+        ids['backpack-send-retail'].click();
+        expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1', 'uuid-1|SP']);
+        const later = [...store, { id: 'uuid-1', cond: 'HP', qty: 1, t: 3, m: 3 }];
+        const u = page({ store: later, pending: p.pendingIds(), ban: { canUpload: true, priced: ['uuid-2', 'uuid-1', 'uuid-1'] } });
+        expect(live(u)).toEqual([['uuid-1', 'HP', 1]]);
+    });
+});
+
 describe('the panel', () => {
     function open(p) { p.nav.click(); return ids['backpack-panel']; }
 

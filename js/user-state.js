@@ -323,7 +323,7 @@
         if (!serverState) return Promise.resolve(false);
         var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
         var mergedRecents = mergeList(localRecents(), serverState.recents || [], recentId, 15);
-        var mergedPack = mergeList(localBackpack(), serverState.backpack || [], function(e) { return e.id; }, BACKPACK_MAX, BACKPACK_MAX);
+        var mergedPack = mergeList(localBackpack(), serverState.backpack || [], ListStorage.backpackKey, BACKPACK_MAX, BACKPACK_MAX);
         var mergedPrefs = mergePrefs(buildPreferences(), serverState.preferences || {});
         // Must run before the write below: it reads the pre-merge local copies.
         mergedRecents = keepRecentArt(mergedRecents);
@@ -357,7 +357,7 @@
                 writeFP('recents', JSON.stringify(trimmedRecents));
             } else { schedule('recents'); synced = false; }
             var trimmedPack = mergedPack.map(trimBackpack);
-            if (sameList(trimmedPack, (serverState.backpack || []).map(trimBackpack), function(e) { return e.id; })) {
+            if (sameList(trimmedPack, (serverState.backpack || []).map(trimBackpack), ListStorage.backpackKey)) {
                 writeFP('backpack', JSON.stringify(trimmedPack));
             } else { schedule('backpack'); synced = false; }
             if (canonJSON(mergedPrefs) === canonJSON(serverState.preferences || {})) {
@@ -422,7 +422,7 @@
         }
         if (newer(favs, server.favorites, function(f) { return f.id; })) return true;
         if (newer(recents, server.recents, function(s) { return ('' + (s.q || '')).toLowerCase(); })) return true;
-        if (newer(pack || [], server.backpack, function(e) { return e.id; })) return true;
+        if (newer(pack || [], server.backpack, ListStorage.backpackKey)) return true;
         var sp = server.preferences || {};
         var keys = Object.keys(prefs);
         for (var k = 0; k < keys.length; k++) { if (String(sp[keys[k]]) !== String(prefs[keys[k]])) return true; }
@@ -622,7 +622,7 @@
     // The backpack syncs identity and the count; prices stay on the page.
     function trimBackpack(e) {
         return {
-            id: e.id, qty: e.qty, t: e.t, m: e.m, del: e.del,
+            id: e.id, cond: e.cond, qty: e.qty, t: e.t, m: e.m, del: e.del,
             name: e.name, edition: e.edition, set: e.set, number: e.number,
             finishTag: e.finishTag, finishClass: e.finishClass, img: e.img, cw: e.cw
         };
