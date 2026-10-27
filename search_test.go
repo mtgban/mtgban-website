@@ -358,3 +358,19 @@ func TestSearchSurvivesAPanickingScan(t *testing.T) {
 		})
 	}
 }
+
+// A search from one of the site's own pages is logged by its path alone, on
+// either apex: the shared favorites page's query is the list's share id.
+func TestRefererSourceKeepsTheSiteQueryOut(t *testing.T) {
+	for _, tc := range []struct{ referer, want string }{
+		{"https://mtgban.com/search/shared?id=abc", "/search/shared"},
+		{"https://mtg.ban.cards/search/shared?id=abc", "/search/shared"},
+		{"https://example.com/deck?id=abc", "<https://example.com/deck?id=abc>"},
+		{"https://mtgban.com.example.com/x?id=abc", "<https://mtgban.com.example.com/x?id=abc>"},
+		{"https://mtgban.com,evil.example/x?id=abc", "<https://mtgban.com,evil.example/x?id=abc>"},
+	} {
+		if got := refererSource(tc.referer); got != tc.want {
+			t.Errorf("refererSource(%q) = %q, want %q", tc.referer, got, tc.want)
+		}
+	}
+}
