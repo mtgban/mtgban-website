@@ -674,10 +674,10 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	}
 
 	miscSearchOpts := readSearchMiscOpts(r)
-	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	// The export links carry the sticky bar as its own parameter rather
 	// than spliced into the path, so the csv holds the rows the page did.
-	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(r.FormValue("scope"))))
+	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(r.FormValue("scope"))))
 	if isSealed {
 		config.SearchMode = "sealed"
 		// v2 keeps an id the request asks for

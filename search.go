@@ -204,11 +204,11 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // dropped, because pinning a name is what the main bar is for. A bar
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
-func scopeFilters(b *mtgmatcher.Backend, scope string) []FilterElem {
+func scopeFilters(ds *datastore, scope string) []FilterElem {
 	if scope == "" {
 		return nil
 	}
-	return parseSearchOptionsNG(b, scope, nil, nil, nil).CardFilters
+	return parseSearchQuery(ds, scope, nil, nil, nil).CardFilters
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
@@ -555,7 +555,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// The pinned bar lives in the url alone, so a page opened without it
 	// starts with nothing pinned.
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(b, scope)
+	pinned := scopeFilters(ds, scope)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -643,7 +643,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
-	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
@@ -796,8 +796,8 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := append(readSearchMiscOpts(page), "oembed")
 
-	config := parseSearchOptionsNG(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, scopeFilters(b, strings.TrimSpace(page.FormValue("scope"))))
+	config := parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(page.FormValue("scope"))))
 	if page.URL.Path == "/sealed" {
 		config.SearchMode = "sealed"
 	}

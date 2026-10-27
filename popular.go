@@ -200,7 +200,7 @@ func curatedPopularSearches(ds *datastore) []PopularSearch {
 		// thumbnail; fall back to the query's results when unresolved or when
 		// its images are already used by another tile.
 		if q.Card != "" {
-			if ids, err := searchAndFilter(ds, parseSearchOptionsNG(ds.backend, q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
+			if ids, err := searchAndFilter(ds, parseSearchQuery(ds, q.Card, nil, nil, nil)); err == nil && len(ids) > 0 {
 				candidateIDs = append(append([]string{}, ids...), uuids...)
 			}
 		}
@@ -252,7 +252,7 @@ func firstUnusedPopularCard(ids []string, usedImages map[string]struct{}, resolv
 // tile wants them: searchAndFilter leaves sort:retail to the caller, since
 // that needs live prices.
 func popularTopCards(ds *datastore, query string) []string {
-	config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
+	config := parseSearchQuery(ds, query, nil, nil, nil)
 	uuids, err := searchAndFilter(ds, config)
 	if err != nil || len(uuids) == 0 {
 		return nil
