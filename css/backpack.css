@@ -164,6 +164,18 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 
 .backpack-qty { min-width: 1.5em; text-align: center; font-weight: 600; }
 
+.backpack-cond {
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    border-radius: 0.4em;
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 0.2em 0.25em;
+    /* sized for a grade, not the widest "Also as" option */
+    width: 4.5em;
+}
+
 .backpack-footer {
     padding: 0.75em 1.25em 1.25em;
     border-top: 1px solid var(--border-subtle);
@@ -241,3 +253,6 @@ body.mobile .backpack-panel .m-drawer-handle span {
 }
 
 body.mobile.light-theme .backpack-panel .m-drawer-handle span { background: rgba(0, 0, 0, 0.2); }
+
+/* iOS zooms into a select under 16px */
+body.mobile .backpack-cond { font-size: 16px; }

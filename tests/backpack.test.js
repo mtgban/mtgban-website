@@ -404,6 +404,107 @@ describe('grades', () => {
     });
 });
 
+describe('the condition dropdown', () => {
+    function open(p) { p.nav.click(); return ids['backpack-panel']; }
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty]).sort();
+    const selects = (panel) => panel.querySelectorAll('.backpack-cond');
+    const pick = (sel, v) => { sel.value = v; (sel.listeners.change || []).forEach((fn) => fn()); };
+    const choices = (sel) => sel.children.filter((o) => o.tag === 'option').map((o) => o.value);
+    const adds = (sel) => sel.children.filter((o) => o.tag === 'optgroup').flatMap((g) => g.children.map((o) => [o.value, o.textContent]));
+
+    test('offers every grade, NM picked, and to add the card in the others', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        const sel = selects(open(p))[0];
+        expect(sel.getAttribute('aria-label')).toBe('Condition');
+        expect(sel.value).toBe('NM');
+        expect(choices(sel)).toEqual(['NM', 'SP', 'MP', 'HP', 'PO']);
+        expect(sel.children[0].getAttribute('title')).toBe('Near Mint');
+        expect(sel.children.find((o) => o.tag === 'optgroup').getAttribute('label')).toBe('Add another condition');
+        expect(adds(sel)).toEqual([['+SP', 'Also as SP'], ['+MP', 'Also as MP'], ['+HP', 'Also as HP'], ['+PO', 'Also as PO']]);
+    });
+
+    test('a grade another entry of the card holds is not offered', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', name: 'A', cond: 'MP', qty: 1, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', cond: 'SP', qty: 1, t: 0, m: 0 }] });
+        const [nm, mp] = selects(open(p));
+        expect(mp.value).toBe('MP');
+        expect(choices(nm)).toEqual(['NM', 'SP', 'HP', 'PO']);
+        expect(choices(mp)).toEqual(['SP', 'MP', 'HP', 'PO']);
+        expect(adds(nm).map((a) => a[0])).toEqual(['+SP', '+HP', '+PO']);
+    });
+
+    test('with every grade held there is nothing to add', () => {
+        const store = ['NM', 'SP', 'MP', 'HP', 'PO'].map((cond) => ({ id: 'uuid-1', name: 'A', cond, qty: 1, t: 1, m: 1 }));
+        const sel = selects(open(page({ store })))[0];
+        expect(choices(sel)).toEqual(['NM']);
+        expect(adds(sel)).toEqual([]);
+    });
+
+    test('picking a grade moves the entry with its copies and place, and keeps focus on it', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 3, t: 5, m: 5 }, { id: 'uuid-2', name: 'B', qty: 1, t: 1, m: 1 }] });
+        const panel = open(p);
+        pick(selects(panel)[0], 'HP');
+        expect(live(p)).toEqual([['uuid-1', 'HP', 3], ['uuid-2', 'NM', 1]]);
+        expect(p.stored().find((e) => e.id === 'uuid-1' && !e.del).t).toBe(5);
+        expect(p.stored().find((e) => e.id === 'uuid-1' && e.del).cond).toBe('NM');
+        expect(panel.querySelectorAll('.backpack-row-name').map((n) => n.textContent)).toEqual(['A', 'B']);
+        expect(selects(panel)[0].value).toBe('HP');
+        expect(p.document.activeElement).toBe(selects(panel)[0]);
+        expect(p.rows[0].classes.has('active')).toBe(true);
+        expect(p.minus[0].hidden).toBe(true);
+    });
+
+    test('picking an add puts one copy in that grade beside the entry', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 3, t: 5, m: 5 }, { id: 'uuid-2', name: 'B', qty: 1, t: 9, m: 9 }] });
+        const panel = open(p);
+        pick(selects(panel)[1], '+MP');
+        expect(live(p)).toEqual([['uuid-1', 'MP', 1], ['uuid-1', 'NM', 3], ['uuid-2', 'NM', 1]]);
+        const sels = selects(panel);
+        expect(sels.map((x) => x.value)).toEqual(['NM', 'NM', 'MP']);
+        expect(p.document.activeElement).toBe(sels[1]);
+        expect(choices(sels[1])).toEqual(['NM', 'SP', 'HP', 'PO']);
+        expect(ids['backpack-count'].textContent).toBe('5 copies of 3 products');
+    });
+
+    test('an add into a full backpack toasts and writes nothing', () => {
+        const store = [];
+        for (let i = 0; i < 100; i++) store.push({ id: i === 0 ? 'uuid-1' : 'c' + i, name: 'c', qty: 1, t: i, m: i });
+        const p = page({ store });
+        const before = p.m.mtgban_backpack;
+        expect(p.window.Backpack.addCond('uuid-1', 'SP')).toBe(false);
+        expect(p.m.mtgban_backpack).toBe(before);
+        expect(ids['backpack-toast'].textContent).toBe('Backpack is full (100 products)');
+    });
+
+    test('NM to SP and back leaves one live NM entry, and undo walks it back', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        p.window.Backpack.setCond('uuid-1', 'SP');
+        p.window.Backpack.setCond('uuid-1|SP', 'NM');
+        expect(live(p)).toEqual([['uuid-1', 'NM', 2]]);
+        expect(p.stored().filter((e) => e.cond === 'NM')).toHaveLength(1);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([['uuid-1', 'SP', 2]]);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([['uuid-1', 'NM', 2]]);
+        expect(p.window.Backpack.undo()).toBe(false);
+    });
+
+    test('moving into a grade the card already holds adds the copies to it', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', cond: 'SP', qty: 998, t: 1, m: 1 }] });
+        p.window.Backpack.setCond('uuid-1', 'SP');
+        expect(live(p)).toEqual([['uuid-1', 'SP', 999]]);
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([['uuid-1', 'NM', 2], ['uuid-1', 'SP', 998]]);
+    });
+
+    test('Tab moves through the dropdown inside the panel', () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }] });
+        const sel = selects(open(p))[0];
+        sel.focus();
+        expect(p.key('Tab')).toBe(false);
+        expect(p.key('Tab', true)).toBe(false);
+    });
+});
+
 describe('the panel', () => {
     function open(p) { p.nav.click(); return ids['backpack-panel']; }
 

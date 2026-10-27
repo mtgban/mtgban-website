@@ -156,6 +156,52 @@
 
     function remove(k) { setQty(k, 0); }
 
+    // setCond moves the entry k names to grade cond, keeping its copies and
+    // its place; when the card already holds that grade the copies join it.
+    function setCond(k, cond) {
+        var list = read();
+        var i = find(list, k);
+        if (i < 0 || list[i].del || list[i].cond === cond) return;
+        var e = list[i];
+        var to = key({ id: e.id, cond: cond });
+        var j = find(list, to);
+        var t = now();
+        remember(list, [k, to]);
+        if (j >= 0 && !list[j].del) {
+            list[j].qty = Math.min(MAX_QTY, list[j].qty + e.qty);
+            list[j].m = t;
+        } else {
+            var moved = JSON.parse(JSON.stringify(e));
+            moved.cond = cond;
+            moved.m = t;
+            if (j >= 0) list.splice(j, 1);
+            list.unshift(moved);
+        }
+        e.del = t; e.m = t;
+        save(list);
+    }
+
+    // addCond adds one copy of the card k names in grade cond, a grade the
+    // card does not hold yet.
+    function addCond(k, cond) {
+        var list = read();
+        var i = find(list, k);
+        if (i < 0 || list[i].del) return false;
+        var to = key({ id: list[i].id, cond: cond });
+        var j = find(list, to);
+        if (j >= 0 && !list[j].del) return false;
+        if (list.filter(ListStorage.isLive).length >= MAX) { toast("Backpack is full (" + MAX + " products)"); return false; }
+        remember(list, [to]);
+        var dup = JSON.parse(JSON.stringify(list[i]));
+        dup.cond = cond;
+        dup.qty = 1;
+        dup.m = now();
+        if (j >= 0) list.splice(j, 1);
+        list.unshift(dup);
+        save(list);
+        return true;
+    }
+
     // take takes counts[key] copies of each entry out as one undo step, the
     // entry itself once none is left, and says how many copies went.
     function take(counts) {
@@ -459,9 +505,54 @@
         document.body.append(overlay, panel);
     }
 
-    function row(e) {
+    var COND_NAMES = { NM: "Near Mint", SP: "Slightly Played", MP: "Moderately Played", HP: "Heavily Played", PO: "Poor" };
+
+    function option(value, label, title) {
+        var o = text("option", null, label);
+        o.value = value;
+        o.setAttribute("title", title);
+        return o;
+    }
+
+    // condSelect moves the entry to a grade, or adds the card in one more,
+    // never offering the grades its other entries hold.
+    function condSelect(e, held) {
+        var sel = text("select", "backpack-cond");
+        sel.setAttribute("aria-label", "Condition");
+        CONDS.forEach(function (c) {
+            if (c === e.cond || held.indexOf(c) === -1) sel.appendChild(option(c, c, COND_NAMES[c]));
+        });
+        var free = CONDS.filter(function (c) { return c !== e.cond && held.indexOf(c) === -1; });
+        if (free.length) {
+            var group = text("optgroup");
+            group.setAttribute("label", "Add another condition");
+            free.forEach(function (c) { group.appendChild(option("+" + c, "Also as " + c, COND_NAMES[c])); });
+            sel.appendChild(group);
+        }
+        sel.value = e.cond;
+        sel.addEventListener("change", function () {
+            var v = sel.value;
+            sel.value = e.cond;
+            var adding = v.charAt(0) === "+";
+            if (adding) addCond(key(e), v.slice(1)); else setCond(key(e), v);
+            render();
+            // The list was rebuilt; keep the keyboard on this entry's grade.
+            focusCond(adding ? key(e) : key({ id: e.id, cond: v }));
+        });
+        return sel;
+    }
+
+    function focusCond(k) {
+        Array.prototype.forEach.call(listEl.children, function (r) {
+            var sel = r.getAttribute("data-key") === k && r.querySelector(".backpack-cond");
+            if (sel) sel.focus();
+        });
+    }
+
+    function row(e, held) {
         var r = text("div", "backpack-row");
         r.setAttribute("data-card-id", e.id);
+        r.setAttribute("data-key", key(e));
         var art = text("div", "backpack-row-art" + (e.cw ? " blurred" : ""));
         if (e.img) {
             var img = document.createElement("img");
@@ -487,7 +578,7 @@
         plus.setAttribute("type", "button");
         plus.setAttribute("aria-label", "One more");
         plus.addEventListener("click", function () { setQty(key(e), (e.qty || 1) + 1); render(); });
-        ctl.append(minus, qty, plus);
+        ctl.append(condSelect(e, held), minus, qty, plus);
 
         r.append(art, body, ctl);
         return r;
@@ -501,7 +592,11 @@
         if (!panel) return;
         var entries = ordered();
         while (listEl.children.length) listEl.children[0].remove();
-        entries.forEach(function (e) { listEl.appendChild(row(e)); });
+        var grades = {};
+        entries.forEach(function (e) { (grades[e.id] = grades[e.id] || []).push(e.cond); });
+        entries.forEach(function (e) {
+            listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; })));
+        });
         var c = count();
         countEl.textContent = countLine(c);
         emptyEl.hidden = entries.length > 0;
@@ -539,7 +634,7 @@
 
     // trapTab keeps Tab and Shift+Tab cycling inside the open panel.
     function trapTab(ev) {
-        var items = Array.prototype.filter.call(panel.querySelectorAll("button, input, [tabindex]"), function (n) {
+        var items = Array.prototype.filter.call(panel.querySelectorAll("button, input, select, [tabindex]"), function (n) {
             if (n.disabled || n.closest("#ban-confirm-dialog")) return false;
             for (var a = n; a && a !== panel.parentNode; a = a.parentNode) if (a.hidden) return false;
             return true;
@@ -564,7 +659,7 @@
         if (panel && panel.classList.contains("open")) close(); else open();
     }
 
-    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
+    window.Backpack = { read: read, add: add, setQty: setQty, remove: remove, setCond: setCond, addCond: addCond, take: take, clear: clear, undo: undo, sendForm: sendForm, count: count, open: open, close: close };
 
     function init() {
         var nav = document.getElementById("nav-backpack");
