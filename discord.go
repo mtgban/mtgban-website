@@ -109,8 +109,8 @@ func cleanupDiscord() {
 	dg.Close()
 }
 
-// This function will be called every time the bot is invited to a discord
-// server and tries to join it.
+// This function will be called every time the bot joins a discord server,
+// and on every connect for each server it is already in.
 func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 	// discordgo runs each handler on a bare goroutine, where a panic would
 	// end the process; recovered, it costs only this event.
@@ -119,8 +119,19 @@ func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 	// Set a "is playing" status
 	s.UpdateGameStatus(0, "http://mtgban.com")
 
+	if !joinedRecently(gc.Guild, time.Now()) {
+		// An install made while the bot was offline only shows up here.
+		log.Printf("discord: connected to %s (%s), joined %s", gc.Guild.Name, gc.Guild.ID, gc.Guild.JoinedAt.Format(time.DateOnly))
+		return
+	}
 	msg := fmt.Sprintf("New bot install at %s (%s)", gc.Guild.Name, gc.Guild.ID)
 	UserNotify("bot", msg, true)
+}
+
+// joinedRecently reports whether the bot joined the guild just now, rather
+// than being told again about a guild it joined before this connect.
+func joinedRecently(guild *discordgo.Guild, now time.Time) bool {
+	return now.Sub(guild.JoinedAt) < time.Minute
 }
 
 var filteredEditions = []string{
