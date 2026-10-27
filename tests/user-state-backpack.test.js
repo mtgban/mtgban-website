@@ -66,8 +66,8 @@ test('a newer add beats an older removal', async () => {
 });
 
 test('the pushed entries carry only the synced fields', async () => {
-    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { sellPrice: 5, query: 'x' })], []);
-    expect(Object.keys(pushed[0]).sort()).toEqual(['cw', 'edition', 'finishClass', 'finishTag', 'id', 'img', 'm', 'name', 'number', 'qty', 'set', 't'].sort());
+    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { cond: 'SP', sellPrice: 5, query: 'x' })], []);
+    expect(Object.keys(pushed[0]).sort()).toEqual(['cond', 'cw', 'edition', 'finishClass', 'finishTag', 'id', 'img', 'm', 'name', 'number', 'qty', 'set', 't'].sort());
     expect(pushed[0].sellPrice).toBeUndefined();
 });
 
@@ -127,4 +127,16 @@ test('a backpack built signed out survives the first sign-in', async () => {
     const { pushed, stored } = await reconcileBackpack([entry('a', 2, now - 5)], [], true);
     expect(stored.filter((e) => !e.del).map((e) => [e.id, e.qty])).toEqual([['a', 2]]);
     expect(pushed.filter((e) => !e.del).map((e) => e.id)).toEqual(['a']);
+});
+
+test('the merge keeps a card\'s grades apart', async () => {
+    const { pushed } = await reconcileBackpack(
+        [entry('a', 3, 10, { cond: 'SP' }), entry('a', 1, 4)],
+        [entry('a', 2, 5, { cond: 'SP' }), entry('a', 5, 7, { cond: 'HP' })]);
+    expect(pushed.filter((e) => !e.del).map((e) => [e.cond || 'NM', e.qty]).sort()).toEqual([['HP', 5], ['NM', 1], ['SP', 3]]);
+});
+
+test('an entry without a grade merges with the NM one', async () => {
+    const { pushed } = await reconcileBackpack([entry('a', 3, 10, { cond: 'NM' })], [entry('a', 2, 5)]);
+    expect(pushed.map((e) => [e.id, e.qty])).toEqual([['a', 3]]);
 });

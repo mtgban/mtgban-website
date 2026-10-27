@@ -47,7 +47,25 @@ var ListStorage = (function() {
         return pinned.concat(unpinned);
     }
 
+    // The grades a backpack entry can be in, best first.
+    var BACKPACK_CONDS = ["NM", "SP", "MP", "HP", "PO"];
+
+    // backpackCond is an entry's grade, NM when it has none it can use.
+    function backpackCond(e) {
+        return BACKPACK_CONDS.indexOf(e.cond) > 0 ? e.cond : "NM";
+    }
+
+    // backpackKey names a backpack entry by card and grade: the bare card
+    // id for NM, so an entry stored without a grade is the NM one.
+    function backpackKey(e) {
+        var c = backpackCond(e);
+        return c === "NM" || e.id == null ? e.id : e.id + "|" + c;
+    }
+
     return {
+        backpackConds: BACKPACK_CONDS,
+        backpackCond: backpackCond,
+        backpackKey: backpackKey,
         isLive: isLive,
         mtime: mtime,
         read: read,
