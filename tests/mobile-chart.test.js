@@ -85,6 +85,7 @@ async function openDrawer(answer, cookie = '') {
         loading: nodes['m-chart-loading'],
         select: nodes['m-chart-range'],
         rangeFailed: nodes['m-chart-range-failed'],
+        busy: nodes['m-chart-busy'],
         legend: nodes['m-chart-legend'],
     };
 }
@@ -262,6 +263,41 @@ test('an empty wider answer is a failed widening too', async () => {
     expect(charts[0].data.labels).toEqual(days(180));
     expect(rangeFailed.hidden).toBe(false);
     expect(select.value).toBe('180');
+});
+
+// openHeld opens the drawer with the prefetched ceiling held back until
+// release(), which answers it with reply(range).
+async function openHeld(reply) {
+    let release;
+    const held = new Promise((done) => { release = done; });
+    const drawer = await openDrawer((range) => range === 180 ? daily(range) : held.then(() => reply(range)));
+    drawer.release = async () => {
+        release();
+        await new Promise((done) => setTimeout(done, 0));
+    };
+    return drawer;
+}
+
+test('the spinner shows while a wider range loads, and goes once it is drawn', async () => {
+    const { busy, charts, release, window } = await openHeld(daily);
+
+    window.changeChartRange(730);
+    expect(busy.hidden).toBe(false);
+
+    await release();
+    expect(busy.hidden).toBe(true);
+    expect(charts[0].data.labels).toEqual(days(3650));
+});
+
+test('the spinner goes when a wider range fails to load', async () => {
+    const { busy, rangeFailed, release, window } = await openHeld(unavailable);
+
+    window.changeChartRange(730);
+    expect(busy.hidden).toBe(false);
+
+    await release();
+    expect(busy.hidden).toBe(true);
+    expect(rangeFailed.hidden).toBe(false);
 });
 
 // Three stores in the order /data/chart lists them, each at a price of its own,
