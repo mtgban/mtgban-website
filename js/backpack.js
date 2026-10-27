@@ -458,21 +458,18 @@
         body.append(name, where);
         if (e.finishTag) body.appendChild(text("span", "backpack-row-finish " + (e.finishClass || ""), e.finishTag));
 
+        // The minus takes the last copy with the card; Undo brings it back.
         var ctl = text("div", "backpack-row-ctl");
         var minus = text("button", "backpack-minus", "−");
         minus.setAttribute("type", "button");
-        minus.setAttribute("aria-label", "One fewer");
+        minus.setAttribute("aria-label", (e.qty || 1) > 1 ? "One fewer" : "Remove");
         minus.addEventListener("click", function () { setQty(e.id, (e.qty || 1) - 1); render(); });
         var qty = text("span", "backpack-qty", String(e.qty || 1));
         var plus = text("button", "backpack-plus", "+");
         plus.setAttribute("type", "button");
         plus.setAttribute("aria-label", "One more");
         plus.addEventListener("click", function () { setQty(e.id, (e.qty || 1) + 1); render(); });
-        var rm = text("button", "backpack-remove", "×");
-        rm.setAttribute("type", "button");
-        rm.setAttribute("aria-label", "Remove");
-        rm.addEventListener("click", function () { remove(e.id); render(); });
-        ctl.append(minus, qty, plus, rm);
+        ctl.append(minus, qty, plus);
 
         r.append(art, body, ctl);
         return r;
