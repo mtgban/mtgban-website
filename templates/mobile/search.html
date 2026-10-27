@@ -375,7 +375,7 @@
             {{if not $expanded}}
             <div class="m-tabs" data-card="{{$cardId}}">
                 {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab{{if $defaultBuyers}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab{{if or $defaultBuyers (not $hasSellers)}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
             {{end}}
 
@@ -488,7 +488,7 @@
 
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
-            <div class="m-tab-panel{{if or $expanded $defaultBuyers}} active{{end}}" id="buyers-{{$cardId}}">
+            <div class="m-tab-panel{{if or $expanded $defaultBuyers (not $hasSellers)}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$headed := false}}
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
@@ -607,6 +607,9 @@
                     {{end}}
                 {{end}}
             </div>
+            {{end}}
+            {{if not (or $hasSellers $hasBuyers)}}
+            <div class="m-vendor-row m-vendor-flat"><span class="m-vendor-name dim">No offers</span></div>
             {{end}}
         </div>
     {{else}}

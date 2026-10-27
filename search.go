@@ -1541,11 +1541,13 @@ func rebuildIndexRows(pageVars *SearchVars, metadata cardMetadata, b *mtgmatcher
 			return strings.ToLower(tmp[i].ScraperName) < strings.ToLower(tmp[j].ScraperName)
 		})
 
-		// In case there are no results at all
-		if result.sellers[cardID] == nil {
-			result.sellers[cardID] = map[mtgban.Condition][]SearchEntry{}
+		// An empty INDEX key reads to the template as offers, hiding "No offers"
+		if len(tmp) > 0 {
+			if result.sellers[cardID] == nil {
+				result.sellers[cardID] = map[mtgban.Condition][]SearchEntry{}
+			}
+			result.sellers[cardID]["INDEX"] = tmp
 		}
-		result.sellers[cardID]["INDEX"] = tmp
 
 		if pageVars.ListingLocked {
 			hide := Config().SearchHideNonAffiliates
