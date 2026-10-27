@@ -13,7 +13,7 @@ function realListStorage() {
 // Runs user-state.js signed in with a local backpack against a server copy,
 // and returns the backpack the reconcile PUT pushes; clean leaves the dirty
 // flag unset; max stands in for the tier's backpack size.
-async function reconcileBackpack(local, server, clean, max) {
+async function reconcileBackpack(local, server, clean, max, tabs) {
     const m = clean ? {} : { mtgban_userstate_dirty: '1' };
     if (local) m.mtgban_backpack = JSON.stringify(local);
     const storage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
@@ -21,6 +21,7 @@ async function reconcileBackpack(local, server, clean, max) {
     const rendered = [];
     const window = { addEventListener() {}, renderBackpack: () => rendered.push(m.mtgban_backpack) };
     if (max) window.BAN_BACKPACK_MAX = max;
+    if (tabs) window.BAN_BACKPACK_TABS = tabs;
     const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
     const state = { version: 3, favorites: [], recents: [], preferences: {}, backpack: server };
     const puts = [];
@@ -66,8 +67,8 @@ test('a newer add beats an older removal', async () => {
 });
 
 test('the pushed entries carry only the synced fields', async () => {
-    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { cond: 'SP', sellPrice: 5, query: 'x' })], []);
-    expect(Object.keys(pushed[0]).sort()).toEqual(['cond', 'cw', 'edition', 'finishClass', 'finishTag', 'id', 'img', 'm', 'name', 'number', 'qty', 'set', 't'].sort());
+    const { pushed } = await reconcileBackpack([entry('a', 1, 10, { cond: 'SP', pack: 2, sellPrice: 5, query: 'x' })], []);
+    expect(Object.keys(pushed[0]).sort()).toEqual(['cond', 'pack', 'cw', 'edition', 'finishClass', 'finishTag', 'id', 'img', 'm', 'name', 'number', 'qty', 'set', 't'].sort());
     expect(pushed[0].sellPrice).toBeUndefined();
 });
 
@@ -139,4 +140,24 @@ test('the merge keeps a card\'s grades apart', async () => {
 test('an entry without a grade merges with the NM one', async () => {
     const { pushed } = await reconcileBackpack([entry('a', 3, 10, { cond: 'NM' })], [entry('a', 2, 5)]);
     expect(pushed.map((e) => [e.id, e.qty])).toEqual([['a', 3]]);
+});
+
+test('the merge keeps a card in two backpacks apart', async () => {
+    const { pushed } = await reconcileBackpack([entry('a', 3, 10, { pack: 2 })], [entry('a', 2, 5)]);
+    expect(pushed.filter((e) => !e.del).map((e) => [e.pack || 1, e.qty]).sort()).toEqual([[1, 2], [2, 3]]);
+});
+
+test('the merge caps each backpack at the size, newest first', async () => {
+    const local = [], server = [];
+    for (let i = 0; i < 5; i++) local.push(entry('l' + i, 1, 1000 + i, { pack: 2 }));
+    for (let i = 0; i < 4; i++) server.push(entry('s' + i, 1, 2000 + i));
+    const { pushed } = await reconcileBackpack(local, server, false, 3, 2);
+    const live = pushed.filter((e) => !e.del).map((e) => e.id).sort();
+    expect(live).toEqual(['l2', 'l3', 'l4', 's1', 's2', 's3']);
+});
+
+test('the merge caps the backpacks together at size times allowance', async () => {
+    const local = [entry('a', 1, 1000), entry('b', 1, 1001, { pack: 2 }), entry('c', 1, 1002, { pack: 3 })];
+    const { pushed } = await reconcileBackpack(local, [], false, 1, 2);
+    expect(pushed.filter((e) => !e.del).map((e) => e.id).sort()).toEqual(['b', 'c']);
 });

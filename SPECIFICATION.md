@@ -586,10 +586,13 @@ override; phone UA detection via `mileusna/useragent`).
   condition each across searches, synced as the `backpack` user-state
   section, and posts them to Upload as `hashes`, `hashesQtys` and
   `hashesCond` from a navbar side panel. An entry is one card in one
-  condition, keyed by `ListStorage.backpackKey` (the bare id for NM); the
-  search buttons add and take NM copies, the panel moves an entry to
-  another condition or adds the card in one more, and each entry counts
-  as one product toward the size limit. The optimizer's take button
+  condition in one numbered backpack, keyed by `ListStorage.backpackKey`
+  (the bare id for NM in backpack 1). The search buttons add and take NM
+  copies in the active backpack (`mtgban_backpack_active`, per device);
+  the panel moves an entry to another condition or adds the card in one
+  more. Each backpack holds `SearchBackpackMax` products, and a tier keeps
+  `SearchBackpackTabs` backpacks, clamped so they hold 1000 together, the
+  most a sync body carries. The optimizer's take button
   matches rows by `data-opt-cond`, each row's condition; a blank one, from
   an upload that ignored conditions, takes the card's copies in any
   condition, best first.

@@ -55,17 +55,42 @@ var ListStorage = (function() {
         return BACKPACK_CONDS.indexOf(e.cond) > 0 ? e.cond : "NM";
     }
 
-    // backpackKey names a backpack entry by card and grade: the bare card
-    // id for NM, so an entry stored without a grade is the NM one.
+    // backpackPack is the number of the backpack an entry is in, 1 when it
+    // names none.
+    function backpackPack(e) {
+        var n = parseInt(e.pack, 10);
+        return n > 1 ? n : 1;
+    }
+
+    // backpackKey names a backpack entry by backpack, card and grade: the
+    // bare card id for NM in backpack 1, so an entry stored without either
+    // is that one. A card id holds no "/" or "|".
     function backpackKey(e) {
-        var c = backpackCond(e);
-        return c === "NM" || e.id == null ? e.id : e.id + "|" + c;
+        if (e.id == null) return e.id;
+        var c = backpackCond(e), p = backpackPack(e);
+        return (p > 1 ? p + "/" : "") + e.id + (c === "NM" ? "" : "|" + c);
+    }
+
+    // capBackpack keeps a backpack list's live entries, newest first, at
+    // most max in each backpack and total in all, and its tombstones after.
+    function capBackpack(list, max, total) {
+        var per = {}, kept = 0;
+        var live = list.filter(isLive).sort(function (a, b) { return (b.t || 0) - (a.t || 0); }).filter(function (e) {
+            var p = backpackPack(e);
+            if (kept >= total || (per[p] || 0) >= max) return false;
+            per[p] = (per[p] || 0) + 1;
+            kept++;
+            return true;
+        });
+        return live.concat(list.filter(function (x) { return !isLive(x); }));
     }
 
     return {
         backpackConds: BACKPACK_CONDS,
         backpackCond: backpackCond,
         backpackKey: backpackKey,
+        backpackPack: backpackPack,
+        capBackpack: capBackpack,
         isLive: isLive,
         mtime: mtime,
         read: read,

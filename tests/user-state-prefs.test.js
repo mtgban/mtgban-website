@@ -56,7 +56,7 @@ async function reconcilePresets(local, server) {
         return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
     };
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
-        window, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] });
+        window, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list });
     for (let i = 0; i < 20; i++) await Promise.resolve();
     expect(puts.length).toBe(1);
     return JSON.parse(puts[0].preferences.mtgban_upload_presets);
@@ -121,7 +121,7 @@ async function reconcileArbit(local, server) {
         return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
     };
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
-        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] });
+        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list });
     for (let i = 0; i < 20; i++) await Promise.resolve();
     expect(puts.length).toBe(1);
     return JSON.parse(puts[0].preferences.mtgban_arbit_filters);
@@ -160,7 +160,7 @@ async function reconcileArbitPresets(local, server) {
         return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve(state) });
     };
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', source)(
-        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] });
+        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list });
     for (let i = 0; i < 20; i++) await Promise.resolve();
     expect(puts.length).toBe(1);
     return JSON.parse(puts[0].preferences.mtgban_arbit_presets);
@@ -358,7 +358,7 @@ async function hydrateBehind(preferences) {
     };
     const timers = [];
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
-        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] },
+        { addEventListener() {} }, document, storage, session, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list },
         (fn) => timers.push(fn), () => {});
     for (let i = 0; i < 10; i++) await Promise.resolve();
     timers.splice(0).forEach((fn) => fn());
@@ -413,7 +413,7 @@ async function syncDevice(server, device) {
     const timers = [];
     new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', 'Date', source)(
         { addEventListener() {} }, { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} }, storage,
-        { getItem: () => null, setItem() {} }, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [] },
+        { getItem: () => null, setItem() {} }, fetch, { mtime: (x) => x.m || x.t || 0, tombstones: () => [], capBackpack: (list) => list },
         (fn) => timers.push(fn), () => {}, FakeDate);
     for (let i = 0; i < 20; i++) await Promise.resolve();
     timers.splice(0).forEach((fn) => fn());

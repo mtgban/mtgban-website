@@ -62,5 +62,5 @@ func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "not signed in"})
 		return
 	}
-	userstate.ServeAPI(w, r, UserStateDB, userStateIdentity(email), string(Config().Game), backpackMaxFromValues(v))
+	userstate.ServeAPI(w, r, UserStateDB, userStateIdentity(email), string(Config().Game), backpackMaxFromValues(v), backpackTabsFromValues(v))
 }

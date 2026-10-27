@@ -17,7 +17,7 @@ func TestServeAPIStoreErrorIs500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/userstate/favorites",
 		strings.NewReader(`{"data":[{"id":"x"}],"version":1}`))
 	w := httptest.NewRecorder()
-	ServeAPI(w, req, c, "apierr@example.com", "", 200)
+	ServeAPI(w, req, c, "apierr@example.com", "", 200, 1)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
@@ -37,7 +37,7 @@ func TestServeAPIUnknownSectionIs400(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/userstate/bogus",
 		strings.NewReader(`{"data":[],"version":0}`))
 	w := httptest.NewRecorder()
-	ServeAPI(w, req, c, "apibad@example.com", "", 200)
+	ServeAPI(w, req, c, "apibad@example.com", "", 200, 1)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
@@ -51,7 +51,7 @@ func TestServeAPIBackpackIsAKnownSection(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/userstate/backpack",
 		strings.NewReader(`{"data":[],"version":0}`))
 	w := httptest.NewRecorder()
-	ServeAPI(w, req, c, t.Name()+"@example.com", "", 200)
+	ServeAPI(w, req, c, t.Name()+"@example.com", "", 200, 1)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("backpack PATCH: expected 200, got %d", w.Code)
@@ -69,16 +69,31 @@ func TestBackpackErrorCountsLiveCards(t *testing.T) {
 		{"tombstones do not count", `[{"id":"a"},{"id":"b"},{"id":"c","del":5}]`, ""},
 		{"a falsy del is live", `[{"id":"a"},{"id":"b"},{"id":"c","del":0}]`, "backpack is full"},
 		{"empty", `[]`, ""},
+		{"each backpack at the limit", `[{"id":"a"},{"id":"b"},{"id":"a","pack":2},{"id":"b","pack":"2"}]`, ""},
+		{"one backpack over the limit", `[{"id":"a"},{"id":"a","pack":2},{"id":"b","pack":2},{"id":"c","pack":2}]`, "backpack is full"},
+		{"pack 1 named or not is one backpack", `[{"id":"a"},{"id":"b","pack":1},{"id":"c","pack":"x"}]`, "backpack is full"},
+		{"over the total across backpacks", `[{"id":"a"},{"id":"a","pack":2},{"id":"a","pack":3},{"id":"b","pack":3},{"id":"a","pack":4}]`, "backpack is full"},
 		{"not a list", `{"id":"a"}`, "bad body"},
 		{"no data", ``, "bad body"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := backpackError(json.RawMessage(tc.raw), 2)
+			got := backpackError(json.RawMessage(tc.raw), 2, 2)
 			if got != tc.want {
-				t.Errorf("backpackError(%s, 2) = %q, want %q", tc.raw, got, tc.want)
+				t.Errorf("backpackError(%s, 2, 2) = %q, want %q", tc.raw, got, tc.want)
 			}
 		})
+	}
+}
+
+// A one-backpack tier cannot spread past its size across more backpacks.
+func TestBackpackErrorCapsTheTotal(t *testing.T) {
+	two := json.RawMessage(`[{"id":"a"},{"id":"b","pack":2}]`)
+	if got := backpackError(two, 1, 1); got != "backpack is full" {
+		t.Errorf("two cards in two backpacks of one, one allowed: %q", got)
+	}
+	if got := backpackError(two, 1, 2); got != "" {
+		t.Errorf("two cards in two backpacks of one, two allowed: %q", got)
 	}
 }
 
@@ -131,7 +146,7 @@ func TestServeAPIShareLifecycle(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPatch, "/api/userstate/share", nil)
 	w := httptest.NewRecorder()
-	ServeAPI(w, req, c, "share-405@example.com", "", 200)
+	ServeAPI(w, req, c, "share-405@example.com", "", 200, 1)
 	if code := w.Code; code != http.StatusMethodNotAllowed {
 		t.Fatalf("PATCH = %d, want 405", code)
 	}
@@ -188,7 +203,7 @@ func TestServeAPIShareRefusesCrossSiteWrites(t *testing.T) {
 	for _, method := range []string{http.MethodPost, http.MethodDelete} {
 		req := httptest.NewRequest(method, "/api/userstate/share", nil)
 		w := httptest.NewRecorder()
-		ServeAPI(w, req, c, email, "", 200)
+		ServeAPI(w, req, c, email, "", 200, 1)
 		if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "same-origin only") {
 			t.Fatalf("%s without the header = %d %s, want 403", method, w.Code, w.Body.String())
 		}
@@ -201,7 +216,7 @@ func TestServeAPIShareRefusesCrossSiteWrites(t *testing.T) {
 func TestServeAPIShareWithoutDBIs503(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/userstate/share", nil)
 	w := httptest.NewRecorder()
-	ServeAPI(w, req, nil, "share-nodb@example.com", "", 200)
+	ServeAPI(w, req, nil, "share-nodb@example.com", "", 200, 1)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", w.Code)
 	}

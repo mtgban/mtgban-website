@@ -37,9 +37,10 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, session, sections = [] } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, session, sections = [] } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
+    if (active) m.mtgban_backpack_active = String(active);
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const sm = session || (pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {});
     const sessionStorage = { getItem: (k) => (k in sm ? sm[k] : null), setItem: (k, v) => { sm[k] = String(v); }, removeItem: (k) => { delete sm[k]; } };
@@ -82,6 +83,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     };
     if (ban) window.BAN_BACKPACK = ban;
     if (max) window.BAN_BACKPACK_MAX = max;
+    if (tabs) window.BAN_BACKPACK_TABS = tabs;
     const docListeners = {};
     const document = {
         body, readyState: 'complete', addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); },
@@ -401,6 +403,103 @@ describe('grades', () => {
         const later = [...store, { id: 'uuid-1', cond: 'HP', qty: 1, t: 3, m: 3 }];
         const u = page({ store: later, pending: p.pendingIds(), ban: { canUpload: true, priced: ['uuid-2', 'uuid-1', 'uuid-1'] } });
         expect(live(u)).toEqual([['uuid-1', 'HP', 1]]);
+    });
+});
+
+describe('numbered backpacks', () => {
+    const live = (p) => p.stored().filter((e) => !e.del).map((e) => [e.pack, e.id, e.cond, e.qty]).sort();
+    const two = [{ id: 'uuid-1', name: 'One', qty: 2, t: 1, m: 1 }, { id: 'uuid-1', name: 'Two', pack: 2, qty: 5, t: 2, m: 2 }, { id: 'uuid-2', name: 'Two B', pack: 2, qty: 1, t: 3, m: 3 }];
+
+    test('an entry without a backpack is in backpack 1, keyed as before', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 1, t: 1, m: 1 }] });
+        expect(p.window.Backpack.read()[0].pack).toBe(1);
+        p.window.Backpack.setQty('uuid-1', 4);
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 4]]);
+    });
+
+    test('the search buttons and the navbar act on the active backpack', () => {
+        const p = page({ store: two, tabs: 3, active: 2 });
+        expect(p.rows[0].children[0].textContent).toBe('5');
+        expect(p.navCount.textContent).toBe('6');
+        p.window.addToBackpack(p.rows[0]);
+        p.window.takeFromBackpack(p.minus[1]);
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 6]]);
+        expect(p.stored().find((e) => e.id === 'uuid-2').del).toBeDefined();
+    });
+
+    test('the add starts a card in the active backpack beside another backpack\'s copy', () => {
+        const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 1, m: 1 }], tabs: 2, active: 2 });
+        expect(p.rows[0].classes.has('active')).toBe(false);
+        p.window.addToBackpack(p.rows[0]);
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 1]]);
+    });
+
+    test('each backpack fills on its own', () => {
+        const store = [];
+        for (let i = 0; i < 3; i++) store.push({ id: 'c' + i, qty: 1, t: i, m: i }, { id: 'd' + i, pack: 2, qty: 1, t: i, m: i });
+        const p = page({ store, max: 3, tabs: 3, active: 3 });
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.stored().filter((e) => !e.del)).toHaveLength(7);
+        const full = page({ store, max: 3, tabs: 3, active: 2 });
+        full.window.addToBackpack(full.rows[0]);
+        expect(full.stored().filter((e) => !e.del)).toHaveLength(6);
+        expect(ids['backpack-toast'].textContent).toBe('Backpack is full (3 products)');
+    });
+
+    test('the panel, Clear and a send take only the active backpack', () => {
+        const p = page({ store: two, tabs: 2, active: 2, emptyAfter: '1' });
+        p.nav.click();
+        expect(ids['backpack-panel'].querySelectorAll('.backpack-row-name').map((n) => n.textContent)).toEqual(['Two B', 'Two']);
+        expect(ids['backpack-count'].textContent).toBe('6 copies of 2 products');
+        ids['backpack-send-retail'].click();
+        expect(submitted[0].children.filter((i) => i.name === 'hashesQtys').map((i) => i.value)).toEqual(['1', '5']);
+        expect(p.pendingIds()).toEqual(['2/uuid-2', '2/uuid-1']);
+        ids['backpack-clear'].click();
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2]]);
+    });
+
+    test('Upload empties the backpack a send came from', () => {
+        const p = page({ store: two, pending: ['2/uuid-2', '2/uuid-1'], ban: { canUpload: true, priced: ['uuid-2', 'uuid-1'] } });
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2]]);
+    });
+
+    test('undo takes back an add to another backpack, and a grade change stays in its backpack', () => {
+        const p = page({ store: two, tabs: 2, active: 2 });
+        p.window.Backpack.setCond('2/uuid-2', 'SP');
+        expect(live(p)).toContainEqual([2, 'uuid-2', 'SP', 1]);
+        p.window.addToBackpack(p.rows[1]);
+        p.window.Backpack.undo();
+        p.window.Backpack.undo();
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 5], [2, 'uuid-2', 'NM', 1]]);
+    });
+
+    test('a save keeps every backpack\'s cards up to the size each', () => {
+        const store = [];
+        for (let i = 0; i < 4; i++) store.push({ id: 'c' + i, qty: 1, t: i, m: i }, { id: 'd' + i, pack: 2, qty: 1, t: i, m: i });
+        const p = page({ store, max: 4, tabs: 2 });
+        p.window.Backpack.setQty('c0', 2);
+        expect(p.stored().filter((e) => !e.del)).toHaveLength(8);
+    });
+
+    test('a tier lowered to fewer backpacks keeps its newest cards up to the total', () => {
+        const store = [{ id: 'a', qty: 1, t: 1, m: 1 }, { id: 'b', pack: 2, qty: 1, t: 2, m: 2 }, { id: 'c', pack: 2, qty: 1, t: 3, m: 3 }];
+        const p = page({ store, max: 2, tabs: 1 });
+        p.window.Backpack.setQty('2/c', 2);
+        expect(p.stored().filter((e) => !e.del).map((e) => e.id).sort()).toEqual(['b', 'c']);
+    });
+
+    test('an add past the total across backpacks is refused', () => {
+        const store = [{ id: 'a', qty: 1, t: 1, m: 1 }, { id: 'b', pack: 2, qty: 1, t: 2, m: 2 }, { id: 'c', pack: 2, qty: 1, t: 3, m: 3 }];
+        const p = page({ store, max: 3, tabs: 1 });
+        p.window.addToBackpack(p.rows[0]);
+        expect(p.stored().filter((e) => !e.del)).toHaveLength(3);
+        expect(ids['backpack-toast'].textContent).toBe('Backpacks are full (3 products in all)');
+    });
+
+    test('the optimizer takes from the active backpack', () => {
+        const p = page({ store: two, tabs: 2, active: 2, sections: [[['uuid-1', 2, false, 'NM']]] });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 3], [2, 'uuid-2', 'NM', 1]]);
     });
 });
 
