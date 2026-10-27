@@ -204,11 +204,21 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // dropped, because pinning a name is what the main bar is for. A bar
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
-func scopeFilters(ds *datastore, scope string) []FilterElem {
+func scopeFilters(ds *datastore, scope string, sealed bool) []FilterElem {
 	if scope == "" {
 		return nil
 	}
-	return parseSearchQuery(ds, scope, nil, nil, nil).CardFilters
+	return parseSearchPage(ds, scope, sealed, nil, nil, nil).CardFilters
+}
+
+// parseSearchPage parses what a reader typed into a search's bars. A sealed
+// search parses without the numbers snapshot: sealed products carry no
+// collector numbers, so a number alone there stays an id or a name's words.
+func parseSearchPage(ds *datastore, query string, sealed bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+	if sealed {
+		return parseSearchOptionsNG(ds.backend, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	}
+	return parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 }
 
 // applySearchScope folds the pinned bar's filters into the search the
@@ -554,8 +564,9 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.FormValue("q"))
 	// The pinned bar lives in the url alone, so a page opened without it
 	// starts with nothing pinned.
+	pageVars.IsSealed = r.URL.Path == "/sealed"
 	scope := strings.TrimSpace(r.FormValue("scope"))
-	pinned := scopeFilters(ds, scope)
+	pinned := scopeFilters(ds, scope, pageVars.IsSealed)
 	pageVars.SearchScope = scope
 	pageVars.CanScope = true
 	// Something is pinned, and none of it is a filter: the search will pass
@@ -563,7 +574,6 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	// like it is doing the work.
 	pageVars.ScopeIgnored = scope != "" && len(pinned) == 0
 
-	pageVars.IsSealed = r.URL.Path == "/sealed"
 	isSetsPage := r.URL.Path == "/sets"
 
 	// A pinned filter names a set of cards the same way a query does, so a
@@ -643,7 +653,7 @@ func (s *site) Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.ShowUpsell = !miscSearchOpts.has("noUpsell")
 
-	config := parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	config := parseSearchPage(ds, query, pageVars.IsSealed, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	applySearchScope(&config, pinned)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
@@ -796,9 +806,10 @@ func (s *site) SearchOEmbed(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := append(readSearchMiscOpts(page), "oembed")
 
-	config := parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
-	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(page.FormValue("scope"))))
-	if page.URL.Path == "/sealed" {
+	sealed := page.URL.Path == "/sealed"
+	config := parseSearchPage(ds, query, sealed, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(page.FormValue("scope")), sealed))
+	if sealed {
 		config.SearchMode = "sealed"
 	}
 

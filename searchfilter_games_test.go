@@ -353,3 +353,64 @@ func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*mtgmatc
 	}
 	return keys, hits
 }
+
+// A number typed alone reaches what cn: does in every game, padded the way
+// Pokemon pads it or not, unless a card is named by it: Yu-Gi-Oh's "7".
+func TestBareNumberInEveryGame(t *testing.T) {
+	// The cn: query each bare number reaches what, or "" for a name.
+	examples := map[mtgmatcher.Game]map[string]string{
+		"pokemon": {"017": "cn:17", "17": "cn:17", "#123": "cn:123"},
+		"lorcana": {"204": "cn:204"},
+		"yugioh":  {"7": ""},
+	}
+	var ran int
+	for game, queries := range examples {
+		path := os.Getenv(gameDatastores[game])
+		if path == "" {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			t.Logf("%s: %v", game, err)
+			continue
+		}
+		loaded, err := mtgmatcher.Open(game, f)
+		f.Close()
+		if err != nil {
+			t.Errorf("%s: %v", game, err)
+			continue
+		}
+		ran++
+
+		t.Run(string(game), func(t *testing.T) {
+			ds := testSite.newDatastore(loaded, time.Now())
+			checkBareNumbersAgreeWithSeed(t, ds)
+			for query, as := range queries {
+				config := parseSearchQuery(ds, query, nil, nil, nil)
+				if as == "" {
+					if config.CleanQuery != query || len(config.CardFilters) != 0 {
+						t.Errorf("%q is not read as a name: %+v", query, config.CardFilters)
+					}
+					continue
+				}
+				got, err := searchAndFilter(ds, config)
+				if err != nil {
+					t.Fatalf("%q: %v", query, err)
+				}
+				want, err := searchAndFilter(ds, parseSearchQuery(ds, as, nil, nil, nil))
+				if err != nil || len(want) == 0 {
+					t.Fatalf("%q reaches nothing: %v", as, err)
+				}
+				slices.Sort(got)
+				slices.Sort(want)
+				if !slices.Equal(got, want) {
+					t.Errorf("%q reaches %d cards, %q reaches %d", query, len(got), as, len(want))
+				}
+			}
+		})
+	}
+
+	if ran == 0 {
+		t.Skip("no non-Magic datastore paths in the environment")
+	}
+}

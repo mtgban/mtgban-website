@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -1009,8 +1010,9 @@ func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
 	return []string{code, number[region:]}, true
 }
 
-// numberTerm is the cn: or cns: term a word typed as a collector number is
-// asked for with, or "" when the word is no number.
+// numberValue is how a word typed as a collector number is asked for: the
+// number filter, "number", "number_strict" or "number_total", and the value
+// it is given. Both are "" when the word is no number.
 //
 // A number saying more than a plain one is asked for exactly as typed,
 // against the number the catalog writes. A spelling no card carries reaches
@@ -1019,19 +1021,83 @@ func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
 // for. So "#234" is the plain number it means, the extraction having taken
 // the # off, while "#17a" is asked for whole and is no card's number - as
 // against 17a, which is one's. A number given with its set total is asked
-// for with it, which cn: reads.
-func numberTerm(b *mtgmatcher.Backend, token string) string {
+// for with it.
+func numberValue(b *mtgmatcher.Backend, token string) (opt, value string) {
 	number := mtgmatcher.ExtractNumberAny(token)
 	if (number == "" && !typesSetTotal(token)) || namesASetCode(b, token) {
-		return ""
+		return "", ""
 	}
 	switch {
 	case typesSetTotal(token):
-		return "cn:" + token
+		return "number_total", token
 	case strings.ContainsFunc(number, isNotDigit):
-		return "cns:" + token
+		return "number_strict", token
 	}
-	return "cn:" + number
+	return "number", number
+}
+
+// numberTerm is the cn: or cns: term numberValue's reading of a word is
+// typed as, or "" when the word is no number.
+func numberTerm(b *mtgmatcher.Backend, token string) string {
+	opt, value := numberValue(b, token)
+	switch opt {
+	case "":
+		return ""
+	case "number_strict":
+		return "cns:" + value
+	}
+	return "cn:" + value
+}
+
+// bareNumberFilters reads a query that is a collector number and nothing
+// else, "123", "#123" or "17a", as numberValue reads it, when a card carries
+// that number. A card's own name, Yu-Gi-Oh's "7", stays a name, and a number
+// no card carries is left to the id and name readings, so a TCGplayer
+// product id reaches its product. Without a numbers snapshot it reads
+// nothing.
+func bareNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string) []FilterElem {
+	if numbers == nil {
+		return nil
+	}
+	tokens := strings.Fields(query)
+	if len(tokens) != 1 || typesSetTotal(tokens[0]) {
+		return nil
+	}
+	token := tokens[0]
+	if !writtenAsNumber(token) {
+		return nil
+	}
+	opt, value := numberValue(b, token)
+	if opt != "number" && opt != "number_strict" {
+		return nil
+	}
+	_, err := b.SearchEquals(token)
+	if err == nil {
+		return nil
+	}
+	// A plain number here is digits alone, which the loose index holds;
+	// numberSeedUUIDs reads strict too, for a cn: given letters.
+	bucket := numbers.loose
+	if opt == "number_strict" {
+		bucket = numbers.strict
+	}
+	filter := FilterElem{Name: opt, Values: fixupNumberNG(b, value, opt)}
+	for _, value := range filter.Values {
+		if len(bucket[value]) != 0 {
+			return []FilterElem{filter}
+		}
+	}
+	return nil
+}
+
+// writtenAsNumber reports whether a word is spelled the way a collector
+// number is: digits, after a # if any, then at most a few marks or letters,
+// "123", "#17a", "107★". An id that starts with a digit is not one.
+func writtenAsNumber(token string) bool {
+	token = strings.TrimPrefix(token, "#")
+	rest := strings.TrimLeft(token, "0123456789")
+	return len(rest) < len(token) && !strings.ContainsFunc(rest, unicode.IsDigit) &&
+		utf8.RuneCountInString(rest) <= 3
 }
 
 // setPrintsNumber reports whether a card of the set carries number exactly,
@@ -1052,14 +1118,16 @@ func isLetter(r rune) bool {
 }
 
 // parseSearchQuery reads a query a reader typed into a SearchConfig, with the
-// datastore's numbers snapshot at hand.
+// datastore's numbers snapshot at hand: a number searched alone is the
+// collector number a card carries.
 func parseSearchQuery(ds *datastore, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
 	return parseSearchOptionsDepth(ds.backend, ds.numbers, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // parseSearchOptionsNG reads a query into a SearchConfig without the numbers
-// snapshot. The outer query is depth zero; parseSearchOptionsDepth counts the
+// snapshot, so a number searched alone is an id or a name, never a collector
+// number. The outer query is depth zero; parseSearchOptionsDepth counts the
 // in: pools nested in it.
 func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
@@ -1108,8 +1176,11 @@ func parseSearchOptionsDepth(b *mtgmatcher.Backend, numbers *numbersSnapshot, qu
 		})
 	}
 
-	// Support our UUID style when there are no options to parse
-	if !strings.Contains(query, ":") && !strings.Contains(query, "|") {
+	// Support our UUID style when there are no options to parse. A number
+	// a card carries is that collector number, though it can be a TCGplayer
+	// product id too; id: asks for the id.
+	noOptions := !strings.Contains(query, ":") && !strings.Contains(query, "|")
+	if noOptions && bareNumberFilters(b, numbers, query) == nil {
 		// XXX should use the idlookup filter
 		uuids := fixupIDs(b, query)
 		for _, uuid := range uuids {
@@ -1832,6 +1903,13 @@ func parseSearchOptionsDepth(b *mtgmatcher.Backend, numbers *numbersSnapshot, qu
 				tokens = nil
 			} else if printed {
 				tokens = split
+			}
+		}
+		if len(tokens) == 1 {
+			numbered := bareNumberFilters(b, numbers, tokens[0])
+			if numbered != nil {
+				filters = append(filters, numbered...)
+				query = ""
 			}
 		}
 		if len(tokens) == 2 {
