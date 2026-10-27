@@ -1009,6 +1009,31 @@ func splitPrintedNumber(b *mtgmatcher.Backend, token string) ([]string, bool) {
 	return []string{code, number[region:]}, true
 }
 
+// numberTerm is the cn: or cns: term a word typed as a collector number is
+// asked for with, or "" when the word is no number.
+//
+// A number saying more than a plain one is asked for exactly as typed,
+// against the number the catalog writes. A spelling no card carries reaches
+// nothing, which is what it should say. What is left after ExtractNumberAny
+// decides which of the two it is, and the word as typed is what gets asked
+// for. So "#234" is the plain number it means, the extraction having taken
+// the # off, while "#17a" is asked for whole and is no card's number - as
+// against 17a, which is one's. A number given with its set total is asked
+// for with it, which cn: reads.
+func numberTerm(b *mtgmatcher.Backend, token string) string {
+	number := mtgmatcher.ExtractNumberAny(token)
+	if (number == "" && !typesSetTotal(token)) || namesASetCode(b, token) {
+		return ""
+	}
+	switch {
+	case typesSetTotal(token):
+		return "cn:" + token
+	case strings.ContainsFunc(number, isNotDigit):
+		return "cns:" + token
+	}
+	return "cn:" + number
+}
+
 // setPrintsNumber reports whether a card of the set carries number exactly,
 // compared the way cns: compares it.
 func setPrintsNumber(b *mtgmatcher.Backend, code, number string) bool {
@@ -1802,31 +1827,11 @@ func parseSearchOptionsDepth(b *mtgmatcher.Backend, query string, blocklistRetai
 			}
 		}
 		if len(tokens) == 2 {
-			number := mtgmatcher.ExtractNumberAny(tokens[1])
-			if (number != "" || typesSetTotal(tokens[1])) && !namesASetCode(b, tokens[1]) {
+			term := numberTerm(b, tokens[1])
+			if term != "" {
 				set, err := b.GetSet(tokens[0])
 				if err == nil {
-					// A number saying more than a plain one is asked for
-					// exactly as typed, against the number the catalog
-					// writes. A spelling no card carries reaches nothing,
-					// which is what it should say.
-					//
-					// What is left after ExtractNumberAny decides which of
-					// the two it is, and the token as typed is what gets
-					// asked for. So "#234" is the plain number it means,
-					// the extraction having taken the # off, while "#17a"
-					// is asked for whole and is no card's number - as
-					// against 17a, which is one's.
-					op, value := "cn:", number
-					if strings.ContainsFunc(number, isNotDigit) {
-						op, value = "cns:", tokens[1]
-					}
-					// A number given with its set total is asked for
-					// with it, which cn: reads.
-					if typesSetTotal(tokens[1]) {
-						op, value = "cn:", tokens[1]
-					}
-					extraConfig := parseSearchOptionsNG(b, "s:"+set.Code+" "+op+value, nil, nil, nil)
+					extraConfig := parseSearchOptionsNG(b, "s:"+set.Code+" "+term, nil, nil, nil)
 					filters = append(filters, extraConfig.CardFilters...)
 					query = ""
 				}
