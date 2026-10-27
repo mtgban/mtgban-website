@@ -59,14 +59,14 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
         minus.push(less);
         return btn;
     });
-    // Upload optimizer sections, each a take button and rows of [id, qty, unticked].
+    // Upload optimizer sections, each a take button and rows of [id, qty, unticked, cond].
     const optSections = sections.map((rows) => {
         const section = el('div'); section.classes.add('opt-store');
         const take = el('button'); take.classes.add('pack-take-btn'); take.hidden = true;
         const fold = el('button'); fold.classes.add('section-fold');
         section.append(take, fold);
-        rows.forEach(([id, qty, unticked]) => {
-            const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-load-qty', String(qty));
+        rows.forEach(([id, qty, unticked, cond = '']) => {
+            const tr = el('tr'); tr.setAttribute('data-opt-id', id); tr.setAttribute('data-opt-cond', cond); tr.setAttribute('data-load-qty', String(qty));
             if (unticked) tr.classes.add('opt-removed');
             section.appendChild(tr);
         });
@@ -769,7 +769,7 @@ describe('sending', () => {
         const form = submitted[0];
         expect(form.getAttribute('action')).toBe('/upload');
         const inputs = form.children.map((i) => [i.name, i.value]);
-        expect(inputs).toEqual([['mode', 'false'], ['hashes', 'uuid-2'], ['hashesQtys', '1'], ['hashes', 'uuid-1'], ['hashesQtys', '2']]);
+        expect(inputs).toEqual([['mode', 'false'], ['hashes', 'uuid-2'], ['hashesQtys', '1'], ['hashesCond', 'NM'], ['hashes', 'uuid-1'], ['hashesQtys', '2'], ['hashesCond', 'NM']]);
         expect(p.stored().filter((e) => !e.del).length).toBe(2);
     });
 
@@ -782,7 +782,7 @@ describe('sending', () => {
         ids['backpack-send-buylist'].click();
         expect(liveAtSubmit).toBe(2);
         expect(submitted[0].children[0].value).toBe('true');
-        expect(submitted[0].children.length).toBe(5);
+        expect(submitted[0].children.length).toBe(7);
         expect(p.stored().filter((e) => !e.del).length).toBe(2);
         expect(p.pendingIds()).toEqual(['uuid-2', 'uuid-1']);
     });
@@ -967,6 +967,44 @@ describe('taking an Upload store section out', () => {
         expect(p.m.mtgban_backpack).toBe(before);
         ok();
         expect(live(p)).toEqual([]);
+    });
+
+    test('takes each row\'s copies from the grade it was sent in', () => {
+        const p = page({
+            store: [{ id: 'a', qty: 3, t: 2, m: 2 }, { id: 'a', cond: 'SP', qty: 2, t: 2, m: 2 }, { id: 'a', cond: 'HP', qty: 1, t: 2, m: 2 }],
+            sections: [[['a', 1, false, 'NM'], ['a', 2, false, 'SP'], ['a', 1, true, 'HP']]],
+        });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(p.stored().filter((e) => !e.del).map((e) => [e.cond, e.qty]).sort()).toEqual([['HP', 1], ['NM', 2]]);
+    });
+
+    test('rows without a grade take the card\'s copies in any grade, best first', () => {
+        const p = page({
+            store: [{ id: 'a', qty: 2, t: 2, m: 2 }, { id: 'a', cond: 'MP', qty: 1, t: 2, m: 2 }, { id: 'a', cond: 'SP', qty: 1, t: 2, m: 2 }, { id: 'b', cond: 'HP', qty: 1, t: 1, m: 1 }],
+            sections: [[['a', 2], ['a', 1], ['b', 1], ['b', 1]]],
+        });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(p.stored().filter((e) => !e.del).map((e) => [e.id, e.cond, e.qty])).toEqual([['a', 'MP', 1]]);
+        expect(ids['backpack-toast'].textContent).toBe('Removed 4 copies from the backpack');
+    });
+
+    test('rows without a grade leave what a graded row already took', () => {
+        const p = page({
+            store: [{ id: 'a', qty: 2, t: 2, m: 2 }, { id: 'a', cond: 'SP', qty: 2, t: 2, m: 2 }],
+            sections: [[['a', 2, false, 'NM'], ['a', 1]]],
+        });
+        p.window.takeRowsFromBackpack(p.optSections[0].take);
+        expect(p.stored().filter((e) => !e.del).map((e) => [e.cond, e.qty])).toEqual([['SP', 1]]);
+    });
+
+    test('a row without a grade shows the button for a card held in any grade', () => {
+        const p = page({ store: [{ id: 'a', cond: 'SP', qty: 1, t: 1, m: 1 }], sections: [[['a', 1]]] });
+        expect(p.optSections[0].take.hidden).toBe(false);
+    });
+
+    test('shows only while a ticked row is in a grade the backpack holds', () => {
+        const p = page({ store: [{ id: 'a', cond: 'SP', qty: 1, t: 1, m: 1 }], sections: [[['a', 1, false, 'NM']], [['a', 1, false, 'SP']]] });
+        expect(p.optSections.map((s) => s.take.hidden)).toEqual([true, false]);
     });
 
     test('a section with nothing in the backpack writes nothing', () => {

@@ -252,7 +252,7 @@
     }
 
     // sendForm builds the Upload POST the search sidebar and favorites use,
-    // with a quantity beside each card.
+    // with a quantity and a grade beside each card.
     function sendForm(mode) {
         var entries = ordered();
         var form = document.createElement("form");
@@ -269,6 +269,9 @@
             var q = document.createElement("input");
             q.type = "hidden"; q.name = "hashesQtys"; q.value = String(e.qty || 1);
             form.appendChild(q);
+            var c = document.createElement("input");
+            c.type = "hidden"; c.name = "hashesCond"; c.value = e.cond;
+            form.appendChild(c);
         });
         return form;
     }
@@ -366,14 +369,25 @@
 
     // ---- the Upload optimizer ----
 
-    // picked adds up the copies of each card in a store section's ticked
-    // rows; a card has a row per condition.
+    // picked adds up the copies of each entry in a store section's ticked
+    // rows, by each row's grade. A row without one, from an upload that
+    // ignored grades, takes the card's copies in any grade, best first.
     function picked(section) {
-        var counts = {};
+        var counts = {}, any = {};
         section.querySelectorAll("tr[data-opt-id]").forEach(function (tr) {
             if (tr.classList.contains("opt-removed")) return;
-            var id = tr.getAttribute("data-opt-id");
-            counts[id] = (counts[id] || 0) + (parseInt(tr.getAttribute("data-load-qty"), 10) || 1);
+            var id = tr.getAttribute("data-opt-id"), cond = tr.getAttribute("data-opt-cond");
+            var n = parseInt(tr.getAttribute("data-load-qty"), 10) || 1;
+            if (!cond) { any[id] = (any[id] || 0) + n; return; }
+            var k = key({ id: id, cond: cond });
+            counts[k] = (counts[k] || 0) + n;
+        });
+        live().sort(function (a, b) { return CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); }).forEach(function (e) {
+            var k = key(e);
+            var n = Math.min(any[e.id] || 0, e.qty - (counts[k] || 0));
+            if (n <= 0) return;
+            counts[k] = (counts[k] || 0) + n;
+            any[e.id] -= n;
         });
         return counts;
     }
@@ -385,7 +399,7 @@
         live().forEach(function (e) { by[key(e)] = true; });
         document.querySelectorAll(".pack-take-btn").forEach(function (b) {
             var section = b.closest(".opt-store");
-            b.hidden = !section || !Object.keys(picked(section)).some(function (id) { return by[id]; });
+            b.hidden = !section || !Object.keys(picked(section)).some(function (k) { return by[k]; });
         });
     }
 
