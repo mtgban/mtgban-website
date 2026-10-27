@@ -159,6 +159,8 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 
 .backpack-tab.active { border-color: var(--dodgerblue); font-weight: 600; }
 
+.backpack-tab.drop-target { outline: 2px dashed var(--dodgerblue); outline-offset: 1px; }
+
 .backpack-tab-field { width: 10em; }
 
 .backpack-list {
@@ -177,6 +179,10 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     padding: 0.6em 0;
     border-bottom: 1px solid var(--border-subtle);
 }
+
+.backpack-row[draggable="true"] { cursor: grab; }
+
+.backpack-row.dragging { opacity: 0.5; }
 
 .backpack-row-art img {
     width: 2.5em;
