@@ -66,6 +66,12 @@
         if (select) select.disabled = disabled;
     }
 
+    // setRangeBusy shows the spinner over the chart while a wider range loads.
+    function setRangeBusy(busy) {
+        var el = document.getElementById('m-chart-busy');
+        if (el) el.hidden = !busy;
+    }
+
     function setRangeFailed(failed) {
         var note = document.getElementById('m-chart-range-failed');
         if (note) note.hidden = !failed;
@@ -382,6 +388,7 @@
         canvas.style.display = 'none';
         resetBtn.style.display = 'none';
         setRangePickerDisabled(true);
+        setRangeBusy(false);
         setRangeFailed(false);
         overlay.classList.add('open');
         drawer.classList.add('open');
@@ -467,6 +474,7 @@
 
         var cardId = currentCardId;
         setRangePickerDisabled(true);
+        setRangeBusy(true);
 
         var p = prefetchPromise;
         if (!p) {
@@ -492,7 +500,9 @@
         }).catch(function() {
             // Swallow - the catch in prefetchFullRange already logged.
         }).then(function() {
-            if (currentCardId === cardId) setRangePickerDisabled(false);
+            if (currentCardId !== cardId) return;
+            setRangePickerDisabled(false);
+            setRangeBusy(false);
         });
     };
 

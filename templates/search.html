@@ -322,6 +322,7 @@
                         <div class="chart-container">
                             <div class="chart-legend" id="chartLegend"></div>
                             <canvas id="cardChart" width="760" height="480"></canvas>
+                            <div class="chart-loading" id="chartLoading" hidden><span class="chart-spinner" role="status" aria-label="Loading history"></span></div>
                             <div class="chart-controls">
                                 <p class="chart-controls-actions">
                                     <select id="dateRange" onchange="window.changeRange && changeRange(parseInt(this.value))">

@@ -1673,6 +1673,39 @@ html.admin-fix-mode .raw-record { display: inline-block; }
     background: rgba(24, 27, 32, 0.7);
 }
 
+/* Over the whole chart while a wider range loads. It lets clicks through,
+   and waits a moment before showing, so a quick answer draws no flash. */
+.chart-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.45);
+    pointer-events: none;
+    animation: chart-loading-in 0.15s 0.15s both;
+}
+.chart-loading[hidden] { display: none; }
+.dark-theme .chart-loading { background: rgba(24, 27, 32, 0.45); }
+.chart-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--ainfo);
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: chart-spin 0.8s linear infinite;
+}
+@keyframes chart-loading-in {
+    from { opacity: 0; }
+}
+@keyframes chart-spin {
+    to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .chart-spinner { animation: none; }
+}
+
 .chart-legend {
     display: flex;
     flex-wrap: wrap;

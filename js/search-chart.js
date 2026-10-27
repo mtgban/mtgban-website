@@ -389,6 +389,8 @@ var chartRange = new ChartRangeLoader({
     onBusy: function(busy) {
         var sel = document.getElementById('dateRange');
         if (sel) sel.disabled = busy;
+        var veil = document.getElementById('chartLoading');
+        if (veil) veil.hidden = !busy;
     },
 });
 
