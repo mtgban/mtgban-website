@@ -64,3 +64,71 @@ test('a readable favorites value is sent trimmed', async () => {
     expect(writes[0].body.data.length).toBe(1);
     expect(writes[0].body.data[0].extra).toBeUndefined();
 });
+
+// Hides the page after writing each value, and returns the keepalive flag of
+// every PATCH the hide-time flush sends, by section. Each of later hides the
+// page again after its own writes; hold keeps every request in flight.
+async function keepaliveOnHide(values, later = [], hold = false) {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    const window = { addEventListener() {}, Storage, localStorage: storage };
+    const listeners = {};
+    const document = {
+        documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', visibilityState: 'visible',
+        addEventListener: (type, fn) => { listeners[type] = fn; },
+    };
+    const sent = {};
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            sent[url.split('/').pop()] = opts.keepalive;
+            // A held request stays in flight, its body counted.
+            if (hold) return new Promise(() => {});
+            return Promise.resolve({ status: 200, ok: true, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    const setTimeout = () => 1;
+    const clearTimeout = () => {};
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), setTimeout, clearTimeout);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    for (const next of [values, ...later]) {
+        for (const [key, value] of Object.entries(next)) storage.setItem(key, value);
+        document.visibilityState = 'hidden';
+        listeners.visibilitychange();
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+    }
+    return sent;
+}
+
+test('a hide-time flush sends keepalive only within the browser\'s 64 KiB', async () => {
+    const sent = await keepaliveOnHide({
+        mtgban_favorites: JSON.stringify([{ id: 'x', name: 'X', query: 'q' }]),
+        mtgban_backpack: JSON.stringify(backpackOf(400)),
+    });
+    expect(sent).toEqual({ favorites: true, backpack: false });
+});
+
+test('a later hide counts the keepalive bodies still in flight', async () => {
+    const sent = await keepaliveOnHide(
+        { mtgban_backpack: JSON.stringify(backpackOf(200)) },
+        [{ mtgban_favorites: JSON.stringify(backpackOf(200)) }],
+        true);
+    expect(sent).toEqual({ backpack: true, favorites: false });
+});
+
+// backpackOf is n entries of about 200 bytes each.
+function backpackOf(n) {
+    const pack = [];
+    for (let i = 0; i < n; i++) {
+        pack.push({ id: 'uuid-' + i, name: 'Card ' + i, edition: 'Edition', set: 'SET', number: String(i), qty: 1, t: i, m: i,
+            img: 'https://cards.scryfall.io/normal/front/0/0/' + 'x'.repeat(60) + i + '.jpg' });
+    }
+    return pack;
+}

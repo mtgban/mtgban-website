@@ -2,6 +2,10 @@
 (function() {
     var BASE = '/api/userstate/';
     var DEBOUNCE_MS = 1500;
+    // A browser refuses a keepalive request once the bodies of those in
+    // flight pass 64 KiB; keepaliveLeft is what the ones in flight leave.
+    var KEEPALIVE_MAX = 64 * 1024;
+    var keepaliveLeft = KEEPALIVE_MAX;
     var FETCH_KEY = 'mtgban_userstate_fetch'; // sessionStorage: {v, ts}
     var TTL_MS = 90 * 1000;
 
@@ -260,13 +264,24 @@
         // Content already on the server: succeed without a request.
         if (fpMatches(section, payloadJSON)) return Promise.resolve(true);
         var body = '{"data":' + payloadJSON + ',"version":' + version + '}';
+        // Past the budget a plain request still lands on a hidden page.
+        if (keepalive === true) {
+            var size = new Blob([body]).size;
+            keepalive = size <= keepaliveLeft;
+            if (keepalive) keepaliveLeft -= size;
+        }
         var sent = performance.now();
-        return fetch(BASE + section, {
+        var req = fetch(BASE + section, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: body,
             keepalive: keepalive === true
-        }).then(function(r) {
+        });
+        if (keepalive) {
+            var settle = function() { keepaliveLeft += size; };
+            req.then(settle, settle);
+        }
+        return req.then(function(r) {
             noteServerClock(r, sent);
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
             if (!r.ok) {
