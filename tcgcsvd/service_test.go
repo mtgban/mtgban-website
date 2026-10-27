@@ -24,6 +24,7 @@ func (s stubStore) EnsureTCGProductsSchema(context.Context) error { return nil }
 func (s stubStore) EnsureTCGCategoryPartition(context.Context, int) error {
 	return nil
 }
+func (s stubStore) EnsurePriceDatesSchema(context.Context) error { return nil }
 func (s stubStore) GetTCGLatestDate(context.Context, int) (time.Time, bool, error) {
 	return time.Time{}, false, nil
 }

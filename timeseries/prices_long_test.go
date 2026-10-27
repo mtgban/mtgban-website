@@ -1,7 +1,7 @@
 package timeseries
 
 import (
-	"regexp"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -49,46 +49,22 @@ func TestBuildLongUpsertQuery(t *testing.T) {
 	}
 }
 
-// normalizeParams makes two renderings of the same predicate comparable when
-// they sit at different parameter positions.
-var paramRE = regexp.MustCompile(`\$\d+`)
-
-func normalizeParams(s string) string { return paramRE.ReplaceAllString(s, "$?") }
-
-// TestMoverQueriesShareGameScope guards the drift that let the anchors and the
-// result set disagree: the anchor dates were provider-wide while the rows were
-// game-scoped, so a game a day behind its provider's newest date resolved to an
-// anchor holding none of its rows. Behavior lives in
-// TestMoversLongGameScopingLive; this keeps the three queries tied together
-// without needing a database.
-func TestMoverQueriesShareGameScope(t *testing.T) {
-	// A category that is not Magic; the exact number does not matter here.
-	const someCategory = 71
-	before := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
-
-	for _, tc := range []struct {
-		name     string
-		category int
-	}{
-		{"magic", CategoryMagic},
-		{"non-magic", someCategory},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			latest, _ := buildMoverAnchorQuery(ProviderTCGLow, tc.category, nil)
-			prior, _ := buildMoverAnchorQuery(ProviderTCGLow, tc.category, &before)
-			rows, _ := buildMoverRowsQuery(ProviderTCGLow, tc.category, before, before, 0, 0)
-
-			scope, _ := moverScope(tc.category, 1)
-			want := normalizeParams(scope)
-			for _, q := range []struct {
-				name  string
-				query string
-			}{{"latest", latest}, {"prior", prior}, {"rows", rows}} {
-				if !strings.Contains(normalizeParams(q.query), want) {
-					t.Errorf("%s query does not carry the game scope %q:\n%s", q.name, want, q.query)
-				}
-			}
-		})
+// price_dates has to file exactly the rows the rows query reads, or an anchor
+// names a day the game holds nothing on. The backfill script states the same
+// predicate in SQL, so hold its text to the writer's.
+func TestPriceDatesBackfillMatchesWriter(t *testing.T) {
+	script, err := os.ReadFile("../db_migration/price_dates/price_dates.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	game, scope := priceDatesGame()
+	for _, want := range []string{game, "(" + scope + ")"} {
+		if !strings.Contains(string(script), want) {
+			t.Errorf("backfill does not file rows as the writer does, missing:\n%s", want)
+		}
+	}
+	if !strings.Contains(recordPriceDatesQuery(), scope) {
+		t.Errorf("writer does not carry its own scope:\n%s", recordPriceDatesQuery())
 	}
 }
 
@@ -99,37 +75,6 @@ func TestMagicMoversLeaveAltCopiesOut(t *testing.T) {
 	scope, _ := moverScope(CategoryMagic, 1)
 	if !strings.Contains(scope, "NOT v.is_alt") {
 		t.Errorf("Magic mover scope keeps the is_alt copies: %q", scope)
-	}
-}
-
-// The anchors used to aggregate: max(date) over a join has to visit every price
-// row the provider holds, across every monthly partition, before it can name
-// the largest - so a screener page paid two full scans before it read a single
-// price. Reading the date off the first row instead lets the planner walk
-// prices_provider_date backwards and stop as soon as a row belongs to this
-// game.
-func TestMoverAnchorStopsAtTheFirstRow(t *testing.T) {
-	query, args := buildMoverAnchorQuery(ProviderTCGLow, CategoryMagic, nil)
-
-	if strings.Contains(query, "max(") {
-		t.Errorf("anchor aggregates instead of stopping at the first row:\n%s", query)
-	}
-	if !strings.Contains(query, "ORDER BY p.date DESC") || !strings.Contains(query, "LIMIT 1") {
-		t.Errorf("anchor is not ordered and bounded:\n%s", query)
-	}
-	if len(args) != 1 || args[0] != ProviderTCGLow {
-		t.Errorf("args = %v, want the provider alone on Magic", args)
-	}
-
-	// The bound and the category are both parameters, numbered in the order
-	// they are appended, so the scope keeps $2 and the bound takes $3.
-	before := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
-	query, args = buildMoverAnchorQuery(ProviderTCGLow, 71, &before)
-	if !strings.Contains(query, "v.tcgp_category_id = $2") || !strings.Contains(query, "p.date <= $3") {
-		t.Errorf("parameters are not numbered as laid out:\n%s", query)
-	}
-	if len(args) != 3 || args[1] != 71 || args[2] != before {
-		t.Errorf("args = %v, want provider, category, bound", args)
 	}
 }
 
@@ -157,44 +102,5 @@ func TestBuildMoverRowsQueryMaterializes(t *testing.T) {
 	query, _ := buildMoverRowsQuery(ProviderTCGLow, CategoryMagic, time.Now(), time.Now(), 0, 0)
 	if n := strings.Count(query, "AS MATERIALIZED ("); n != 2 {
 		t.Errorf("query materializes %d of its two arms:\n%s", n, query)
-	}
-}
-
-// The fast path asks two cheap questions per step: what is the provider's
-// newest date (an index read with no join in the way), and did this game write
-// anything on it (an equality on date, so the planner can nested-loop into
-// variants and stop at the first hit).
-func TestMoverAnchorFastPathQueries(t *testing.T) {
-	if q := providerLatestDateQuery(false, false); strings.Contains(q, "date <") || strings.Contains(q, "JOIN") {
-		t.Errorf("unbounded latest-date query is not plain:\n%s", q)
-	}
-	if q := providerLatestDateQuery(true, false); !strings.Contains(q, "date <= $2") {
-		t.Errorf("bounded query does not include its bound:\n%s", q)
-	}
-	if q := providerLatestDateQuery(true, true); !strings.Contains(q, "date < $2") {
-		t.Errorf("stepping query does not exclude the date it just tried:\n%s", q)
-	}
-
-	// The probe must pin one date and stop at one row, or it is the scan again.
-	probe := gameHasRowsOnQuery(CategoryMagic)
-	for _, want := range []string{"p.date=$2", "LIMIT 1", "v.mtgjson_uuid IS NOT NULL"} {
-		if !strings.Contains(probe, want) {
-			t.Errorf("magic probe is missing %q:\n%s", want, probe)
-		}
-	}
-
-	// And it must drive from prices, not from variants. Driving from variants
-	// makes the hit almost free and the miss catastrophic - one scattered
-	// primary-key descent per variant, 40.8s measured against 1.3s for this
-	// shape - and moverAnchor loops on misses.
-	if strings.Contains(probe, "MATERIALIZED") {
-		t.Errorf("probe pins a join order that inverts its miss cost:\n%s", probe)
-	}
-	pricesAt, variantsAt := strings.Index(probe, "FROM prices"), strings.Index(probe, "JOIN variants")
-	if pricesAt < 0 || variantsAt < 0 || pricesAt > variantsAt {
-		t.Errorf("probe does not drive from prices:\n%s", probe)
-	}
-	if probe := gameHasRowsOnQuery(71); !strings.Contains(probe, "v.tcgp_category_id = $3") {
-		t.Errorf("non-magic probe does not carry its category at $3:\n%s", probe)
 	}
 }

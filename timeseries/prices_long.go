@@ -1,11 +1,17 @@
 package timeseries
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	_ "embed"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // LongPrice is one row of the long prices table: a single provider's price for a
@@ -229,154 +235,86 @@ func moverScope(tcgCategory, next int) (string, []any) {
 	return fmt.Sprintf("v.mtgjson_uuid IS NULL AND v.tcgp_category_id = $%d", next), []any{tcgCategory}
 }
 
-// buildMoverAnchorQuery asks for the newest date this game has under this
-// provider, optionally no later than before.
-//
-// It reads the date off the first row rather than aggregating: `max(date)` over
-// a join has to visit every price row the provider holds, across every monthly
-// partition, before it can name the largest - which is what this query used to
-// do, and what made a screener page cost two full scans before it read a single
-// price. Ordering by date descending and stopping at the first row lets the
-// planner walk prices_provider_date backwards and quit as soon as a row belongs
-// to this game.
+// priceDatesGame renders, over an aliased `v` of variants, the game price_dates
+// files a row under and the rows it files at all: exactly the rows moverScope
+// selects for some game. A Magic day holding only foreign-language or
+// Alternate Fourth Edition rows would otherwise anchor the screener on a day
+// its rows query finds nothing on, and a TCGplayer row under category 1 would
+// share Magic's key.
+func priceDatesGame() (game, scope string) {
+	magic, _ := moverScope(CategoryMagic, 0)
+	return fmt.Sprintf("coalesce(v.tcgp_category_id, %d)", CategoryMagic),
+		fmt.Sprintf("(%s) OR (v.mtgjson_uuid IS NULL AND v.tcgp_category_id <> %d)", magic, CategoryMagic)
+}
+
+func recordPriceDatesQuery() string {
+	game, scope := priceDatesGame()
+	return `
+		INSERT INTO price_dates (provider, category, date)
+		SELECT DISTINCT $1::smallint, ` + game + `, $2::date
+		  FROM variants v
+		 WHERE v.ban_id = ANY($3::bigint[]) AND (` + scope + `)
+		ON CONFLICT DO NOTHING`
+}
+
+// recordPriceDates files the days these rows give each game under each
+// provider, in the transaction that writes them. A snapshot covers one or two
+// days, so it is a handful of statements, each sending only its ban_ids. They
+// run in a fixed order, so two writers filing the same days wait on each other
+// instead of deadlocking.
+func recordPriceDates(ctx context.Context, tx *sql.Tx, rows []LongPrice) error {
+	type day struct {
+		provider int16
+		date     string
+	}
+	banIDs := map[day][]int64{}
+	for _, r := range rows {
+		d := day{r.Provider, r.Date}
+		banIDs[d] = append(banIDs[d], r.BanID)
+	}
+	days := slices.SortedFunc(maps.Keys(banIDs), func(a, b day) int {
+		return cmp.Or(cmp.Compare(a.provider, b.provider), strings.Compare(a.date, b.date))
+	})
+	query := recordPriceDatesQuery()
+	for _, d := range days {
+		if _, err := tx.ExecContext(ctx, query, d.provider, d.date, pq.Array(banIDs[d])); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ExpirePriceDates drops the days in price_dates older than the screener can
+// ask for: its longest window is a year, and a month more keeps that window for
+// a game whose newest day lags. No-op on a read-only client.
+func (c *Client) ExpirePriceDates(ctx context.Context) error {
+	if c.readOnly {
+		return nil
+	}
+	_, err := c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE date < current_date - interval '13 months'`)
+	return err
+}
+
+// moverAnchor returns the newest date this game has under this provider, at or
+// before the given bound, from price_dates.
 //
 // The anchor is per game, not per provider: one provider carries every game's
 // prices, written by producers on unrelated schedules - the per-site snapshot
 // stash for Magic, the TCGplayer archive ingest for the others - so a
 // provider's newest date routinely belongs to a game other than the one being
-// asked about. Anchoring provider-wide and filtering afterwards returns nothing
-// at all whenever the games sit a day apart: the normal state for part of every
-// day, and the lasting state whenever one game's ingest fails, since the daily
-// ingest is deliberately per-category and non-fatal.
-func buildMoverAnchorQuery(provider int16, tcgCategory int, before *time.Time) (string, []any) {
-	args := []any{provider}
-	scope, scopeArgs := moverScope(tcgCategory, len(args)+1)
-	args = append(args, scopeArgs...)
-
-	query := `SELECT p.date
-		  FROM prices p
-		  JOIN variants v ON v.ban_id = p.ban_id
-		 WHERE p.provider = $1 AND ` + scope
-	if before != nil {
-		args = append(args, *before)
-		query += fmt.Sprintf(" AND p.date <= $%d", len(args))
-	}
-	return query + `
-		 ORDER BY p.date DESC
-		 LIMIT 1`, args
-}
-
-// moverAnchorSteps bounds the fast path: how many of the provider's dates it
-// checks, newest first, before handing over to the scan. A game normally has
-// rows on the provider's newest date or within a day or two of it, and a game
-// that has fallen further behind than this is better served by the scan than by
-// another round-trip per date.
-const moverAnchorSteps = 8
-
-// providerLatestDateQuery finds the newest date a provider wrote, optionally
-// no later (or strictly earlier) than a bound. It reads nothing but the
-// prices_provider_date index and answers in milliseconds whatever the table
-// holds, because no join stands between it and the answer.
-func providerLatestDateQuery(bounded, strict bool) string {
-	query := `SELECT max(date) FROM prices WHERE provider=$1`
-	if !bounded {
-		return query
-	}
-	if strict {
-		return query + ` AND date < $2`
-	}
-	return query + ` AND date <= $2`
-}
-
-// gameHasRowsOnQuery asks whether one game wrote anything on one exact date.
-// The equality on date is what makes it cheap: the planner nested-loops from
-// the day's index entries into variants by primary key and stops at the first
-// row that belongs to this game.
-//
-// It drives from prices, and that is deliberate. Driving from prices means the
-// hit costs however many of the day's entries sit in front of this game's
-// first one - a day of TCGplayer prices carries every game, written game by
-// game, so for Magic under provider 3 that is 51,817 entries and 345ms on the
-// live archive. Tempting, then, to drive from variants instead and make each
-// ban_id a primary-key probe into prices: the hit drops to under a
-// millisecond, because a game with rows that day has them for most of its
-// variants and the first probe lands.
-//
-// The miss is what kills it. moverAnchor loops on misses - that is the whole
-// point of the walk - and a miss satisfies no LIMIT, so the probe side runs to
-// the end. Driving from variants that is one scattered primary-key descent per
-// variant into a 42GB index: measured at 40.8 seconds for a 61,619-variant
-// game against a provider holding 147,280 rows that day, where driving from
-// prices scans the day once and answers in 1.3. Forcing a hash join between
-// both sides instead is stable on the miss (0.2s) but pays for the whole day
-// slice on every hit (3.2s), and hits are the common case.
-//
-// So all three shapes trade hit against miss, and this one takes the trade that
-// matches the traffic. The way out is not another rewrite of this query: it is
-// to stop asking the archive which dates a game covers, and keep a
-// (provider, category, date) coverage table that answers both anchors with a
-// primary-key lookup.
-func gameHasRowsOnQuery(tcgCategory int) string {
-	scope, _ := moverScope(tcgCategory, 3)
-	return `SELECT 1 FROM prices p
-		  JOIN variants v ON v.ban_id = p.ban_id
-		 WHERE p.provider=$1 AND p.date=$2 AND ` + scope + ` LIMIT 1`
-}
-
-// moverAnchor returns the newest date this game has under this provider, at or
-// before the given bound.
-//
-// It walks the provider's own dates newest-first and asks, per date, whether
-// this game wrote anything - two index reads a step, against a table where
-// finding "the newest row of this game" directly means scanning past every
-// newer row that belongs to another one. Games normally sit on the same date
-// or a day apart, so this settles in a step or two.
-//
-// Beyond moverAnchorSteps it gives up and scans, which is slower but bounded
-// by nothing: a game whose ingest died months ago still gets its answer.
+// asked about. Finding the game's own newest date in prices means walking past
+// every newer row of every other game, and through the provider's whole
+// history when the game has none at or before the bound.
 func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory int, before *time.Time) (sql.NullTime, error) {
-	probe := gameHasRowsOnQuery(tcgCategory)
-	_, scopeArgs := moverScope(tcgCategory, 3)
-
-	cursor := before
-	for step := 0; step < moverAnchorSteps; step++ {
-		args := []any{provider}
-		if cursor != nil {
-			args = append(args, *cursor)
-		}
-		var date sql.NullTime
-		bounded, strict := cursor != nil, step > 0
-		err := c.queryRow(ctx, c.providerLatestDateStmt(bounded, strict),
-			providerLatestDateQuery(bounded, strict), args...).Scan(&date)
-		if err != nil && err != sql.ErrNoRows {
-			return sql.NullTime{}, err
-		}
-		if !date.Valid {
-			// The provider has nothing older, so neither has this game.
-			return sql.NullTime{}, nil
-		}
-
-		var found int
-		probeArgs := append([]any{provider, date.Time}, scopeArgs...)
-		err = c.db.QueryRowContext(ctx, probe, probeArgs...).Scan(&found)
-		if err == nil {
-			return date, nil
-		}
-		if err != sql.ErrNoRows {
-			return sql.NullTime{}, err
-		}
-		next := date.Time
-		cursor = &next
+	query := `SELECT max(date) FROM price_dates WHERE provider=$1 AND category=$2`
+	args := []any{provider, tcgCategory}
+	if before != nil {
+		query += ` AND date <= $3`
+		args = append(args, *before)
 	}
-
-	// Too far behind for the step-by-step walk; let the scan settle it.
-	query, args := buildMoverAnchorQuery(provider, tcgCategory, before)
 	var date sql.NullTime
 	err := c.db.QueryRowContext(ctx, query, args...).Scan(&date)
-	if err != nil && err != sql.ErrNoRows {
-		return sql.NullTime{}, err
-	}
-	return date, nil
+	return date, err
 }
 
 // buildMoverRowsQuery pairs each of this game's prices on the two anchor dates.
@@ -492,6 +430,9 @@ func dedupeLongPrices(rows []LongPrice) []LongPrice {
 // the rows inserted or changed. Every snapshot re-covers days it already wrote,
 // and rewriting an unchanged price would still leave a dead row version and a
 // new entry in each index.
+//
+// The days written are filed in price_dates in the same transaction, so the
+// screener's anchors never name a day the prices do not hold.
 func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSize int) (int, error) {
 	if c.readOnly || len(rows) == 0 {
 		return 0, nil
@@ -514,6 +455,9 @@ func (c *Client) UpsertLongPrices(ctx context.Context, rows []LongPrice, batchSi
 		n, _ := res.RowsAffected()
 		total += int(n)
 	}
+	if err := recordPriceDates(ctx, tx, rows); err != nil {
+		return 0, fmt.Errorf("price dates: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
@@ -535,6 +479,22 @@ func buildLongUpsertQuery(batch []LongPrice) (string, []any) {
 		` ON CONFLICT (ban_id, date, provider) DO UPDATE SET price = EXCLUDED.price` +
 		` WHERE prices.price IS DISTINCT FROM EXCLUDED.price`
 	return q, args
+}
+
+//go:embed schema_price_dates.sql
+var priceDatesSchemaSQL string
+
+// EnsurePriceDatesSchema creates price_dates if it does not exist. Every
+// UpsertLongPrices writes to it, so call it at startup with the partitions.
+// Idempotent; no-op on a read-only client.
+func (c *Client) EnsurePriceDatesSchema(ctx context.Context) error {
+	if c.readOnly {
+		return nil
+	}
+	if err := c.execTCGDDL(ctx, priceDatesSchemaSQL); err != nil {
+		return fmt.Errorf("timeseries: ensure price_dates: %w", err)
+	}
+	return nil
 }
 
 // EnsurePricePartition creates the monthly range partition of prices covering
