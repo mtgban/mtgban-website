@@ -197,7 +197,8 @@ func TestModeSwitchKeepsAnOpenedListOpen(t *testing.T) {
 	}
 
 	var packed strings.Builder
-	for _, entry := range unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}}) {
+	unpacked, _ := unpackSealed(backend(), []UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+	for _, entry := range unpacked {
 		if entry.Unpacked {
 			continue
 		}
