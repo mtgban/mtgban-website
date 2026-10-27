@@ -1051,11 +1051,19 @@ func isLetter(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 }
 
-// parseSearchOptionsNG reads a query into a SearchConfig. The outer query is
-// depth zero; parseSearchOptionsDepth counts the in: pools nested in it.
+// parseSearchQuery reads a query a reader typed into a SearchConfig, with the
+// datastore's numbers snapshot at hand.
+func parseSearchQuery(ds *datastore, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+	budget := maxPools
+	return parseSearchOptionsDepth(ds.backend, ds.numbers, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+}
+
+// parseSearchOptionsNG reads a query into a SearchConfig without the numbers
+// snapshot. The outer query is depth zero; parseSearchOptionsDepth counts the
+// in: pools nested in it.
 func parseSearchOptionsNG(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
 	budget := maxPools
-	return parseSearchOptionsDepth(b, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
+	return parseSearchOptionsDepth(b, nil, query, blocklistRetail, blocklistBuylist, miscSearchOpts, 0, &budget)
 }
 
 // maxPoolDepth is how deep in: pools nest. A pool found at depth
@@ -1070,7 +1078,7 @@ const maxPools = 8
 // reach restoreProtected and the pool loop.
 var stripMarks = strings.NewReplacer(protectedMark, "", poolMark, "")
 
-func parseSearchOptionsDepth(b *mtgmatcher.Backend, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
+func parseSearchOptionsDepth(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string, depth int, budget *int) (config SearchConfig) {
 	query = stripMarks.Replace(query)
 	rawQuery := query
 	var filters []FilterElem
@@ -1764,7 +1772,7 @@ func parseSearchOptionsDepth(b *mtgmatcher.Backend, query string, blocklistRetai
 				sub = `contents:"` + pool.Value + `"`
 			}
 		}
-		subConfig := parseSearchOptionsDepth(b, sub, nil, nil, nil, depth+1, budget)
+		subConfig := parseSearchOptionsDepth(b, numbers, sub, nil, nil, nil, depth+1, budget)
 		filters = append(filters, FilterElem{
 			Name:   "pool",
 			Negate: pool.Negate,

@@ -71,7 +71,7 @@ var popularSearchModes = map[string]bool{"": true, "any": true}
 // it found; "" when the mode or shape can't yield a key, it found nothing,
 // or the results span more than one card's name.
 func resolvePopularKey(ds *datastore, q string) string {
-	config := parseSearchOptionsNG(ds.backend, q, nil, nil, nil)
+	config := parseSearchQuery(ds, q, nil, nil, nil)
 	if !popularSearchModes[config.SearchMode] || !popularKeyShape(config) {
 		return ""
 	}
