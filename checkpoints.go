@@ -64,6 +64,10 @@ type ChartCheckpoint struct {
 	KeyruneCode string `json:"keyruneCode,omitempty"`
 }
 
+// errNoCheckpointsPath is the reload error of a game that has no curated
+// document configured.
+var errNoCheckpointsPath = errors.New("timeseries_config.checkpoints_path not configured")
+
 // checkpointsStore holds the checkpoints document. The bucket is built per
 // operation, with the key pair held for the bucket the path names; reload and
 // save are infrequent enough that the extra B2 auth round-trip is not worth a
@@ -72,7 +76,7 @@ var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		cpPath := Config().TimeseriesConfig.CheckpointsPath
 		if cpPath == "" {
-			return nil, "", errors.New("timeseries_config.checkpoints_path not configured")
+			return nil, "", errNoCheckpointsPath
 		}
 		u, err := url.Parse(cpPath)
 		if err != nil {
@@ -461,9 +465,16 @@ func containsFold(list []string, target string) bool {
 // fails leaves the markers as they are -- an empty index when the boot-time
 // load failed too -- so it is worth reporting rather than only logging: for
 // Magic the source is a document on someone else's server, and a chart quietly
-// missing every ban marker looks like a chart with nothing to mark.
+// missing every ban marker looks like a chart with nothing to mark. A game
+// with no checkpoints_path has nothing to reload, so that is only logged.
 func refreshCheckpoints() {
-	if err := reloadCheckpoints(); err != nil {
-		ServerNotify("checkpoints", "reload failed: "+err.Error(), true)
+	err := reloadCheckpoints()
+	if err == nil {
+		return
 	}
+	if errors.Is(err, errNoCheckpointsPath) {
+		log.Println("checkpoints: reload skipped:", err)
+		return
+	}
+	ServerNotify("checkpoints", "reload failed: "+err.Error(), true)
 }
