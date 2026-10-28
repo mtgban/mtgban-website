@@ -122,3 +122,39 @@ func TestAlertsPageEmptyStateShowsTheBellFlow(t *testing.T) {
 		}
 	}
 }
+
+// A desktop row shows its card's image on hover, and a row whose card no
+// longer resolves clears it; the mobile page has no hover image to fill.
+func TestAlertsPageRowsCarryTheHoverImage(t *testing.T) {
+	tmpl, err := template.New("").Funcs(funcMap).ParseFiles("templates/partials/alerts-body.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	vars := AlertsPageVars{
+		SignedIn: true, Allowed: true, Allowance: 5,
+		Alerts: []alerts.View{
+			{Alert: alerts.Alert{ID: 1, CardID: "card-1", Status: alerts.StatusActive}},
+			{Alert: alerts.Alert{ID: 2, CardID: "gone", Status: alerts.StatusUnresolvable}},
+		},
+		Cards: cardMetadata{"card-1": {UUID: "card-1", ImageURL: "https://img.example/card-1.jpg", SetCode: "SLD"}},
+	}
+	for _, mobile := range []bool{false, true} {
+		var out strings.Builder
+		if err := tmpl.ExecuteTemplate(&out, "alerts-body", PageVars{IsMobile: mobile, AlertsPage: &vars}); err != nil {
+			t.Fatalf("mobile %v: %v", mobile, err)
+		}
+		page := out.String()
+		if got := strings.Count(page, "onmouseover="); got != map[bool]int{false: 2, true: 0}[mobile] {
+			t.Errorf("mobile %v: %d rows with a hover image", mobile, got)
+		}
+		if mobile {
+			continue
+		}
+		if !strings.Contains(page, `https://img.example/card-1.jpg`) || !strings.Contains(page, `hw.setAttribute('data-set','SLD')`) {
+			t.Errorf("the card's row lacks its image:\n%s", page)
+		}
+		if !strings.Contains(page, `onmouseover="window.setCardArtSource(document.getElementById('hoverImage'),'data:image`) {
+			t.Errorf("the missing card's row does not clear the image:\n%s", page)
+		}
+	}
+}
