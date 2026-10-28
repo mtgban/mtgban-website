@@ -157,16 +157,11 @@ func sealedQuerySuggestion(b *mtgmatcher.Backend, rawQuery string) *AltSearch {
 	return &AltSearch{Label: label, Query: query}
 }
 
-// Build returns a "did you mean..." card name and a list of alternative
-// searches to show when a query returns nothing.
-func Build(p Params) (string, []AltSearch) {
+// Build returns the alternative searches to show when a query returns
+// nothing.
+func Build(p Params) []AltSearch {
 	if p.SearchMode == "hashing" {
-		return "", nil
-	}
-
-	var didYouMean string
-	if p.CleanQuery != "" {
-		didYouMean = Closest(p.Backend, p.CleanQuery, p.Sealed)
+		return nil
 	}
 
 	alts := relaxedSearches(p.RawQuery, p.CleanQuery, p.AppliedFilters)
@@ -180,5 +175,42 @@ func Build(p Params) (string, []AltSearch) {
 		}
 	}
 
-	return didYouMean, alts
+	return alts
+}
+
+// SetCodeFilters reads every is: or not: filter whose values are all set
+// codes as the s: filter it was meant to be: "is:plst" asks for a tag no
+// card carries, "s:plst" for the set. It reports whether any was rewritten.
+func SetCodeFilters(b *mtgmatcher.Backend, filters []string) ([]string, bool) {
+	out := make([]string, 0, len(filters))
+	var fixed bool
+	for _, filter := range filters {
+		key, value, found := strings.Cut(filter, ":")
+		negate := strings.HasPrefix(key, "-")
+		key = strings.ToLower(strings.TrimPrefix(key, "-"))
+		if key == "not" {
+			negate = !negate
+		}
+		if !found || (key != "is" && key != "not") || !allSetCodes(b, value) {
+			out = append(out, filter)
+			continue
+		}
+		prefix := "s:"
+		if negate {
+			prefix = "-s:"
+		}
+		out = append(out, prefix+value)
+		fixed = true
+	}
+	return out, fixed
+}
+
+func allSetCodes(b *mtgmatcher.Backend, value string) bool {
+	for _, code := range strings.Split(value, ",") {
+		_, err := b.GetSet(code)
+		if err != nil {
+			return false
+		}
+	}
+	return value != ""
 }
