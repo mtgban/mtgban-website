@@ -248,7 +248,18 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     border-bottom: 1px solid var(--border-subtle);
 }
 
-.backpack-row[draggable="true"] { cursor: grab; }
+/* the handle runs the row's height, art or not */
+.backpack-row-art[draggable="true"] { cursor: grab; align-self: stretch; display: flex; align-items: center; }
+
+/* a grip marks the handle of a row without art */
+.backpack-row-art[draggable="true"]:empty { justify-content: center; }
+.backpack-row-art[draggable="true"]:empty::before {
+    content: "";
+    width: 8px;
+    height: 16px;
+    opacity: 0.4;
+    background: radial-gradient(circle, currentColor 1.2px, transparent 1.6px) 0 0 / 4px 4px;
+}
 
 .backpack-row.dragging { opacity: 0.5; }
 
