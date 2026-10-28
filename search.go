@@ -204,18 +204,19 @@ var AllConditions = []mtgban.Condition{"INDEX", mtgban.NM, mtgban.SP, mtgban.MP,
 // dropped, because pinning a name is what the main bar is for. A bar
 // that yields nothing at all is a bar the search will ignore, which is
 // the one thing the reader has to be told.
-func scopeFilters(ds *datastore, scope string, sealed bool) []FilterElem {
+func scopeFilters(ds *datastore, scope string, bareIDs bool) []FilterElem {
 	if scope == "" {
 		return nil
 	}
-	return parseSearchPage(ds, scope, sealed, nil, nil, nil).CardFilters
+	return parseSearchPage(ds, scope, bareIDs, nil, nil, nil).CardFilters
 }
 
-// parseSearchPage parses what a reader typed into a search's bars. A sealed
-// search parses without the numbers snapshot: sealed products carry no
-// collector numbers, so a number alone there stays an id or a name's words.
-func parseSearchPage(ds *datastore, query string, sealed bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
-	if sealed {
+// parseSearchPage parses what a reader typed into a search's bars. With
+// bareIDs it parses without the numbers snapshot, so a number alone stays an
+// id or a name's words: sealed products carry no collector numbers, and the
+// price API's callers ask by TCGplayer product id.
+func parseSearchPage(ds *datastore, query string, bareIDs bool, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) SearchConfig {
+	if bareIDs {
 		return parseSearchOptionsNG(ds.backend, query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	}
 	return parseSearchQuery(ds, query, blocklistRetail, blocklistBuylist, miscSearchOpts)

@@ -674,10 +674,13 @@ func (s *site) searchPrices(w http.ResponseWriter, r *http.Request, isAPI bool) 
 	}
 
 	miscSearchOpts := readSearchMiscOpts(r)
-	config := parseSearchPage(ds, query, isSealed, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	// The export reads a number alone as the page does; the API keeps it the
+	// product id its callers send.
+	bareIDs := isSealed || isAPI
+	config := parseSearchPage(ds, query, bareIDs, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	// The export links carry the sticky bar as its own parameter rather
 	// than spliced into the path, so the csv holds the rows the page did.
-	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(r.FormValue("scope")), isSealed))
+	applySearchScope(&config, scopeFilters(ds, strings.TrimSpace(r.FormValue("scope")), bareIDs))
 	if isSealed {
 		config.SearchMode = "sealed"
 		// v2 keeps an id the request asks for
