@@ -771,22 +771,24 @@
         var r = text("div", "backpack-row");
         r.setAttribute("data-card-id", e.id);
         r.setAttribute("data-key", key(e));
-        if (others.length) {
-            r.setAttribute("draggable", "true");
-            r.addEventListener("dragstart", function (ev) {
-                ev.dataTransfer.setData(DRAG_TYPE, key(e));
-                ev.dataTransfer.effectAllowed = "move";
-                r.classList.add("dragging");
-            });
-            r.addEventListener("dragend", function () { r.classList.remove("dragging"); });
-        }
         var art = text("div", "backpack-row-art" + (e.cw ? " blurred" : ""));
         if (e.img) {
             var img = document.createElement("img");
             img.setAttribute("src", e.img);
             img.setAttribute("alt", "");
             img.setAttribute("loading", "lazy");
+            img.setAttribute("draggable", "false");
             art.appendChild(img);
+        }
+        // The art is the handle, so the row's text stays selectable.
+        if (others.length) {
+            art.setAttribute("draggable", "true");
+            art.addEventListener("dragstart", function (ev) {
+                ev.dataTransfer.setData(DRAG_TYPE, key(e));
+                ev.dataTransfer.effectAllowed = "move";
+                r.classList.add("dragging");
+            });
+            art.addEventListener("dragend", function () { r.classList.remove("dragging"); });
         }
         var body = text("div", "backpack-row-body");
         var name = text("div", "backpack-row-name", e.name || e.id);

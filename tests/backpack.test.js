@@ -724,7 +724,7 @@ describe('moving cards between backpacks', () => {
     test('one backpack has nothing to move to', () => {
         const p = page({ store: store.slice(0, 2) });
         open(p);
-        expect(rowsOf()[0].getAttribute('draggable')).toBeNull();
+        expect(rowsOf()[0].querySelector('.backpack-row-art').getAttribute('draggable')).toBeNull();
         expect(moves(rowsOf()[0].querySelector('.backpack-cond'))).toEqual([]);
     });
 
@@ -741,13 +741,15 @@ describe('moving cards between backpacks', () => {
         expect(p.document.activeElement).toBe(tabsOf()[0]);
     });
 
-    test('a row dragged onto another tab moves there', () => {
+    test('a row dragged by its art onto another tab moves there', () => {
         const p = page({ store, tabs: 3, tabList });
         open(p);
         const row = rowsOf()[1];
-        expect(row.getAttribute('draggable')).toBe('true');
+        const art = row.querySelector('.backpack-row-art');
+        expect(row.getAttribute('draggable')).toBeNull();
+        expect(art.getAttribute('draggable')).toBe('true');
         const dt = transfer();
-        fire(row, 'dragstart', dragEvent(dt));
+        fire(art, 'dragstart', dragEvent(dt));
         expect(row.classes.has('dragging')).toBe(true);
         const target = tabsOf()[2];
         const over = dragEvent(dt);
@@ -789,7 +791,7 @@ describe('moving cards between backpacks', () => {
         const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 2, m: 2 }, { id: 'uuid-1', pack: 2, qty: 998, t: 1, m: 1 }], tabs: 2, tabList });
         open(p);
         const dt = transfer();
-        fire(rowsOf()[0], 'dragstart', dragEvent(dt));
+        fire(rowsOf()[0].querySelector('.backpack-row-art'), 'dragstart', dragEvent(dt));
         const target = tabsOf()[1];
         fire(target, 'dragover', dragEvent(dt));
         fire(target, 'drop', dragEvent(dt));
