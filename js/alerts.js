@@ -763,11 +763,14 @@
     }
 
     // ── Sorting the list on /alerts ─────────────────────────
-    // The pick is kept per device in localStorage as "field:dir". The
-    // server lists newest first, which also breaks every sort's ties.
+    // The pick, from the menu or a header, is kept per device in
+    // localStorage as "field:dir". The server lists newest first, which
+    // also breaks every sort's ties.
     var SORT_KEY = 'alertsSort';
     var SORT_DEFAULT = 'created:desc';
     var SORT_FIELDS = ['created', 'name', 'now', 'fired', 'status', 'side'];
+    // The way each field runs first, as the menu lists it.
+    var SORT_FIRST_DIR = { created: 'desc', name: 'asc', now: 'desc', fired: 'desc', status: 'asc', side: 'asc' };
     var STATUS_RANK = { active: 0, paused: 1, over_allowance: 2, undeliverable: 3, unresolvable: 4 };
 
     // parseSort reads a "field:dir" value, falling back to the server's
@@ -826,6 +829,22 @@
         });
     }
 
+    // headerSort is what a click on field's header picks: the list the
+    // other way round when it is already sorted by field.
+    function headerSort(cur, field) {
+        if (cur.field === field) return { field: field, dir: cur.dir === 'asc' ? 'desc' : 'asc' };
+        return { field: field, dir: SORT_FIRST_DIR[field] };
+    }
+
+    // markSortHeaders puts the arrow on the sorted field's header, the
+    // aria-sort main.css draws for the tablesort tables.
+    function markSortHeaders(sort) {
+        document.querySelectorAll('.alerts-table th[data-sort]').forEach(function (th) {
+            if (th.getAttribute('data-sort') === sort.field) th.setAttribute('aria-sort', sort.dir === 'asc' ? 'ascending' : 'descending');
+            else th.removeAttribute('aria-sort');
+        });
+    }
+
     function applySort(sort) {
         var body = document.querySelector('.alerts-table tbody');
         if (!body) return;
@@ -841,17 +860,35 @@
         var pick = document.getElementById('alerts-sort');
         if (!pick) return;
         var sort = loadSort();
-        pick.value = sort.field + ':' + sort.dir;
+        var show = function (picked) {
+            sort = picked;
+            pick.value = sort.field + ':' + sort.dir;
+            markSortHeaders(sort);
+            applySort(sort);
+        };
         pick.closest('.alerts-sort').hidden = false;
-        applySort(sort);
+        show(sort);
         pick.addEventListener('change', function () {
-            var picked = parseSort(pick.value);
-            saveSort(picked);
-            applySort(picked);
+            show(parseSort(pick.value));
+            saveSort(sort);
+        });
+        document.querySelectorAll('.alerts-table th[data-sort]').forEach(function (th) {
+            var onPick = function () {
+                show(headerSort(sort, th.getAttribute('data-sort')));
+                saveSort(sort);
+            };
+            th.setAttribute('role', 'columnheader');
+            th.tabIndex = 0;
+            th.addEventListener('click', onPick);
+            th.addEventListener('keydown', function (e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                onPick();
+            });
         });
     }
 
-    window.alertsSort = { parseSort: parseSort, loadSort: loadSort, saveSort: saveSort, alertSortData: alertSortData, sortAlerts: sortAlerts };
+    window.alertsSort = { parseSort: parseSort, loadSort: loadSort, saveSort: saveSort, alertSortData: alertSortData, sortAlerts: sortAlerts, headerSort: headerSort };
 
     // ── Channels box (#alerts-channels on /alerts) ──────────
 

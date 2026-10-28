@@ -15,7 +15,8 @@
         <h2>Your alerts</h2>
         <span class="alerts-count">{{len .Alerts}} of {{.Allowance}}</span>
         {{if gt (len .Alerts) 1}}
-        {{/* js/alerts.js shows it and sorts the rows by their data-* values. */}}
+        {{/* js/alerts.js shows it and sorts the rows by their data-* values;
+             the headers with a data-sort pick the same sorts. */}}
         <label class="alerts-sort" hidden>Sort
             <select class="alert-input" id="alerts-sort">
                 <option value="created:desc">Newest first</option>
@@ -92,15 +93,15 @@
     <table class="table-data alerts-table">
         <thead>
             <tr>
-                <th>Card</th>
-                <th>Price</th>
+                <th data-sort="name">Card</th>
+                <th data-sort="side">Price</th>
                 <th>Cond</th>
                 <th>Stores</th>
                 <th class="num">Reference</th>
                 <th class="num">Above</th>
                 <th class="num">Below</th>
-                <th class="num">Now</th>
-                <th>Status</th>
+                <th class="num" data-sort="now">Now</th>
+                <th data-sort="status">Status</th>
                 <th></th>
             </tr>
         </thead>

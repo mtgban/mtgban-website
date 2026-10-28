@@ -176,6 +176,15 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
+/* The sort arrow sits after the header's name, not floated: a float drops
+   below the name in a column as narrow as Price. */
+.alerts-table th[data-sort] { white-space: nowrap; }
+.alerts-table th[role=columnheader][data-sort]::after {
+    float: none;
+    display: inline-block;
+    vertical-align: middle;
+    margin-top: 0;
+}
 .alerts-table td { vertical-align: top; }
 .alerts-table td.alert-card { min-width: 14em; }
 .alerts-table td.alert-card a {

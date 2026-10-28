@@ -178,3 +178,20 @@ test('sortAlerts puts a row with no offer or no firing last either way', () => {
     // The input is left as it was.
     expect(ROWS.map(r => r.id)).toEqual([5, 4, 3, 2, 1]);
 });
+
+test('headerSort flips the sorted field and starts another the way the menu lists it first', () => {
+    const h = loadSort();
+    const body = readFileSync(new URL('../templates/partials/alerts-body.html', import.meta.url), 'utf8');
+    const menu = [...body.matchAll(/<option value="(\w+):(asc|desc)">/g)];
+    const first = {};
+    for (const [, field, dir] of menu) if (!(field in first)) first[field] = dir;
+    const headers = [...body.matchAll(/<th[^>]* data-sort="(\w+)"/g)].map(m => m[1]);
+    expect(headers.length).toBeGreaterThan(0);
+    for (const field of headers) {
+        expect(first[field]).toBeDefined();
+        expect(h.headerSort({ field: 'created', dir: 'desc' }, field)).toEqual({ field, dir: first[field] });
+    }
+    expect(h.headerSort({ field: 'name', dir: 'asc' }, 'name')).toEqual({ field: 'name', dir: 'desc' });
+    expect(h.headerSort({ field: 'now', dir: 'asc' }, 'now')).toEqual({ field: 'now', dir: 'desc' });
+    expect(h.headerSort({ field: 'status', dir: 'desc' }, 'status')).toEqual({ field: 'status', dir: 'asc' });
+});
