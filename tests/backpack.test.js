@@ -39,11 +39,12 @@ let submitHook = null;
 let confirms = [];
 let currentDoc = null;
 
-function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false } = {}) {
+function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max, tabs, active, tabList, session, sections = [], navMenu = false, sort, fetch } = {}) {
     ids = {}; submitted = []; submitHook = null; confirms = [];
     const m = { mtgban_backpack: JSON.stringify(store), mtgban_backpack_empty_after: emptyAfter };
     if (active) m.mtgban_backpack_active = String(active);
     if (tabList) m.mtgban_backpack_tabs = JSON.stringify(tabList);
+    if (sort) m.mtgban_backpack_sort = JSON.stringify(sort);
     const localStorage = { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } };
     const sm = session || (pending ? { mtgban_backpack_pending_clear: JSON.stringify(pending) } : {});
     const sessionStorage = { getItem: (k) => (k in sm ? sm[k] : null), setItem: (k, v) => { sm[k] = String(v); }, removeItem: (k) => { delete sm[k]; } };
@@ -88,6 +89,7 @@ function page({ store = [], emptyAfter = '0', mobile = false, ban, pending, max,
     if (ban) window.BAN_BACKPACK = ban;
     if (max) window.BAN_BACKPACK_MAX = max;
     if (tabs) window.BAN_BACKPACK_TABS = tabs;
+    if (fetch) window.fetch = fetch;
     const docListeners = {};
     const document = {
         body, readyState: 'complete', addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); },
@@ -1470,5 +1472,157 @@ describe('the navbar switcher', () => {
         p.window.Backpack.addTab();
         p.window.renderBackpack();
         expect(picks()).toEqual(['Backpack 1:2', 'Backpack 2:0*']);
+    });
+});
+
+describe('sorting the panel', () => {
+    const store = [
+        { id: 'uuid-1', name: 'Bolt', edition: 'Magic 2010', number: '146', qty: 1, t: 3, m: 3 },
+        { id: 'uuid-2', name: 'Arc', edition: 'Alpha', number: '10', qty: 1, t: 1, m: 1 },
+        { id: 'uuid-3', name: 'Cut', edition: 'Alpha', number: '9', qty: 1, t: 2, m: 2 },
+        { id: 'uuid-1', name: 'Bolt', edition: 'Magic 2010', number: '146', cond: 'SP', qty: 1, t: 3, m: 3 },
+    ];
+    const names = () => ids['backpack-list'].querySelectorAll('.backpack-row').map((r) => r.querySelector('.backpack-row-name').textContent + (r.getAttribute('data-key').includes('|') ? ' ' + r.getAttribute('data-key').split('|')[1] : ''));
+    const pick = (by) => { const sel = ids['backpack-sort-by']; sel.value = by; sel.listeners.change.forEach((fn) => fn()); };
+    const reverse = () => ids['backpack-sort-dir'].click();
+    const tick = () => new Promise((r) => setTimeout(r, 0));
+    const json = (data, status = 200) => Promise.resolve({ ok: status === 200, status, json: () => Promise.resolve(data) });
+
+    test('the panel opens newest first, as before', () => {
+        const p = page({ store });
+        p.nav.click();
+        expect(names()).toEqual(['Bolt', 'Bolt SP', 'Cut', 'Arc']);
+        expect(ids['backpack-sort-by'].value).toBe('added');
+        expect(ids['backpack-sort-dir'].getAttribute('title')).toBe('Newest first');
+    });
+
+    test('name runs A to Z, a card\'s grades together best first, and reverses', () => {
+        const p = page({ store });
+        p.nav.click();
+        pick('name');
+        expect(names()).toEqual(['Arc', 'Bolt', 'Bolt SP', 'Cut']);
+        expect(JSON.parse(p.m.mtgban_backpack_sort)).toEqual({ by: 'name', dir: 'asc' });
+        reverse();
+        expect(names()).toEqual(['Cut', 'Bolt', 'Bolt SP', 'Arc']);
+        expect(ids['backpack-sort-dir'].getAttribute('title')).toBe('Z–A');
+    });
+
+    test('edition orders by edition, then collector number as a number', () => {
+        const p = page({ store });
+        p.nav.click();
+        pick('edition');
+        expect(names()).toEqual(['Cut', 'Arc', 'Bolt', 'Bolt SP']);
+    });
+
+    test('the sort orders the panel only; a send keeps the backpack\'s order', () => {
+        const p = page({ store, sort: { by: 'name', dir: 'asc' } });
+        p.nav.click();
+        expect(names()[0]).toBe('Arc');
+        const form = p.window.Backpack.sendForm('retail');
+        expect(form.children.filter((i) => i.name === 'hashes').map((i) => i.value)).toEqual(['uuid-1', 'uuid-1', 'uuid-3', 'uuid-2']);
+    });
+
+    test('a price sort fetches the open backpack\'s cards once each and orders by price, priceless last', async () => {
+        const calls = [];
+        const fetch = (url) => { calls.push(url); return json({ 'uuid-1': { sellPrice: 2, sellVendor: 'TCG Low', buyPrice: 1 }, 'uuid-2': { sellPrice: 5, sellVendor: 'Card Kingdom' }, 'uuid-3': { sellPrice: null } }); };
+        const p = page({ store, fetch });
+        p.nav.click();
+        expect(calls).toEqual([]);
+        pick('retail');
+        expect(ids['backpack-sort-note'].textContent).toBe('Loading prices…');
+        await tick(); await tick(); await tick();
+        expect(calls).toEqual(['/data/prices/' + encodeURIComponent('uuid-1,uuid-2,uuid-3')]);
+        expect(names()).toEqual(['Arc', 'Bolt', 'Bolt SP', 'Cut']);
+        const lines = ids['backpack-list'].querySelectorAll('.backpack-row-price').map((n) => n.textContent);
+        expect(lines).toEqual(['NM $ 5.00 · Card Kingdom', 'NM $ 2.00 · TCG Low', 'NM $ 2.00 · TCG Low', 'No NM price']);
+        expect(ids['backpack-sort-note'].hidden).toBe(true);
+        reverse();
+        expect(names()).toEqual(['Bolt', 'Bolt SP', 'Arc', 'Cut']);
+        pick('buylist');
+        expect(names()).toEqual(['Bolt', 'Bolt SP', 'Arc', 'Cut']);
+        expect(calls.length).toBe(1);
+    });
+
+    test('prices fetched once serve the tab until they age out', async () => {
+        const calls = [];
+        const fetch = (url) => { calls.push(url); return json({}); };
+        const p = page({ store, fetch, sort: { by: 'retail', dir: 'desc' } });
+        p.nav.click();
+        await tick(); await tick(); await tick();
+        expect(calls.length).toBe(1);
+        p.window.Backpack.close();
+        p.nav.click();
+        await tick();
+        expect(calls.length).toBe(1);
+        expect(Object.keys(JSON.parse(p.sm.mtgban_backpack_prices)).sort()).toEqual(['uuid-1', 'uuid-2', 'uuid-3']);
+    });
+
+    test('a refusal says why and stops until the sort is picked again', async () => {
+        const calls = [];
+        const fetch = (url) => { calls.push(url); return json({}, 401); };
+        const p = page({ store, fetch, sort: { by: 'retail', dir: 'desc' } });
+        p.nav.click();
+        await tick(); await tick();
+        expect(ids['backpack-sort-note'].textContent).toBe('Log in to sort by price');
+        p.window.renderBackpack();
+        await tick();
+        expect(calls.length).toBe(1);
+        pick('retail');
+        await tick(); await tick();
+        expect(calls.length).toBe(2);
+    });
+
+    test('more than 50 cards go in paced calls of 50, a 429 retried once', async () => {
+        const many = Array.from({ length: 60 }, (_, i) => ({ id: 'id-' + i, name: 'C' + i, qty: 1, t: i, m: i }));
+        const calls = [];
+        let limited = false;
+        const fetch = (url) => {
+            calls.push(decodeURIComponent(url.slice('/data/prices/'.length)).split(',').length);
+            if (calls.length === 2 && !limited) { limited = true; return json({}, 429); }
+            return json({});
+        };
+        const p = page({ store: many, fetch, sort: { by: 'buylist', dir: 'desc' } });
+        p.nav.click();
+        await tick(); await tick();
+        expect(ids['backpack-sort-note'].textContent).toBe('Loading prices 1/2…');
+        await new Promise((r) => setTimeout(r, 2000));
+        expect(calls).toEqual([50, 10, 10]);
+        expect(ids['backpack-sort-note'].hidden).toBe(true);
+    });
+
+    test('closing the panel stops the load after the call in flight, and reopening picks it up', async () => {
+        const many = Array.from({ length: 60 }, (_, i) => ({ id: 'id-' + i, name: 'C' + i, qty: 1, t: i, m: i }));
+        const calls = [];
+        const fetch = (url) => { calls.push(decodeURIComponent(url.slice('/data/prices/'.length)).split(',').length); return json({}); };
+        const p = page({ store: many, fetch, sort: { by: 'retail', dir: 'desc' } });
+        p.nav.click();
+        p.window.Backpack.close();
+        await new Promise((r) => setTimeout(r, 600));
+        expect(calls).toEqual([50]);
+        p.nav.click();
+        await tick(); await tick(); await tick();
+        expect(calls).toEqual([50, 10]);
+    });
+
+    test('a closed panel fetches nothing', () => {
+        const calls = [];
+        const p = page({ store, fetch: (url) => { calls.push(url); return json({}); }, sort: { by: 'retail', dir: 'desc' } });
+        p.window.renderBackpack();
+        expect(calls).toEqual([]);
+    });
+
+    test('one entry under a price sort fetches nothing and shows no note', async () => {
+        const calls = [];
+        const p = page({ store: store.slice(0, 1), fetch: (url) => { calls.push(url); return json({}); }, sort: { by: 'retail', dir: 'desc' } });
+        p.nav.click();
+        await tick();
+        expect(calls).toEqual([]);
+        expect(ids['backpack-sort-note'].hidden).toBe(true);
+    });
+
+    test('one entry shows no sort bar', () => {
+        const p = page({ store: store.slice(0, 1) });
+        p.nav.click();
+        expect(ids['backpack-sort'].hidden).toBe(true);
     });
 });

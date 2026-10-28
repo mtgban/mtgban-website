@@ -94,9 +94,9 @@
         return t ? t.name : "the backpack";
     }
     function inPack(p) { return live().filter(function (e) { return e.pack === p; }); }
-    // ordered is backpack p's order in the panel, the active one's by
-    // default, newest first and a card's grades best first, which the
-    // Upload list follows.
+    // ordered is backpack p's own order, the active one's by default,
+    // newest first and a card's grades best first, which Clear, a send and
+    // the Upload list follow; the panel shows it under the reader's sort.
     function ordered(p) {
         return inPack(p || active()).sort(function (a, b) { return (b.t || 0) - (a.t || 0) || CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); });
     }
@@ -604,10 +604,148 @@
         else if (window.confirm(ask)) doTake();
     };
 
+    // ---- sorting the panel ----
+
+    // The panel's sorts, each with its label, the way it runs when picked
+    // and what each way reads as, which names the arrow that reverses it.
+    // They order the panel only; Clear and a send keep the backpack's own
+    // order.
+    var SORTS = {
+        added: { label: "Added", dir: "desc", asc: "Oldest first", desc: "Newest first" },
+        name: { label: "Name", dir: "asc", asc: "A–Z", desc: "Z–A" },
+        edition: { label: "Edition", dir: "asc", asc: "A–Z", desc: "Z–A" },
+        retail: { label: "Retail $", dir: "desc", asc: "Lowest first", desc: "Highest first" },
+        buylist: { label: "Buylist $", dir: "desc", asc: "Lowest first", desc: "Highest first" }
+    };
+    var SORT_KEY = "mtgban_backpack_sort";
+    var PRICES_KEY = "mtgban_backpack_prices";
+    // How long the tab trusts a fetched price, the most ids /data/prices
+    // takes at once, and the gap between calls, under the signed reader's
+    // three requests a second.
+    var PRICE_TTL = 60 * 60 * 1000;
+    var PRICE_BATCH = 50;
+    var PRICE_GAP = 400;
+
+    function sortPref() {
+        var s;
+        try { s = JSON.parse(localStorage.getItem(SORT_KEY) || "null"); } catch (e) { s = null; }
+        if (!s || !SORTS[s.by]) return { by: "added", dir: SORTS.added.dir };
+        return { by: s.by, dir: s.dir === "asc" ? "asc" : "desc" };
+    }
+    function setSortPref(s) { try { localStorage.setItem(SORT_KEY, JSON.stringify(s)); } catch (e) {} }
+    function isPriceSort(by) { return by === "retail" || by === "buylist"; }
+
+    // prices are each card's NM prices as /data/prices gave them, by id,
+    // stamped when fetched; a card it priced at nothing keeps the stamp.
+    function prices() {
+        try {
+            var p = JSON.parse(sessionStorage.getItem(PRICES_KEY) || "{}");
+            return p && typeof p === "object" ? p : {};
+        } catch (e) { return {}; }
+    }
+    function savePrices(p) {
+        var t = Date.now();
+        Object.keys(p).forEach(function (id) { if (!(t - p[id].at < PRICE_TTL)) delete p[id]; });
+        try { sessionStorage.setItem(PRICES_KEY, JSON.stringify(p)); } catch (e) {}
+    }
+    // priceOf is the entry's card's NM price on the side by names, with the
+    // store quoting it, or null when there is none.
+    function priceOf(e, by, p) {
+        var got = p[e.id];
+        var v = got && (by === "retail" ? got.sellPrice : got.buyPrice);
+        return typeof v === "number" ? { v: v, store: by === "retail" ? got.sellVendor : got.buyVendor } : null;
+    }
+
+    function cmpText(a, b) { return String(a || "").localeCompare(String(b || ""), undefined, { numeric: true, sensitivity: "base" }); }
+    // cmpCard orders cards by name and printing, and byGrade a card's
+    // entries best first; byCard keeps a card's entries together, best
+    // grade first, under the field a sort compares.
+    function cmpCard(a, b) {
+        return cmpText(a.name || a.id, b.name || b.id) || cmpText(a.edition, b.edition) || cmpText(a.number, b.number) || cmpText(a.id, b.id);
+    }
+    function byGrade(a, b) { return CONDS.indexOf(a.cond) - CONDS.indexOf(b.cond); }
+    function byCard(a, b) { return cmpCard(a, b) || byGrade(a, b); }
+
+    // viewOrder puts the entries in the order the reader picked; a card
+    // with no price yet sorts last whichever way a price sort runs.
+    function viewOrder(entries, s) {
+        var dir = s.dir === "asc" ? 1 : -1;
+        var p = isPriceSort(s.by) ? prices() : null;
+        return entries.slice().sort(function (a, b) {
+            switch (s.by) {
+            case "name":
+                return dir * cmpCard(a, b) || byGrade(a, b);
+            case "edition":
+                return dir * (cmpText(a.edition, b.edition) || cmpText(a.number, b.number)) || byCard(a, b);
+            case "retail":
+            case "buylist":
+                var pa = priceOf(a, s.by, p), pb = priceOf(b, s.by, p);
+                if (!pa !== !pb) return pa ? -1 : 1;
+                return (pa && pb && dir * (pa.v - pb.v)) || byCard(a, b);
+            default:
+                return dir * ((a.t || 0) - (b.t || 0)) || byGrade(a, b);
+            }
+        });
+    }
+
+    // loadPrices fetches, for a price sort in the open panel, the prices the
+    // tab lacks for the open backpack's cards, one batch at a time, then
+    // redraws the list once. Closing the panel stops it after the call in
+    // flight; a refusal stops it until the sort is picked again or the
+    // panel reopens.
+    var pricesLoading = false, priceRefusal = "";
+    function loadPrices() {
+        if (pricesLoading || priceRefusal || !panel || !panel.classList.contains("open") || !isPriceSort(sortPref().by)) return;
+        var have = prices(), t = Date.now(), seen = {};
+        var ids = inPack(active()).map(function (e) { return e.id; }).filter(function (id) {
+            if (seen[id] || (have[id] && t - have[id].at < PRICE_TTL)) return false;
+            seen[id] = true;
+            return true;
+        });
+        if (!ids.length || typeof window.fetch !== "function") return;
+        pricesLoading = true;
+        var batches = [];
+        for (var i = 0; i < ids.length; i += PRICE_BATCH) batches.push(ids.slice(i, i + PRICE_BATCH));
+        var done = 0;
+        var note = function () { setSortNote("Loading prices" + (batches.length > 1 ? " " + (done + 1) + "/" + batches.length : "") + "…"); };
+        var finish = function (refusal) {
+            pricesLoading = false;
+            priceRefusal = refusal || "";
+            renderPanel();
+        };
+        var next = function (retried) {
+            if (done === batches.length || !panel.classList.contains("open")) { finish(); return; }
+            note();
+            var batch = batches[done];
+            window.fetch("/data/prices/" + encodeURIComponent(batch.join(","))).then(function (r) {
+                if (r.status === 429 && !retried) { setTimeout(function () { next(true); }, 3 * PRICE_GAP); return; }
+                if (!r.ok) { finish(priceRefusalText(r.status)); return; }
+                return r.json().then(function (data) {
+                    var p = prices(), at = Date.now();
+                    batch.forEach(function (id) {
+                        var got = data && data[id] || {};
+                        p[id] = { sellPrice: got.sellPrice, sellVendor: got.sellVendor || "", buyPrice: got.buyPrice, buyVendor: got.buyVendor || "", at: at };
+                    });
+                    savePrices(p);
+                    done++;
+                    setTimeout(function () { next(false); }, done === batches.length ? 0 : PRICE_GAP);
+                });
+            }).catch(function () { finish(priceRefusalText(0)); });
+        };
+        next(false);
+    }
+
+    function priceRefusalText(status) {
+        if (status === 429) return "Too many requests, pick the sort again in a moment";
+        if (status === 401) return "Log in to sort by price";
+        return "Prices could not load";
+    }
+
     // ---- the panel ----
 
     var panel = null, overlay = null, stripEl = null, listEl = null, countEl = null, emptyEl = null;
     var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null;
+    var sortBar = null, sortSel = null, sortDirBtn = null, sortNote = null;
 
     function text(tag, cls, s) {
         var n = document.createElement(tag);
@@ -668,13 +806,21 @@
         emptySwitch.addEventListener("change", function () { setEmptyAfter(emptySwitch.checked); });
         label.append(emptySwitch, text("span", null, "Empty the backpack after sending"));
 
+        // One row: the sort, Undo and Clear as icons, the sends taking the rest.
+        buildSortBar();
         var actions = text("div", "backpack-actions");
-        undoBtn = text("button", "backpack-btn backpack-btn-plain", "Undo");
+        undoBtn = text("button", "backpack-btn backpack-btn-plain backpack-btn-icon");
         undoBtn.setAttribute("id", "backpack-undo");
+        undoBtn.setAttribute("aria-label", "Undo");
+        undoBtn.setAttribute("title", "Undo");
+        icon(undoBtn, "undo-2");
         undoBtn.setAttribute("type", "button");
         undoBtn.addEventListener("click", function () { if (undo()) render(); });
-        var clearBtn = text("button", "backpack-btn backpack-btn-plain", "Clear");
+        var clearBtn = text("button", "backpack-btn backpack-btn-plain backpack-btn-icon");
         clearBtn.setAttribute("id", "backpack-clear");
+        clearBtn.setAttribute("aria-label", "Empty the backpack");
+        clearBtn.setAttribute("title", "Empty the backpack");
+        icon(clearBtn, "trash-2");
         clearBtn.setAttribute("type", "button");
         clearBtn.addEventListener("click", function () {
             var keys = ordered().map(key);
@@ -692,16 +838,72 @@
         sendBuylist.setAttribute("id", "backpack-send-buylist");
         sendBuylist.setAttribute("type", "button");
         sendBuylist.addEventListener("click", function () { send("buylist"); });
-        actions.append(undoBtn, clearBtn, sendRetail, sendBuylist);
+        actions.append(sortBar, undoBtn, clearBtn, sendRetail, sendBuylist);
         if (!canUpload()) {
             sendRetail.setAttribute("title", "Upload needs a higher tier");
             sendBuylist.setAttribute("title", "Upload needs a higher tier");
             emptySwitch.disabled = true;
         }
-        footer.append(label, actions);
+        footer.append(label, sortNote, actions);
 
         panel.append(header, stripEl, listEl, emptyEl, footer);
         document.body.append(overlay, panel);
+    }
+
+    // buildSortBar makes the sort picker, the button that turns its order
+    // around, and the line that says how fetching the prices went.
+    function buildSortBar() {
+        sortBar = text("div", "backpack-sort");
+        sortBar.setAttribute("id", "backpack-sort");
+        sortSel = text("select", "backpack-sort-by");
+        sortSel.setAttribute("id", "backpack-sort-by");
+        sortSel.setAttribute("aria-label", "Sort by");
+        sortSel.setAttribute("title", "Sort by");
+        Object.keys(SORTS).forEach(function (by) { sortSel.appendChild(option(by, SORTS[by].label, SORTS[by].label)); });
+        sortSel.addEventListener("change", function () {
+            if (!SORTS[sortSel.value]) return;
+            setSortPref({ by: sortSel.value, dir: SORTS[sortSel.value].dir });
+            priceRefusal = "";
+            renderPanel();
+        });
+        sortDirBtn = text("button", "backpack-sort-dir");
+        sortDirBtn.setAttribute("id", "backpack-sort-dir");
+        sortDirBtn.setAttribute("type", "button");
+        sortDirBtn.addEventListener("click", function () {
+            var s = sortPref();
+            setSortPref({ by: s.by, dir: s.dir === "asc" ? "desc" : "asc" });
+            renderPanel();
+        });
+        sortNote = text("span", "backpack-sort-note");
+        sortNote.setAttribute("id", "backpack-sort-note");
+        sortNote.setAttribute("aria-live", "polite");
+        sortBar.append(sortSel, sortDirBtn);
+    }
+
+    // icon puts the lucide icon named in button b, painted once lucide has
+    // loaded.
+    function icon(b, name) {
+        while (b.children.length) b.children[0].remove();
+        var i = text("i");
+        i.setAttribute("data-lucide", name);
+        b.appendChild(i);
+        if (typeof window.paintIcons === "function") window.paintIcons(b);
+    }
+
+    function setSortNote(s) {
+        sortNote.textContent = s;
+        sortNote.hidden = !s || sortBar.hidden;
+    }
+
+    // renderSortBar shows the sort picked, while there is more than one
+    // entry to order.
+    function renderSortBar(s, n) {
+        sortBar.hidden = n < 2;
+        sortSel.value = s.by;
+        icon(sortDirBtn, s.dir === "asc" ? "arrow-up-narrow-wide" : "arrow-down-wide-narrow");
+        sortDirBtn.setAttribute("aria-label", SORTS[s.by][s.dir] + ", reverse");
+        sortDirBtn.setAttribute("title", SORTS[s.by][s.dir]);
+        setSortNote(isPriceSort(s.by) ? priceRefusal || (pricesLoading ? sortNote.textContent : "") : "");
     }
 
     var COND_NAMES = { NM: "Near Mint", SP: "Slightly Played", MP: "Moderately Played", HP: "Heavily Played", PO: "Poor" };
@@ -767,7 +969,16 @@
         });
     }
 
-    function row(e, held, others) {
+    // priceLine is the row's line under a price sort: the card's NM price and
+    // who quotes it, or that it has none once the prices are in.
+    function priceLine(e, by, p) {
+        if (!p[e.id]) return null;
+        var got = priceOf(e, by, p);
+        if (!got) return text("div", "backpack-row-price none", "No NM price");
+        return text("div", "backpack-row-price", "NM $ " + got.v.toFixed(2) + (got.store ? " · " + got.store : ""));
+    }
+
+    function row(e, held, others, price) {
         var r = text("div", "backpack-row");
         r.setAttribute("data-card-id", e.id);
         r.setAttribute("data-key", key(e));
@@ -795,6 +1006,7 @@
         var where = text("div", "backpack-row-where", (e.edition || "") + (e.set ? " (" + e.set + ")" : "") + (e.number ? " #" + e.number : ""));
         body.append(name, where);
         if (e.finishTag) body.appendChild(text("span", "backpack-row-finish " + (e.finishClass || ""), e.finishTag));
+        if (price) body.appendChild(price);
 
         // The minus takes the last copy with the card; Undo brings it back.
         var ctl = text("div", "backpack-row-ctl");
@@ -937,16 +1149,20 @@
 
     function renderPanel() {
         if (!panel) return;
-        var entries = ordered();
+        var s = sortPref();
+        var entries = viewOrder(ordered(), s);
         while (listEl.children.length) listEl.children[0].remove();
         var grades = {};
         entries.forEach(function (e) { (grades[e.id] = grades[e.id] || []).push(e.cond); });
         var cur = active();
         var others = tabs().filter(function (t) { return t.pack !== cur; });
+        var p = isPriceSort(s.by) ? prices() : null;
         entries.forEach(function (e) {
-            listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; }), others));
+            listEl.appendChild(row(e, grades[e.id].filter(function (c) { return c !== e.cond; }), others, p && priceLine(e, s.by, p)));
         });
         renderTabs();
+        renderSortBar(s, entries.length);
+        if (entries.length > 1) loadPrices();
         var c = count();
         countEl.textContent = countLine(c);
         emptyEl.hidden = entries.length > 0;
@@ -965,9 +1181,10 @@
 
     function open() {
         build();
-        renderPanel();
+        priceRefusal = "";
         overlay.classList.add("open");
         panel.classList.add("open");
+        renderPanel();
         var nav = document.getElementById("nav-backpack");
         if (nav) nav.setAttribute("aria-expanded", "true");
         var c = document.getElementById("backpack-close");

@@ -231,6 +231,34 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 
 .backpack-tab-field { width: 10em; }
 
+.backpack-sort {
+    flex: none;
+    display: flex;
+    gap: 0.25em;
+}
+
+.backpack-sort[hidden],
+.backpack-sort-note[hidden] { display: none; }
+
+.backpack-sort-by,
+.backpack-sort-dir {
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    border-radius: 0.4em;
+    font-size: 0.9em;
+    padding: 0.3em;
+    cursor: pointer;
+}
+
+.backpack-sort-dir { display: inline-flex; align-items: center; justify-content: center; min-width: 2.25rem; padding: 0.3em; }
+
+.backpack-sort-note { font-size: 0.85em; opacity: 0.75; }
+
+.backpack-row-price { font-size: 0.85em; font-variant-numeric: tabular-nums; }
+
+.backpack-row-price.none { opacity: 0.6; }
+
 .backpack-list {
     flex: 1;
     overflow-y: auto;
@@ -315,7 +343,7 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 
 .backpack-switch { display: flex; align-items: center; gap: 0.5em; font-size: 0.9em; }
 
-.backpack-actions { display: flex; gap: 0.5em; }
+.backpack-actions { display: flex; align-items: stretch; gap: 0.4em; }
 
 .backpack-btn {
     flex: 1;
@@ -327,6 +355,22 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     font-weight: 600;
     cursor: pointer;
 }
+
+.backpack-btn-icon {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    padding: 0.45em;
+}
+
+.backpack-btn-icon svg,
+.backpack-sort-dir svg { width: 1.1em; height: 1.1em; display: block; }
+
+/* the sends give up their padding before the row runs out of room */
+.backpack-btn-retail,
+.backpack-btn-buylist { min-width: 0; padding-left: 0.4em; padding-right: 0.4em; }
 
 .backpack-btn:disabled { opacity: 0.5; cursor: default; }
 
@@ -385,4 +429,11 @@ body.mobile.light-theme .backpack-panel .m-drawer-handle span { background: rgba
 
 /* iOS zooms into a field under 16px */
 body.mobile .backpack-cond,
+body.mobile .backpack-sort-by,
 body.mobile .backpack-tab-field { font-size: 16px; }
+
+/* the one footer row fits a phone with tighter gaps and icons */
+body.mobile .backpack-actions,
+body.mobile .backpack-sort { gap: 0.25em; }
+body.mobile .backpack-btn-icon,
+body.mobile .backpack-sort-dir { min-width: 2rem; padding: 0.3em; }
