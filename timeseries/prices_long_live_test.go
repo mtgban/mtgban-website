@@ -417,6 +417,55 @@ func TestMoversLongGameScopingLive(t *testing.T) {
 	}
 }
 
+// TestExpirePriceDatesLive keeps the screener's year and a month of slack, and
+// drops what is older.
+func TestExpirePriceDatesLive(t *testing.T) {
+	ctx := context.Background()
+	c, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	if err := c.EnsurePriceDatesSchema(ctx); err != nil {
+		t.Fatalf("EnsurePriceDatesSchema: %v", err)
+	}
+	cleanup := func() {
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE provider=$1`, scopeSentinelProvider)
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	now := time.Now()
+	kept, expired := now.AddDate(0, -12, -20), now.AddDate(0, -13, -2)
+	for _, day := range []time.Time{kept, expired} {
+		if _, err := c.db.ExecContext(ctx, `INSERT INTO price_dates (provider, category, date) VALUES ($1, $2, $3)`,
+			scopeSentinelProvider, scopeSentinelCat, day.Format(time.DateOnly)); err != nil {
+			t.Fatalf("insert %s: %v", day.Format(time.DateOnly), err)
+		}
+	}
+	if err := c.ExpirePriceDates(ctx); err != nil {
+		t.Fatalf("ExpirePriceDates: %v", err)
+	}
+
+	rs, err := c.db.QueryContext(ctx, `SELECT to_char(date, 'YYYY-MM-DD') FROM price_dates WHERE provider=$1`, scopeSentinelProvider)
+	if err != nil {
+		t.Fatalf("read price_dates: %v", err)
+	}
+	defer rs.Close()
+	var left []string
+	for rs.Next() {
+		var day string
+		if err := rs.Scan(&day); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		left = append(left, day)
+	}
+	if want := []string{kept.Format(time.DateOnly)}; !slices.Equal(left, want) {
+		t.Errorf("price_dates after expiry = %v, want %v", left, want)
+	}
+}
+
 // Sentinels for the derived-id test. 8191 is the largest category TCGBanID
 // accepts and no TCGplayer category comes near it; 999004 is past it, so it
 // exercises the sequence fallback.

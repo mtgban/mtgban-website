@@ -791,6 +791,10 @@ func writeSnapshot(ctx context.Context, start time.Time, snapshot longSnapshot) 
 		return
 	}
 
+	if err := PricesArchiveDB.ExpirePriceDates(ctx); err != nil {
+		log.Println("timeseries: could not expire price_dates:", err)
+	}
+
 	SetLastStashUpdate(time.Now())
 	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d prices collected, %d new or changed%s",
 		time.Since(start), len(snapshot.Rows), upserted, snapshot.skipped()))

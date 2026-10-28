@@ -284,6 +284,17 @@ func recordPriceDates(ctx context.Context, tx *sql.Tx, rows []LongPrice) error {
 	return nil
 }
 
+// ExpirePriceDates drops the days in price_dates older than the screener can
+// ask for: its longest window is a year, and a month more keeps that window for
+// a game whose newest day lags. No-op on a read-only client.
+func (c *Client) ExpirePriceDates(ctx context.Context) error {
+	if c.readOnly {
+		return nil
+	}
+	_, err := c.db.ExecContext(ctx, `DELETE FROM price_dates WHERE date < current_date - interval '13 months'`)
+	return err
+}
+
 // moverAnchor returns the newest date this game has under this provider, at or
 // before the given bound, from price_dates.
 //

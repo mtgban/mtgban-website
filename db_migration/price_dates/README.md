@@ -2,9 +2,10 @@
 
 The screener anchors each window on a game's newest day under a provider. It
 reads that day from `price_dates (provider, category, date)`, which
-`UpsertLongPrices` fills in the same transaction as the prices. `price_dates.sql`
-fills it for the prices written before then: every month since 2020-09, about
-40 s a month on the live archive.
+`UpsertLongPrices` fills in the same transaction as the prices. Each snapshot
+drops the days older than 13 months, the screener's year-long window and a
+month of slack. `price_dates.sql` fills those 13 months from the prices written
+before then, about 40 s a month on the live archive.
 
 ## Running it
 
