@@ -80,11 +80,13 @@ func stubCartStores(t *testing.T) {
 	ckGraded.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 50, OriginalID: "555001"})
 	szStock := mtgban.InventoryRecord{}
 	szStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 2, InstanceID: "USCIDU-637-F-978240-993-XAK-QHC"})
-	// Manaleak sells and buys a card under one product id
+	// Manaleak sells and buys a card under one product id, each grade an
+	// option of it
 	ml := mtgban.BuylistRecord{}
 	ml.Add("card-a", &mtgban.BuylistEntry{Conditions: mtgban.NM, BuyPrice: 0.1, InstanceID: "7090"})
 	mlStock := mtgban.InventoryRecord{}
 	mlStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.2, Quantity: 1, InstanceID: "7090"})
+	mlStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.15, Quantity: 2, InstanceID: "7090"})
 	// Mana Pool's product ids name one condition and finish each
 	mpStock := mtgban.InventoryRecord{}
 	mpStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.5, InstanceID: "001229ab-da01-4346-91f9-23c145cd23c5"})
@@ -195,7 +197,7 @@ func TestCartRows(t *testing.T) {
 		{"GN", false, "MTG-3ED-155-KGVDX6L40M:3"},
 		{"MMC", false, "283193:3,663174:1"},
 		{"ML", true, "7090:4"},
-		{"ML", false, "7090:3"},
+		{"ML", false, "7090-NM:3,7090-SP:1"},
 		{"MP", false, "001229ab-da01-4346-91f9-23c145cd23c5:3,088072ea-66c7-4ef2-86a2-fd90055698a8:1"},
 		// The properties go base64url, whatever their values, and a row with
 		// no price as Card Trader quotes it stays out
@@ -270,7 +272,7 @@ func TestCartLoadButtons(t *testing.T) {
 		{"GN", false, `href="https://www.gamenerdz.com/cart.php#ban=MTG-3ED-155-KGVDX6L40M:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Game Nerdz"`},
 		{"MMC", false, `href="https://www.mtgmintcard.com/shopping-cart#ban=283193:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="MTG Mint Card"`},
 		{"ML", true, `href="https://www.manaleak.com/index.php?route=buylist/cart#ban=7090:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Manaleak"`},
-		{"ML", false, `href="https://www.manaleak.com/index.php?route=checkout/cart#ban=7090:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Manaleak"`},
+		{"ML", false, `href="https://www.manaleak.com/index.php?route=checkout/cart#ban=7090-NM:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Manaleak"`},
 		{"MP", false, `href="https://manapool.com/cart#ban=001229ab-da01-4346-91f9-23c145cd23c5:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Mana Pool"`},
 		{"CT0", false, `href="https://www.cardtrader.com/cart/edit#ban=16310-NM-1450EUR-z-` + ctEnglish + `:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Card Trader"`},
 		{"SZ", true, `href="http://shop.strikezoneonline.com/TUser?MC=CUVC&amp;MF=B&amp;BUID=637#ban=USCIDU-637-F-978240-993-XAK-QHC:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Strike Zone"`},
