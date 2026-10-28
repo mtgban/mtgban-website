@@ -253,22 +253,33 @@ func applySearchScope(config *SearchConfig, pinned []FilterElem) {
 }
 
 // searchSuggestions adapts a parsed search that found nothing into the
-// suggest package's inputs.
+// suggest package's inputs. The did-you-mean is a whole query: the closest
+// name with the filters typed, an is: naming a set code read as s:.
 func searchSuggestions(b *mtgmatcher.Backend, rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
-	quoted := quoteIfFilter(config.CleanQuery)
-	didYouMean, alts := suggest.Build(suggest.Params{
+	if config.SearchMode == "hashing" {
+		return "", nil
+	}
+	alts := suggest.Build(suggest.Params{
 		RawQuery:       rawQuery,
-		CleanQuery:     quoted,
+		CleanQuery:     quoteIfFilter(config.CleanQuery),
 		SearchMode:     config.SearchMode,
 		AppliedFilters: config.AppliedFilters,
 		Sealed:         sealed,
 		Backend:        b,
 	})
-	// Did-you-mean compares names, so it reads the name unquoted.
-	if quoted != config.CleanQuery && config.SearchMode != "hashing" {
-		didYouMean = suggest.Closest(b, config.CleanQuery, sealed)
+
+	filters, fixed := suggest.SetCodeFilters(b, config.AppliedFilters)
+	name := suggest.Closest(b, config.CleanQuery, sealed)
+	if name == "" && !fixed {
+		return "", alts
 	}
-	return didYouMean, alts
+	if name == "" {
+		name = config.CleanQuery
+	}
+	if name != "" {
+		filters = append([]string{quoteIfFilter(name)}, filters...)
+	}
+	return strings.Join(filters, " "), alts
 }
 
 // searchFallback re-reads a search whose name matched nothing, in the order a

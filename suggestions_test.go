@@ -41,3 +41,30 @@ func TestAppliedFiltersCapture(t *testing.T) {
 		}
 	}
 }
+
+// The did-you-mean keeps the filters typed, and reads an is: naming a set
+// code as the s: it was meant to be.
+func TestDidYouMeanKeepsFilters(t *testing.T) {
+	skipWithoutDatastore(t)
+	b := backend()
+
+	tests := []struct{ query, want string }{
+		{"control mage s:4ed", "Control Magic s:4ed"},
+		{"mountain is:plst", "mountain s:plst"},
+		{"mountian -is:plst f:foil", "Mountain -s:plst f:foil"},
+		{"mountain not:plst", "mountain -s:plst"},
+		{"mountain -not:plst", "mountain s:plst"},
+		{"mountain is:plst,lea", "mountain s:plst,lea"},
+		{"mountain is:plst,foil", ""},
+		{"is:plst", "s:plst"},
+		{"lightning bolt s:lea", ""},
+		{"lightning bolt is:foil", ""},
+	}
+	for _, tt := range tests {
+		config := parseSearchOptionsNG(b, tt.query, nil, nil, nil)
+		got, _ := searchSuggestions(b, tt.query, config, false)
+		if got != tt.want {
+			t.Errorf("%q: did-you-mean %q, want %q", tt.query, got, tt.want)
+		}
+	}
+}
