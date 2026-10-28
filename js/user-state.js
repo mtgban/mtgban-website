@@ -29,7 +29,7 @@
         'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
         'mtgban_search_layout', 'mtgban_popular_collapsed', 'mtgban_store_factors',
         'mtgban_upload_presets', 'mtgban_arbit_filters', 'mtgban_arbit_presets',
-        'mtgban_backpack_tabs'
+        'mtgban_backpack_tabs', 'mtgban_backpack_sort'
     ];
 
     // The server renders whether the request carried the auth cookie; that is
