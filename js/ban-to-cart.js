@@ -1037,19 +1037,23 @@
     }
 
     // mlStore loads Manaleak's store cart, or its buylist cart on that
-    // cart's page, kept by its session cookie. Each card's page names the
-    // option its Near Mint copies go by and, in the store, how many it has;
-    // a card already in the cart gets the list's quantity through the cart
-    // form, and a new one is added in the store's own way.
+    // cart's page, kept by its session cookie. A store row is named
+    // <product id>-<grade>, a buylist row by the product alone, bought as
+    // Near Mint. Each card's page names the option each grade goes by and,
+    // in the store, how many it has; a card already in the cart gets the
+    // list's quantity through the cart form, and a new one is added in the
+    // store's own way.
     function mlStore() {
         var buylist = /[?&]route=buylist\//.test(location.search);
         var retail = /[#&]side=retail(&|$)/.test(location.hash);
         var route = buylist ? "buylist/cart" : "checkout/cart";
+        // Manaleak's names for the grades go-mtgban reads off its pages
+        var labels = {NM: "Mint/Near Mint", SP: "Light Play", MP: "Played", HP: "Heavy Play", PO: "Damaged"};
         // The cart's lines by key, <product id>:<base64 options>:
         var held = {};
-        // Each card's Near Mint option value once its page was read, null
-        // for a card with none
-        var nmValues = {};
+        // Each product's condition field and grades once its page was read,
+        // null for one with none
+        var pages = {};
         async function post(url, body) {
             var resp = await fetch(url, {
                 method: "POST",
@@ -1061,6 +1065,15 @@
             }
             return resp.text();
         }
+        // row reads a list id as the product and the grade it is wanted in
+        function row(id) {
+            var parts = id.split("-");
+            return {product: parts[0], grade: parts[1] || "NM"};
+        }
+        // listID names a product's grade as the list does
+        function listID(product, grade) {
+            return buylist ? product : product + "-" + grade;
+        }
         // lineOptions is the options a cart line's key names, as Manaleak
         // serializes them: a:1:{i:<option>;s:5:"<value>";}
         function lineOptions(key) {
@@ -1070,22 +1083,41 @@
                 return "";
             }
         }
-        // nearMint reads a card's page for its Near Mint option: the field,
-        // the value, and the copies the store has, 0 when out of stock
-        async function nearMint(id) {
-            var resp = await fetch("/index.php?route=product/product&product_id=" + id);
+        // grades reads a card's page for its condition field and, by grade,
+        // each option's value and the copies the store has, 0 when out of stock
+        async function grades(product) {
+            if (product in pages) {
+                return pages[product];
+            }
+            pages[product] = null;
+            var resp = await fetch("/index.php?route=product/product&product_id=" + product);
             if (!resp.ok) {
                 return null;
             }
             var page = await resp.text();
             // Its HTML breaks lines inside a tag
             var select = /<select\s+name="(option\[\d+\])">([\s\S]*?)<\/select>/.exec(page);
-            var option = select && /<option\s+value="(\d+)"[^>]*>\s*Mint\/Near Mint[^<]*/.exec(select[2]);
-            if (!option) {
+            if (!select) {
                 return null;
             }
-            var stock = /Qty:\s*(\d+)/.exec(option[0]);
-            return {field: select[1], value: option[1], stock: stock ? Number(stock[1]) : 0};
+            var found = {field: select[1], grades: {}};
+            Object.keys(labels).forEach(function (grade) {
+                var option = new RegExp('<option\\s+value="(\\d+)"[^>]*>\\s*' + labels[grade] + '(?![A-Za-z])[^<]*').exec(select[2]);
+                if (option) {
+                    var stock = /Qty:\s*(\d+)/.exec(option[0]);
+                    found.grades[grade] = {value: option[1], stock: stock ? Number(stock[1]) : 0};
+                }
+            });
+            pages[product] = found;
+            return found;
+        }
+        // gradeOf is the grade a cart line holds, once its card's page was read
+        function gradeOf(key) {
+            var page = pages[key.split(":")[0]];
+            var options = lineOptions(key);
+            return page && Object.keys(page.grades).find(function (grade) {
+                return options.indexOf('"' + page.grades[grade].value + '"') >= 0;
+            });
         }
         return {
             name: "Manaleak",
@@ -1113,10 +1145,10 @@
                 var m;
                 while ((m = re.exec(page)) !== null) {
                     held[m[1]] = Number(m[2]);
-                    // A card counts as held in Near Mint, once that is known
-                    var id = m[1].split(":")[0];
-                    if (!(id in nmValues) || (nmValues[id] !== null && lineOptions(m[1]).indexOf('"' + nmValues[id] + '"') >= 0)) {
-                        found.push(id);
+                    // A buylist row is only ever loaded as Near Mint
+                    var grade = gradeOf(m[1]);
+                    if (grade && (!buylist || grade === "NM")) {
+                        found.push(listID(m[1].split(":")[0], grade));
                     }
                 }
                 return found;
@@ -1128,26 +1160,27 @@
                 var updates = 0;
                 for (var i = 0; i < chunk.length; i++) {
                     var id = chunk[i];
-                    var nm = await nearMint(id);
-                    nmValues[id] = nm ? nm.value : null;
-                    if (!nm) {
+                    var want = row(id);
+                    var page = await grades(want.product);
+                    var option = page && page.grades[want.grade];
+                    if (!option) {
                         continue;
                     }
-                    var want = buylist ? qty[id] : Math.min(qty[id], nm.stock);
-                    if (want <= 0) {
+                    var count = buylist ? qty[id] : Math.min(qty[id], option.stock);
+                    if (count <= 0) {
                         continue;
                     }
                     var key = Object.keys(held).find(function (k) {
-                        return k.split(":")[0] === id && lineOptions(k).indexOf('"' + nm.value + '"') >= 0;
+                        return k.split(":")[0] === want.product && gradeOf(k) === want.grade;
                     });
                     if (key) {
-                        update["quantity[" + key + "]"] = String(want);
+                        update["quantity[" + key + "]"] = String(count);
                         updates++;
                         continue;
                     }
-                    var add = {product_id: id};
-                    add[buylist ? "buylist_quantity" : "quantity"] = String(want);
-                    add[nm.field] = nm.value;
+                    var add = {product_id: want.product};
+                    add[buylist ? "buylist_quantity" : "quantity"] = String(count);
+                    add[page.field] = option.value;
                     await post("/index.php?route=" + route + "/add", add);
                 }
                 if (updates > 0) {

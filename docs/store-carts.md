@@ -267,11 +267,15 @@ POST /index.php?route=buylist/cart/add    product_id=7090  buylist_quantity=2 op
 
 - The id is the `product_id` every listing row's link carries, which
   go-mtgban's `manaleak` scraper stores as `InstanceID` on both sides.
-  It prices Near Mint only, so the loader adds Near Mint.
+  The buylist prices Near Mint only, so a buylist row is the product id
+  and goes in as Near Mint. The store prices each grade the page stocks,
+  so a store row is `<product id>-<grade>` (`7090-SP`).
 - The option's field and value differ per product (`option[165360]=824434`
-  on 178453), so the loader reads each card's page for its "Mint/Near Mint"
-  option first, and in the store for its "Qty:" too. That HTML breaks
-  lines inside a tag. A product with no such option is left out.
+  on 178453), so the loader reads each card's page once for its grade
+  options, by name: "Mint/Near Mint", "Light Play", "Played", "Heavy
+  Play" and "Damaged" for NM, SP, MP, HP and PO, and in the store for each
+  one's "Qty:" too. That HTML breaks lines inside a tag. A row whose grade
+  has no option is left out.
 - Both adds refuse a line with no option ("Card Condition required!").
 - The carts are kept by Manaleak's session cookie, guests included. Each
   cart page (`route=checkout/cart`, `route=buylist/cart`) lists a
@@ -283,7 +287,7 @@ POST /index.php?route=buylist/cart/add    product_id=7090  buylist_quantity=2 op
   disagree.
 - An add adds to a line, so a load holds `ban-to-cart-ml`, a lock
   Manaleak's tabs share, as CSI's does, and counts a card as loaded only
-  when its Near Mint line is in the cart.
+  when its line in the row's grade is in the cart.
 
 | Sent | Result |
 |---|---|

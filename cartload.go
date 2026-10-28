@@ -55,6 +55,7 @@ var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
 	"CT":    ctCartID,
 	"CT0":   ctCartID,
 	"CT1DR": ctCartID,
+	"ML":    mlCartID,
 }
 
 // ctSplits name Card Trader's storefronts the way its loader tells their
@@ -110,6 +111,15 @@ func csiCartID(entry mtgban.InventoryEntry) string {
 		return ""
 	}
 	return entry.OriginalID + "-" + entry.InstanceID
+}
+
+// mlCartID names a Manaleak store row as <product id>-<grade>: the product
+// sells each grade as an option of its own, which the loader picks by name.
+func mlCartID(entry mtgban.InventoryEntry) string {
+	if entry.InstanceID == "" || entry.Conditions == "" {
+		return ""
+	}
+	return entry.InstanceID + "-" + string(entry.Conditions)
 }
 
 // cartAffiliates are how a store's own links from us credit our partner

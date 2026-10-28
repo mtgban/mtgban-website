@@ -964,19 +964,26 @@ describe('ban-to-cart bookmarklet on Card Trader', () => {
     });
 });
 
-// fakeML stands in for Manaleak: each product page names its Near Mint
-// option, its HTML breaking lines inside tags, with the store's copies; a
+// fakeML stands in for Manaleak: each product page names an option per
+// grade, its HTML breaking lines inside tags, with the store's copies; a
 // cart page lists a quantity field per line, keyed by product and options;
 // an add adds to a line and the cart form sets one, as Manaleak does. A
-// cart is held as {line: qty}, a line being <id> for Near Mint or <id>:lp
-// for Light Play.
+// product's Near Mint option is its nm value, and each lower grade's that
+// value behind the grade's digit. A cart is held as {line: qty}, a line
+// being <id> for Near Mint or <id>:<grade> for another grade.
+const mlGrades = {
+    nm: {digit: '', label: 'Mint/Near Mint'},
+    sp: {digit: '9', label: 'Light Play'},
+    mp: {digit: '8', label: 'Played'},
+    hp: {digit: '7', label: 'Heavy Play'},
+};
 function fakeML({products = {}, store = {}, buy = {}} = {}) {
     const carts = {'checkout/cart': {...store}, 'buylist/cart': {...buy}};
     const posts = [];
     const reads = [];
     const value = (line) => {
-        const [id, grade] = line.split(':');
-        return grade === 'lp' ? '9' + products[id].nm : products[id].nm;
+        const [id, grade = 'nm'] = line.split(':');
+        return mlGrades[grade].digit + products[id].nm;
     };
     const key = (line) => line.split(':')[0] + ':' + btoa(`a:1:{i:${products[line.split(':')[0]].option};s:5:"${value(line)}";}`) + ':';
     const fetch = async (url, opts = {}) => {
@@ -985,9 +992,10 @@ function fakeML({products = {}, store = {}, buy = {}} = {}) {
             reads.push(route);
             if (route === 'product/product') {
                 const p = products[/product_id=(\d+)/.exec(url)[1]];
+                const stock = (grade) => (p.stocks || {nm: p.stock, sp: 6})[grade];
                 const page = p ? `<select\nname="option[${p.option}]"><option\nvalue=""> --- Please Select ---</option>` +
-                    `<option\nvalue="${p.nm}" data-image="x.jpg">Mint/Near Mint    (£0.15)\n- ${p.stock ? 'Qty:' + p.stock : 'Out of Stock'}</option>` +
-                    `<option\nvalue="9${p.nm}">Light Play (£0.15)\n- Qty:6</option></select>` : 'Product not found!';
+                    Object.entries(mlGrades).map(([grade, g]) => `<option\nvalue="${g.digit}${p.nm}" data-image="x.jpg">${g.label}${p.unpriced ? '' : '    (£0.15)'}\n- ` +
+                        `${stock(grade) ? 'Qty:' + stock(grade) : 'Out of Stock'}</option>`).join('') + '</select>' : 'Product not found!';
                 return {ok: true, status: 200, text: async () => page};
             }
             const fields = Object.entries(carts[route]).map(([line, q]) => `<input\ntype="text" name="quantity[${key(line)}]" value="${q}" size="1" />`);
@@ -1000,8 +1008,9 @@ function fakeML({products = {}, store = {}, buy = {}} = {}) {
             const cartRoute = route.slice(0, -'/add'.length);
             const qty = Number(body.get(cartRoute === 'buylist/cart' ? 'buylist_quantity' : 'quantity'));
             const sent = body.get(`option[${products[id].option}]`);
-            const line = sent === products[id].nm ? id : sent === '9' + products[id].nm ? id + ':lp' : null;
-            if (line) {
+            const grade = Object.keys(mlGrades).find((g) => sent === mlGrades[g].digit + products[id].nm);
+            if (grade) {
+                const line = grade === 'nm' ? id : id + ':' + grade;
                 carts[cartRoute][line] = (carts[cartRoute][line] || 0) + qty;
             }
         } else {
@@ -1026,7 +1035,7 @@ describe('ban-to-cart bookmarklet on Manaleak', () => {
 
     test('a store list adds each card\'s Near Mint copies up to the stock, and sets a card already there', async () => {
         const ml = fakeML({products, store: {178453: 3}});
-        const {alerts, page, posts} = await run({...storePage, hash: '#ban=7090%3a10%2c178453%3a1%2c500%3a1%2c42%3a1&side=retail', abu: ml});
+        const {alerts, page, posts} = await run({...storePage, hash: '#ban=7090-NM%3a10%2c178453-NM%3a1%2c500-NM%3a1%2c42-NM%3a1&side=retail', abu: ml});
         expect(posts).toEqual([
             {route: 'checkout/cart/add', body: {product_id: '7090', quantity: '4', 'option[7090]': '35446'}},
             {route: 'checkout/cart', body: {['quantity[178453:' + btoa('a:1:{i:165360;s:5:"82443";}') + ':]']: '1'}},
@@ -1038,10 +1047,25 @@ describe('ban-to-cart bookmarklet on Manaleak', () => {
     });
 
     test('a card the cart holds only in another condition is not counted as loaded', async () => {
-        const ml = fakeML({products, store: {'500:lp': 2}});
-        const {alerts, posts} = await run({...storePage, hash: '#ban=500:1&side=retail', abu: ml});
+        const ml = fakeML({products, store: {'500:sp': 2}});
+        const {alerts, posts} = await run({...storePage, hash: '#ban=500-NM:1&side=retail', abu: ml});
         expect(posts).toHaveLength(0);
         expect(alerts[0]).toBe('Loaded 0 cards into your Manaleak cart. 1 were not taken by Manaleak.');
+    });
+
+    test('a store row in a lower grade adds that grade\'s option, and sets that grade\'s line', async () => {
+        const graded = {...products, 62160: {option: 62160, nm: '30843', stocks: {mp: 2, hp: 2}}};
+        const ml = fakeML({products: graded, store: {'7090:sp': 1}});
+        const {alerts, posts} = await run({...storePage, hash: '#ban=62160-MP:1,62160-HP:5,62160-NM:1,7090-SP:3&side=retail', abu: ml});
+        expect(posts).toEqual([
+            {route: 'checkout/cart/add', body: {product_id: '62160', quantity: '1', 'option[62160]': '830843'}},
+            {route: 'checkout/cart/add', body: {product_id: '62160', quantity: '2', 'option[62160]': '730843'}},
+            {route: 'checkout/cart', body: {['quantity[7090:' + btoa('a:1:{i:7090;s:5:"935446";}') + ':]']: '3'}},
+        ]);
+        expect(ml.carts['checkout/cart']).toEqual({'62160:mp': 1, '62160:hp': 2, '7090:sp': 3});
+        // One read of a card's page serves each of its grades
+        expect(ml.reads.filter((r) => r === 'product/product')).toHaveLength(2);
+        expect(alerts[0]).toBe('Loaded 3 cards into your Manaleak cart. 1 were not taken by Manaleak.');
     });
 
     test('a buylist list goes to the buylist cart whatever the stock', async () => {
@@ -1051,6 +1075,17 @@ describe('ban-to-cart bookmarklet on Manaleak', () => {
         expect(ml.carts['buylist/cart']).toEqual({500: 3});
         expect(ml.reads).toEqual(['buylist/cart', 'product/product', 'buylist/cart']);
         expect(alerts[0]).toBe('Loaded 1 cards into your Manaleak cart.');
+    });
+
+    test('a buylist card held only in another grade is not counted as loaded, and a grade with no price still reads', async () => {
+        const ml = fakeML({products: {...products, 500: {...products[500], unpriced: true}}, buy: {'7090:sp': 1}});
+        const {alerts, posts} = await run({...buyPage, hash: '#ban=7090:2,500:1', abu: ml});
+        expect(posts).toEqual([
+            {route: 'buylist/cart/add', body: {product_id: '7090', buylist_quantity: '2', 'option[7090]': '35446'}},
+            {route: 'buylist/cart/add', body: {product_id: '500', buylist_quantity: '1', 'option[500]': '11111'}},
+        ]);
+        expect(ml.carts['buylist/cart']).toEqual({'7090:sp': 1, 7090: 2, 500: 1});
+        expect(alerts[0]).toBe('Loaded 2 cards into your Manaleak cart.');
     });
 
     test('two tabs loading the same list at once take turns and do not double it', async () => {
