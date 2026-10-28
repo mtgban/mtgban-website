@@ -1056,23 +1056,56 @@ func numberTerm(b *mtgmatcher.Backend, token string) string {
 // product id reaches its product. Without a numbers snapshot it reads
 // nothing.
 func bareNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string) []FilterElem {
-	if numbers == nil {
-		return nil
-	}
 	tokens := strings.Fields(query)
 	if len(tokens) != 1 || typesSetTotal(tokens[0]) {
 		return nil
 	}
 	token := tokens[0]
-	if !writtenAsNumber(token) {
-		return nil
-	}
-	opt, value := numberValue(b, token)
-	if opt != "number" && opt != "number_strict" {
+	filters := carriedNumberFilters(b, numbers, token)
+	if filters == nil {
 		return nil
 	}
 	_, err := b.SearchEquals(token)
 	if err == nil {
+		return nil
+	}
+	return filters
+}
+
+// trailingNumberFilters reads a card's name followed by a collector number,
+// "command tower 7029", as the name with that number, when the whole query
+// names no card and a card carries the number. It returns the name and the
+// number's filter, or the query untouched and nil.
+func trailingNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string) (string, []FilterElem) {
+	tokens := strings.Fields(query)
+	if len(tokens) < 2 {
+		return query, nil
+	}
+	filters := carriedNumberFilters(b, numbers, tokens[len(tokens)-1])
+	if filters == nil {
+		return query, nil
+	}
+	name := strings.Join(tokens[:len(tokens)-1], " ")
+	_, err := b.SearchEquals(query)
+	if err == nil {
+		return query, nil
+	}
+	_, err = b.SearchEquals(name)
+	if err != nil {
+		return query, nil
+	}
+	return name, filters
+}
+
+// carriedNumberFilters is the cn: or cns: filter for a word spelled as a
+// collector number, as numberValue reads it, when a card carries that
+// number. Without a numbers snapshot it reads nothing.
+func carriedNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, token string) []FilterElem {
+	if numbers == nil || !writtenAsNumber(token) {
+		return nil
+	}
+	opt, value := numberValue(b, token)
+	if opt != "number" && opt != "number_strict" {
 		return nil
 	}
 	// A plain number here is digits alone, which the loose index holds;
@@ -1922,6 +1955,11 @@ func parseSearchOptionsDepth(b *mtgmatcher.Backend, numbers *numbersSnapshot, qu
 					query = ""
 				}
 			}
+		}
+		named, numbered := trailingNumberFilters(b, numbers, query)
+		if numbered != nil {
+			filters = append(filters, numbered...)
+			query = named
 		}
 	}
 

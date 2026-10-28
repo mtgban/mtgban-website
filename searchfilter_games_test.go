@@ -354,12 +354,13 @@ func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*mtgmatc
 	return keys, hits
 }
 
-// A number typed alone reaches what cn: does in every game, padded the way
-// Pokemon pads it or not, unless a card is named by it: Yu-Gi-Oh's "7".
+// A number typed alone or after a name reaches what cn: does in every game,
+// padded the way Pokemon pads it or not, unless a card is named by it:
+// Yu-Gi-Oh's "7".
 func TestBareNumberInEveryGame(t *testing.T) {
-	// The cn: query each bare number reaches what, or "" for a name.
+	// The cn: query each number reaches what, or "" for a name.
 	examples := map[mtgmatcher.Game]map[string]string{
-		"pokemon": {"017": "cn:17", "17": "cn:17", "#123": "cn:123"},
+		"pokemon": {"017": "cn:17", "17": "cn:17", "#123": "cn:123", "charizard 4": "charizard cn:4"},
 		"lorcana": {"204": "cn:204"},
 		"yugioh":  {"7": ""},
 	}
@@ -385,6 +386,7 @@ func TestBareNumberInEveryGame(t *testing.T) {
 		t.Run(string(game), func(t *testing.T) {
 			ds := testSite.newDatastore(loaded, time.Now())
 			checkBareNumbersAgreeWithSeed(t, ds)
+			checkNumberedNamesStayNames(t, ds)
 			for query, as := range queries {
 				config := parseSearchQuery(ds, query, nil, nil, nil)
 				if as == "" {

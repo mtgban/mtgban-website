@@ -12,7 +12,7 @@
 </template>
 
 <template data-section="collector-numbers">
-<p>A number searched on its own, like <code>123</code> or <code>17a</code>, is a collector number: it finds what <code>cn:123</code> does. A card named by it keeps its name, and a TCGplayer product id that collides with a collector number is reached with <code>id:NUMBER</code>.</p>
+<p>A number searched on its own, like <code>123</code> or <code>17a</code>, is a collector number: it finds what <code>cn:123</code> does. A card named by it keeps its name, and a TCGplayer product id that collides with a collector number is reached with <code>id:NUMBER</code>. After a card's name, as in <code>command tower 7029</code>, it narrows that name the same way, unless the whole query is itself a card's name.</p>
 <p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p>
 <p>A plain <code>cn:</code> number ignores the ★/†/φ decorations, so <code>cn:107</code> also finds a card numbered 107★. A number with letters or marks, like <code>cn:107★</code> or <code>cn:HNT222</code>, finds the printing numbered that way. Use the strict form <code>cns:NUMBER</code> to match even a plain number exactly as printed.</p>
 <p>Regular expressions are supported via <code>cne:REGEXP</code>.</p>

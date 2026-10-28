@@ -313,3 +313,78 @@ func TestBareNumberIsACollectorNumber(t *testing.T) {
 		t.Errorf("the bot reads %q as %+v %q, want its product %s", carried, res, msg, carriedUUID)
 	}
 }
+
+// A number typed after a card's name narrows the name as cn: would:
+// "command tower 7029" reaches what "command tower cn:7029" does. A name
+// that ends in a number stays that name.
+func TestNameThenNumber(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+	for _, tt := range []struct{ query, as string }{
+		{"command tower 7029", "command tower cn:7029"},
+		{"llanowar elves 1", "llanowar elves cn:1"},
+		{"lightning bolt 141*", "lightning bolt cn:141 f:foil"},
+		{"command tower 7029 s:sld", "command tower cn:7029 s:sld"},
+	} {
+		want, err := searchAndFilter(ds, parseSearchQuery(ds, tt.as, nil, nil, nil))
+		if err != nil || len(want) == 0 {
+			t.Fatalf("%q reaches nothing: %v", tt.as, err)
+		}
+		got, err := searchAndFilter(ds, parseSearchQuery(ds, tt.query, nil, nil, nil))
+		if err != nil {
+			t.Fatalf("%q: %v", tt.query, err)
+		}
+		slices.Sort(got)
+		slices.Sort(want)
+		if !slices.Equal(got, want) {
+			t.Errorf("%q reaches %d cards, %q reaches %d", tt.query, len(got), tt.as, len(want))
+		}
+	}
+
+	// A number another card carries, but no card of the name, is a miss,
+	// with no card of a longer name pulled in.
+	miss := parseSearchQuery(ds, "lightning bolt 7029", nil, nil, nil)
+	if len(miss.CardFilters) == 0 {
+		t.Errorf("lightning bolt 7029 is not split: %q", miss.CleanQuery)
+	}
+	if keys, err := searchAndFilter(ds, miss); err != nil || len(keys) != 0 {
+		t.Errorf("lightning bolt 7029 reaches %d cards: %v", len(keys), err)
+	}
+
+	checkNumberedNamesStayNames(t, ds)
+
+	// A number no card carries, or no snapshot, leaves the query a name.
+	if len(ds.numbers.loose["99999"]) != 0 {
+		t.Fatal("a card carries 99999")
+	}
+	for _, config := range []SearchConfig{
+		parseSearchQuery(ds, "command tower 99999", nil, nil, nil),
+		parseSearchOptionsNG(ds.backend, "command tower 7029", nil, nil, nil),
+	} {
+		if len(config.CardFilters) != 0 {
+			t.Errorf("%q is read as %+v, want a name", config.CleanQuery, config.CardFilters)
+		}
+	}
+}
+
+// checkNumberedNamesStayNames checks that every card name ending in a
+// number, "Overseer of Vault 76", is searched as that name.
+func checkNumberedNamesStayNames(t *testing.T, ds *datastore) {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, uuid := range ds.backend.GetUUIDs() {
+		co, err := ds.backend.GetUUID(uuid)
+		if err != nil || seen[co.Name] {
+			continue
+		}
+		seen[co.Name] = true
+		tokens := strings.Fields(co.Name)
+		if len(tokens) < 2 || !writtenAsNumber(tokens[len(tokens)-1]) {
+			continue
+		}
+		config := parseSearchQuery(ds, co.Name, nil, nil, nil)
+		if len(config.CardFilters) != 0 || config.SearchMode != "" {
+			t.Errorf("%q is read as %q %+v", co.Name, config.CleanQuery, config.CardFilters)
+		}
+	}
+}
