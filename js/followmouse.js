@@ -8,11 +8,13 @@ hoverImage.addEventListener("load", followMouse);
 window.addEventListener("scroll", followMouse);
 window.addEventListener("resize", followMouse);
 
+// Kept in window coordinates: a scroll moves the page under a still
+// pointer, so its page position is only known when the image is placed.
 var mouseLoc = {x: 0, y: 0};
 
 function getMouse(e){
-    mouseLoc.x = e.pageX + 10;
-    mouseLoc.y = e.pageY + 10;
+    mouseLoc.x = e.clientX;
+    mouseLoc.y = e.clientY;
     followMouse();
 }
 
@@ -20,14 +22,16 @@ function followMouse(){
     var el = hoverWrap || hoverImage;
     var w = hoverImage.width;
     var h = hoverImage.height;
-    if (mouseLoc.x + w > window.innerWidth + window.pageXOffset) {
-        el.style.left = (mouseLoc.x - w - 20) + "px";
+    var x = mouseLoc.x + window.pageXOffset + 10;
+    var y = mouseLoc.y + window.pageYOffset + 10;
+    if (x + w > window.innerWidth + window.pageXOffset) {
+        el.style.left = (x - w - 20) + "px";
     } else {
-        el.style.left = mouseLoc.x + "px";
+        el.style.left = x + "px";
     }
-    if (mouseLoc.y + h > window.innerHeight + window.pageYOffset) {
-        el.style.top = (mouseLoc.y - h - 20) + "px";
+    if (y + h > window.innerHeight + window.pageYOffset) {
+        el.style.top = (y - h - 20) + "px";
     } else {
-        el.style.top = mouseLoc.y + "px";
+        el.style.top = y + "px";
     }
 }
