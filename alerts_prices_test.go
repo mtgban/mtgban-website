@@ -67,10 +67,12 @@ func TestAlertStorePricesSkipsIndexBlockedAndOtherKind(t *testing.T) {
 func TestAlertStorePricesMarksPickedOnly(t *testing.T) {
 	alertTestStores(t)
 	net := mtgban.BuylistRecord{"card-1": {{Conditions: "NM", BuyPrice: 15}}}
-	vendors := append(slices.Clip(GetVendors()), mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "TCGDirectNet", Name: "TCG Direct (net)"}))
+	vendors := append(slices.Clip(GetVendors()),
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "TCGDirectNet", Name: "TCG Direct (net)"}),
+		mtgban.NewVendorFromBuylist(net, mtgban.ScraperInfo{Shorthand: "CKBLLast", Name: "Card Kingdom (last)"}))
 	vendorsPtr.Store(&vendors)
 	for _, s := range alertStorePrices("card-1", false, alerts.SideBuylist, nil) {
-		if s.PickedOnly != (s.Shorthand == "TCGDirectNet") {
+		if s.PickedOnly != (s.Shorthand == "TCGDirectNet" || s.Shorthand == "CKBLLast") {
 			t.Fatalf("%s PickedOnly = %v", s.Shorthand, s.PickedOnly)
 		}
 	}

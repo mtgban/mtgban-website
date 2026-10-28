@@ -10,9 +10,10 @@ import (
 )
 
 // alertPickedOnlyStores are watched only by an alert that names them.
-// TCGDirectNet is what a card nets sold through TCGplayer Direct, not an
-// offer to buy it, so an alert on every buylist leaves it out.
-var alertPickedOnlyStores = []string{"TCGDirectNet"}
+// TCGDirectNet is what a card nets sold through TCGplayer Direct and
+// CKBLLast is the last price Card Kingdom bought at, neither an offer to
+// buy it now, so an alert on every buylist leaves them out.
+var alertPickedOnlyStores = []string{"TCGDirectNet", "CKBLLast"}
 
 // alertStorePrices lists every non-index store of the card's kind (sealed
 // or singles) outside the blocklist, so an alert can watch a store not
