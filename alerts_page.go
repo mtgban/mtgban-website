@@ -30,6 +30,8 @@ type AlertsPageVars struct {
 	// UnsubscribeURL is this user's one-click email unsubscribe link,
 	// empty when not signed in.
 	UnsubscribeURL string
+	// Cards is each alert's card by its id, for the rows' hover image.
+	Cards cardMetadata
 }
 
 // alertChannelList is alertChannels comma-joined, as the pages hand it to
@@ -109,4 +111,9 @@ func (s *site) Alerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	vars.Alerts = views
+	b := s.backend()
+	vars.Cards = cardMetadata{}
+	for _, view := range views {
+		vars.Cards[view.CardID] = uuid2card(b, view.CardID, false)
+	}
 }

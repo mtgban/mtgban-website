@@ -89,7 +89,7 @@
     {{end}}
     {{else}}
     <div class="alerts-table-wrap">
-    <table class="table-data alerts-table">
+    <table class="table-data alerts-table"{{if not $.IsMobile}} onmouseout="if (!event.relatedTarget || !this.contains(event.relatedTarget)) { window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false'); }"{{end}}>
         <thead>
             <tr>
                 <th>Card</th>
@@ -106,8 +106,9 @@
         </thead>
         <tbody>
         {{$allowed := .Allowed}}
+        {{$cards := .Cards}}
         {{range .Alerts}}
-            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}" data-delivery="{{.Delivery}}" data-name="{{.Card.Name}}" data-status="{{.Status}}" data-now="{{if .Current}}{{printf "%.2f" (mulf .Current 1)}}{{end}}" data-created="{{.CreatedAt.Unix}}" data-fired="{{with .LastEvent}}{{.FiredAt.Unix}}{{end}}">
+            <tr class="alert-row alert-{{.Status}}" data-id="{{.ID}}" data-card-id="{{.CardID}}" data-side="{{.Side}}" data-delivery="{{.Delivery}}" data-name="{{.Card.Name}}" data-status="{{.Status}}" data-now="{{if .Current}}{{printf "%.2f" (mulf .Current 1)}}{{end}}" data-created="{{.CreatedAt.Unix}}" data-fired="{{with .LastEvent}}{{.FiredAt.Unix}}{{end}}"{{if not $.IsMobile}}{{$card := index $cards .CardID}} onmouseover="{{if not $card.UUID}}window.setCardArtSource(document.getElementById('hoverImage'),'{{card_art_placeholder}}');{{else}}window.setCardArtSource(document.getElementById('hoverImage'),{{$card.ImageURL}});var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});hw.toggleAttribute('data-sealed',{{$card.Sealed}});{{end}}"{{end}}>
                 <td class="alert-card">
                     <a href="/search?q={{.CardID}}">{{.Card.Name}}</a>
                     <span class="alert-meta">{{.Card.Set}} #{{.Card.Number}} {{.Card.Finish}}</span>
