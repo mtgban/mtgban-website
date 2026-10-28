@@ -730,3 +730,74 @@ func TestSearchAPIKeepsSealedToTheSealedMode(t *testing.T) {
 		}
 	}
 }
+
+// A number alone is the TCGplayer product id it names on the price API, whose
+// callers ask by id, while the export reads it as the page does: the
+// collector number the cards carrying it share.
+func TestSearchAPIReadsANumberAsAnID(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+	var tcgID, uuid string
+	for _, u := range ds.backend.GetUUIDs() {
+		co, err := ds.backend.GetUUID(u)
+		if err != nil || slices.Contains(filteredEditions, co.SetCode) {
+			continue
+		}
+		id := co.Identifiers["tcgplayerProductId"]
+		numbered := ds.numbers.loose[id]
+		if id != "" && len(numbered) > 1 && !slices.Contains(numbered, u) &&
+			ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, id) == u {
+			tcgID, uuid = id, u
+			break
+		}
+	}
+	if tcgID == "" {
+		t.Fatal("no TCGplayer id that is also a collector number")
+	}
+	inventory := mtgban.InventoryRecord{}
+	for _, id := range append([]string{uuid}, ds.numbers.loose[tcgID]...) {
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: "NM", Price: 1, Quantity: 1})
+	}
+	publishStores(t, []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inventory, mtgban.ScraperInfo{Shorthand: "TCGMarket", Name: "TCG Market"}),
+	}, []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{}, mtgban.ScraperInfo{Shorthand: "CKBL", Name: "Card Kingdom Buylist"}),
+	})
+	signingEnabled(t, false)
+	withAPIUserSecret(t, "plan@example.com", "plan-secret")
+
+	key := apisig.Mint([]byte("plan-secret"), signatureLink(), apisig.Claims{
+		API:     "ALL_ACCESS",
+		Fields:  url.Values{"APImode": {"all"}, "UserEmail": {"plan@example.com"}},
+		Expires: time.Now().Add(time.Hour).Unix(),
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/search/retail/"+tcgID+".json?id=mtgjson&sig="+url.QueryEscape(key), nil)
+	// The API limiter is shared and keyed on the address.
+	req.RemoteAddr = "192.0.2.90:1234"
+	rec := httptest.NewRecorder()
+	enforceAPISigning(http.HandlerFunc(testSite.SearchAPI)).ServeHTTP(rec, req)
+	var out PriceAPIOutputV2
+	err := json.Unmarshal(rec.Body.Bytes(), &out)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, rec.Body.String())
+	}
+	if got := slices.Sorted(maps.Keys(out.Retail)); !slices.Equal(got, []string{uuid}) {
+		t.Errorf("API %s reaches %v, want the TCGplayer id's %s", tcgID, got, uuid)
+	}
+
+	sig := signedAs(t, url.Values{"SearchDownloadCSV": {"true"}}, time.Now().Add(time.Hour))
+	req = httptest.NewRequest(http.MethodGet, "/search/export/retail/"+tcgID+".csv?id=mtgjson", nil)
+	req.AddCookie(&http.Cookie{Name: "BAN_SIG", Value: sig})
+	rec = httptest.NewRecorder()
+	testSite.SearchExport(rec, req)
+	var rows []string
+	for _, line := range strings.Split(rec.Body.String(), "\n")[1:] {
+		id, _, found := strings.Cut(line, ",")
+		if found {
+			rows = append(rows, id)
+		}
+	}
+	if len(rows) < 2 || slices.Contains(rows, uuid) {
+		t.Errorf("export %s lists %v, want the cards numbered %s", tcgID, rows, tcgID)
+	}
+}
