@@ -270,6 +270,7 @@ func (reg *Registry) Publish(b *mtgmatcher.Backend, kind string, info mtgban.Scr
 		return report, err
 	}
 	reg.stores[key(kind, info.Shorthand)] = true
+	reg.hooks.Notify("refresh", fmt.Sprintf("session %s store %s published", kind, info.Shorthand))
 
 	return report, nil
 }
