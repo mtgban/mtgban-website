@@ -2094,9 +2094,9 @@ func searchVendorsNG(cardIDs []string, config SearchConfig) (foundVendors map[st
 	return
 }
 
-// customBuylistSkipSets holds the editions the custom buylist never prices:
-// the Collectors' Editions, 30th Anniversary Edition and the World
-// Championship Decks, PTC included
+// customBuylistSkipSets holds the editions whose cards the custom buylist
+// never prices: the Collectors' Editions, 30th Anniversary Edition and the
+// World Championship Decks, PTC included. Their sealed products are priced.
 var customBuylistSkipSets = append([]string{"CED", "CEI", "30A"}, wcSets...)
 
 // Append a virtual buylist to search results, priced off the reference
@@ -2126,7 +2126,7 @@ func searchCustomBuylist(b *mtgmatcher.Backend, r *http.Request, cardIDs []strin
 	// keyed by the unique card, so dedupe to avoid appending an entry per copy.
 	for _, cardID := range dedupeKeys(cardIDs) {
 		co, err := b.GetUUID(cardID)
-		if err != nil || slices.Contains(customBuylistSkipSets, co.SetCode) {
+		if err != nil || (!co.Sealed && slices.Contains(customBuylistSkipSets, co.SetCode)) {
 			continue
 		}
 
