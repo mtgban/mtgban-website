@@ -166,6 +166,9 @@ func TestRegistryPublishInstallsAndTracks(t *testing.T) {
 	if reg.Is(Buylist, "ZZS") {
 		t.Error("the buylist side reads as registered too")
 	}
+	if want := []string{"refresh: session retail store ZZS published"}; !slices.Equal(host.notifications, want) {
+		t.Errorf("notified %q, want %q", host.notifications, want)
+	}
 }
 
 // The form the caller hands over is checked before anything reaches the
@@ -237,6 +240,11 @@ func TestRegistryPublishReplacesItsOwnStore(t *testing.T) {
 	if len(host.sellers) != 1 || host.sellers[0].Info().Shorthand != "zzs" {
 		t.Errorf("the host serves %+v, want only one seller spelled zzs", host.sellers)
 	}
+	// A store replacing itself is published again, never removed
+	want := []string{"refresh: session retail store ZZS published", "refresh: session retail store zzs published"}
+	if !slices.Equal(host.notifications, want) {
+		t.Errorf("notified %q, want %q", host.notifications, want)
+	}
 	// Is is case-insensitive, so both spellings agree - the fact worth
 	// asserting is that there is exactly one seller, not two
 	if !reg.Is(Retail, "ZZS") || !reg.Is(Retail, "zzs") {
@@ -269,8 +277,9 @@ func TestRegistryRemove(t *testing.T) {
 	if reg.Is(Retail, "ZZS") {
 		t.Error("ZZS is still registered after being removed")
 	}
-	if len(host.notifications) != 1 {
-		t.Errorf("got %d notifications, want one", len(host.notifications))
+	want := []string{"refresh: session retail store ZZS published", "refresh: session retail store ZZS removed"}
+	if !slices.Equal(host.notifications, want) {
+		t.Errorf("notified %q, want %q", host.notifications, want)
 	}
 
 	if err := reg.Remove(Retail, "ZZS"); err == nil {
