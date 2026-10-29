@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -101,7 +103,7 @@ func TestBackpackErrorCapsTheTotal(t *testing.T) {
 }
 
 // A sync body may come gzipped, and is held to maxBody as sent and to
-// maxDecoded once unpacked.
+// maxDecoded once unpacked; a body past either is refused with 413.
 func TestDecodeBodyTakesGzip(t *testing.T) {
 	gz := func(s string) *bytes.Buffer {
 		var buf bytes.Buffer
@@ -110,17 +112,24 @@ func TestDecodeBodyTakesGzip(t *testing.T) {
 		zw.Close()
 		return &buf
 	}
+	// Random bytes barely compress, so this stays past maxBody gzipped.
+	noise := make([]byte, maxBody)
+	_, err := rand.Read(noise)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		name    string
 		body    io.Reader
 		gzipped bool
-		ok      bool
+		status  int
 	}{
-		{"plain", strings.NewReader(`{"data":"x"}`), false, true},
-		{"gzipped", gz(`{"data":"x"}`), true, true},
-		{"gzipped past maxDecoded", gz(`{"data":"` + strings.Repeat("x", maxDecoded) + `"}`), true, false},
-		{"plain past maxBody", strings.NewReader(`{"data":"` + strings.Repeat("x", maxBody) + `"}`), false, false},
-		{"not gzip", strings.NewReader(`{"data":"x"}`), true, false},
+		{"plain", strings.NewReader(`{"data":"x"}`), false, http.StatusOK},
+		{"gzipped", gz(`{"data":"x"}`), true, http.StatusOK},
+		{"gzipped past maxDecoded", gz(`{"data":"` + strings.Repeat("x", maxDecoded) + `"}`), true, http.StatusRequestEntityTooLarge},
+		{"gzipped past maxBody", gz(`{"data":"` + base64.StdEncoding.EncodeToString(noise) + `"}`), true, http.StatusRequestEntityTooLarge},
+		{"plain past maxBody", strings.NewReader(`{"data":"` + strings.Repeat("x", maxBody) + `"}`), false, http.StatusRequestEntityTooLarge},
+		{"not gzip", strings.NewReader(`{"data":"x"}`), true, http.StatusBadRequest},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -132,11 +141,19 @@ func TestDecodeBodyTakesGzip(t *testing.T) {
 				Data string `json:"data"`
 			}
 			err := decodeBody(httptest.NewRecorder(), req, &got)
-			if (err == nil) != tc.ok {
-				t.Fatalf("err = %v, want ok %v", err, tc.ok)
+			if err == nil {
+				if tc.status != http.StatusOK {
+					t.Fatalf("decoded, want %d", tc.status)
+				}
+				if got.Data != "x" {
+					t.Errorf("data = %q", got.Data)
+				}
+				return
 			}
-			if tc.ok && got.Data != "x" {
-				t.Errorf("data = %q", got.Data)
+			rec := httptest.NewRecorder()
+			badBody(rec, err)
+			if rec.Code != tc.status {
+				t.Errorf("err %v answered %d, want %d", err, rec.Code, tc.status)
 			}
 		})
 	}
