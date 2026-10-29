@@ -38,7 +38,7 @@ Every change is reviewed against seven rules:
    `setupDiscord`, `buildTemplateCache`) never reads: it runs before the
    load, so it would keep the empty datastore forever.
 3. **Pass the narrowest thing.** A function that only matches cards takes
-   `b *mtgmatcher.Backend` first, after a `ctx`; one that reads a derived
+   `b *matcher.Backend` first, after a `ctx`; one that reads a derived
    snapshot takes `ds *datastore`. Neither goes into `SearchConfig`,
    `PageVars` or any other data struct.
 4. **Read-only.** A published backend is shared by every goroutine, and
@@ -46,7 +46,7 @@ Every change is reviewed against seven rules:
    own slices: never assign into one, sort it in place or `append` to it;
    `slices.Clone` first.
 5. **Don't pin.** Only the owner keeps a `*datastore` or a
-   `*mtgmatcher.Backend` past a unit of work. State derived from a backend
+   `*matcher.Backend` past a unit of work. State derived from a backend
    lives in the `datastore`, or remembers its source through a
    `weak.Pointer`, as `internal/mkmidparser` does for its sellers.
 6. **Never nil.** Before the first load the site serves the empty
