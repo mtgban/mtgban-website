@@ -936,6 +936,7 @@ type uploadRows struct {
 	missingCounts    map[string]int
 	missingPrices    map[string]float64
 	optimizedResults map[string][]OptimizedUploadEntry
+	optimizedAt      map[optimizedKey]int
 	optimizedTotals  map[string]float64
 	optimizedQtys    map[string]int
 	highestTotal     float64
@@ -948,6 +949,13 @@ type uploadRows struct {
 	anyCounted       bool
 }
 
+// optimizedKey names a card in a store's optimizer list: the store, and the
+// key the card's prices are filed under, its condition included.
+type optimizedKey struct {
+	store    string
+	priceKey string
+}
+
 // priceUploadRows prices each matched row at the stores and indexes fetched,
 // adds up the totals, and picks the best stores for the optimizer.
 func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices uploadPrices, indexes uploadIndexes, uploadedData []UploadEntry) uploadRows {
@@ -957,6 +965,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		missingCounts:    map[string]int{},
 		missingPrices:    map[string]float64{},
 		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedAt:      map[optimizedKey]int{},
 		optimizedTotals:  map[string]float64{},
 		optimizedQtys:    map[string]int{},
 		tallies:          map[string]*unpackedTally{},
@@ -1030,7 +1039,6 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 		}
 
 		var factor float64
-		var profitability float64
 		// Compute spread (and skip if needed)
 		if comparePrice != 0 {
 			factor = price / comparePrice * 100
@@ -1041,47 +1049,77 @@ func (rows *uploadRows) optimizeRow(row uploadRow, offers map[string]float64, be
 			if st.skipHighValue && st.percSpreadMax != 0 && factor >= st.percSpreadMax {
 				continue
 			}
-
-			if factor > 0 {
-				profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+factor)
-				if row.qty > 1 {
-					profitability *= math.Pow(float64(row.qty), 0.25)
-				}
-			}
 		}
 
-		// Break down by store
-		rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
-			CardID:        row.CardID,
-			Condition:     row.conds,
-			Price:         comparePrice,
-			CompareSource: st.altPriceSource,
-			Spread:        factor,
-			BestPrice:     price,
-			Quantity:      row.qty,
-			Notes:         row.Notes,
-			VisualPrice:   comparePrice * st.visualPerc / 100.0,
-			Profitability: profitability,
-		})
+		// Copies of a card opened from different products are one row here,
+		// as a store's list takes them, capped as one card; the sections
+		// keep them apart. added is what this copy adds within the cap.
+		// Opened copies carry no price of their own, so they all compare
+		// alike; an uploaded row is judged on its own and stays its own.
+		added, qty := bestPrice, row.qty
+		opened := row.UnpackedFrom != ""
+		key := optimizedKey{bestStore, row.priceKey}
+		at, seen := rows.optimizedAt[key]
+		if opened && seen {
+			entry := &rows.optimizedResults[bestStore][at]
+			qty = adjustQty(entry.Quantity+row.qty, 1, st.maxQty) - entry.Quantity
+			added = price * float64(qty)
+			entry.Quantity += qty
+			entry.Profitability = profitability(entry.Price, entry.BestPrice, entry.Spread, entry.Quantity)
+			if entry.Notes != row.Notes {
+				entry.Notes = ""
+			}
+		} else {
+			// Break down by store
+			if opened {
+				rows.optimizedAt[key] = len(rows.optimizedResults[bestStore])
+			}
+			rows.optimizedResults[bestStore] = append(rows.optimizedResults[bestStore], OptimizedUploadEntry{
+				CardID:        row.CardID,
+				Condition:     row.conds,
+				Price:         comparePrice,
+				CompareSource: st.altPriceSource,
+				Spread:        factor,
+				BestPrice:     price,
+				Quantity:      row.qty,
+				Notes:         row.Notes,
+				VisualPrice:   comparePrice * st.visualPerc / 100.0,
+				Profitability: profitability(comparePrice, price, factor, row.qty),
+			})
+		}
 
 		// Save totals
-		rows.optimizedTotals[bestStore] += bestPrice
-		rows.optimizedQtys[bestStore] += row.qty
+		rows.optimizedTotals[bestStore] += added
+		rows.optimizedQtys[bestStore] += qty
 		// The first store kept, which a high-value filter may have moved
-		// off the best: the row is listed there, so it counts there.
+		// off the best: the row is listed there, so it counts there. Its
+		// product's section is read a box at a time, so it counts whole.
 		if !counted {
 			counted = true
-			rows.highestTotal += bestPrice
+			rows.highestTotal += added
 			if row.isSealed {
-				rows.sealedHighest += bestPrice
+				rows.sealedHighest += added
 			} else {
-				rows.singlesHighest += bestPrice
+				rows.singlesHighest += added
 			}
 			if row.UnpackedFrom != "" {
 				rows.tallyFor(row.UnpackedFrom).Highest += bestPrice
 			}
 		}
 	}
+}
+
+// profitability ranks an optimizer row by how far the store's offer is from
+// the comparison price, weighed by the spread and, gently, by the quantity.
+func profitability(comparePrice, price, spread float64, qty int) float64 {
+	if comparePrice == 0 || spread <= 0 {
+		return 0
+	}
+	p := ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+spread)
+	if qty > 1 {
+		p *= math.Pow(float64(qty), 0.25)
+	}
+	return p
 }
 
 // tallyOffers files the row's price at every store, in credit when the price

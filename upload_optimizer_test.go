@@ -127,6 +127,7 @@ func TestOptimizerCountsTheStoreItKept(t *testing.T) {
 	rows := uploadRows{
 		resultPrices:     map[string]map[string]float64{"card": {"CK": 55, "SCG": 49.6}},
 		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedAt:      map[optimizedKey]int{},
 		optimizedTotals:  map[string]float64{},
 		optimizedQtys:    map[string]int{},
 	}
@@ -142,6 +143,67 @@ func TestOptimizerCountsTheStoreItKept(t *testing.T) {
 	}
 	if rows.optimizedQtys["CK"] != 0 || rows.optimizedQtys["SCG"] != 3 {
 		t.Errorf("quantities %v, want SCG's 3 alone", rows.optimizedQtys)
+	}
+}
+
+// TestOptimizerMergesOpenedCopies lists a card opened from several products
+// once per store, its copies added up and capped as one card's, while each
+// product's section still counts its own copy.
+func TestOptimizerMergesOpenedCopies(t *testing.T) {
+	rows := uploadRows{
+		resultPrices:     map[string]map[string]float64{"card": {"CK": 2}},
+		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedAt:      map[optimizedKey]int{},
+		optimizedTotals:  map[string]float64{},
+		optimizedQtys:    map[string]int{},
+		tallies:          map[string]*unpackedTally{},
+	}
+	st := uploadSettings{maxQty: 3}
+	for _, deck := range []string{"deck1", "deck2", "deck3", "deck4"} {
+		entry := &UploadEntry{CardID: "card", Notes: deck, UnpackedFrom: deck}
+		row := uploadRow{UploadEntry: entry, priceKey: "card", qty: 1}
+		rows.optimizeRow(row, map[string]float64{"CK": 2}, []string{"CK"}, st, uploadIndexes{})
+	}
+
+	got := rows.optimizedResults["CK"]
+	if len(got) != 1 || got[0].Quantity != 3 || got[0].Notes != "" {
+		t.Fatalf("CK lists %+v, want one row of 3 with no notes", got)
+	}
+	if rows.optimizedTotals["CK"] != 6 || rows.optimizedQtys["CK"] != 3 || rows.highestTotal != 6 {
+		t.Errorf("total %v, quantity %v, highest %v, want 6, 3 and 6",
+			rows.optimizedTotals["CK"], rows.optimizedQtys["CK"], rows.highestTotal)
+	}
+	for _, deck := range []string{"deck1", "deck2", "deck3", "deck4"} {
+		if rows.tallies[deck].Highest != 2 {
+			t.Errorf("%s's section counts %v, want its own copy's 2", deck, rows.tallies[deck].Highest)
+		}
+	}
+}
+
+// TestOptimizerKeepsUploadedCopiesApart leaves a row uploaded with a price of
+// its own out of the opened copies' row: it was judged on that price, which
+// the opened ones do not have.
+func TestOptimizerKeepsUploadedCopiesApart(t *testing.T) {
+	rows := uploadRows{
+		resultPrices:     map[string]map[string]float64{"card": {"CK": 2}},
+		optimizedResults: map[string][]OptimizedUploadEntry{},
+		optimizedAt:      map[optimizedKey]int{},
+		optimizedTotals:  map[string]float64{},
+		optimizedQtys:    map[string]int{},
+		tallies:          map[string]*unpackedTally{},
+	}
+	for _, entry := range []*UploadEntry{
+		{CardID: "card", OriginalPrice: 4},
+		{CardID: "card", UnpackedFrom: "deck1"},
+		{CardID: "card", UnpackedFrom: "deck2"},
+	} {
+		row := uploadRow{UploadEntry: entry, priceKey: "card", qty: 1}
+		rows.optimizeRow(row, map[string]float64{"CK": 2}, []string{"CK"}, uploadSettings{}, uploadIndexes{})
+	}
+
+	got := rows.optimizedResults["CK"]
+	if len(got) != 2 || got[0].Price != 4 || got[0].Quantity != 1 || got[1].Price != 0 || got[1].Quantity != 2 {
+		t.Fatalf("CK lists %+v, want the uploaded row at 4 alone and the opened copies as one of 2", got)
 	}
 }
 
