@@ -228,6 +228,69 @@
         });
     }
 
+    // listingsUpload is the upload of a store whose cart is filled from its
+    // live listings at or under BAN's price: fill adds what it can of a
+    // row's need, counting the copies added in progress.got. An add adds to
+    // the cart, so two tabs would each add the same cards, and a second load
+    // of the whole list would add again the cards a stopped one did: the
+    // page then keeps only the rest, a card cut short at what it still lacks.
+    function listingsUpload(name, lock, fill) {
+        return async function (rows, qty) {
+            var release = await hold("ban-to-cart-" + lock);
+            var added = 0;
+            var cut = 0;
+            var none = 0;
+            var progress = {};
+            function report() {
+                var message = "Added " + added + " cards to your " + name + " cart, on top of what it held.";
+                if (cut > 0) {
+                    message += " " + cut + " were cut to the copies " + name + " has at or under BAN's price.";
+                }
+                if (none > 0) {
+                    message += " " + none + " that " + name + " has none of at or under BAN's price were left out.";
+                }
+                return message;
+            }
+            try {
+                for (var i = 0; i < rows.length; i++) {
+                    banner.textContent = "BAN: loading cards into your " + name + " cart, " + i + " of " +
+                        rows.length + " done. Keep this tab open until it finishes.";
+                    progress.got = 0;
+                    await fill(rows[i], qty[rows[i]], progress);
+                    if (progress.got <= 0) {
+                        none++;
+                        continue;
+                    }
+                    added++;
+                    if (progress.got < qty[rows[i]]) {
+                        cut++;
+                    }
+                }
+            } catch (err) {
+                if (progress.got > 0) {
+                    added++;
+                    qty[rows[i]] -= progress.got;
+                }
+                if (added === 0) {
+                    throw err;
+                }
+                var rest = rows.slice(i);
+                history.replaceState(null, "", location.pathname + location.search + location.hash.replace(/([#&]ban=)[^&]*/,
+                    "$1" + encodeURIComponent(rest.map(function (id) {
+                        return id + ":" + qty[id];
+                    }).join(","))));
+                throw new Error(err.message + " " + report() + " The other " + rest.length +
+                    " were not added, and this page now holds only those: click BAN-to-Cart again to load them." + leftOut());
+            } finally {
+                release();
+            }
+            window.removeEventListener("beforeunload", stay);
+            alert(report() + leftOut());
+            history.replaceState(null, "", location.pathname + location.search);
+            location.reload();
+        };
+    }
+
     // abuStore loads ABU's buylist or store cart, whichever page this is,
     // through the API ABU's own pages call with the user's token.
     function abuStore() {
@@ -970,69 +1033,20 @@
             loggedIn: function () {
                 return true;
             },
-            upload: async function (rows, qty) {
-                // An add adds to the cart, so two tabs would each add the same cards
-                var release = await hold("ban-to-cart-ct");
-                var added = 0;
-                var cut = 0;
-                var none = 0;
-                function report() {
-                    var message = "Added " + added + " cards to your Card Trader cart, on top of what it held.";
-                    if (cut > 0) {
-                        message += " " + cut + " were cut to the copies Card Trader has at or under BAN's price.";
-                    }
-                    if (none > 0) {
-                        message += " " + none + " that Card Trader has none of at or under BAN's price were left out.";
-                    }
-                    return message;
+            upload: listingsUpload("Card Trader", "ct", async function (id, need, progress) {
+                var ids = [];
+                (await listings(id)).forEach(function (p) {
+                    ids = ids.concat(p.all_ids || [p.id]);
+                });
+                if (ids.length === 0) {
+                    return;
                 }
-                try {
-                    for (var i = 0; i < rows.length; i++) {
-                        banner.textContent = "BAN: loading cards into your Card Trader cart, " + i + " of " +
-                            rows.length + " done. Keep this tab open until it finishes.";
-                        var ids = [];
-                        (await listings(rows[i])).forEach(function (p) {
-                            ids = ids.concat(p.all_ids || [p.id]);
-                        });
-                        if (ids.length === 0) {
-                            none++;
-                            continue;
-                        }
-                        var query = "quantity=" + qty[rows[i]] + "&" + ids.map(function (listing) {
-                            return "product_ids[]=" + listing;
-                        }).join("&") + "&future_order=1";
-                        var body = await call("/" + locale + "/cart/add.json?" + query);
-                        var delta = Number(body.delta_changed_quantity) || 0;
-                        if (delta <= 0) {
-                            none++;
-                            continue;
-                        }
-                        added++;
-                        if (delta < qty[rows[i]]) {
-                            cut++;
-                        }
-                    }
-                } catch (err) {
-                    if (added === 0) {
-                        throw err;
-                    }
-                    // A second load of the whole list would add the cards
-                    // before this one again, so the page keeps only the rest
-                    var rest = rows.slice(i);
-                    history.replaceState(null, "", location.pathname + location.search + location.hash.replace(/([#&]ban=)[^&]*/,
-                        "$1" + encodeURIComponent(rest.map(function (id) {
-                            return id + ":" + qty[id];
-                        }).join(","))));
-                    throw new Error(err.message + " " + report() + " The other " + rest.length +
-                        " were not added, and this page now holds only those: click BAN-to-Cart again to load them." + leftOut());
-                } finally {
-                    release();
-                }
-                window.removeEventListener("beforeunload", stay);
-                alert(report() + leftOut());
-                history.replaceState(null, "", location.pathname + location.search);
-                location.reload();
-            }
+                var query = "quantity=" + need + "&" + ids.map(function (listing) {
+                    return "product_ids[]=" + listing;
+                }).join("&") + "&future_order=1";
+                var body = await call("/" + locale + "/cart/add.json?" + query);
+                progress.got = Number(body.delta_changed_quantity) || 0;
+            })
         };
     }
 
