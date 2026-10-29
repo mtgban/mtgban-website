@@ -66,6 +66,12 @@ func TestDidYouMeanKeepsFilters(t *testing.T) {
 		{"lightning bolt s:lea", ""},
 		{"lightning bolt s:lea f:foil", ""},
 		{"lightning bolt is:xyz", ""},
+		{"counterspell c:r", ""},
+		{"goblin guide c:u", ""},
+		{"llanowar elves -c:g", ""},
+		{"lightning bolt year>2030", ""},
+		{"lightning bolt price>200", ""},
+		{"black lotus store:ck", ""},
 	}
 	for _, tt := range tests {
 		config := parseSearchOptionsNG(ds.backend, tt.query, nil, nil, nil)
@@ -99,5 +105,24 @@ func TestDidYouMeanRekeyBounds(t *testing.T) {
 	config = parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
 	if got, _ := searchSuggestions(ds, query, config, nil, false); got != "" {
 		t.Errorf("%q: did-you-mean %q, want none past %d values", query, got, maxRekeyValues)
+	}
+}
+
+// A store filter naming a store stays one, though a set shares its code.
+func TestDidYouMeanKeepsAStore(t *testing.T) {
+	skipWithoutDatastore(t)
+	ds := testSite.datastore()
+
+	query := "murder store:mkm"
+	config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
+	if got, _ := searchSuggestions(ds, query, config, nil, false); got != "murder s:mkm" {
+		t.Fatalf("%q with no such store: did-you-mean %q, want murder s:mkm", query, got)
+	}
+	registerTestSeller(t, "MKM", somePlainCardUUIDs(t, 1))
+	for _, query := range []string{query, "murder store:empty:mkm"} {
+		config := parseSearchOptionsNG(ds.backend, query, nil, nil, nil)
+		if got, _ := searchSuggestions(ds, query, config, nil, false); got != "" {
+			t.Errorf("%q with an MKM store: did-you-mean %q, want none", query, got)
+		}
 	}
 }

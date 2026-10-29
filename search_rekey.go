@@ -17,14 +17,17 @@ import (
 // A key stands in only where it parses into a card filter and reads each
 // comma-separated value whole, as one value that keeps cards and answers
 // differently than a value naming nothing: ci:modern reads six colour
-// letters and never stands in. name is what the query searches by name and
-// pinned the scope bar's filters; the cards are looked up once for every
-// key.
+// letters and never stands in, nor does a key matching by pattern, which
+// a short value matches by chance. A filter whose own key reads its value
+// somewhere is left as typed: c:r keeps no Counterspell, but it is no typo.
+// Neither is a comparison, or a store filter naming a store. name is what
+// the query searches by name and pinned the scope bar's filters; the cards
+// are looked up once for every key.
 //
 // The page is public, so the work is bounded: a query with more than
 // maxRekeyFilters filters is not rekeyed, nor a filter of more than
 // maxRekeyValues values, and the cards walked come to one card pool at
-// most.
+// most, plus a walk of the datastore for each filter a key stands in for.
 func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, sealed bool) ([]string, bool) {
 	if len(filters) > maxRekeyFilters {
 		return filters, false
@@ -49,7 +52,10 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 		key, op, value := strings.ToLower(filter[:index]), filter[index:index+1], filter[index+1:]
 		negate := strings.HasPrefix(key, "-")
 		key = strings.TrimPrefix(key, "-")
-		if FilterOperations[key] == nil || strings.Count(value, ",") >= maxRekeyValues {
+		if FilterOperations[key] == nil || op != ":" || strings.Count(value, ",") >= maxRekeyValues {
+			continue
+		}
+		if (key == "store" || key == "seller" || key == "vendor") && namesStores(value) {
 			continue
 		}
 
@@ -89,7 +95,7 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 			}
 			token := prefix + key + op + value
 			elem, ok := cardFilterOf(ds, token, sealed)
-			if !ok || elem.Negate != negate || slices.ContainsFunc(tried, elem.sameAs) {
+			if !ok || elem.Regexp != nil || elem.Negate != negate || slices.ContainsFunc(tried, elem.sameAs) {
 				continue
 			}
 			tried = append(tried, elem)
@@ -121,14 +127,51 @@ func rekeyFilters(ds *datastore, name, filters []string, pinned []FilterElem, se
 			continue
 		}
 		for _, c := range candidates {
-			if !slices.ContainsFunc(c.parts, rekeyPart.failed) {
+			if slices.ContainsFunc(c.parts, rekeyPart.failed) {
+				continue
+			}
+			// Asked only of a filter some key would stand in for: the
+			// walk covers the whole datastore when the value names nothing.
+			if typed == nil || !readsAnywhere(ds, typed.filter[0], filter[:index+1], sealed) {
 				out[i] = c.token
 				rekeyed = true
-				break
 			}
+			break
 		}
 	}
 	return out, rekeyed
+}
+
+// readsAnywhere reports whether a filter keeps a card somewhere in the
+// datastore and reads its value there, as a filter naming nothing does not.
+func readsAnywhere(ds *datastore, elem FilterElem, key string, sealed bool) bool {
+	p := newRekeyPart(ds, elem, key, sealed)
+	for _, co := range ds.backend.UUIDs {
+		p.try(ds.backend, co)
+		if !p.failed() {
+			return true
+		}
+	}
+	return false
+}
+
+// namesStores reports whether every comma-separated value names a loaded
+// store, by shorthand or by name, read past an option the way the parser
+// reads store:empty:ck.
+func namesStores(value string) bool {
+	subCodes := strings.Split(value, ":")
+	if len(subCodes) > 1 {
+		value = subCodes[1]
+	}
+	idx := currentStoreIndex()
+	for _, store := range fixupStoreCodeNG(value) {
+		_, seller := idx.sellerFold[store]
+		_, vendor := idx.vendorFold[store]
+		if !seller && !vendor {
+			return false
+		}
+	}
+	return true
 }
 
 // maxRekeyFilters is how many filters a query may carry, and
