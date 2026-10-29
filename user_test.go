@@ -656,7 +656,7 @@ func TestTierPagesClampTheBackpacks(t *testing.T) {
 	if len(pages) != 1 {
 		t.Fatalf("pages %+v", pages)
 	}
-	want := []string{"Backpack of 1000 cards", "Up to 5 backpacks"}
+	want := []string{"Backpack of 1000 cards", "Up to 7 backpacks"}
 	if !slices.Equal(pages[0].Perks, want) {
 		t.Errorf("perks %v, want %v", pages[0].Perks, want)
 	}

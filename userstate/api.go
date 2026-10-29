@@ -20,8 +20,8 @@ import (
 // client_max_body_size, so a body the droplets pass is one this takes.
 const maxBody = 1 << 20
 
-// maxDecoded caps a gzipped body once unpacked: a backpack's 5000 cards and
-// as many removed ones come to about 2.3 MB.
+// maxDecoded caps a gzipped body once unpacked: a backpack's 7000 cards and
+// as many removed ones come to about 3.2 MB.
 const maxDecoded = 8 << 20
 
 // decodeBody decodes a JSON body of at most maxBody bytes as sent, which a

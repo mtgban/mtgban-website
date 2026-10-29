@@ -25,11 +25,13 @@ func userStateIdentity(email string) string {
 // no SearchBackpackMax, maxBackpackMax the most a tier can set, and
 // maxBackpackTotal the most a reader's backpacks hold together: gzipped,
 // that many cards and as many removed ones still fit the userstate sync
-// body's 1 MB beside the other sections.
+// body's 1 MB beside the other sections, and plain, the browser's copy of
+// them (about 3.2 MB) fits localStorage's 5 MB, past which a save is
+// dropped silently.
 const (
 	defaultBackpackMax = 100
 	maxBackpackMax     = 1000
-	maxBackpackTotal   = 5000
+	maxBackpackTotal   = 7000
 )
 
 // backpackMaxFromValues reads SearchBackpackMax off signed ACL values, held
