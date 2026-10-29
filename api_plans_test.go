@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apiproductlist"
 	"github.com/mtgban/mtgban-website/internal/pledge"
 )
@@ -25,7 +25,7 @@ func apiPlansPageAt(t *testing.T, sig, target string) string {
 	savedDev, savedSig, savedCfg := DevMode, SigCheck, Config().APIGateway
 	t.Cleanup(func() { DevMode, SigCheck, Config().APIGateway = savedDev, savedSig, savedCfg })
 	DevMode, SigCheck = true, false
-	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []mtgmatcher.Game{"magic", "pokemon"}}
+	Config().APIGateway = APIGatewayConfig{URL: "https://api.example", Games: []matcher.Game{"magic", "pokemon"}}
 
 	req := httptest.NewRequest(http.MethodGet, target, nil)
 	req.Host = "mtgban.com"

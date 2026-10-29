@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 type paletteFinish struct {
@@ -44,7 +44,7 @@ func TestFinishesCacheComesFromTheDatastore(t *testing.T) {
 	for _, finish := range finishes {
 		byValue[finish.Value] = finish
 	}
-	for _, want := range []string{mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil} {
+	for _, want := range []string{matcher.FinishNonfoil, matcher.FinishFoil} {
 		if _, found := byValue[want]; !found {
 			t.Errorf("%q is missing from the list", want)
 		}

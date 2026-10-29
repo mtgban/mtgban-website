@@ -4,29 +4,29 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // rarityBackend builds a backend for the game holding one card per uuid at
 // the rarity given, ranked by order as a loader ranks its game's.
-func rarityBackend(game mtgmatcher.Game, order []string, cards map[string]string) *mtgmatcher.Backend {
-	b := &mtgmatcher.Backend{Game: game, UUIDs: map[string]*mtgmatcher.CardObject{}}
+func rarityBackend(game matcher.Game, order []string, cards map[string]string) *matcher.Backend {
+	b := &matcher.Backend{Game: game, UUIDs: map[string]*matcher.CardObject{}}
 	for uuid, rarity := range cards {
-		co := &mtgmatcher.CardObject{}
+		co := &matcher.CardObject{}
 		co.UUID = uuid
 		co.Rarity = rarity
 		b.UUIDs[uuid] = co
 		b.AllUUIDs = append(b.AllUUIDs, uuid)
 	}
 	slices.Sort(b.AllUUIDs)
-	b.Rarities = mtgmatcher.RarityNames(order)
+	b.Rarities = matcher.RarityNames(order)
 	b.IndexRarities()
 	return b
 }
 
 // rarityKept parses the query the way the search does and lists the cards
 // its filters keep.
-func rarityKept(b *mtgmatcher.Backend, query string) []string {
+func rarityKept(b *matcher.Backend, query string) []string {
 	config := parseSearchOptionsNG(b, query, nil, nil, nil)
 	var kept []string
 	for _, uuid := range b.AllUUIDs {
@@ -41,7 +41,7 @@ func rarityKept(b *mtgmatcher.Backend, query string) []string {
 // Every game reads r: as its rarities are listed, one lower-case word or the
 // letter they begin, and ranks r> and r< by its own order.
 func TestRarityFilterReadsEachGamesOrder(t *testing.T) {
-	magic := rarityBackend(mtgmatcher.GameMagic,
+	magic := rarityBackend(matcher.GameMagic,
 		[]string{"oversize", "special", "mythic", "rare", "uncommon", "common", "token"},
 		map[string]string{"bolt": "common", "jace": "mythic", "lotus": "rare", "goblin": "token", "pack": "product"})
 	gundam := rarityBackend("gundam",
@@ -55,7 +55,7 @@ func TestRarityFilterReadsEachGamesOrder(t *testing.T) {
 		map[string]string{"sec": "secretrare", "sr": "superrare", "c": "common"})
 
 	tests := []struct {
-		b     *mtgmatcher.Backend
+		b     *matcher.Backend
 		query string
 		want  []string
 	}{

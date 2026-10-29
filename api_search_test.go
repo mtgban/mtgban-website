@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/apisig"
 	"github.com/mtgban/mtgban-website/banprice"
 	"github.com/mtgban/mtgban-website/ratelimit"
@@ -34,7 +34,7 @@ func plainCard(t *testing.T) (id, name string) {
 			return u, co.Name
 		}
 	}
-	t.Skip("mtgmatcher data not loaded")
+	t.Skip("matcher data not loaded")
 	return "", ""
 }
 
@@ -76,7 +76,7 @@ func searchStores(t *testing.T) string {
 func TestSearchAPIv2(t *testing.T) {
 	id, name := plainCard(t)
 	plain := regexp.MustCompile(`^[A-Za-z ]+$`)
-	var box *mtgmatcher.CardObject
+	var box *matcher.CardObject
 	for _, u := range backend().GetSealedUUIDs() {
 		co, err := backend().GetUUID(u)
 		if err == nil && plain.MatchString(co.Name) {
@@ -558,7 +558,7 @@ func TestSearchAPIKeyScopeMeetsBlockListsAsPrices(t *testing.T) {
 func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 	uuids, err := backend().SearchEquals("Counterspell")
 	if err != nil || len(uuids) < 3 {
-		t.Skip("mtgmatcher data not loaded")
+		t.Skip("matcher data not loaded")
 	}
 	sortData := resolveSortingData(backend(), uuids)
 	sort.Slice(uuids, func(i, j int) bool { return cmpSets(sortData[uuids[i]], sortData[uuids[j]]) })
@@ -623,7 +623,7 @@ func TestSearchCSVKeepsThePageOrder(t *testing.T) {
 func TestSearchCSVListsWhatThePageLists(t *testing.T) {
 	uuids, err := backend().SearchEquals("Counterspell")
 	if err != nil || len(uuids) < 4 {
-		t.Skip("mtgmatcher data not loaded")
+		t.Skip("matcher data not loaded")
 	}
 	signingEnabled(t, false)
 	inventory := mtgban.InventoryRecord{}
@@ -670,8 +670,8 @@ func TestSiteExportServesNoJSON(t *testing.T) {
 func TestSearchAPIKeepsSealedToTheSealedMode(t *testing.T) {
 	b := fixtureBackend("FIXTUREA", "Fixture Edition Alpha", "2020-01-01", [][2]string{{"Fixture Card Alpha", "1"}})
 	box := "FIXTUREA-box"
-	b.UUIDs[box] = &mtgmatcher.CardObject{
-		Card:   mtgmatcher.Card{UUID: box, Name: "Fixture Booster Box", SetCode: "FIXTUREA"},
+	b.UUIDs[box] = &matcher.CardObject{
+		Card:   matcher.Card{UUID: box, Name: "Fixture Booster Box", SetCode: "FIXTUREA"},
 		Sealed: true,
 	}
 	s := newSite()
@@ -746,7 +746,7 @@ func TestSearchAPIReadsANumberAsAnID(t *testing.T) {
 		id := co.Identifiers["tcgplayerProductId"]
 		numbered := ds.numbers.loose[id]
 		if id != "" && len(numbered) > 1 && !slices.Contains(numbered, u) &&
-			ds.backend.ConvertID(mtgmatcher.IDSpaceTCGplayer, id) == u {
+			ds.backend.ConvertID(matcher.IDSpaceTCGplayer, id) == u {
 			tcgID, uuid = id, u
 			break
 		}

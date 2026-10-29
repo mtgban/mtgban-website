@@ -11,15 +11,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 )
 
 // productWithVariableCards finds a product whose variable reading answers
 // with cards rather than with the packs it wraps - a Fat Pack might hold its
 // boosters, and the odds are of the cards inside those, not of the boosters -
 // and whose cards are not all equally likely, so that an order means something.
-func productWithVariableCards(t *testing.T) *mtgmatcher.CardObject {
+func productWithVariableCards(t *testing.T) *matcher.CardObject {
 	t.Helper()
 	for _, code := range backend().GetAllSets() {
 		set, err := backend().GetSet(code)

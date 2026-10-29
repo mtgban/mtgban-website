@@ -19,23 +19,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/magic"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 	"github.com/mtgban/mtgban-website/internal/mkmidparser"
 	"github.com/mtgban/mtgban-website/internal/notify"
 	"github.com/mtgban/mtgban-website/internal/siteorigin"
 )
 
 // externalUUID resolves an outside identifier without knowing which id space
-// it lives in, the way mtgmatcher.ExternalUUID used to: the spaces in their
+// it lives in, the way matcher.ExternalUUID used to: the spaces in their
 // historical order, first hit wins.
-func externalUUID(b *mtgmatcher.Backend, id string) string {
-	for _, space := range []mtgmatcher.IDSpace{
-		mtgmatcher.IDSpaceMTGJSON,
-		mtgmatcher.IDSpaceScryfall,
-		mtgmatcher.IDSpaceTCGplayer,
+func externalUUID(b *matcher.Backend, id string) string {
+	for _, space := range []matcher.IDSpace{
+		matcher.IDSpaceMTGJSON,
+		matcher.IDSpaceScryfall,
+		matcher.IDSpaceTCGplayer,
 	} {
 		uuid := b.ConvertID(space, id)
 		if uuid != "" {
@@ -96,8 +96,8 @@ func cookiePath(r *http.Request, cookieName string) string {
 // Special, promo and Illumineer's Quest cards carry the gold Lorcana emblem
 // rather than a rarity gem. The emblem's gold is legendary's, so the three
 // share an invented purple.
-var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
-	mtgmatcher.GameLorcana: {
+var colorRarityMap = map[matcher.Game]map[string]template.CSS{
+	matcher.GameLorcana: {
 		"common":    "var(--normal)",
 		"uncommon":  "#707883",
 		"rare":      "#B06435",
@@ -119,7 +119,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// A promo carries a banner over whatever gem the card already had rather
 	// than one of its own, so its purple stays invented. The "none" rarity,
 	// held by twelve tokens, is left out so those cards render no badge.
-	mtgmatcher.GameRiftbound: {
+	matcher.GameRiftbound: {
 		"common":   "var(--normal)",
 		"uncommon": "#187870",
 		"rare":     "#BF287F",
@@ -138,7 +138,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// the colors the other games give their treatments. DON!! cards are a
 	// resource rather than a tier, and take the grey darker than common's
 	// that Pokemon's code cards do.
-	mtgmatcher.GameOnePiece: {
+	matcher.GameOnePiece: {
 		"common":       "var(--normal)",
 		"uncommon":     "#707883",
 		"rare":         "#B06435",
@@ -160,7 +160,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// rather than sampled: common takes the theme's neutral like every other
 	// game, and the rest take neighbouring tiers' colors. The 139 cards with
 	// no rarity are left out and draw no badge.
-	mtgmatcher.GameFleshAndBlood: {
+	matcher.GameFleshAndBlood: {
 		"common":      "var(--normal)",
 		"basic":       "#707883",
 		"token":       "#919495",
@@ -183,7 +183,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// each group climbs the ladder the other games already use. Grand Master
 	// Rare claims no tier, and sits with the ghost and starlight rares it is
 	// ordered beside.
-	mtgmatcher.GameYuGiOh: {
+	matcher.GameYuGiOh: {
 		"common":                       "var(--normal)",
 		"duelterminaltechnologycommon": "var(--normal)",
 
@@ -245,7 +245,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// above. The cards marked None or Unconfirmed are left out and draw no
 	// badge; code cards, which are filler rather than a tier, take a grey
 	// darker than common's.
-	mtgmatcher.GamePokemon: {
+	matcher.GamePokemon: {
 		"common": "var(--normal)",
 
 		"uncommon": "#707883",
@@ -299,7 +299,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// So this climbs the placed ladder the other games use, in the order
 	// the datastore ranks them. P +, the promo's own parallel run, takes the
 	// promo's purple.
-	mtgmatcher.GameGundam: {
+	matcher.GameGundam: {
 		"common":     "var(--normal)",
 		"c+":         "#919495",
 		"c++":        "#A88A3C",
@@ -324,7 +324,7 @@ var colorRarityMap = map[mtgmatcher.Game]map[string]template.CSS{
 	// ranks them: the trial-deck rarities run beside their booster
 	// counterparts rather than under them, so each lands its own adjacent
 	// step rather than sharing its counterpart's colour.
-	mtgmatcher.GamePalworld: {
+	matcher.GamePalworld: {
 		"trialdeck":              "var(--normal)",
 		"common":                 "#707883",
 		"uncommon":               "#919495",
@@ -430,8 +430,8 @@ func loadRarityBadges() {
 	// actually registers and the registered spelling is what gets joined. A
 	// game nobody registered has no symbols to read, and a name like "../.."
 	// matches none of them.
-	var game mtgmatcher.Game
-	for _, registered := range mtgmatcher.RegisteredGames() {
+	var game matcher.Game
+	for _, registered := range matcher.RegisteredGames() {
 		if registered == Config().Game {
 			game = registered
 			break
@@ -461,9 +461,9 @@ func loadRarityBadges() {
 // fills a GenericCard's PromoLabels, one entry per promo token. A "ff" token
 // (Final Fantasy's "ffi", "ffii", ...) reads as its own initialism rather than
 // the fuller spelling PromoTypeLabels carries for it ("FF I"); everything
-// else is mtgmatcher's own spelling, which - unlike title-casing the token -
+// else is matcher's own spelling, which - unlike title-casing the token -
 // can put back a space the token dropped ("bestof" -> "Best Of").
-func promoTypeLabel(b *mtgmatcher.Backend, value string) string {
+func promoTypeLabel(b *matcher.Backend, value string) string {
 	if strings.HasPrefix(value, "ff") {
 		return strings.ToUpper(value)
 	}
@@ -473,7 +473,7 @@ func promoTypeLabel(b *mtgmatcher.Backend, value string) string {
 type GenericCard struct {
 	UUID string
 	// ChartID is the id the UI passes to the chart system. uuid2card leaves it
-	// as the mtgmatcher card id; chart-capable pages override it with ban:<id>
+	// as the matcher card id; chart-capable pages override it with ban:<id>
 	// via chartIDForCard, so chartless pages (upload, arbit, news, ...) don't
 	// pay the variant-cache lookup for every card they render.
 	ChartID    string
@@ -578,7 +578,7 @@ func fileExists(filename string) bool {
 
 // keyruneForCardSet returns a card's keyrune CSS class and its set's
 // published symbol image, both off the one GetSet lookup a card needs.
-func keyruneForCardSet(b *mtgmatcher.Backend, cardID string) (keyrune, symbol string) {
+func keyruneForCardSet(b *matcher.Backend, cardID string) (keyrune, symbol string) {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return "", ""
@@ -625,7 +625,7 @@ func keyruneForCardSet(b *mtgmatcher.Backend, cardID string) (keyrune, symbol st
 
 // getSetKeyrunes returns a map of set code -> bare "ss-CODE" keyrune class.
 // Used by the search landing page to render set-search recent-search items.
-func getSetKeyrunes(b *mtgmatcher.Backend) map[string]string {
+func getSetKeyrunes(b *matcher.Backend) map[string]string {
 	codes := b.GetAllSets()
 	out := make(map[string]string, len(codes))
 	for _, code := range codes {
@@ -643,11 +643,11 @@ func getSetKeyrunes(b *mtgmatcher.Backend) map[string]string {
 //
 // A game with finishes of its own names them in CardObject.Finish, the name
 // TCGplayer prices the printing under with the spaces taken out, so it can be
-// typed into a search; its row in mtgmatcher.Finishes spells it back as
+// typed into a search; its row in matcher.Finishes spells it back as
 // TCGplayer does. Magic never reaches it: its foil types live in PromoTypes.
-func finishLabel(co *mtgmatcher.CardObject) string {
+func finishLabel(co *matcher.CardObject) string {
 	switch co.Finish {
-	case "", mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+	case "", matcher.FinishNonfoil, matcher.FinishFoil, matcher.FinishEtched:
 		return ""
 	}
 	return spellFinish(co.Finish)
@@ -661,10 +661,10 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 // "Dragon Scale Foil". PromoTypeLabel title-cases the bare token where it has
 // no spelling of its own, which is worse than spellFinish, so it is taken
 // only where it says something. Every other finish is spellFinish's.
-func finishListLabel(b *mtgmatcher.Backend, finish string) string {
+func finishListLabel(b *matcher.Backend, finish string) string {
 	if slices.Contains(altFoilTags, finish) {
 		label := b.PromoTypeLabel(finish)
-		if label != mtgmatcher.Title(finish) {
+		if label != matcher.Title(finish) {
 			return label
 		}
 	}
@@ -679,21 +679,21 @@ func finishListLabel(b *mtgmatcher.Backend, finish string) string {
 func spellFinish(finish string) string {
 	// The plain printing is asked for as f:nonfoil; TCGplayer's "Normal"
 	// would send a reader to a word the search does not take.
-	if finish == mtgmatcher.FinishNonfoil {
+	if finish == matcher.FinishNonfoil {
 		return "Non-foil"
 	}
-	row, found := mtgmatcher.FinishOf(finish)
+	row, found := matcher.FinishOf(finish)
 	if found {
 		return row.TCGplayer
 	}
 	base := strings.TrimSuffix(finish, "foil")
 	if base != finish && base != "" {
-		return mtgmatcher.Title(base) + " Foil"
+		return matcher.Title(base) + " Foil"
 	}
-	return mtgmatcher.Title(finish)
+	return matcher.Title(finish)
 }
 
-func editionTitle(b *mtgmatcher.Backend, cardID string) string {
+func editionTitle(b *matcher.Backend, cardID string) string {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return ""
@@ -727,10 +727,10 @@ func editionTitle(b *mtgmatcher.Backend, cardID string) string {
 		extra = ": "
 		if co.Side != "" {
 			subtype := strings.Replace(co.Side, "_", " ", -1)
-			extra += mtgmatcher.Title(" " + subtype + ", ")
+			extra += matcher.Title(" " + subtype + ", ")
 		}
 		category := strings.Replace(co.Layout, "_", " ", -1)
-		extra += mtgmatcher.Title(category)
+		extra += matcher.Title(category)
 	} else {
 		extra = " #" + co.Card.Number
 		if co.SetTotal != "" {
@@ -859,7 +859,7 @@ func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, er
 }
 
 // Look for a TCGproductId in all available places
-func findTCGproductID(b *mtgmatcher.Backend, cardID string) string {
+func findTCGproductID(b *matcher.Backend, cardID string) string {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return ""
@@ -960,7 +960,7 @@ var allLanguageFlags = map[string]string{
 	"Spanish":             "🇪🇸",
 }
 
-func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) GenericCard {
+func uuid2card(b *matcher.Backend, cardID string, preferFlavorName bool) GenericCard {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
@@ -1027,7 +1027,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 				if short, ok := altFoilChipLabels[promoType]; ok {
 					finishTag = short
 				} else {
-					finishTag = mtgmatcher.Title(strings.TrimSuffix(promoType, "foil"))
+					finishTag = matcher.Title(strings.TrimSuffix(promoType, "foil"))
 				}
 				finishClass = "altfoil"
 			} else {
@@ -1131,7 +1131,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 	var rarityColor template.CSS
 	keyrune, setSymbol := keyruneForCardSet(b, cardID)
 	if keyrune == "" {
-		rarityColor = colorRarityMap[Config().Game][mtgmatcher.RarityName(co.Rarity)]
+		rarityColor = colorRarityMap[Config().Game][matcher.RarityName(co.Rarity)]
 	}
 
 	var hotlistStore string
@@ -1181,7 +1181,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 		Booster:     canBoosterGen,
 		HasDeck:     hasDecklist,
 		Flag:        allLanguageFlags[co.Language],
-		LangTag:     mtgmatcher.LanguageTag2LanguageCode[co.Language],
+		LangTag:     matcher.LanguageTag2LanguageCode[co.Language],
 
 		Rarity:            co.Rarity,
 		RarityColor:       rarityColor,
@@ -1210,7 +1210,7 @@ func uuid2card(b *mtgmatcher.Backend, cardID string, preferFlavorName bool) Gene
 // cardPrintings is a card's printings row for the search sidebar: a symbol
 // for each set the card was printed in. For a sealed product it is the set's
 // value panel instead.
-func cardPrintings(b *mtgmatcher.Backend, cardID string) string {
+func cardPrintings(b *matcher.Backend, cardID string) string {
 	co, err := b.GetUUID(cardID)
 	if err != nil {
 		return ""
@@ -1225,7 +1225,7 @@ func cardPrintings(b *mtgmatcher.Backend, cardID string) string {
 type cardMetadata map[string]GenericCard
 
 // add reads a card's details into m, once: a card already there is kept.
-func (m cardMetadata) add(b *mtgmatcher.Backend, cardID string, preferFlavor bool) {
+func (m cardMetadata) add(b *matcher.Backend, cardID string, preferFlavor bool) {
 	if _, found := m[cardID]; found {
 		return
 	}
@@ -1242,7 +1242,7 @@ func quoteIfFilter(name string) string {
 	return name
 }
 
-func genQuery(co *mtgmatcher.CardObject) string {
+func genQuery(co *matcher.CardObject) string {
 	query := quoteIfFilter(co.Name)
 	if !co.Sealed {
 		// cns: compares the number as printed, which is what co.Number is.
@@ -1258,7 +1258,7 @@ func genQuery(co *mtgmatcher.CardObject) string {
 	return query
 }
 
-func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
+func genCardPrintings(b *matcher.Backend, co *matcher.CardObject) string {
 	symbol, err := setSymbolTemplate()
 	if err != nil {
 		log.Print("printings set symbol parsing error: ", err)
@@ -1319,7 +1319,7 @@ func genCardPrintings(b *mtgmatcher.Backend, co *mtgmatcher.CardObject) string {
 	return sb.String()
 }
 
-func genSealedPrintings(co *mtgmatcher.CardObject) string {
+func genSealedPrintings(co *matcher.CardObject) string {
 	var b strings.Builder
 	// A hover/focus trigger with the tables in a panel that opens upward,
 	// overlaying the picture, so the products list below stays visible.
@@ -1605,7 +1605,7 @@ func isSecureRequest(r *http.Request) bool {
 // serve real answers (the same predicate /healthz uses). Cacheable endpoints
 // must not let degraded warmup responses into caches: an empty payload with
 // a public max-age poisons every client behind the CDN for its lifetime.
-func dataReady(b *mtgmatcher.Backend) bool {
+func dataReady(b *matcher.Backend) bool {
 	return len(b.GetUUIDs()) != 0 && len(GetSellers()) != 0 && len(GetVendors()) != 0
 }
 
@@ -1693,7 +1693,7 @@ func appendNonEmptyCSV(dst []string, value string) []string {
 }
 
 // Return a random uuid from the pool of singles or sealed uuids
-func randomUUID(b *mtgmatcher.Backend, sealed bool) string {
+func randomUUID(b *matcher.Backend, sealed bool) string {
 	uuids := b.GetUUIDs()
 	if sealed {
 		uuids = b.GetSealedUUIDs()

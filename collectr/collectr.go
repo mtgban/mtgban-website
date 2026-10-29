@@ -12,22 +12,22 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/hashicorp/go-cleanhttp"
 )
 
 // CategoryID maps game names to Collectr category IDs.
-var CategoryID = map[mtgmatcher.Game]string{
-	mtgmatcher.GameMagic:   "1",
-	mtgmatcher.GameLorcana: "71",
+var CategoryID = map[matcher.Game]string{
+	matcher.GameMagic:   "1",
+	matcher.GameLorcana: "71",
 }
 
 // CategoryFilter maps game names to the catalog_category_name used by the API.
-var CategoryFilter = map[mtgmatcher.Game]string{
-	mtgmatcher.GameMagic:   "Magic: The Gathering",
-	mtgmatcher.GameLorcana: "Lorcana",
+var CategoryFilter = map[matcher.Game]string{
+	matcher.GameMagic:   "Magic: The Gathering",
+	matcher.GameLorcana: "Lorcana",
 }
 
 // Item is one product listing read off a showcase page.
@@ -126,7 +126,7 @@ var sortVariants = []string{
 // fingerprint: direct fetches from datacenter IPs get served empty shells
 // or 403s by Cloudflare. Multiple page fetches with different sort orders
 // are combined to maximize coverage of the full collection.
-func Load(ctx context.Context, proxyBase, link string, game mtgmatcher.Game, maxRows int) ([]Item, error) {
+func Load(ctx context.Context, proxyBase, link string, game matcher.Game, maxRows int) ([]Item, error) {
 	handle, err := ParseShowcaseURL(link)
 	if err != nil {
 		return nil, err

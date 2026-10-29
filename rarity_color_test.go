@@ -5,16 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestRarityBadgesKeyByName pins that a badge's colors and shapes are keyed
-// by mtgmatcher.RarityName, the spelling a card carries its rarity in, and
+// by matcher.RarityName, the spelling a card carries its rarity in, and
 // that a rarity spelled the way a datastore publishes it finds its color.
 func TestRarityBadgesKeyByName(t *testing.T) {
 	for game, colors := range colorRarityMap {
 		for rarity := range colors {
-			if rarity != mtgmatcher.RarityName(rarity) {
+			if rarity != matcher.RarityName(rarity) {
 				t.Errorf("%s: %q is not spelled by RarityName", game, rarity)
 			}
 		}
@@ -22,16 +22,16 @@ func TestRarityBadgesKeyByName(t *testing.T) {
 
 	// As the datastores publish them
 	for _, tt := range []struct {
-		game   mtgmatcher.Game
+		game   matcher.Game
 		rarity string
 	}{
-		{mtgmatcher.GameOnePiece, "Super Rare"},
-		{mtgmatcher.GamePalworld, "Trial Deck Super Rare"},
-		{mtgmatcher.GameYuGiOh, "Secret Pharaoh's Rare"},
-		{mtgmatcher.GameYuGiOh, "Ultra Pharaoh's Rare"},
-		{mtgmatcher.GameGundam, "LR++"},
+		{matcher.GameOnePiece, "Super Rare"},
+		{matcher.GamePalworld, "Trial Deck Super Rare"},
+		{matcher.GameYuGiOh, "Secret Pharaoh's Rare"},
+		{matcher.GameYuGiOh, "Ultra Pharaoh's Rare"},
+		{matcher.GameGundam, "LR++"},
 	} {
-		if colorRarityMap[tt.game][mtgmatcher.RarityName(tt.rarity)] == "" {
+		if colorRarityMap[tt.game][matcher.RarityName(tt.rarity)] == "" {
 			t.Errorf("%s %q has no color", tt.game, tt.rarity)
 		}
 	}
@@ -50,7 +50,7 @@ func TestRarityBadgesKeyByName(t *testing.T) {
 		}
 		for _, file := range files {
 			rarity := strings.TrimSuffix(file.Name(), ".svg")
-			if rarity != mtgmatcher.RarityName(rarity) {
+			if rarity != matcher.RarityName(rarity) {
 				t.Errorf("%s: shape %q is not named by RarityName", dir.Name(), file.Name())
 			}
 		}

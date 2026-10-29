@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/banprice"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
@@ -19,7 +19,7 @@ import (
 // (SuggestAPI answers 204) and palette (lists served no-store) all wait for
 // an actual load.
 type datastore struct {
-	backend  *mtgmatcher.Backend
+	backend  *matcher.Backend
 	numbers  *numbersSnapshot
 	sources  *sourcesSnapshot
 	names    *suggest.Names

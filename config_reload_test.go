@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // withConfigFile starts the config over from a local file, the way a process
@@ -84,7 +84,7 @@ func TestConfigReloadDropsWhatTheFileDropped(t *testing.T) {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
 		}
 	}
-	if !slices.Equal(Config().APIGateway.Games, []mtgmatcher.Game{DefaultGame, "lorcana"}) {
+	if !slices.Equal(Config().APIGateway.Games, []matcher.Game{DefaultGame, "lorcana"}) {
 		t.Errorf("gateway games %v, want the default game and this one", Config().APIGateway.Games)
 	}
 }

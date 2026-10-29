@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // isCaseNames are the values cardFilterIs answers with a case of its own,
@@ -33,7 +33,7 @@ func TestWCDAndGoldFiltersDiverge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			card := &mtgmatcher.CardObject{Card: mtgmatcher.Card{SetCode: tt.setCode, BorderColor: tt.border}}
+			card := &matcher.CardObject{Card: matcher.Card{SetCode: tt.setCode, BorderColor: tt.border}}
 			got := !cardFilterIs(backend(), []string{tt.filter}, card)
 			if got != tt.wantMatch {
 				t.Fatalf("is:%s match = %v, want %v", tt.filter, got, tt.wantMatch)
@@ -86,7 +86,7 @@ func TestIsFilterStillMatchesAPromoType(t *testing.T) {
 	}
 	promoType := all[0]
 
-	co := &mtgmatcher.CardObject{}
+	co := &matcher.CardObject{}
 	co.PromoTypes = []string{promoType}
 	if cardFilterIs(backend(), []string{promoType}, co) {
 		t.Errorf("is:%s did not match a card carrying it", promoType)
@@ -104,7 +104,7 @@ func TestIsFilterStillMatchesAPromoType(t *testing.T) {
 // effect on a Magic card and a promo type elsewhere, so the short form would
 // otherwise arrive at the promo types as itself and match nothing.
 func TestPromoAliasesExpandToSlugs(t *testing.T) {
-	want := mtgmatcher.PromoTypeSlug("Extended Art")
+	want := matcher.PromoTypeSlug("Extended Art")
 	if got := isKnownPromo["ea"]; got != want {
 		t.Errorf("isKnownPromo[\"ea\"] = %q, want %q", got, want)
 	}
@@ -113,7 +113,7 @@ func TestPromoAliasesExpandToSlugs(t *testing.T) {
 	// files a promo type under PromoTypeSlug of its label, and cardFilterIs
 	// compares what comes out of this map against exactly that.
 	for alias, expanded := range isKnownPromo {
-		if slug := mtgmatcher.PromoTypeSlug(expanded); slug != expanded {
+		if slug := matcher.PromoTypeSlug(expanded); slug != expanded {
 			t.Errorf("isKnownPromo[%q] = %q, which is not a slug (%q)", alias, expanded, slug)
 		}
 	}

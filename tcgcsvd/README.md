@@ -208,4 +208,4 @@ go svc.StashPrices()   // single-flight + crawl lock; StashProducts is the same
 `New` takes any `Store` — `*timeseries.Client` implements it — so the package
 carries no assumption about how the caller built its connection pool.
 `WithProductReport` exists because the server's match report needs the loaded
-mtgmatcher datastore, which a standalone process doesn't have.
+matcher datastore, which a standalone process doesn't have.

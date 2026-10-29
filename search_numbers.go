@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // numbersSnapshot accelerates exact collector-number filters. The keys are
@@ -14,7 +14,7 @@ type numbersSnapshot struct {
 	strict map[string][]string
 }
 
-func newNumbersSnapshot(b *mtgmatcher.Backend) *numbersSnapshot {
+func newNumbersSnapshot(b *matcher.Backend) *numbersSnapshot {
 	all := b.GetUUIDs()
 	numbers := &numbersSnapshot{
 		loose:  make(map[string][]string),

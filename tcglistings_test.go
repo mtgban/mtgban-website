@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // setTestTCGListings files cards as the loaded counts, as of 2026-09-28,
@@ -297,7 +297,7 @@ func TestLoadTCGListingsWaitsForADatastore(t *testing.T) {
 		t.Errorf("queried the newspaper %d times with no datastore loaded", n)
 	}
 
-	s.ds.Store(&datastore{backend: &mtgmatcher.Backend{AllUUIDs: []string{"a-card"}}})
+	s.ds.Store(&datastore{backend: &matcher.Backend{AllUUIDs: []string{"a-card"}}})
 	s.loadTCGListings()
 	if conn.dials.Load() == 0 {
 		t.Error("did not query the newspaper once a datastore was loaded")
@@ -430,8 +430,8 @@ func TestRankDirectAsOneCopy(t *testing.T) {
 // one copy and for nine, so the divisor here follows whatever weight Arbit
 // gives quantity.
 func TestRankDirectAsOneCopyUndoesArbit(t *testing.T) {
-	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{
-		"card": {Card: mtgmatcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
+	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
+		"card": {Card: matcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
 	}}
 	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
 		"card": {{Conditions: "NM", BuyPrice: 15, Quantity: 20}},

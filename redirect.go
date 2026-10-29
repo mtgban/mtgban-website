@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // localRedirect sends the reader to path on this site. It never reuses the
@@ -79,12 +79,12 @@ func (s *site) Redirect(w http.ResponseWriter, r *http.Request) {
 }
 
 // printingsAt returns the cards a set files under a number, as printed.
-func printingsAt(b *mtgmatcher.Backend, set, number string) []mtgmatcher.Card {
+func printingsAt(b *matcher.Backend, set, number string) []matcher.Card {
 	edition, err := b.GetSet(set)
 	if err != nil {
 		return nil
 	}
-	var cards []mtgmatcher.Card
+	var cards []matcher.Card
 	for _, card := range edition.Cards {
 		if strings.EqualFold(card.Number, number) {
 			cards = append(cards, card)
@@ -101,7 +101,7 @@ func printingsAt(b *mtgmatcher.Backend, set, number string) []mtgmatcher.Card {
 // both "Marlynn // Treasure Island" and "Marlynn // Arrows Back" under
 // SEA083//SEA247, and either name in front drops the other. Magic files one
 // name per number throughout; 1,337 numbers over six other games do not.
-func openingName(cards []mtgmatcher.Card) string {
+func openingName(cards []matcher.Card) string {
 	if len(cards) == 0 {
 		return ""
 	}
@@ -124,7 +124,7 @@ func openingName(cards []mtgmatcher.Card) string {
 // word the search answers. A name answers to nothing: spelled the way finishes
 // are spelled, "another-round" is "anotherround", which no printing is sold
 // as.
-func namesFinish(b *mtgmatcher.Backend, cards []mtgmatcher.Card, word string) bool {
+func namesFinish(b *matcher.Backend, cards []matcher.Card, word string) bool {
 	values := fixupFinishNG(word)
 	for _, card := range cards {
 		// A set carries one card object per printing, in its plain finish;
@@ -219,7 +219,7 @@ func sealedSlug(name string) string {
 }
 
 // sealedProductBySlug finds the product in a set that a slug names, or nil.
-func sealedProductBySlug(b *mtgmatcher.Backend, setCode, slug string) *mtgmatcher.SealedProduct {
+func sealedProductBySlug(b *matcher.Backend, setCode, slug string) *matcher.SealedProduct {
 	set, err := b.GetSet(strings.ToUpper(setCode))
 	if err != nil || slug == "" {
 		return nil

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/infrastructure"
 )
@@ -88,8 +88,8 @@ func parseSearchOptionsWrapper(input string) SearchConfig {
 // file. The empty backend served then matches no Forest.
 func skipWithoutDatastore(tb testing.TB) {
 	tb.Helper()
-	_, err := backend().Match(&mtgmatcher.InputCard{Name: "Forest"})
-	var alias *mtgmatcher.AliasingError
+	_, err := backend().Match(&matcher.InputCard{Name: "Forest"})
+	var alias *matcher.AliasingError
 	if err != nil && !errors.As(err, &alias) {
 		tb.Skip("no datastore loaded")
 	}

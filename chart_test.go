@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-// nRealUUIDs returns n distinct UUIDs from the loaded mtgmatcher pool, or skips
+// nRealUUIDs returns n distinct UUIDs from the loaded matcher pool, or skips
 // the test when fewer are available. parseChartIDs is the only branch that
 // requires real UUIDs to exercise the validation path; everything else in this
 // file is data-independent.
@@ -25,7 +25,7 @@ func nRealUUIDs(t *testing.T, n int) []string {
 	t.Helper()
 	uuids := backend().GetUUIDs()
 	if len(uuids) < n {
-		t.Skipf("mtgmatcher data not loaded (need %d UUIDs); skipping", n)
+		t.Skipf("matcher data not loaded (need %d UUIDs); skipping", n)
 	}
 	return uuids[:n]
 }
@@ -323,7 +323,7 @@ func TestRosterDatasetsLabelEachPrinting(t *testing.T) {
 func twoPrintingsOfOneCard(t *testing.T) (string, int, string) {
 	t.Helper()
 	b := backend()
-	first := map[string]*mtgmatcher.CardObject{}
+	first := map[string]*matcher.CardObject{}
 	for _, uuid := range slices.Sorted(slices.Values(b.GetUUIDs())) {
 		co, err := b.GetUUID(uuid)
 		if err != nil || co.Sealed || co.Foil || co.Etched {
@@ -616,7 +616,7 @@ func TestCollectMagicSnapshotCountsResolveErrors(t *testing.T) {
 func TestMagicVariantAltCopy(t *testing.T) {
 	original, err := backend().GetUUID("1b3a28ad-41ca-587a-9feb-5f40154976da")
 	if err != nil {
-		t.Skip("mtgmatcher data not loaded; skipping")
+		t.Skip("matcher data not loaded; skipping")
 	}
 	copied, err := backend().GetUUID(original.UUID + "_alt")
 	if err != nil {

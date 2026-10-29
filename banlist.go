@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // banlistURL is where Magic's ban history comes from: a chronological record
@@ -191,7 +191,7 @@ func indexBanlist(doc banlistFile) map[string][]ChartCheckpoint {
 				if !known {
 					continue
 				}
-				key := mtgmatcher.Normalize(banlistCardName(card))
+				key := matcher.Normalize(banlistCardName(card))
 				m := marker{key, date, format, action.Type}
 				if seen[m] {
 					continue
@@ -233,7 +233,7 @@ func banlistCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 	var out []ChartCheckpoint
 	seen := map[ChartCheckpoint]bool{}
 	for _, name := range names {
-		for _, cp := range (*index)[mtgmatcher.Normalize(name)] {
+		for _, cp := range (*index)[matcher.Normalize(name)] {
 			if cp.Date < earliestStr || seen[cp] {
 				continue
 			}

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // A card reprinted on one day in sets of different categories gets a marker
@@ -17,15 +17,15 @@ import (
 // a hundred requests all but ensure a wrong one if nothing else orders them.
 func TestSameDayCheckpointsKeepOneOrder(t *testing.T) {
 	const name = "Fixture Reprint"
-	b := &mtgmatcher.Backend{
-		UUIDs: map[string]*mtgmatcher.CardObject{
-			"REPRINT-1": {Card: mtgmatcher.Card{
+	b := &matcher.Backend{
+		UUIDs: map[string]*matcher.CardObject{
+			"REPRINT-1": {Card: matcher.Card{
 				UUID:      "REPRINT-1",
 				Name:      name,
 				Printings: []string{"AAA", "BBB", "CCC", "DDD"},
 			}},
 		},
-		Hashes: map[string][]string{mtgmatcher.Normalize(name): {"REPRINT-1"}},
+		Hashes: map[string][]string{matcher.Normalize(name): {"REPRINT-1"}},
 	}
 	day := time.Date(2024, 2, 9, 0, 0, 0, 0, time.UTC)
 	edition := func(name, code string) EditionEntry {

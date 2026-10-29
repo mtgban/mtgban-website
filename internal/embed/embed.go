@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/danielgtaylor/unistyle"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 const (
@@ -426,7 +426,7 @@ func LastSoldFields(lastSales []Sale, lang string) []Field {
 // to the instance name whatever host the reader arrived through. editionTitle
 // renders a card's edition line, and indexFor returns the index-price offers
 // for one card, so every card in the panel is quoted with its own prices.
-func Generate(backend *mtgmatcher.Backend, providerURL string, allKeys []string, editionTitle func(cardID string) string, indexFor func(cardID string) []Entry) *OEmbed {
+func Generate(backend *matcher.Backend, providerURL string, allKeys []string, editionTitle func(cardID string) string, indexFor func(cardID string) []Entry) *OEmbed {
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""

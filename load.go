@@ -15,8 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/sessionstore"
 	"github.com/mtgban/simplecloud"
@@ -275,7 +275,7 @@ func updateScraperIndexStore(store string, kinds map[string][]string) {
 // parseDumpKey parses a bucket key of the form
 // "<game>/<store>/<kind>/<shorthand>.json.xz", or reports ok=false for a
 // stray object, a wrong kind, or the wrong extension.
-func parseDumpKey(key string, game mtgmatcher.Game) (store, kind, shorthand string, ok bool) {
+func parseDumpKey(key string, game matcher.Game) (store, kind, shorthand string, ok bool) {
 	rest, ok := strings.CutPrefix(key, string(game)+"/")
 	if !ok {
 		return "", "", "", false
@@ -298,7 +298,7 @@ func parseDumpKey(key string, game mtgmatcher.Game) (store, kind, shorthand stri
 // listDumps lists every dump under prefix and returns it as a scraperIndex,
 // parsing each key against game+"/" regardless of how much further prefix
 // narrows it. bucket must implement simplecloud.Lister.
-func listDumps(ctx context.Context, bucket simplecloud.Reader, game mtgmatcher.Game, prefix string) (*scraperIndex, error) {
+func listDumps(ctx context.Context, bucket simplecloud.Reader, game matcher.Game, prefix string) (*scraperIndex, error) {
 	lister, ok := bucket.(simplecloud.Lister)
 	if !ok {
 		return nil, fmt.Errorf("%T cannot list dumps", bucket)
@@ -322,7 +322,7 @@ func listDumps(ctx context.Context, bucket simplecloud.Reader, game mtgmatcher.G
 // listDumpsWithRetry is listDumps with loadScraperWithRetry's policy: each
 // attempt times out after scraperLoadTimeout, and only a timeout is
 // retried.
-func listDumpsWithRetry(bucket simplecloud.Reader, game mtgmatcher.Game, prefix string) (*scraperIndex, error) {
+func listDumpsWithRetry(bucket simplecloud.Reader, game matcher.Game, prefix string) (*scraperIndex, error) {
 	var lastErr error
 	for attempt := range scraperLoadRetries {
 		if attempt > 0 {
@@ -533,7 +533,7 @@ func isTimeout(err error) bool {
 	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
-func loadScraperWithRetry(bucket simplecloud.Reader, game mtgmatcher.Game, name, kind, shorthand string) error {
+func loadScraperWithRetry(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) error {
 	var lastErr error
 	for attempt := range scraperLoadRetries {
 		if attempt > 0 {
@@ -556,7 +556,7 @@ func loadScraperWithRetry(bucket simplecloud.Reader, game mtgmatcher.Game, name,
 	return lastErr
 }
 
-func loadScraper(bucket simplecloud.Reader, game mtgmatcher.Game, name, kind, shorthand string) error {
+func loadScraper(bucket simplecloud.Reader, game matcher.Game, name, kind, shorthand string) error {
 	key := path.Join(string(game), name, kind, shorthand) + "." + dumpFormat
 
 	log.Println("loading", key)

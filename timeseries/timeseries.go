@@ -4,7 +4,7 @@ package timeseries
 
 import "time"
 
-// NormalizeUUID strips the suffixes mtgmatcher appends for a printing's
+// NormalizeUUID strips the suffixes matcher appends for a printing's
 // finishes and for its copies, returning a clean UUID suitable for Postgres.
 // A standard UUID is 36 characters; anything appended after that (e.g. _f,
 // _e, _alt) is stripped.

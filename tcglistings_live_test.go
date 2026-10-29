@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -86,7 +86,7 @@ func TestTCGListingsLive(t *testing.T) {
 		{631816, "Normal", true}, // Coeurl, Final Fantasy
 		{9525, "Foil", true},     // Metamorphic Wurm, Odyssey
 	} {
-		cardID, err := b.Match(&mtgmatcher.InputCard{
+		cardID, err := b.Match(&matcher.InputCard{
 			ID:     strconv.FormatInt(tc.productID, 10),
 			Finish: tc.printing,
 			Foil:   tc.printing != "Normal",

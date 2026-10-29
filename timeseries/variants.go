@@ -471,7 +471,7 @@ func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, b
 // LookupMagicBanIDByUUID resolves a bare mtgjson uuid to the canonical Magic
 // ban_id (preferring the base printing: language empty, non-foil, non-etched,
 // non-alt; else the smallest match). It lets a uuid that is in our price history
-// but retired from the current mtgmatcher datastore still chart. ok=false if the
+// but retired from the current matcher datastore still chart. ok=false if the
 // uuid has no variant.
 func (c *Client) LookupMagicBanIDByUUID(ctx context.Context, uuid string) (int64, bool, error) {
 	uuid = NormalizeUUID(uuid)
@@ -542,7 +542,7 @@ const (
 )
 
 // tcgSubTypeCodes numbers the TCGplayer sub-types for TCGBanID: the sixteen
-// mtgmatcher.Finishes names, which are every sub-type the variants table held
+// matcher.Finishes names, which are every sub-type the variants table held
 // when this was written. The codes are part of every derived id, so append a
 // new name with the next free code and never renumber one.
 var tcgSubTypeCodes = map[string]int64{

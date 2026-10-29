@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 func TestFinishLabel(t *testing.T) {
@@ -14,9 +14,9 @@ func TestFinishLabel(t *testing.T) {
 	}{
 		// The three the Foil and Etched flags already describe.
 		{"unset", "", ""},
-		{"shared nonfoil", mtgmatcher.FinishNonfoil, ""},
-		{"shared foil", mtgmatcher.FinishFoil, ""},
-		{"shared etched", mtgmatcher.FinishEtched, ""},
+		{"shared nonfoil", matcher.FinishNonfoil, ""},
+		{"shared foil", matcher.FinishFoil, ""},
+		{"shared etched", matcher.FinishEtched, ""},
 
 		// Every other finish, spelled as TCGplayer names the printing.
 		{"flesh and blood rainbow", "rainbowfoil", "Rainbow Foil"},
@@ -33,7 +33,7 @@ func TestFinishLabel(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			co := &mtgmatcher.CardObject{}
+			co := &matcher.CardObject{}
 			co.Finish = test.finish
 			got := finishLabel(co)
 			if got != test.want {
@@ -45,8 +45,8 @@ func TestFinishLabel(t *testing.T) {
 
 // Every name a finish is listed by is one f: reads back as that finish.
 func TestSpellFinishReadsBackThroughTheFilter(t *testing.T) {
-	slugs := []string{mtgmatcher.FinishEtched}
-	for _, finish := range mtgmatcher.Finishes {
+	slugs := []string{matcher.FinishEtched}
+	for _, finish := range matcher.Finishes {
 		slugs = append(slugs, finish.Slug)
 	}
 	for _, slug := range slugs {

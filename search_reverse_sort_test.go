@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestReverseSortKeepsNonfoilFirst is the is:promopack case from the site:
@@ -95,7 +95,7 @@ func TestReverseSortKeepsNonfoilFirst(t *testing.T) {
 // TestReverseOddsSortKeepsUncoveredLast: reversing the drop-rate sort turns
 // the known rates around, and the cards no rate covers stay at the end.
 func TestReverseOddsSortKeepsUncoveredLast(t *testing.T) {
-	ds := &datastore{backend: &mtgmatcher.Backend{}}
+	ds := &datastore{backend: &matcher.Backend{}}
 	odds := map[string]float64{"low": 0.5, "zero": 0, "high": 2}
 
 	for query, want := range map[string][]string{
@@ -118,16 +118,16 @@ func TestReverseOddsSortKeepsUncoveredLast(t *testing.T) {
 // keep their order within a card when the sort is reversed, as the
 // nonfoil and foil of a Magic card do.
 func TestReverseSortKeepsEveryGamesFinishOrder(t *testing.T) {
-	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{}, UUIDs: map[string]*mtgmatcher.CardObject{}}
+	b := &matcher.Backend{Sets: map[string]*matcher.Set{}, UUIDs: map[string]*matcher.CardObject{}}
 	var keys []string
 	for setCode, finishes := range map[string][]string{
 		"PKM": {"nonfoil", "holofoil", "reverseholofoil"},
 		"YGO": {"1stedition", "unlimited", "1steditionholofoil"},
 		"FAB": {"nonfoil", "foil", "rainbowfoil", "coldfoil"},
 	} {
-		b.Sets[setCode] = &mtgmatcher.Set{Code: setCode, Name: setCode + " Set"}
+		b.Sets[setCode] = &matcher.Set{Code: setCode, Name: setCode + " Set"}
 		for _, number := range []string{"001", "002"} {
-			card := &mtgmatcher.Card{Name: setCode + number, Number: number, SetCode: setCode}
+			card := &matcher.Card{Name: setCode + number, Number: number, SetCode: setCode}
 			for _, finish := range finishes {
 				uuid := setCode + number + "_" + finish
 				b.AddPrinting(card, uuid, finish)

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 func loadBanlistFixture(t *testing.T) map[string][]ChartCheckpoint {
@@ -46,7 +46,7 @@ func TestIndexBanlist(t *testing.T) {
 		{"a dateless entry with a dated url", "Launch Card", 1, ""},
 		{"a dateless entry with no date anywhere", "Standing Card", 0, "a standing ban list is not an event"},
 	} {
-		got := len(index[mtgmatcher.Normalize(banlistCardName(tc.card))])
+		got := len(index[matcher.Normalize(banlistCardName(tc.card))])
 		if got != tc.want {
 			t.Errorf("%s: %q has %d markers, want %d %s", tc.name, tc.card, got, tc.want, tc.why)
 		}
@@ -54,7 +54,7 @@ func TestIndexBanlist(t *testing.T) {
 
 	// The two announcements for one card should say what each format did.
 	var details []string
-	for _, cp := range index[mtgmatcher.Normalize("Sowing Mycospawn")] {
+	for _, cp := range index[matcher.Normalize("Sowing Mycospawn")] {
 		details = append(details, cp.Detail)
 	}
 	want := map[string]bool{"Banned in Legacy": true, "Restricted in Vintage": true}

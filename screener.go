@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"golang.org/x/sync/singleflight"
 )
@@ -306,7 +306,7 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 // moverCardID resolves a mover row to this game's uuid: Magic rows carry the
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
 // through the external id map with the sub-type naming the finish.
-func moverCardID(b *mtgmatcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
+func moverCardID(b *matcher.Backend, row timeseries.MoverRow) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
@@ -338,7 +338,7 @@ type screenerMeta struct {
 }
 
 // Classification is static, so resolve once at cache build, not per request; overridable in tests.
-var screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) {
+var screenerClassify = func(b *matcher.Backend, uuid string) (screenerMeta, bool) {
 	co, err := b.GetUUID(uuid)
 	if err != nil {
 		return screenerMeta{}, false
@@ -360,7 +360,7 @@ func cachedScreenerRows(key string) ([]screenerRow, bool) {
 	return e.rows, ok && time.Since(e.fetched) < screenerCacheTTL
 }
 
-func cachedMovers(ctx context.Context, b *mtgmatcher.Backend, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
+func cachedMovers(ctx context.Context, b *matcher.Backend, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	key := screenerCacheKey(metric, window, minPrice, minPriorPrice)
 
 	if rows, live := cachedScreenerRows(key); live {
@@ -389,7 +389,7 @@ func cachedMovers(ctx context.Context, b *mtgmatcher.Backend, metric, window int
 
 // buildMovers reads a page of movers, resolves every row to this game's uuid,
 // and caches the result under key.
-func buildMovers(ctx context.Context, b *mtgmatcher.Backend, key string, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
+func buildMovers(ctx context.Context, b *matcher.Backend, key string, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	raw, err := screenerFetch(ctx, metric, window, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err

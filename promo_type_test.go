@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
+	"github.com/mtgban/go-mtgban/matcher/magic"
 )
 
 // promoTypeCards finds one real card whose PromoTypes carries a token (the
@@ -100,7 +100,7 @@ func TestFrameEffectPromoTypesShowRegardlessOfDate(t *testing.T) {
 	}
 }
 
-// promoTypeLabel is what fills a card row's PromoLabels: mtgmatcher's
+// promoTypeLabel is what fills a card row's PromoLabels: matcher's
 // own spelling, with a space put back where title-casing the token could not
 // ("bestof" -> "Best Of"), except a "ff" token (Final Fantasy's "ffi", ...),
 // which reads as its own initialism rather than the fuller spelling
@@ -124,7 +124,7 @@ func TestPromoTypeLabel(t *testing.T) {
 			continue
 		}
 		if got, want := promoTypeLabel(backend(), value), backend().PromoTypeLabel(value); got != want {
-			t.Errorf("promoTypeLabel(%q) = %q, want mtgmatcher's own %q", value, got, want)
+			t.Errorf("promoTypeLabel(%q) = %q, want matcher's own %q", value, got, want)
 		}
 	}
 }

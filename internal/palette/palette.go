@@ -13,9 +13,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/sealed"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/sealed"
 )
 
 // NewspaperPage is the slice of a newspaper page the palette needs to build
@@ -29,7 +29,7 @@ type NewspaperPage struct {
 // and scraper lists via callbacks so it always reflects current state.
 type Service struct {
 	// Backend returns the current card datastore, never nil.
-	Backend func() *mtgmatcher.Backend
+	Backend func() *matcher.Backend
 	// Sellers and Vendors return the live scraper lists for the stores
 	// endpoint.
 	Sellers func() []mtgban.Seller
@@ -45,11 +45,11 @@ type Service struct {
 	// FinishLabel spells a finish name the way a person writes it, since the
 	// matcher stores one as a single lowercase word. Called with the backend
 	// being listed, which during a pre-publish build is not yet the live one.
-	FinishLabel func(b *mtgmatcher.Backend, finish string) string
+	FinishLabel func(b *matcher.Backend, finish string) string
 
 	// FinishNames are the names the finish filter reaches a printing by, so
 	// the list offers what f: accepts and nothing else.
-	FinishNames func(*mtgmatcher.CardObject) []string
+	FinishNames func(*matcher.CardObject) []string
 
 	// Snapshot returns the sets, promos and finishes lists built alongside
 	// the datastore currently served, nil before the first load.
@@ -74,7 +74,7 @@ type Snapshot struct {
 }
 
 // NewSnapshot builds the lists from b.
-func (s *Service) NewSnapshot(b *mtgmatcher.Backend) *Snapshot {
+func (s *Service) NewSnapshot(b *matcher.Backend) *Snapshot {
 	return &Snapshot{
 		sets:     s.buildSets(b),
 		promos:   s.buildPromos(b),
@@ -86,7 +86,7 @@ func (s *Service) NewSnapshot(b *mtgmatcher.Backend) *Snapshot {
 
 // buildSets is the JSON-serialized sets list, built from b. A marshal error
 // leaves it nil, same as the unbuilt list before the first load.
-func (s *Service) buildSets(b *mtgmatcher.Backend) []byte {
+func (s *Service) buildSets(b *matcher.Backend) []byte {
 	sets := []Set{}
 	for _, code := range b.GetAllSets() {
 		set, err := b.GetSet(code)
@@ -344,7 +344,7 @@ type Promo struct {
 // Riftbound with 10, One Piece with 464. Nothing here knows which game it is
 // serving, which is the point - the guide and the palette can offer what the
 // datastore actually holds instead of a table written for one game.
-func (s *Service) buildPromos(b *mtgmatcher.Backend) []byte {
+func (s *Service) buildPromos(b *matcher.Backend) []byte {
 	// One pass over the printings, rather than a scan per type: with a few
 	// hundred types and a few thousand printings the difference is real.
 	counts := map[string]int{}
@@ -440,7 +440,7 @@ type Finish struct {
 }
 
 // buildFinishes is the JSON-serialized finish list, built from b.
-func (s *Service) buildFinishes(b *mtgmatcher.Backend) []byte {
+func (s *Service) buildFinishes(b *matcher.Backend) []byte {
 	data, err := json.Marshal(s.FinishList(b))
 	if err != nil {
 		return nil
@@ -455,7 +455,7 @@ func (s *Service) buildFinishes(b *mtgmatcher.Backend) []byte {
 // the game's: Lorcana prints cold foil and holofoil, Flesh and Blood rainbow
 // and cold, Yu-Gi-Oh prices print runs, and a game added tomorrow brings its
 // own.
-func (s *Service) FinishList(b *mtgmatcher.Backend) []Finish {
+func (s *Service) FinishList(b *matcher.Backend) []Finish {
 	finishes := []Finish{}
 	if s.FinishNames == nil {
 		return finishes
@@ -524,7 +524,7 @@ type Rarity struct {
 }
 
 // buildRarities is the JSON-serialized rarity list, built from b.
-func buildRarities(b *mtgmatcher.Backend) []byte {
+func buildRarities(b *matcher.Backend) []byte {
 	data, err := json.Marshal(RarityList(b))
 	if err != nil {
 		return nil
@@ -535,7 +535,7 @@ func buildRarities(b *mtgmatcher.Backend) []byte {
 // RarityList is every rarity b's printings carry, in the game's order,
 // rarest first. A rarity has a letter where no other rarity of the game
 // begins with it, which is when r: reads that letter as it alone.
-func RarityList(b *mtgmatcher.Backend) []Rarity {
+func RarityList(b *matcher.Backend) []Rarity {
 	counts := map[string]int{}
 	for _, uuid := range b.GetUUIDs() {
 		co, err := b.GetUUID(uuid)
@@ -576,7 +576,7 @@ type Color struct {
 }
 
 // buildColors is the JSON-serialized colour list, built from b.
-func buildColors(b *mtgmatcher.Backend) []byte {
+func buildColors(b *matcher.Backend) []byte {
 	data, err := json.Marshal(ColorList(b))
 	if err != nil {
 		return nil
@@ -586,7 +586,7 @@ func buildColors(b *mtgmatcher.Backend) []byte {
 
 // ColorList is every colour b's sets list, in the game's order (b.Colors),
 // colorless and multicolor last where a set lists them.
-func ColorList(b *mtgmatcher.Backend) []Color {
+func ColorList(b *matcher.Backend) []Color {
 	listed := map[string]bool{}
 	for _, code := range b.GetAllSets() {
 		set, err := b.GetSet(code)
@@ -622,7 +622,7 @@ func ColorList(b *mtgmatcher.Backend) []Color {
 
 	colors := []Color{}
 	for _, name := range names {
-		colors = append(colors, Color{Value: name, Label: mtgmatcher.Title(name)})
+		colors = append(colors, Color{Value: name, Label: matcher.Title(name)})
 	}
 	return colors
 }
@@ -680,7 +680,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if co.Rarity != "" {
-			rarityMap[mtgmatcher.RarityName(co.Rarity)] = true
+			rarityMap[matcher.RarityName(co.Rarity)] = true
 		}
 		for _, c := range co.Colors {
 			colorMap[c] = true
@@ -701,7 +701,7 @@ func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 	for t := range typeMap {
 		resp.Types = append(resp.Types, t)
 	}
-	mtgmatcher.SortByOrder(resp.Rarities, b.Rarities)
+	matcher.SortByOrder(resp.Rarities, b.Rarities)
 	sort.Strings(resp.Colors)
 	sort.Strings(resp.Types)
 
@@ -940,7 +940,7 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	resp.UUID = co.UUID
 	resp.SetCode = co.SetCode
 
-	// hasContents and hasPicks both check actual data availability via mtgmatcher;
+	// hasContents and hasPicks both check actual data availability via matcher;
 	// a "found+sealed" product can still legitimately have neither (e.g., a Case that
 	// contains other sealed products but no decklist of its own).
 	if _, contentsErr := sealed.ProductDecklist(b, co.SetCode, co.UUID); contentsErr == nil {
@@ -958,7 +958,7 @@ func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 }
 
 // sealedname2uuid resolves a sealed product name to its uuid, or "".
-func (s *Service) sealedname2uuid(b *mtgmatcher.Backend, name string) string {
+func (s *Service) sealedname2uuid(b *matcher.Backend, name string) string {
 	name = strings.TrimSpace(strings.Trim(name, "\""))
 	res, err := b.SearchSealedEquals(name)
 	if err != nil {

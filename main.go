@@ -34,8 +34,8 @@ import (
 	"golang.org/x/oauth2/google"
 	"gopkg.in/Iwark/spreadsheet.v2"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	_ "github.com/mtgban/go-mtgban/mtgmatcher/games"
+	"github.com/mtgban/go-mtgban/matcher"
+	_ "github.com/mtgban/go-mtgban/matcher/games"
 	"github.com/mtgban/simplecloud"
 
 	_ "net/http/pprof"
@@ -67,7 +67,7 @@ type APIGatewayConfig struct {
 	// URL is the gateway's public origin, no trailing slash
 	URL string `json:"url"`
 	// Games are the gateway's configured games, what the configurator offers
-	Games []mtgmatcher.Game `json:"games"`
+	Games []matcher.Game `json:"games"`
 }
 
 // DiscordConfig contains the bot connection, community links, channel IDs,
@@ -97,8 +97,8 @@ type ConfigType struct {
 		From string `json:"from"`
 	} `json:"mail"`
 
-	Game         mtgmatcher.Game `json:"game"`
-	InstanceName string          `json:"instance_name"`
+	Game         matcher.Game `json:"game"`
+	InstanceName string       `json:"instance_name"`
 
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
@@ -339,7 +339,7 @@ const (
 	DefaultServerPort    = "8080"
 	DefaultConfigPath    = "config.json"
 	DefaultSecret        = "NotVerySecret!"
-	DefaultGame          = mtgmatcher.GameMagic
+	DefaultGame          = matcher.GameMagic
 	DefaultServerURL     = apisig.DefaultLink
 	DefaultExternalURL   = "https://mtgban.com"
 	DefaultAPIGatewayURL = "https://api.mtgban.com"
@@ -482,7 +482,7 @@ func finishConfig(config ConfigType) {
 
 // applyAPIGatewayDefaults fills api_gateway so the pricing page always has a
 // target; game is this deployment's own game, added to the default game list.
-func applyAPIGatewayDefaults(c *APIGatewayConfig, game mtgmatcher.Game) {
+func applyAPIGatewayDefaults(c *APIGatewayConfig, game matcher.Game) {
 	if c.URL == "" {
 		c.URL = DefaultAPIGatewayURL
 	}
@@ -492,7 +492,7 @@ func applyAPIGatewayDefaults(c *APIGatewayConfig, game mtgmatcher.Game) {
 		c.URL = DefaultAPIGatewayURL
 	}
 	if len(c.Games) == 0 {
-		c.Games = []mtgmatcher.Game{DefaultGame}
+		c.Games = []matcher.Game{DefaultGame}
 		if game != "" && game != DefaultGame {
 			c.Games = append(c.Games, game)
 		}
@@ -616,7 +616,7 @@ func loadGoogleCredentials() (*http.Client, error) {
 // datastoreGame names the game whose loader reads this site's datastore. An
 // unset game is the default one, the same reading the rest of the site gives
 // it.
-func datastoreGame() mtgmatcher.Game {
+func datastoreGame() matcher.Game {
 	if Config().Game == "" {
 		return DefaultGame
 	}

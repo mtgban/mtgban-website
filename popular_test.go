@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/observability"
 )
 
@@ -150,7 +150,7 @@ func TestMergePopular(t *testing.T) {
 }
 
 func TestPopularRankQuery(t *testing.T) {
-	empty := &mtgmatcher.Backend{}
+	empty := &matcher.Backend{}
 	search, link, label := popularRankQuery(empty, observability.SearchRank{Key: "card:Black Lotus"})
 	if search != "Black Lotus" || link != "Black Lotus" || label != "Black Lotus" {
 		t.Fatalf("card: %q %q %q", search, link, label)

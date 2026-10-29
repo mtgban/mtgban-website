@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // ckTestCard is a card as the signal tests read it.
-func ckTestCard(id string) *mtgmatcher.CardObject {
-	return &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: id}}
+func ckTestCard(id string) *matcher.CardObject {
+	return &matcher.CardObject{Card: matcher.Card{UUID: id}}
 }
 
 // setTestCKOdds loads odds for the test, nil for none.

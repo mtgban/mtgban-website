@@ -4,12 +4,12 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // finishCard builds a printing carrying a game's own finish name.
-func finishCard(uuid, finish string, foil bool) *mtgmatcher.CardObject {
-	co := &mtgmatcher.CardObject{Foil: foil}
+func finishCard(uuid, finish string, foil bool) *matcher.CardObject {
+	co := &matcher.CardObject{Foil: foil}
 	co.UUID = uuid
 	co.Finish = finish
 	return co
@@ -17,7 +17,7 @@ func finishCard(uuid, finish string, foil bool) *mtgmatcher.CardObject {
 
 // matches runs the filter the way the search does, through fixupFinishNG, and
 // reports whether the card survives (cardFilterFinish returns "skip this one").
-func matches(query string, co *mtgmatcher.CardObject) bool {
+func matches(query string, co *matcher.CardObject) bool {
 	return !cardFilterFinish(fixupFinishNG(query), co)
 }
 
@@ -25,15 +25,15 @@ func matches(query string, co *mtgmatcher.CardObject) bool {
 // exactly as before: its Finish is one of them, so the new comparison agrees
 // with the case rather than adding to it.
 func TestFinishFilterKeepsTheSharedNames(t *testing.T) {
-	nonfoil := finishCard("m-1", mtgmatcher.FinishNonfoil, false)
-	foil := finishCard("m-1_f", mtgmatcher.FinishFoil, true)
-	etched := &mtgmatcher.CardObject{Foil: true, Etched: true}
+	nonfoil := finishCard("m-1", matcher.FinishNonfoil, false)
+	foil := finishCard("m-1_f", matcher.FinishFoil, true)
+	etched := &matcher.CardObject{Foil: true, Etched: true}
 	etched.UUID = "m-1_e"
-	etched.Finish = mtgmatcher.FinishEtched
+	etched.Finish = matcher.FinishEtched
 
 	tests := []struct {
 		query string
-		co    *mtgmatcher.CardObject
+		co    *matcher.CardObject
 		want  bool
 	}{
 		{"foil", foil, true},
@@ -79,7 +79,7 @@ func TestFinishFilterSeparatesTreatments(t *testing.T) {
 	rainbow := finishCard("omn071_695162_rainbow", "rainbowfoil", true)
 	cold := finishCard("omn071_695162_cold", "coldfoil", true)
 
-	for _, co := range []*mtgmatcher.CardObject{rainbow, cold} {
+	for _, co := range []*matcher.CardObject{rainbow, cold} {
 		if !matches("foil", co) {
 			t.Errorf("f:foil stopped matching %q", co.UUID)
 		}
@@ -135,7 +135,7 @@ func TestFinishFilterMatchesThePrintRun(t *testing.T) {
 
 	tests := []struct {
 		query string
-		co    *mtgmatcher.CardObject
+		co    *matcher.CardObject
 		want  bool
 	}{
 		{"1stedition", first, true},
@@ -165,7 +165,7 @@ func TestFinishFilterMatchesThePrintRun(t *testing.T) {
 // finishes are nonfoil, foil and etched - so the treatment has to be reached
 // there or a galaxy foil is only ever f:foil.
 func TestFinishFilterReachesMagicTreatments(t *testing.T) {
-	galaxy := finishCard("m-2_f", mtgmatcher.FinishFoil, true)
+	galaxy := finishCard("m-2_f", matcher.FinishFoil, true)
 	galaxy.PromoTypes = []string{"galaxyfoil"}
 
 	if !matches("galaxyfoil", galaxy) {
@@ -185,7 +185,7 @@ func TestFinishFilterReachesMagicTreatments(t *testing.T) {
 // f: means the finish, so a promo type that names something else stays out of
 // reach even though it is a promo type like the treatments are.
 func TestFinishFilterIgnoresNonFoilPromoTypes(t *testing.T) {
-	prerelease := finishCard("m-3_f", mtgmatcher.FinishFoil, true)
+	prerelease := finishCard("m-3_f", matcher.FinishFoil, true)
 	prerelease.PromoTypes = []string{"prerelease"}
 
 	if matches("prerelease", prerelease) {
@@ -196,23 +196,23 @@ func TestFinishFilterIgnoresNonFoilPromoTypes(t *testing.T) {
 // The finish list and the offline catalog offer the names finishNames gives,
 // so past the three flags f: has to take each of them and nothing else.
 func TestFinishNamesNameWhatTheFilterTakes(t *testing.T) {
-	galaxy := finishCard("m-2_f", mtgmatcher.FinishFoil, true)
+	galaxy := finishCard("m-2_f", matcher.FinishFoil, true)
 	galaxy.PromoTypes = []string{"galaxyfoil", "prerelease"}
-	cards := []*mtgmatcher.CardObject{galaxy}
+	cards := []*matcher.CardObject{galaxy}
 	names := append(slices.Clone(altFoilTags), "prerelease")
 	for short := range isKnownPromo {
 		names = append(names, short)
 	}
-	for _, row := range mtgmatcher.Finishes {
+	for _, row := range matcher.Finishes {
 		cards = append(cards, finishCard(row.Slug, row.Slug, row.Foil))
-		names = append(names, row.Slug, row.Treatment, mtgmatcher.PromoTypeSlug(row.Run))
+		names = append(names, row.Slug, row.Treatment, matcher.PromoTypeSlug(row.Run))
 	}
 
 	for _, co := range cards {
 		listed := finishNames(co)
 		for _, name := range names {
 			switch name {
-			case "", mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+			case "", matcher.FinishNonfoil, matcher.FinishFoil, matcher.FinishEtched:
 				continue
 			}
 			got := matches(name, co)

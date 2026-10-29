@@ -4,15 +4,15 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // colorBackend builds a backend for the game holding one card per uuid, with
 // the colours given.
-func colorBackend(game mtgmatcher.Game, cards map[string][]string) *mtgmatcher.Backend {
-	b := &mtgmatcher.Backend{Game: game, UUIDs: map[string]*mtgmatcher.CardObject{}}
+func colorBackend(game matcher.Game, cards map[string][]string) *matcher.Backend {
+	b := &matcher.Backend{Game: game, UUIDs: map[string]*matcher.CardObject{}}
 	for uuid, colors := range cards {
-		co := &mtgmatcher.CardObject{}
+		co := &matcher.CardObject{}
 		co.UUID = uuid
 		co.Colors = colors
 		b.UUIDs[uuid] = co
@@ -24,7 +24,7 @@ func colorBackend(game mtgmatcher.Game, cards map[string][]string) *mtgmatcher.B
 
 // keptBy parses the query the way the search does and lists the cards its
 // filters keep.
-func keptBy(b *mtgmatcher.Backend, query string) []string {
+func keptBy(b *matcher.Backend, query string) []string {
 	config := parseSearchOptionsNG(b, query, nil, nil, nil)
 	var kept []string
 	for _, uuid := range b.AllUUIDs {
@@ -40,7 +40,7 @@ func keptBy(b *mtgmatcher.Backend, query string) []string {
 // groups; every other game reads it as the colour names it publishes, with
 // colorless and multicolor meaning the same everywhere.
 func TestColorFilterReadsEachGamesNames(t *testing.T) {
-	magic := colorBackend(mtgmatcher.GameMagic, map[string][]string{
+	magic := colorBackend(matcher.GameMagic, map[string][]string{
 		"bolt":        {"red"},
 		"detain":      {"white", "blue"},
 		"ornithopter": nil,
@@ -73,7 +73,7 @@ func TestColorFilterReadsEachGamesNames(t *testing.T) {
 	})
 
 	tests := []struct {
-		b     *mtgmatcher.Backend
+		b     *matcher.Backend
 		query string
 		want  []string
 	}{
@@ -115,7 +115,7 @@ func TestColorFilterReadsEachGamesNames(t *testing.T) {
 
 // identity: is the guide's alias of ci:, so both filter on colour identity.
 func TestIdentityIsAColorIdentityAlias(t *testing.T) {
-	b := colorBackend(mtgmatcher.GameMagic, nil)
+	b := colorBackend(matcher.GameMagic, nil)
 	for _, query := range []string{"ci:wu", "identity:wu"} {
 		config := parseSearchOptionsNG(b, query, nil, nil, nil)
 		var names []string
@@ -131,13 +131,13 @@ func TestIdentityIsAColorIdentityAlias(t *testing.T) {
 // ci: keeps the Magic cards whose colour identity the query's colours cover,
 // read from the names the cards carry.
 func TestColorIdentityReadsNames(t *testing.T) {
-	b := &mtgmatcher.Backend{Game: mtgmatcher.GameMagic, UUIDs: map[string]*mtgmatcher.CardObject{}}
+	b := &matcher.Backend{Game: matcher.GameMagic, UUIDs: map[string]*matcher.CardObject{}}
 	for uuid, identity := range map[string][]string{
 		"bolt":   {"red"},
 		"detain": {"white", "blue"},
 		"sol":    nil,
 	} {
-		co := &mtgmatcher.CardObject{}
+		co := &matcher.CardObject{}
 		co.UUID = uuid
 		co.ColorIdentity = identity
 		b.UUIDs[uuid] = co

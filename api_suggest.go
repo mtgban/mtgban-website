@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
@@ -16,7 +16,7 @@ func (s *site) SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	ds := s.datastore()
 
 	if r.FormValue("all") == "true" {
-		AllNames := ds.backend.Names(mtgmatcher.NameFormCanonical, sealed)
+		AllNames := ds.backend.Names(matcher.NameFormCanonical, sealed)
 		// An empty pool means the datastore isn't (fully) loaded; make sure
 		// no cache holds on to the degraded answer
 		if len(AllNames) == 0 {

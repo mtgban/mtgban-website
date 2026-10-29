@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // A phone pages search results at 25: the 100-result page was 2.6 MB of
@@ -30,7 +30,7 @@ func TestSearchPageSizeFollowsTheLayout(t *testing.T) {
 // its unfurl: a page index reads at the size the link names, and at 100
 // when it names none, as every link without one was written.
 func TestOrderSearchKeysPagesOneSliceEverywhere(t *testing.T) {
-	ds := &datastore{backend: &mtgmatcher.Backend{}}
+	ds := &datastore{backend: &matcher.Backend{}}
 	for _, tc := range []struct {
 		query      string
 		start, end int

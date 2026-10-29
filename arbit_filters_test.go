@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/banprice"
 )
 
@@ -206,7 +206,7 @@ func TestArbitApplied(t *testing.T) {
 
 func TestArbitApplyPicks(t *testing.T) {
 	st := parseArbitQuery(t, "cond=NM,SP,MP,PO&rarity=mythic,rare&finish=etched")
-	opts, _ := st.apply(rarityBackend(mtgmatcher.GameMagic, testArbitOffer.Rarities, nil), arbitMode{})
+	opts, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), arbitMode{})
 	if !slices.Equal(opts.Conditions, []mtgban.Condition{"HP", "PO"}) {
 		t.Errorf("conditions dropped %v, want HP and the PO that goes with it", opts.Conditions)
 	}
@@ -221,14 +221,14 @@ func TestArbitApplyPicks(t *testing.T) {
 		t.Fatal("a finish pick sets no card filter")
 	}
 	for finish, keep := range map[string]bool{"etched": true, "foil": false, "nonfoil": false, "": false} {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{Finish: finish}}
+		co := &matcher.CardObject{Card: matcher.Card{Finish: finish}}
 		_, skip := opts.CustomCardFilter(co)
 		if skip == keep {
 			t.Errorf("a %q printing is kept: %v, want %v", finish, !skip, keep)
 		}
 	}
 
-	sealed, _ := st.apply(rarityBackend(mtgmatcher.GameMagic, testArbitOffer.Rarities, nil), arbitMode{Sealed: true})
+	sealed, _ := st.apply(rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), arbitMode{Sealed: true})
 	if sealed.Conditions != nil || sealed.Rarities != nil || sealed.CustomCardFilter != nil {
 		t.Errorf("a sealed source applies the singles' picks: %+v", sealed)
 	}
@@ -278,8 +278,8 @@ func TestArbitRowFilter(t *testing.T) {
 // prints: a trade scoring 0.18994 shows as 0.19, so a minimum of 0.19 keeps
 // it, run through the engine and the row filter as the page runs it.
 func TestArbitMinProfitAsShown(t *testing.T) {
-	b := &mtgmatcher.Backend{UUIDs: map[string]*mtgmatcher.CardObject{
-		"card": {Card: mtgmatcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
+	b := &matcher.Backend{UUIDs: map[string]*matcher.CardObject{
+		"card": {Card: matcher.Card{Name: "Plain Card", Rarity: "rare", SetCode: "AAA", Number: "10"}, Edition: "Alpha Set"},
 	}}
 	vendor := mtgban.NewVendorFromBuylist(mtgban.BuylistRecord{
 		"card": {{Conditions: "NM", BuyPrice: 0.98, Quantity: 5}},
@@ -561,7 +561,7 @@ func TestArbitPresetNorms(t *testing.T) {
 // that it is still there on a singles source after an Apply here.
 func TestArbitBarGreysWhatTheSourceDoesNotApply(t *testing.T) {
 	st := parseArbitQuery(t, "cond=NM%2CSP&rl=1&f=1")
-	bar := newArbitBar(st, arbitMode{Sealed: true}, testArbitOffer, rarityBackend(mtgmatcher.GameMagic, testArbitOffer.Rarities, nil), "SRC")
+	bar := newArbitBar(st, arbitMode{Sealed: true}, testArbitOffer, rarityBackend(matcher.GameMagic, testArbitOffer.Rarities, nil), "SRC")
 	if !bar.Condition.Disabled || len(bar.Condition.Choices) != len(arbitConditions) {
 		t.Fatalf("a sealed source's condition row is %+v, want every grade, greyed", bar.Condition)
 	}

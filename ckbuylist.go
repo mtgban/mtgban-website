@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/internal/jobs"
 )
@@ -667,7 +667,7 @@ func (s *site) refreshCKSignals() {
 }
 
 // ckSignalForCard is a card's CK signal as of the last rebuild.
-func ckSignalForCard(co *mtgmatcher.CardObject) ckView {
+func ckSignalForCard(co *matcher.CardObject) ckView {
 	signals := ckSignalsPtr.Load()
 	if signals == nil {
 		return ckView{}
@@ -676,7 +676,7 @@ func ckSignalForCard(co *mtgmatcher.CardObject) ckView {
 }
 
 // ckNewHighTipFor is the New high pill's tooltip on a card.
-func ckNewHighTipFor(co *mtgmatcher.CardObject) string {
+func ckNewHighTipFor(co *matcher.CardObject) string {
 	tip := ckSignalForCard(co).NewHighTip
 	if tip == "" {
 		return ckNewHighVerdict

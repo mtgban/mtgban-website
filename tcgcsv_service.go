@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/tcgcsvd"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -116,7 +116,7 @@ func stashTCGCSVProducts() {
 }
 
 // logTCGProductMatchReport reports how many synced products resolve to a loaded
-// card identity via mtgmatcher's external-id map. It is meaningful only on a
+// card identity via matcher's external-id map. It is meaningful only on a
 // deployment whose datastore is the matching game (e.g. a Lorcana datastore for
 // category 71); elsewhere it will resolve few or none, which is expected until
 // the display work runs a per-game backend. It needs the loaded datastore, which
@@ -127,7 +127,7 @@ func (s *site) logTCGProductMatchReport(categoryID int, products []timeseries.TC
 	var matched int
 	var sampleUnmatched []string
 	for _, p := range products {
-		if b.ConvertID(mtgmatcher.IDSpaceTCGplayer, strconv.Itoa(p.ProductID)) != "" {
+		if b.ConvertID(matcher.IDSpaceTCGplayer, strconv.Itoa(p.ProductID)) != "" {
 			matched++
 		} else if len(sampleUnmatched) < 3 {
 			sampleUnmatched = append(sampleUnmatched, fmt.Sprintf("%d %q", p.ProductID, p.Name))

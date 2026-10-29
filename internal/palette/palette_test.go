@@ -7,25 +7,25 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestRarityListFollowsTheGame pins the rarity list: the game's order, only
 // what a printing carries, each labelled as its datastore published it, and
 // a letter only where it names that rarity alone.
 func TestRarityListFollowsTheGame(t *testing.T) {
-	b := mtgmatcher.NewBackend()
+	b := matcher.NewBackend()
 	for uuid, rarity := range map[string]string{
 		"a": "Super Rare", "b": "Super Rare", "c": "special", "d": "Legend Rare", "e": "Common",
 	} {
-		co := &mtgmatcher.CardObject{}
+		co := &matcher.CardObject{}
 		co.UUID = uuid
 		co.Rarity = b.AddRarity(rarity)
 		b.UUIDs[uuid] = co
 		b.AllUUIDs = append(b.AllUUIDs, uuid)
 	}
 	slices.Sort(b.AllUUIDs)
-	b.Rarities = mtgmatcher.RarityNames([]string{"Special", "Legend Rare", "Super Rare", "Rare", "Common"})
+	b.Rarities = matcher.RarityNames([]string{"Special", "Legend Rare", "Super Rare", "Rare", "Common"})
 
 	got := RarityList(b)
 	want := []Rarity{
@@ -43,7 +43,7 @@ func TestRarityListFollowsTheGame(t *testing.T) {
 // list, in the game's order rather than the sets', any the order leaves out
 // after it by name, and colorless and multicolor last.
 func TestColorListFollowsTheGame(t *testing.T) {
-	b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{
+	b := &matcher.Backend{Sets: map[string]*matcher.Set{
 		"AAA": {Code: "AAA", Colors: []string{"mind", "fury", "colorless"}},
 		"BBB": {Code: "BBB", Colors: []string{"order", "calm", "fury", "spirit", "multicolor"}},
 		"CCC": {Code: "CCC"},
@@ -123,11 +123,11 @@ func TestSetMark(t *testing.T) {
 // whose contents open to nothing, as one listing no contents does, offers no
 // pack pull, while one holding a booster does.
 func TestSealedOffersPicksOnlyWhereAnOpeningHoldsCards(t *testing.T) {
-	b := mtgmatcher.NewBackend()
-	b.UUIDs["c1"] = &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: "c1", SetCode: "AAA"}}
+	b := matcher.NewBackend()
+	b.UUIDs["c1"] = &matcher.CardObject{Card: matcher.Card{UUID: "c1", SetCode: "AAA"}}
 	// Decoded the way a datastore is, so a field added upstream does not
 	// break the test.
-	var booster mtgmatcher.Booster
+	var booster matcher.Booster
 	err := json.Unmarshal([]byte(`{
 		"boosters": [{"contents": {"common": 1}, "weight": 1}],
 		"boostersTotalWeight": 1,
@@ -136,18 +136,18 @@ func TestSealedOffersPicksOnlyWhereAnOpeningHoldsCards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := &mtgmatcher.Set{Code: "AAA", Booster: map[string]mtgmatcher.Booster{"draft": booster}}
-	set.SealedProduct = []mtgmatcher.SealedProduct{
+	set := &matcher.Set{Code: "AAA", Booster: map[string]matcher.Booster{"draft": booster}}
+	set.SealedProduct = []matcher.SealedProduct{
 		{UUID: "empty", Name: "Empty"},
-		{UUID: "pack", Name: "Pack", Contents: map[string][]mtgmatcher.SealedContent{
+		{UUID: "pack", Name: "Pack", Contents: map[string][]matcher.SealedContent{
 			"pack": {{Set: "aaa", Code: "draft"}},
 		}},
 	}
 	for _, product := range set.SealedProduct {
-		b.UUIDs[product.UUID] = &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: product.UUID, SetCode: "AAA"}, Sealed: true}
+		b.UUIDs[product.UUID] = &matcher.CardObject{Card: matcher.Card{UUID: product.UUID, SetCode: "AAA"}, Sealed: true}
 	}
-	b.Sets = map[string]*mtgmatcher.Set{"AAA": set}
-	s := &Service{Backend: func() *mtgmatcher.Backend { return b }}
+	b.Sets = map[string]*matcher.Set{"AAA": set}
+	s := &Service{Backend: func() *matcher.Backend { return b }}
 
 	for uuid, want := range map[string]bool{"empty": false, "pack": true} {
 		w := httptest.NewRecorder()

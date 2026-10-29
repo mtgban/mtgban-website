@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TestSimplePrice2CSVTCGSKU checks that an upload export carries the SKU of
@@ -123,7 +123,7 @@ func TestCSVCondQtyIndexing(t *testing.T) {
 	qtys := []string{"1", "2", "3"}
 
 	for _, tc := range []struct {
-		export          func(*mtgmatcher.Backend, *csv.Writer, []string, []string, []string) error
+		export          func(*matcher.Backend, *csv.Writer, []string, []string, []string) error
 		condCol, qtyCol int
 		labels          map[mtgban.Condition]string
 	}{

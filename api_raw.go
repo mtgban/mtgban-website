@@ -9,7 +9,7 @@ import (
 
 // RawCardAPI serves the record behind one card id exactly as the backend
 // holds it: the CardObject that s.backend().GetUUID resolves, every field
-// present since the mtgmatcher structs carry no omitempty. It exists to
+// present since the matcher structs carry no omitempty. It exists to
 // debug what the matcher knows about a printing - finishes, identifiers,
 // number decorations - beside the Fix links that correct its matches, so it
 // is gated like them: admins, or a sigless dev build.

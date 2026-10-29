@@ -5,16 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // cardFor builds a card object. id is the identifier the mirror files the
 // image under - scryfallId for a Magic single, tcgplayerProductId for Magic
 // sealed - which is deliberately not the same thing as whatever the image url
 // happens to be named.
-func cardFor(uuid, setCode, imagesFull, id string, sealed bool) *mtgmatcher.CardObject {
-	co := &mtgmatcher.CardObject{
-		Card:   mtgmatcher.Card{UUID: uuid, SetCode: setCode},
+func cardFor(uuid, setCode, imagesFull, id string, sealed bool) *matcher.CardObject {
+	co := &matcher.CardObject{
+		Card:   matcher.Card{UUID: uuid, SetCode: setCode},
 		Sealed: sealed,
 	}
 	if imagesFull != "" {
@@ -33,7 +33,7 @@ func cardFor(uuid, setCode, imagesFull, id string, sealed bool) *mtgmatcher.Card
 func TestImageKey(t *testing.T) {
 	tests := []struct {
 		name  string
-		co    *mtgmatcher.CardObject
+		co    *matcher.CardObject
 		magic bool
 		want  string
 	}{
@@ -110,7 +110,7 @@ func TestImageKey(t *testing.T) {
 
 // datastoreCard builds a datastore game's single the way the loaders do: its
 // TCGplayer product id, where it names one, among its identifiers.
-func datastoreCard(uuid, product, imagesFull string) *mtgmatcher.CardObject {
+func datastoreCard(uuid, product, imagesFull string) *matcher.CardObject {
 	co := cardFor(uuid, "DTD", imagesFull, "", false)
 	if product != "" {
 		co.Identifiers = map[string]string{"tcgplayerProductId": product}
@@ -152,8 +152,8 @@ func TestDatastoreImageKeyFoldsAPrintingThatNamesNoProduct(t *testing.T) {
 }
 
 func TestNewCatalogCardIncludesImageKey(t *testing.T) {
-	co := &mtgmatcher.CardObject{
-		Card: mtgmatcher.Card{
+	co := &matcher.CardObject{
+		Card: matcher.Card{
 			Name:        "Lightning Bolt",
 			Number:      "1",
 			Rarity:      "common",
@@ -170,8 +170,8 @@ func TestNewCatalogCardIncludesImageKey(t *testing.T) {
 }
 
 func TestNewCatalogCardSealed(t *testing.T) {
-	co := &mtgmatcher.CardObject{
-		Card: mtgmatcher.Card{
+	co := &matcher.CardObject{
+		Card: matcher.Card{
 			Name:        "Modern Horizons 3 Collector Booster",
 			SetCode:     "MH3",
 			Images:      map[string]string{"full": "https://product-images.tcgplayer.com/541185.jpg"},
@@ -197,7 +197,7 @@ func TestNewCatalogCardPlainNumber(t *testing.T) {
 		{"ST01-002", "2", `"pn":"2"`},
 		{"P-001", "", `"pn":""`},
 	} {
-		co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{Name: "Card", SetCode: "SET", Number: tt.number, PlainNumber: tt.plain}}
+		co := &matcher.CardObject{Card: matcher.Card{Name: "Card", SetCode: "SET", Number: tt.number, PlainNumber: tt.plain}}
 		raw, err := json.Marshal(newCatalogCard(co, nil, false))
 		if err != nil {
 			t.Fatal(err)
@@ -210,8 +210,8 @@ func TestNewCatalogCardPlainNumber(t *testing.T) {
 }
 
 func TestNewCatalogCardOmitsImageKeyWhenMissing(t *testing.T) {
-	co := &mtgmatcher.CardObject{
-		Card: mtgmatcher.Card{
+	co := &matcher.CardObject{
+		Card: matcher.Card{
 			Name:    "No Image Card",
 			SetCode: "LEA",
 		},

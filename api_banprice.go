@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/banprice"
 )
@@ -135,7 +135,7 @@ func baseAccessStoreEligible(info mtgban.ScraperInfo) bool {
 // writeV2Response writes a v2 response, as json.Encoder would encode its
 // meta and its retail and buylist maps: the sections are walked card by card
 // as they are written, and one with no card is left out.
-func writeV2Response(w io.Writer, b *mtgmatcher.Backend, meta PriceAPIMeta, retail, buylist *v2Section) error {
+func writeV2Response(w io.Writer, b *matcher.Backend, meta PriceAPIMeta, retail, buylist *v2Section) error {
 	head, err := json.Marshal(meta)
 	if err != nil {
 		return err
@@ -533,7 +533,7 @@ func (s *site) priceAPI(w http.ResponseWriter, r *http.Request, prefix, version 
 // former func-value call both allocated a closure per call and forced the
 // freshly copied CardObject to escape to the heap, dominating full-dump
 // allocations.
-func getIDFromMode(b *mtgmatcher.Backend, mode string, co *mtgmatcher.CardObject) string {
+func getIDFromMode(b *matcher.Backend, mode string, co *matcher.CardObject) string {
 	switch mode {
 	case "tcg":
 		return findTCGproductID(b, co.UUID)
@@ -569,7 +569,7 @@ func getIDFromMode(b *mtgmatcher.Backend, mode string, co *mtgmatcher.CardObject
 // scanning whole inventories and checking the set code per entry was the
 // dominant cost of edition dumps. Returns nil for an unknown set, which
 // callers treat as no results.
-func resolveEditionFilter(b *mtgmatcher.Backend, filterByEdition string, filterByHash []string, sealed bool) []string {
+func resolveEditionFilter(b *matcher.Backend, filterByEdition string, filterByHash []string, sealed bool) []string {
 	if filterByHash != nil || filterByEdition == "" {
 		return filterByHash
 	}
@@ -587,7 +587,7 @@ func resolveEditionFilter(b *mtgmatcher.Backend, filterByEdition string, filterB
 // enabledStores is the whole store policy - explicit sig store lists
 // override blocklists by design, and ALL_ACCESS folds them in upstream -
 // so no blocklist is applied here.
-func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filterByFinish string, sealed bool) SearchConfig {
+func apiSearchConfig(b *matcher.Backend, uuids, enabledStores []string, filterByFinish string, sealed bool) SearchConfig {
 	// The set index buckets are read-only, so partition into a fresh slice
 	kept := make([]string, 0, len(uuids))
 	for _, uuid := range uuids {
@@ -626,7 +626,7 @@ func apiSearchConfig(b *mtgmatcher.Backend, uuids, enabledStores []string, filte
 // zero base price drops the store; each grade keeps its best price and its
 // total copies, through setGrade like the entry loop. INDEX rows are
 // metadata prices whose underlying grade is always NM.
-func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
+func banPricesFromRows(b *matcher.Backend, cardIDs []string, found map[string]map[mtgban.Condition][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
 	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
@@ -755,7 +755,7 @@ func banPricesFromRows(b *mtgmatcher.Backend, cardIDs []string, found map[string
 	return out
 }
 
-func getSellerPrices(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getSellerPrices(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering: resolve
@@ -831,7 +831,7 @@ type EntryRule struct {
 	Rate     float64
 }
 
-func processEntry[T mtgban.GenericEntry](b *mtgmatcher.Backend, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
+func processEntry[T mtgban.GenericEntry](b *matcher.Backend, out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
 	// Unpriced listings (zero, or a NaN) are ignored throughout, matching the
 	// search walk the filtered endpoints ride (shouldSkipPriceNG drops them
 	// before they become rows): the base price is the first priced entry, and
@@ -966,7 +966,7 @@ func betterPrice(current, value float64, buy bool) bool {
 }
 
 // finishPrice is the field of price that co's finish fills.
-func finishPrice(price *BanPrice, co *mtgmatcher.CardObject) *float64 {
+func finishPrice(price *BanPrice, co *matcher.CardObject) *float64 {
 	switch {
 	case co.Sealed:
 		return &price.Sealed
@@ -995,7 +995,7 @@ func setGrade(price *BanPrice, condTag string, value float64, quantity int, buy,
 	}
 }
 
-func getVendorPrices(b *mtgmatcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
+func getVendorPrices(b *matcher.Backend, mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 
 	// Filtered requests funnel through the shared search gathering, exactly
@@ -1053,7 +1053,7 @@ func getVendorPrices(b *mtgmatcher.Backend, mode string, enabledStores []string,
 
 // BanPrice2CSV is a convenience wrapper around SimplePrice2CSV that
 // writes directly to an http.ResponseWriter.
-func BanPrice2CSV(b *mtgmatcher.Backend, httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string) error {
+func BanPrice2CSV(b *matcher.Backend, httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string) error {
 	httpWriter.Header().Set("Content-Type", "text/csv")
 	w := csv.NewWriter(httpWriter)
 	return SimplePrice2CSV(b, w, pm, nil, sorted, false)
@@ -1063,7 +1063,7 @@ func BanPrice2CSV(b *mtgmatcher.Backend, httpWriter http.ResponseWriter, pm map[
 // each row corresponds to an uploaded entry and includes Loaded columns.
 // When uploadedData is nil, rows are derived from the price map keys (using
 // sorted for ordering if non-nil).
-func SimplePrice2CSV(b *mtgmatcher.Backend, w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, sorted []string, preferFlavor bool) error {
+func SimplePrice2CSV(b *matcher.Backend, w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, sorted []string, preferFlavor bool) error {
 	var allScrapers []string
 	var allIndexes []string
 	for id := range pm {
@@ -1176,7 +1176,7 @@ func SimplePrice2CSV(b *mtgmatcher.Backend, w *csv.Writer, pm map[string]map[str
 	return w.Error()
 }
 
-func priceRowToCSV(b *mtgmatcher.Backend, pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition mtgban.Condition, preferFlavor, withSKU bool) ([]string, error) {
+func priceRowToCSV(b *matcher.Backend, pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition mtgban.Condition, preferFlavor, withSKU bool) ([]string, error) {
 	co, err := b.GetUUID(id)
 	if err != nil {
 		uuid := externalUUID(b, id)

@@ -10,7 +10,7 @@
     // INTEGER is what online's strconv.Atoi takes
     var INTEGER = /^[+-]?\d+$/;
 
-    // rarityName spells a rarity as mtgmatcher.RarityName does, which is how
+    // rarityName spells a rarity as matcher.RarityName does, which is how
     // online compares one: lower case, without spaces ("superrare").
     function rarityName(rarity) {
         return String(rarity || '').trim().toLowerCase().replace(/ /g, '');

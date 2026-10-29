@@ -4,16 +4,16 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-// registeredGames is every game mtgmatcher activates through its games
+// registeredGames is every game matcher activates through its games
 // package, which is what a deployment can be configured as. Read from
-// mtgmatcher.RegisteredGames() rather than a hand-kept list, so a game whose
+// matcher.RegisteredGames() rather than a hand-kept list, so a game whose
 // blank import lands here doesn't first need a matching edit in this file.
-var registeredGames = mtgmatcher.RegisteredGames()
+var registeredGames = matcher.RegisteredGames()
 
 // A game absent from gameMap gets no newspaper, cacheNewspaper logging an
 // error on every refresh, so the entry has to exist before an instance of
@@ -66,7 +66,7 @@ func TestVariantCacheScope(t *testing.T) {
 
 	cases := []struct {
 		name string
-		game mtgmatcher.Game
+		game matcher.Game
 		// catalog is the TCGplayer category the loaded dump names, which is
 		// how a non-Magic site learns its own; 0 stands for no dump loaded.
 		catalog int

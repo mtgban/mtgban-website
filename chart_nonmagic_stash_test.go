@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -15,7 +15,7 @@ import (
 
 // withGameAndFlags points the config at one game and one long-form write
 // flag for the duration of a test.
-func withGameAndFlags(t *testing.T, game mtgmatcher.Game, writes bool) {
+func withGameAndFlags(t *testing.T, game matcher.Game, writes bool) {
 	t.Helper()
 	prevGame := Config().Game
 	prevTS := Config().TimeseriesConfig
@@ -34,14 +34,14 @@ func withGameAndFlags(t *testing.T, game mtgmatcher.Game, writes bool) {
 // datasets the tcgcsv ingest writes on its own (issue #280).
 func TestLongFormGatesForNonMagic(t *testing.T) {
 	for _, tc := range []struct {
-		game      mtgmatcher.Game
+		game      matcher.Game
 		writes    bool
 		wantWrite bool
 	}{
 		{DefaultGame, false, false},
 		{DefaultGame, true, true},
-		{mtgmatcher.GameLorcana, false, true},
-		{mtgmatcher.GameLorcana, true, true},
+		{matcher.GameLorcana, false, true},
+		{matcher.GameLorcana, true, true},
 		{"pokemon", false, true},
 	} {
 		withGameAndFlags(t, tc.game, tc.writes)
@@ -269,7 +269,7 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 	// The cache holds a variant for one of the two cards, as it does for a
 	// product the tcgcsv catalog has reached and not for one it has not.
 	var resolved int
-	snapshot := collectNonMagicSnapshot(backend(), now, func(card *mtgmatcher.CardObject) int64 {
+	snapshot := collectNonMagicSnapshot(backend(), now, func(card *matcher.CardObject) int64 {
 		resolved++
 		if card.UUID == known {
 			return 555
@@ -303,10 +303,10 @@ func TestCollectNonMagicSnapshotFromServedScrapers(t *testing.T) {
 	}
 }
 
-// Every finish mtgmatcher can hand the snapshot has a sub-type code, or that
+// Every finish matcher can hand the snapshot has a sub-type code, or that
 // finish's printings would fall back to the identity sequence.
 func TestEveryFinishHasADerivedBanID(t *testing.T) {
-	for _, finish := range mtgmatcher.Finishes {
+	for _, finish := range matcher.Finishes {
 		if _, ok := timeseries.TCGBanID(timeseries.TCGVariant{CategoryID: 71, ProductID: 1, SubType: finish.TCGplayer}); !ok {
 			t.Errorf("finish %q (%q) has no sub-type code", finish.Slug, finish.TCGplayer)
 		}
@@ -316,8 +316,8 @@ func TestEveryFinishHasADerivedBanID(t *testing.T) {
 // A card is filed under the TCGplayer name of its own finish, in this game's
 // category, and not at all when one of the three is unknown.
 func TestTCGVariantForCard(t *testing.T) {
-	card := func(pid, finish string) *mtgmatcher.CardObject {
-		co := &mtgmatcher.CardObject{}
+	card := func(pid, finish string) *matcher.CardObject {
+		co := &matcher.CardObject{}
 		co.Finish = finish
 		co.Identifiers = map[string]string{}
 		if pid != "" {
@@ -327,7 +327,7 @@ func TestTCGVariantForCard(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name     string
-		co       *mtgmatcher.CardObject
+		co       *matcher.CardObject
 		category int
 		want     timeseries.TCGVariant
 		ok       bool

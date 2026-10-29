@@ -15,7 +15,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
@@ -291,7 +291,7 @@ type AffiliateConfig struct {
 	// the card on this site beside the store's own link, so it answers with
 	// nothing rather than with a guess: a link to the wrong card is worse
 	// than no link at all.
-	CardFunc func(*mtgmatcher.Backend, *url.URL) *mtgmatcher.CardObject
+	CardFunc func(*matcher.Backend, *url.URL) *matcher.CardObject
 }
 
 // unknownTitle is the title a store's link carries where the printing behind
@@ -306,7 +306,7 @@ func unknownTitle(*url.URL) string {
 // printing - a second one offering that printing here. Every other address
 // on this site would be a search for whatever the URL happened to spell,
 // which is not what the reader clicked.
-func storeLinkDescription(co *mtgmatcher.CardObject, guildID string) string {
+func storeLinkDescription(co *matcher.CardObject, guildID string) string {
 	description := "Support **MTGBAN** by using this link"
 	if co == nil {
 		return description
@@ -323,7 +323,7 @@ func storeLinkDescription(co *mtgmatcher.CardObject, guildID string) string {
 // a reader: the page that answers for its kind, the printing's own uuid as
 // the query, and the tags that attribute the visit to the bot and to the
 // server the message was posted in.
-func banSearchLink(co *mtgmatcher.CardObject, guildID string) string {
+func banSearchLink(co *matcher.CardObject, guildID string) string {
 	searchEndpoint := "search"
 	if co.Sealed {
 		searchEndpoint = "sealed"
@@ -334,7 +334,7 @@ func banSearchLink(co *mtgmatcher.CardObject, guildID string) string {
 // printingTitle names a printing the way the bot announces a link: the card,
 // the set it is in, the number it is filed under, and a mark for a finish
 // that is not the plain one.
-func printingTitle(co *mtgmatcher.CardObject) string {
+func printingTitle(co *matcher.CardObject) string {
 	title := fmt.Sprintf("%s [%s]", co.Name, co.SetCode)
 	if co.Number != "" {
 		title += " #" + co.Number
@@ -376,7 +376,7 @@ func printingTitle(co *mtgmatcher.CardObject) string {
 // the query form is what a deep link to one finish's listing carries. Mana
 // Pool also serves a /card/<slug> shape for a card across every set, which
 // names no printing at all and so is answered with nothing.
-func manapoolCard(b *mtgmatcher.Backend, u *url.URL) *mtgmatcher.CardObject {
+func manapoolCard(b *matcher.Backend, u *url.URL) *matcher.CardObject {
 	fields := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(fields) < 3 {
 		return nil
@@ -418,7 +418,7 @@ func manapoolCard(b *mtgmatcher.Backend, u *url.URL) *mtgmatcher.CardObject {
 // datastore's 1,219 etched ids: 333 answer a non-etched printing when the
 // finish is read off the URL, and 1 when it is read off the id - that one
 // being a printing the datastore holds no etched sibling for at all.
-func tcgplayerCard(b *mtgmatcher.Backend, u *url.URL) *mtgmatcher.CardObject {
+func tcgplayerCard(b *matcher.Backend, u *url.URL) *matcher.CardObject {
 	var id string
 	for _, id = range strings.Split(u.Path, "/") {
 		_, err := strconv.Atoi(id)
@@ -429,7 +429,7 @@ func tcgplayerCard(b *mtgmatcher.Backend, u *url.URL) *mtgmatcher.CardObject {
 
 	// A printing files its plain and its etched product under one id space,
 	// so the id is etched exactly when it is the one filed as etched.
-	base, err := b.GetUUID(b.ConvertID(mtgmatcher.IDSpaceTCGplayer, id))
+	base, err := b.GetUUID(b.ConvertID(matcher.IDSpaceTCGplayer, id))
 	etched := err == nil && base.Identifiers["tcgplayerEtchedProductId"] == id
 
 	cardID, err := b.MatchID(id, u.Query().Get("Printing") == "Foil", etched)
@@ -468,7 +468,7 @@ var AffiliateStores = []AffiliateConfig{
 			if err != nil {
 				return title
 			}
-			return mtgmatcher.Title(cleanName)
+			return matcher.Title(cleanName)
 		},
 	},
 	{
@@ -478,7 +478,7 @@ var AffiliateStores = []AffiliateConfig{
 		DefaultFields: []string{"utm_referrer"},
 		TitleFunc: func(u *url.URL) string {
 			base, _ := url.QueryUnescape(path.Base(u.Path))
-			return mtgmatcher.Title(base)
+			return matcher.Title(base)
 		},
 	},
 	{
@@ -521,7 +521,7 @@ var AffiliateStores = []AffiliateConfig{
 			urlpath := strings.ToLower(u.Path)
 			if strings.Contains(urlpath, "-sgl-") {
 				index := strings.Index(urlpath, "-sgl-")
-				return mtgmatcher.Title(strings.Replace(urlpath[1:index], "-", " ", -1))
+				return matcher.Title(strings.Replace(urlpath[1:index], "-", " ", -1))
 			}
 			return "Your search"
 		},
@@ -541,7 +541,7 @@ var AffiliateStores = []AffiliateConfig{
 		DefaultFields: []string{"ref"},
 		TitleFunc: func(u *url.URL) string {
 			base := path.Base(u.Path)
-			title := mtgmatcher.Title(strings.Replace(base, "-", " ", -1))
+			title := matcher.Title(strings.Replace(base, "-", " ", -1))
 			urlpath := strings.TrimSuffix(u.Path, "/"+base)
 			title += " from " + strings.ToUpper(path.Base(urlpath))
 			return title
@@ -592,7 +592,7 @@ func onStore(u *url.URL, trigger string) bool {
 // this guild or this game does not answer for, and a link that parsed into
 // nothing all end the same way, and there is nothing a caller could do
 // differently about any of them.
-func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.MessageEmbed {
+func checkForLinks(b *matcher.Backend, mGuildID, mContent string) *discordgo.MessageEmbed {
 	// Only for the main discord and only for the main game
 	if mGuildID != discordGuildID() || Config().Game != DefaultGame {
 		return nil
@@ -634,13 +634,13 @@ func checkForLinks(b *mtgmatcher.Backend, mGuildID, mContent string) *discordgo.
 			// Name the printing the link points at, where the store's URL
 			// carries enough to. This reads the posted URL, so it has to
 			// happen before URLFunc folds it into a partner redirect.
-			var co *mtgmatcher.CardObject
+			var co *matcher.CardObject
 			if store.CardFunc != nil {
 				co = store.CardFunc(b, u)
 			}
 
 			// Extract a sensible link title
-			title := mtgmatcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
+			title := matcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
 			switch {
 			case co != nil:
 				title = printingTitle(co)
@@ -914,7 +914,7 @@ func (s *site) messageCreate(session *discordgo.Session, m *discordgo.MessageCre
 	}
 }
 
-func prepareCard(b *mtgmatcher.Backend, searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
+func prepareCard(b *matcher.Backend, searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
 	for _, field := range ogFields {

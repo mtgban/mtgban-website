@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/alerts"
 	"github.com/mtgban/mtgban-website/internal/dsreload"
@@ -51,7 +51,7 @@ type site struct {
 
 	// fetchLastSold is how the Discord $$ lookup fetches a printing's recent
 	// sales: getLastSold, held here so a test can answer in its place.
-	fetchLastSold func(ctx context.Context, b *mtgmatcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error)
+	fetchLastSold func(ctx context.Context, b *matcher.Backend, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error)
 }
 
 // newSite builds the services a deployment serves through. It runs at
@@ -63,7 +63,7 @@ func newSite() *site {
 	// Pre-stored before the first load, so s.ds is never nil: nil numbers,
 	// names and palette keep the pre-load answers scan, 204 and no-store.
 	s.ds.Store(&datastore{
-		backend:  &mtgmatcher.Backend{},
+		backend:  &matcher.Backend{},
 		editions: &editionsSnapshot{},
 	})
 
@@ -80,13 +80,13 @@ func newSite() *site {
 	}
 
 	s.offline = offlineapi.NewService(offlineapi.Deps{
-		Datastore: func() (*mtgmatcher.Backend, time.Time) {
+		Datastore: func() (*matcher.Backend, time.Time) {
 			ds := s.datastore()
 			return ds.backend, ds.loadedAt
 		},
 		Allow: offlineModeAllowed,
 
-		CanonicalSetCode: func(b *mtgmatcher.Backend, setCode string) (string, error) {
+		CanonicalSetCode: func(b *matcher.Backend, setCode string) (string, error) {
 			set, err := b.GetSet(setCode)
 			if err != nil {
 				return "", err
@@ -94,7 +94,7 @@ func newSite() *site {
 			return set.Code, nil
 		},
 
-		BuildSetPayload: func(b *mtgmatcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error) {
+		BuildSetPayload: func(b *matcher.Backend, setCode string, sellers, vendors []string) (*offline.SetPayload, error) {
 			set, err := b.GetSet(setCode)
 			if err != nil {
 				return nil, err
@@ -179,7 +179,7 @@ func newSite() *site {
 
 		ImagesDownloadAuth: offlineImagesDownloadAuth,
 
-		Game: func() mtgmatcher.Game { return Config().Game },
+		Game: func() matcher.Game { return Config().Game },
 
 		ManifestPathConfigured: func() bool { return Config().Offline.ManifestPath != "" },
 		ManifestReadOnly:       DevMode,
@@ -202,18 +202,18 @@ func (s *site) datastore() *datastore {
 	return s.ds.Load()
 }
 
-func (s *site) backend() *mtgmatcher.Backend {
+func (s *site) backend() *matcher.Backend {
 	return s.datastore().backend
 }
 
 // newDatastore builds every derived snapshot from b; an empty backend gives
 // empty snapshots.
-func (s *site) newDatastore(b *mtgmatcher.Backend, loadedAt time.Time) *datastore {
+func (s *site) newDatastore(b *matcher.Backend, loadedAt time.Time) *datastore {
 	return &datastore{
 		backend:  b,
 		numbers:  newNumbersSnapshot(b),
 		sources:  newSourcesSnapshot(b),
-		names:    suggest.NewNames(b.Names(mtgmatcher.NameFormCanonical, false), b.Names(mtgmatcher.NameFormCanonical, true)),
+		names:    suggest.NewNames(b.Names(matcher.NameFormCanonical, false), b.Names(matcher.NameFormCanonical, true)),
 		editions: newEditionsSnapshot(b),
 		palette:  s.palette.NewSnapshot(b),
 		finishes: v2FinishList(b),
@@ -233,7 +233,7 @@ func (s *site) loadDatastore(path string) error {
 	defer reader.Close()
 
 	// LoadDatastore would read the file whole and try every registered loader.
-	backend, err := mtgmatcher.Open(datastoreGame(), reader)
+	backend, err := matcher.Open(datastoreGame(), reader)
 	if err != nil {
 		return err
 	}

@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // TCGplayer's sellers and copies per grade, from the newspaper's nightly
@@ -186,7 +186,7 @@ func tcgListingsDue(current *tcgListingsSnapshot, failed *tcgListingsFailure, da
 // queryTCGListings reads day's counts for game and keys them by b's card
 // ids, answering how many printings matched no card. A load matching none
 // is an error, so the previous one stays.
-func queryTCGListings(ctx context.Context, b *mtgmatcher.Backend, game string, day time.Time) (map[string]*tcgListings, int, error) {
+func queryTCGListings(ctx context.Context, b *matcher.Backend, game string, day time.Time) (map[string]*tcgListings, int, error) {
 	rows, err := NewNewspaperDB.QueryContext(ctx, tcgListingsQuery, game, day)
 	if err != nil {
 		return nil, 0, err
@@ -212,7 +212,7 @@ func queryTCGListings(ctx context.Context, b *mtgmatcher.Backend, game string, d
 	// The card ids TCGplayer's own prices are filed under: the product id,
 	// with the printing as its finish.
 	match := func(productID int64, printing string) (string, error) {
-		return b.Match(&mtgmatcher.InputCard{
+		return b.Match(&matcher.InputCard{
 			ID:     strconv.FormatInt(productID, 10),
 			Finish: printing,
 			Foil:   printing != "Normal",

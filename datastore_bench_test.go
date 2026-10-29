@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // benchCards returns a fixed prefix of the uuid index. Load sorts that
@@ -16,7 +16,7 @@ func benchCards(b *testing.B, n int) []string {
 
 // keptCards holds the escaping benchmark's result past the iteration that
 // produced it, so the lookups below cannot be optimised away.
-var keptCards []*mtgmatcher.CardObject
+var keptCards []*matcher.CardObject
 
 // The lookup on its own: the price every card-driven page pays per card.
 func BenchmarkGetUUID(b *testing.B) {
@@ -42,7 +42,7 @@ func BenchmarkGetUUIDEscaping(b *testing.B) {
 	const pageSize = 60
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		kept := make([]*mtgmatcher.CardObject, 0, pageSize)
+		kept := make([]*matcher.CardObject, 0, pageSize)
 		for j := 0; j < pageSize; j++ {
 			co, err := backend().GetUUID(uuids[(i*pageSize+j)%len(uuids)])
 			if err != nil {

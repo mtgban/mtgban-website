@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 )
 
@@ -21,9 +21,9 @@ import (
 // whose behaviour visibly changes is the empty name, which used to file
 // img/setsymbol/default.svg a second time under "default".
 func TestSetSymbolsOnlyReadUnderTheirOwnDirectory(t *testing.T) {
-	for _, game := range []mtgmatcher.Game{"../logo", "..", "../..", "/etc", "nosuchgame", ""} {
+	for _, game := range []matcher.Game{"../logo", "..", "../..", "/etc", "nosuchgame", ""} {
 		t.Run(string(game), func(t *testing.T) {
-			defer func(old mtgmatcher.Game) { Config().Game = old }(Config().Game)
+			defer func(old matcher.Game) { Config().Game = old }(Config().Game)
 			defer func(old map[string]rarityBadge) { rarityBadges = old }(rarityBadges)
 			Config().Game = game
 			rarityBadges = map[string]rarityBadge{}
@@ -42,7 +42,7 @@ func TestSetSymbolsOnlyReadUnderTheirOwnDirectory(t *testing.T) {
 
 // A game that is registered still reads its own symbols.
 func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
-	for _, game := range mtgmatcher.RegisteredGames() {
+	for _, game := range matcher.RegisteredGames() {
 		if game == DefaultGame {
 			continue // the default returns before reading a directory
 		}
@@ -51,7 +51,7 @@ func TestSetSymbolsLoadForARegisteredGame(t *testing.T) {
 			continue
 		}
 
-		defer func(old mtgmatcher.Game) { Config().Game = old }(Config().Game)
+		defer func(old matcher.Game) { Config().Game = old }(Config().Game)
 		defer func(old map[string]rarityBadge) { rarityBadges = old }(rarityBadges)
 		Config().Game = game
 		rarityBadges = map[string]rarityBadge{}
@@ -118,13 +118,13 @@ func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
 
 	for _, tc := range []struct {
 		name   string
-		set    mtgmatcher.Set
+		set    matcher.Set
 		want   []string
 		absent []string
 	}{
 		{
 			name: "keyrune set",
-			set:  mtgmatcher.Set{Code: "PM10", Name: "Magic 2010 Promos", KeyruneCode: "M10"},
+			set:  matcher.Set{Code: "PM10", Name: "Magic 2010 Promos", KeyruneCode: "M10"},
 			want: []string{
 				`href="/search?q=Bolt+s%3APM10"><i class="ss ss-m10 ss-2x ss-fw`,
 				`data-mark="★"`,
@@ -133,7 +133,7 @@ func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
 		},
 		{
 			name: "symbol set",
-			set:  mtgmatcher.Set{Code: "MA", Name: "EX Team Magma vs Team Aqua", Symbol: "https://example.com/ma.png"},
+			set:  matcher.Set{Code: "MA", Name: "EX Team Magma vs Team Aqua", Symbol: "https://example.com/ma.png"},
 			want: []string{
 				`<a class="printing-symbol" title="EX Team Magma vs Team Aqua"`,
 				`<img class="set-symbol-art " src="https://example.com/ma.png" alt="MA" title="EX Team Magma vs Team Aqua"`,
@@ -144,20 +144,20 @@ func TestCardPrintingsDrawTheSetSymbol(t *testing.T) {
 		},
 		{
 			name:   "quoted name",
-			set:    mtgmatcher.Set{Code: "QQ", Name: `Duel Decks: "Anthology" & <More>`},
+			set:    matcher.Set{Code: "QQ", Name: `Duel Decks: "Anthology" & <More>`},
 			want:   []string{`<a class="printing-symbol" title="Duel Decks: &#34;Anthology&#34; &amp; &lt;More&gt;"`},
 			absent: []string{`"Anthology"`, `<More>`},
 		},
 		{
 			name:   "bare set",
-			set:    mtgmatcher.Set{Code: "PR-1840", Name: "Deck Exclusives"},
+			set:    matcher.Set{Code: "PR-1840", Name: "Deck Exclusives"},
 			want:   []string{`<svg`, `>PR-1840</text>`},
 			absent: []string{`<img`, `class="ss `},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			b := &mtgmatcher.Backend{Sets: map[string]*mtgmatcher.Set{tc.set.Code: &tc.set}}
-			co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{Name: "Bolt", Printings: []string{tc.set.Code}}}
+			b := &matcher.Backend{Sets: map[string]*matcher.Set{tc.set.Code: &tc.set}}
+			co := &matcher.CardObject{Card: matcher.Card{Name: "Bolt", Printings: []string{tc.set.Code}}}
 
 			got := strings.Join(strings.Fields(genCardPrintings(b, co)), " ")
 			for _, want := range tc.want {

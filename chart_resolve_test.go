@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -109,7 +109,7 @@ func TestTCGSubTypeForCard(t *testing.T) {
 			subTypes[subType] = int64(i + 1)
 		}
 		for uuid, finish := range tc.printings {
-			co := &mtgmatcher.CardObject{Card: mtgmatcher.Card{UUID: uuid, Finish: finish, FoilUUIDs: foilUUIDs(tc.printings)}}
+			co := &matcher.CardObject{Card: matcher.Card{UUID: uuid, Finish: finish, FoilUUIDs: foilUUIDs(tc.printings)}}
 			if got := tcgSubTypeForCard(co, subTypes); got != tc.want[uuid] {
 				t.Errorf("%s: tcgSubTypeForCard(%s) = %q, want %q", tc.name, finish, got, tc.want[uuid])
 			}
@@ -126,7 +126,7 @@ func productInBothFinishes(t *testing.T) (int, string, string) {
 		if err != nil || co.Foil || co.Etched || co.Sealed {
 			continue
 		}
-		foil, hasFoil := co.FoilUUIDs[mtgmatcher.FinishFoil]
+		foil, hasFoil := co.FoilUUIDs[matcher.FinishFoil]
 		if !hasFoil || foil == co.UUID {
 			continue
 		}
@@ -196,20 +196,20 @@ func TestMagicFinishSearchID(t *testing.T) {
 	}
 }
 
-// fabCard builds the FoilUUIDs shape mtgmatcher/fleshandblood produces for a
+// fabCard builds the FoilUUIDs shape matcher/fleshandblood produces for a
 // product sold in Normal + Rainbow Foil: one key per printing, named as
 // TCGplayer prices it, and the foil flag's default beside them.
-func fabCard(uuid string, foil bool) *mtgmatcher.CardObject {
-	co := &mtgmatcher.CardObject{Foil: foil}
+func fabCard(uuid string, foil bool) *matcher.CardObject {
+	co := &matcher.CardObject{Foil: foil}
 	co.UUID = uuid
-	co.Finish = mtgmatcher.FinishNonfoil
+	co.Finish = matcher.FinishNonfoil
 	if foil {
 		co.Finish = "rainbowfoil"
 	}
 	co.FoilUUIDs = map[string]string{
-		mtgmatcher.FinishNonfoil: "omn071_695162",
-		mtgmatcher.FinishFoil:    "omn071_695162_rainbowfoil",
-		"rainbowfoil":            "omn071_695162_rainbowfoil",
+		matcher.FinishNonfoil: "omn071_695162",
+		matcher.FinishFoil:    "omn071_695162_rainbowfoil",
+		"rainbowfoil":         "omn071_695162_rainbowfoil",
 	}
 	return co
 }
@@ -220,7 +220,7 @@ func TestTCGSubTypeForCardByName(t *testing.T) {
 
 	tests := []struct {
 		name string
-		co   *mtgmatcher.CardObject
+		co   *matcher.CardObject
 		want string
 	}{
 		{"rainbow foil", fabCard("omn071_695162_rainbowfoil", true), "Rainbow Foil"},
@@ -272,7 +272,7 @@ func TestTCGSubTypeForCardPrintRuns(t *testing.T) {
 
 	// The flag says nothing about a run, so resolution holds either way.
 	for _, foil := range []bool{false, true} {
-		co := &mtgmatcher.CardObject{Foil: foil}
+		co := &matcher.CardObject{Foil: foil}
 		co.FoilUUIDs = map[string]string{
 			"1stedition": "hac1-en105_265004_1stedition",
 			"unlimited":  "hac1-en105_265004_unlimited",
@@ -291,12 +291,12 @@ func TestTCGSubTypeForCardPrintRuns(t *testing.T) {
 func TestTCGSubTypeForCardGenericNames(t *testing.T) {
 	subTypes := map[string]int64{"Normal": 1, "Foil": 2}
 
-	co := &mtgmatcher.CardObject{}
+	co := &matcher.CardObject{}
 	co.FoilUUIDs = map[string]string{
-		mtgmatcher.FinishNonfoil: "rft001",
-		mtgmatcher.FinishFoil:    "rft001_foil",
+		matcher.FinishNonfoil: "rft001",
+		matcher.FinishFoil:    "rft001_foil",
 	}
-	for finish, want := range map[string]string{mtgmatcher.FinishNonfoil: "Normal", mtgmatcher.FinishFoil: "Foil"} {
+	for finish, want := range map[string]string{matcher.FinishNonfoil: "Normal", matcher.FinishFoil: "Foil"} {
 		co.UUID, co.Finish = co.FoilUUIDs[finish], finish
 		if got := tcgSubTypeForCard(co, subTypes); got != want {
 			t.Errorf("%s: got %q, want %q", finish, got, want)
@@ -306,7 +306,7 @@ func TestTCGSubTypeForCardGenericNames(t *testing.T) {
 
 // One card's printings share a TCGplayer product name, so a roster of them is
 // told apart by the card each variant maps to, in every game whose datastore
-// is at hand; a product mtgmatcher does not know keeps the product name.
+// is at hand; a product matcher does not know keeps the product name.
 func TestNonMagicPrintingLabelsEachPrinting(t *testing.T) {
 	var ran int
 	for game, envVar := range gameDatastores {
@@ -319,7 +319,7 @@ func TestNonMagicPrintingLabelsEachPrinting(t *testing.T) {
 			t.Errorf("%s: %v", game, err)
 			continue
 		}
-		b, err := mtgmatcher.Open(game, f)
+		b, err := matcher.Open(game, f)
 		f.Close()
 		if err != nil {
 			t.Errorf("%s: %v", game, err)
@@ -361,9 +361,9 @@ func TestNonMagicPrintingLabelsEachPrinting(t *testing.T) {
 }
 
 // productsSharingAName finds a card name printed under more than one TCGplayer
-// product, each sold plain, and those products: one per printing mtgmatcher
+// product, each sold plain, and those products: one per printing matcher
 // tells apart, since One Piece files several promos under one set and number.
-func productsSharingAName(b *mtgmatcher.Backend) (string, []int) {
+func productsSharingAName(b *matcher.Backend) (string, []int) {
 	uuids := slices.Sorted(slices.Values(b.GetUUIDs()))
 	byName := map[string][]int{}
 	printings := map[string]bool{}
@@ -412,7 +412,7 @@ func TestMagicTargetNamesThePrinting(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		for _, want := range []*mtgmatcher.CardObject{co, original} {
+		for _, want := range []*matcher.CardObject{co, original} {
 			mv := magicVariant(want)
 			vi := timeseries.VariantInfo{BanID: 7, MtgjsonUUID: mv.MtgjsonUUID, IsFoil: mv.IsFoil, IsEtched: mv.IsEtched,
 				IsAlt: mv.IsAlt, Language: *timeseries.NormalizeLanguage(&mv.Language)}

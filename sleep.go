@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/matcher"
+	"github.com/mtgban/go-mtgban/matcher/magic"
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 )
 
 type Sleeper struct {
@@ -183,7 +183,7 @@ func (s *site) Sleepers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getBulks(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
+func getBulks(b *matcher.Backend, skipEditions []string) map[string]int {
 	inv, err := findSellerInventory("TCGLow")
 	if err != nil {
 		return nil
@@ -219,7 +219,7 @@ func getBulks(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
 		cardPrices := map[string]float64{}
 		var totalPrices float64
 		for _, card := range set.Cards {
-			uuid := b.ConvertID(mtgmatcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
+			uuid := b.ConvertID(matcher.IDSpaceScryfall, card.Identifiers["scryfallId"])
 			co, err := b.GetUUID(uuid)
 			if err != nil {
 				continue
@@ -271,7 +271,7 @@ func getBulks(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
 	return tiers
 }
 
-func getHotlist(b *mtgmatcher.Backend, skipEditions []string) map[string]int {
+func getHotlist(b *matcher.Backend, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	bl, _ := findVendorBuylist("CK")
@@ -351,7 +351,7 @@ func getReprints(skipEditions []string) map[string]int {
 	return tiers
 }
 
-func getTiers(b *mtgmatcher.Backend, blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
+func getTiers(b *matcher.Backend, blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	sellersSnapshot := GetSellers()
@@ -429,7 +429,7 @@ func getTiers(b *mtgmatcher.Backend, blocklistRetail, blocklistBuylist, skipEdit
 	return tiers
 }
 
-func getGap(b *mtgmatcher.Backend, blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
+func getGap(b *matcher.Backend, blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	log.Println("Sleepers comparing", ref, "with", target)
@@ -503,7 +503,7 @@ func getGap(b *mtgmatcher.Backend, blocklistRetail []string, ref, target string,
 	return tiers
 }
 
-func noOversize(co *mtgmatcher.CardObject) (float64, bool) {
+func noOversize(co *matcher.CardObject) (float64, bool) {
 	if co.Rarity == "oversize" {
 		return 0, true
 	}
@@ -511,7 +511,7 @@ func noOversize(co *mtgmatcher.CardObject) (float64, bool) {
 }
 
 // Return a map of letter : []cardId from a map of cardId : amount
-func sleepersLayout(b *mtgmatcher.Backend, tiers map[string]int) (map[string][]string, error) {
+func sleepersLayout(b *matcher.Backend, tiers map[string]int) (map[string][]string, error) {
 	results := []Sleeper{}
 	for c := range tiers {
 		co, err := b.GetUUID(c)

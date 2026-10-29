@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 )
 
 // TestNumbersSnapshotMatchesScan pins the snapshot to the scan it stands in
@@ -72,9 +72,9 @@ func TestNumberSeedDeclines(t *testing.T) {
 }
 
 func TestNumbersSnapshotKeepsStoredForms(t *testing.T) {
-	b := &mtgmatcher.Backend{
+	b := &matcher.Backend{
 		AllUUIDs: []string{"card"},
-		UUIDs:    map[string]*mtgmatcher.CardObject{"card": {Card: mtgmatcher.Card{UUID: "card", Number: "021★", PlainNumber: "21"}}},
+		UUIDs:    map[string]*matcher.CardObject{"card": {Card: matcher.Card{UUID: "card", Number: "021★", PlainNumber: "21"}}},
 	}
 	numbers := newNumbersSnapshot(b)
 	if !slices.Equal(numbers.loose["21"], []string{"card"}) || !slices.Equal(numbers.strict["021★"], []string{"card"}) {

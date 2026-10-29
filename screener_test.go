@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/matcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -236,7 +236,7 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "box"},
 		}, nil
 	}
-	screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) {
+	screenerClassify = func(b *matcher.Backend, uuid string) (screenerMeta, bool) {
 		switch uuid {
 		case "bad":
 			return screenerMeta{}, false
@@ -279,7 +279,7 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCache = map[string]screenerCacheEntry{}
 	screenerCacheMu.Unlock()
 
-	screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) { return screenerMeta{}, true }
+	screenerClassify = func(b *matcher.Backend, uuid string) (screenerMeta, bool) { return screenerMeta{}, true }
 	screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
 		calls[screenerCacheKey(metric, window, minPrice, minPriorPrice)]++
 		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil
@@ -427,7 +427,7 @@ func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
 		<-release
 		return []timeseries.MoverRow{{MtgjsonUUID: "good", Current: 100, Prior: 50}}, nil
 	}
-	screenerClassify = func(b *mtgmatcher.Backend, uuid string) (screenerMeta, bool) {
+	screenerClassify = func(b *matcher.Backend, uuid string) (screenerMeta, bool) {
 		return screenerMeta{SetCode: "STX", Edition: "Strixhaven"}, true
 	}
 
