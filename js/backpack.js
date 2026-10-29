@@ -637,15 +637,22 @@
 
     // prices are each card's NM prices as /data/prices gave them, by id,
     // stamped when fetched; a card it priced at nothing keeps the stamp.
+    // pricesSaved holds the last save too, for a tab whose storage refuses
+    // it, which would otherwise fetch the same prices again on every draw.
+    var pricesSaved = {};
     function prices() {
-        try {
-            var p = JSON.parse(sessionStorage.getItem(PRICES_KEY) || "{}");
-            return p && typeof p === "object" ? p : {};
-        } catch (e) { return {}; }
+        var p;
+        try { p = JSON.parse(sessionStorage.getItem(PRICES_KEY) || "{}"); } catch (e) { p = null; }
+        if (!p || typeof p !== "object") p = {};
+        Object.keys(pricesSaved).forEach(function (id) {
+            if (!(p[id] && p[id].at >= pricesSaved[id].at)) p[id] = pricesSaved[id];
+        });
+        return p;
     }
     function savePrices(p) {
         var t = Date.now();
         Object.keys(p).forEach(function (id) { if (!(t - p[id].at < PRICE_TTL)) delete p[id]; });
+        pricesSaved = p;
         try { sessionStorage.setItem(PRICES_KEY, JSON.stringify(p)); } catch (e) {}
     }
     // priceOf is the entry's card's NM price on the side by names, with the
