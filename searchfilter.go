@@ -1074,8 +1074,9 @@ func bareNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query st
 
 // trailingNumberFilters reads a card's name followed by a collector number,
 // "command tower 7029", as the name with that number, when the whole query
-// names no card and a card carries the number. It returns the name and the
-// number's filter, or the query untouched and nil.
+// finds no card the way its game searches names and a card carries the
+// number. It returns the name and the number's filter, or the query
+// untouched and nil.
 func trailingNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, query string) (string, []FilterElem) {
 	tokens := strings.Fields(query)
 	if len(tokens) < 2 {
@@ -1086,12 +1087,20 @@ func trailingNumberFilters(b *mtgmatcher.Backend, numbers *numbersSnapshot, quer
 		return query, nil
 	}
 	name := strings.Join(tokens[:len(tokens)-1], " ")
-	_, err := b.SearchEquals(query)
-	if err == nil {
+	_, err := b.SearchEquals(name)
+	if err != nil {
 		return query, nil
 	}
-	_, err = b.SearchEquals(name)
-	if err != nil {
+	// Magic searches a name by prefix and other games by substring, so
+	// "pyromancy 10" (Pyromancy 101) and Yu-Gi-Oh's "skyscraper 2"
+	// (Skyscraper 2 - Hero City) stay names. b.Game is the deployment's
+	// game, the one that picks the "any" mode in parseSearchOptionsNG.
+	if b.Game == mtgmatcher.GameMagic {
+		_, err = b.SearchHasPrefix(query)
+	} else {
+		_, err = b.SearchContains(query)
+	}
+	if err == nil {
 		return query, nil
 	}
 	return name, filters

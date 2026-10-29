@@ -351,6 +351,12 @@ func TestNameThenNumber(t *testing.T) {
 		t.Errorf("lightning bolt 7029 reaches %d cards: %v", len(keys), err)
 	}
 
+	// The start of a longer name stays a name: Pyromancy 101.
+	prefix := parseSearchQuery(ds, "pyromancy 10", nil, nil, nil)
+	if len(prefix.CardFilters) != 0 {
+		t.Errorf("pyromancy 10 is read as %q %+v", prefix.CleanQuery, prefix.CardFilters)
+	}
+
 	checkNumberedNamesStayNames(t, ds)
 
 	// A number no card carries, or no snapshot, leaves the query a name.
