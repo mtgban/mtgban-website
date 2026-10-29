@@ -39,6 +39,17 @@ func decodeBody(w http.ResponseWriter, r *http.Request, v any) error {
 	return json.NewDecoder(body).Decode(v)
 }
 
+// badBody refuses a body decodeBody could not read: 413 past its size caps,
+// as nginx answers past client_max_body_size, and 400 otherwise.
+func badBody(w http.ResponseWriter, err error) {
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "body too large"})
+		return
+	}
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
+}
+
 // apiLimiter throttles /api/userstate/ separately from page rendering.
 var apiLimiter = ratelimit.NewLimiter(10, 5) // 10 req/s, burst 5
 
@@ -148,8 +159,9 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			return
 		}
 		var body State
-		if err := decodeBody(w, r, &body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
+		err := decodeBody(w, r, &body)
+		if err != nil {
+			badBody(w, err)
 			return
 		}
 		if body.Backpack != nil {
@@ -184,8 +196,9 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email, game st
 			Data    json.RawMessage `json:"data"`
 			Version int64           `json:"version"`
 		}
-		if err := decodeBody(w, r, &body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
+		err := decodeBody(w, r, &body)
+		if err != nil {
+			badBody(w, err)
 			return
 		}
 		if section == "backpack" {
