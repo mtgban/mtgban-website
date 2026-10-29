@@ -222,6 +222,9 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     display: inline-flex;
     gap: 0.4em;
     max-width: 12em;
+    /* what a button has by default, kept for the tab */
+    box-sizing: border-box;
+    user-select: none;
 }
 
 .backpack-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
