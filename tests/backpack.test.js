@@ -1557,6 +1557,15 @@ describe('sorting the panel', () => {
         expect(Object.keys(JSON.parse(p.sm.mtgban_backpack_prices)).sort()).toEqual(['uuid-1', 'uuid-2', 'uuid-3']);
     });
 
+    test('prices a tab cannot store are kept for the page, not fetched again', async () => {
+        const calls = [];
+        const fetch = (url) => { calls.push(url); return json({ 'uuid-1': { sellPrice: 2, sellVendor: 'TCG Low' } }); };
+        page({ store, fetch, sort: { by: 'retail', dir: 'desc' }, session: Object.freeze({}) }).nav.click();
+        await tick(); await tick(); await tick(); await tick();
+        expect(calls.length).toBe(1);
+        expect(ids['backpack-list'].querySelectorAll('.backpack-row-price')[0].textContent).toBe('NM $ 2.00 · TCG Low');
+    });
+
     test('a refusal says why and stops until the sort is picked again', async () => {
         const calls = [];
         const fetch = (url) => { calls.push(url); return json({}, 401); };
