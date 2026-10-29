@@ -923,6 +923,20 @@ describe('the panel', () => {
         expect(ids['backpack-send-retail'].disabled).toBe(false);
     });
 
+    test("a row's name links to the card's search and Tab reaches it", () => {
+        const p = page({ store: [{ id: 'uuid 1', name: 'A', img: 'a.jpg', qty: 1, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }] });
+        const panel = open(p);
+        const [b, a] = panel.querySelectorAll('.backpack-row');
+        expect(a.querySelector('.backpack-row-name').tag).toBe('a');
+        expect(a.querySelector('.backpack-row-name').getAttribute('href')).toBe('/search?q=uuid%201');
+        expect(a.querySelector('.backpack-row-name').getAttribute('draggable')).toBe('false');
+        expect(a.querySelector('.backpack-row-art').querySelector('a')).toBeNull();
+        expect(b.querySelector('.backpack-row-name').getAttribute('href')).toBe('/search?q=uuid-2');
+        // Tab from a name goes on to the next control, not back to the top.
+        b.querySelector('.backpack-row-name').focus();
+        expect(p.key('Tab')).toBe(false);
+    });
+
     test('plus and minus change the store; minus at 1 removes', () => {
         const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 2, t: 1, m: 1 }, { id: 'uuid-2', name: 'B', qty: 1, t: 2, m: 2 }] });
         const panel = open(p);

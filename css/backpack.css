@@ -300,7 +300,8 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 
 .backpack-row-art.blurred img { filter: blur(0.3em); }
 
-.backpack-row-name { font-weight: 600; }
+.backpack-row-name { font-weight: 600; color: inherit; text-decoration: none; }
+.backpack-row-name:hover, .backpack-row-name:focus-visible { text-decoration: underline; }
 
 .backpack-row-where { font-size: 0.85em; opacity: 0.75; }
 
