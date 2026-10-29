@@ -1194,9 +1194,12 @@
         }
     }
 
+    // carries says whether drag event ev holds data of the given type.
+    function carries(ev, type) { return !!ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types, type) !== -1; }
+
     // dropOn lets a panel row dragged onto tab b move to backpack p.
     function dropOn(b, p) {
-        var ours = function (ev) { return ev.dataTransfer && Array.prototype.indexOf.call(ev.dataTransfer.types, DRAG_TYPE) !== -1; };
+        var ours = function (ev) { return carries(ev, DRAG_TYPE); };
         b.addEventListener("dragover", function (ev) {
             if (!ours(ev)) return;
             ev.preventDefault();
@@ -1221,6 +1224,9 @@
             return from < i ? "drop-after" : "drop-before";
         };
         var unmark = function () { b.classList.remove("drop-before"); b.classList.remove("drop-after"); };
+        // A tab whose drag ended unseen, removed by a render, leaves
+        // draggedTab set; the drag's own type keeps a row drag from using it.
+        var ours = function (ev) { return draggedTab && draggedTab !== p && carries(ev, TAB_DRAG_TYPE); };
         b.setAttribute("draggable", "true");
         b.addEventListener("dragstart", function (ev) {
             ev.dataTransfer.setData(TAB_DRAG_TYPE, String(p));
@@ -1230,14 +1236,14 @@
         });
         b.addEventListener("dragend", function () { draggedTab = 0; b.classList.remove("dragging"); });
         b.addEventListener("dragover", function (ev) {
-            if (!draggedTab || draggedTab === p) return;
+            if (!ours(ev)) return;
             ev.preventDefault();
             ev.dataTransfer.dropEffect = "move";
             b.classList.add(mark());
         });
         b.addEventListener("dragleave", unmark);
         b.addEventListener("drop", function (ev) {
-            if (!draggedTab || draggedTab === p) return;
+            if (!ours(ev)) return;
             ev.preventDefault();
             unmark();
             var moved = draggedTab;
