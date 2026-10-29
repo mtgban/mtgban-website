@@ -937,6 +937,7 @@ type uploadRows struct {
 	missingPrices    map[string]float64
 	optimizedResults map[string][]OptimizedUploadEntry
 	optimizedAt      map[optimizedKey]int
+	openedCounted    map[optimizedKey]int
 	optimizedTotals  map[string]float64
 	optimizedQtys    map[string]int
 	highestTotal     float64
@@ -966,6 +967,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 		missingPrices:    map[string]float64{},
 		optimizedResults: map[string][]OptimizedUploadEntry{},
 		optimizedAt:      map[optimizedKey]int{},
+		openedCounted:    map[optimizedKey]int{},
 		optimizedTotals:  map[string]float64{},
 		optimizedQtys:    map[string]int{},
 		tallies:          map[string]*unpackedTally{},
@@ -979,7 +981,7 @@ func priceUploadRows(b *matcher.Backend, blMode bool, st uploadSettings, prices 
 
 		row := newUploadRow(b, st, &uploadedData[i])
 		rows.tallyMissing(row, prices, indexes)
-		rows.tallyIndexes(row, indexes)
+		rows.tallyIndexes(row, st, indexes)
 		if row.counts {
 			rows.tallyQuantity(row)
 		}
@@ -1153,21 +1155,32 @@ func (rows *uploadRows) tallyOffers(row uploadRow, blMode bool, st uploadSetting
 			continue
 		}
 
-		// Adjust for quantity
-		price *= float64(row.qty)
-
 		// Add to totals (unless it was an index, since it was already added)
 		_, found := indexes.results[row.CardID][shorthand]
 		if !found && row.counts {
-			rows.totalEntries[shorthand] += price
+			rows.totalEntries[shorthand] += price * float64(rows.openedQty(shorthand, row, st.maxQty))
 			if row.UnpackedFrom != "" {
-				rows.tallyFor(row.UnpackedFrom).Totals[shorthand] += price
+				rows.tallyFor(row.UnpackedFrom).Totals[shorthand] += price * float64(row.qty)
 			}
 		}
 
-		offers[shorthand] = price
+		offers[shorthand] = price * float64(row.qty)
 	}
 	return offers
+}
+
+// openedQty is how many of the row's copies the page's total at store counts:
+// copies of a card opened from several products count as one card's, capped
+// at maxQty together as the optimizer lists them. Uploaded rows count whole.
+func (rows *uploadRows) openedQty(store string, row uploadRow, maxQty int) int {
+	if row.UnpackedFrom == "" {
+		return row.qty
+	}
+	key := optimizedKey{store, row.priceKey}
+	had := rows.openedCounted[key]
+	qty := adjustQty(had+row.qty, 1, maxQty) - had
+	rows.openedCounted[key] = had + qty
+	return qty
 }
 
 // tallyQuantity adds the row's quantity to the totals.
@@ -1185,7 +1198,7 @@ func (rows *uploadRows) tallyQuantity(row uploadRow) {
 
 // tallyIndexes files the row's index prices and adds them, by quantity, to
 // the index totals. An opened product keeps them in its own tally instead.
-func (rows *uploadRows) tallyIndexes(row uploadRow, indexes uploadIndexes) {
+func (rows *uploadRows) tallyIndexes(row uploadRow, st uploadSettings, indexes uploadIndexes) {
 	// Summary of the index entries. We pass the row's condition to
 	// every index; getPrice handles the MetadataOnly sources
 	// (TCGLow/TCGMarket/MKM*) by falling back to their flat price
@@ -1198,21 +1211,19 @@ func (rows *uploadRows) tallyIndexes(row uploadRow, indexes uploadIndexes) {
 		}
 		rows.resultPrices[row.priceKey][indexKey] = indexPrice
 
-		indexPrice *= float64(row.qty)
-
 		// An opened product keeps its own index prices - for a sealed
 		// product those are the expected values, which is the number its
 		// section is read against - and adds nothing to the page: the
 		// cards it became are in the list already, and counting both
 		// would count them twice.
 		if row.Unpacked {
-			rows.tallyFor(row.CardID).ProductIndex[indexKey] = indexPrice
+			rows.tallyFor(row.CardID).ProductIndex[indexKey] = indexPrice * float64(row.qty)
 			continue
 		}
 
-		rows.totalEntries[indexKey] += indexPrice
+		rows.totalEntries[indexKey] += indexPrice * float64(rows.openedQty(indexKey, row, st.maxQty))
 		if row.UnpackedFrom != "" {
-			rows.tallyFor(row.UnpackedFrom).Totals[indexKey] += indexPrice
+			rows.tallyFor(row.UnpackedFrom).Totals[indexKey] += indexPrice * float64(row.qty)
 		}
 	}
 }
