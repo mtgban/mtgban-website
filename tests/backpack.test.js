@@ -863,6 +863,21 @@ describe('moving cards between backpacks', () => {
         expect(tabsOf()[0].getAttribute('draggable')).toBeNull();
     });
 
+    test('a tab drag that ended unseen does not reorder on a later card drop', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const dt = transfer();
+        // No dragend: a render removed the dragged tab mid-drag.
+        fire(tabsOf()[2], 'dragstart', dragEvent(dt));
+        fire(rowsOf()[1].querySelector('.backpack-row-art'), 'dragstart', dragEvent(dt));
+        const over = dragEvent(dt);
+        fire(tabsOf()[0], 'dragover', over);
+        expect(over.prevented).toBe(false);
+        fire(tabsOf()[1], 'drop', dragEvent(dt));
+        expect(tabsOf().map((b) => b.getAttribute('data-pack'))).toEqual(['1', '2', '3']);
+        expect(live(p)).toEqual([[1, 'uuid-1', 'NM', 2], [2, 'uuid-1', 'NM', 3], [2, 'uuid-2', 'SP', 1]]);
+    });
+
     test('a full backpack refuses a new card but takes more copies of one it holds', () => {
         const full = [{ id: 'a', pack: 2, qty: 1, t: 1, m: 1 }, { id: 'uuid-1', pack: 2, qty: 997, t: 1, m: 1 }];
         const p = page({ store: [{ id: 'uuid-1', qty: 2, t: 2, m: 2 }, { id: 'uuid-2', qty: 1, t: 1, m: 1 }, ...full], max: 2, tabs: 2, tabList });
