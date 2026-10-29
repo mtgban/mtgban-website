@@ -356,13 +356,14 @@ func searchHits(t *testing.T, ds *datastore, query string) ([]string, []*mtgmatc
 
 // A number typed alone or after a name reaches what cn: does in every game,
 // padded the way Pokemon pads it or not, unless a card is named by it:
-// Yu-Gi-Oh's "7".
+// Yu-Gi-Oh's "7", or a name holds the words: "skyscraper 2".
 func TestBareNumberInEveryGame(t *testing.T) {
 	// The cn: query each number reaches what, or "" for a name.
 	examples := map[mtgmatcher.Game]map[string]string{
 		"pokemon": {"017": "cn:17", "17": "cn:17", "#123": "cn:123", "charizard 4": "charizard cn:4"},
 		"lorcana": {"204": "cn:204"},
-		"yugioh":  {"7": ""},
+		"yugioh":  {"7": "", "skyscraper 2": ""},
+		"gundam":  {"ptolemaios 2": "", "gundam 02": ""},
 	}
 	var ran int
 	for game, queries := range examples {
