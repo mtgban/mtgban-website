@@ -191,9 +191,12 @@ html:has(.backpack-panel.open) { overflow: hidden; }
     gap: 0.35em;
     padding: 0.5em 1.25em;
     border-bottom: 1px solid var(--border-subtle);
-    /* a long row of tabs scrolls sideways rather than wrapping */
+    /* a long row of tabs scrolls sideways rather than wrapping, barless */
     overflow-x: auto;
+    scrollbar-width: none;
 }
+
+.backpack-tabs::-webkit-scrollbar { display: none; }
 
 .backpack-tabs[hidden] { display: none; }
 
@@ -228,6 +231,11 @@ html:has(.backpack-panel.open) { overflow: hidden; }
 .backpack-tab.active { border-color: var(--dodgerblue); font-weight: 600; }
 
 .backpack-tab.drop-target { outline: 2px dashed var(--dodgerblue); outline-offset: 1px; }
+
+/* a dragged tab lands on the side of the one it is over that this marks */
+.backpack-tab.dragging { opacity: 0.5; }
+.backpack-tab.drop-before { box-shadow: -3px 0 0 var(--dodgerblue); }
+.backpack-tab.drop-after { box-shadow: 3px 0 0 var(--dodgerblue); }
 
 .backpack-tab-field { width: 10em; }
 

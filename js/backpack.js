@@ -15,6 +15,7 @@
     // A dragged panel row carries its key under this type, which only the
     // backpack tabs take.
     var DRAG_TYPE = "application/x-mtgban-backpack";
+    var TAB_DRAG_TYPE = "application/x-mtgban-backpack-tab";
     var UNDO_MAX = 20;
     // The reader's tier sets each backpack's size and how many backpacks
     // they keep; the page's base template hands both over.
@@ -200,6 +201,18 @@
         list.push({ pack: p, name: "Backpack " + p });
         saveTabs(list);
         setActive(p);
+        return true;
+    }
+
+    // moveTab puts backpack p where backpack q is in the strip, q stepping
+    // aside toward where p was.
+    function moveTab(p, q) {
+        var list = tabs();
+        var packs = list.map(function (t) { return t.pack; });
+        var from = packs.indexOf(p), to = packs.indexOf(q);
+        if (from < 0 || to < 0 || from === to) return false;
+        list.splice(to, 0, list.splice(from, 1)[0]);
+        saveTabs(list);
         return true;
     }
 
@@ -753,6 +766,8 @@
     var panel = null, overlay = null, stripEl = null, listEl = null, countEl = null, emptyEl = null;
     var sendRetail = null, sendBuylist = null, emptySwitch = null, undoBtn = null;
     var sortBar = null, sortSel = null, sortDirBtn = null, sortNote = null;
+    // draggedTab is the backpack whose tab is being dragged along the strip.
+    var draggedTab = 0;
 
     function text(tag, cls, s) {
         var n = document.createElement(tag);
@@ -798,6 +813,12 @@
         stripEl.setAttribute("id", "backpack-tabs");
         stripEl.setAttribute("role", "tablist");
         stripEl.setAttribute("aria-label", "Backpacks");
+        // The strip draws no scrollbar, so a vertical wheel scrolls it sideways.
+        stripEl.addEventListener("wheel", function (ev) {
+            if (!ev.deltaY || Math.abs(ev.deltaX) > Math.abs(ev.deltaY) || stripEl.scrollWidth <= stripEl.clientWidth) return;
+            ev.preventDefault();
+            stripEl.scrollLeft += ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? stripEl.clientWidth : 1);
+        }, { passive: false });
 
         listEl = text("div", "backpack-list");
         listEl.setAttribute("id", "backpack-list");
@@ -1052,6 +1073,7 @@
             b.setAttribute("title", on ? "Rename" : t.name);
             b.append(text("span", "backpack-tab-name", t.name), text("span", "backpack-tab-count", String(copies[t.pack] || 0)));
             if (!on) dropOn(b, t.pack);
+            if (list.length > 1) reorderBy(b, t.pack, i, list);
             b.addEventListener("click", function () {
                 if (on) { rename(b, t); return; }
                 setActive(t.pack);
@@ -1062,6 +1084,12 @@
                 var step = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
                 if (!step) return;
                 ev.preventDefault();
+                // Alt carries the tab a place along the strip instead.
+                if (ev.altKey) {
+                    var by = list[i + step];
+                    if (by && moveTab(t.pack, by.pack)) { render(); focusTab(t.pack); }
+                    return;
+                }
                 var next = list[(i + step + list.length) % list.length];
                 setActive(next.pack);
                 render();
@@ -1102,6 +1130,39 @@
             // A refused move renders nothing, so the outline goes here
             b.classList.remove("drop-target");
             moveCard(ev.dataTransfer.getData(DRAG_TYPE), p);
+        });
+    }
+
+    // reorderBy lets tab b be dragged along the strip: dropped on another
+    // tab it takes that one's place, and the mark shows the side it lands.
+    function reorderBy(b, p, i, list) {
+        var mark = function () {
+            var from = list.map(function (t) { return t.pack; }).indexOf(draggedTab);
+            return from < i ? "drop-after" : "drop-before";
+        };
+        var unmark = function () { b.classList.remove("drop-before"); b.classList.remove("drop-after"); };
+        b.setAttribute("draggable", "true");
+        b.addEventListener("dragstart", function (ev) {
+            ev.dataTransfer.setData(TAB_DRAG_TYPE, String(p));
+            ev.dataTransfer.effectAllowed = "move";
+            draggedTab = p;
+            b.classList.add("dragging");
+        });
+        b.addEventListener("dragend", function () { draggedTab = 0; b.classList.remove("dragging"); });
+        b.addEventListener("dragover", function (ev) {
+            if (!draggedTab || draggedTab === p) return;
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = "move";
+            b.classList.add(mark());
+        });
+        b.addEventListener("dragleave", unmark);
+        b.addEventListener("drop", function (ev) {
+            if (!draggedTab || draggedTab === p) return;
+            ev.preventDefault();
+            unmark();
+            var moved = draggedTab;
+            draggedTab = 0;
+            if (moveTab(moved, p)) render();
         });
     }
 

@@ -769,7 +769,84 @@ describe('moving cards between backpacks', () => {
         const over = dragEvent(transfer(['text/plain']));
         fire(tabsOf()[1], 'dragover', over);
         expect(over.prevented).toBe(false);
-        expect(tabsOf()[0].listeners.dragover).toBeUndefined();
+        const dt = transfer();
+        fire(rowsOf()[0].querySelector('.backpack-row-art'), 'dragstart', dragEvent(dt));
+        const onOpen = dragEvent(dt);
+        fire(tabsOf()[0], 'dragover', onOpen);
+        expect(onOpen.prevented).toBe(false);
+    });
+
+    test('a tab dragged onto another takes its place, and the order is kept', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const order = () => tabsOf().map((b) => b.getAttribute('data-pack'));
+        const cards = p.m.mtgban_backpack;
+        expect(tabsOf().every((b) => b.getAttribute('draggable') === 'true')).toBe(true);
+        const dt = transfer();
+        fire(tabsOf()[2], 'dragstart', dragEvent(dt));
+        expect(tabsOf()[2].classes.has('dragging')).toBe(true);
+        const over = dragEvent(dt);
+        fire(tabsOf()[0], 'dragover', over);
+        expect(over.prevented).toBe(true);
+        expect(tabsOf()[0].classes.has('drop-before')).toBe(true);
+        fire(tabsOf()[0], 'drop', dragEvent(dt));
+        expect(order()).toEqual(['3', '1', '2']);
+        expect(JSON.parse(p.m.mtgban_backpack_tabs).map((t) => t.pack + ':' + t.name)).toEqual(['3:Backpack 3', '1:Backpack 1', '2:Trades']);
+        // Rightward it lands after the tab it was dropped on.
+        fire(tabsOf()[0], 'dragstart', dragEvent(dt));
+        fire(tabsOf()[1], 'dragover', dragEvent(dt));
+        expect(tabsOf()[1].classes.has('drop-after')).toBe(true);
+        fire(tabsOf()[1], 'drop', dragEvent(dt));
+        expect(order()).toEqual(['1', '3', '2']);
+        expect(p.m.mtgban_backpack).toBe(cards);
+    });
+
+    test('Alt+Arrow carries the focused tab along the strip, stopping at the ends', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const order = () => tabsOf().map((b) => b.getAttribute('data-pack'));
+        const press = (n, key) => { const ev = { key, altKey: true, prevented: false, preventDefault() { this.prevented = true; } }; fire(n, 'keydown', ev); return ev; };
+        expect(press(tabsOf()[0], 'ArrowRight').prevented).toBe(true);
+        expect(order()).toEqual(['2', '1', '3']);
+        expect(p.document.activeElement).toBe(tabsOf()[1]);
+        expect(tabsOf()[1].getAttribute('aria-selected')).toBe('true');
+        press(tabsOf()[1], 'ArrowRight');
+        press(tabsOf()[2], 'ArrowRight');
+        expect(order()).toEqual(['2', '3', '1']);
+        press(tabsOf()[2], 'ArrowLeft');
+        expect(order()).toEqual(['2', '1', '3']);
+        expect(JSON.parse(p.m.mtgban_backpack_tabs).map((t) => t.pack)).toEqual([2, 1, 3]);
+    });
+
+    test('a vertical wheel scrolls an overflowing strip sideways', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const s = ids['backpack-tabs'];
+        const wheel = (deltaY, deltaMode = 0, deltaX = 0) => { const ev = { deltaY, deltaX, deltaMode, prevented: false, preventDefault() { this.prevented = true; } }; fire(s, 'wheel', ev); return ev; };
+        Object.assign(s, { scrollWidth: 400, clientWidth: 400, scrollLeft: 0 });
+        expect(wheel(50).prevented).toBe(false);
+        s.scrollWidth = 1200;
+        expect(wheel(50).prevented).toBe(true);
+        wheel(3, 1);
+        expect(s.scrollLeft).toBe(98);
+        expect(wheel(10, 0, 40).prevented).toBe(false);
+        expect(s.scrollLeft).toBe(98);
+    });
+
+    test('a tab takes no drop of itself, a card drop does not reorder, one tab does not drag', () => {
+        const p = page({ store, tabs: 3, tabList });
+        open(p);
+        const dt = transfer();
+        fire(tabsOf()[1], 'dragstart', dragEvent(dt));
+        const self = dragEvent(dt);
+        fire(tabsOf()[1], 'dragover', self);
+        expect(self.prevented).toBe(false);
+        fire(tabsOf()[1], 'dragend', dragEvent(dt));
+        fire(rowsOf()[0].querySelector('.backpack-row-art'), 'dragstart', dragEvent(dt));
+        fire(tabsOf()[2], 'drop', dragEvent(dt));
+        expect(tabsOf().map((b) => b.getAttribute('data-pack'))).toEqual(['1', '2', '3']);
+        open(page({ store: store.slice(0, 2), tabs: 3 }));
+        expect(tabsOf()[0].getAttribute('draggable')).toBeNull();
     });
 
     test('a full backpack refuses a new card but takes more copies of one it holds', () => {
