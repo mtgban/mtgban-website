@@ -1041,6 +1041,13 @@ describe('the panel', () => {
         // Tab from a name goes on to the next control, not back to the top.
         b.querySelector('.backpack-row-name').focus();
         expect(p.key('Tab')).toBe(false);
+        expect(b.querySelector('.backpack-row-name').getAttribute('target')).toBeNull();
+    });
+
+    test("on Upload a row's name opens its search in a new tab", () => {
+        const p = page({ store: [{ id: 'uuid-1', name: 'A', qty: 1, t: 1, m: 1 }], ban: { canUpload: true, priced: null } });
+        const panel = open(p);
+        expect(panel.querySelector('.backpack-row-name').getAttribute('target')).toBe('_blank');
     });
 
     test('plus and minus change the store; minus at 1 removes', () => {
