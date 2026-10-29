@@ -311,9 +311,11 @@
                         <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
                             <input type="hidden" name="c" data-load-list="tcg" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}-{{(index $.Metadata .CardID).TCGId}}||{{end}}"/>
-                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at TCG</a>
+                            {{/* TCGplayer's cart has a Load at button of its own below, which
+                                 the cart loader's messages name, so this one says what it opens */}}
+                            <a class="arb-load-btn buy" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Mass entry at TCGplayer</a>
                             <noscript>
-                                <input type="submit" value="Load at TCG"/>
+                                <input type="submit" value="Mass entry at TCGplayer"/>
                             </noscript>
                         </form>
                     {{end}}

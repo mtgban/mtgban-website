@@ -964,6 +964,126 @@ describe('ban-to-cart bookmarklet on Card Trader', () => {
     });
 });
 
+// fakeTCG stands in for TCGplayer: its listings call answers a sku's live
+// listings at or under the price asked, cheapest first, 50 a page, Direct's
+// alone when asked; its cart's add takes one seller's listing and refuses
+// more than the listing has left, counting what the cart already holds,
+// with what the listing has and the cart holds of it.
+function fakeTCG({listings = []} = {}) {
+    const posts = [];
+    const adds = [];
+    const fetch = async (url, opts = {}) => {
+        const body = JSON.parse(opts.body);
+        if (url.includes('/listings')) {
+            posts.push({url, body});
+            const {term, range} = body.filters;
+            const found = listings.filter((l) => url.endsWith('/product/' + l.product + '/listings') &&
+                term.productConditionId.includes(l.sku) && l.price <= range.price.lte && (!term['direct-seller'] || l.directListing))
+                .sort((a, b) => a.price - b.price);
+            return {ok: true, status: 200, json: async () => ({results: [{totalResults: found.length, results: found.slice(body.from, body.from + body.size)}]})};
+        }
+        adds.push({url, ...body});
+        const l = listings.find((x) => x.sellerKey === body.sellerKey && x.sku === body.sku);
+        if (!l || body.requestedQuantity > l.quantity - (l.inCart || 0)) {
+            const results = l ? [{sellerQuantityAvailable: l.quantity, itemQuantityInCart: l.inCart || 0}] : [];
+            return {ok: false, status: 422, json: async () => ({results})};
+        }
+        l.inCart = (l.inCart || 0) + body.requestedQuantity;
+        return {ok: true, status: 200};
+    };
+    return {fetch, posts, adds};
+}
+
+function tcgListing(sellerKey, price, {quantity = 1, sku = 15955, product = 1828, direct = false, inCart = 0} = {}) {
+    return {sellerKey, price, quantity, sku, product, directListing: direct, inCart};
+}
+
+describe('ban-to-cart bookmarklet on TCGplayer', () => {
+    const cartPage = {host: 'www.tcgplayer.com', path: '/cart', cookie: 'setting=x; StoreCart_PRODUCTION=' + encodeURIComponent('CK=abc123&Ignore=false')};
+
+    test('a row goes to the cheapest listings at or under BAN\'s price, each its seller\'s, until it has the copies asked for', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2), tcgListing('b', 0.25, {quantity: 5}), tcgListing('c', 0.26, {quantity: 9}),
+            tcgListing('d', 0.1, {sku: 15956})]});
+        const {alerts, page} = await run({...cartPage, hash: '#ban=1828-15955-25-m%3a3&side=retail', abu: tcg});
+        expect(tcg.posts).toHaveLength(1);
+        expect(tcg.posts[0].url).toBe('https://mp-search-api.tcgplayer.com/v1/product/1828/listings');
+        expect(tcg.posts[0].body.filters.term).toEqual({sellerStatus: 'Live', channelId: 0, productConditionId: [15955], listingType: ['standard']});
+        expect(tcg.posts[0].body.filters.range).toEqual({quantity: {gte: 1}, price: {lte: 0.25}});
+        expect(tcg.adds).toEqual([
+            {url: 'https://mpgateway.tcgplayer.com/v1/cart/abc123/item/add', sku: 15955, sellerKey: 'a', channelId: 0, requestedQuantity: 1, isDirect: false, countryCode: 'US'},
+            {url: 'https://mpgateway.tcgplayer.com/v1/cart/abc123/item/add', sku: 15955, sellerKey: 'b', channelId: 0, requestedQuantity: 2, isDirect: false, countryCode: 'US'},
+        ]);
+        expect(alerts).toEqual(['Added 1 cards to your TCGplayer cart, on top of what it held.']);
+        expect(page.url).toBe('/cart');
+        expect(page.reloaded).toBe(true);
+    });
+
+    test('a Direct row asks for Direct\'s listings alone', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.3), tcgListing('d', 0.4, {quantity: 3, direct: true})]});
+        await run({...cartPage, hash: '#ban=1828-15955-40-d:2&side=retail', abu: tcg});
+        expect(tcg.posts[0].body.filters.term['direct-seller']).toBe(true);
+        expect(tcg.posts[0].body.filters.range.directInventory).toEqual({gte: 1});
+        expect(tcg.adds.map((a) => [a.sellerKey, a.requestedQuantity, a.isDirect])).toEqual([['d', 2, true]]);
+    });
+
+    test('a listing sold since or held in the cart is passed over, a card short is cut and one with none left out', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2, {inCart: 1}), tcgListing('b', 0.25), tcgListing('c', 0.5, {sku: 15956})]});
+        const {alerts} = await run({...cartPage, hash: '#ban=1828-15955-25-m:2,1828-15956-25-m:1,bad-row:1&side=retail', abu: tcg});
+        expect(tcg.adds.map((a) => a.sellerKey)).toEqual(['a', 'b']);
+        expect(alerts).toEqual(['Added 1 cards to your TCGplayer cart, on top of what it held. 1 were cut to the copies TCGplayer has at or under BAN\'s price. ' +
+            '2 that TCGplayer has none of at or under BAN\'s price were left out.']);
+    });
+
+    test('a listing with fewer left than asked is asked again for what it has left', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2, {quantity: 4, inCart: 1}), tcgListing('b', 0.25, {quantity: 3})]});
+        const {alerts} = await run({...cartPage, hash: '#ban=1828-15955-25-m:4&side=retail', abu: tcg});
+        expect(tcg.adds.map((a) => [a.sellerKey, a.requestedQuantity])).toEqual([['a', 4], ['a', 3], ['b', 1]]);
+        expect(alerts).toEqual(['Added 1 cards to your TCGplayer cart, on top of what it held.']);
+    });
+
+    test('a refusal that does not say what is left passes the listing over', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2), tcgListing('b', 0.25)]});
+        const fetch = tcg.fetch;
+        tcg.fetch = async (url, opts) => (url.includes('/item/add') && JSON.parse(opts.body).sellerKey === 'a' ?
+            (tcg.adds.push(JSON.parse(opts.body)), {ok: false, status: 422, json: async () => { throw new SyntaxError('not JSON'); }}) : fetch(url, opts));
+        const {alerts} = await run({...cartPage, hash: '#ban=1828-15955-25-m:1&side=retail', abu: tcg});
+        expect(tcg.adds.map((a) => a.sellerKey)).toEqual(['a', 'b']);
+        expect(alerts).toEqual(['Added 1 cards to your TCGplayer cart, on top of what it held.']);
+    });
+
+    test('a card past a page of listings reads the next', async () => {
+        const tcg = fakeTCG({listings: Array.from({length: 60}, (_, i) => tcgListing('s' + i, 0.1))});
+        await run({...cartPage, hash: '#ban=1828-15955-10-m:55&side=retail', abu: tcg});
+        expect(tcg.posts.map((p) => p.body.from)).toEqual([0, 50]);
+        expect(tcg.adds).toHaveLength(55);
+    });
+
+    test('a page with no cart key sends the user to log in and loads nothing', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2)]});
+        const {alerts} = await run({...cartPage, cookie: 'setting=x', hash: '#ban=1828-15955-25-m:1&side=retail', abu: tcg});
+        expect(alerts).toEqual(['Log in to TCGplayer first, then go back to BAN and press Load at TCGplayer again.']);
+        expect(tcg.posts).toHaveLength(0);
+    });
+
+    test('a refusal partway keeps on the page what is left, the card it stopped in at what it still lacks', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2, {quantity: 9}), tcgListing('x', 0.2, {sku: 15956}), tcgListing('y', 0.25, {sku: 15956, quantity: 5})]});
+        const fetch = tcg.fetch;
+        tcg.fetch = async (url, opts) => (url.includes('/item/add') && tcg.adds.length === 2 ? {ok: false, status: 503} : fetch(url, opts));
+        const {alerts, page} = await run({...cartPage, hash: '#ban=1828-15955-25-m:1,1828-15956-25-m:3,1828-15955-20-m:1&side=retail', abu: tcg});
+        expect(alerts).toEqual(['TCGplayer refused the list (503). Added 2 cards to your TCGplayer cart, on top of what it held. ' +
+            'The other 2 were not added, and this page now holds only those: click BAN-to-Cart again to load them.']);
+        expect(page.url).toBe('/cart#ban=' + encodeURIComponent('1828-15956-25-m:2,1828-15955-20-m:1') + '&side=retail&v=test');
+        expect(page.reloaded).toBe(false);
+    });
+
+    test('two tabs loading at once take turns', async () => {
+        const tcg = fakeTCG({listings: [tcgListing('a', 0.2, {quantity: 9})]});
+        const locks = fakeLocks();
+        await Promise.all([1, 2].map(() => run({...cartPage, hash: '#ban=1828-15955-25-m:1&side=retail', abu: tcg, locks})));
+        expect(locks.names).toEqual(['ban-to-cart-tcg', 'ban-to-cart-tcg']);
+    });
+});
+
 // fakeML stands in for Manaleak: each product page names an option per
 // grade, its HTML breaking lines inside tags, with the store's copies; a
 // cart page lists a quantity field per line, keyed by product and options;

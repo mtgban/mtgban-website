@@ -21,7 +21,7 @@ const (
 // stubCartStores stands in ABU's buylist and one of its store splits, with
 // one item id per condition, CSI's buylist and sealed buylist, SCG's
 // buylist, both sides of Mint, Strike Zone, Hareruya and Manaleak, Mana
-// Pool's store, and a store the bookmarklet does not fill.
+// Pool's and TCGplayer's stores, and a store the bookmarklet does not fill.
 func stubCartStores(t *testing.T) {
 	t.Helper()
 	buylist := mtgban.BuylistRecord{}
@@ -121,6 +121,17 @@ func stubCartStores(t *testing.T) {
 	csiStock := mtgban.InventoryRecord{}
 	csiStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 4.49, OriginalID: "434190", InstanceID: "10753983"})
 	csiStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 3.49, OriginalID: "434190", InstanceID: "10753984"})
+	// TCGplayer's rows name the sku BAN priced, with its product and the
+	// price BAN shows, every seller's and Direct's apart
+	tcgStock := mtgban.InventoryRecord{}
+	tcgStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.25, SellerName: "TCG Player", OriginalID: "1828", InstanceID: "15955"})
+	tcgStock.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.SP, Price: 0.2, SellerName: "TCG Player", OriginalID: "1828", InstanceID: "15956"})
+	// A sku nobody lists, which the scraper keeps at $0
+	tcgStock.Add("card-b", &mtgban.InventoryEntry{Conditions: mtgban.NM, SellerName: "TCG Player", OriginalID: "1829", InstanceID: "15960"})
+	tcgDirect := mtgban.InventoryRecord{}
+	tcgDirect.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.4, SellerName: "TCG Direct", OriginalID: "590519", InstanceID: "8313277"})
+	tcgTrends := mtgban.InventoryRecord{}
+	tcgTrends.Add("card-a", &mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 0.3, SellerName: "TCGplayer Trends", OriginalID: "1828", InstanceID: "15955"})
 
 	prevSellers, prevVendors := sellersPtr.Load(), vendorsPtr.Load()
 	t.Cleanup(func() {
@@ -156,6 +167,9 @@ func stubCartStores(t *testing.T) {
 		mtgban.NewSellerFromInventory(ctZero, mtgban.ScraperInfo{Shorthand: "CT0"}),
 		mtgban.NewSellerFromInventory(ct1DR, mtgban.ScraperInfo{Shorthand: "CT1DR"}),
 		mtgban.NewSellerFromInventory(ctSealed, mtgban.ScraperInfo{Shorthand: "CTSealed"}),
+		mtgban.NewSellerFromInventory(tcgStock, mtgban.ScraperInfo{Shorthand: "TCGPlayer"}),
+		mtgban.NewSellerFromInventory(tcgDirect, mtgban.ScraperInfo{Shorthand: "TCGDirect"}),
+		mtgban.NewSellerFromInventory(tcgTrends, mtgban.ScraperInfo{Shorthand: "TCGTrends"}),
 	}
 	vendorsPtr.Store(&vendors)
 	sellersPtr.Store(&sellers)
@@ -205,6 +219,11 @@ func TestCartRows(t *testing.T) {
 		{"CT0", false, "16310-NM-1450EUR-z-" + ctEnglish + ":3"},
 		{"CT1DR", false, "16310-NM-1450EUR-d-" + ctEnglish + ":3"},
 		{"CTSealed", false, ""},
+		// The sku with BAN's price in cents, a $0 one staying out, and
+		// Direct's apart; the market price is no listing to load
+		{"TCGPlayer", false, "1828-15955-25-m:3,1828-15956-20-m:1"},
+		{"TCGDirect", false, "590519-8313277-40-d:3"},
+		{"TCGTrends", false, ""},
 		{"SZ", true, "USCIDU-637-F-978240-993-XAK-QHC:4"},
 		{"SZ", false, "USCIDU-637-F-978240-993-XAK-QHC:3"},
 		// Each condition its own class in the store, one class on the buylist
@@ -224,6 +243,11 @@ func TestCartRows(t *testing.T) {
 	ck := ckCartID(mtgban.InventoryEntry{Conditions: mtgban.SP, OriginalID: "10190"})
 	if ck != "10190-EX" {
 		t.Errorf("ckCartID = %q, want 10190-EX", ck)
+	}
+	// The other games' scraper names its listings split TCGplayer
+	tcg := tcgCartID(mtgban.InventoryEntry{Conditions: mtgban.NM, Price: 3.1, SellerName: "TCGplayer", OriginalID: "500", InstanceID: "600"})
+	if tcg != "500-600-310-m" {
+		t.Errorf("tcgCartID = %q, want 500-600-310-m", tcg)
 	}
 
 	// The button carries each row's id in row order, for the page to rebuild
@@ -280,6 +304,8 @@ func TestCartLoadButtons(t *testing.T) {
 		{"HA", true, `href="https://www.hareruyamtg.com/ja/purchase/cart#ban=356866:2&amp;v=` + cartVersion() + `" target="_blank" rel="noopener" data-store="Hareruya"`},
 		{"HA", false, `href="https://www.hareruyamtg.com/en/cart#ban=27947:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Hareruya"`},
 		{"CK", false, `href="https://www.cardkingdom.com/cart#ban=10190-NM:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="Card Kingdom"`},
+		{"TCGPlayer", false, `href="https://www.tcgplayer.com/cart#ban=1828-15955-25-m:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="TCGplayer"`},
+		{"TCGDirect", false, `href="https://www.tcgplayer.com/cart#ban=590519-8313277-40-d:2&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="TCGplayer"`},
 	} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			IsBuylist:       tc.buylist,
@@ -331,7 +357,20 @@ func TestCartLoadButtons(t *testing.T) {
 		t.Error("CK's deck builder button is not told apart from its cart's")
 	}
 
-	for _, key := range []string{"MKM", "SCG", "CKGraded", "CKSealed"} {
+	// TCGplayer the same, by its mass entry
+	tcg := renderUpload(t, PageVars{UploadVars: UploadVars{
+		Optimized:       map[string][]OptimizedUploadEntry{"TCGPlayer": entries},
+		OptimizedKeys:   []string{"TCGPlayer"},
+		OptimizedTotals: map[string]float64{"TCGPlayer": 1},
+	}})
+	if strings.Count(tcg, ">Load at TCGplayer<") != 1 || strings.Contains(tcg, ">Load at TCG<") {
+		t.Error("want one Load at TCGplayer, the cart's, and no Load at TCG")
+	}
+	if !strings.Contains(tcg, ">Mass entry at TCGplayer<") || !strings.Contains(tcg, `value="Mass entry at TCGplayer"`) {
+		t.Error("TCGplayer's mass entry button is not told apart from its cart's")
+	}
+
+	for _, key := range []string{"MKM", "SCG", "CKGraded", "CKSealed", "TCGTrends"} {
 		out := renderUpload(t, PageVars{UploadVars: UploadVars{
 			Optimized:       map[string][]OptimizedUploadEntry{key: entries},
 			OptimizedKeys:   []string{key},
@@ -547,8 +586,34 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		t.Errorf("buying at Card Trader Zero: no store cart button with %s", ctBuy)
 	}
 
+	// TCGplayer Direct's listings are gone by load time too, and its cart
+	// asks the same way; the other sellers each ship their own package, so
+	// that cart asks for the rows' own, beside its mass entry form, told
+	// apart from it
+	direct := renderArbit(t, PageVars{
+		ScraperShort: "TCGDirect",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
+	})
+	directBuy := `href="https://www.tcgplayer.com/cart#ban=590519-8313277-40-d:999&amp;v=` + cartVersion() + `&amp;side=retail&amp;skip=1" target="_blank" rel="noopener" data-store="TCGplayer" data-buylist="false" data-load-list="cart" data-load-items="590519-8313277-40-d," data-load-qtys="999,20"`
+	if !strings.Contains(direct, directBuy) {
+		t.Errorf("buying at TCGplayer Direct: no store cart button with %s", directBuy)
+	}
+	tcg := renderArbit(t, PageVars{
+		ScraperShort: "TCGPlayer",
+		UserNav:      &NavElem{Short: "beta"},
+		Arb:          []Arbitrage{{Name: "Store", Key: "CSI", Arbit: mintRows}},
+	})
+	tcgBuy := `href="https://www.tcgplayer.com/cart#ban=1828-15955-25-m:2,1828-15956-20-m:8&amp;v=` + cartVersion() + `&amp;side=retail" target="_blank" rel="noopener" data-store="TCGplayer" data-buylist="false" data-load-list="cart" data-load-items="1828-15955-25-m,1828-15956-20-m" onclick`
+	if !strings.Contains(tcg, tcgBuy) {
+		t.Errorf("buying at TCGplayer: no store cart button with %s", tcgBuy)
+	}
+	if strings.Count(tcg, ">Load at TCGplayer<") != 1 || !strings.Contains(tcg, ">Mass entry at TCGplayer<") {
+		t.Error("TCGplayer's mass entry button is not told apart from its cart's")
+	}
+
 	// Other stores' carts carry the page's quantities
-	if strings.Contains(ck+csi+mp, "data-load-qtys") {
+	if strings.Contains(ck+csi+mp+tcg, "data-load-qtys") {
 		t.Error("a cart other than Mint's store asks its own quantities")
 	}
 
@@ -633,7 +698,7 @@ func TestCartLoadArbitButtons(t *testing.T) {
 		key   string
 		want  string
 	}{
-		{"IndexSealed", "TCGSealed", ">Load at TCG<"},
+		{"IndexSealed", "TCGSealed", ">Mass entry at TCGplayer<"},
 		{"IndexSealed", "HASealed", haCart},
 		// CK's, CSI's and Manapool's deck builders and SCG's upload take
 		// singles, and CSI's store cart was measured on singles only
@@ -693,7 +758,7 @@ func TestCartBookmarklet(t *testing.T) {
 	}
 	// Firefox drops a bookmark whose URL runs past 65,536 characters, and
 	// the loader only grows as stores are added
-	if len(link) >= 60000 {
+	if len(link) >= 64000 {
 		t.Errorf("bookmarklet is %d characters, too close to Firefox's limit of 65,536 on a bookmark", len(link))
 	}
 }
@@ -726,7 +791,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 	stubCartStores(t)
 	saved := affiliatesPtr.Load()
 	t.Cleanup(func() { affiliatesPtr.Store(saved) })
-	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused", "MP": "banmp", "CT": "banct"}})
+	affiliatesPtr.Store(&AffiliatesConfig{Codes: map[string]string{"CK": "ban", "MMC": "banmint", "CSI": "bancsi", "SCG": "123", "ABU": "unused", "MP": "banmp", "CT": "banct", "TCG": "4242"}})
 	entries := []OptimizedUploadEntry{{CardID: "card-a", Quantity: 2}}
 
 	for _, tc := range []struct {
@@ -742,6 +807,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 		{"CSI", true, "https://www.coolstuffinc.com/buylist_cart.php?utm_referrer=bancsi#ban="},
 		// The list rides inside u, where a tool that skips the redirect finds it
 		{"SCG", true, "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads%23ban%3DSGL-A1%3A2%26v%3D"},
+		{"TCGPlayer", false, "https://partner.tcgplayer.com/c/4242/1830156/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fcart%23ban%3D1828-15955-25-m%3A2%26v%3D"},
 		// A store with no affiliate query keeps its plain page
 		{"ABUGames", true, "https://abugames.com/cartview/buylist#ban="},
 	} {
@@ -750,7 +816,7 @@ func TestCartLoadAffiliates(t *testing.T) {
 			t.Errorf("%s link = %q, want it to start %q", tc.key, got, tc.want)
 		}
 		// The affiliate query keeps the whole fragment after it
-		if !strings.HasSuffix(got, cartVersion()) && !strings.HasSuffix(got, "side=retail") {
+		if !strings.HasSuffix(got, cartVersion()) && !strings.HasSuffix(got, "side=retail") && !strings.HasSuffix(got, "side%3Dretail") {
 			t.Errorf("%s link = %q lost the end of its list", tc.key, got)
 		}
 	}
@@ -761,6 +827,14 @@ func TestCartLoadAffiliates(t *testing.T) {
 	want := "https://goto.starcitygames.com/c/123/3052179/37198?u=https%3A%2F%2Fsellyourcards.starcitygames.com%2Fmtg%2Fuploads#ban="
 	if !strings.HasPrefix(got, want) || !strings.HasSuffix(got, "&v=abc") {
 		t.Errorf("long SCG link = %.200q..., want it to start %q", got, want)
+	}
+
+	// TCGplayer's the same
+	long = "https://www.tcgplayer.com/cart#ban=" + strings.Repeat("1828-15955-25-m:1,", 400) + "&v=abc"
+	got = affiliated("TCG", long)
+	want = "https://partner.tcgplayer.com/c/4242/1830156/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fcart#ban=1828-15955-25-m:1,"
+	if !strings.HasPrefix(got, want) || !strings.HasSuffix(got, "&v=abc") {
+		t.Errorf("long TCG link = %.200q..., want it to start %q", got, want)
 	}
 
 	got = affiliated("CK", "https://www.cardkingdom.com/cart")

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/url"
 	"os"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/starcitygames"
+	"github.com/mtgban/go-mtgban/tcgplayer"
 )
 
 // cartStores are the stores whose carts the BAN-to-Cart bookmarklet fills,
@@ -44,6 +46,9 @@ var cartStores = []cartStore{
 	// live at load time
 	{"CT", "Card Trader", "", "https://www.cardtrader.com/cart/edit"},
 	{"CK", "Card Kingdom", "", "https://www.cardkingdom.com/cart"},
+	// TCGplayer buys nothing; its store cart is filled from the listings
+	// live at load time, one seller's at a time
+	{"TCG", "TCGplayer", "", "https://www.tcgplayer.com/cart"},
 }
 
 // cartRetailIDs name a store row the way a store's cart takes it, for a store
@@ -56,6 +61,10 @@ var cartRetailIDs = map[string]func(mtgban.InventoryEntry) string{
 	"CT0":   ctCartID,
 	"CT1DR": ctCartID,
 	"ML":    mlCartID,
+	// The prefix, which no split goes by, marks TCGplayer's as named here
+	"TCG":       tcgCartID,
+	"TCGPlayer": tcgCartID,
+	"TCGDirect": tcgCartID,
 }
 
 // ctSplits name Card Trader's storefronts the way its loader tells their
@@ -85,6 +94,26 @@ func ctCartID(entry mtgban.InventoryEntry) string {
 		split,
 		base64.RawURLEncoding.EncodeToString([]byte(fields["Properties"])),
 	}, "-")
+}
+
+// tcgSplits name TCGplayer's storefronts the way its loader tells their
+// listings apart: every seller's, and Direct's alone. Magic's scraper calls
+// the first "TCG Player", the other games' "TCGplayer".
+var tcgSplits = map[string]string{
+	"TCG Player": "m",
+	"TCGplayer":  "m",
+	"TCG Direct": "d",
+}
+
+// tcgCartID names a TCGplayer row by what its loader looks the sku's live
+// listings up with, as <product>-<sku>-<price cents>-<split>.
+func tcgCartID(entry mtgban.InventoryEntry) string {
+	split := tcgSplits[entry.SellerName]
+	if split == "" || entry.OriginalID == "" || entry.InstanceID == "" || entry.Price <= 0 {
+		return ""
+	}
+	cents := strconv.Itoa(int(math.Round(entry.Price * 100)))
+	return strings.Join([]string{entry.OriginalID, entry.InstanceID, cents, split}, "-")
 }
 
 // cartBuylistIDs name a buylist row the way a store's cart takes it, for a
@@ -142,24 +171,33 @@ var cartAffiliates = map[string]func(code, page string) string{
 	"MP": func(code, page string) string {
 		return withQuery(page, url.Values{"ref": {code}})
 	},
-	// Through the partner redirector, with the list inside its u query: a
-	// privacy tool that skips the redirect opens u alone. The redirector
-	// refuses a link past about 8 KB, so a longer list goes after it.
+	// Through the partner redirectors, as TCGplayer's and SCG's product links
+	// from us go
+	"TCG": func(code, page string) string {
+		return throughRedirector(fmt.Sprintf(tcgplayer.PartnerProductURL, url.PathEscape(code))+"?u=", page)
+	},
 	"SCG": func(code, page string) string {
-		redirect := fmt.Sprintf(starcitygames.PartnerProductURL, url.PathEscape(code)) + "?u="
-		link := redirect + url.QueryEscape(page)
-		target, list, found := strings.Cut(page, "#")
-		if len(link) <= scgRedirectMax || !found {
-			return link
-		}
-		return redirect + url.QueryEscape(target) + "#" + list
+		return throughRedirector(fmt.Sprintf(starcitygames.PartnerProductURL, url.PathEscape(code))+"?u=", page)
 	},
 }
 
-// scgRedirectMax is the longest link SCG's partner redirector is sent with
-// the list inside it, under the 8,000 or so characters past which it answers
-// 400, with room for the longest SKUs.
-const scgRedirectMax = 7000
+// throughRedirector is page opened through a partner redirector, with the
+// list inside its u query: a privacy tool that skips the redirect opens u
+// alone. Both redirectors refuse a link past about 8 KB, so a longer list
+// goes after it, where the browser keeps it through the redirect.
+func throughRedirector(redirect, page string) string {
+	link := redirect + url.QueryEscape(page)
+	target, list, found := strings.Cut(page, "#")
+	if len(link) <= redirectorMax || !found {
+		return link
+	}
+	return redirect + url.QueryEscape(target) + "#" + list
+}
+
+// redirectorMax is the longest link a partner redirector is sent with the
+// list inside it, under the 8,000 or so characters past which SCG's answers
+// 400 and TCGplayer's a server error, with room for the longest ids.
+const redirectorMax = 7000
 
 // affiliated is the cart page, its fragment included, as a store's links
 // from us carry it, where an affiliate code is configured for the store.
@@ -296,11 +334,13 @@ func cartSendsFor(keys []string, prices map[string]float64, entry OptimizedUploa
 }
 
 // cartAsksMost are the splits whose feed does not give their stock: Mint's
-// caps it at 8, and Card Trader's is gone by the time a listing is loaded,
-// which is filled from every listing at or under the price BAN shows. Mana
-// Pool's gives none, but its optimizer fills a line from the cheapest
-// listings up, at rising prices, so it asks for the row's own.
-var cartAsksMost = []string{"MMC", "CT", "CT0", "CT1DR"}
+// caps it at 8, and Card Trader's and TCGplayer Direct's are gone by the
+// time a listing is loaded, which is filled from every listing at or under
+// the price BAN shows. Mana Pool's gives none, but its optimizer fills a
+// line from the cheapest listings up, at rising prices, so it asks for the
+// row's own, as do TCGplayer's other listings: each seller ships its own
+// package, whose shipping a spread priced on one copy does not cover.
+var cartAsksMost = []string{"MMC", "CT", "CT0", "CT1DR", "TCGDirect"}
 
 // cartMostQuantity is what a cart is asked for to get as many as the store
 // has, for a store whose cart trims a quantity to its stock.
