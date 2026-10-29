@@ -1321,6 +1321,7 @@
         renderPanel();
     }
     window.renderBackpack = render;
+    window.syncTooLarge = function () { toast("Too much saved to sync. Remove backpack cards"); };
 
     function open() {
         build();
