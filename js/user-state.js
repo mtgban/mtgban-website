@@ -242,6 +242,16 @@
         if (typeof state.version === 'number') version = state.version;
     }
 
+    // A body past the server's cap is refused with 413 on every write until
+    // it shrinks; the backpack, which grows it most, says so once, and again
+    // only after a write carrying it has landed.
+    var toldTooLarge = false;
+    function tooLarge() {
+        if (toldTooLarge || typeof window.syncTooLarge !== 'function') return;
+        toldTooLarge = true;
+        window.syncTooLarge();
+    }
+
     function rerender() {
         if (typeof window.renderFavorites === 'function') window.renderFavorites();
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
@@ -301,12 +311,14 @@
             noteServerClock(r, sent);
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
             if (!r.ok) {
+                if (r.status === 413) tooLarge();
                 console.warn('mtgban sync: ' + section + ' write failed (' + r.status + ')');
                 return false;
             }
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') { version = res.version; writeMarker(version); }
                 writeFP(section, payloadJSON);
+                if (section === 'backpack') toldTooLarge = false;
                 return true;
             });
         }).catch(function() {
@@ -419,12 +431,14 @@
                 return r.json().then(function(s) { return reconcile(s, attempt + 1); });
             }
             if (!r.ok) {
+                if (r.status === 413) tooLarge();
                 console.warn('mtgban sync: reconcile write failed (' + r.status + ')');
                 return false;
             }
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') version = res.version;
                 writeMarker(version);
+                toldTooLarge = false;
                 writeFP('favorites', JSON.stringify(mergedFavs.map(trimFavorite)));
                 writeFP('recents', JSON.stringify(mergedRecents.map(trimRecent)));
                 writeFP('backpack', JSON.stringify(mergedPack.map(trimBackpack)));

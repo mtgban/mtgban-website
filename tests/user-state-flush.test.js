@@ -145,3 +145,53 @@ test('a big backpack goes gzipped, a small one plain', async () => {
     const small = await flushAfterWrite('mtgban_backpack', JSON.stringify(backpackOf(2)));
     expect(small.writes.map((w) => w.gzipped)).toEqual([false]);
 });
+
+test('a write refused as too large tells the backpack once until a backpack write lands, a 400 not at all', async () => {
+    const m = {};
+    class Storage {
+        getItem(k) { return k in m ? m[k] : null; }
+        setItem(k, v) { m[k] = String(v); }
+        removeItem(k) { delete m[k]; }
+    }
+    const storage = new Storage();
+    const session = { getItem: () => null, setItem() {}, removeItem() {} };
+    let told = 0;
+    const window = { addEventListener() {}, Storage, localStorage: storage, syncTooLarge: () => { told++; } };
+    const document = { documentElement: { dataset: { signedIn: 'true' } }, readyState: 'complete', addEventListener() {} };
+    let status = 400;
+    const fetch = (url, opts) => {
+        if (opts && opts.method === 'PATCH') {
+            const ok = status === 200 || (status === 413 && !url.endsWith('/backpack'));
+            return Promise.resolve({ status: ok ? 200 : status, ok, headers: { get: () => null }, json: () => Promise.resolve({ version: 1 }) });
+        }
+        return Promise.resolve({ status: 401, ok: false, headers: { get: () => null }, json: () => Promise.resolve(null) });
+    };
+    let timers = [];
+    const setTimeout = (fn) => { timers.push(fn); return timers.length; };
+    const clearTimeout = () => {};
+    new Function('window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'ListStorage', 'setTimeout', 'clearTimeout', source)(
+        window, document, storage, session, fetch, realListStorage(), setTimeout, clearTimeout);
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    const write = async (n, key = 'mtgban_backpack') => {
+        storage.setItem(key, JSON.stringify(key === 'mtgban_backpack' ? backpackOf(n) : [{ id: 'f' + n, name: 'F', query: 'q' }]));
+        const due = timers;
+        timers = [];
+        due.forEach((fn) => fn());
+        for (let i = 0; i < 10; i++) await turn();
+    };
+    await write(1);
+    expect(told).toBe(0);
+    status = 413;
+    await write(2);
+    await write(3);
+    expect(told).toBe(1);
+    // Favorites landing while the backpack is refused does not re-arm it.
+    await write(4, 'mtgban_favorites');
+    await write(5);
+    expect(told).toBe(1);
+    status = 200;
+    await write(6);
+    status = 413;
+    await write(7);
+    expect(told).toBe(2);
+});
