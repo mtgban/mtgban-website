@@ -583,8 +583,9 @@
         return counts;
     }
 
-    // markSections shows a section's button while one of its ticked rows is
-    // a card in the backpack.
+    // markSections shows a section's take button while one of its ticked
+    // rows is a card in the backpack, and its add button while it has a
+    // ticked row.
     function markSections() {
         var by = {};
         live().forEach(function (e) { by[key(e)] = true; });
@@ -592,7 +593,78 @@
             var section = b.closest(".opt-store");
             b.hidden = !section || !Object.keys(picked(section, source())).some(function (k) { return by[k]; });
         });
+        document.querySelectorAll(".pack-add-btn").forEach(function (b) {
+            var section = b.closest(".opt-store");
+            b.hidden = !section || !ticked(section).length;
+        });
     }
+
+    function ticked(section) {
+        return Array.prototype.filter.call(section.querySelectorAll("tr[data-opt-id]"), function (tr) { return !tr.classList.contains("opt-removed"); });
+    }
+
+    // put adds a store section's ticked rows to backpack p as one undo step,
+    // each row's copies in its grade, NM for a row without one, held to 999
+    // a card and new cards only while there is room. It says how many
+    // copies went in and how many did not fit.
+    function put(section, p) {
+        var list = read();
+        var t = now();
+        var want = {}, rows = {}, order = [];
+        ticked(section).forEach(function (tr) {
+            var k = key({ id: tr.getAttribute("data-opt-id"), cond: tr.getAttribute("data-opt-cond"), pack: p });
+            if (!(k in want)) { want[k] = 0; rows[k] = tr; order.push(k); }
+            want[k] += parseInt(tr.getAttribute("data-load-qty"), 10) || 1;
+        });
+        var room = Math.min(MAX - inPack(p).length, MAX * TABS - live().length);
+        var plan = [], copies = 0, left = 0;
+        order.forEach(function (k) {
+            var i = find(list, k);
+            var had = i >= 0 && !list[i].del ? list[i].qty : 0;
+            var n = had || room > 0 ? Math.min(want[k], MAX_QTY - had) : 0;
+            if (!had && n > 0) room--;
+            if (n > 0) plan.push({ k: k, n: n });
+            copies += n;
+            left += want[k] - n;
+        });
+        if (!copies) return { copies: 0, left: left };
+        remember(list, plan.map(function (x) { return x.k; }));
+        // Unshifted last row first, so the new cards keep the section's order
+        plan.reverse().forEach(function (x) {
+            var i = find(list, x.k);
+            if (i >= 0 && !list[i].del) {
+                list[i].qty += x.n;
+                list[i].m = t;
+                return;
+            }
+            if (i >= 0) list.splice(i, 1);
+            var tr = rows[x.k];
+            var attr = function (n) { return tr.getAttribute(n) || ""; };
+            list.unshift({
+                id: attr("data-opt-id"), name: attr("data-load-name"), edition: attr("data-opt-edition"), set: attr("data-load-set"),
+                number: attr("data-load-number"), finishTag: attr("data-opt-finish-tag"), finishClass: attr("data-opt-finish-class"),
+                img: attr("data-opt-img"), cw: attr("data-opt-cw") === "true", cond: ListStorage.backpackCond({ cond: attr("data-opt-cond") }),
+                pack: p, qty: x.n, t: t, m: t
+            });
+        });
+        save(list);
+        return { copies: copies, left: left };
+    }
+
+    // addRowsToBackpack adds a store section's ticked rows to the active
+    // backpack.
+    window.addRowsToBackpack = function (btn) {
+        var section = btn.closest(".opt-store");
+        if (!section) return;
+        var p = active();
+        var r = put(section, p);
+        if (!r.copies) {
+            if (r.left && !full(p)) toastCeiling();
+            return;
+        }
+        render();
+        toast("Added " + r.copies + (r.copies === 1 ? " copy" : " copies") + " to " + packName(p) + (r.left ? "; " + r.left + " did not fit" : ""));
+    };
 
     // takeRowsFromBackpack takes the copies a store section's ticked rows
     // list out of the backpack they came from, once sent to that store and
