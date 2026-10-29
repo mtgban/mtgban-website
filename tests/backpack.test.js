@@ -586,6 +586,18 @@ describe('the backpack tabs', () => {
         expect(p.m.mtgban_backpack_active).toBe('2');
     });
 
+    test('a tab is no button, and Enter or Space picks it as a click would', () => {
+        const p = page({ store: two, tabs: 3 });
+        open(p);
+        expect(tabsOf().map((b) => b.tag)).toEqual(['div', 'div']);
+        expect(keydown(tabsOf()[1], 'Enter').prevented).toBe(true);
+        expect(p.m.mtgban_backpack_active).toBe('2');
+        keydown(tabsOf()[0], ' ');
+        expect(p.m.mtgban_backpack_active).toBe('1');
+        keydown(tabsOf()[0], 'Enter');
+        expect(strip().children.some((n) => n.classes.has('backpack-tab-field'))).toBe(true);
+    });
+
     test('a backpack with cards the synced list lacks still has a tab', () => {
         open(page({ store: two, tabs: 1, tabList: [{ pack: 1, name: 'Trades' }] }));
         expect(strip().hidden).toBe(false);

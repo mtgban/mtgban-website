@@ -1139,8 +1139,8 @@
         live().forEach(function (e) { copies[e.pack] = (copies[e.pack] || 0) + e.qty; });
         list.forEach(function (t, i) {
             var on = t.pack === cur;
-            var b = text("button", "backpack-tab" + (on ? " active" : ""));
-            b.setAttribute("type", "button");
+            // Not a button: Firefox starts no drag from one.
+            var b = text("div", "backpack-tab" + (on ? " active" : ""));
             b.setAttribute("role", "tab");
             b.setAttribute("aria-selected", on ? "true" : "false");
             b.setAttribute("tabindex", on ? "0" : "-1");
@@ -1156,6 +1156,11 @@
                 focusTab(t.pack);
             });
             b.addEventListener("keydown", function (ev) {
+                if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    b.click();
+                    return;
+                }
                 var step = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
                 if (!step) return;
                 ev.preventDefault();
